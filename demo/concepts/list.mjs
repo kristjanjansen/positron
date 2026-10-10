@@ -5,7 +5,6 @@
 // groups first appear here; prev and next walk this order.
 export const CONCEPTS = [
   { n: '010', group: 'synths', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
-  { n: '011', group: 'synths', title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
   { n: '012', group: 'synths', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: '013', group: 'synths', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
   { n: '014', group: 'synths', title: 'Shader', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
@@ -27,4 +26,5 @@ export const CONCEPTS = [
   { n: '090', group: 'misc', title: 'Announce', say: 'Every port the studio room can hear.' },
   { n: '091', group: 'misc', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
   { n: '092', group: 'misc', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
+  { n: '093', group: 'misc', title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
 ];

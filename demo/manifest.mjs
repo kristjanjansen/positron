@@ -934,28 +934,30 @@ export const DEMOS = [
   // ⚠️ NO `bootMs` ON ANY OF THEM. The monolith needed 12 s because two of
   // INPUT's timed checks and LAYOUT's tab page pass ran before `ready`; on
   // their own pages INPUT's run after it and LAYOUT's fits the default wait.
-  { name: 'kit/input', title: 'input', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  // 🔴 OFF THE FRONT PAGE SINCE 2026-10-10: *"make a separate kit page (rm from
+  // frontpage) /kit"*. Every part is `unlisted` and `/kit/` draws them as cards.
+  { name: 'kit/input', title: 'input', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'buttons, sliders, knobs, keys and fields that a visitor presses, drags or types into',
     tags: ['shell', 'no network'] },
-  { name: 'kit/status', title: 'status', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/status', title: 'status', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'readout cells, logs, tables and badges that say how a page is doing',
     tags: ['shell', 'no network'] },
-  { name: 'kit/timeline', title: 'timeline', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/timeline', title: 'timeline', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'transport bars, strips and video panels for watching something play out over time',
     tags: ['shell', 'no network'] },
-  { name: 'kit/layout', title: 'layout', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/layout', title: 'layout', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'how blocks stack, sit in tabs and fall into cards from a wide screen down to a phone',
     tags: ['shell', 'no network'] },
-  { name: 'kit/devices', title: 'devices', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/devices', title: 'devices', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'instrument panels and the knobs, pads, faders and displays they are built from',
     tags: ['shell', 'no network'] },
-  { name: 'kit/hardware', title: 'hardware', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/hardware', title: 'hardware', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'the Pico router’s small screen and four keys, drawn by its real firmware running in the browser',
     tags: ['shell', 'no network'] },
-  { name: 'kit/diagram', title: 'diagram', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/diagram', title: 'diagram', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'boxes and arrows drawn from plain data, down to a label that will not fit',
     tags: ['shell', 'no network'] },
-  { name: 'kit/slides', title: 'slides', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/slides', title: 'slides', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'slides made from plain data at six type sizes, with live parts of this site running on them',
     tags: ['shell', 'no network'] },
   // 🔴 THE NINTH PART, 2026-10-06: *"add kit/logo page and use individual slides
@@ -963,15 +965,15 @@ export const DEMOS = [
   // deck, one block per slide; the deck itself is gone from shell/decks.mjs.
   // The tenth part, 2026-10-10: *"move 21 to kit, patchbay card"*, what was
   // `/concepts/21/`.
-  { name: 'kit/patchbay', title: 'patchbay', group: 'kit', act: 0, created: '2026-10-10', built: true,
+  { name: 'kit/patchbay', title: 'patchbay', group: 'kit', act: 0, created: '2026-10-10', built: true, unlisted: true,
     one: 'patchbay pictures drawn from a bay’s own nodes, ports and links, with stand-in traffic on every wire',
     tags: ['shell', 'no network'] },
-  { name: 'kit/logo', title: 'logo', group: 'kit', act: 0, created: '2026-10-06', built: true,
+  { name: 'kit/logo', title: 'logo', group: 'kit', act: 0, created: '2026-10-06', built: true, unlisted: true,
     one: 'the positron mark and wordmarks drawn as slides, with the favicon and the app icon at the sizes they ship',
     tags: ['shell', 'no network'] },
   // The eleventh part, 2026-10-10: *"see ../eccm icon system. We need one from
   // icones. Make a sample sheet in one of kit pages called icons."*
-  { name: 'kit/icons', title: 'icons', group: 'kit', act: 0, created: '2026-10-10', built: true,
+  { name: 'kit/icons', title: 'icons', group: 'kit', act: 0, created: '2026-10-10', built: true, unlisted: true,
     one: 'every icon the kit can draw, from the Feather set in the colour of the text around it',
     tags: ['shell', 'no network'] },
 
