@@ -1,5 +1,7 @@
 ## Open
 
+- **031 Granulator is hidden, to come back to** (2026-10-10). Asked: *"hide 031 for now and backlog"*. Off the index in `demo/concepts/list.mjs` (the row is kept in a comment there); the page stays at /concepts/031/. Open: what it needs before it returns was not said, so ask.
+- ~~**015 LFO flattened the wave; 066 blend removed** (2026-10-10). Asked: *"015: lfo just flattens osc. fix"*, *"rm blend from 066"*.~~ DONE 2026-10-10, the LFO moves the filter's detune in octaves.
 - ~~**018 a playable Faust voice; 017 status lines capitalised; 001 hidden** (2026-10-10). Asked: *"make fau synth more interesting"*, *"reaching: Reaching"*, *"hide concepts/001 now"*.~~ DONE 2026-10-10. 018 compiles in the tab, about 1 MB on the first press.
 - ~~**Concepts 017 Yoshimi and 018 Faust synth** (2026-10-10). Asked: *"where is fau and yoshimi concepts???"*, *"go. add asap"*. 017 untested against the real Pi; 018 loads its Faust node on a press.~~ DONE 2026-10-10.
 - ~~**Concept 001, patch from words** (2026-10-10). Asked: *"build a wish-like demo as first group: patchbay. select from predef list, have best (leftmost) model interpers and use patchbay to visualize"*.~~ DONE 2026-10-10, about $0.00045 a press. Open: `.step { height: 34px }` in shell.css squeezes a column choice; 001 carries a page-local override.

@@ -15,7 +15,8 @@ export const CONCEPTS = [
   { n: '017', group: 'synths', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
   { n: '018', group: 'synths', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: '030', group: 'radio', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
-  { n: '031', group: 'radio', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' },
+  // 031 Granulator is off the index since 2026-10-10 (*"hide 031 for now and backlog"*);
+  // the page stays at /concepts/031/, row: { n: '031', group: 'radio', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' }
   { n: '032', group: 'radio', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
   { n: '060', group: 'video', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: '061', group: 'video', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
