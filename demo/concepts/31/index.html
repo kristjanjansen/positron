@@ -179,7 +179,7 @@
     const host = el('div', 'cc-wave');
     const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 1 });
     scopes.set(st.key, scope);
-    return createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', st.name),
+    return createVideoPanel({ media: host, aspect: 'auto', right: false, left: el('span', 'cc-say', st.name),
       centre: el('span', 'cc-say', `${st.kbps} kbit/s`) });
   });
   const pair = el('div', 'cc-pair');
@@ -195,7 +195,7 @@
   // A tick fades in 1.2 s: at 28 grains a second a longer fade drew a wall of ticks over the wave.
   const ghost = el('div', 'cc-wave');
   const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 1200 });
-  const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', left: el('span', 'cc-say', 'granulator'),
+  const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', right: false, left: el('span', 'cc-say', 'granulator'),
     centre: el('span', 'cc-say', 'output and grains') });
 
   // The sound follows the links the bay holds, as on /concepts/11/: a station
