@@ -23,11 +23,18 @@
   .cc-wave .pos-scope-gut { display: none; }
   /* Play and the crossfader, centred under the two panels. The slider takes the
      row between its two named ends, as /grains/ draws its blend. */
-  .cc-fade { display: flex; align-items: center; gap: 14px; width: min(100%, 520px); margin-inline: auto; }
-  .cc-fade .cc-end { font: 400 12px/1 var(--mono); color: var(--dim); white-space: nowrap; }
-  /* The kit stretches a button group across a phone; this one is one glyph square beside the fader. */
-  .cc-fade > .pos-bgroup { flex: none; width: auto; }
-  .cc-fade > .sld { flex: 1 1 auto; min-width: 0; }
+  /* A slider row: an end label, the slider, an end label, at the full width.
+     Both label columns take the width of the longest end label on the page,
+     `--end` in ch of the labels' own mono face, so every slider starts and
+     ends at the same x (asked 2026-10-10, *"label area w's on slider left and
+     right the longest one"*). */
+  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
+    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
+  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
+  /* Play on its own row: the button's own size, at the left. */
+  .cc-stack > .pos-bgroup { align-self: flex-start; width: auto; }
+  .cc-fade .cc-end:first-child { text-align: right; }
+  .cc-fade > .sld { min-width: 0; }
   .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
   .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
@@ -233,10 +240,15 @@
   const fader = createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: x,
     onInput: (v) => { x = v; applyFade(); } });
   const fade = el('div', 'cc-fade');
-  fade.append(transport.el, el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
+  fade.append(el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
 
   const out = el('div', 'cc-stack');
-  out.append(pair, fade, pb.el);
+  // Play on its own row, top left under the title.
+  out.append(transport.el, pair, fade, pb.el);
+  // Both label columns of every slider row take the longest end label's width.
+  const ends = [...out.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
+  out.style.setProperty('--end', `${Math.max(...ends)}ch`);
+
   d.el.append(out);
   d.ready();
 </script>
