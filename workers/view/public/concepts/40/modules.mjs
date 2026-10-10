@@ -74,27 +74,24 @@ const NAMES = {
  */
 const L1 = `web:osc:audio-out -> web:speaker:audio-in
 web:osc:audio-out -> web:scope:audio-in`;
-const L2 = `${L1}
-web:knobs:value-out -> web:osc:value-in`;
-const L4 = `web:knobs:value-out -> web:osc:value-in
-web:knobs:value-out -> web:filter:value-in
-web:osc:audio-out -> web:filter:audio-in
+const L2 = L1;
+const L4 = `web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:speaker:audio-in
 web:filter:audio-out -> web:scope:audio-in`;
 const L5 = `web:keys:midi-out -> web:osc:midi-in
 web:keys:midi-out -> web:amp:midi-in
-web:knobs:value-out -> web:osc:value-in
-web:knobs:value-out -> web:filter:value-in
-web:knobs:value-out -> web:amp:value-in
 web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:amp:audio-in
 web:amp:audio-out -> web:speaker:audio-in
 web:amp:audio-out -> web:scope:audio-in`;
 const L6 = `${L5}
-web:knobs:value-out -> web:lfo:value-in
 web:lfo:audio-out -> web:filter:cutoff-in`;
 
-export const STEPS = [
+// One node per knob, eurorack style (*"Per knob. Lets go eurorack :)"*): each
+// knob a step offers is a box of its own with a cable into the module it moves.
+const withKnobs = (patch, names) => [patch,
+  ...names.map((k) => `web:${k}:value-out -> web:${KNOBS.find((x) => x.name === k).owner}:value-in`)].join('\n');
+const STEP_LIST = [
   { name: 'sine', patch: L1, knobs: [], preset: { wave: 'sine', freq: 220 } },
   { name: 'knob', patch: L2, knobs: ['freq'], preset: { wave: 'sine' } },
   { name: 'saw', patch: L2, knobs: ['freq', 'wave'], preset: { wave: 'sawtooth' } },
@@ -102,6 +99,7 @@ export const STEPS = [
   { name: 'keys', patch: L5, knobs: ['detune', 'wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
   { name: 'lfo', patch: L6, knobs: ['detune', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 800 } },
 ];
+export const STEPS = STEP_LIST.map((st) => ({ ...st, patch: withKnobs(st.patch, st.knobs) }));
 
 /**
  * @param {object} o
@@ -183,7 +181,8 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
-    ['keys', 'person', 'keyboard'], ['knobs', 'person', 'knobs'],
+    ['keys', 'person', 'keyboard'],
+    ...KNOBS.map((k) => [k.name, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
     ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
     ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
@@ -193,7 +192,10 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
   const PORTS = [
     { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: id('knobs', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    // No `names` on a knob: the bay's shape check wants names to be equal, and
+    // one knob names one of a module's several. The module ignores and logs a
+    // name it does not have.
+    ...KNOBS.map((k) => ({ id: id(k.name, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
     { id: id('osc', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: oscNote },
     param('osc'),
     { id: id('osc', 'audio-out'), dir: 'out', medium: 'audio' },
