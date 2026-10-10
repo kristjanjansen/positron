@@ -26,9 +26,9 @@
  *              +12 octave up
  *
  * Every note on that arrives runs a pulse along KEYS to PICO, and every note
- * on the core sends runs one along PICO to SYNTH once the first has arrived. A
- * box lights for a moment as a pulse reaches it, and each wire shows the name
- * of the last note it carried for a short while. The two names differ exactly
+ * on the core sends runs one along PICO to SYNTH once the first has arrived.
+ * The boxes are always drawn plain, only the dots travel, and each wire shows
+ * the name of the last note it carried for a short while. The two names differ exactly
  * when the route changes the note.
  *
  * ⚠️ THE SOUND IS NOT DELAYED BY THE PICTURE. The bytes go out at once; only
@@ -69,7 +69,6 @@ static const uint8_t KEY_PIN[2] = { 10, 11 };   /* K1, K2 */
 
 #define FRAME_US 33333      /* 30 frames a second */
 #define LEG_MS 300          /* a pulse crosses one wire in this long */
-#define FLASH_MS 120        /* a box stays lit this long when a pulse reaches it */
 #define NAME_MS 900         /* a wire keeps its note name this long after the pulse arrives */
 #define NPULSE 8            /* pulses in flight per wire, oldest replaced first */
 
@@ -212,25 +211,24 @@ static void text(int x, int y, const char *s, bool on) {
   }
 }
 
-/* A patchbay box: a rounded outline and its name, or filled and the name cut
- * out of it while lit. */
+/* A patchbay box: a rounded outline and its name. It never lights. */
 #define BOX_H 15
 #define BOX_PAD 2
 static int box_w(const char *name) { return text_w(name) + 2 * BOX_PAD + 2; }
 
-static void box(int x, int y, const char *name, bool lit) {
+static void box(int x, int y, const char *name) {
   int w = box_w(name);
-  if (lit) {
-    fill(x + 1, y, w - 2, BOX_H, true);
-    fill(x, y + 1, 1, BOX_H - 2, true);
-    fill(x + w - 1, y + 1, 1, BOX_H - 2, true);
-  } else {
-    fill(x + 1, y, w - 2, 1, true);
-    fill(x + 1, y + BOX_H - 1, w - 2, 1, true);
-    fill(x, y + 1, 1, BOX_H - 2, true);
-    fill(x + w - 1, y + 1, 1, BOX_H - 2, true);
-  }
-  text(x + 1 + BOX_PAD, y + (BOX_H - 7) / 2, name, !lit);
+  fill(x + 1, y, w - 2, 1, true);
+  fill(x + 1, y + BOX_H - 1, w - 2, 1, true);
+  fill(x, y + 1, 1, BOX_H - 2, true);
+  fill(x + w - 1, y + 1, 1, BOX_H - 2, true);
+  text(x + 1 + BOX_PAD, y + (BOX_H - 7) / 2, name, true);
+}
+
+/* The travelling dot: 5x5 with its corners off, so it reads round. */
+static void dot(int cx, int cy) {
+  fill(cx - 1, cy - 2, 3, 5, true);
+  fill(cx - 2, cy - 1, 5, 3, true);
 }
 
 static const char *const NOTE[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
@@ -264,7 +262,6 @@ static void layout(void) {
 /* Draws one frame. Answers whether anything is still moving. */
 static bool redraw(uint32_t t) {
   bool moving = false;
-  bool lit[3] = { false, false, false };
   ssd1306_clear();
 
   for (int leg = 0; leg < 2; leg++) {
@@ -276,15 +273,11 @@ static bool redraw(uint32_t t) {
       if (!p->used) continue;
       int32_t age = (int32_t)(t - p->t0);
       if (age < 0) { moving = true; continue; }                  /* waiting for the first leg */
-      if (age < LEG_MS) {
-        int x = x0 + (x1 - x0) * age / LEG_MS;
-        fill(x - 1, WIRE_Y - 1, 3, 3, true);
-        moving = true;
-      } else if (age < LEG_MS + FLASH_MS) {
-        lit[leg + 1] = true;
+      if (age < LEG_MS) {                                         /* inset so it never bites a box */
+        int x = x0 + 2 + (x1 - x0 - 4) * age / LEG_MS;
+        dot(x, WIRE_Y);
         moving = true;
       }
-      if (leg == 0 && age < FLASH_MS) lit[0] = true;           /* the key that sent it */
       if (age < LEG_MS + NAME_MS) {
         moving = true;
         if (!last || (int32_t)(p->t0 - last->t0) > 0) last = p;
@@ -296,7 +289,7 @@ static bool redraw(uint32_t t) {
       text((x0 + x1 + 1 - text_w(nm)) / 2, NAME_Y, nm, true);
     }
   }
-  for (int b = 0; b < 3; b++) box(bx[b], BOX_Y, NAMES[b], lit[b]);
+  for (int b = 0; b < 3; b++) box(bx[b], BOX_Y, NAMES[b]);
 
   const char *say = ROUTES[route].say;
   text((SSD1306_W - text_w(say)) / 2, SAY_Y, say, true);

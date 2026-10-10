@@ -50,10 +50,17 @@ const wire0 = litIn(mid, keysAt.x + 30, 8, picoAt.x - 4, 26);
 ok(wire0 > 18, `150 ms in, a pulse is on the KEYS to PICO wire (${wire0} px there)`);
 ok(hex(take()) === '90 3C 64', 'as played: 90 3C 64 goes out as 90 3C 64');
 if (show) ascii(mid);
-run(400);
+// the boxes never light: a pulse reaching one leaves it drawn plain
+const plain = (s, t) => s.has(t, false) && !s.has(t, true);
+run(200);
+const arrive0 = screen();
+ok(['KEYS', 'PICO'].every((t) => plain(arrive0, t)), '50 ms after the pulse reaches PICO, KEYS and PICO are plain, not inverted');
+run(200);
 const s1 = screen();
 ok(s1.find('C4').length === 2, `the note name C4 is drawn on both wires (${s1.find('C4').length})`);
 if (show) ascii(board.pixels());
+run(100);
+ok(plain(screen(), 'SYNTH'), '50 ms after the pulse reaches SYNTH, SYNTH is plain, not inverted');
 board.send([0x80, 60, 0]);
 run(50);
 ok(hex(take()) === '80 3C 00', 'as played: the note off goes out unchanged');
