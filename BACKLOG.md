@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**070 one octave up toggle; concepts index in groups; 410 is 450** (2026-10-10). Asked: *"only octave up"*, *"have groups in concepts index. no titles"*, *"rename 410 to 450"*.~~ DONE 2026-10-10.
+- **Concept 410: 400 with a Faust engine and its external knobs** (2026-10-10). Asked: *"410 is copy of 400 but with fau and its "external knobs""*.
 - **Concept 080, ETV and ETV2 side by side** (2026-10-10). Asked: *"make 080 (do we have it free) with etv etv2 1/2 videopanels like fliiper but just startstopbutotns, videopanels, crossfader and patchbay"*. Two half-width panels playing ERR's live channels as /flipper/ does, a start/stop button, a crossfader, a patchbay. Two ERR connections per press, which ERR counts; opens nothing on a visit; graded only against demo/fake-err.mjs.
 - ~~**Site names three characters with one digit** (2026-10-10). Asked: *"web-soxe ??"*, then *"make sure its 3 chars and icludes 1 num"*. `randomSite` gives `web-8kt`; tests 42/42, and the five pages that check the shape follow.~~ DONE 2026-10-10.
 - ~~**Concept 650 fades faster, both panels** (2026-10-10). Asked: *"fade out bit faster, both videopanels"*. 3 s, both pictures together.~~ DONE 2026-10-10.

@@ -32,7 +32,7 @@
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createChoice } from '/shell/choice.mjs';
+  import { createToggle } from '/shell/toggle.mjs';
 
   // /concepts/100/ with a Pico in the middle. The keyboard's notes go into an
   // emulated RP2040 as DIN MIDI bytes on UART0 RX, the firmware's C
@@ -217,17 +217,14 @@
   // ── the Pico block: its screen, and its two keys ────────────────────────
   // K1 plays the notes as played, K2 an octave up. The firmware reads the
   // pins; the page only presses them, and the screen says which route is on.
-  const ROUTES = [['as played', 1], ['octave up', 2]];
   async function tap(k) {
     await picoStart();
     pico.runner?.key(k, true); pico.runner?.key(k, false, 0);
   }
-  const route = createChoice({
-    label: 'route',
-    options: ROUTES,
-    title: (k, name) => `K${k}, ${name}`,
-    onPick: (k) => tap(k),
-  });
+  // One toggle, octave up, asked 2026-10-10 (*"only octave up"*): on presses K2,
+  // off presses K1, which is the notes as played.
+  const route = createToggle({ label: 'octave up', title: 'K2 octave up, K1 as played',
+    onChange: (on) => tap(on ? 2 : 1) });
   const panel = createVideoPanel({ media: oledBox, aspect: '2 / 1', left: el('span', 'cc-say', 'Pico (emulated)'), centre: picoSays, right: false });
   const picoBlock = el('div', 'cc-col');
   picoBlock.append(panel.el, route.el);
