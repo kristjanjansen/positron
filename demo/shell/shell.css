@@ -2862,6 +2862,9 @@ button.pos-pg-lab:hover { color: var(--fg); }
   }
   .pos-bgroup-row::-webkit-scrollbar { display: none; }
   .pos-bgroup-row button { flex: 1 0 auto; min-width: 0; padding: 0 var(--pad-seg); }
+  /* an icon button in a group stays its square on a phone: the words grow to
+     share the row, a picture does not */
+  .pos-bgroup-row button.pos-icobtn { flex: none; }
 }
 
 /* ── button group, standing up (button-group.mjs, orient: 'column') ────────
@@ -5015,6 +5018,16 @@ button[data-glyph="1"] {
    halo on a shorter face and nothing here restates it. */
 button.pos-sm { height: var(--ctl-sm); padding: 0 calc(var(--pad-btn) / 2); }
 button.pos-sm[data-glyph="1"] { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; }
+
+/* ── the icon button (button.pos-icobtn), demo/shell/icon-button.mjs ─────
+   Asked 2026-10-10: *"Use transport icons on all our concepts. Keep them
+   square. Kit iconbutton (group?)"*. The square is the two rules above, which
+   `setIcon` reaches by stamping `data-glyph`, so nothing here sizes a button.
+   The svg is a drawn picture with no advance or baseline, so the grid's
+   `place-items: center` centres its ink with no measuring, which is what a
+   font glyph needs `symbol.mjs` for. `pointer-events: none` so a press lands
+   on the button and `event.target` is never a path inside it. */
+.pos-icobtn > svg { display: block; pointer-events: none; }
 
 /* ── the link button (button.pos-linkbtn), demo/shell/link-button.mjs ────
    A button that reads as a link, asked 2026-10-10 for the patchbay's

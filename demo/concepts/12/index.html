@@ -145,15 +145,12 @@
     const box = notesT.scroller(), on = box.querySelector('.pos-tbl-row.on');
     if (on) box.scrollTop = on.offsetTop - box.offsetTop - (box.clientHeight - on.offsetHeight) / 2;
   };
-  // Two toggles, glyphs only: ● records and becomes ■ while recording, ► plays
-  // and becomes ■ while playing. Recording and playing stop each other.
-  const GLYPH = { rec: '\u25CF', play: '\u25BA', stop: '\u25A0' };
+  // Two toggles, icons only: record becomes stop while recording, play
+  // becomes stop while playing. Recording and playing stop each other.
   function face() {
-    const r = transport.button('rec'), p = transport.button('play');
-    r.textContent = armed ? GLYPH.stop : GLYPH.rec;
-    r.title = armed ? 'stop recording' : 'record';
-    p.textContent = playing ? GLYPH.stop : GLYPH.play;
-    p.title = playing ? 'stop playing' : 'play';
+    const p = transport.button('play');
+    transport.setIcon('rec', armed ? 'stop' : 'record', armed ? 'stop recording' : 'record');
+    transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop playing' : 'play');
     p.disabled = !notes.length && !playing;
   }
   function play() {
@@ -181,8 +178,8 @@
     drawNotes(); face();
   }
   const transport = createButtonGroup({ buttons: [
-    { id: 'rec', label: GLYPH.rec, onPress: () => (armed ? stop() : record()) },
-    { id: 'play', label: GLYPH.play, onPress: () => (playing ? stop() : play()) },
+    { id: 'rec', icon: 'record', label: 'record', onPress: () => (armed ? stop() : record()) },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
   ] });
   transport.button('rec').classList.add('cc-rec');
   face();

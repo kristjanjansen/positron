@@ -23,12 +23,16 @@
   .ico-set { display: flex; gap: 12px; align-items: flex-end; }
   .ico-btns { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); align-items: center; }
   .ico-btn-col { display: flex; flex-direction: column; gap: 12px; }
+  /* record is red, as it is on the concept pages (shell.css --rec) */
+  .ico-rec { color: var(--rec); }
 </style>
 <script type="module">
   import { el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
   import { icon, hasIcon, NAMES, GROUPS, SOURCE, BODIES } from '/shell/icons.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
 
   /**
    * kit/icons, THE KIT'S ICONS, 2026-10-10. Asked: *"see ../eccm icon system.
@@ -43,7 +47,47 @@
     what: 'Every icon in the kit, drawn from the Feather set in the ink of the text around it.',
   });
 
-  // the blocks, newest first: the sheet is the reason for the page
+  // the blocks, newest first
+  // ICON BUTTON, 2026-10-10: *"Use transport icons on all our concepts. Keep
+  // them square. Kit iconbutton (group?)"*. One square button per icon, at
+  // both sizes, a play that becomes stop, a toggle, and a group of two.
+  const ib = [];                       // every icon button on this block
+  let swap = null, swapSm = null, loopB = null, grp = null;
+  section('ICON BUTTON',
+    'A square button holding one icon and named by its label, at 34 and 26 px, alone or joined in a button group.',
+    `createIconButton({ icon: 'play', label: 'Play', onPress, small, pressed })
+  -> { el, set('stop', 'Stop'), pressed(true) }
+createButtonGroup({ buttons: [{ id: 'play', icon: 'play', label: 'Play' }] })
+  -> group.setIcon('play', 'stop', 'Stop')`,
+    (box) => {
+      const col = el('div', 'ico-btn-col');
+      for (const small of [false, true]) {
+        const row = el('div', 'ico-btns');
+        let playing = false;
+        const p = createIconButton({ icon: 'play', label: 'Play', small,
+          onPress: () => { playing = !playing; p.set(playing ? 'stop' : 'play', playing ? 'Stop' : 'Play'); } });
+        const r = createIconButton({ icon: 'record', label: 'Record', small });
+        r.el.classList.add('ico-rec');
+        const s = createIconButton({ icon: 'stop', label: 'Stop', small });
+        const l = createIconButton({ icon: 'loop', label: 'Loop', small, pressed: false,
+          onPress: () => l.pressed(!l.pressed()) });
+        row.append(p.el, r.el, s.el, l.el);
+        ib.push(p.el, r.el, s.el, l.el);
+        if (small) swapSm = p; else { swap = p; loopB = l; }
+        col.append(row);
+      }
+      let on = false;
+      grp = createButtonGroup({ buttons: [
+        { id: 'rec', icon: 'record', label: 'Record' },
+        { id: 'play', icon: 'play', label: 'Play',
+          onPress: () => { on = !on; grp.setIcon('play', on ? 'stop' : 'play', on ? 'Stop' : 'Play'); } },
+      ] });
+      grp.button('rec').classList.add('ico-rec');
+      ib.push(...grp.buttons);
+      col.append(grp.el);
+      box.append(col);
+    });
+
   const cells = [];
   section('SAMPLE SHEET', 'Every name icon() knows, at 24 px, with the name to ask for it by under it.', null, (box) => {
     const grid = el('div', 'ico-sheet');
@@ -113,6 +157,75 @@
   const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
   await frames(3);
   checkPage();
+
+  // ICON BUTTON. Every claim is read off rendered rects, never off the CSS.
+  {
+    const sm = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ctl-sm'));
+    const want = (b) => (b.classList.contains('pos-sm') ? sm : 34);
+    const geo = (b) => {
+      const r = b.getBoundingClientRect(), s = b.querySelector('svg').getBoundingClientRect();
+      return { w: r.width, h: r.height,
+        off: Math.max(Math.abs((s.left + s.width / 2) - (r.left + r.width / 2)), Math.abs((s.top + s.height / 2) - (r.top + r.height / 2))) };
+    };
+
+    // square at both sizes, the group's two included
+    const notSq = ib.filter((b) => { const g = geo(b); return Math.abs(g.w - want(b)) > 0.5 || Math.abs(g.h - want(b)) > 0.5; });
+    const nSm = ib.filter((b) => b.classList.contains('pos-sm')).length;
+    d.assert('ICON BUTTON is the kit’s square, 34 px and --ctl-sm, alone and in a group',
+      ib.length === 10 && nSm === 4 && notSq.length === 0,
+      notSq.length ? notSq.map((b) => `${b.getAttribute('aria-label')} ${geo(b).w.toFixed(1)}x${geo(b).h.toFixed(1)}`).join(', ')
+        : `${ib.length} buttons, ${ib.length - nSm} at 34 px and ${nSm} at ${sm} px, each as wide as it is tall`);
+
+    // the icon on the centre of its button
+    const worst = Math.max(...ib.map((b) => geo(b).off));
+    d.assert('ICON BUTTON puts its icon on the button’s centre',
+      worst <= 0.5, `the worst of ${ib.length} is ${worst.toFixed(2)} px off centre`);
+
+    // swapping play for stop keeps the size and the centre, alone and grouped
+    const swaps = [];
+    for (const [name, b, doSet] of [
+      ['big', swap.el, (n, l) => swap.set(n, l)],
+      ['small', swapSm.el, (n, l) => swapSm.set(n, l)],
+      ['group', grp.button('play'), (n, l) => grp.setIcon('play', n, l)],
+    ]) {
+      const a = geo(b);
+      doSet('stop', 'Stop');
+      const z = geo(b), faced = b.dataset.icon, named = b.getAttribute('aria-label');
+      doSet('play', 'Play');
+      swaps.push({ name, ok: faced === 'stop' && named === 'Stop' && b.querySelectorAll('svg').length === 1
+        && Math.abs(a.w - z.w) < 0.01 && Math.abs(a.h - z.h) < 0.01 && z.off <= 0.5,
+        say: `${name} ${a.w.toFixed(1)} to ${z.w.toFixed(1)}, ${faced}, ${z.off.toFixed(2)} off` });
+    }
+    d.assert('swapping play for stop keeps the button its size and the icon on its centre',
+      swaps.every((x) => x.ok), swaps.map((x) => x.say).join('; '));
+
+    // a name for every one, the picture hidden behind it
+    const unnamed = ib.filter((b) => {
+      const n = (b.getAttribute('aria-label') || '').trim();
+      return !n || b.title !== n || b.querySelector('svg').getAttribute('aria-hidden') !== 'true' || b.textContent.trim() !== '';
+    });
+    const before = loopB.pressed();
+    loopB.el.click();
+    const after = loopB.el.getAttribute('aria-pressed');
+    loopB.el.click();
+    d.assert('every icon button is named by its label, its picture is aria-hidden, and a toggle says pressed',
+      unnamed.length === 0 && before === false && after === 'true' && loopB.pressed() === false
+        && !grp.buttons.some((b) => b.hasAttribute('aria-pressed')),
+      unnamed.length ? `unnamed: ${unnamed.length}` : `${ib.length} named, ${ib.map((b) => b.getAttribute('aria-label')).slice(0, 4).join(', ')}..., loop pressed ${before} then ${after}, the group writes none`);
+
+    // NEGATIVE CONTROL: an unknown icon throws, at build and at swap, and a
+    // failed swap leaves the old face rather than an empty square; so does a
+    // picture with no label
+    const errs = [];
+    try { createIconButton({ icon: 'no-such-icon', label: 'Nothing' }); } catch (e) { errs.push(e.message); }
+    const faceBefore = swap.el.innerHTML;
+    try { swap.set('no-such-icon', 'Nothing'); } catch (e) { errs.push(e.message); }
+    try { createIconButton({ icon: 'play', label: '' }); } catch (e) { errs.push(e.message); }
+    d.assert('an unknown icon throws at build and at swap, leaving the old face, and so does an icon with no label',
+      errs.length === 3 && errs[0].includes('no-such-icon') && errs[1].includes('no-such-icon') && errs[2].includes('label')
+        && swap.el.innerHTML === faceBefore && swap.el.dataset.icon === 'play',
+      errs.length ? errs.join(' | ') : 'NOTHING THREW');
+  }
 
   // 1. every name has a cell, and every cell draws an <svg> with ink in it
   {

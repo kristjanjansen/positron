@@ -40,7 +40,6 @@
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { setSymbol } from '/shell/symbol.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
 
   // A simple radio as a patchbay: one ERR station and one Ida station, each an
@@ -223,15 +222,11 @@
     face();
   }
 
-  const GLYPH = { play: '►', stop: '■' };
   const transport = createButtonGroup({ buttons: [
-    { id: 'play', label: GLYPH.play, aria: 'play', onPress: () => (playing ? stop() : play()) },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
   ] });
   function face() {
-    const b = transport.button('play');
-    setSymbol(b, playing ? GLYPH.stop : GLYPH.play);
-    b.title = playing ? 'stop' : 'play';
-    b.setAttribute('aria-label', b.title);
+    transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play');
   }
   face();
 

@@ -57,14 +57,25 @@
 // and squares the button up with `centreSymbol`, because a picture is drawn
 // small and high in a box sized for a capital. A group is for named actions; a
 // glyph control belongs in the shell's row where that already happens.
+//
+// 🔴 BUT AN ICON IS, SINCE 2026-10-10: `{ id, icon: 'play', label: 'Play' }`.
+// Asked as *"Use transport icons on all our concepts. Keep them square. Kit
+// iconbutton (group?)"*. The button is `icon-button.mjs`'s square, the label is
+// its accessible name and hover text rather than its face, and `setIcon(id,
+// name, label)` swaps play for stop. It is an option here rather than a second
+// group component because the join, the busy sweep and the disabled reason are
+// this file's, and a copy of them would be the drift this file was built to
+// stop.
 
 import { el } from './shell.mjs';
+import { setIcon as faceIcon } from './icon-button.mjs';
 
 /**
  * @param {object} o
  * @param {string} [o.label]   shown before the row, uppercased by CSS
- * @param {Array<{id: string, label: string, aria?: string, title?: string,
+ * @param {Array<{id: string, label: string, aria?: string, title?: string, icon?: string,
  *                primary?: boolean, onPress?: (btn: HTMLButtonElement) => any}>} o.buttons
+ *                `icon` makes it the kit's square icon button, named by `label`
  * @param {(id: string, btn: HTMLButtonElement) => any} [o.onPress]  fires for any button
  * @param {'row'|'column'} [o.orient]  which way the buttons run, default across;
  *                     `column` stacks them, the join and the corners turning with
@@ -73,7 +84,8 @@ import { el } from './shell.mjs';
  *            button: (id: string) => HTMLButtonElement,
  *            enable: (id: string, yes: boolean, reason?: string) => void,
  *            enabled: (id: string) => boolean,
- *            enableAll: (yes: boolean, reason?: string) => void}}
+ *            enableAll: (yes: boolean, reason?: string) => void,
+ *            setIcon: (id: string, name: string, label: string) => void}}
  */
 export function createButtonGroup({ label, buttons = [], onPress, orient = 'row' } = {}) {
   // A group with nothing in it is a label pointing at an empty row, which is
@@ -112,10 +124,11 @@ export function createButtonGroup({ label, buttons = [], onPress, orient = 'row'
     // and it is what a screen reader announces as "pressed" and what shell.css
     // keys the armed tint on. A group of actions has nothing selected, so
     // writing it would be the one change that turns this into a choice.
-    const b = el('button', spec.primary ? 'pos-pri' : '', spec.label, { type: 'button' });
+    const b = el('button', spec.primary ? 'pos-pri' : '', spec.icon ? '' : spec.label, { type: 'button' });
     b.dataset.id = spec.id;
     if (spec.aria) b.setAttribute('aria-label', spec.aria);
     if (spec.title) b.title = spec.title;
+    if (spec.icon) faceIcon(b, spec.icon, spec.label);
 
     // The shell's control row does exactly this for a handler that returns a
     // promise: disabled so a second press cannot start a second run, and swept
@@ -189,5 +202,6 @@ export function createButtonGroup({ label, buttons = [], onPress, orient = 'row'
     enable,
     enabled: (id) => !button(id).disabled,
     enableAll: (yes, reason) => { for (const id of made.keys()) enable(id, yes, reason); },
+    setIcon: (id, name, label) => { faceIcon(button(id), name, label); },
   };
 }
