@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Knob area keeps its height with no knob** (2026-10-10). Asked: *"in individual knobs demos fix their area h even when no know is shown"*.~~ DONE 2026-10-10 on 40.
+- **Concept 31: a BPM detector feeding the granulator, Ida only** (2026-10-10). Asked: *"for 31 make bmp detector sepatate block that feeds into granualtoer. use ida tallinn only, rm top waves and crossfader"*, then *"can not see 31 updatref"*. One station (Ida Tallinn) through its relay into the granulator and into a `web:bpm` node whose tempo events cable into the granulator's clock; the station panels and the crossfader go.
 - ~~**Concept 40: steps on the right; unused knobs not shown** (2026-10-10). Asked: *"move step selector to the right in desktop"* and *"do not show inactive / disabled knobs"*. Also on 50.~~ DONE 2026-10-10.
 - ~~**Concept 40 without keys or detune** (2026-10-10). Asked: *"from 40 rm keys and detune"*. Play is a test tone (`web:tone`, a held A3) into the osc and amp; step 5 is called amp.~~ DONE 2026-10-10.
 - ~~**Concept 31 granulator rhythmic and expressive** (2026-10-10). Asked: *"make 31 granulator more ryhymic and expressive. in bg"*. 112 bpm 16ths, five patterns, accents, ratchets, slices, a pentatonic motif, a dotted eighth delay; one new sparse to busy control.~~ DONE 2026-10-10.

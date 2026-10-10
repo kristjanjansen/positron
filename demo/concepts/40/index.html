@@ -14,6 +14,7 @@
   /* The step picker and the sound button on one row; on a phone they wrap. */
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .cc-reserve { visibility: hidden; }
   /* On a desk the step selector sits at the right end of the row (asked
      2026-10-10, *"move step selector to the right in desktop"*). */
   @media (min-width: 561px) { .cc-top { justify-content: space-between; } }
@@ -121,8 +122,11 @@
     // Every knob keeps its box; one whose cable the step does not lay is off.
     // A knob the step does not use is not shown at all (asked 2026-10-10, *"do
     // not show inactive / disabled knobs"*), and with none the row goes too.
-    for (const k of KNOBS) { grid.show(k.name, on.has(k.name)); grid.cellOf(k.name).hidden = !on.has(k.name); }
-    grid.el.hidden = on.size === 0;
+    // With none to show, the row keeps its height: every box stays in and the
+    // row is not drawn (asked 2026-10-10, *"fix their area h even when no
+    // knob is shown"*).
+    for (const k of KNOBS) { grid.show(k.name, on.has(k.name)); grid.cellOf(k.name).hidden = on.size > 0 && !on.has(k.name); }
+    grid.el.classList.toggle('cc-reserve', on.size === 0);
     // A step that patches the tone starts it if sound is on; one that does not, stops it.
     if (toneOn && !inPatch('tone')) { toneOn = false; }
     tone(true);
