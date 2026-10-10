@@ -1280,5 +1280,59 @@ function V0() { return { codec: 'h264' }; }
   ok('a value event is delivered along a concrete link', v.send('p:fader:out', { v: 0.5 }) === 1 && seenV[0]?.v === 0.5, JSON.stringify(seenV));
 }
 
+{
+  // A loop through a store is a replay, not feedback (2026-10-10). The shapes
+  // are concept 4's: a chat tab keeps each line in positron-store's history and
+  // hears the history back, which the cycle walk used to refuse.
+  const b = createBay();
+  b.addNode({ id: 'web-ab12:chat', kind: 'person', label: 'chat', place: 'browser' });
+  b.addNode({ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' });
+  b.addPort({ id: 'web-ab12:chat:value-out', label: 'chat', dir: 'out', medium: 'value', transports: ['relay'] });
+  b.addPort({ id: 'web-ab12:chat:value-in', label: 'chat', dir: 'in', medium: 'value', transports: ['relay'] });
+  b.addPort({ id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] });
+  b.addPort({ id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] });
+  const keep = b.link('web-ab12:chat:value-out', 'cf-store:history:value-in');
+  const back = b.link('cf-store:history:value-out', 'web-ab12:chat:value-in');
+  ok('a chat may keep its lines in a store and hear the history back', keep.ok && back.ok, back.why);
+  const r = createBay();
+  for (const n of ['web-ab12:chat', 'cf-store:history']) r.addNode({ id: n, kind: n.startsWith('cf') ? 'store' : 'person', label: n, place: 'browser' });
+  for (const p of b.ports()) r.addPort({ id: p.id, label: p.label, dir: p.dir, medium: p.medium });
+  const first = r.link('cf-store:history:value-out', 'web-ab12:chat:value-in');
+  const then = r.link('web-ab12:chat:value-out', 'cf-store:history:value-in');
+  ok('the other way round too: history back first, then the keeping link', first.ok && then.ok, then.why);
+  // A store in the MIDDLE of the path back also breaks the cycle.
+  const m = createBay();
+  m.addNode({ id: 'p:a', kind: 'engine', label: 'a', place: 'p' });
+  m.addNode({ id: 'p:rec', kind: 'store', label: 'rec', place: 'p' });
+  m.addNode({ id: 'p:b', kind: 'engine', label: 'b', place: 'p' });
+  for (const [id, dir] of [['p:a:out', 'out'], ['p:a:in', 'in'], ['p:rec:in', 'in'], ['p:rec:out', 'out'], ['p:b:in', 'in'], ['p:b:out', 'out']]) {
+    m.addPort({ id, label: id, dir, medium: 'value' });
+  }
+  m.link('p:b:out', 'p:rec:in'); m.link('p:rec:out', 'p:a:in');
+  const mid = m.link('p:a:out', 'p:b:in');
+  ok('a path back that passes through a store is not a loop', mid.ok, mid.why);
+  /* NEGATIVE CONTROL: the same two shapes with no store in them are still loops. */
+  const n = createBay();
+  n.addNode({ id: 'web-ab12:chat', kind: 'person', label: 'chat', place: 'browser' });
+  n.addNode({ id: 'cf-store:history', kind: 'endpoint', label: 'history', place: 'cloudflare' });
+  for (const p of b.ports()) n.addPort({ id: p.id, label: p.label, dir: p.dir, medium: p.medium });
+  n.link('web-ab12:chat:value-out', 'cf-store:history:value-in');
+  const nl = n.link('cf-store:history:value-out', 'web-ab12:chat:value-in');
+  ok('NEGATIVE CONTROL: an ordinary two-node loop is still refused', !nl.ok && /loop/.test(nl.why), nl.why);
+  const q = createBay();
+  for (const id of ['p:a', 'p:mid', 'p:b']) q.addNode({ id, kind: 'engine', label: id, place: 'p' });
+  for (const [id, dir] of [['p:a:out', 'out'], ['p:a:in', 'in'], ['p:mid:in', 'in'], ['p:mid:out', 'out'], ['p:b:in', 'in'], ['p:b:out', 'out']]) {
+    q.addPort({ id, label: id, dir, medium: 'value' });
+  }
+  q.link('p:b:out', 'p:mid:in'); q.link('p:mid:out', 'p:a:in');
+  const ql = q.link('p:a:out', 'p:b:in');
+  ok('NEGATIVE CONTROL: a three-node loop with no store on it is still refused', !ql.ok && /loop/.test(ql.why), ql.why);
+  /* And a replay really delivers: history out reaches the chat in-port. */
+  const got = [];
+  b.addPort({ ...b.port('web-ab12:chat:value-in'), deliver: (e) => got.push(e.text) });
+  ok('a line played back by the store is delivered along the history link',
+    b.send('cf-store:history:value-out', { text: 'kept' }) === 1 && got[0] === 'kept', JSON.stringify(got));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

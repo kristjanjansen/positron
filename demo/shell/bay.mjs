@@ -1155,7 +1155,16 @@ export function createBay({ now = () => Date.now() } = {}) {
     }
 
     // Cycles, at node level, because hardware THRU can close one outside our view.
-    if (reachesNode(nodeOf(b.id), nodeOf(a.id), a.medium)) {
+    /* ⚠️ A LOOP THROUGH A STORE IS NOT FEEDBACK (2026-10-10). A node of kind
+       `store` keeps what reaches it and plays it back only when somebody asks
+       (positron-store's history, workers/store/src/graph.js), so chat ->
+       history -> chat is a replay, not an echo. Until this, concept 4's
+       `cf-store:history:value-out -> <me>:chat:value-in` was refused as a loop
+       and its history never delivered. A store at either end, or anywhere on
+       the path back, breaks the cycle; a loop with no store in it is still one. */
+    const isStore = (id) => nodes.get(id)?.kind === 'store';
+    if (!isStore(nodeOf(a.id)) && !isStore(nodeOf(b.id))
+        && reachesNode(nodeOf(b.id), nodeOf(a.id), a.medium, isStore)) {
       return { ok: false, why: `that closes a loop: ${b.label} already reaches ${a.label}.`,
                fix: `Remove the link that already joins them, and then this one can be made.` };
     }
@@ -1375,11 +1384,12 @@ export function createBay({ now = () => Date.now() } = {}) {
      to an engine and hearing its `audio` back is the most ordinary patch plan
      §3 describes, and walking every medium refused it as a loop. With MIDI
      alone on the desk the answer is unchanged. */
-  function reachesNode(startNode, targetNode, medium) {
+  function reachesNode(startNode, targetNode, medium, through = () => false) {
     const seenNodes = new Set();
     const walk = (n) => {
       if (n === targetNode) return true;
       if (seenNodes.has(n)) return false;
+      if (n !== startNode && through(n)) return false;   // a path through a store is not a loop
       seenNodes.add(n);
       for (const l of links.values()) {
         /* A `*` link is not walked: it is light and never MIDI (§4h), so it

@@ -32,15 +32,15 @@
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createBay } from '/shell/bay.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
 
-  // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
-  // with one NODE and two PORTS of medium `value`. A line is shown only when the
-  // bay, filled from the REGISTRY, accepts a LINK from the sender's out to our in.
+  // The smallest multi-user chat built from patchbay blocks, with an admin who
+  // writes notices. Every tab is a SITE; every leg is a LINK its bay holds, and a
+  // line travels by `node.emit` along it (plans/plan-site-names.md §4h).
   // Its own room, never studio-1, so nothing lands on the studio's desk.
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-3';
@@ -126,75 +126,104 @@
   setInterval(() => { if (said.length || told.length) draw(); }, 30000);
   const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : `browser ${site.replace(/^web-/, '')}`;
 
+  // ── the links this tab holds ──────────────────────────────────────────────
+  // Every leg is a link in this bay, and a line travels by `node.emit` along it:
+  // one `bay.event` on the room, delivered by the receiving bay only along a
+  // link IT holds. Holding the listener is a tab's consent to hear.
+  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
+  //            *:chat:value-out -> <me>:chat:value-in        (listener)
+  //   notices  <me>:admin:value-out -> *:notice:value-in     (admin tab only)
+  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
+  //   store    chat and admin lines -> cf-store:history:value-in, and
+  //            cf-store:history:value-out -> chat and notice (the replay)
+  // ⚠️ THE STORE HAS ONE OUT PORT, so a kept line is offered to both in-ports
+  // and each takes only its own kind, read from where it was first said.
+  const KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
+  const isNotice = (src) => /:admin:value-out$/.test(String(src));
+  function bay() {
+    const b = node.registry.fill(createBay());
+    if (b.port(IN)) b.addPort({ ...b.port(IN), deliver: heard });
+    if (b.port(NOTICE)) b.addPort({ ...b.port(NOTICE), deliver: heardAdmin });
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
+    b.link('*:admin:value-out', NOTICE);
+    b.link(OUT, KEEP);
+    b.link(KEPT, IN);
+    b.link(KEPT, NOTICE);
+    if (admin && b.port(AOUT)) {
+      b.link(AOUT, '*:notice:value-in');
+      b.link(AOUT, KEEP);
+    }
+    return b;
+  }
+
   const node = createBayNode({
-    room: ROOM, graphs: [selfGraph()], local: [STORE],
+    room: ROOM, graphs: [selfGraph()], local: [STORE], bay,
     log: (line, kind) => d.log(line, kind),
     onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); },
-    onMessage: (m) => { if (m.type === 'chat.line') heard(m); else if (m.type === 'chat.admin') heardAdmin(m); else if (m.type === 'chat.clear') wipe(); },
+    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
-  function heard(m, old = false) {
-    const source = old ? 'cf-store:history:value-out' : String(m.source || '');
-    const from = String(m.source || '');
-    if (old) pb?.pulse('cf-store:history:value-out', IN);
-    else if (from.split(':')[0] !== SITE) pb?.pulse('*:chat:value-out', IN);
-    const bay = node.registry.fill(createBay());
-    const l = bay.link(source, IN, [], { site: SITE });
-    said.push({ at: Number(m.sent) || Date.now(), who: short(from.split(':')[0]), text: String(m.text || ''),
-      link: l.ok ? `${source} -> ${IN}` : 'refused', why: l.ok ? (l.session?.transport || 'no transport needed') : l.why });
+  // Called by the bay, only along a link this tab holds into chat:value-in.
+  // A line out of the store carries who first said it as `speaker`.
+  function heard(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && isNotice(by)) return;          // a kept notice is the notice port's
+    pb?.pulse(l.from, l.to);
+    said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
     draw();
   }
 
-  // An admin line: shown in the chat AND as the notice, if the bay accepts a link
-  // from its admin:value-out to this tab's notice:value-in.
-  function heardAdmin(m, old = false) {
-    const from = String(m.source || '');
-    const source = old ? 'cf-store:history:value-out' : from;
-    const bay = node.registry.fill(createBay());
-    const l = bay.link(source, NOTICE, [], { site: SITE });
-    const site = from.split(':')[0];
-    if (!old && site !== SITE) pb?.pulse('*:admin:value-out', NOTICE);
-    told.push({ at: Number(m.sent) || Date.now(), who: site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`,
-      text: String(m.text || ''), link: l.ok ? `${source} -> ${NOTICE}` : 'refused', why: l.ok ? 'in the notices' : l.why });
+  // Called by the bay, only along a link this tab holds into notice:value-in.
+  function heardAdmin(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && !isNotice(by)) return;         // a kept chat line is the chat port's
+    pb?.pulse(l.from, l.to);
+    told.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
     draw();
   }
 
   // Wake the recorder into this room, then read what it kept. Our own worker,
-  // asked only on a press of Join.
+  // asked only on a press of Join. Each kept line is handed to the bay as an
+  // event leaving the store's out port. `chat.line` and `chat.admin` rows are
+  // from before 2026-10-10, when this page sent its own message types.
   async function loadHistory() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
       d.log(`store recording ${ROOM}: ${r.status}`);
       const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
       const rows = (await h.text()).split('\n').filter(Boolean);
+      const b = bay();
       let n = 0;
       for (const line of rows) {
         let m; try { m = JSON.parse(line); } catch { continue; }
-        if (m.type === 'chat.line') { heard(m, true); n++; }
-        else if (m.type === 'chat.admin') { heardAdmin(m, true); n++; }
+        const kept = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(String(m.source)) ? m.ev?.text
+          : m.type === 'chat.line' || m.type === 'chat.admin' ? m.text : undefined;
+        if (typeof kept !== 'string') continue;
+        if (b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') })) n++;
       }
       d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
     } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
   }
 
+  // Who a line went to, for the hover: the concrete pairs the `*` link stood for.
+  const reached = (r) => (r.far.length ? r.far.map((to) => `${r.source} -> ${to}`).join('\n') : 'nobody else in the room');
   const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
   text.disabled(true);
   function say() {
     const t = text.value().trim();
     if (!t) return;
-    if (node.send({ type: 'chat.line', source: OUT, text: t, store: true })) {
-      pb?.pulse(OUT, '*:chat:value-in');
-      pb?.pulse(OUT, 'cf-store:history:value-in');
-    }
-    // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
-    // the line goes to the room and this shows the one-to-one links it stands for.
-    const bay = node.registry.fill(createBay());
-    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && (p.id.endsWith(':chat:value-in') || p.id === 'cf-store:history:value-in') && p.id !== IN)
-      .map((p) => ({ p, l: bay.link(OUT, p.id, [], { site: SITE }) }));
-    const ok = to.filter((x) => x.l.ok).map((x) => `${OUT} -> ${x.p.id}`);
-    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`,
-      why: ok.length ? ok.join('\n') : 'nobody else in the room' });
+    // `store: true` rides on the bay.event, which is what positron-store keeps.
+    const r = node.emit(OUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
+    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`, why: reached({ ...r, source: OUT }) });
     draw();
     text.set('');
   }
@@ -204,9 +233,10 @@
   function sayAdmin() {
     const t = noticeText.value().trim();
     if (!t) return;
-    if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
-    heardAdmin({ source: AOUT, text: t, sent: Date.now() });
-    told[told.length - 1].link = `${AOUT} -> *:notice:value-in`;
+    const r = node.emit(AOUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
+    told.push({ at: Date.now(), who: 'you', text: t, link: `${AOUT} -> *:notice:value-in`, why: reached({ ...r, source: AOUT }) });
     draw();
     noticeText.set('');
   }
@@ -285,26 +315,12 @@
   }
 
 
-  // ── the patchbay: the links this tab acts out, all DRAWN ONLY ────────────────
-  // ⚠️ THIS PAGE HOLDS NO LINKS. A line goes to the room as a raw `chat.line` or
-  // `chat.admin` message, and each arrival makes a throwaway bay only to ask
-  // whether one link fits. So the picture is a bay built for it: the ports from
-  // the registry (this tab and the store, nothing opened before Join) and the
-  // links below, as /concepts/21/ listed them plus the store's two chat legs.
-  // Notices also go to the store and come back from it; those two wires are
-  // left out so the picture stays readable.
-  const LINKS = () => [
-    [OUT, '*:chat:value-in'], ['*:chat:value-out', IN],
-    [OUT, 'cf-store:history:value-in'], ['cf-store:history:value-out', IN],
-    ['*:admin:value-out', NOTICE],
-    ...(admin ? [[AOUT, '*:notice:value-in']] : []),      // only the admin tab says notices
-  ];
+  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
+  // Before Join it is drawn from this tab's own graph and the store's, which
+  // opens nothing.
   const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history' };
-  pb = createPatchbay(heldPicture(() => {
-    const b = node.registry.fill(createBay());
-    return { ports: () => b.ports(), port: (id) => b.port(id), node: (id) => b.node(id),
-      links: () => LINKS().map(([from, to]) => ({ from, to })) };
-  }, SITE), { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+  pb = createPatchbay(heldPicture(bay, SITE),
+    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
 
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);

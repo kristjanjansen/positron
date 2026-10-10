@@ -38,15 +38,15 @@
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createBay, TRANSPORT_NAMES } from '/shell/bay.mjs';
+  import { createBay, printLink } from '/shell/bay.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
 
-  // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
-  // with one NODE and two PORTS of medium `value`. A line is shown only when the
-  // bay, filled from the REGISTRY, accepts a LINK from the sender's out to our in.
+  // The smallest multi-user chat built from patchbay blocks, with an admin who
+  // writes notices and broadcasts a camera. Every tab is a SITE; every leg is a
+  // LINK its bay holds, and a line travels by `node.emit` along it.
   // Its own room, never studio-1, so nothing lands on the studio's desk.
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-4';
@@ -161,33 +161,47 @@
   const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : site === 'cf-stream' ? 'CF Stream'
     : `browser ${site.replace(/^web-/, '')}`;
 
-  // A bay from everything heard. ⚠️ NOT `registry.fill`: bay.mjs knows `whep` and
-  // not `whip` (TRANSPORT_NAMES), and `addPort` throws on a transport it does not
-  // know, so a port that says `whip` keeps it in the room table and leaves it out
-  // of the bay. Only the ports' transports lists are touched.
-  const KNOWN = new Set(TRANSPORT_NAMES);
-  function filled() {
-    const b = createBay();
-    const { nodes, ports } = node.registry.merged();
-    for (const n of nodes) b.addNode({ id: n.id, kind: n.kind, label: n.label, place: n.place, net: n.net });
-    for (const p of ports) {
-      const q = { ...p };
-      if (Array.isArray(q.transports)) {
-        q.transports = q.transports.filter((t) => KNOWN.has(t));
-        if (!q.transports.length) delete q.transports;
-      }
-      b.addPort(q);
-    }
-    return b;
-  }
-  // The bay the node delivers through: this tab hears the on-air state along
-  // `*:broadcast:value-out -> <me>:screen:value-in`, and an admin speaks it along
-  // `<me>:broadcast:value-out -> *:screen:value-in`.
+  // ── the links this tab holds ──────────────────────────────────────────────
+  // Every leg is a link in this bay, and a line travels by `node.emit` along it:
+  // one `bay.event` on the room, delivered by the receiving bay only along a
+  // link IT holds. Holding the listener is a tab's consent to hear.
+  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
+  //            *:chat:value-out -> <me>:chat:value-in        (listener)
+  //   notices  <me>:admin:value-out -> *:notice:value-in     (admin tab only)
+  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
+  //   store    chat and admin lines -> cf-store:history:value-in, and
+  //            cf-store:history:value-out -> chat and notice (the replay)
+  //   on air   *:broadcast:value-out -> <me>:screen:value-in  (every tab)
+  //            <me>:broadcast:value-out -> *:screen:value-in  (admin tab only)
+  //   camera   <me>:camera:video-out -> cf-stream:live:video-in by WHIP (admin tab)
+  //            cf-stream:live:video-out -> <me>:screen:video-in by WHEP (every other tab)
+  // The camera legs are opened by the page itself (live.mjs); the bay holds them
+  // and names their transport, it does not open them.
+  // ⚠️ THE STORE HAS ONE OUT PORT, so a kept line is offered to both in-ports
+  // and each takes only its own kind, read from where it was first said.
+  const KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
+  const isNotice = (src) => /:admin:value-out$/.test(String(src));
   function bay() {
-    const b = filled();
+    const b = node.registry.fill(createBay());
+    if (b.port(IN)) b.addPort({ ...b.port(IN), deliver: heard });
+    if (b.port(NOTICE)) b.addPort({ ...b.port(NOTICE), deliver: heardAdmin });
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
+    b.link('*:admin:value-out', NOTICE);
+    b.link(OUT, KEEP);
+    b.link(KEPT, IN);
+    b.link(KEPT, NOTICE);
     if (b.port(ONAIR)) b.addPort({ ...b.port(ONAIR), deliver: onAir });
     b.link('*:broadcast:value-out', ONAIR);
+    if (admin && b.port(AOUT)) {
+      b.link(AOUT, '*:notice:value-in');
+      b.link(AOUT, KEEP);
+    }
     if (admin && b.port(BOUT)) b.link(BOUT, '*:screen:value-in');
+    // WHIP has to be asked for by name: at internet-one the transport table
+    // offers whep or relay-h264 for a video out, and this input takes only whip.
+    if (admin && b.port(CAM)) b.link(CAM, 'cf-stream:live:video-in', [], { site: SITE, via: 'whip' });
+    if (!admin) b.link('cf-stream:live:video-out', SCREEN, [], { site: SITE });
     return b;
   }
 
@@ -196,71 +210,68 @@
     log: (line, kind) => d.log(line, kind),
     onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); if (pub) tellAir(true, false); },
-    onEvent: (m, n) => { if (n < 0) d.log(`refused a broadcast state said as ${m.source} by a socket that never announced it`, 'warn'); },
-    onMessage: (m) => { if (m.type === 'chat.line') heard(m); else if (m.type === 'chat.admin') heardAdmin(m); else if (m.type === 'chat.clear') wipe(); },
+    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
-  function heard(m, old = false) {
-    const source = old ? 'cf-store:history:value-out' : String(m.source || '');
-    const from = String(m.source || '');
-    if (old) pb?.pulse('cf-store:history:value-out', IN);
-    else if (from.split(':')[0] !== SITE) pb?.pulse('*:chat:value-out', IN);
-    const b = filled();
-    const l = b.link(source, IN, [], { site: SITE });
-    said.push({ at: Number(m.sent) || Date.now(), who: short(from.split(':')[0]), text: String(m.text || ''),
-      link: l.ok ? `${source} -> ${IN}` : 'refused', why: l.ok ? (l.session?.transport || 'no transport needed') : l.why });
+  // Called by the bay, only along a link this tab holds into chat:value-in.
+  // A line out of the store carries who first said it as `speaker`.
+  function heard(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && isNotice(by)) return;          // a kept notice is the notice port's
+    pb?.pulse(l.from, l.to);
+    said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
     draw();
   }
 
-  // An admin line: shown in the chat AND as the notice, if the bay accepts a link
-  // from its admin:value-out to this tab's notice:value-in.
-  function heardAdmin(m, old = false) {
-    const from = String(m.source || '');
-    const source = old ? 'cf-store:history:value-out' : from;
-    const b = filled();
-    const l = b.link(source, NOTICE, [], { site: SITE });
-    const site = from.split(':')[0];
-    if (!old && site !== SITE) pb?.pulse('*:admin:value-out', NOTICE);
-    told.push({ at: Number(m.sent) || Date.now(), who: site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`,
-      text: String(m.text || ''), link: l.ok ? `${source} -> ${NOTICE}` : 'refused', why: l.ok ? 'in the notices' : l.why });
+  // Called by the bay, only along a link this tab holds into notice:value-in.
+  function heardAdmin(e, l, m) {
+    const by = String(m.speaker || m.from);
+    if (l.from === KEPT && !isNotice(by)) return;         // a kept chat line is the chat port's
+    pb?.pulse(l.from, l.to);
+    told.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
+      link: `${m.from} -> ${m.to}`,
+      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
     draw();
   }
 
   // Wake the recorder into this room, then read what it kept. Our own worker,
-  // asked only on a press of Join.
+  // asked only on a press of Join. Each kept line is handed to the bay as an
+  // event leaving the store's out port. `chat.line` and `chat.admin` rows are
+  // from before 2026-10-10, when this page sent its own message types.
   async function loadHistory() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
       d.log(`store recording ${ROOM}: ${r.status}`);
       const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
       const rows = (await h.text()).split('\n').filter(Boolean);
+      const b = bay();
       let n = 0;
       for (const line of rows) {
         let m; try { m = JSON.parse(line); } catch { continue; }
-        if (m.type === 'chat.line') { heard(m, true); n++; }
-        else if (m.type === 'chat.admin') { heardAdmin(m, true); n++; }
+        const kept = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(String(m.source)) ? m.ev?.text
+          : m.type === 'chat.line' || m.type === 'chat.admin' ? m.text : undefined;
+        if (typeof kept !== 'string') continue;
+        if (b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') })) n++;
       }
       d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
     } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
   }
 
+  // Who a line went to, for the hover: the concrete pairs the `*` link stood for.
+  const reached = (r) => (r.far.length ? r.far.map((to) => `${r.source} -> ${to}`).join('\n') : 'nobody else in the room');
   const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
   text.disabled(true);
   function say() {
     const t = text.value().trim();
     if (!t) return;
-    if (node.send({ type: 'chat.line', source: OUT, text: t, store: true })) {
-      pb?.pulse(OUT, '*:chat:value-in');
-      pb?.pulse(OUT, 'cf-store:history:value-in');
-    }
-    // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
-    // the line goes to the room and this shows the one-to-one links it stands for.
-    const b = filled();
-    const to = node.registry.merged().ports.filter((p) => p.dir === 'in' && (p.id.endsWith(':chat:value-in') || p.id === 'cf-store:history:value-in') && p.id !== IN)
-      .map((p) => ({ p, l: b.link(OUT, p.id, [], { site: SITE }) }));
-    const ok = to.filter((x) => x.l.ok).map((x) => `${OUT} -> ${x.p.id}`);
-    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`,
-      why: ok.length ? ok.join('\n') : 'nobody else in the room' });
+    // `store: true` rides on the bay.event, which is what positron-store keeps.
+    const r = node.emit(OUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
+    said.push({ at: Date.now(), who: 'you', text: t, link: `${OUT} -> *:chat:value-in`, why: reached({ ...r, source: OUT }) });
     draw();
     text.set('');
   }
@@ -270,9 +281,10 @@
   function sayAdmin() {
     const t = noticeText.value().trim();
     if (!t) return;
-    if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
-    heardAdmin({ source: AOUT, text: t, sent: Date.now() });
-    told[told.length - 1].link = `${AOUT} -> *:notice:value-in`;
+    const r = node.emit(AOUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
+    told.push({ at: Date.now(), who: 'you', text: t, link: `${AOUT} -> *:notice:value-in`, why: reached({ ...r, source: AOUT }) });
     draw();
     noticeText.set('');
   }
@@ -308,12 +320,11 @@
   };
 
   let pub = null, cam = null, beat = null, ice = null;
-  // What the bay says about a video link, for the log. It is asked, not obeyed:
-  // the page opens the leg itself, and the bay has no `whip` yet, so it names
-  // the publish leg by the WebRTC cell it does have.
+  // What the bay says about a video link, for the log. The page opens the leg
+  // itself; the bay holds it and names its transport.
   const verdict = (from, to) => {
-    const l = filled().link(from, to, [], { site: SITE });
-    return l.ok ? `the bay accepts ${from} -> ${to} (${l.session?.transport || 'light'})` : `the bay refuses ${from} -> ${to}: ${l.why}`;
+    const l = bay().links().find((x) => x.from === from && x.to === to);
+    return l ? `this tab holds ${from} -> ${to} (${l.session?.transport || 'light'})` : `this tab does not hold ${from} -> ${to}`;
   };
   const iceOnce = async () => ice || (ice = await fetchIceServers({ log: (m) => d.log(`webrtc ${m}`) }));
   // The on-air state, out of this tab's broadcast port. A late tab hears the
@@ -324,9 +335,10 @@
     if (r.sent) pb?.pulse(BOUT, '*:screen:value-in');
     if (notice) {
       const t = on ? 'broadcast started' : 'broadcast stopped';
-      if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
-      heardAdmin({ source: AOUT, text: t, sent: Date.now() });
-      told[told.length - 1].link = `${BOUT} -> *:screen:value-in`;
+      const n = node.emit(AOUT, { text: t }, { store: true });
+      if (n.sent && n.far.some((to) => to !== KEEP)) pb?.pulse(AOUT, '*:notice:value-in');
+      if (n.sent && n.far.includes(KEEP)) pb?.pulse(AOUT, KEEP);
+      told.push({ at: Date.now(), who: 'you', text: t, link: `${BOUT} -> *:screen:value-in`, why: reached({ ...r, source: BOUT }) });
       draw();
     }
     return r;
@@ -505,29 +517,12 @@
     }
   }
 
-  // ── the patchbay: what this tab holds, and what it only acts out ────────────
-  // REAL bay links, from bay(): `*:broadcast:value-out -> <me>:screen:value-in`
-  // and, on the admin tab, `<me>:broadcast:value-out -> *:screen:value-in`.
-  // DRAWN ONLY, listed below: the chat, notice and store legs, which travel as
-  // raw room messages, and the camera's two WebRTC legs, which the page opens
-  // itself (WHIP out on the admin tab, WHEP back on every other tab). Notices
-  // kept and replayed by the store are left out so the picture stays readable.
+  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
   // Before Join it is drawn from this tab's graph and the two services', which
   // opens nothing. A video wire is lit while its peer connection is connected.
-  const LINKS = () => [
-    [OUT, '*:chat:value-in'], ['*:chat:value-out', IN],
-    [OUT, 'cf-store:history:value-in'], ['cf-store:history:value-out', IN],
-    ['*:admin:value-out', NOTICE],
-    ...(admin ? [[AOUT, '*:notice:value-in'], [CAM, 'cf-stream:live:video-in']]
-      : [['cf-stream:live:video-out', SCREEN]]),
-  ];
   const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history',
     screen: 'on air video', camera: 'camera', broadcast: 'on air switch', live: 'Stream live input' };
-  pb = createPatchbay(heldPicture(() => {
-    const b = bay();
-    return { ports: () => b.ports(), port: (id) => b.port(id), node: (id) => b.node(id),
-      links: () => [...b.links(), ...LINKS().map(([from, to]) => ({ from, to }))] };
-  }, SITE), {
+  pb = createPatchbay(heldPicture(bay, SITE), {
     detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }],
     flowing: (l) => (l.from === CAM ? pub?.pc.connectionState === 'connected'
       : l.to === SCREEN ? sub?.pc.connectionState === 'connected' : false),
