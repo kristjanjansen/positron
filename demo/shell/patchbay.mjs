@@ -56,7 +56,7 @@ const list = (xs) => (xs && xs.length ? xs.join(', ') : '');
  * @param {Function} [o.flowing]  `(link, medium) => boolean` for a stream wire
  * @param {boolean} [o.open]      details shown from the start
  */
-export function createPatchbay(source, { title = 'patchbay', detail, flowing = () => false, open = false } = {}) {
+export function createPatchbay(source, { title = 'patchbay', detail, flowing = () => false, open = false, details = false } = {}) {
   if (!styled) { document.head.append(Object.assign(document.createElement('style'), { textContent: CSS })); styled = true; }
   // The view sees every link under its printed form, so the same link read
   // from a fresh bay is the same wire.
@@ -76,7 +76,11 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
   const more = createLinkButton({ label: open ? 'Hide details' : 'See details', expanded: open, onPress: () => toggle() });
   const button = more.el;
   const head = el('div', 'pb-head');
-  head.append(el('h3', 'pos-sec-h', title), button);
+  // ⚠️ THE DETAILS ARE ARCHIVED, NOT DELETED, 2026-10-10: *"archive see details
+  // of patchbay component. revisit later"*. The link and the two tables are
+  // built as before and left off the page unless a caller passes
+  // `details: true`. BACKLOG.md carries the revisit.
+  head.append(el('h3', 'pos-sec-h', title), ...(details ? [button] : []));
 
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true, hover: 'line' },
@@ -99,7 +103,7 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
   box.hidden = !open;
 
   const root = el('div', 'pb');
-  root.append(head, view.el, box);
+  root.append(head, view.el, ...(details ? [box] : []));
 
   function toggle() {
     box.hidden = !box.hidden;
