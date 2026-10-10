@@ -16,15 +16,10 @@
   /* The step picker and the sound button on one row; on a phone they wrap. */
   .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* The module pictures: each cell its own size, the browser counts the columns. */
-  .cc-pics { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); }
-  /* Two scopes side by side, one under the other on a phone. As /concepts/30/. */
-  .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
-  .cc-pair > * { flex: 1 1 0; min-width: 0; }
-  @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } .cc-pair > * { flex: none; } }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
-  .cc-wave .pos-scope-gut { display: none; }
+  /* A knob or the keyboard the step does not use keeps its place and is not
+     drawn, so the panel is the same size at every step (asked 2026-10-10,
+     *"reserve space for kbow block and keyboard even when not present"*). */
+  .cc-off { visibility: hidden; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -33,11 +28,10 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createKnob, createKnobBank } from '/shell/knob.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
-  import { createWaveShape, createFilterView, createEnvelopeView, OCTAVES, Q_MIN, Q_MAX } from '/shell/synth-view.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
   import { createSynth, STEPS, KNOBS, knobRaw } from './modules.mjs';
 
   // A WebAudio synth built in the patchbay, in six steps (plans/plan-synth-patch.md).
@@ -50,45 +44,15 @@
   const d = mount({ name: 'concept 40', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav(40);
 
-  const pics = {};
-  const synth = createSynth({ log: (m, lv) => d.log(m, lv), onParam: (mod) => draw(mod) });
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay, P } = synth;
   const ID = synth.id;
 
-  // ── the module pictures, the kit's synth view ────────────────────────────
-  // The filter view's x axis is OCTAVES octaves from 20 Hz, and its resonance
-  // runs Q_MIN to Q_MAX, both on a 0 to 127 travel.
-  const cut = (f) => Math.max(0, Math.min(127, (Math.log2(f / 20) / OCTAVES) * 127));
-  const res = (q) => Math.max(0, Math.min(127, ((q - Q_MIN) / (Q_MAX - Q_MIN)) * 127));
-  const ENV_MAX = 3;
-  pics.osc = createWaveShape({ label: 'osc', name: P.osc.wave });
-  pics.filter = createFilterView({ label: 'filter', type: 'low pass 12dB', freq: cut(P.filter.cutoff), resonance: res(P.filter.q) });
-  pics.amp = createEnvelopeView({ label: 'amp', max: ENV_MAX, unit: 's' });
-  // The LFO drawn over a two second window, so a faster rate is more cycles.
-  pics.lfo = createWaveShape({ label: 'lfo', name: 'sine', cycles: 1 });
-  function draw(mod) {
-    if (mod === 'osc') pics.osc.set({ name: P.osc.wave });
-    if (mod === 'filter') pics.filter.set({ freq: cut(P.filter.cutoff), resonance: res(P.filter.q) });
-    if (mod === 'amp') {
-      const a = P.amp;
-      pics.amp.set({ attack: a.attack, decay: a.decay, sustain: a.sustain * ENV_MAX, release: a.release });
-    }
-    if (mod === 'lfo') pics.lfo.set({ cycles: Math.max(0.25, Math.min(12, P.lfo.rate * 2)) });
-  }
-  for (const m of ['osc', 'filter', 'amp', 'lfo']) draw(m);
-  const picRow = el('div', 'cc-pics');
-  picRow.append(pics.osc.el, pics.filter.el, pics.amp.el, pics.lfo.el);
-
-  // ── the scopes: grain-scope `feed()` in a video panel, as /concepts/30/ ─
-  const scopes = ['scope-a', 'scope-b'].map((s) => {
-    const host = el('div', 'cc-wave');
-    const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 0.6 });
-    const from = el('span', 'cc-say', '');
-    const panel = createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', bay.node(`web:${s}`).label), centre: from });
-    return { s, scope, from, panel };
-  });
-  const pair = el('div', 'cc-pair');
-  pair.append(...scopes.map((x) => x.panel.el));
+  // ── one waveform, the output, drawn as the synths slide draws it ──────────
+  // `createWaveShape` fed one window from the first rising zero crossing, so a
+  // steady tone stands still, at one fixed scale, so a level change shows.
+  const WINDOW = 512, FULL = 0.5;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
 
   // ── the knobs: one `web:knobs` node, each turn one event out of value-out ─
   const knobs = new Map();
@@ -104,7 +68,7 @@
   const keysHost = el('div');
   const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
   const kb = createKeyboard(keysHost, {
-    ...keyRange(21), base: 48,
+    ...keyRange(19), base: 48,   // 12 white keys, as many as fit inside the instrument panel, as on /concepts/14/
     onDown: (note, how) => {
       if (how === 'midi' || !inPatch('keys')) return;
       wake(); sound(true);
@@ -135,10 +99,13 @@
   }
 
   function frame() {
-    for (const x of scopes) {
-      const buf = synth.on() ? synth.read(x.s) : null;
-      if (buf) x.scope.feed(buf, ctx.sampleRate);
-    }
+    const buf = synth.on() ? synth.read('scope') : null;
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
     requestAnimationFrame(frame);
   }
 
@@ -152,26 +119,13 @@
   }
   // Show what the links use, and nothing else.
   function follow() {
-    pics.osc.el.hidden = !inPatch('osc');
-    pics.filter.el.hidden = !inPatch('filter');
-    pics.amp.el.hidden = !inPatch('amp');
-    pics.lfo.el.hidden = !inPatch('lfo');
-    picRow.hidden = !['osc', 'filter', 'amp', 'lfo'].some(inPatch);
-    for (const x of scopes) {
-      const l = bay.links().find((k) => k.to === ID(x.s, 'audio-in'));
-      x.panel.el.hidden = !l;
-      x.from.textContent = l ? `from ${l.from.split(':')[1]}` : '';
-    }
     // A knob shows when the step offers it and the knobs reach its module.
     const reach = (mod) => bay.links().some((l) => l.from === ID('knobs', 'value-out') && l.to === ID(mod, 'value-in'));
-    let shown = 0;
     for (const k of KNOBS) {
       const on = step.knobs.includes(k.name) && reach(k.owner);
-      knobs.get(k.name).el.hidden = !on;
-      shown += on;
+      knobs.get(k.name).el.classList.toggle('cc-off', !on);
     }
-    bank.el.hidden = !shown;
-    keysHost.hidden = !inPatch('keys');
+    keysHost.classList.toggle('cc-off', !inPatch('keys'));
     pb.refresh();
   }
 
@@ -199,9 +153,12 @@
   });
 
   const top = el('div', 'cc-top');
-  top.append(picker.el, transport.el);
+  top.append(transport.el, picker.el);
   const out = el('div', 'cc-stack');
-  out.append(top, picRow, pair, bank.el, keysHost, pb.el);
+  // One instrument: the waveform on top, the knob group, then the keys.
+  const panel = createInstrumentPanel({ viz: wave.el, keys: keysHost, plate: false });
+  panel.addRow(bank.el);
+  out.append(top, panel.el, pb.el);
   d.el.append(out);
   for (const [name, v] of Object.entries(step.preset)) {
     synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);

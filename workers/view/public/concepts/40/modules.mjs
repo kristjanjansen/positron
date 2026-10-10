@@ -73,15 +73,14 @@ const NAMES = {
  * however the page was left.
  */
 const L1 = `web:osc:audio-out -> web:speaker:audio-in
-web:osc:audio-out -> web:scope-a:audio-in`;
+web:osc:audio-out -> web:scope:audio-in`;
 const L2 = `${L1}
 web:knobs:value-out -> web:osc:value-in`;
 const L4 = `web:knobs:value-out -> web:osc:value-in
 web:knobs:value-out -> web:filter:value-in
 web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:speaker:audio-in
-web:osc:audio-out -> web:scope-a:audio-in
-web:filter:audio-out -> web:scope-b:audio-in`;
+web:filter:audio-out -> web:scope:audio-in`;
 const L5 = `web:keys:midi-out -> web:osc:midi-in
 web:keys:midi-out -> web:amp:midi-in
 web:knobs:value-out -> web:osc:value-in
@@ -90,8 +89,7 @@ web:knobs:value-out -> web:amp:value-in
 web:osc:audio-out -> web:filter:audio-in
 web:filter:audio-out -> web:amp:audio-in
 web:amp:audio-out -> web:speaker:audio-in
-web:osc:audio-out -> web:scope-a:audio-in
-web:amp:audio-out -> web:scope-b:audio-in`;
+web:amp:audio-out -> web:scope:audio-in`;
 const L6 = `${L5}
 web:knobs:value-out -> web:lfo:value-in
 web:lfo:audio-out -> web:filter:cutoff-in`;
@@ -188,7 +186,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     ['keys', 'person', 'keyboard'], ['knobs', 'person', 'knobs'],
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
     ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
-    ['scope-a', 'screen', 'scope A'], ['scope-b', 'screen', 'scope B'], ['speaker', 'screen', 'speakers'],
+    ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
   ];
   for (const [n, kind, label] of NODES) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
@@ -214,8 +212,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     { id: id('amp', 'audio-out'), dir: 'out', medium: 'audio' },
     param('lfo'),
     { id: id('lfo', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: id('scope-a', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('scope-b', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
     { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
   // A port's label is its own `node:port`, which is what a refusal names.
@@ -275,7 +272,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     lo.connect(lg); lo.start();
     N.lfo = { o: lo, g: lg, out: lg, input: () => null };
 
-    for (const s of ['scope-a', 'scope-b']) {
+    for (const s of ['scope']) {
       const an = ctx.createAnalyser(); an.fftSize = 2048;
       an.connect(pull);
       N[s] = { an, buf: new Float32Array(an.fftSize), out: null, input: () => an };
