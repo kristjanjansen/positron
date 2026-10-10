@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Concept 40: one bay node per knob** (2026-10-10). Asked: *"Per knob. Lets go eurorack :)"*, answering whether `web:knobs` should split. Each knob is its own node with a `value-out` linked to the module it moves, so the patch says which knob drives what.~~ DONE 2026-10-10.
 - ~~**A link button, beside the patchbay title** (2026-10-10). Asked: *"create linkbutton component, but it next to patchbay comppnent title See details"*. A kit component, a button that looks like a link, newest block on `/kit/input/`; `createPatchbay`'s `details` button becomes one reading `See details`, right after the title.~~ DONE 2026-10-10.
 - ~~**Bay view: no vertical layout on a desk** (2026-10-10). Asked: *"do not do vert layouts on desktop. overflow"*, after the stacking fix for 31. The desk keeps one row and scrolls sideways; only a phone stacks.~~ DONE 2026-10-10.
 - ~~**Concept 31 wet only, with the owner's settings** (2026-10-10). Asked, with a screenshot of the three rows at where about 0.22, spread about 0.19 and the mix at grains: *"keep this. onlu show wet try"*. Those become the defaults, the dry path and the dry to grains slider go.~~ DONE 2026-10-10.
