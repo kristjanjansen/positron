@@ -10,6 +10,8 @@ export const CONCEPTS = [
   { n: '014', group: 'synths', title: 'Dot piano', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
   { n: '015', group: 'synths', title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
   { n: '016', group: 'synths', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
+  { n: '017', group: 'synths', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
+  { n: '018', group: 'synths', title: 'Faust synth', say: 'A Faust program played from the patchbay with every parameter a knob of its own.' },
   { n: '030', group: 'radio', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   { n: '031', group: 'radio', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' },
   { n: '032', group: 'radio', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
