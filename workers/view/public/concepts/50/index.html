@@ -292,7 +292,11 @@
     at = n;
     const s = STEPS[n];
     setWords(s);
-    for (const n of grid.names) grid.show(n, s.boxes.includes(KNOBS.find((x) => x.name === n).owner));
+    // A knob the step does not use is not shown at all, as on /concepts/40/.
+    for (const n of grid.names) {
+      const on = s.boxes.includes(KNOBS.find((x) => x.name === n).owner);
+      grid.show(n, on); grid.cellOf(n).hidden = !on;
+    }
     if (s.boxes.includes('scope')) delete scopeHost.dataset.off; else scopeHost.dataset.off = '';
     const bad = synth.load(s.patch.join('\n'));
     for (const b of bad) d.log(`${b.line} refused: ${b.why}`, 'warn');
