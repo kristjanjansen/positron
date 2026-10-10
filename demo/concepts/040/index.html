@@ -8,232 +8,167 @@
 <title>POSITRON concept 040</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--ctl-gap, 8px); }
-  .cc-row > .pos-field { flex: 1 1 260px; min-width: 0; }
-  .cc-ends { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: var(--ctl-gap, 8px); }
-  /* The same medium colours and live dot as /concepts/010/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
-  .cc-ring::after { content: none; }
+  /* Every part of this page follows the links, so a part the patch does not use
+     is hidden, and the kit's components set `display` of their own. (0,2,0). */
+  .pos-body [hidden] { display: none; }
+  /* The step picker and the sound button on one row; on a phone they wrap. */
+  .cc-top { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .cc-reserve { visibility: hidden; }
+  /* On a desk the step selector sits at the right end of the row (asked
+     2026-10-10, *"move step selector to the right in desktop"*). */
+  @media (min-width: 561px) { .cc-top { justify-content: space-between; } }
+  /* The keyboard keeps its place when the step does not use it and is not
+     drawn, so the panel is the same size at every step (asked 2026-10-10,
+     *"reserve space for kbow block and keyboard even when not present"*). The
+     knobs do the same in the kit's knob grid, which keeps every box. */
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createTable } from '/shell/table.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createBay, printLink } from '/shell/bay.mjs';
-  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
-  import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createSynth, STEPS, KNOBS, knobRaw } from './modules.mjs';
 
-  // The smallest multi-user chat built from patchbay blocks
-  // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
-  // PORTS of medium `value`, shaped `of: text`. It holds two `*` LINKS: a speaker,
-  // `<me>:chat:value-out -> *:chat:value-in`, and a listener, `*:chat:value-out -> <me>:chat:value-in`,
-  // plus two concrete ones to the store. A line crosses the room as one
-  // `bay.event`, and the receiving bay delivers it only along a link it holds.
-  // Its own room, never studio-1, so nothing lands on the studio's desk.
-  const asked = new URLSearchParams(location.search).get('room');
-  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-2';
-  // History: positron-store, a recorder that joins the room as an ordinary socket
-  // and keeps every message sent with `store: true` (workers/store/src/index.js).
-  const STORE_URL = 'https://store.positron.studio';
-  const SITE = randomSite('web');
-  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
-  const SELF = {
-    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
-    nodes: [{ id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
-    ports: [
-      { id: OUT, label: 'chat', dir: 'out', medium: 'value', shape: { of: 'text' }, transports: ['relay'] },
-      { id: IN, label: 'chat', dir: 'in', medium: 'value', shape: { of: 'text' }, transports: ['relay'] },
-    ],
-  };
-  // The store as a site, announced on its behalf into this page's own registry
-  // only, as /patchbay/ does for R2: every tab would describe the same store.
-  const STORE = {
-    v: 1, site: 'cf-store', place: 'cloudflare', net: 'cloudflare', kind: 'service', label: 'CF Store',
-    nodes: [{ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' }],
-    ports: [
-      { id: 'cf-store:history:value-in', label: 'history', dir: 'in', medium: 'value', transports: ['relay'] },
-      { id: 'cf-store:history:value-out', label: 'history', dir: 'out', medium: 'value', transports: ['https'] },
-    ],
-  };
-
+  // A WebAudio synth built in the patchbay, in six steps (plans/plan-synth-patch.md).
+  // Every module is a bay node and every part of this page follows the links the
+  // bay holds: the sound is wired by the router in modules.mjs, and a picture, a
+  // knob or the keyboard shows only while its module is in the patch.
+  //
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or play
+  // press.
   const d = mount({ name: 'concept 040', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('040');
 
-  const lines = createTable({
-    columns: [
-      { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'line', grow: true, hi: true },
-      { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
-    ],
-    minRows: 4,
-    stick: true,
-  });
-  const said = [];
-  // The patchbay picture, made once the node exists (at the foot of the page).
-  let pb = null;
-  // How long ago, from the send stamp the relay envelope carries (`sent`).
-  const ago = (at) => {
-    const s = Math.max(0, Math.round((Date.now() - at) / 1000));
-    if (s < 10) return 'now';
-    if (s < 60) return `${s} s ago`;
-    if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-    return `${Math.floor(s / 86400)} d ago`;
-  };
-  const draw = () => lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
-  setInterval(() => { if (said.length) draw(); }, 30000);
-  const short = (site) => site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : `browser ${site.replace(/^web-/, '')}`;
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
+  const { bay, P } = synth;
+  const ID = synth.id;
+  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
 
-  const SPEAK = `${OUT} -> *:chat:value-in`, KEEP = 'cf-store:history:value-in', KEPT = 'cf-store:history:value-out';
-  // The bay as it stands now: everybody heard, this tab's in-port able to
-  // deliver, and the four links this tab holds: speak to everyone, hear
-  // everyone, have the store keep each line, and hear what the store kept.
-  function bay() {
-    const b = node.registry.fill(createBay());
-    b.addPort({ ...b.port(IN), deliver: heard });
-    b.link(OUT, '*:chat:value-in');
-    b.link('*:chat:value-out', IN);
-    b.link(OUT, KEEP);
-    b.link(KEPT, IN);
-    return b;
+  // ── one waveform, the output, drawn as the synths slide draws it ──────────
+  // `createWaveShape` fed one window from the first rising zero crossing, so a
+  // steady tone stands still, at one fixed scale, so a level change shows.
+  const WINDOW = 512, FULL = 0.5;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+
+  // ── the knobs: one `web:knobs` node, each turn one event out of value-out ─
+  const knobs = new Map();
+  for (const k of KNOBS) {
+    knobs.set(k.name, createKnob({
+      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+      onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
+    }));
   }
-  const node = createBayNode({
-    room: ROOM, graphs: [SELF], local: [STORE], bay,
-    log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
-    onGraph: () => { drawSites(); pb?.refresh(); },
-    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
-    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
-  });
+  // Every knob has a box at every step; a knob the step does not offer is off.
+  // Three across, so nine are a square at every width from a phone up, and no
+  // width leaves one box alone on a row.
+  const grid = createKnobGrid(knobs, { row: true });
 
-  // Called by the bay, only along a link this tab holds. A line out of the
-  // store carries who first said it as `speaker`.
-  function heard(e, l, m) {
-    pb?.pulse(l.from, l.to);
-    const by = String(m.speaker || m.from);
-    said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
-      link: `${m.from} -> ${m.to}`,
-      why: `delivered along the link you hold, ${printLink(l)}${m.speaker ? `, first said at ${m.speaker}` : ''}` });
-    draw();
+
+  // ── sound on and off ────────────────────────────────────────────────────
+  let ctx = null;
+  function wake() {
+    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
+    ctx.resume();
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => { if (!synth.on()) wake(); sound(!synth.on()); } },
+  ] });
+  // The test tone: while sound is on and the step patches web:tone, one held
+  // A3 (220 Hz) goes out of tone:midi-out, so the amp's envelope opens.
+  const TONE = 57;
+  let toneOn = false;
+  function tone(v) {
+    v = v && synth.on() && inPatch('tone');
+    if (v === toneOn) return;
+    toneOn = v;
+    bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: TONE, d2: v ? 100 : 0 });
+  }
+  function sound(v) {
+    if (!v) tone(false);
+    synth.sound(v);
+    if (v) tone(true);
+    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
   }
 
-  // Wake the recorder into this room, then read what it kept. Our own worker,
-  // asked only on a press of Join. Each kept line is handed to the bay as an
-  // event leaving the store's out port. `chat.line` rows are from before
-  // 2026-10-09, when the page sent its own message type.
-  async function loadHistory() {
-    try {
-      const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
-      d.log(`store recording ${ROOM}: ${r.status}`);
-      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
-      const rows = (await h.text()).split('\n').filter(Boolean);
-      const b = bay();
-      let n = 0;
-      for (const line of rows) {
-        let m; try { m = JSON.parse(line); } catch { continue; }
-        const kept = m.type === 'bay.event' && /:chat:value-out$/.test(String(m.source)) ? m.ev?.text
-          : m.type === 'chat.line' ? m.text : undefined;
-        if (typeof kept !== 'string') continue;
-        n += b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') });
+  function frame() {
+    const buf = synth.on() ? synth.read('scope') : null;
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patch: a step is a text, and the text is the links ───────────────
+  let step = STEPS[0];
+  function apply(text) {
+    let bad;
+    try { bad = synth.load(text); } catch (e) { bad = [{ line: '', why: e.message.replace(/^bay: /, '') }]; }
+    for (const b of bad) d.log(b.line ? `${b.line} refused: ${b.why}` : b.why, 'warn');
+    follow();
+  }
+  // Show what the links use, and nothing else.
+  function follow() {
+    // A knob shows while its own cable reaches its module.
+    const reach = (k) => bay.links().some((l) => l.from === ID(`knob-${k.name}`, 'value-out') && l.to === ID(k.owner, 'value-in'));
+    const on = new Set(KNOBS.filter(reach).map((k) => k.name));
+    // Every knob keeps its box; one whose cable the step does not lay is off.
+    // A knob the step does not use is not shown at all (asked 2026-10-10, *"do
+    // not show inactive / disabled knobs"*), and with none the row goes too.
+    // With none to show, the row keeps its height: every box stays in and the
+    // row is not drawn (asked 2026-10-10, *"fix their area h even when no
+    // knob is shown"*).
+    for (const k of KNOBS) { grid.show(k.name, on.has(k.name)); grid.cellOf(k.name).hidden = on.size > 0 && !on.has(k.name); }
+    grid.el.classList.toggle('cc-reserve', on.size === 0);
+    // A step that patches the tone starts it if sound is on; one that does not, stops it.
+    if (toneOn && !inPatch('tone')) { toneOn = false; }
+    tone(true);
+    pb.refresh();
+  }
+
+  // Choosing a step sets its starting sound and replaces the whole patch.
+  const picker = createChoice({ label: 'step', at: 0,
+    options: STEPS.map((s, i) => [`${i + 1} ${s.name}`, i]),
+    onPick: (i) => {
+      step = STEPS[i];
+      for (const [name, v] of Object.entries(step.preset)) {
+        const k = KNOBS.find((x) => x.name === name);
+        synth.setParam(k.owner, name, v);
+        knobs.get(name).set(knobRaw(name, v), { quiet: true });
       }
-      d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
-    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
-  }
+      apply(step.patch);
+    } });
 
-  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
-  text.disabled(true);
-  function say() {
-    const t = text.value().trim();
-    if (!t) return;
-    // `store: true` rides on the bay.event, which is what positron-store keeps.
-    const r = node.emit(OUT, { text: t }, { store: true });
-    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
-    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
-    said.push({ at: Date.now(), who: 'you', text: t, link: SPEAK,
-      why: r.far.length ? r.far.map((to) => `${OUT} -> ${to}`).join('\n') : 'nobody else in the room' });
-    draw();
-    text.set('');
-  }
-  text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
-  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
-  send.button('send').disabled = true;
-  // Clear: the store forgets this room, and every tab in it empties its table.
-  function wipe() { said.length = 0; draw(); }
-  async function clearAll() {
-    try {
-      const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
-      d.log(`store cleared ${ROOM}: ${r.status}`);
-    } catch (e) { d.log(`the store did not clear: ${e.message || e}`, 'warn'); }
-    node.send({ type: 'chat.clear' });
-    wipe();
-  }
-  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  const clear = createButtonGroup({ buttons: [{ id: 'clear', label: 'Clear history', onPress: clearAll }] });
-  clear.button('clear').disabled = true;
-  // Join on the left, Clear history on its own at the right of the same line.
-  const joinRow = el('div', 'cc-ends');
-  joinRow.append(join.el, clear.el);
-
-  // Who is in the room: the registry, as /concepts/010/ draws it. Port names are
-  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
-  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
-  const sites = createTable({
-    columns: [
-      { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-      { key: 'who', label: 'who', width: 120 },
-      { key: 'dir', label: 'dir', width: 48 },
-      { key: 'medium', label: 'medium', width: 72 },
-      { key: 'by', label: 'transport', width: 120 },
-    ],
-    minRows: 4,
+  // ── the patchbay, drawing only the nodes the links use ───────────────────
+  const view = {
+    nodes: () => bay.nodes().filter((n) => inPatch(n.id.split(':')[1])),
+    ports: () => bay.ports().filter((p) => inPatch(p.id.split(':')[1])),
+    links: () => bay.links(),
+  };
+  const pb = createPatchbay(view, {
+    flowing: (l) => (l.from === ID('lfo', 'audio-out') ? synth.on() : synth.sounding()),
   });
-  function drawSites() {
-    const rows = node.registry.merged().ports.map((p) => {
-      const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
-        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
-    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
-    sites.set(rows);
-    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-      const t = cell.textContent;
-      if (t === 'live' || t === 'stale') {
-        const dot = document.createElement('span');
-        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
-        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
-        cell.textContent = '';
-        cell.append(dot);
-        cell.title = t;
-      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
-    }
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el, picker.el);
+  // The waveform and the knob group are blocks of the page, not glued (asked
+  // 2026-10-10, *"scope knobs keys are different blocks not
+  // glued. just hide them when not there"*).
+  // Blocks in the shell's stack, at the shell's gap.
+  d.stack.add(top, wave.el, grid.el, pb.el);
+  for (const [name, v] of Object.entries(step.preset)) {
+    synth.setParam(KNOBS.find((x) => x.name === name).owner, name, v);
+    knobs.get(name).set(knobRaw(name, v), { quiet: true });
   }
-
-
-  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
-  // Speak to everyone, hear everyone, and the store keeping each line. The
-  // fourth, the store playing history back, is refused by the bay as a loop
-  // (BACKLOG), so it is not drawn. Before Join it is drawn from this tab's own
-  // graph and the store's, which opens nothing.
-  const INFO = { chat: 'chat box', history: 'chat history' };
-  pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
-
-  const row = el('div', 'cc-row');
-  row.append(text.el, send.el);
-  // Blocks in the shell's stack; a heading and its table are one block.
-  d.stack.add(joinRow, row, lines.el, pb.el);
-  d.stack.titled('IN THE ROOM', sites.el);
+  apply(step.patch);
+  window.__demo.synth = synth;
+  window.__demo.knobs = grid;
   d.ready();
 </script>
