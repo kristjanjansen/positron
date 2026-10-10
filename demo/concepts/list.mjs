@@ -26,5 +26,4 @@ export const CONCEPTS = [
   { n: '090', group: 'misc', title: 'Announce', say: 'Every port the studio room can hear.' },
   { n: '091', group: 'misc', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
   { n: '092', group: 'misc', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
-  { n: '093', group: 'misc', title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
 ];

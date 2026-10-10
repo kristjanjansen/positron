@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**093 Effects archived** (2026-10-10). Asked: *"arvhive / rm 093"*. Moved to `archive/concepts/093/`, off the list; the kit patchbay picture of its links stays, without a link.~~ DONE 2026-10-10.
 - ~~**TV is 066 in a video group** (2026-10-10). Asked: *"move 040 to 066 and rename group "video""*.~~ DONE 2026-10-10.
 - **066: one video screen, the crossfader crossfades the pictures** (2026-10-10). Asked: *"040: single vidosceen, crossfade crossfades"*.
 - **070's Pico screen: no flashing boxes, only the travelling dots** (2026-10-10). Asked: *"rm flashing the keys/pico/synth. just knobs travelling"*.

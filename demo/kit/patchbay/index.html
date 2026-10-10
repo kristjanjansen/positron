@@ -56,7 +56,7 @@
       links: [...CHAT, ...ADMIN, ['web:broadcast:value-out', '*:screen:value-in'], ['*:broadcast:value-out', 'web:screen:value-in'],
         ['web:camera:video-out', 'cf-stream:live:video-in'], ['cf-stream:live:video-out', 'web:screen:video-in']] },
     { title: 'KEYBOARD CONCEPT', n: 10, note: `${concept('010')}: the on-screen keys to a sine and the speakers.`, links: [KEYS, SOUND] },
-    { title: 'EFFECTS CONCEPT', n: 11, note: `${concept('093')}: an octaver as three parallel links and a filter node.`,
+    { title: 'EFFECTS CONCEPT', n: 11, note: 'Archived concept 011: an octaver as three parallel links and a filter node.',
       links: [KEYS, [...KEYS, 'transpose +12'], [...KEYS, 'transpose -12'],
         ['web:synth:audio-out', 'web:fx:audio-in'], ['web:fx:audio-out', 'web:speaker:audio-in']] },
     { title: 'RECORDER CONCEPT', n: 12, note: `${concept('012')} and ${concept('013')}: a recorder taking the keys and playing back into the synth.`,
