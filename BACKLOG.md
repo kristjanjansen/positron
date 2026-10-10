@@ -1,5 +1,6 @@
 ## Open
 
+- ~~**Concept 31 layout, and slider end labels in one width** (2026-10-10). Asked: *"in 31: move play to top left, under title. make crossfader and dry full w. global cnage: label area w's on slider left ad right the longest one"*. Play on its own row under the title; every slider row full width; the end labels on both sides take the width of the longest one on the page, so the sliders line up. Also 30, which has the same crossfader row.~~ DONE 2026-10-10, page-local in 30 and 31; older, plain and freeze removed (*"no older, plain, freeze controls for now"*).
 - ~~**Stream wires: much longer bands** (2026-10-10). Asked: *"make streamy connectoins animation waaaay longer than currentlu"*.~~ DONE 2026-10-10.
 - ~~**Concept 41 pad labels the wrong size** (2026-10-10). Asked: *"wrong font size on xy"*. Sized from the pad's on-screen width, 13 px.~~ DONE 2026-10-10.
 - **Concept synths laid out one way** (2026-10-10). Asked: *"have standard logic for istrument panes when you lay out concept syths. they are linear execpt knobs that are are independet in the knobs area, horiz scrollable. no half col scope, scope is always full w"*. Rule in the positron-concepts skill; `createKnobGrid` gains a one-row scrolling mode; 40, 41 and 50 follow it.
