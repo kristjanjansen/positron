@@ -1,3 +1,71 @@
+# Handoff, 2026-10-10, session 73: the concepts grow into groups, a kit of their own, and playable synths
+
+## Where it is right now
+
+- **Site: BUILD `341cbcd3-144638-34eb`**, confirmed on the edge. Every change below is deployed and its build committed (`build, as deployed`).
+- **Not pushed. 146 commits ahead of `origin/main`.** Push needs the account switch in CLAUDE.md, and switching back.
+- Counted: **57 demos, 56 built** (`DEMOS.length`), **101 plans**. No agent running. Working tree clean apart from this handoff.
+- The Pi still runs old board code (sessions 71 and 72, unchanged). 017 Yoshimi has never been tried against it.
+
+## The concepts, as they are now
+
+`https://positron.studio/concepts/` renders `demo/concepts/list.mjs`: rows `{ n: '0xx', group, title, say }`, one titled block per group in first-appearance order. **Numbers are the old ones zero padded to three digits** (10 is 010), not ten times them; that mistake was made and undone this session.
+
+| group | pages |
+| --- | --- |
+| synths | 010 Keyboard, 012 Recorder, 013 Timeline, 014 Dot piano, 015 Synth, 016 XY filter, 017 Yoshimi, 018 Faust synth |
+| radio | 030 Radio, 032 Tuner (031 Granulator hidden) |
+| video | 060 Camera, 061 Camera shader, 062 Camera recorder, 065 Camera loopback, 066 TV |
+| pico | 070 Pico router |
+| chat | 003 Chat, 004 History, 005 Admin, 006 Broadcast |
+| misc | 090 Announce, 091 Mirror, 092 Tutorial slide |
+
+- **Hidden, page still deployed:** 001 Patch from words (asks Workers AI, about $0.00045 a press) and 031 Granulator. Each row is a comment in `list.mjs`.
+- **Archived:** 093 Effects, as `archive/concepts/effects.md`; its page is in commit `0bf0a195`.
+- **The synth layout rule** is in `.claude/skills/positron-concepts/SKILL.md`: linear and full width, knobs each their own bay node `web:knob-<name>` in one sideways scrolling row (`createKnobGrid(knobs, { row: true })`, `hand: true`), the scope full width, play/stop an icon button alone top left.
+- **Desktop never stacks vertically**; overflow scrolls sideways (memory `desk-rows-not-stacks`).
+
+What the newest pages do:
+
+| page | what |
+| --- | --- |
+| 015 Synth | a WebAudio synth built step by step in the patchbay. The LFO now swings the filter's `detune` in octaves (0 to 4, default 1.5), because a swing in Hz drove a low cutoff to 0 and flattened the wave |
+| 017 Yoshimi | keys and cutoff (CC 74) and reso (CC 71) knobs to Yoshimi on the Pi through `board.mjs`, AddSynth Morph (bank 115, program 32), a scope from the Pi's PCM. Untested on the real Pi |
+| 018 Faust synth | a page-local Faust voice compiled in the tab on the first press (about 1 MB): two detuned saws plus a sub, Moog lowpass, envelope, LFO, echo; ten knob nodes; the program shown read only in the kit's code box at a third of its height |
+| 066 TV | ETV and ETV2 into `web:mixer`, then `web:dither` (061's Bayer shader, size knob 2 to 16 px), then `web:screen`. Plain mix by the fader, no blend choice. Sound is an equal power crossfade. Checked once against `fake-err`; phone and Safari not looked at |
+| 070 Pico router | its own firmware `rig/pico/patch/` (UF2 `demo/resources/pico/patch-pico.uf2`, listed in `build.mjs`), OLED drawn as a patchbay, one octave up toggle, a dot travelling the wires; firmware tests 20/20 |
+| 062 / 065 | camera recorded 10 s into IndexedDB on the kit timeline; camera through Cloudflare Stream (WHIP out, WHEP back) 20 s a press with a slow fade |
+
+## The kit, and shared pieces that changed
+
+- **`/kit/` is its own page**: a card index of the parts, every `kit/*` row `unlisted: true` in the manifest, so the front page no longer shows them. New parts `/kit/patchbay/` and `/kit/icons/`.
+- **New components:** `link-button.mjs`, `icons.mjs` (Feather 4.29 vendored, built by `demo/resources/build-icons.mjs`), `icon-button.mjs` (and `createButtonGroup` takes `icon`), `knob-grid.mjs`.
+- **`patchbay.mjs`** (`createPatchbay`): heading is the kit's `.pos-sec-h`; the See details button and tables are archived behind `details: true`, which no page passes.
+- **`bay-view.mjs`** keeps one row on a desk and scrolls; stacks only below 480 px. **`bay-traffic.mjs`** stream wave is long and slow (`WAVE = { k: 0.6, perSec: 0.4, depth: 1 }`).
+- **`bay.mjs`**: the loop rule skips nodes of kind `store`. Knob ports carry only `{ of: 'param' }`, because a `names` shape must match exactly.
+- **`randomSite(prefix)`** is 2 letters plus 1 digit (`web-8kt`); site regexes in patchbay, midi-node, nola, fau and engine-node-test follow. bay-node-test 42/42.
+- **`/fau/`**: knobs are external bay nodes rebuilt on each compile, plus a patchbay block. 86 page asserts, one red that predates this session.
+- **Front page**: no slogan (also removed from `workers/view/menu.html`, which is what the deployed front page is built from), no slides group (`byGroup` drops empty groups).
+
+## Open
+
+`BACKLOG.md` under `## Open`. The new ones:
+- **031 Granulator hidden, to come back to.** What it needs before it returns was not said.
+- **"chat: 003 004 005 006 (rename title)"** was asked during the regrouping and never settled. Ask what the new titles are.
+- **018's ► button**: the owner asked whether it is needed. Answer given: a key press would do as the gesture, but the button is where the 1 MB compile happens, so without it the first note is late. No decision yet.
+- Patchbay at desk width scrolls sideways and hides right hand boxes (066's `web:screen` is cut).
+- Revisit the patchbay details (archived behind `details: true`).
+- `.step { height: 34px }` in `shell.css` squeezes a column choice; 001 carries a page-local override.
+- Safari and phone behaviour of most new concept pages is untested.
+
+## Mistakes worth knowing
+
+- **"Add a zero" meant zero padding, and I multiplied by ten.** Every link, row and mount name was renumbered twice. A numbering change is cheap to confirm with one example (`10 -> 010`) before touching sixty files.
+- **The deployed front page is `workers/view/menu.html`, not `demo/index.html`.** Removing the slogan from one left it live on the other.
+- **A new firmware file 404ed on the deploy** because `build.mjs` copies Pico UF2s from an explicit list. Add the file there.
+- **An analyser nothing pulls reads silence**, and headless AudioContext stays suspended. Both blanked 030's waves; the fix is a silent `pull` sink, and shots need `--autoplay-policy=no-user-gesture-required`.
+- **Holding an agent's unfinished page out of a deploy**: after the build, `git show HEAD:demo/concepts/<n>/index.html > workers/view/public/concepts/<n>/index.html`. Used for 018 and 066 all session.
+
 # Handoff, 2026-10-10, session 72: the bay drawn from its own data, and the ports renamed
 
 ## Where it is right now
