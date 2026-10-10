@@ -12,17 +12,18 @@
   .cc-top { display: flex; align-items: flex-end; gap: 12px; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   /* The pad and the knob group side by side on a desk. The row wraps when the
-     pad's own basis and the bank do not both fit, so a phone stacks them with
+     pad's own basis and the knob grid do not both fit, so a phone stacks them with
      no media query: the decision is the row's width, not the window's. */
   .cc-play { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
   .cc-pad { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-  .cc-play > .pos-knob-bank { flex: none; }
+  .cc-play > .pos-kgrid { flex: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createKnob, createKnobBank } from '/shell/knob.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { setSymbol } from '/shell/symbol.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
@@ -87,11 +88,12 @@
   padBox.append(pad.el);
 
   // ── the knobs: one node each, `web:knob-<name>`, a turn is one event ─────
-  const knobs = KNOBS.map((k) => createKnob({
+  const knobs = new Map(KNOBS.map((k) => [k.name, createKnob({
     label: k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format,
     onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
-  }));
-  const bank = createKnobBank(knobs);
+  })]));
+  // Three boxes across at most, so beside the pad they are one row.
+  const grid = createKnobGrid(knobs, { cols: 3 });
 
   // The keys node has no keyboard on this page: play holds a note through it.
   const note = (n, v) => bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: v });
@@ -136,7 +138,7 @@
   const top = el('div', 'cc-top');
   top.append(transport.el);
   const play = el('div', 'cc-play');
-  play.append(padBox, bank.el);
+  play.append(padBox, grid.el);
   const out = el('div', 'cc-stack');
   out.append(top, wave.el, play, pb.el);
   d.el.append(out);
@@ -148,5 +150,6 @@
   window.__demo.synth = synth;
   window.__demo.pad = pad;
   window.__demo.drone = drone;
+  window.__demo.knobs = grid;
   d.ready();
 </script>
