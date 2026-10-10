@@ -25,9 +25,9 @@
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
@@ -42,7 +42,6 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  const DIR = { in: '→○', out: '○→' };
   for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
@@ -114,15 +113,10 @@
     }
     for (const n of [...voices.keys()]) noteOff(n);
     audio();
-    draw();
+    pb.refresh();
+   
   }
 
-  const portsT = createTable({ columns: [
-    { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-    { key: 'dir', label: 'dir', width: 48 },
-    { key: 'medium', label: 'medium', width: 72 },
-    { key: 'heard', label: 'heard', width: 64, align: 'right' },
-  ] });
   // ── the recorder: a deck, its bar and its strip ─────────────────────────
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
@@ -138,7 +132,7 @@
     actuate(payload) {
       if (armed) return;           // a note scheduled while recording already sounded from the keys
       bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: payload.n, d2: payload.vel });
-      draw();
+     
     },
     reduce() { return {}; },
     assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
@@ -206,37 +200,23 @@
   const surface = createGlue(bar.el, strip.surface);
   face();
 
-  const linksT = createTable({ columns: [
-    { key: 'line', label: 'link', grow: true, hi: true, clip: true },
-    { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 4 });
-  const sentOut = { n: 0 };
-  function draw() {
-    const all = bay.ports ? bay.ports() : [];
-    const heard = new Map(all.map((p) => [p.id, p.heard]));
-    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium,
-      heard: p.dir === 'out' ? (p.id.endsWith('keys:midi-out') ? sentOut.n : '') : heard.get(p.id) ?? 0 })));
-    const ls = bay.links ? bay.links() : [];
-    linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
-    for (const t of [portsT, linksT]) {
-      for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-        if (/^(midi|audio)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
-      }
-    }
-  }
+  // ── the links as a picture, with the links and ports behind its details ──
+  // A MIDI wire pulses once per event its link delivered; an audio wire is lit
+  // while a voice sounds.
+  const pb = createPatchbay(bay, { flowing: () => voices.size > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');
   // C to A, 13 white keys: as many as the content width holds at the kit's 49 px minimum.
   kb = createKeyboard(host, {
     ...keyRange(21), base: 48,
-    onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
+    onDown: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
 
   patch();
   const out = el('div', 'cc-stack');
-  out.append(surface, host, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(surface, host, pb.el);
   d.el.append(out);
   d.ready();
 </script>

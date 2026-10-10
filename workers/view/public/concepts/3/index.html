@@ -32,6 +32,8 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
 
   // The smallest multi-user chat built from patchbay blocks
   // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
@@ -67,6 +69,8 @@
     stick: true,
   });
   const said = [];
+  // The patchbay picture, made once the node exists (at the foot of the page).
+  let pb = null;
   // How long ago, from the send stamp the relay envelope carries (`sent`).
   const ago = (at) => {
     const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -93,13 +97,14 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.button('send').disabled = false; drawSites(); },
-    onGraph: () => drawSites(),
+    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
+    onGraph: () => { drawSites(); pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
   // Called by the bay, only along the listener link.
   function heard(e, l, m) {
+    pb?.pulse(l.from, l.to);
     said.push({ at: Number(m.sent) || Date.now(), who: short(String(m.from).split(':')[0]), text: String(e.text || ''),
       link: `${m.from} -> ${m.to}`, why: `delivered along the link you hold, ${printLink(l)}` });
     draw();
@@ -111,6 +116,7 @@
     const t = text.value().trim();
     if (!t) return;
     const r = node.emit(OUT, { text: t });
+    if (r.sent) pb?.pulse(OUT, '*:chat:value-in');
     said.push({ at: Date.now(), who: 'you', text: t, link: SPEAK,
       why: r.far.length ? r.far.map((to) => `${OUT} -> ${to}`).join('\n') : 'nobody else in the room' });
     draw();
@@ -155,10 +161,17 @@
     }
   }
 
+
+  // ── the patchbay: the two `*` links this tab holds, read from bay() itself ──
+  // Before Join it is drawn from this tab's own graph, which opens nothing. A
+  // wire pulses when a line really left (the room took it) or arrived along it.
+  pb = createPatchbay(heldPicture(bay, SITE),
+    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
   const out = el('div', 'cc-stack');
-  out.append(join.el, row, lines.el, el('h3', 'cc-h', 'in the room'), sites.el);
+  out.append(join.el, row, lines.el, pb.el, el('h3', 'cc-h', 'in the room'), sites.el);
   d.el.append(out);
   d.ready();
 </script>

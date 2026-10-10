@@ -27,7 +27,8 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
 
   // /concepts/10/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
@@ -35,7 +36,6 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  const DIR = { in: '→○', out: '○→' };
   for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
@@ -107,15 +107,10 @@
     }
     for (const n of [...voices.keys()]) noteOff(n);
     audio();
-    draw();
+    pb.refresh();
+   
   }
 
-  const portsT = createTable({ columns: [
-    { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-    { key: 'dir', label: 'dir', width: 48 },
-    { key: 'medium', label: 'medium', width: 72 },
-    { key: 'heard', label: 'heard', width: 64, align: 'right' },
-  ] });
   // ── the recorder ────────────────────────────────────────────────────────
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
@@ -150,9 +145,9 @@
     const box = notesT.scroller(), on = box.querySelector('.pos-tbl-row.on');
     if (on) box.scrollTop = on.offsetTop - box.offsetTop - (box.clientHeight - on.offsetHeight) / 2;
   };
-  // Two toggles, glyphs only: ● records and becomes ■ while recording, ▶ plays
+  // Two toggles, glyphs only: ● records and becomes ■ while recording, ► plays
   // and becomes ■ while playing. Recording and playing stop each other.
-  const GLYPH = { rec: '\u25CF', play: '\u25B6', stop: '\u25A0' };
+  const GLYPH = { rec: '\u25CF', play: '\u25BA', stop: '\u25A0' };
   function face() {
     const r = transport.button('rec'), p = transport.button('play');
     r.textContent = armed ? GLYPH.stop : GLYPH.rec;
@@ -167,7 +162,7 @@
     const end = notes.reduce((m, r) => Math.max(m, r.at + (r.len ?? 200)), 0);
     timers.push(setTimeout(() => { playing = false; face(); }, end + 50));
     notes.forEach((r, i) => {
-      timers.push(setTimeout(() => { sounding.add(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); draw(); }, r.at));
+      timers.push(setTimeout(() => { sounding.add(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: r.vel }); }, r.at));
       timers.push(setTimeout(() => { sounding.delete(i); lit(); bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: r.n, d2: 0 }); }, r.at + (r.len ?? 200)));
     });
     face();
@@ -192,38 +187,24 @@
   transport.button('rec').classList.add('cc-rec');
   face();
 
-  const linksT = createTable({ columns: [
-    { key: 'line', label: 'link', grow: true, hi: true, clip: true },
-    { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 4 });
-  const sentOut = { n: 0 };
-  function draw() {
-    const all = bay.ports ? bay.ports() : [];
-    const heard = new Map(all.map((p) => [p.id, p.heard]));
-    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium,
-      heard: p.dir === 'out' ? (p.id.endsWith('keys:midi-out') ? sentOut.n : '') : heard.get(p.id) ?? 0 })));
-    const ls = bay.links ? bay.links() : [];
-    linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
-    for (const t of [portsT, linksT]) {
-      for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-        if (/^(midi|audio)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
-      }
-    }
-  }
+  // ── the links as a picture, with the links and ports behind its details ──
+  // A MIDI wire pulses once per event its link delivered; an audio wire is lit
+  // while a voice sounds.
+  const pb = createPatchbay(bay, { flowing: () => voices.size > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');
   // C to A, 13 white keys: as many as the content width holds at the kit's 49 px minimum.
   kb = createKeyboard(host, {
     ...keyRange(21), base: 48,
-    onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
+    onDown: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
 
   patch();
   const out = el('div', 'cc-stack');
   drawNotes();
-  out.append(host, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(host, el('h3', 'cc-h', 'recording'), transport.el, notesT.el, pb.el);
   d.el.append(out);
   d.ready();
 </script>

@@ -33,6 +33,8 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
 
   // The smallest multi-user chat built from patchbay blocks
   // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
@@ -81,6 +83,8 @@
     stick: true,
   });
   const said = [];
+  // The patchbay picture, made once the node exists (at the foot of the page).
+  let pb = null;
   // How long ago, from the send stamp the relay envelope carries (`sent`).
   const ago = (at) => {
     const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -110,8 +114,8 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], local: [STORE], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; drawSites(); },
-    onGraph: () => drawSites(),
+    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
+    onGraph: () => { drawSites(); pb?.refresh(); },
     onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
@@ -119,6 +123,7 @@
   // Called by the bay, only along a link this tab holds. A line out of the
   // store carries who first said it as `speaker`.
   function heard(e, l, m) {
+    pb?.pulse(l.from, l.to);
     const by = String(m.speaker || m.from);
     said.push({ at: Number(m.sent) || Date.now(), who: short(by.split(':')[0]), text: String(e.text || ''),
       link: `${m.from} -> ${m.to}`,
@@ -156,6 +161,8 @@
     if (!t) return;
     // `store: true` rides on the bay.event, which is what positron-store keeps.
     const r = node.emit(OUT, { text: t }, { store: true });
+    if (r.sent && r.far.some((to) => to !== KEEP)) pb?.pulse(OUT, '*:chat:value-in');
+    if (r.sent && r.far.includes(KEEP)) pb?.pulse(OUT, KEEP);
     said.push({ at: Date.now(), who: 'you', text: t, link: SPEAK,
       why: r.far.length ? r.far.map((to) => `${OUT} -> ${to}`).join('\n') : 'nobody else in the room' });
     draw();
@@ -215,10 +222,20 @@
     }
   }
 
+
+  // ── the patchbay: the links this tab holds, read from bay() itself ─────────
+  // Speak to everyone, hear everyone, and the store keeping each line. The
+  // fourth, the store playing history back, is refused by the bay as a loop
+  // (BACKLOG), so it is not drawn. Before Join it is drawn from this tab's own
+  // graph and the store's, which opens nothing.
+  const INFO = { chat: 'chat box', history: 'chat history' };
+  pb = createPatchbay(heldPicture(bay, SITE),
+    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
   const out = el('div', 'cc-stack');
-  out.append(joinRow, row, lines.el, el('h3', 'cc-h', 'in the room'), sites.el);
+  out.append(joinRow, row, lines.el, pb.el, el('h3', 'cc-h', 'in the room'), sites.el);
   d.el.append(out);
   d.ready();
 </script>

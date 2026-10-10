@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/patchbay</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<style>
+  /* The medium colours the concept pages use, for the port ink. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
+  }
+  .kit-n a { color: inherit; }
+</style>
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { MEDIA } from '/shell/bay.mjs';
+  import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
+  import { createPortInk } from '/shell/port-ink.mjs';
+  import { createBayTraffic } from '/shell/bay-traffic.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * kit/patchbay, 2026-10-10: what was `/concepts/21/`, asked as *"move 21 to
+   * kit, patchbay card"*. Every link the concept pages hold and the links the
+   * demos announce today, each drawn by `createBayView` from a bay-shaped
+   * object built from a list of links, with stand-in traffic shaped like the
+   * medium. Nothing here is a real bay and a visit opens nothing.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'patchbay',
+    what: 'Patchbay pictures drawn from a bay’s own nodes, ports and links, with stand-in traffic on every wire.',
+  });
+  document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS }));
+
+  // The links each concept page holds, with `web` for the tab's own site.
+  const CHAT = [['web:chat:value-out', '*:chat:value-in'], ['*:chat:value-out', 'web:chat:value-in']];
+  const ADMIN = [['web:admin:value-out', '*:notice:value-in'], ['*:admin:value-out', 'web:notice:value-in']];
+  const KEYS = ['web:keys:midi-out', 'web:synth:midi-in'], SOUND = ['web:synth:audio-out', 'web:speaker:audio-in'];
+  const concept = (n) => `<a href="/concepts/${n}/">/concepts/${n}/</a>`;
+  const demo = (slug) => `<a href="/${slug}/">/${slug}/</a>`;
+  const EXAMPLES = [
+    { title: 'MIRROR CONCEPT', n: 2, note: `${concept(2)}: a shader sent to the Pi and its picture back beside the local one.`,
+      links: [['web:webgl:program-out', 'studio-1:gpu:program-in'], ['studio-1:gpu:video-out', 'web:right:video-in'],
+        ['web:webgl:video-out', 'web:left:video-in']] },
+    { title: 'CHAT CONCEPT', n: 3, note: `${concept(3)}: a speaker and a listener link to every other tab.`, links: CHAT },
+    { title: 'HISTORY CONCEPT', n: 4, note: `${concept(4)}: the chat with a store that keeps what was said.`,
+      links: [...CHAT, ['web:chat:value-out', 'cf-store:history:value-in'], ['cf-store:history:value-out', 'web:chat:value-in']] },
+    { title: 'ADMIN CONCEPT', n: 5, note: `${concept(5)}: the chat plus an admin line every tab shows.`, links: [...CHAT, ...ADMIN] },
+    { title: 'BROADCAST CONCEPT', n: 6, note: `${concept(6)}: the admin chat with a camera through Stream.`,
+      links: [...CHAT, ...ADMIN, ['web:broadcast:value-out', '*:screen:value-in'], ['*:broadcast:value-out', 'web:screen:value-in'],
+        ['web:camera:video-out', 'cf-stream:live:video-in'], ['cf-stream:live:video-out', 'web:screen:video-in']] },
+    { title: 'KEYBOARD CONCEPT', n: 10, note: `${concept(10)}: the on-screen keys to a sine and the speakers.`, links: [KEYS, SOUND] },
+    { title: 'EFFECTS CONCEPT', n: 11, note: `${concept(11)}: an octaver as three parallel links and a filter node.`,
+      links: [KEYS, [...KEYS, 'transpose +12'], [...KEYS, 'transpose -12'],
+        ['web:synth:audio-out', 'web:fx:audio-in'], ['web:fx:audio-out', 'web:speaker:audio-in']] },
+    { title: 'RECORDER CONCEPT', n: 12, note: `${concept(12)} and ${concept(13)}: a recorder taking the keys and playing back into the synth.`,
+      links: [KEYS, ['web:keys:midi-out', 'web:rec:midi-in'], ['web:rec:midi-out', 'web:synth:midi-in'], SOUND] },
+    { title: 'SHADER CONCEPT', n: 14, note: `${concept(14)}: the same notes drawn by a shader and by the emulated Pico.`,
+      links: [[...KEYS, 'only note'], ['web:keys:midi-out', 'web:rec:midi-in', 'only note'], ['web:rec:midi-out', 'web:synth:midi-in'], SOUND,
+        ['web:keys:midi-out', 'web:midi:midi-in'], ['web:rec:midi-out', 'web:midi:midi-in'], ['web:midi:value-out', 'web:shader:value-in'],
+        ['web:shader:video-out', 'web:screen:video-in'], ['web:keys:midi-out', 'web:pico:midi-in'], ['web:rec:midi-out', 'web:pico:midi-in'],
+        ['web:pico:video-out', 'web:oled:video-in']] },
+    // Real demos, with the ids they announce today (older names, not <medium>-<dir> yet).
+    { title: 'PATCHBAY DEMO', note: `${demo('patchbay')}: the desk example.`,
+      links: [['web:keys:out', 'studio-1:circuit:in', 'channel 1'],
+        ['studio-1:circuit:audio', 'web:screen:audio'], ['web:editor:program', 'studio-1:gpu:program'],
+        ['studio-1:gpu:video', 'phone:screen:video'], ['studio-1:circuit:audio', 'r2:recordings:in'],
+        ['studio-1:circuit:audio', 'phone:screen:audio'], ['err:klassika:audio', 'web:screen:audio']],
+      labels: { 'web:screen': 'browser screen', 'phone:screen': 'phone screen' } },
+    { title: 'MIRROR DEMO', note: `${demo('mirror')}: the ids it announces today.`,
+      links: [['web:webgl:video', 'web:left:video'], ['web:webgl:program', 'studio-1:gpu:program'],
+        ['studio-1:gpu:video', 'web:screen:video']], labels: { 'web:screen': 'right pane' } },
+    { title: 'KNOBS DEMO', note: `${demo('knobs')}: keys to Yoshimi on the Pi.`, links: [['knobs:keys:out', 'studio-1:yoshimi:in']] },
+    { title: 'AWAY DEMO', note: `${demo('away')}: keys to the Circuit from another building.`, links: [['away:keys:out', 'studio-1:circuit:in']] },
+    { title: 'FAU DEMO', note: `${demo('fau')}: keys to a Faust engine in the page.`, links: [['web:keys:out', 'fau:fau:midi']] },
+    { title: 'NOLA DEMO', note: `${demo('nola')}: keys to the nola engine.`, links: [['web:keys:out', 'nola:nola:midi']] },
+    { title: 'WISH DEMO', note: `${demo('wish')}: two links the model wrote.`,
+      links: [['here:mk-425c-usb-midi-keyboard:out', 'here:circuit:in', 'transpose +1'],
+        ['here:model-12-midi-in:out', 'here:circuit:in', 'channel 1']] },
+  ];
+
+  // A port's medium is the word before -in or -out, or the whole name on the
+  // older ports the demos still announce (`circuit:audio`, `gpu:program`),
+  // where a bare `in` or `out` is MIDI.
+  const mediumOf = (id) => {
+    const name = id.split(':')[2], m = name.split('-');
+    if (MEDIA.includes(name)) return name;
+    if (m.length > 1 && MEDIA.includes(m[0])) return m[0];
+    return name === 'in' || name === 'out' ? 'midi' : 'value';
+  };
+  const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+  // What each node is, in a few words, drawn grey at a box's top right.
+  const INFO = {
+    keys: 'on-screen keyboard', synth: 'saw synth', speaker: 'speakers', fx: 'low-pass filter',
+    rec: 'recorder', midi: 'midi state', shader: 'WebGL shader', screen: 'canvas',
+    pico: 'emulated Pico', oled: 'Pico OLED, 128x64', chat: 'chat box', admin: 'admin line',
+    notice: 'notice bar', broadcast: 'on air switch', camera: 'camera',
+    history: 'chat history', live: 'Stream live input', webgl: 'WebGL page', gpu: 'Pi GPU',
+    left: 'left pane', right: 'right pane',
+    circuit: 'Novation Circuit', yoshimi: 'Yoshimi synth', editor: 'shader editor', recordings: 'R2 recordings',
+    klassika: 'Klassikaraadio', fau: 'Faust engine', nola: 'nola engine', 'mk-425c-usb-midi-keyboard': 'MK-425C keyboard',
+    'model-12-midi-in': 'Model 12 MIDI IN',
+  };
+  const nodeInfo = (id, n, labels = {}) => {
+    const node = id.split(':')[1];
+    if (labels[id]) return { id, label: labels[id] };
+    return { id, label: n === 10 && node === 'synth' ? 'sine synth' : n === 6 && node === 'screen' ? 'on air video' : INFO[node] || '' };
+  };
+  const fakeBay = (pairs, n, labels) => {
+    const ports = new Map(), nodes = new Map();
+    const links = pairs.map(([from, to, tf], i) => {
+      for (const [id, dir] of [[from, 'out'], [to, 'in']]) {
+        if (!nodes.has(nodeOf(id))) nodes.set(nodeOf(id), nodeInfo(nodeOf(id), n, labels));
+        if (!ports.has(id)) ports.set(id, { id, dir, medium: mediumOf(id) });
+      }
+      return { id: `l${i}`, from, to, tf };
+    });
+    return { nodes: () => [...nodes.values()], ports: () => [...ports.values()], links: () => links };
+  };
+  const line = (l) => `${l.from} -> ${l.to}${l.tf ? ` { ${l.tf} }` : ''}`;
+  // Which stand-in drives a link: by medium, with rare text for value and program.
+  const sourceKey = (from) => {
+    const m = mediumOf(from);
+    return from === 'web:midi:value-out' ? 'midi' : m === 'value' || m === 'program' ? 'chat' : m;
+  };
+
+  // ── stand-in traffic, one source per row, shaped like the medium ─────────
+  // Each source answers events since the last frame and a level 0..1.
+  // Clock is 48 ticks a second, so it is drawn as the stream it looks like.
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  function phases(on, off) {            // on for `on` ms, off for `off` ms, repeating
+    const len = on + off, t0 = performance.now() - Math.random() * len;
+    return (t) => (t - t0) % len < on;
+  }
+  function source(key) {
+    let next = 0, level = 0, value = 0.5;
+    if (key === 'midi') {               // a player: notes 150 to 500 ms apart, 4 s on, 2 s off
+      const on = phases(4000, 2000);
+      return (t) => { let n = 0; if (on(t) && t >= next) { n = 1; next = t + rnd(150, 500); } return { n, level: 0 }; };
+    }
+    if (key === 'value') {              // a knob being turned: 30 events a second for 1 s, then left
+      const on = phases(1000, 2500);
+      return (t) => { let n = 0; if (on(t) && t >= next) { n = 1; next = t + 33; value = Math.min(1, Math.max(0, value + rnd(-0.08, 0.08))); } return { n, level: value }; };
+    }
+    if (key === 'chat') {               // a message every 2.5 to 7 s
+      return (t) => { let n = 0; if (t >= next) { if (next) n = 1; next = t + rnd(2500, 7000); } return { n, level: 0 }; };
+    }
+    if (key === 'clock') {              // 24 ppqn at 120 bpm is 48 ticks a second, 6 s playing, 3 s stopped
+      const on = phases(6000, 3000);
+      return (t) => { let n = 0; const p = on(t); if (p && t >= next) { n = 1; next = t + 1000 / 48; } return { n, level: p ? 1 : 0, flowing: p }; };
+    }
+    if (key === 'audio') {              // a synth: each note jumps the level, it decays between them
+      const on = phases(4000, 2000); let last = 0;
+      return (t) => {
+        if (on(t) && t >= next) { level = rnd(0.6, 1); next = t + rnd(150, 500); }
+        level *= Math.exp(-(t - last) / 450); last = t;
+        return { n: 0, level, flowing: level > 0.03 };
+      };
+    }
+    if (key === 'video') {              // a camera: steady frames, bitrate wanders, 8 s live, 3 s off
+      const on = phases(8000, 3000);
+      return (t) => { const p = on(t); return { n: 0, level: p ? 0.7 + 0.2 * Math.sin(t / 700) : 0, flowing: p }; };
+    }
+    if (key === 'file') {               // a recording uploaded every 9 s, the upload takes 2.5 s
+      const on = phases(2500, 6500); let was = false;
+      return (t) => { const p = on(t), n = p && !was ? 1 : 0; was = p; return { n, level: p ? 1 : 0, flowing: p }; };
+    }
+  }
+
+  const life = createBayTraffic();
+  // Links leaving the same port in one picture share their stand-in, as a
+  // real out port sends one event to every link it has.
+  function addWires(view, bay) {
+    const srcs = new Map();
+    for (const l of bay.links()) {
+      const k = `${sourceKey(l.from)}|${l.from}`;
+      if (!srcs.has(k)) srcs.set(k, source(sourceKey(l.from)));
+      life.add(view, l.id, mediumOf(l.from), srcs.get(k));
+    }
+  }
+
+  const LABEL = (node) => [{ text: node.label, sans: true }];
+  const EX = EXAMPLES.map((x) => ({ ...x, bay: fakeBay(x.links, x.n, x.labels) }));
+  const views = new Map();
+  for (const x of EX) {
+    section(x.title, null, x.bay.links().map(line).join('\n'), (box) => {
+      const view = createBayView(x.bay, { detail: LABEL });
+      box.append(view.el);
+      addWires(view, x.bay);
+      views.set(x.title, { view, x });
+    });
+    // The note carries a link, so it is written after section() made it.
+    const sec = document.getElementById(x.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    sec?.querySelector('.kit-h')?.after(Object.assign(el('p', 'kit-n'), { innerHTML: x.note }));
+  }
+
+  const ink = createPortInk({ ports: () => EX.flatMap((x) => x.bay.ports()) }, MEDIA);
+  ink.paint(d.el);
+  land();
+
+  if (SELFCHECK) {
+    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    await frames(3);
+    checkPage();
+    const bad = [];
+    for (const [title, { view, x }] of views) {
+      const want = x.bay.links().length, boxes = view.el.querySelectorAll('.lv-box').length;
+      if (view.wires.size !== want || boxes !== x.bay.nodes().length) bad.push(`${title} ${view.wires.size}/${want} wires ${boxes} boxes`);
+    }
+    d.assert('every picture draws one wire per link and one box per node',
+      views.size === EXAMPLES.length && bad.length === 0,
+      bad.length ? bad.join(', ') : `${views.size} pictures, ${EX.reduce((a, x) => a + x.links.length, 0)} wires`);
+    d.assert('NEGATIVE CONTROL: a picture of no links draws no wire',
+      (() => { const v = createBayView(fakeBay([], 0, {})); return v.wires.size === 0; })(), 'empty bay, 0 wires');
+  }
+  d.ready();
+</script>

@@ -1,4 +1,4 @@
-// demo/concepts/20/port-ink.mjs: colours the port part of every port id on the
+// demo/shell/port-ink.mjs: colours the port part of every port id on the
 // page (`web:keys:midi-out`) in its medium's colour, read from the bay's own
 // port, without touching the text. The CSS Custom Highlight API paints ranges
 // over the existing text nodes, so a cell still holds plain ASCII that copies,

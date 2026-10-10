@@ -35,9 +35,9 @@
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { conceptNav } from '/concepts/nav.mjs';
-  import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createBay, printLink } from '/shell/bay.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
@@ -57,7 +57,6 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  const DIR = { in: '→○', out: '○→' };
   for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED']]) {
     bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
@@ -317,16 +316,11 @@
     }
     for (const n of [...voices.keys()]) noteOff(n);
     audio();
+    pb.refresh();
     sendState();                   // a new link hears the current state once, then only changes
-    draw();
+   
   }
 
-  const portsT = createTable({ columns: [
-    { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-    { key: 'dir', label: 'dir', width: 48 },
-    { key: 'medium', label: 'medium', width: 72 },
-    { key: 'heard', label: 'heard', width: 64, align: 'right' },
-  ] });
   // ── the recorder: a deck, its bar and its strip ─────────────────────────
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
@@ -342,7 +336,7 @@
     actuate(payload) {
       if (armed) return;           // a note scheduled while recording already sounded from the keys
       bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: payload.n, d2: payload.vel });
-      draw();
+     
     },
     reduce() { return {}; },
     assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
@@ -395,31 +389,17 @@
   const surface = createGlue(bar.el, strip.surface);
   face();
 
-  const linksT = createTable({ columns: [
-    { key: 'line', label: 'link', grow: true, hi: true, clip: true },
-    { key: 'sent', label: 'sent', width: 64, align: 'right' },
-  ], minRows: 11 });
-  const sentOut = { n: 0 };
-  function draw() {
-    const all = bay.ports ? bay.ports() : [];
-    const heard = new Map(all.map((p) => [p.id, p.heard]));
-    portsT.set(PORTS.map((p) => ({ id: p.id, dir: DIR[p.dir], medium: p.medium,
-      heard: p.dir === 'out' ? (p.id.endsWith('keys:midi-out') ? sentOut.n : '') : heard.get(p.id) ?? 0 })));
-    const ls = bay.links ? bay.links() : [];
-    linksT.set(ls.map((l) => ({ line: printLink(l), by: l.session?.transport || 'the bay, one event at a time', sent: l.sent })));
-    for (const t of [portsT, linksT]) {
-      for (const cell of t.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-        if (/^(midi|audio|video|value)$/.test(cell.textContent)) cell.classList.add(`md-${cell.textContent}`);
-      }
-    }
-  }
+  // ── the links as a picture, with the links and ports behind its details ──
+  // A MIDI wire pulses once per event its link delivered; an audio wire is lit
+  // while a voice sounds, a video wire always, because both pictures redraw every frame.
+  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voices.size > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');
   // C3 to G4, 12 white keys: as many as fit inside the instrument panel's inset at 49 px.
   kb = createKeyboard(host, {
     ...keyRange(19), base: 48,
-    onDown: (note, how) => { if (how === 'midi') return; sentOut.n++; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); draw(); },
+    onDown: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
 
@@ -429,7 +409,7 @@
   // The knobs above the keyboard. Volume sends CC 7 out of keys:midi-out, the same
   // port the notes leave by; on this page it only brightens the picture.
   const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100,
-    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); draw(); } });
+    onInput: (v) => { bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
 
   const knobs = createKnobBank([volume]);
   // The knobs and the keyboard are one instrument, glued, as on /fau/.
@@ -442,7 +422,7 @@
   setInterval(() => { const t = `${canvas.width}\u00d7${canvas.height}`; if (glRes.textContent !== t) glRes.textContent = t; }, 500);
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, picoPanel.el);
-  out.append(pair, surface, instrument.el, el('h3', 'cc-h', 'links'), linksT.el, el('h3', 'cc-h', 'ports'), portsT.el);
+  out.append(pair, surface, instrument.el, pb.el);
   d.el.append(out);
   window.__demo.pico = pico;
   d.ready();

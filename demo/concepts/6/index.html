@@ -41,6 +41,8 @@
   import { createBay, TRANSPORT_NAMES } from '/shell/bay.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
 
   // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
   // with one NODE and two PORTS of medium `value`. A line is shown only when the
@@ -128,6 +130,8 @@
     stick: true,
   });
   const said = [];
+  // The patchbay picture, made once the node exists (at the foot of the page).
+  let pb = null;
   // How long ago, from the send stamp the relay envelope carries (`sent`).
   const ago = (at) => {
     const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -190,8 +194,8 @@
   const node = createBayNode({
     room: ROOM, graphs: [selfGraph()], local: [STORE, STREAM], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); },
-    onGraph: () => { drawSites(); if (pub) tellAir(true, false); },
+    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); pb?.refresh(); },
+    onGraph: () => { drawSites(); pb?.refresh(); if (pub) tellAir(true, false); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a broadcast state said as ${m.source} by a socket that never announced it`, 'warn'); },
     onMessage: (m) => { if (m.type === 'chat.line') heard(m); else if (m.type === 'chat.admin') heardAdmin(m); else if (m.type === 'chat.clear') wipe(); },
   });
@@ -199,6 +203,8 @@
   function heard(m, old = false) {
     const source = old ? 'cf-store:history:value-out' : String(m.source || '');
     const from = String(m.source || '');
+    if (old) pb?.pulse('cf-store:history:value-out', IN);
+    else if (from.split(':')[0] !== SITE) pb?.pulse('*:chat:value-out', IN);
     const b = filled();
     const l = b.link(source, IN, [], { site: SITE });
     said.push({ at: Number(m.sent) || Date.now(), who: short(from.split(':')[0]), text: String(m.text || ''),
@@ -214,6 +220,7 @@
     const b = filled();
     const l = b.link(source, NOTICE, [], { site: SITE });
     const site = from.split(':')[0];
+    if (!old && site !== SITE) pb?.pulse('*:admin:value-out', NOTICE);
     told.push({ at: Number(m.sent) || Date.now(), who: site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`,
       text: String(m.text || ''), link: l.ok ? `${source} -> ${NOTICE}` : 'refused', why: l.ok ? 'in the notices' : l.why });
     draw();
@@ -242,7 +249,10 @@
   function say() {
     const t = text.value().trim();
     if (!t) return;
-    node.send({ type: 'chat.line', source: OUT, text: t, store: true });
+    if (node.send({ type: 'chat.line', source: OUT, text: t, store: true })) {
+      pb?.pulse(OUT, '*:chat:value-in');
+      pb?.pulse(OUT, 'cf-store:history:value-in');
+    }
     // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
     // the line goes to the room and this shows the one-to-one links it stands for.
     const b = filled();
@@ -260,7 +270,7 @@
   function sayAdmin() {
     const t = noticeText.value().trim();
     if (!t) return;
-    node.send({ type: 'chat.admin', source: AOUT, text: t, store: true });
+    if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
     heardAdmin({ source: AOUT, text: t, sent: Date.now() });
     told[told.length - 1].link = `${AOUT} -> *:notice:value-in`;
     draw();
@@ -311,9 +321,10 @@
   // room changes. `notice` also puts a line in the notices, which the store keeps.
   function tellAir(on, notice = true) {
     const r = node.emit(BOUT, { on, at: Date.now() });
+    if (r.sent) pb?.pulse(BOUT, '*:screen:value-in');
     if (notice) {
       const t = on ? 'broadcast started' : 'broadcast stopped';
-      node.send({ type: 'chat.admin', source: AOUT, text: t, store: true });
+      if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
       heardAdmin({ source: AOUT, text: t, sent: Date.now() });
       told[told.length - 1].link = `${BOUT} -> *:screen:value-in`;
       draw();
@@ -388,6 +399,7 @@
   // The audience half: called by the bay, only along the listener link this tab holds.
   let sub = null, lastOn = 0, opening = false;
   function onAir(e, l, m) {
+    pb?.pulse(l.from, l.to);
     if (admin) return;   // an admin tab shows its own camera, never somebody else's
     if (e?.on) {
       lastOn = Date.now();
@@ -438,6 +450,7 @@
       if (admin && sub) stopWatching('this tab is the admin now');
       node.setGraphs([selfGraph()], [STORE, STREAM]);
       drawSites();
+      pb?.refresh();
     },
   });
   send.button('send').disabled = true;
@@ -492,10 +505,38 @@
     }
   }
 
+  // ── the patchbay: what this tab holds, and what it only acts out ────────────
+  // REAL bay links, from bay(): `*:broadcast:value-out -> <me>:screen:value-in`
+  // and, on the admin tab, `<me>:broadcast:value-out -> *:screen:value-in`.
+  // DRAWN ONLY, listed below: the chat, notice and store legs, which travel as
+  // raw room messages, and the camera's two WebRTC legs, which the page opens
+  // itself (WHIP out on the admin tab, WHEP back on every other tab). Notices
+  // kept and replayed by the store are left out so the picture stays readable.
+  // Before Join it is drawn from this tab's graph and the two services', which
+  // opens nothing. A video wire is lit while its peer connection is connected.
+  const LINKS = () => [
+    [OUT, '*:chat:value-in'], ['*:chat:value-out', IN],
+    [OUT, 'cf-store:history:value-in'], ['cf-store:history:value-out', IN],
+    ['*:admin:value-out', NOTICE],
+    ...(admin ? [[AOUT, '*:notice:value-in'], [CAM, 'cf-stream:live:video-in']]
+      : [['cf-stream:live:video-out', SCREEN]]),
+  ];
+  const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history',
+    screen: 'on air video', camera: 'camera', broadcast: 'on air switch', live: 'Stream live input' };
+  pb = createPatchbay(heldPicture(() => {
+    const b = bay();
+    return { ports: () => b.ports(), port: (id) => b.port(id), node: (id) => b.node(id),
+      links: () => [...b.links(), ...LINKS().map(([from, to]) => ({ from, to }))] };
+  }, SITE), {
+    detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }],
+    flowing: (l) => (l.from === CAM ? pub?.pc.connectionState === 'connected'
+      : l.to === SCREEN ? sub?.pc.connectionState === 'connected' : false),
+  });
+
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
   const out = el('div', 'cc-stack');
-  out.append(roles.el, joinRow, el('h3', 'cc-h', 'broadcast'), airRow, airSay, airBox, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, el('h3', 'cc-h', 'in the room'), sites.el);
+  out.append(roles.el, joinRow, el('h3', 'cc-h', 'broadcast'), airRow, airSay, airBox, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, pb.el, el('h3', 'cc-h', 'in the room'), sites.el);
   d.el.append(out);
   d.ready();
 </script>

@@ -1,4 +1,4 @@
-// demo/concepts/20/bay-view.mjs: the bay drawn from its own data and nothing
+// demo/shell/bay-view.mjs: the bay drawn from its own data and nothing
 // else. A box is a node (`bay.nodes()`), its inlets and outlets are its ports
 // (`bay.ports()`, in on the left, out on the right), and a wire is a link
 // (`bay.links()`) from the outlet it names to the inlet it names, coloured by
@@ -277,3 +277,26 @@ export const BAY_VIEW_CSS = `
   .lv-wire { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
   .lv-free { opacity: 0.45; }
 `;
+
+/** What one site holds, as something `createBayView` can draw: the site's own
+ *  nodes, every node a link it holds reaches, and one box per wildcard end
+ *  (`*:chat` is every other tab). A wildcard end has no port in the bay, so
+ *  it takes the medium of the port at the link's other end. Pass a function
+ *  that answers a fresh bay, for a page that builds one per action. */
+export function heldPicture(source, site, { star = 'every other tab' } = {}) {
+  const bayOf = () => (typeof source === 'function' ? source() : source);
+  const read = () => {
+    const b = bayOf(), links = b.links();
+    const ports = new Map(), nodes = new Map();
+    const addNode = (id) => { if (!nodes.has(id)) nodes.set(id, b.node(id) || { id, label: id.startsWith('*:') ? star : '' }); };
+    for (const p of b.ports()) if (p.id.split(':')[0] === site) { ports.set(p.id, p); addNode(nodeOf(p.id)); }
+    for (const l of links) {
+      for (const [id, other, dir] of [[l.from, l.to, 'out'], [l.to, l.from, 'in']]) {
+        if (!ports.has(id)) ports.set(id, b.port(id) || { id, dir, medium: b.port(other)?.medium || '' });
+        addNode(nodeOf(id));
+      }
+    }
+    return { nodes: [...nodes.values()], ports: [...ports.values()], links };
+  };
+  return { nodes: () => read().nodes, ports: () => read().ports, links: () => read().links };
+}

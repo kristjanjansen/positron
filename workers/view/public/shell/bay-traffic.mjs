@@ -1,4 +1,4 @@
-// demo/concepts/20/bay-traffic.mjs: shows that something is passing along the
+// demo/shell/bay-traffic.mjs: shows that something is passing along the
 // wires a links view drew. Light shading travels out to in along a thin wire.
 // On an event medium each event sends one short soft pulse along it; on a
 // stream medium the line fades up while it flows, with a slow gradient moving

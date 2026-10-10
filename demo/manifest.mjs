@@ -961,6 +961,11 @@ export const DEMOS = [
   // 🔴 THE NINTH PART, 2026-10-06: *"add kit/logo page and use individual slides
   // from the brand slides. rm brand slids after it"*. The front page's `brand`
   // deck, one block per slide; the deck itself is gone from shell/decks.mjs.
+  // The tenth part, 2026-10-10: *"move 21 to kit, patchbay card"*, what was
+  // `/concepts/21/`.
+  { name: 'kit/patchbay', title: 'patchbay', group: 'kit', act: 0, created: '2026-10-10', built: true,
+    one: 'patchbay pictures drawn from a bay’s own nodes, ports and links, with stand-in traffic on every wire',
+    tags: ['shell', 'no network'] },
   { name: 'kit/logo', title: 'logo', group: 'kit', act: 0, created: '2026-10-06', built: true,
     one: 'the positron mark and wordmarks drawn as slides, with the favicon and the app icon at the sizes they ship',
     tags: ['shell', 'no network'] },

@@ -6,7 +6,7 @@ on top left (extra fields bottom left if bigger version)"*. A spec, not built.
 
 ## What is wrong today
 
-The renderer is `demo/concepts/20/links-view.mjs`. Below 480 px a chain that
+The renderer is `demo/shell/bay-view.mjs` (was `demo/concepts/20/`). Below 480 px a chain that
 does not fit becomes a vertical stack, and the stack moves things around:
 
 1. **The title moves.** It sits under the in-port row, so it is the second line of

@@ -35,6 +35,8 @@
   import { createBay } from '/shell/bay.mjs';
   import { createTabs } from '/shell/tabs.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
 
   // The smallest multi-user chat built from patchbay blocks. Every tab is a SITE
   // with one NODE and two PORTS of medium `value`. A line is shown only when the
@@ -94,6 +96,8 @@
     stick: true,
   });
   const said = [];
+  // The patchbay picture, made once the node exists (at the foot of the page).
+  let pb = null;
   // How long ago, from the send stamp the relay envelope carries (`sent`).
   const ago = (at) => {
     const s = Math.max(0, Math.round((Date.now() - at) / 1000));
@@ -125,14 +129,16 @@
   const node = createBayNode({
     room: ROOM, graphs: [selfGraph()], local: [STORE],
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); },
-    onGraph: () => drawSites(),
+    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); pb?.refresh(); },
+    onGraph: () => { drawSites(); pb?.refresh(); },
     onMessage: (m) => { if (m.type === 'chat.line') heard(m); else if (m.type === 'chat.admin') heardAdmin(m); else if (m.type === 'chat.clear') wipe(); },
   });
 
   function heard(m, old = false) {
     const source = old ? 'cf-store:history:value-out' : String(m.source || '');
     const from = String(m.source || '');
+    if (old) pb?.pulse('cf-store:history:value-out', IN);
+    else if (from.split(':')[0] !== SITE) pb?.pulse('*:chat:value-out', IN);
     const bay = node.registry.fill(createBay());
     const l = bay.link(source, IN, [], { site: SITE });
     said.push({ at: Number(m.sent) || Date.now(), who: short(from.split(':')[0]), text: String(m.text || ''),
@@ -148,6 +154,7 @@
     const bay = node.registry.fill(createBay());
     const l = bay.link(source, NOTICE, [], { site: SITE });
     const site = from.split(':')[0];
+    if (!old && site !== SITE) pb?.pulse('*:admin:value-out', NOTICE);
     told.push({ at: Number(m.sent) || Date.now(), who: site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`,
       text: String(m.text || ''), link: l.ok ? `${source} -> ${NOTICE}` : 'refused', why: l.ok ? 'in the notices' : l.why });
     draw();
@@ -176,7 +183,10 @@
   function say() {
     const t = text.value().trim();
     if (!t) return;
-    node.send({ type: 'chat.line', source: OUT, text: t, store: true });
+    if (node.send({ type: 'chat.line', source: OUT, text: t, store: true })) {
+      pb?.pulse(OUT, '*:chat:value-in');
+      pb?.pulse(OUT, 'cf-store:history:value-in');
+    }
     // No link reaches many listeners yet (plans/plan-site-names.md, chat gaps), so
     // the line goes to the room and this shows the one-to-one links it stands for.
     const bay = node.registry.fill(createBay());
@@ -194,7 +204,7 @@
   function sayAdmin() {
     const t = noticeText.value().trim();
     if (!t) return;
-    node.send({ type: 'chat.admin', source: AOUT, text: t, store: true });
+    if (node.send({ type: 'chat.admin', source: AOUT, text: t, store: true })) pb?.pulse(AOUT, '*:notice:value-in');
     heardAdmin({ source: AOUT, text: t, sent: Date.now() });
     told[told.length - 1].link = `${AOUT} -> *:notice:value-in`;
     draw();
@@ -219,6 +229,7 @@
       noticeRow.hidden = !admin;
       node.setGraphs([selfGraph()], [STORE]);
       drawSites();
+      pb?.refresh();
     },
   });
   send.button('send').disabled = true;
@@ -273,10 +284,32 @@
     }
   }
 
+
+  // ── the patchbay: the links this tab acts out, all DRAWN ONLY ────────────────
+  // ⚠️ THIS PAGE HOLDS NO LINKS. A line goes to the room as a raw `chat.line` or
+  // `chat.admin` message, and each arrival makes a throwaway bay only to ask
+  // whether one link fits. So the picture is a bay built for it: the ports from
+  // the registry (this tab and the store, nothing opened before Join) and the
+  // links below, as /concepts/21/ listed them plus the store's two chat legs.
+  // Notices also go to the store and come back from it; those two wires are
+  // left out so the picture stays readable.
+  const LINKS = () => [
+    [OUT, '*:chat:value-in'], ['*:chat:value-out', IN],
+    [OUT, 'cf-store:history:value-in'], ['cf-store:history:value-out', IN],
+    ['*:admin:value-out', NOTICE],
+    ...(admin ? [[AOUT, '*:notice:value-in']] : []),      // only the admin tab says notices
+  ];
+  const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history' };
+  pb = createPatchbay(heldPicture(() => {
+    const b = node.registry.fill(createBay());
+    return { ports: () => b.ports(), port: (id) => b.port(id), node: (id) => b.node(id),
+      links: () => LINKS().map(([from, to]) => ({ from, to })) };
+  }, SITE), { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
   const out = el('div', 'cc-stack');
-  out.append(roles.el, joinRow, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, el('h3', 'cc-h', 'in the room'), sites.el);
+  out.append(roles.el, joinRow, el('h3', 'cc-h', 'notices'), noticeRow, notices.el, el('h3', 'cc-h', 'chat'), row, lines.el, pb.el, el('h3', 'cc-h', 'in the room'), sites.el);
   d.el.append(out);
   d.ready();
 </script>

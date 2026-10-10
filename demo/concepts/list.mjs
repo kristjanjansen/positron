@@ -13,6 +13,5 @@ export const CONCEPTS = [
   { n: 12, title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: 13, title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
   { n: 14, title: 'Shader', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
-  { n: 20, title: 'Links UI', say: '' },
-  { n: 21, title: 'Patchbay viz', say: '' },
+  { n: 30, title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
 ];
