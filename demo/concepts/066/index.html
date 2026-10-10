@@ -13,15 +13,14 @@
      group, so it sits on no text line. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* ETV on the left, ETV2 on the right, each half the content width, as
-     /concepts/065/. On a phone they stack, ETV first. */
-  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
-  /* The faded-out picture dims, never to nothing. The page sets the strength. */
-  .cc-pair video { transition: opacity 120ms linear; }
+  /* One screen, two pictures stacked in its stage: ETV underneath, ETV2 on
+     top. Both fill the stage, which keeps its own aspect ratio and is already
+     the positioned box. ETV2's opacity is the crossfade. */
+  .cc-tv .pos-vp-stage > video { position: absolute; inset: 0; }
+  .cc-tv .pos-vp-stage > video + video { transition: opacity 120ms linear; }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
   /* The crossfader row, as /concepts/030/: an end label, the slider, an end
      label, both label columns as wide as the longest end label on the page. */
   .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
@@ -42,8 +41,8 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { CHANNELS, NATIVE_HLS, readPlaylist, findServedEdge, wallHandler } from '/shell/err-live.mjs';
 
-  // Two ERR television channels live, side by side, with one crossfader
-  // between their sound. The pictures come straight from ERR's own CDN
+  // Two ERR television channels live, layered in one screen, with one
+  // crossfader between them, picture and sound. The pictures come straight from ERR's own CDN
   // (live.err.ee), not through positron's relay, and the patchbay says so.
   // `?base=` points every ERR URL at demo/fake-err.mjs instead, through
   // `errUrl` in err-live.mjs, which is how this page is tested.
@@ -68,15 +67,17 @@
   // refuses to be a source, does the fader set each element's `volume`
   // instead, and the log says so.
   //
-  // THE PICTURE. The crossfader also dims the picture it fades out, from full
-  // strength at the centre down to 0.35 at the far end, never to nothing.
+  // THE PICTURE. Both videos sit in one stage, ETV underneath at full
+  // strength and ETV2 on top with its opacity equal to the fader, 0 to 1. So
+  // the ETV end shows only ETV, the ETV2 end only ETV2, and the middle is a
+  // straight mix. ETV stays at 1 under it on purpose: fading both (ETV at
+  // 1 - x) would let the page background through and the middle would go dark.
   const S = 'web';
   const ON_PAGE = CHANNELS.filter((c) => c.id === 'etv' || c.id === 'etv2');
-  const DIM = 0.35;
   const PROBE_STEPS = 8, WALL_BACKOFF_S = 90;
 
   const vOut = (c) => `err:${c.id}:video-out`, aOut = (c) => `err:${c.id}:audio-out`;
-  const screenIn = (c) => `${S}:screen-${c.id}:video-in`;
+  const SCREEN_IN = `${S}:screen:video-in`;
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
 
   // ── the bay ─────────────────────────────────────────────────────────────
@@ -90,9 +91,13 @@
     bay.addNode({ id: `err:${c.id}`, kind: 'external', label: c.name, place: 'err', net: 'err' });
     bay.addPort({ id: vOut(c), label: `${c.name} picture`, dir: 'out', medium: 'video', transports: ['llhls'], address: host });
     bay.addPort({ id: aOut(c), label: `${c.name} sound`, dir: 'out', medium: 'audio', transports: ['llhls'], address: host });
-    bay.addNode({ id: `${S}:screen-${c.id}`, kind: 'screen', label: `${c.name} panel`, place: 'browser' });
-    bay.addPort({ id: screenIn(c), label: `${c.name} panel`, dir: 'in', medium: 'video', transports: ['llhls'] });
   }
+  // One screen, and both pictures link into its one video-in. The blend
+  // happens in the screen itself (two layers, one opacity), so no node makes
+  // a mixed picture that anything else could take, and a mixer with a
+  // video-out would draw one that does not exist.
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'TV panel', place: 'browser' });
+  bay.addPort({ id: SCREEN_IN, label: 'TV panel', dir: 'in', medium: 'video', transports: ['llhls'] });
   bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
@@ -118,46 +123,58 @@
   // which is the press where a person asks to watch, so the consent is named
   // here rather than at the press.
   for (const c of ON_PAGE) {
-    hold(vOut(c), screenIn(c), { consent: true, via: 'llhls' });
+    hold(vOut(c), SCREEN_IN, { consent: true, via: 'llhls' });
     hold(aOut(c), FADER_IN, { consent: true, via: 'llhls' });
   }
   hold(FADER_OUT, SPEAKER_IN);
 
-  // ── the two panels ──────────────────────────────────────────────────────
+  // ── the one panel ───────────────────────────────────────────────────────
   const tv = ON_PAGE.map((c) => {
     const video = el('video');
     video.muted = true; video.playsInline = true;
     // Before any src, or the native path's samples are withheld from the graph.
     video.crossOrigin = 'anonymous';
-    const size = el('span', 'cc-say', '');
-    const panel = createVideoPanel({ media: video, left: el('span', 'cc-say', c.name) });
-    panel.el.querySelector('.pos-vp-r').prepend(size);
-    const ch = { c, video, size, panel, hls: null, src: null, tap: null, gain: null, buf: null,
+    const ch = { c, video, hls: null, src: null, tap: null, gain: null, buf: null,
       lastFrame: 0, lastSound: 0, frames: 0, refused: false };
-    video.addEventListener('resize', () => showSize(ch));
+    video.addEventListener('resize', () => showSize());
     return ch;
   });
-  const pair = el('div', 'cc-pair');
-  pair.append(...tv.map((ch) => ch.panel.el));
+  // One footer line, as the camera pages: which channel is showing at the
+  // left, the resolution and the panel's own full-screen button at the right.
+  const who = el('span', 'cc-say', '');
+  const size = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: tv[0].video, left: who });
+  panel.el.classList.add('cc-tv');
+  tv[0].video.after(tv[1].video);   // ETV2 on top, under the caption and tag slots
+  panel.el.querySelector('.pos-vp-r').prepend(size);
 
-  function showSize(ch) {
-    const v = ch.video;
-    ch.size.textContent = v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
+  // The stronger picture's resolution, the one a viewer is mostly looking at.
+  function showSize() {
+    const v = tv[x < 0.5 ? 0 : 1].video;
+    size.textContent = playing && v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
+  }
+  // One name at either end, both with their share in between: `ETV 70 ETV2 30`.
+  // Empty while stopped, as the camera pages, so no name sits under an empty picture.
+  function showWho() {
+    const p = Math.round(x * 100);
+    who.textContent = !playing ? '' : p <= 0 ? tv[0].c.name : p >= 100 ? tv[1].c.name
+      : `${tv[0].c.name} ${100 - p} ${tv[1].c.name} ${p}`;
   }
 
   // ── the fader ───────────────────────────────────────────────────────────
   let x = 0.5;                     // 0 is all ETV, 1 is all ETV2
   const gains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];   // equal power
-  // Full strength at the centre, where each gain is 0.707, down to DIM at the end.
-  const strength = (g) => DIM + (1 - DIM) * Math.min(1, g * Math.SQRT2);
   let ctx = null, sum = null, mode = null;   // mode: 'graph' or 'volume'
   function applyFade() {
     const g = gains();
+    // The picture is a linear crossfade: ETV2 over ETV at the fader's value.
+    tv[0].video.style.opacity = '1';
+    tv[1].video.style.opacity = String(x);
     tv.forEach((ch, i) => {
-      ch.video.style.opacity = String(strength(g[i]));
       if (mode === 'graph' && ch.gain) ch.gain.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02);
       if (mode === 'volume') ch.video.volume = g[i];
     });
+    showWho(); showSize();
   }
 
   // The sound follows the links the bay holds, as on /concepts/030/: a channel
@@ -208,7 +225,7 @@
     const tick = () => {
       if (gen !== mine) return;
       ch.lastFrame = performance.now(); ch.frames++;
-      if (ch.frames === 1) { showSize(ch); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
+      if (ch.frames === 1) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
       v.requestVideoFrameCallback(tick);
     };
     v.requestVideoFrameCallback(tick);
@@ -251,7 +268,7 @@
     if (gen !== mine) return;
     if (served?.none) d.log(`${c.name}: ERR refused every point asked, across the whole window`, 'bad');
     else if (served && !served.edgeServed) d.log(`${c.name}: ERR refuses its newest ${Math.round(served.blockedMin)} min, so it starts behind that`, 'warn');
-    if (holds(vOut(c), screenIn(c)) || holds(aOut(c), FADER_IN)) {
+    if (holds(vOut(c), SCREEN_IN) || holds(aOut(c), FADER_IN)) {
       if (NATIVE_HLS) {
         v.src = pl.variant;
       } else if (window.Hls?.isSupported()) {
@@ -304,10 +321,10 @@
       try { v.pause(); } catch { /* fine */ }
       v.removeAttribute('src');
       v.load();
-      ch.size.textContent = '';
       Object.assign(ch, { lastFrame: 0, lastSound: 0, frames: 0, refused: false });
     }
     ctx?.suspend();
+    showWho(); showSize();
     pb.refresh();
     face();
     d.log('stopped: both engines destroyed, both pictures emptied');
@@ -329,12 +346,14 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, pair, fade, pb.el);
+  d.stack.add(top, panel.el, fade, pb.el);
   const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
   d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,
-    channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames, size: ch.size.textContent,
+    footer: () => ({ left: who.textContent, right: size.textContent }),
+    channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames,
+      size: ch.video.videoWidth ? `${ch.video.videoWidth}x${ch.video.videoHeight}` : '',
       opacity: ch.video.style.opacity, sound: fresh(ch.lastSound), refused: ch.refused, muted: ch.video.muted })),
   };
   d.ready();

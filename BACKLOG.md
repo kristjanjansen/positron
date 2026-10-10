@@ -1,8 +1,8 @@
 ## Open
 
-- ~~**093 Effects archived** (2026-10-10). Asked: *"arvhive / rm 093"*. Moved to `archive/concepts/093/`, off the list; the kit patchbay picture of its links stays, without a link.~~ DONE 2026-10-10.
+- ~~**093 Effects archived** (2026-10-10). Asked: *"arvhive / rm 093"*. Kept as `archive/concepts/effects.md` (*"093 just keep in md or smth"*), off the list; the kit patchbay picture of its links stays, without a link.~~ DONE 2026-10-10.
 - ~~**TV is 066 in a video group** (2026-10-10). Asked: *"move 040 to 066 and rename group "video""*.~~ DONE 2026-10-10.
-- **066: one video screen, the crossfader crossfades the pictures** (2026-10-10). Asked: *"040: single vidosceen, crossfade crossfades"*.
+- ~~**066: one video screen, the crossfader crossfades the pictures** (2026-10-10). Asked: *"040: single vidosceen, crossfade crossfades"*.~~ DONE 2026-10-10, one panel, ETV2 over ETV by the fader.
 - ~~**070's Pico screen: no flashing boxes, only the travelling dots** (2026-10-10). Asked: *"rm flashing the keys/pico/synth. just knobs travelling"*.~~ DONE 2026-10-10, firmware tests 20/20.
 - ~~**014 Dot piano: the volume knob its own node and row** (2026-10-10). Asked: *"make dotpiano knob separate as in recent synth ones"*. `web:knob-volume` cabled into midi state and the Pico; keys send notes only; the phone pictures no longer collapse.~~ DONE 2026-10-10.
 - ~~**Front page: no slides, no slogan** (2026-10-10). Asked: *"rm slide from frontpage"* and *"rm frontpage slogan"*.~~ DONE 2026-10-10.
