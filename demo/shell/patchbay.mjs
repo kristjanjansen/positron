@@ -28,11 +28,16 @@ export const MEDIUM_COLOURS = {
 const CSS = `
   :root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }
   ${MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n  ')}
-  .pb { display: flex; flex-direction: column; gap: 12px; }
-  .pb-head { display: flex; align-items: baseline; gap: 12px; }
-  .pb-head .pos-linkbtn { font-size: 13px; }
-  .pb-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  .pb-more { display: flex; flex-direction: column; gap: 12px; }
+  .pb { display: flex; flex-direction: column; }
+  .pb-more { margin-top: 24px; }
+  .pb-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+  .pb-head .pos-linkbtn { font-size: 12px; }
+  /* The kit's section heading (.pos-sec-h, uppercase mono), asked 2026-10-10:
+     *"patchbay title should be standard heading, uppercase mono"*. Its own
+     10 px margin is the gap to what it names; in the head row the row's
+     baseline alignment does that job, so it gives the margin up there. */
+  .pb-head .pos-sec-h { margin: 0; }
+  .pb-more { display: flex; flex-direction: column; gap: 24px; }
   .pb-more[hidden] { display: none; }
   ${BAY_VIEW_CSS}
 `;
@@ -71,7 +76,7 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
   const more = createLinkButton({ label: open ? 'Hide details' : 'See details', expanded: open, onPress: () => toggle() });
   const button = more.el;
   const head = el('div', 'pb-head');
-  head.append(el('h3', 'pb-h', title), button);
+  head.append(el('h3', 'pos-sec-h', title), button);
 
   const linksT = createTable({ columns: [
     { key: 'line', label: 'link', grow: true, hi: true, clip: true, hover: 'line' },
@@ -88,7 +93,9 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
     { key: 'by', label: 'transport', width: 96, clip: true },
   ] });
   const box = el('div', 'pb-more');
-  box.append(el('h3', 'pb-h', 'links'), linksT.el, el('h3', 'pb-h', 'ports'), portsT.el);
+  // A heading and its table are one block; the blocks are spaced, the pair is not.
+  const block = (name, t) => { const b = el('div'); b.append(el('h3', 'pos-sec-h', name), t.el); return b; };
+  box.append(block('links', linksT), block('ports', portsT));
   box.hidden = !open;
 
   const root = el('div', 'pb');
