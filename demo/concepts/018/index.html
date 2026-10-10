@@ -22,6 +22,7 @@
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { faustFactory, faustNode } from '/shell/faust.mjs';
   import { SYNTH_STEPS, synthUrl } from '/shell/synth-steps.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
 
   // /concepts/015/'s patchbay synth with the sound made by a Faust program,
   // and every parameter that program declares a knob node of its own, cabled
@@ -257,7 +258,13 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, wave.el, grid.el, pb.el);
+  // The program itself in the kit's code box, read only (asked 2026-10-10,
+  // *"show faust code"*, *"use code panel"*): the knobs below are its sliders.
+  const lines = PROGRAM.code.replace(/\n$/, '').split('\n').length;
+  const code = createCodeBox({ language: 'faust', rows: lines, label: '', value: PROGRAM.code.replace(/\n$/, ''),
+    ariaLabel: 'the Faust program this synth plays, read only' });
+  code.input.readOnly = true;
+  d.stack.add(top, wave.el, code.el, grid.el, pb.el);
   window.__demo.knobs = grid;
   window.__demo.fau = {
     bay: () => bay, node: () => node, names: () => names.slice(),
