@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 50</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/slide.css">
+<style>
+  /* A SANDBOX FOR TUTORIAL LAYOUTS (plans/plan-tutorial-layout.md). Every rule
+     here is page local on purpose: this page tries four arrangements of the
+     same three regions (the words, the build area, the patchbay) and the one
+     that wins moves into the kit, not this CSS.
+
+     🔴 THE PAGE IS WIDER THAN THE SITE'S 720 px COLUMN, and that is the first
+     finding rather than a styling choice: a words column, a build area and a
+     patchbay do not share 688 px of content at desk width. Desktop first was
+     asked for, so the body takes up to 1440 px here. */
+  body { max-width: 1440px; }
+  :root { --tl-side: 360px; --tl-dock: 280px; --tl-gap: 24px; }
+
+  .tl-bar { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: var(--tl-gap); }
+  .tl-bar .pos-linkbtn { font-size: 13px; }
+
+  .tl { display: grid; gap: var(--tl-gap); align-items: start; }
+  .tl > [hidden] { display: none; }
+  .tl-words { grid-area: words; min-width: 0; }
+  .tl-build { grid-area: build; min-width: 0; }
+  .tl-bay { grid-area: bay; min-width: 0; }
+  .tl-slide { grid-area: slide; min-width: 0; }
+
+  /* the words as a column: the slide's own content, set as page text */
+  .tl-words {
+    background: var(--card); border: var(--edge); border-radius: var(--r);
+    padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .tl-say { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 600; text-wrap: balance; }
+  .tl-p { margin: 0; color: var(--fg); max-width: 62ch; }
+  .tl-list { margin: 0; padding-left: 18px; color: var(--dim); }
+
+  /* the build area: two module boxes side by side, the keyboard under them */
+  .tl-build { display: flex; flex-direction: column; gap: 16px; }
+  .tl-mods { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .tl-mod-name { font-size: 13px; color: var(--dim); }
+  .tl-knobs { display: flex; gap: var(--ctl-gap); }
+
+  /* A: words left a third, build right two thirds, patchbay a band under both */
+  .tl[data-layout="a"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-areas: "words build" "bay bay"; }
+  .tl[data-layout="a"][data-words="off"] { grid-template-areas: "build build" "bay bay"; }
+  .tl[data-layout="a"][data-bay="off"] { grid-template-areas: "words build"; }
+  .tl[data-layout="a"][data-words="off"][data-bay="off"] { grid-template-areas: "build build"; }
+
+  /* B: words over build in the main column, patchbay a fixed right sidebar */
+  .tl[data-layout="b"] { grid-template-columns: minmax(0, 1fr) var(--tl-side); grid-template-areas: "words bay" "build bay"; grid-template-rows: auto 1fr; }
+  .tl[data-layout="b"][data-words="off"] { grid-template-areas: "build bay"; grid-template-rows: auto; }
+  .tl[data-layout="b"][data-bay="off"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "words" "build"; }
+  .tl[data-layout="b"][data-words="off"][data-bay="off"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "build"; }
+  .tl[data-layout="b"] .tl-bay { position: sticky; top: 16px; }
+
+  /* C: a real slide, split 1:2, the build area in its slot, patchbay under it */
+  .tl[data-layout="c"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "build" "bay"; }
+  .tl[data-layout="c"][data-bay="off"] { grid-template-areas: "build"; }
+  .tl[data-layout="c"][data-slide="on"] { grid-template-areas: "slide" "bay"; }
+  .tl[data-layout="c"][data-slide="on"][data-bay="off"] { grid-template-areas: "slide"; }
+  /* the build area inside the slot is page sized, not slide sized */
+  .tl-slot { align-self: stretch; display: flex; align-items: center; justify-content: center; min-width: 0; }
+
+  /* D: build on top, full width; under it a dock of fixed height, the words
+     scrolling inside themselves on the left and the patchbay on the right */
+  .tl[data-layout="d"] { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); grid-template-areas: "build build" "words bay"; }
+  .tl[data-layout="d"][data-words="off"] { grid-template-areas: "build build" "bay bay"; }
+  .tl[data-layout="d"][data-bay="off"] { grid-template-areas: "build build" "words words"; }
+  .tl[data-layout="d"][data-words="off"][data-bay="off"] { grid-template-areas: "build build"; }
+  .tl[data-layout="d"] .tl-words { height: var(--tl-dock); overflow-y: auto; }
+  .tl[data-layout="d"] .tl-bay { max-height: var(--tl-dock); overflow-y: auto; }
+
+  /* THE PHONE: one column for every layout, the build first, then the words in
+     a box that scrolls inside itself (the owner's phone note), then the bay.
+     Flex rather than grid, so a hidden region leaves no track and no gap.
+     Last in the sheet, so it wins its ties on order. */
+  @media (max-width: 560px) {
+    .tl[data-layout] { display: flex; flex-direction: column; align-items: stretch; }
+    .tl[data-layout] .tl-build { order: 1; }
+    .tl[data-layout] .tl-words { order: 2; height: auto; max-height: 40svh; overflow-y: auto; }
+    .tl[data-layout] .tl-bay { order: 3; position: static; max-height: none; }
+  }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createGlueRows } from '/shell/glue.mjs';
+  import { createLinkButton } from '/shell/link-button.mjs';
+  import { createSlide } from '/shell/slide.mjs';
+
+  // Layouts for a future tutorial: the words, the thing being built and the
+  // patchbay, arranged four ways. No sound and nothing opened on a visit: a key
+  // sends a note along the bay, which lights the cables, and that is all.
+  const d = mount({ name: 'concept 50', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav(50);
+
+  // ── the words, one spec, drawn as a slide (C) or as a column (A, B, D) ───
+  const WORDS = {
+    say: 'A filter takes the bright edge off a saw',
+    text: [
+      'The oscillator makes a sawtooth wave, which carries many overtones above the note you play. That is why it sounds bright and buzzy.',
+      'The low-pass filter lets everything below its cutoff through and turns down what is above it. Lower the cutoff and fewer overtones reach the speaker, so the sound gets darker.',
+      'Q raises the level right at the cutoff. Turn it up and a ring appears that moves with the cutoff knob.',
+    ],
+    list: ['Hold a key and watch the cables light', 'Turn cutoff down on the filter', 'Turn Q up and sweep cutoff again'],
+  };
+  const words = el('div', 'tl-words');
+  words.append(el('h2', 'tl-say', WORDS.say));
+  for (const t of WORDS.text) words.append(el('p', 'tl-p', t));
+  const ul = el('ul', 'tl-list');
+  for (const t of WORDS.list) ul.append(el('li', null, t));
+  words.append(ul);
+
+  // ── the bay: keys to osc to filter to speaker ────────────────────────────
+  const bay = createBay();
+  const ID = (n, p) => `web:${n}:${p}`;
+  for (const [n, label] of [['keys', 'keyboard'], ['osc', 'oscillator'], ['filter', 'lowpass filter'], ['speaker', 'speakers']]) {
+    bay.addNode({ id: `web:${n}`, kind: n === 'keys' ? 'person' : 'engine', label, place: 'browser' });
+  }
+  for (const p of [
+    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: ID('osc', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: () => {} },
+    { id: ID('osc', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('filter', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('filter', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ]) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  for (const [a, b] of [[ID('keys', 'midi-out'), ID('osc', 'midi-in')], [ID('osc', 'audio-out'), ID('filter', 'audio-in')],
+    [ID('filter', 'audio-out'), ID('speaker', 'audio-in')]]) {
+    const r = bay.link(a, b);
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const held = new Set();
+  const pb = createPatchbay(bay, { flowing: () => held.size > 0 });
+  const bayBox = el('div', 'tl-bay');
+  bayBox.append(pb.el);
+
+  // ── the build area: an oscillator box, a filter box, a keyboard ──────────
+  function module(name, knobs) {
+    const box = createGlueRows();
+    box.row(el('span', 'tl-mod-name', name));
+    const row = el('div', 'tl-knobs');
+    for (const k of knobs) row.append(createKnob(k).el);
+    box.row(row);
+    return box.el;
+  }
+  const WAVES = ['sine', 'tri', 'saw', 'square'];
+  const mods = el('div', 'tl-mods');
+  mods.append(
+    module('oscillator', [
+      { label: 'freq', min: 0, max: 127, value: 64 },
+      { label: 'wave', min: 0, max: 3, step: 1, value: 2, format: (r) => WAVES[Math.round(r)] },
+    ]),
+    module('filter', [
+      { label: 'cutoff', min: 0, max: 127, value: 80 },
+      { label: 'Q', min: 0.7, max: 15, value: 5, format: (r) => r.toFixed(1) },
+    ]),
+  );
+  const keysHost = el('div');
+  createKeyboard(keysHost, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      held.add(note);
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+    },
+    onUp: (note, how) => {
+      if (how === 'midi') return;
+      held.delete(note);
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
+    },
+  });
+  const build = el('div', 'tl-build');
+  build.append(mods, keysHost);
+
+  // ── C's slide: the same words, the build area moved into its slot ────────
+  const slotHost = el('div', 'tl-slot');
+  const slide = createSlide({ name: 'tutorial step', layout: 'split', cols: '1:2', side: 'right',
+    say: WORDS.say, sayStep: 3, text: WORDS.text[0], textStep: 2, slot: slotHost });
+  const slideBox = el('div', 'tl-slide');
+  slideBox.append(slide.frame);
+
+  // ── the layout and the switches ──────────────────────────────────────────
+  const LAYOUTS = [['A footer', 'a'], ['B sidebar', 'b'], ['C slide', 'c'], ['D dock', 'd']];
+  const root = el('div', 'tl');
+  root.append(words, build, slideBox, bayBox);
+  const phone = matchMedia('(max-width: 560px)');
+  const S = { layout: 'a', words: true, bay: true };
+  const fromHash = location.hash.slice(1);
+  if (LAYOUTS.some(([, v]) => v === fromHash)) S.layout = fromHash;
+
+  function apply() {
+    // The slide holds the build only on a desk with the words showing; a 16:9
+    // slide on a phone puts the keyboard at a fifth of its size.
+    const useSlide = S.layout === 'c' && S.words && !phone.matches;
+    root.dataset.layout = S.layout;
+    root.dataset.words = S.words ? 'on' : 'off';
+    root.dataset.bay = S.bay ? 'on' : 'off';
+    root.dataset.slide = useSlide ? 'on' : 'off';
+    if (useSlide) { if (build.parentNode !== slotHost) slotHost.append(build); }
+    else if (build.parentNode !== root) root.insertBefore(build, slideBox);
+    slideBox.hidden = !useSlide;
+    words.hidden = !S.words || useSlide;
+    bayBox.hidden = !S.bay;
+    wordsBtn.label(S.words ? 'Hide words' : 'Show words'); wordsBtn.expanded(S.words);
+    bayBtn.label(S.bay ? 'Hide patchbay' : 'Show patchbay'); bayBtn.expanded(S.bay);
+    history.replaceState(null, '', `#${S.layout}`);
+    requestAnimationFrame(() => pb.refresh());
+  }
+
+  const choice = createChoice({ label: 'layout', at: LAYOUTS.findIndex(([, v]) => v === S.layout),
+    options: LAYOUTS, onPick: (v) => { S.layout = v; apply(); } });
+  const wordsBtn = createLinkButton({ label: 'Hide words', expanded: true, onPress: () => { S.words = !S.words; apply(); } });
+  const bayBtn = createLinkButton({ label: 'Hide patchbay', expanded: true, onPress: () => { S.bay = !S.bay; apply(); } });
+  const bar = el('div', 'tl-bar');
+  bar.append(choice.el, wordsBtn.el, bayBtn.el);
+  phone.addEventListener('change', apply);
+
+  d.el.append(bar, root);
+  apply();
+
+  // What a shot needs to read back: each region's box, whether the keyboard
+  // fits its column, whether the bay drew one row or stacked, and whether the
+  // whole tutorial fits one screen.
+  function measure() {
+    const r = (e) => { if (!e || e.hidden || !e.isConnected) return null; const b = e.getBoundingClientRect();
+      return b.width ? { x: Math.round(b.left), y: Math.round(b.top + scrollY), w: Math.round(b.width), h: Math.round(b.height) } : null; };
+    const kbd = keysHost.querySelector('.kbd') || keysHost.firstElementChild;
+    const xs = new Set([...pb.view.el.querySelectorAll('.lv-box rect')].map((x) => x.getAttribute('x')));
+    const lv = pb.view.el;
+    return {
+      layout: S.layout, vw: innerWidth, vh: innerHeight,
+      words: r(words), build: r(build), slide: r(slideBox.hidden ? null : slideBox), bay: r(bayBox),
+      keys: r(kbd), keysOverflow: kbd ? Math.max(0, Math.round(kbd.scrollWidth - kbd.clientWidth)) : null,
+      bayRow: xs.size > 1 ? 'one row' : 'stacked', bayScroll: Math.max(0, lv.scrollWidth - lv.clientWidth),
+      wordsScroll: Math.max(0, words.scrollHeight - words.clientHeight),
+      pageBottom: Math.round(root.getBoundingClientRect().bottom + scrollY),
+    };
+  }
+  window.__demo.tl = {
+    set(layout, o = {}) { if (layout) { S.layout = layout; choice.set?.(LAYOUTS.findIndex(([, v]) => v === layout)); }
+      if ('words' in o) S.words = o.words; if ('bay' in o) S.bay = o.bay; apply(); },
+    measure,
+  };
+  d.ready();
+</script>
