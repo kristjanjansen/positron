@@ -1,5 +1,6 @@
 ## Open
 
+- **Transport icons on every concept, an icon button in the kit** (2026-10-10). Asked: *"Use transport icons on all our convepts. Keep them square. Kit iconbutton(group?)"*. Feather play, pause, stop and record from `demo/shell/icons.mjs` in square buttons; a kit `createIconButton` (and a group if a row of them needs one), then every concept page's own play, stop and record buttons use it (12, 13 and 14's record, 30, 31, 40, 41). Waits for the knob grid agent, which is editing 40, 41 and `shell.css`.
 - **A knob grid kit component** (2026-10-10). Asked: *"Knobs:each has its own wrapper box, in a grid, already reserve room for it. A kit component. In 40 41"*. Each knob in a box of its own, the boxes in a grid whose slots are reserved, used on concepts 40 and 41.
 - ~~**Concept 41: no keyboard, a labelled pad with a 2x2 grid** (2026-10-10). Asked: *"Rm keyboard from 41. Make xy have labels and 2x2 grid lines, similar to draw (can you reuse?)"*.~~ DONE 2026-10-10.
 - **Icons: open questions** (2026-10-10, from the icons agent). Feather has no keyboard, plug, cable, knob, unlink or broadcast icon (Lucide has them, refused for eccm as rounded); positron keeps Feather's round caps where eccm squares them; at 375 px `fullscreen-exit` breaks after its hyphen. No page uses `icons.mjs` yet.
