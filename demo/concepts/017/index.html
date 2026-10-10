@@ -166,9 +166,9 @@
     starting = true;
     try {
       if (!board) makeBoard();
-      say(`reaching ${ROOM}`);
+      say(`Reaching ${ROOM}`);
       const up = await Promise.race([opened, wait(8000).then(() => false)]);
-      if (!up) { say(`the relay did not open ${ROOM} within eight seconds, so nothing is playing`, 'warn'); return; }
+      if (!up) { say(`The relay did not open ${ROOM} within eight seconds, so nothing is playing`, 'warn'); return; }
       await board.startAudio();
       const pl = board.playout();
       if (pl && !analyser) {
@@ -178,14 +178,14 @@
         pl.connect(analyser);
         requestAnimationFrame(frame);
       }
-      if (!MAY_PLAY) { say('a check is running, so nothing was sent to the shared board. Add ?board=1 to let it through', 'warn'); return; }
+      if (!MAY_PLAY) { say('A check is running, so nothing was sent to the shared board. Add ?board=1 to let it through', 'warn'); return; }
       let st = await status();
-      if (!st) { say(`the Raspberry Pi is not answering in ${ROOM}, so the keys and knobs go nowhere`, 'warn'); return; }
+      if (!st) { say(`The Raspberry Pi is not answering in ${ROOM}, so the keys and knobs go nowhere`, 'warn'); return; }
       if (st.ok && st.source !== 'yoshimi') { say(`${st.source} is playing on the Pi and this page will not stop it`, 'warn'); return; }
       if (!st.ok) {
-        say('starting Yoshimi on the Pi, which takes ten to forty seconds');
+        say('Starting Yoshimi on the Pi, which takes ten to forty seconds');
         st = await board.ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 60000);
-        if (!st?.ok) { say(`the Pi could not start Yoshimi${st?.reason ? `, it said ${st.reason}` : ''}`, 'bad'); return; }
+        if (!st?.ok) { say(`The Pi could not start Yoshimi${st?.reason ? `, it said ${st.reason}` : ''}`, 'bad'); return; }
       }
       board.send({ type: 'voice.select', channel: 0, bank: BANK, program: PROGRAM, name: PATCH });
       await wait(PATCH_SETTLE_MS);
@@ -200,7 +200,7 @@
     armed = false;
     kb.panic?.();
     transport.setIcon('play', 'play', 'play');
-    say('stopped, every note on the Pi was released');
+    say('Stopped, every note on the Pi was released');
   }
   setInterval(() => { if (armed) pump(); }, 50);
 
