@@ -9,7 +9,7 @@ export const CONCEPTS = [
   { n: '005', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: '006', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
   { n: '007', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
-  { n: '080', title: 'TV', say: 'ETV and ETV2 live side by side with a crossfader between their sound.' },
+  { n: '008', title: 'TV', say: 'ETV and ETV2 live side by side with a crossfader between their sound.' },
   { n: '010', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
   { n: '011', title: 'Effects', say: 'The keyboard and a saw synth with MIDI and audio effects.' },
   { n: '012', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
