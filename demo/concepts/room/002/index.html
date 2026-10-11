@@ -12,36 +12,12 @@
      compose box, driven by room/000's bay: two `*` links, a line crossing the
      room as one `bay.event`. The patchbay picture sits under the frame. */
 
-  @media (max-width: 560px) { .rc-panel .pos-vp-stage { --vp-aspect: 4 / 5; } }
-
-  .rc { position: absolute; inset: 0; display: flex; flex-direction: column;
-        background: var(--card); }
-
-  .rc-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto;
-             display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
-  .rc-msgs > :first-child { margin-top: auto; }
-  .rc-msg { display: flex; flex-direction: column; gap: 3px; }
-  .rc-msg-h { display: flex; gap: 10px; align-items: baseline; }
-  .rc-who { font: 500 12px/1.3 var(--mono); color: var(--fg); }
-  .rc-when { font: 400 11px/1.3 var(--mono); color: var(--dim2); }
-  .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
-             overflow-wrap: anywhere; white-space: pre-wrap; }
-  .rc-msg.me .rc-who { color: var(--hi); }
-
-  .rc-compose[hidden] { display: none; }
-  .rc-compose { position: relative; padding: 10px 12px 12px; }
-  .rc-compose .pos-field { display: block; margin: 0; }
-  /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
-  .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
-                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
-  .rc-send { position: absolute; right: 18px; bottom: 18px; }
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs. */
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createChatLog, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
@@ -87,15 +63,8 @@
   const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
   const short = (site) => site === SITE ? 'you' : site;
 
-  const list = el('div', 'rc-msgs');
-  function add({ who, at, text, me = false }) {
-    const m = el('div', `rc-msg${me ? ' me' : ''}`);
-    const h = el('div', 'rc-msg-h');
-    h.append(el('span', 'rc-who', who), el('span', 'rc-when', clock(at)));
-    m.append(h, el('p', 'rc-text', text));
-    list.append(m);
-    list.scrollTop = list.scrollHeight;
-  }
+  const log = createChatLog();
+  const add = (r) => log.add(r);
 
   // Called by the bay, only along the listener link.
   function heard(e, l, m) {
@@ -110,56 +79,9 @@
     if (!r.far.length) d.log('nobody else in the room heard it');
   }
 
-  /** The compose box: grows to six lines, Enter sends, Shift and Enter is a
-      new line, the send icon in its bottom right. Off until joined. */
-  function compose(onSend) {
-    const wrap = el('div', 'rc-compose');
-    const field = createField({ rows: 2, placeholder: `Join ${ROOM} to write` });
-    const ta = field.input;
-    ta.rows = 1;
-    ta.setAttribute('aria-label', `Message ${ROOM}`);
-    const grow = () => {
-      ta.style.height = 'auto';
-      ta.style.height = `${ta.scrollHeight + 2}px`;
-      ta.style.overflowY = ta.scrollHeight > ta.clientHeight + 2 ? 'auto' : 'hidden';
-    };
-    const b = createIconButton({ icon: 'send', label: 'Send', small: true, onPress: () => send() });
-    b.el.classList.add('rc-send');
-    const send = () => {
-      const text = ta.value.trim();
-      if (!text || ta.disabled) return;
-      onSend(text);
-      field.set('');
-      grow();
-      ta.focus();
-    };
-    ta.addEventListener('input', grow);
-    ta.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-    });
-    const enable = (on) => {
-      field.disabled(!on);
-      b.el.disabled = !on;
-      ta.placeholder = on ? `Message ${ROOM}` : `Join ${ROOM} to write`;
-      // No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*).
-      wrap.hidden = !on;
-      requestAnimationFrame(grow);
-      if (on) ta.focus();
-    };
-    enable(false);
-    wrap.append(field.el, b.el);
-    requestAnimationFrame(grow);
-    return { el: wrap, enable };
-  }
-
-  const box = compose(say);
-  const chat = el('div', 'rc');
-  chat.append(list, box.el);
-
+  const box = createChatCompose({ placeholder: `Message ${ROOM}`, onSend: say });
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  const panel = createVideoPanel({ left: join.el, fullMode: 'footer' });
-  panel.el.classList.add('rc-panel');
-  panel.stage.append(chat);
+  const panel = createChatWindow({ columns: [createChatColumn({ body: log, compose: box })], footer: join.el });
 
   // ── the patchbay: the two `*` links this tab holds, read from bay() ──────
   // Before Join it is drawn from this tab's own graph, which opens nothing. A

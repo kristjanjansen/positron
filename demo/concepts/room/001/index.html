@@ -14,140 +14,53 @@
      the chat, listed kit-style"*. Nothing here opens a socket: a sent line
      lands in this tab only. */
 
-  /* A phone gets a taller stage, set through the panel's own custom property
-     so the panel's full screen rule still wins. */
-  @media (max-width: 560px) { .rc-panel .pos-vp-stage { --vp-aspect: 4 / 5; } }
-
-  /* The chat fills the stage, full width. The sidebar was taken out
-     2026-10-11 (*"no in the room sidebar / ui for now, full w"*). */
-  .rc { position: absolute; inset: 0; display: flex; flex-direction: column;
-        background: var(--card); }
-
-  /* ── messages: newest at the bottom, scrolling inside themselves ── */
-  .rc-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto;
-             display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
-  .rc-msgs > :first-child { margin-top: auto; }
-  .rc-msg { display: flex; flex-direction: column; gap: 3px; }
-  .rc-msg-h { display: flex; gap: 10px; align-items: baseline; }
-  .rc-who { font: 500 12px/1.3 var(--mono); color: var(--fg); }
-  .rc-when { font: 400 11px/1.3 var(--mono); color: var(--dim2); }
-  .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
-             overflow-wrap: anywhere; white-space: pre-wrap; }
-  .rc-msg.me .rc-who { color: var(--hi); }
-
-  /* ── compose: the kit's field, growing with what is typed, send in its
-     bottom right corner ── */
-  .rc-compose { position: relative; padding: 10px 12px 12px; }
-  .rc-compose .pos-field { display: block; margin: 0; }
-  /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
-  .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
-                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
-  .rc-send { position: absolute; right: 18px; bottom: 18px; }
-
-
-
-  /* ── the parts, each at its own size on a card ── */
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs (asked 2026-10-11,
+     *"(make it reusable) as all chat ui elements"*). Only the part cards are
+     the page's. */
   .rc-part { background: var(--card); border: var(--edge, 1px solid var(--line));
-             border-radius: var(--r, 4px); }
-  .rc-part.pad { padding: 14px 16px; }
-  .rc-part.msgs { height: 220px; display: flex; flex-direction: column; }
+             border-radius: var(--r, 4px); display: flex; flex-direction: column; }
+  .rc-part.msgs { height: 220px; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createChatLog, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
 
   const d = mount({ name: 'concept room 001', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('room/001');
 
   const ROOM = 'chat-1';
-  const ME = 'web-8kt';
+  const now = Date.now();
   const SAMPLE = [
-    { who: 'web-2qm', when: '14:02', text: 'Is the Pi up today?' },
-    { who: 'web-7zd', when: '14:03', text: 'It answered a minute ago. Yoshimi is loaded.' },
-    { who: 'web-2qm', when: '14:05', text: 'Good. Patching the keys to it now.' },
+    { who: 'web-2qm', at: now - 180000, text: 'Is the Pi up today?' },
+    { who: 'web-7zd', at: now - 120000, text: 'It answered a minute ago. Yoshimi is loaded.' },
+    { who: 'web-2qm', at: now - 60000, text: 'Good. Patching the keys to it now.' },
   ];
-  const clock = () => new Date().toTimeString().slice(0, 5);
+  const logOf = (rows) => { const l = createChatLog(); for (const r of rows) l.add(r); return l; };
 
-  // ── the parts, each a function, so the frame and the list below use the same ones ──
-  function message({ who, when, text }) {
-    const m = el('div', `rc-msg${who === ME ? ' me' : ''}`);
-    const h = el('div', 'rc-msg-h');
-    h.append(el('span', 'rc-who', who), el('span', 'rc-when', when));
-    m.append(h, el('p', 'rc-text', text));
-    return m;
-  }
-
-  function messages(rows) {
-    const box = el('div', 'rc-msgs');
-    for (const r of rows) box.append(message(r));
-    return {
-      el: box,
-      add(r) { box.append(message(r)); box.scrollTop = box.scrollHeight; },
-    };
-  }
-
-  /** The compose box: grows with its text up to six lines, Enter sends,
-      Shift and Enter is a new line, the send icon sits in its bottom right. */
-  function compose(onSend) {
-    const wrap = el('div', 'rc-compose');
-    const field = createField({ rows: 2, placeholder: `Message ${ROOM}` });
-    const ta = field.input;
-    ta.rows = 1;
-    ta.setAttribute('aria-label', `Message ${ROOM}`);
-    const grow = () => {
-      ta.style.height = 'auto';
-      ta.style.height = `${ta.scrollHeight + 2}px`;
-      ta.style.overflowY = ta.scrollHeight > ta.clientHeight + 2 ? 'auto' : 'hidden';
-    };
-    const send = () => {
-      const text = ta.value.trim();
-      if (!text) return;
-      onSend(text);
-      field.set('');
-      grow();
-      ta.focus();
-    };
-    ta.addEventListener('input', grow);
-    ta.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-    });
-    const b = createIconButton({ icon: 'send', label: 'Send', small: true, onPress: send });
-    b.el.classList.add('rc-send');
-    wrap.append(field.el, b.el);
-    requestAnimationFrame(grow);
-    return { el: wrap, input: ta };
-  }
-
-
-  // ── the frame ──────────────────────────────────────────────────────────
-  const list = messages(SAMPLE);
-  const chat = el('div', 'rc');
-  const box = compose((text) => list.add({ who: ME, when: clock(), text }));
-  chat.append(list.el, box.el);
-  // The frame's compose box takes the focus on load (asked 2026-10-11, *"autofocus compose input"*).
-  box.input.focus({ preventScroll: true });
-
-  const panel = createVideoPanel({ left: false, fullMode: 'footer' });
-  panel.el.classList.add('rc-panel');
-  panel.stage.append(chat);
+  // ── the frame: UI only, a sent line lands in this tab ──────────────────
+  const list = logOf(SAMPLE);
+  const box = createChatCompose({ placeholder: `Message ${ROOM}`, onSend: (text) => list.add({ who: 'you', at: Date.now(), text, me: true }) });
+  const panel = createChatWindow({ columns: [createChatColumn({ body: list, compose: box })] });
   d.stack.add(panel.el);
+  // The frame's compose box takes the focus on load (asked 2026-10-11, *"autofocus compose input"*).
+  box.enable(true);
 
   // ── the parts, listed ──────────────────────────────────────────────────
-  const msgPart = el('div', 'rc-part pad');
-  msgPart.append(message(SAMPLE[1]));
+  const msgPart = el('div', 'rc-part');
+  msgPart.append(logOf([SAMPLE[1]]).el);
   d.stack.titled('MESSAGE', msgPart);
 
   const msgsPart = el('div', 'rc-part msgs');
-  msgsPart.append(messages(SAMPLE).el);
+  msgsPart.append(logOf(SAMPLE).el);
   d.stack.titled('MESSAGES', msgsPart);
 
   const composePart = el('div', 'rc-part');
-  composePart.append(compose((text) => d.log(`send: ${text}`)).el);
+  const partBox = createChatCompose({ placeholder: `Message ${ROOM}`, onSend: (text) => d.log(`send: ${text}`) });
+  partBox.enable(true);
+  composePart.append(partBox.el);
   d.stack.titled('COMPOSE', composePart);
-
+  box.input.focus({ preventScroll: true });
 
   d.ready();
 </script>
