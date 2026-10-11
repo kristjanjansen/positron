@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept 092</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/slide.css">
+<style>
+  /* ONE TUTORIAL SLIDE (plans/plan-tutorial-layout.md). Decided 2026-10-10:
+     *"I'm asking you to design a slide. So a page should contain a slide frame,
+     and the content inside of it can go to full screen and have some kind of
+     mobile support."* The frame sits in the page's own column (no wide body),
+     and everything inside it is laid out ONCE at a logical 1024 by 576 and
+     scaled, the way `fitBox` in slide.mjs scales a px control on a slide, so
+     nothing reflows at any width: only `--fit-k` changes.
+
+     🔴 PAGE LOCAL, NOT `createSlide`. Its `split` has two columns and no
+     footer band, and its words are fixed steps that clip rather than scroll.
+     What the kit would need is in the plan, section 2.
+
+     🔴 IN THE KIT'S SLIDE PLAYER'S CONTAINER, asked 2026-10-10 as *"50: use
+     standard slider container"*. Built from the pieces `createSlidePlayer`
+     uses (a video panel, the stepper on the left, `N / M` in the middle, the
+     panel's own ⛶, `sl-player`, its keys), not the player itself: the player
+     only shows `createSlide` slides, a slot sits inside the slide's inset and
+     under its words, and in full screen it letterboxes 16:9, so neither the
+     edge to edge frame nor the upright rows fit in it. */
+
+
+  /* The frame fills the panel's stage, which is 16:9 in the page and the
+     whole screen when full. It is the box the scale is measured off; the panel
+     draws the edge, so the frame draws none. */
+  .tf { position: absolute; inset: 0; overflow: hidden; background: var(--card); }
+
+  /* The inside, at its logical size, scaled from the top left corner. The same
+     transform `.sl-fit-in` uses, with the same custom properties. */
+  .tf-in {
+    position: absolute; left: 0; top: 0;
+    width: var(--fit-w, 1024px); height: var(--fit-h, 576px);
+    transform-origin: 0 0;
+    transform: translate(var(--fit-x, 0px), var(--fit-y, 0px)) scale(var(--fit-k, 1));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "words build" "words bay";
+    /* one surface, three regions: the seams are the ground between them */
+    gap: 1px; background: var(--line);
+  }
+  .tf-in > * { min-width: 0; min-height: 0; }
+
+  /* ── the words: a quarter of the width, the full height, NO SCROLLING ──
+     Asked 2026-10-10: *"could layout work with 1/4 left text col (no
+     scrolling), and then top synth and bottom patchbay?"*. So a step's words
+     are written to fit this column at reading size, and `measure()` reports
+     `wordsMore`, which must be 0. Cut, never clipped and never faded. */
+  .tf-words {
+    grid-area: words; background: var(--card);
+    overflow: hidden;
+    padding: 24px 22px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .tf-say {
+    margin: 0; font-family: 'Slide JetBrains Mono', var(--mono);
+    font-size: 21px; line-height: 1.15; letter-spacing: -0.03em; font-weight: 600;
+    text-wrap: balance;
+  }
+  .tf-p { margin: 0; font-size: 16px; line-height: 1.42; }
+  .tf-list { margin: 0; padding-left: 18px; font-size: 16px; line-height: 1.42; color: var(--dim); }
+  .tf-list li + li { margin-top: 4px; }
+
+  /* ── the build area: LINEAR, the concept synth layout (positron-concepts,
+     *"they are linear except knobs that are independent in the knobs area,
+     horiz scrollable. no half col scope, scope is always full w"*). The scope
+     at the full width, then one row of the kit's own boxed knobs that scrolls
+     sideways and never wraps (`createKnobGrid(..., { row: true })`, as on
+     /concepts/synth/040/), then the keys. No module boxes: the band says which
+     modules are patched, and the live knobs say which are in play. ─────── */
+  .tf-build {
+    grid-area: build; background: var(--bg);
+    padding: 24px 28px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  /* the scope takes the height the knobs and keys leave, never a typed one */
+  .tf-scope { flex: 1 1 auto; display: flex; min-height: 0; }
+  .tf-scope .pos-sv { margin: 0; flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
+  .tf-scope .pos-sv-c { flex: 1 1 0; height: auto; min-height: 0; }
+  /* a step with no scope in its patch keeps the scope's place, so nothing
+     below it moves between steps */
+  .tf-scope[data-off] { visibility: hidden; }
+  .tf-keys .kbd { margin: 0; }
+
+  /* ── the patchbay: a full width band, always one row ───────────────────── */
+  .tf-bay {
+    grid-area: bay; background: var(--bg);
+    padding: 14px 28px 18px;
+    display: flex; flex-direction: column;
+  }
+  /* The heading is the kit's .pos-sec-h, uppercase mono, as createPatchbay draws
+     it; its own 10 px margin is the gap to the picture it names. */
+
+  /* 🔴 ROWS, FULL SCREEN ON A SCREEN TALLER THAN IT IS WIDE. Decided as *"full
+     screen in portrait turns into rows: build on top, then the words
+     scrolling, then the patchbay"*, and since the quarter column the words do
+     not scroll here either: they are short enough to sit whole. The script
+     lays the inside out at a logical 730 wide (13 white keys and their padding) and as tall as the screen at
+     that scale, and sets `data-mode`. Same parts, one column; the words row
+     takes what is left. */
+  .tf-in[data-mode="rows"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "build" "words" "bay";
+  }
+  .tf-in[data-mode="rows"] .tf-build { padding: 20px 16px; }
+  /* rows: the build is an `auto` row, so the scope has no leftover height to
+     take and is given the kit's own figure height instead */
+  .tf-in[data-mode="rows"] .tf-scope { flex: none; height: 120px; }
+  .tf-in[data-mode="rows"] .tf-words { padding: 22px 20px; }
+  .tf-in[data-mode="rows"] .tf-bay { padding: 14px 16px 18px; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { swipeStep } from '/shell/slide.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createSynth, KNOBS } from './modules.mjs';
+
+  // One tutorial slide in three steps. A step changes the words, which boxes
+  // the build area shows and the patch the bay holds; the footer band draws
+  // that patch, and a key lights the cables it travels.
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key press.
+  const d = mount({ name: 'concept tutorial 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('tutorial/000');
+
+  const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
+  const { bay } = synth;
+  const ID = synth.id;
+
+  // ── the steps: the words, the boxes and the patch ─────────────────────────
+  const STEPS = [
+    {
+      name: 'oscillator', boxes: ['osc'],
+      say: 'An oscillator makes the sound',
+      text: ['A key sends a note, and the oscillator plays it as a wave at that pitch. A sine is smooth and a saw is bright.'],
+      list: ['Hold a key and watch the cables light', 'Turn wave from sine to saw'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'filter', boxes: ['osc', 'filter'],
+      say: 'A filter takes the bright edge off a saw',
+      text: ['It lets through what is below its cutoff. Lower the cutoff and the sound gets darker. Q adds a ring at the cutoff.'],
+      list: ['Hold a key and turn cutoff down', 'Turn Q up and sweep again'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:speaker:audio-in'],
+    },
+    {
+      name: 'scope', boxes: ['osc', 'filter', 'scope'],
+      say: 'A scope draws what reaches the speakers',
+      text: ['It draws one cycle of the wave. Close the cutoff and the sharp corner of a saw rounds off. Raise Q and a ripple follows it.'],
+      list: ['Turn cutoff down slowly', 'Turn Q up and watch the ripple'],
+      patch: ['web:keys:midi-out -> web:osc:midi-in', 'web:osc:audio-out -> web:filter:audio-in',
+        'web:filter:audio-out -> web:scope:audio-in', 'web:scope:audio-out -> web:speaker:audio-in'],
+    },
+  ];
+
+  // ── the words ───────────────────────────────────────────────────────────
+  const words = el('div', 'tf-words');
+  function setWords(s) {
+    words.replaceChildren(el('h2', 'tf-say', s.say), ...s.text.map((t) => el('p', 'tf-p', t)));
+    const ul = el('ul', 'tf-list');
+    for (const t of s.list) ul.append(el('li', null, t));
+    words.append(ul);
+  }
+
+  // ── the build area: the scope, the knobs area, the keys ──────────────────
+  const knobs = new Map();
+  for (const k of KNOBS) {
+    knobs.set(k.name, createKnob({
+      label: k.name === 'q' ? 'Q' : k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
+      onInput: (r) => synth.setParam(k.owner, k.name, k.value(r)),
+    }));
+  }
+  // Every knob has a box at every step; a knob whose module the step does not
+  // patch is switched off and keeps its slot.
+  const grid = createKnobGrid(knobs, { row: true });
+  const scopeHost = el('div', 'tf-scope');
+  const wave = createWaveShape({ host: scopeHost, reason: null, colour: '--hi', name: '' });
+
+  let ctx = null;
+  const wake = () => {
+    if (!ctx) { ctx = new AudioContext(); synth.start(ctx); requestAnimationFrame(frame); }
+    ctx.resume();
+  };
+  const keysHost = el('div', 'tf-keys');
+  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /concepts/synth/040/:
+  // the build area is three quarters of 1024 now, 712 logical px inside
+  createKeyboard(keysHost, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      wake();
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+    },
+    onUp: (note, how) => {
+      if (how === 'midi') return;
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
+    },
+  });
+  const build = el('div', 'tf-build');
+  build.append(scopeHost, grid.el, keysHost);
+
+  const WINDOW = 512, FULL = 0.5;
+  function frame() {
+    const buf = synth.read();
+    if (buf) {
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      wave.set({ points: Array.from(buf.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patchbay band: the picture only, one row ─────────────────────────
+  // The band draws only the boxes the step's links use, so it is one row at
+  // every step: a box nothing is patched to would be drawn as a second row.
+  const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
+  const view = {
+    nodes: () => bay.nodes().filter((n) => inPatch(n.id.split(':')[1])),
+    ports: () => bay.ports().filter((p) => inPatch(p.id.split(':')[1])),
+    links: () => bay.links(),
+  };
+  // Compact boxes, the title and the ports: the node's label beside its title
+  // made five boxes wider than the band and the last one scrolled out of it.
+  const pb = createPatchbay(view, { flowing: () => synth.sounding(), detail: () => [] });
+  const bayBand = el('div', 'tf-bay');
+  bayBand.append(el('h3', 'pos-sec-h', 'PATCHBAY'), pb.view.el);
+
+  // ── the frame ───────────────────────────────────────────────────────────
+  const inner = el('div', 'tf-in');
+  inner.append(words, build, bayBand);
+  const tf = el('div', 'tf');
+  tf.append(inner);
+
+  // ── the container: the kit's slide player, piece by piece ────────────────
+  // ‹ › on the left, `N / M` in the middle, the panel's own ⛶ on the right.
+  let at = -1;
+  const stepper = createStepper({ prev: () => go(at - 1), next: () => go(at + 1), what: 'step' });
+  const count = el('span', 'sl-count', '');
+  const panel = createVideoPanel({ left: stepper, centre: count, fullMode: 'hover', onFull: () => fit() });
+  panel.el.classList.add('sl-player');
+  panel.el.tabIndex = 0;
+  panel.el.setAttribute('aria-roledescription', 'slide player');
+  panel.stage.append(tf);
+
+  /**
+   * The scale. A frame is laid out at 1024 by 576 and letterboxed; a full
+   * screen taller than it is wide is laid out in rows at 730 wide and as tall
+   * as the screen at that scale. `fitBox`'s arithmetic and custom properties,
+   * with a second shape, which `fitBox` cannot change once it is made.
+   */
+  const FRAME = { w: 1024, h: 576 }, ROWS_W = 730;
+  let mode = 'frame', k = 0;
+  function fit() {
+    const ow = tf.clientWidth, oh = tf.clientHeight;
+    if (!ow || !oh) return;
+    const rows = panel.isFull() && oh > ow;
+    let w, h, x, y;
+    if (rows) { k = ow / ROWS_W; w = ROWS_W; h = oh / k; x = 0; y = 0; }
+    else { k = Math.min(ow / FRAME.w, oh / FRAME.h); w = FRAME.w; h = FRAME.h; x = (ow - w * k) / 2; y = (oh - h * k) / 2; }
+    const next = rows ? 'rows' : 'frame';
+    if (next !== mode) { mode = next; inner.dataset.mode = mode; }
+    for (const [p, v] of [['--fit-w', `${w}px`], ['--fit-h', `${h}px`], ['--fit-k', String(k)], ['--fit-x', `${x}px`], ['--fit-y', `${y}px`]]) {
+      inner.style.setProperty(p, v);
+    }
+    requestAnimationFrame(() => pb.refresh());
+  }
+  inner.dataset.mode = mode;
+  new ResizeObserver(fit).observe(tf);
+
+  // ── the steps ───────────────────────────────────────────────────────────
+  function go(i) {
+    const n = Math.max(0, Math.min(STEPS.length - 1, i));
+    if (n === at) return at;
+    at = n;
+    const s = STEPS[n];
+    setWords(s);
+    // A knob the step does not use is not shown at all, as on /concepts/synth/040/.
+    for (const n of grid.names) {
+      const on = s.boxes.includes(KNOBS.find((x) => x.name === n).owner);
+      grid.show(n, on); grid.cellOf(n).hidden = !on;
+    }
+    if (s.boxes.includes('scope')) delete scopeHost.dataset.off; else scopeHost.dataset.off = '';
+    const bad = synth.load(s.patch.join('\n'));
+    for (const b of bad) d.log(`${b.line} refused: ${b.why}`, 'warn');
+    pb.refresh();
+    count.textContent = `${at + 1} / ${STEPS.length}`;
+    stepper.buttons[0].disabled = at === 0;
+    stepper.buttons[stepper.buttons.length - 1].disabled = at === STEPS.length - 1;
+    return at;
+  }
+
+  // The player's keys, heard on the panel and stopped there, and on the whole
+  // document while it fills the screen (its footer, and the focus with it, is
+  // gone then). A key aimed at a field, a slider or a knob is that control's.
+  const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
+  const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
+  let heard = 0;
+  const onKey = (e) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t instanceof Element) {
+      if (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      if (t.closest('[role="slider"]')) return;
+      if (/^(BUTTON|A)$/.test(t.tagName) && (e.key === ' ' || e.key === 'Enter')) return;
+    }
+    let did = true;
+    if (NEXT.has(e.key)) go(at + 1);
+    else if (PREV.has(e.key)) go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(STEPS.length - 1);
+    else if (e.key === 'f' || e.key === 'F' || e.key === 'F5') panel.full(!panel.isFull());
+    else if (e.key === 'Escape' && panel.isFull()) panel.full(false);
+    else did = false;
+    if (!did) return;
+    heard++;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  panel.el.addEventListener('keydown', onKey);
+  document.addEventListener('keydown', (e) => {
+    if (!panel.isFull() || panel.el.contains(e.target)) return;
+    onKey(e);
+  });
+  new MutationObserver(() => {
+    if (panel.isFull() && !panel.el.contains(document.activeElement)) panel.el.focus({ preventScroll: true });
+  }).observe(panel.el, { attributes: true, attributeFilter: ['class', 'data-full'] });
+  panel.stage.addEventListener('pointerdown', () => panel.el.focus({ preventScroll: true }));
+
+  // A finger swiped sideways steps it, as in the player, so a phone in full
+  // screen (no footer, no keys) can still turn the page. The player's tap on a
+  // third of the screen is left out: this frame is knobs, keys and
+  // words, so a tap here is nearly always meant for a control.
+  const OWN = 'button, a, input, select, textarea, [role="slider"], .k, .pos-knob, .pos-kgrid-cell';
+  let from = null;
+  panel.stage.addEventListener('pointerdown', (e) => {
+    from = e.pointerType === 'touch' && !(e.target instanceof Element && e.target.closest(OWN))
+      ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  });
+  panel.stage.addEventListener('pointerup', (e) => {
+    if (!from || e.pointerId !== from.id) return;
+    const z = swipeStep(e.clientX - from.x, e.clientY - from.y);
+    from = null;
+    if (z) go(at + z);
+  });
+  panel.stage.addEventListener('pointercancel', () => { from = null; });
+
+  d.el.append(panel.el);
+  go(0);
+
+  // What a shot reads back: the scale, the mode, every region's box in screen
+  // px, the knob boxes (equal and not overlapping), and whether the words and
+  // the bay fit.
+  function measure() {
+    const r = (e) => { const b = e.getBoundingClientRect(); return { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width), h: Math.round(b.height) }; };
+    const cells = [...build.querySelectorAll('.pos-kgrid-cell')].map((c) => c.getBoundingClientRect());
+    const sizes = new Set(cells.map((c) => `${c.width.toFixed(1)}x${c.height.toFixed(1)}`));
+    let overlap = 0;
+    for (let i = 0; i < cells.length; i++) for (let j = i + 1; j < cells.length; j++) {
+      const a = cells[i], b = cells[j];
+      if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlap++;
+    }
+    const knobsCut = [...build.querySelectorAll('.pos-kgrid-cell')].filter((c) => c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1).length;
+    const xs = new Set([...pb.view.el.querySelectorAll('.lv-box')].map((g) => Math.round(g.getBoundingClientRect().top)));
+    const kbd = keysHost.querySelector('.keys');
+    return {
+      step: at, mode, k: +k.toFixed(3), full: panel.isFull(), count: count.textContent, keys: heard, vw: innerWidth, vh: innerHeight,
+      frame: r(tf), words: r(words), build: r(build), bay: r(bayBand),
+      wordsMore: Math.max(0, words.scrollHeight - words.clientHeight),
+      knobBoxes: cells.length, knobSizes: [...sizes], knobOverlap: overlap, knobsCut,
+      keysOverflow: kbd ? Math.max(0, kbd.scrollWidth - kbd.clientWidth) : null,
+      bayRows: xs.size, bayScroll: Math.max(0, pb.view.el.scrollWidth - pb.view.el.clientWidth),
+    };
+  }
+  window.__demo.tf = { show: go, full: (want) => panel.full(want), measure, panel };
+  window.__demo.synth = synth;
+  d.ready();
+</script>

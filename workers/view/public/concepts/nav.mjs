@@ -13,8 +13,8 @@ export function conceptNav(n) {
   back.replaceWith(row);
   row.append(back);
   const side = el('span', 'cc-nav-pn');
-  if (prev) side.append(el('a', 'pos-back', `‹ ${prev.n} ${prev.title}`, { href: `/concepts/${prev.n}/` }));
-  if (next) side.append(el('a', 'pos-back', `${next.n} ${next.title} ›`, { href: `/concepts/${next.n}/` }));
+  if (prev) side.append(el('a', 'pos-back', `‹ ${prev.n.split('/')[1]} ${prev.title}`, { href: `/concepts/${prev.n}/` }));
+  if (next) side.append(el('a', 'pos-back', `${next.n.split('/')[1]} ${next.title} ›`, { href: `/concepts/${next.n}/` }));
   row.append(side);
   if (!document.getElementById('cc-nav-css')) {
     const st = el('style');

@@ -2,7 +2,7 @@
 // slot for every knob it was given.
 //
 // 🔴 THE ASK, 2026-10-10: *"Knobs: each has its own wrapper box, in a grid,
-// already reserve room for it. A kit component. In 40 41"*. `/concepts/015/`
+// already reserve room for it. A kit component. In 40 41"*. `/concepts/synth/040/`
 // had taken a knob the step did not offer out of the row (`cc-gone`) and hid
 // the whole bank when a step offered none (`cc-off`), so the row closed up and
 // opened out under the reader on every step. Here a knob that is switched off
