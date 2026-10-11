@@ -32,6 +32,7 @@
   import { createBoard } from '/shell/board.mjs';
   import { createLease } from '/shell/openers.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
+  import { readPatch } from '/shell/circuit-patch.mjs';
 
   // The keyboard and a patch selector playing the Novation Circuit
   // that is plugged into the Raspberry Pi, the way /away/ reaches it: the Pi
@@ -42,8 +43,10 @@
   //
   // 🔴 NOTHING HERE CAN WRITE THE CIRCUIT'S FLASH. Notes, two synth control
   // changes and a program change on channel 1, patches 0 to 63, which selects
-  // a synth patch into RAM. No SysEx, no session change on 16. The board's gate
-  // refuses everything else whatever this page sends.
+  // a synth patch into RAM. One SysEx, the nine byte Current Patch Dump Request,
+  // which asks the Circuit for the patch it is holding and changes nothing. No
+  // session change on 16. The board's gate refuses everything else whatever
+  // this page sends.
   //
   // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
   // load. A check run sends nothing to the Circuit unless ?board=1 is added.
@@ -58,8 +61,9 @@
   // Synth 1 is channel 1 (plans/plan-circuit-model12.md §3.1). The gate allows
   // program change on 1 and 2 only, patches 0 to 63.
   const CH = 1;
-  // Nothing on this desk carries the Circuit's patch names as data, so a patch
-  // is its number (as on /away/).
+  // The list is numbers, because only the patch a synth is HOLDING can be read
+  // (a dump request answers for the current patch, never for a slot). The cell
+  // shows the name the Circuit sends back, as it stores it.
   const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
 
   // ── the bay ─────────────────────────────────────────────────────────────
@@ -135,13 +139,46 @@
   }
 
   // ── the patch selector, its own node ─────────────────────────────────────
-  // It opens empty: nothing says which patch the Circuit is on, so it shows
-  // what this page last sent.
-  let patchAt = null;
+  // It opens empty. On play, and after each patch change, the page asks the
+  // Circuit for the patch Synth 1 is holding (Current Patch Dump Request,
+  // plans/plan-circuit-patches.md §5) and shows its name.
+  let patchAt = null, patchName = '', nameReads = 0, nameMisses = 0, lastDump = null;
+  let nameBusy = false, nameAgain = false;
+  // 📄 Programmer's Reference Guide 1.3 p13, nine bytes, location 00 is Synth 1.
+  const DUMP_REQUEST = Object.freeze([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, CH - 1, 0xF7]);
+  function showName(text) { patchName = text; patchPick.show(text, patchAt ?? undefined); }
+  async function askName() {
+    // Byte 6 is read before anything is sent: 0x40 is the dump request, and 00
+    // and 01 are the two messages that replace a patch.
+    if (DUMP_REQUEST.length !== 9 || DUMP_REQUEST[6] !== 0x40) { d.log('the patch request is not the nine byte dump request, so it was not sent', 'warn'); return; }
+    const r = await board.ask({ type: 'midi.send', bytes: [...DUMP_REQUEST] }, 'midi.patch', 1500);
+    if (!armed) return;
+    if (!r) { nameMisses++; showName(''); d.log('The Pi did not answer the patch name request within 1.5 s', 'warn'); return; }
+    if (!r.ok) { nameMisses++; showName(''); d.log(`No patch name, ${r.why}`, 'warn'); return; }
+    let p;
+    try { p = readPatch(Uint8Array.from(r.bytes)); }
+    catch (e) { nameMisses++; showName(''); d.log(`The Circuit's answer did not read as a patch, ${e.message}`, 'warn'); return; }
+    if (p.command !== 0x00 || p.writesFlash || p.slot !== CH - 1) { nameMisses++; showName(''); d.log(`The answer was ${p.commandName} for ${p.slotName}, not Synth 1's patch`, 'warn'); return; }
+    lastDump = { bytes: [...p.bytes], name: p.name };
+    nameReads++;
+    showName(p.name);
+    d.log(`Synth 1 holds ${p.name ? `"${p.name}"` : 'a patch with no name'}`);
+  }
+  // One request at a time, and the last change always gets its name.
+  async function readName() {
+    if (!armed || !board) return;
+    if (nameBusy) { nameAgain = true; return; }
+    nameBusy = true;
+    try { do { nameAgain = false; await askName(); } while (nameAgain && armed); }
+    finally { nameBusy = false; }
+  }
   function pickPatch(i) {
     patchAt = i;
     patchPick.show(PATCHES[i], i);
     bay.send(id('patch', 'midi-out'), { cls: 'program', ch: CH, d1: i });
+    // The guide: wait for the patch to load (10 ms is plenty) and leave 20 ms
+    // between consecutive messages.
+    if (armed) setTimeout(readName, 30);
   }
   const step = (by) => pickPatch(patchAt == null ? (by > 0 ? 0 : PATCHES.length - 1) : (patchAt + by + PATCHES.length) % PATCHES.length);
   const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pickPatch(i) });
@@ -201,6 +238,7 @@
       patchPick.disabled(false);
       say('The Circuit on the Raspberry Pi, play the keys');
       transport.setIcon('play', 'stop', 'stop');
+      readName();
     } finally { starting = false; }
   }
   function stop() {
@@ -233,6 +271,7 @@
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
     armed, level, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
+    patchAt, patchName, nameReads, nameMisses, lastDump, shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
   });
   d.ready();

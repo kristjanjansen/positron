@@ -649,6 +649,37 @@ console.log('inputs: what a page may send the Circuit');
   is('a pass carries no kind field, so nothing reads one as a refusal', midiVerdict([0x90, 60, 100], CH).kind, undefined);
   is('and a synth controller refusal on the drums says why', /not a synth/.test(midiVerdict([0xB9, 74, 64], CH).why), true);
 
+  // ── ONE SysEx, the Current Patch Dump Request, since 2026-10-11 ─────────────
+  // 📄 Programmer's Reference Guide 1.3 p13: F0 00 20 29 01 60 40 <00|01> F7,
+  // "9 bytes in total". Matched byte for byte, never by prefix. Every negative
+  // control below is a shape that differs from it in one place.
+  const REQ = (loc) => [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, loc, 0xF7];
+  is('the dump request for synth 1 passes, and says which synth', midiVerdict(REQ(0), CH), { ok: true, dump: 0 });
+  is('the dump request for synth 2 passes', midiVerdict(REQ(1), CH), { ok: true, dump: 1 });
+  is('byte 6 of the request is 0x40, read before it is trusted', REQ(0)[6], 0x40);
+  is('NEGATIVE: the same nine bytes with command 00, Replace Current Patch, are refused', midiVerdict([...REQ(0).slice(0, 6), 0x00, 0, 0xF7], CH).ok, false);
+  is('NEGATIVE: the same nine bytes with command 01, Replace Patch, are refused', midiVerdict([...REQ(0).slice(0, 6), 0x01, 0, 0xF7], CH).ok, false);
+  is('NEGATIVE: every command byte but 40 is refused in the request shape',
+    [...Array(256).keys()].filter((c) => c !== 0x40 && midiVerdict([...REQ(0).slice(0, 6), c, 0, 0xF7], CH).ok), []);
+  {
+    // A whole 350 byte Replace Current Patch and Replace Patch, as a page could send them.
+    const big = (cmd) => [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, cmd, 0, 0, ...Array(340).fill(0x20), 0xF7];
+    is('NEGATIVE: a 350 byte Replace Current Patch is refused', midiVerdict(big(0x00), CH).ok, false);
+    is('NEGATIVE: a 350 byte Replace Patch, the one that writes flash, is refused', midiVerdict(big(0x01), CH).ok, false);
+    is('NEGATIVE: a 350 byte message wearing command 40 is refused', midiVerdict(big(0x40), CH).ok, false);
+  }
+  is('NEGATIVE: eight bytes, the location missing, is refused', midiVerdict([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, 0xF7], CH).ok, false);
+  is('NEGATIVE: ten bytes, a trailing 00 as one editor sends it, is refused', midiVerdict([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, 0, 0, 0xF7], CH).ok, false);
+  is('NEGATIVE: the request with anything after F7 is refused', midiVerdict([...REQ(0), 0x90], CH).ok, false);
+  is('NEGATIVE: a wrong byte anywhere in the header is refused, manufacturer, product type and product number',
+    [1, 2, 3, 4, 5].filter((i) => { const b = REQ(0); b[i] = (b[i] + 1) & 0x7F; return midiVerdict(b, CH).ok; }), []);
+  is('NEGATIVE: a Circuit Mono Station or another Novation product number is refused', [0x61, 0x62, 0x63, 0x64].map((p) => { const b = REQ(0); b[5] = p; return midiVerdict(b, CH).ok; }), [false, false, false, false]);
+  is('NEGATIVE: a location that is not synth 1 or 2 is refused', [2, 0x0F, 0x7F, 0x80].map((l) => midiVerdict(REQ(l), CH).ok), [false, false, false, false]);
+  is('NEGATIVE: no end of sysex is refused', midiVerdict([...REQ(0).slice(0, 8), 0x00], CH).ok, false);
+  is('NEGATIVE: a request whose synth channel this input does not play is refused', midiVerdict(REQ(1), [1, 10]).ok, false);
+  is('NEGATIVE: a universal SysEx is still refused', midiVerdict([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7], CH).ok, false);
+  is('and a refusal of the request shape names it sysex', midiVerdict([...REQ(0).slice(0, 6), 0x01, 0, 0xF7], CH).kind, 'sysex');
+
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
   is('a midi port is read from config', cfg.inputs.get('circuit').midi, { port: 'Circuit', channels: [1, 2, 10] });
   is('a midi port that is a path is refused', parseInputs('{"c":{"device":"x","midi":{"port":"/dev/snd/midiC0D0","channels":[1]}}}').inputs.has('c'), false);
@@ -707,6 +738,74 @@ console.log('inputs: what a page may send the Circuit');
   t += 61_000; c.s.lastHeard = t; c.beat();
   is('so the lease still releases it', writes.at(-1), [0x80, 64, 0]);
   hw.close();
+
+  // ── the dump request out, the patch back, against a fake raw MIDI input ────
+  {
+    let t2 = 0;
+    const out = [], order = [], inbox = [], timers = [];
+    let readFd = null, readClosed = 0;
+    const EAGAIN = () => { const e = new Error('EAGAIN: resource temporarily unavailable'); e.code = 'EAGAIN'; return e; };
+    const dumpFs = {
+      readlinkSync: () => 'card7',
+      openSync: (pth, fl) => { order.push(fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK) ? 'open read' : 'open write'); if (fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK)) { readFd = 77; return 77; } return 42; },
+      writeSync: (fd, buf) => { order.push('write'); out.push([...buf]); },
+      readSync: (fd, buf) => { if (fd !== 77) throw new Error('read on the wrong fd'); const c = inbox.shift(); if (!c) throw EAGAIN(); buf.set(c); return c.length; },
+      closeSync: (fd) => { if (fd === 77) readClosed++; },
+    };
+    const sock2 = [];
+    class WS2 { constructor() { this.readyState = 1; this.sent = []; sock2.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+    const hw3 = createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 3, rate: 48000, name: 'pi', id: 'pi',
+      spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); return p; },
+      WebSocket: WS2, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+      randomId: () => 'x', now: () => t2, fs: dumpFs, leaseMs: 60_000, beatMs: 5_000, setTimer: (fn, ms) => timers.push([t2 + ms, fn]) });
+    const run = (ms) => { const until = t2 + ms; while (timers.length) { timers.sort((a, b) => a[0] - b[0]); if (timers[0][0] > until) break; const [at, fn] = timers.shift(); t2 = at; fn(); } t2 = until; };
+    const last = () => JSON.parse(sock2[0].sent.filter((x) => typeof x === 'string').at(-1));
+    const sentOf = (type) => sock2[0].sent.filter((x) => typeof x === 'string').map((x) => JSON.parse(x)).filter((m) => m.type === type);
+    // A reply as the Circuit sends it. This is a FIXTURE fed to the fake input
+    // only; the asserts below check it is never written to the instrument port.
+    const reply = (loc, name = 'Soft pad') => [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x00, loc, 0x00,
+      ...[...name.padEnd(16, ' ')].map((ch) => ch.charCodeAt(0)), ...Array(324).fill(0x10), 0xF7];
+    const c3 = hw3.get('circuit'); c3.connect();
+
+    c3.handle({ type: 'midi.send', id: 'd1', bytes: REQ(0) });
+    is('the input is opened for reading BEFORE the request is written, so the answer cannot arrive first', order, ['open read', 'open write', 'write']);
+    is('the request reaches the port, exactly nine bytes', out, [REQ(0)]);
+    // The answer arrives in pieces with MIDI clock inside it, as USB MIDI does.
+    const r1 = reply(0);
+    inbox.push(Uint8Array.from([0xF8, ...r1.slice(0, 100)]), Uint8Array.from([0xF8, 0xFE, ...r1.slice(100)]));
+    run(50);
+    const got = sentOf('midi.patch');
+    is('one midi.patch goes back to the room', got.length, 1);
+    is('carrying the 350 bytes the Circuit sent, clock bytes taken out', got[0]?.bytes, r1);
+    is('answering the request by its id, for synth 1', [got[0]?.re, got[0]?.synth, got[0]?.ok], ['d1', 1, true]);
+    is('and the reader is closed once it has its answer', readClosed, 1);
+    is('NEGATIVE: the reply is never written to the instrument', out.filter((b) => b.length > 9), []);
+
+    // A second ask while one is open is refused, and nothing is written for it.
+    t2 += 100;
+    c3.handle({ type: 'midi.send', id: 'd2', bytes: REQ(0) });
+    c3.handle({ type: 'midi.send', id: 'd3', bytes: REQ(0) });
+    is('NEGATIVE: a second request while one is being read is not written', out.length, 2);
+    is('and is answered that it was not', [last().type, last().ok, last().re], ['midi.patch', false, 'd3']);
+    // The wrong synth, and a SysEx that is not a patch, are not passed back.
+    inbox.push(Uint8Array.from(reply(1)), Uint8Array.from([0xF0, 0x7E, 0x00, 0x06, 0x02, 0xF7]));
+    run(1100);
+    const after = sentOf('midi.patch').filter((m) => m.re === 'd2');
+    is('NEGATIVE: a patch for synth 2 does not answer a request for synth 1', after.map((m) => m.ok), [false]);
+    ok('and the timeout says why', /no patch came back/.test(after[0]?.why ?? ''), JSON.stringify(after[0]));
+    is('NEGATIVE: and nothing that was not asked for reaches the room', after[0]?.bytes ?? null, null);
+    is('the reader is closed after the timeout too', readClosed, 2);
+
+    // A program change then a request, the page's order, for synth 2.
+    t2 += 100;
+    c3.handle({ type: 'midi.send', id: 'p2', bytes: [0xC1, 5] });
+    c3.handle({ type: 'midi.send', id: 'd4', bytes: REQ(1) });
+    inbox.push(Uint8Array.from(reply(1, 'Bass two')));
+    run(50);
+    is('synth 2 is answered for synth 2', sentOf('midi.patch').filter((m) => m.re === 'd4').map((m) => [m.ok, m.synth, m.bytes?.length]), [[true, 2, 350]]);
+    is('NEGATIVE: across the whole run only the three requests and one program change were written', out.map((b) => b[0]), [0xF0, 0xF0, 0xC1, 0xF0]);
+    hw3.close();
+  }
 }
 
 console.log('\nrtc: the direct path, against a fake peer');

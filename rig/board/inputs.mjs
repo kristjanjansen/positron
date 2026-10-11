@@ -55,6 +55,72 @@ export const SYNTH_CC = new Set(CIRCUIT_CC.filter((p) => p.ch === '1/2').map((p)
 export const SYNTH_CHANNELS = [1, 2];
 
 /**
+ * 🔴 THE ONE SysEx THE GATE LETS OUT, SINCE 2026-10-11, AND IT IS A READ.
+ * Asked as *"show initial patch name on selector"* for `/concepts/synth/070/`,
+ * option 1 chosen verbatim. 📄 Circuit Programmer's Reference Guide 1.3, p13,
+ * read off the table rather than the plans (which disagree, 9 against 10):
+ *   F0 00 20 29 01 60 40 <00|01> F7, "9 bytes in total"
+ * The Circuit answers with a 350 byte Replace Current Patch on its USB port,
+ * which is a message FROM the instrument and is never written back to it.
+ * ⚠️ MATCHED BYTE FOR BYTE AND BY LENGTH, NEVER BY PREFIX. A Replace Current
+ * Patch (command 00) and a Replace Patch (01, which writes flash) share this
+ * header and differ from the request in byte 6 and in length, so a prefix test
+ * on the header is exactly the gate that lets the dangerous ones through.
+ * `test.mjs` sabotages this and counts the reds.
+ * Returns the location, 0 for Synth 1 and 1 for Synth 2, or null.
+ */
+export const DUMP_REQUEST_HEAD = Object.freeze([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40]);
+export function dumpRequestSynth(bytes) {
+  if (!Array.isArray(bytes) || bytes.length !== 9) return null;
+  for (let i = 0; i < DUMP_REQUEST_HEAD.length; i++) if (bytes[i] !== DUMP_REQUEST_HEAD[i]) return null;
+  if (bytes[7] !== 0x00 && bytes[7] !== 0x01) return null;
+  if (bytes[8] !== 0xF7) return null;
+  return bytes[7];
+}
+
+/**
+ * The reply, recognised by its whole shape: 350 bytes, Novation's Circuit
+ * header, command 00 (Replace Current Patch, which is what the Circuit sends
+ * back), the location that was asked for, a reserved 00, 340 seven bit data
+ * bytes and F7. Anything else the Circuit says is not passed on.
+ */
+export function isPatchReply(msg, loc) {
+  if (!msg || msg.length !== 350) return false;
+  for (let i = 0; i < 6; i++) if (msg[i] !== DUMP_REQUEST_HEAD[i]) return false;
+  if (msg[6] !== 0x00 || msg[7] !== loc || msg[349] !== 0xF7) return false;
+  for (let i = 1; i < 349; i++) if (msg[i] > 0x7F) return false;
+  return true;
+}
+
+/**
+ * SysEx messages out of a raw MIDI byte stream. Real time bytes (F8 to FF) may
+ * sit anywhere, inside a SysEx too, and are dropped; any other status byte ends
+ * a SysEx that never closed and it is thrown away. A message longer than `max`
+ * is abandoned rather than grown, so the Circuit cannot fill this with clock.
+ */
+export function createSysexCatcher(max = 400) {
+  let cur = null;
+  return {
+    feed(chunk) {
+      const done = [];
+      for (const b of chunk) {
+        if (b >= 0xF8) continue;
+        if (b === 0xF0) { cur = [b]; continue; }
+        if (!cur) continue;
+        if (b === 0xF7) { cur.push(b); done.push(cur); cur = null; continue; }
+        if (b > 0x7F) { cur = null; continue; }
+        cur.push(b);
+        if (cur.length > max) cur = null;
+      }
+      return done;
+    },
+  };
+}
+
+/** How long the board listens for the Circuit's answer before saying none came. */
+export const DUMP_MS = 1000;
+
+/**
  * 🔴 WHAT A PAGE MAY SEND AN INSTRUMENT, AND IT IS AN ALLOWLIST.
  * Note on, note off and CC 123 all notes off, on the channels the config
  * names, and since 2026-09-30 the synth control changes in `SYNTH_CC` on
@@ -73,6 +139,9 @@ export const SYNTH_CHANNELS = [1, 2];
  * 0 to 31 and queued from 64 to 95, over whatever is being worked on. So it is
  * the synth channels only and never 16, and 64 to 127 are refused as well,
  * because they are not patches on 1 and 2 and ARE sessions on 16.
+ * ⚠️ AND SINCE 2026-10-11 ONE SysEx, the nine byte Current Patch Dump Request
+ * and nothing else (`dumpRequestSynth` above). A pass for it carries `dump`,
+ * the location, so the handler knows to listen for the answer.
  */
 export function midiVerdict(bytes, channels) {
   const v = verdict(bytes, channels);
@@ -83,6 +152,12 @@ export function midiVerdict(bytes, channels) {
 
 function verdict(bytes, channels) {
   if (!Array.isArray(bytes) || !bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
+  const loc = dumpRequestSynth(bytes);
+  if (loc !== null) {
+    const ch = loc + 1;
+    if (!channels.includes(ch)) return { ok: false, why: `a patch dump request for synth ${ch} and channel ${ch} is not one this input plays` };
+    return { ok: true, dump: loc };
+  }
   if (bytes.length === 2 && (bytes[0] & 0xF0) === 0xC0) {
     const ch = (bytes[0] & 0x0F) + 1, p = bytes[1];
     if (!SYNTH_CHANNELS.includes(ch) || !channels.includes(ch)) return { ok: false, why: `a program change on channel ${ch} is not a synth patch` };
@@ -247,7 +322,7 @@ export function createInputs({
       cfg, room: `${room}-${cfg.name}`, from: `board-${cfg.name}-${randomId(6)}`,
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
-      bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null,
+      bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null,
     };
     // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
     // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
@@ -439,11 +514,15 @@ export function createInputs({
     // ⚠️ THE CARD IS RESOLVED BY NAME EVERY TIME IT IS OPENED. A card number is a
     // position in a list that moves when anything is plugged in, which is the
     // avfoundation-index lesson from rig/m1 in its ALSA costume.
-    function midiOpen() {
-      if (s.midiFd !== null) return s.midiFd;
+    function midiDev() {
       const card = fs.readlinkSync(`/proc/asound/${cfg.midi.port}`);   // 'card7'
       const n = /^card(\d+)$/.exec(card)?.[1];
       if (n == null) throw new Error(`/proc/asound/${cfg.midi.port} is ${card}`);
+      return n;
+    }
+    function midiOpen() {
+      if (s.midiFd !== null) return s.midiFd;
+      const n = midiDev();
       // 🔴 NON-BLOCKING, MEASURED 2026-10-03 ON THIS BOARD: while any ALSA
       // sequencer subscription into the Circuit exists, a plain open of its raw
       // device for write does not fail, it WAITS, and a synchronous open here
@@ -473,6 +552,69 @@ export function createInputs({
       s.notesOut++;
       return true;
     }
+    // ── the one thing read back: the patch a dump request asks for ──────────
+    // 🔴 THE INPUT IS OPENED ONLY WHILE AN ANSWER IS EXPECTED, AND BEFORE THE
+    // REQUEST IS WRITTEN. A raw MIDI input buffers nothing until it is open, so
+    // opening it after the write could miss an answer that came back fast; and
+    // holding it open between requests would keep a device somebody else may
+    // want. MEASURED 2026-10-11 on the board: `/proc/asound/Circuit/midi0`
+    // showed Input 0 with no owner and the Circuit sending (Rx 130,660 bytes,
+    // its clock), so the input is free and has to be filtered.
+    // ⚠️ NON-BLOCKING AND POLLED every 10 ms, for the same reason as the write
+    // side: a blocking read with nothing to read never returns, and a thread
+    // parked in one cannot be taken back.
+    function finishDump(d, body) {
+      if (s.dump !== d) return;
+      s.dump = null;
+      try { fs.closeSync(d.fd); } catch { /* gone */ }
+      d.reply('midi.patch', { synth: d.loc + 1, ...body });
+    }
+    function pollDump(d) {
+      if (s.dump !== d) return;
+      const chunk = Buffer.alloc(1024);
+      for (;;) {
+        let n = 0;
+        try { n = fs.readSync(d.fd, chunk, 0, chunk.length, null); }
+        catch (e) {
+          if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') break;
+          log(`${cfg.name}: reading the patch failed, ${e.message}`);
+          return finishDump(d, { ok: false, why: `the instrument input could not be read, ${e.code || e.message}` });
+        }
+        if (!n) break;
+        d.seen += n;
+        for (const b of chunk.subarray(0, n)) {
+          if (b >= 0xF8) d.realtime++;
+          else if (d.head.length < 24) d.head.push(b.toString(16).padStart(2, '0'));
+        }
+        for (const m of d.catcher.feed(chunk.subarray(0, n))) {
+          if (isPatchReply(m, d.loc)) {
+            log(`${cfg.name}: synth ${d.loc + 1} patch read back, ${now() - d.at} ms`);
+            return finishDump(d, { ok: true, bytes: m });
+          }
+          d.other++;
+        }
+      }
+      if (now() >= d.until) {
+        log(`${cfg.name}: no patch came back for synth ${d.loc + 1} in ${DUMP_MS} ms (${d.seen} bytes heard, ${d.realtime} of them real time, ${d.other} other SysEx${d.head.length ? `, the rest began ${d.head.join(' ')}` : ''})`);
+        return finishDump(d, { ok: false, why: `no patch came back from the instrument in ${DUMP_MS} ms` });
+      }
+      setTimer(() => pollDump(d), 10);
+    }
+    function askPatch(bytes, loc, reply) {
+      if (s.dump) return reply('midi.patch', { ok: false, synth: loc + 1, why: 'a patch is already being read, one at a time' });
+      let fd;
+      try { fd = fs.openSync(`/dev/snd/midiC${midiDev()}D0`, FS.O_RDONLY | FS.O_NONBLOCK); }
+      catch (e) {
+        log(`${cfg.name}: the instrument input could not be opened, ${e.message}`);
+        return reply('midi.patch', { ok: false, synth: loc + 1, why: `the instrument input could not be opened, ${e.code || e.message}` });
+      }
+      const d = { fd, loc, reply, at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
+      s.dump = d;
+      if (!midiWrite(bytes)) return finishDump(d, { ok: false, why: 'the instrument port could not be written' });
+      setTimer(() => pollDump(d), 10);
+      return undefined;
+    }
+
     /** Every note this board started and nobody ended, ended. */
     function midiPanic(why) {
       if (!cfg.midi || !s.held.size) return 0;
@@ -504,6 +646,7 @@ export function createInputs({
         if (!cfg.midi || !fs) return reply('midi.refused', { why: `${cfg.name} has no MIDI port configured` });
         const v = midiVerdict(msg.bytes, cfg.midi.channels);
         if (!v.ok) { s.refused++; return reply('midi.refused', { why: v.why }); }
+        if (v.dump != null) return askPatch(msg.bytes, v.dump, reply);
         if (!midiWrite(msg.bytes)) return reply('midi.refused', { why: 'the instrument port could not be written' });
         return undefined;   // no reply per note: a keyboard is not a request/response
       }
@@ -582,6 +725,7 @@ export function createInputs({
       close() {
         s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); s.rtc?.close();
         if (s.bridge) { try { s.bridge.kill('SIGTERM'); } catch { /* gone */ } s.bridge = null; }
+        if (s.dump) { try { fs.closeSync(s.dump.fd); } catch {} s.dump = null; }
         if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
         try { s.ws?.close(); } catch {}
       },
