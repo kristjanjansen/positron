@@ -86,6 +86,10 @@
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
 
   const d = mount({ name: 'concept room 004', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('room/004');
@@ -165,6 +169,7 @@
       node.setGraphs([selfGraph()], [STORE]);
       join.enable('join', false, `in ${ROOM}`);
       clear.enable('clear', true);
+      startClock();
       chatBox.enable(true);
       loadHistory();
       decide();
@@ -230,12 +235,14 @@
     if (l.from === KEPT && isNotice(by)) return;
     pb?.pulse(l.from, l.to);
     chats.add({ who: short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
+    said('chat', Number(m.sent) || Date.now(), String(e.text || ''), short(by.split(':')[0]));
   }
   function heardAdmin(e, l, m) {
     const by = String(m.speaker || m.from);
     if (l.from === KEPT && !isNotice(by)) return;
     pb?.pulse(l.from, l.to);
     const mine = by.split(':')[0] === SITE;
+    said('cast', Number(m.sent) || Date.now(), String(e.text || ''), mine ? 'you as admin' : short(by.split(':')[0]));
     casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
   }
 
@@ -264,12 +271,14 @@
     const r = node.emit(OUT, { text }, { store: true });
     if (r.sent) { pb?.pulse(OUT, '*:chat:value-in'); pb?.pulse(OUT, KEEP); }
     chats.add({ who: 'you', at: Date.now(), text, me: true });
+    said('chat', Date.now(), text, 'you');
   }
   function cast(text) {
     if (!admin) return;
     const r = node.emit(AOUT, { text }, { store: true });
     if (r.sent) { pb?.pulse(AOUT, '*:notice:value-in'); pb?.pulse(AOUT, KEEP); }
     casts.add({ who: 'you as admin', at: Date.now(), text, me: true });
+    said('cast', Date.now(), text, 'you as admin');
   }
 
   /** The compose box from room/001: grows to six lines, Enter sends, Shift
@@ -335,7 +344,7 @@
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
   // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*, kept on 004):
   // the store forgets the room, and every tab in it empties both columns.
-  function wipe() { casts.clear(); chats.el.replaceChildren(); }
+  function wipe() { casts.clear(); chats.el.replaceChildren(); lines.length = 0; }
   async function clearAll() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
@@ -358,6 +367,44 @@
     detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : n.id.startsWith('cf-store') ? 'Cloudflare' : n.label, sans: true }],
   });
 
-  d.stack.add(panel.el, pb.el);
+  // ── the timeline: a broadcast lane and a chat lane ───────────────────────
+  // Asked 2026-10-11, *"add timeline with broacast and chat lanes, properly
+  // coloured"*. The kit's transport bar and strip glued, as on synth/020. Every
+  // line is a tick at the moment it was said, a store replay at its own time.
+  // The clock runs in real time from the earliest line or the Join, whichever
+  // came first, and nothing plays: the bar has no toggle (`toggle: false`).
+  // Broadcast is the admin's violet, chat the yellow of `you`.
+  const CAST_INK = '#c39af0', CHAT_INK = '#ffd400', AIR_MS = 60000;
+  const lines = [];             // { lane, sent, text, who }
+  let origin = 0;
+  const deck = createDeck({ items: [], adapters: {}, range: [0, AIR_MS] });
+  function startClock() {
+    if (!origin) origin = Date.now();
+    deck.seek(Date.now() - origin);
+    deck.play();
+  }
+  function said(lane, sent, text, who) {
+    lines.push({ lane, sent, text, who });
+    if (origin && sent < origin) origin = sent;
+    const now = Date.now() - (origin || sent);
+    deck.setRange([0, Math.max(AIR_MS, now + AIR_MS / 2)]);
+    if (origin) deck.seek(Date.now() - origin);
+  }
+  const rowsOf = (lane) => () => lines.filter((r) => r.lane === lane)
+    .map((r, i) => ({ at: r.sent - origin, id: `${lane}${i}`, kind: lane, payload: r }));
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, { scrub: false, loop: false, live: false, toggle: false, publish: false });
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: true, gutter: 120,
+    lanes: [
+      { id: 'cast', kind: 'cast', label: 'broadcast', color: CAST_INK, height: 40, width: 2, as: 'ticks', terse: true,
+        rows: rowsOf('cast'), describeRow: (r) => [r.payload.who, r.payload.text] },
+      { id: 'chat', kind: 'chat', label: 'chat', color: CHAT_INK, height: 40, width: 2, as: 'ticks', terse: true,
+        rows: rowsOf('chat'), describeRow: (r) => [r.payload.who, r.payload.text] },
+    ],
+  });
+  const timeline = createGlue(bar.el, strip.surface);
+
+  d.stack.add(panel.el, timeline, pb.el);
   d.ready();
 </script>
