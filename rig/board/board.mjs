@@ -21,7 +21,7 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
-         jackGraph, jackChain, jackRebuild, ensureJackd, wire as jackWire, setBayRows, getBayRows,
+         jackGraph, jackChain, jackRebuild, ensureJackd, setJackCard, wire as jackWire, setBayRows, getBayRows,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
@@ -1728,6 +1728,14 @@ sweepStrayEncoders((l) => log('video:', l));
 // taking the board down.
 const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
 for (const p of inputsCfg.problems) log('inputs:', p);
+// 🔴 jackd ON AN INPUT'S CARD, SINCE 2026-10-11: set BEFORE anything can raise
+// jackd, so the first server is already the right one (jacksynth.mjs
+// `ensureJackd` has the measurement that asked for it).
+{
+  const c = [...inputsCfg.inputs.values()].find((i) => i.jackd);
+  setJackCard(c ? { name: c.name, device: c.device, channels: c.channels, ...c.jackd } : null);
+  if (c) log(`inputs: jackd runs on ${c.device}, so ${c.name} is the clock`);
+}
 // 🔴 THE DIRECT PATH IS OPTIONAL, AND ITS ABSENCE IS NOT A FAULT. node-datachannel
 // is this board's first npm dependency (rig/board/package.json, installed by
 // push.sh and setup.sh), and a board without it runs exactly as before with the

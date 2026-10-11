@@ -6,8 +6,8 @@
 // README rather than faked here, because a fake that passes is worse than a
 // gap that is written down.
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
-import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
-import { parseJackLsp, jackChain, jackRebuild , setBayRows } from './jacksynth.mjs';
+import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM, noAutoconnect, ensureNoAutoconnect } from './yoshimi.mjs';
+import { parseJackLsp, jackChain, jackRebuild , setBayRows, jackdArgs, cardPortNames, jackdOwns, countXruns, JACKD_ENV } from './jacksynth.mjs';
 import * as jack from './jack.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
@@ -594,6 +594,101 @@ console.log('inputs: a name, a room and a lease');
   is('a bridge that dies is started again, not left gone', !!second && !second.p.killed, true);
   jhw.close();
   is('NEGATIVE CONTROL: closing the board does take the bridge down', !!second?.p.killed, true);
+
+console.log('jackd on the card: the Circuit IS the clock, nothing resamples');
+{
+  // ── 2026-10-11, the owner: *"what is goin on with jack?"*. alsa_in bridged a
+  // card on its own clock into a jackd on the Pi's timer and resampled the
+  // difference; the floor went from -80 to -19 dBFS over minutes. With jackd
+  // ON the card there is one clock. Graded here: the config, the server's
+  // arguments, the port names and the input's bridge. Whether it is CLEAN is
+  // measured on the Pi over ten minutes, never here.
+  const one = parseInputs(JSON.stringify({ circuit: { device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, via: 'jack', jackd: true } }));
+  is('jackd: true is read with its defaults, the period measured clean under load', one.inputs.get('circuit')?.jackd, { period: 512, periods: 3 });
+  is('jackd with a period is read as given',
+    parseInputs(JSON.stringify({ c: { device: 'hw:0', via: 'jack', jackd: { period: 512, periods: 2 } } })).inputs.get('c')?.jackd, { period: 512, periods: 2 });
+  is('NEGATIVE CONTROL: an input with no jackd key keeps the shape it always had',
+    Object.keys(parseInputs(JSON.stringify({ c: { device: 'hw:0', via: 'jack' } })).inputs.get('c')), ['name', 'device', 'channels', 'take', 'midi', 'via']);
+  is('NEGATIVE CONTROL: jackd on an arecord input is refused, the card cannot be both',
+    /jackd needs via jack/.test(parseInputs(JSON.stringify({ c: { device: 'hw:0', jackd: true } })).problems[0] ?? ''), true);
+  const two = parseInputs(JSON.stringify({ a: { device: 'hw:0', via: 'jack', jackd: true }, b: { device: 'hw:1', via: 'jack', jackd: true } }));
+  is('NEGATIVE CONTROL: two inputs cannot both be the clock, there is one jackd', [two.inputs.has('a'), two.inputs.has('b'), /one jackd/.test(two.problems[0] ?? '')], [true, false, true]);
+  is('NEGATIVE CONTROL: a period that is not a power of two is refused',
+    /period/.test(parseInputs(JSON.stringify({ c: { device: 'hw:0', via: 'jack', jackd: { period: 300 } } })).problems[0] ?? ''), true);
+
+  const card = { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, period: 256, periods: 3 };
+  is('jackd on the card is ALSA, capture only, at the card device, rate and period',
+    jackdArgs(card), ['-r', '-d', 'alsa', '-C', 'hw:CARD=Pro,DEV=0', '-r', '48000', '-p', '256', '-n', '3']);
+  const a = jackdArgs(card);
+  is('NEGATIVE CONTROL: no playback device, so nothing new can come out of the Fast Track Pro',
+    [a.includes('-P'), a.includes('-D'), a.includes('-d') && a[a.indexOf('-d') + 1] === 'alsa' && !a.includes('-o')], [false, false, true]);
+  is('jackd skips the D-Bus card reservation a service has no session bus for', JACKD_ENV.JACK_NO_AUDIO_RESERVATION, '1');
+  is('with no card it is the dummy clock it always was', jackdArgs(null), ['-r', '-d', 'dummy', '-r', '48000', '-p', '1024']);
+  is('the card ports are shown by the input name', cardPortNames(card),
+    { 'system:capture_1': 'circuit:capture_1', 'system:capture_2': 'circuit:capture_2' });
+  is('NEGATIVE CONTROL: the dummy clock renames nothing', cardPortNames(null), {});
+  is('a running jackd on the card is recognised from its command line',
+    jackdOwns('1234 jackd -r -d alsa -C hw:CARD=Pro,DEV=0 -r 48000 -p 256 -n 3', card), true);
+  is('NEGATIVE CONTROL: a dummy jackd does not own the card',
+    jackdOwns('1234 jackd -r -d dummy -r 48000 -p 1024', card), false);
+  is('NEGATIVE CONTROL: and ALSA on another card does not either',
+    jackdOwns('1234 jackd -r -d alsa -C hw:CARD=Other,DEV=0 -r 48000', card), false);
+  is('xruns are counted off jackd\'s own lines',
+    countXruns('JackEngine::XRun: client = yoshimi was not finished, state = Triggered\nJack: **** alsa_pcm: xrun of at least 2.1 msecs\nCannot lock down 1 byte memory area'), 2);
+  is('NEGATIVE CONTROL: ordinary chatter is not an xrun', countXruns('JackAlsaDriver::Open\nconfiguring for 48000Hz, period = 256 frames'), 0);
+
+  // Yoshimi with no physical playback port. MEASURED 2026-10-11 the first time
+  // jackd ran on the card capture only: `No physical jack playback ports
+  // found. Failed to connect jack audio ports ... Yoshimi stages a strategic
+  // retreat`, exit 1, because its saved instance asks to auto connect.
+  const inst = '<par name="audio_engine" value="1" />\n<par name="connect_jack_audio" value="1" />\n<par name="other" value="1" />';
+  const na = noAutoconnect(inst);
+  is('auto connect is switched off in the instance', [na.changed, /connect_jack_audio" value="0"/.test(na.xml)], [true, true]);
+  is('NEGATIVE CONTROL: and nothing else in the file moves', na.xml.replace('value="0" />\n<par name="other"', 'value="1" />\n<par name="other"'), inst);
+  is('NEGATIVE CONTROL: an instance already off is left alone', noAutoconnect(na.xml).changed, false);
+  {
+    const d = mkdtempSync(join(tmpdir(), 'yinst-'));
+    writeFileSync(join(d, 'yoshimi-0.instance'), gzipSync(inst));
+    const r1 = ensureNoAutoconnect(d), r2 = ensureNoAutoconnect(d);
+    const back = readFileSync(join(d, 'yoshimi-0.instance'));
+    is('the gzipped instance on disk is rewritten once and stays gzipped', [r1.changed, r2.changed, back[0] === 0x1f && back[1] === 0x8b], [true, false, true]);
+    is('NEGATIVE CONTROL: no instance file is not an error, Yoshimi writes one on its first run', ensureNoAutoconnect(join(d, 'none')).changed, false);
+    rmSync(d, { recursive: true, force: true });
+  }
+
+  // The rename, at jack.mjs's one boundary, against the real Pi listing.
+  jack.setPortNames(cardPortNames(card));
+  const renamed = jack.listJack({ text: piCPT }).rows;
+  is('the listing shows the card capture by the input name', renamed.slice(0, 2).map((r) => r.port), ['circuit:capture_1', 'circuit:capture_2']);
+  is('NEGATIVE CONTROL: playback is not renamed, it is not the input', renamed.some((r) => r.port === 'system:playback_1'), true);
+  is('a connect turns the shown name back into the real one', [jack.realPort('circuit:capture_1'), jack.realPort('poscircuit:input_1')], ['system:capture_1', 'poscircuit:input_1']);
+  is('NEGATIVE CONTROL: an exact map, so capture_10 is not capture_1', jack.shownPort('system:capture_10'), 'system:capture_10');
+  jack.setPortNames({});
+  is('NEGATIVE CONTROL: with no card the listing is untouched', jack.listJack({ text: piCPT }).rows[0].port, 'system:capture_1');
+
+  // The input: no alsa_in when jackd owns its card, and the same reader.
+  const sp = [], wd = [], tm = [];
+  let t2 = 1000;
+  const chw = createInputs({
+    inputs: one.inputs, room: 'studio-1', relay: 'wss://relay', frame: 4, rate: 48000, name: 'pi', id: 'pi-1',
+    spawn: (cmd, args) => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => { p.killed = true; }; sp.push({ cmd, args, p }); return p; },
+    WebSocket: FakeWS, format: fmt, parse: prs, randomId: () => 'abc', now: () => t2,
+    setTimer: (fn) => tm.push(fn),
+    jack: { ensure: () => ({ ok: true, card: 'circuit' }), wire: (doc) => { wd.push(doc); return { ok: true }; } },
+  });
+  const cc = chw.get('circuit');
+  cc.connect(); cc.startBridge();
+  await new Promise((r) => setImmediate(r));
+  is('NEGATIVE CONTROL: jackd owns the card, so no alsa_in and no arecord', sp.map((x) => x.cmd), []);
+  cc.handle({ type: 'input.want', id: 'c1' });
+  await new Promise((r) => setImmediate(r));
+  is('asking still starts the one JACK reader', sp.map((x) => x.cmd), ['ffmpeg']);
+  tm.shift()();
+  is('and it is fed by the same name, which jack.mjs turns into system:capture_1',
+    wd.at(-1), { v: 1, links: [{ from: 'circuit:capture_1', to: 'poscircuit:input_1' }], own: ['poscircuit:input_1'] });
+  is('the status says the card is the clock', cc.status().jack && [cc.status().jack.bridge, cc.status().jack.by], [true, 'jackd']);
+  chw.close();
+}
 }
 
 console.log('inputs: what a page may send the Circuit');

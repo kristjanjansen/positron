@@ -20,7 +20,8 @@ import { openSync, writeSync, closeSync, existsSync, mkdirSync, readFileSync } f
 // strings here, each run blind with its output thrown away. Each re-patch is
 // now a small document (`links` that must be there, `own` inputs whose whole
 // feed it decides), planned against the graph, applied, and READ BACK.
-import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff } from './jack.mjs';
+import { ensureNoAutoconnect } from './yoshimi.mjs';
+import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff, setPortNames } from './jack.mjs';
 export { parseJackLsp };
 
 export const RATE = 48000, FRAME = 960;
@@ -133,27 +134,109 @@ function withBay(doc, rows) {
 }
 
 /**
+ * 🔴 jackd ON THE CARD, SINCE 2026-10-11. With the dummy driver jackd keeps
+ * time off the Pi's timer and `alsa_in` resamples the Fast Track Pro's own
+ * clock into it, adaptively, forever. MEASURED that day through the relay,
+ * the same note burst each time: `arecord` read a floor of -80.5 dBFS and an
+ * HF share of 0.04; `alsa_in` read -80.1 and 0.15 just after a restart, and
+ * -18.8 and 0.14 some minutes later, which the owner called *"supernoisy"*.
+ * Two clocks and a resampler between them. With jackd on the card there is
+ * one clock and nothing to resample.
+ *
+ * `card` is the input configured `"jackd": ...` in BOARD_INPUTS
+ * (`inputs.mjs`), set once at startup by board.mjs. CAPTURE ONLY (`-C`):
+ * no `system:playback_*` exists, so neither Yoshimi nor scsynth can send
+ * anything to the card's outputs, which carried nothing before either.
+ * ⚠️ `-r` TWICE IS NOT A TYPO: before `-d` it is jackd's `--no-realtime`
+ * (this service has `ulimit -r` 0), after it the driver's rate.
+ */
+let CARD = null;
+export function setJackCard(card) { CARD = card ?? null; }
+export function jackdArgs(card) {
+  if (!card) return ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'];
+  return ['-r', '-d', 'alsa', '-C', card.device, '-r', String(RATE), '-p', String(card.period), '-n', String(card.periods)];
+}
+/**
+ * ⚠️ JACK_NO_AUDIO_RESERVATION, MEASURED 2026-10-11 ON THE FIRST TRY: jackd
+ * asks the D-Bus session bus to reserve the card, a service has no session
+ * bus, and it gave up with `Audio device hw:CARD=Pro,DEV=0 cannot be
+ * acquired`, exit 255, and the board fell back to the dummy clock.
+ */
+export const JACKD_ENV = { JACK_NO_AUDIO_RESERVATION: '1' };
+/** The card's capture ports shown by the input's name (`jack.mjs` `setPortNames`). */
+export function cardPortNames(card) {
+  if (!card) return {};
+  return Object.fromEntries(Array.from({ length: card.channels }, (_, i) => [`system:capture_${i + 1}`, `${card.name}:capture_${i + 1}`]));
+}
+/** Whether a running jackd, by its `pgrep -a` line, is the one on this card. */
+export function jackdOwns(cmdline, card) {
+  if (!card || !cmdline) return false;
+  return /\s-d\s+alsa\b/.test(cmdline) && cmdline.split(/\s+/).includes(card.device);
+}
+/** jackd's own xrun lines, counted. The memory-lock complaint is not one. */
+export function countXruns(text) {
+  return String(text).split('\n').filter((l) => /xrun/i.test(l) && !/^Cannot lock down/.test(l.trim())).length;
+}
+const jackdState = { xruns: 0, card: null, since: null, lines: 0 };
+export const jackdStats = () => ({ ...jackdState });
+
+/**
  * jackd, raised if JACK does not answer. Shared by the instrument chain and by
  * the hardware inputs on JACK (`inputs.mjs` `via: "jack"`), which need a server
  * before any instrument has been asked for.
+ * Answers `card`: the input whose card is the clock, or null on the dummy one.
  */
 export async function ensureJackd({ onLog } = {}) {
   // Ask JACK, not the process table. `pgrep -x jackd` reports a server this
   // process may not be able to REACH, in a different mount namespace or as a
   // different user, and skipping the start on that basis leaves every client
   // unable to connect. jack_lsp answers the question actually being asked.
-  if (sh('jack_lsp 2>/dev/null').trim()) return { ok: true, started: false };
+  if (sh('jack_lsp 2>/dev/null').trim()) {
+    const owns = jackdOwns(sh('pgrep -ax jackd 2>/dev/null').split('\n')[0], CARD);
+    setPortNames(cardPortNames(owns ? CARD : null));
+    return { ok: true, started: false, card: owns ? CARD.name : null };
+  }
   sh('pkill -9 -x jackd 2>/dev/null');            // a server we cannot reach is worse than none
   await wait(400);
-  spawn('jackd', ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'],
-    { stdio: 'ignore', detached: true }).unref();
-  // Poll rather than sleep a guessed amount: 2.5 s was enough on a warm board
-  // and not on a cold one, which is the worst kind of timing constant.
-  let up = false;
-  for (let i = 0; i < 20 && !up; i++) { await wait(500); up = !!sh('jack_lsp 2>/dev/null').trim(); }
-  if (!up) return { ok: false, reason: 'jackd would not start' };
-  onLog?.('jackd up');
-  return { ok: true, started: true };
+  // ⚠️ THE CARD FIRST AND THE DUMMY CLOCK SECOND. A card that is unplugged or
+  // held by something else must not cost Yoshimi its server; the input then
+  // falls back to `alsa_in`, which says so in the log.
+  for (const card of CARD ? [CARD, null] : [null]) {
+    const p = spawn('jackd', jackdArgs(card), { stdio: ['ignore', 'pipe', 'pipe'], detached: true, env: { ...process.env, ...JACKD_ENV } });
+    p.unref();
+    const said = [];
+    const hear = (d) => {
+      const t = String(d);
+      const n = countXruns(t);
+      jackdState.xruns += n;
+      for (const l of t.split('\n').map((x) => x.trim()).filter((x) => x && !/^Cannot lock down/.test(x))) {
+        said.push(l);
+        // Every line for the first 40, then only xruns, one in fifty.
+        jackdState.lines++;
+        if (jackdState.lines <= 40 || (/xrun/i.test(l) && jackdState.xruns % 50 === 1)) onLog?.(`jackd: ${l.slice(0, 200)}${/xrun/i.test(l) ? ` (xruns ${jackdState.xruns})` : ''}`);
+      }
+    };
+    p.stdout?.on('data', hear); p.stderr?.on('data', hear);
+    p.stdout?.unref?.(); p.stderr?.unref?.();
+    let exited = false;
+    p.on('exit', (code, sig) => { exited = true; onLog?.(`jackd exited (${sig ?? code})`); });
+    // Poll rather than sleep a guessed amount: 2.5 s was enough on a warm board
+    // and not on a cold one, which is the worst kind of timing constant.
+    let up = false;
+    for (let i = 0; i < 20 && !up && !exited; i++) { await wait(500); up = !!sh('jack_lsp 2>/dev/null').trim(); }
+    if (up) {
+      setPortNames(cardPortNames(card));
+      Object.assign(jackdState, { card: card?.name ?? null, since: Date.now(), xruns: 0 });
+      onLog?.(card ? `jackd up on ${card.device}, period ${card.period} x ${card.periods}: ${card.name} is the clock`
+                   : `jackd up${CARD ? `, on the dummy clock because ${CARD.device} would not open` : ''}`);
+      return { ok: true, started: true, card: card?.name ?? null };
+    }
+    try { p.kill('SIGKILL'); } catch { /* gone */ }
+    if (card) onLog?.(`jackd would not start on ${card.device}: ${said.slice(-2).join(' / ') || 'nothing said'}`);
+    await wait(400);
+  }
+  setPortNames({});
+  return { ok: false, reason: 'jackd would not start' };
 }
 
 /**
@@ -182,7 +265,10 @@ export const JACK_SYNTHS = {
   yoshimi: {
     needs: ['yoshimi', 'jackd', 'ffmpeg'],
     // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
-    spawn: () => spawn('yoshimi', ['-i', '-a', '-J', '-b=256'], { stdio: ['ignore','pipe','pipe'] }),
+    // `ensureNoAutoconnect` first: see yoshimi.mjs. Without it Yoshimi exits 1
+    // on a jackd that owns a card capture only, since there is no playback.
+    spawn: () => { try { ensureNoAutoconnect(); } catch { /* yoshimi says why if it matters */ }
+                   return spawn('yoshimi', ['-i', '-a', '-J', '-b=256'], { stdio: ['ignore','pipe','pipe'] }); },
     portMatch: /^yoshimi:left/i,
     portMatch2: /^yoshimi:right/i,
     // It appears on the graph well before it has read 911 instruments off the
@@ -288,7 +374,14 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
     const rt = '/tmp/rt';
     try { mkdirSync(rt, { recursive: true, mode: 0o700 }); } catch { /* there already */ }
     pappusProc = spawn('sclang', ['/opt/positron-board/rig/board/norns/run-pappus.scd'], {
-      env: { ...process.env, XDG_RUNTIME_DIR: rt, QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_DISABLE_SANDBOX: '1' },
+      // ⚠️ NO AUTOCONNECT, SINCE jackd CAN OWN A CARD (2026-10-11). scsynth
+      // patches itself to the PHYSICAL ports unless told otherwise, and with
+      // jackd on the Fast Track Pro the physical capture IS the Circuit, so the
+      // granulator would hear it with nobody having asked. Every link into
+      // `SuperCollider:in_*` is this file's or a bay link's to make. A pattern
+      // that names no port connects nothing.
+      env: { ...process.env, XDG_RUNTIME_DIR: rt, QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_DISABLE_SANDBOX: '1',
+             SC_JACK_DEFAULT_INPUTS: 'posnothing:none', SC_JACK_DEFAULT_OUTPUTS: 'posnothing:none' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     pappusReady = false;
@@ -505,6 +598,8 @@ export function jackGraph() {
     jackd,
     declaredRate: rateArgs.at(-1) ?? null,
     declaredPeriod: jackd ? Number(jackd.match(/-p\s+(\d+)/)?.[1]) || null : null,
+    clock: jackdOwns(jackd, CARD) ? CARD.name : 'pi',
+    xruns: jackdStats().xruns,
     ...(server === 'down' ? { reason: 'jack_lsp lists no ports at all, so there is no server to look at' } : {}),
   };
 }

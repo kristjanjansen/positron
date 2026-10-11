@@ -43,8 +43,8 @@
 // 911 instruments in 24 banks, of which 878 are reachable — 33 sit in slots
 // above 128, which need Yoshimi's extended program-change control, and that is
 // switched off here (`midi_upper_voice_C` 128 means "no CC assigned").
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
+import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { homedir } from 'node:os';
 
 /** Where Yoshimi keeps the state this module reads. */
@@ -228,4 +228,30 @@ export function flatten(list) {
   const out = [];
   for (const b of list.banks ?? []) for (const p of b.patches) out.push({ bank: b.bank, bankName: b.name, program: p.program, name: p.name });
   return out;
+}
+
+/**
+ * 🔴 NO AUTO CONNECT, SINCE 2026-10-11. Yoshimi's saved instance carries
+ * `connect_jack_audio` 1, and with it Yoshimi REFUSES TO START when JACK has
+ * no physical playback port: MEASURED the first time jackd ran on the Fast
+ * Track Pro capture only, `No physical jack playback ports found. Failed to
+ * connect jack audio ports`, exit 1. On the dummy clock it connected itself
+ * to `system:playback_*`, which made no sound and which nothing read. The
+ * board wires `yoshimi:left/right` itself (`jacksynth.mjs`), so the auto
+ * connect never carried anything; switched off, it cannot send Yoshimi to a
+ * card's outputs either. There is no command line flag for it (`-K` only
+ * turns it ON), so the instance is edited, once, and only that one value.
+ */
+export function noAutoconnect(xml) {
+  const re = /(<par name="connect_jack_audio" value=")1(" \/>)/;
+  return re.test(xml) ? { changed: true, xml: xml.replace(re, '$10$2') } : { changed: false, xml };
+}
+export function ensureNoAutoconnect(dir = YOSHIMI_DIR) {
+  const f = `${dir}/yoshimi-0.instance`;
+  if (!existsSync(f)) return { changed: false, reason: 'no instance yet' };
+  const raw = readFileSync(f);
+  const gz = raw[0] === 0x1f && raw[1] === 0x8b;
+  const r = noAutoconnect((gz ? gunzipSync(raw) : raw).toString('utf8'));
+  if (r.changed) writeFileSync(f, gz ? gzipSync(Buffer.from(r.xml)) : r.xml);
+  return { changed: r.changed };
 }

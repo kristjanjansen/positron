@@ -108,14 +108,42 @@ const clean = (s) => String(s).split('\n').map((l) => l.trim())
   .filter((l) => l && !/^Cannot lock down \d+ byte memory area/.test(l)).join(' ') || null;
 
 /**
+ * 🔴 PORT NAMES, WHEN jackd OWNS A CARD, SINCE 2026-10-11. With `jackd -d alsa`
+ * on the Fast Track Pro the Circuit is `system:capture_1`, not the
+ * `circuit:capture_1` that `alsa_in -j circuit` registered and that every bay
+ * link, `graph-registry.mjs` `inputJack` and `jack-bay-live.mjs` name. JACK
+ * cannot rename its driver's client, so the board renames at this ONE
+ * boundary: every listing reads the real name as the input's name, and every
+ * connect or disconnect turns it back. Everything above this file keeps
+ * saying `circuit:capture_1` and never learns which bridge is under it.
+ * ⚠️ An exact map, never a prefix: `system:capture_1` is not
+ * `system:capture_10`. An empty map is the dummy driver and changes nothing.
+ */
+let NAMES = new Map(), REAL = new Map();
+export function setPortNames(map = {}) {
+  NAMES = new Map(Object.entries(map ?? {}));
+  REAL = new Map([...NAMES].map(([real, shown]) => [shown, real]));
+}
+export const portNames = () => Object.fromEntries(NAMES);
+/** The name a port is shown by, for a real name off `jack_lsp`. */
+export const shownPort = (p) => NAMES.get(p) ?? p;
+/** The real name `jack_connect` needs, for a shown one. */
+export const realPort = (p) => REAL.get(p) ?? p;
+const renameRows = (rows) => {
+  if (!NAMES.size) return rows;
+  for (const r of rows) { r.port = shownPort(r.port); r.connected = r.connected.map(shownPort); }
+  return rows;
+};
+
+/**
  * The graph as it is now. `{ backend, rows, error }`.
  * ⚠️ AN EMPTY LIST MEANS NO SERVER, NOT NO PORTS: a running jackd always has
  * at least its driver's ports. That is `jacksynth.mjs`'s established reading
  * and it is kept, as `error`, so "jackd is down" never reads as a quiet graph.
  */
 export function listJack({ from, text } = {}) {
-  if (text != null) return { backend: 'fake', rows: parseJackLsp(text), error: null };
-  if (from) return { backend: 'fake', rows: parseJackLsp(readFileSync(from, 'utf8')), error: null };
+  if (text != null) return { backend: 'fake', rows: renameRows(parseJackLsp(text)), error: null };
+  if (from) return { backend: 'fake', rows: renameRows(parseJackLsp(readFileSync(from, 'utf8'))), error: null };
   const r = sh('jack_lsp', ['-c', '-p', '-t']);
   if (r.code !== 0 && !r.out.trim()) {
     // The useful sentence is jack_lsp's LAST line; the five above it are
@@ -124,7 +152,7 @@ export function listJack({ from, text } = {}) {
     return { backend: 'jack', rows: [], error: /ENOENT/.test(r.err) ? 'jack_lsp is not installed on this board'
       : /server is not running/.test(r.err) ? 'jackd is not running, so there is no graph' : (last ?? 'jack_lsp failed') };
   }
-  const rows = parseJackLsp(r.out);
+  const rows = renameRows(parseJackLsp(r.out));
   return { backend: 'jack', rows, error: rows.length ? null : 'jack_lsp lists no ports at all, so there is no server' };
 }
 
@@ -256,7 +284,7 @@ export function diff(doc, rows) {
 
 /** One step on the real graph. Answers the text, because the exit status cannot tell failure from "already". */
 export function runStep(s) {
-  const r = sh(`jack_${s.act}`, [s.from, s.to]);
+  const r = sh(`jack_${s.act}`, [realPort(s.from), realPort(s.to)]);
   return clean(`${r.out}\n${r.err}`);
 }
 

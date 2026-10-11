@@ -252,7 +252,26 @@ export function parseInputs(text) {
     // inside the Pi. See `createInputs` for what changes and what does not.
     const via = v.via ?? 'arecord';
     if (via !== 'arecord' && via !== 'jack') { problems.push(`${name}: via is arecord or jack, not ${JSON.stringify(via)}`); continue; }
-    inputs.set(name, { name, device, channels, take, midi, via });
+    // 🔴 `jackd`, SINCE 2026-10-11: this input's card is jackd's own device,
+    // so it is the clock and `alsa_in` is not used (`jacksynth.mjs`
+    // `ensureJackd` has the measurement). `true` or `{ period, periods }`.
+    // Only on `via: "jack"`, and only one input: there is one jackd.
+    // ⚠️ 512 x 3 BY DEFAULT, MEASURED 2026-10-11 on the Pi 4 (jackd is not
+    // realtime here): at 256 x 3 about ten xruns while sclang compiles and a
+    // few a minute with Yoshimi and the granulator playing; at 512 x 3 one at
+    // the compile and none in 100 s of the same load. 512 is 10.7 ms, the same
+    // as arecord's 480 frame period, so the Circuit is no later for it.
+    let jackd = null;
+    if (v.jackd != null && v.jackd !== false) {
+      if (via !== 'jack') { problems.push(`${name}: jackd needs via jack, the card cannot be both arecord's and jackd's`); continue; }
+      if ([...inputs.values()].some((i) => i.jackd)) { problems.push(`${name}: there is one jackd, and another input is already its card`); continue; }
+      const o = v.jackd === true ? {} : v.jackd;
+      const period = Number(o?.period ?? 512), periods = Number(o?.periods ?? 3);
+      if (!Number.isInteger(period) || period < 32 || period > 4096 || (period & (period - 1))) { problems.push(`${name}: jackd period is a power of two, 32 to 4096`); continue; }
+      if (!Number.isInteger(periods) || periods < 2 || periods > 8) { problems.push(`${name}: jackd periods is 2 to 8`); continue; }
+      jackd = { period, periods };
+    }
+    inputs.set(name, { name, device, channels, take, midi, via, ...(jackd ? { jackd } : {}) });
   }
   return { inputs, problems };
 }
@@ -351,7 +370,7 @@ export function createInputs({
       cfg, room: `${room}-${cfg.name}`, from: `board-${cfg.name}-${randomId(6)}`,
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
-      bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null,
+      bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null, onCard: false,
     };
     // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
     // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
@@ -393,7 +412,7 @@ export function createInputs({
     const alive = () => ({ type: 'board.alive', ...shape(), audio: s.proc ? cfg.name : null, frames: s.frames,
                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0 });
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device, via: onJack ? 'jack' : 'arecord',
-                            ...(onJack ? { jack: { port: jackPort, bridge: !!s.bridge, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
+                            ...(onJack ? { jack: { port: jackPort, bridge: s.onCard || !!s.bridge, by: s.onCard ? 'jackd' : s.bridge ? 'alsa_in' : null, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
                             frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             direct: s.rtc ? s.rtc.status() : null,
@@ -421,6 +440,12 @@ export function createInputs({
           setTimer(startBridge, s.bridgeBackoff); s.bridgeBackoff = Math.min(s.bridgeBackoff * 2, 60_000);
           return;
         }
+        // 🔴 jackd OWNS THIS CARD: the port is jackd's own `system:capture_N`,
+        // shown as `<name>:capture_N` by `jack.mjs`, so there is nothing to
+        // bridge and nothing to resample. An `alsa_in` here would only fail to
+        // open a card jackd holds.
+        s.onCard = j?.card === cfg.name;
+        if (s.onCard) { log(`${cfg.name}: ${cfg.device} is jackd's own card, ${jackPort} with no alsa_in`); return; }
         const dev = cfg.device.replace(/^hw:/, 'plughw:');
         const p = spawn('alsa_in', ['-j', cfg.name, '-d', dev, '-c', String(cfg.channels), '-r', String(rate),
           '-p', '256', '-n', '2'], { stdio: ['ignore', 'pipe', 'pipe'] });
