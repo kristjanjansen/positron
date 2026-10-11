@@ -1,5 +1,7 @@
 ## Open
 
+- **`sampler/030`: the piano on the Pi through sfizz** (2026-10-11). Asked: *"Build sfizz pi as next demo in bg"*. sfizz installed on the Pi as a JACK client, `pi-1:sampler` announced by the board, the R2 piano cached on the SD card, keys from the page, sound back through the relay as synth/060's Yoshimi. Background agent.
+
 - **Plans: a sampler on the Pi, and one on the Pico** (2026-10-11). Asked: *"Can pi be similar sampler too? Pico?"*, then *"Yes to plans"*. Spec only, in `plans/`: the Pi as `pi-1:sampler` (sfizz or a node sampler behind JACK, the R2 samples cached on the SD card, sound back through the relay as Yoshimi's, its latency), and the Pico (Pico 2 W memory and flash budget, sample format, PWM against an I2S DAC, what rp2040js would need to make sound in the browser). Background agent.
 
 - **Radio 020 back on the index as a tempo page: no granulator, the radio waves and a separate BPM visualiser, Ida from R2, named as the other concepts** (2026-10-11). Asked: *"In radio demo we had some bpm detect demo. Dearcive. Rm granulator just a radio waves and sepatare visualizer. Use r2 and ida. Bring to cocept to naming syrem"*. The page is `/concepts/radio/020/` (hidden as "Granulator"): Ida Radio Tallinn through `cf-shout`, a granulator and a `web:bpm` detector. Background agent.
