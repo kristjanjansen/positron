@@ -48,14 +48,13 @@
   .rc-left .pos-field textarea:focus-visible { border-color: var(--admin); }
   /* The broadcast on show: centred both ways in what is left of the column,
      balanced across its lines, wrapping long words, and scrolling only if it
-     outgrows the area. Who and when sit small under it. */
+     outgrows the area. The words alone, in the brand face, with no name or
+     time under them (asked 2026-10-11, *"rm you as admin + timestap from
+     centered message. use brnad font"*). */
   .rc-sign { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
              align-items: center; justify-content: center; gap: 12px; padding: 16px 24px; text-align: center; }
-  .rc-sign-t { margin: 0; max-width: 32ch; font-size: clamp(18px, 3.2vw, 30px); line-height: 1.3; color: var(--fg);
+  .rc-sign-t { margin: 0; max-width: 32ch; font: 600 clamp(18px, 3vw, 28px)/1.3 var(--brand); color: var(--fg);
                text-wrap: balance; overflow-wrap: anywhere; white-space: pre-line; }
-  .rc-sign-by { display: flex; gap: 10px; align-items: baseline; }
-  .rc-sign-by[hidden] { display: none; }
-  .rc-sign.me .rc-who { color: var(--admin); }
 
   .rc-compose { position: relative; padding: 10px 12px 12px; }
   .rc-compose[hidden] { display: none; }
@@ -212,18 +211,11 @@
   const casts = (() => {
     const box = el('div', 'rc-sign');
     const t = el('p', 'rc-sign-t', '');
-    const by = el('div', 'rc-sign-by');
-    by.hidden = true;
-    box.append(t, by);
+    box.append(t);
     return {
       el: box,
-      add({ who, at, text, me = false }) {
-        t.textContent = text;
-        by.replaceChildren(el('span', 'rc-who', who), el('span', 'rc-when', clock(at)));
-        by.hidden = false;
-        box.classList.toggle('me', me);
-      },
-      clear() { t.textContent = ''; by.hidden = true; box.classList.remove('me'); },
+      add({ text }) { t.textContent = text; },
+      clear() { t.textContent = ''; },
     };
   })();
   const chats = column('');
