@@ -8,10 +8,11 @@
 <title>POSITRON concept 017</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The play button alone at the top left, with what the board said beside it. */
+  /* The play button alone at the top left. What the board says goes to the log
+     only (asked 2026-10-11, *"rm AddSynth Morph on the Raspberry Pi, play the
+     keys etc labelling from 060"*). */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-said { color: var(--dim); font-size: 14px; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -143,8 +144,8 @@
   });
 
   // ── Start: join the board as /knobs/ does, and load the patch once ───────
-  const said = el('span', 'cc-said', 'press play to reach Yoshimi on the Raspberry Pi');
-  const say = (text, kind) => { said.textContent = text; d.log(text, kind); };
+  let saidLast = '';
+  const say = (text, kind) => { saidLast = text; d.log(text, kind); };
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   let opened = null, starting = false;
 
@@ -219,7 +220,7 @@
   setInterval(() => pb.refresh?.(), 500);
 
   const top = el('div', 'cc-top');
-  top.append(transport.el, said);
+  top.append(transport.el);
   d.stack.add(top, wave.el, grid.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver: the scope's level and the
@@ -235,7 +236,7 @@
       for (let i = 1; i < b.length; i++) { dsum += Math.abs(b[i] - b[i - 1]); asum += Math.abs(b[i]); }
       bright = asum > 1e-3 ? dsum / asum : null;
     }
-    return { armed, level, bright, said: said.textContent, stats: board ? board.stats() : null };
+    return { armed, level, bright, said: saidLast, stats: board ? board.stats() : null };
   };
   d.ready();
 </script>
