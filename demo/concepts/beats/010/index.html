@@ -16,10 +16,6 @@
      its own margin, border and corner, and its always-empty caption takes no room. */
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
-  /* The chroma picture: twelve pitch classes across, the full width of its
-     panel and the wave's height (the scope's 150). It sits in a host as the
-     wave does, because the panel stretches a canvas that is its direct child. */
-  .cc-chroma { display: block; width: 100%; height: 150px; }
   /* Play on its own row: the button's own size, at the left. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
@@ -34,6 +30,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // concepts beats/010, KEY, 2026-10-11. /concepts/beats/005/ with the tempo
@@ -79,7 +76,7 @@
   // A live station is AUDIO all the way: the station's site into the relay,
   // the relay into the level node in this tab, and the level node's
   // `audio-out` feeds the wave, the speakers and the key detector. The key
-  // detector's readings leave on a value port for the chroma display.
+  // detector's readings leave on a value port for the keyboard.
   const bay = createBay();
   for (const st of STATIONS) {
     bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.name, place: st.site, net: st.site });
@@ -98,8 +95,8 @@
   bay.addPort({ id: KEY_EV, label: 'key', dir: 'out', medium: 'value' });
   // The only way a reading reaches the picture: a delivered event on this
   // port. The detector never touches the picture.
-  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'chroma', place: 'browser' });
-  bay.addPort({ id: DISPLAY_IN, label: 'chroma', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
+  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'keyboard', place: 'browser' });
+  bay.addPort({ id: DISPLAY_IN, label: 'keyboard', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
@@ -163,24 +160,33 @@
   }
   const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
 
-  // The chroma picture: twelve bars, C at the left, each as tall as that pitch
-  // class's share of the last half second of sound. The detected key's scale is
-  // drawn in the foreground ink and its tonic in the accent; the five notes
-  // outside the scale stay dim. No grid lines and no labels on the picture:
-  // the footer names the key.
-  const chromaCanvas = el('canvas', 'cc-chroma');
-  const chromaHost = el('div', 'cc-chroma-host');
-  chromaHost.append(chromaCanvas);
-  const keyPanel = createVideoPanel({ media: chromaHost, aspect: 'auto', right: false,
+  // The key on the kit keyboard: one octave, C to B, nothing to press. The
+  // seven notes of the detected key are lit grey (the keyboard's `hint`, a
+  // note that could sound) and its home note in the accent. The footer names
+  // the key.
+  const kbHost = el('div', 'cc-kb-host');
+  const kb = createKeyboard(kbHost, { ...keyRange(11), base: 60, letters: false, pad: false, chord: false, full: true });
+  let lit = [];                    // [note, who] currently painted
+  function paintKey(r) {
+    for (const [n, who] of lit) kb.lightNote(n, false, who);
+    lit = [];
+    if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
+    for (const deg of KEY_SCALE[r.mode]) {
+      const n = 60 + ((r.tonic + deg) % 12), who = deg === 0 ? 'self' : 'hint';
+      kb.lightNote(n, true, who); lit.push([n, who]);
+    }
+  }
+  const keyPanel = createVideoPanel({ media: kbHost, aspect: 'auto', right: false,
     left: el('span', 'cc-say', 'key'),
     values: [{ key: 'key', reserve: 8 }, { key: 'conf', label: 'confidence', reserve: 4 }, { key: 'also', label: 'also', reserve: 18 }] });
 
   // What the picture shows is only what arrived on its in-port.
   let reading = null;              // the last event delivered
-  const bars = new Float64Array(12);  // what is drawn, eased toward the last delivered chroma
   function shown(ev) {
     if (ev?.of !== 'param' || ev.name !== 'key' || !Array.isArray(ev.chroma)) return;
+    const moved = reading?.v !== ev.v;
     reading = ev;
+    if (moved) paintKey(ev);
     keyPanel.values.set('key', ev.v ?? '');
     keyPanel.values.set('conf', Number.isFinite(ev.confidence) ? ev.confidence.toFixed(2) : '');
     keyPanel.values.set('also', Array.isArray(ev.also) ? ev.also.slice(0, 2).map((k) => k.key).join(', ') : '');
@@ -363,50 +369,10 @@
     }, KEY_HOP_S * 1000);
   }
 
-  // Canvas ink is read off the stylesheet's tokens once.
-  const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
-  let ink = null;
-  const inks = () => (ink ??= { card: tok('--card') || '#141922', dim: tok('--dim2') || '#6a7280',
-    fg: tok('--fg') || '#e6e6e6', hi: tok('--hi') || '#ffd400', mono: tok('--mono') || 'ui-monospace, monospace' });
-  function fit(c) {
-    const dpr = window.devicePixelRatio || 1;
-    const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
-    if (W && H && (c.width !== W || c.height !== H)) { c.width = W; c.height = H; }
-    return { W, H, dpr };
-  }
-  function drawChroma() {
-    const { W, H, dpr } = fit(chromaCanvas);
-    if (!W || !H) return;
-    const k = inks(), g = chromaCanvas.getContext('2d');
-    g.fillStyle = k.card; g.fillRect(0, 0, W, H);
-    const want = reading?.chroma ?? null;
-    let top = 0;
-    for (let i = 0; i < 12; i++) {
-      bars[i] += ((want ? want[i] : 0) - bars[i]) * 0.3;
-      top = Math.max(top, bars[i]);
-    }
-    // The twelve pitch classes are named under their bars, so a bar is a note
-    // before any reading arrives.
-    const pad = 8 * dpr, gap = 4 * dpr, bw = (W - 2 * pad - 11 * gap) / 12, lab = 16 * dpr, h = H - 2 * pad - lab;
-    g.font = `${11 * dpr}px ${k.mono}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
-    for (let i = 0; i < 12; i++) {
-      g.fillStyle = reading && i === reading.tonic ? k.hi : k.dim;
-      g.fillText(KEY_NAMES[i], pad + i * (bw + gap) + bw / 2, H - pad + 2 * dpr);
-    }
-    if (!(top > 0)) return;
-    const tonic = reading?.tonic, scale = reading?.mode ? KEY_SCALE[reading.mode] : null;
-    for (let i = 0; i < 12; i++) {
-      const deg = tonic == null ? -1 : (i - tonic + 12) % 12;
-      g.fillStyle = deg === 0 ? k.hi : (scale && scale.includes(deg) ? k.fg : k.dim);
-      const bh = Math.max(dpr, (bars[i] / top) * h);
-      g.fillRect(Math.round(pad + i * (bw + gap)), Math.round(pad + h - bh), Math.round(bw), Math.round(bh));
-    }
-  }
 
   function frame() {
     if (!playing) return;
     if (holds(PLAYER_OUT, WAVE_IN)) { tap.getFloatTimeDomainData(tapBuf); scope.feed(tapBuf, ctx.sampleRate); }
-    drawChroma();
     requestAnimationFrame(frame);
   }
 
@@ -517,7 +483,7 @@
     playing = true;
     face();
     keyStart();
-    reading = null; bars.fill(0);
+    reading = null; paintKey(null);
     for (const k of ['key', 'conf', 'also']) keyPanel.values.set(k, '');
     route();
     // The press is the person asking to listen: only now does a stream open,
