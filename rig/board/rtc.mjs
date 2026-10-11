@@ -1,4 +1,5 @@
-// rig/board/rtc.mjs — a direct path from a browser to one input, beside the relay.
+// rig/board/rtc.mjs: a direct path from a browser to one input, or to the
+// board's main socket (`createMainDirect`, at the end), beside the relay.
 //
 // Asked 2026-09-30: *"can we bring roundtrip more down"*, then *"webrtc for
 // away"*. `plans/plan-away-webrtc.md` has the whole case. The short of it: the
@@ -67,6 +68,30 @@ export function fresher(last, bytes, n) {
 }
 
 /**
+ * The key a `note.on` or `note.off` is ordered and held within: its node, its
+ * channel and its note. The main socket's verbs, where an input's are raw MIDI
+ * bytes (`midiKey`). Null for anything that is not a note with a number.
+ */
+export function noteKey(m) {
+  if (!m || (m.type !== 'note.on' && m.type !== 'note.off') || !Number.isInteger(m.note)) return null;
+  return `${typeof m.node === 'string' ? m.node : ''}:${Number.isInteger(m.channel) ? m.channel : 0}:${m.note}`;
+}
+
+/**
+ * `fresher` for the main socket's notes. A numbered note older than the last
+ * one applied to its key is refused; an unnumbered one is applied, so a page
+ * that does not number its notes is no worse off than on the relay.
+ */
+export function fresherNote(last, m) {
+  const key = noteKey(m);
+  if (key == null || !Number.isFinite(m.n)) return true;
+  const was = last.get(`note:${key}`);
+  if (was != null && m.n <= was) return false;
+  last.set(`note:${key}`, m.n);
+  return true;
+}
+
+/**
  * The live half. `PeerConnection` is node-datachannel's class, or a fake.
  * `signal(msg)` sends into the relay room; `handle(msg, reply)` is the input's
  * own handler; `frameMs` is what the capture delivers per unit.
@@ -101,7 +126,7 @@ export function createRtc({
     const want = msg.frameMs === 20 ? 20 : 10;
     const frameMs = want % unitMs === 0 ? want : unitMs;
     const p = { id, pc: null, pcm: null, ctl: null, heard: now(), frameMs, parts: frameMs / unitMs,
-                pending: [], seq: 0, held: new Set(), last: new Map(), sent: 0, dropped: 0 };
+                pending: [], seq: 0, held: new Set(), notes: new Map(), last: new Map(), sent: 0, dropped: 0 };
     let pc;
     try { pc = new PeerConnection(`away-${id}`, { iceServers }); }
     catch (e) { signal({ type: 'rtc.refused', peer: id, why: `no peer connection here: ${e.message}` }); return; }
@@ -132,7 +157,19 @@ export function createRtc({
           const kind = st & 0xF0, key = `${st & 0x0F}:${a}`;
           if (kind === 0x90 && b > 0) p.held.add(key); else if (kind === 0x80 || kind === 0x90) p.held.delete(key);
         }
-        handle(m, (type, body) => reply(type, { re: m.id, ...body }));
+        // The main socket's notes (`note.on` / `note.off`, board.mjs), held per
+        // peer for the same reason as `held` above: a peer that goes away lets
+        // go of what IT started, and nothing else.
+        if (m.type === 'note.on' || m.type === 'note.off') {
+          if (!fresherNote(p.last, m)) return;          // overtaken, as midi.send above
+          const k = noteKey(m);
+          if (k != null) {
+            if (m.type === 'note.on' && (m.vel ?? 100) > 0) {
+              p.notes.set(k, { ...(typeof m.node === 'string' ? { node: m.node } : {}), channel: Number.isInteger(m.channel) ? m.channel : 0, note: m.note });
+            } else p.notes.delete(k);
+          }
+        }
+        handle(m, (type, body) => reply(type, { re: m.id, ...body }), p.id);
       });
     });
     try { pc.setRemoteDescription(msg.sdp, 'offer'); }
@@ -179,5 +216,70 @@ export function createRtc({
     get size() { return peers.size; },
     status: () => [...peers.values()].map((p) => ({ peer: p.id, frameMs: p.frameMs, sent: p.sent, dropped: p.dropped, open: !!p.pcm && !!p.ctl })),
     close() { for (const id of [...peers.keys()]) close(id, 'shutting down'); },
+  };
+}
+
+/**
+ * The board's MAIN socket on the direct path, beside the inputs (`inputs.mjs`).
+ *
+ * 🔴 FOUND 2026-10-11: `/concepts/sampler/035/` offered the direct path in
+ * `studio-1`, the room of the main socket, and waited three seconds for an
+ * answer that could never come. Only the per input sockets (`<room>-<input>`,
+ * what `/away/` joins) had `createRtc`, so the main socket dropped the offer on
+ * the floor: no answer, no refusal, nothing in the journal. This is the same
+ * path for the synth capture (Yoshimi and the sampler summed on JACK).
+ *
+ * `handle(msg, reply)` is the main socket's own handler, so a note over `ctl`
+ * goes through exactly what a note over the relay does. It is async on the
+ * board, so a throw here arrives as a rejection and is caught, never left
+ * unhandled (an unhandled rejection takes the service down).
+ * `frame` is the relay's frame in samples; the direct path sends half of it.
+ */
+export function createMainDirect({ PeerConnection = null, signal, handle, frame, rate, log = () => {}, ...rest }) {
+  const unit = frame % 2 === 0 ? frame / 2 : frame;
+  const run = (m, reply, peer) => {
+    Promise.resolve().then(() => handle(m, reply, peer)).catch((err) => {
+      log(`handler threw over ctl: ${err.message}`);
+      reply('board.error', { error: err.message });
+    });
+  };
+  const rtc = PeerConnection ? createRtc({
+    PeerConnection, signal, rate, unitMs: 1000 * unit / rate, log, handle: run,
+    // A direct listener that goes away lets go of the notes IT started, one
+    // note off each through the same handler. Not a panic, so a note somebody
+    // else is holding on the same engine keeps sounding.
+    onGone: (p) => {
+      for (const n of p.notes.values()) run({ type: 'note.off', ...n }, () => {}, p.id);
+      p.notes.clear();
+    },
+    ...rest,
+  }) : null;
+  return {
+    /** What `board.hello` and `board.alive` say, so a page knows whether to offer. */
+    direct: !!rtc,
+    /**
+     * Signalling from the relay room. True when the message was the direct
+     * path's, answered or refused out loud; false for everything else.
+     */
+    signalling(msg) {
+      if (msg?.type === 'rtc.offer') {
+        if (!rtc) { signal({ type: 'rtc.refused', peer: msg.peer, why: 'this board has no direct path, use the relay' }); return true; }
+        try { rtc.offer(msg); } catch (err) { log(`offer threw: ${err.message}`); signal({ type: 'rtc.refused', peer: msg.peer, why: err.message }); }
+        return true;
+      }
+      if (msg?.type === 'rtc.candidate') { try { rtc?.candidate(msg); } catch { /* */ } return true; }
+      return false;
+    },
+    /** One capture unit (half a relay frame) for every open peer. */
+    unit(int16) { rtc?.pcm(int16); },
+    /** A whole relay frame, for a source that only makes whole ones, in units. */
+    frame(int16) {
+      if (!rtc || !rtc.size) return;
+      for (let o = 0; o < int16.length; o += unit) rtc.pcm(int16.subarray(o, o + unit));
+    },
+    sweep() { rtc?.sweep(); },
+    status: () => (rtc ? rtc.status() : null),
+    get size() { return rtc ? rtc.size : 0; },
+    close() { rtc?.close(); },
   };
 }

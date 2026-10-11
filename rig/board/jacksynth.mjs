@@ -1030,8 +1030,15 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
 // ⚠️ THE FRAME PUMP IS THE NEWEST HOLDER'S `onFrame`. Every holder on this board
 // passes the same `sendPcm`, so this is a formality, written down so it is not
 // a surprise.
-const capture = { proc: null, users: new Set(), onFrame: null };
+const capture = { proc: null, users: new Set(), onFrame: null, onUnit: null };
 export const captureHolders = () => [...capture.users];
+/**
+ * Half a frame, as soon as it exists, for the main socket's direct path
+ * (`rtc.mjs` `createMainDirect`), the same split `inputs.mjs` reads in. The
+ * relay's `onFrame` still gets whole frames, at the moment it always did, built
+ * from two halves. Set once by `board.mjs`; null sends nothing extra.
+ */
+export function setCaptureUnit(fn) { capture.onUnit = typeof fn === 'function' ? fn : null; }
 export async function ensureCapture(user, { onFrame, onLog } = {}) {
   capture.users.add(user);
   if (onFrame) capture.onFrame = onFrame;
@@ -1040,13 +1047,22 @@ export async function ensureCapture(user, { onFrame, onLog } = {}) {
   const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', CAP_CLIENT,
     '-f', 's16le', '-ar', String(RATE), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
   capture.proc = cap;
-  const BYTES = FRAME * 2;
-  let carry = Buffer.alloc(0);
+  // Read in HALF frames, so the direct path sends 10 ms as soon as 10 ms
+  // exists (inputs.mjs does the same); the relay gets its whole 20 ms frame.
+  const HALF = FRAME / 2, IN = HALF * 2;
+  let carry = Buffer.alloc(0), halves = [];
   cap.stdout.on('data', (chunk) => {
     carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
-    while (carry.length >= BYTES) {
-      capture.onFrame?.(new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + BYTES)));
-      carry = carry.subarray(BYTES);
+    while (carry.length >= IN) {
+      const one = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
+      carry = carry.subarray(IN);
+      capture.onUnit?.(one);
+      halves.push(one);
+      if (halves.length < 2) continue;
+      const whole = new Int16Array(FRAME);
+      whole.set(halves[0], 0); whole.set(halves[1], HALF);
+      halves = [];
+      capture.onFrame?.(whole);
     }
   });
   cap.stderr?.on('data', (d) => onLog?.(`ffmpeg: ${String(d).trim()}`));

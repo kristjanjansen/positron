@@ -73,6 +73,9 @@ export function graphOf(f) {
 export function helloMsg(f) {
   return { type: 'board.hello', name: f.name, id: f.id, backend: f.backend, ports: f.ports.length, dry: f.dry,
            since: f.since, audioChannels: 1, frameMs: f.frameMs, instruments: f.instruments,
+           // Whether this socket answers `rtc.offer`, as an input's hello says
+           // (inputs.mjs). Left out when not given, so an older caller is unchanged.
+           ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
            ...(f.error ? { error: f.error, hint: f.hint } : {}),
            graph: graphOf(f.graphFacts) };
 }
@@ -88,5 +91,6 @@ export function helloMsg(f) {
 export function aliveMsg(f) {
   return { type: 'board.alive', name: f.name, id: f.id, upSec: f.upSec,
            audio: f.audio, voices: f.voices, frames: f.frames, ...f.insert,
+           ...(typeof f.direct === 'boolean' ? { direct: f.direct } : {}),
            ...(f.graphFacts ? { graph: graphOf(f.graphFacts) } : {}) };
 }

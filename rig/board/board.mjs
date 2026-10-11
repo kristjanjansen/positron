@@ -22,6 +22,7 @@ import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } fr
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
          jackGraph, jackChain, jackRebuild, ensureJackd, setJackCard, wire as jackWire, setBayRows, getBayRows,
+         setCaptureUnit,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
@@ -29,6 +30,7 @@ import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
+import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
@@ -435,6 +437,9 @@ const bankCC = (source) => (source === 'yoshimi' ? yoshimiList().bankCC ?? 32 : 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: FROM, seq: seq++ })); return true; } return false; };
+// The main socket's direct path (rtc.mjs `createMainDirect`), made at the
+// bottom of this file once node-datachannel has been asked for. Null until then.
+let mainDirect = null;
 
 // ── shipping the grains ──────────────────────────────────────────────────────
 //
@@ -504,6 +509,13 @@ function sendPcm(int16) {
   Buffer.from(int16.buffer, int16.byteOffset, int16.byteLength).copy(out, 12);
   ws.send(out);
   sentFrames++;
+}
+// A source that makes whole frames only (the synth, `arecord`): the frame to
+// the relay and, in two halves, to every direct listener. The JACK capture
+// feeds the direct path half by half itself (`setCaptureUnit` below).
+function pcmOut(int16) {
+  mainDirect?.frame(int16);
+  sendPcm(int16);
 }
 
 async function startAudio(source = 'synth', msg = null) {
@@ -600,7 +612,7 @@ async function startAudio(source = 'synth', msg = null) {
   // reproduced; not listed, not the default, not on the page.
   if (source === 'moog') {
     synth = createMoogSynth({ patch: msg?.patch ?? 'bass' });
-    stopSynth = synth.startRealtime(sendPcm);
+    stopSynth = synth.startRealtime(pcmOut);
     log(`moog up · patch ${msg?.patch ?? 'bass'}`);
     return { ok: true, source: 'moog', patch: msg?.patch ?? 'bass', patches: Object.keys(MOOG_PATCHES),
              rate: RATE, msgPerSec: RATE / FRAME, needs: 'nothing plugged in' };
@@ -608,7 +620,7 @@ async function startAudio(source = 'synth', msg = null) {
 
   if (source === 'synth') {
     synth = createSynth();
-    stopSynth = synth.startRealtime(sendPcm);
+    stopSynth = synth.startRealtime(pcmOut);
     // On the board, a real keyboard patched in with `aconnect` plays it too —
     // the synth is just another sequencer port, so the patchbay needs no
     // special case for it.
@@ -648,11 +660,11 @@ async function startAudio(source = 'synth', msg = null) {
     carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
     while (carry.length >= IN) {
       const all = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
-      if (AUDIO_CH === 1) sendPcm(all);
+      if (AUDIO_CH === 1) pcmOut(all);
       else {
         const one = new Int16Array(FRAME);
         for (let i = 0; i < FRAME; i++) one[i] = all[i * AUDIO_CH + AUDIO_TAKE - 1];
-        sendPcm(one);
+        pcmOut(one);
       }
       carry = carry.subarray(IN);
     }
@@ -804,8 +816,10 @@ const CTL_NAMES = {
 // Every verb that changes the rig has a PLAN twin that changes nothing, so a
 // client can always ask "what would this do" first. A wrong MIDI patch is
 // silent; a plan is not.
-async function handle(msg) {
-  const reply = (type, body) => send({ type, re: msg.id, ...body });
+// `replyVia` is the direct path's `ctl` channel (rtc.mjs), so an answer goes
+// back the way its question came. Absent, the answer goes into the room.
+async function handle(msg, replyVia = null) {
+  const reply = replyVia || ((type, body) => send({ type, re: msg.id, ...body }));
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -1376,7 +1390,9 @@ async function handle(msg) {
         : audio ? { ok: true, source: 'capture', ...insertState() }
         : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status(),
         // The sampler beside it, never in place of it (option b).
-        sampler: samp ? samp.status() : { ok: false, available: samplerAvailable(), starting: !!sampStarting } });
+        sampler: samp ? samp.status() : { ok: false, available: samplerAvailable(), starting: !!sampStarting },
+        // The main socket's direct listeners, or null on a board without the library.
+        direct: mainDirect ? mainDirect.status() : null });
     case 'sampler.cpu':
       return reply('sampler.cpu', samp ? { ok: true, ...(await samp.cpu()), voices: samp.status().voices } : { ok: false, reason: 'the sampler is not running' });
     // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
@@ -1651,7 +1667,8 @@ function connect() {
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
-                    frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts }));
+                    frameMs: 1000 * FRAME / RATE, instruments, error: s.error, hint: s.hint, graphFacts,
+                    direct: !!mainDirect?.direct }));
     if (ONCE) { console.log(JSON.stringify(s, null, 2)); setTimeout(() => process.exit(0), 400); }
   };
   ws.onmessage = (e) => {
@@ -1671,6 +1688,15 @@ function connect() {
         const cut = Date.now() - INSERT_HELD_MS;
         for (const [k, t] of clientSeen) if (t < cut) clientSeen.delete(k);
       }
+    }
+    // Signalling for the direct path arrives here and ONLY here, answered or
+    // refused out loud: a page waiting on an offer nobody reads waits three
+    // seconds in silence, which is what /concepts/sampler/035/ did until
+    // 2026-10-11. A `ctl` channel cannot open another peer (rtc.mjs).
+    if (msg.type === 'rtc.offer' || msg.type === 'rtc.candidate') {
+      if (mainDirect) mainDirect.signalling(msg);
+      else if (msg.type === 'rtc.offer') send({ type: 'rtc.refused', peer: msg.peer, why: 'this board has not finished starting, use the relay' });
+      return;
     }
     // handle() is async now (raising a JACK chain takes seconds), so a throw
     // arrives as a rejection — an unhandled one would take the service down.
@@ -1727,7 +1753,8 @@ function connect() {
 function alive() {
   return aliveMsg({ name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
                     audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
-                    voices: synth?.voices ?? 0, frames: sentFrames, insert: insertState(), graphFacts });
+                    voices: synth?.voices ?? 0, frames: sentFrames, insert: insertState(), graphFacts,
+                    direct: !!mainDirect?.direct });
 }
 setInterval(() => {
   // 🔴 SWEEP BEFORE THE BEAT, NOT AFTER IT. `sweepInsert` is async and sends
@@ -1740,6 +1767,7 @@ setInterval(() => {
   // rejection takes the whole service down. Same reason `handle()` is wrapped.
   sweepInsert('the page that asked for it stopped talking')
     .catch((e) => log('the insert sweep threw:', e.message));
+  mainDirect?.sweep();
   send(alive());
 }, 5000).unref?.();
 
@@ -1814,11 +1842,28 @@ for (const p of inputsCfg.problems) log('inputs:', p);
 // is this board's first npm dependency (rig/board/package.json, installed by
 // push.sh and setup.sh), and a board without it runs exactly as before with the
 // relay only. rtc.mjs has the why and the P0 measurement.
+// ⚠️ ASKED FOR WHETHER OR NOT THERE ARE INPUTS, SINCE 2026-10-11: the main
+// socket has the direct path too (below), and it was only loaded for inputs.
 let PeerConnection = null;
-if (inputsCfg.inputs.size) {
-  try { PeerConnection = (await import('node-datachannel')).default.PeerConnection; log('inputs: direct path available (node-datachannel)'); }
-  catch (e) { log('inputs: no direct path, node-datachannel is not installed:', e.code || e.message); }
-}
+try { PeerConnection = (await import('node-datachannel')).default.PeerConnection; log('direct path available (node-datachannel)'); }
+catch (e) { log('no direct path, node-datachannel is not installed:', e.code || e.message); }
+
+// 🔴 THE MAIN SOCKET'S DIRECT PATH, SINCE 2026-10-11. Until then only the input
+// rooms (`<room>-<input>`, inputs.mjs) answered an offer, so a page in this room
+// (`/concepts/sampler/035/`) offered into a socket that had no handler for it
+// and waited three seconds in silence. The same handler as the relay, so a note
+// over `ctl` for node `sampler` or for Yoshimi does what it does over the relay;
+// the answer goes back on `ctl`. A ctl message has no `from`, so it is given
+// one per peer and dated in `clientSeen` exactly as a relay message is.
+mainDirect = createMainDirect({
+  PeerConnection, signal: send, frame: FRAME, rate: RATE, log: (...a) => log('direct:', ...a),
+  handle: (m, reply, peer) => {
+    const from = typeof m.from === 'string' ? m.from : `rtc-${peer}`;
+    clientSeen.set(from, Date.now());
+    return handle({ ...m, from }, reply);
+  },
+});
+setCaptureUnit((u) => mainDirect.unit(u));
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
   spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a), PeerConnection,
@@ -1828,5 +1873,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); stopSampler(); hwInputs.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();
