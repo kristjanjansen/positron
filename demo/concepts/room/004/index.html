@@ -287,24 +287,33 @@
     for (const r of lines) (r.lane === 'cast' ? casts : chats).add({ who: r.who, at: r.sent, text: r.text });
     bar.el.querySelector('.tbar-toggle')?.setAttribute('hidden', '');
     if (!origin) origin = Date.now();
-    deck.setRange([0, Math.max(AIR_MS, Date.now() - origin + AIR_MS / 2)]);
-    deck.seek(Date.now() - origin);
-    deck.play();
+    settle();
+  }
+  // While live the strip is typist/030's: it does not run on the clock. Each
+  // line refits it to the whole take, from the first line to the last plus
+  // TAIL_MS, and the playhead parks at the end, so nothing scrolls and nothing
+  // moves until somebody writes (asked: *"timelines are very nervous when
+  // recording. the moving cursor adds stress"*, then *"typist already
+  // compresses timeline and no autocroll. 030. so do same for chat rec"*).
+  const TAIL_MS = 2000;
+  function settle() {
+    const end = lines.length ? Math.max(...lines.map((r) => r.sent)) - origin : 0;
+    deck.setRange([0, end + TAIL_MS]);
+    deck.seek(end + TAIL_MS);
+    strip?.strip?.fit?.();
   }
   function said(lane, sent, text, who) {
     lines.push({ lane, sent, text, who });
     if (!origin || sent < origin) origin = sent;
     if (!live) return;
-    const now = Date.now() - origin;
-    deck.setRange([0, Math.max(AIR_MS, now + AIR_MS / 2)]);
-    deck.seek(now);
+    settle();
   }
   const rowsOf = (lane) => () => lines.filter((r) => r.lane === lane)
     .map((r, i) => ({ at: r.sent - origin, id: `${lane}${i}`, kind: lane, payload: r }));
   const glue = el('div');
   const bar = createTransportBar(glue, deck, { scrub: false, loop: false, live: false, publish: false });
   const strip = createStripView(glue, deck, {
-    size: 'auto', follow: true, gutter: 120,
+    size: 'auto', follow: false, gutter: 120,
     lanes: [
       { id: 'cast', kind: 'cast', label: 'broadcast', color: CAST_INK, height: 40, width: 2, as: 'ticks', terse: true,
         rows: rowsOf('cast'), describeRow: (r) => [r.payload.who, r.payload.text] },
