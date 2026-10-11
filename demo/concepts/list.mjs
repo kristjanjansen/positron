@@ -15,7 +15,7 @@ export const CONCEPTS = [
   { n: 'synth/040', title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
   { n: 'synth/050', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: 'synth/060', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
-  { n: 'synth/070', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
+  { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'radio/000', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   // radio/020 Granulator is off the index since 2026-10-10 (*"hide 031 for now and backlog"*);
   // the page stays at /concepts/radio/020/, row: { n: 'radio/020', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' }
