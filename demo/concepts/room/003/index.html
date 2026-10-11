@@ -32,6 +32,14 @@
   .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
              overflow-wrap: anywhere; white-space: pre-wrap; }
   .rc-msg.me .rc-who { color: var(--hi); }
+  /* The broadcast column has a colour of its own, so the admin's voice is not
+     the chat's (asked 2026-10-11, *"Add different color to left char focus
+     color and you string, add "you as admin""*): its own name and the
+     composer's focus edge. `--admin` is the program violet from the medium
+     palette. The focus rule matches shell.css's (0,1,1) with a class and wins. */
+  .rc-left { --admin: #c39af0; }
+  .rc-left .rc-msg.me .rc-who { color: var(--admin); }
+  .rc-left .pos-field textarea:focus-visible { border-color: var(--admin); }
   /* A broadcast reads louder than a chat line. */
   .rc-cast .rc-text { color: var(--fg); font-size: 15px; }
 
@@ -198,7 +206,8 @@
     const by = String(m.speaker || m.from);
     if (l.from === KEPT && !isNotice(by)) return;
     pb?.pulse(l.from, l.to);
-    casts.add({ who: short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
+    const mine = by.split(':')[0] === SITE;
+    casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
   }
 
   // Wake the recorder into this room, then replay what it kept, each line
@@ -231,7 +240,7 @@
     if (!admin) return;
     const r = node.emit(AOUT, { text }, { store: true });
     if (r.sent) { pb?.pulse(AOUT, '*:notice:value-in'); pb?.pulse(AOUT, KEEP); }
-    casts.add({ who: 'you', at: Date.now(), text, me: true });
+    casts.add({ who: 'you as admin', at: Date.now(), text, me: true });
   }
 
   /** The compose box from room/001: grows to six lines, Enter sends, Shift
