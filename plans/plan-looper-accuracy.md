@@ -517,3 +517,18 @@ About 250 s, 9 takes or attempts.
    off / panic button as the only clear.
 2. **A take that starts more than about 1 s before its first note starts at
    that note instead** (design 2.2, with the lookback kept for the near case).
+
+## 11. The third Copy log, 2026-10-11 18:27, hold clear at 3 s, MIDI on channel 2 (MEASURED)
+
+- **Lookback, five takes:** opening notes 138.7, 67.4, 16.5, 15.6 and 12.7 ms
+  before the press, all taken in. The 138.7 ms one is near the 150 ms edge.
+- **The 3 s hold clear did only what was meant.** Four clears, each a hold of
+  **3.77, 3.70, 3.90 and 4.69 s** with no note, each right after a loop the
+  owner went on to replace. One hold with notes in it was kept (137207.9,
+  5 notes). No loop was lost to a hold.
+- **Overdub was tried and is missing.** At 132552.5 the owner pressed over a
+  15.04 s loop, played nothing, closed: the empty take kept the loop (the rule
+  worked). At 140938.2 he pressed again and played: the take replaced the 15 s
+  loop with a 1.85 s one whose first note is 805.7 ms in. Read as an overdub
+  attempt that a "press while looping is a new take" looper cannot honour.
+- **One take started 805.7 ms before its first note** (design 2.2 again).
