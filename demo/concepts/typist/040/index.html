@@ -46,19 +46,45 @@
   const q = new URLSearchParams(location.search);
   let count = Math.min(MAX, Math.max(1, parseInt(q.get('n'), 10) || 2));
 
-  // ── the text ─────────────────────────────────────────────────────────────
-  // Six short letters, one per typist, plain lines. One text and no choice of
-  // it (asked: *"keep only letters on 030, no others coice"*); the Estonian
-  // letters and the concerto set went then, and the concerto's facts are in
-  // `research/mattiisen-kirjutusmasinakontsert-2026-10-11.md`. `pace` slows
-  // (above 1) or speeds (below 1) a typist.
-  const LETTERS = [
-      { text: 'Dear Anna,\nthe weather turned cold this week.\nThe garden is asleep under the snow.' },
-      { text: 'Minutes of the meeting.\nPresent were four of us and the cat.\nWe meet again on Monday.' },
-      { text: 'Shopping list.\nBread, milk and apples.\nA new ribbon for the typewriter.' },
-      { text: 'The train leaves at seven.\nBring a warm coat and a book.\nI will wait on the platform.' },
-      { text: 'Note to self.\nCall the printer before noon.\nAsk about the blue paper.' },
-      { text: 'Hello from the fourth floor.\nThe window looks over the harbour.\nShips come in all morning.' },
+  // ── the texts ────────────────────────────────────────────────────────────
+  // Six typists, each a different kind of typing (asked: *"make 6 typist more
+  // varied. one tyoing and clearing a lot. one contructng concrete poetry, one
+  // drawing ascci mixed with text"*). 1, 5 and 6 write letters; 2 writes and
+  // rubs out, over and over; 3 builds concrete poetry out of spaces and line
+  // breaks; 4 draws in characters and writes around the drawing. So four
+  // papers already show three of the kinds. `\b` in a text is the backspace
+  // key. `pace` slows (above 1) or speeds (below 1) a typist.
+  const BS = '\b', rub = (s) => BS.repeat(s.length);
+  const TEXTS = [
+    { text: 'Dear Anna,\nthe weather turned cold this week.\nThe garden is asleep under the snow.' },
+    { text: 'Dear Mr Lind,\n'
+        + 'I am sorry to' + rub('I am sorry to') + 'Thank you for' + rub('Thank you for')
+        + 'I write about the' + rub('the') + 'your letter.' + rub('your letter.') + 'the rent.\n'
+        + 'It will be late' + rub('late') + 'paid on Friday' + rub('on Friday') + 'soon' + rub('soon') + 'on Friday.\n'
+        + 'Yours sincerely' + rub('sincerely') + 'truly' + rub('Yours truly') + 'Best,\nK.' + rub('Best,\nK.') + 'Kind regards,\nK.',
+      pace: 0.8 },
+    { text: 'sea sea sea sea\n'
+        + '  sea sea sea sea\n'
+        + '    sea sea sea sea\n'
+        + '  sea sea sea sea\n'
+        + 'sea sea sea sea\n'
+        + '\n'
+        + '                    sand\n'
+        + '                   sand sand\n'
+        + '                  sand  shell  sand\n'
+        + '\n'
+        + 'r\n a\n  i\n   n          r\n                a\n                 i\n                  n' },
+    { text: 'Postcard from the harbour.\n\n'
+        + '       |\\\n'
+        + '       | \\\n'
+        + '       |__\\\n'
+        + '   _____|_____\n'
+        + '   \\_________/   ~ ~\n'
+        + ' ~~~~~~~~~~~~~~~~~~~~~~\n\n'
+        + 'This is the boat.\nIt leaves at six.\n\n'
+        + '   (  )   <- the sun\n' },
+    { text: 'Note to self.\nCall the printer before noon.\nAsk about the blue paper.' },
+    { text: 'Hello from the fourth floor.\nThe window looks over the harbour.\nShips come in all morning.' },
   ];
 
   // ── the sound ────────────────────────────────────────────────────────────
@@ -134,7 +160,7 @@
     // The paper draws what ARRIVES: a typist's character is put on the sheet
     // here. A person's typing is already in the textarea, so it is not put twice.
     bay.addPort({ id: `${P(k, 'paper')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
-      deliver: (e) => { if (e?.by === 'typist') papers[k].type(e.text); } });
+      deliver: (e) => { if (e?.by !== 'typist') return; if (e.kind === 'deleteContentBackward') papers[k].back(); else papers[k].type(e.text); } });
     // The typewriter sounds what arrives, whoever typed it.
     bay.addPort({ id: `${P(k, 'typewriter')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
       deliver: (e) => typed(k, e) });
@@ -245,8 +271,12 @@
     const r = rnd(k * 7919);
     typists[k] = { r, base: 95 + r() * 60, i: 0, due: 0, wait: false, typed: 0 };
   }
-  const textOf = (k) => LETTERS[k - 1];
-  function gap(t, ch, pace) {
+  const textOf = (k) => TEXTS[k - 1];
+  function gap(t, ch, pace, prev) {
+    // a run of spaces is the space bar tapped fast, a run of backspaces the
+    // key held down, so a shaped poem and a rubbed out line do not crawl
+    if (ch === ' ' && prev === ' ') return (30 + t.r() * 25) * pace;
+    if (ch === BS) return (prev === BS ? 55 + t.r() * 35 : 300 + t.r() * 300) * pace;
     let ms = t.base * (0.55 + t.r() * 0.9);
     if (ch === ' ') ms += 40;
     if (/[.,;:!?]/.test(ch)) ms += 200 + t.r() * 250;
@@ -269,10 +299,11 @@
         t.i = 0; t.wait = false; t.due = now + 900;
         continue;
       }
-      const ch = text[t.i++];
-      bay.send(`${P(k, 'keys')}:value-out`, { text: ch, kind: ch === '\n' ? 'insertLineBreak' : 'insertText', by: 'typist' });
+      const prev = text[t.i - 1], ch = text[t.i++];
+      const kind = ch === BS ? 'deleteContentBackward' : ch === '\n' ? 'insertLineBreak' : 'insertText';
+      bay.send(`${P(k, 'keys')}:value-out`, { text: ch === BS ? '' : ch, kind, by: 'typist' });
       t.typed++; typing.chars++;
-      t.due = now + gap(t, ch, pace);
+      t.due = now + gap(t, ch, pace, prev);
     }
   }
   function startTyping() {

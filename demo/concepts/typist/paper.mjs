@@ -14,7 +14,7 @@
 //
 //   const p = createPaper({ label: 'paper 1', onInput: (e) => ... });
 //   host.append(p.el);
-//   p.type('a'); p.type('\n'); p.clear();
+//   p.type('a'); p.type('\n'); p.back(); p.clear();
 
 import { el } from '/shell/shell.mjs';
 
@@ -114,6 +114,12 @@ export function createPaper({ label = 'the paper', text = '', onInput = () => {}
     /** Type at the end of the sheet, as a machine does, and move the cursor there. */
     type(s) {
       keys.value += s;
+      keys.setSelectionRange(keys.value.length, keys.value.length);
+      draw();
+    },
+    /** Take back the last character, as a typist's backspace does. */
+    back() {
+      keys.value = keys.value.slice(0, -1);
       keys.setSelectionRange(keys.value.length, keys.value.length);
       draw();
     },
