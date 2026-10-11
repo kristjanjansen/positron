@@ -167,8 +167,10 @@
   function looperUp(s, at, len) {
     s.looperUp = at;
     if (len === null || len < CLEAR_HOLD_MS) return '';
-    s.looper = 'empty';
-    return `, 020 would have cleared the loop ${CLEAR_HOLD_MS / 1000} s into the hold`;
+    // Since plans/plan-looper-accuracy.md section 9, 020 clears on a hold only
+    // when no note was played during it. This page does not follow the notes,
+    // so it says which way it goes rather than guessing.
+    return `, held ${CLEAR_HOLD_MS / 1000} s or more: 020 clears the loop if no note was played during the hold`;
   }
 
   /** Half pedal: the band has held long enough by time `t`. */
