@@ -78,6 +78,12 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
     if (by) return String(by).startsWith('relay');
     return siteOf(l.from) !== siteOf(l.to) && !HEAVY.includes(mediumIn(ports, l));
   };
+  // 🔴 A HOP KEEPS ONE OBJECT ACROSS READS. The traffic layer counts a wire's
+  // events as the change in `sent` on the SAME object, and treats a new object
+  // as a new wire; a hop built afresh on every read was a new wire every time,
+  // so no MIDI ever pulsed on a relayed link (found 2026-10-11 on
+  // /concepts/synth/070/, *"i do not see midi animation on circuilt patchbay"*).
+  const hopCache = new Map();
   const drawn = () => {
     const ports = raw.ports(), links = [], extra = new Map(), hops = new Map();
     for (const l of raw.links()) {
@@ -88,9 +94,14 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
       for (const [from, to] of [[l.from, rin], [rout, l.to]]) {
         const k = `${from} -> ${to}`;
         const h = hops.get(k);
-        if (h) { h.origs.push(l); h.sent = (h.sent || 0) + (l.sent || 0); continue; }
-        const hop = { ...l, from, to, via: 'relay', origs: [l] };
-        delete hop.id; delete hop.session;
+        if (h) { h.origs.push(l); h.sent += l.sent || 0; continue; }
+        let hop = hopCache.get(k);
+        if (!hop) {
+          hop = { ...l, from, to, via: 'relay' };
+          delete hop.id; delete hop.session;
+          hopCache.set(k, hop);
+        }
+        hop.origs = [l]; hop.sent = l.sent || 0;
         hops.set(k, hop); links.push(hop);
       }
     }
