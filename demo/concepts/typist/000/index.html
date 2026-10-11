@@ -48,18 +48,18 @@
   .tp-keys::selection { background: transparent; }
 
   /* ── the cursor ─────────────────────────────────────────────────────────
-     A BLOCK ONE CHARACTER WIDE, NOT A BAR. It takes no width in the flow (a
-     zero width span with the block drawn by its ::after), so the line in the
-     <pre> stays exactly the line in the <textarea>. Drawn white over the
-     sheet with `difference`, it reads as a black cell and turns the letter
-     under it white, the way a block cursor does. While the paper has no
-     focus it is an outline that does not blink. */
+     A FILLED BAR 0.4 CHARACTER WIDE, filled whether or not the paper has
+     focus (asked: *"typist: always filled cursor"*, *"but thinner"*). It
+     takes no width in the flow (a zero width span with the bar drawn by its
+     ::after), so the line in the <pre> stays exactly the line in the
+     <textarea>. Drawn white over the sheet with `difference`, it reads black
+     and turns what it covers white. Without focus it stays and does not
+     blink. */
   .tp-cur { position: relative; }
-  .tp-cur::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1ch;
+  .tp-cur::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 0.4ch;
                    background: #fff; mix-blend-mode: difference;
                    animation: tp-blink 1.06s steps(1) infinite; }
-  .tp:not(.on) .tp-cur::after { background: transparent; mix-blend-mode: normal; animation: none;
-                                box-shadow: inset 0 0 0 1.5px #16161a; }
+  .tp:not(.on) .tp-cur::after { animation: none; }
   @keyframes tp-blink { 0%, 54% { opacity: 1 } 55%, 100% { opacity: 0 } }
   @media (prefers-reduced-motion: reduce) { .tp-cur::after { animation: none; } }
   .tp-sel { background: rgba(22, 22, 26, .16); }

@@ -14,9 +14,10 @@
 //                          full width, or two with the second a third wide;
 //                          a phone stacks two columns, each half the stage
 //   createChatGrid(o)      one to six equal cells in the kit's video panel,
-//                          separated by the seam, the layout following the
+//                          edge to edge, the layout following the
 //                          count and the frame's own width (lifted from
-//                          /concepts/typist/030/, the multi typer)
+//                          /concepts/typist/030/, the multi typer);
+//                          `fixed: true` keeps one shape at every count
 //
 // Nothing here opens anything: a page wires the send and the arrivals.
 
@@ -86,10 +87,13 @@ const CSS = `
      per layout: 1 spans all six, 2 span three, 3 span two, 4 span three
      (two by two), 6 span two (three by two). 5 IS THREE OVER TWO, THE TWO
      WIDER, not a three by two with a hole: an empty cell over the seam ground
-     reads as a cell that failed to load. Rows share the height. The seam is
-     the gap over a line coloured ground, so every cell paints its own. */
+     reads as a cell that failed to load. Rows share the height. NO SEAM: the
+     cells meet edge to edge, always (asked on /concepts/typist/030/: *"no
+     borders between typists papers"*, then *"seam aleays false, no
+     setting"*). The line coloured ground stays under them, and every cell
+     paints its own. */
   .pos-chat-grid { position: absolute; inset: 0; container: pos-chat-grid / size; }
-  .pos-chat-cells { width: 100%; height: 100%; display: grid; gap: 1px; background: var(--line);
+  .pos-chat-cells { width: 100%; height: 100%; display: grid; gap: 0; background: var(--line);
                     grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
   .pos-chat-cells > * { min-width: 0; min-height: 0; grid-column: span 2; }
   .pos-chat-cells[data-n="1"] > * { grid-column: span 6; }
@@ -121,6 +125,12 @@ const CSS = `
     .pos-chat-gwin .pos-vp-stage { --vp-aspect: 3 / 4; }
     .pos-chat-gwin[data-n="1"] .pos-vp-stage { --vp-aspect: 4 / 5; }
   }
+  /* \`fixed: true\`: one shape at every count, so the frame keeps its height as
+     cells come and go (asked on /concepts/typist/030/: *"keep aspect ratio / h
+     on all typist couts"*). 16:9 at the desk, 3:4 on a phone. (0,4,0) and
+     after everything above, so it wins over every per-count rule. */
+  .pos-chat-gwin.pos-chat-fixed[data-n] .pos-vp-stage { --vp-aspect: 16 / 9; }
+  @media (max-width: 560px) { .pos-chat-gwin.pos-chat-fixed[data-n] .pos-vp-stage { --vp-aspect: 3 / 4; } }
 `;
 let styled = false;
 const style = () => {
@@ -265,7 +275,7 @@ export const CHAT_GRID_MAX = 6;
  * @param {Element|null} [o.centre]   the footer's centre slot
  * @returns {{ el: Element, panel: object, grid: Element, set: (n: number) => number, count: () => number }}
  */
-export function createChatGrid({ cells = [], count = cells.length, left = false, centre = null } = {}) {
+export function createChatGrid({ cells = [], count = cells.length, left = false, centre = null, fixed = false } = {}) {
   style();
   if (cells.length > CHAT_GRID_MAX) throw new Error(`createChatGrid: at most ${CHAT_GRID_MAX} cells, got ${cells.length}`);
   const grid = el('div', 'pos-chat-cells');
@@ -273,6 +283,7 @@ export function createChatGrid({ cells = [], count = cells.length, left = false,
   frame.append(grid);
   const panel = createVideoPanel({ left, centre, fullMode: 'footer' });
   panel.el.classList.add('pos-chat-gwin');
+  if (fixed) panel.el.classList.add('pos-chat-fixed');
   panel.stage.append(frame);
   let n = 0;
   const set = (want) => {
