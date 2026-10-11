@@ -6,6 +6,8 @@
 //   node ask.mjs --room studio-1 ports.get
 //   node ask.mjs --room studio-1 patch.plan  '{"v":1,"links":[{"from":"circuit","to":"microfreak"}]}'
 //   node ask.mjs --room studio-1 patch.apply '{"v":1,"links":[{"from":"digitakt","to":"microfreak"}]}'
+//   node ask.mjs --room studio-1 jack.list
+//   node ask.mjs --room studio-1 jack.plan '{"v":1,"links":[{"from":"yoshimi:left","to":"posboard:input_1"}]}'
 //   node ask.mjs --room studio-1 listen 5            watch everything for 5 s
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
@@ -35,7 +37,9 @@ ws.onopen = () => {
   // both under `patch` meant `audio.start {"source":"yoshimi"}` arrived with
   // no source at all and fell back to the built-in synth, reporting ok:true for
   // an instrument nobody asked for, which is the worst kind of wrong.
-  const wrap = body ? (VERB.startsWith('patch.') ? { patch: body } : body) : {};
+  // `jack.plan` and `jack.apply` take a document too (rig/board/jack.mjs).
+  const takesDoc = VERB.startsWith('patch.') || VERB === 'jack.plan' || VERB === 'jack.apply';
+  const wrap = body ? (takesDoc ? { patch: body } : body) : {};
   ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++, by: 'tool' }));
 };
 

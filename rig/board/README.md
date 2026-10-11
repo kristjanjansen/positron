@@ -482,15 +482,56 @@ verb that pretended to ask would be worse. Instead:
   already rebuilds the whole chain including the capture, at about thirteen
   seconds of silence for everybody in the room.
 
-⚠️ **NOT ONE LINE OF THIS HAS MET A JACK SERVER.** Written from a laptop that
-cannot reach the board. What is graded is the half where a bug would be silent:
-`node rig/board/test.mjs` is 92/92 with 25 checks on the `jack_lsp -c` parse and
-the chain, including a stray source summed into the capture, a missing right
-channel, a capture that has gone, and the case where generated material means
-the instrument must stay unplugged. Two deliberate sabotages take it 88/92 and
-90/92. What is unverified: that `jack_lsp -c`'s real output on this board parses
-as the fixture does, that `pgrep -ax jackd` carries the rate and period, and
-that a real `jack_connect` repairs a real drift.
+✅ **IT HAS MET THE JACK SERVER SINCE 2026-10-11.** It was written on
+2026-09-18 from a laptop that could not reach the board. On 2026-10-11, from the
+board's LAN: `jack.graph` read the real graph (eight ports, yoshimi's two
+channels summed into `posboard:input_1`, `chain.intact` true), and `fx.pappus`
+on, `source.set` on and off, and `fx.pappus` off each left the chain intact on
+read back. The fixtures that grade the parse are now captured off the board
+(`fixtures/jack-lsp-c-pi.txt`, `fixtures/jack-lsp-cpt-pi.txt`); the older
+`fixtures/jack-lsp-c.txt` is kept because the chain checks were written
+against it.
+
+### The JACK arm of the patchbay: `jack.mjs`, `jack.list`, `jack.plan`, `jack.apply`
+
+The ALSA patchbay has been a document since session 17. The JACK one was 21
+`jack_connect`/`jack_disconnect` shell strings in `jacksynth.mjs`. Since
+2026-10-11 every one of them is a `jack.mjs` document, planned, applied and
+read back, and the same three steps are on the wire:
+
+```sh
+node ask.mjs --room studio-1 jack.list                          # jack_lsp -c -p -t, as rows
+node ask.mjs --room studio-1 jack.plan  '{"v":1,"links":[{"from":"yoshimi:left","to":"posboard:input_1"}]}'
+node ask.mjs --room studio-1 jack.apply '{"v":1,"links":[],"own":["system:playback_1"]}'
+```
+
+The document is `{ v: 1, links: [{ from, to }], own: [<input>] }`. `links`
+must be there afterwards. `own` names inputs whose whole feed the document
+decides, so anything else feeding them is cut; an input that is not owned is
+only ever added to. The two arms do not share a vocabulary and the module says
+so rather than flattening it: a JACK port is an exact `client:port`, never a
+fuzzy name, because `yoshimi` meaning `yoshimi:left` is how a capture loses its
+right channel and still sounds fine; a link is one channel; two sources into
+one input sum; a `carry` field is refused by name, because JACK has no message
+classes; direction and type are checked when the listing carries them.
+
+`jack.apply` answers with the graph READ BACK. `jack_connect` exits 1 both on
+failure and on "already connected" (MEASURED on the board), so an exit status
+is never the verdict. It refuses a plan with any problem and applies nothing,
+takes `onlyIfIdle` like `jack.rebuild`, and writes one journal line naming who
+asked. It does not change what the board believes is playing: a document that
+moves the capture shows up in `jack.graph` as `missing` or `extra`, and
+`jack.rebuild` puts the board's own chain back.
+
+⚠️ **A PORT IS NOT A READY ENGINE.** `jack.mjs` checks the wire and nothing
+behind it. `fx.pappus` once answered ok when `SuperCollider:out_1` appeared,
+about seven seconds before the engine was ready; `pappusFx` still waits for
+`PAPPUS READY` before it patches, and that wait stays the caller's job.
+
+MEASURED 2026-10-11 over the relay, on the dummy driver's playback port so
+nobody could hear it: `jack.apply` owning `system:playback_1` with no links cut
+`yoshimi:left` from it and read back intact, and a second document put it back.
+The graph afterwards listed the same connections as before.
 
 **Deploying it.** The service runs from `/opt/positron-board`, never from
 `~/positron`, and the copy there is stale.
@@ -532,9 +573,10 @@ down:
 | `alsa.mjs` | parse `aconnect -l`, resolve names, plan, apply. Pure where it can be |
 | `synth.mjs` | the built-in instrument, importing `demo/shell/rhodes.mjs` |
 | `board.mjs` | the service: relay socket, request handlers, synth and capture |
-| `jacksynth.mjs` | the JACK graph: raising the chain, the granular insert, and since 2026-09-18 reporting the graph and patching its difference |
+| `jack.mjs` | the JACK graph as a value: parse `jack_lsp -c -p -t`, plan a document of links, apply it and read it back. Pure where it can be |
+| `jacksynth.mjs` | the JACK graph: raising the chain, the granular insert, and since 2026-09-18 reporting the graph and patching its difference, every patch through `jack.mjs` since 2026-10-11 |
 | `ask.mjs` | a terminal client — the proof that the browser is not the interface |
-| `test.mjs` | 92 checks, no hardware (counted 2026-09-18 by running it, not remembered) |
+| `test.mjs` | 277 checks, no hardware (counted 2026-10-11 by running it, not remembered) |
 | `insert-test.mjs` | against a running board: that the granulator goes in, stays in while its page is alive, and comes out BY ITSELF when that page closes. Written 2026-09-16 and not yet run |
 | `norns/writedefs.scd` | compiles `pappus-<rung>.scsyndef` and `possource.scsyndef` on the board, for `/grains/` to load in a browser |
 | `live-test.mjs` | 13 checks against a running board, over the real relay |
@@ -543,6 +585,7 @@ down:
 | `positron-board.service` | `Restart=always`, `StartLimitIntervalSec=0` |
 | `fixtures/aconnect-l.txt` | a rig that does not exist, so the rest can be checked |
 | `fixtures/jack-lsp-c.txt` | a JACK graph that does not exist, for the same reason |
+| `fixtures/jack-lsp-c-pi.txt`, `fixtures/jack-lsp-cpt-pi.txt` | the board's real JACK graph, `jack_lsp -c` and `jack_lsp -c -p -t`, captured 2026-10-11 with yoshimi playing |
 
 The envelope is `demo/shell/wire.mjs`, **imported rather than copied** — the same
 file the pages use, so a change to the shape cannot reach only one end.

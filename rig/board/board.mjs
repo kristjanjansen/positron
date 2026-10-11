@@ -28,6 +28,7 @@ import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
 import { helloMsg, aliveMsg } from './beat.mjs';
+import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical } from './jack.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import * as fsMod from 'node:fs';
@@ -1405,6 +1406,49 @@ async function handle(msg) {
         + `${r.changed} link${r.changed === 1 ? '' : 's'} moved, ${others.length} other client(s) in the room`
         + `${r.reason ? `. ${r.reason}` : ''}`);
       return reply('jack.rebuild', { ...r, others, dry: DRY });
+    }
+    // ── the JACK arm of the patchbay, the twin of patch.plan / patch.apply ──
+    //
+    // `jack.list` is the graph with every port's direction and type and every
+    // connection (`jack_lsp -c -p -t`). `jack.plan` takes `{ patch }`, a
+    // `jack.mjs` document, and answers the steps and the refusals without
+    // touching anything. `jack.apply` applies it and answers the graph READ
+    // BACK, because `jack_connect` exits 1 for "already connected" and for a
+    // failure alike.
+    // ⚠️ THE BOARD'S OWN CHAIN STILL WINS. `jack.apply` patches what it is
+    // told; it does not change what the board believes is playing, so a
+    // document that cuts the capture shows up in `jack.graph` as `extra` or
+    // `missing`, and `jack.rebuild` puts the board's chain back. That is on
+    // purpose: one source of truth about the instrument, and this verb a way to
+    // patch around it in the open.
+    // ⚠️ TOKENLESS, LIKE EVERY VERB ON THE RELAY. Its blast radius is the one
+    // jackd on this board, the same as `jack.rebuild` and `audio.stop`, so it
+    // carries the same `onlyIfIdle` refusal and the same journal line.
+    case 'jack.list': {
+      const g = listJack();
+      return reply('jack.list', { ok: !g.error, ...g });
+    }
+    case 'jack.plan': {
+      const g = listJack();
+      if (g.error) return reply('jack.planned', { ok: false, steps: [], problems: [g.error], backend: g.backend });
+      return reply('jack.planned', { ...jackPlan(msg.patch, g.rows), backend: g.backend });
+    }
+    case 'jack.apply': {
+      const g = listJack();
+      if (g.error) return reply('jack.applied', { ok: false, applied: false, steps: [], problems: [g.error] });
+      const planned = jackPlan(msg.patch, g.rows);
+      if (!planned.ok) return reply('jack.applied', { ok: false, applied: false, ...planned });
+      const others = [...clientSeen.entries()]
+        .filter(([who, t]) => who !== msg.from && Date.now() - t < INSERT_HELD_MS)
+        .map(([who, t]) => ({ by: who, heardAgoSec: Math.round((Date.now() - t) / 1000) }));
+      if (!DRY && planned.steps.length && msg.onlyIfIdle === true && others.length) {
+        return reply('jack.applied', { ok: true, kept: true, applied: false, steps: planned.steps, others,
+          reason: `${others.length} other client${others.length === 1 ? '' : 's'} heard from inside ${INSERT_HELD_MS / 1000} s. Send jack.apply without onlyIfIdle to do it anyway` });
+      }
+      const r = jackApply(planned, { dry: DRY });
+      log(`jack.apply by ${msg.from ?? 'nobody'}: ${planned.steps.map((x) => `${x.act} ${x.from} -> ${x.to}`).join(', ') || 'nothing to do'}`
+        + `, read back ${r.ok ? 'agrees' : 'DISAGREES'}, ${others.length} other client(s) in the room`);
+      return reply('jack.applied', { ...r, applied: !DRY, steps: planned.steps, doc: jackCanonical(msg.patch), others });
     }
     default: return false;      // another client's traffic; the relay is verbatim
   }

@@ -1,0 +1,32 @@
+system:capture_1
+	properties: output,physical,terminal,
+	32 bit float mono audio
+system:capture_2
+	properties: output,physical,terminal,
+	32 bit float mono audio
+system:playback_1
+   yoshimi:left
+	properties: input,physical,terminal,
+	32 bit float mono audio
+system:playback_2
+   yoshimi:right
+	properties: input,physical,terminal,
+	32 bit float mono audio
+yoshimi:left
+   system:playback_1
+   posboard:input_1
+	properties: output,
+	32 bit float mono audio
+yoshimi:right
+   system:playback_2
+   posboard:input_1
+	properties: output,
+	32 bit float mono audio
+posboard:input_1
+   yoshimi:left
+   yoshimi:right
+	properties: input,
+	32 bit float mono audio
+posboard:input_2
+	properties: input,
+	32 bit float mono audio

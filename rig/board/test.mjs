@@ -8,6 +8,7 @@
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
 import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
+import * as jack from './jack.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
@@ -273,7 +274,14 @@ ok('and never asks for it back',
    !made.want.some(([f]) => f.startsWith('yoshimi:')) && !made.missing.some(([f]) => f.startsWith('yoshimi:')));
 
 console.log('jack: the repair, planned only');
-const planned = jackRebuild({ ...yosh, insert: true, plan: true, graph });
+// The granulator's four ports, added to the fixture: a plan against ports that
+// are not on the graph is now refused rather than planned (jack.mjs).
+const scText = jackText + 'SuperCollider:in_1\nSuperCollider:in_2\nSuperCollider:out_1\nSuperCollider:out_2\n';
+const scGraph = { graph: parseJackLsp(scText) };
+const planned = jackRebuild({ ...yosh, insert: true, plan: true, graph: scGraph });
+is('with the granulator absent, an insert rebuild is refused and names the port',
+   [jackRebuild({ ...yosh, insert: true, plan: true, graph }).ok,
+    /SuperCollider:in_1 is not on the graph/.test(jackRebuild({ ...yosh, insert: true, plan: true, graph }).reason ?? '')], [false, true]);
 is('a plan runs nothing', planned.changed, 0);
 is('it disconnects before it connects', planned.steps.map((s) => s.act),
    ['disconnect', 'disconnect', 'connect', 'connect', 'connect', 'connect']);
@@ -283,6 +291,136 @@ is('a healthy graph plans nothing at all', jackRebuild({ ...yosh, plan: true, gr
 is('with no instrument there is nothing to rebuild', jackRebuild({ plan: true, graph }).ok, false);
 is('a missing capture says which verbs raise it',
    /audio\.stop then audio\.start/.test(jackRebuild({ ...yosh, plan: true, graph: { graph: goneRows } }).reason ?? ''), true);
+
+// ── jack.mjs: the JACK arm of the patchbay ──────────────────────────────────
+//
+// Graded against text read off the Pi on 2026-10-11 (`jack_lsp -c` and
+// `jack_lsp -c -p -t`), not against the hand-written fixture above, which is a
+// graph that never existed. NEGATIVE CONTROLS are marked: each is written so
+// the bug it names would fail it, because a plan that always answers ok and an
+// apply that always says it worked would pass every positive check here.
+console.log('jack.mjs: the real board, parsed');
+const piC = readFileSync(new URL('./fixtures/jack-lsp-c-pi.txt', import.meta.url), 'utf8');
+const piCPT = readFileSync(new URL('./fixtures/jack-lsp-cpt-pi.txt', import.meta.url), 'utf8');
+const piRows = jack.parseJackLsp(piC);
+const piFull = jack.parseJackLsp(piCPT);
+is('the board has eight ports', piRows.map((r) => r.port),
+   ['system:capture_1', 'system:capture_2', 'system:playback_1', 'system:playback_2',
+    'yoshimi:left', 'yoshimi:right', 'posboard:input_1', 'posboard:input_2']);
+is('the capture is fed by both yoshimi channels, and only them', piRows.find((r) => r.port === 'posboard:input_1').connected,
+   ['yoshimi:left', 'yoshimi:right']);
+is('posboard:input_2 exists and nothing feeds it', piRows.find((r) => r.port === 'posboard:input_2').connected, []);
+is('yoshimi also feeds the dummy playback', piRows.find((r) => r.port === 'yoshimi:left').connected,
+   ['system:playback_1', 'posboard:input_1']);
+is('-p -t gives the same ports and the same connections',
+   piFull.map((r) => [r.port, r.connected]), piRows.map((r) => [r.port, r.connected]));
+is('and a direction on every row', piFull.map((r) => r.dir), ['out', 'out', 'in', 'in', 'out', 'out', 'in', 'in']);
+is('and a medium on every row', [...new Set(piFull.map((r) => r.medium))], ['audio']);
+is('physical and terminal are read', [piFull[0].physical, piFull[0].terminal, piFull[4].physical], [true, true, false]);
+// NEGATIVE CONTROL: jackd's complaint merged into stdout must not become a port.
+const noisy = jack.parseJackLsp('Cannot lock down 107350048 byte memory area (Cannot allocate memory)\n' + piC);
+is('NEGATIVE CONTROL: a merged stderr line is noise, not a port', [noisy.length, noisy.noise.length], [8, 1]);
+// NEGATIVE CONTROL: a property line must not be read as a connection.
+ok('NEGATIVE CONTROL: no property line is ever a connection',
+   !piFull.some((r) => r.connected.some((c) => /properties|audio$/.test(c))));
+
+console.log('jack.mjs: plan, against the real board');
+const capDoc = { v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_1' }, { from: 'yoshimi:right', to: 'posboard:input_1' }],
+                 own: ['posboard:input_1'] };
+const p0 = jack.plan(capDoc, piFull);
+is('the board as it is plans zero steps', [p0.ok, p0.steps.length, p0.already], [true, 0, 2]);
+is('and both checks were possible', p0.checked, { direction: true, type: true });
+// NEGATIVE CONTROL: a plan that always answered "nothing to do" passes p0.
+const monoDoc = { v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_1' }], own: ['posboard:input_1'] };
+is('NEGATIVE CONTROL: owning the capture with one channel cuts the other',
+   jack.plan(monoDoc, piFull).steps.map((s) => [s.act, s.from, s.to]), [['disconnect', 'yoshimi:right', 'posboard:input_1']]);
+is('without own, the same link only adds, and adds nothing here', jack.plan({ v: 1, links: monoDoc.links }, piFull).steps, []);
+const toTwo = jack.plan({ v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_2' }] }, piFull);
+is('a missing link is one connect, with its command', toTwo.steps, [{ act: 'connect', from: 'yoshimi:left', to: 'posboard:input_2',
+   cmd: 'jack_connect "yoshimi:left" "posboard:input_2"' }]);
+is('disconnects come before connects', jack.plan({ v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_2' }],
+   own: ['posboard:input_1'] }, piFull).steps.map((s) => s.act), ['disconnect', 'disconnect', 'connect']);
+// The refusals. Each is a REASON, asserted, because a plan that refuses
+// everything is the same bug from the other side.
+const why = (doc, rows = piFull) => jack.plan(doc, rows);
+const refused = (name, doc, re, rows) => {
+  const r = why(doc, rows);
+  is(`refused: ${name}`, [r.ok, r.steps.length, r.problems.some((x) => re.test(x))], [false, 0, true]);
+};
+refused('an unknown version', { ...capDoc, v: 2 }, /unknown patch version 2/);
+refused('no links array', { v: 1 }, /no links array/);
+refused('a port not on the graph', { v: 1, links: [{ from: 'yoshimi:left', to: 'SuperCollider:in_1' }] }, /SuperCollider:in_1 is not on the graph/);
+refused('a client named as if it were a port, with candidates', { v: 1, links: [{ from: 'yoshimi', to: 'posboard:input_1' }] },
+  /yoshimi is a client, not a port.*yoshimi:left, yoshimi:right/);
+refused('an input as a source', { v: 1, links: [{ from: 'posboard:input_1', to: 'system:playback_1' }] }, /posboard:input_1 is an input/);
+refused('an output as a destination', { v: 1, links: [{ from: 'yoshimi:left', to: 'yoshimi:right' }] }, /yoshimi:right is an output/);
+refused('a port to itself', { v: 1, links: [{ from: 'yoshimi:left', to: 'yoshimi:left' }] }, /to itself/);
+refused('any carry, which is an ALSA word', { v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_1', carry: ['all'] }] }, /carry is an ALSA word/);
+refused('owning an output', { v: 1, links: [], own: ['yoshimi:left'] }, /only an input has a feed to own/);
+const midiRows = jack.parseJackLsp(piCPT + 'a2j:Circuit (capture): Circuit MIDI 1\n\tproperties: output,physical,terminal,\n\t8 bit raw midi\n');
+refused('MIDI into audio', { v: 1, links: [{ from: 'a2j:Circuit (capture): Circuit MIDI 1', to: 'posboard:input_1' }] }, /is midi and posboard:input_1 is audio/, midiRows);
+// One bad link refuses the whole document: no half plan.
+is('one bad link and nothing is planned for the good one',
+   why({ v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_2' }, { from: 'nope:x', to: 'posboard:input_1' }] }).steps, []);
+// Bare `-c` text cannot check direction, and says so rather than claiming it.
+is('from bare -c, direction and type are reported unchecked', jack.plan(capDoc, piRows).checked, { direction: false, type: false });
+is('an owned input that is not on the graph is skipped, not refused',
+   jack.plan({ ...capDoc, own: ['posboard:input_1', 'SuperCollider:in_1'] }, piFull).ok, true);
+is('canonical: sorted, deduplicated, own sorted', jack.canonical({ v: 1,
+   links: [{ from: 'b:1', to: 'c:1' }, { from: 'a:1', to: 'c:1' }, { from: 'b:1', to: 'c:1' }], own: ['z:1', 'c:1'] }),
+   { v: 1, links: [{ from: 'a:1', to: 'c:1' }, { from: 'b:1', to: 'c:1' }], own: ['c:1', 'z:1'] });
+
+console.log('jack.mjs: apply, read back, against a fake graph');
+// A tiny JACK in memory: steps change it, `read` lists it. This grades the
+// apply logic, not JACK; the real round trip is in the README's board notes.
+const fakeJack = (text) => {
+  const rows = jack.parseJackLsp(text).map((r) => ({ ...r, connected: [...r.connected] }));
+  const at = (p) => rows.find((r) => r.port === p);
+  return {
+    read: () => rows.map((r) => ({ ...r, connected: [...r.connected] })),
+    run: (s) => {
+      const a = at(s.from), b = at(s.to);
+      if (!a || !b) return `ERROR ${!a ? s.from : s.to} not a valid port`;
+      if (s.act === 'connect') { if (b.connected.includes(s.from)) return 'cannot connect client, already connected?'; a.connected.push(s.to); b.connected.push(s.from); }
+      else { a.connected = a.connected.filter((x) => x !== s.to); b.connected = b.connected.filter((x) => x !== s.from); }
+      return null;
+    },
+  };
+};
+{
+  const fj = fakeJack(piCPT);
+  const r = jack.apply(jack.plan(monoDoc, fj.read()), fj);
+  is('apply runs the step and the read back agrees', [r.ok, r.ran.length, r.after], [true, 1, { missing: [], extra: [], intact: true }]);
+  is('and the graph really changed', fj.read().find((x) => x.port === 'posboard:input_1').connected, ['yoshimi:left']);
+  const back = jack.apply(jack.plan(capDoc, fj.read()), fj);
+  is('the stereo document puts it back', [back.ok, back.ran.map((s) => s.act)], [true, ['connect']]);
+  // NEGATIVE CONTROL: a run that reports nothing and does nothing. An apply
+  // that trusted the commands would answer ok here.
+  const deaf = { read: fj.read, run: () => null };
+  const lie = jack.apply(jack.plan(monoDoc, fj.read()), deaf);
+  is('NEGATIVE CONTROL: commands that changed nothing are not ok', [lie.ok, lie.after.extra], [false, [['yoshimi:right', 'posboard:input_1']]]);
+  // NEGATIVE CONTROL: a refused plan applies nothing at all.
+  let calls = 0;
+  const none = jack.apply(jack.plan({ v: 2, links: [] }, fj.read()), { run: () => { calls++; return null; }, read: fj.read });
+  is('NEGATIVE CONTROL: a refused plan runs nothing', [none.ok, none.ran.length, calls], [false, 0, 0]);
+  is('dry runs nothing and says so', jack.apply(jack.plan(monoDoc, fj.read()), { dry: true, run: () => { calls++; } }).ran.map((s) => s.result), ['dry']);
+  is('and really ran nothing', calls, 0);
+  // A step whose command printed something is kept with its text, and the
+  // read back still decides. Here the link is there, so it is ok.
+  const racy = fakeJack(piCPT);
+  const pl = jack.plan({ v: 1, links: [{ from: 'yoshimi:left', to: 'posboard:input_2' }] }, racy.read());
+  racy.run({ act: 'connect', from: 'yoshimi:left', to: 'posboard:input_2' });   // somebody else got there first
+  const rr = jack.apply(pl, racy);
+  is('"already connected" text is kept and is not a failure', [rr.ok, rr.ran[0].said], [true, 'cannot connect client, already connected?']);
+}
+
+console.log('jack: the board\'s own chain, through jack.mjs');
+{
+  const c = jackChain({ ...yosh, graph: { graph: piFull } });
+  is('the real board, playing yoshimi with no insert, is intact', [c.intact, c.missing, c.extra], [true, [], []]);
+  ok('and the chain carries the document it was read through', c.doc?.v === 1 && c.doc.own.includes('posboard:input_1'));
+  is('the dummy playback is not the chain\'s business', c.extra.some(([, t]) => t.startsWith('system:')), false);
+}
 
 console.log('inputs: a name, a room and a lease');
 {

@@ -15,6 +15,13 @@
 import { spawn, execFileSync, execSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { openSync, writeSync, closeSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+// 🔴 EVERY JACK CONNECTION THIS FILE MAKES OR BREAKS GOES THROUGH `jack.mjs`
+// SINCE 2026-10-11. There were 21 `jack_connect`/`jack_disconnect` shell
+// strings here, each run blind with its output thrown away. Each re-patch is
+// now a small document (`links` that must be there, `own` inputs whose whole
+// feed it decides), planned against the graph, applied, and READ BACK.
+import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff } from './jack.mjs';
+export { parseJackLsp };
 
 export const RATE = 48000, FRAME = 960;
 
@@ -64,6 +71,36 @@ const CAP_CLIENT = 'posboard';
 const CAP = `${CAP_CLIENT}:input_1`;
 const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
 const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
+
+/**
+ * Patch the graph to a document and say how it went. Never throws, because
+ * none of the 21 commands it replaced could either: a refused plan or a link
+ * that did not land is LOGGED and returned, and the caller decides.
+ *
+ * ⚠️ ONE DIFFERENCE FROM THE SHELL STRINGS, AND IT IS ON PURPOSE. A command
+ * list touched only the links it named. A document that OWNS an input also
+ * cuts any other source feeding it, which is what `jack.rebuild` already did
+ * and what every comment in this file says the capture needs: a stray source
+ * summed into `posboard:input_1` is indistinguishable from the instrument. On
+ * the graph this board actually runs (read 2026-10-11) nothing else feeds
+ * those inputs, so the difference is zero commands.
+ * ⚠️ AND A PLAN NAMING A PORT THAT IS NOT THERE APPLIES NOTHING, where the old
+ * strings ran the half that could run. That half was a graph nobody wrote down.
+ */
+export function wire(doc, { onLog, what = 'jack' } = {}) {
+  const g = listJack();
+  if (g.error) { onLog?.(`${what}: ${g.error}, nothing patched`); return { ok: false, planned: null, ran: [], reason: g.error }; }
+  const planned = jackPlan(doc, g.rows);
+  if (!planned.ok) {
+    onLog?.(`${what}: refused, ${planned.problems.join('; ')}`);
+    return { ok: false, planned, ran: [], reason: planned.problems.join('; ') };
+  }
+  const r = jackApply(planned);
+  for (const s of r.ran) if (s.said) onLog?.(`${what}: ${s.act} ${s.from} -> ${s.to} (${s.said})`);
+  if (!r.ok) onLog?.(`${what}: read back disagrees, missing ${JSON.stringify(r.after.missing)} extra ${JSON.stringify(r.after.extra)}`);
+  return { ...r, planned };
+}
+const l = (from, to) => ({ from, to });
 
 /**
  * The instruments this module knows how to raise.
@@ -179,16 +216,17 @@ export function pappusAvailable() {
 
 export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = {}) {
   if (!on) {
+    // The instrument straight into the capture, and the capture and the
+    // granulator's inputs owned, so the insert's return and the instrument's
+    // feed into it are both cut. An absent `SuperCollider:in_*` is skipped.
+    let w = null;
     if (instrumentPort) {
-      sh(`jack_disconnect "${instrumentPort}" ${SCIN} 2>/dev/null`);
-      if (instrumentPortR) sh(`jack_disconnect "${instrumentPortR}" ${SCIN2} 2>/dev/null`);
-      sh(`jack_disconnect ${SCOUT} ${CAP} 2>/dev/null`);
-      sh(`jack_disconnect ${SCOUT2} ${CAP} 2>/dev/null`);
-      sh(`jack_connect "${instrumentPort}" ${CAP} 2>/dev/null`);
-      if (instrumentPortR) sh(`jack_connect "${instrumentPortR}" ${CAP} 2>/dev/null`);
+      w = wire({ v: 1,
+        links: [l(instrumentPort, CAP), ...(instrumentPortR ? [l(instrumentPortR, CAP)] : [])],
+        own: [CAP, SCIN, SCIN2] }, { onLog, what: 'pappus bypass' });
     }
     onLog?.('pappus bypassed');
-    return { ok: true, on: false };
+    return { ok: true, on: false, ...(w ? { wired: w.ok } : {}) };
   }
   if (!pappusAvailable()) return { ok: false, reason: 'supercollider or the engine is not installed' };
 
@@ -231,26 +269,27 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
   // see the header. A right channel left on the capture is a dry instrument
   // under everything the insert does; a right channel not patched to `in_2` is
   // a granulator fed in mono-left.
-  if (instrumentPort) {
-    sh(`jack_disconnect "${instrumentPort}" ${CAP} 2>/dev/null`);
-    sh(`jack_connect "${instrumentPort}" ${SCIN} 2>/dev/null`);
-  }
-  if (instrumentPortR) {
-    sh(`jack_disconnect "${instrumentPortR}" ${CAP} 2>/dev/null`);
-    sh(`jack_connect "${instrumentPortR}" ${SCIN2} 2>/dev/null`);
-  }
-  sh(`jack_connect ${SCOUT} ${CAP} 2>/dev/null`);
+  //
   // ⚠️ AND THE GRANULATOR'S OWN RIGHT CHANNEL, for the same reason one stage
-  // down: Pappus pans — SPRAY, TILT and the delay taps all place things in the
-  // stereo field — so capturing only `out_1` drops whatever it put on the right.
+  // down: Pappus pans (SPRAY, TILT and the delay taps all place things in the
+  // stereo field), so capturing only `out_1` drops whatever it put on the right.
   // Many ports into one input sum in JACK, so this is the mono-SUM the capture
   // comment in `startJackSynth` argues for, applied to the thing that is
   // actually playing.
-  sh(`jack_connect ${SCOUT2} ${CAP} 2>/dev/null`);
+  //
+  // With no instrument the inputs are not owned: the old commands then only
+  // connected the return, and cutting anything here would be new behaviour.
+  const w = wire({ v: 1,
+    links: [
+      ...(instrumentPort ? [l(instrumentPort, SCIN)] : []),
+      ...(instrumentPortR ? [l(instrumentPortR, SCIN2)] : []),
+      l(SCOUT, CAP), l(SCOUT2, CAP),
+    ],
+    own: instrumentPort ? [CAP, SCIN, ...(instrumentPortR ? [SCIN2] : [])] : [] }, { onLog, what: 'pappus insert' });
   onLog?.(instrumentPort
     ? `pappus inserted${instrumentPortR ? '' : ' (mono source — no right channel)'}`
     : 'pappus running, nothing feeding it');
-  return { ok: true, on: true, fed: !!instrumentPort, stereo: !!instrumentPortR, ready: pappusReady };
+  return { ok: true, on: true, fed: !!instrumentPort, stereo: !!instrumentPortR, ready: pappusReady, wired: w.ok };
 }
 
 /**
@@ -279,16 +318,17 @@ export function sourceFeed(on, { instrumentPort, instrumentPortR, onLog } = {}) 
   // granulator's buffer, which is not "the same input at both ends" — it is the
   // page's material plus half an instrument, and it would read as the
   // comparison being noisy rather than as the wiring being wrong.
-  const said = [];
-  for (const [port, bus] of [[instrumentPort, SCIN], [instrumentPortR, SCIN2]]) {
-    if (!port) continue;
-    said.push(on ? sh(`jack_disconnect "${port}" ${bus} 2>&1`) : sh(`jack_connect "${port}" ${bus} 2>&1`));
-  }
+  // ⚠️ IT OWNS ONLY THE GRANULATOR'S INPUTS and never the capture, so the
+  // insert's return stays exactly where `pappusFx` put it.
+  const pairs = [[instrumentPort, SCIN], ...(instrumentPortR ? [[instrumentPortR, SCIN2]] : [])];
+  const w = wire({ v: 1, links: on ? [] : pairs.map(([p, bus]) => l(p, bus)), own: pairs.map(([, bus]) => bus) },
+                 { onLog, what: 'source feed' });
+  const said = [w.reason ?? '', ...w.ran.map((s) => s.said ?? '')];
   onLog?.(on ? `${instrumentPort} unplugged from the granulator` : `${instrumentPort} feeding the granulator again`);
   // jack_connect answers non-empty on failure AND on "already connected"; the
   // second is not an error, so the text travels rather than a boolean nobody
   // can interpret.
-  return { ok: true, instrument: instrumentPort, fed: !on, said: said.join(' ').trim() || null };
+  return { ok: true, instrument: instrumentPort, fed: !on, said: said.join(' ').trim() || null, wired: w.ok };
 }
 
 export function pappusOsc(cmdName, ...args) {
@@ -356,37 +396,10 @@ export function jackSynthAvailable(name) {
 // the DIFF rather than re-running a sequence of commands: see its own comment
 // for why that is what makes it safe to send at a board somebody else is
 // listening to.
-// ⚠️ NONE OF IT HAS RUN ON THE BOARD. Written 2026-09-18 from a laptop that
-// cannot reach it, against `jack_lsp -c` output as this file's existing code
-// already parses it. The parse is graded by `node rig/board/test.mjs`, on
-// captured text rather than on a server.
-
-/**
- * `jack_lsp -c` as structure: a port on its own line, each of its connections
- * indented under it.
- *
- * ⚠️ EXPORTED SO IT CAN BE GRADED WITHOUT A BOARD. It is the only part of this
- * section that is pure, the indentation is the whole of the format, and a
- * parser that silently drops a line would report a healthy graph about a broken
- * one, which is the exact shape of failure this board keeps producing.
- * `fixtures/jack-lsp-c.txt` and `node rig/board/test.mjs` grade it.
- *
- * A connection list is SYMMETRIC: both ends name each other. So a SINK's entry
- * is the list of everything feeding it, which is the question every answer
- * below is built out of.
- */
-export function parseJackLsp(text) {
-  const rows = [];
-  for (const line of String(text).split('\n')) {
-    if (!line.trim()) continue;
-    // An indented line belongs to the port above it. A leading-space line with
-    // no port above it is malformed output rather than a connection, so it is
-    // dropped rather than given an invented parent.
-    if (/^\s/.test(line)) rows.at(-1)?.connected.push(line.trim());
-    else rows.push({ port: line.trim(), connected: [] });
-  }
-  return rows;
-}
+// ⚠️ IT HAS RUN ON THE BOARD SINCE 2026-10-11. Written 2026-09-18 from a
+// laptop that could not reach it; the parser moved to `jack.mjs` that day and
+// is graded against `jack_lsp` text captured off the Pi
+// (`fixtures/jack-lsp-c-pi.txt`, `fixtures/jack-lsp-cpt-pi.txt`).
 
 /** `jack_lsp -c` and what can be read beside it, as an object. */
 export function jackGraph() {
@@ -394,7 +407,9 @@ export function jackGraph() {
     return { ok: false, server: 'unknown', reason: 'jack_lsp is not installed on this board',
              ports: [], graph: [], procs: null, jackd: null };
   }
-  const graph = parseJackLsp(sh('jack_lsp -c 2>/dev/null'));
+  // `-p -t` as well since 2026-10-11, so every row says its direction and
+  // type; a bare `-c` row is the same row without them.
+  const graph = listJack().rows;
   // An empty listing means NO SERVER rather than no ports, and that is this
   // file's own established reading: `startJackSynth` decides whether to raise
   // jackd on exactly this test, and its comment says why it asks JACK rather
@@ -483,8 +498,6 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
       want.push([SCOUT, CAP], [SCOUT2, CAP]);
     }
   }
-  const has = ([from, to]) => sourcesOf(to).includes(from);
-  const missing = want.filter((e) => !has(e));
 
   // Anything ELSE feeding those sinks. This is the half that re-running the
   // connect commands can never find: a link that should not be there sums into
@@ -492,14 +505,12 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
   // granulator's inputs are swept whenever its ports exist at all, insert on or
   // off, because `pappusFx(false)` disconnects them for the same reason.
   const sinks = [CAP, ...(present(SCIN) ? [SCIN, SCIN2] : [])];
-  const extra = [];
-  for (const sink of sinks) {
-    for (const src of sourcesOf(sink)) {
-      if (!want.some(([f, t]) => f === src && t === sink)) extra.push([src, sink]);
-    }
-  }
+  // ⚠️ THE CHAIN IS A `jack.mjs` DOCUMENT, so the report here and the repair
+  // in `jackRebuild` read one description through one diff.
+  const doc = { v: 1, links: want.map(([from, to]) => ({ from, to })), own: sinks };
+  const { missing, extra } = jackDiff(doc, rows);
   return {
-    want, missing, extra,
+    want, missing, extra, doc,
     intact: !!instrumentPort && missing.length === 0 && extra.length === 0,
     // Named separately because they are three different faults with three
     // different repairs, and a caller reading one boolean cannot tell them
@@ -560,21 +571,22 @@ export function jackRebuild({ instrumentPort, instrumentPortR, insert = false, s
     return { ok: false, plan, changed: 0, steps: [], before, after: before,
              reason: `${CAP} is not on the graph: the capture process is gone, and only audio.stop then audio.start raises it again` };
   }
-  const steps = [
-    ...before.extra.map(([f, t]) => ({ act: 'disconnect', from: f, to: t, cmd: `jack_disconnect "${f}" "${t}"` })),
-    ...before.missing.map(([f, t]) => ({ act: 'connect', from: f, to: t, cmd: `jack_connect "${f}" "${t}"` })),
-  ];
+  const rows = graph?.graph ?? listJack().rows;
+  const planned = jackPlan(before.doc, rows);
+  if (!planned.ok) {
+    return { ok: false, plan, changed: 0, steps: [], before, after: before, reason: planned.problems.join('; ') };
+  }
+  const steps = planned.steps;
   if (plan) {
     onLog?.(steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'} would run, nothing did` : 'the graph is already what it should be');
     return { ok: true, plan: true, changed: 0, steps, before, after: before };
   }
-  for (const s of steps) {
-    // ⚠️ THE TEXT TRAVELS, NOT A BOOLEAN. `jack_connect` answers non-empty on
-    // failure AND on "already connected", and those are opposite facts that no
-    // exit status here tells apart.
-    s.said = sh(`${s.cmd} 2>&1`).trim() || null;
-    onLog?.(`${s.act} ${s.from} -> ${s.to}${s.said ? ` (${s.said})` : ''}`);
-  }
+  // ⚠️ THE TEXT TRAVELS, NOT A BOOLEAN. `jack_connect` answers non-empty on
+  // failure AND on "already connected", and exits 1 for both (MEASURED on the
+  // board 2026-10-11), so no exit status here tells them apart.
+  const ran = jackApply(planned, { read: () => [] }).ran;
+  ran.forEach((r, i) => { steps[i].said = r.said; });
+  for (const s of steps) onLog?.(`${s.act} ${s.from} -> ${s.to}${s.said ? ` (${s.said})` : ''}`);
   // 🔴 `ok` IS THE GRAPH READ BACK, NOT THE COMMANDS HAVING RUN. Printing "ok"
   // is not evidence (CLAUDE.md); a `jack_connect` to a port that vanished
   // between the read and the write answers on stderr and changes nothing.
@@ -729,7 +741,6 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // 4. wire the instrument's output into the capture client
   const port = sh('jack_lsp').split('\n').find((p) => def.portMatch.test(p));
   if (!port) { procs.forEach((p) => p.kill()); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
-  sh(`jack_connect "${port}" ${CAP}`);
   // ⚠️ AND THE RIGHT CHANNEL, WHICH WAS GOING NOWHERE. `portMatch` finds ONE
   // port, and for a stereo instrument that is the left one — so the capture was
   // mono-LEFT rather than mono-SUM and everything panned right was silently
@@ -739,10 +750,12 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // ports into one input SUM in JACK, which is what mono-sum means.
   let portR = null;
   if (def.portMatch2) {
-    portR = sh('jack_lsp').split('\n').find((p) => def.portMatch2.test(p));
-    if (portR) sh(`jack_connect "${portR}" ${CAP}`);
-    else onLog?.(`${name}: no right channel found — the capture is one channel of a stereo source`);
+    portR = sh('jack_lsp').split('\n').find((p) => def.portMatch2.test(p)) ?? null;
+    if (!portR) onLog?.(`${name}: no right channel found, so the capture is one channel of a stereo source`);
   }
+  // ⚠️ ADDITIVE, NOT OWNED: these two lines only ever added, and whatever else
+  // the capture had was left alone. `jack.rebuild` is what cuts a stray.
+  const wired = wire({ v: 1, links: [l(port, CAP), ...(portR ? [l(portR, CAP)] : [])] }, { onLog, what: `${name} into the capture` });
 
   // ⚠️ THE FEEDER'S OWN PATCH WAS HERE and left with step 2 above. It joined
   // the feeding instrument to `SuperCollider:in_1`, which is a HARDWARE input:
@@ -798,7 +811,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     // ⚠️ `jack: true` IS LOAD-BEARING. The caller gates the granular insert on
     // it, and so does the page. Leaving it to be inferred from which variable
     // happened to be set is exactly the coupling this refactor removed.
-    ok: true, source: name, jack: true, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd,
+    ok: true, source: name, jack: true, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd, wired: wired.ok,
     rate: RATE, msgPerSec: RATE / FRAME,
     noteOn: (ch, n, v) => midi([0x90 | (ch & 15), n & 127, v & 127]),
     noteOff: (ch, n) => midi([0x80 | (ch & 15), n & 127, 0]),

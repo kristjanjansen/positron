@@ -7,7 +7,10 @@
 > `demo/shell/bay.mjs`, `graph-registry.mjs`, `bay-node.mjs`, `bay-view.mjs`,
 > `bay-traffic.mjs`, `/patchbay/` and the `/concepts/` pages.
 >
-> **Spec only. Nothing here is built or measured.** Every "today" fact below was
+> **Updated 2026-10-11 evening: §3 item 3, the JACK arm, is built for the board and
+> measured on the Pi; its bay half is specced, with questions in §5.**
+>
+> **Spec only otherwise. Nothing else here is built or measured.** Every "today" fact below was
 > read from the tree on 2026-10-11 by grep; the commands are named so they can be
 > re-run.
 
@@ -45,7 +48,7 @@ still the best leftover in the whole plan.**
 | --- | --- | --- |
 | §0 write the canvas, 116 lines, no library | no drag canvas exists (`demo/shell/nodes.mjs` absent). `bay-view.mjs` is a computed SVG picture with no pointer handlers (`grep -c pointerdown demo/shell/bay-view.mjs` is 0) | superseded: write it, yes, but as a view, not an editor |
 | §2.2 ALSA patchbay: yes, `alsa.mjs` | `rig/board/alsa.mjs` is still there; the bay now names the same ports as `pi-1:<node>:midi-in` | holds, absorbed into the bay |
-| §2.2 JACK: yes, it is the gap, nine hard coded calls | `rig/board/jacksynth.mjs` now has **21** `jack_connect`/`jack_disconnect` lines; no `jack.mjs` | still the gap, and it grew |
+| §2.2 JACK: yes, it is the gap, nine hard coded calls | **built 2026-10-11**: `rig/board/jack.mjs` parses `jack_lsp -c -p -t`, plans and applies a document of links and reads it back; the 21 shell strings in `jacksynth.mjs` are gone (`grep -c 'sh(.jack_\(dis\)\?connect' rig/board/jacksynth.mjs` is 0); `jack.list`, `jack.plan`, `jack.apply` on the wire; run on the Pi | built for the board; bay links to it not yet (§3 item 3) |
 | §2.2 relay: no, a bus | light links ride the relay per site, `*` links and `bay.event` exist; the relay still does not parse | flipped to yes, rule 15 kept |
 | §2.2 timeline: no | still no; but a recorder is now a store node with in and out ports (concepts 012, 013, 062) | holds, refined |
 | §2.2 the page's own audio chain: yes, cheapest | built through the bay, not a canvas: concept 015 builds a WebAudio synth one linked module at a time | holds, different road |
@@ -90,12 +93,61 @@ still the best leftover in the whole plan.**
    lines sorted, pretty printed, the plan's rules 3 and 8. Still saved locally
    first; a scene is a list of link lines and nothing else, so ports that are
    not announced right now show as **waiting**, not as errors.
-3. **The JACK arm.** Unchanged from plan §5.4 and more valuable now: the Pi
-   announces `pi-1:yoshimi:audio-out` and `pi-1:synth:audio-out`, but which of
-   them actually reaches the capture is 21 shell strings in `jacksynth.mjs`.
-   `rig/board/jack.mjs` parses `jack_lsp -c` against a fixture, then the bay's
-   links to and from Pi audio ports plan and apply real JACK connections. It
-   leaves something behind with no UI at all, which was the plan's test.
+3. **The JACK arm. BUILT 2026-10-11 for the board, the bay half specced only.**
+   What is now true, each checked on the Pi at <pi> that day:
+   - **The graph, read off the Pi.** Eight ports: `system:capture_1/2`,
+     `system:playback_1/2` (jackd's dummy driver, so they go nowhere),
+     `yoshimi:left/right`, `posboard:input_1/2`. Yoshimi's two channels both
+     feed `posboard:input_1` (the mono sum the capture reads) and yoshimi also
+     autoconnects to the dummy playback. Nothing feeds `posboard:input_2`.
+     With the granulator in, `SuperCollider:in_1/2` and `out_1/2` appear and
+     the capture is fed by `out_1` and `out_2`. Captured as
+     `rig/board/fixtures/jack-lsp-c-pi.txt` and `jack-lsp-cpt-pi.txt`.
+   - **`rig/board/jack.mjs`**: `parseJackLsp` (ports, connections, and with
+     `-p -t` each port's direction and medium), `listJack`, `plan(doc, rows)`,
+     `apply(planned)` which answers the graph READ BACK, `diff`, `canonical`.
+     The document is `{ v: 1, links: [{ from, to }], own: [<input>] }`:
+     `links` must exist afterwards, `own` names inputs whose whole feed the
+     document decides. Refused by name, and then nothing planned at all: an
+     unknown `v`, a port not on the graph, a client named as if it were a port
+     (with the candidates), an input as a source, an output as a destination,
+     audio into MIDI, a port to itself, any `carry`. The vocabulary differences
+     from `alsa.mjs` are a table at the top of the file, not flattened: exact
+     `client:port` names and no fuzzy match, one channel per link, sums into
+     one input, no message classes, `own` exists only here.
+   - **`jacksynth.mjs` has no hard coded connects left.** Its four re-patches
+     (`startJackSynth`'s capture wiring, `pappusFx` on and off, `sourceFeed`)
+     and `jackRebuild` each build a document and go through `jack.mjs`. One
+     deliberate difference: a document that owns an input also cuts a stray
+     source into it; on the real graph that is zero extra commands. The
+     readiness lesson stays where it was: `pappusFx` waits for `PAPPUS READY`
+     before it patches, because a port is not an engine.
+   - **On the wire**: `jack.list`, `jack.plan {patch}`, `jack.apply {patch}`
+     (with `onlyIfIdle` and a journal line, like `jack.rebuild`). MEASURED over
+     the relay: a zero step plan for the capture as it is, a refusal naming two
+     problems, and a real `jack.apply` that cut and then restored
+     `yoshimi:left -> system:playback_1` (the dummy port, inaudible), each read
+     back intact. `fx.pappus` on, `source.set` on and off, `fx.pappus` off all
+     left `jack.graph`'s chain intact.
+   - `node rig/board/test.mjs` 235/235 before, **277/277** after, on the laptop
+     and on the Pi; five sabotages of `jack.mjs` take it red (1, 1, 7, 1 and 1).
+
+   **The bay half is NOT built, because no bay link can name two JACK ports
+   today.** Every audio port the board announces is an OUT whose `address` is a
+   relay room: `pi-1:yoshimi:audio-out` is the capture's stream, already past
+   JACK, and there is no announced audio IN on the Pi at all. The smallest
+   honest version, waiting on the questions in §5:
+   - the board announces the JACK side as ports: `pi-1:capture:audio-in`
+     (`posboard:input_1`) and, where sclang is installed, `pi-1:pappus:audio-in`
+     and `pi-1:pappus:audio-out`, each carrying the JACK port names behind it
+     (`jack: ['yoshimi:left', 'yoshimi:right']`);
+   - a bay link whose two ends are on one board and both `audio` resolves to
+     transport `jack` and to a `jack.mjs` document (one bay link, two JACK rows
+     for a stereo source into the mono capture), planned with `jack.plan` and
+     applied with `jack.apply`;
+   - the page reads the far side back with `jack.list`, never a count of drawn
+     wires, and one refused link per run is asserted (`pi-1:pappus:audio-in`
+     as a source).
 4. **A re-patch is an event.** Plan §5.5 unchanged: each applied link or unlink
    appended as a timestamped row, so a session's patching is a lane on the
    strip. Needs 2 first.
@@ -125,11 +177,33 @@ still the best leftover in the whole plan.**
    `/kit/patchbay/`? Concepts today are read only pictures of links a page made.
 4. **Does a scene that names absent ports wait for them**, and connect when they
    announce (the Circuit plugging into the Pi is the case), or ask first?
+5. **JACK in the bay: what does `pi-1:yoshimi:audio-out` mean?** Today it is the
+   relay stream every concept page links from. To link it inside the Pi it would
+   have to be the JACK port, and the stream a separate node (`pi-1:capture:audio-out`)
+   that pages link from instead. That renames what 017 and every Pi page link to.
+6. **Who wins, a bay link or the board's own chain?** `fx.pappus` and
+   `jack.rebuild` restore the board's belief, so a bay link into the granulator
+   would be undone by the next rebuild. Should the insert BECOME two bay links
+   (a link is a lease, plan-universal-routing §4), or stay a verb with the bay
+   only drawing it?
+7. **Stereo on the picture.** The capture is a mono sum of two JACK channels
+   and the port says `channels: 1`. Draw two wires, or one wire that resolves
+   to two rows?
+8. **Exposure.** `jack.apply` is tokenless like every relay verb, so a page
+   could cut the capture for everybody in `studio-1`, which `audio.stop` can
+   already do. Accept that, or require the `owner`/`heldBy` of
+   plan-universal-routing §6 first?
+9. **Hardware inputs are not on JACK.** The Circuit comes in through `arecord`
+   (`rig/board/inputs.mjs`), not JACK, so "the Circuit into the granulator" is
+   not a JACK link until inputs move onto JACK (`alsa_in`), which is a larger
+   change than this item.
 
 ## 6. Uncertainty
 
 - No measurement was taken for this revision. The table in §1 is greps.
 - Tap to link is a design, not a prototype; whether bay-view's port labels are
   big enough to tap on a phone is UNCONFIRMED (the plan's 11 px warning stands).
-- The JACK arm's port names have not been read off the Pi since the 2026-10-10
-  rename; `jack_lsp -c` on the board is the first step and costs nothing.
+- The JACK port names were read off the Pi on 2026-10-11 (§3 item 3). The
+  graph has no `-ac 2` capture: `posboard:input_2` exists and ffmpeg asks for
+  `-ac 1`, so whether a source patched to `input_2` would be heard (ffmpeg
+  downmixing the two) is UNMEASURED and was deliberately not tried.

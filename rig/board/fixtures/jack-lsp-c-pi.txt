@@ -1,0 +1,16 @@
+system:capture_1
+system:capture_2
+system:playback_1
+   yoshimi:left
+system:playback_2
+   yoshimi:right
+yoshimi:left
+   system:playback_1
+   posboard:input_1
+yoshimi:right
+   system:playback_2
+   posboard:input_1
+posboard:input_1
+   yoshimi:left
+   yoshimi:right
+posboard:input_2
