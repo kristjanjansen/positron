@@ -17,6 +17,7 @@
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
@@ -39,8 +40,8 @@
   bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => sampler.midi(e) });
+  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (e) => sampler.midi(e) });
   bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
   bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
   bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
@@ -66,11 +67,22 @@
   // ── the keys ────────────────────────────────────────────────────────────
   const host = el('div');
   const send = (note, vel) => bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: vel });
-  createKeyboard(host, {
+  const kb = createKeyboard(host, {
     ...keyRange(21), base: 48,
     onDown: (note, how) => { if (how !== 'midi') send(note, 100); },
     onUp: (note, how) => { if (how !== 'midi') send(note, 0); },
     onPanic: () => sampler.panic(),
+  });
+
+  // A plugged in keyboard plays through the same keys node, so it follows the
+  // patch and its pedal is the sampler's sustain (found 2026-10-11, *"sampler
+  // 010 keeps playing piano when i switch patch woth mouse and keep playing
+  // midi"*: this page never opened one, so a 020 tab was the one playing).
+  createMidi({
+    log: (line, kind) => d.log(line, kind),
+    onDown: (n, vel) => { kb.lightNote?.(n, true); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: vel }); },
+    onUp: (n) => { kb.lightNote?.(n, false); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 }); },
+    onControl: (c, v) => { if (c === 64) bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: c, d2: v }); },
   });
 
   d.stack.add(host, pb.el);
