@@ -437,9 +437,16 @@
       g.globalAlpha = shade(q.confidence);
       g.beginPath(); g.moveTo(x(p.at), y(p.v)); g.lineTo(x(q.at), y(q.v)); g.stroke();
     }
-    g.globalAlpha = 1;
+    // The dot is NOW and stays at xNow (*"can yellow dot just steady on lover
+    // wiz"*): the line runs on from the last reading to it, so the dot never
+    // drifts left between readings and jumps back when one arrives.
     const last = history[history.length - 1];
-    if (last) { g.fillStyle = k.hi; g.beginPath(); g.arc(x(last.at), y(last.v), 3 * dpr, 0, 2 * Math.PI); g.fill(); }
+    if (last) {
+      g.globalAlpha = shade(last.confidence);
+      g.beginPath(); g.moveTo(x(last.at), y(last.v)); g.lineTo(xNow, y(last.v)); g.stroke();
+    }
+    g.globalAlpha = 1;
+    if (last) { g.fillStyle = k.hi; g.beginPath(); g.arc(xNow, y(last.v), 3 * dpr, 0, 2 * Math.PI); g.fill(); }
     g.font = `${11 * dpr}px ${k.mono}`;
     // No labels on the line since 2026-10-11 (*"no need for annotations"*):
     // the footer says the bpm and confidence, the pointer reads any moment.
