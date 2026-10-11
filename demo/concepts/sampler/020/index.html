@@ -314,7 +314,7 @@
       `state ${L.state}, loop ${f(L.len)} ms, lap ${L.lap}, take started at ${f(L.t1)}`,
       '', 'inputs: sent ms (device stamp)\tseen ms (looper)\tsrc\tkind\td1\td2\tch'];
     for (const r of J.inputs) o.push([f(r.sent), f(r.seen), r.src, r.kind, r.d1, r.d2, r.ch].join('\t'));
-    o.push('', 'decisions: at ms\twhat\tstate before\tdetail');
+    o.push('', 'decisions: at ms\twhat\tstate\tdetail');
     for (const r of J.decisions) o.push([f(r.at), r.what, r.state, r.detail].join('\t'));
     o.push('', 'loop events: at ms from the take start\tnote\tvelocity');
     for (const e of L.events) o.push([f(e.at), e.d1, e.d2].join('\t'));
