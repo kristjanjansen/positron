@@ -488,3 +488,32 @@ One session, about 200 s on the MK-425C: 55 pedal messages, several hundred note
 3. Rolling buffer and start lookback of 150 to 200 ms (catches all four lost
    openings here).
 4. Length from notes within TOL 120 ms (keys are millisecond accurate).
+
+## 10. The owner's second Copy log, 2026-10-11 18:16, with section 9 steps 1 to 4 live (MEASURED)
+
+About 250 s, 9 takes or attempts.
+
+- **The lookback caught every opening chord.** 7 takes started from notes
+  played **22.9, 43.9, 63.4, 64.4, 74.5, 78.8 and 80.3 ms** before the
+  reported press (median 64 ms, max 80), taking in 2 to 4 notes each. None
+  lost. 150 ms has room; 100 ms would also have caught all seven.
+- **The seam rule acted once** (61 at the end repeated the opening, dropped).
+- **Replays:** 400, lateness median 2.0 ms, max 7.4 ms.
+- **The hold clear still destroyed loops, six times.** The owner holds the
+  pedal 1.45 to 1.65 s on a closing press while the last chord rings, with no
+  new note: 41387.8 (1.65 s), 92793.3 (1.52 s), 149217.7 (1.45 s), 161024.8
+  (1.52 s) each closed a loop and the hold then cleared it 1 s later. 29053.6
+  (held 1.58 s, no notes) cleared the playing loop. 132072.1 was held 3.69 s
+  and the first note came 1.73 s in, after the 1 s clear had already fired.
+  **"No note during the hold" is not enough: a ringing chord is not a note.**
+- **One take started long before the playing**: 86992.6, first note 2981 ms
+  later, so the loop carries 3 s of silence at its start. That is design 2.2
+  (start on the first note after arming), not built.
+
+### Proposed
+1. **Hold clear at 3 s, not 1 s**, still only with no note during it. Every
+   hold in both logs that was not meant as a clear was 1.45 to 1.65 s, or had
+   a note before 3 s. Or remove the hold clear and keep the keyboard's notes
+   off / panic button as the only clear.
+2. **A take that starts more than about 1 s before its first note starts at
+   that note instead** (design 2.2, with the lookback kept for the near case).
