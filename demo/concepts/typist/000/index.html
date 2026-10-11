@@ -26,7 +26,8 @@
   .tp { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
         container-type: inline-size; background: #fff; cursor: text;
         /* the margins of a typed page: more air above than at the sides */
-        padding: clamp(24px, 8cqi, 72px) clamp(20px, 7cqi, 64px); }
+        /* 10 per cent less than first built (asked 2026-10-11, *"reduce typist 000 padding by 10%"*) */
+        padding: clamp(21.6px, 7.2cqi, 64.8px) clamp(18px, 6.3cqi, 57.6px); }
 
   /* ── the line ───────────────────────────────────────────────────────────
      ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The
