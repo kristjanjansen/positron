@@ -240,18 +240,76 @@ export function flatten(list) {
  * board wires `yoshimi:left/right` itself (`jacksynth.mjs`), so the auto
  * connect never carried anything; switched off, it cannot send Yoshimi to a
  * card's outputs either. There is no command line flag for it (`-K` only
- * turns it ON), so the instance is edited, once, and only that one value.
+ * turns it ON), so the instance is edited, once, and only the two values
+ * named here and below (`ensureBoardInstance`).
  */
 export function noAutoconnect(xml) {
   const re = /(<par name="connect_jack_audio" value=")1(" \/>)/;
   return re.test(xml) ? { changed: true, xml: xml.replace(re, '$10$2') } : { changed: false, xml };
 }
-export function ensureNoAutoconnect(dir = YOSHIMI_DIR) {
+
+/**
+ * 🔴 NO MIDI SEARCH EITHER, SINCE 2026-10-11. The saved instance carries
+ * `alsa_midi_type` 1, which Yoshimi's own guide calls `Search`: it *"will
+ * accept input from any Alsa sources it can find"*, so it subscribes itself
+ * to EVERY readable sequencer port, the Circuit's `Circuit MIDI 1` included.
+ * MEASURED the same day: with Yoshimi up, the board's own raw read of the
+ * Circuit was EBUSY, so `/concepts/synth/070/` lost its patch name, and the
+ * Circuit's MIDI out played Yoshimi, which nobody asked for. The three values
+ * are 0 `Fixed` (the `linux_alsa_midi_dev` list), 1 `Search`, 2 `External`
+ * ("connection is then made externally"). 2 is the board's shape: the one
+ * source Yoshimi has is the virmidi port `startJackSynth` connects with
+ * `aconnect`. MEASURED on the Pi with a throwaway instance at 2 and `-a`:
+ * its client came up with no subscriptions at all. `-a` with no device does
+ * not override the type, so the command line is unchanged.
+ */
+export function externalMidi(xml) {
+  const re = /(<par name="alsa_midi_type" value=")[0-9]+(" \/>)/;
+  const m = xml.match(re);
+  return m && !/value="2"/.test(m[0]) ? { changed: true, xml: xml.replace(re, '$12$2') } : { changed: false, xml };
+}
+
+/** Both edits, in the order they are applied, and which ones moved anything. */
+export function boardInstance(xml) {
+  const a = noAutoconnect(xml), b = externalMidi(a.xml);
+  const edits = [a.changed && 'connect_jack_audio', b.changed && 'alsa_midi_type'].filter(Boolean);
+  return { changed: edits.length > 0, edits, xml: b.xml };
+}
+
+/**
+ * Set the instance up for the board before Yoshimi starts: no JACK auto
+ * connect, no ALSA MIDI search. Idempotent, writes only when a value moves,
+ * keeps the file gzipped if it was.
+ */
+export function ensureBoardInstance(dir = YOSHIMI_DIR) {
   const f = `${dir}/yoshimi-0.instance`;
-  if (!existsSync(f)) return { changed: false, reason: 'no instance yet' };
+  if (!existsSync(f)) return { changed: false, edits: [], reason: 'no instance yet' };
   const raw = readFileSync(f);
   const gz = raw[0] === 0x1f && raw[1] === 0x8b;
-  const r = noAutoconnect((gz ? gunzipSync(raw) : raw).toString('utf8'));
+  const r = boardInstance((gz ? gunzipSync(raw) : raw).toString('utf8'));
   if (r.changed) writeFileSync(f, gz ? gzipSync(Buffer.from(r.xml)) : r.xml);
-  return { changed: r.changed };
+  return { changed: r.changed, edits: r.edits };
+}
+
+/**
+ * Who feeds a sequencer client, out of `aconnect -l`, as `{ id, name }` per
+ * source port. `match` is a RegExp on the client's name or `(id, name) => bool`. The board's check that Yoshimi hears the virmidi port and
+ * nothing else: an instance edited by hand, or a Yoshimi that ignores the
+ * setting, would show the Circuit here.
+ *
+ *   client 128: 'yoshimi' [type=user,pid=4321]
+ *       0 'input           '
+ *           Connected From: 16:0, 44:0[real:0]
+ */
+export function sourcesOf(listing, match) {
+  const names = new Map();
+  let cur = null, inside = false;
+  const from = [];
+  for (const line of String(listing).split('\n')) {
+    const c = line.match(/^client (\d+): '([^']*)'/);
+    if (c) { cur = c[1]; names.set(cur, c[2]); inside = typeof match === 'function' ? match(c[1], c[2]) : match.test(c[2]); continue; }
+    const f = line.match(/^\s+Connected From:\s*(.*)$/);
+    if (f && inside) for (const id of f[1].match(/\d+:\d+/g) ?? []) from.push(id);
+  }
+  return from.map((id) => ({ id, name: names.get(id.split(':')[0]) ?? null }));
 }

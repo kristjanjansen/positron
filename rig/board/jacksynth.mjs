@@ -20,7 +20,7 @@ import { openSync, writeSync, closeSync, existsSync, mkdirSync, readFileSync } f
 // strings here, each run blind with its output thrown away. Each re-patch is
 // now a small document (`links` that must be there, `own` inputs whose whole
 // feed it decides), planned against the graph, applied, and READ BACK.
-import { ensureNoAutoconnect } from './yoshimi.mjs';
+import { ensureBoardInstance, sourcesOf as alsaSourcesOf } from './yoshimi.mjs';
 import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff, setPortNames } from './jack.mjs';
 export { parseJackLsp };
 
@@ -261,14 +261,23 @@ export async function ensureJackd({ onLog } = {}) {
  * below, which inserts it between whatever is playing and the capture, and can
  * be switched on and off under a running instrument.
  */
+/**
+ * Yoshimi's command line. `-a` with no device: the device list only matters on
+ * `Fixed`, and the instance says `External` (yoshimi.mjs `externalMidi`), so
+ * the board's `aconnect` is the one connection. No `-K`, which would turn the
+ * JACK auto connect back on, and no `-k`, which would start a second jackd.
+ */
+export const YOSHIMI_ARGS = Object.freeze(['-i', '-a', '-J', '-b=256']);
+
 export const JACK_SYNTHS = {
   yoshimi: {
     needs: ['yoshimi', 'jackd', 'ffmpeg'],
     // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
-    // `ensureNoAutoconnect` first: see yoshimi.mjs. Without it Yoshimi exits 1
-    // on a jackd that owns a card capture only, since there is no playback.
-    spawn: () => { try { ensureNoAutoconnect(); } catch { /* yoshimi says why if it matters */ }
-                   return spawn('yoshimi', ['-i', '-a', '-J', '-b=256'], { stdio: ['ignore','pipe','pipe'] }); },
+    // `ensureBoardInstance` first: see yoshimi.mjs. Without it Yoshimi exits 1
+    // on a jackd that owns a card capture only, since there is no playback,
+    // and subscribes itself to every MIDI source on the box, the Circuit too.
+    spawn: () => { try { ensureBoardInstance(); } catch { /* yoshimi says why if it matters */ }
+                   return spawn('yoshimi', YOSHIMI_ARGS, { stdio: ['ignore','pipe','pipe'] }); },
     portMatch: /^yoshimi:left/i,
     portMatch2: /^yoshimi:right/i,
     // It appears on the graph well before it has read 911 instruments off the
@@ -760,6 +769,17 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // left is the grain cloud that `/grains/` drives, along with `sweepInsert()`,
 // which is what stops an insert outliving the page that asked for it.
 
+/**
+ * Every source feeding sequencer client `client` that is not the board's
+ * virmidi port. Empty is the healthy answer; with no virmidi at all, every
+ * source is a stray, because then nothing the board sends can be among them.
+ */
+export function strayMidiSources(listing, client, virmidiClient) {
+  const own = virmidiClient != null ? `${virmidiClient}:0` : null;
+  // By NUMBER, not name: two yoshimis can share a name and one of them is ours.
+  return alsaSourcesOf(listing, (id) => id === String(client)).filter((s) => s.id !== own);
+}
+
 /** snd-virmidi's raw device, and the sequencer client that mirrors it. */
 function findVirmidi() {
   const l = sh('aconnect -l');
@@ -921,6 +941,12 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     sh(`aconnect ${vm.client}:0 ${alsaClient}:0`);
     try { midiFd = openSync(vm.dev, 'w'); } catch (e) { onLog?.(`virmidi open failed: ${e.message}`); }
   }
+  // ⚠️ AND THE VIRMIDI PORT IS ITS ONLY SOURCE. Yoshimi on `Search` subscribed
+  // itself to the Circuit, which made the board's own raw read of it EBUSY
+  // (yoshimi.mjs `externalMidi`). The instance edit stops that; this cuts any
+  // stray that survives it, by name in the log, so it cannot come back silently.
+  const strays = alsaClient ? strayMidiSources(sh('aconnect -l'), alsaClient, vm?.client) : [];
+  for (const s of strays) { sh(`aconnect -d ${s.id} ${alsaClient}:0`); onLog?.(`cut ${s.name ?? s.id} (${s.id}) -> ${name}: the board is its only MIDI source`); }
 
   // 6. the capture's bytes, cut into 20 ms frames
   const BYTES = FRAME * 2;

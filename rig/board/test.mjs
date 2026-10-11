@@ -6,8 +6,8 @@
 // README rather than faked here, because a fake that passes is worse than a
 // gap that is written down.
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
-import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM, noAutoconnect, ensureNoAutoconnect } from './yoshimi.mjs';
-import { parseJackLsp, jackChain, jackRebuild , setBayRows, jackdArgs, cardPortNames, jackdOwns, countXruns, JACKD_ENV } from './jacksynth.mjs';
+import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM, noAutoconnect, externalMidi, boardInstance, ensureBoardInstance, sourcesOf } from './yoshimi.mjs';
+import { parseJackLsp, jackChain, jackRebuild , setBayRows, jackdArgs, cardPortNames, jackdOwns, countXruns, JACKD_ENV, YOSHIMI_ARGS, strayMidiSources } from './jacksynth.mjs';
 import * as jack from './jack.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
@@ -17,7 +17,7 @@ import { graphProblem, createRegistry } from '../../demo/shell/graph-registry.mj
 import { EventEmitter } from 'node:events';
 import { constants as FS_C } from 'node:fs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -646,15 +646,50 @@ console.log('jackd on the card: the Circuit IS the clock, nothing resamples');
   is('auto connect is switched off in the instance', [na.changed, /connect_jack_audio" value="0"/.test(na.xml)], [true, true]);
   is('NEGATIVE CONTROL: and nothing else in the file moves', na.xml.replace('value="0" />\n<par name="other"', 'value="1" />\n<par name="other"'), inst);
   is('NEGATIVE CONTROL: an instance already off is left alone', noAutoconnect(na.xml).changed, false);
+  // Yoshimi on ALSA MIDI `Search`. MEASURED 2026-10-11: `alsa_midi_type` 1
+  // subscribed it to the Circuit, the board's raw read of the Circuit went
+  // EBUSY and /concepts/synth/070/ lost its patch name. 2 is `External`.
+  const midiInst = '<par name="midi_engine" value="1" />\n<par name="alsa_midi_type" value="1" />\n<string name="linux_alsa_midi_dev">default</string>';
+  const em = externalMidi(midiInst);
+  is('ALSA MIDI search is switched to External in the instance', [em.changed, /alsa_midi_type" value="2"/.test(em.xml)], [true, true]);
+  is('NEGATIVE CONTROL: and nothing else in the file moves', em.xml.replace('"alsa_midi_type" value="2"', '"alsa_midi_type" value="1"'), midiInst);
+  is('NEGATIVE CONTROL: Fixed (0) is not left alone either, its default source list is not the board', externalMidi(midiInst.replace('value="1" />\n<string', 'value="0" />\n<string')).changed, true);
+  is('NEGATIVE CONTROL: an instance already External is left alone', externalMidi(em.xml).changed, false);
+  is('NEGATIVE CONTROL: midi_engine is not mistaken for the type', externalMidi('<par name="midi_engine" value="1" />').changed, false);
+  const both = boardInstance(inst + '\n' + midiInst);
+  is('both edits land in one pass and are named', [both.edits, /connect_jack_audio" value="0"/.test(both.xml), /alsa_midi_type" value="2"/.test(both.xml)], [['connect_jack_audio', 'alsa_midi_type'], true, true]);
+  is('NEGATIVE CONTROL: a second pass moves nothing', boardInstance(both.xml).changed, false);
   {
     const d = mkdtempSync(join(tmpdir(), 'yinst-'));
-    writeFileSync(join(d, 'yoshimi-0.instance'), gzipSync(inst));
-    const r1 = ensureNoAutoconnect(d), r2 = ensureNoAutoconnect(d);
+    writeFileSync(join(d, 'yoshimi-0.instance'), gzipSync(inst + '\n' + midiInst));
+    const r1 = ensureBoardInstance(d), r2 = ensureBoardInstance(d);
     const back = readFileSync(join(d, 'yoshimi-0.instance'));
+    const text = gunzipSync(back).toString('utf8');
     is('the gzipped instance on disk is rewritten once and stays gzipped', [r1.changed, r2.changed, back[0] === 0x1f && back[1] === 0x8b], [true, false, true]);
-    is('NEGATIVE CONTROL: no instance file is not an error, Yoshimi writes one on its first run', ensureNoAutoconnect(join(d, 'none')).changed, false);
+    is('and on disk it says no auto connect and External MIDI', [/connect_jack_audio" value="0"/.test(text), /alsa_midi_type" value="2"/.test(text)], [true, true]);
+    is('NEGATIVE CONTROL: no instance file is not an error, Yoshimi writes one on its first run', ensureBoardInstance(join(d, 'none')).changed, false);
     rmSync(d, { recursive: true, force: true });
   }
+  is('the Yoshimi command line asks for ALSA MIDI with no fixed device', YOSHIMI_ARGS.includes('-a') && !YOSHIMI_ARGS.some((a) => /^-a=|^--alsa-midi=/.test(a)), true);
+  is('NEGATIVE CONTROL: and neither JACK auto connect nor a second jackd', YOSHIMI_ARGS.some((a) => a === '-K' || a === '-k' || /^--auto-connect|^--autostart-jack/.test(a)), false);
+
+  // Who feeds Yoshimi, off `aconnect -l`. The second listing is the shape of
+  // the 2026-10-11 defect: Search had subscribed it to the Circuit (44:0).
+  const seqHead = "client 0: 'System' [type=kernel]\n    0 'Timer           '\n    1 'Announce        '\nclient 14: 'Midi Through' [type=kernel]\n    0 'Midi Through Port-0'\n"
+    + "client 16: 'Virtual Raw MIDI 0-0' [type=kernel,card=0]\n    0 'VirMIDI 0-0     '\n\tConnecting To: 128:0\n"
+    + "client 40: 'FastTrack Pro' [type=kernel,card=6]\n    0 'FastTrack Pro MIDI 1'\n"
+    + "client 44: 'Circuit' [type=kernel,card=7]\n    0 'Circuit MIDI 1  '\n";
+  const seqGood = seqHead + "client 128: 'yoshimi' [type=user,pid=4321]\n    0 'input           '\n\tConnected From: 16:0\n";
+  const seqBad = seqHead + "client 128: 'yoshimi' [type=user,pid=4321]\n    0 'input           '\n\tConnected From: 14:0, 16:0, 40:0, 44:0[real:0]\n";
+  is('the board\'s virmidi port is read as Yoshimi\'s source', sourcesOf(seqGood, /yoshimi/).map((s) => s.name), ['Virtual Raw MIDI 0-0']);
+  is('with the board\'s port as its only source, there are no strays', strayMidiSources(seqGood, 128, 16), []);
+  is('NEGATIVE CONTROL: the Circuit is never left in Yoshimi\'s subscriptions, it is named as a stray',
+    strayMidiSources(seqBad, 128, 16).map((s) => s.name), ['Midi Through', 'FastTrack Pro', 'Circuit']);
+  is('NEGATIVE CONTROL: and the stray carries the id aconnect -d needs, without the [real:0] suffix',
+    strayMidiSources(seqBad, 128, 16).find((s) => s.name === 'Circuit')?.id, '44:0');
+  is('NEGATIVE CONTROL: a client of another number is not Yoshimi, even fed by the Circuit',
+    strayMidiSources(seqBad.replace("client 128: 'yoshimi'", "client 129: 'yoshimi'"), 128, 16), []);
+  is('NEGATIVE CONTROL: with no virmidi, every source is a stray', strayMidiSources(seqGood, 128, null).map((s) => s.id), ['16:0']);
 
   // The rename, at jack.mjs's one boundary, against the real Pi listing.
   jack.setPortNames(cardPortNames(card));
