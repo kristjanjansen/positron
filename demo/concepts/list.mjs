@@ -28,6 +28,7 @@ export const CONCEPTS = [
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   { n: 'room/001', title: 'Chat UI', say: 'The chat as a framed window with its messages and a compose box.' },
+  { n: 'room/002', title: 'Chat UI wired', say: 'The chat window wired to the patchbay, so tabs in one room talk to each other.' },
   { n: 'room/010', title: 'History', say: 'The same chat, with a store that keeps what was said.' },
   { n: 'room/020', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: 'room/030', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },

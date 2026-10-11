@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* concepts room/002, THE CHAT UI WIRED TO THE PATCHBAY, 2026-10-11. Asked:
+     *"002: wire in patchbay from 000 and show it"*. room/001's frame and
+     compose box, driven by room/000's bay: two `*` links, a line crossing the
+     room as one `bay.event`. The patchbay picture sits under the frame. */
+
+  @media (max-width: 560px) { .rc-panel .pos-vp-stage { --vp-aspect: 4 / 5; } }
+
+  .rc { position: absolute; inset: 0; display: flex; flex-direction: column;
+        background: var(--card); }
+
+  .rc-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+             display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+  .rc-msgs > :first-child { margin-top: auto; }
+  .rc-msg { display: flex; flex-direction: column; gap: 3px; }
+  .rc-msg-h { display: flex; gap: 10px; align-items: baseline; }
+  .rc-who { font: 500 12px/1.3 var(--mono); color: var(--fg); }
+  .rc-when { font: 400 11px/1.3 var(--mono); color: var(--dim2); }
+  .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
+             overflow-wrap: anywhere; white-space: pre-wrap; }
+  .rc-msg.me .rc-who { color: var(--hi); }
+
+  .rc-compose { position: relative; padding: 10px 12px 12px; }
+  .rc-compose .pos-field { display: block; margin: 0; }
+  /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
+  .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
+                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
+  .rc-send { position: absolute; right: 18px; bottom: 18px; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+
+  const d = mount({ name: 'concept room 002', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('room/002');
+
+  // ── the bay, as room/000 has it ──────────────────────────────────────────
+  // Every tab is a SITE with one `chat` node and two `value` ports shaped
+  // `of: text`, and holds two `*` links: a speaker and a listener. Its own
+  // room, never studio-1. Nothing opens until Join is pressed.
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-1';
+  const SITE = randomSite('web');
+  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
+  const SELF = {
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
+    nodes: [{ id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
+    ports: [
+      { id: OUT, label: 'chat', dir: 'out', medium: 'value', shape: { of: 'text' } },
+      { id: IN, label: 'chat', dir: 'in', medium: 'value', shape: { of: 'text' } },
+    ],
+  };
+  function bay() {
+    const b = node.registry.fill(createBay());
+    b.addPort({ ...b.port(IN), deliver: heard });
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
+    return b;
+  }
+  let pb = null;
+  const node = createBayNode({
+    room: ROOM, graphs: [SELF], bay,
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => { join.button('join').disabled = true; box.enable(true); pb?.refresh(); },
+    onGraph: () => { pb?.refresh(); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
+  });
+
+  // ── the chat UI, as room/001 has it ──────────────────────────────────────
+  const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
+  const short = (site) => site === SITE ? 'you' : site;
+
+  const list = el('div', 'rc-msgs');
+  function add({ who, at, text, me = false }) {
+    const m = el('div', `rc-msg${me ? ' me' : ''}`);
+    const h = el('div', 'rc-msg-h');
+    h.append(el('span', 'rc-who', who), el('span', 'rc-when', clock(at)));
+    m.append(h, el('p', 'rc-text', text));
+    list.append(m);
+    list.scrollTop = list.scrollHeight;
+  }
+
+  // Called by the bay, only along the listener link.
+  function heard(e, l, m) {
+    pb?.pulse(l.from, l.to);
+    add({ who: short(String(m.from).split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
+  }
+
+  function say(text) {
+    const r = node.emit(OUT, { text });
+    if (r.sent) pb?.pulse(OUT, '*:chat:value-in');
+    add({ who: 'you', at: Date.now(), text, me: true });
+    if (!r.far.length) d.log('nobody else in the room heard it');
+  }
+
+  /** The compose box: grows to six lines, Enter sends, Shift and Enter is a
+      new line, the send icon in its bottom right. Off until joined. */
+  function compose(onSend) {
+    const wrap = el('div', 'rc-compose');
+    const field = createField({ rows: 2, placeholder: `Join ${ROOM} to write` });
+    const ta = field.input;
+    ta.rows = 1;
+    ta.setAttribute('aria-label', `Message ${ROOM}`);
+    const grow = () => {
+      ta.style.height = 'auto';
+      ta.style.height = `${ta.scrollHeight + 2}px`;
+      ta.style.overflowY = ta.scrollHeight > ta.clientHeight + 2 ? 'auto' : 'hidden';
+    };
+    const b = createIconButton({ icon: 'send', label: 'Send', small: true, onPress: () => send() });
+    b.el.classList.add('rc-send');
+    const send = () => {
+      const text = ta.value.trim();
+      if (!text || ta.disabled) return;
+      onSend(text);
+      field.set('');
+      grow();
+      ta.focus();
+    };
+    ta.addEventListener('input', grow);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+    });
+    const enable = (on) => {
+      field.disabled(!on);
+      b.el.disabled = !on;
+      ta.placeholder = on ? `Message ${ROOM}` : `Join ${ROOM} to write`;
+      if (on) ta.focus();
+    };
+    enable(false);
+    wrap.append(field.el, b.el);
+    requestAnimationFrame(grow);
+    return { el: wrap, enable };
+  }
+
+  const box = compose(say);
+  const chat = el('div', 'rc');
+  chat.append(list, box.el);
+
+  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
+  const panel = createVideoPanel({ left: join.el, fullMode: 'footer' });
+  panel.el.classList.add('rc-panel');
+  panel.stage.append(chat);
+
+  // ── the patchbay: the two `*` links this tab holds, read from bay() ──────
+  // Before Join it is drawn from this tab's own graph, which opens nothing. A
+  // wire pulses when a line leaves or arrives along it.
+  pb = createPatchbay(heldPicture(bay, SITE),
+    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+
+  d.stack.add(panel.el, pb.el);
+  d.ready();
+</script>

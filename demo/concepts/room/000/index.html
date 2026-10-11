@@ -28,6 +28,7 @@
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
@@ -95,7 +96,7 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
+    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
@@ -121,8 +122,10 @@
     text.set('');
   }
   text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
-  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
-  send.button('send').disabled = true;
+  // The kit's send icon, an ordinary button rather than the primary (asked
+  // 2026-10-11, *"use send iconbutton on 000 secondary"*).
+  const send = createIconButton({ icon: 'send', label: 'Send', onPress: say });
+  send.el.disabled = true;
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
 
   // Who is in the room: the registry, as /concepts/bay/000/ draws it. Port names are
