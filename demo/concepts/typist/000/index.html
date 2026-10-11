@@ -26,8 +26,7 @@
   .tp { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
         container-type: inline-size; background: #fff; cursor: text;
         /* the margins of a typed page: more air above than at the sides */
-        /* 10 per cent less than first built (asked 2026-10-11, *"reduce typist 000 padding by 10%"*) */
-        padding: clamp(21.6px, 7.2cqi, 64.8px) clamp(18px, 6.3cqi, 57.6px); }
+        padding: clamp(24px, 8cqi, 72px) clamp(20px, 7cqi, 64px); }
 
   /* ── the line ───────────────────────────────────────────────────────────
      ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The
@@ -69,6 +68,8 @@
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
 
   const d = mount({ name: 'concept typist 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('typist/000');
@@ -109,6 +110,20 @@
     else if (c.top - line < s.top) sheet.scrollTop -= s.top - (c.top - line);
   }
 
+  // ── the patchbay (asked 2026-10-11, *"can we patchbay 000?"*) ───────────
+  // The keyboard is a node whose typing leaves on `keys:value-out`, shaped
+  // text; the paper takes it on `paper:value-in`. One link, inside this tab.
+  // Every keystroke is one event along it, so the wire pulses as you type;
+  // the paper draws from the textarea as before.
+  const S = 'web';
+  const bay = createBay();
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:paper`, kind: 'screen', label: 'paper', place: 'browser' });
+  bay.addPort({ id: `${S}:keys:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
+  bay.addPort({ id: `${S}:paper:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
+  bay.link(`${S}:keys:value-out`, `${S}:paper:value-in`);
+  keys.addEventListener('input', (e) => bay.send(`${S}:keys:value-out`, { text: e.data || '', kind: e.inputType }));
+
   for (const ev of ['input', 'select', 'keyup', 'pointerup']) keys.addEventListener(ev, draw);
   document.addEventListener('selectionchange', () => { if (document.activeElement === keys) draw(); });
   keys.addEventListener('focus', () => { sheet.classList.add('on'); draw(); });
@@ -128,7 +143,8 @@
   const panel = createVideoPanel({ left: false, fullMode: 'footer' });
   panel.el.classList.add('tp-panel');
   panel.stage.append(sheet);
-  d.stack.add(panel.el);
+  const pb = createPatchbay(bay, { detail: (n) => [{ text: n.label, sans: true }] });
+  d.stack.add(panel.el, pb.el);
   draw();
   keys.focus({ preventScroll: true });
 
