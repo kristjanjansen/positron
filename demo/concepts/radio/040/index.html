@@ -99,6 +99,7 @@
   // autoplay holds or would play on value-in-2, the notes sounding on midi-in).
   const DISPLAY_IN = `${S}:keys:value-in`, KEYS_CHORD = `${S}:keys:value-in-2`, KEYS_LIGHTS = `${S}:keys:midi-in`;
   const AUTO_CHORD = `${S}:autoplay:value-out`, PAD_NOTES = `${S}:pad:midi-out`;
+  const AUTO_BASS = `${S}:autoplay:midi-out-2`, BASS_IN = `${S}:bass:midi-in`, BASS_OUT = `${S}:bass:audio-out`;
   const KEYS_OUT = `${S}:keys:midi-out`, AUTO_OUT = `${S}:autoplay:midi-out`, AUTO_KEY = `${S}:autoplay:value-in`;
   const PAD_IN = `${S}:pad:midi-in`, PAD_OUT = `${S}:pad:audio-out`, PAD_LEVEL = `${S}:pad:value-in`;
   const ENERGY_OUT = `${S}:level:value-out`;
@@ -141,6 +142,11 @@
   bay.addPort({ id: AUTO_KEY, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => autoKey(ev) });
   bay.addPort({ id: AUTO_OUT, label: 'autoplay', dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
   bay.addPort({ id: AUTO_CHORD, label: 'chord', dir: 'out', medium: 'value' });
+  // The chord's root, on a port of its own, for the bass.
+  bay.addPort({ id: AUTO_BASS, label: 'bass', dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addNode({ id: `${S}:bass`, kind: 'engine', label: 'bass', place: 'browser' });
+  bay.addPort({ id: BASS_IN, label: 'bass', dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (ev) => bassEvent(ev) });
+  bay.addPort({ id: BASS_OUT, label: 'bass', dir: 'out', medium: 'audio' });
   bay.addNode({ id: `${S}:pad`, kind: 'engine', label: 'pad synth', place: 'browser' });
   bay.addPort({ id: PAD_IN, label: 'pad synth', dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (ev) => padEvent(ev) });
   // What the pad is sounding, every note on and off, for whoever shows it.
@@ -188,11 +194,13 @@
   hold(PAD_NOTES, KEYS_LIGHTS);
   hold(KEY_EV, AUTO_KEY);
   hold(KEYS_OUT, PAD_IN);
-  // Autoplay's chords also an octave down and an octave up: two more links
-  // from the same port, each moving every note by twelve semitones.
+  // Autoplay's chord to the pad, its root to the bass. The octave up and
+  // octave down links that were here went 2026-10-11 (*"radio 040 sound is
+  // still orgaby and lame"*): a chord stacked in three octaves on bright saws
+  // is an organ registration, and it filled every band the radio needs.
   hold(AUTO_OUT, PAD_IN);
-  hold(AUTO_OUT, PAD_IN, {}, [{ op: 'transpose', by: -12 }]);
-  hold(AUTO_OUT, PAD_IN, {}, [{ op: 'transpose', by: 12 }]);
+  hold(AUTO_BASS, BASS_IN);
+  hold(BASS_OUT, MIXER_WET);
   hold(ENERGY_OUT, PAD_LEVEL);
   hold(PAD_OUT, MIXER_WET);
   hold(KNOB_MIX, MIXER_MIX);
@@ -259,11 +267,20 @@
     values: [{ key: 'key', label: 'key', reserve: 8 }, { key: 'conf', label: 'confidence', reserve: 4 }, { key: 'also', label: 'also', reserve: 18 }] });
   keyPanel.el.classList.add('cc-keyfoot');
 
-  // ── the pad synth ───────────────────────────────────────────────────────
-  // Two saws a few cents apart and a sine an octave down, through a soft
-  // lowpass, with a slow swell and a long release. One voice per note.
-  const PAD = { attack: 0.35, release: 1.4, cutoff: 1400, level: 0.12 };
-  let padBus = null, dryG = null, wetG = null, mixOut = null, mix = 0.5, energy = null;
+  // ── the pad synth and the bass ──────────────────────────────────────────
+  // Asked: *"pad is very churchlike and eats so many fequencyies and sounds
+  // lame. perhaps bassy + paddy"*, then *"still orgaby and lame"*. So two
+  // voices. The PAD is five saws spread across the stereo field a few cents
+  // apart, through a low lowpass that drifts slowly (one shared LFO), with a
+  // slow swell and a long release; the whole pad is high passed so it leaves
+  // the bottom to the bass, and a generated room reverb sits behind it. The
+  // BASS is the chord's root an octave under the pad: a sine with a triangle
+  // an octave above it for small speakers, short attack, darker filter.
+  // Then *"its also slow to react, old chords stay"*: a 3 s release and a full
+  // reverb let each chord bleed under the next, so 0.5 s in, 1 s out, less room.
+  const PAD = { attack: 0.5, release: 1, cutoff: 900, sweep: 450, lfoHz: 0.12, hp: 180, level: 0.12, reverb: 0.3 };
+  const BASS = { attack: 0.06, release: 0.8, cutoff: 420, level: 0.35 };
+  let padBus = null, padOut = null, padLfo = null, bassBus = null, dryG = null, wetG = null, mixOut = null, mix = 0.5, energy = null;
   const voices = new Map();
   function sound() {
     ctx ??= new AudioContext();
@@ -274,13 +291,37 @@
       if (holds(MIXER_OUT, SPEAKER_IN)) mixOut.connect(ctx.destination);
       mixApply();
     }
-    if (!padBus) { padBus = ctx.createGain(); padBus.gain.value = PAD.level; padRoute(); }
+    if (!padBus) {
+      padBus = ctx.createGain(); padBus.gain.value = PAD.level;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = PAD.hp; hp.Q.value = 0.5;
+      const conv = ctx.createConvolver(); conv.buffer = roomImpulse(1.6);
+      const rev = ctx.createGain(); rev.gain.value = PAD.reverb;
+      padOut = ctx.createGain();
+      padBus.connect(hp); hp.connect(padOut); hp.connect(conv); conv.connect(rev); rev.connect(padOut);
+      // one slow LFO for every pad voice's filter, so the pad breathes together
+      const lfo = ctx.createOscillator(); lfo.frequency.value = PAD.lfoHz;
+      padLfo = ctx.createGain(); padLfo.gain.value = PAD.sweep;
+      lfo.connect(padLfo); lfo.start();
+      bassBus = ctx.createGain(); bassBus.gain.value = BASS.level;
+      padRoute();
+    }
     return ctx;
   }
   function padRoute() {
-    if (!padBus) return;
-    try { padBus.disconnect(); } catch { /* not connected */ }
-    if (holds(PAD_OUT, MIXER_WET)) padBus.connect(wetG);
+    if (!padOut) return;
+    try { padOut.disconnect(); } catch { /* not connected */ }
+    try { bassBus.disconnect(); } catch { /* not connected */ }
+    if (holds(PAD_OUT, MIXER_WET)) padOut.connect(wetG);
+    if (holds(BASS_OUT, MIXER_WET)) bassBus.connect(wetG);
+  }
+  /** A room: two channels of noise falling away exponentially over `sec`. */
+  function roomImpulse(sec) {
+    const n = Math.round(ctx.sampleRate * sec), buf = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const x = buf.getChannelData(c);
+      for (let i = 0; i < n; i++) x[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    }
+    return buf;
   }
   // Equal power: the dry side is cos, the wet side sin, of the knob's quarter
   // turn, so the middle is neither louder nor quieter than the ends. The wet
@@ -335,12 +376,14 @@
     const t = ctx.currentTime, f = 440 * 2 ** ((note - 69) / 12);
     const env = ctx.createGain(); env.gain.setValueAtTime(0, t);
     env.gain.linearRampToValueAtTime(vel, t + PAD.attack);
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = PAD.cutoff; lp.Q.value = 0.5;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = PAD.cutoff; lp.Q.value = 0.7;
+    padLfo.connect(lp.frequency);
     lp.connect(env); env.connect(chGain(ch));
-    const oscs = [['sawtooth', f, -7], ['sawtooth', f, 7], ['sine', f / 2, 0]].map(([type, freq, cents]) => {
-      const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = cents;
-      const g = ctx.createGain(); g.gain.value = type === 'sine' ? 0.5 : 0.35;
-      o.connect(g); g.connect(lp); o.start(t); return o;
+    const oscs = [[-14, -0.7], [-7, -0.35], [0, 0], [7, 0.35], [14, 0.7]].map(([cents, panAt]) => {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = cents;
+      const g = ctx.createGain(); g.gain.value = 0.16;
+      const pan = ctx.createStereoPanner(); pan.pan.value = panAt;
+      o.connect(g); g.connect(pan); pan.connect(lp); o.start(t); return o;
     });
     voices.set(`${ch}/${note}`, { env, oscs });
   }
@@ -353,6 +396,41 @@
     v.env.gain.setValueAtTime(v.env.gain.value, t);
     v.env.gain.linearRampToValueAtTime(0, t + PAD.release);
     for (const o of v.oscs) o.stop(t + PAD.release + 0.05);
+  }
+
+  // The bass: one note at a time, its level on CC 11 like the pad's autoplay channel.
+  let bassVoice = null, bassExpr = null;
+  function bassEvent(ev) {
+    sound();
+    if (!bassExpr) { bassExpr = ctx.createGain(); bassExpr.connect(bassBus); }
+    if (ev?.cls === 'cc' && ev.d1 === 11) { bassExpr.gain.setTargetAtTime((ev.d2 / 127) ** 2, ctx.currentTime, 0.05); return; }
+    if (ev?.cls !== 'note') return;
+    if (ev.d2 > 0) bassOn(ev.d1, ev.d2 / 127);
+    else if (bassVoice?.note === ev.d1) bassOff();
+  }
+  function bassOn(note, vel) {
+    bassOff();
+    const t = ctx.currentTime, f = 440 * 2 ** ((note - 69) / 12);
+    const env = ctx.createGain(); env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vel, t + BASS.attack);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = BASS.cutoff; lp.Q.value = 0.8;
+    lp.connect(env); env.connect(bassExpr);
+    const oscs = [['sine', f, 0.8], ['triangle', f * 2, 0.25]].map(([type, freq, gain]) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
+      const g = ctx.createGain(); g.gain.value = gain;
+      o.connect(g); g.connect(lp); o.start(t); return o;
+    });
+    bassVoice = { note, env, oscs };
+  }
+  function bassOff() {
+    const v = bassVoice;
+    if (!v) return;
+    bassVoice = null;
+    const t = ctx.currentTime;
+    v.env.gain.cancelScheduledValues(t);
+    v.env.gain.setValueAtTime(v.env.gain.value, t);
+    v.env.gain.linearRampToValueAtTime(0, t + BASS.release);
+    for (const o of v.oscs) o.stop(t + BASS.release + 0.05);
   }
 
   // ── autoplay ────────────────────────────────────────────────────────────
@@ -375,9 +453,9 @@
     const target = Math.max(0, Math.min(1, (c - AUTO_CONF_LO) / (AUTO_CONF_HI - AUTO_CONF_LO)));
     autoExpr += (target - autoExpr) * (1 - Math.exp(-AUTO_EXPR_MS / 1000 / AUTO_TAU_S));
     const v = Math.round(autoExpr * 127);
-    if (v !== autoExprSent) { autoExprSent = v; bay.send(AUTO_OUT, { cls: 'cc', ch: AUTO_CH, d1: 11, d2: v }); }
+    if (v !== autoExprSent) { autoExprSent = v; for (const port of [AUTO_OUT, AUTO_BASS]) bay.send(port, { cls: 'cc', ch: AUTO_CH, d1: 11, d2: v }); }
   }
-  let autoTimer = null, autoAt = 0, autoHeld = [];
+  let autoTimer = null, autoAt = 0, autoHeld = [], autoBassNote = null;
   // Which drawn key is which note: read once off the names the keys print
   // (`C3`, `C♯3`), because the keyboard publishes no element per note.
   const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -417,7 +495,8 @@
   const autoSay = (notes) => bay.send(AUTO_CHORD, { of: 'param', name: 'chord', notes: [...notes] });
   function autoRelease() {
     for (const n of autoHeld) bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 0 });
-    autoHeld = [];
+    if (autoBassNote != null) bay.send(AUTO_BASS, { cls: 'note', ch: AUTO_CH, d1: autoBassNote, d2: 0 });
+    autoHeld = []; autoBassNote = null;
     autoSay([]);
     autoPreview();
   }
@@ -426,10 +505,13 @@
     const r = autoReading;
     if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
     const step = AUTO_STEPS[autoAt++ % AUTO_STEPS.length];
-    for (const n of chordOf(r, step)) {
+    const chord = chordOf(r, step);
+    for (const n of chord) {
       bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 100 });
       autoHeld.push(n);
     }
+    autoBassNote = chord[0] - 12;
+    bay.send(AUTO_BASS, { cls: 'note', ch: AUTO_CH, d1: autoBassNote, d2: 110 });
     autoSay(autoHeld);
   }
   function autoSet(on) {
