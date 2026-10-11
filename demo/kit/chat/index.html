@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/chat</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<style>
+  /* A specimen box holds a column at a height a chat would have, so the log
+     sits at the bottom and the sign in the middle as they do in a window. */
+  .kc-tall { flex: 1 1 100%; height: 240px; display: flex; flex-direction: column;
+             background: var(--card); border: var(--edge, 1px solid var(--line)); border-radius: var(--r, 4px); }
+  .kc-full { flex: 1 1 100%; min-width: 0; }
+</style>
+<script type="module">
+  import { el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createChatLog, createChatSign, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
+
+  /**
+   * kit/chat, THE CHAT'S PIECES, 2026-10-11. Asked: *"(make it reusable) as all
+   * chat ui elements"*, *"make it a kit page too and keep it update while we
+   * work on chat for chat components"*. Every piece is `demo/shell/chat-ui.mjs`,
+   * the module the /concepts/room/ pages draw their chat with. Nothing here is
+   * wired to a room: a line you send lands on this page only.
+   * ⚠️ KEEP IT IN STEP: a piece added to chat-ui.mjs gets a block here, newest
+   * first, and a row in demo/shell/kit-parts.mjs.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'chat',
+    what: 'The pieces a chat page is drawn with, a window, columns, a log, a sign and a compose box.',
+  });
+  const now = Date.now();
+  const SAMPLE = [
+    { who: 'web-2qm', at: now - 180000, text: 'Is the Pi up today?' },
+    { who: 'web-7zd', at: now - 120000, text: 'It answered a minute ago. Yoshimi is loaded.' },
+    { who: 'you', at: now - 60000, text: 'Good. Patching the keys to it now.', me: true },
+  ];
+
+  // the blocks, newest first
+  let win = null, winLog = null, winSign = null;
+  section('CHAT WINDOW',
+    'The kit video panel with the chat as its picture: one column full width, or a broadcast column and a chat a third wide; a phone stacks the two.',
+    `createChatWindow({ columns: [castCol, chatCol], footer: joinRow })
+  -> { el, panel, grid }`,
+    (box) => {
+      winSign = createChatSign();
+      winSign.add({ text: 'Doors open at eight\nStream at nine' });
+      const castBox = createChatCompose({ placeholder: 'Broadcast to everybody in the room', onSend: (t) => winSign.add({ text: t }) });
+      winLog = createChatLog();
+      for (const r of SAMPLE) winLog.add(r);
+      const chatBox = createChatCompose({ placeholder: 'Message chat-1', onSend: (t) => winLog.add({ who: 'you', at: Date.now(), text: t, me: true }) });
+      const cast = createChatColumn({ title: 'BROADCAST, YOU ARE ADMIN', body: winSign, compose: castBox, ink: '#c39af0' });
+      const chat = createChatColumn({ title: 'CHAT', body: winLog, compose: chatBox });
+      const foot = createButtonGroup({ buttons: [{ id: 'join', label: 'Join chat-1' }] });
+      foot.enable('join', false, 'a specimen, nothing to join');
+      win = createChatWindow({ columns: [cast, chat], footer: foot.el });
+      castBox.enable(true); chatBox.enable(true);
+      win.el.classList.add('kc-full');
+      box.append(win.el);
+    });
+
+  section('CHAT COLUMN',
+    'A heading, a body and an optional compose box; ink colours your own name and the box focus edge.',
+    `createChatColumn({ title: 'CHAT', body: log, compose: box, ink: '#c39af0' })
+  -> { el, title('BROADCAST FROM WEB-2QM') }`,
+    (box) => {
+      const log = createChatLog();
+      log.add({ who: 'you as admin', at: now, text: 'A column in the admin violet.', me: true });
+      const c = createChatColumn({ title: 'BROADCAST', body: log, ink: '#c39af0' });
+      c.el.classList.add('kc-tall');
+      box.append(c.el);
+    });
+
+  section('CHAT SIGN',
+    'One line on show, a new one replacing it: centred both ways, balanced, at most 32 characters and 70 per cent of the area a line, newlines kept, in the brand face.',
+    `createChatSign() -> { el, add({ text }), clear(), text() }`,
+    (box) => {
+      const s = createChatSign();
+      s.add({ text: 'What is this world here?' });
+      const host = el('div', 'kc-tall');
+      host.append(s.el);
+      box.append(host);
+    });
+
+  section('CHAT LOG',
+    'Lines with who and when, newest at the bottom, your own name in the column ink, scrolling inside itself.',
+    `createChatLog() -> { el, add({ who, at, text, me }), clear() }`,
+    (box) => {
+      const log = createChatLog();
+      for (const r of SAMPLE) log.add(r);
+      const host = el('div', 'kc-tall');
+      host.append(log.el);
+      box.append(host);
+    });
+
+  section('CHAT COMPOSE',
+    'Grows to six lines, Enter sends, Shift and Enter is a new line, the send icon in its bottom right; hidden and off until enabled, so a page shows no box before Join.',
+    `createChatCompose({ placeholder, onSend }) -> { el, input, enable(true), enabled() }`,
+    (box) => {
+      const sent = createChatLog();
+      const c = createChatCompose({ placeholder: 'Type and press Enter', onSend: (t) => sent.add({ who: 'you', at: Date.now(), text: t, me: true }) });
+      c.enable(true);
+      const host = el('div', 'kc-tall');
+      host.append(sent.el, c.el);
+      box.append(host);
+    });
+
+  land();
+
+  if (SELFCHECK) {
+    const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    await frames(3);
+    checkPage();
+    const ta = win.el.querySelectorAll('textarea');
+    d.assert('the window holds two columns, each with a compose box that grew to its text',
+      ta.length === 2 && [...ta].every((t) => t.getBoundingClientRect().height >= 30),
+      [...ta].map((t) => `${t.getBoundingClientRect().height.toFixed(0)} px`).join(', '));
+    const hidden = createChatCompose({ placeholder: 'x', onSend: () => {} });
+    document.body.append(hidden.el);
+    d.assert('a compose box is hidden until it is enabled',
+      getComputedStyle(hidden.el).display === 'none', getComputedStyle(hidden.el).display);
+    hidden.el.remove();
+  }
+  d.ready();
+</script>
+</html>

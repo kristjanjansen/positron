@@ -86,6 +86,12 @@ export const KIT_PARTS = [
   { part: 'icons', label: 'ICONS', ids: [
     'icon-button', 'sample-sheet', 'sizes', 'in-a-button', 'colour',
   ] },
+  // ⚠️ `chat` IS THE TWELFTH, 2026-10-11 (*"make it a kit page too and keep it
+  // update while we work on chat for chat components"*): demo/shell/chat-ui.mjs,
+  // the pieces the /concepts/room/ pages draw their chat with.
+  { part: 'chat', label: 'CHAT', ids: [
+    'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
+  ] },
 ];
 
 export const idFor = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

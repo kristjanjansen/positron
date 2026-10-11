@@ -976,6 +976,11 @@ export const DEMOS = [
   { name: 'kit/icons', title: 'icons', group: 'kit', act: 0, created: '2026-10-10', built: true, unlisted: true,
     one: 'every icon the kit can draw, from the Feather set in the colour of the text around it',
     tags: ['shell', 'no network'] },
+  // The twelfth part, 2026-10-11: *"make it a kit page too and keep it update
+  // while we work on chat for chat components"*.
+  { name: 'kit/chat', title: 'chat', group: 'kit', act: 0, created: '2026-10-11', built: true, unlisted: true,
+    one: 'the pieces a chat page is drawn with, a window, columns, a log, a sign and a compose box',
+    tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
   // title is on footer on 1/2 w it replaces page count and becomes link to

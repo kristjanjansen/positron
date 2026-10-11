@@ -14,57 +14,14 @@
      030 room wiring"*: room/030's chat, notice, admin and store links, without
      its camera. */
 
-  /* Two regions on one surface, the seam is the ground between them. The
-     members chat is the right third. */
-  .rc { position: absolute; inset: 0; display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-        gap: 1px; background: var(--line); }
-  .rc > * { min-width: 0; min-height: 0; background: var(--card); display: flex; flex-direction: column; }
-  .rc-h { margin: 0; padding: 12px 16px 0; }
-
-  .rc-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto;
-             display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 14px; }
-  .rc-msgs > :first-child { margin-top: auto; }
-  .rc-msg { display: flex; flex-direction: column; gap: 3px; }
-  .rc-msg-h { display: flex; gap: 10px; align-items: baseline; }
-  .rc-who { font: 500 12px/1.3 var(--mono); color: var(--fg); }
-  .rc-when { font: 400 11px/1.3 var(--mono); color: var(--dim2); }
-  .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
-             overflow-wrap: anywhere; white-space: pre-wrap; }
-  .rc-msg.me .rc-who { color: var(--hi); }
-  /* The broadcast column has a colour of its own, so the admin's voice is not
-     the chat's (asked 2026-10-11, *"Add different color to left char focus
-     color and you string, add "you as admin""*): its own name and the
-     composer's focus edge. `--admin` is the program violet from the medium
-     palette. The focus rule matches shell.css's (0,1,1) with a class and wins. */
-  .rc-left { --admin: #c39af0; }
-  .rc-left .rc-msg.me .rc-who { color: var(--admin); }
-  .rc-left .pos-field textarea:focus-visible { border-color: var(--admin); }
-  /* A broadcast reads louder than a chat line. */
-  .rc-cast .rc-text { color: var(--fg); font-size: 15px; }
-
-  .rc-compose { position: relative; padding: 10px 12px 12px; }
-  .rc-compose[hidden] { display: none; }
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs (asked 2026-10-11,
+     *"(make it reusable) as all chat ui elements"*). Only the footer row is the page's. */
   .rc-foot { display: flex; gap: var(--ctl-gap, 8px); }
-  .rc-compose .pos-field { display: block; margin: 0; }
-  /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
-  .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
-                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
-  .rc-send { position: absolute; right: 18px; bottom: 18px; }
-
-  /* A phone puts the broadcast above the chat, each half the stage; a desk
-     keeps the two columns. After the base rules, so it wins on order. */
-  @media (max-width: 560px) {
-    .rc-panel .pos-vp-stage { --vp-aspect: 3 / 5; }
-    .rc { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
-  }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createChatLog, createChatSign, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
@@ -170,9 +127,8 @@
       node.setGraphs([selfGraph()], [STORE]);
       d.log(admin ? 'you were first in the room, so you are admin and may broadcast' : `${first} is admin now`);
     }
-    castBox.el.hidden = !admin;
     castBox.enable(admin);
-    castHead.textContent = admin ? 'BROADCAST, YOU ARE ADMIN' : adminSite ? `BROADCAST FROM ${adminSite.toUpperCase()}` : 'BROADCAST';
+    castCol.title(admin ? 'BROADCAST, YOU ARE ADMIN' : adminSite ? `BROADCAST FROM ${adminSite.toUpperCase()}` : 'BROADCAST');
     pb?.refresh();
   }
 
@@ -180,22 +136,10 @@
   const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
   const short = (site) => (site === SITE ? 'you' : site === 'cf-store' ? 'CF Store' : site);
 
-  function column(cls) {
-    const list = el('div', `rc-msgs ${cls}`);
-    return {
-      el: list,
-      add({ who, at, text, me = false }) {
-        const m = el('div', `rc-msg${me ? ' me' : ''}`);
-        const h = el('div', 'rc-msg-h');
-        h.append(el('span', 'rc-who', who), el('span', 'rc-when', clock(at)));
-        m.append(h, el('p', 'rc-text', text));
-        list.append(m);
-        list.scrollTop = list.scrollHeight;
-      },
-    };
-  }
-  const casts = column('rc-cast');
-  const chats = column('');
+  // The broadcast area is one broadcast on show, a sign (asked 2026-10-11,
+  // *"copy broadcast message rendering to 003"*); the chat is a log.
+  const casts = createChatSign();
+  const chats = createChatLog();
 
   // Called by the bay, only along a link this tab holds. A line out of the
   // store carries who first said it as `speaker`, and each port takes its own kind.
@@ -246,70 +190,18 @@
     casts.add({ who: 'you as admin', at: Date.now(), text, me: true });
   }
 
-  /** The compose box from room/001: grows to six lines, Enter sends, Shift
-      and Enter is a new line, the send icon in its bottom right. */
-  function compose(onSend, placeholder) {
-    const wrap = el('div', 'rc-compose');
-    const field = createField({ rows: 2, placeholder: `Join ${ROOM} to write` });
-    const ta = field.input;
-    ta.rows = 1;
-    ta.setAttribute('aria-label', placeholder);
-    const grow = () => {
-      ta.style.height = 'auto';
-      ta.style.height = `${ta.scrollHeight + 2}px`;
-      ta.style.overflowY = ta.scrollHeight > ta.clientHeight + 2 ? 'auto' : 'hidden';
-    };
-    const b = createIconButton({ icon: 'send', label: 'Send', small: true, onPress: () => send() });
-    b.el.classList.add('rc-send');
-    const send = () => {
-      const text = ta.value.trim();
-      if (!text || ta.disabled) return;
-      onSend(text);
-      field.set('');
-      grow();
-      ta.focus();
-    };
-    ta.addEventListener('input', grow);
-    ta.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
-    });
-    let on = null;
-    const enable = (v) => {
-      if (v === on) return;
-      on = v;
-      field.disabled(!v);
-      b.el.disabled = !v;
-      ta.placeholder = v ? placeholder : `Join ${ROOM} to write`;
-      // No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*).
-      wrap.hidden = !v;
-      // A box that was hidden measured 0 tall, so it measures again once it
-      // shows (the broadcast box opened squashed to a sliver, 2026-10-11).
-      requestAnimationFrame(grow);
-      if (v) ta.focus();
-    };
-    enable(false);
-    wrap.append(field.el, b.el);
-    requestAnimationFrame(grow);
-    return { el: wrap, enable };
-  }
 
-  // Left: the broadcast. Only the admin has a composer.
-  const castHead = el('h3', 'pos-sec-h rc-h', 'BROADCAST');
-  const castBox = compose(cast, 'Broadcast to everybody in the room');
-  castBox.el.hidden = true;
-  const left = el('div', 'rc-left');
-  left.append(castHead, casts.el, castBox.el);
+  // Left: the broadcast, in the admin's violet. Only the admin has a composer.
+  const castBox = createChatCompose({ placeholder: 'Broadcast to everybody in the room', onSend: cast });
+  const castCol = createChatColumn({ title: 'BROADCAST', body: casts, compose: castBox, ink: '#c39af0' });
   // Right: the members chat, everybody writes.
-  const chatBox = compose(say, `Message ${ROOM}`);
-  const right = el('div', 'rc-right');
-  right.append(el('h3', 'pos-sec-h rc-h', 'CHAT'), chats.el, chatBox.el);
-  const chat = el('div', 'rc');
-  chat.append(left, right);
+  const chatBox = createChatCompose({ placeholder: `Message ${ROOM}`, onSend: say });
+  const chatCol = createChatColumn({ title: 'CHAT', body: chats, compose: chatBox });
 
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
   // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*):
   // the store forgets the room, and every tab in it empties both columns.
-  function wipe() { casts.el.replaceChildren(); chats.el.replaceChildren(); }
+  function wipe() { casts.el.replaceChildren(); chats.clear(); }
   async function clearAll() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
@@ -322,9 +214,7 @@
   clear.enable('clear', false, 'join the room first');
   const foot = el('div', 'rc-foot');
   foot.append(join.el, clear.el);
-  const panel = createVideoPanel({ left: foot, fullMode: 'footer' });
-  panel.el.classList.add('rc-panel');
-  panel.stage.append(chat);
+  const panel = createChatWindow({ columns: [castCol, chatCol], footer: foot });
 
   // ── the patchbay: the links this tab holds, read from bay() ──────────────
   pb = createPatchbay(heldPicture(bay, SITE), {
