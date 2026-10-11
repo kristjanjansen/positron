@@ -144,10 +144,17 @@
   // plans/plan-circuit-patches.md §5) and shows its name.
   let patchAt = null, patchName = '', nameReads = 0, nameMisses = 0, lastDump = null;
   let nameBusy = false, nameAgain = false;
+  // Every name the Circuit has sent, by slot, so a patch shows its name the
+  // moment it is picked once it has been read. Kept for the page's life only:
+  // a name is only ever learned by selecting that patch.
+  const names = new Map();
+  let stale = 0;
+  const same = (a, b) => !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
   // 📄 Programmer's Reference Guide 1.3 p13, nine bytes, location 00 is Synth 1.
   const DUMP_REQUEST = Object.freeze([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, CH - 1, 0xF7]);
   function showName(text) { patchName = text; patchPick.show(text, patchAt ?? undefined); }
-  async function askName() {
+  async function askName(tries = 0) {
+    const asked = patchAt;
     // Byte 6 is read before anything is sent: 0x40 is the dump request, and 00
     // and 01 are the two messages that replace a patch.
     if (DUMP_REQUEST.length !== 9 || DUMP_REQUEST[6] !== 0x40) { d.log('the patch request is not the nine byte dump request, so it was not sent', 'warn'); return; }
@@ -159,8 +166,21 @@
     try { p = readPatch(Uint8Array.from(r.bytes)); }
     catch (e) { nameMisses++; showName(''); d.log(`The Circuit's answer did not read as a patch, ${e.message}`, 'warn'); return; }
     if (p.command !== 0x00 || p.writesFlash || p.slot !== CH - 1) { nameMisses++; showName(''); d.log(`The answer was ${p.commandName} for ${p.slotName}, not Synth 1's patch`, 'warn'); return; }
-    lastDump = { bytes: [...p.bytes], name: p.name };
+    // The Circuit can answer before the program change has landed, with the
+    // patch it held before. An answer byte for byte the last one, right after
+    // a change, is asked again, up to three times 60 ms apart. Two slots can
+    // hold the same patch (an initial patch copied about), so after that it is
+    // believed.
+    if (asked !== lastDump?.at && same(p.bytes, lastDump?.bytes) && tries < 3) {
+      stale++;
+      await wait(60);
+      if (armed && patchAt === asked) return askName(tries + 1);
+      return;
+    }
+    lastDump = { bytes: [...p.bytes], name: p.name, at: asked };
     nameReads++;
+    if (asked != null) names.set(asked, p.name);
+    if (patchAt !== asked) return;
     showName(p.name);
     d.log(`Synth 1 holds ${p.name ? `"${p.name}"` : 'a patch with no name'}`);
   }
@@ -174,7 +194,9 @@
   }
   function pickPatch(i) {
     patchAt = i;
-    patchPick.show(PATCHES[i], i);
+    // A name read before shows at once; a patch not seen yet shows its number
+    // until the Circuit answers.
+    patchPick.show(names.has(i) ? names.get(i) : PATCHES[i], i);
     bay.send(id('patch', 'midi-out'), { cls: 'program', ch: CH, d1: i });
     // The guide: wait for the patch to load (10 ms is plenty) and leave 20 ms
     // between consecutive messages.
@@ -271,7 +293,7 @@
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
     armed, level, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
-    patchAt, patchName, nameReads, nameMisses, lastDump, shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
+    patchAt, patchName, nameReads, nameMisses, lastDump, stale, names: () => Object.fromEntries(names), shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
   });
   d.ready();

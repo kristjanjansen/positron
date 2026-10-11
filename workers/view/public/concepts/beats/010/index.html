@@ -16,6 +16,15 @@
      its own margin, border and corner, and its always-empty caption takes no room. */
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
+  /* The keyboard sits in the panel's stage, so the panel is its box: the
+     keyboard's own border, ground and margins come off, and so does the gap
+     its pad row would have needed (this keyboard has no pad row). */
+  .cc-kb-host .kbd { border: 0; background: transparent; margin: 0; }
+  .cc-kb-host .kbd .keys { margin-bottom: 0; }
+  /* The key's notes are rings, the kit's `ai` lamp, in the foreground ink
+     rather than the proposal lilac: a ring is a note you could play, and
+     playing it fills it. */
+  .cc-kb-host .k.ai .kd::after { box-shadow: inset 0 0 0 1px var(--fg); }
   /* Play on its own row: the button's own size, at the left. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
@@ -31,6 +40,7 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createCheck } from '/shell/check.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   // concepts beats/010, KEY, 2026-10-11. /concepts/beats/005/ with the tempo
@@ -71,6 +81,8 @@
   const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const KEY_IN = `${S}:key:audio-in`, KEY_EV = `${S}:key:value-out`;
   const DISPLAY_IN = `${S}:display:value-in`;
+  const KEYS_OUT = `${S}:keys:midi-out`, AUTO_OUT = `${S}:auto:midi-out`;
+  const PAD_IN = `${S}:pad:midi-in`, PAD_OUT = `${S}:pad:audio-out`;
 
   // ── the bay ─────────────────────────────────────────────────────────────
   // A live station is AUDIO all the way: the station's site into the relay,
@@ -97,6 +109,14 @@
   // port. The detector never touches the picture.
   bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'keyboard', place: 'browser' });
   bay.addPort({ id: DISPLAY_IN, label: 'keyboard', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
+  // The keys and autoplay both play the pad synth, which sounds on the speakers.
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keys', place: 'browser' });
+  bay.addPort({ id: KEYS_OUT, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+  bay.addNode({ id: `${S}:auto`, kind: 'engine', label: 'autoplay', place: 'browser' });
+  bay.addPort({ id: AUTO_OUT, label: 'autoplay', dir: 'out', medium: 'midi', emits: ['note'] });
+  bay.addNode({ id: `${S}:pad`, kind: 'engine', label: 'pad synth', place: 'browser' });
+  bay.addPort({ id: PAD_IN, label: 'pad synth', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (ev) => padEvent(ev) });
+  bay.addPort({ id: PAD_OUT, label: 'pad synth', dir: 'out', medium: 'audio' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
@@ -126,6 +146,9 @@
   hold(PLAYER_OUT, KEY_IN);
   hold(PLAYER_OUT, SPEAKER_IN);
   hold(KEY_EV, DISPLAY_IN);
+  hold(KEYS_OUT, PAD_IN);
+  hold(AUTO_OUT, PAD_IN);
+  hold(PAD_OUT, SPEAKER_IN);
 
   // ── the sound ───────────────────────────────────────────────────────────
   let ctx = null, pull = null, out = null, tap = null, tapBuf = null;
@@ -160,25 +183,114 @@
   }
   const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
 
-  // The key on the kit keyboard: one octave, C to B, nothing to press. The
-  // seven notes of the detected key are lit grey (the keyboard's `hint`, a
-  // note that could sound) and its home note in the accent. The footer names
-  // the key.
+  // The key on the kit keyboard, two octaves from C3, which fill the panel
+  // without stretching a key. The seven notes of the detected key are rings
+  // and the home note a ring with a grey dot in it; a note that sounds, from a
+  // finger or from autoplay, fills its ring in the accent.
+  const KB_BASE = 48, KB_SPAN = 23;
   const kbHost = el('div', 'cc-kb-host');
-  const kb = createKeyboard(kbHost, { ...keyRange(11), base: 60, letters: false, pad: false, chord: false, full: true });
+  const kb = createKeyboard(kbHost, { ...keyRange(KB_SPAN), base: KB_BASE, letters: false, pad: false, chord: false, full: true,
+    onDown: (note) => bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: note, d2: 90 }),
+    onUp: (note) => bay.send(KEYS_OUT, { cls: 'note', ch: 1, d1: note, d2: 0 }) });
   let lit = [];                    // [note, who] currently painted
   function paintKey(r) {
     for (const [n, who] of lit) kb.lightNote(n, false, who);
     lit = [];
     if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
-    for (const deg of KEY_SCALE[r.mode]) {
-      const n = 60 + ((r.tonic + deg) % 12), who = deg === 0 ? 'self' : 'hint';
-      kb.lightNote(n, true, who); lit.push([n, who]);
+    for (let n = KB_BASE; n <= KB_BASE + KB_SPAN; n++) {
+      const deg = (n - r.tonic + 120) % 12;
+      if (!KEY_SCALE[r.mode].includes(deg)) continue;
+      kb.lightNote(n, true, 'ai'); lit.push([n, 'ai']);
+      if (deg === 0) { kb.lightNote(n, true, 'hint'); lit.push([n, 'hint']); }
     }
   }
-  const keyPanel = createVideoPanel({ media: kbHost, aspect: 'auto', right: false,
+  const auto = createCheck({ label: 'Autoplay', title: 'chords in the detected key on the pad synth', onChange: (on) => autoSet(on) });
+  const keyPanel = createVideoPanel({ media: kbHost, aspect: 'auto', right: auto.el,
     left: el('span', 'cc-say', 'key'),
     values: [{ key: 'key', reserve: 8 }, { key: 'conf', label: 'confidence', reserve: 4 }, { key: 'also', label: 'also', reserve: 18 }] });
+
+  // ── the pad synth ───────────────────────────────────────────────────────
+  // Two saws a few cents apart and a sine an octave down, through a soft
+  // lowpass, with a slow swell and a long release. One voice per note.
+  const PAD = { attack: 0.35, release: 1.4, cutoff: 1400, level: 0.12 };
+  let padBus = null;
+  const voices = new Map();
+  function sound() {
+    ctx ??= new AudioContext();
+    ctx.resume();
+    if (!padBus) { padBus = ctx.createGain(); padBus.gain.value = PAD.level; padRoute(); }
+    return ctx;
+  }
+  function padRoute() {
+    if (!padBus) return;
+    try { padBus.disconnect(); } catch { /* not connected */ }
+    if (holds(PAD_OUT, SPEAKER_IN)) padBus.connect(ctx.destination);
+  }
+  function padEvent(ev) {
+    if (ev?.cls !== 'note') return;
+    const on = ev.d2 > 0;
+    kb.lightNote(ev.d1, on);
+    if (on) padOn(ev.d1, ev.d2 / 127); else padOff(ev.d1);
+  }
+  function padOn(note, vel) {
+    sound();
+    padOff(note);
+    const t = ctx.currentTime, f = 440 * 2 ** ((note - 69) / 12);
+    const env = ctx.createGain(); env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(vel, t + PAD.attack);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = PAD.cutoff; lp.Q.value = 0.5;
+    lp.connect(env); env.connect(padBus);
+    const oscs = [['sawtooth', f, -7], ['sawtooth', f, 7], ['sine', f / 2, 0]].map(([type, freq, cents]) => {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = cents;
+      const g = ctx.createGain(); g.gain.value = type === 'sine' ? 0.5 : 0.35;
+      o.connect(g); g.connect(lp); o.start(t); return o;
+    });
+    voices.set(note, { env, oscs });
+  }
+  function padOff(note) {
+    const v = voices.get(note);
+    if (!v) return;
+    voices.delete(note);
+    const t = ctx.currentTime;
+    v.env.gain.cancelScheduledValues(t);
+    v.env.gain.setValueAtTime(v.env.gain.value, t);
+    v.env.gain.linearRampToValueAtTime(0, t + PAD.release);
+    for (const o of v.oscs) o.stop(t + PAD.release + 0.05);
+  }
+
+  // ── autoplay ────────────────────────────────────────────────────────────
+  // While ticked, the pad plays chords in the key the footer names, four
+  // seconds each: the home chord, then the ones built on the sixth, fourth and
+  // fifth notes of the scale, round again. It follows the key when it changes,
+  // and waits silently while there is no key yet.
+  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4;
+  let autoTimer = null, autoAt = 0, autoHeld = [];
+  function autoRelease() {
+    for (const n of autoHeld) bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: 0 });
+    autoHeld = [];
+  }
+  function autoChord() {
+    autoRelease();
+    const r = reading;
+    if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
+    const sc = KEY_SCALE[r.mode], step = AUTO_STEPS[autoAt++ % AUTO_STEPS.length];
+    const root = KB_BASE + r.tonic;
+    for (const k of [step, step + 2, step + 4]) {
+      const n = root + sc[k % 7] + 12 * Math.floor(k / 7);
+      bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: 70 });
+      autoHeld.push(n);
+    }
+  }
+  function autoSet(on) {
+    clearInterval(autoTimer); autoTimer = null;
+    autoRelease();
+    if (!on) { d.log('autoplay off'); return; }
+    sound();
+    autoAt = 0;
+    autoChord();
+    autoTimer = setInterval(autoChord, AUTO_S * 1000);
+    d.log(reading?.v ? `autoplay in ${reading.v}` : 'autoplay waits for a key');
+  }
 
   // What the picture shows is only what arrived on its in-port.
   let reading = null;              // the last event delivered
@@ -186,7 +298,7 @@
     if (ev?.of !== 'param' || ev.name !== 'key' || !Array.isArray(ev.chroma)) return;
     const moved = reading?.v !== ev.v;
     reading = ev;
-    if (moved) paintKey(ev);
+    if (moved) { paintKey(ev); if (autoTimer) { autoAt = 0; autoChord(); } }
     keyPanel.values.set('key', ev.v ?? '');
     keyPanel.values.set('conf', Number.isFinite(ev.confidence) ? ev.confidence.toFixed(2) : '');
     keyPanel.values.set('also', Array.isArray(ev.also) ? ev.also.slice(0, 2).map((k) => k.key).join(', ') : '');
@@ -471,8 +583,7 @@
     // somebody else's too, so under ?selfcheck=1 Play opens nothing, makes no
     // AudioContext and plays nothing.
     if (SELFCHECK) { d.log('a self check is running, so no live stream is opened and nothing plays'); return; }
-    ctx ??= new AudioContext();
-    ctx.resume();
+    sound();
     if (!out) {
       pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       out = ctx.createGain();
@@ -512,6 +623,7 @@
   // Read only, for a check over CDP.
   window.__demo.key = { src: () => srcOf(STATIONS[at]), station: () => STATIONS[at].id, open: () => (leg ? leg.st.id : null),
     live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null, gain: () => (lv ? +lv.g.toFixed(3) : null),
-    levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing };
+    levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing,
+    voices: () => [...voices.keys()], auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
   d.ready();
 </script>
