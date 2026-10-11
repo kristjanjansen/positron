@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept beats 000</title>
+<title>POSITRON concept radio 020</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-say { font-size: 12px; color: var(--dim); }
@@ -40,7 +40,7 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
 
-  // concepts beats/000 (radio/020 until 2026-10-11, *"move radio 020 to beats group into 000"*), TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
+  // concepts radio/020 (beats/000 for an afternoon, 2026-10-11: *"move radio 020 to beats group into 000"*, then *"move beats concepts to radio, rename accordingly"*), TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
   // and of Ida, kept in our own R2 bucket (`positron-station`, read through the station
   // worker's /media/, CORS `*`, as /concepts/sampler/000/ reads its piano),
   // played in this tab into the radio's wave, the speakers and a tempo
@@ -119,8 +119,8 @@
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
-  const d = mount({ name: 'concept beats 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('beats/000');
+  const d = mount({ name: 'concept radio 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('radio/020');
 
   // ── the links, held from load so the picture does not change with play ────
   const held = new Map();

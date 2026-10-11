@@ -1,7 +1,7 @@
-# Beat detection on /concepts/beats/000/, how it works and what is next
+# Beat detection on /concepts/radio/020/, how it works and what is next
 
 Written 2026-10-11, asked *"write these workings to pplan"* after *"what was
-bmp detect fix?"*. The page is `demo/concepts/beats/000/index.html` (it was
+bmp detect fix?"*. The page is `demo/concepts/radio/020/index.html` (it was
 `radio/020` until the same day). The measurements behind it are in
 `research/beat-tracking-2026-10-11.md`, with the scripts in that session's
 scratchpad `beat/` folder.

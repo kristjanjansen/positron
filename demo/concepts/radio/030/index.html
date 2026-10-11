@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept beats 005</title>
+<title>POSITRON concept radio 030</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-say { font-size: 12px; color: var(--dim); }
@@ -42,10 +42,10 @@
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
-  // concepts beats/005, LIVE TEMPO, 2026-10-11. /concepts/beats/000/ with one
+  // concepts radio/030, LIVE TEMPO, 2026-10-11. /concepts/radio/020/ with one
   // thing changed, the source. Asked: *"do beats 005 with live radios"*. The
   // detector, the wave with its beat lines, the tempo scope, the fx box and the
-  // mix knob are beats/000's, line for line. Instead of a recording looped
+  // mix knob are radio/020's, line for line. Instead of a recording looped
   // from our bucket, the station plays LIVE through our own relay
   // (`cf-shout`, the positron-shout worker, which holds ONE upstream connection
   // per mount however many tabs listen), read with the kit's createMp3Stream
@@ -81,7 +81,7 @@
   // the page reads the relay.
   const STATION_OUT = (st) => `${st.site}:${st.node}:audio-out`;
   const RELAY_IN = (st) => `cf-shout:${st.mount}:audio-in`, RELAY_OUT = (st) => `cf-shout:${st.mount}:audio-out`;
-  // The level node takes the place of beats/000's player: the live sound comes
+  // The level node takes the place of radio/020's player: the live sound comes
   // in, is raised to one loudness, and feeds the wave, the detector and the fx.
   const PLAYER_IN = `${S}:level:audio-in`, PLAYER_OUT = `${S}:level:audio-out`;
   const WAVE_IN = `${S}:wave:audio-in`, WAVE_BEATS = `${S}:wave:value-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
@@ -131,8 +131,8 @@
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
-  const d = mount({ name: 'concept beats 005', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('beats/005');
+  const d = mount({ name: 'concept radio 030', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('radio/030');
 
   // ── the links, held from load so the picture does not change with play ────
   // Holding a link opens nothing. A link out of an `external` node is refused
@@ -554,7 +554,7 @@
   }
 
   // ── the level: one gain per station, from a running RMS ──────────────────
-  // beats/000 levels each recording as it is decoded, per 1 s block, toward
+  // radio/020 levels each recording as it is decoded, per 1 s block, toward
   // -16 dB RMS, raise only, up to 36 dB, then a tanh knee. A live stream has no
   // whole file to measure ahead of, so here the gain follows the sound as it
   // arrives. MEASURED on the captures (the session, 2026-10-11): Ida is music
@@ -567,13 +567,13 @@
   // read every LEVEL_READ_MS, followed twice, slowly over LEVEL_SLOW_S and fast
   // over LEVEL_FAST_S. The louder of the two sets the target LEVEL_RMS / rms,
   // never under 1 (raise only, a loud station is left alone) and never over
-  // LEVEL_MAX (36 dB, as beats/000). The gain falls to a lower target fast
+  // LEVEL_MAX (36 dB, as radio/020). The gain falls to a lower target fast
   // (LEVEL_DOWN_S) and rises to a higher one slowly (LEVEL_UP_S), so it never
   // rises into a loud stretch and it never pumps on a single drum hit. Under
   // LEVEL_FLOOR (a gap, a silence) it holds, so a pause is not raised into
   // hiss. A DynamicsCompressor set as a limiter after the gain takes what gets
   // over the top in the moment before the gain has come down, which is the
-  // tanh knee's job in beats/000. Each station keeps its gain, so coming back to
+  // tanh knee's job in radio/020. Each station keeps its gain, so coming back to
   // Ida starts where Ida was. The detector hears the levelled sound too.
   // ⚠️ The limiter delays everything after it by its few ms of look-ahead,
   // the detector and the speakers alike, so they stay in step with each other.
