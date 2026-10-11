@@ -44,10 +44,10 @@
     }
     return grids.get(group);
   };
-  CONCEPTS.forEach(({ title, say, n, group = 'misc' }, i) => {
-    // A row may name its page number, so a new topic can start at 10.
-    const a = el('a', 'cc-card', '', { href: `/concepts/${n ?? i + 1}/` });
-    const num = n ?? i + 1;
+  CONCEPTS.forEach(({ title, say, n }) => {
+    // `n` is `<group>/<number>`, the page's folder and URL.
+    const [group, num] = n.split('/');
+    const a = el('a', 'cc-card', '', { href: `/concepts/${n}/` });
     const h = el('h3', 'cc-t');
     h.append(el('span', 'cc-n', String(num)), document.createTextNode(title));
     a.append(h);
