@@ -8,19 +8,22 @@
 <title>POSITRON concept synth 070</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* Play at the left end, the patch selector at the right end, two children
-     so a phone wraps them into two left-aligned lines. No status label: what
-     the board says goes to the log (060's rule, asked 2026-10-11). */
-  .cc-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  /* Play alone at the top left. No status label: what the board says goes to
+     the log (060's rule, asked 2026-10-11). */
+  .cc-top { display: flex; align-items: center; gap: 12px; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
+  /* The patch selector is a full width block under the scope (asked
+     2026-10-11, *"patch selctor is full w blokc under scope"*): the name cell
+     takes the width between the two arrows. (0,2,0) beats the cell's own width. */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createKnob } from '/shell/knob.mjs';
-  import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPicker } from '/shell/picker.mjs';
@@ -30,7 +33,7 @@
   import { createLease } from '/shell/openers.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
-  // The keyboard, two knobs and a patch selector playing the Novation Circuit
+  // The keyboard and a patch selector playing the Novation Circuit
   // that is plugged into the Raspberry Pi, the way /away/ reaches it: the Pi
   // carries the Circuit as an input in a room of its own (`studio-1-circuit`),
   // takes MIDI bytes there through its gate (rig/board/inputs.mjs `midiVerdict`)
@@ -55,13 +58,6 @@
   // Synth 1 is channel 1 (plans/plan-circuit-model12.md §3.1). The gate allows
   // program change on 1 and 2 only, patches 0 to 63.
   const CH = 1;
-  // From demo/shell/circuit-cc.mjs, Synth 1 & 2 filter: 74 frequency, 71
-  // resonance. A knob sends only when it is turned, so a patch keeps its own
-  // filter until somebody moves one.
-  const KNOBS = [
-    { name: 'cutoff', label: 'cutoff', cc: 74 },
-    { name: 'resonance', label: 'reso', cc: 71 },
-  ];
   // Nothing on this desk carries the Circuit's patch names as data, so a patch
   // is its number (as on /away/).
   const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
@@ -74,7 +70,6 @@
   const CIRCUIT_IN = boardPort(INPUT, 'midi-in'), CIRCUIT_AUDIO = boardPort(INPUT, 'audio-out');
   const bay = createBay();
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  for (const k of KNOBS) bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: `knob CC ${k.cc}`, place: 'browser' });
   bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
   bay.addNode({ id: `${BOARD_SITE}:${INPUT}`, kind: 'device', label: 'Circuit on the Pi', place: ROOM });
   bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
@@ -104,7 +99,6 @@
   }
   const PORTS = [
     { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    ...KNOBS.map((k) => ({ id: id(`knob-${k.name}`, 'midi-out'), dir: 'out', medium: 'midi', emits: ['cc'] })),
     { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
     { id: CIRCUIT_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toCircuit },
     { id: CIRCUIT_AUDIO, dir: 'out', medium: 'audio' },
@@ -114,7 +108,6 @@
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
   const LINKS = [
     [id('keys', 'midi-out'), CIRCUIT_IN],
-    ...KNOBS.map((k) => [id(`knob-${k.name}`, 'midi-out'), CIRCUIT_IN]),
     [id('patch', 'midi-out'), CIRCUIT_IN],
     [CIRCUIT_AUDIO, id('scope', 'audio-in')],
     [CIRCUIT_AUDIO, id('speaker', 'audio-in')],
@@ -141,18 +134,6 @@
     requestAnimationFrame(frame);
   }
 
-  // ── the knobs, each its own node ─────────────────────────────────────────
-  const knobs = new Map();
-  for (const k of KNOBS) {
-    const out = id(`knob-${k.name}`, 'midi-out');
-    knobs.set(k.name, createKnob({
-      label: k.label, min: 0, max: 127, step: 1, value: 64, home: 64, hand: true,
-      onInput: (v) => bay.send(out, { cls: 'cc', ch: CH, d1: k.cc, d2: Math.round(v) }),
-      onChange: (v) => bay.send(out, { cls: 'cc', ch: CH, d1: k.cc, d2: Math.round(v), end: true }),
-    }));
-  }
-  const grid = createKnobGrid(knobs, { row: true });
-
   // ── the patch selector, its own node ─────────────────────────────────────
   // It opens empty: nothing says which patch the Circuit is on, so it shows
   // what this page last sent.
@@ -163,7 +144,7 @@
     bay.send(id('patch', 'midi-out'), { cls: 'program', ch: CH, d1: i });
   }
   const step = (by) => pickPatch(patchAt == null ? (by > 0 ? 0 : PATCHES.length - 1) : (patchAt + by + PATCHES.length) % PATCHES.length);
-  const patchPick = createPicker({ what: 'patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pickPatch(i) });
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pickPatch(i) });
   patchPick.options(PATCHES, 0);
   patchPick.show('');
   patchPick.disabled(true);
@@ -214,7 +195,7 @@
       }
       if (!MAY_PLAY) { say('A check is running, so nothing was sent to the Circuit. Add ?board=1 to let it through', 'warn'); return; }
       const st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
-      if (!st) { say(`The Raspberry Pi is not answering in ${INPUT_ROOM}, so the keys and knobs go nowhere`, 'warn'); return; }
+      if (!st) { say(`The Raspberry Pi is not answering in ${INPUT_ROOM}, so the keys go nowhere`, 'warn'); return; }
       lease = createLease({ ask: (m, r, t) => board.ask(m, r, t), what: 'the Circuit capture', log: (line, kind) => d.log(line, kind) });
       armed = true;
       patchPick.disabled(false);
@@ -246,8 +227,8 @@
   setInterval(() => pb.refresh?.(), 500);
 
   const top = el('div', 'cc-top');
-  top.append(transport.el, patchPick.el);
-  d.stack.add(top, wave.el, grid.el, host, pb.el);
+  top.append(transport.el);
+  d.stack.add(top, wave.el, patchPick.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
