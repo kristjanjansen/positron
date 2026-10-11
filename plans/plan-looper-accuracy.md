@@ -427,3 +427,64 @@ the thing a player reports as a bug. (PROPOSED)
 - **Product behaviour not found in documents**: Elektron, Pigtronix, Ditto and
   Line 6 at the record edges; MPC's retrospective buffer length; whether
   Bitwig has added MIDI capture since 4.1.
+
+## 9. The owner's first Copy log, 2026-10-11 17:12 (MEASURED)
+
+One session, about 200 s on the MK-425C: 55 pedal messages, several hundred notes,
+15 takes or attempts. Device timestamps (`sent`) used throughout.
+
+### The keys are NOT on the pedal's grid
+- Pedal, 55 messages: best period **65.93 ms**, phase lock **0.82** (the
+  same scan as the first run; lower than 0.997 only because 200 s of a tiny
+  period error drifts the phase).
+- Notes, 57 note-ons: phase lock **0.21** at the best period in 65.5 to 66.5,
+  which is no lock. Chord notes arrive **0.2 to 5 ms** apart (37455.4 and
+  37455.7; 42677.8 and 42678.0). **So the keys are timed to about a
+  millisecond and only the pedal is coarse. Section 2.3, length from notes,
+  is worth building.**
+
+### Where the notes fell against the presses
+| take | start press | the chord he meant to start on | close press | the chord he meant to end on |
+| --- | --- | --- | --- | --- |
+| 39038.8 | | 20 ms AFTER, kept | 43261.2 | 337 ms before, or 353 after |
+| 64423.9 | | **98 ms BEFORE, lost** (64325.7, 4 notes) | 71942.2 | 143 ms before |
+| 77481.2 | | **88 ms BEFORE, lost** (77393.3, 5 notes) | 80514.9 | 470 ms before |
+| 86056.4 | | **17 to 43 ms BEFORE, lost** (86013.8, 4 notes) | 97073.5 | 146 ms before |
+| 184811.4 | | **23 to 43 ms BEFORE, lost** (184768.3, 4 notes) | 189427.1 | 117 to 137 ms before |
+| 114150.2, 136361.5, 189889.3 | | pressed in a gap, nothing lost | | |
+
+- **Four of the seven real takes lost their opening chord.** It came 17 to
+  98 ms before the reported press: 0 to 66 ms of scan plus the foot. A
+  lookback of 150 ms would have caught all four (W_pre 200 ms as proposed).
+- **Closing presses came 117 to 146 ms after the chord he was closing on**
+  (64423 take: the end chord at 7375 ms of a 7518 ms loop). So today the
+  closing chord is recorded at the very end of the loop and the opening
+  chord is missing: the downbeat replays about 140 ms early and once.
+- Chord to chord, the 64423 take is 71798.8 - 64325.7 = **7473.1 ms**
+  against the pedal's 7518.3: the note-based length differs by 45 ms, inside
+  the proposed TOL of 120 ms.
+
+### Two looper rules hurt this player
+1. **The 1 s hold clear destroyed four takes.** The pedal went down at
+   171160.9, 176369.1 and 178875.3 to START a take and stayed down while he
+   played (2.37, 2.18 and 1.65 s), the way a sustain pedal is held; each time
+   the looper cleared at 1 s. Same at 6892.6 (held 30 s). And at 80713.4 a
+   re-press held 1.45 s cleared the loop he had just closed. **Proposed:
+   never clear while recording; while looping, clear only on a hold with no
+   note played during it.**
+2. **A press while looping throws the loop away and starts a take, and an
+   empty take then replaces it.** 48600.4 to 49787.9 (1.19 s) and 107289.2
+   to 109597.2 (2.31 s) made loops of **0 notes**. **Proposed: a take with no
+   notes keeps the loop that was playing.**
+
+### What worked
+- The spring-back rule caught one real spring back (80713.4, 66.6 ms after a
+  release).
+- Replay timing: 347 replays, lateness median **2.4 ms**, max **8.7 ms**.
+
+### Revised build order
+1. Fix the two rules above (they cost more takes than timing did).
+2. Use the device timestamps in the looper itself.
+3. Rolling buffer and start lookback of 150 to 200 ms (catches all four lost
+   openings here).
+4. Length from notes within TOL 120 ms (keys are millisecond accurate).
