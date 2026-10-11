@@ -7,6 +7,12 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON concept sampler 020</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* the patch picker, full width, as /concepts/sampler/010/ */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+</style>
 <script type="module">
   // concepts sampler/020, LOOPER, 2026-10-11. 000's piano sampler with a MIDI
   // looper between the keys and the sampler. Asked: *"Looper. Triggered from
@@ -52,15 +58,21 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
+  import { createSampler, PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+  import { createPicker } from '/shell/picker.mjs';
 
   const d = mount({ name: 'concept sampler 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('sampler/020');
 
   // ── the sampler ─────────────────────────────────────────────────────────
   let fetchedAt = 0;
+  // Piano and Rhodes, as /concepts/sampler/010/ (asked: *"add rhodes sound too
+  // to looper"*): a `web:patch` node sends a program change straight into the
+  // sampler, so the loop plays back in whichever sound is picked now.
+  const INSTRUMENTS = [PIANO, RHODES];
   const sampler = createSampler({
-    instruments: [PIANO],
+    instruments: INSTRUMENTS,
+    onProgram: (ins) => patchPick?.show(ins.name, INSTRUMENTS.indexOf(ins)),
     log: (line, kind) => d.log(line, kind),
     onFetch: (on) => { if (!on) fetchedAt = performance.now(); },
   });
@@ -324,11 +336,15 @@
   bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  bay.addPort({ id: `${S}:patch:midi-out`, dir: 'out', medium: 'midi', emits: ['program'] });
+  bay.addPort({ id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
   bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
   bay.addPort({ id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => kb.lightNote?.(e.d1, e.d2 > 0) });
   bay.addPort({ id: `${S}:looper:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: looperIn });
   bay.addPort({ id: `${S}:looper:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => sampler.midi(e) });
+  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'program'], deliver: (e) => sampler.midi(e) });
   bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
   bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
   bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
@@ -337,6 +353,8 @@
     [`${S}:keys:midi-out`, `${S}:looper:midi-in`],
     [`${S}:looper:midi-out`, `${S}:sampler:midi-in`],
     [`${CF}:piano:file-out`, `${S}:sampler:file-in`],
+    [`${CF}:rhodes:file-out`, `${S}:sampler:file-in`],
+    [`${S}:patch:midi-out`, `${S}:sampler:midi-in`],
     [`${S}:sampler:audio-out`, `${S}:speaker:audio-in`],
   ]) {
     const r = bay.link(a, b, [], { site: S });
@@ -348,6 +366,13 @@
     return false;
   };
   const pb = createPatchbay(bay, { detail: (n) => [{ text: n.label, sans: true }], flowing });
+
+  // ── the patch ───────────────────────────────────────────────────────────
+  let patchAt = 0;
+  const pick = (i) => { patchAt = i; bay.send(`${S}:patch:midi-out`, { cls: 'program', ch: 1, d1: INSTRUMENTS[i].program }); };
+  const step = (by) => pick((patchAt + by + INSTRUMENTS.length) % INSTRUMENTS.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pick(i) });
+  patchPick.options(INSTRUMENTS.map((x) => x.name), 0);
 
   // ── the keys, on screen and plugged in ───────────────────────────────────
   const host = el('div');
@@ -457,7 +482,7 @@
   }
   const copyBtn = createButtonGroup({ buttons: [{ id: 'copy', label: 'Copy log', onPress: copy }] });
 
-  d.stack.add(surface, host, copyBtn.el, pb.el);
+  d.stack.add(surface, patchPick.el, host, copyBtn.el, pb.el);
   // The strip fits itself to its first width; this window is the empty take's.
   requestAnimationFrame(() => strip.strip.fit(0, VIEW_MS));
   window.__demo.bay = bay;
