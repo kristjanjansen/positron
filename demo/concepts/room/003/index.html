@@ -45,6 +45,7 @@
 
   .rc-compose { position: relative; padding: 10px 12px 12px; }
   .rc-compose[hidden] { display: none; }
+  .rc-foot { display: flex; gap: var(--ctl-gap, 8px); }
   .rc-compose .pos-field { display: block; margin: 0; }
   /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
   .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
@@ -147,11 +148,13 @@
       since = Date.now();
       node.setGraphs([selfGraph()], [STORE]);
       join.enable('join', false, `in ${ROOM}`);
+      clear.enable('clear', true);
       chatBox.enable(true);
       loadHistory();
       decide();
     },
     onGraph: () => decide(),
+    onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
@@ -304,7 +307,22 @@
   chat.append(left, right);
 
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  const panel = createVideoPanel({ left: join.el, fullMode: 'footer' });
+  // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*):
+  // the store forgets the room, and every tab in it empties both columns.
+  function wipe() { casts.el.replaceChildren(); chats.el.replaceChildren(); }
+  async function clearAll() {
+    try {
+      const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
+      d.log(`store cleared ${ROOM}: ${r.status}`);
+    } catch (e) { d.log(`the store did not clear: ${e.message || e}`, 'warn'); }
+    node.send({ type: 'chat.clear' });
+    wipe();
+  }
+  const clear = createButtonGroup({ buttons: [{ id: 'clear', label: 'Clear', onPress: clearAll }] });
+  clear.enable('clear', false, 'join the room first');
+  const foot = el('div', 'rc-foot');
+  foot.append(join.el, clear.el);
+  const panel = createVideoPanel({ left: foot, fullMode: 'footer' });
   panel.el.classList.add('rc-panel');
   panel.stage.append(chat);
 
