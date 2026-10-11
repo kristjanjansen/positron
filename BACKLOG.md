@@ -1,5 +1,5 @@
 ## Open
-- **`beats/005`: musical key detection** (2026-10-11). Asked: *"beats 005 - key detection"*. Background agent; validated offline on the three R2 recordings, no live stream opened by anyone but the owner.
+- ~~**`beats/005`: musical key detection**~~ (2026-10-11, built as `beats/010` Key, live stations, checked against `demo/fake-station.mjs`: decodes, 0 errors, reads the stand-in's E and A tones as A minor at 0.20; never run against ERR). Asked: *"beats 005 - key detection"*. Background agent; validated offline on the three R2 recordings, no live stream opened by anyone but the owner.
 - **`beats/005`: the Tempo page on live radio instead of the recordings** (2026-10-11). Asked: *"do beats 005 with live radios"*. Opens a station through positron-shout ONLY on Play, never on load and never under ?selfcheck=1 (ERR's listener statistics, CLAUDE.md). Background agent.
 - **`radio/020` becomes `beats/000`, a new group; Ida added as a third station** (2026-10-11). Asked: *"add ida"*, *"move radio 020 to beats group into 000"*. Ida captured ONCE, 3 minutes through positron-shout, into R2.
 - **`synth/000`: wire in local MIDI devices when there are any** (2026-10-11). Asked: *"adjust 000 demo when there are local midi devices wire them in"*, *"synth 000"*.

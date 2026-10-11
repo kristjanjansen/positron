@@ -48,4 +48,5 @@ export const CONCEPTS = [
   { n: 'sampler/035', title: 'Pi piano direct', say: 'The same Pi piano over a direct WebRTC path instead of the relay.' },
   { n: 'beats/000', title: 'Tempo', say: 'Recordings of Raadio 2, Raadio 4 and Ida played from our own bucket into a tempo detector.' },
   { n: 'beats/005', title: 'Live tempo', say: 'The same tempo detector listening to live Raadio 2, Raadio 4 and Ida through our relay.' },
+  { n: 'beats/010', title: 'Key', say: 'The live stations into a key detector that names the key they are playing in.' },
 ];
