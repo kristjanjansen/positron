@@ -1,3 +1,54 @@
+# Handoff, 2026-10-11, session 75: looper accuracy, the Pi on direct, concepts reshuffled
+
+## Where it is right now
+
+- **Site: BUILD `c91a423b-182349-a3d3`** (sampler/020 with Rhodes), confirmed on the edge. The owner asked to "deploy now and then" (memory `deploy-often`): deploy at coherent points, not per change.
+- **GitHub:** pushed to `c0189308`; **3 commits ahead** (Rhodes in 020, its build, plan section 11). Push needs the account switch in CLAUDE.md, and switching back.
+- Counted: **58 demos, 57 built**, **108 plans**. Working tree clean. No agent running.
+- **The Pi runs the repo's board code** (pushed this session, md5 checked): the direct WebRTC answer (`node-datachannel`) and the Salamander piano, 208 files fetched from R2 onto its SD card.
+
+## What landed this session
+
+| where | what |
+| --- | --- |
+| `/concepts/radio/020`, `030`, `040` | the beats group moved back into radio (Tempo, Live tempo, Key); `beats/*` URLs 404 |
+| `/concepts/radio/040/` Key | the key on the kit keyboard (grey rings for the key, yellow for the chord autoplay plays or would play, filled only when sounding); a pad (five spread saws, drifting lowpass, high passed, room) and a separate `web:bass`; Autoplay checkbox, CC 11 on channel 2 eased 3 s from the key's confidence; wet/dry `web:mixer`; the station's energy as a value into the pad; every light and ring over a link (one `web:keys` node). Key detector improved by an agent: `plans/plan-key-detection.md` |
+| `/concepts/sampler/020/` Looper | spring back 70 ms, no loop under 0.5 s, hold clear **3 s with no note**, an empty take keeps the playing loop, device timestamps, 2 s buffer and **150 ms start lookback** with the end moved alike and the repeated downbeat dropped at the seam; the plugged-in keyboard as its own `web:midi` device node; Piano and Rhodes (`web:patch`); **Copy log** (every input with the device stamp, every decision, the loop) |
+| `/concepts/sampler/030/` | relay or direct on one page (`?path=direct`); 035 redirects there. MEASURED on the Pi: direct, round trip 3.3 ms |
+| `/concepts/sampler/040/` | the Pi's SuperCollider sampler in the tab (wasm scsynth); compared in `research/scsynth-sampler-in-browser-2026-10-11.md`: same sound, 1.8 MB and about 1 s more to the first note |
+| `/concepts/synth/060`, `070` | four lag cells as sampler/030; 070's scope scales to the Circuit's level; patch names cached per slot |
+| `/concepts/typist/030` Playback (new), `040` Multi typer (was 030) | 030 records one paper in memory on /typist/'s lanes and plays it back with sound, no rate control; 040's typists varied (eraser, concrete poetry, ASCII boat), papers edge to edge, one frame shape at every count (`createChatGrid({ fixed: true })`, the grid has no seam anywhere now) |
+| `/concepts/room/003`, `004` | 003 has no history or store; 004 live does not run on the clock (refits per line, as typist/030); room/010 and 020 removed |
+| `/concepts/misc/000`, `010`, `020` | bay/000, bay/010, tutorial/000 moved into a last misc group |
+| R2 | Salamander `sampler/salamander/web/` (m4a) and `pi/` (flac) uploaded, 420 files; they had never been |
+
+## Plans and research written
+
+- `plans/plan-looper-accuracy.md` with sections 9, 10, 11 from the owner's three Copy logs: the MK-425C scans its pedal every 65.95 ms, the keys are timed to about 1 ms; lookback caught every opening chord (13 to 139 ms early); the 1 s hold clear destroyed loops, 3 s only fired on deliberate holds.
+- `plans/plan-sustain-pedal.md`, `research/sustain-pedal-pressing-2026-10-11.md` section 5.
+- `plans/plan-key-detection.md`, `research/scsynth-sampler-in-browser-2026-10-11.md`.
+
+## Open, asked of the owner
+
+- **Overdub on the looper**: the gesture table is proposed (press while looping overdubs, press again keeps the layer, 3 s hold clears). The third log shows an overdub attempt that replaced a 15 s loop. Waiting for yes.
+- **Start a take at its first note** when it starts more than about 1 s early (design 2.2): proposed twice, not built.
+- **Length from notes** (plan section 2.3, step 5): proposed, not built.
+- room/030 Broadcast: keep or remove (asked, no answer).
+- Warm SuperCollider before the first key on sampler/040 (backlogged, not built).
+- The Rhodes damper tick in `demo/concepts/sampler/sampler.mjs` (ramp instead of stop) and the 250 ms fixed sleep in `demo/shell/scsynth.mjs`.
+- The first key on a fresh sampler page blocks the main thread about 158 ms while the sampler wakes.
+- MIDI device support for the other synth concepts (backlogged).
+- The rest is in `BACKLOG.md` under `## Open`.
+
+## Mistakes worth knowing
+
+- **The Pi ran code four hours old** and sampler/035 never went direct. Compare md5 of `/opt/positron-board/rig/board/*` before believing a page about the Pi.
+- **Encoded samples were never uploaded to R2**; the page 404ed every file. `fetch-salamander.mjs` says the upload is by hand; nothing checked it happened.
+- **A patchbay is only as true as the code that goes through it.** radio/040 lit keys and drew rings by calling the keyboard directly, and sampler/020 folded the MIDI keyboard into the on-screen keys, so the picture showed neither. Everything a page shows should arrive on a link.
+- **A hold-to-clear on a sustain pedal fights how a pianist holds a pedal.** 1 s cleared ten loops across two logs; 3 s and "no note during the hold" cleared none by accident.
+- **zsh does not split an unquoted `$VAR` of paths**; a perl rewrite over `$FILES` touched nothing twice. Use a `while read` loop.
+- **The repo hook refuses `git add -A`**, even with paths; `git mv` already stages, so commit path limited.
+
 # Handoff, 2026-10-11, session 74: the Pi on JACK, typist, chat kit, sampler group, radio tempo
 
 ## Where it is right now
