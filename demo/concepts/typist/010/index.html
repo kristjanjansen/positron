@@ -190,7 +190,10 @@
   function typed(e) {
     if (muted) return;
     const at = performance.now();
-    const go = () => { if (performance.now() - at < LATE) sound(e); else stat.dropped++; };
+    // The press that wakes the typewriter always sounds, however long the
+    // samples took (asked 2026-10-11, *"first typing is not hear"*).
+    const first = !ctx;
+    const go = () => { if (first || performance.now() - at < LATE) sound(e); else stat.dropped++; };
     if (stat.decoded === FILES.length) go();
     else wake().then(go);
   }
