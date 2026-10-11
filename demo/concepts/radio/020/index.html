@@ -185,17 +185,16 @@
   }
 
   // The tempo scope: every reading that arrived on the display's in-port, time
-  // across (the last TEMPO_S seconds, the newest at the right) and bpm up, the
+  // across (the last TEMPO_S seconds, the newest at NOW_AT of the width) and bpm up, the
   // detector's whole range. Asked 2026-10-11: *"show all condidences"*, *"same
   // h as waveform . no horiz grid"*, *"zoom in time, show less hsitoric"* and
   // *"show bpm and conf on all times"*. So nothing is withheld: the chosen
   // tempo is the line, each segment as bright as its confidence, every
-  // candidate the detector weighed is a dot as bright as its score,  the
-  // pointer reads any moment out in full. The labels that rode the line every
-  // LABEL_S seconds came off the same day (*"no need for annotations"*); the
-  // faint lines every LABEL_S seconds stay. The range is the corner
-  // label, not lines. 15 s across is a quarter of the 60 it was.
-  const TEMPO_S = 15, LABEL_S = 5;
+  // candidate the detector weighed is a dot as bright as its score, and the
+  // pointer reads any moment out in full. The labels on the line and the
+  // vertical lines came off the same day (*"no need for annotations"*, *"rm
+  // radio 020 vert line on viz"*). The range is the corner label. 15 s across is a quarter of the 60 it was.
+  const TEMPO_S = 15, NOW_AT = 2 / 3;
   const tempoCanvas = el('canvas', 'cc-tempo');
   const tempoHost = el('div', 'cc-tempo-host');
   tempoHost.append(tempoCanvas);
@@ -407,8 +406,8 @@
     g.globalAlpha = 1;
   }
 
-  // The tempo scope. A faint line every 5 s across and no lines up it. The
-  // range in the top left corner, the time across in the bottom right.
+  // The tempo scope. No grid lines. The range in the top left corner, the
+  // time across beside now.
   let stoppedAt = 0;
   const clock = () => (ctx ? (playing ? ctx.currentTime : stoppedAt) : 0);
   function drawTempo() {
@@ -419,9 +418,11 @@
     const pad = 8 * dpr, top = pad, bot = H - pad;
     const y = (v) => bot - ((v - LO) / (HI - LO)) * (bot - top);
     const now = clock();
-    const x = (at) => W - ((now - at) / TEMPO_S) * W;
-    g.fillStyle = k.line;
-    for (let s = LABEL_S; s < TEMPO_S; s += LABEL_S) g.fillRect(Math.round(x(now - s)), 0, dpr, H);
+    // Now sits at NOW_AT of the width, the last TEMPO_S seconds to its left,
+    // and no lines up the scope. Asked 2026-10-11: *"rm radio 020 vert line on
+    // viz. make yellow dot around 2/3 of w"*.
+    const xNow = W * NOW_AT;
+    const x = (at) => xNow - ((now - at) / TEMPO_S) * xNow;
     while (history.length && history[0].at < now - TEMPO_S - 1) history.shift();
     // the candidates: a dot each, as bright as its score
     g.fillStyle = k.dim;
@@ -446,7 +447,7 @@
     g.textBaseline = 'top'; g.textAlign = 'left';
     g.fillText(`${LO} to ${HI} bpm`, 6 * dpr, 6 * dpr);
     g.textBaseline = 'bottom'; g.textAlign = 'right';
-    g.fillText(`${TEMPO_S} s`, W - 6 * dpr, H - 6 * dpr);
+    g.fillText(`${TEMPO_S} s`, xNow - 6 * dpr, H - 6 * dpr);
     // the pointer: a hairline and the reading nearest it, in full, in a box
     // pinned to the top right so it never covers the left corner label
     if (hoverX != null && history.length) {
