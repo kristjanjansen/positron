@@ -59,9 +59,12 @@
   const lines = createTable({
     columns: [
       { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'message', width: 240, hi: true, clip: true, hover: 'text' },
+      // The link is never cut (asked 2026-10-11, *"avoid link clippng"*): its
+      // column is as wide as the longest one this page prints, two 7 letter
+      // sites, 47 characters; the message takes what is left and is cut instead.
+      { key: 'text', label: 'message', grow: true, hi: true, clip: true, hover: 'text' },
       { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', grow: true, clip: true, hover: 'why' },
+      { key: 'link', label: 'link', width: 340, hover: 'why' },
     ],
     minRows: 4,
     stick: true,
