@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept beats 010</title>
+<title>POSITRON concept radio 040</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-say { font-size: 12px; color: var(--dim); }
@@ -43,10 +43,10 @@
   import { createCheck } from '/shell/check.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
-  // concepts beats/010, KEY, 2026-10-11. /concepts/beats/005/ with the tempo
+  // concepts radio/040, KEY, 2026-10-11. /concepts/radio/030/ with the tempo
   // detector swapped for a key detector. Asked: *"010 key dertect, live
   // stations"*. The live source, the level, the wave, the speakers and the
-  // patchbay are beats/005's, line for line. One idea per page, so what was
+  // patchbay are radio/030's, line for line. One idea per page, so what was
   // about tempo went: the tempo detector, the beat lines over the wave, the
   // tempo scope, and the fx box with its mix knob and click (that box was
   // driven by the tempo, so with no tempo it had nothing to do).
@@ -120,8 +120,8 @@
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
-  const d = mount({ name: 'concept beats 010', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('beats/010');
+  const d = mount({ name: 'concept radio 040', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('radio/040');
 
   // ── the links, held from load so the picture does not change with play ────
   // Holding a link opens nothing. A link out of an `external` node is refused
@@ -489,7 +489,7 @@
   }
 
   // ── the level: one gain per station, from a running RMS ──────────────────
-  // beats/005's, unchanged. The stream's RMS BEFORE the gain, read every
+  // radio/030's, unchanged. The stream's RMS BEFORE the gain, read every
   // LEVEL_READ_MS, followed slowly (LEVEL_SLOW_S) and fast (LEVEL_FAST_S); the
   // louder sets the target LEVEL_RMS / rms, raise only, at most LEVEL_MAX (36
   // dB). Down fast, up slow, held under LEVEL_FLOOR, a limiter after the gain.
