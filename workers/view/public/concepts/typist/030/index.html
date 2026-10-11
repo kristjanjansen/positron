@@ -26,7 +26,6 @@
      under 560 px (asked: *"keep aspect ratio / h on all typist couts"*), the
      frame (not the window) stacking one to three and going two across for
      four to six. Every paper paints its own white. */
-  .mt-choice { min-width: 0; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -36,7 +35,6 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { createPaper } from '../paper.mjs';
   import { createSamples, createVoice, FILES } from '../sampler.mjs';
   import { createFx, character, nameOf, trimFor } from '../020/fx.mjs';
@@ -48,40 +46,20 @@
   const q = new URLSearchParams(location.search);
   let count = Math.min(MAX, Math.max(1, parseInt(q.get('n'), 10) || 2));
 
-  // ── the sample texts ─────────────────────────────────────────────────────
-  // Six per set, one per typist, short plain lines. `pace` slows (above 1) or
-  // speeds (below 1) that typist. The concerto set is a nod to Alo Mattiisen's
-  // *Kirjutusmasina kontsert D-duur* (1984): its title, its four movement
-  // names and where it was first played, as facts in our own words
-  // (`research/mattiisen-kirjutusmasinakontsert-2026-10-11.md`), the music not
-  // at all. Each movement's typist keeps its tempo.
-  const SETS = [
-    ['Letters', [
+  // ── the text ─────────────────────────────────────────────────────────────
+  // Six short letters, one per typist, plain lines. One text and no choice of
+  // it (asked: *"keep only letters on 030, no others coice"*); the Estonian
+  // letters and the concerto set went then, and the concerto's facts are in
+  // `research/mattiisen-kirjutusmasinakontsert-2026-10-11.md`. `pace` slows
+  // (above 1) or speeds (below 1) a typist.
+  const LETTERS = [
       { text: 'Dear Anna,\nthe weather turned cold this week.\nThe garden is asleep under the snow.' },
       { text: 'Minutes of the meeting.\nPresent were four of us and the cat.\nWe meet again on Monday.' },
       { text: 'Shopping list.\nBread, milk and apples.\nA new ribbon for the typewriter.' },
       { text: 'The train leaves at seven.\nBring a warm coat and a book.\nI will wait on the platform.' },
       { text: 'Note to self.\nCall the printer before noon.\nAsk about the blue paper.' },
       { text: 'Hello from the fourth floor.\nThe window looks over the harbour.\nShips come in all morning.' },
-    ]],
-    ['Kirjad', [
-      { text: 'Kallis Anna,\nsel nädalal läks ilm külmaks.\nAed magab lume all.' },
-      { text: 'Koosoleku protokoll.\nKohal olid neli inimest ja kass.\nJärgmine kord kohtume esmaspäeval.' },
-      { text: 'Poenimekiri.\nLeib, piim ja õunad.\nUus lint kirjutusmasinale.' },
-      { text: 'Rong väljub kell seitse.\nVõta kaasa soe mantel ja raamat.\nMa ootan sind perroonil.' },
-      { text: 'Meelespea.\nHelista trükikotta enne lõunat.\nKüsi sinise paberi kohta.' },
-      { text: 'Tervitused neljandalt korruselt.\nAknast paistab sadam.\nLaevad tulevad terve hommiku.' },
-    ]],
-    ['Concerto', [
-      { text: 'Kirjutusmasina kontsert D-duur.\nAlo Mattiisen, 1984.\nThe typewriter is the soloist.' },
-      { text: 'I. Allegro vivace e marcato.\nFast, and every key marked.', pace: 0.7 },
-      { text: 'II. Largo molto tranquillo.\nSlow, and very calm.', pace: 1.9 },
-      { text: 'III. Allegro agitato.\nFast, and restless.', pace: 0.6 },
-      { text: 'IV. Finale.\nUnder a minute.', pace: 0.85 },
-      { text: 'In Spe played it first,\nat the Tartu popular music days.\nThe band is the orchestra.' },
-    ]],
   ];
-  let set = Math.min(SETS.length - 1, Math.max(0, parseInt(q.get('set'), 10) || 0));
 
   // ── the sound ────────────────────────────────────────────────────────────
   // ONE sample set for every typewriter, decoded once. Each paper has a voice
@@ -267,7 +245,7 @@
     const r = rnd(k * 7919);
     typists[k] = { r, base: 95 + r() * 60, i: 0, due: 0, wait: false, typed: 0 };
   }
-  const textOf = (k) => SETS[set][1][k - 1];
+  const textOf = (k) => LETTERS[k - 1];
   function gap(t, ch, pace) {
     let ms = t.base * (0.55 + t.r() * 0.9);
     if (ch === ' ') ms += 40;
@@ -307,11 +285,6 @@
     timer = setInterval(tick, 12);
   }
   function stopTyping() { playing = false; clearInterval(timer); }
-
-  /** Every typist back to the start of its text, on a fresh sheet. */
-  function restart() {
-    for (let k = 1; k <= MAX; k++) { papers[k].clear(); typists[k].i = 0; typists[k].wait = false; }
-  }
 
   // ── the frame ────────────────────────────────────────────────────────────
   // The papers are the cells of the kit's chat grid, which places the first
@@ -353,9 +326,6 @@
   const step = createStepper({ what: 'typists', prev: () => setCount(count - 1), next: () => setCount(count + 1),
     pick: { options: NAMES, at: count - 1, onPick: (i) => setCount(i + 1) } });
 
-  const choice = createChoice({ label: 'text', at: set, options: SETS.map(([name], i) => [name, i]),
-    onPick: (i) => { set = i; restart(); } });
-  choice.el.classList.add('mt-choice');
 
   frame = createChatGrid({ cells: papers.slice(1), count, left, centre: step.el, fixed: true });
   const panel = frame.panel;
@@ -387,14 +357,13 @@
     return [{ text: m ? nameOf(tw[+m[1]].fxIndex) : n.label, sans: true }];
   }, flowing });
 
-  d.stack.add(panel.el, choice.el, pb.el);
+  d.stack.add(panel.el, pb.el);
   layout();
   patch();
 
   // Read only, for a check over CDP.
   window.__demo.multi = {
     get count() { return count; },
-    get set() { return SETS[set][0]; },
     get playing() { return playing; },
     get state() { return ctx?.state || 'none'; },
     get samples() { return { ...samples.stat, files: FILES.length }; },
