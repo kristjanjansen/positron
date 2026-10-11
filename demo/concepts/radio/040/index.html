@@ -24,7 +24,12 @@
   /* The key's notes are rings, the kit's `ai` lamp, in the accent rather than
      the proposal lilac (asked: *"suggested cricles are yellow"*): a ring is a
      note you could play, and playing it fills it. */
-  .cc-kb-host .k.ai .kd::after { box-shadow: inset 0 0 0 1px var(--hi); }
+  .cc-kb-host .k.ai .kd::after { box-shadow: inset 0 0 0 1px var(--dim2); }
+  /* Asked: *"only circles that autoplay plays are yellow-bordered. when on
+     autoplay keep thay hellow. others grayer"*. The rest of the key's notes
+     stay grey rings; the notes of the chord autoplay is holding, in every
+     octave, are yellow rings for as long as the chord lasts. */
+  .cc-kb-host .k.ai.cc-auto .kd::after { box-shadow: inset 0 0 0 1px var(--hi); }
   /* The footer's labels in the kit's form label style, `.pos-field-l`'s
      declarations (asked: *"use std form label styling"*). */
   .cc-keyfoot .pos-vp-k {
@@ -325,11 +330,24 @@
   // seconds each: the home chord, then the ones built on the sixth, fourth and
   // fifth notes of the scale, round again. It follows the key when it changes,
   // and waits silently while there is no key yet.
-  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4;
+  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4, AUTO_SURE = 0.4;
   let autoTimer = null, autoAt = 0, autoHeld = [];
+  // Which drawn key is which note: read once off the names the keys print
+  // (`C3`, `C♯3`), because the keyboard publishes no element per note.
+  const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const keyEls = new Map();
+  for (const k of kbHost.querySelectorAll('.k')) {
+    const m = /^([A-G])(♯|#)?(-?\d+)$/.exec(k.querySelector('.kn')?.textContent.trim() || '');
+    if (m) keyEls.set(12 * (+m[3] + 1) + PC[m[1]] + (m[2] ? 1 : 0), k);
+  }
+  function autoMark(notes) {
+    for (const k of keyEls.values()) k.classList.remove('cc-auto');
+    for (const n of notes) for (const o of [-12, 0, 12]) keyEls.get(n + o)?.classList.add('cc-auto');
+  }
   function autoRelease() {
     for (const n of autoHeld) bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: 0 });
     autoHeld = [];
+    autoMark([]);
   }
   function autoChord() {
     autoRelease();
@@ -337,11 +355,17 @@
     if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
     const sc = KEY_SCALE[r.mode], step = AUTO_STEPS[autoAt++ % AUTO_STEPS.length];
     const root = KB_BASE + r.tonic;
+    // Asked: *"adjust volume on autoplay notes on probalilty?"*. The chord is as
+    // loud as the key is sure: velocity 20 at confidence 0, full 110 from
+    // AUTO_SURE up, set per chord, so it follows the reading every 4 s.
+    const sure = Math.max(0, Math.min(1, (r.confidence ?? 0) / AUTO_SURE));
+    const vel = Math.round(20 + 90 * sure);
     for (const k of [step, step + 2, step + 4]) {
       const n = root + sc[k % 7] + 12 * Math.floor(k / 7);
-      bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: 70 });
+      bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: vel });
       autoHeld.push(n);
     }
+    autoMark(autoHeld);
   }
   function autoSet(on) {
     clearInterval(autoTimer); autoTimer = null;
@@ -722,6 +746,6 @@
   window.__demo.key = { src: () => srcOf(STATIONS[at]), station: () => STATIONS[at].id, open: () => (leg ? leg.st.id : null),
     live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null, gain: () => (lv ? +lv.g.toFixed(3) : null),
     levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing,
-    voices: () => [...voices.keys()], mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
+    voices: () => [...voices.keys()], marked: () => [...keyEls].filter(([, k]) => k.classList.contains('cc-auto')).map(([n]) => n), keyEls: () => keyEls.size, mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
   d.ready();
 </script>
