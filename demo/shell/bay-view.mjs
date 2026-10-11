@@ -197,28 +197,87 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       // it, every port on the right edge one per row (ins, then outs), and every
       // wire in a gutter to the right, one lane each, reused where their
       // vertical spans do not overlap (plans/plan-links-view-phone.md).
-      let y = 0;
-      for (const n of order) {
-        const { ins, outs } = portsOf(n);
-        const rows = Math.max(ins.length + outs.length, fieldsR(n)[0] ? 2 : 1);
-        const h = rows * ROW + PAD;
-        boxes.push({ n, x: 0, y, h, ins, outs, phone: true });
-        [...ins, ...outs].forEach((p, i) => at.set(p.id, { y: y + PAD / 2 + i * ROW + ROW / 2, side: 'r' }));
-        y += h + PAD;
+      /* 🔴 A TITLE THAT DOES NOT FIT BESIDE ITS PORTS GETS A LINE OF ITS OWN,
+         2026-10-11. The first port row shared the title's line on every card,
+         so on /concepts/typist/030/?n=6 at 375 px the gutter took 22 lanes, the
+         cards shrank to 159 px and `web:typewriter-k` was drawn over its own
+         `value-in` (40 overlapping labels, MEASURED). Each card now measures
+         its title (and the grey field under it) against the port names on the
+         same rows, and only a card that collides pushes its ports down a row
+         or two. That moves every span, so the lanes are worked out again, and
+         a narrower card can make another one collide: it settles in a few
+         passes because a card only ever gains rows. A card narrower than its
+         own longest name is not squeezed further: the picture widens and
+         scrolls inside its own box. */
+      const off = new Map(order.map((n) => [n.id, 0]));
+      const lay = () => {
+        boxes.length = 0; at.clear(); laneOf.clear();
+        let y = 0;
+        for (const n of order) {
+          const { ins, outs } = portsOf(n), o = off.get(n.id);
+          const rows = Math.max(o + ins.length + outs.length, fieldsR(n)[0] ? 2 : 1);
+          const h = rows * ROW + PAD;
+          boxes.push({ n, x: 0, y, h, ins, outs, phone: true });
+          [...ins, ...outs].forEach((p, i) => at.set(p.id, { y: y + PAD / 2 + (o + i) * ROW + ROW / 2, side: 'r' }));
+          y += h + PAD;
+        }
+        H = y - PAD;
+        // ⚠️ A FAN SHARES ONE LANE, 2026-10-11: every wire out of one outlet
+        // (a sample store to six typewriters) or into one inlet (six fx boxes
+        // to one speaker) runs in one lane as a trunk with branches, which is
+        // how a patch bus is drawn. One lane per wire gave typist/030 at six
+        // papers 26 lanes, a gutter wider than its cards. Twins (same two
+        // ends) keep a lane each, so they still split, run and rejoin.
+        const live = links.filter((l) => at.has(l.from) && at.has(l.to));
+        const count = (k) => live.filter((l) => l.from === k || l.to === k).length;
+        const keyOf = (l) => (pairCount.get(`${l.from} ${l.to}`) > 1 ? l.id
+          : count(l.from) > 1 ? `o ${l.from}` : count(l.to) > 1 ? `i ${l.to}` : l.id);
+        const groups = new Map();
+        for (const l of live) {
+          const a = at.get(l.from).y, b = at.get(l.to).y, k = keyOf(l);
+          const g = groups.get(k) || { ls: [], lo: Infinity, hi: -Infinity };
+          g.ls.push(l); g.lo = Math.min(g.lo, a, b); g.hi = Math.max(g.hi, a, b);
+          groups.set(k, g);
+        }
+        const spans = [...groups.values()].sort((p, q) => (p.hi - p.lo) - (q.hi - q.lo));
+        const taken = [];             // per lane, the spans already in it
+        for (const sp of spans) {
+          let i = taken.findIndex((ls) => ls.every((o) => sp.hi < o.lo - 6 || sp.lo > o.hi + 6));
+          if (i < 0) { i = taken.length; taken.push([]); }
+          taken[i].push(sp);
+          for (const l of sp.ls) laneOf.set(l.id, i);
+        }
+        return taken.length;
+      };
+      // What sits on row r of a card on its left: the title on 0, the field on 1.
+      const leftW = (n, r) => (r === 0 ? width(n.id, TITLE) : r === 1 && fieldsR(n)[0] ? width(fieldsR(n)[0].text, FONT, fieldsR(n)[0].sans) : 0);
+      const collides = (n, bw) => {
+        const { ins, outs } = portsOf(n), o = off.get(n.id);
+        return [...ins, ...outs].some((p, i) => {
+          const lw = leftW(n, o + i);
+          return lw && PAD + lw + PAD + width(portName(p.id), FONT) + PAD > bw;
+        });
+      };
+      const minW = Math.ceil(Math.max(...order.map((n) => {
+        const { ins, outs } = portsOf(n), f = fieldsR(n)[0];
+        return Math.max(width(n.id, TITLE), f ? width(f.text, FONT, f.sans) : 0, longest(ins), longest(outs)) + 2 * PAD;
+      })));
+      let lanes = 0, bw = 0;
+      for (let pass = 0; pass < 8; pass++) {
+        lanes = lay();
+        bw = Math.max(minW, avail - (8 + PLANE * lanes));
+        let moved = false;
+        for (const n of order) {
+          if (!collides(n, bw)) continue;
+          // the title alone first, then the field under it as well
+          const next = off.get(n.id) + 1;
+          if (next > (fieldsR(n)[0] ? 2 : 1)) continue;
+          off.set(n.id, next); moved = true;
+        }
+        if (!moved) break;
       }
-      H = y - PAD;
-      const spans = links.filter((l) => at.has(l.from) && at.has(l.to)).map((l) => {
-        const a = at.get(l.from).y, b = at.get(l.to).y;
-        return { l, lo: Math.min(a, b), hi: Math.max(a, b) };
-      }).sort((p, q) => (p.hi - p.lo) - (q.hi - q.lo));
-      const taken = [];               // per lane, the spans already in it
-      for (const sp of spans) {
-        let i = taken.findIndex((ls) => ls.every((o) => sp.hi < o.lo - 6 || sp.lo > o.hi + 6));
-        if (i < 0) { i = taken.length; taken.push([]); }
-        taken[i].push(sp);
-        laneOf.set(sp.l.id, i);
-      }
-      const bw = avail - (8 + PLANE * taken.length);
+      const need = bw + 8 + PLANE * lanes;
+      if (need > avail) { avail = need; el.style.overflowX = 'auto'; }
       for (const b of boxes) b.w = bw;
       for (const q of at.values()) q.x = bw;
       laneX = (i) => bw + 8 + PLANE * i;
