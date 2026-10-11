@@ -46,4 +46,5 @@ export const CONCEPTS = [
   { n: 'sampler/015', title: 'Sustain', say: 'Every message a sustain pedal sends with its timing and the presses it makes.' },
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back through the relay beside Yoshimi.' },
+  { n: 'sampler/035', title: 'Pi piano direct', say: 'The same Pi piano over a direct WebRTC path instead of the relay.' },
 ];
