@@ -50,7 +50,8 @@
   //
   // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
   // load. A check run sends nothing to the Circuit unless ?board=1 is added.
-  const d = mount({ name: 'concept synth 070', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concept synth 070', what: '', joined: false,
+    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' }, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('synth/070');
 
   const q = new URLSearchParams(location.search);
@@ -92,6 +93,7 @@
   function toCircuit(ev) {
     if (!armed) return;
     if (ev.cls === 'note') {
+      if (ev.d2 > 0) pressed(ev.d1);
       if (midi(ev.d2 > 0 ? [0x90 | (CH - 1), ev.d1, ev.d2] : [0x80 | (CH - 1), ev.d1, 0])) sent.note++;
     } else if (ev.cls === 'cc') {
       pendingCc.set(ev.d1, ev.d2);
@@ -150,6 +152,74 @@
     }
     requestAnimationFrame(frame);
   }
+
+  // ── the lags: what came back, against when the key went down ────────────
+  // The four cells /concepts/sampler/030/ carries, measured the same way,
+  // asked 2026-10-11: *"add readouts to all pi-driven synths. 4"*. Key to sound is measured
+  // per press: the first 1 ms block after the press that is over ONSET and
+  // three times what the 30 ms before it held, on the speaker's clock
+  // (`getOutputTimestamp`, so the browser's own output latency is inside it).
+  // The other cells are the parts this page can name: the Pi's round trip, the
+  // playout cushion, the browser's output latency, and the path. What is left
+  // over is the Pi's capture block and frame (JACK 512 x 3 at 48 kHz, 20 ms
+  // frames), which the page cannot see on its own.
+  const KEEP_MS = 200, ONSET = 0.02, WAIT_MS = 1500;
+  const env = [];          // { at, peak } per 1 ms block, performance time
+  const pending = [];      // presses still waiting for their sound
+  const lags = [];         // the last 20 measured lags
+  let lastLag = null, readUpTo = 0;
+  function pressed(note) {
+    const at = performance.now();
+    pending.push({ note, at });
+    while (pending.length > 8) pending.shift();
+  }
+  function listen() {
+    if (!analyser || !buf) return;
+    const ctx = board.ctx();
+    const ts = ctx.getOutputTimestamp?.();
+    if (!ts || !ts.performanceTime) return;
+    analyser.getFloatTimeDomainData(buf);
+    const sr = ctx.sampleRate, N = buf.length, blk = Math.round(sr / 1000);
+    // the buffer's last sample is the context's current time
+    const tEnd = ts.performanceTime + (ctx.currentTime - ts.contextTime) * 1000;
+    const t0 = tEnd - (N / sr) * 1000;
+    for (let i = 0; i + blk <= N; i += blk) {
+      const at = t0 + (i / sr) * 1000;
+      if (at <= readUpTo) continue;
+      let pk = 0;
+      for (let j = i; j < i + blk; j++) { const a = buf[j] < 0 ? -buf[j] : buf[j]; if (a > pk) pk = a; }
+      env.push({ at, peak: pk });
+      readUpTo = at;
+      // an onset: over ONSET and three times the 30 ms before it
+      let before = 0;
+      for (let k = env.length - 31; k < env.length - 1; k++) if (k >= 0 && env[k].peak > before) before = env[k].peak;
+      if (pk > ONSET && pk > before * 3) {
+        const p = pending.find((x) => x.at < at);
+        if (p) {
+          pending.splice(pending.indexOf(p), 1);
+          lastLag = at - p.at;
+          lags.push(lastLag); if (lags.length > 20) lags.shift();
+        }
+      }
+    }
+    const now = performance.now();
+    while (env.length && env[0].at < now - KEEP_MS) env.shift();
+    for (let k = pending.length - 1; k >= 0; k--) if (now - pending[k].at > WAIT_MS) pending.splice(k, 1);
+  }
+  const cell = (k, v) => d.set(k, v);
+  function lagCells() {
+    const st = board?.stats();
+    const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
+    cell('key to sound', lastLag == null ? '' : Math.round(lastLag));
+    cell('median', med == null ? '' : Math.round(med));
+    cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+  }
+  function lagFrame() {
+    listen();
+    requestAnimationFrame(lagFrame);
+  }
+  setInterval(() => { if (board) lagCells(); }, 250);
 
   // ── the patch selector, its own node ─────────────────────────────────────
   // It opens empty. On play, and after each patch change, the page asks the
@@ -264,6 +334,7 @@
         buf = new Float32Array(analyser.fftSize);
         pl.connect(analyser);
         requestAnimationFrame(frame);
+        requestAnimationFrame(lagFrame);
       }
       if (!MAY_PLAY) { say('A check is running, so nothing was sent to the Circuit. Add ?board=1 to let it through', 'warn'); return; }
       const st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
