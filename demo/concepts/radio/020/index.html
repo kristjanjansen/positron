@@ -406,8 +406,8 @@
     g.globalAlpha = 1;
   }
 
-  // The tempo scope. No grid lines. The range in the top left corner, the
-  // time across beside now.
+  // The tempo scope. No grid lines and no time label (*"rm 15sc label"*). The
+  // range in the top left corner.
   let stoppedAt = 0;
   const clock = () => (ctx ? (playing ? ctx.currentTime : stoppedAt) : 0);
   function drawTempo() {
@@ -446,8 +446,6 @@
     g.fillStyle = k.dim;
     g.textBaseline = 'top'; g.textAlign = 'left';
     g.fillText(`${LO} to ${HI} bpm`, 6 * dpr, 6 * dpr);
-    g.textBaseline = 'bottom'; g.textAlign = 'right';
-    g.fillText(`${TEMPO_S} s`, xNow - 6 * dpr, H - 6 * dpr);
     // the pointer: a hairline and the reading nearest it, in full, in a box
     // pinned to the top right so it never covers the left corner label
     if (hoverX != null && history.length) {
