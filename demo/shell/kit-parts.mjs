@@ -90,7 +90,7 @@ export const KIT_PARTS = [
   // update while we work on chat for chat components"*): demo/shell/chat-ui.mjs,
   // the pieces the /concepts/room/ pages draw their chat with.
   { part: 'chat', label: 'CHAT', ids: [
-    'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
+    'chat-grid', 'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
   ] },
 ];
 

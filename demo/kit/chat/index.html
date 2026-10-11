@@ -20,7 +20,8 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createChatLog, createChatSign, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createChatLog, createChatSign, createChatCompose, createChatColumn, createChatWindow, createChatGrid } from '/shell/chat-ui.mjs';
 
   /**
    * kit/chat, THE CHAT'S PIECES, 2026-10-11. Asked: *"(make it reusable) as all
@@ -33,7 +34,7 @@
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'chat',
-    what: 'The pieces a chat page is drawn with, a window, columns, a log, a sign and a compose box.',
+    what: 'The pieces a chat page is drawn with, a window, a grid, columns, a log, a sign and a compose box.',
   });
   const now = Date.now();
   const SAMPLE = [
@@ -43,6 +44,37 @@
   ];
 
   // the blocks, newest first
+  // CHAT GRID: six columns, logs and signs taking turns, the stepper showing
+  // the first n of them. The layout is the multi typer's (/concepts/typist/030/).
+  const PEOPLE = ['web-2qm', 'web-7zd', 'web-k4p', 'web-91x', 'web-ab12', 'web-3fe'];
+  const LINES = ['Is the Pi up today?', 'It answered a minute ago.', 'Yoshimi is loaded.',
+    'Patching the keys to it now.', 'I hear it from here.', 'Doors open at eight'];
+  let grid = null;
+  section('CHAT GRID',
+    'One to six equal cells in the video panel, separated by the seam: 1 full, 2 and 3 across, 4 two by two, 5 three over two, 6 three by two; a frame under 560 px stacks 1 to 3 and goes two across for 4 to 6.',
+    `createChatGrid({ cells: [col1, col2, ...], count: 3, left, centre })
+  -> { el, panel, grid, set(n), count() }`,
+    (box) => {
+      const cells = PEOPLE.map((who, i) => {
+        if (i % 2) {
+          const s = createChatSign();
+          s.add({ text: LINES[i] });
+          return createChatColumn({ title: who.toUpperCase(), body: s });
+        }
+        const log = createChatLog();
+        log.add({ who, at: now - 60000 * (i + 1), text: LINES[i] });
+        log.add({ who: 'you', at: now - 30000 * (i + 1), text: LINES[(i + 3) % 6], me: true });
+        return createChatColumn({ title: who.toUpperCase(), body: log });
+      });
+      const NAMES = PEOPLE.map((_, i) => `${i + 1} ${i ? 'cells' : 'cell'}`);
+      const to = (n) => { const k = grid.set(n); step.show(NAMES[k - 1], k - 1); };
+      const step = createStepper({ what: 'cells', prev: () => to(grid.count() - 1), next: () => to(grid.count() + 1),
+        pick: { options: NAMES, at: 2, onPick: (i) => to(i + 1) } });
+      grid = createChatGrid({ cells, count: 3, centre: step.el });
+      grid.el.classList.add('kc-full');
+      box.append(grid.el);
+    });
+
   let win = null, winLog = null, winSign = null;
   section('CHAT WINDOW',
     'The kit video panel with the chat as its picture: one column full width, or a broadcast column and a chat a third wide; a phone stacks the two.',
@@ -126,6 +158,24 @@
     d.assert('a compose box is hidden until it is enabled',
       getComputedStyle(hidden.el).display === 'none', getComputedStyle(hidden.el).display);
     hidden.el.remove();
+
+    // The grid, at every count: how many cells sit in each row, read off rects.
+    const rows = () => {
+      const tops = new Map();
+      for (const c of grid.grid.children) { const t = Math.round(c.getBoundingClientRect().top); tops.set(t, (tops.get(t) || 0) + 1); }
+      return [...tops.entries()].sort((a, b) => a[0] - b[0]).map(([, k]) => k).join(',');
+    };
+    const want = { 1: '1', 2: '2', 3: '3', 4: '2,2', 5: '3,2', 6: '3,3' };
+    const got = {};
+    for (let n = 1; n <= 6; n++) { grid.set(n); got[n] = rows(); }
+    grid.set(3);
+    d.assert('the grid lays one to six cells out as 1, 2, 3, 2 by 2, 3 over 2 and 3 by 2 on a desk',
+      Object.keys(want).every((n) => got[n] === want[n]), JSON.stringify(got));
+    const ar = (n) => { grid.set(n); const r = grid.panel.stage.getBoundingClientRect(); return +(r.width / r.height).toFixed(2); };
+    const a3 = ar(3), a4 = ar(4);
+    grid.set(3);
+    d.assert('the frame is 16:9 for one row of cells and 4:3 for two',
+      Math.abs(a3 - 16 / 9) < 0.02 && Math.abs(a4 - 4 / 3) < 0.02, `${a3} at 3, ${a4} at 4`);
   }
   d.ready();
 </script>

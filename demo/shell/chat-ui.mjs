@@ -13,6 +13,10 @@
 //   createChatWindow(o)    the frame: the kit's video panel holding one column
 //                          full width, or two with the second a third wide;
 //                          a phone stacks two columns, each half the stage
+//   createChatGrid(o)      one to six equal cells in the kit's video panel,
+//                          separated by the seam, the layout following the
+//                          count and the frame's own width (lifted from
+//                          /concepts/typist/030/, the multi typer)
 //
 // Nothing here opens anything: a page wires the send and the arrivals.
 
@@ -44,8 +48,14 @@ const CSS = `
      balanced, at most 32 characters and 70 per cent of the area a line,
      newlines kept, long words broken, scrolling only past the area. */
   .pos-chat-sign { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
-                   align-items: center; justify-content: center; padding: 16px 24px; text-align: center; }
-  .pos-chat-sign-t { margin: 0; max-width: min(32ch, 70%); font: 600 clamp(18px, 3vw, 28px)/1.3 var(--brand);
+                   align-items: center; justify-content: safe center; padding: 16px 24px; text-align: center;
+                   container-type: inline-size; }
+  /* The type is the window's 18 to 28 px, capped by the sign's own box (9cqi,
+     floor 12 px), so a sign in a sixth of a phone grid does not break words
+     in half or spill. In a window the box is the wider one and nothing changes.
+     Safe centring, so a sign longer than its box scrolls from its first line
+     rather than being cut at the top. */
+  .pos-chat-sign-t { margin: 0; max-width: min(32ch, 70%); font: 600 max(12px, min(max(18px, 3vw), 28px, 9cqi))/1.3 var(--brand);
                      color: var(--fg); text-wrap: balance; overflow-wrap: anywhere; white-space: pre-line; }
 
   .pos-chat-compose { position: relative; padding: 10px 12px 12px; }
@@ -57,11 +67,48 @@ const CSS = `
   .pos-chat-compose .pos-field textarea:focus-visible { border-color: var(--chat-ink, var(--hi)); }
   .pos-chat-send { position: absolute; right: 18px; bottom: 18px; }
 
+  /* A column paints its own ground, wherever it sits (a window or a grid). */
+  .pos-chat-col { min-width: 0; min-height: 0; background: var(--card); display: flex; flex-direction: column; }
+
+  /* ── the grid of one to six cells, lifted from /concepts/typist/030/ ─────
+     ONE GRID OF SIX TRACKS, so every count is a span and nothing is typed
+     per layout: 1 spans all six, 2 span three, 3 span two, 4 span three
+     (two by two), 6 span two (three by two). 5 IS THREE OVER TWO, THE TWO
+     WIDER, not a three by two with a hole: an empty cell over the seam ground
+     reads as a cell that failed to load. Rows share the height. The seam is
+     the gap over a line coloured ground, so every cell paints its own. */
+  .pos-chat-grid { position: absolute; inset: 0; container: pos-chat-grid / size; }
+  .pos-chat-cells { width: 100%; height: 100%; display: grid; gap: 1px; background: var(--line);
+                    grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
+  .pos-chat-cells > * { min-width: 0; min-height: 0; grid-column: span 2; }
+  .pos-chat-cells[data-n="1"] > * { grid-column: span 6; }
+  .pos-chat-cells[data-n="2"] > *, .pos-chat-cells[data-n="4"] > * { grid-column: span 3; }
+  .pos-chat-cells[data-n="5"] > :nth-child(n + 4) { grid-column: span 3; }
+  /* A narrow FRAME, which is a phone (it asks its own box, so a full screen
+     phone in landscape gets the desk layout): one, two and three stack in one
+     column, four and six go two by two and two by three, and five is two, two
+     and one across. Never three columns on a phone. */
+  @container pos-chat-grid (max-width: 560px) {
+    .pos-chat-cells > *, .pos-chat-cells[data-n] > * { grid-column: span 3; }
+    .pos-chat-cells[data-n="1"] > *, .pos-chat-cells[data-n="2"] > *, .pos-chat-cells[data-n="3"] > *,
+    .pos-chat-cells[data-n="5"] > :nth-child(5) { grid-column: span 6; }
+  }
+  /* The frame's shape: 16:9 while the cells sit in one row (1 to 3), 4:3 once
+     there are two (4 to 6), so a cell is still wider than tall. A phone gets a
+     tall frame, 4:5 for one and 3:4 for more, because it stacks rather than
+     squeezing columns. Through the panel's own custom property, so its full
+     screen rule still wins. The frame cannot ask its own width for its own
+     height, so this one is the window's. */
+  .pos-chat-gwin[data-n="4"] .pos-vp-stage, .pos-chat-gwin[data-n="5"] .pos-vp-stage,
+  .pos-chat-gwin[data-n="6"] .pos-vp-stage { --vp-aspect: 4 / 3; }
+
   /* A phone stacks two columns, each half a taller stage. After the base rules. */
   @media (max-width: 560px) {
     .pos-chat-win.two .pos-vp-stage { --vp-aspect: 3 / 5; }
     .pos-chat-win.one .pos-vp-stage { --vp-aspect: 4 / 5; }
     .pos-chat.two { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+    .pos-chat-gwin .pos-vp-stage { --vp-aspect: 3 / 4; }
+    .pos-chat-gwin[data-n="1"] .pos-vp-stage { --vp-aspect: 4 / 5; }
   }
 `;
 let styled = false;
@@ -189,4 +236,43 @@ export function createChatWindow({ columns = [], footer = false } = {}) {
   panel.el.classList.add('pos-chat-win', two ? 'two' : 'one');
   panel.stage.append(grid);
   return { el: panel.el, panel, grid };
+}
+
+export const CHAT_GRID_MAX = 6;
+
+/**
+ * One to six equal cells in the kit's video panel, the multi typer's layout
+ * (/concepts/typist/030/). A separate piece from the window rather than a
+ * window with N columns, because the window's two columns are a CLAIM that one
+ * is the main thing and the other a third wide beside it, and N equal cells
+ * are the opposite claim.
+ * @param {object} o
+ * @param {Array<{ el: Element, draw?: () => void }>} o.cells  up to six; `draw`
+ *        is called after a cell is placed, for a cell that measures itself
+ * @param {number} [o.count]   how many to show at the start, all by default
+ * @param {Element|false} [o.left]    the footer's left slot
+ * @param {Element|null} [o.centre]   the footer's centre slot
+ * @returns {{ el: Element, panel: object, grid: Element, set: (n: number) => number, count: () => number }}
+ */
+export function createChatGrid({ cells = [], count = cells.length, left = false, centre = null } = {}) {
+  style();
+  if (cells.length > CHAT_GRID_MAX) throw new Error(`createChatGrid: at most ${CHAT_GRID_MAX} cells, got ${cells.length}`);
+  const grid = el('div', 'pos-chat-cells');
+  const frame = el('div', 'pos-chat-grid');
+  frame.append(grid);
+  const panel = createVideoPanel({ left, centre, fullMode: 'footer' });
+  panel.el.classList.add('pos-chat-gwin');
+  panel.stage.append(frame);
+  let n = 0;
+  const set = (want) => {
+    n = Math.min(cells.length, Math.max(1, Math.floor(want) || 1));
+    grid.dataset.n = String(n);
+    panel.el.dataset.n = String(n);
+    const shown = cells.slice(0, n);
+    grid.replaceChildren(...shown.map((c) => c.el));
+    for (const c of shown) c.draw?.();
+    return n;
+  };
+  set(count);
+  return { el: panel.el, panel, grid, set, count: () => n };
 }

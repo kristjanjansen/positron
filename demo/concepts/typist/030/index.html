@@ -19,53 +19,18 @@
      other people (that is 040). Nothing is fetched and nothing sounds until
      the first press of play or of a key. */
 
-  /* ── the frame's shape ─────────────────────────────────────────────────
-     16:9 while the papers sit in one row (1, 2, 3), 4:3 once there are two
-     rows (4, 5, 6), so a paper in a grid is still wider than tall. A phone
-     gets a tall frame, 4:5 for one paper (as 000) and 3:4 for more, because a
-     phone stacks papers rather than squeezing columns. Set through the panel's
-     own custom property, so its full screen rule still wins. */
-  .mt-panel[data-n="4"] .pos-vp-stage, .mt-panel[data-n="5"] .pos-vp-stage,
-  .mt-panel[data-n="6"] .pos-vp-stage { --vp-aspect: 4 / 3; }
-  @media (max-width: 560px) {
-    .mt-panel .pos-vp-stage { --vp-aspect: 3 / 4; }
-    .mt-panel[data-n="1"] .pos-vp-stage { --vp-aspect: 4 / 5; }
-  }
-
-  /* ── the papers ────────────────────────────────────────────────────────
-     ONE GRID OF SIX TRACKS, so every count is a span and nothing is typed
-     per layout: 1 spans all six, 2 span three, 3 span two, 4 span three
-     (two by two), 6 span two (three by two). 5 IS THREE OVER TWO, THE TWO
-     WIDER, not a three by two with a hole: an empty cell over the seam ground
-     reads as a paper that failed to load, and three over two centred would
-     leave the line colour showing either side. Rows share the height.
-     The papers are separated by the 1 px seam as `.pos-chat` draws it: a gap
-     over a line coloured ground, every paper painting its own white. */
-  .mt-frame { position: absolute; inset: 0; container-type: size; }
-  .mt { width: 100%; height: 100%; display: grid; gap: 1px; background: var(--line);
-        grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
-  .mt > * { min-width: 0; min-height: 0; grid-column: span 2; }
-  .mt[data-n="1"] > * { grid-column: span 6; }
-  .mt[data-n="2"] > *, .mt[data-n="4"] > * { grid-column: span 3; }
-  .mt[data-n="5"] > :nth-child(n + 4) { grid-column: span 3; }
-
-  /* A narrow frame, which is a phone (it asks its own box, so a full screen
-     phone in landscape gets the desk layout): one, two and three papers stack
-     in one column, four and six go two by two and two by three, and five is
-     two, two and one across. Never three columns, which would be ten
-     characters a line. */
-  @container (max-width: 560px) {
-    .mt > *, .mt[data-n] > * { grid-column: span 3; }
-    .mt[data-n="1"] > *, .mt[data-n="2"] > *, .mt[data-n="3"] > *,
-    .mt[data-n="5"] > :nth-child(5) { grid-column: span 6; }
-  }
-
+  /* ── the frame and the papers ─────────────────────────────────────────
+     `createChatGrid` in demo/shell/chat-ui.mjs, which was lifted from this
+     page: one grid of six tracks, the seam between papers, 16:9 for one to
+     three papers and 4:3 for four to six, and a frame under 560 px (asked of
+     the frame, not the window) stacking one to three and going two across
+     for four to six. Every paper paints its own white. */
   .mt-choice { min-width: 0; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
-  import { mount, el } from '/shell/shell.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { createChatGrid } from '/shell/chat-ui.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
@@ -348,15 +313,10 @@
   }
 
   // ── the frame ────────────────────────────────────────────────────────────
-  const grid = el('div', 'mt');
-  const frame = el('div', 'mt-frame');
-  frame.append(grid);
-  function layout() {
-    grid.dataset.n = String(count);
-    panel.el.dataset.n = String(count);
-    grid.replaceChildren(...papers.slice(1, count + 1).map((p) => p.el));
-    for (let k = 1; k <= count; k++) papers[k].draw();
-  }
+  // The papers are the cells of the kit's chat grid, which places the first
+  // `count` of them and draws each once it is placed.
+  let frame = null;
+  const layout = () => frame?.set(count);
 
   // Play and pause. The first press is the gesture: it makes the AudioContext,
   // fetches the samples, and the typists start once they are decoded, so the
@@ -396,9 +356,8 @@
     onPick: (i) => { set = i; restart(); } });
   choice.el.classList.add('mt-choice');
 
-  const panel = createVideoPanel({ left, centre: step.el, fullMode: 'footer' });
-  panel.el.classList.add('mt-panel');
-  panel.stage.append(frame);
+  frame = createChatGrid({ cells: papers.slice(1), count, left, centre: step.el });
+  const panel = frame.panel;
 
   // `file` and `audio` are lit rather than pulsed: the file wires while the
   // samples come down and 600 ms after, an audio wire while its typewriter's
