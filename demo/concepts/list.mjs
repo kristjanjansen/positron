@@ -41,4 +41,5 @@ export const CONCEPTS = [
   { n: 'typist/000', title: 'Paper', say: 'A sheet of white paper you can type on.' },
   { n: 'typist/010', title: 'Typewriter', say: 'The same paper with a real typewriter sounding every key.' },
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
+  { n: 'typist/030', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
 ];
