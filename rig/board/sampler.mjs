@@ -2,6 +2,10 @@
 // SD card and one .sfz that maps them. No engine is raised here; this is the
 // half that is the same whichever SFZ player ends up running it.
 //
+// SINCE 2026-10-11 PROGRAM 0 IS THE SALAMANDER GRAND (`ensureSalamander`,
+// below), and the FluidR3 piano this header describes is program 2. Both stay
+// on the card and in R2.
+//
 // The recordings are the thirty /nola/ uses (demo/nola/PROVENANCE.json:
 // FluidR3_GM's acoustic grand through midi-js-soundfonts, MIT), one every minor
 // third from A0 (21) to C8 (108), served from R2 by the station worker. The
@@ -182,6 +186,66 @@ export async function ensureRhodes({ dir = RHODES_DIR, base = RHODES_BASE, onLog
   return { dir, fetched, missing: RHODES_FILES.filter((n) => !existsSync(join(dir, `${n}.flac`))) };
 }
 
+// ── the Salamander grand, the piano since 2026-10-11 (program 0) ────────────
+//
+// plans/plan-piano-samples.md: Salamander Grand Piano V3 by Alexander Holm
+// (CC BY 3.0), four of its sixteen velocity layers at the same thirty notes,
+// capped at 8 s, and the 88 key-off release samples. The board's copy is made
+// for it by demo/resources/fetch-salamander.mjs: MONO (the capture sums out_1
+// and out_2 anyway), 48 kHz (the scsynth rate, so BufRateScale is 1), 16 bit
+// FLAC, so nothing is converted here. 208 files, fetched once, one at a time.
+// THE BANDS AND THE NAMES ARE COPIES of demo/concepts/sampler/sampler.mjs and
+// test.mjs grades them against it.
+
+export const SALAMANDER_BASE = SAMPLE_BASE.replace(/piano\/$/, 'salamander/pi/');
+export const SALAMANDER_DIR = process.env.BOARD_SALAMANDER || SAMPLE_DIR.replace(/piano\/?$/, 'salamander');
+/** Salamander's layer for each band, softest first. */
+export const SALAMANDER_LAYERS = Object.freeze([1, 6, 11, 16]);
+/** The 88 keys with a key-off sample. */
+export const RELEASE_KEYS = Object.freeze(Array.from({ length: 88 }, (_, i) => 21 + i));
+const pad3 = (n) => String(n).padStart(3, '0');
+/** `p060-v11`, the name the station worker serves and the card keeps. */
+export const salamanderName = (note, layer) => `p${pad3(note)}-v${layer}`;
+export const releaseName = (key) => `rel${pad3(key)}`;
+/** Every file: 120 notes and 88 releases. */
+export const SALAMANDER_FILES = Object.freeze([
+  ...PIANO_NOTES.flatMap((n) => SALAMANDER_LAYERS.map((l) => salamanderName(n, l))),
+  ...RELEASE_KEYS.map(releaseName),
+]);
+
+/**
+ * Put the Salamander on the card: only what is missing is fetched, one at a
+ * time, written under a temporary name and renamed into place, so a run cut
+ * off half way leaves nothing `ensureSalamander` would count. Already FLAC.
+ */
+export async function ensureSalamander({ dir = SALAMANDER_DIR, base = SALAMANDER_BASE, onLog = () => {},
+                                         fetchImpl = fetch } = {}) {
+  mkdirSync(dir, { recursive: true });
+  const have = new Set();
+  try { for (const f of readdirSync(dir)) if (f.endsWith('.flac') && statSync(join(dir, f)).size > 0) have.add(f.slice(0, -5)); }
+  catch { /* none yet */ }
+  const missing = SALAMANDER_FILES.filter((n) => !have.has(n));
+  let fetched = 0, bytes = 0;
+  if (missing.length) onLog(`fetching ${missing.length} of ${SALAMANDER_FILES.length} Salamander samples into ${dir}, once`);
+  for (const n of missing) {
+    const r = await fetchImpl(`${base}${n}.flac`);
+    if (!r.ok) throw new Error(`${base}${n}.flac answered ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    const tmp = join(dir, `.${n}.flac`);
+    writeFileSync(tmp, buf);
+    renameSync(tmp, join(dir, `${n}.flac`));
+    fetched++; bytes += buf.length;
+  }
+  if (fetched) onLog(`fetched ${fetched} Salamander samples, ${bytes} bytes, into ${dir}`);
+  const licence = join(dir, 'LICENSE-salamander');
+  if (!existsSync(licence)) {
+    writeFileSync(licence, 'Salamander Grand Piano V3 by Alexander Holm, a Yamaha C5, CC BY 3.0, '
+      + 'https://creativecommons.org/licenses/by/3.0/ , source https://github.com/sfzinstruments/SalamanderGrandPiano\n'
+      + 'These are positron\'s R2 copies (trimmed, capped at 8 s, faded, mono 16 bit FLAC), not the author\'s originals.\n');
+  }
+  return { dir, fetched, bytes, missing: SALAMANDER_FILES.filter((n) => !existsSync(join(dir, `${n}.flac`))) };
+}
+
 /** ffmpeg, channels and rate kept: the conversion changes the container and drops the priming, nothing else. */
 export function flacFromMp3(src, dst) {
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-c:a', 'flac', '-f', 'flac', dst]);
@@ -189,6 +253,7 @@ export function flacFromMp3(src, dst) {
 
 // `node rig/board/sampler.mjs` on the board fetches and writes, and prints what it did.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  ensurePiano({ onLog: console.log }).then((r) => console.log(JSON.stringify(r, null, 1)))
+  ensureSalamander({ onLog: console.log })
+    .then(async (r) => { console.log(JSON.stringify(r, null, 1)); console.log(JSON.stringify(await ensurePiano({ onLog: console.log }), null, 1)); })
     .catch((e) => { console.error(e.message); process.exit(1); });
 }

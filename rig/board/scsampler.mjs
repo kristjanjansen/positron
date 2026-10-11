@@ -26,12 +26,15 @@
 // for this engine at all, so nothing on the board (the Circuit included) can be
 // subscribed to it, by anybody or by itself.
 //
-// The rules a key is played by are /nola/'s, as `demo/concepts/sampler/sampler.mjs`
-// has them: the nearest recording, a tie to the lower one, rate 2^(shift/12),
-// level (LOUDEST / file peak) * (v/127)^1.5, the Rhodes layer from the author's
-// crossfade table with his fallback over the holes, a key struck again damps
-// the voice it replaces, the oldest voice taken past the cap, the damper a ramp
-// (`demo/shell/pedal.mjs`, imported, not copied).
+// The rules a key is played by are the ones `demo/concepts/sampler/sampler.mjs`
+// has: the nearest recording, a tie to the lower one, rate 2^(shift/12), the
+// Rhodes layer from the author's crossfade table with his fallback over the
+// holes, a key struck again damps the voice it replaces, the oldest voice taken
+// past the cap, the damper a ramp (`demo/shell/pedal.mjs`, imported, not copied).
+// The piano (program 0) is the Salamander grand since 2026-10-11
+// (plans/plan-piano-samples.md): four velocity bands hard switched, level from
+// ONE constant for the set and 6 dB inside a band, and a key-off sample when
+// the damper lands. The FluidR3 piano is program 2, on /nola/'s (v/127)^1.5.
 import { spawn, execFileSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, statSync } from 'node:fs';
@@ -40,7 +43,8 @@ import { createPedal, SUSTAIN_CC } from '../../demo/shell/pedal.mjs';
 import { JACK_ENDS, jackRows } from '../../demo/shell/graph-registry.mjs';
 import { oscMessage, ensureJackd, ensureCapture, releaseCapture, setStandingRows, wire, SAMPLER_SC_PORT } from './jacksynth.mjs';
 import { readOsc } from './pappus.mjs';
-import { PIANO_NOTES, RHODES_NOTES, RHODES_ABSENT, rhodesName, SAMPLE_DIR, RHODES_DIR, ensurePiano, ensureRhodes } from './sampler.mjs';
+import { PIANO_NOTES, RHODES_NOTES, RHODES_ABSENT, rhodesName, SAMPLE_DIR, RHODES_DIR, ensurePiano, ensureRhodes,
+  SALAMANDER_DIR, SALAMANDER_LAYERS, RELEASE_KEYS, salamanderName, releaseName, ensureSalamander } from './sampler.mjs';
 
 export const SC_CLIENT = 'possampler';
 export const SC_PORT = SAMPLER_SC_PORT;
@@ -51,8 +55,15 @@ export const DEF_SCD = join(HERE, 'norns', 'possampler-defs.scd');
 export const VOICES = 32;
 /** One hard note lands here in the capture, as one does in the browser. */
 export const LOUDEST = 0.30;
-/** The loudest piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
+/** The loudest FluidR3 piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
 export const PIANO_PEAK = 0.097;
+/**
+ * The loudest Salamander v16 file, the browser's encode decoded back
+ * (PROVENANCE-salamander.json `peak.web`). The SAME constant as the browser, so
+ * a mono file here lands a little under a stereo one there, by what summing L
+ * and R loses (0.6 to 1.7 dB, plan section 2.2), which a mono speaker loses too.
+ */
+export const SALAMANDER_PEAK = 0.9085;
 /** The loudest Rhodes file, from demo/nola/PROVENANCE-rhodes.json. */
 export const RHODES_PEAK = 0.9981;
 
@@ -84,6 +95,28 @@ export function layerFor(vel) {
   for (const g of RHODES_XF) { const v = xfGain(g, vel); if (v > top) { top = v; best = g; } }
   return best.layer;
 }
+/** The Salamander's four bands, hard switched: the browser module's PIANO_BANDS. */
+export const PIANO_BANDS = Object.freeze([
+  { layer: 1, lo: 1, hi: 40 },
+  { layer: 6, lo: 41, hi: 72 },
+  { layer: 11, lo: 73, hi: 104 },
+  { layer: 16, lo: 105, hi: 127 },
+]);
+const clampVel = (vel) => Math.max(1, Math.min(127, Math.round(vel)));
+const bandOf = (vel) => { const v = clampVel(vel); return PIANO_BANDS.find((b) => v <= b.hi); };
+export const bandFor = (vel) => bandOf(vel).layer;
+export const BAND_SPAN_DB = 6;
+/** One press on the Salamander: one constant for the set, 6 dB from a band's bottom to its top. */
+export function pianoGain(vel) {
+  const v = clampVel(vel), b = bandOf(v);
+  return (LOUDEST / SALAMANDER_PEAK) * Math.pow(10, (-BAND_SPAN_DB * (b.hi - v) / (b.hi - b.lo)) / 20);
+}
+/** A key-off sample: Data/hammer.txt's volume=-37, amp_veltrack=82, rt_decay=2 dB per second held. */
+export function releaseGain(vel, heldSec = 0) {
+  const v = clampVel(vel) / 127;
+  return (LOUDEST / SALAMANDER_PEAK) * Math.pow(10, -37 / 20) * (0.18 + 0.82 * v * v)
+    * Math.pow(10, (-2 * Math.max(0, heldSec)) / 20);
+}
 const RHODES_FALLBACK = { 1: 2, 3: 4 };
 export function rhodesLayerAt(note, layer) {
   let l = layer;
@@ -95,9 +128,22 @@ export function rhodesLayerAt(note, layer) {
   return l;
 }
 
-/** The two sets, by program number. Buffer numbers are fixed per file. */
+/**
+ * The sets, by program number. Buffer numbers are fixed per file and never
+ * overlap: FluidR3 0 to 29, Rhodes 100 to 164, Salamander notes 300 to 419 and
+ * its releases 500 to 587, all under scsynth's default of 1024 buffers.
+ */
 export const SETS = Object.freeze({
-  0: { id: 'piano', name: 'Piano', program: 0, notes: PIANO_NOTES, peak: PIANO_PEAK, dir: SAMPLE_DIR,
+  0: { id: 'piano', name: 'Piano', program: 0, notes: PIANO_NOTES, peak: SALAMANDER_PEAK, dir: SALAMANDER_DIR,
+       gain: pianoGain, releaseGain,
+       files: [
+         ...PIANO_NOTES.flatMap((n) => SALAMANDER_LAYERS.map((l) => salamanderName(n, l)))
+           .map((k, i) => ({ key: k, file: `${k}.flac`, bufnum: 300 + i })),
+         ...RELEASE_KEYS.map((k, i) => ({ key: releaseName(k), file: `${releaseName(k)}.flac`, bufnum: 500 + i })),
+       ],
+       fileFor: (near, vel) => salamanderName(near, bandFor(vel)),
+       releaseFor: (key) => (key >= 21 && key <= 108 ? releaseName(key) : null) },
+  2: { id: 'piano-fluid', name: 'FluidR3 piano', program: 2, notes: PIANO_NOTES, peak: PIANO_PEAK, dir: SAMPLE_DIR,
        files: PIANO_NOTES.map((n, i) => ({ key: `${n}`, file: `${n}.flac`, bufnum: i })),
        fileFor: (near) => `${near}` },
   1: { id: 'rhodes', name: 'Rhodes', program: 1, notes: RHODES_NOTES, peak: RHODES_PEAK, dir: RHODES_DIR,
@@ -138,11 +184,28 @@ export const isForSampler = (msg) => msg?.node === 'sampler';
  * is the whole output; `loaded(program)` says whether a set's buffers are in.
  * Every decision about a note is here, so `test.mjs` drives it with a fake.
  */
-export function createSamplerCore({ send, voices: cap = VOICES, buffers = new Map(), log = () => {}, onProgram = () => {} } = {}) {
+export function createSamplerCore({ send, voices: cap = VOICES, buffers = new Map(), log = () => {}, onProgram = () => {},
+  now = () => Date.now() / 1000 } = {}) {
   let program = 0, nextId = 2000;
-  const live = [];                // { id, note, damped }, oldest first
-  const stat = { started: 0, stolen: 0, dropped: 0, ended: 0, programs: [], last: null, peakVoices: 0 };
-  const release = (note, sec) => { for (const v of live) if (v.note === note && !v.damped) damp(v, sec); };
+  const live = [];                // { id, note, damped, set, vel, at }, oldest first
+  const stat = { started: 0, stolen: 0, dropped: 0, ended: 0, releases: 0, programs: [], last: null, peakVoices: 0 };
+  /**
+   * The damper falls on a key: its voices ramp out, and a Salamander string
+   * makes its key-off sound (only when a sounding voice was damped, never on a
+   * key up under the pedal, which pedal.mjs does not pass here). A release
+   * voice is not counted in `live`: it is under half a second and frees itself.
+   */
+  const release = (note, sec) => {
+    let fell = null;
+    for (const v of live) if (v.note === note && !v.damped) { damp(v, sec); fell ??= v; }
+    const set = fell && SETS[fell.program];
+    const key = set?.releaseFor?.(note);
+    const b = key && buffers.get(`${set.id}:${key}`);
+    if (!b) return;
+    const amp = set.releaseGain(fell.vel, now() - fell.at) * (b.channels === 2 ? 0.5 : 1);
+    send('/s_new', [b.channels === 2 ? 'posSampler2' : 'posSampler1', nextId++, 1, 0, 'buf', b.bufnum, 'rate', 1, 'amp', amp]);
+    stat.releases++;
+  };
   const pedal = createPedal({ cc: SUSTAIN_CC, release });
   function damp(v, sec) {
     if (v.damped) return;
@@ -162,10 +225,10 @@ export function createSamplerCore({ send, voices: cap = VOICES, buffers = new Ma
     for (const v of live) if (v.note === note) damp(v, 0.04);
     while (live.length >= cap) { const old = live[0]; damp(old, 0.02); remove(old); stat.stolen++; }
     const rate = Math.pow(2, (note - near) / 12);
-    const amp = velGain(set.peak, vel) * (b.channels === 2 ? 0.5 : 1);
+    const amp = (set.gain ? set.gain(vel) : velGain(set.peak, vel)) * (b.channels === 2 ? 0.5 : 1);
     const id = nextId++;
     send('/s_new', [b.channels === 2 ? 'posSampler2' : 'posSampler1', id, 1, 0, 'buf', b.bufnum, 'rate', rate, 'amp', amp]);
-    live.push({ id, note, damped: false });
+    live.push({ id, note, damped: false, program, vel, at: now() });
     stat.started++;
     stat.peakVoices = Math.max(stat.peakVoices, live.length);
     stat.last = { set: set.id, note, near, file: key, rate: +rate.toFixed(4), amp: +amp.toFixed(4), id };
@@ -175,7 +238,7 @@ export function createSamplerCore({ send, voices: cap = VOICES, buffers = new Ma
   function control(c, v) { return pedal.control(c, v); }
   function setProgram(p) {
     stat.programs.push(p);
-    if (!SETS[p]) { log(`program ${p} is not a set here, 0 is the piano and 1 the Rhodes`); return { ok: false, reason: `program ${p} is not a set here` }; }
+    if (!SETS[p]) { log(`program ${p} is not a set here, 0 is the piano, 1 the Rhodes and 2 the FluidR3 piano`); return { ok: false, reason: `program ${p} is not a set here` }; }
     if (p === program) return { ok: true, program: p, set: SETS[p].id, changed: false };
     program = p;
     for (const v of [...live]) { damp(v, 0.06); remove(v); }
@@ -229,7 +292,7 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   if (!samplerAvailable()) return { ok: false, reason: 'scsynth, sclang or jackd is not installed on this board' };
   const j = await ensureJackd({ onLog });
   if (!j.ok) return { ok: false, reason: j.reason };
-  const piano = await ensurePiano({ onLog }).catch((e) => ({ error: e.message }));
+  const piano = await ensureSalamander({ onLog }).catch((e) => ({ error: e.message }));
   if (piano.error) return { ok: false, reason: `the piano samples are not on the card: ${piano.error}` };
   const defs = await ensureDefs(onLog);
   if (!defs.ok) return { ok: false, reason: 'the SynthDefs could not be written' };
@@ -276,10 +339,23 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   const dl = await ask('/d_loadDir', [DEF_DIR], (m) => m.addr === '/done' && m.args[0] === '/d_loadDir');
   if (!dl) { stop(); return { ok: false, reason: 'scsynth did not load the SynthDefs' }; }
 
-  /** Read one set's files into buffers, in parallel, and ask each its channel count. */
+  /**
+   * Read one set's files into buffers, four at a time, and ask each its channel
+   * count. Four, not all at once: scsynth reads files one after another on its
+   * own thread, so 208 Salamander requests sent together would queue behind
+   * each other and the later ones would outlive their 8 s answer timeout.
+   */
   async function loadSet(set) {
     const t = Date.now();
-    const got = await Promise.all(set.files.map(async (f) => {
+    const pool = async (items, n, fn) => {
+      const res = new Array(items.length);
+      let next = 0;
+      await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+        while (next < items.length) { const i = next++; res[i] = await fn(items[i]); }
+      }));
+      return res;
+    };
+    const got = await pool(set.files, 4, async (f) => {
       const path = join(set.dir, f.file);
       if (!existsSync(path)) return null;
       const d = await ask('/b_allocRead', [f.bufnum, path, 0, -1], (m) => m.addr === '/done' && m.args[0] === '/b_allocRead' && m.args[1] === f.bufnum, 8000);
@@ -289,7 +365,7 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
       const b = { bufnum: f.bufnum, frames: info.args[1], channels: info.args[2], rate: info.args[3] };
       buffers.set(`${set.id}:${f.key}`, b);
       return b;
-    }));
+    });
     const n = got.filter(Boolean).length;
     onLog?.(`${set.name}: ${n} of ${set.files.length} recordings in scsynth in ${Date.now() - t} ms`);
     return { loaded: n, of: set.files.length, ms: Date.now() - t };
@@ -299,9 +375,9 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
     if (loading.has(p)) return loading.get(p);
     const set = SETS[p];
     const job = (async () => {
-      if (set.id === 'rhodes') {
-        const r = await ensureRhodes({ onLog }).catch((e) => ({ error: e.message }));
-        if (r.error) { onLog?.(`the Rhodes could not be fetched: ${r.error}`); loading.delete(p); return { loaded: 0, of: set.files.length, error: r.error }; }
+      if (set.id === 'rhodes' || set.id === 'piano-fluid') {
+        const r = await (set.id === 'rhodes' ? ensureRhodes : ensurePiano)({ onLog }).catch((e) => ({ error: e.message }));
+        if (r.error) { onLog?.(`the ${set.name} could not be fetched: ${r.error}`); loading.delete(p); return { loaded: 0, of: set.files.length, error: r.error }; }
       }
       return loadSet(set);
     })();

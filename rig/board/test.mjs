@@ -11,7 +11,7 @@ import { parseJackLsp, jackChain, jackRebuild , setBayRows, jackdArgs, cardPortN
 import * as jack from './jack.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
-import { fresher, midiKey, MAX_PEERS } from './rtc.mjs';
+import { fresher, midiKey, MAX_PEERS, noteKey, fresherNote, createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { graphProblem, createRegistry } from '../../demo/shell/graph-registry.mjs';
 import { EventEmitter } from 'node:events';
@@ -19,9 +19,10 @@ import { constants as FS_C } from 'node:fs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
-import { keyRanges, pianoSfz, ensurePiano, PIANO_NOTES, RHODES_NOTES, RHODES_FILES, ensureRhodes } from './sampler.mjs';
+import { keyRanges, pianoSfz, ensurePiano, PIANO_NOTES, RHODES_NOTES, RHODES_FILES, ensureRhodes,
+         ensureSalamander, SALAMANDER_FILES } from './sampler.mjs';
 import { createSamplerCore, startPlan, stopPlan, isForSampler, nearestIn, layerFor, rhodesLayerAt, velGain, SETS,
-         PIANO_PEAK, RHODES_PEAK, scsynthArgs, SC_ENV } from './scsampler.mjs';
+         PIANO_PEAK, RHODES_PEAK, scsynthArgs, SC_ENV, bandFor, pianoGain, releaseGain, PIANO_BANDS } from './scsampler.mjs';
 import { setStandingRows, getStandingRows, pappusScsynthPids, SAMPLER_SC_PORT } from './jacksynth.mjs';
 import { JACK_ENDS } from '../../demo/shell/graph-registry.mjs';
 import { join } from 'node:path';
@@ -1154,6 +1155,119 @@ console.log('\nrtc: the direct path, against a fake peer');
   is('closing the board closes every peer', pcs.every((p) => p.closed), true);
 }
 
+console.log('\nrtc: the MAIN socket\'s direct path (studio-1, the synth capture)');
+{
+  // Found 2026-10-11: /concepts/sampler/035/ offered in studio-1 and the main
+  // socket had no handler, so it waited 3 s for nothing. These are that socket.
+  is('a main socket note is keyed by node, channel and note', noteKey({ type: 'note.on', node: 'sampler', note: 60 }), 'sampler:0:60');
+  is('a Yoshimi note has no node', noteKey({ type: 'note.off', channel: 2, note: 61 }), ':2:61');
+  is('anything else has no key', noteKey({ type: 'voice.select', program: 1 }), null);
+  const nl = new Map();
+  is('a note off that overtook its note on applies', fresherNote(nl, { type: 'note.off', node: 'sampler', note: 64, n: 2 }), true);
+  is('NEGATIVE CONTROL: and the late note on is refused', fresherNote(nl, { type: 'note.on', node: 'sampler', note: 64, n: 1 }), false);
+  is('the same note on another node is not held back', fresherNote(nl, { type: 'note.on', note: 64, n: 1 }), true);
+  is('an unnumbered note from an older page applies', fresherNote(nl, { type: 'note.on', node: 'sampler', note: 64 }), true);
+
+  const pcs = [];
+  class FakeDC {
+    constructor(label) { this.label = label; this.out = []; this.open = true; this.backlog = 0; }
+    getLabel() { return this.label; } isOpen() { return this.open; } bufferedAmount() { return this.backlog; }
+    sendMessage(x) { this.out.push(JSON.parse(x)); } sendMessageBinary(b) { this.out.push(b); }
+    onMessage(f) { this.recv = f; } close() { this.open = false; }
+  }
+  class FakePC {
+    constructor(name, cfg) { this.name = name; this.cfg = cfg; this.cands = []; this.closed = false; pcs.push(this); }
+    onLocalDescription(f) { this.ld = f; } onLocalCandidate(f) { this.lc = f; }
+    onStateChange(f) { this.sc = f; } onDataChannel(f) { this.dcf = f; }
+    setRemoteDescription(sdp, kind) { this.remote = [sdp, kind]; this.ld('v=0 answer', 'answer'); this.lc('candidate:1 1 UDP 1 <pi> 5000 typ host', '0'); }
+    addRemoteCandidate(c, mid) { this.cands.push([c, mid]); }
+    close() { this.closed = true; }
+    channels() { const pcm = new FakeDC('pcm'), ctl = new FakeDC('ctl'); this.dcf(pcm); this.dcf(ctl); return { pcm, ctl }; }
+  }
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let t = 0;
+  // The board's handler as far as these verbs go: what it was asked, and its
+  // answer through whichever reply it was handed.
+  const asked = [];
+  const handle = async (m, reply) => {
+    asked.push(m);
+    if (m.type === 'boom') throw new Error('kaboom');
+    if (m.type === 'note.on' || m.type === 'note.off') return reply('note.ack', { note: m.note, ...(m.node ? { node: m.node } : {}) });
+    if (m.type === 'voice.select') return reply('voice.selected', { ok: true, node: m.node, program: m.program });
+  };
+
+  // a board with no library answers out loud, rather than leaving a page waiting
+  const bareOut = [];
+  const bare = createMainDirect({ PeerConnection: null, signal: (m) => bareOut.push(m), handle, frame: 960, rate: 48000 });
+  is('a main socket with no library says direct false', bare.direct, false);
+  is('an offer to it is the direct path\'s business', bare.signalling({ type: 'rtc.offer', peer: 'page1', sdp: 'v=0' }), true);
+  is('and is refused out loud, addressed to that peer', [bareOut.at(-1)?.type, bareOut.at(-1)?.peer], ['rtc.refused', 'page1']);
+  is('anything else is left to the handler', bare.signalling({ type: 'note.on', note: 60 }), false);
+
+  const out = [];
+  const md = createMainDirect({ PeerConnection: FakePC, signal: (m) => out.push(m), handle, frame: 960, rate: 48000, now: () => t });
+  is('a main socket with the library says direct true', md.direct, true);
+  md.signalling({ type: 'rtc.offer', peer: 'page1', sdp: 'v=0 offer', frameMs: 10 });
+  is('an offer in studio-1 makes a peer', pcs.length, 1);
+  const ans = out.find((m) => m.type === 'rtc.answer');
+  is('the answer goes back into the room, addressed to that peer', [ans?.peer, ans?.sdp], ['page1', 'v=0 answer']);
+  md.signalling({ type: 'rtc.candidate', peer: 'page1', cand: 'candidate:9 1 udp 1 x.local 1 typ host', mid: '0' });
+  is('the page\'s candidate reaches its peer', pcs[0].cands.length, 1);
+
+  const { pcm, ctl } = pcs[0].channels();
+  is('ctl opens with 10 ms, one channel, 48 kHz', [ctl.out[0].type, ctl.out[0].frameMs, ctl.out[0].audioChannels, ctl.out[0].rate], ['rtc.hello', 10, 1, 48000]);
+  ctl.recv(JSON.stringify({ type: 'note.on', id: 'a', n: 1, node: 'sampler', note: 60, vel: 90 }));
+  await tick();
+  is('a sampler note over ctl reaches the main handler unchanged', [asked.at(-1)?.type, asked.at(-1)?.node, asked.at(-1)?.note], ['note.on', 'sampler', 60]);
+  is('and is answered on ctl, with the question\'s id', [ctl.out.at(-1).type, ctl.out.at(-1).re, ctl.out.at(-1).node], ['note.ack', 'a', 'sampler']);
+  is('not into the relay room', out.some((m) => m.type === 'note.ack'), false);
+  ctl.recv(JSON.stringify({ type: 'voice.select', id: 'v', node: 'sampler', program: 1 }));
+  await tick();
+  is('voice.select over ctl is answered on ctl', [ctl.out.at(-1).type, ctl.out.at(-1).re], ['voice.selected', 'v']);
+  ctl.recv(JSON.stringify({ type: 'note.off', id: 'b', n: 3, channel: 0, note: 62 }));
+  ctl.recv(JSON.stringify({ type: 'note.on', id: 'c', n: 2, channel: 0, note: 62, vel: 100 }));
+  await tick();
+  is('a Yoshimi note on that arrives after its own note off is dropped', asked.some((m) => m.type === 'note.on' && m.note === 62), false);
+  ctl.recv(JSON.stringify({ type: 'boom', id: 'x' }));
+  await tick(); await tick();
+  is('a handler that throws is answered on ctl, never left unhandled', [ctl.out.at(-1).type, ctl.out.at(-1).re, ctl.out.at(-1).error], ['board.error', 'x', 'kaboom']);
+  ctl.recv(JSON.stringify({ type: 'rtc.offer', peer: 'sneaky', sdp: 'v=0' }));
+  is('ctl cannot open another peer', pcs.length, 1);
+
+  // 48 kHz, 960 a relay frame, so 480 a unit
+  const unit = (v) => new Int16Array(480).fill(v);
+  md.unit(unit(5));
+  const bins = () => pcm.out.filter((x) => Buffer.isBuffer(x));
+  is('a 10 ms unit off the JACK capture reaches the peer at once', bins().length, 1);
+  const b0 = bins()[0];
+  is('with the same 12 byte header and 480 mono samples', [b0.length, b0.readUInt32LE(0), b0.readInt16LE(12)], [12 + 960, 0, 5]);
+  const whole = new Int16Array(960); whole.fill(1, 0, 480); whole.fill(2, 480);
+  md.frame(whole);
+  is('a whole 20 ms frame from a pipe source goes as two units', [bins().length, bins()[1].readInt16LE(12), bins()[2].readInt16LE(12), bins()[2].readUInt32LE(0)], [3, 1, 2, 2]);
+  pcm.backlog = 1 << 20; md.unit(unit(6));
+  is('a peer that is not draining loses the unit rather than queueing it', bins().length, 3);
+  pcm.backlog = 0;
+  is('the status names the peer and what it was sent', [md.status()[0].peer, md.status()[0].sent, md.status()[0].dropped, md.status()[0].open], ['page1', 3, 1, true]);
+
+  // a peer that goes quiet lets go of ITS notes, through the same handler
+  ctl.recv(JSON.stringify({ type: 'note.on', id: 'h1', n: 4, node: 'sampler', note: 67, vel: 100 }));
+  ctl.recv(JSON.stringify({ type: 'note.on', id: 'h2', n: 5, channel: 1, note: 48, vel: 100 }));
+  ctl.recv(JSON.stringify({ type: 'note.on', id: 'h3', n: 6, node: 'sampler', note: 69, vel: 100 }));
+  ctl.recv(JSON.stringify({ type: 'note.off', id: 'h4', n: 7, node: 'sampler', note: 69 }));
+  await tick();
+  const n0 = asked.length;
+  t += 61_000; md.sweep();
+  await tick();
+  is('a peer silent on ctl for a minute is closed', pcs[0].closed, true);
+  const offs = asked.slice(n0).map((m) => [m.type, m.node ?? null, m.channel, m.note]);
+  is('its held notes get a note off each, on the node they were played on',
+    offs.sort(), [['note.off', null, 1, 48], ['note.off', 'sampler', 0, 60], ['note.off', 'sampler', 0, 67]].sort());
+  is('a note it already let go of is not sent again', offs.some((o) => o[3] === 69), false);
+  md.signalling({ type: 'rtc.offer', peer: 'page2', sdp: 'v=0' });
+  md.close();
+  is('closing the board closes every peer', pcs.every((p) => p.closed), true);
+}
+
 // ── what the board says about itself ────────────────────────────────────────
 // `board.hello` and `board.alive` carry `graph` since 2026-10-04 (plans/
 // plan-universal-routing.md §11 step 3). Built from the board's own facts: the
@@ -1168,6 +1282,11 @@ console.log('\nbeat: the graph on the hello and on every beat');
     frameMs: 20, instruments: graphFacts.instruments, error: null, hint: null, graphFacts });
   const alive = aliveMsg({ name: 'positron-board', id: 'b-7f3a', upSec: 3600, audio: 'synth', voices: 2, frames: 180000,
     insert: { fx: null, fxBy: null, fxAgoSec: null, fxHeld: false }, graphFacts });
+  is('a hello given no direct flag carries none, as before', 'direct' in hello, false);
+  is('the main hello and beat say direct when the socket answers an offer',
+    [helloMsg({ name: 'p', id: 'b', backend: 'alsa', ports, dry: false, since: 1, frameMs: 20, instruments: {}, graphFacts, direct: true }).direct,
+     aliveMsg({ name: 'p', id: 'b', upSec: 1, audio: null, voices: 0, frames: 0, insert: {}, graphFacts, direct: false }).direct],
+    [true, false]);
   is('the hello is still a board.hello with its old fields', [hello.type, hello.ports, hello.audioChannels, hello.instruments.yoshimi],
     ['board.hello', 5, 1, true]);
   is('the hello carries a graph graphProblem accepts', graphProblem(hello.graph), '');
@@ -1310,12 +1429,20 @@ console.log('\nbeat: the graph on the hello and on every beat');
   console.log('sampler: the rules a key is played by');
   const sent = [];
   const bufs = new Map();
-  SETS[0].files.forEach((f) => bufs.set(`piano:${f.key}`, { bufnum: f.bufnum, channels: 2 }));
-  const core = createSamplerCore({ send: (addr, args) => sent.push([addr, ...args]), buffers: bufs, voices: 3 });
+  // The notes are faked stereo, so the halving is graded; the releases are not loaded yet.
+  SETS[0].files.filter((f) => f.key.startsWith('p')).forEach((f) => bufs.set(`piano:${f.key}`, { bufnum: f.bufnum, channels: 2 }));
+  let clock = 100;
+  const core = createSamplerCore({ send: (addr, args) => sent.push([addr, ...args]), buffers: bufs, voices: 3, now: () => clock });
   const n60 = core.noteOn(60, 127);
   is('60 plays its own recording at rate 1, through the stereo def', [n60.near, n60.rate, sent[0][1]], [60, 1, 'posSampler2']);
   ok('a stereo voice is halved, so the summed capture lands where one browser channel does',
-    Math.abs(n60.amp - velGain(PIANO_PEAK, 127) / 2) < 1e-4, String(n60.amp));
+    Math.abs(n60.amp - pianoGain(127) / 2) < 1e-4, String(n60.amp));
+  {
+    const c2 = createSamplerCore({ send: () => {}, buffers: bufs });
+    is('the piano is the Salamander: 127 plays the v16 file, 100 the v11, 64 the v6, 20 the v1',
+      [n60.file, c2.noteOn(61, 100).file, c2.noteOn(59, 64).file, c2.noteOn(58, 20).file],
+      ['p060-v16', 'p060-v11', 'p060-v6', 'p057-v1']);
+  }
   const n62 = core.noteOn(62, 64);
   is('62 is nearer 63 and plays it a semitone down', [n62.near, n62.rate], [63, +Math.pow(2, -1 / 12).toFixed(4)]);
   sent.length = 0;
@@ -1336,6 +1463,34 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the pedal up lets it go over the damper\'s 0.12 s', sent.filter((m) => m[0] === '/n_set'), [['/n_set', held.id, 'rel', 0.12, 'gate', 0]]);
   core.ended(held.id);
   is('scsynth saying a node ended takes it off the count', core.sounding(), 0);
+
+  // The key-off samples: with them loaded, a damper landing plays one, mono,
+  // at rate 1 from the KEY's own file, at hammer.txt's level.
+  SETS[0].files.filter((f) => f.key.startsWith('rel')).forEach((f) => bufs.set(`piano:${f.key}`, { bufnum: f.bufnum, channels: 1 }));
+  sent.length = 0;
+  clock = 200;
+  const k = core.noteOn(62, 100);
+  clock = 203;
+  core.noteOff(62);
+  const rel = sent.filter((m) => m[0] === '/s_new' && m[1] === 'posSampler1');
+  is('a key up plays rel062 once, at rate 1, after the damper', [rel.length, rel[0]?.[6], rel[0]?.[8], sent.findIndex((m) => m[0] === '/n_set') < sent.indexOf(rel[0])],
+    [1, SETS[0].files.find((f) => f.key === 'rel062').bufnum, 1, true]);
+  ok('at volume -37 dB with velocity and the 3 s held taken off by rt_decay', Math.abs(rel[0]?.[10] - releaseGain(100, 3)) < 1e-9
+    && releaseGain(100, 3) < releaseGain(100, 0) && releaseGain(30, 0) < releaseGain(100, 0), String(rel[0]?.[10]));
+  core.ended(k.id);
+  sent.length = 0;
+  core.control(64, 127);
+  const p2 = core.noteOn(64, 90);
+  core.noteOff(64);
+  is('NEGATIVE CONTROL: a key up under the pedal plays no key-off sound', sent.filter((m) => m[0] === '/s_new').length, 1);
+  core.noteOn(64, 90);
+  is('NEGATIVE CONTROL: a key struck again damps but plays no key-off sound', sent.filter((m) => m[0] === '/s_new').length, 2);
+  core.noteOff(64);
+  core.control(64, 0);
+  is('the pedal lifting is the damper landing, so it plays one', sent.filter((m) => m[0] === '/s_new' && m[1] === 'posSampler1').length, 1);
+  core.panic();
+  is('NEGATIVE CONTROL: a panic plays no key-off sound', sent.filter((m) => m[0] === '/s_new' && m[1] === 'posSampler1').length, 1);
+  core.ended(p2.id);
   core.noteOn(50, 100);
   sent.length = 0;
   is('program 1 is the Rhodes and damps what was sounding', [core.program(1).set, sent[0]?.[0], sent[0]?.[3]], ['rhodes', '/n_set', 0.06]);
@@ -1345,6 +1500,12 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the Rhodes picks the hardest layer at 127 and falls back over a hole', [layerFor(127), rhodesLayerAt(81, 1), rhodesLayerAt(96, 3)], [1, 2, 4]);
   is('a Rhodes key between two recordings goes to the lower on a tie', nearestIn(RHODES_NOTES, 32), 29);
   is('65 Rhodes files with buffer numbers of their own', [SETS[1].files.length, RHODES_FILES.length, SETS[1].files[0].bufnum], [65, 65, 100]);
+  {
+    const nums = Object.values(SETS).flatMap((x) => x.files.map((f) => f.bufnum));
+    is('208 Salamander files, and no buffer number is used twice across the three sets, all under 1024',
+      [SETS[0].files.length, new Set(nums).size === nums.length, Math.max(...nums) < 1024], [208, true, true]);
+    is('program 2 is still the FluidR3 piano', [core.program(2).set, SETS[2].files.length, SETS[2].files[0].file], ['piano-fluid', 30, '21.flac']);
+  }
 
   console.log('sampler: the board\'s copy against the browser\'s module');
   // The browser module imports `/shell/pedal.mjs` by an absolute URL; that one
@@ -1359,7 +1520,10 @@ console.log('\nbeat: the graph on the hello and on every beat');
   }
   for (let v = 1; v < 128; v++) {
     if (web.layerFor(v) !== layerFor(v)) diffs.push(`layer ${v}`);
-    if (Math.abs(web.velGain(web.PIANO, v) - velGain(PIANO_PEAK, v)) > 1e-9) diffs.push(`piano gain ${v}`);
+    if (Math.abs(web.velGain(web.PIANO, v) - pianoGain(v)) > 1e-9) diffs.push(`piano gain ${v}`);
+    if (Math.abs(web.velGain(web.PIANO_FLUID, v) - velGain(PIANO_PEAK, v)) > 1e-9) diffs.push(`fluid gain ${v}`);
+    if (web.bandFor(v) !== bandFor(v)) diffs.push(`band ${v}`);
+    if (Math.abs(web.releaseGain(v, 1.5) - releaseGain(v, 1.5)) > 1e-9) diffs.push(`release gain ${v}`);
     if (Math.abs(web.velGain(web.RHODES, v) - velGain(RHODES_PEAK, v)) > 1e-9) diffs.push(`rhodes gain ${v}`);
   }
   for (const n of RHODES_NOTES) for (const l of [1, 2, 3, 4, 5]) if (web.rhodesLayerAt(n, l) !== rhodesLayerAt(n, l)) diffs.push(`hole ${n}-${l}`);
@@ -1367,6 +1531,19 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the board plays every note, velocity and layer exactly as the browser module does', diffs, []);
   is('and fetches the same file names the browser does',
     RHODES_FILES.every((f) => web.RHODES.file(+f.slice(7, 10), +f.slice(-1)).endsWith(`/${f}.m4a`)), true);
+  is('the Salamander: the same bands, and the same 120 note and 88 release names as the browser',
+    [JSON.stringify(web.PIANO_BANDS) === JSON.stringify(PIANO_BANDS),
+     SALAMANDER_FILES.filter((f) => f.startsWith('p')).every((f) => web.PIANO.file(+f.slice(1, 4), +f.slice(6)).endsWith(`/salamander/web/${f}.m4a`)),
+     SALAMANDER_FILES.filter((f) => f.startsWith('rel')).every((f) => web.PIANO.release(+f.slice(3)).endsWith(`/salamander/web/${f}.m4a`))],
+    [true, true, true]);
+  is('NEGATIVE CONTROL: no key outside A0 to C8 has a release, and no name carries a #',
+    [web.PIANO.release(20), web.PIANO.release(109), SALAMANDER_FILES.some((f) => f.includes('#'))], [null, null, false]);
+  {
+    const p = web.PIANO.plan(60, 11), b = web.PIANO.behind(60, 11, 61);
+    is('a press waits on ONE file, and the rest of its octave follows behind it',
+      [p.urls.length, p.urls[0].split('/').pop(), b[0].split('/').pop(), b.slice(1, 5).map((u) => u.split('/').pop()), b.length, new Set(b).size],
+      [1, 'p060-v11.m4a', 'rel061.m4a', ['p060-v11.m4a', 'p063-v11.m4a', 'p066-v11.m4a', 'p069-v11.m4a'], 28, 28]);
+  }
 
   // The Rhodes fetch, against a fake network: the 65, once.
   const rdir = mkdtempSync(join(tmpdir(), 'rhodes-'));
@@ -1376,6 +1553,20 @@ console.log('\nbeat: the graph on the hello and on every beat');
   const r2 = await ensureRhodes({ dir: rdir, fetchImpl: async () => { throw new Error('asked twice'); }, convert: () => {} });
   is('the Rhodes comes down once, 65 files, and a second run asks nobody', [r1.fetched, r1.missing.length, r2.fetched, asked.length], [65, 0, 0, 65]);
   rmSync(rdir, { recursive: true, force: true });
+
+  // The Salamander fetch: the 208, once, already FLAC, from salamander/pi/.
+  const sdir = mkdtempSync(join(tmpdir(), 'salamander-'));
+  const sasked = [];
+  const s1 = await ensureSalamander({ dir: sdir, fetchImpl: async (u) => { sasked.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) }; } });
+  const s2 = await ensureSalamander({ dir: sdir, fetchImpl: async () => { throw new Error('asked twice'); } });
+  is('the Salamander comes down once, 208 FLACs from salamander/pi/, and a second run asks nobody',
+    [s1.fetched, s1.missing.length, s2.fetched, sasked.length, sasked.every((u) => /\/sampler\/salamander\/pi\/(p\d{3}-v\d+|rel\d{3})\.flac$/.test(u))],
+    [208, 0, 0, 208, true]);
+  is('no temporary file is left, and the licence is beside them', [readdirSync(sdir).filter((f) => f.startsWith('.')), readdirSync(sdir).includes('LICENSE-salamander')], [[], true]);
+  const sbad = await ensureSalamander({ dir: mkdtempSync(join(tmpdir(), 'salamander-')), fetchImpl: async () => ({ ok: false, status: 404 }) })
+    .then(() => 'resolved', (e) => e.message);
+  ok('NEGATIVE CONTROL: a refused file is an error naming it', /p021-v1\.flac answered 404/.test(sbad), sbad);
+  rmSync(sdir, { recursive: true, force: true });
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

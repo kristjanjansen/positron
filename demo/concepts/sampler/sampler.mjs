@@ -3,27 +3,34 @@
 // bucket instead of the site's own static files.
 //
 // What is the same as /nola/ (demo/nola/index.html), and why it matters:
-//   - the PIANO is thirty recordings three semitones apart, A0 to C8, so every
-//     key is at most one semitone from a file and plays it at 2^(shift/12);
 //   - the RHODES is fifteen notes at uneven steps and five velocity layers,
 //     layer 1 the hardest, picked by the author's own SFZ crossfade table, with
 //     his fallback where two layers have holes;
 //   - a tie between two recordings goes to the lower one (his SFZ says so);
-//   - level is the player's: one curve over velocity, scaled per instrument by
-//     the loudest file, because the piano files sit 21 dB down and the Rhodes
-//     files at full scale;
 //   - the damper is a ramp, never a stop(), and the pedal is /shell/pedal.mjs;
 //   - a key struck again damps the voice it is about to replace;
 //   - 64 voices, oldest taken first past that;
 //   - a note let go while its recording was still loading SOUNDS and is damped
 //     at once, rather than being dropped or ringing on;
-//   - the piano loads an octave at a time, the Rhodes every layer of one note,
-//     keyed by URL, each URL fetched and decoded once.
+//   - every URL is fetched and decoded once.
 //
-// What is different: the files come from R2 (`positron-station`, served by the
-// station worker at /media/, CORS `*`), nothing at all is opened before the
-// first note, and an instrument is chosen by a MIDI program change (0 piano,
-// 1 Rhodes), which is how every instrument on this desk is switched.
+// THE PIANO IS THE SALAMANDER GRAND (plans/plan-piano-samples.md), since
+// 2026-10-11, replacing /nola/'s FluidR3 render, which MEASURED brighter than
+// a Yamaha C5 struck as hard as it can be, phase cancelling above middle C and
+// cut dead at 3.13 s. Thirty notes three apart, A0 to C8 (the same grid, so
+// `nearestIn` is unchanged), four velocity bands hard switched (v1, v6, v11,
+// v16 of Salamander's sixteen), capped at 8 s with a 1.5 s fade, and the 88
+// key-off release samples played when the damper falls. Made by
+// demo/resources/fetch-salamander.mjs, served from R2 at sampler/salamander/web/.
+// A press fetches ONE file, the one it plays; the rest of its octave, the
+// octave's releases and the other bands follow behind it, one file at a time.
+// The FluidR3 piano is still here as PIANO_FLUID (program 2) and still in R2
+// at sampler/piano/, so nothing that pointed at it breaks.
+//
+// What is different from /nola/: the files come from R2 (`positron-station`,
+// served by the station worker at /media/, CORS `*`), nothing at all is opened
+// before the first note, and an instrument is chosen by a MIDI program change
+// (0 piano, 1 Rhodes), which is how every instrument on this desk is switched.
 import { createPedal, SUSTAIN_CC } from '/shell/pedal.mjs';
 
 export const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/sampler/';
@@ -40,16 +47,63 @@ export const nearestIn = (notes, note) => notes.reduce(
 export const VOICES = 64;
 /** How long a note sounds whose key was already up when its recording arrived. */
 const LATE_S = 0.3;
-/** The loudest piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
-const PIANO_PEAK = 0.097;
+/** The loudest FluidR3 piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
+const FLUID_PEAK = 0.097;
+/**
+ * The loudest Salamander v16 file as encoded, decoded back, from
+ * PROVENANCE-salamander.json (`peak.web`). ONE number for the whole set, so the
+ * 18 dB the recordings carry between v1 and v16 is kept (plan section 4.2).
+ */
+const SALAMANDER_PEAK = 0.9085;
 /** The loudest Rhodes file, from PROVENANCE-rhodes.json. */
 const RHODES_PEAK = 0.9981;
 /** Where one note played as hard as possible lands. */
 const LOUDEST = 0.30;
 
-/** What one press is worth, before the damper. /nola/'s curve, unchanged. */
-export const velGain = (ins, vel) =>
-  (LOUDEST / ins.peak) * Math.pow(Math.max(1, Math.min(127, vel)) / 127, 1.5);
+const clampVel = (vel) => Math.max(1, Math.min(127, Math.round(vel)));
+
+/** What one press is worth, before the damper: the instrument's own rule, or /nola/'s curve. */
+export const velGain = (ins, vel) => (ins.gain ? ins.gain(vel)
+  : (LOUDEST / ins.peak) * Math.pow(clampVel(vel) / 127, 1.5));
+
+/**
+ * The Salamander's four bands, hard switched, no crossfade (plan section 4.1).
+ * Salamander's own SFZ ranges for these files are 1-26, 47-50, 81-88, 121-127.
+ */
+export const PIANO_BANDS = Object.freeze([
+  { layer: 1, lo: 1, hi: 40 },
+  { layer: 6, lo: 41, hi: 72 },
+  { layer: 11, lo: 73, hi: 104 },
+  { layer: 16, lo: 105, hi: 127 },
+]);
+export const bandOf = (vel) => { const v = clampVel(vel); return PIANO_BANDS.find((b) => v <= b.hi); };
+/** The Salamander layer a velocity plays. */
+export const bandFor = (vel) => bandOf(vel).layer;
+/**
+ * Within a band the level rises 6 dB from its bottom to its top; between bands
+ * the recordings carry the step themselves. INFERRED in the plan (section 4.2)
+ * from Salamander's own `amp_veltrack=75`; tune by ear.
+ */
+export const BAND_SPAN_DB = 6;
+export function pianoGain(vel) {
+  const v = clampVel(vel), b = bandOf(v);
+  const db = -BAND_SPAN_DB * (b.hi - v) / (b.hi - b.lo);
+  return (LOUDEST / SALAMANDER_PEAK) * Math.pow(10, db / 20);
+}
+/**
+ * A key-off sample's level, from Salamander's Data/hammer.txt: `volume=-37`,
+ * `amp_veltrack=82` on SFZ's default square curve, `rt_decay=2` dB for every
+ * second the note was held. On the set's one normalising constant.
+ */
+export const RELEASE_DB = -37;
+export function releaseGain(vel, heldSec = 0) {
+  const v = clampVel(vel) / 127;
+  return (LOUDEST / SALAMANDER_PEAK) * Math.pow(10, RELEASE_DB / 20)
+    * (0.18 + 0.82 * v * v) * Math.pow(10, (-2 * Math.max(0, heldSec)) / 20);
+}
+/** The 88 keys with a release sample. */
+export const RELEASE_KEYS = Object.freeze(Array.from({ length: 88 }, (_, i) => 21 + i));
+const pad3 = (n) => String(n).padStart(3, '0');
 
 /** The author's crossfade table from jRhodes3d-mono.sfz. Layer 5 is the softest. */
 const RHODES_XF = [
@@ -86,26 +140,61 @@ export function rhodesLayerAt(note, layer) {
   return l;
 }
 
+/** The octave a recording sits in, for the fetch that follows a press. */
+const octaveOf = (n) => Math.floor(n / 12);
+
+export const SALAMANDER_BASE = `${BASE}salamander/web/`;
 export const PIANO = {
   id: 'piano', name: 'Piano', program: 0,
-  notes: PIANO_NOTES, peak: PIANO_PEAK,
+  notes: PIANO_NOTES, peak: SALAMANDER_PEAK, gain: pianoGain,
+  file: (note, band) => `${SALAMANDER_BASE}p${pad3(note)}-v${band}.m4a`,
+  pick: (near, vel) => bandFor(vel),
+  layerAt: (near, layer) => layer,
+  /** The key-off sample for this KEY (chromatic), or null outside A0 to C8. */
+  release: (key) => (key >= 21 && key <= 108 ? `${SALAMANDER_BASE}rel${pad3(key)}.m4a` : null),
+  releaseGain,
+  /** A press waits on its one file. */
+  plan: (near, band) => ({ key: `piano ${near} v${band}`, says: `piano note ${near} at band v${band}`,
+    urls: [PIANO.file(near, band)] }),
+  /** What follows it, in order: the key's release, the octave at that band, the octave's releases, the other bands. */
+  behind: (near, band, key) => {
+    const oct = PIANO_NOTES.filter((n) => octaveOf(n) === octaveOf(near));
+    const keys = RELEASE_KEYS.filter((k) => octaveOf(k) === octaveOf(near));
+    return [
+      PIANO.release(key),
+      ...oct.map((n) => PIANO.file(n, band)),
+      ...keys.filter((k) => k !== key).map((k) => PIANO.release(k)),
+      ...PIANO_BANDS.filter((b) => b.layer !== band).flatMap((b) => oct.map((n) => PIANO.file(n, b.layer))),
+    ].filter(Boolean);
+  },
+};
+/** /nola/'s FluidR3 piano, as it was before 2026-10-11, at program 2. Still in R2 at sampler/piano/. */
+export const PIANO_FLUID = {
+  id: 'piano-fluid', name: 'FluidR3 piano', program: 2,
+  notes: PIANO_NOTES, peak: FLUID_PEAK,
   file: (note) => `${BASE}piano/${note}.mp3`,
+  pick: () => null,
   layerAt: () => null,
+  plan: (near) => {
+    const oct = octaveOf(near);
+    return { key: `piano-fluid ${oct}`, says: 'this piano octave',
+      urls: PIANO_NOTES.filter((n) => octaveOf(n) === oct).map((n) => PIANO_FLUID.file(n)) };
+  },
 };
 export const RHODES = {
   id: 'rhodes', name: 'Rhodes', program: 1,
   notes: RHODES_NOTES, peak: RHODES_PEAK,
   file: (note, layer) => `${BASE}rhodes/rhodes-${String(note).padStart(3, '0')}-${layer}.m4a`,
+  pick: (near, vel) => rhodesLayerAt(near, layerFor(vel)),
   layerAt: rhodesLayerAt,
 };
 
-/** What one press needs in hand: an octave of piano, or every layer of one Rhodes note. */
-export function planFor(ins, near) {
-  if (ins.id === 'piano') {
-    const oct = Math.floor(near / 12);
-    return { key: `piano ${oct}`, says: 'this piano octave',
-      urls: ins.notes.filter((n) => Math.floor(n / 12) === oct).map((n) => ins.file(n)) };
-  }
+/**
+ * What one press needs in hand before it sounds: one Salamander file, an
+ * octave of the FluidR3 piano, or every layer of one Rhodes note.
+ */
+export function planFor(ins, near, layer) {
+  if (ins.plan) return ins.plan(near, layer);
   const layers = [1, 2, 3, 4, 5].filter((l) => !RHODES_ABSENT.has(`${near}-${l}`));
   return { key: `rhodes ${near}`, says: `Rhodes note ${near} at every velocity`,
     urls: layers.map((l) => ins.file(near, l)) };
@@ -127,10 +216,13 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
   onProgram = () => {}, warm = null } = {}) {
   let ctx = null, out = null, inst = instruments[0], loading = 0;
   const buffers = new Map();      // url -> AudioBuffer
+  const inflight = new Map();     // url -> promise, so a press and the queue behind it never fetch one file twice
   const wanted = new Map();       // plan key -> promise, so a chord fetches once
-  const voices = [];              // { note, src, gain, damped, inst }
+  const voices = [];              // { note, src, gain, damped, inst, vel, at }
   const held = new Set();         // notes under a finger
-  const stat = { files: 0, bytes: 0, urls: [], started: 0, late: 0, programs: [], firstAt: null };
+  const queue = [];               // urls to fetch behind a press, one at a time
+  let draining = false;
+  const stat = { files: 0, bytes: 0, urls: [], started: 0, late: 0, releases: 0, programs: [], firstAt: null };
 
   function ensure() {
     if (ctx) return ctx;
@@ -150,6 +242,30 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     return buf;
   }
 
+  /** One file into a buffer, once. A failure is forgotten so the next ask tries again. */
+  function load(u) {
+    if (buffers.has(u)) return Promise.resolve();
+    if (inflight.has(u)) return inflight.get(u);
+    ensure();
+    const job = (async () => {
+      try { buffers.set(u, await ctx.decodeAudioData(await pull(u))); }
+      catch (e) { log(`a recording did not load: ${e.message}`, 'warn'); }
+    })().finally(() => inflight.delete(u));
+    inflight.set(u, job);
+    return job;
+  }
+
+  /** Files a press does not wait for, fetched one at a time behind it. */
+  function behind(urls) {
+    for (const u of urls) if (!buffers.has(u) && !queue.includes(u)) queue.push(u);
+    if (draining) return;
+    draining = true;
+    loading++; onFetch(true);
+    (async () => {
+      while (queue.length) await load(queue.shift());
+    })().finally(() => { draining = false; loading--; onFetch(false); });
+  }
+
   function fetchPlan(p) {
     if (wanted.has(p.key)) return wanted.get(p.key);
     const need = p.urls.filter((u) => !buffers.has(u));
@@ -158,10 +274,7 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     const job = (async () => {
       ensure();
       // In parallel: the first note waits on the slowest file, not on the sum.
-      await Promise.all(need.map(async (u) => {
-        try { buffers.set(u, await ctx.decodeAudioData(await pull(u))); }
-        catch (e) { log(`a recording did not load: ${e.message}`, 'warn'); }
-      }));
+      await Promise.all(need.map(load));
       if (need.length) log(`${need.length} recording${need.length === 1 ? '' : 's'} for ${p.says} `
         + `came from R2 in ${Math.round(performance.now() - t0)} ms`);
     })().finally(() => {
@@ -183,8 +296,39 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     try { v.src.stop(now + sec * 1.5); } catch { /* already stopped */ }
   }
   function endVoice(v) { const i = voices.indexOf(v); if (i >= 0) voices.splice(i, 1); }
+  function take(v) { if (ctx) damp(v, 0.02); endVoice(v); }
+  /** Room for one more voice: the oldest goes past the cap. */
+  function room() { while (voices.length >= VOICES) take(voices[0]); }
+
+  /**
+   * The key-off sound, when the damper actually lands on a sounding string.
+   * Not on a key up under the pedal (pedal.mjs never calls release then), not
+   * on a key struck again, not on a steal. Skipped in silence if its file has
+   * not arrived yet: it is a detail, and a press never waits for it.
+   */
+  function keyOff(v) {
+    const ins = instruments.find((x) => x.id === v.inst);
+    const url = ins?.release?.(v.note);
+    const buf = url && buffers.get(url);
+    if (!buf) return;
+    room();
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.value = ins.releaseGain(v.vel, ctx.currentTime - v.at);
+    src.connect(g).connect(out);
+    const r = { note: null, src, gain: g, damped: false, inst: ins.id, rel: v.note };
+    src.onended = () => endVoice(r);
+    src.start();
+    voices.push(r);
+    stat.releases++;
+  }
+
+  /** The damper falls on a key: every voice of it ramps out, and a piano string makes its key-off sound. */
   function release(note, sec) {
-    for (const v of [...voices]) if (v.note === note && !v.damped) damp(v, sec);
+    let fell = null;
+    for (const v of [...voices]) if (v.note === note && !v.damped) { damp(v, sec); fell ??= v; }
+    if (fell) keyOff(fell);
   }
   const pedal = createPedal({ cc: SUSTAIN_CC, release });
 
@@ -197,22 +341,25 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     // change a note that started before it.
     const ins = inst;
     const near = nearestIn(ins.notes, note);
-    const layer = ins.layerAt(near, layerFor(vel));
+    const layer = ins.pick(near, vel);
     const url = ins.file(near, layer);
-    if (!buffers.has(url)) await fetchPlan(planFor(ins, near));
+    if (!buffers.has(url)) await fetchPlan(planFor(ins, near, layer));
+    // What this press will want next, behind it, never in front of it.
+    if (ins.behind) behind(ins.behind(near, layer, note));
     const buf = buffers.get(url);
     if (!buf) return;
     // The key may be up by now: it sounds, and the damper goes straight on.
     const alreadyUp = !held.has(note) && !pedal.down();
     for (const v of [...voices]) if (v.note === note) damp(v, 0.04);
-    while (voices.length >= VOICES) { const old = voices[0]; damp(old, 0.02); endVoice(old); }
+    room();
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.playbackRate.value = Math.pow(2, (note - near) / 12);
     const g = ctx.createGain();
     g.gain.value = velGain(ins, vel);
     src.connect(g).connect(out);
-    const v = { note, src, gain: g, damped: false, inst: ins.id, near, layer, rate: src.playbackRate.value };
+    const v = { note, src, gain: g, damped: false, inst: ins.id, near, layer, rate: src.playbackRate.value,
+      vel, at: ctx.currentTime };
     src.onended = () => endVoice(v);
     src.start();
     voices.push(v);
@@ -223,7 +370,10 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     // wakes the sampler, almost always, as a click is shorter than a fetch)
     // sounds for LATE_S and is then damped. /nola/ damps it at once, which on
     // a first click is a blip too short to hear as the key you pressed.
-    if (alreadyUp) { stat.late++; setTimeout(() => { if (!held.has(note) && !pedal.down()) damp(v, pedal.damper()); }, LATE_S * 1000); }
+    if (alreadyUp) {
+      stat.late++;
+      setTimeout(() => { if (!held.has(note) && !pedal.down() && !v.damped) { damp(v, pedal.damper()); keyOff(v); } }, LATE_S * 1000);
+    }
   }
 
   function noteOff(note) {
@@ -243,7 +393,7 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
     // A program change is a press, so this is not a visit: fetch the notes the
     // keys on screen reach, so the first note on the new instrument is not a
     // cold fetch (/nola/'s repair, reported three times there).
-    if (warm && next.id !== 'piano') {
+    if (warm && next.id === 'rhodes') {
       const near = new Set();
       for (let n2 = warm[0]; n2 <= warm[1]; n2++) near.add(nearestIn(next.notes, n2));
       ensure();
@@ -252,7 +402,8 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
   }
 
   function panic() {
-    for (const v of [...voices]) { if (ctx) damp(v, 0.02); endVoice(v); }
+    queue.length = 0;
+    for (const v of [...voices]) take(v);
     held.clear();
     pedal.panic?.();
   }

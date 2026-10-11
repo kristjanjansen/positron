@@ -9,11 +9,12 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts sampler/000, PIANO, 2026-10-11. The on-screen keyboard playing a
-  // sampler, the /nola/ piano's thirty recordings, which come from our R2
-  // bucket as a node of the patchbay (`cf-r2:piano:file-out ->
+  // sampler, the Salamander grand's recordings (thirty notes, four velocity
+  // bands, since 2026-10-11; /nola/'s FluidR3 piano before), which come from
+  // our R2 bucket as a node of the patchbay (`cf-r2:piano:file-out ->
   // web:sampler:file-in`). Asked: *"Piano souns in samler, r2 in patchbay"*.
-  // NOTHING OPENS ON A VISIT: the AudioContext and the first octave of files
-  // come with the first key press, and that press sounds once they arrive.
+  // NOTHING OPENS ON A VISIT: the AudioContext and the one file a press plays
+  // come with the first key press, and that press sounds once it arrives.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
