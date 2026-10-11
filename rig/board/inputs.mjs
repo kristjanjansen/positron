@@ -583,7 +583,8 @@ export function createInputs({
     }
     // ── the one thing read back: the patch a dump request asks for ──────────
     // 🔴 THE INPUT IS OPENED ONLY WHILE AN ANSWER IS EXPECTED, AND BEFORE THE
-    // REQUEST IS WRITTEN. A raw MIDI input buffers nothing until it is open, so
+    // REQUEST IS WRITTEN, AND READ ONCE BEFORE IT TOO (see `askBack`). A raw
+    // MIDI input buffers nothing until it is open AND triggered by a read, so
     // opening it after the write could miss an answer that came back fast; and
     // holding it open between requests would keep a device somebody else may
     // want. MEASURED 2026-10-11 on the board: `/proc/asound/Circuit/midi0`
@@ -645,6 +646,28 @@ export function createInputs({
       }
       const d = { ...want, fd, reply, others: [], at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
       s.dump = d;
+      // 🔴 READ ONCE BEFORE THE REQUEST IS WRITTEN, BECAUSE OPENING THE INPUT IS
+      // NOT ENOUGH. MEASURED 2026-10-11 on this board: snd-usb-audio runs its
+      // input URBs from probe and DROPS what arrives for a substream that is open
+      // but not yet triggered, and the trigger is the first read or poll. The
+      // Circuit answers the Device Inquiry faster than the first poll 10 ms
+      // later, so the reply was thrown away in the kernel and never even counted
+      // in `/proc/asound/Circuit/midi0` Rx, while the clock after it was. Same
+      // script, same minute: read first, 17 byte identity 2 of 2; write first,
+      // nothing 2 of 2. amidi does this too ("trigger reading"). A zero length
+      // read does not do it from node, which returns before the syscall. What
+      // this read drains came before the question, so it cannot be its answer.
+      const pre = Buffer.alloc(1024);
+      for (let i = 0; i < 64; i++) {
+        let n = 0;
+        try { n = fs.readSync(fd, pre, 0, pre.length, null); }
+        catch (e) {
+          if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') break;
+          log(`${cfg.name}: the instrument input could not be read, ${e.message}`);
+          return finishDump(d, { ok: false, why: `the instrument input could not be read, ${e.code || e.message}` });
+        }
+        if (!n) break;
+      }
       if (!midiWrite(bytes)) return finishDump(d, { ok: false, why: 'the instrument port could not be written' });
       setTimer(() => pollDump(d), 10);
       return undefined;

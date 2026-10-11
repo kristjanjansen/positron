@@ -763,7 +763,7 @@ console.log('inputs: what a page may send the Circuit');
       readlinkSync: () => 'card7',
       openSync: (pth, fl) => { order.push(fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK) ? 'open read' : 'open write'); if (fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK)) { readFd = 77; return 77; } return 42; },
       writeSync: (fd, buf) => { order.push('write'); out.push([...buf]); },
-      readSync: (fd, buf) => { if (fd !== 77) throw new Error('read on the wrong fd'); const c = inbox.shift(); if (!c) throw EAGAIN(); buf.set(c); return c.length; },
+      readSync: (fd, buf) => { if (fd !== 77) throw new Error('read on the wrong fd'); if (order.at(-1) === 'open read') order.push('read'); const c = inbox.shift(); if (!c) throw EAGAIN(); buf.set(c); return c.length; },
       closeSync: (fd) => { if (fd === 77) readClosed++; },
     };
     const sock2 = [];
@@ -782,7 +782,7 @@ console.log('inputs: what a page may send the Circuit');
     const c3 = hw3.get('circuit'); c3.connect();
 
     c3.handle({ type: 'midi.send', id: 'd1', bytes: REQ(0) });
-    is('the input is opened for reading BEFORE the request is written, so the answer cannot arrive first', order, ['open read', 'open write', 'write']);
+    is('the input is opened AND read once BEFORE the request is written, so the answer cannot arrive first', order, ['open read', 'read', 'open write', 'write']);
     is('the request reaches the port, exactly nine bytes', out, [REQ(0)]);
     // The answer arrives in pieces with MIDI clock inside it, as USB MIDI does.
     const r1 = reply(0);
@@ -840,6 +840,56 @@ console.log('inputs: what a page may send the Circuit');
     is('NEGATIVE: an inquiry nobody answers is reported as not answered', none.map((m) => [m.ok, m.bytes ?? null]), [[false, null]]);
     ok('and says why', /no identity came back/.test(none[0]?.why ?? ''), JSON.stringify(none[0]));
     hw3.close();
+  }
+
+  // ── a fake that behaves like snd-usb-audio, and a Circuit that answers fast ──
+  // MEASURED 2026-10-11 on the board: bytes reaching an input that is open but
+  // not yet triggered by a read are DROPPED in the kernel, and the Circuit's
+  // identity arrives before a poll 10 ms after the write. So this fake answers
+  // AT the write and drops the answer unless the input has been read since it
+  // was opened. Taking the pre-write read out of `askBack` turns these red.
+  {
+    let t4 = 0, triggered = false;
+    const inbox = [], timers = [], out = [];
+    const ID_REPLY = [0xF0, 0x7E, 0x00, 0x06, 0x02, 0x00, 0x20, 0x29, 0x79, 0x00, 0x00, 0x00, 0x03, 0x05, 0x09, 0x02, 0xF7];
+    const EAGAIN = () => { const e = new Error('EAGAIN: resource temporarily unavailable'); e.code = 'EAGAIN'; return e; };
+    const kFs = {
+      readlinkSync: () => 'card7',
+      openSync: (pth, fl) => { if (fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK)) { triggered = false; inbox.length = 0; return 77; } return 42; },
+      writeSync: (fd, buf) => {
+        out.push([...buf]);
+        const b = [...buf];
+        // the instrument answers the inquiry at once, and only the inquiry
+        if (b.length === 6 && b[0] === 0xF0 && b[3] === 0x06 && b[4] === 0x01 && triggered) inbox.push(Uint8Array.from([0xF8, ...ID_REPLY]));
+      },
+      readSync: (fd, buf) => { if (fd !== 77) throw new Error('read on the wrong fd'); triggered = true; const c = inbox.shift(); if (!c) throw EAGAIN(); buf.set(c); return c.length; },
+      closeSync: () => {},
+    };
+    const sock4 = [];
+    class WS4 { constructor() { this.readyState = 1; this.sent = []; sock4.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+    const hw4 = createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 3, rate: 48000, name: 'pi', id: 'pi',
+      spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); return p; },
+      WebSocket: WS4, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+      randomId: () => 'x', now: () => t4, fs: kFs, leaseMs: 60_000, beatMs: 5_000, setTimer: (fn, ms) => timers.push([t4 + ms, fn]) });
+    const run = (ms) => { const until = t4 + ms; while (timers.length) { timers.sort((a, b) => a[0] - b[0]); if (timers[0][0] > until) break; const [at, fn] = timers.shift(); t4 = at; fn(); } t4 = until; };
+    const sentOf = (type) => sock4[0].sent.filter((x) => typeof x === 'string').map((x) => JSON.parse(x)).filter((m) => m.type === type);
+    const c4 = hw4.get('circuit'); c4.connect();
+    c4.handle({ type: 'midi.send', id: 'k1', bytes: INQ });
+    is('the input was triggered before the inquiry went out, so a fast answer is kept', triggered, true);
+    run(50);
+    const ids = sentOf('midi.identity');
+    is('an identity that comes back AT the write is read back', ids.map((m) => [m.re, m.ok]), [['k1', true]]);
+    is('carrying the 17 bytes the Circuit sent on 2026-10-11', ids[0]?.bytes, ID_REPLY);
+    // Bytes waiting in the input before the question are not its answer: a
+    // whole patch for synth 1 sits there (a FIXTURE fed to the fake input only).
+    t4 += 1100; run(0);
+    const stale = kFs.openSync; kFs.openSync = (pth, fl) => { const fd = stale(pth, fl); if (fd === 77) inbox.push(Uint8Array.from([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x00, 0x00, 0x00, ...[...'Old pad'.padEnd(16, ' ')].map((ch) => ch.charCodeAt(0)), ...Array(324).fill(0x10), 0xF7])); return fd; };
+    c4.handle({ type: 'midi.send', id: 'k2', bytes: REQ(0) });
+    run(1100);
+    const p = sentOf('midi.patch').filter((m) => m.re === 'k2');
+    is('NEGATIVE: what was waiting before the request is drained, not taken as the answer', p.map((m) => [m.ok, m.bytes ?? null]), [[false, null]]);
+    is('NEGATIVE: only the inquiry and the dump request were written', out.map((b) => b.length), [6, 9]);
+    hw4.close();
   }
 }
 
