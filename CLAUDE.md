@@ -407,6 +407,24 @@ had asked to see. A visit, a step and a scrub must open nothing.
 
 ## How a session is run
 
+🔴 **EVERY HEADLESS CHROME A SCRIPT OR AN AGENT STARTS IS CLOSED BY IT, AND
+THE SESSION SWEEPS WHAT IS LEFT. Asked 2026-10-11:** *"i need to close all
+chromes"*, then *"write to claude.md / skills to clean up properly"*. Sixteen
+headless Chromes were running from a day of parallel agents' CDP scripts, each
+with its own temp profile, and the owner needed Chrome closed.
+- A script that spawns Chrome kills it on every path out: `try { ... } finally
+  { chrome.kill() }` plus `process.on('exit', () => chrome.kill())`, and the
+  same on an error or a timeout. `demo/shot.mjs` already does this; a
+  throwaway script in the scratchpad must too.
+- An agent brief that allows browser runs says: close every Chrome you start
+  before reporting, and do not leave one running between runs.
+- The session checks after each agent reports and before handing over:
+  `pgrep -fl "Google Chrome.*--headless"` should print nothing, and
+  `pkill -f "Google Chrome.*--headless"` clears what is left. It never
+  touches the owner's own Chrome (no `--headless` in its command line).
+- Temp profiles (`mkdtemp` under the system temp dir) go with it: remove the
+  directory in the same `finally`.
+
 🔴 **A REQUEST THAT ARRIVES MID-TASK GOES IN `BACKLOG.md` BEFORE IT IS WORKED
 ON.** Over one long run a stream of small requests was tracked in the session's
 head instead, and two were quietly dropped: the report that followed was *"do

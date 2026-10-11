@@ -299,6 +299,22 @@ handle is **dropped at the boundary and reported**, a class on `never` **refuses
 the link outright**. The difference is between *I do not use that* and *that
 damages me*, and only the second is worth an error.
 
+## Close every Chrome you start
+
+🔴 **A HEADLESS CHROME OUTLIVES THE SCRIPT THAT STARTED IT UNLESS THE SCRIPT
+KILLS IT.** 2026-10-11: sixteen were found running after a day of parallel
+agents driving pages over CDP, and the owner had to ask for them to be closed
+(*"i need to close all chromes"*, then *"write to claude.md / skills to clean up
+properly"*).
+- Spawn, then guard every exit: `try { ... } finally { chrome.kill(); rmSync(profile, { recursive: true, force: true }) }`
+  and `process.on('exit', () => chrome.kill())`. An early `process.exit()`, a
+  thrown error, a timeout and a Ctrl-C all count. `demo/shot.mjs` is the model.
+- Never start a second run while the first one's Chrome is still up.
+- Before reporting: `pgrep -fl "Google Chrome.*--headless"` prints nothing of
+  yours. The session runs the same check after every agent, and
+  `pkill -f "Google Chrome.*--headless"` clears leftovers without touching the
+  owner's own Chrome.
+
 ## The traps, each one paid for
 
 **Measure the quantity in question, not one adjacent to it.** An A/B where both
