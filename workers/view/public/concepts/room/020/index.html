@@ -23,6 +23,8 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
   .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
   .cc-ring::after { content: none; }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
+  .cc-row[hidden] { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -155,10 +157,11 @@
     return b;
   }
 
+  let joined = false;
   const node = createBayNode({
     room: ROOM, graphs: [selfGraph()], local: [STORE], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; noticeRow.hidden = !admin; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); },
     onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
@@ -245,7 +248,7 @@
   tell.button('tell').disabled = true;
   const noticeRow = el('div', 'cc-row');
   noticeRow.append(noticeText.el, tell.el);
-  noticeRow.hidden = !admin;
+  noticeRow.hidden = !admin || !joined;
 
   // The two roles. Switching re-announces this tab: the admin tab adds the
   // `admin` node and its `admin:value-out`, the audience tab takes them away.
@@ -254,7 +257,7 @@
     at: admin ? 'admin' : 'audience',
     onPick: (id) => {
       admin = id === 'admin';
-      noticeRow.hidden = !admin;
+      noticeRow.hidden = !admin || !joined;
       node.setGraphs([selfGraph()], [STORE]);
       drawSites();
       pb?.refresh();
@@ -318,9 +321,10 @@
   // opens nothing.
   const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history' };
   pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
 
   const row = el('div', 'cc-row');
+  row.hidden = true;
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and what it names are one block.
   d.stack.add(roles.el, joinRow);

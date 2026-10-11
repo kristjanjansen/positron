@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept beats 010</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  /* The kit's live wave (grain-scope) as a panel's picture, as /concepts/radio/000/
+     draws it: the panel's stage is the edge and the ground, so the scope gives up
+     its own margin, border and corner, and its always-empty caption takes no room. */
+  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
+  .cc-wave .pos-scope-gut { display: none; }
+  /* The chroma picture: twelve pitch classes across, the full width of its
+     panel and the wave's height (the scope's 150). It sits in a host as the
+     wave does, because the panel stretches a canvas that is its direct child. */
+  .cc-chroma { display: block; width: 100%; height: 150px; }
+  /* Play on its own row: the button's own size, at the left. */
+  .cc-top { display: flex; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+
+  // concepts beats/010, KEY, 2026-10-11. /concepts/beats/005/ with the tempo
+  // detector swapped for a key detector. Asked: *"010 key dertect, live
+  // stations"*. The live source, the level, the wave, the speakers and the
+  // patchbay are beats/005's, line for line. One idea per page, so what was
+  // about tempo went: the tempo detector, the beat lines over the wave, the
+  // tempo scope, and the fx box with its mix knob and click (that box was
+  // driven by the tempo, so with no tempo it had nothing to do).
+  //
+  // The station plays LIVE through our own relay (`cf-shout`, the
+  // positron-shout worker, which holds ONE upstream connection per mount
+  // however many tabs listen), read with the kit's createMp3Stream exactly as
+  // /concepts/radio/000/ reads it. `?base=` points the page at
+  // demo/fake-station.mjs instead.
+  //
+  // 🔴 NOTHING OPENS ON A VISIT, AND ONE STATION AT A TIME. Every connection to
+  // an ERR mount is counted in a public broadcaster's listener statistics
+  // (CLAUDE.md, "What costs real money and somebody else's server"), so a
+  // stream is opened only on Play, closed on Stop, and closed BEFORE the next
+  // one opens when the station is switched while playing. Under ?selfcheck=1 the
+  // page never opens a stream at all: Play logs that a check is running and
+  // plays nothing.
+  //
+  // Ida is ADTS AAC, the two ERR mounts MP3. createMp3Stream reads both.
+  const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
+  const STATIONS = [
+    { id: 'raadio2', label: 'Raadio 2', site: 'err', node: 'raadio2', mount: 'raadio2', name: 'ERR Raadio 2' },
+    { id: 'raadio4', label: 'Raadio 4', site: 'err', node: 'raadio4', mount: 'raadio4', name: 'ERR Raadio 4' },
+    { id: 'ida', label: 'Ida', site: 'ida', node: 'tallinn', mount: 'ida-tallinn', name: 'Ida Radio Tallinn' },
+  ];
+  const srcOf = (st) => `${BASE}/${st.mount}`;
+  let at = 0;
+  const S = 'web';
+  const STATION_OUT = (st) => `${st.site}:${st.node}:audio-out`;
+  const RELAY_IN = (st) => `cf-shout:${st.mount}:audio-in`, RELAY_OUT = (st) => `cf-shout:${st.mount}:audio-out`;
+  const PLAYER_IN = `${S}:level:audio-in`, PLAYER_OUT = `${S}:level:audio-out`;
+  const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
+  const KEY_IN = `${S}:key:audio-in`, KEY_EV = `${S}:key:value-out`;
+  const DISPLAY_IN = `${S}:display:value-in`;
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  // A live station is AUDIO all the way: the station's site into the relay,
+  // the relay into the level node in this tab, and the level node's
+  // `audio-out` feeds the wave, the speakers and the key detector. The key
+  // detector's readings leave on a value port for the chroma display.
+  const bay = createBay();
+  for (const st of STATIONS) {
+    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.name, place: st.site, net: st.site });
+    bay.addPort({ id: STATION_OUT(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
+    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
+    bay.addPort({ id: RELAY_IN(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
+    bay.addPort({ id: RELAY_OUT(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'], address: srcOf(st) });
+  }
+  bay.addNode({ id: `${S}:level`, kind: 'engine', label: 'level', place: 'browser' });
+  bay.addPort({ id: PLAYER_IN, label: 'level', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: PLAYER_OUT, label: 'level', dir: 'out', medium: 'audio' });
+  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
+  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${S}:key`, kind: 'engine', label: 'key detector', place: 'browser' });
+  bay.addPort({ id: KEY_IN, label: 'key detector', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: KEY_EV, label: 'key', dir: 'out', medium: 'value' });
+  // The only way a reading reaches the picture: a delivered event on this
+  // port. The detector never touches the picture.
+  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'chroma', place: 'browser' });
+  bay.addPort({ id: DISPLAY_IN, label: 'chroma', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+
+  const d = mount({ name: 'concept beats 010', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('beats/010');
+
+  // ── the links, held from load so the picture does not change with play ────
+  // Holding a link opens nothing. A link out of an `external` node is refused
+  // without `consent: true`, and the consent is the Play press, the moment a
+  // person asks to listen, so it is named here where the link is made, as on
+  // /concepts/radio/000/.
+  const held = new Map();
+  function hold(a, b, opts) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...opts });
+    if (r.ok) held.set(k, r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  // The sound follows the links the bay holds, read off `bay.links()`.
+  const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+  for (const st of STATIONS) {
+    hold(STATION_OUT(st), RELAY_IN(st), { consent: true, via: 'https' });
+    hold(RELAY_OUT(st), PLAYER_IN, { via: 'https' });
+  }
+  hold(PLAYER_OUT, WAVE_IN);
+  hold(PLAYER_OUT, KEY_IN);
+  hold(PLAYER_OUT, SPEAKER_IN);
+  hold(KEY_EV, DISPLAY_IN);
+
+  // ── the sound ───────────────────────────────────────────────────────────
+  let ctx = null, pull = null, out = null, tap = null, tapBuf = null;
+  // The one open stream, or null: { st, stream, live }. Never two.
+  let leg = null, playing = false;
+
+  const pb = createPatchbay(bay, {
+    flowing: (l, medium) => {
+      if (medium !== 'audio') return false;
+      const live = playing && !!leg?.live;
+      const st = STATIONS.find((s) => l.from === STATION_OUT(s) || l.from === RELAY_OUT(s));
+      if (st) return live && leg.st === st;
+      return live;
+    },
+  });
+
+  // ── the pictures ────────────────────────────────────────────────────────
+  const waveHost = el('div', 'cc-wave');
+  const scope = createGrainScope(waveHost, { seconds: 4, height: 150, fullScale: 1 });
+  // The station, the kit picker in the wave panel's footer. Choosing one while
+  // playing CLOSES the old station's stream first and only then opens the new
+  // one, and starts a fresh key reading. Choosing while stopped opens nothing.
+  const pick = createPicker({ what: 'station', prev: () => choose(at - 1), next: () => choose(at + 1), onPick: (i) => choose(i) });
+  pick.options(STATIONS.map((st) => st.label), 0);
+  function choose(i) {
+    const n = (i + STATIONS.length) % STATIONS.length;
+    if (n === at) return;
+    at = n;
+    pick.show(STATIONS[at].label, at);
+    pb.refresh();
+    if (playing) { stop(); play(); }
+  }
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
+
+  // The chroma picture: twelve bars, C at the left, each as tall as that pitch
+  // class's share of the last half second of sound. The detected key's scale is
+  // drawn in the foreground ink and its tonic in the accent; the five notes
+  // outside the scale stay dim. No grid lines and no labels on the picture:
+  // the footer names the key.
+  const chromaCanvas = el('canvas', 'cc-chroma');
+  const chromaHost = el('div', 'cc-chroma-host');
+  chromaHost.append(chromaCanvas);
+  const keyPanel = createVideoPanel({ media: chromaHost, aspect: 'auto', right: false,
+    left: el('span', 'cc-say', 'key'),
+    values: [{ key: 'key', reserve: 8 }, { key: 'conf', label: 'confidence', reserve: 4 }, { key: 'also', label: 'also', reserve: 18 }] });
+
+  // What the picture shows is only what arrived on its in-port.
+  let reading = null;              // the last event delivered
+  const bars = new Float64Array(12);  // what is drawn, eased toward the last delivered chroma
+  function shown(ev) {
+    if (ev?.of !== 'param' || ev.name !== 'key' || !Array.isArray(ev.chroma)) return;
+    reading = ev;
+    keyPanel.values.set('key', ev.v ?? '');
+    keyPanel.values.set('conf', Number.isFinite(ev.confidence) ? ev.confidence.toFixed(2) : '');
+    keyPanel.values.set('also', Array.isArray(ev.also) ? ev.also.slice(0, 2).map((k) => k.key).join(', ') : '');
+  }
+
+  // ── the key detector ────────────────────────────────────────────────────
+  // An AnalyserNode on the levelled sound, read every KEY_HOP_S on the main
+  // thread. Its spectrum is folded into twelve pitch classes (a chromagram),
+  // those are summed with a decay of KEY_TAU_S, and the sum is matched against
+  // the 24 major and minor key profiles. Everything between the markers below
+  // is plain arithmetic on the analyser's dB spectrum, no WebAudio, so the
+  // offline check reads this very block out of this file and runs it on our
+  // R2 recordings.
+  //
+  // 1. Peaks only. Every local maximum of the spectrum between 55 Hz and 2 kHz
+  //    and within 50 dB of the loudest, its frequency refined by a parabola
+  //    through the three bins, becomes a pitch in fractional semitones. Its
+  //    weight is its height above that floor in dB, which is the compression
+  //    that keeps one loud bass note from outvoting a chord.
+  // 2. Tuning. How far the peaks sit from the equal tempered grid, as a
+  //    circular mean weighted by the peaks and eased over 2 s, is taken off
+  //    before a pitch is rounded to its class. A peak halfway between two
+  //    semitones counts for nothing.
+  // 3. Harmonics. A peak 19 semitones (a twelfth, the third harmonic) or 28
+  //    (the fifth harmonic) over a louder one counts for 30%.
+  // 4. Each frame is normalised to sum 1, so a loud moment and a quiet one
+  //    count alike, then summed into `acc` with a decay of KEY_TAU_S (and into
+  //    `now`, the picture, over half a second).
+  // 5. The 24 keys are the Temperley (Kostka-Payne) profiles rotated to each
+  //    tonic, scored by correlation with `acc`. The best is the key; a key
+  //    already shown stays until another beats it by KEY_STICK. Confidence is
+  //    the winner's correlation times its margin over the runner-up (a margin
+  //    of 0.1 or more counts in full).
+  //
+  // 🔴 WHY TEMPERLEY AND WHY THE HARMONICS STEP, MEASURED 2026-10-11 OFFLINE on
+  // our three R2 recordings of the day (about three minutes each). There is NO
+  // ground truth: nobody has said what key any of it is in. With Krumhansl-
+  // Kessler profiles and no harmonics step the detector read every recording a
+  // FIFTH ABOVE what Temperley read (Raadio 2 Bb minor against Eb minor, Raadio
+  // 4 Ab minor against E major), on 89% and 80% of readings. A fifth up is
+  // where a note's third harmonic lands, so the harmonics step went in, and
+  // with it the two profile sets mostly AGREE: same key on 72% (Raadio 2), 76%
+  // (Raadio 4) and 77% (Ida) of readings. Temperley was the steadier of the two
+  // (switches after the first 15 s: 2, 1 and 0 against 9, 1 and 6), so it is
+  // the one used. A 32768 point analyser (0.7 s, 1.4 Hz bins) was steadier than
+  // 16384 on Raadio 4, and 20 s of decay steadier than 10 on Raadio 4 and Ida.
+  //
+  // ⚠️ A RELATIVE KEY IS THE SAME SEVEN NOTES. F# major and Eb minor, the two
+  // readings Raadio 2 sways between, differ only in which note is home, which a
+  // pitch class histogram can barely tell. The runner-up in the footer is
+  // there for that reason.
+  // KEY CORE BEGIN
+  const KEY_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+  const KEY_PROFILES = {
+    kk: { major: [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88],
+      minor: [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17] },
+    temperley: { major: [0.748, 0.060, 0.488, 0.082, 0.670, 0.460, 0.096, 0.715, 0.104, 0.366, 0.057, 0.400],
+      minor: [0.712, 0.084, 0.474, 0.618, 0.049, 0.460, 0.105, 0.747, 0.404, 0.067, 0.133, 0.330] },
+  };
+  const KEY_SCALE = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
+  const KEY_MIN_S = 3;             // no key until this much sound has been heard
+  function keyCreate(sr, n, o = {}) {
+    const s = { sr, n, lo: o.lo ?? 55, hi: o.hi ?? 2000, tau: o.tau ?? 20, floorDb: o.floorDb ?? 50,
+      profiles: KEY_PROFILES[o.profiles ?? 'temperley'], harm: o.harm ?? 0.7, stick: o.stick ?? 0.02,
+      acc: new Float64Array(12), now: new Float64Array(12), tRe: 0, tIm: 0, tuning: 0, heard: 0, last: null };
+    s.k0 = Math.max(2, Math.floor(s.lo * n / sr) - 1);
+    s.k1 = Math.min(n / 2 - 2, Math.ceil(s.hi * n / sr) + 1);
+    return s;
+  }
+  // One frame: `db` is the analyser's dB spectrum (n / 2 bins), `dt` the
+  // seconds of sound since the frame before.
+  function keyFrame(s, db, dt) {
+    const { sr, n, k0, k1 } = s;
+    let top = -Infinity;
+    for (let k = k0; k <= k1; k++) if (db[k] > top) top = db[k];
+    const frame = new Float64Array(12);
+    if (!(top > -100)) { keyDecay(s, frame, dt); return; }
+    const floor = top - s.floorDb;
+    let tRe = 0, tIm = 0;
+    const peaks = [];              // pitch, weight, pitch, weight, ...
+    for (let k = k0 + 1; k < k1; k++) {
+      const a = db[k - 1], b = db[k], c = db[k + 1];
+      if (!(b > a && b >= c && b > floor)) continue;
+      const den = a - 2 * b + c;
+      const o = 0.5 * (a - c) / den;   // a silent bin is -Infinity, and its parabola is NaN
+      const off = Number.isFinite(o) ? Math.max(-0.5, Math.min(0.5, o)) : 0;
+      const f = (k + off) * sr / n;
+      if (f < s.lo || f > s.hi) continue;
+      const p = 69 + 12 * Math.log2(f / 440);
+      const w = b - floor;
+      const dv = p - Math.round(p);
+      tRe += w * Math.cos(2 * Math.PI * dv); tIm += w * Math.sin(2 * Math.PI * dv);
+      peaks.push(p, w);
+    }
+    const g = Math.exp(-dt / 2);
+    s.tRe = s.tRe * g + tRe; s.tIm = s.tIm * g + tIm;
+    s.tuning = Math.atan2(s.tIm, s.tRe) / (2 * Math.PI);
+    if (s.harm) for (let i = peaks.length - 2; i >= 0; i -= 2) {
+      for (let j = 0; j < i; j += 2) {
+        const dp = peaks[i] - peaks[j];
+        if ((Math.abs(dp - 19.02) < 0.35 || Math.abs(dp - 27.86) < 0.35) && peaks[j + 1] >= peaks[i + 1]) { peaks[i + 1] *= 1 - s.harm; break; }
+      }
+    }
+    for (let i = 0; i < peaks.length; i += 2) {
+      const q = peaks[i] - s.tuning, r = Math.round(q), near = 1 - 2 * Math.abs(q - r);
+      frame[((r % 12) + 12) % 12] += peaks[i + 1] * near;
+    }
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += frame[i];
+    if (sum > 0) for (let i = 0; i < 12; i++) frame[i] /= sum;
+    keyDecay(s, frame, dt);
+    if (sum > 0) s.heard += dt;
+  }
+  function keyDecay(s, frame, dt) {
+    const g = Math.exp(-dt / s.tau), h = Math.exp(-dt / 0.5);
+    for (let i = 0; i < 12; i++) { s.acc[i] = s.acc[i] * g + frame[i] * dt; s.now[i] = s.now[i] * h + frame[i] * (1 - h); }
+  }
+  function keyCorr(x, prof, rot) {
+    let mx = 0, mp = 0;
+    for (let i = 0; i < 12; i++) { mx += x[i]; mp += prof[i]; }
+    mx /= 12; mp /= 12;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < 12; i++) {
+      const a = x[(i + rot) % 12] - mx, b = prof[i] - mp;
+      sxy += a * b; sxx += a * a; syy += b * b;
+    }
+    return sxx > 0 ? sxy / Math.sqrt(sxx * syy) : 0;
+  }
+  // The key now, or null before KEY_MIN_S of sound.
+  function keyRead(s) {
+    if (s.heard < KEY_MIN_S) return null;
+    const all = [];
+    for (const mode of ['major', 'minor']) for (let t = 0; t < 12; t++) all.push({ tonic: t, mode, r: keyCorr(s.acc, s.profiles[mode], t) });
+    all.sort((a, b) => b.r - a.r);
+    // The key shown last stays until another beats it by `stick`.
+    if (s.last && s.stick) {
+      const i = all.findIndex((k) => k.tonic === s.last.tonic && k.mode === s.last.mode);
+      if (i > 0 && all[0].r - all[i].r < s.stick) all.unshift(...all.splice(i, 1));
+    }
+    const best = all[0], next = all[1];
+    s.last = best;
+    const conf = Math.max(0, Math.min(1, best.r)) * Math.max(0, Math.min(1, (best.r - next.r) / 0.1));
+    const name = (k) => `${KEY_NAMES[k.tonic]} ${k.mode}`;
+    return { key: name(best), tonic: best.tonic, mode: best.mode, r: best.r, confidence: conf,
+      also: all.slice(1, 4).map((k) => ({ key: name(k), r: k.r })), tuning: s.tuning };
+  }
+  // KEY CORE END
+
+  const KEY_FFT = 32768, KEY_HOP_S = 0.1, KEY_READ_S = 0.5;
+  let key = null;                  // { an, db, s, clock, nextRead, last, timer }
+  function keyBuild() {
+    const an = ctx.createAnalyser();
+    an.fftSize = KEY_FFT; an.smoothingTimeConstant = 0;
+    an.connect(pull);              // pulled, or it is never run
+    return { an, db: new Float32Array(KEY_FFT / 2) };
+  }
+  // A fresh reading every play: a new sum, so the key is this listen's.
+  function keyStart() {
+    clearInterval(key.timer);
+    key.s = keyCreate(ctx.sampleRate, KEY_FFT);
+    key.clock = null; key.nextRead = KEY_READ_S; key.last = null; key.sound = 0;
+    // Timed on the audio clock, so a throttled tab changes how often a frame
+    // is read and never how fast the sum decays.
+    key.timer = setInterval(() => {
+      if (!playing || !leg?.live) { key.clock = null; return; }
+      const now = ctx.currentTime;
+      if (key.clock == null) { key.clock = now; return; }
+      const dt = Math.min(1, now - key.clock);
+      key.clock = now;
+      if (dt <= 0) return;
+      key.an.getFloatFrequencyData(key.db);
+      keyFrame(key.s, key.db, dt);
+      key.sound += dt;
+      if (key.sound >= key.nextRead) { key.nextRead += KEY_READ_S; key.last = keyRead(key.s); }
+      const r = key.last;
+      bay.send(KEY_EV, { of: 'param', name: 'key', v: r?.key ?? null, tonic: r?.tonic ?? null, mode: r?.mode ?? null,
+        confidence: r ? Math.round(r.confidence * 100) / 100 : null,
+        also: r ? r.also.map((k) => ({ key: k.key, r: Math.round(k.r * 100) / 100 })) : [],
+        tuning: Math.round(key.s.tuning * 100), chroma: [...key.s.now].map((v) => Math.round(v * 1000) / 1000) });
+    }, KEY_HOP_S * 1000);
+  }
+
+  // Canvas ink is read off the stylesheet's tokens once.
+  const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  let ink = null;
+  const inks = () => (ink ??= { card: tok('--card') || '#141922', dim: tok('--dim2') || '#6a7280',
+    fg: tok('--fg') || '#e6e6e6', hi: tok('--hi') || '#ffd400', mono: tok('--mono') || 'ui-monospace, monospace' });
+  function fit(c) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+    if (W && H && (c.width !== W || c.height !== H)) { c.width = W; c.height = H; }
+    return { W, H, dpr };
+  }
+  function drawChroma() {
+    const { W, H, dpr } = fit(chromaCanvas);
+    if (!W || !H) return;
+    const k = inks(), g = chromaCanvas.getContext('2d');
+    g.fillStyle = k.card; g.fillRect(0, 0, W, H);
+    const want = reading?.chroma ?? null;
+    let top = 0;
+    for (let i = 0; i < 12; i++) {
+      bars[i] += ((want ? want[i] : 0) - bars[i]) * 0.3;
+      top = Math.max(top, bars[i]);
+    }
+    // The twelve pitch classes are named under their bars, so a bar is a note
+    // before any reading arrives.
+    const pad = 8 * dpr, gap = 4 * dpr, bw = (W - 2 * pad - 11 * gap) / 12, lab = 16 * dpr, h = H - 2 * pad - lab;
+    g.font = `${11 * dpr}px ${k.mono}`; g.textAlign = 'center'; g.textBaseline = 'bottom';
+    for (let i = 0; i < 12; i++) {
+      g.fillStyle = reading && i === reading.tonic ? k.hi : k.dim;
+      g.fillText(KEY_NAMES[i], pad + i * (bw + gap) + bw / 2, H - pad + 2 * dpr);
+    }
+    if (!(top > 0)) return;
+    const tonic = reading?.tonic, scale = reading?.mode ? KEY_SCALE[reading.mode] : null;
+    for (let i = 0; i < 12; i++) {
+      const deg = tonic == null ? -1 : (i - tonic + 12) % 12;
+      g.fillStyle = deg === 0 ? k.hi : (scale && scale.includes(deg) ? k.fg : k.dim);
+      const bh = Math.max(dpr, (bars[i] / top) * h);
+      g.fillRect(Math.round(pad + i * (bw + gap)), Math.round(pad + h - bh), Math.round(bw), Math.round(bh));
+    }
+  }
+
+  function frame() {
+    if (!playing) return;
+    if (holds(PLAYER_OUT, WAVE_IN)) { tap.getFloatTimeDomainData(tapBuf); scope.feed(tapBuf, ctx.sampleRate); }
+    drawChroma();
+    requestAnimationFrame(frame);
+  }
+
+  // ── the level: one gain per station, from a running RMS ──────────────────
+  // beats/005's, unchanged. The stream's RMS BEFORE the gain, read every
+  // LEVEL_READ_MS, followed slowly (LEVEL_SLOW_S) and fast (LEVEL_FAST_S); the
+  // louder sets the target LEVEL_RMS / rms, raise only, at most LEVEL_MAX (36
+  // dB). Down fast, up slow, held under LEVEL_FLOOR, a limiter after the gain.
+  // MEASURED on the captures: Ida is music at about -44 dB RMS for most of its
+  // length with one 25 s stretch at -14 dB, so the gain has to reach about 28
+  // to 30 dB and come down within a fraction of a second. The key detector
+  // hears the levelled sound, though with every frame normalised it cares
+  // about the spectrum's shape over the floor, not its loudness.
+  const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_MAX = 10 ** (36 / 20), LEVEL_FLOOR = 10 ** (-60 / 20);
+  const LEVEL_READ_MS = 100, LEVEL_SLOW_S = 3, LEVEL_FAST_S = 0.3, LEVEL_DOWN_S = 0.08, LEVEL_UP_S = 1.5;
+  const levels = new Map();        // station id -> its gain, kept across plays
+  let lv = null;                   // { meter, buf, gain, limit, slow, fast, g, timer }
+  function levelBuild() {
+    lv = { meter: ctx.createAnalyser(), gain: ctx.createGain(), limit: ctx.createDynamicsCompressor(), slow: 0, fast: 0, g: 1, timer: 0 };
+    lv.meter.fftSize = 4096; lv.meter.smoothingTimeConstant = 0;
+    lv.buf = new Float32Array(lv.meter.fftSize);
+    lv.meter.connect(pull);          // pulled, or it is never run
+    const c = lv.limit;
+    c.threshold.value = -3; c.knee.value = 3; c.ratio.value = 20; c.attack.value = 0.002; c.release.value = 0.15;
+    lv.gain.connect(c).connect(out);
+  }
+  function levelStart(st, node) {
+    lv.g = levels.get(st.id) ?? 1;
+    lv.slow = 0; lv.fast = 0;
+    lv.gain.gain.cancelScheduledValues(ctx.currentTime);
+    lv.gain.gain.setValueAtTime(lv.g, ctx.currentTime);
+    node.connect(lv.meter);
+    node.connect(lv.gain);
+    clearInterval(lv.timer);
+    const kSlow = 1 - Math.exp(-LEVEL_READ_MS / 1000 / LEVEL_SLOW_S), kFast = 1 - Math.exp(-LEVEL_READ_MS / 1000 / LEVEL_FAST_S);
+    let said = 0;
+    lv.timer = setInterval(() => {
+      if (!playing || !leg?.live || leg.st !== st) return;
+      lv.meter.getFloatTimeDomainData(lv.buf);
+      let s = 0; for (const v of lv.buf) s += v * v;
+      const ms = s / lv.buf.length;
+      lv.slow = lv.slow ? lv.slow + (ms - lv.slow) * kSlow : ms;
+      lv.fast = lv.fast ? lv.fast + (ms - lv.fast) * kFast : ms;
+      const rms = Math.sqrt(Math.max(lv.slow, lv.fast));
+      if (rms < LEVEL_FLOOR) return;
+      const g = Math.max(1, Math.min(LEVEL_MAX, LEVEL_RMS / rms));
+      const tau = g < lv.g ? LEVEL_DOWN_S : LEVEL_UP_S / 3;
+      lv.g = g;
+      levels.set(st.id, g);
+      lv.gain.gain.setTargetAtTime(g, ctx.currentTime, tau);
+      const now = performance.now();
+      if (now - said > 10000) { said = now; d.log(`${st.label} at ${(20 * Math.log10(rms)).toFixed(1)} dB RMS, raised ${(20 * Math.log10(g)).toFixed(1)} dB`); }
+    }, LEVEL_READ_MS);
+  }
+
+  // ── the stream: opened on Play, closed on Stop and on a switch ───────────
+  function open(st) {
+    // One connection at a time, whatever called this.
+    close();
+    const url = srcOf(st);
+    d.log(`opening ${url}`);
+    const stream = createMp3Stream(ctx, { url, log: (m) => d.log(`${st.label}: ${m}`) });
+    const me = { st, stream, live: false };
+    leg = me;
+    levelStart(st, stream.node);
+    stream.started.then((path) => {
+      if (leg !== me) return;
+      me.live = true;
+      d.log(`${st.label} playing, ${path}`);
+      pb.refresh();
+    }).catch((e) => { if (leg === me) d.log(`${st.label} did not start: ${e?.message || e}`, 'warn'); });
+  }
+  function close() {
+    if (!leg) return;
+    const { st, stream } = leg;
+    leg = null;
+    try { stream.stop(); } catch { /* already stopped */ }
+    try { stream.node.disconnect(); } catch { /* gone */ }
+    if (lv) clearInterval(lv.timer);
+    d.log(`${st.label} closed`);
+  }
+
+  // The sound follows the links the bay holds: the level node reaches the
+  // speakers, the wave and the key detector each only along its own link.
+  function route() {
+    try { out.disconnect(); } catch { /* not connected */ }
+    out.connect(tap);
+    tap.connect(pull);
+    if (holds(PLAYER_OUT, KEY_IN)) out.connect(key.an);
+    if (holds(PLAYER_OUT, SPEAKER_IN)) out.connect(ctx.destination);
+  }
+
+  function play() {
+    // 🔴 A HARNESS NEVER OPENS A LIVE STREAM. Every connection to an ERR mount
+    // lands in a public broadcaster's audience statistics, and Ida's server is
+    // somebody else's too, so under ?selfcheck=1 Play opens nothing, makes no
+    // AudioContext and plays nothing.
+    if (SELFCHECK) { d.log('a self check is running, so no live stream is opened and nothing plays'); return; }
+    ctx ??= new AudioContext();
+    ctx.resume();
+    if (!out) {
+      pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      out = ctx.createGain();
+      tap = ctx.createAnalyser(); tap.fftSize = 2048; tapBuf = new Float32Array(tap.fftSize);
+      key = keyBuild();
+      levelBuild();
+    }
+    playing = true;
+    face();
+    keyStart();
+    reading = null; bars.fill(0);
+    for (const k of ['key', 'conf', 'also']) keyPanel.values.set(k, '');
+    route();
+    // The press is the person asking to listen: only now does a stream open,
+    // and only the one station picked.
+    open(STATIONS[at]);
+    pb.refresh();
+    requestAnimationFrame(frame);
+  }
+  function stop() {
+    playing = false;
+    if (key) clearInterval(key.timer);
+    close();
+    pb.refresh();
+    face();
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
+  ] });
+  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
+  face();
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wavePanel.el, keyPanel.el, pb.el);
+  // Read only, for a check over CDP.
+  window.__demo.key = { src: () => srcOf(STATIONS[at]), station: () => STATIONS[at].id, open: () => (leg ? leg.st.id : null),
+    live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null, gain: () => (lv ? +lv.g.toFixed(3) : null),
+    levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing };
+  d.ready();
+</script>

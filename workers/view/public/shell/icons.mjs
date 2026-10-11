@@ -16,7 +16,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** [group, [names]] in the order the sample sheet shows them. */
-export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
+export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","send","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
 
 /** Each name's Feather name, so the sheet can say where it came from. */
 export const SOURCE = {
@@ -63,6 +63,7 @@ export const SOURCE = {
   "trash": "trash-2",
   "edit": "edit-2",
   "chat": "message-square",
+  "send": "send",
   "user": "user",
   "users": "users",
   "lock": "lock",
@@ -138,6 +139,7 @@ export const BODIES = {
   "trash": "<path d=\"M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-6 5v6m4-6v6\"/>",
   "edit": "<path d=\"M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5L2 22l1.5-5.5z\"/>",
   "chat": "<path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/>",
+  "send": "<path d=\"M22 2L11 13M22 2l-7 20l-4-9l-9-4z\"/>",
   "user": "<path d=\"M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2\"/><circle cx=\"12\" cy=\"7\" r=\"4\"/>",
   "users": "<path d=\"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M23 21v-2a4 4 0 0 0-3-3.87m-4-12a4 4 0 0 1 0 7.75\"/>",
   "lock": "<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\"/><path d=\"M7 11V7a5 5 0 0 1 10 0v4\"/>",

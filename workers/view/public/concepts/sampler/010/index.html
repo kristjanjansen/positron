@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 010</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The patch selector is a full width block, as /concepts/synth/070/'s: the
+     name cell takes the width between the two arrows. (0,2,0) beats the
+     cell's own width. */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+</style>
+<script type="module">
+  // concepts sampler/010, PIANO AND RHODES, 2026-10-11. 000's sampler holding
+  // two sample sets, the Salamander piano and the jRhodes3d Rhodes, both from R2
+  // into `web:sampler:file-in`. A separate patch node, `web:patch`, sends a
+  // MIDI program change (0 piano, 1 Rhodes) into the same `midi-in` the keys
+  // play, so the sampler switches the way a hardware synth does
+  // (/concepts/synth/070/). Asked: *"Piano plus rhodes in sampler. What
+  // cahnges in patcbay? Separaete Patch seleta node?"*.
+  // NOTHING OPENS ON A VISIT. The Rhodes is fetched only once program 1
+  // arrives: the notes the keys on screen reach, so its first note is not a
+  // cold fetch, and any other note on its first press.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createSampler, PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+
+  const d = mount({ name: 'concept sampler 010', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('sampler/010');
+
+  // ── the sampler ─────────────────────────────────────────────────────────
+  let fetchedAt = 0;
+  const sampler = createSampler({
+    instruments: [PIANO, RHODES],
+    // the keys on screen, C3 to A4
+    warm: [48, 69],
+    onProgram: (ins) => patchPick.show(ins.name, INSTRUMENTS.indexOf(ins)),
+    log: (line, kind) => d.log(line, kind),
+    onFetch: (on) => { if (!on) fetchedAt = performance.now(); pb?.refresh?.(); },
+  });
+
+  const INSTRUMENTS = [PIANO, RHODES];
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const S = 'web', CF = 'cf-r2';
+  const bay = createBay();
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: `${S}:patch:midi-out`, dir: 'out', medium: 'midi', emits: ['program'] });
+  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: (e) => sampler.midi(e) });
+  bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
+  bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
+  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  bay.addPort({ id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  bay.addPort({ id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  for (const [a, b] of [
+    [`${S}:keys:midi-out`, `${S}:sampler:midi-in`],
+    [`${S}:patch:midi-out`, `${S}:sampler:midi-in`],
+    [`${CF}:piano:file-out`, `${S}:sampler:file-in`],
+    [`${CF}:rhodes:file-out`, `${S}:sampler:file-in`],
+    [`${S}:sampler:audio-out`, `${S}:speaker:audio-in`],
+  ]) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+
+  // A file wire is lit while its set's recordings come down and for 600 ms
+  // after; the audio wire while a voice sounds. MIDI pulses once per event.
+  const flowing = (l, medium) => {
+    if (medium === 'file') {
+      const mine = l.from.startsWith(`${CF}:${sampler.inst().id}:`);
+      return mine && (sampler.loading() || (fetchedAt && performance.now() - fetchedAt < 600));
+    }
+    if (medium === 'audio') return sampler.sounding() > 0;
+    return false;
+  };
+  const pb = createPatchbay(bay, { detail: (n) => [{ text: n.label, sans: true }], flowing });
+
+  // ── the patch selector, its own node ─────────────────────────────────────
+  // A pick is one program change leaving patch:midi-out. The cell shows what
+  // the sampler says it is playing, so it changes when the change arrives.
+  let patchAt = 0;
+  const pick = (i) => { patchAt = i; bay.send(`${S}:patch:midi-out`, { cls: 'program', ch: 1, d1: INSTRUMENTS[i].program }); };
+  const step = (by) => pick((patchAt + by + INSTRUMENTS.length) % INSTRUMENTS.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pick(i) });
+  patchPick.options(INSTRUMENTS.map((x) => x.name), 0);
+
+  // ── the keys ────────────────────────────────────────────────────────────
+  const host = el('div');
+  const send = (note, vel) => bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: vel });
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') send(note, 100); },
+    onUp: (note, how) => { if (how !== 'midi') send(note, 0); },
+    onPanic: () => sampler.panic(),
+  });
+
+  // A plugged in keyboard plays through the same keys node, so it follows the
+  // patch and its pedal is the sampler's sustain (found 2026-10-11, *"sampler
+  // 010 keeps playing piano when i switch patch woth mouse and keep playing
+  // midi"*: this page never opened one, so a 020 tab was the one playing).
+  createMidi({
+    log: (line, kind) => d.log(line, kind),
+    onDown: (n, vel) => { kb.lightNote?.(n, true); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: vel }); },
+    onUp: (n) => { kb.lightNote?.(n, false); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 }); },
+    onControl: (c, v) => { if (c === 64) bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: c, d2: v }); },
+  });
+
+  d.stack.add(patchPick.el, host, pb.el);
+  window.__demo.bay = bay;
+  // Read only, for a check over CDP.
+  window.__demo.sampler = { stat: () => sampler.stat() };
+  d.ready();
+</script>

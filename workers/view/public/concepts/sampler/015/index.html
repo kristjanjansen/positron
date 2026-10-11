@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 015</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-stack { display: flex; flex-direction: column; gap: 12px; }
+  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+</style>
+<script type="module">
+  // concepts sampler/015, SUSTAIN, 2026-10-11. A page for seeing what a sustain
+  // pedal really sends, between 010 (the sampler) and 020 (the looper whose only
+  // control is CC 64). Asked: *"do 015 with sustain debuggind. what you get from
+  // the port, timings, "gestures""*. The owner is debugging a real pedal.
+  //
+  // WHAT IT SHOWS
+  //   - every message off every input port, with the port name, the bytes in
+  //     hex, the channel, a reading, the event's own `timeStamp` and the gap
+  //     since the previous message on the same controller of the same port;
+  //   - a readout for the pedal that last spoke on CC 64: messages, presses,
+  //     the last press's length and message rate, the values seen, and a guess
+  //     at its type and its polarity;
+  //   - gestures, as rows and on a strip: press and release exactly as 020
+  //     reads them, and tap, hold, double, half pedal and bounce on top.
+  //
+  // THE THRESHOLDS, all of them, used nowhere else:
+  //   press    CC 64 crossing from below 64 to 64 or above (020's PRESS, from
+  //            /shell/pedal.mjs's PEDAL_ON). The state before a port's first
+  //            message is 0, as 020's is, so a first 127 is a press and a
+  //            first 0 is nothing.
+  //   release  crossing back below 64.
+  //   tap      a release under TAP_MS (250 ms) after its press.
+  //   hold     a release TAP_MS or more after its press.
+  //   double   a tap whose press came under DOUBLE_MS (400 ms) after the
+  //            previous tap's release.
+  //   half     the value staying inside 1..126 and inside a band HALF_BAND
+  //            (16) wide for HALF_MS (200 ms). A sweep moves through the band
+  //            faster than that and is not half pedal.
+  //   bounce   a crossing under BOUNCE_MS (20 ms) after the previous one, which
+  //            020 treats as two presses that make no loop.
+  //
+  // THE GUESSES
+  //   type     only 0 and 127 ever seen: a switch. Values in between, six or
+  //            more distinct values: continuous. In between but fewer: unsure.
+  //   polarity the FIRST CC 64 message from a port is taken as the first press,
+  //            because a pedal sits at rest until somebody steps on it. For a
+  //            switch (first value 0 or 127), 64 or above is normal and below
+  //            is inverted. For a continuous pedal the first value is a small
+  //            step off rest, so the direction of its first change decides:
+  //            rising is normal, falling inverted. A reload, then one press, asks
+  //            again. An inverted pedal makes 020's looper fire on the
+  //            RELEASE, which the log says once.
+  //            /shell/pedal.mjs records why it happens on this desk: the
+  //            MK-425C senses polarity at power up.
+  //
+  // 🔴 MIDI IS OPENED HERE, NOT WITH `createMidi`, AND THAT IS ON PURPOSE.
+  // `/shell/midi.mjs` hands a page a note, a controller or its `onAny` bytes
+  // with a timestamp, but never the PORT NAME, and this page's first column is
+  // which port said it. It also owns `port.onmidimessage`, so a second reader
+  // on the same port would replace the first. So this page uses
+  // `navigator.requestMIDIAccess` and `addEventListener('midimessage')`, and
+  // `midi-decode.mjs` for the reading, which is what `/dump/` does.
+  //
+  // NOTHING IS FETCHED ON A VISIT. MIDI access is asked for on load (the
+  // browser's prompt), the samples on the first note. A check feeds bytes with
+  // `__demo.pedal.feed(bytes, timeStamp, port)`, which is the same function a
+  // real port's message calls.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
+  import { decode } from '/shell/midi-decode.mjs';
+  import { createBay, classOf, CLASSES } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { registerRenderer } from '/timeline/strip.mjs';
+  import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
+
+  const d = mount({
+    name: 'concept sampler 015', what: '', index: '/concepts/', indexLabel: 'concepts',
+    readout: {
+      messages: '', presses: '', 'last press': 'ms', rate: '/s',
+      values: '', distinct: '', type: '', polarity: '',
+    },
+  });
+  conceptNav('sampler/015');
+
+  const TAP_MS = 250, DOUBLE_MS = 400, HALF_MS = 200, HALF_BAND = 16, BOUNCE_MS = 20;
+  const PEDALS = new Map([[64, 'sustain'], [66, 'sostenuto'], [67, 'soft']]);
+  const ONSCREEN = 'on-screen keys';
+  const SHOWN_KEPT = 5000;
+
+  // ── the sampler, so the pedal is heard ─────────────────────────────────
+  let fetchedAt = 0;
+  const sampler = createSampler({
+    instruments: [PIANO],
+    log: (line, kind) => d.log(line, kind),
+    onFetch: (on) => { if (!on) fetchedAt = performance.now(); },
+  });
+
+  // ── the model ──────────────────────────────────────────────────────────
+  const M = {
+    seq: 0,
+    msgs: [],              // every message, as it arrived
+    gestures: [],          // every gesture
+    floods: 0,             // clock and active sensing, counted and not listed
+    lastAt: new Map(),     // port|ch|controller -> { at, value }
+    src: new Map(),        // port -> CC 64 analysis
+    last: null,            // the port that last spoke on CC 64
+    oddPedal: new Set(),   // port|cc already reported as a pedal on another controller
+  };
+
+  function source(port) {
+    let s = M.src.get(port);
+    if (!s) {
+      s = { port, n: 0, counts: new Map(), min: 127, max: 0, first: null, value: null, lastAt: 0,
+            crossings: 0, lastCross: -Infinity, presses: 0,
+            downAt: null, downN: 0, downAts: [], lastTapUp: -Infinity, lastLen: null, lastRate: null,
+            firstMove: null, repeats: 0, half: null, warned: false, looper: 'empty', looperT: 0 };
+      M.src.set(port, s);
+    }
+    return s;
+  }
+
+  const fmt = (t) => t.toFixed(3);
+  const ms = (t) => `${t.toFixed(1)} ms`;
+
+  function gesture(s, at, kind, detail, mark) {
+    const g = { i: M.gestures.length, at, port: s.port, kind, detail, mark };
+    M.gestures.push(g);
+    gestT.add({ at: fmt(at), port: s.port, kind, detail });
+    strip?.strip.invalidate();
+    return g;
+  }
+
+  /** What 020 would do on this press, per port, so the two pages can be compared. */
+  function looper(s, at) {
+    if (s.looper === 'recording') {
+      const len = at - s.looperT;
+      if (len < BOUNCE_MS) { s.looper = 'empty'; return `020 would make no loop, ${ms(len)} after the first press`; }
+      s.looper = 'looping';
+      return `020 would loop ${(len / 1000).toFixed(3)} s`;
+    }
+    s.looper = 'recording'; s.looperT = at;
+    return '020 would start recording';
+  }
+
+  /** Half pedal: the band has held long enough by time `t`. */
+  function checkHalf(s, t) {
+    const h = s.half;
+    if (!h || h.emitted || t - h.start < HALF_MS) return;
+    h.emitted = true;
+    gesture(s, h.start, 'half', `between ${h.lo} and ${h.hi} for ${HALF_MS} ms or more`, '~');
+  }
+
+  function pedalMessage(s, v, at) {
+    if (s.value !== null && v === s.value) s.repeats++;
+    s.n++;
+    s.counts.set(v, (s.counts.get(v) || 0) + 1);
+    s.min = Math.min(s.min, v); s.max = Math.max(s.max, v);
+    if (s.first === null) s.first = v;
+    else if (s.firstMove === null && v !== s.first) s.firstMove = v > s.first ? 'up' : 'down';
+
+    checkHalf(s, at);
+    if (v >= 1 && v <= 126) {
+      const h = s.half;
+      if (!h || Math.max(h.hi, v) - Math.min(h.lo, v) > HALF_BAND) s.half = { start: at, lo: v, hi: v, emitted: false };
+      else { h.lo = Math.min(h.lo, v); h.hi = Math.max(h.hi, v); }
+    } else s.half = null;
+
+    const was = s.value === null ? 0 : s.value;   // 020's L.pedal starts at 0
+    const wasHigh = was >= PEDAL_ON, isHigh = v >= PEDAL_ON;
+    if (s.downAt !== null) { s.downN++; s.downAts.push(at); }
+    if (!wasHigh && isHigh) {
+      const gap = at - s.lastCross;
+      s.crossings++; s.presses++; s.lastCross = at;
+      s.downAt = at; s.downN = 1; s.downAts = [at];
+      const bounce = gap < BOUNCE_MS;
+      gesture(s, at, 'press', `${v}, ${looper(s, at)}`, bounce ? 'B' : 'P');
+      if (bounce) gesture(s, at, 'bounce', `${ms(gap)} after the release before it`, null);
+    } else if (wasHigh && !isHigh) {
+      const gap = at - s.lastCross;
+      s.crossings++; s.lastCross = at;
+      const len = s.downAt === null ? null : at - s.downAt;
+      const n = s.downN, ats = s.downAts;
+      s.downAt = null; s.downN = 0; s.downAts = [];
+      const bounce = gap < BOUNCE_MS;
+      // The rate during the press, and how even the gaps were.
+      const dts = ats.slice(1).map((t, i) => t - ats[i]);
+      const mean = dts.length ? dts.reduce((a, b) => a + b, 0) / dts.length : null;
+      const sd = dts.length > 1 ? Math.sqrt(dts.reduce((a, b) => a + (b - mean) ** 2, 0) / dts.length) : null;
+      s.lastLen = len;
+      s.lastRate = len > 0 ? n / (len / 1000) : null;
+      const stream = `${n} message${n === 1 ? '' : 's'}`
+        + (mean !== null ? `, gaps ${mean.toFixed(1)} ms` : '')
+        + (sd !== null ? ` plus or minus ${sd.toFixed(1)}` : '');
+      let mark = len !== null && len < TAP_MS ? 'T' : 'H';
+      const rel = gesture(s, at, 'release', `${v}, after ${len === null ? '?' : ms(len)}, ${stream}`, null);
+      if (len !== null && len < TAP_MS) {
+        const since = (at - len) - s.lastTapUp;
+        gesture(s, at, 'tap', ms(len), null);
+        if (since < DOUBLE_MS) { gesture(s, at, 'double', `pressed ${ms(since)} after the tap before it`, null); mark = 'D'; s.lastTapUp = -Infinity; }
+        else s.lastTapUp = at;
+      } else if (len !== null) gesture(s, at, 'hold', ms(len), null);
+      if (bounce) { gesture(s, at, 'bounce', `${ms(gap)} after the press before it`, null); mark = 'B'; }
+      // The lane's one mark for this release.
+      rel.mark = mark;
+    }
+    s.value = v; s.lastAt = at;
+    guessWarn(s);
+  }
+
+  function typeOf(s) {
+    if (!s || !s.n) return '';
+    let mid = 0;
+    for (const [v, c] of s.counts) if (v >= 1 && v <= 126) mid += c;
+    if (!mid) return 'switch';
+    return s.counts.size >= 6 ? 'continuous' : 'unsure';
+  }
+  function polarityOf(s) {
+    if (!s || s.first === null) return '';
+    // A switch's first message is where it was pressed TO. A continuous
+    // pedal's first message is a small step off its rest, so for a first value
+    // between the ends it is the direction of the first change that says which
+    // way pressing goes.
+    const mid = s.first > 0 && s.first < 127;
+    const byFirst = !mid ? (s.first >= PEDAL_ON ? 'normal' : 'inverted')
+      : s.firstMove === 'up' ? 'normal' : s.firstMove === 'down' ? 'inverted' : 'unsure';
+    // ⚠️ THERE WAS A SECOND VOTE, TIME SPENT ON EACH SIDE (a pedal is at rest
+    // more than it is down), AND IT WAS TAKEN OUT. MEASURED on the synthetic
+    // script: a normal switch held for a second at a time read `unsure`, and so
+    // did an inverted one, because somebody debugging a looper holds the pedal
+    // as long as they leave it. The first message is the one fact that does
+    // not depend on how the pedal is used; A reload, then one press, asks again.
+    return byFirst;
+  }
+  function guessWarn(s) {
+    if (s.warned || polarityOf(s) !== 'inverted') return;
+    s.warned = true;
+    d.log(`${s.port} reads inverted: CC 64 goes below 64 when pressed, so 020's looper would start and stop on the release. `
+      + 'An MK-425C senses this at power up, so power it with the pedal up', 'warn');
+  }
+
+  function face() {
+    const s = M.last ? M.src.get(M.last) : null;
+    d.set('messages', M.msgs.length);
+    d.set('presses', s ? s.presses : '');
+    d.set('last press', s?.lastLen != null ? s.lastLen.toFixed(1) : '');
+    d.set('rate', s?.lastRate != null ? s.lastRate.toFixed(1) : '');
+    d.set('values', s?.n ? `${s.min} to ${s.max}` : '');
+    d.set('distinct', s?.n ? s.counts.size : '');
+    d.set('type', typeOf(s));
+    d.set('polarity', polarityOf(s));
+    if (s) guessWarn(s);
+  }
+
+  /** One message off a port. A real port and `__demo.pedal.feed` both call this. */
+  function ingest(bytes, at, port) {
+    const m = decode(bytes);
+    if (m.flood) { M.floods++; return; }
+    const ctl = m.cc !== null ? `cc${m.cc}` : m.note !== null ? `note${m.note}` : m.kind;
+    const key = `${port}|${m.ch}|${ctl}`;
+    const prev = M.lastAt.get(key);
+    M.lastAt.set(key, { at, value: m.d2 });
+    let reading = m.reading;
+    if (m.cc !== null && PEDALS.has(m.cc)) reading = `${PEDALS.get(m.cc)} ${m.d2}, ${m.d2 >= PEDAL_ON ? 'down' : 'up'}`;
+    if (m.cc !== null && prev && prev.value === m.d2) reading += ', repeated';
+    const row = { i: M.seq++, at, port, hex: m.bytes, ch: m.ch ?? '', what: m.what, reading,
+                  cc: m.cc, note: m.note, value: m.d2, gap: prev ? at - prev.at : null };
+    M.msgs.push(row);
+    if (M.msgs.length > SHOWN_KEPT) M.msgs.shift();
+    if (shows(row)) msgT.add(cells(row));
+    if (m.cc === SUSTAIN_CC) {
+      M.last = port;
+      pedalMessage(source(port), m.d2, at);
+      kb.sustain?.set(m.d2 >= PEDAL_ON, true);
+    } else if (m.cc !== null && !PEDALS.has(m.cc)) oddPedal(port, m.cc);
+    face();
+  }
+
+  // A pedal plugged into a keyboard that maps it to another controller is the
+  // first thing to rule out (`pedal.mjs` records the MK-425C's rear panel
+  // printing SUSTAIN C21), so a controller that has only ever said 0 and 127,
+  // both of them, is named once.
+  function oddPedal(port, cc) {
+    const k = `${port}|${cc}`;
+    if (M.oddPedal.has(k)) return;
+    const vals = new Set(M.msgs.filter((r) => r.port === port && r.cc === cc).map((r) => r.value));
+    if (vals.size === 2 && vals.has(0) && vals.has(127)) {
+      M.oddPedal.add(k);
+      d.log(`${port} sends CC ${cc} as only 0 and 127, which looks like a pedal on controller ${cc} rather than 64`, 'warn');
+    }
+  }
+
+  // ── the tables ─────────────────────────────────────────────────────────
+  // Every message is shown, notes too. Asked 2026-10-11: *"show alwats
+  // everything"*; the pedals and no-notes filter is gone.
+  const shows = () => true;
+  const cells = (r) => ({ at: fmt(r.at), port: r.port, hex: r.hex, ch: r.ch, reading: r.reading,
+                          gap: r.gap === null ? '' : `+${r.gap.toFixed(1)}` });
+  const msgT = createTable({
+    columns: [
+      // The reading comes before the port, so a phone, where the row scrolls
+      // sideways, shows when, the bytes and what they mean without a drag.
+      { key: 'at', label: 'at ms', width: 92, align: 'right' },
+      { key: 'hex', label: 'bytes', width: 80, hi: true },
+      { key: 'reading', label: 'reading', grow: true, clip: true },
+      { key: 'gap', label: 'gap ms', width: 72, align: 'right' },
+      { key: 'ch', label: 'ch', width: 32, align: 'right' },
+      { key: 'port', label: 'port', width: 120, clip: true },
+    ],
+    cap: 1000, stick: true, minRows: 12,
+  });
+  const gestT = createTable({
+    columns: [
+      { key: 'at', label: 'at ms', width: 92, align: 'right' },
+      { key: 'kind', label: 'gesture', width: 72, hi: true },
+      { key: 'detail', label: 'detail', grow: true, clip: true },
+      { key: 'port', label: 'port', width: 120, clip: true },
+    ],
+    cap: 1000, stick: true, minRows: 6,
+  });
+
+  /** The whole log as text, for Copy log and a check. */
+  function text() {
+    const out = [`positron sampler/015, ${new Date().toISOString()}`, ''];
+    for (const s of M.src.values()) {
+      out.push(`${s.port}: CC 64 ${s.n} messages, ${s.presses} press${s.presses === 1 ? '' : 'es'}, values ${s.min} to ${s.max}, `
+        + `${s.counts.size} distinct, ${s.repeats} repeated, type ${typeOf(s)}, polarity ${polarityOf(s)}`);
+    }
+    if (M.floods) out.push(`${M.floods} clock or active sensing messages, not listed`);
+    out.push('', 'at ms\tport\tbytes\tch\treading\tgap ms');
+    for (const r of M.msgs) out.push([fmt(r.at), r.port, r.hex, r.ch, r.reading, r.gap === null ? '' : r.gap.toFixed(1)].join('\t'));
+    out.push('', 'at ms\tport\tgesture\tdetail');
+    for (const g of M.gestures) out.push([fmt(g.at), g.port, g.kind, g.detail].join('\t'));
+    return out.join('\n');
+  }
+  // The one button left, asked back the same day: *"just add copy button"*.
+  async function copy() {
+    const t = text();
+    try { await navigator.clipboard.writeText(t); }
+    catch {
+      const ta = el('textarea'); ta.value = t; document.body.append(ta); ta.select();
+      try { document.execCommand('copy'); } finally { ta.remove(); }
+    }
+    d.log(`copied ${M.msgs.length} messages and ${M.gestures.length} gestures`);
+  }
+  const btns = createButtonGroup({ buttons: [{ id: 'copy', label: 'Copy log', onPress: copy }] });
+  function clearAll() {
+    M.msgs = []; M.gestures = []; M.floods = 0; M.seq = 0;
+    M.lastAt.clear(); M.src.clear(); M.last = null; M.oddPedal.clear();
+    msgT.set([]); gestT.set([]); face(); strip.strip.invalidate();
+  }
+
+  // ── the timeline: the raw value, and the gestures ───────────────────────
+  // The strip's time is performance time in ms, the same clock as a MIDI
+  // message's `timeStamp`. The deck plays nothing; it holds the range and a
+  // playhead that is always now.
+  const VIEW_MS = 4000;   // the strip's window when it follows
+  let range = 60000;
+  const deck = createDeck({ items: [], range: [0, range],
+    adapters: { note: { caps: { rates: [1], continuous: false }, actuate() {}, reduce() { return {}; }, assertState() { return {}; } } } });
+  const COLOR = (port) => (port === ONSCREEN ? '#c9ced6' : '#6fb8e8');
+  const pedalRows = () => M.msgs.filter((r) => r.cc === SUSTAIN_CC);
+
+  // A stepped line: a controller holds its value until the next message, so a
+  // sloped line between two values would draw values nobody sent. One line
+  // per port, a dot on every message, and the threshold at 64 dashed.
+  registerRenderer('pedal-step', (ctx, L, C) => {
+    const { x, t0, t1 } = C;
+    const top = L.y + 3, h = L.height - 6;
+    const y = (v) => top + h - (v / 127) * h;
+    ctx.save();
+    ctx.strokeStyle = '#6a7280'; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x(t0), Math.round(y(PEDAL_ON)) + 0.5); ctx.lineTo(x(t1), Math.round(y(PEDAL_ON)) + 0.5); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const by = new Map();
+    for (const r of pedalRows()) { if (!by.has(r.port)) by.set(r.port, []); by.get(r.port).push(r); }
+    const now = Math.min(performance.now(), t1);
+    for (const [port, rows] of by) {
+      ctx.strokeStyle = ctx.fillStyle = COLOR(port); ctx.lineWidth = 1.5;
+      let i = rows.findIndex((r) => r.at >= t0);
+      if (i < 0) i = rows.length - 1; else if (i > 0) i--;
+      ctx.beginPath();
+      let prev = null;
+      for (let k = i; k < rows.length && rows[k].at <= t1; k++) {
+        const r = rows[k], px = x(r.at);
+        if (prev === null) ctx.moveTo(Math.max(px, x(t0)), y(r.value));
+        else { ctx.lineTo(px, y(prev)); ctx.lineTo(px, y(r.value)); }
+        prev = r.value;
+      }
+      if (prev !== null) ctx.lineTo(x(now), y(prev));
+      ctx.stroke();
+      const dense = rows.length > 1 && (x(rows[rows.length - 1].at) - x(rows[i].at)) / (rows.length - i) < 4;
+      if (!dense) for (let k = i; k < rows.length && rows[k].at <= t1; k++) {
+        if (rows[k].at < t0) continue;
+        ctx.beginPath(); ctx.arc(x(rows[k].at), y(rows[k].value), 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  });
+
+  const MARK_COLOR = { P: '#9ad16b', T: '#6fb8e8', H: '#c39af0', D: '#d68fc6', '~': '#ee9a4d', B: '#e07a5f' };
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, { toggle: false, scrub: false, loop: false, live: false });
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: true, followEdge: 0.99, followBack: 0.95, gutter: 96, footer: true,
+    lanes: [
+      { id: 'cc64', kind: 'note', label: 'CC 64', height: 80, as: 'pedal-step', terse: true, rows: () => [] },
+      { id: 'gest', kind: 'note', label: 'gestures', height: 40, width: 2, as: 'ticks', terse: true,
+        rows: () => M.gestures.filter((g) => g.mark).map((g) => ({ at: g.at, id: `g${g.i}`, kind: 'note', payload: g })),
+        glyphOf: (r) => r.payload.mark,
+        colorOfRow: (r) => MARK_COLOR[r.payload.mark],
+        describeRow: (r) => {
+          const same = M.gestures.filter((g) => g.at === r.payload.at && g.port === r.payload.port);
+          return [same.map((g) => g.kind).join(', '), same[0].detail];
+        } },
+    ],
+  });
+  const surface = createGlue(bar.el, strip.surface);
+  const RESUME_MS = 3000;
+  let touchedAt = 0;
+  for (const ev of ['pointerdown', 'pointermove', 'wheel']) strip.surface.addEventListener(ev, () => { touchedAt = performance.now(); }, { passive: true });
+  function tick() {
+    const now = performance.now();
+    if (now > range - 5000) { range = now + 60000; deck.setRange([0, range]); }
+    if (Math.abs(deck.position() - now) > 0.5) deck.seek(now);
+    // With the Follow button gone, a strip scrolled back by hand comes back to
+    // now on its own after RESUME_MS without a touch.
+    if (strip.strip.follow().engaged) strip.strip.frame(now, VIEW_MS, 0.95);
+    else if (now - touchedAt > RESUME_MS) strip.strip.setFollow(true);
+    for (const s of M.src.values()) checkHalf(s, now);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  // The debug node is a listener beside the sampler, not a stage in front of
+  // it: what reaches the sampler is exactly what the port sent.
+  const S = 'web', CF = 'cf-r2';
+  const bay = createBay();
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:midi`, kind: 'device', label: 'MIDI keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:pedal-debug`, kind: 'screen', label: 'pedal debug', place: 'browser' });
+  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: `${S}:midi:midi-out`, dir: 'out', medium: 'midi', emits: [...CLASSES] });
+  bay.addPort({ id: `${S}:pedal-debug:midi-in`, dir: 'in', medium: 'midi', accepts: [...CLASSES, 'other'],
+    deliver: (e, l, meta) => ingest(meta.raw, meta.at, meta.port) });
+  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (e) => sampler.midi(e) });
+  bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
+  bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
+  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  bay.addPort({ id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  for (const [a, b] of [
+    [`${S}:keys:midi-out`, `${S}:pedal-debug:midi-in`],
+    [`${S}:midi:midi-out`, `${S}:pedal-debug:midi-in`],
+    [`${S}:keys:midi-out`, `${S}:sampler:midi-in`],
+    [`${S}:midi:midi-out`, `${S}:sampler:midi-in`],
+    [`${CF}:piano:file-out`, `${S}:sampler:file-in`],
+    [`${S}:sampler:audio-out`, `${S}:speaker:audio-in`],
+  ]) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const flowing = (l, medium) => {
+    if (medium === 'file') return sampler.loading() || (fetchedAt && performance.now() - fetchedAt < 600);
+    if (medium === 'audio') return sampler.sounding() > 0;
+    return false;
+  };
+  const pb = createPatchbay(bay, { detail: (n) => [{ text: n.label, sans: true }], flowing });
+
+  /** Bytes from a source onto the bay, with what the debug node needs beside them. */
+  function emit(from, bytes, at, port) {
+    const m = decode(bytes);
+    if (m.flood) { M.floods++; return; }
+    const ev = { cls: classOf(m), ch: m.ch ?? 1, d1: m.d1, d2: m.kind === 'note off' ? 0 : m.d2 };
+    bay.send(from, ev, { raw: Array.from(bytes), at, port });
+  }
+
+  // ── the on-screen keys ──────────────────────────────────────────────────
+  // Their Sustain is a latching button, as /nola/'s: down sends 127, up sends 0.
+  const host = el('div');
+  const keys = (bytes) => emit(`${S}:keys:midi-out`, bytes, performance.now(), ONSCREEN);
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (n, how) => { if (how !== 'midi') keys([0x90, n, 100]); },
+    onUp: (n, how) => { if (how !== 'midi') keys([0x80, n, 0]); },
+    onPanic: () => sampler.panic(),
+    sustain: true,
+    onSustain: (on) => keys([0xb0, SUSTAIN_CC, on ? 127 : 0]),
+  });
+
+  // ── the plugged in keyboard ─────────────────────────────────────────────
+  const wired = new WeakSet();
+  const portNames = [];
+  function fromPort(e) {
+    const bytes = e.data;
+    const st = bytes[0] & 0xf0;
+    if (st === 0x90 && bytes[2] > 0) kb.lightNote?.(bytes[1], true);
+    else if (st === 0x80 || st === 0x90) kb.lightNote?.(bytes[1], false);
+    emit(`${S}:midi:midi-out`, bytes, e.timeStamp, e.target.name || 'unnamed port');
+  }
+  function ports(access) {
+    portNames.length = 0;
+    for (const p of access.inputs.values()) {
+      portNames.push(p.name || 'unnamed port');
+      if (!wired.has(p)) { p.addEventListener('midimessage', fromPort); wired.add(p); }
+    }
+    bay.node(`${S}:midi`).label = portNames.length ? portNames.join(', ') : 'MIDI keyboard';
+    pb.refresh();
+  }
+  (async () => {
+    if (!navigator.requestMIDIAccess) { d.log('this browser has no MIDI, so only the on-screen keys reach this page', 'warn'); return; }
+    try {
+      const access = await navigator.requestMIDIAccess({ sysex: false });
+      ports(access);
+      d.log(portNames.length ? `MIDI inputs: ${portNames.join(', ')}` : 'no MIDI input plugged in yet');
+      access.onstatechange = () => {
+        const before = portNames.join(', ');
+        ports(access);
+        const now = portNames.join(', ');
+        if (now !== before) d.log(now ? `MIDI inputs: ${now}` : 'no MIDI input plugged in');
+      };
+    } catch (e) { d.log(`MIDI was refused: ${e.message}`, 'warn'); }
+  })();
+
+  // ── the page ───────────────────────────────────────────────────────────
+  const section = (title, ...parts) => {
+    const box = el('div', 'cc-stack');
+    box.append(el('h3', 'cc-h', title), ...parts);
+    return box;
+  };
+  d.stack.add(btns.el, surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
+  requestAnimationFrame(() => strip.strip.frame(performance.now(), VIEW_MS, 0.95));
+  face();
+
+  window.__demo.bay = bay;
+  window.__demo.sampler = { stat: () => sampler.stat() };
+  // A check's way in, and the only one that writes: bytes go through the same
+  // `emit` a real port's message does, on the hardware node.
+  window.__demo.pedal = {
+    feed: (bytes, at = performance.now(), port = 'test port') => emit(`${S}:midi:midi-out`, bytes, at, port),
+    clear: clearAll,
+    text,
+    get messages() { return M.msgs.map((r) => ({ ...r })); },
+    get gestures() { return M.gestures.map((g) => ({ ...g })); },
+    sources: () => [...M.src.values()].map((s) => ({ port: s.port, n: s.n, presses: s.presses, min: s.min, max: s.max,
+      distinct: s.counts.size, repeats: s.repeats, lastLen: s.lastLen, lastRate: s.lastRate,
+      type: typeOf(s), polarity: polarityOf(s) })),
+    get shown() { return msgT.count(); },
+  };
+  d.ready();
+</script>

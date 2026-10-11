@@ -14,7 +14,7 @@
 
 import { el } from './shell.mjs';
 import { createTable } from './table.mjs';
-import { MEDIA, printLink } from './bay.mjs';
+import { MEDIA, HEAVY, printLink } from './bay.mjs';
 import { createBayView, BAY_VIEW_CSS } from './bay-view.mjs';
 import { createBayTraffic, STREAMY } from './bay-traffic.mjs';
 import { createPortInk } from './port-ink.mjs';
@@ -46,6 +46,7 @@ let styled = false;
 const DIR = { in: '→○', out: '○→' };
 const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
 const siteOf = (id) => id.split(':')[0];
+const mediumOf = (ports, id) => ports.find((p) => p.id === id)?.medium || '';
 const list = (xs) => (xs && xs.length ? xs.join(', ') : '');
 
 /**
@@ -55,8 +56,60 @@ const list = (xs) => (xs && xs.length ? xs.join(', ') : '');
  * @param {Function} [o.detail]   `(node) => fields` for a box, see createBayView; the node's label by default
  * @param {Function} [o.flowing]  `(link, medium) => boolean` for a stream wire
  * @param {boolean} [o.open]      details shown from the start
+ * @param {string} [o.room]       the relay room, named on the relay's box, `cf-relay:<room>`
  */
-export function createPatchbay(source, { title = 'patchbay', detail, flowing = () => false, open = false, details = false } = {}) {
+export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () => false, open = false, details = false, room = 'room' } = {}) {
+  /* 🔴 THE RELAY IS DRAWN AS A BOX, 2026-10-11. Asked: *"why relay can no be
+     another box?"*, *"why it can have standard node naming?"*, then, after a
+     prototype on /concepts/room/000/, *"ok do it and update patcbays"*. Every
+     link the relay carries is drawn as two hops through `cf-relay:<room>`,
+     named like any node (as `cf-store:history`), with one in and one out port
+     per medium it carries. PICTURE ONLY: the bay still holds and routes the
+     one link, and the relay announces nothing, because it passes messages on
+     without reading them. A link counts as carried by the relay when its
+     session or `via` says `relay` (`relay`, `relay-h264`), or when it is a
+     LIGHT link between two sites with neither, which rides the room as one
+     `bay.event`. A heavy link with no session is not guessed at: an ERR
+     stream or a WHIP leg is not the relay. */
+  const RELAY = `cf-relay:${room}`;
+  const mediumIn = (ports, l) => mediumOf(ports, l.from) || mediumOf(ports, l.to);
+  const relayed = (ports, l) => {
+    const by = l.session?.transport || l.via;
+    if (by) return String(by).startsWith('relay');
+    return siteOf(l.from) !== siteOf(l.to) && !HEAVY.includes(mediumIn(ports, l));
+  };
+  // 🔴 A HOP KEEPS ONE OBJECT ACROSS READS. The traffic layer counts a wire's
+  // events as the change in `sent` on the SAME object, and treats a new object
+  // as a new wire; a hop built afresh on every read was a new wire every time,
+  // so no MIDI ever pulsed on a relayed link (found 2026-10-11 on
+  // /concepts/synth/070/, *"i do not see midi animation on circuilt patchbay"*).
+  const hopCache = new Map();
+  const drawn = () => {
+    const ports = raw.ports(), links = [], extra = new Map(), hops = new Map();
+    for (const l of raw.links()) {
+      if (!relayed(ports, l)) { links.push(l); continue; }
+      const md = mediumIn(ports, l);
+      const rin = `${RELAY}:${md}-in`, rout = `${RELAY}:${md}-out`;
+      extra.set(rin, { id: rin, dir: 'in', medium: md }); extra.set(rout, { id: rout, dir: 'out', medium: md });
+      for (const [from, to] of [[l.from, rin], [rout, l.to]]) {
+        const k = `${from} -> ${to}`;
+        const h = hops.get(k);
+        if (h) { h.origs.push(l); h.sent += l.sent || 0; continue; }
+        let hop = hopCache.get(k);
+        if (!hop) {
+          hop = { ...l, from, to, via: 'relay' };
+          delete hop.id; delete hop.session;
+          hopCache.set(k, hop);
+        }
+        hop.origs = [l]; hop.sent = l.sent || 0;
+        hops.set(k, hop); links.push(hop);
+      }
+    }
+    const nodes = raw.nodes();
+    if (extra.size) nodes.push({ id: RELAY, label: 'Cloudflare', kind: 'service' });
+    return { nodes, ports: [...ports, ...extra.values()], links };
+  };
+  const source = { nodes: () => drawn().nodes, ports: () => drawn().ports, links: () => drawn().links };
   if (!styled) { document.head.append(Object.assign(document.createElement('style'), { textContent: CSS })); styled = true; }
   // The view sees every link under its printed form, so the same link read
   // from a fresh bay is the same wire.
@@ -68,7 +121,8 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
     links: () => source.links().map((l) => ({ ...l, id: keyOf(l) })),
   };
   const pending = new Map();       // key -> pulses a page asked for
-  const view = createBayView(keyed, { detail: detail || ((n) => [{ text: n.label || '', sans: true }]) });
+  const fields = detail || ((n) => [{ text: n.label || '', sans: true }]);
+  const view = createBayView(keyed, { detail: (n) => (n.id === RELAY ? [{ text: 'Cloudflare', sans: true }] : fields(n)) });
   const ink = createPortInk(source, MEDIA);
   const traffic = createBayTraffic();
   const traced = new Set();
@@ -113,7 +167,6 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
     ink.paint(root);
   }
 
-  const mediumOf = (ports, id) => ports.find((p) => p.id === id)?.medium || '';
   // A light link has no session: inside one site the bay hands the event over
   // itself, across sites it rides the room as one `bay.event`.
   const whereOf = (l) => l.session?.where || (siteOf(l.from) === siteOf(l.to) ? 'machine' : 'internet');
@@ -144,7 +197,7 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
       const medium = mediumOf(ports, l.from) || mediumOf(ports, l.to);
       let was = l, seen = l.sent || 0;
       traffic.add(view, key, medium, STREAMY.includes(medium)
-        ? () => ({ flowing: !!(latest.get(key) && flowing(latest.get(key), medium)) })
+        ? () => { const now = latest.get(key); return { flowing: !!(now && flowing(now.origs?.[0] || now, medium)) }; }
         : () => {
           const now = latest.get(key);
           if (now !== was) { was = now; seen = now?.sent || 0; }
@@ -158,7 +211,9 @@ export function createPatchbay(source, { title = 'patchbay', detail, flowing = (
 
   /** One event along every drawn link from `from` to `to`, for a leg the bay does not count. */
   function pulse(from, to) {
-    for (const [key, l] of latest) if (l.from === from && l.to === to) pending.set(key, (pending.get(key) || 0) + 1);
+    // A relayed link is drawn as two hops, and a pulse on the link lights both.
+    const is = (l) => l.from === from && l.to === to;
+    for (const [key, l] of latest) if (is(l) || l.origs?.some(is)) pending.set(key, (pending.get(key) || 0) + 1);
   }
 
   /** Redraw after the links changed. Cheap enough to call after every send. */

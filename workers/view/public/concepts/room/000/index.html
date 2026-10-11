@@ -19,8 +19,8 @@
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
   .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
-  .cc-ring::after { content: none; }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
+  .cc-row[hidden] { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -28,6 +28,7 @@
   import { createTable } from '/shell/table.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
@@ -59,9 +60,8 @@
   const lines = createTable({
     columns: [
       { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'line', grow: true, hi: true },
+      { key: 'text', label: 'message', grow: true, hi: true, clip: true, hover: 'text' },
       { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
     ],
     minRows: 4,
     stick: true,
@@ -92,11 +92,12 @@
     b.link('*:chat:value-out', IN);
     return b;
   }
+  let joined = false;
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
-    onGraph: () => { drawSites(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
+    onGraph: () => { pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
@@ -108,7 +109,7 @@
     draw();
   }
 
-  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
+  const text = createField({ label: 'message', placeholder: 'say something', grow: 'wide' });
   text.disabled(true);
   function say() {
     const t = text.value().trim();
@@ -121,55 +122,24 @@
     text.set('');
   }
   text.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); say(); } });
-  const send = createButtonGroup({ buttons: [{ id: 'send', label: 'Send', primary: true, onPress: say }] });
-  send.button('send').disabled = true;
+  // The kit's send icon, an ordinary button rather than the primary (asked
+  // 2026-10-11, *"use send iconbutton on 000 secondary"*).
+  const send = createIconButton({ icon: 'send', label: 'Send', onPress: say });
+  send.el.disabled = true;
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-
-  // Who is in the room: the registry, as /concepts/bay/000/ draws it. Port names are
-  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
-  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
-  const sites = createTable({
-    columns: [
-      { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-      { key: 'who', label: 'who', width: 120 },
-      { key: 'dir', label: 'dir', width: 48 },
-      { key: 'medium', label: 'medium', width: 72 },
-      { key: 'by', label: 'transport', width: 120 },
-    ],
-    minRows: 4,
-  });
-  function drawSites() {
-    const rows = node.registry.merged().ports.map((p) => {
-      const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
-        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
-    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
-    sites.set(rows);
-    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-      const t = cell.textContent;
-      if (t === 'live' || t === 'stale') {
-        const dot = document.createElement('span');
-        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
-        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
-        cell.textContent = '';
-        cell.append(dot);
-        cell.title = t;
-      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
-    }
-  }
 
 
   // ── the patchbay: the two `*` links this tab holds, read from bay() itself ──
   // Before Join it is drawn from this tab's own graph, which opens nothing. A
   // wire pulses when a line really left (the room took it) or arrived along it.
   pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+
 
   const row = el('div', 'cc-row');
+  row.hidden = true;
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
   d.stack.add(join.el, row, lines.el, pb.el);
-  d.stack.titled('IN THE ROOM', sites.el);
   d.ready();
 </script>

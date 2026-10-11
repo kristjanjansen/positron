@@ -60,7 +60,7 @@ export const GROUPS = [
     ['save', 'save'], ['copy', 'copy'], ['trash', 'trash-2'], ['edit', 'edit-2'],
   ]],
   ['people', [
-    ['chat', 'message-square'], ['user', 'user'], ['users', 'users'], ['lock', 'lock'],
+    ['chat', 'message-square'], ['send', 'send'], ['user', 'user'], ['users', 'users'], ['lock', 'lock'],
     ['unlock', 'unlock'], ['eye', 'eye'], ['eye-off', 'eye-off'],
   ]],
   ['state', [

@@ -553,8 +553,11 @@ export function createBoard({
     if (via !== 'relay' && dx?.ctl?.readyState === 'open') {
       const id = randomId();
       // ⚠️ NUMBERED, because `ctl` is unordered: the board refuses a note older
-      // than the last one it applied to the same key (rig/board/rtc.mjs).
-      const out = { ...msg, id, ...(msg.type === 'midi.send' ? { n: ++dxN } : {}) };
+      // than the last one it applied to the same key (rig/board/rtc.mjs). Raw
+      // MIDI on an input's socket, and since 2026-10-11 `note.on` / `note.off`
+      // on the main socket too, or a note off that overtakes its note on
+      // leaves a note held on an instrument in another building.
+      const out = { ...msg, id, ...(/^(midi\.send|note\.on|note\.off)$/.test(msg.type) ? { n: ++dxN } : {}) };
       try { dx.ctl.send(JSON.stringify(out)); } catch { return null; }
       return id;
     }

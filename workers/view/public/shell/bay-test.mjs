@@ -1334,5 +1334,25 @@ function V0() { return { codec: 'h264' }; }
     b.send('cf-store:history:value-out', { text: 'kept' }) === 1 && got[0] === 'kept', JSON.stringify(got));
 }
 
+// ── a light link between two sites names its wire (2026-10-11, sampler/035) ──
+{
+  const b = createBay();
+  b.addNode({ id: 'web:keys', kind: 'person', label: 'keys', place: 'browser' });
+  b.addNode({ id: 'web:synth', kind: 'engine', label: 'synth', place: 'browser' });
+  b.addNode({ id: 'pi-1:sampler', kind: 'engine', label: 'sampler', place: 'studio-1' });
+  b.addPort({ id: 'web:keys:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
+  b.addPort({ id: 'web:synth:midi-in', dir: 'in', medium: 'midi', accepts: ['note'] });
+  b.addPort({ id: 'pi-1:sampler:midi-in', dir: 'in', medium: 'midi', accepts: ['note'] });
+  const dc = b.link('web:keys:midi-out', 'pi-1:sampler:midi-in', [], { via: 'datachannel' });
+  ok('a MIDI link to another site may say it rides the data channel, and keeps it',
+    dc.ok && b.links().find((l) => l.id === dc.id)?.via === 'datachannel', JSON.stringify(dc));
+  const rl = b.link('web:keys:midi-out', 'pi-1:sampler:midi-in', [], { via: 'relay' });
+  ok('and may say the relay', rl.ok && b.links().find((l) => l.id === rl.id)?.via === 'relay', JSON.stringify(rl));
+  const same = b.link('web:keys:midi-out', 'web:synth:midi-in', [], { via: 'datachannel' });
+  ok('NEGATIVE CONTROL: inside one site there is no wire to name', !same.ok, same.why);
+  const whep = b.link('web:keys:midi-out', 'pi-1:sampler:midi-in', [], { via: 'whep' });
+  ok('NEGATIVE CONTROL: a light link cannot ask for a media transport', !whep.ok, whep.why);
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

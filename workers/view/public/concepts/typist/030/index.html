@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* concepts typist/030, MULTI TYPER, 2026-10-11. Asked: *"multi-typer, which
+     supports multiple columns. So for two, it's two. For three, it's three
+     columns. For four, it's a grid, two by two, etc. Figure out the layouts.
+     ... sample texts. Doesn't have to be editable, just to show out how a
+     layout would work"*, then *"030 typist: layout sound and patchbay for
+     multitype"* and *"no distict knob, use default"*. N papers in one frame,
+     each typed by a typist of its own through a typewriter of its own, every
+     typewriter through its own fx box (`../020/fx.mjs`, Machine k for paper
+     k, at the default distinctness), all into one speaker. Not wired to
+     other people (that is 040). Nothing is fetched and nothing sounds until
+     the first press of play or of a key. */
+
+  /* ── the frame and the papers ─────────────────────────────────────────
+     `createChatGrid` in demo/shell/chat-ui.mjs, which was lifted from this
+     page: one grid of six tracks, the seam between papers, 16:9 for one to
+     three papers and 4:3 for four to six, and a frame under 560 px (asked of
+     the frame, not the window) stacking one to three and going two across
+     for four to six. Every paper paints its own white. */
+  .mt-choice { min-width: 0; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { createChatGrid } from '/shell/chat-ui.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createPaper } from '../paper.mjs';
+  import { createSamples, createVoice, FILES } from '../sampler.mjs';
+  import { createFx, character, nameOf, trimFor } from '../020/fx.mjs';
+
+  const d = mount({ name: 'concept typist 030', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('typist/030');
+
+  const MAX = 6;
+  const q = new URLSearchParams(location.search);
+  let count = Math.min(MAX, Math.max(1, parseInt(q.get('n'), 10) || 2));
+
+  // ── the sample texts ─────────────────────────────────────────────────────
+  // Six per set, one per typist, short plain lines. `pace` slows (above 1) or
+  // speeds (below 1) that typist. The concerto set is a nod to Alo Mattiisen's
+  // *Kirjutusmasina kontsert D-duur* (1984): its title, its four movement
+  // names and where it was first played, as facts in our own words
+  // (`research/mattiisen-kirjutusmasinakontsert-2026-10-11.md`), the music not
+  // at all. Each movement's typist keeps its tempo.
+  const SETS = [
+    ['Letters', [
+      { text: 'Dear Anna,\nthe weather turned cold this week.\nThe garden is asleep under the snow.' },
+      { text: 'Minutes of the meeting.\nPresent were four of us and the cat.\nWe meet again on Monday.' },
+      { text: 'Shopping list.\nBread, milk and apples.\nA new ribbon for the typewriter.' },
+      { text: 'The train leaves at seven.\nBring a warm coat and a book.\nI will wait on the platform.' },
+      { text: 'Note to self.\nCall the printer before noon.\nAsk about the blue paper.' },
+      { text: 'Hello from the fourth floor.\nThe window looks over the harbour.\nShips come in all morning.' },
+    ]],
+    ['Kirjad', [
+      { text: 'Kallis Anna,\nsel nädalal läks ilm külmaks.\nAed magab lume all.' },
+      { text: 'Koosoleku protokoll.\nKohal olid neli inimest ja kass.\nJärgmine kord kohtume esmaspäeval.' },
+      { text: 'Poenimekiri.\nLeib, piim ja õunad.\nUus lint kirjutusmasinale.' },
+      { text: 'Rong väljub kell seitse.\nVõta kaasa soe mantel ja raamat.\nMa ootan sind perroonil.' },
+      { text: 'Meelespea.\nHelista trükikotta enne lõunat.\nKüsi sinise paberi kohta.' },
+      { text: 'Tervitused neljandalt korruselt.\nAknast paistab sadam.\nLaevad tulevad terve hommiku.' },
+    ]],
+    ['Concerto', [
+      { text: 'Kirjutusmasina kontsert D-duur.\nAlo Mattiisen, 1984.\nThe typewriter is the soloist.' },
+      { text: 'I. Allegro vivace e marcato.\nFast, and every key marked.', pace: 0.7 },
+      { text: 'II. Largo molto tranquillo.\nSlow, and very calm.', pace: 1.9 },
+      { text: 'III. Allegro agitato.\nFast, and restless.', pace: 0.6 },
+      { text: 'IV. Finale.\nUnder a minute.', pace: 0.85 },
+      { text: 'In Spe played it first,\nat the Tartu popular music days.\nThe band is the orchestra.' },
+    ]],
+  ];
+  let set = Math.min(SETS.length - 1, Math.max(0, parseInt(q.get('set'), 10) || 0));
+
+  // ── the sound ────────────────────────────────────────────────────────────
+  // ONE sample set for every typewriter, decoded once. Each paper has a voice
+  // (its typewriter, into its own `out` gain), an fx box built for its index
+  // as it arrives, and they all meet in one `master`. NOTHING OPENS ON A
+  // VISIT: the AudioContext is made and the files fetched on the first press.
+  const samples = createSamples();
+  let ctx = null, master = null, loading = null, ready = false, muted = false;
+  const tw = [];      // per paper k (1 based): { out, voice, fx, fxIndex, twIndex, tuning }
+  for (let k = 1; k <= MAX; k++) tw[k] = { out: null, voice: null, fx: null, fxIndex: 0, twIndex: 0, tuning: character(0) };
+  const stat = { dropped: 0 };
+
+  /** The fx box of paper k, built on demand at whatever index has arrived for it. */
+  function fxOf(k) {
+    const t = tw[k];
+    if (!ctx || t.fx) return t.fx;
+    t.fx = createFx(ctx, t.fxIndex, (n, a) => samples.load(ctx).then(() => trimFor(samples.buf.get('key-1'), n, a)).catch(() => 1));
+    return t.fx;
+  }
+
+  function wake() {
+    if (ctx) return loading;
+    ctx = new AudioContext({ latencyHint: 'interactive' });
+    master = ctx.createGain();                 // the speakers' audio-in
+    master.connect(ctx.destination);
+    for (let k = 1; k <= MAX; k++) {
+      const t = tw[k];
+      t.out = ctx.createGain();                // typewriter k's audio-out
+      t.voice = createVoice(ctx, samples, { out: t.out, tuning: () => t.tuning, muted: () => muted });
+    }
+    for (let k = 1; k <= count; k++) fxOf(k);
+    route();
+    // Ready means the samples are decoded AND every shown paper's machine is
+    // built, so the first strike is not played into an empty fx box.
+    loading = samples.load(ctx)
+      .then(() => Promise.all(Array.from({ length: count }, (_, i) => tw[i + 1].fx.ready)))
+      .then(() => { ready = true; })
+      .catch((e) => d.log(`the typewriters did not load: ${e.message}`, 'warn'));
+    return loading;
+  }
+
+  // ── the patchbay ─────────────────────────────────────────────────────────
+  // Per paper k: `keys-k` (the typist, its typing as text) to `paper-k` and to
+  // `typewriter-k`; `typewriter-k` audio to `fx-k`; `fx-k` audio to the one
+  // `speaker`. One `cf-r2:typewriter` feeds every typewriter. The index of
+  // each paper comes from ONE node, `machines`, with one out port per paper
+  // (`value-out` for paper 1, `value-out-2` for paper 2, ...) sending k to
+  // `fx-k` and to `typewriter-k`'s second value input, as 020's stepper does.
+  // A constant node per paper would be six more boxes saying one number each.
+  // Links exist only for the papers shown, so `bay.links()` is the truth the
+  // router and the picture both read.
+  const S = 'web', CF = 'cf-r2';
+  const bay = createBay();
+  const P = (k, s) => `${S}:${s}-${k}`;
+  const nth = (base, k) => (k === 1 ? base : `${base}-${k}`);
+  const arrivals = [];
+
+  bay.addNode({ id: `${S}:machines`, kind: 'person', label: 'machines', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addNode({ id: `${CF}:typewriter`, kind: 'store', label: 'samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  bay.addPort({ id: `${CF}:typewriter:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+
+  const papers = [];
+  for (let k = 1; k <= MAX; k++) {
+    bay.addNode({ id: P(k, 'keys'), kind: 'person', label: `typist ${k}`, place: 'browser' });
+    bay.addNode({ id: P(k, 'paper'), kind: 'screen', label: `paper ${k}`, place: 'browser' });
+    bay.addNode({ id: P(k, 'typewriter'), kind: 'engine', label: `typewriter ${k}`, place: 'browser' });
+    bay.addNode({ id: P(k, 'fx'), kind: 'engine', label: `fx ${k}`, place: 'browser' });
+    bay.addPort({ id: `${S}:machines:${nth('value-out', k)}`, dir: 'out', medium: 'value', shape: { of: 'index' } });
+    bay.addPort({ id: `${P(k, 'keys')}:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
+    // The paper draws what ARRIVES: a typist's character is put on the sheet
+    // here. A person's typing is already in the textarea, so it is not put twice.
+    bay.addPort({ id: `${P(k, 'paper')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
+      deliver: (e) => { if (e?.by === 'typist') papers[k].type(e.text); } });
+    // The typewriter sounds what arrives, whoever typed it.
+    bay.addPort({ id: `${P(k, 'typewriter')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' },
+      deliver: (e) => typed(k, e) });
+    bay.addPort({ id: `${P(k, 'typewriter')}:value-in-2`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex(k, 'typewriter') });
+    bay.addPort({ id: `${P(k, 'typewriter')}:file-in`, dir: 'in', medium: 'file' });
+    bay.addPort({ id: `${P(k, 'typewriter')}:audio-out`, dir: 'out', medium: 'audio' });
+    bay.addPort({ id: `${P(k, 'fx')}:audio-in`, dir: 'in', medium: 'audio' });
+    bay.addPort({ id: `${P(k, 'fx')}:value-in`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex(k, 'fx') });
+    bay.addPort({ id: `${P(k, 'fx')}:audio-out`, dir: 'out', medium: 'audio' });
+  }
+
+  function deliverIndex(k, where) {
+    return (e, l) => {
+      const n = Math.floor(e?.n);
+      if (e?.of !== 'index' || !Number.isFinite(n) || n < 0) { d.log(`${where} ${k} takes an index, and this was not one`, 'warn'); return; }
+      arrivals.push({ at: `${where}-${k}`, n, link: `${l.from} -> ${l.to}` });
+      if (arrivals.length > 60) arrivals.shift();
+      const t = tw[k];
+      if (where === 'fx') { t.fxIndex = n; t.fx?.set(n); }
+      else { t.twIndex = n; t.tuning = character(n); }
+    };
+  }
+
+  const linksOf = (k) => [
+    [`${P(k, 'keys')}:value-out`, `${P(k, 'paper')}:value-in`],
+    [`${P(k, 'keys')}:value-out`, `${P(k, 'typewriter')}:value-in`],
+    [`${CF}:typewriter:file-out`, `${P(k, 'typewriter')}:file-in`],
+    [`${P(k, 'typewriter')}:audio-out`, `${P(k, 'fx')}:audio-in`],
+    [`${P(k, 'fx')}:audio-out`, `${S}:speaker:audio-in`],
+    [`${S}:machines:${nth('value-out', k)}`, `${P(k, 'fx')}:value-in`],
+    [`${S}:machines:${nth('value-out', k)}`, `${P(k, 'typewriter')}:value-in-2`],
+  ];
+  const held = new Map();     // paper k -> link ids
+  function patch() {
+    for (let k = 1; k <= MAX; k++) {
+      if (k <= count && !held.has(k)) {
+        const ids = [];
+        for (const [a, b] of linksOf(k)) {
+          // One sample set to many typewriters is `internet-many` to the bay,
+          // whose table offers HLS there; files come down by https, so say so.
+          const r = bay.link(a, b, [], { site: S, ...(a.startsWith(CF) ? { via: 'https' } : {}) });
+          if (r.ok) ids.push(r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+        }
+        held.set(k, ids);
+        // Paper k is Machine k: the index leaves on its own port of `machines`.
+        bay.send(`${S}:machines:${nth('value-out', k)}`, { of: 'index', n: k });
+        if (ctx) fxOf(k);
+      } else if (k > count && held.has(k)) {
+        for (const id of held.get(k)) bay.unlink(id);
+        held.delete(k);
+      }
+    }
+    route();
+    pb?.refresh();
+  }
+
+  /**
+   * THE ROUTER, as 020's: reads `bay.links()` and connects exactly the audio
+   * links that are held, out to in, after disconnecting every out. A paper
+   * that is not shown holds no links, so its typewriter reaches nothing.
+   */
+  const routed = [];
+  function route() {
+    if (!ctx) return;
+    const N = { speaker: { input: master } };
+    for (let k = 1; k <= MAX; k++) {
+      N[`typewriter-${k}`] = { out: tw[k].out };
+      if (tw[k].fx) N[`fx-${k}`] = { input: tw[k].fx.input, out: tw[k].fx.output };
+    }
+    for (const m of Object.values(N)) if (m.out) { try { m.out.disconnect(); } catch { /* not connected */ } }
+    routed.length = 0;
+    for (const l of bay.links()) {
+      if (bay.port(l.from)?.medium !== 'audio') continue;
+      const src = N[l.from.split(':')[1]]?.out, dst = N[l.to.split(':')[1]]?.input;
+      if (src && dst) { src.connect(dst); routed.push(`${l.from} -> ${l.to}`); }
+    }
+  }
+
+  // ── typing, by a typist or by a person ───────────────────────────────────
+  const LATE = 150;   // ms: a person's press that waited longer than this for the files is dropped, not played late
+  function typed(k, e) {
+    if (muted) return;
+    const v = () => tw[k].voice.sound(e.kind, e.text, papers[k].column());
+    // The press that wakes the typewriters always sounds, however long the
+    // samples took (010 and 020's fix, commits d404cc6c and 38bf10ee).
+    // A typist's letter that arrives before the samples (an unmute while the
+    // typists run) wakes them and is not played late.
+    const first = !ctx, at = performance.now();
+    if (ready) return v();
+    if (e.by !== 'person') { wake(); stat.dropped++; return; }
+    wake().then(() => { if (first || performance.now() - at < LATE) v(); else stat.dropped++; });
+  }
+
+  for (let k = 1; k <= MAX; k++) {
+    papers[k] = createPaper({ label: `paper ${k}`, onInput: (e) =>
+      bay.send(`${P(k, 'keys')}:value-out`, { text: e.data || '', kind: e.inputType, by: 'person' }) });
+  }
+
+  // THE TYPISTS. Each walks its text one character at a time at a human pace:
+  // a base gap of its own (seeded, so the six never fall into step), jittered,
+  // longer after a space, longer still after punctuation and at a line's end,
+  // and now and then a hesitation. At the end of the text it waits, returns
+  // the carriage and starts on a fresh sheet. A paper a person is typing into
+  // holds its typist until it loses focus. One timer for all of them.
+  const typists = [];
+  const rnd = (seed) => { let s = seed >>> 0; return () => { s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0; return s / 2 ** 32; }; };
+  for (let k = 1; k <= MAX; k++) {
+    const r = rnd(k * 7919);
+    typists[k] = { r, base: 95 + r() * 60, i: 0, due: 0, wait: false, typed: 0 };
+  }
+  const textOf = (k) => SETS[set][1][k - 1];
+  function gap(t, ch, pace) {
+    let ms = t.base * (0.55 + t.r() * 0.9);
+    if (ch === ' ') ms += 40;
+    if (/[.,;:!?]/.test(ch)) ms += 200 + t.r() * 250;
+    if (ch === '\n') ms += 450 + t.r() * 400;
+    if (t.r() < 0.03) ms += 250 + t.r() * 400;
+    return ms * pace;
+  }
+  let playing = false, timer = 0;
+  const typing = { chars: 0, since: 0 };
+  function tick() {
+    const now = performance.now();
+    for (let k = 1; k <= count; k++) {
+      const t = typists[k], p = papers[k], { text, pace = 1 } = textOf(k);
+      if (now < t.due || p.focused()) continue;
+      if (t.i >= text.length) {
+        // the end of the sheet: a carriage return, then a fresh one
+        if (!t.wait) { t.wait = true; t.due = now + 2400; continue; }
+        p.clear();
+        bay.send(`${P(k, 'keys')}:value-out`, { text: '', kind: 'insertLineBreak', by: 'clear' });
+        t.i = 0; t.wait = false; t.due = now + 900;
+        continue;
+      }
+      const ch = text[t.i++];
+      bay.send(`${P(k, 'keys')}:value-out`, { text: ch, kind: ch === '\n' ? 'insertLineBreak' : 'insertText', by: 'typist' });
+      t.typed++; typing.chars++;
+      t.due = now + gap(t, ch, pace);
+    }
+  }
+  function startTyping() {
+    if (playing) return;
+    playing = true;
+    const now = performance.now();
+    // staggered starts, so the first letters do not land together
+    for (let k = 1; k <= MAX; k++) typists[k].due = Math.max(typists[k].due, now + (k - 1) * 140);
+    typing.since ||= now;
+    timer = setInterval(tick, 12);
+  }
+  function stopTyping() { playing = false; clearInterval(timer); }
+
+  /** Every typist back to the start of its text, on a fresh sheet. */
+  function restart() {
+    for (let k = 1; k <= MAX; k++) { papers[k].clear(); typists[k].i = 0; typists[k].wait = false; }
+  }
+
+  // ── the frame ────────────────────────────────────────────────────────────
+  // The papers are the cells of the kit's chat grid, which places the first
+  // `count` of them and draws each once it is placed.
+  let frame = null;
+  const layout = () => frame?.set(count);
+
+  // Play and pause. The first press is the gesture: it makes the AudioContext,
+  // fetches the samples, and the typists start once they are decoded, so the
+  // first letter sounds. Muted, nothing is fetched and the typists just type.
+  const play = createIconButton({ icon: 'play', label: 'play, the typists start typing', pressed: false, onPress: async () => {
+    if (playing) { stopTyping(); show(); return; }
+    if (!muted && !ctx) { play.el.dataset.busy = ''; await wake(); delete play.el.dataset.busy; }
+    else if (ctx?.state === 'suspended') ctx.resume();
+    startTyping(); show();
+  } });
+  const show = () => {
+    play.pressed(playing);
+    play.set(playing ? 'pause' : 'play', playing ? 'pause the typists' : 'play, the typists start typing');
+  };
+  const mute = createIconButton({ icon: 'volume', label: 'mute the typewriters', pressed: false, onPress: () => {
+    muted = !muted;
+    mute.pressed(muted);
+    mute.set(muted ? 'mute' : 'volume', muted ? 'unmute the typewriters' : 'mute the typewriters');
+    for (let k = 1; k <= MAX; k++) if (tw[k].out) tw[k].out.gain.value = muted ? 0 : 1;
+    // an unmute while the typists run is a gesture too: wake the sound then
+    if (!muted && playing && !ctx) wake();
+  } });
+  const left = document.createDocumentFragment();
+  left.append(play.el, mute.el);
+
+  const NAMES = Array.from({ length: MAX }, (_, i) => `${i + 1} ${i ? 'typists' : 'typist'}`);
+  const setCount = (n) => {
+    count = Math.min(MAX, Math.max(1, n));
+    step.show(NAMES[count - 1], count - 1);
+    layout(); patch();
+    if (ctx) for (let k = 1; k <= count; k++) fxOf(k);
+  };
+  const step = createStepper({ what: 'typists', prev: () => setCount(count - 1), next: () => setCount(count + 1),
+    pick: { options: NAMES, at: count - 1, onPick: (i) => setCount(i + 1) } });
+
+  const choice = createChoice({ label: 'text', at: set, options: SETS.map(([name], i) => [name, i]),
+    onPick: (i) => { set = i; restart(); } });
+  choice.el.classList.add('mt-choice');
+
+  frame = createChatGrid({ cells: papers.slice(1), count, left, centre: step.el });
+  const panel = frame.panel;
+
+  // `file` and `audio` are lit rather than pulsed: the file wires while the
+  // samples come down and 600 ms after, an audio wire while its typewriter's
+  // last strike still sounds (plus its fx box's room after the box).
+  const flowing = (l, medium) => {
+    if (medium === 'file') return !!samples.loading && (!samples.ready || performance.now() - samples.stat.at < 600);
+    if (medium !== 'audio' || !ctx || muted) return false;
+    const node = l.from.split(':')[1], k = Number(node.split('-')[1]);
+    if (node.startsWith('typewriter')) return ctx.currentTime < tw[k].voice.until;
+    if (node.startsWith('fx')) return ctx.currentTime < tw[k].voice.until + (character(tw[k].fxIndex).room?.ms || 0) / 1000;
+    return false;
+  };
+  // The picture shows the nodes and ports the held links touch, so a paper
+  // that is not shown is not drawn either.
+  const touched = () => { const s = new Set(); for (const l of bay.links()) { s.add(l.from); s.add(l.to); } return s; };
+  const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+  const view = {
+    nodes: () => { const t = [...touched()].map(nodeOf); return bay.nodes().filter((n) => t.includes(n.id)); },
+    ports: () => { const t = touched(); return bay.ports().filter((p) => t.has(p.id)); },
+    links: () => bay.links(),
+  };
+  // Each fx box says which machine it is, from what last arrived at it.
+  let pb = null;
+  pb = createPatchbay(view, { detail: (n) => {
+    const m = /^web:fx-(\d)$/.exec(n.id);
+    return [{ text: m ? nameOf(tw[+m[1]].fxIndex) : n.label, sans: true }];
+  }, flowing });
+
+  d.stack.add(panel.el, choice.el, pb.el);
+  layout();
+  patch();
+
+  // Read only, for a check over CDP.
+  window.__demo.multi = {
+    get count() { return count; },
+    get set() { return SETS[set][0]; },
+    get playing() { return playing; },
+    get state() { return ctx?.state || 'none'; },
+    get samples() { return { ...samples.stat, files: FILES.length }; },
+    get papers() {
+      return Array.from({ length: count }, (_, i) => {
+        const k = i + 1, t = tw[k];
+        return { k, chars: papers[k].text.length, typed: typists[k].typed, started: t.voice?.started || 0,
+                 fx: t.fx ? { index: t.fx.index, chains: t.fx.live, trim: t.fx.trim && +t.fx.trim.toFixed(2) } : null,
+                 tuning: { n: t.tuning.n, key: t.tuning.rate.key } };
+      });
+    },
+    get typing() { return { chars: typing.chars, perSecond: typing.since ? +(typing.chars / ((performance.now() - typing.since) / 1000)).toFixed(1) : 0 }; },
+    get dropped() { return stat.dropped; },
+    get routed() { return [...routed]; },
+    get links() { return bay.links().map((l) => `${l.from} -> ${l.to}`); },
+    get arrivals() { return arrivals.map((a) => ({ ...a })); },
+  };
+
+  d.ready();
+</script>
