@@ -32,6 +32,8 @@
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { makeLogDeck } from '/timeline/logdeck.mjs';
+  import { createSamples, createVoice } from '../sampler.mjs';
+  import { character } from '../020/fx.mjs';
   import { makeTextOpAdapter, deriveOp, selectOp, OP_INSERT, OP_DELETE, OP_SELECT } from '/shell/text-adapter.mjs';
   import { createPaper } from '../paper.mjs';
 
@@ -39,7 +41,6 @@
   conceptNav('typist/030');
 
   const KIND = 'text-op';
-  const RATES = [0.25, 0.5, 1, 2, 4];
   const LEAD_MS = 250;            // position 0 sits this far before the first change
   const TAIL_MS = 400;            // and the end this far after the last
   const EMPTY_MS = 4000;          // the width of the line before anything is typed
@@ -109,7 +110,9 @@
     // a seek folds the prefix to one document and writes it in one go
     assert() { if (!capturing) showUpTo(countAt(deck.position())); },
   });
-  adapter.caps.rates = RATES;
+  // One rate and no rate control (asked: *"030 add sound. no rate controls"*):
+  // the bar draws no rate choice for a lattice of one.
+  adapter.caps.rates = [1];
 
   const deck = makeLogDeck({ lanes: [{ kind: KIND, rows: [], adapter }], leadInMs: LEAD_MS, tailMs: TAIL_MS, range: [0, EMPTY_MS] });
 
@@ -260,13 +263,49 @@
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   bay.addNode({ id: `${S}:rec`, kind: 'store', label: 'recorder', place: 'browser' });
   bay.addNode({ id: `${S}:paper`, kind: 'screen', label: 'paper', place: 'browser' });
+  // The typewriter sounds what reaches it: live keys on one link, the
+  // recorder's playback on another, so both are heard and the picture says so.
+  bay.addNode({ id: `${S}:typewriter`, kind: 'engine', label: 'typewriter', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: `${S}:keys:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
   bay.addPort({ id: `${S}:rec:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
   bay.addPort({ id: `${S}:rec:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
   bay.addPort({ id: `${S}:paper:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  for (const [a, b] of [[`${S}:keys:value-out`, `${S}:paper:value-in`], [`${S}:keys:value-out`, `${S}:rec:value-in`], [`${S}:rec:value-out`, `${S}:paper:value-in`]]) {
+  bay.addPort({ id: `${S}:typewriter:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: (e) => strike(e) });
+  bay.addPort({ id: `${S}:typewriter:audio-out`, dir: 'out', medium: 'audio' });
+  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  for (const [a, b] of [[`${S}:keys:value-out`, `${S}:paper:value-in`], [`${S}:keys:value-out`, `${S}:rec:value-in`], [`${S}:rec:value-out`, `${S}:paper:value-in`],
+    [`${S}:keys:value-out`, `${S}:typewriter:value-in`], [`${S}:rec:value-out`, `${S}:typewriter:value-in`], [`${S}:typewriter:audio-out`, `${S}:speaker:audio-in`]]) {
     const r = bay.link(a, b);
     if (r && r.ok === false) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+
+  // ── the sound ────────────────────────────────────────────────────────────
+  // /concepts/typist/010/'s Hermes Precisa 305 samples from R2, through the
+  // shared sampler. NOTHING LOADS ON A VISIT: the AudioContext and the files
+  // come with the first key or the first press anywhere on the page, which is
+  // also the gesture a browser asks for before it will sound.
+  let ctx = null, voice = null;
+  const samples = createSamples();
+  function wake() {
+    if (ctx) { ctx.resume(); return; }
+    ctx = new AudioContext();
+    const out = ctx.createGain();
+    out.connect(ctx.destination);
+    voice = createVoice(ctx, samples, { out, tuning: () => character(0) });
+    samples.load(ctx).catch((e) => d.log(`typewriter samples did not load, ${e.message}`, 'warn'));
+  }
+  addEventListener('keydown', wake, { capture: true });
+  addEventListener('pointerdown', wake, { capture: true });
+  function strike(e) {
+    if (!voice || !samples.ready) return;
+    // the recorder's ops are insert, delete and select; the sampler hears
+    // the browser's input types, and a cursor move makes no sound
+    const t = e.text || '';
+    const kind = e.kind === 'delete' ? 'deleteContentBackward'
+      : e.kind === 'insert' ? (t.includes('\n') ? 'insertLineBreak' : 'insertText')
+      : e.kind === 'select' ? null : e.kind;
+    if (kind) voice.sound(kind, t, paper.column());
   }
 
   // ── the frame ────────────────────────────────────────────────────────────
