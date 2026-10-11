@@ -8,8 +8,6 @@
 <title>POSITRON concept 018</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-top { display: flex; align-items: flex-end; gap: 12px; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -18,7 +16,6 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { faustCompile, faustNode } from '/shell/faust.mjs';
@@ -287,23 +284,19 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     pb?.refresh();
   }
 
-  // ── play switches the synth on, and a key does too ───────────────────────
+  // ── a key switches the synth on ──────────────────────────────────────────
+  // No play button since 2026-10-11 (*"does fau (now 080) need start button?
+  // if not rm"*): the first key press is the gesture, fetches the compiler
+  // and compiles, and the held note sounds once the node is ready.
   function sound(v) {
     on = v;
     if (master) master.gain.setTargetAtTime(v ? 0.8 : 0, ctx.currentTime, 0.03);
-    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
   }
   async function start() {
     try { await wake(); } catch { return false; }
     sound(true);
     return true;
   }
-  const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play', onPress: async () => {
-      if (on) { sound(false); return; }
-      await start();
-    } },
-  ] });
 
   // ── the keyboard: its notes leave on `keys:midi-out` and nowhere else ────
   const host = el('div');
@@ -338,8 +331,6 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     flowing: (l) => !!node && on && (l.from !== ID('keys', 'midi-out') || held.length > 0),
   });
 
-  const top = el('div', 'cc-top');
-  top.append(transport.el);
   // The program itself in the kit's code box, read only (asked 2026-10-10,
   // *"show faust code"*, *"use code panel"*): the knobs below are its sliders.
   const lines = CODE.replace(/\n$/, '').split('\n').length;
@@ -348,7 +339,7 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
   const code = createCodeBox({ language: 'faust', rows: Math.max(6, Math.round(lines / 3)), label: '', value: CODE.replace(/\n$/, ''),
     ariaLabel: 'the Faust program this synth plays, read only' });
   code.input.readOnly = true;
-  d.stack.add(top, wave.el, code.el, grid.el, host, pb.el);
+  d.stack.add(wave.el, code.el, grid.el, host, pb.el);
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
   window.__demo.fau = {
