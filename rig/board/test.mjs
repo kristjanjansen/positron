@@ -677,7 +677,21 @@ console.log('inputs: what a page may send the Circuit');
   is('NEGATIVE: a location that is not synth 1 or 2 is refused', [2, 0x0F, 0x7F, 0x80].map((l) => midiVerdict(REQ(l), CH).ok), [false, false, false, false]);
   is('NEGATIVE: no end of sysex is refused', midiVerdict([...REQ(0).slice(0, 8), 0x00], CH).ok, false);
   is('NEGATIVE: a request whose synth channel this input does not play is refused', midiVerdict(REQ(1), [1, 10]).ok, false);
-  is('NEGATIVE: a universal SysEx is still refused', midiVerdict([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7], CH).ok, false);
+  is('NEGATIVE: another universal SysEx, GM System On, is still refused', midiVerdict([0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7], CH).ok, false);
+  // ── and the SECOND one, the universal Device Inquiry, since 2026-10-11 ─────
+  // Asked *"Add it and test"*, to learn whether this Circuit answers SysEx at
+  // all. Device id 7F (all call) only.
+  const INQ = [0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7];
+  is('the Device Inquiry passes, and says so', midiVerdict(INQ, CH), { ok: true, identity: true });
+  is('NEGATIVE: five bytes of it, the F7 missing, is refused', midiVerdict(INQ.slice(0, 5), CH).ok, false);
+  is('NEGATIVE: seven bytes of it, anything after F7, is refused', midiVerdict([...INQ, 0x00], CH).ok, false);
+  is('NEGATIVE: seven bytes with a byte inside, is refused', midiVerdict([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0x00, 0xF7], CH).ok, false);
+  is('NEGATIVE: sub id 06 02, the REPLY, never goes out', midiVerdict([0xF0, 0x7E, 0x7F, 0x06, 0x02, 0xF7], CH).ok, false);
+  is('NEGATIVE: every other sub id 2 under 06 is refused', [...Array(128).keys()].filter((n) => n !== 0x01 && midiVerdict([0xF0, 0x7E, 0x7F, 0x06, n, 0xF7], CH).ok), []);
+  is('NEGATIVE: every other sub id 1 is refused', [...Array(128).keys()].filter((n) => n !== 0x06 && midiVerdict([0xF0, 0x7E, 0x7F, n, 0x01, 0xF7], CH).ok), []);
+  is('NEGATIVE: a device id other than 7F is refused, 00 included', [0x00, 0x01, 0x10, 0x7E].map((n) => midiVerdict([0xF0, 0x7E, n, 0x06, 0x01, 0xF7], CH).ok), [false, false, false, false]);
+  is('NEGATIVE: real time universal 7F in place of 7E is refused', midiVerdict([0xF0, 0x7F, 0x7F, 0x06, 0x01, 0xF7], CH).ok, false);
+  is('NEGATIVE: and the dump request is not mistaken for it, nor it for the dump request', [midiVerdict(REQ(0), CH).identity, midiVerdict(INQ, CH).dump], [undefined, undefined]);
   is('and a refusal of the request shape names it sysex', midiVerdict([...REQ(0).slice(0, 6), 0x01, 0, 0xF7], CH).kind, 'sysex');
 
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
@@ -804,6 +818,27 @@ console.log('inputs: what a page may send the Circuit');
     run(50);
     is('synth 2 is answered for synth 2', sentOf('midi.patch').filter((m) => m.re === 'd4').map((m) => [m.ok, m.synth, m.bytes?.length]), [[true, 2, 350]]);
     is('NEGATIVE: across the whole run only the three requests and one program change were written', out.map((b) => b[0]), [0xF0, 0xF0, 0xC1, 0xF0]);
+
+    // The Device Inquiry, out and back, under the same one at a time rule.
+    t2 += 100;
+    const ID_REPLY = [0xF0, 0x7E, 0x00, 0x06, 0x02, 0x00, 0x20, 0x29, 0x01, 0x00, 0x60, 0x00, 0x00, 0x01, 0x08, 0x00, 0xF7];
+    c3.handle({ type: 'midi.send', id: 'i1', bytes: INQ });
+    is('the inquiry reaches the port, exactly six bytes', out.at(-1), INQ);
+    c3.handle({ type: 'midi.send', id: 'd5', bytes: REQ(0) });
+    is('NEGATIVE: a dump request while the inquiry is open is not written', out.at(-1), INQ);
+    inbox.push(Uint8Array.from([0xF8, 0xF0, 0x7E, 0x00, 0x06, 0x02, 0x41, 0x00, 0x00, 0xF7]), Uint8Array.from([0xF8, ...ID_REPLY]));
+    run(50);
+    const ids = sentOf('midi.identity');
+    is('one midi.identity goes back, answering the inquiry', ids.map((m) => [m.re, m.ok]), [['i1', true]]);
+    is('carrying the Novation reply, not the Roland one before it', ids[0]?.bytes, ID_REPLY);
+    is('NEGATIVE: the identity reply is never written to the instrument', out.filter((b) => b.length > 9), []);
+    // And silence is said in words.
+    t2 += 100;
+    c3.handle({ type: 'midi.send', id: 'i2', bytes: INQ });
+    run(1100);
+    const none = sentOf('midi.identity').filter((m) => m.re === 'i2');
+    is('NEGATIVE: an inquiry nobody answers is reported as not answered', none.map((m) => [m.ok, m.bytes ?? null]), [[false, null]]);
+    ok('and says why', /no identity came back/.test(none[0]?.why ?? ''), JSON.stringify(none[0]));
     hw3.close();
   }
 }

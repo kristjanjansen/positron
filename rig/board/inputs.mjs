@@ -79,6 +79,33 @@ export function dumpRequestSynth(bytes) {
 }
 
 /**
+ * 🔴 AND THE SECOND, THE UNIVERSAL DEVICE INQUIRY, SINCE 2026-10-11. Asked
+ * *"Add it and test"*, after the dump request went unanswered on this desk,
+ * to learn whether this Circuit answers SysEx at all. 📄 MIDI 1.0 General
+ * Information, Identity Request: F0 7E <device> 06 01 F7. Device 7F is the
+ * all call, and nothing documented says the Circuit needs 00, so 7F only. It
+ * asks a device to say who it is and changes nothing. Exact bytes, exact length:
+ * 06 02 is the REPLY and must never leave this board.
+ */
+export const DEVICE_INQUIRY = Object.freeze([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]);
+export function isDeviceInquiry(bytes) {
+  return Array.isArray(bytes) && bytes.length === DEVICE_INQUIRY.length && DEVICE_INQUIRY.every((b, i) => bytes[i] === b);
+}
+/**
+ * An Identity Reply from Novation: F0 7E <device> 06 02 00 20 29, then family,
+ * model and version, then F7. 📄 That is 17 bytes for a three byte manufacturer
+ * id; a little slack either way is allowed, because the point of asking is to
+ * learn what this unit sends, and a reply refused for its length would read as
+ * no reply at all.
+ */
+export function isIdentityReply(msg) {
+  if (!msg || msg.length < 15 || msg.length > 24) return false;
+  const want = [0xF0, 0x7E, null, 0x06, 0x02, 0x00, 0x20, 0x29];
+  if (!want.every((b, i) => b === null || msg[i] === b)) return false;
+  return msg[msg.length - 1] === 0xF7;
+}
+
+/**
  * The reply, recognised by its whole shape: 350 bytes, Novation's Circuit
  * header, command 00 (Replace Current Patch, which is what the Circuit sends
  * back), the location that was asked for, a reserved 00, 340 seven bit data
@@ -139,9 +166,10 @@ export const DUMP_MS = 1000;
  * 0 to 31 and queued from 64 to 95, over whatever is being worked on. So it is
  * the synth channels only and never 16, and 64 to 127 are refused as well,
  * because they are not patches on 1 and 2 and ARE sessions on 16.
- * ⚠️ AND SINCE 2026-10-11 ONE SysEx, the nine byte Current Patch Dump Request
- * and nothing else (`dumpRequestSynth` above). A pass for it carries `dump`,
- * the location, so the handler knows to listen for the answer.
+ * ⚠️ AND SINCE 2026-10-11 TWO SysEx, both reads: the nine byte Current Patch
+ * Dump Request (`dumpRequestSynth` above, a pass carries `dump`, the location)
+ * and the six byte Device Inquiry (`isDeviceInquiry`, a pass carries
+ * `identity`). Nothing else. The handler listens for the answer to either.
  */
 export function midiVerdict(bytes, channels) {
   const v = verdict(bytes, channels);
@@ -152,6 +180,7 @@ export function midiVerdict(bytes, channels) {
 
 function verdict(bytes, channels) {
   if (!Array.isArray(bytes) || !bytes.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return { ok: false, why: 'bytes are 0 to 255' };
+  if (isDeviceInquiry(bytes)) return { ok: true, identity: true };
   const loc = dumpRequestSynth(bytes);
   if (loc !== null) {
     const ch = loc + 1;
@@ -567,7 +596,7 @@ export function createInputs({
       if (s.dump !== d) return;
       s.dump = null;
       try { fs.closeSync(d.fd); } catch { /* gone */ }
-      d.reply('midi.patch', { synth: d.loc + 1, ...body });
+      d.reply(d.type, { ...d.extra, ...body });
     }
     function pollDump(d) {
       if (s.dump !== d) return;
@@ -587,28 +616,34 @@ export function createInputs({
           else if (d.head.length < 24) d.head.push(b.toString(16).padStart(2, '0'));
         }
         for (const m of d.catcher.feed(chunk.subarray(0, n))) {
-          if (isPatchReply(m, d.loc)) {
-            log(`${cfg.name}: synth ${d.loc + 1} patch read back, ${now() - d.at} ms`);
+          if (d.match(m)) {
+            log(`${cfg.name}: ${d.what} read back, ${now() - d.at} ms, ${m.length} bytes${d.type === 'midi.identity' ? `: ${m.map((b) => b.toString(16).padStart(2, '0')).join(' ')}` : ''}`);
             return finishDump(d, { ok: true, bytes: m });
           }
           d.other++;
+          if (d.others.length < 3) d.others.push(m.slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join(' '));
         }
       }
       if (now() >= d.until) {
-        log(`${cfg.name}: no patch came back for synth ${d.loc + 1} in ${DUMP_MS} ms (${d.seen} bytes heard, ${d.realtime} of them real time, ${d.other} other SysEx${d.head.length ? `, the rest began ${d.head.join(' ')}` : ''})`);
-        return finishDump(d, { ok: false, why: `no patch came back from the instrument in ${DUMP_MS} ms` });
+        log(`${cfg.name}: no ${d.what} came back in ${DUMP_MS} ms (${d.seen} bytes heard, ${d.realtime} of them real time, ${d.other} other SysEx${d.others.length ? ` [${d.others.join('] [')}]` : ''}${d.head.length ? `, the rest began ${d.head.join(' ')}` : ''})`);
+        return finishDump(d, { ok: false, why: `no ${d.short} came back from the instrument in ${DUMP_MS} ms` });
       }
       setTimer(() => pollDump(d), 10);
     }
-    function askPatch(bytes, loc, reply) {
-      if (s.dump) return reply('midi.patch', { ok: false, synth: loc + 1, why: 'a patch is already being read, one at a time' });
+    // `want` names what is listened for: the reply type, how to recognise it,
+    // and the words a log line uses. One question open at a time, of either kind.
+    const wantPatch = (loc) => ({ type: 'midi.patch', extra: { synth: loc + 1 }, what: `patch for synth ${loc + 1}`, short: 'patch', match: (m) => isPatchReply(m, loc) });
+    const WANT_IDENTITY = { type: 'midi.identity', extra: {}, what: 'identity', short: 'identity', match: isIdentityReply };
+    function askBack(bytes, want, reply) {
+      const { type, extra } = want;
+      if (s.dump) return reply(type, { ok: false, ...extra, why: `the ${s.dump.what} is already being read, one question at a time` });
       let fd;
       try { fd = fs.openSync(`/dev/snd/midiC${midiDev()}D0`, FS.O_RDONLY | FS.O_NONBLOCK); }
       catch (e) {
         log(`${cfg.name}: the instrument input could not be opened, ${e.message}`);
-        return reply('midi.patch', { ok: false, synth: loc + 1, why: `the instrument input could not be opened, ${e.code || e.message}` });
+        return reply(type, { ok: false, ...extra, why: `the instrument input could not be opened, ${e.code || e.message}` });
       }
-      const d = { fd, loc, reply, at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
+      const d = { ...want, fd, reply, others: [], at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
       s.dump = d;
       if (!midiWrite(bytes)) return finishDump(d, { ok: false, why: 'the instrument port could not be written' });
       setTimer(() => pollDump(d), 10);
@@ -646,7 +681,8 @@ export function createInputs({
         if (!cfg.midi || !fs) return reply('midi.refused', { why: `${cfg.name} has no MIDI port configured` });
         const v = midiVerdict(msg.bytes, cfg.midi.channels);
         if (!v.ok) { s.refused++; return reply('midi.refused', { why: v.why }); }
-        if (v.dump != null) return askPatch(msg.bytes, v.dump, reply);
+        if (v.dump != null) return askBack(msg.bytes, wantPatch(v.dump), reply);
+        if (v.identity) return askBack(msg.bytes, WANT_IDENTITY, reply);
         if (!midiWrite(msg.bytes)) return reply('midi.refused', { why: 'the instrument port could not be written' });
         return undefined;   // no reply per note: a keyboard is not a request/response
       }
