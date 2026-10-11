@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 030</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The play button alone at the top left, as /concepts/synth/060/. What the
+     board says goes to the log only. */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  /* The patch selector is a full width block, as /concepts/sampler/010/'s. */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+</style>
+<script type="module">
+  // concepts sampler/030, THE PIANO ON THE PI, 2026-10-11. /concepts/sampler/010/'s
+  // piano and Rhodes, played by the Raspberry Pi in studio-1 instead of the tab:
+  // `pi-1:sampler` is a SuperCollider server of its own on the board
+  // (rig/board/scsampler.mjs), the samples come from R2 onto the SD card once,
+  // and its sound comes back down the relay as synth/060's Yoshimi does.
+  // Asked: *"do supercollider. rm fluidsynth"*, option b) of
+  // plans/plan-sampler-pi-pico.md §2.2: the sampler and Yoshimi sum into the one
+  // capture, so this page starting the sampler never stops Yoshimi for somebody
+  // else, and synth/060 starting Yoshimi never stops this.
+  //
+  // NOTHING OPENS ON A VISIT. The board (and so the relay socket) is made on the
+  // play press, never at load. A check run sends nothing to the shared board
+  // unless ?board=1 is added, the same gate synth/060 and /knobs/ use.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
+
+  const d = mount({ name: 'concept sampler 030', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('sampler/030');
+
+  const q = new URLSearchParams(location.search);
+  const ROOM = q.get('room') || 'studio-1';
+  const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
+  /** Program 0 is the piano and 1 the Rhodes, on the board as in 010. */
+  const INSTRUMENTS = [{ id: 'piano', name: 'Piano', program: 0 }, { id: 'rhodes', name: 'Rhodes', program: 1 }];
+
+  // ── the bay: this page's nodes and the ports the Pi announces ───────────
+  const S = 'web', CF = 'cf-r2';
+  const id = (n, p) => `${S}:${n}:${p}`;
+  const SAMPLER_IN = boardPort('sampler', 'midi-in'), SAMPLER_AUDIO = boardPort('sampler', 'audio-out'),
+        SAMPLER_FILES = boardPort('sampler', 'file-in');
+  const bay = createBay();
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  bay.addNode({ id: `${BOARD_SITE}:sampler`, kind: 'engine', label: 'sampler on the Pi', place: ROOM });
+  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+
+  let board = null, armed = false, program = 0, loadingSet = null, loadedAt = 0;
+  // What reaches pi-1:sampler:midi-in leaves for the board, and only once armed.
+  // A program change picked before play is kept and sent on arming.
+  function toSampler(ev) {
+    if (ev.cls === 'program') return choose(ev.d1);
+    if (!armed || !board) return;
+    if (ev.cls === 'note') {
+      board.send(ev.d2 > 0
+        ? { type: 'note.on', node: 'sampler', note: ev.d1, vel: ev.d2, channel: 0 }
+        : { type: 'note.off', node: 'sampler', note: ev.d1, channel: 0 });
+    } else if (ev.cls === 'cc') {
+      board.send({ type: 'cc', node: 'sampler', ctrl: ev.d1, value: ev.d2, channel: 0 });
+    }
+  }
+  const PORTS = [
+    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
+    { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
+    { id: SAMPLER_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toSampler },
+    { id: SAMPLER_FILES, dir: 'in', medium: 'file' },
+    { id: SAMPLER_AUDIO, dir: 'out', medium: 'audio' },
+    { id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
+    { id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
+    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const LINKS = [
+    [id('keys', 'midi-out'), SAMPLER_IN],
+    [id('patch', 'midi-out'), SAMPLER_IN],
+    [`${CF}:piano:file-out`, SAMPLER_FILES],
+    [`${CF}:rhodes:file-out`, SAMPLER_FILES],
+    [SAMPLER_AUDIO, id('scope', 'audio-in')],
+    [SAMPLER_AUDIO, id('speaker', 'audio-in')],
+  ];
+  for (const [from, to] of LINKS) {
+    const r = bay.link(from, to);
+    if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+
+  // ── the scope: an analyser on the board's playout, drawn full width ──────
+  const WINDOW = 512, FULL = 0.25;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+  let analyser = null, buf = null, level = 0;
+  function frame() {
+    if (analyser) {
+      analyser.getFloatTimeDomainData(buf);
+      let i0 = 0, hi = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      for (const v of buf) { const a = v < 0 ? -v : v; if (a > hi) hi = a; }
+      level = hi;
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patch selector, its own node ─────────────────────────────────────
+  // A pick is one program change leaving patch:midi-out. The cell shows what
+  // the Pi says it is playing, so it changes when the change arrives there.
+  let patchAt = 0;
+  const pick = (i) => { patchAt = i; bay.send(id('patch', 'midi-out'), { cls: 'program', ch: 1, d1: INSTRUMENTS[i].program }); };
+  const step = (by) => pick((patchAt + by + INSTRUMENTS.length) % INSTRUMENTS.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pick(i) });
+  patchPick.options(INSTRUMENTS.map((x) => x.name), 0);
+
+  async function choose(p) {
+    const ins = INSTRUMENTS.find((x) => x.program === p);
+    if (!ins) return;
+    program = p;
+    if (!armed || !board) { patchPick.show(ins.name, INSTRUMENTS.indexOf(ins)); return; }
+    loadingSet = ins.id;
+    pb?.refresh?.();
+    const slow = setTimeout(() => say(`The ${ins.name} is coming onto the Pi's SD card from R2 for the first time, which takes about half a minute`), 2500);
+    const r = await board.ask({ type: 'voice.select', node: 'sampler', program: p }, 'voice.selected', 120000);
+    clearTimeout(slow);
+    loadingSet = null; loadedAt = performance.now();
+    if (!r?.ok) { say(`The Pi did not change to the ${ins.name}${r?.reason ? `, it said ${r.reason}` : ''}`, 'warn'); return; }
+    patchPick.show(ins.name, INSTRUMENTS.indexOf(ins));
+    say(`The ${ins.name} on the Raspberry Pi, ${r.load?.loaded ?? 0} recordings in`);
+  }
+
+  // ── the keyboard, and a plugged in one through the same node ─────────────
+  const host = el('div');
+  const send = (note, vel) => bay.send(id('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: vel });
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') send(note, 100); },
+    onUp: (note, how) => { if (how !== 'midi') send(note, 0); },
+  });
+  let midiOpen = false;
+  function openMidi() {
+    if (midiOpen) return;
+    midiOpen = true;
+    createMidi({
+      log: (line, kind) => d.log(line, kind),
+      onDown: (n, vel) => { kb.lightNote?.(n, true); send(n, vel); },
+      onUp: (n) => { kb.lightNote?.(n, false); send(n, 0); },
+      onControl: (c, v) => { if (c === 64) bay.send(id('keys', 'midi-out'), { cls: 'cc', ch: 1, d1: c, d2: v }); },
+    });
+  }
+
+  // ── play: join the board and raise the sampler beside whatever is up ─────
+  let saidLast = '';
+  const say = (text, kind) => { saidLast = text; d.log(text, kind); };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  let opened = null, starting = false, lastStatus = null;
+
+  function makeBoard() {
+    let open;
+    opened = new Promise((r) => { open = r; });
+    board = createBoard({
+      room: ROOM, of: 'Raspberry Pi', showName: false, cushionMs: 160, maxCushionMs: 400,
+      log: (line, kind) => d.log(line, kind),
+      onOpen: () => open(true),
+    });
+  }
+
+  async function start() {
+    if (starting) return;
+    starting = true;
+    try {
+      if (!board) makeBoard();
+      say(`Reaching ${ROOM}`);
+      const up = await Promise.race([opened, wait(8000).then(() => false)]);
+      if (!up) { say(`The relay did not open ${ROOM} within eight seconds, so nothing is playing`, 'warn'); return; }
+      await board.startAudio();
+      const pl = board.playout();
+      if (pl && !analyser) {
+        analyser = board.ctx().createAnalyser();
+        analyser.fftSize = 2048;
+        buf = new Float32Array(analyser.fftSize);
+        pl.connect(analyser);
+        requestAnimationFrame(frame);
+      }
+      if (!MAY_PLAY) { say('A check is running, so nothing was sent to the shared board. Add ?board=1 to let it through', 'warn'); return; }
+      let st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
+      lastStatus = st;
+      if (!st) { say(`The Raspberry Pi is not answering in ${ROOM}, so the keys go nowhere`, 'warn'); return; }
+      if (!st.sampler) { say('The Pi runs board code from before the sampler, so there is nothing to play', 'warn'); return; }
+      if (!st.sampler.ok) {
+        say('Starting the sampler on the Pi, a few seconds');
+        const r = await board.ask({ type: 'audio.start', source: 'sampler' }, 'audio.started', 60000);
+        if (!r?.ok) { say(`The Pi could not start the sampler${r?.reason ? `, it said ${r.reason}` : ''}`, 'bad'); return; }
+      }
+      armed = true;
+      openMidi();
+      transport.setIcon('play', 'stop', 'stop');
+      // The sampler on the Pi keeps its program between visitors, so ask for
+      // the one this page shows rather than assuming the piano.
+      await choose(program);
+      const beside = st.ok && st.source ? `, and ${st.source === 'yoshimi' ? 'Yoshimi' : st.source} is playing there too, both heard together` : '';
+      say(`${INSTRUMENTS[program].name} on the Raspberry Pi, play the keys${beside}`);
+    } finally { starting = false; }
+  }
+  function stop() {
+    if (armed && board) board.send({ type: 'note.panic', node: 'sampler' });
+    armed = false;
+    kb.panic?.();
+    transport.setIcon('play', 'play', 'play');
+    say('Stopped, every note of this sampler on the Pi was released');
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (armed ? stop() : start()) },
+  ] });
+
+  // ── the patchbay ────────────────────────────────────────────────────────
+  // A file wire is lit while the Pi is loading that set and 600 ms after; the
+  // audio wire while the scope hears something; MIDI while armed.
+  const flowing = (l, medium) => {
+    if (medium === 'file') {
+      const set = l.from.split(':')[1];
+      return loadingSet === set || (set === INSTRUMENTS[program].id && loadedAt && performance.now() - loadedAt < 600);
+    }
+    if (l.from === SAMPLER_AUDIO) return armed && level > 0.002;
+    return armed;
+  };
+  const pb = createPatchbay(bay, { room: ROOM, flowing });
+  setInterval(() => pb.refresh?.(), 500);
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wave.el, patchPick.el, host, pb.el);
+  window.__demo.bay = bay;
+  // What this page hears from the Pi, for a driver: the scope's level, the
+  // board's counters (frames, lost, peak) and the last status. Reads only.
+  window.__demo.probe = () => ({ armed, level, program, said: saidLast, status: lastStatus,
+    stats: board ? board.stats() : null });
+  d.ready();
+</script>

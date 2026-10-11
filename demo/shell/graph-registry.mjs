@@ -92,6 +92,10 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  */
 export const JACK_ENDS = {
   yoshimi: ['yoshimi:left', 'yoshimi:right'],
+  // The board's SuperCollider sampler (`rig/board/scsampler.mjs`), a scsynth of
+  // its own whose JACK client is named so it is never taken for the
+  // granulator's `SuperCollider`.
+  sampler: ['possampler:out_1', 'possampler:out_2'],
   pappusIn: ['SuperCollider:in_1', 'SuperCollider:in_2'],
   pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
   capture: ['posboard:input_1'],
@@ -171,6 +175,10 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     const j = jack && JACK_ENDS[k] ? JACK_ENDS[k] : null;
     port(n, 'audio-out', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
       transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: [...j] } : {}) });
+    // The sampler plays recordings the board fetches itself (from R2, kept on
+    // the SD card), so it is the one engine with a `file` end. Drawn as a fact:
+    // the board does the fetch, nothing flows over this port from a page.
+    if (k === 'sampler') port(n, 'file-in', { label: k, dir: 'in', medium: 'file', address: room });
   }
   // 🔴 THE GRANULATOR AND THE CAPTURE, AS JACK ENDS, SINCE 2026-10-11. Both
   // travel by JACK and nothing else, so a link from either to a page is refused

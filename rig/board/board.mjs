@@ -24,6 +24,8 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          jackGraph, jackChain, jackRebuild, ensureJackd, setJackCard, wire as jackWire, setBayRows, getBayRows,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
+import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
+import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
@@ -109,6 +111,14 @@ let synth = null, stopSynth = null, midiIn = null, inst = null;
 // instruments, interleaved samples, 100 msg/s into a 60 msg/s relay. Measured
 // twice.
 let starting = null;
+/**
+ * 🔴 THE SAMPLER IS NOT `inst`, SINCE 2026-10-11 (option b of
+ * plans/plan-sampler-pi-pico.md §2.2). It sounds BESIDE whatever `inst` is,
+ * summed into the same capture, so `startAudio` for Yoshimi leaves it alone and
+ * `audio.start {source: 'sampler'}` leaves Yoshimi alone. `scsampler.mjs`
+ * `startPlan` is the rule, graded in `test.mjs`.
+ */
+let samp = null, sampStarting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
@@ -503,6 +513,11 @@ async function startAudio(source = 'synth', msg = null) {
   // samples, and 100 msg/s against the relay's 60 — measured 60 frames/s
   // arriving and 5,495 dropped at the relay. It sounds like corruption and it
   // is two instruments talking over each other.
+  if (source === 'sampler') return startSampler();
+  // ⚠️ A PIPE SOURCE BESIDE THE SAMPLER WOULD BE TWO STREAMS INTERLEAVED INTO ONE
+  // SOCKET, the exact fault `REPLACE, do not refuse` above was written about.
+  // Only a JACK instrument can sum with it.
+  if (samp && !JACK_SYNTHS[source]) return { ok: false, reason: `the sampler is sounding through the JACK capture, and ${source} writes its own frames, so the two would interleave. Stop the sampler first` };
   if (starting) return { ok: false, reason: `already starting ${starting}`, starting };
   // 🔴 A NEW INSTRUMENT DOES NOT INHERIT AN INSERT NOBODY IS HOLDING. The line
   // further down re-patches a switched-on insert onto whatever comes up, which
@@ -650,9 +665,35 @@ async function startAudio(source = 'synth', msg = null) {
   return { ok: true, source: 'capture', device: AUDIO_DEV, rate: RATE, deviceChannels: AUDIO_CH, take: AUDIO_TAKE };
 }
 
+async function startSampler() {
+  const plan = startPlan('sampler', { running: inst?.source ?? null, sampler: !!samp });
+  if (plan.act === 'already') return { ok: true, already: true, ...samp.status() };
+  if (sampStarting) return { ok: false, reason: 'the sampler is already starting', starting: 'sampler' };
+  sampStarting = 'sampler';
+  log('starting the sampler (its own scsynth, beside whatever else is playing) ...');
+  let r;
+  try { r = await startScSampler({ onFrame: sendPcm, onLog: (l) => log('sampler:', l), onState: (s) => { if (s === 'exited') samp = null; } }); }
+  catch (e) { r = { ok: false, reason: e.message }; }
+  finally { sampStarting = null; }
+  if (!r.ok) { log(`sampler failed: ${r.reason}`); return { ...r, source: 'sampler' }; }
+  samp = r;
+  return { ok: true, ...samp.status(), beside: inst?.source ?? null };
+}
+
+function stopSampler() {
+  if (!samp) return { ok: true, was: null };
+  const held = samp.stop();
+  samp = null;
+  if (!held) aseq = 0;            // the capture stopped too, so a new one restarts the sequence
+  return { ok: true, was: 'sampler', captureStillRunning: held };
+}
+
 function stopAudio() {
   const was = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
-  aseq = 0;                       // a new source restarts the sequence
+  // ⚠️ THE SEQUENCE RESTARTS ONLY WITH THE CAPTURE. With the sampler holding
+  // it, frames go on flowing after Yoshimi stops, and a counter jumping back to
+  // 0 mid stream reads as a reorder at every listener.
+  if (!captureHolders().filter((h) => h !== was).length) aseq = 0;
   if (inst) { inst.stop(); inst = null; }
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
   if (midiIn) { midiIn.kill('SIGTERM'); midiIn = null; }
@@ -797,6 +838,13 @@ async function handle(msg) {
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The board does
     // not care which, and does not need one to exist.
     case 'note.on':
+      // 🔴 `node: 'sampler'` IS THE SAMPLER'S, and it never starts anything:
+      // a note for an engine that is not running is dropped and said, not
+      // turned into Yoshimi.
+      if (isForSampler(msg)) {
+        if (!samp) return reply('note.ack', { note: msg.note, node: 'sampler', dropped: true, reason: 'the sampler is not running, send audio.start {source: "sampler"}' });
+        return reply('note.ack', { node: 'sampler', ...samp.noteOn(msg.note, msg.vel ?? 100) });
+      }
       // Whichever instrument is running takes the note.
       // If something is mid-start, do NOT start a second instrument — drop the
       // note. One missed note is nothing; two instruments is a broken stream.
@@ -812,10 +860,13 @@ async function handle(msg) {
       return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
         on: inst ? inst.source : 'synth' });
     case 'note.off':
+      if (isForSampler(msg)) { samp?.noteOff(msg.note); return reply('note.ack', { note: msg.note, node: 'sampler' }); }
       if (inst) inst.noteOff(msg.channel ?? 0, msg.note);
       else if (synth) synth.noteOff(msg.note);
       return reply('note.ack', { note: msg.note });
     case 'note.panic':
+      // Each engine's own: a page stopping Yoshimi does not cut somebody's piano.
+      if (isForSampler(msg)) { samp?.panic(); return reply('note.ack', { panic: true, node: 'sampler' }); }
       if (inst) inst.panic();
       if (synth) synth.allOff();
       // An insert keeps sounding after every note has stopped — a captured
@@ -855,6 +906,15 @@ async function handle(msg) {
     // The multitimbral surface: one call per channel, then sixteen channels are
     // sixteen instruments.
     case 'voice.select': {
+      // The sampler's program change: 0 the piano, 1 the Rhodes.
+      if (isForSampler(msg)) {
+        if (!samp) return reply('voice.selected', { ok: false, node: 'sampler', reason: 'the sampler is not running' });
+        const r = samp.program(msg.program);
+        // Answer when the set is IN, so a page can say so: the Rhodes is
+        // fetched and converted the first time it is asked for.
+        const load = r.ok ? await samp.loadSet(msg.program) : null;
+        return reply('voice.selected', { node: 'sampler', ...r, load });
+      }
       // 🔴 A PROGRAM NUMBER, NEVER A NAME. `{voice:'rhodes'}` used to resolve
       // through a General MIDI table in fluid.mjs, and General MIDI was
       // FluidSynth's meaning for a program number and nobody else's: Yoshimi's
@@ -924,6 +984,7 @@ async function handle(msg) {
     case 'ctl.meter':
       return reply('ctl.meter', ctlMeter());
     case 'cc': {
+      if (isForSampler(msg)) return reply('cc.ack', { node: 'sampler', ok: !!samp, moved: samp ? samp.cc(msg.ctrl, msg.value) : null });
       // Yoshimi answers CC 74 (cutoff) and 71 (resonance) for real, which is
       // the pair `/knobs/` is built on.
       if (inst) { inst.cc(msg.channel ?? 0, msg.ctrl, msg.value); return reply('cc.ack', { ok: true, on: inst.source }); }
@@ -935,7 +996,14 @@ async function handle(msg) {
     }
     case 'moog.patch':
       return reply('moog.patched', { ok: !!synth?.setPatch?.(msg.patch), patch: msg.patch, patches: Object.keys(MOOG_PATCHES) });
-    case 'audio.stop':  return reply('audio.stopped', stopAudio());
+    case 'audio.stop': {
+      // `{source: 'sampler'}` stops the sampler and nothing else; no source
+      // stops the instrument and never the sampler (scsampler.mjs `stopPlan`).
+      const sp = stopPlan(msg.source ?? null, { running: inst?.source ?? null, sampler: !!samp });
+      if (msg.source === 'sampler') return reply('audio.stopped', { ...stopSampler(), source: 'sampler' });
+      return reply('audio.stopped', { ...(sp.stopInst || stopSynth || audio ? stopAudio() : { ok: true, was: null }),
+                                      sampler: samp ? 'still running' : null });
+    }
     // ⚠️ `sf.list` STOOD HERE AND LEFT ON 2026-09-16 with the sampled
     // instrument. It walked the board's soundfont directories so a page could
     // offer a choice of them; with nothing on this board that can read one, a
@@ -1306,7 +1374,11 @@ async function handle(msg) {
       return reply('audio.started', { ...(inst ? { ok: true, source: inst.source, jack: !!inst.jack, ...insertState() }
         : stopSynth ? { ok: true, source: 'synth', ...insertState() }
         : audio ? { ok: true, source: 'capture', ...insertState() }
-        : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status() });
+        : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status(),
+        // The sampler beside it, never in place of it (option b).
+        sampler: samp ? samp.status() : { ok: false, available: samplerAvailable(), starting: !!sampStarting } });
+    case 'sampler.cpu':
+      return reply('sampler.cpu', samp ? { ok: true, ...(await samp.cpu()), voices: samp.status().voices } : { ok: false, reason: 'the sampler is not running' });
     // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
     // WRITTEN. `at` WAS an envelope field (`wire.mjs`, `sent` since 2026-10-04),
     // `format()` throws on the collision by design, the throw was caught by the handler wrapper below and
@@ -1569,7 +1641,8 @@ function connect() {
     // gathered HERE and kept, because each instrument check is a `which` spawn
     // and the beat every five seconds should not be.
     const instruments = { synth: true, pappusFx: pappusAvailable(),
-                          ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) };
+                          ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])),
+                          sampler: samplerAvailable() };
     // `jack`: this board has a JACK graph, so its JACK ends are announced
     // (graph-registry.mjs `boardGraph`). Yoshimi installed or an input on JACK
     // is the same question `startJackSynth` and `inputs.mjs` ask.
@@ -1610,6 +1683,7 @@ function connect() {
     clearInterval(ws.__watchdog);
     log(`closed ${e.code} — retrying in ${backoff} ms`);
     stopAudio();
+    stopSampler();
     if (!ONCE) setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 30_000);
   };
@@ -1754,5 +1828,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); hwInputs.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); stopSampler(); hwInputs.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

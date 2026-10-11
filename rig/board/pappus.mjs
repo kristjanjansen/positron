@@ -69,7 +69,7 @@ export const POS_ON = '/pos/on', POS_SET = '/pos/set', POS_SETN = '/pos/setn',
  * because `jacksynth.mjs` only ever needed to WRITE OSC — this is the first
  * thing in the board that has to read any.
  */
-function readOsc(b) {
+export function readOsc(b) {
   let i = 0;
   const str = () => {
     const z = b.indexOf(0, i);

@@ -126,8 +126,24 @@ const l = (from, to) => ({ from, to });
 let bayRows = [];
 export function setBayRows(rows) { bayRows = Array.isArray(rows) ? rows.map((r) => l(r.from, r.to)) : []; }
 export function getBayRows() { return bayRows.map((r) => l(r.from, r.to)); }
+/**
+ * 🔴 AN ENGINE THAT SOUNDS BESIDE THE INSTRUMENT, SINCE 2026-10-11 (option b of
+ * plans/plan-sampler-pi-pico.md §2.2). The SuperCollider sampler sums into the
+ * capture next to Yoshimi, and every document here that OWNS the capture
+ * (`pappusFx`, `jack.rebuild`) would otherwise cut it as a stray. So an engine
+ * names its standing links once, by name, and they ride on every re-patch
+ * exactly as a bay link does: wanted by `jackChain`, kept by `wire()`.
+ * ⚠️ NOT A BAY LINK. A page's `jack.unlink` and `setBayRows` cannot remove one;
+ * only the engine that set it, by setting its name to `[]` when it stops.
+ */
+const standing = new Map();
+export function setStandingRows(name, rows) {
+  if (Array.isArray(rows) && rows.length) standing.set(name, rows.map((r) => l(r.from, r.to)));
+  else standing.delete(name);
+}
+export function getStandingRows() { return [...standing.values()].flat().map((r) => l(r.from, r.to)); }
 const present = (rows, port) => rows.some((r) => r.port === port);
-const bayOnGraph = (rows) => bayRows.filter((r) => present(rows, r.from) && present(rows, r.to));
+const bayOnGraph = (rows) => [...bayRows, ...getStandingRows()].filter((r) => present(rows, r.from) && present(rows, r.to));
 function withBay(doc, rows) {
   const extra = bayOnGraph(rows);
   return extra.length ? { ...doc, links: [...(doc.links ?? []), ...extra] } : doc;
@@ -528,7 +544,25 @@ export function pappusPanic() {
 export function stopPappus() {
   pappusReady = false;
   if (pappusProc) { try { pappusProc.kill('SIGTERM'); } catch { /* gone */ } pappusProc = null; }
-  sh('pkill -9 -x scsynth 2>/dev/null'); sh('pkill -9 -x sclang 2>/dev/null');
+  // ⚠️ NOT `pkill -x scsynth` ANY MORE, SINCE 2026-10-11. The board runs a
+  // second scsynth for the sampler (`scsampler.mjs`), and a name match would
+  // take somebody's piano away with the granulator. Every scsynth but the one
+  // listening on the sampler's port, by pid.
+  for (const pid of pappusScsynthPids(sh('pgrep -ax scsynth 2>/dev/null'))) sh(`kill -9 ${pid} 2>/dev/null`);
+  sh('pkill -9 -x sclang 2>/dev/null');
+}
+
+/** The sampler's scsynth listens here and nowhere else (`scsampler.mjs`). */
+export const SAMPLER_SC_PORT = 57130;
+/**
+ * The scsynth pids `stopPappus` may kill, read off `pgrep -ax scsynth`: every
+ * one except a server started with `-u <SAMPLER_SC_PORT>`. Pure, so the one
+ * line that decides whose sound stops is graded without a board.
+ */
+export function pappusScsynthPids(pgrepAx, keepPort = SAMPLER_SC_PORT) {
+  return String(pgrepAx).split('\n').map((x) => x.trim()).filter(Boolean)
+    .filter((line) => !new RegExp(`(^|\\s)-u\\s+${keepPort}(\\s|$)`).test(line))
+    .map((line) => Number(line.split(/\s+/)[0])).filter((n) => Number.isInteger(n) && n > 0);
 }
 
 export function jackSynthAvailable(name) {
@@ -892,20 +926,14 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   onLog?.(ready ? `port up in ${Date.now() - t0port} ms` : `no port after ${ceiling} ms — carrying on so the failure is reported below`);
   if (ready && def.settle) await wait(def.settle);
 
-  // 3. capture — raw s16 on stdout, read straight into the frame pump
-  const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', CAP_CLIENT,
-    '-f', 's16le', '-ar', String(RATE), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
-  procs.push(cap);
-  // Same again for the capture's own client, rather than 2.5 s of hoping.
-  const t0cap = Date.now();
-  while (Date.now() - t0cap < 8000) {
-    if (sh('jack_lsp 2>/dev/null').includes(CAP)) break;
-    await wait(200);
-  }
+  // 3. capture: raw s16 on stdout, read straight into the frame pump.
+  // ⚠️ SHARED SINCE 2026-10-11 (`ensureCapture` below): the sampler sums into
+  // the same capture, so this instrument holds it rather than owning it.
+  await ensureCapture(name, { onFrame, onLog });
 
   // 4. wire the instrument's output into the capture client
   const port = sh('jack_lsp').split('\n').find((p) => def.portMatch.test(p));
-  if (!port) { procs.forEach((p) => p.kill()); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
+  if (!port) { procs.forEach((p) => p.kill()); releaseCapture(name); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
   // ⚠️ AND THE RIGHT CHANNEL, WHICH WAS GOING NOWHERE. `portMatch` finds ONE
   // port, and for a stereo instrument that is the left one — so the capture was
   // mono-LEFT rather than mono-SUM and everything panned right was silently
@@ -948,17 +976,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   const strays = alsaClient ? strayMidiSources(sh('aconnect -l'), alsaClient, vm?.client) : [];
   for (const s of strays) { sh(`aconnect -d ${s.id} ${alsaClient}:0`); onLog?.(`cut ${s.name ?? s.id} (${s.id}) -> ${name}: the board is its only MIDI source`); }
 
-  // 6. the capture's bytes, cut into 20 ms frames
-  const BYTES = FRAME * 2;
-  let carry = Buffer.alloc(0);
-  cap.stdout.on('data', (chunk) => {
-    carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
-    while (carry.length >= BYTES) {
-      onFrame?.(new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + BYTES)));
-      carry = carry.subarray(BYTES);
-    }
-  });
-  cap.stderr?.on('data', (d) => onLog?.(`ffmpeg: ${String(d).trim()}`));
+  // 6. the capture's bytes, cut into 20 ms frames: `ensureCapture` does it.
 
   // ⚠️ STEP 7 WAS `def.osc` AND IT LEFT WITH hexter TOO. It sent DSSI OSC to a
   // plugin host once the instrument was up, which is how hexter loaded its four
@@ -995,6 +1013,55 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
       try { udp?.close(); } catch { /* already closed */ }
       if (midiFd !== null) { try { closeSync(midiFd); } catch {} }
       for (const p of procs) { try { p.kill('SIGTERM'); } catch {} }
+      releaseCapture(name);
     },
   };
+}
+
+// ── the capture, held by whoever is sounding ────────────────────────────────
+//
+// 🔴 ONE ffmpeg ON `posboard`, HELD BY NAME, SINCE 2026-10-11. It was spawned
+// inside `startJackSynth` and killed with the instrument, which was right while
+// the board had one sound. With the sampler beside Yoshimi (option b,
+// plans/plan-sampler-pi-pico.md §2.2) either may be the only thing playing, so
+// the capture lives while ANY holder does and a second holder reuses it rather
+// than starting a second `posboard` (JACK would name it `posboard-01`, and
+// nothing is wired to that).
+// ⚠️ THE FRAME PUMP IS THE NEWEST HOLDER'S `onFrame`. Every holder on this board
+// passes the same `sendPcm`, so this is a formality, written down so it is not
+// a surprise.
+const capture = { proc: null, users: new Set(), onFrame: null };
+export const captureHolders = () => [...capture.users];
+export async function ensureCapture(user, { onFrame, onLog } = {}) {
+  capture.users.add(user);
+  if (onFrame) capture.onFrame = onFrame;
+  if (capture.proc && sh('jack_lsp 2>/dev/null').includes(CAP)) return { ok: true, started: false };
+  if (capture.proc) { try { capture.proc.kill('SIGTERM'); } catch { /* gone */ } capture.proc = null; }
+  const cap = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-i', CAP_CLIENT,
+    '-f', 's16le', '-ar', String(RATE), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  capture.proc = cap;
+  const BYTES = FRAME * 2;
+  let carry = Buffer.alloc(0);
+  cap.stdout.on('data', (chunk) => {
+    carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
+    while (carry.length >= BYTES) {
+      capture.onFrame?.(new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + BYTES)));
+      carry = carry.subarray(BYTES);
+    }
+  });
+  cap.stderr?.on('data', (d) => onLog?.(`ffmpeg: ${String(d).trim()}`));
+  cap.on('exit', () => { if (capture.proc === cap) capture.proc = null; });
+  // The capture's own client, rather than 2.5 s of hoping.
+  const t0cap = Date.now();
+  while (Date.now() - t0cap < 8000) {
+    if (sh('jack_lsp 2>/dev/null').includes(CAP)) break;
+    await wait(200);
+  }
+  return { ok: sh('jack_lsp 2>/dev/null').includes(CAP), started: true };
+}
+/** Let go. The ffmpeg stops when nobody holds it. Answers whether it is still running. */
+export function releaseCapture(user) {
+  capture.users.delete(user);
+  if (!capture.users.size && capture.proc) { try { capture.proc.kill('SIGTERM'); } catch { /* gone */ } capture.proc = null; }
+  return !!capture.proc;
 }

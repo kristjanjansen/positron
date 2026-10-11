@@ -416,5 +416,22 @@ console.log('\n== the JACK ends, and one bay link as JACK rows (2026-10-11) ==')
   ok('NEGATIVE CONTROL: the granulator\'s input as a source is refused', !asSource.ok && /is an input/.test(asSource.why), asSource.why);
 }
 
+console.log('\n== the sampler on the board (2026-10-11) ==');
+
+{
+  // `pi-1:sampler`, the SuperCollider sampler of `rig/board/scsampler.mjs`.
+  // Four asserts, two of them NEGATIVE CONTROLS.
+  const g = desk({ jack: true, instruments: { ...INSTRUMENTS, sampler: true } });
+  ok('the sampler announces midi-in, audio-out and file-in, and the graph is still legal',
+    port(g, 'pi-1:sampler:midi-in')?.accepts.includes('program') && port(g, 'pi-1:sampler:audio-out')?.address === 'studio-1'
+    && port(g, 'pi-1:sampler:file-in')?.medium === 'file' && graphProblem(g) === '', graphProblem(g));
+  ok('its audio-out names its own two JACK ports, not the granulator\'s',
+    JSON.stringify(port(g, 'pi-1:sampler:audio-out')?.jack) === '["possampler:out_1","possampler:out_2"]'
+    && !JACK_ENDS.sampler.some((p) => p.startsWith('SuperCollider:')));
+  ok('NEGATIVE CONTROL: no other engine grows a file-in', !port(g, 'pi-1:yoshimi:file-in') && !port(g, 'pi-1:synth:file-in'));
+  ok('NEGATIVE CONTROL: a board that cannot run the sampler announces none of it',
+    !desk({ instruments: { ...INSTRUMENTS, sampler: false } }).ports.some((p) => p.id.startsWith('pi-1:sampler:')));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

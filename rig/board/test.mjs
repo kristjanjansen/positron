@@ -19,7 +19,11 @@ import { constants as FS_C } from 'node:fs';
 import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
-import { keyRanges, pianoSfz, ensurePiano, PIANO_NOTES } from './sampler.mjs';
+import { keyRanges, pianoSfz, ensurePiano, PIANO_NOTES, RHODES_NOTES, RHODES_FILES, ensureRhodes } from './sampler.mjs';
+import { createSamplerCore, startPlan, stopPlan, isForSampler, nearestIn, layerFor, rhodesLayerAt, velGain, SETS,
+         PIANO_PEAK, RHODES_PEAK, scsynthArgs, SC_ENV } from './scsampler.mjs';
+import { setStandingRows, getStandingRows, pappusScsynthPids, SAMPLER_SC_PORT } from './jacksynth.mjs';
+import { JACK_ENDS } from '../../demo/shell/graph-registry.mjs';
 import { join } from 'node:path';
 
 let pass = 0, fail = 0;
@@ -1261,6 +1265,117 @@ console.log('\nbeat: the graph on the hello and on every beat');
     .then(() => 'resolved', (e) => e.message);
   ok('a refused file is an error naming it, never an empty sample', /21\.mp3 answered 404/.test(bad), bad);
   rmSync(dir, { recursive: true, force: true });
+}
+
+// ── the SuperCollider sampler (scsampler.mjs), option b ─────────────────────
+//
+// What decides whose sound stops, and every rule a key is played by, with a
+// fake scsynth. 27 asserts below, 11 of them NEGATIVE CONTROLS.
+{
+  console.log('sampler: the one-source rule, with the sampler beside it');
+  is('starting the sampler beside Yoshimi stops nothing',
+    startPlan('sampler', { running: 'yoshimi', sampler: false }), { act: 'start-sampler', stopInst: false, stopSampler: false });
+  is('starting Yoshimi beside the sampler leaves the sampler running',
+    startPlan('yoshimi', { running: null, sampler: true }).stopSampler, false);
+  is('NEGATIVE CONTROL: between the others it is still one at a time, a new one replaces the old',
+    startPlan('yoshimi', { running: 'synth', sampler: true }), { act: 'start', stopInst: true, stopSampler: false });
+  is('a second sampler start is already', startPlan('sampler', { sampler: true }).act, 'already');
+  is('audio.stop with no source stops the instrument and never the sampler',
+    stopPlan(null, { running: 'yoshimi', sampler: true }), { stopInst: true, stopSampler: false });
+  is('NEGATIVE CONTROL: audio.stop {source: sampler} leaves Yoshimi',
+    stopPlan('sampler', { running: 'yoshimi', sampler: true }), { stopInst: false, stopSampler: true });
+  is('only node: sampler is the sampler\'s', [isForSampler({ node: 'sampler' }), isForSampler({}), isForSampler({ node: 'yoshimi' })], [true, false, false]);
+
+  console.log('sampler: the server is its own and connects nowhere by itself');
+  const a = scsynthArgs();
+  ok('a JACK client of its own name and its own port, no inputs, two outputs',
+    a.join(' ').includes('-H default:possampler') && a.join(' ').includes(`-u ${SAMPLER_SC_PORT}`) && a.join(' ').includes('-i 0 -o 2'), a.join(' '));
+  ok('NEGATIVE CONTROL: its JACK name is never the granulator\'s SuperCollider', !/SuperCollider/.test(a.join(' ')) && JACK_ENDS.sampler.every((p) => p.startsWith('possampler:')));
+  is('and it auto connects to a port that does not exist', [SC_ENV.SC_JACK_DEFAULT_INPUTS, SC_ENV.SC_JACK_DEFAULT_OUTPUTS], ['posnothing:none', 'posnothing:none']);
+  const ps = '101 scsynth -u 57110 -a 1024 -i 2 -o 2\n202 scsynth -u 57130 -i 0 -o 2 -H default:possampler\n303 scsynth -u 571300\n';
+  is('stopPappus kills every scsynth but the sampler\'s', pappusScsynthPids(ps), [101, 303]);
+  is('NEGATIVE CONTROL: with no sampler running it still kills the granulator\'s', pappusScsynthPids('101 scsynth -u 57110'), [101]);
+
+  console.log('sampler: the capture keeps it, whoever re-patches');
+  const capRows = parseJackLsp(jackText.replace('posboard:input_1\n   yoshimi:left',
+    'posboard:input_1\n   possampler:out_1\n   possampler:out_2\n   yoshimi:left') + 'possampler:out_1\n   posboard:input_1\npossampler:out_2\n   posboard:input_1\n');
+  setStandingRows('sampler', JACK_ENDS.sampler.map((f) => ({ from: f, to: 'posboard:input_1' })));
+  const withS = jackChain({ ...yosh, graph: { graph: capRows } });
+  is('with the sampler standing, its two links into the capture are wanted, not stray', [withS.intact, withS.extra], [true, []]);
+  setStandingRows('sampler', []);
+  const without = jackChain({ ...yosh, graph: { graph: capRows } });
+  is('NEGATIVE CONTROL: once it stops, the same two links are strays a rebuild would cut', without.extra.length, 2);
+  is('and it leaves no standing row behind', getStandingRows(), []);
+
+  console.log('sampler: the rules a key is played by');
+  const sent = [];
+  const bufs = new Map();
+  SETS[0].files.forEach((f) => bufs.set(`piano:${f.key}`, { bufnum: f.bufnum, channels: 2 }));
+  const core = createSamplerCore({ send: (addr, args) => sent.push([addr, ...args]), buffers: bufs, voices: 3 });
+  const n60 = core.noteOn(60, 127);
+  is('60 plays its own recording at rate 1, through the stereo def', [n60.near, n60.rate, sent[0][1]], [60, 1, 'posSampler2']);
+  ok('a stereo voice is halved, so the summed capture lands where one browser channel does',
+    Math.abs(n60.amp - velGain(PIANO_PEAK, 127) / 2) < 1e-4, String(n60.amp));
+  const n62 = core.noteOn(62, 64);
+  is('62 is nearer 63 and plays it a semitone down', [n62.near, n62.rate], [63, +Math.pow(2, -1 / 12).toFixed(4)]);
+  sent.length = 0;
+  core.noteOn(60, 90);
+  is('a key struck again damps the voice it replaces, over 40 ms', sent[0], ['/n_set', n60.id, 'rel', 0.04, 'gate', 0]);
+  core.panic();
+  const first = core.noteOn(40, 90); core.noteOn(44, 90); core.noteOn(47, 90);
+  sent.length = 0;
+  core.noteOn(52, 90);
+  is('past the cap the OLDEST voice is taken, over 20 ms', [sent[0][0], sent[0][1], sent[0][3], core.sounding()], ['/n_set', first.id, 0.02, 3]);
+  core.panic();
+  sent.length = 0;
+  core.control(64, 127);
+  const held = core.noteOn(48, 100);
+  core.noteOff(48);
+  is('NEGATIVE CONTROL: with the pedal down a key up releases nothing', sent.filter((m) => m[0] === '/n_set'), []);
+  core.control(64, 0);
+  is('the pedal up lets it go over the damper\'s 0.12 s', sent.filter((m) => m[0] === '/n_set'), [['/n_set', held.id, 'rel', 0.12, 'gate', 0]]);
+  core.ended(held.id);
+  is('scsynth saying a node ended takes it off the count', core.sounding(), 0);
+  core.noteOn(50, 100);
+  sent.length = 0;
+  is('program 1 is the Rhodes and damps what was sounding', [core.program(1).set, sent[0]?.[0], sent[0]?.[3]], ['rhodes', '/n_set', 0.06]);
+  const cold = core.noteOn(60, 100);
+  is('NEGATIVE CONTROL: a note on a set not loaded yet is dropped and says so', [cold.ok, cold.dropped, /Rhodes is not loaded/.test(cold.reason)], [false, true, true]);
+  is('NEGATIVE CONTROL: program 7 is not a set', core.program(7).ok, false);
+  is('the Rhodes picks the hardest layer at 127 and falls back over a hole', [layerFor(127), rhodesLayerAt(81, 1), rhodesLayerAt(96, 3)], [1, 2, 4]);
+  is('a Rhodes key between two recordings goes to the lower on a tie', nearestIn(RHODES_NOTES, 32), 29);
+  is('65 Rhodes files with buffer numbers of their own', [SETS[1].files.length, RHODES_FILES.length, SETS[1].files[0].bufnum], [65, 65, 100]);
+
+  console.log('sampler: the board\'s copy against the browser\'s module');
+  // The browser module imports `/shell/pedal.mjs` by an absolute URL; that one
+  // import is pointed at the real file and everything else is the page's code.
+  const src = readFileSync(new URL('../../demo/concepts/sampler/sampler.mjs', import.meta.url), 'utf8')
+    .replace("'/shell/pedal.mjs'", `'${new URL('../../demo/shell/pedal.mjs', import.meta.url).href}'`);
+  const web = await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
+  const diffs = [];
+  for (let n = 0; n < 128; n++) {
+    if (web.nearestIn(web.PIANO_NOTES, n) !== nearestIn(PIANO_NOTES, n)) diffs.push(`piano ${n}`);
+    if (web.nearestIn(web.RHODES_NOTES, n) !== nearestIn(RHODES_NOTES, n)) diffs.push(`rhodes ${n}`);
+  }
+  for (let v = 1; v < 128; v++) {
+    if (web.layerFor(v) !== layerFor(v)) diffs.push(`layer ${v}`);
+    if (Math.abs(web.velGain(web.PIANO, v) - velGain(PIANO_PEAK, v)) > 1e-9) diffs.push(`piano gain ${v}`);
+    if (Math.abs(web.velGain(web.RHODES, v) - velGain(RHODES_PEAK, v)) > 1e-9) diffs.push(`rhodes gain ${v}`);
+  }
+  for (const n of RHODES_NOTES) for (const l of [1, 2, 3, 4, 5]) if (web.rhodesLayerAt(n, l) !== rhodesLayerAt(n, l)) diffs.push(`hole ${n}-${l}`);
+  if (JSON.stringify(web.RHODES_NOTES) !== JSON.stringify(RHODES_NOTES)) diffs.push('rhodes notes');
+  is('the board plays every note, velocity and layer exactly as the browser module does', diffs, []);
+  is('and fetches the same file names the browser does',
+    RHODES_FILES.every((f) => web.RHODES.file(+f.slice(7, 10), +f.slice(-1)).endsWith(`/${f}.m4a`)), true);
+
+  // The Rhodes fetch, against a fake network: the 65, once.
+  const rdir = mkdtempSync(join(tmpdir(), 'rhodes-'));
+  const asked = [];
+  const r1 = await ensureRhodes({ dir: rdir, fetchImpl: async (u) => { asked.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) }; },
+    convert: (a, b) => writeFileSync(b, readFileSync(a)) });
+  const r2 = await ensureRhodes({ dir: rdir, fetchImpl: async () => { throw new Error('asked twice'); }, convert: () => {} });
+  is('the Rhodes comes down once, 65 files, and a second run asks nobody', [r1.fetched, r1.missing.length, r2.fetched, asked.length], [65, 0, 0, 65]);
+  rmSync(rdir, { recursive: true, force: true });
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

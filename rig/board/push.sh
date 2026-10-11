@@ -122,11 +122,12 @@ echo "== what landed, against what was sent"
 # a board nobody can ssh to. An md5 that covers one of two changed files is a
 # confirmation that can be true while the deploy is broken.
 ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs $DEST/rig/board/pappus.mjs \
+  $DEST/rig/board/scsampler.mjs $DEST/rig/board/sampler.mjs $DEST/rig/board/norns/possampler-defs.scd \
   $DEST/rig/board/norns/run-pappus.scd \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
-md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
-  || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/norns/run-pappus.scd" \
+  || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then

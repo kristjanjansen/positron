@@ -127,6 +127,61 @@ export async function ensurePiano({ dir = SAMPLE_DIR, base = SAMPLE_BASE, onLog 
   return { dir, sfz: sfzPath, fetched, wroteSfz: old !== text, ...presentSamples(dir) };
 }
 
+// ── the Rhodes, the second set (program 1) ──────────────────────────────────
+//
+// jRhodes3d by Jeff Learman (CC BY-NC-SA 4.0), as `/concepts/sampler/010/`
+// plays it: our R2 copies, capped at 4 s, faded over 8 ms, AAC 96 kbps
+// (demo/nola/PROVENANCE-rhodes.json). Fifteen notes at the author's uneven
+// steps and five velocity layers, layer 1 the hardest, ten holes at the top of
+// layers 1 and 3. 🔴 THESE TABLES ARE COPIES of
+// `demo/concepts/sampler/sampler.mjs`, because that module imports
+// `/shell/pedal.mjs` by an absolute URL node cannot resolve; `test.mjs` imports
+// the browser module with that one import rewritten and grades every table
+// here against it, so the two cannot drift silently.
+
+export const RHODES_BASE = SAMPLE_BASE.replace(/piano\/$/, 'rhodes/');
+export const RHODES_DIR = process.env.BOARD_RHODES || SAMPLE_DIR.replace(/piano\/?$/, 'rhodes');
+export const RHODES_NOTES = Object.freeze([29, 35, 40, 45, 50, 55, 59, 62, 65, 71, 76, 81, 86, 91, 96]);
+export const RHODES_ABSENT = Object.freeze(new Set(['81-1', '86-1', '91-1', '96-1',
+  '71-3', '76-3', '81-3', '86-3', '91-3', '96-3']));
+/** `rhodes-029-1`, the name the station worker serves and the card keeps. */
+export const rhodesName = (note, layer) => `rhodes-${String(note).padStart(3, '0')}-${layer}`;
+/** Every recording there is: 15 notes by 5 layers less the 10 holes, 65. */
+export const RHODES_FILES = Object.freeze(RHODES_NOTES.flatMap((n) =>
+  [1, 2, 3, 4, 5].filter((l) => !RHODES_ABSENT.has(`${n}-${l}`)).map((l) => rhodesName(n, l))));
+
+/**
+ * Put the Rhodes on the card, the way `ensurePiano` does the piano: only what
+ * is missing is fetched, one at a time, each converted to FLAC under a
+ * temporary name and renamed into place. 65 files, 3.2 MB as AAC.
+ */
+export async function ensureRhodes({ dir = RHODES_DIR, base = RHODES_BASE, onLog = () => {}, fetchImpl = fetch,
+                                     convert = flacFromMp3 } = {}) {
+  mkdirSync(dir, { recursive: true });
+  const have = new Set();
+  try { for (const f of readdirSync(dir)) if (f.endsWith('.flac') && statSync(join(dir, f)).size > 0) have.add(f.slice(0, -5)); }
+  catch { /* none yet */ }
+  const missing = RHODES_FILES.filter((n) => !have.has(n));
+  let fetched = 0;
+  for (const n of missing) {
+    const r = await fetchImpl(`${base}${n}.m4a`);
+    if (!r.ok) throw new Error(`${base}${n}.m4a answered ${r.status}`);
+    const tmp = join(dir, `.${n}.m4a`);
+    writeFileSync(tmp, Buffer.from(await r.arrayBuffer()));
+    convert(tmp, join(dir, `.${n}.flac`));
+    rmSync(tmp, { force: true });
+    renameSync(join(dir, `.${n}.flac`), join(dir, `${n}.flac`));
+    fetched++;
+  }
+  if (fetched) onLog(`fetched ${fetched} of ${RHODES_FILES.length} Rhodes samples into ${dir}`);
+  const licence = join(dir, 'LICENSE-jrhodes3d');
+  if (!existsSync(licence)) {
+    writeFileSync(licence, 'jRhodes3d by Jeff Learman, CC BY-NC-SA 4.0, https://github.com/sfzinstruments/jlearman.jRhodes3d\n'
+      + 'These are positron\'s R2 copies (capped at 4 s, faded over 8 ms, AAC 96 kbps), converted to FLAC on this board.\n');
+  }
+  return { dir, fetched, missing: RHODES_FILES.filter((n) => !existsSync(join(dir, `${n}.flac`))) };
+}
+
 /** ffmpeg, channels and rate kept: the conversion changes the container and drops the priming, nothing else. */
 export function flacFromMp3(src, dst) {
   execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', src, '-c:a', 'flac', '-f', 'flac', dst]);
