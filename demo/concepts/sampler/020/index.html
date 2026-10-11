@@ -102,14 +102,22 @@
   const LOOKBACK_MS = 150;
   const SEAM_MS = 150;
   const BUFFER_MS = 2000;
-  /** What a press does: 'spring', 'short' (both ignored), 'close' or 'start'. */
+  /** What a press does: 'spring', 'short' (both ignored), 'close', 'start',
+   *  'overdub' (while looping) or 'keep' (while overdubbing). Overdub since
+   *  2026-10-11 (*"how i overdub?"*, then *"Okay, build."*): the third Copy
+   *  log showed a press over a 15 s loop replacing it with a 1.85 s take. A
+   *  fresh loop now starts only after a clear, the 3 s hold. */
   function pressAction(state, t1, releasedAt, now) {
     if (now - releasedAt < SPRING_MS) return 'spring';
     if (state === 'recording') return now - t1 < MIN_LOOP_MS ? 'short' : 'close';
+    if (state === 'looping') return 'overdub';
+    if (state === 'overdub') return 'keep';
     return 'start';
   }
   const L = {
-    state: 'empty',          // 'empty' | 'recording' | 'looping'
+    state: 'empty',          // 'empty' | 'recording' | 'looping' | 'overdub'
+    layer: 0,                // the layer being recorded: 0 the first take, 1 and up overdubs
+    dub: new Map(),          // note -> its overdub note on event, while overdubbing
     t1: 0, len: 0,           // ms, performance.now() clock
     lapStart: 0, lastPos: 0, lap: 0,
     events: [],              // { at, d1, d2 } in ms from the first press, sorted
@@ -156,7 +164,25 @@
     L.hold = setTimeout(() => {
       if (L.pedal < PEDAL_ON) return;
       if (L.notesInHold) { jdo('hold kept', `${L.notesInHold} notes played during the hold`); return; }
+      // Asked: *"cancelling just removes the last layer"*. A hold over a loop
+      // with overdubs takes the newest layer away; only a loop of one layer, or
+      // a take still recording, is cleared whole.
       const had = L.state;
+      if (had === 'overdub' && !L.events.some((e) => e.d2 && e.layer === L.layer)) {
+        // the press just started an empty overdub: drop it, then undo the one before
+        L.dub.clear(); L.layer--; L.state = 'looping';
+      }
+      if ((L.state === 'looping' || L.state === 'overdub') && L.layer > 0) {
+        const k = L.layer;
+        const gone = L.events.filter((e) => e.layer === k);
+        for (const e of gone) if (e.d2 && L.sounding.has(e.d1)) { out(e.d1, 0); L.sounding.delete(e.d1); }
+        L.events = L.events.filter((e) => e.layer !== k);
+        L.dub.clear(); L.layer = k - 1; L.state = 'looping';
+        jdo('hold undo', `layer ${k} removed, ${gone.filter((e) => e.d2).length} notes`);
+        d.log(`pedal held ${CLEAR_HOLD_MS / 1000} s with no note played: layer ${k} removed, the loop plays on`);
+        strip.strip.invalidate(); face();
+        return;
+      }
       jdo('hold clear', had);
       L.prev = null;
       clear();
@@ -166,6 +192,29 @@
     jdo(`press ${act}`, `${Number.isFinite(L.releasedAt) ? `${(now - L.releasedAt).toFixed(1)} ms after the last release` : 'no release yet'}, ${L.state === 'recording' ? `${(now - L.t1).toFixed(1)} ms into the take` : ''}`);
     if (act === 'spring') { d.log(`press ${(now - L.releasedAt).toFixed(0)} ms after a release, the pedal springing back, ignored`, 'warn'); return; }
     if (act === 'short') { d.log(`press ${(now - L.t1).toFixed(0)} ms into the take, under ${MIN_LOOP_MS / 1000} s, ignored, still recording`, 'warn'); return; }
+    if (act === 'overdub') {
+      L.state = 'overdub'; L.layer++; L.dub.clear();
+      // notes played just before the press count too, at their own place in the loop
+      let early = 0;
+      for (const b of L.buffer) if (b.d2 && b.t >= now - LOOKBACK_MS && b.t < now) { dubNote(b.d1, b.d2, b.t); early++; }
+      d.log(`press: overdubbing layer ${L.layer}, the loop plays on`);
+      jdo('overdub', `layer ${L.layer}${early ? `, ${early} note${early === 1 ? '' : 's'} from before the press taken in` : ''}`);
+      face();
+      return;
+    }
+    if (act === 'keep') {
+      const pos = loopPos(now);
+      for (const [n] of L.dub) addEvent({ at: pos, d1: n, d2: 0, layer: L.layer, skipLap: L.lap });
+      L.dub.clear();
+      const n = L.events.filter((e) => e.d2 && e.layer === L.layer).length;
+      L.state = 'looping';
+      d.log(`press: layer ${L.layer} kept with ${n} note${n === 1 ? '' : 's'}`);
+      jdo('overdub kept', `layer ${L.layer}, ${n} notes, ${L.events.filter((e) => e.d2).length} in the loop`);
+      if (!n) L.layer--;
+      strip.strip.invalidate();
+      face();
+      return;
+    }
     if (act === 'close') {
       const len = now - L.shift - L.t1;
       if (!L.events.some((e) => e.d2) && L.prev) {
@@ -231,9 +280,32 @@
     face();
   }
 
+  // Overdub: a note's place in the loop is the loop's own clock at its device
+  // time, so the pedal's 66 ms scan does not touch it and nothing is moved.
+  // A note added now must not also replay in this lap (it was just played
+  // live), so it carries the lap it was played in and is skipped there.
+  const loopPos = (t) => (((t - L.lapStart) % L.len) + L.len) % L.len;
+  function addEvent(ev) {
+    let i = L.events.length;
+    while (i > 0 && L.events[i - 1].at > ev.at) i--;
+    L.events.splice(i, 0, ev);
+  }
+  function dubNote(d1, d2, t) {
+    const at = loopPos(t);
+    if (d2) {
+      const ev = { at, d1, d2, layer: L.layer, skipLap: L.lap };
+      L.dub.set(d1, ev);
+      addEvent(ev);
+    } else if (L.dub.has(d1)) {
+      L.dub.delete(d1);
+      addEvent({ at, d1, d2: 0, layer: L.layer, skipLap: L.lap });
+    }
+    strip.strip.invalidate();
+  }
+
   function clear() {
     silence();
-    L.state = 'empty'; L.events = []; L.open.clear(); L.len = 0;
+    L.state = 'empty'; L.events = []; L.open.clear(); L.len = 0; L.layer = 0; L.dub.clear();
     deck.setLoopView(null);
     strip.strip.invalidate();
     face();
@@ -258,6 +330,7 @@
     L.buffer.push({ t: now, d1: e.d1, d2: e.d2 });
     while (L.buffer.length && L.buffer[0].t < now - BUFFER_MS) L.buffer.shift();
     if (e.d2 && L.pedal >= PEDAL_ON) L.notesInHold++;
+    if (L.state === 'overdub') { dubNote(e.d1, e.d2, now); return; }
     if (L.state !== 'recording') return;
     const at = now - L.t1;
     if (e.d2 && at < 0) jdo('note before the take', `${e.d1} at ${at.toFixed(1)} ms`);
@@ -270,6 +343,7 @@
   // where it is now. Positions come from the first lap's start and the loop
   // length, never from the last tick, so the loop cannot drift.
   function fire(ev, lapStart) {
+    if (ev.skipLap === L.lap) return;
     const now = performance.now();
     L.fired.push({ lap: L.lap, at: ev.at, late: +(now - (lapStart + ev.at)).toFixed(2) });
     if (L.fired.length > 400) L.fired.shift();
@@ -277,7 +351,7 @@
     out(ev.d1, ev.d2);
   }
   setInterval(() => {
-    if (L.state !== 'looping') return;
+    if (L.state !== 'looping' && L.state !== 'overdub') return;
     const now = performance.now();
     const elapsed = now - L.lapStart;
     const lap = Math.floor(elapsed / L.len);
@@ -320,7 +394,7 @@
       // The view grows with the take, half again each time it fills.
       const span = deck.range[1];
       if (p > span * 0.95) { const next = span * 1.5; deck.setRange([0, next]); strip.strip.fit(0, next); }
-    } else if (L.state === 'looping') {
+    } else if (L.state === 'looping' || L.state === 'overdub') {
       p = (now - L.lapStart) % L.len;
     }
     if (Math.abs(deck.position() - p) > 0.5) deck.seek(Math.min(p, deck.range[1]));
@@ -388,7 +462,7 @@
     sustain: true,
     onSustain: () => { const t = performance.now(); jin('screen', 'cc', SUSTAIN_CC, 127, 1, t); jin('screen', 'cc', SUSTAIN_CC, 0, 1, t); cc(SUSTAIN_CC, 127); cc(SUSTAIN_CC, 0); },
   });
-  function face() { kb.sustain?.set(L.state === 'recording', true); }
+  function face() { kb.sustain?.set(L.state === 'recording' || L.state === 'overdub', true); }
 
   // ── keyboards plugged into this machine ────────────────────────────────
   // As /concepts/synth/000/ (asked: *"where is midi in parchbay in sampler
