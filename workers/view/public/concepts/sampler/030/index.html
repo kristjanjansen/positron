@@ -28,6 +28,17 @@
   // capture, so this page starting the sampler never stops Yoshimi for somebody
   // else, and synth/060 starting Yoshimi never stops this.
   //
+  // RELAY OR DIRECT, ONE PAGE SINCE 2026-10-11 (asked: *"can we combiine 030
+  // and 035 with radiobutton of direct/notdirect mode?"*). 035 was this page
+  // with `createBoard({ direct: true })` and `goDirect()` on play: two WebRTC
+  // data channels to the Pi, signalled through the relay room, `pcm` carrying
+  // the sound back and `ctl` the keys out, the relay kept for presence and as
+  // the fallback (plans/plan-away-webrtc.md, rig/board/rtc.mjs). MEASURED on
+  // /away/, laptop and Pi on one network: round trip 4 ms against ~72 over the
+  // relay, key to speakers ~48 ms against ~175. `?path=direct` opens on direct;
+  // /concepts/sampler/035/ redirects here with it. A change of mode while
+  // playing stops, makes a new board for the new mode and plays again.
+  //
   // NOTHING OPENS ON A VISIT. The board (and so the relay socket) is made on the
   // play press, never at load. A check run sends nothing to the shared board
   // unless ?board=1 is added, the same gate synth/060 and /knobs/ use.
@@ -39,6 +50,7 @@
   import { createMidi } from '/shell/midi.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createPicker } from '/shell/picker.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBoard } from '/shell/board.mjs';
@@ -48,11 +60,15 @@
     // The lag cells under the title and the log alone at the foot, asked
     // 2026-10-11: *"move readout to top of page below title in 030 and 035"*.
     joined: false,
-    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' } });
+    readout: { 'key to sound': 'ms', 'round trip': 'ms', cushion: 'ms', path: '' } });
   conceptNav('sampler/030');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';
+  let mode = q.get('path') === 'direct' ? 'direct' : 'relay';
+  // 10 ms frames on the direct path: at 20 ms /away/ ratcheted its cushion to
+  // 96 ms (plan-away-webrtc.md section 9 P3). ?frame=20 and ?cushion= for measuring.
+  const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
   const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
   /** Program 0 is the piano and 1 the Rhodes, on the board as in 010. */
   const INSTRUMENTS = [{ id: 'piano', name: 'Piano', program: 0 }, { id: 'rhodes', name: 'Rhodes', program: 1 }];
@@ -187,11 +203,10 @@
   const cell = (k, v) => d.set(k, v);
   function lagCells() {
     const st = board?.stats();
-    const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
     cell('key to sound', lastLag == null ? '' : Math.round(lastLag));
-    cell('median', med == null ? '' : Math.round(med));
     cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
     cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+    cell('path', st?.via ?? '');
   }
   function lagFrame() {
     listen();
@@ -250,11 +265,34 @@
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   let opened = null, starting = false, lastStatus = null;
 
+  // 🔴 THE LINKS SAY WHICH WIRE CARRIES THEM, and the patchbay draws that
+  // (asked on 035: *"webrtc shuld be link"*). When the board's path changes,
+  // every link between this page and the Pi is made again with `via`:
+  // `datachannel` while direct (or through TURN), `relay` otherwise. The R2
+  // file links are not the board's wire.
+  let wiredVia = null;
+  function rewire(path) {
+    const via = path === 'direct' || path === 'turn' ? 'datachannel' : 'relay';
+    if (via === wiredVia) return;
+    wiredVia = via;
+    for (const l of bay.links()) {
+      const pi = l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+      if (!pi || l.from.startsWith(`${CF}:`)) continue;
+      bay.unlink(l.id);
+      const r = bay.link(l.from, l.to, l.transforms || [], { via });
+      if (!r.ok) d.log(`${l.from} -> ${l.to} via ${via} refused: ${r.why}`, 'warn');
+    }
+    pb?.refresh?.();
+  }
+
   function makeBoard() {
     let open;
     opened = new Promise((r) => { open = r; });
+    const direct = mode === 'direct'
+      ? { cushionMs: 80, maxCushionMs: 250, direct: true, directCushionMs: Number(q.get('cushion')) || 40 }
+      : { cushionMs: 160, maxCushionMs: 400 };
     board = createBoard({
-      room: ROOM, of: 'Raspberry Pi', showName: false, cushionMs: 160, maxCushionMs: 400,
+      room: ROOM, of: 'Raspberry Pi', showName: false, ...direct,
       log: (line, kind) => d.log(line, kind),
       onOpen: () => open(true),
     });
@@ -275,8 +313,7 @@
         analyser.fftSize = 2048;
         buf = new Float32Array(analyser.fftSize);
         pl.connect(analyser);
-        requestAnimationFrame(frame);
-        requestAnimationFrame(lagFrame);
+        if (!looping) { looping = true; requestAnimationFrame(frame); requestAnimationFrame(lagFrame); }
       }
       if (!MAY_PLAY) { say('A check is running, so nothing was sent to the shared board. Add ?board=1 to let it through', 'warn'); return; }
       let st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
@@ -288,6 +325,16 @@
         const r = await board.ask({ type: 'audio.start', source: 'sampler' }, 'audio.started', 60000);
         if (!r?.ok) { say(`The Pi could not start the sampler${r?.reason ? `, it said ${r.reason}` : ''}`, 'bad'); return; }
       }
+      if (mode === 'direct') {
+        // The direct path before the first note, so the keys never start on
+        // the relay and switch mid phrase. It falls back to the relay after 3 s.
+        say('Opening a direct path to the Pi');
+        const path = await board.goDirect({ frameMs: DIRECT_FRAME_MS });
+        rewire(path);
+        say(path === 'direct' ? 'Direct to the Pi, the relay only carries presence now'
+          : path === 'turn' ? 'Direct to the Pi through a TURN server, so not on one network'
+          : 'No direct path, so the relay carries everything', path === 'relay' ? 'warn' : undefined);
+      } else rewire('relay');
       armed = true;
       board.watchRtt(2000);
       openMidi();
@@ -308,6 +355,24 @@
     say('Stopped, every note of this sampler on the Pi was released');
   }
 
+  // Relay or direct. A change while playing stops, makes a new board for the
+  // new mode (its own socket, cushion and playout) and plays again.
+  let looping = false;
+  async function setMode(m) {
+    if (m === mode) return;
+    mode = m;
+    const u = new URL(location.href);
+    if (m === 'direct') u.searchParams.set('path', 'direct'); else u.searchParams.delete('path');
+    history.replaceState(null, '', u);
+    const was = armed;
+    if (armed) stop();
+    if (board) { board.close(); board = null; analyser = null; buf = null; }
+    d.log(`mode: ${m}`);
+    if (was) await start();
+  }
+  const pathChoice = createChoice({ label: 'path', options: [['relay', 'relay'], ['direct', 'direct']],
+    at: mode === 'direct' ? 1 : 0, onPick: (v) => setMode(v) });
+
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'play', onPress: () => (armed ? stop() : start()) },
   ] });
@@ -324,10 +389,10 @@
     return armed;
   };
   const pb = createPatchbay(bay, { room: ROOM, flowing });
-  setInterval(() => pb.refresh?.(), 500);
+  setInterval(() => { if (board && armed) rewire(board.stats().via); pb.refresh?.(); }, 500);
 
   const top = el('div', 'cc-top');
-  top.append(transport.el);
+  top.append(transport.el, pathChoice.el);
   d.stack.add(top, wave.el, patchPick.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver: the scope's level, the
