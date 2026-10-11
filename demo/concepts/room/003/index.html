@@ -146,7 +146,7 @@
     onJoin: () => {
       since = Date.now();
       node.setGraphs([selfGraph()], [STORE]);
-      join.button('join').disabled = true;
+      join.enable('join', false, `in ${ROOM}`);
       chatBox.enable(true);
       loadHistory();
       decide();
@@ -277,6 +277,11 @@
       field.disabled(!v);
       b.el.disabled = !v;
       ta.placeholder = v ? placeholder : `Join ${ROOM} to write`;
+      // No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*).
+      wrap.hidden = !v;
+      // A box that was hidden measured 0 tall, so it measures again once it
+      // shows (the broadcast box opened squashed to a sliver, 2026-10-11).
+      requestAnimationFrame(grow);
       if (v) ta.focus();
     };
     enable(false);

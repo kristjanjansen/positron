@@ -22,6 +22,8 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
   .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
   .cc-ring::after { content: none; }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
+  .cc-row[hidden] { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -109,10 +111,11 @@
     b.link(KEPT, IN);
     return b;
   }
+  let joined = false;
   const node = createBayNode({
     room: ROOM, graphs: [SELF], local: [STORE], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); },
     onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
@@ -231,6 +234,7 @@
     { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
 
   const row = el('div', 'cc-row');
+  row.hidden = true;
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
   d.stack.add(joinRow, row, lines.el, pb.el);

@@ -28,6 +28,7 @@
              overflow-wrap: anywhere; white-space: pre-wrap; }
   .rc-msg.me .rc-who { color: var(--hi); }
 
+  .rc-compose[hidden] { display: none; }
   .rc-compose { position: relative; padding: 10px 12px 12px; }
   .rc-compose .pos-field { display: block; margin: 0; }
   /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
@@ -77,7 +78,7 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; box.enable(true); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); box.enable(true); pb?.refresh(); },
     onGraph: () => { pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
@@ -140,6 +141,9 @@
       field.disabled(!on);
       b.el.disabled = !on;
       ta.placeholder = on ? `Message ${ROOM}` : `Join ${ROOM} to write`;
+      // No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*).
+      wrap.hidden = !on;
+      requestAnimationFrame(grow);
       if (on) ta.focus();
     };
     enable(false);

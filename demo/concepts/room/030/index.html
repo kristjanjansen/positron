@@ -27,6 +27,8 @@
      [hidden], because .pos-vp sets display and would beat it. */
   .cc-air[hidden] { display: none; }
   .cc-say { margin: 0; color: var(--dim); font-size: 13.5px; }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
+  .cc-row[hidden] { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -203,10 +205,11 @@
     return b;
   }
 
+  let joined = false;
   const node = createBayNode({
     room: ROOM, graphs: [selfGraph()], local: [STORE, STREAM], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; noticeRow.hidden = !admin; clear.button('clear').disabled = false; loadHistory(); text.disabled(false); send.button('send').disabled = false; tell.button('tell').disabled = false; noticeText.disabled(false); air.enable('start', !pub, 'already on air'); drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); if (pub) tellAir(true, false); },
     onMessage: (m) => { if (m.type === 'chat.clear') wipe(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
@@ -293,7 +296,7 @@
   tell.button('tell').disabled = true;
   const noticeRow = el('div', 'cc-row');
   noticeRow.append(noticeText.el, tell.el);
-  noticeRow.hidden = !admin;
+  noticeRow.hidden = !admin || !joined;
 
   // ── the broadcast ──────────────────────────────────────────────────────────
   // One picture, under the tabs. The admin sees its own camera here (nothing
@@ -390,7 +393,7 @@
     if (p) tellAir(false);
     dropCamera();
     air.enable('stop', false, 'not on air');
-    air.enable('start', join.button('join').disabled, 'join the room first');   // Join is off once joined
+    air.enable('start', !join.enabled('join'), 'join the room first');   // Join is off once joined
     showAir(false, 'offline', 'off air');
     if (why) d.log(`off air: ${why}`);
     await p?.stop();
@@ -454,7 +457,7 @@
     at: admin ? 'admin' : 'audience',
     onPick: (id) => {
       admin = id === 'admin';
-      noticeRow.hidden = !admin;
+      noticeRow.hidden = !admin || !joined;
       airRow.hidden = !admin;
       if (!admin && pub) stopBroadcast('left the admin tab');
       if (admin && sub) stopWatching('this tab is the admin now');
@@ -527,6 +530,7 @@
   });
 
   const row = el('div', 'cc-row');
+  row.hidden = true;
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and what it names are one block.
   d.stack.add(roles.el, joinRow);

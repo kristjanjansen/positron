@@ -19,6 +19,8 @@
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
   .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
+  .cc-row[hidden] { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -90,10 +92,11 @@
     b.link('*:chat:value-out', IN);
     return b;
   }
+  let joined = false;
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
     onGraph: () => { pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
@@ -134,6 +137,7 @@
 
 
   const row = el('div', 'cc-row');
+  row.hidden = true;
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
   d.stack.add(join.el, row, lines.el, pb.el);
