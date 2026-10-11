@@ -19,7 +19,6 @@ export const CONCEPTS = [
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'radio/000', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   { n: 'radio/010', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
-  { n: 'radio/020', title: 'Tempo', say: 'Recordings of Raadio 2 and Raadio 4 played from our own bucket into a tempo detector.' },
   { n: 'video/000', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: 'video/010', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },
@@ -47,4 +46,5 @@ export const CONCEPTS = [
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back through the relay beside Yoshimi.' },
   { n: 'sampler/035', title: 'Pi piano direct', say: 'The same Pi piano over a direct WebRTC path instead of the relay.' },
+  { n: 'beats/000', title: 'Tempo', say: 'Recordings of Raadio 2, Raadio 4 and Ida played from our own bucket into a tempo detector.' },
 ];
