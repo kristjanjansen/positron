@@ -102,6 +102,8 @@
   function pressAction(state, t1, releasedAt, now) {
     if (now - releasedAt < SPRING_MS) return 'spring';
     if (state === 'recording') return now - t1 < MIN_LOOP_MS ? 'short' : 'close';
+    if (state === 'looping') return 'overdub';
+    if (state === 'overdub') return 'keep';
     return 'start';
   }
   const PEDALS = new Map([[64, 'sustain'], [66, 'sostenuto'], [67, 'soft']]);
@@ -160,6 +162,8 @@
       s.looper = 'looping';
       return `020 would loop ${((at - s.looperT) / 1000).toFixed(3)} s`;
     }
+    if (act === 'overdub') { s.looper = 'overdub'; return '020 would start overdubbing'; }
+    if (act === 'keep') { s.looper = 'looping'; return '020 would keep the overdub'; }
     s.looper = 'recording'; s.looperT = at;
     return '020 would start recording';
   }
@@ -170,7 +174,7 @@
     // Since plans/plan-looper-accuracy.md section 9, 020 clears on a hold only
     // when no note was played during it. This page does not follow the notes,
     // so it says which way it goes rather than guessing.
-    return `, held ${CLEAR_HOLD_MS / 1000} s or more: 020 clears the loop if no note was played during the hold`;
+    return `, held ${CLEAR_HOLD_MS / 1000} s or more: if no note was played during the hold, 020 removes the newest overdub, or clears a loop of one layer`;
   }
 
   /** Half pedal: the band has held long enough by time `t`. */
