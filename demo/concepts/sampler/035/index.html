@@ -57,6 +57,9 @@
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
   const d = mount({ name: 'concept sampler 035', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The lag cells under the title and the log alone at the foot, asked
+    // 2026-10-11: *"move readout to top of page below title in 030 and 035"*.
+    joined: false,
     readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms', output: 'ms', path: '' } });
   conceptNav('sampler/035');
   // 10 ms frames on the direct path: at 20 ms /away/ ratcheted its cushion to
