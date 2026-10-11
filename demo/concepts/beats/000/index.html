@@ -525,6 +525,32 @@
 
   // ── the recording: fetched once, decoded once, looped ────────────────────
   let bytes = 0;
+  // Every recording brought to one loudness once, as it is decoded (asked
+  // 2026-10-11, *"ida signal is soooo weak"*). MEASURED with ffmpeg's
+  // volumedetect: Raadio 2 -15.5 dB mean and -3.6 peak, Raadio 4 -21.4 and
+  // -8.7, Ida -27.2 and 0.0. Ida is 12 dB under Raadio 2 on average while its
+  // loudest instants already touch full scale, so plain gain would clip. Each
+  // file is raised (never lowered) toward LEVEL_RMS, and anything over KNEE is
+  // bent under 1 with a tanh, which touches only Ida's few loud transients.
+  // The detector hears the levelled sound too.
+  const LEVEL_RMS = 10 ** (-16 / 20), KNEE = 0.8;
+  function level(b, st) {
+    let sum = 0, n = 0;
+    for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < x.length; i += 4) { sum += x[i] * x[i]; n++; } }
+    const rms = Math.sqrt(sum / Math.max(1, n));
+    const g = rms > 0 ? Math.max(1, LEVEL_RMS / rms) : 1;
+    if (g <= 1.01) return;
+    const room = 1 - KNEE;
+    for (let c = 0; c < b.numberOfChannels; c++) {
+      const x = b.getChannelData(c);
+      for (let i = 0; i < x.length; i++) {
+        const v = x[i] * g, a = v < 0 ? -v : v;
+        x[i] = a <= KNEE ? v : Math.sign(v) * (KNEE + room * Math.tanh((a - KNEE) / room));
+      }
+    }
+    d.log(`${st.label} raised ${(20 * Math.log10(g)).toFixed(1)} dB to one loudness with the others`);
+  }
+
   function load() {
     const st = STATIONS[at], url = srcOf(st);
     if (buffers.has(st.id)) { buffer = buffers.get(st.id); return Promise.resolve(buffer); }
@@ -536,6 +562,7 @@
       const ab = await r.arrayBuffer();
       bytes = ab.byteLength;
       const b = await ctx.decodeAudioData(ab);
+      level(b, st);
       buffers.set(st.id, b);
       if (STATIONS[at] === st) buffer = b;
       d.log(`${st.label}: ${(bytes / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s`);
