@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* concepts room/001, THE CHAT AS UI ONLY, 2026-10-11. Asked: *"room 001 is ui
+     only. looks like slide frame or videopanel, contains room name and
+     fullscreen button. inside, there is a ~ 1/3 right sidebar + chat compose
+     window (autogrow, send icon in right bottom corner). below are parts of
+     the chat, listed kit-style"*. Nothing here opens a socket: a sent line
+     lands in this tab only. */
+
+  /* A phone gets a taller stage, set through the panel's own custom property
+     so the panel's full screen rule still wins. */
+  @media (max-width: 560px) { .rc-panel .pos-vp-stage { --vp-aspect: 4 / 5; } }
+
+  /* The chat fills the stage: one surface, two regions, the seam is the
+     ground between them. The sidebar is a third. */
+  .rc { position: absolute; inset: 0; display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 1px; background: var(--line); }
+  .rc > * { min-width: 0; min-height: 0; background: var(--card); }
+  .rc-main { display: flex; flex-direction: column; }
+
+  /* ── messages: newest at the bottom, scrolling inside themselves ── */
+  .rc-msgs { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+             display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; }
+  .rc-msgs > :first-child { margin-top: auto; }
+  .rc-msg { display: flex; flex-direction: column; gap: 3px; }
+  .rc-msg-h { display: flex; gap: 10px; align-items: baseline; }
+  .rc-who { font: 500 12px/1.3 var(--mono); color: var(--fg); }
+  .rc-when { font: 400 11px/1.3 var(--mono); color: var(--dim2); }
+  .rc-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--dim);
+             overflow-wrap: anywhere; white-space: pre-wrap; }
+  .rc-msg.me .rc-who { color: var(--hi); }
+
+  /* ── compose: the kit's field, growing with what is typed, send in its
+     bottom right corner ── */
+  .rc-compose { position: relative; padding: 10px 12px 12px; }
+  .rc-compose .pos-field { display: block; margin: 0; }
+  /* `.pos-field.tall textarea` is (0,2,1), so this matches it and wins on order */
+  .rc-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
+                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
+  .rc-send { position: absolute; right: 18px; bottom: 18px; }
+
+  /* ── the sidebar: who is in the room ── */
+  .rc-side { overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .rc-people { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .rc-person { display: flex; align-items: center; gap: 8px; font: 400 13px/1.3 var(--mono);
+               color: var(--dim); min-width: 0; }
+  .rc-person > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rc-person.me { color: var(--fg); }
+  .rc-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .rc-dot.away { background: none; box-shadow: inset 0 0 0 1px var(--dim2); }
+
+  .rc-room { font: 500 12px/1 var(--mono); color: var(--fg); letter-spacing: .04em; }
+
+  /* ── the parts, each at its own size on a card ── */
+  .rc-part { background: var(--card); border: var(--edge, 1px solid var(--line));
+             border-radius: var(--r, 4px); }
+  .rc-part.pad { padding: 14px 16px; }
+  .rc-part.narrow { max-width: 280px; }
+  .rc-part.msgs { height: 220px; display: flex; flex-direction: column; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
+
+  const d = mount({ name: 'concept room 001', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('room/001');
+
+  const ROOM = 'chat-1';
+  const ME = 'web-8kt';
+  const PEOPLE = [
+    { name: ME, me: true }, { name: 'web-2qm' }, { name: 'web-7zd' }, { name: 'pi-1', away: true },
+  ];
+  const SAMPLE = [
+    { who: 'web-2qm', when: '14:02', text: 'Is the Pi up today?' },
+    { who: 'web-7zd', when: '14:03', text: 'It answered a minute ago. Yoshimi is loaded.' },
+    { who: 'web-2qm', when: '14:05', text: 'Good. Patching the keys to it now.' },
+  ];
+  const clock = () => new Date().toTimeString().slice(0, 5);
+
+  // ── the parts, each a function, so the frame and the list below use the same ones ──
+  function message({ who, when, text }) {
+    const m = el('div', `rc-msg${who === ME ? ' me' : ''}`);
+    const h = el('div', 'rc-msg-h');
+    h.append(el('span', 'rc-who', who), el('span', 'rc-when', when));
+    m.append(h, el('p', 'rc-text', text));
+    return m;
+  }
+
+  function messages(rows) {
+    const box = el('div', 'rc-msgs');
+    for (const r of rows) box.append(message(r));
+    return {
+      el: box,
+      add(r) { box.append(message(r)); box.scrollTop = box.scrollHeight; },
+    };
+  }
+
+  /** The compose box: grows with its text up to six lines, Enter sends,
+      Shift and Enter is a new line, the send icon sits in its bottom right. */
+  function compose(onSend) {
+    const wrap = el('div', 'rc-compose');
+    const field = createField({ rows: 2, placeholder: `Message ${ROOM}` });
+    const ta = field.input;
+    ta.rows = 1;
+    ta.setAttribute('aria-label', `Message ${ROOM}`);
+    const grow = () => {
+      ta.style.height = 'auto';
+      ta.style.height = `${ta.scrollHeight + 2}px`;
+      ta.style.overflowY = ta.scrollHeight > ta.clientHeight + 2 ? 'auto' : 'hidden';
+    };
+    const send = () => {
+      const text = ta.value.trim();
+      if (!text) return;
+      onSend(text);
+      field.set('');
+      grow();
+      ta.focus();
+    };
+    ta.addEventListener('input', grow);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+    });
+    const b = createIconButton({ icon: 'send', label: 'Send', small: true, onPress: send });
+    b.el.classList.add('rc-send');
+    wrap.append(field.el, b.el);
+    requestAnimationFrame(grow);
+    return { el: wrap, input: ta };
+  }
+
+  function people() {
+    const side = el('div', 'rc-side');
+    side.append(el('h3', 'pos-sec-h', 'IN THE ROOM'));
+    const ul = el('ul', 'rc-people');
+    for (const p of PEOPLE) {
+      const li = el('li', `rc-person${p.me ? ' me' : ''}`);
+      li.append(el('span', `rc-dot${p.away ? ' away' : ''}`), el('span', '', p.name));
+      ul.append(li);
+    }
+    side.append(ul);
+    return side;
+  }
+
+  // ── the frame ──────────────────────────────────────────────────────────
+  const list = messages(SAMPLE);
+  const main = el('div', 'rc-main');
+  main.append(list.el, compose((text) => list.add({ who: ME, when: clock(), text })).el);
+  const chat = el('div', 'rc');
+  chat.append(main, people());
+
+  const panel = createVideoPanel({ left: el('span', 'rc-room', ROOM), fullMode: 'footer' });
+  panel.el.classList.add('rc-panel');
+  panel.stage.append(chat);
+  d.stack.add(panel.el);
+
+  // ── the parts, listed ──────────────────────────────────────────────────
+  const msgPart = el('div', 'rc-part pad');
+  msgPart.append(message(SAMPLE[1]));
+  d.stack.titled('MESSAGE', msgPart);
+
+  const msgsPart = el('div', 'rc-part msgs');
+  msgsPart.append(messages(SAMPLE).el);
+  d.stack.titled('MESSAGES', msgsPart);
+
+  const composePart = el('div', 'rc-part');
+  composePart.append(compose((text) => d.log(`send: ${text}`)).el);
+  d.stack.titled('COMPOSE', composePart);
+
+  const sidePart = el('div', 'rc-part narrow');
+  sidePart.append(people());
+  d.stack.titled('SIDEBAR', sidePart);
+
+  d.ready();
+</script>
