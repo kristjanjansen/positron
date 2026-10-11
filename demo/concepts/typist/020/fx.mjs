@@ -55,7 +55,7 @@ function curve({ drive, bits }) {
  */
 export function chain(c, ch, seed = 1) {
   // Machine 0 is the recording as it is: no filter, no drive, no room.
-  if (ch.n === 0) { const g = c.createGain(); return { input: g, output: g }; }
+  if (ch.n === 0 || ch.amt === 0) { const g = c.createGain(); return { input: g, output: g }; }
   const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = ch.hp; hp.Q.value = 0.7;
   const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = ch.lp; lp.Q.value = 0.7;
   const sh = c.createBiquadFilter(); sh.type = 'lowshelf'; sh.frequency.value = ch.shelf.f; sh.gain.value = ch.shelf.g;
@@ -95,35 +95,67 @@ const ALPHA = [(Math.sqrt(5) - 1) / 2, Math.SQRT2 - 1, Math.sqrt(5) - 2, Math.sq
 // original (no paramter to fx)"*, *"or disabed / enabled signal you choose"*):
 // the index stays the one signal, and 0 means the fx box passes the sound
 // through untouched, every key at its recorded pitch. 1 and up are generated.
-const ORIGINAL = { n: 0, name: 'Machine 0', rate: { key: 1, space: 1, return: 1, bell: 1, del: 1 }, level: 1 };
+const ORIGINAL = { n: 0, name: 'Machine 0', amt: 0, rate: { key: 1, space: 1, return: 1, bell: 1, del: 1 }, level: 1, room: { ms: 0, wet: 0 } };
 
-export function character(n) {
+/**
+ * 🔴 DISTINCT, 0 TO 1: HOW FAR A MACHINE IS FROM THE ORIGINAL (asked 2026-10-11,
+ * *"2 and 8 sounds too extreme. make it more closer to original in general.
+ * distictivness as sepaate knob"*). Every parameter is drawn as before for the
+ * index, then blended toward the original by `amt`: pitch in log steps toward
+ * 1, the filters toward wide open, shelf, peak, drive and room toward none,
+ * the grit toward 16 bits. 0 is the original for every index, 1 the full
+ * machine. DISTINCT is the default.
+ */
+export const DISTINCT = 0.35;
+
+export function character(n, amt = DISTINCT) {
   n = Math.max(0, Math.floor(n) || 0);
   if (n === 0) return ORIGINAL;
+  const full = machine(n);
+  const a = Math.max(0, Math.min(1, Number(amt)));
+  const rd = (x, k = 100) => Math.round(x * k) / k;
+  const toward = (x, from) => from * (x / from) ** a;           // log blend
+  const rate = {};
+  for (const [k, v] of Object.entries(full.rate)) rate[k] = rd(v ** a);
+  const shelf = { f: full.shelf.f, g: rd(full.shelf.g * a, 10) };
+  const peak = { f: full.peak.f, g: rd(full.peak.g * a, 10), q: full.peak.q };
+  const drive = rd(full.drive * a, 10);
+  const bits = full.bits ? Math.round(16 - (16 - full.bits) * a) : 0;
+  const room = { ...full.room, wet: rd(full.room.wet * a) };
+  const level = rd(1 / (1 + 0.05 * Math.max(0, shelf.g) + 0.05 * peak.g + 0.06 * drive + (bits && bits < 12 ? 0.1 : 0)));
+  return { ...full, amt: a, rate, hp: Math.round(toward(full.hp, 20)), lp: Math.round(Math.min(toward(full.lp, 20000), 20000)),
+           shelf, peak, drive, bits: bits >= 16 ? 0 : bits, room, level };
+}
+
+/** The full machine for an index, before DISTINCT. */
+function machine(n) {
   const r = mulberry32(Math.imul(n, 2654435761) ^ 0x7e57c0de);
   const at = (k) => { const v = (0.5 + n * ALPHA[k] + (r() - 0.5) * 0.06) % 1; return v < 0 ? v + 1 : v; };
   const lin = (a, b, u = r()) => a + (b - a) * u;
   const log = (a, b, u = r()) => a * (b / a) ** u;
   const rd = (x, k = 100) => Math.round(x * k) / k;
-  const key = log(0.66, 1.75, at(0));
-  // The filters move with the pitch: a sample played faster carries its body
-  // higher, and a fixed low pass would take most of a fast machine away
-  // (MEASURED: index 7 at rate 1.49 behind a 3.4 kHz low pass came out 20 dB
-  // under the rest).
-  const hp = log(40, 900, at(1)) * key;
-  const lp = Math.max(hp * 4, log(3000, 12000, at(2)) * key);
-  const peak = { f: Math.round(log(250, 4500, at(3))), g: rd(lin(1, 7, at(4)), 10), q: rd(lin(0.8, 2.5)) };
-  const shelf = { f: Math.round(lin(120, 260)), g: rd(lin(-2, 7, at(5)), 10) };
-  const ms = Math.round(log(30, 260, at(6)));
-  const drive = r() < 0.5 ? 0 : rd(lin(1, 4), 10);
-  const bits = r() < 0.2 ? Math.round(lin(5, 7)) : 0;
-  const room = { ms, decay: rd((ms / 1000) * lin(0.15, 0.35), 1000), wet: rd(lin(0.06, 0.3)),
-                 comb: r() < 0.4 ? rd(lin(0.9, 5), 10) : 0 };
+  // 🔴 NARROWER RANGES SINCE 2026-10-11, NOTHING METALLIC OR THIN. Asked:
+  // *"2 is reall metally, do not like"*, *"4 is metally and htin too"*, *"do not
+  // like those"*. At full distinctness 2 had a +5.9 dB peak at 3.7 kHz, Q 2,
+  // with drive, and 4 played 1.74 times fast through a 3.4 ms comb. So: pitch
+  // 0.8 to 1.15 (faster reads as thin and toy), the peak only in the body,
+  // 150 to 1500 Hz, gentle and broad, no comb, no bit grit, a light drive on a
+  // third of them, a low pass that only darkens, a small quiet room. Machines
+  // differ in pitch, body, warmth and room.
+  const key = log(0.8, 1.15, at(0));
+  const hp = log(30, 220, at(1));
+  const lp = log(5000, 16000, at(2));
+  const peak = { f: Math.round(log(150, 1500, at(3))), g: rd(lin(0, 4, at(4)), 10), q: rd(lin(0.7, 1.2)) };
+  const shelf = { f: Math.round(lin(120, 260)), g: rd(lin(-2, 5, at(5)), 10) };
+  const ms = Math.round(log(30, 160, at(6)));
+  const drive = r() < 0.33 ? rd(lin(1, 1.6), 10) : 0;
+  const bits = 0;
+  const room = { ms, decay: rd((ms / 1000) * lin(0.15, 0.3), 1000), wet: rd(lin(0.05, 0.2)), comb: 0 };
   const level = rd(1 / (1 + 0.05 * Math.max(0, shelf.g) + 0.05 * peak.g + 0.06 * drive + (bits ? 0.1 : 0)));
   return { n, name: nameOf(n),
-    rate: { key: rd(key), space: rd(key * lin(0.85, 1.12)), return: rd(key * lin(0.9, 1.1)),
-            bell: rd(log(0.85, 1.3)), del: rd(key * lin(0.75, 0.85)) },
-    hp: Math.round(hp), lp: Math.round(Math.min(lp, 16000)), shelf, peak, drive, bits, room, level };
+    rate: { key: rd(key), space: rd(key * lin(0.9, 1.06)), return: rd(key * lin(0.92, 1.05)),
+            bell: rd(log(0.9, 1.15)), del: rd(key * lin(0.8, 0.88)) },
+    hp: Math.round(hp), lp: Math.round(lp), shelf, peak, drive, bits, room, level };
 }
 
 /** Every index is named by its number (asked: *"all machine n's"*). */
@@ -138,12 +170,12 @@ export const nameOf = (n) => `Machine ${n}`;
 export function createFx(c, at = 1, trim = async () => 1) {
   const input = c.createGain(), output = c.createGain();
   let cur = null, asked = 0;
-  async function set(n) {
-    if (cur && cur.n === n) return;
+  async function set(n, amt = cur?.amt ?? DISTINCT) {
+    if (cur && cur.n === n && cur.amt === amt) return;
     const mine = ++asked;
-    const k = await trim(n);
+    const k = await trim(n, amt);
     if (mine !== asked) return;   // a newer index arrived while this one was being measured
-    const t = c.currentTime, ch = character(n);
+    const t = c.currentTime, ch = character(n, amt);
     const p = chain(c, ch, n);
     const fade = c.createGain();
     fade.gain.setValueAtTime(0, t);
@@ -159,11 +191,11 @@ export function createFx(c, at = 1, trim = async () => 1) {
       setTimeout(() => { try { input.disconnect(old.p.input); old.fade.disconnect(); } catch { /* gone */ } live--; }, FADE * 1000 * 4);
     }
     live++;
-    cur = { n, p, fade, ch, trim: k };
+    cur = { n, amt, p, fade, ch, trim: k };
   }
   let live = 0;
   const ready = set(at);
-  return { input, output, set, ready, get index() { return cur?.n; }, get character() { return cur?.ch; }, get trim() { return cur?.trim; }, get live() { return live; } };
+  return { input, output, set, ready, get index() { return cur?.n; }, get amt() { return cur?.amt; }, get character() { return cur?.ch; }, get trim() { return cur?.trim; }, get live() { return live; } };
 }
 
 /** Peak, RMS and the spectral centroid of a rendered strike, Hann frames of 2048. */
@@ -207,8 +239,8 @@ function fft(re, im) {
 }
 
 /** Render one sample through one character, offline: the same chain, the same rate the sampler would use, times `trim`. */
-export async function render(buffer, n, kind = 'key', trim = 1) {
-  const ch = character(n), rate = ch.rate[kind] ?? 1, sr = buffer.sampleRate;
+export async function render(buffer, n, kind = 'key', trim = 1, amt = DISTINCT) {
+  const ch = character(n, amt), rate = ch.rate[kind] ?? 1, sr = buffer.sampleRate;
   const len = Math.ceil((buffer.duration / rate + ch.room.ms / 1000 + 0.05) * sr);
   const c = new OfflineAudioContext(1, len, sr);
   const src = c.createBufferSource(); src.buffer = buffer; src.playbackRate.value = rate;
@@ -225,13 +257,18 @@ export async function render(buffer, n, kind = 'key', trim = 1) {
  * typewriter but not equally loud: MEASURED before this, one strike through
  * indexes 1 to 12 ranged from 0.0064 to 0.047 RMS, 17 dB, and the quiet ones
  * read as broken. So each index is measured once, offline, on a letter
- * strike, and given the gain that brings it to TARGET, within 0.5 to 4.
+ * strike, and given the gain that brings it to the original strike's loudness, within 0.5 to 4.
  * Cached per index, so a switch back costs nothing.
  */
-export const TARGET = 0.025;
+// Every machine is trimmed to the loudness of the ORIGINAL strike, so
+// stepping from Machine 0 to any other changes the sound and not the level.
 const trims = new Map();
-export function trimFor(buffer, n) {
-  if (n === 0) return Promise.resolve(1);
-  if (!trims.has(n)) trims.set(n, render(buffer, n, 'key').then((r) => Math.min(4, Math.max(0.5, TARGET / (r.rms || TARGET)))));
-  return trims.get(n);
+let originalRms = null;
+export function trimFor(buffer, n, amt = DISTINCT) {
+  if (n === 0 || amt === 0) return Promise.resolve(1);
+  originalRms ??= render(buffer, 0, 'key').then((r) => r.rms || 0.025);
+  const key = `${n} ${amt}`;
+  if (!trims.has(key)) trims.set(key, Promise.all([originalRms, render(buffer, n, 'key', 1, amt)])
+    .then(([t, r]) => Math.min(4, Math.max(0.5, t / (r.rms || t)))));
+  return trims.get(key);
 }

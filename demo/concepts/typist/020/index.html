@@ -78,7 +78,9 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { createStepper } from '/shell/stepper.mjs';
-  import { createFx, character, nameOf, render, trimFor, FADE } from './fx.mjs';
+  import { createFx, character, nameOf, render, trimFor, FADE, DISTINCT } from './fx.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
 
   const d = mount({ name: 'concept typist 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('typist/020');
@@ -156,7 +158,7 @@
     })).then(() => { stat.ms = Math.round(performance.now() - t0); fetchedAt = performance.now(); });
     // The fx box, at whatever index has arrived so far, each machine trimmed
     // to one loudness once the samples are here to measure it with.
-    fx = createFx(ctx, fxIndex, (n) => fetched.then(() => trimFor(buf.get('key-1'), n)).catch(() => 1));
+    fx = createFx(ctx, fxIndex, (n, a) => fetched.then(() => trimFor(buf.get('key-1'), n, a)).catch(() => 1));
     route();
     // Ready means the samples are decoded AND the first machine is built, so
     // the first strike is not played into an fx box with nothing in it.
@@ -232,17 +234,30 @@
   bay.addNode({ id: `${CF}:typewriter`, kind: 'store', label: 'samples', place: 'cloudflare', net: 'cloudflare' });
 
   // The index as it ARRIVES, at each end. Nothing sets these but a delivery.
-  let fxIndex = 0, tuning = character(0), pb = null;
+  let fxIndex = 0, fxAmt = DISTINCT, twIndex = 0, twAmt = DISTINCT, tuning = character(0), pb = null;
   const arrivals = [];
   const deliverIndex = (where) => (e, l) => {
     const n = Math.floor(e?.n);
     if (e?.of !== 'index' || !Number.isFinite(n) || n < 0) { d.log(`${where} takes an index, and this was not one`, 'warn'); return; }
     arrivals.push({ at: where, n, link: `${l.from} -> ${l.to}`, t: Math.round(performance.now()) });
     if (arrivals.length > 50) arrivals.shift();
-    if (where === 'fx') { fxIndex = n; fx?.set(n); pb?.refresh(); }
-    else tuning = character(n);
+    if (where === 'fx') { fxIndex = n; fx?.set(n, fxAmt); pb?.refresh(); }
+    else { twIndex = n; tuning = character(n, twAmt); }
   };
 
+  // DISTINCT, how far from the original, arrives on its own input at each end
+  // (asked 2026-10-11, *"distictivness as sepaate knob"*), 0 to 1.
+  const deliverAmt = (where) => (e) => {
+    const a = Number(e?.v);
+    if (!Number.isFinite(a)) return;
+    const v = Math.max(0, Math.min(1, a));
+    if (where === 'fx') { fxAmt = v; fx?.set(fxIndex, v); }
+    else { twAmt = v; tuning = character(twIndex, v); }
+  };
+  bay.addNode({ id: `${S}:knob-distinct`, kind: 'person', label: 'distinct', place: 'browser' });
+  bay.addPort({ id: `${S}:knob-distinct:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+  bay.addPort({ id: `${S}:fx:value-in-2`, dir: 'in', medium: 'value', shape: { of: 'param' }, deliver: deliverAmt('fx') });
+  bay.addPort({ id: `${S}:typewriter:value-in-3`, dir: 'in', medium: 'value', shape: { of: 'param' }, deliver: deliverAmt('typewriter') });
   bay.addPort({ id: `${S}:keys:value-out`, dir: 'out', medium: 'value', shape: { of: 'text' } });
   bay.addPort({ id: `${S}:paper:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
   bay.addPort({ id: `${S}:typewriter:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
@@ -263,6 +278,8 @@
     [`${S}:fx:audio-out`, `${S}:speaker:audio-in`],
     [`${S}:pick:value-out`, `${S}:fx:value-in`],
     [`${S}:pick:value-out`, `${S}:typewriter:value-in-2`],
+    [`${S}:knob-distinct:value-out`, `${S}:fx:value-in-2`],
+    [`${S}:knob-distinct:value-out`, `${S}:typewriter:value-in-3`],
   ]) {
     const r = bay.link(a, b, [], { site: S });
     if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
@@ -301,7 +318,7 @@
   // sample sounds, plus the fx box's room.
   const flowing = (l, medium) => {
     if (medium === 'file') return !!loading && (stat.decoded < FILES.length || performance.now() - fetchedAt < 600);
-    if (medium === 'audio') return !!ctx && !muted && ctx.currentTime < until + (l.from.startsWith(`${S}:fx`) ? character(fxIndex).room.ms / 1000 : 0);
+    if (medium === 'audio') return !!ctx && !muted && ctx.currentTime < until + (l.from.startsWith(`${S}:fx`) ? (character(fxIndex, fxAmt).room?.ms || 0) / 1000 : 0);
     return false;
   };
 
@@ -346,12 +363,20 @@
   const step = createStepper({ what: 'machine', prev: () => pick(pickN - 1), next: () => pick(pickN + 1),
     pick: { options: [], onPick: (i) => pick(i) } });
 
+  // The distinct knob, its own node: 0 is the original for every machine, 1 the
+  // full machine. A turn rebuilds the fx chain, so turns are gathered for 60 ms.
+  let amtTimer = 0;
+  const knob = createKnob({ label: 'distinct', min: 0, max: 100, step: 1, value: Math.round(DISTINCT * 100), home: Math.round(DISTINCT * 100), hand: true,
+    onInput: (v) => { clearTimeout(amtTimer); amtTimer = setTimeout(() => bay.send(`${S}:knob-distinct:value-out`, { of: 'param', v: v / 100 }), 60); },
+    onChange: (v) => { clearTimeout(amtTimer); bay.send(`${S}:knob-distinct:value-out`, { of: 'param', v: v / 100 }); keys.focus({ preventScroll: true }); } });
+  const knobs = createKnobGrid(new Map([['distinct', knob]]), { row: true });
+
   const panel = createVideoPanel({ left: mute.el, centre: step.el, fullMode: 'footer' });
   panel.el.classList.add('tp-panel');
   panel.stage.append(sheet);
   // The fx box says which machine it is, from what last arrived at it.
   pb = createPatchbay(bay, { detail: (n) => [{ text: n.id === `${S}:fx` ? nameOf(fxIndex) : n.label, sans: true }], flowing });
-  d.stack.add(panel.el, pb.el);
+  d.stack.add(panel.el, knobs.el, pb.el);
   pick(0, false);
   draw();
   keys.focus({ preventScroll: true });
@@ -371,11 +396,11 @@
     get tuning() { return { n: tuning.n, ...tuning.rate }; },
     get arrivals() { return arrivals.map((a) => ({ ...a })); },
     get routed() { return [...routed]; },
-    character: (n) => JSON.parse(JSON.stringify(character(n))),
+    character: (n, a = fxAmt) => JSON.parse(JSON.stringify(character(n, a))),
     fade: FADE,
     render: async (n, name = 'key-1', trimmed = true) => {
       if (!buf.get(name)) throw new Error('not loaded yet');
-      return render(buf.get(name), n, KIND(name), trimmed ? await trimFor(buf.get('key-1'), n) : 1);
+      return render(buf.get(name), n, KIND(name), trimmed ? await trimFor(buf.get('key-1'), n, fxAmt) : 1, fxAmt);
     },
   };
 
