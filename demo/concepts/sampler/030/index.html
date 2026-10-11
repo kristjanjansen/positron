@@ -48,7 +48,7 @@
     // The lag cells under the title and the log alone at the foot, asked
     // 2026-10-11: *"move readout to top of page below title in 030 and 035"*.
     joined: false,
-    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms', output: 'ms', path: '' } });
+    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' } });
   conceptNav('sampler/030');
 
   const q = new URLSearchParams(location.search);
@@ -182,15 +182,16 @@
     while (env.length && env[0].at < now - KEEP_MS) env.shift();
     for (let k = pending.length - 1; k >= 0; k--) if (now - pending[k].at > WAIT_MS) pending.splice(k, 1);
   }
+  // Four cells, asked 2026-10-11: *"reduce readouts 30 35 to 4 items. keep
+  // relevant ones"*.
+  const cell = (k, v) => d.set(k, v);
   function lagCells() {
-    const st = board?.stats(), ctx = board?.ctx();
+    const st = board?.stats();
     const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
-    d.set('key to sound', lastLag == null ? '' : Math.round(lastLag));
-    d.set('median', med == null ? '' : Math.round(med));
-    d.set('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
-    d.set('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
-    d.set('output', ctx ? Math.round(((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000) : '');
-    d.set('path', st?.via ?? '');
+    cell('key to sound', lastLag == null ? '' : Math.round(lastLag));
+    cell('median', med == null ? '' : Math.round(med));
+    cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
   }
   function lagFrame() {
     listen();

@@ -60,7 +60,7 @@
     // The lag cells under the title and the log alone at the foot, asked
     // 2026-10-11: *"move readout to top of page below title in 030 and 035"*.
     joined: false,
-    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms', output: 'ms', path: '' } });
+    readout: { 'key to sound': 'ms', 'round trip': 'ms', cushion: 'ms', path: '' } });
   conceptNav('sampler/035');
   // 10 ms frames on the direct path: at 20 ms /away/ ratcheted its cushion to
   // 96 ms (plan-away-webrtc.md §9 P3). ?frame=20 and ?cushion= for measuring.
@@ -124,6 +124,26 @@
   for (const [from, to] of LINKS) {
     const r = bay.link(from, to);
     if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');
+  }
+  // 🔴 THE LINKS SAY WHICH WIRE CARRIES THEM, and the patchbay draws that.
+  // Asked 2026-10-11: *"webrtc shuld be link"*, after this page's patchbay drew
+  // the relay box under keys and sound the data channel was carrying. When the
+  // board's path changes, every link between this page and the Pi's sampler is
+  // made again with `via`: `datachannel` while direct (or through TURN), and
+  // `relay` when it falls back. The R2 file links are not the board's wire.
+  let wiredVia = null;
+  function rewire(path) {
+    const via = path === 'direct' || path === 'turn' ? 'datachannel' : 'relay';
+    if (via === wiredVia) return;
+    wiredVia = via;
+    for (const l of bay.links()) {
+      const pi = l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+      if (!pi || l.from.startsWith(`${CF}:`)) continue;
+      bay.unlink(l.id);
+      const r = bay.link(l.from, l.to, l.transforms || [], { via });
+      if (!r.ok) d.log(`${l.from} -> ${l.to} via ${via} refused: ${r.why}`, 'warn');
+    }
+    pb?.refresh?.();
   }
 
   // ── the scope: an analyser on the board's playout, drawn full width ──────
@@ -197,15 +217,15 @@
     while (env.length && env[0].at < now - KEEP_MS) env.shift();
     for (let k = pending.length - 1; k >= 0; k--) if (now - pending[k].at > WAIT_MS) pending.splice(k, 1);
   }
+  // Four cells, asked 2026-10-11: *"reduce readouts 30 35 to 4 items. keep
+  // relevant ones"*.
+  const cell = (k, v) => d.set(k, v);
   function lagCells() {
-    const st = board?.stats(), ctx = board?.ctx();
-    const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
-    d.set('key to sound', lastLag == null ? '' : Math.round(lastLag));
-    d.set('median', med == null ? '' : Math.round(med));
-    d.set('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
-    d.set('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
-    d.set('output', ctx ? Math.round(((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000) : '');
-    d.set('path', st?.via ?? '');
+    const st = board?.stats();
+    cell('key to sound', lastLag == null ? '' : Math.round(lastLag));
+    cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+    cell('path', st?.via ?? '');
   }
   function lagFrame() {
     listen();
@@ -307,6 +327,7 @@
       // relay and switch mid phrase. It falls back to the relay after 3 s.
       say('Opening a direct path to the Pi');
       const path = await board.goDirect({ frameMs: DIRECT_FRAME_MS });
+      rewire(path);
       say(path === 'direct' ? 'Direct to the Pi, the relay only carries presence now'
         : path === 'turn' ? 'Direct to the Pi through a TURN server, so not on one network'
         : 'No direct path, so the relay carries everything as in 030', path === 'relay' ? 'warn' : undefined);
@@ -346,7 +367,7 @@
     return armed;
   };
   const pb = createPatchbay(bay, { room: ROOM, flowing });
-  setInterval(() => pb.refresh?.(), 500);
+  setInterval(() => { if (board && armed) rewire(board.stats().via); pb.refresh?.(); }, 500);
 
   const top = el('div', 'cc-top');
   top.append(transport.el);

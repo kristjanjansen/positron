@@ -153,6 +153,8 @@ export const TRANSPORT_NAMES = [...new Set([...Object.values(TRANSPORTS), READS]
    graph, which is decided by the ports in `sessionFor` and not by a cell. */
 /** The transports that never leave one machine, so `via` cannot ask for them across a wire. */
 export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb', 'jack'];
+/** What a light link between two sites may name as its wire: the relay room, or a board's direct WebRTC channel. */
+export const LIGHT_VIA = ['relay', 'datachannel'];
 
 /**
  * Which transport a heavy link rides, from plan §5's table.
@@ -1183,7 +1185,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     const ses = sessionFor(a, b, opts);
     if (ses.refuse) return { ok: false, ...ses.refuse };
     return { ok: true, why: '', ...(warns.length ? { warn: warns.join('. ') } : {}),
-             session: ses.session };
+             session: ses.session, ...(ses.via ? { via: ses.via } : {}) };
   }
 
   /**
@@ -1313,6 +1315,15 @@ export function createBay({ now = () => Date.now() } = {}) {
     const via = typeof opts?.via === 'string' && opts.via ? opts.via : null;
     if (!HEAVY.includes(a.medium)) {
       if (!via) return { session: null };
+      /* 🔴 A LIGHT LINK BETWEEN TWO SITES MAY SAY WHICH WIRE CARRIES IT, SINCE
+         2026-10-11. Its bytes are inside the link, but between two machines
+         they still ride something: the relay room, or a WebRTC data channel
+         once a board's direct path is open (/concepts/sampler/035/). Asked:
+         *"webrtc shuld be link"*, after the patchbay drew a relay box under a
+         path the relay was not carrying. Only those two, only across sites,
+         and the page that opened the path says so, so the drawing reads the
+         wire rather than guessing it. */
+      if (LIGHT_VIA.includes(via) && siteOf(a) !== siteOf(b)) return { session: null, via };
       return { refuse: { why: `${a.label} carries ${a.medium}, which travels inside the link itself, so there is no transport to ask for.`,
                          fix: `Make the link without via ${via}.` } };
     }
@@ -1455,7 +1466,7 @@ export function createBay({ now = () => Date.now() } = {}) {
     if (!v.ok) return { ok: false, why: v.why, fix: v.fix || '' };
     const id = `L${nextLink++}`;
     links.set(id, { id, from: fromId, to: toId, transforms, enabled: true, sent: 0, dropped: 0,
-                    session: v.session, ...(v.session?.via ? { via: v.session.via } : {}),
+                    session: v.session, ...(v.session?.via || v.via ? { via: v.session?.via || v.via } : {}),
                     ...(opts.options && Object.keys(opts.options).length ? { options: { ...opts.options } } : {}) });
     return { ok: true, id, why: '', warn: v.warn, session: v.session, ...(v.matches ? { matches: v.matches } : {}) };
   }
