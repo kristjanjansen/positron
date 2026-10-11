@@ -10,9 +10,6 @@
 <style>
   .cc-stack { display: flex; flex-direction: column; gap: 12px; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  /* The filter and the buttons are a cluster: each its own width, one gap
-     between them and between lines when a phone wraps them. */
-  .cc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 </style>
 <script type="module">
   // concepts sampler/015, SUSTAIN, 2026-10-11. A page for seeing what a sustain
@@ -54,7 +51,7 @@
   //            switch (first value 0 or 127), 64 or above is normal and below
   //            is inverted. For a continuous pedal the first value is a small
   //            step off rest, so the direction of its first change decides:
-  //            rising is normal, falling inverted. Clear, then one press, asks
+  //            rising is normal, falling inverted. A reload, then one press, asks
   //            again. An inverted pedal makes 020's looper fire on the
   //            RELEASE, which the log says once.
   //            /shell/pedal.mjs records why it happens on this desk: the
@@ -80,15 +77,12 @@
   import { createBay, classOf, CLASSES } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createTable } from '/shell/table.mjs';
-  import { createChoice } from '/shell/choice.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { registerRenderer } from '/timeline/strip.mjs';
   import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
-  import { createWaveShape } from '/shell/synth-view.mjs';
 
   const d = mount({
     name: 'concept sampler 015', what: '', index: '/concepts/', indexLabel: 'concepts',
@@ -245,7 +239,7 @@
     // script: a normal switch held for a second at a time read `unsure`, and so
     // did an inverted one, because somebody debugging a looper holds the pedal
     // as long as they leave it. The first message is the one fact that does
-    // not depend on how the pedal is used; Clear, then one press, asks again.
+    // not depend on how the pedal is used; A reload, then one press, asks again.
     return byFirst;
   }
   function guessWarn(s) {
@@ -307,9 +301,9 @@
   }
 
   // ── the tables ─────────────────────────────────────────────────────────
-  let filter = 'controls';
-  const shows = (r) => filter === 'all'
-    || (filter === 'pedals' ? PEDALS.has(r.cc) : r.note === null);
+  // Every message is shown, notes too. Asked 2026-10-11: *"show alwats
+  // everything"*; the pedals and no-notes filter is gone.
+  const shows = () => true;
   const cells = (r) => ({ at: fmt(r.at), port: r.port, hex: r.hex, ch: r.ch, reading: r.reading,
                           gap: r.gap === null ? '' : `+${r.gap.toFixed(1)}` });
   const msgT = createTable({
@@ -334,16 +328,8 @@
     ],
     cap: 1000, stick: true, minRows: 6,
   });
-  function refill() { msgT.set(M.msgs.filter(shows).slice(-1000).map(cells)); }
 
-  const show = createChoice({
-    label: 'show',
-    options: [['pedals', 'pedals'], ['no notes', 'controls'], ['everything', 'all']],
-    at: 1,
-    onPick: (v) => { filter = v; refill(); },
-  });
-
-  /** The whole log as text, every message whatever the filter shows. */
+  /** The whole log as text, for a check or the console: `copy(__demo.pedal.text())`. */
   function text() {
     const out = [`positron sampler/015, ${new Date().toISOString()}`, ''];
     for (const s of M.src.values()) {
@@ -357,34 +343,17 @@
     for (const g of M.gestures) out.push([fmt(g.at), g.port, g.kind, g.detail].join('\t'));
     return out.join('\n');
   }
-  async function copy() {
-    const t = text();
-    try { await navigator.clipboard.writeText(t); }
-    catch {
-      const ta = el('textarea'); ta.value = t; document.body.append(ta); ta.select();
-      try { document.execCommand('copy'); } finally { ta.remove(); }
-    }
-    d.log(`copied ${M.msgs.length} messages and ${M.gestures.length} gestures`);
-  }
   function clearAll() {
     M.msgs = []; M.gestures = []; M.floods = 0; M.seq = 0;
     M.lastAt.clear(); M.src.clear(); M.last = null; M.oddPedal.clear();
     msgT.set([]); gestT.set([]); face(); strip.strip.invalidate();
   }
 
-  const btns = createButtonGroup({
-    buttons: [
-      { id: 'follow', label: 'Follow', onPress: () => strip.strip.setFollow(true) },
-      { id: 'clear', label: 'Clear', onPress: clearAll },
-      { id: 'copy', label: 'Copy log', onPress: copy },
-    ],
-  });
-
   // ── the timeline: the raw value, and the gestures ───────────────────────
   // The strip's time is performance time in ms, the same clock as a MIDI
   // message's `timeStamp`. The deck plays nothing; it holds the range and a
   // playhead that is always now.
-  const VIEW_MS = 4000;   // the scope's window, so the two pictures span the same time
+  const VIEW_MS = 4000;   // the strip's window when it follows
   let range = 60000;
   const deck = createDeck({ items: [], range: [0, range],
     adapters: { note: { caps: { rates: [1], continuous: false }, actuate() {}, reduce() { return {}; }, assertState() { return {}; } } } });
@@ -446,49 +415,17 @@
     ],
   });
   const surface = createGlue(bar.el, strip.surface);
-  // ── the scope: the pedal's value, live, full width ─────────────────────
-  // Asked 2026-10-11: *"can youse your scope viz for sustain debugger"*. The
-  // kit's scope from the synth pages, fed CC 64 instead of a sound: the last
-  // SCOPE_MS of the port that last spoke on CC 64, 0 at the bottom and 127 at
-  // the top. The scope's middle line is 63.5, which is exactly 020's
-  // threshold: 63 is under it and 64 is on or over it. The value is held from
-  // one message to the next, so a switch draws steps and a continuous pedal a
-  // ramp. The second trace is what 020 hears, the same messages read as down
-  // or up only, so a bounce or a pedal hovering on 64 shows as the two lines
-  // parting. A scope of the sampler's sound is not drawn: sampler.mjs keeps its
-  // output node to itself, and reaching it from here would be a page-local
-  // patch on a shared module.
-  const SCOPE_MS = VIEW_MS, SCOPE_N = 800;
-  const scope = createWaveShape({ reason: null, height: 160, name: 'CC 64', colour: '#6fb8e8',
-    axes: { y: '127', x: `${SCOPE_MS / 1000} s` } });
-  const toY = (v) => (v / 127) * 2 - 1;
-  function drawScope(now) {
-    const s = M.last ? M.src.get(M.last) : null;
-    if (!s) { scope.set({ points: null, over: null, name: 'CC 64' }); return; }
-    const rows = M.msgs.filter((r) => r.cc === SUSTAIN_CC && r.port === s.port);
-    const t0 = now - SCOPE_MS;
-    let k = 0, v = 0;
-    while (k < rows.length && rows[k].at <= t0) { v = rows[k].value; k++; }
-    const pts = new Array(SCOPE_N), bin = new Array(SCOPE_N);
-    for (let i = 0; i < SCOPE_N; i++) {
-      const t = t0 + ((i + 1) / SCOPE_N) * SCOPE_MS;
-      // Every message inside this column is seen, so a bounce shorter than a
-      // column still flips the second trace: the column shows its extreme.
-      let lo = v, hi = v;
-      while (k < rows.length && rows[k].at <= t) { v = rows[k].value; lo = Math.min(lo, v); hi = Math.max(hi, v); k++; }
-      pts[i] = toY(v);
-      bin[i] = (lo < PEDAL_ON && hi >= PEDAL_ON ? (i % 2 ? 1 : -1) : v >= PEDAL_ON ? 1 : -1) * 0.82;
-    }
-    scope.set({ points: pts, name: `CC 64 = ${v}, ${s.port}`,
-      over: { points: bin, name: `020 reads ${v >= PEDAL_ON ? 'down' : 'up'}`, colour: '--dim' } });
-  }
-
+  const RESUME_MS = 3000;
+  let touchedAt = 0;
+  for (const ev of ['pointerdown', 'pointermove', 'wheel']) strip.surface.addEventListener(ev, () => { touchedAt = performance.now(); }, { passive: true });
   function tick() {
     const now = performance.now();
-    drawScope(now);
     if (now > range - 5000) { range = now + 60000; deck.setRange([0, range]); }
     if (Math.abs(deck.position() - now) > 0.5) deck.seek(now);
+    // With the Follow button gone, a strip scrolled back by hand comes back to
+    // now on its own after RESUME_MS without a touch.
     if (strip.strip.follow().engaged) strip.strip.frame(now, VIEW_MS, 0.95);
+    else if (now - touchedAt > RESUME_MS) strip.strip.setFollow(true);
     for (const s of M.src.values()) checkHalf(s, now);
     requestAnimationFrame(tick);
   }
@@ -593,9 +530,7 @@
     box.append(el('h3', 'cc-h', title), ...parts);
     return box;
   };
-  const row = el('div', 'cc-row');
-  row.append(show.el, btns.el);
-  d.stack.add(scope.el, row, surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
+  d.stack.add(surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
   requestAnimationFrame(() => strip.strip.frame(performance.now(), VIEW_MS, 0.95));
   face();
 
@@ -613,7 +548,6 @@
       distinct: s.counts.size, repeats: s.repeats, lastLen: s.lastLen, lastRate: s.lastRate,
       type: typeOf(s), polarity: polarityOf(s) })),
     get shown() { return msgT.count(); },
-    get filter() { return filter; },
   };
   d.ready();
 </script>
