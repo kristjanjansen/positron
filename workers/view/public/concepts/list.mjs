@@ -33,12 +33,10 @@ export const CONCEPTS = [
   { n: 'room/002', title: 'Chat UI wired', say: 'The chat window wired to the patchbay, so tabs in one room talk to each other.' },
   { n: 'room/003', title: 'Broadcast chat', say: 'The chat window with the first one in the room broadcasting to everybody in a column of its own.' },
   { n: 'room/004', title: 'Chat timeline', say: 'The broadcast chat with a timeline that plays the room\'s history back until you join.' },
-  { n: 'room/010', title: 'History', say: 'The same chat, with a store that keeps what was said.' },
-  { n: 'room/020', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
+  // room/010 History and room/020 Admin removed 2026-10-11 (*"rm room 010 020
+  // 030. since we cover it right?"*): room/004 keeps the history, room/003 the
+  // admin. Their pages are in git history before that commit.
   { n: 'room/030', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
-  { n: 'bay/000', title: 'Announce', say: 'Every port the studio room can hear.' },
-  { n: 'bay/010', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
-  { n: 'tutorial/000', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
   { n: 'typist/000', title: 'Paper', say: 'A sheet of white paper you can type on.' },
   { n: 'typist/010', title: 'Typewriter', say: 'The same paper with a real typewriter sounding every key.' },
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
@@ -50,4 +48,9 @@ export const CONCEPTS = [
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back through the relay with the time from key to sound read out.' },
   { n: 'sampler/035', title: 'Pi piano direct', say: 'The same Pi piano over a direct WebRTC path instead of the relay.' },
+  // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
+  // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
+  { n: 'misc/000', title: 'Announce', say: 'Every port the studio room can hear.' },
+  { n: 'misc/010', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
+  { n: 'misc/020', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
 ];

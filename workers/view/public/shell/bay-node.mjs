@@ -200,7 +200,7 @@ export function createBayNode({
     if (!b) return { sent: false, far: [], here: 0 };
     /* ⚠️ "HERE" IS THIS PAGE'S ANNOUNCED SITES, NOT `owns()`. A `local` graph
        describes something elsewhere on its behalf (the store on
-       `/concepts/room/010/`), so a link into it still has to cross the room. */
+       `/concepts/room/004/`), so a link into it still has to cross the room. */
     const mine = new Set(own.map((g) => g.site));
     const far = b.targets(source).map((t) => t.to).filter((to) => !mine.has(to.split(':')[0]));
     const here = b.send(source, ev) - far.length;
