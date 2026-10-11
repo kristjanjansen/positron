@@ -43,6 +43,7 @@
   // does, so a pedal on a plugged in keyboard works from the first press.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createMidi } from '/shell/midi.mjs';
   import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
@@ -93,6 +94,22 @@
     hold: 0,                 // the pending clear of the press now down, a timer
     fired: [],               // { lap, at, late } for a check: how far each replay was off
   };
+  // ── the journal, for Copy log ───────────────────────────────────────────
+  // Asked 2026-10-11: *"add a copy button to the looper ... in order to debug,
+  // record all you have, and let's analyze it"*. Every key and pedal message as
+  // it came in, with the time the device stamped on it (`sent`, the MIDI
+  // message's own timeStamp; the press time for the on-screen keys) and the
+  // time the looper saw it (`seen`), and every decision the looper made.
+  // Memory only, the last 5000 of each.
+  const J = { inputs: [], decisions: [] };
+  const jin = (src, kind, d1, d2, ch, sent) => {
+    J.inputs.push({ sent: +sent.toFixed(2), seen: +performance.now().toFixed(2), src, kind, d1, d2, ch });
+    if (J.inputs.length > 5000) J.inputs.shift();
+  };
+  const jdo = (what, detail = '') => {
+    J.decisions.push({ at: +performance.now().toFixed(2), what, state: L.state, detail });
+    if (J.decisions.length > 5000) J.decisions.shift();
+  };
   const out = (d1, d2) => bay.send(`${S}:looper:midi-out`, { cls: 'note', ch: 1, d1, d2 });
   function silence() { for (const n of L.sounding) out(n, 0); L.sounding.clear(); }
 
@@ -104,10 +121,12 @@
     L.hold = setTimeout(() => {
       if (L.pedal < PEDAL_ON) return;
       const had = L.state;
+      jdo('hold clear', had);
       clear();
       d.log(`pedal held ${CLEAR_HOLD_MS / 1000} s: ${had === 'empty' ? 'nothing to clear' : 'the loop is stopped and empty'}`);
     }, CLEAR_HOLD_MS);
     const act = pressAction(L.state, L.t1, L.releasedAt, now);
+    jdo(`press ${act}`, `${Number.isFinite(L.releasedAt) ? `${(now - L.releasedAt).toFixed(1)} ms after the last release` : 'no release yet'}, ${L.state === 'recording' ? `${(now - L.t1).toFixed(1)} ms into the take` : ''}`);
     if (act === 'spring') { d.log(`press ${(now - L.releasedAt).toFixed(0)} ms after a release, the pedal springing back, ignored`, 'warn'); return; }
     if (act === 'short') { d.log(`press ${(now - L.t1).toFixed(0)} ms into the take, under ${MIN_LOOP_MS / 1000} s, ignored, still recording`, 'warn'); return; }
     if (act === 'close') {
@@ -125,6 +144,7 @@
       strip.strip.fit(-len * 0.04, len * 1.04);
       strip.strip.invalidate();
       d.log(`second press: the loop is ${(len / 1000).toFixed(3)} s with ${L.events.filter((e) => e.d2).length} notes, playing`);
+      jdo('loop closed', `${len.toFixed(1)} ms, ${L.events.filter((e) => e.d2).length} notes, first note ${L.events.find((e) => e.d2) ? `at ${L.events.find((e) => e.d2).at.toFixed(1)} ms` : 'none'}`);
     } else {
       silence();
       L.state = 'recording'; L.t1 = now; L.len = 0; L.events = []; L.open.clear();
@@ -133,6 +153,7 @@
       strip.strip.fit(0, VIEW_MS);
       strip.strip.invalidate();
       d.log('first press: recording');
+      jdo('recording', `take starts at ${now.toFixed(1)}`);
     }
     face();
   }
@@ -161,6 +182,7 @@
     out(e.d1, e.d2);
     if (L.state !== 'recording') return;
     const at = now - L.t1;
+    if (e.d2 && at < 0) jdo('note before the take', `${e.d1} at ${at.toFixed(1)} ms`);
     if (e.d2) { L.open.set(e.d1, true); L.events.push({ at, d1: e.d1, d2: e.d2 }); }
     else if (L.open.has(e.d1)) { L.open.delete(e.d1); L.events.push({ at, d1: e.d1, d2: 0 }); }
     strip.strip.invalidate();
@@ -266,25 +288,55 @@
   const cc = (d1, d2) => bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1, d2 });
   const kb = createKeyboard(host, {
     ...keyRange(21), base: 48,
-    onDown: (n, how) => { if (how !== 'midi') note(n, 100); },
-    onUp: (n, how) => { if (how !== 'midi') note(n, 0); },
+    onDown: (n, how) => { if (how !== 'midi') { jin('screen', 'on', n, 100, 1, performance.now()); note(n, 100); } },
+    onUp: (n, how) => { if (how !== 'midi') { jin('screen', 'off', n, 0, 1, performance.now()); note(n, 0); } },
     onPanic: () => { clear(); sampler.panic(); d.log('the loop is stopped and empty'); },
     // One click is one press of a pedal: down, then up straight away. The
     // button is lit while the looper records, which is what it is doing.
     sustain: true,
-    onSustain: () => { cc(SUSTAIN_CC, 127); cc(SUSTAIN_CC, 0); },
+    onSustain: () => { const t = performance.now(); jin('screen', 'cc', SUSTAIN_CC, 127, 1, t); jin('screen', 'cc', SUSTAIN_CC, 0, 1, t); cc(SUSTAIN_CC, 127); cc(SUSTAIN_CC, 0); },
   });
   function face() { kb.sustain?.set(L.state === 'recording', true); }
 
   // A plugged in keyboard plays the same keys, and its pedal is the same press.
   createMidi({
     log: (line, kind) => d.log(line, kind),
-    onDown: (n, vel) => { kb.lightNote?.(n, true); note(n, vel); },
-    onUp: (n) => { kb.lightNote?.(n, false); note(n, 0); },
-    onControl: (c, v) => { if (c === SUSTAIN_CC) cc(c, v); },
+    onDown: (n, vel, ch, ts) => { jin('midi', 'on', n, vel, ch, ts ?? performance.now()); kb.lightNote?.(n, true); note(n, vel); },
+    onUp: (n, ch, ts) => { jin('midi', 'off', n, 0, ch, ts ?? performance.now()); kb.lightNote?.(n, false); note(n, 0); },
+    onControl: (c, v, ch, ts) => { if (c === SUSTAIN_CC) { jin('midi', 'cc', c, v, ch, ts ?? performance.now()); cc(c, v); } },
   });
 
-  d.stack.add(surface, host, pb.el);
+  /** Everything, as text: the rules, every input, every decision, the loop. */
+  function text() {
+    const f = (x) => (Number.isFinite(x) ? x.toFixed(2) : '');
+    const o = [`positron sampler/020 looper, ${new Date().toISOString()}`,
+      `rules: SPRING_MS ${SPRING_MS}, MIN_LOOP_MS ${MIN_LOOP_MS}, CLEAR_HOLD_MS ${CLEAR_HOLD_MS}, PEDAL_ON ${PEDAL_ON}`,
+      `state ${L.state}, loop ${f(L.len)} ms, lap ${L.lap}, take started at ${f(L.t1)}`,
+      '', 'inputs: sent ms (device stamp)\tseen ms (looper)\tsrc\tkind\td1\td2\tch'];
+    for (const r of J.inputs) o.push([f(r.sent), f(r.seen), r.src, r.kind, r.d1, r.d2, r.ch].join('\t'));
+    o.push('', 'decisions: at ms\twhat\tstate before\tdetail');
+    for (const r of J.decisions) o.push([f(r.at), r.what, r.state, r.detail].join('\t'));
+    o.push('', 'loop events: at ms from the take start\tnote\tvelocity');
+    for (const e of L.events) o.push([f(e.at), e.d1, e.d2].join('\t'));
+    const late = L.fired.map((x) => x.late);
+    if (late.length) {
+      const s = [...late].sort((a, b) => a - b);
+      o.push('', `replays: ${late.length}, lateness ms median ${f(s[s.length >> 1])}, max ${f(s[s.length - 1])}`);
+    }
+    return o.join('\n');
+  }
+  async function copy() {
+    const t = text();
+    try { await navigator.clipboard.writeText(t); }
+    catch {
+      const ta = el('textarea'); ta.value = t; document.body.append(ta); ta.select();
+      try { document.execCommand('copy'); } finally { ta.remove(); }
+    }
+    d.log(`copied ${J.inputs.length} inputs, ${J.decisions.length} decisions and ${L.events.length} loop events`);
+  }
+  const copyBtn = createButtonGroup({ buttons: [{ id: 'copy', label: 'Copy log', onPress: copy }] });
+
+  d.stack.add(surface, host, copyBtn.el, pb.el);
   // The strip fits itself to its first width; this window is the empty take's.
   requestAnimationFrame(() => strip.strip.fit(0, VIEW_MS));
   window.__demo.bay = bay;
@@ -295,7 +347,7 @@
     get presses() { return [...L.presses]; }, get events() { return L.events.map((e) => ({ ...e })); },
     get fired() { return L.fired.map((f) => ({ ...f })); },
     get position() { return deck.position(); }, get range() { return [...deck.range]; },
-    rules: { SPRING_MS, MIN_LOOP_MS, CLEAR_HOLD_MS }, pressAction,
+    rules: { SPRING_MS, MIN_LOOP_MS, CLEAR_HOLD_MS }, pressAction, text,
   };
   d.ready();
 </script>
