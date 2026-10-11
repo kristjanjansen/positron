@@ -326,6 +326,75 @@ the only direct reading of the switch point.
   leaving the top to falling under 64. That is the switch point and the release
   speed, measured.
 
+## 5. Measured on the owner's presses, 2026-10-11 afternoon (MEASURED)
+
+The owner pressed the pedal in 015 and pasted its export into the session:
+**74 CC 64 messages, 37 presses**, MK-425C USB MIDI Keyboard, channel 2,
+values 0 and 127 only (a switch pedal), polarity `normal`, no repeated values,
+no chatter inside one tick. Analysed offline in Node from the pasted times.
+
+### The keyboard reads its pedal about 15 times a second
+
+Every one of the 74 messages lies within **1.81 ms** of a **65.95 ms** grid
+(phase lock 0.9974 across all 74). So the MK-425C looks at its pedal jack
+about **15.2 times a second** and sends what it saw on that beat. 015 stamps
+each message with the event's own `timeStamp` and does no rounding, so the
+grid is the keyboard's, not the page's. This answers the open question above
+in part: whatever debouncing the MK-425C does, it reports on a 66 ms scan.
+
+Consequences, all in ticks of 65.95 ms:
+
+| | ticks | count |
+| --- | --- | --- |
+| press held | 1 (66 ms) | 13 |
+| | 2 (132 ms) | 16 |
+| | 3 (198 ms) | 6 |
+| | 4 or 5 | 2 |
+| foot up before the next press, inside a burst | 1 (66 ms) | 3 |
+| | 2 (132 ms) | 14 |
+| | 3 or 5 | 2 |
+
+- **A third of the presses were seen for one tick**, so they lasted under
+  about 130 ms. A tap shorter than one tick can fall between two looks and be
+  missed entirely. That is one honest reading of *"it's heavy to push"*: a
+  light quick tap does not register at all.
+- **The fastest possible double is 132 ms press to press**: down one tick, up
+  one tick. The owner's usual double came out at **264 ms**, two ticks down
+  and two up.
+- **Bursts came out uneven.** Grouping presses whose gap is at most 6 ticks
+  gives **18 bursts: 6 single, 6 double, 5 triple, 1 quadruple**. If each was
+  meant as a double, a third landed as two presses.
+- **Three re-presses one tick after a release**, at 43.72 s, 45.30 s and
+  47.68 s, each right after a short press. That is the shape of a heavy pedal
+  springing back (or a contact bouncing on release); at a 66 ms scan it cannot
+  be told apart from a deliberate press.
+
+### What it means for 020's looper
+
+020 flips between *start recording* and *loop* on every press, so a triple
+leaves it in the opposite state from a double, and a spring back makes a loop
+of one or two ticks. The export shows exactly that: *"020 would loop 0.132 s"*
+and *"0.199 s"*. Revised from the recommendation list below, with the scan in
+mind:
+
+1. **Lockout of one tick, about 70 ms, after a release** (not 50 ms as below:
+   at this keyboard's scan, nothing under 66 ms is visible anyway, and a
+   one tick re-press is the bounce signature measured here).
+2. **A burst within about 400 ms is one gesture.** One press is record or
+   stop; two or more is something else, a clear for instance. Only if a double
+   is wanted at all (recommendation 2 below still says do not).
+3. **No loop under about 0.5 s** (Boss's 0.25 s is the floor; 0.5 s also
+   swallows a spring back plus one tick).
+4. **Timing inside 020 is quantised by the keyboard to 66 ms.** A loop length
+   taken press to press on this keyboard is right only to plus or minus one
+   tick. A faster scanning keyboard or pedal interface is the only cure.
+
+### Not measured yet
+
+- **Whether the MK-425C's NOTES are on the same 66 ms grid**, or only the
+  pedal. One 015 run with a few key presses would settle it.
+- The four tests in section 4 were not run as such; this was a free run.
+
 ## Recommendation, in priority order
 
 1. **Check polarity first.** If 015 says `inverted`, every press and double
@@ -361,13 +430,14 @@ the only direct reading of the switch point.
 
 ## What could not be settled
 
-- **The owner's own presses.** They are in the open 015 tab and were not read.
-  Every recommended number above is a placeholder for the owner's medians.
+- **The owner's own presses.** One free run is now measured (section 5); the
+  four tests in section 4 were not run as such.
 - **Which pedal is on the desk**, its model, its travel, and whether it is a
   switch or continuous. 015's `type` column will say the last one.
 - **Any actuation force in newtons** for any sustain pedal. Nothing published
   was found.
-- **Whether the MK-425C debounces** its pedal input before sending MIDI.
+- **Whether the MK-425C debounces** its pedal input before sending MIDI. It
+  reports on a 66 ms scan (section 5), which hides anything finer.
 - **Re-pedalling speed at the piano in ms.** Repp measured it; the numbers are
   behind paywalls and were not read.
 - **Whether release is really steadier than press for a foot.** One forum
