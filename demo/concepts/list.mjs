@@ -43,5 +43,6 @@ export const CONCEPTS = [
   { n: 'typist/030', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
   { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing a sampler of piano recordings that come from our R2 bucket.' },
   { n: 'sampler/010', title: 'Piano and Rhodes', say: 'The same sampler holding a piano and a Rhodes that a patch node switches by program change.' },
+  { n: 'sampler/015', title: 'Sustain', say: 'Every message a sustain pedal sends with its timing and the presses it makes.' },
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
 ];
