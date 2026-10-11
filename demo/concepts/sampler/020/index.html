@@ -45,7 +45,6 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createMidi } from '/shell/midi.mjs';
   import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -75,7 +74,10 @@
   // and these numbers to report what 020 would do; change both together.
   const SPRING_MS = 70;          // a press this soon after a release is ignored
   const MIN_LOOP_MS = 500;       // a press that would close a shorter loop is ignored
-  const CLEAR_HOLD_MS = 1000;    // a press held this long with no note played clears the loop
+  // 3 s since section 10 of the plan (asked: *"i can not reach panic. make it 3s
+  // then"*): the owner holds a closing press 1.45 to 1.65 s while the chord
+  // rings, and at 1 s that cleared six loops in one session.
+  const CLEAR_HOLD_MS = 3000;    // a press held this long with no note played clears the loop
   // plans/plan-looper-accuracy.md section 9, the owner's first Copy log: 4 of 7
   // takes lost their opening chord, played 17 to 98 ms before the press the
   // keyboard reported (it scans its pedal every 66 ms; the keys are timed to
@@ -323,6 +325,7 @@
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
   bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => kb.lightNote?.(e.d1, e.d2 > 0) });
   bay.addPort({ id: `${S}:looper:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: looperIn });
   bay.addPort({ id: `${S}:looper:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
   bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => sampler.midi(e) });
@@ -362,13 +365,67 @@
   });
   function face() { kb.sustain?.set(L.state === 'recording', true); }
 
-  // A plugged in keyboard plays the same keys, and its pedal is the same press.
-  createMidi({
-    log: (line, kind) => d.log(line, kind),
-    onDown: (n, vel, ch, ts) => { jin('midi', 'on', n, vel, ch, ts ?? performance.now()); kb.lightNote?.(n, true); note(n, vel, ts); },
-    onUp: (n, ch, ts) => { jin('midi', 'off', n, 0, ch, ts ?? performance.now()); kb.lightNote?.(n, false); note(n, 0, ts); },
-    onControl: (c, v, ch, ts) => { if (c === SUSTAIN_CC) { jin('midi', 'cc', c, v, ch, ts ?? performance.now()); cc(c, v, ts); } },
-  });
+  // ── keyboards plugged into this machine ────────────────────────────────
+  // As /concepts/synth/000/ (asked: *"where is midi in parchbay in sampler
+  // 020"*): one `device` node per MIDI input, named after the device, its
+  // midi-out linked to the looper (notes and the sustain pedal, CC 64) and to
+  // the keys (they light). Each message carries the device's own timeStamp as
+  // `t`, which the looper times by. A device keeps its node id across a replug.
+  const plugged = new Set(), slots = new Map(), devHeld = new Map(), devLinks = new Map();
+  const slotFor = (p) => {
+    if (!slots.has(p.id)) slots.set(p.id, slots.size ? `${S}:midi-${slots.size + 1}` : `${S}:midi`);
+    return slots.get(p.id);
+  };
+  const wired = new WeakSet();
+  function fromDevice(e) {
+    const node = slots.get(e.target.id);
+    if (!node || !plugged.has(node)) return;
+    const [b0, d1, d2 = 0] = e.data;
+    const st = b0 & 0xf0, ch = (b0 & 0x0f) + 1, t = e.timeStamp;
+    if (st === 0xb0 && d1 === SUSTAIN_CC) {
+      jin('midi', 'cc', d1, d2, ch, t);
+      bay.send(`${node}:midi-out`, { cls: 'cc', ch, d1, d2, t });
+      return;
+    }
+    if (st !== 0x90 && st !== 0x80) return;
+    const on = st === 0x90 && d2 > 0;
+    jin('midi', on ? 'on' : 'off', d1, on ? d2 : 0, ch, t);
+    const held = devHeld.get(node);
+    if (on) held.add(d1); else held.delete(d1);
+    bay.send(`${node}:midi-out`, { cls: 'note', ch, d1, d2: on ? d2 : 0, t });
+  }
+  function plug(p) {
+    const node = slotFor(p);
+    bay.addNode({ id: node, kind: 'device', label: p.name || 'MIDI keyboard', place: 'browser' });
+    if (plugged.has(node)) return;
+    bay.addPort({ id: `${node}:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+    const ids = [];
+    for (const to of [`${S}:looper:midi-in`, `${S}:keys:midi-in`]) {
+      const r = bay.link(`${node}:midi-out`, to, [], { site: S });
+      if (r.ok) ids.push(r.id); else d.log(`${node}:midi-out -> ${to} refused: ${r.why}`, 'warn');
+    }
+    plugged.add(node); devHeld.set(node, new Set()); devLinks.set(node, ids);
+    if (!wired.has(p)) { p.addEventListener('midimessage', fromDevice); wired.add(p); }
+    d.log(`MIDI in: ${p.name || 'unnamed port'} as ${node}`);
+  }
+  function unplug(node) {
+    for (const n of devHeld.get(node) || []) bay.send(`${node}:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0, t: performance.now() });
+    for (const id of devLinks.get(node) || []) bay.unlink(id);
+    plugged.delete(node); devHeld.delete(node); devLinks.delete(node);
+    d.log(`MIDI in gone: ${bay.node(node)?.label || node}`);
+  }
+  function devices(access) {
+    const now = new Set();
+    for (const p of access.inputs.values()) if (p.state !== 'disconnected') { plug(p); now.add(slotFor(p)); }
+    for (const node of [...plugged]) if (!now.has(node)) unplug(node);
+    pb.refresh?.();
+  }
+  if (navigator.requestMIDIAccess) {
+    navigator.requestMIDIAccess({ sysex: false }).then((access) => {
+      devices(access);
+      access.onstatechange = () => devices(access);
+    }, () => {});
+  }
 
   /** Everything, as text: the rules, every input, every decision, the loop. */
   function text() {

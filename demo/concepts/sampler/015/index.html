@@ -98,7 +98,7 @@
 
   const TAP_MS = 250, DOUBLE_MS = 400, HALF_MS = 200, HALF_BAND = 16, BOUNCE_MS = 20;
   // 020's looper rules, copied from demo/concepts/sampler/020/index.html.
-  const SPRING_MS = 70, MIN_LOOP_MS = 500, CLEAR_HOLD_MS = 1000;
+  const SPRING_MS = 70, MIN_LOOP_MS = 500, CLEAR_HOLD_MS = 3000;
   function pressAction(state, t1, releasedAt, now) {
     if (now - releasedAt < SPRING_MS) return 'spring';
     if (state === 'recording') return now - t1 < MIN_LOOP_MS ? 'short' : 'close';
