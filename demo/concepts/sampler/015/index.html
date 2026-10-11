@@ -50,11 +50,13 @@
   //   type     only 0 and 127 ever seen: a switch. Values in between, six or
   //            more distinct values: continuous. In between but fewer: unsure.
   //   polarity the FIRST CC 64 message from a port is taken as the first press,
-  //            because a pedal sits at rest until somebody steps on it: 64 or
-  //            above is normal, below is inverted. After two crossings the time
-  //            spent on each side votes too (a pedal is at rest more than it is
-  //            down), and if the two disagree it says unsure. An inverted pedal
-  //            makes 020's looper fire on the RELEASE, which the log says once.
+  //            because a pedal sits at rest until somebody steps on it. For a
+  //            switch (first value 0 or 127), 64 or above is normal and below
+  //            is inverted. For a continuous pedal the first value is a small
+  //            step off rest, so the direction of its first change decides:
+  //            rising is normal, falling inverted. Clear, then one press, asks
+  //            again. An inverted pedal makes 020's looper fire on the
+  //            RELEASE, which the log says once.
   //            /shell/pedal.mjs records why it happens on this desk: the
   //            MK-425C senses polarity at power up.
   //
@@ -86,6 +88,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { registerRenderer } from '/timeline/strip.mjs';
   import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
 
   const d = mount({
     name: 'concept sampler 015', what: '', index: '/concepts/', indexLabel: 'concepts',
@@ -125,7 +128,7 @@
     let s = M.src.get(port);
     if (!s) {
       s = { port, n: 0, counts: new Map(), min: 127, max: 0, first: null, value: null, lastAt: 0,
-            dwellHigh: 0, dwellLow: 0, crossings: 0, lastCross: -Infinity, presses: 0,
+            crossings: 0, lastCross: -Infinity, presses: 0,
             downAt: null, downN: 0, downAts: [], lastTapUp: -Infinity, lastLen: null, lastRate: null,
             firstMove: null, repeats: 0, half: null, warned: false, looper: 'empty', looperT: 0 };
       M.src.set(port, s);
@@ -165,11 +168,7 @@
   }
 
   function pedalMessage(s, v, at) {
-    // Time on each side, up to this message, for the polarity vote.
-    if (s.value !== null) {
-      if (s.value >= PEDAL_ON) s.dwellHigh += at - s.lastAt; else s.dwellLow += at - s.lastAt;
-      if (v === s.value) s.repeats++;
-    }
+    if (s.value !== null && v === s.value) s.repeats++;
     s.n++;
     s.counts.set(v, (s.counts.get(v) || 0) + 1);
     s.min = Math.min(s.min, v); s.max = Math.max(s.max, v);
@@ -232,7 +231,7 @@
     if (!mid) return 'switch';
     return s.counts.size >= 6 ? 'continuous' : 'unsure';
   }
-  function polarityOf(s, now = performance.now()) {
+  function polarityOf(s) {
     if (!s || s.first === null) return '';
     // A switch's first message is where it was pressed TO. A continuous
     // pedal's first message is a small step off its rest, so for a first value
@@ -241,25 +240,22 @@
     const mid = s.first > 0 && s.first < 127;
     const byFirst = !mid ? (s.first >= PEDAL_ON ? 'normal' : 'inverted')
       : s.firstMove === 'up' ? 'normal' : s.firstMove === 'down' ? 'inverted' : 'unsure';
-    if (s.crossings < 2) return byFirst;
-    // The time since the last message counts for the side the pedal is on now.
-    const since = Math.max(0, now - s.lastAt);
-    const high = s.dwellHigh + (s.value >= PEDAL_ON ? since : 0);
-    const low = s.dwellLow + (s.value >= PEDAL_ON ? 0 : since);
-    if (high + low <= 0) return byFirst;
-    const byRest = low >= high ? 'normal' : 'inverted';
-    return byFirst === byRest ? byFirst : 'unsure';
+    // ⚠️ THERE WAS A SECOND VOTE, TIME SPENT ON EACH SIDE (a pedal is at rest
+    // more than it is down), AND IT WAS TAKEN OUT. MEASURED on the synthetic
+    // script: a normal switch held for a second at a time read `unsure`, and so
+    // did an inverted one, because somebody debugging a looper holds the pedal
+    // as long as they leave it. The first message is the one fact that does
+    // not depend on how the pedal is used; Clear, then one press, asks again.
+    return byFirst;
   }
   function guessWarn(s) {
-    if (s.warned || s.crossings < 2 || polarityOf(s) !== 'inverted') return;
+    if (s.warned || polarityOf(s) !== 'inverted') return;
     s.warned = true;
     d.log(`${s.port} reads inverted: CC 64 goes below 64 when pressed, so 020's looper would start and stop on the release. `
       + 'An MK-425C senses this at power up, so power it with the pedal up', 'warn');
   }
 
-  let faced = 0;
   function face() {
-    faced = performance.now();
     const s = M.last ? M.src.get(M.last) : null;
     d.set('messages', M.msgs.length);
     d.set('presses', s ? s.presses : '');
@@ -388,7 +384,7 @@
   // The strip's time is performance time in ms, the same clock as a MIDI
   // message's `timeStamp`. The deck plays nothing; it holds the range and a
   // playhead that is always now.
-  const VIEW_MS = 6000;
+  const VIEW_MS = 4000;   // the scope's window, so the two pictures span the same time
   let range = 60000;
   const deck = createDeck({ items: [], range: [0, range],
     adapters: { note: { caps: { rates: [1], continuous: false }, actuate() {}, reduce() { return {}; }, assertState() { return {}; } } } });
@@ -436,7 +432,7 @@
   const glue = el('div');
   const bar = createTransportBar(glue, deck, { toggle: false, scrub: false, loop: false, live: false });
   const strip = createStripView(glue, deck, {
-    size: 'auto', follow: true, followEdge: 0.97, followBack: 0.85, gutter: 96, footer: true,
+    size: 'auto', follow: true, followEdge: 0.99, followBack: 0.95, gutter: 96, footer: true,
     lanes: [
       { id: 'cc64', kind: 'note', label: 'CC 64', height: 80, as: 'pedal-step', terse: true, rows: () => [] },
       { id: 'gest', kind: 'note', label: 'gestures', height: 40, width: 2, as: 'ticks', terse: true,
@@ -450,15 +446,50 @@
     ],
   });
   const surface = createGlue(bar.el, strip.surface);
+  // ── the scope: the pedal's value, live, full width ─────────────────────
+  // Asked 2026-10-11: *"can youse your scope viz for sustain debugger"*. The
+  // kit's scope from the synth pages, fed CC 64 instead of a sound: the last
+  // SCOPE_MS of the port that last spoke on CC 64, 0 at the bottom and 127 at
+  // the top. The scope's middle line is 63.5, which is exactly 020's
+  // threshold: 63 is under it and 64 is on or over it. The value is held from
+  // one message to the next, so a switch draws steps and a continuous pedal a
+  // ramp. The second trace is what 020 hears, the same messages read as down
+  // or up only, so a bounce or a pedal hovering on 64 shows as the two lines
+  // parting. A scope of the sampler's sound is not drawn: sampler.mjs keeps its
+  // output node to itself, and reaching it from here would be a page-local
+  // patch on a shared module.
+  const SCOPE_MS = VIEW_MS, SCOPE_N = 800;
+  const scope = createWaveShape({ reason: null, height: 160, name: 'CC 64', colour: '#6fb8e8',
+    axes: { y: '127', x: `${SCOPE_MS / 1000} s` } });
+  const toY = (v) => (v / 127) * 2 - 1;
+  function drawScope(now) {
+    const s = M.last ? M.src.get(M.last) : null;
+    if (!s) { scope.set({ points: null, over: null, name: 'CC 64' }); return; }
+    const rows = M.msgs.filter((r) => r.cc === SUSTAIN_CC && r.port === s.port);
+    const t0 = now - SCOPE_MS;
+    let k = 0, v = 0;
+    while (k < rows.length && rows[k].at <= t0) { v = rows[k].value; k++; }
+    const pts = new Array(SCOPE_N), bin = new Array(SCOPE_N);
+    for (let i = 0; i < SCOPE_N; i++) {
+      const t = t0 + ((i + 1) / SCOPE_N) * SCOPE_MS;
+      // Every message inside this column is seen, so a bounce shorter than a
+      // column still flips the second trace: the column shows its extreme.
+      let lo = v, hi = v;
+      while (k < rows.length && rows[k].at <= t) { v = rows[k].value; lo = Math.min(lo, v); hi = Math.max(hi, v); k++; }
+      pts[i] = toY(v);
+      bin[i] = (lo < PEDAL_ON && hi >= PEDAL_ON ? (i % 2 ? 1 : -1) : v >= PEDAL_ON ? 1 : -1) * 0.82;
+    }
+    scope.set({ points: pts, name: `CC 64 = ${v}, ${s.port}`,
+      over: { points: bin, name: `020 reads ${v >= PEDAL_ON ? 'down' : 'up'}`, colour: '--dim' } });
+  }
+
   function tick() {
     const now = performance.now();
+    drawScope(now);
     if (now > range - 5000) { range = now + 60000; deck.setRange([0, range]); }
     if (Math.abs(deck.position() - now) > 0.5) deck.seek(now);
-    if (strip.strip.follow().engaged) strip.strip.frame(now, VIEW_MS, 0.85);
+    if (strip.strip.follow().engaged) strip.strip.frame(now, VIEW_MS, 0.95);
     for (const s of M.src.values()) checkHalf(s, now);
-    // The polarity vote moves with time at rest, so the readout is refreshed
-    // twice a second as well as on every message.
-    if (now - faced > 500) face();
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
@@ -564,8 +595,8 @@
   };
   const row = el('div', 'cc-row');
   row.append(show.el, btns.el);
-  d.stack.add(row, surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
-  requestAnimationFrame(() => strip.strip.frame(performance.now(), VIEW_MS, 0.85));
+  d.stack.add(scope.el, row, surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
+  requestAnimationFrame(() => strip.strip.frame(performance.now(), VIEW_MS, 0.95));
   face();
 
   window.__demo.bay = bay;
