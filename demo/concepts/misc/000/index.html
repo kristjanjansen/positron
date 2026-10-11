@@ -28,8 +28,8 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
 
-  const d = mount({ name: 'concept bay 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('bay/000');
+  const d = mount({ name: 'concept misc 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('misc/000');
 
   // Joins on a press, never on load, and then says what it is, like any patchbay tab.
   const ROOM = roomFor({ slug: 'patchbay' });

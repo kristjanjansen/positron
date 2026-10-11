@@ -1,4 +1,4 @@
-// demo/concepts/tutorial/000/modules.mjs: the mono WebAudio synth of /concepts/synth/050/, cut
+// demo/concepts/misc/020/modules.mjs: the mono WebAudio synth of /concepts/synth/050/, cut
 // down to the chain a tutorial slide teaches in three steps: keys, oscillator,
 // filter, scope, speakers.
 //
