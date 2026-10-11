@@ -8,7 +8,7 @@
 export const CONCEPTS = [
   // room/040 Patch from words is off the index since 2026-10-10 (*"hide concepts/001 now"*);
   // the page stays at /concepts/room/040/.
-  { n: 'synth/000', title: 'Keyboard', say: 'The on-screen keyboard patched to a sine synth.' },
+  { n: 'synth/000', title: 'Keyboard', say: 'The on-screen keyboard, or a MIDI keyboard when one is plugged in, patched to a sine synth.' },
   { n: 'synth/010', title: 'Recorder', say: 'The keyboard and synth with a recorder you can play back.' },
   { n: 'synth/020', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
   { n: 'synth/030', title: 'Dot piano', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
@@ -23,13 +23,13 @@ export const CONCEPTS = [
   { n: 'video/010', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },
   { n: 'video/030', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
-  { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live side by side with a crossfader between their sound.' },
+  { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   { n: 'room/001', title: 'Chat UI', say: 'The chat as a framed window with its messages and a compose box.' },
   { n: 'room/002', title: 'Chat UI wired', say: 'The chat window wired to the patchbay, so tabs in one room talk to each other.' },
   { n: 'room/003', title: 'Broadcast chat', say: 'The chat window with the first one in the room broadcasting to everybody in a column of its own.' },
-  { n: 'room/004', title: 'Broadcast sign', say: 'The broadcast chat with the latest broadcast shown alone in the middle of its area.' },
+  { n: 'room/004', title: 'Chat timeline', say: 'The broadcast chat with a timeline that plays the room\'s history back until you join.' },
   { n: 'room/010', title: 'History', say: 'The same chat, with a store that keeps what was said.' },
   { n: 'room/020', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: 'room/030', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
@@ -44,7 +44,7 @@ export const CONCEPTS = [
   { n: 'sampler/010', title: 'Piano and Rhodes', say: 'The same sampler holding a piano and a Rhodes that a patch node switches by program change.' },
   { n: 'sampler/015', title: 'Sustain', say: 'Every message a sustain pedal sends with its timing and the presses it makes.' },
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
-  { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back through the relay beside Yoshimi.' },
+  { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back through the relay with the time from key to sound read out.' },
   { n: 'sampler/035', title: 'Pi piano direct', say: 'The same Pi piano over a direct WebRTC path instead of the relay.' },
   { n: 'beats/000', title: 'Tempo', say: 'Recordings of Raadio 2, Raadio 4 and Ida played from our own bucket into a tempo detector.' },
 ];
