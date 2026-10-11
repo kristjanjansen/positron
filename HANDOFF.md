@@ -3,7 +3,7 @@
 ## Where it is right now
 
 - **Site: BUILD `c91a423b-182349-a3d3`** (sampler/020 with Rhodes), confirmed on the edge. The owner asked to "deploy now and then" (memory `deploy-often`): deploy at coherent points, not per change.
-- **GitHub:** pushed to `c0189308`; **3 commits ahead** (Rhodes in 020, its build, plan section 11). Push needs the account switch in CLAUDE.md, and switching back.
+- **GitHub:** everything pushed, `main` matches `origin/main` with this handoff. Push needs the account switch in CLAUDE.md, and switching back.
 - Counted: **58 demos, 57 built**, **108 plans**. Working tree clean. No agent running.
 - **The Pi runs the repo's board code** (pushed this session, md5 checked): the direct WebRTC answer (`node-datachannel`) and the Salamander piano, 208 files fetched from R2 onto its SD card.
 
