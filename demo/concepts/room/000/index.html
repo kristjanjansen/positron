@@ -31,7 +31,6 @@
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createPortInk } from '/shell/port-ink.mjs';
 
   // The smallest multi-user chat built from patchbay blocks
   // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
@@ -59,12 +58,8 @@
   const lines = createTable({
     columns: [
       { key: 'who', label: 'who', width: 96 },
-      // The link is never cut (asked 2026-10-11, *"avoid link clippng"*): its
-      // column is as wide as the longest one this page prints, two 7 letter
-      // sites, 47 characters; the message takes what is left and is cut instead.
       { key: 'text', label: 'message', grow: true, hi: true, clip: true, hover: 'text' },
       { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 340, hover: 'why' },
     ],
     minRows: 4,
     stick: true,
@@ -81,12 +76,7 @@
     if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
     return `${Math.floor(s / 86400)} d ago`;
   };
-  // The link cell is a printed link, `from -> to`, each port's name in its
-  // medium's colour as the patchbay draws it (port-ink.mjs). Every port here
-  // is named `<medium>-<dir>`, so the medium is read off the id.
-  const ink = createPortInk({ ports: () => said.flatMap((r) => r.link.split(' -> '))
-    .map((id) => ({ id, medium: id.split(':')[2]?.split('-')[0] })) }, ['value']);
-  const draw = () => { lines.set(said.map((r) => ({ ...r, ago: ago(r.at) }))); ink.paint(lines.el); };
+  const draw = () => lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
   setInterval(() => { if (said.length) draw(); }, 30000);
   const short = (site) => site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`;
 
@@ -111,7 +101,6 @@
   // Called by the bay, only along the listener link.
   function heard(e, l, m) {
     pb?.pulse(l.from, l.to);
-    pb2?.pulse('*:chat:value-out', R_IN); pb2?.pulse(R_OUT, IN);
     said.push({ at: Number(m.sent) || Date.now(), who: short(String(m.from).split(':')[0]), text: String(e.text || ''),
       link: `${m.from} -> ${m.to}`, why: `delivered along the link you hold, ${printLink(l)}` });
     draw();
@@ -123,7 +112,7 @@
     const t = text.value().trim();
     if (!t) return;
     const r = node.emit(OUT, { text: t });
-    if (r.sent) { pb?.pulse(OUT, '*:chat:value-in'); pb2?.pulse(OUT, R_IN); pb2?.pulse(R_OUT, '*:chat:value-in'); }
+    if (r.sent) pb?.pulse(OUT, '*:chat:value-in');
     said.push({ at: Date.now(), who: 'you', text: t, link: SPEAK,
       why: r.far.length ? r.far.map((to) => `${OUT} -> ${to}`).join('\n') : 'nobody else in the room' });
     draw();
@@ -141,41 +130,12 @@
   // Before Join it is drawn from this tab's own graph, which opens nothing. A
   // wire pulses when a line really left (the room took it) or arrived along it.
   pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
 
-  // ── a second patchbay, a PROTOTYPE: the relay drawn as a box ────────────
-  // Asked 2026-10-11: *"prototype it in room 000 first, second patcbay"*,
-  // after *"why it can have standard node naming?"*. PICTURE ONLY: the bay
-  // above still holds the two `*` links and routes them; this source draws
-  // each of them as two hops through `cf-relay:<room>`, the room's Durable
-  // Object named like any node (as `cf-store:history`), drawn as a standard
-  // box (*"no dashing, std box"*). It announces nothing.
-  const RELAY = `cf-relay:${ROOM}`, R_IN = `${RELAY}:value-in`, R_OUT = `${RELAY}:value-out`;
-  const hop = (from, to) => ({ from, to, transforms: [], options: {} });
-  const viaRelay = {
-    nodes: () => [
-      { id: `${SITE}:chat`, label: 'chat' },
-      { id: RELAY, label: 'relay' },
-      { id: '*:chat', label: 'every other tab' },
-    ],
-    ports: () => [
-      { id: IN, dir: 'in', medium: 'value' }, { id: OUT, dir: 'out', medium: 'value' },
-      { id: R_IN, dir: 'in', medium: 'value' }, { id: R_OUT, dir: 'out', medium: 'value' },
-      { id: '*:chat:value-in', dir: 'in', medium: 'value' }, { id: '*:chat:value-out', dir: 'out', medium: 'value' },
-    ],
-    links: () => [
-      hop(OUT, R_IN), hop(R_OUT, '*:chat:value-in'),
-      hop('*:chat:value-out', R_IN), hop(R_OUT, IN),
-    ],
-  };
-  const pb2 = createPatchbay(viaRelay, {
-    title: 'patchbay, relay drawn',
-    detail: (n) => [{ text: n.id === RELAY ? 'Cloudflare' : n.id.startsWith('*:') ? n.label : 'chat box', sans: true }],
-  });
 
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
-  d.stack.add(join.el, row, lines.el, pb.el, pb2.el);
+  d.stack.add(join.el, row, lines.el, pb.el);
   d.ready();
 </script>

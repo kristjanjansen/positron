@@ -94,6 +94,14 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
   function render() {
     let avail = el.clientWidth;
     if (!avail) return;
+    /* 🔴 A ROW THAT DOES NOT FIT FOLDS ITS LABELS FIRST, 2026-10-11. Asked:
+       *"adjust rendering so the connectors fit into w"*, when the relay box
+       (`cf-relay:<room>`, patchbay.mjs) made a three box chat 15 px wider than
+       the page and its return wire ran off the right edge. The grey field
+       beside a title moves under it, which narrows every box to its title or
+       its ports, before the row is allowed to scroll. */
+    let folded = false;
+    const fieldsR = (n) => { const f = fieldsOf(n); return folded && f[0] && !f[1] ? [null, f[0], f[2]] : f; };
     const nodes = bay.nodes(), ports = bay.ports(), links = bay.links();
     const portsOf = (n) => {
       const mine = ports.filter((p) => nodeOf(p.id) === n.id);
@@ -109,13 +117,23 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     // Box width from what each box holds: its title, and its own longest in
     // label beside its own longest out label. One width for every box.
     const longest = (ps) => Math.max(0, ...ps.map((p) => width(portName(p.id), FONT)));
-    const boxW = Math.ceil(Math.max(...order.map((n) => {
+    // One width per COLUMN, from the boxes in it, since 2026-10-11 (*"adjust
+    // rendering so the connectors fit into w"*): one width for every box made
+    // a four column chain as wide as four of its widest box, and Yoshimi's
+    // row ran off the page for one long knob name in the first column.
+    const nodeW = (n) => {
       const { ins, outs } = portsOf(n);
-      const [f1, f2, f3] = fieldsOf(n), fw = (f) => (f ? width(f.text, FONT, f.sans) : 0);
+      const [f1, f2, f3] = fieldsR(n), fw = (f) => (f ? width(f.text, FONT, f.sans) : 0);
       return Math.max(width(n.id, TITLE) + fw(f1) + (f1 ? 3 : 2) * PAD,
         fw(f2) + fw(f3) + (f2 && f3 ? 3 : 2) * PAD,
         longest(ins) + longest(outs) + (ins.length && outs.length ? 3 : 2) * PAD);
-    })));
+    };
+    const boxWidth = () => Math.ceil(Math.max(...order.map(nodeW)));
+    const colWidths = () => cols.map((col) => Math.ceil(Math.max(...col.map(nodeW))));
+    let boxW = boxWidth(), colW = colWidths();
+    // What the boxes need side by side: each column its own width when the
+    // boxes stretch, one width for all when a page asked for that (sizeAs, no stretch).
+    const boxesW = () => (stretch ? colW.reduce((a, b) => a + b, 0) : cols.length * boxW);
     // Return wires run in lanes outside the boxes, so the row gives up a
     // margin on each side for them: STEP per wire, plus room for a corner.
     const STEP = 6, M = backs.length ? 8 + STEP * backs.length : 0;
@@ -128,19 +146,20 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     const wide = new Set(links.filter((l) => pairCount.get(`${l.from} ${l.to}`) > 1 && !back.has(l.id))
       .map((l) => rank.get(nodeOf(l.from))));
     const extra = (g) => wide.size * Math.max(0, TWIN_GAP - g);
-    const gapFor = (g) => cols.length * boxW + (cols.length - 1) * g + extra(g) + 2 * M <= avail;
+    const gapFor = (g) => boxesW() + (cols.length - 1) * g + extra(g) + 2 * M <= avail;
     // Too wide even then: a wide host keeps the chain and scrolls sideways;
     // only a phone stacks. Stacking on a desk was tried 2026-10-10 and
     // refused: *"do not do vert layouts on desktop. overflow"*.
+    if (avail >= STACK_BELOW && !gapFor(MIN_GAP) && order.some((n) => fieldsOf(n)[0] && !fieldsOf(n)[1])) { folded = true; boxW = boxWidth(); colW = colWidths(); }
     const GAPX = gapFor(GAP) ? GAP : MIN_GAP;
-    const need = cols.length * boxW + (cols.length - 1) * GAPX + extra(GAPX) + 2 * M;
+    const need = boxesW() + (cols.length - 1) * GAPX + extra(GAPX) + 2 * M;
     const across = gapFor(GAPX) || avail >= STACK_BELOW;
     if (across && need > avail) avail = need;
     el.style.overflowX = across && need > el.clientWidth ? 'auto' : '';
     const room = avail - 2 * M;
 
     // Under the title: TGAP in a compact box, a grey line of fields in a detailed one.
-    const HEAD = PAD + TITLE + TGAP + (order.some((n) => { const f = fieldsOf(n); return f[1] || f[2]; }) ? DROW : 0);
+    const HEAD = PAD + TITLE + TGAP + (order.some((n) => { const f = fieldsR(n); return f[1] || f[2]; }) ? DROW : 0);
     svg.replaceChildren();
     wires.clear();
     const at = new Map();          // port id -> { x, y, side }
@@ -149,19 +168,23 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     const boxes = [];
     let H = 0;
     if (across) {
-      const w = stretch ? (room - (cols.length - 1) * GAPX - extra(GAPX)) / cols.length
-        : Math.max(boxW, sizeAs ? (room - (sizeAs - 1) * GAPX) / sizeAs : 0);
+      // Stretched: the spare width is shared out in proportion to each
+      // column's own width, so a wide column stays the wider one.
+      const k = (room - (cols.length - 1) * GAPX - extra(GAPX)) / boxesW();
+      const fixed = Math.max(boxW, sizeAs ? (room - (sizeAs - 1) * GAPX) / sizeAs : 0);
+      const wOf = (ci) => (stretch ? colW[ci] * k : fixed);
+      const w = fixed;
       const gap = stretch || cols.length < 2 ? GAPX : Math.min(maxWire, (room - cols.length * w) / (cols.length - 1));
       const gapAt = (i) => (wide.has(i) ? Math.max(gap, TWIN_GAP) : gap);
       const left = [M];
-      for (let i = 1; i < cols.length; i++) left[i] = left[i - 1] + w + gapAt(i - 1);
+      for (let i = 1; i < cols.length; i++) left[i] = left[i - 1] + wOf(i - 1) + gapAt(i - 1);
       cols.forEach((col, ci) => {
         let y = 0;
         for (const n of col) {
           const { ins, outs } = portsOf(n);
           const top = y + HEAD;
           const h = HEAD + Math.max(ins.length, outs.length, 1) * ROW + PAD / 2;
-          const x = left[ci];
+          const x = left[ci], w = wOf(ci);
           boxes.push({ n, x, y, w, h, ins, outs });
           ins.forEach((p, i) => at.set(p.id, { x, y: top + i * ROW + ROW / 2, side: 'l' }));
           outs.forEach((p, i) => at.set(p.id, { x: x + w, y: top + i * ROW + ROW / 2, side: 'r' }));
@@ -177,7 +200,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       let y = 0;
       for (const n of order) {
         const { ins, outs } = portsOf(n);
-        const rows = Math.max(ins.length + outs.length, fieldsOf(n)[0] ? 2 : 1);
+        const rows = Math.max(ins.length + outs.length, fieldsR(n)[0] ? 2 : 1);
         const h = rows * ROW + PAD;
         boxes.push({ n, x: 0, y, h, ins, outs, phone: true });
         [...ins, ...outs].forEach((p, i) => at.set(p.id, { y: y + PAD / 2 + i * ROW + ROW / 2, side: 'r' }));
@@ -211,7 +234,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       g.append(s('rect', { x: b.x + 0.5, y: b.y + 0.5, width: b.w - 1, height: b.h - 1, rx: 4 }));
       const ty = b.phone ? b.y + PAD / 2 + ROW / 2 + 5 : b.y + PAD + TITLE - 2;
       g.append(s('text', { x: b.x + PAD, y: ty, class: 'lv-title' }, b.n.id));
-      const [f1, f2, f3] = fieldsOf(b.n), fy = ty + TGAP + DROW - 2;
+      const [f1, f2, f3] = fieldsR(b.n), fy = ty + TGAP + DROW - 2;
       const field = (f, x, y, anchor) => f && g.append(s('text',
         { x, y, 'text-anchor': anchor, class: `lv-f${f.sans ? ' lv-f-sans' : ''}` }, f.text));
       if (b.phone) { field(f1, b.x + PAD, b.y + PAD / 2 + ROW * 1.5 + 4, 'start'); svg.append(g); continue; }

@@ -161,7 +161,7 @@
   // Before Join it is drawn from this tab's own graph, which opens nothing. A
   // wire pulses when a line leaves or arrives along it.
   pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
 
   d.stack.add(panel.el, pb.el);
   d.ready();

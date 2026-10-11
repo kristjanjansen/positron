@@ -318,7 +318,7 @@
   // opens nothing.
   const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history' };
   pb = createPatchbay(heldPicture(bay, SITE),
-    { detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }] });
 
   const row = el('div', 'cc-row');
   row.append(text.el, send.el);

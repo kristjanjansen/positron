@@ -520,7 +520,7 @@
   // opens nothing. A video wire is lit while its peer connection is connected.
   const INFO = { chat: 'chat box', notice: 'notice bar', admin: 'admin line', history: 'chat history',
     screen: 'on air video', camera: 'camera', broadcast: 'on air switch', live: 'Stream live input' };
-  pb = createPatchbay(heldPicture(bay, SITE), {
+  pb = createPatchbay(heldPicture(bay, SITE), { room: ROOM, 
     detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : INFO[n.id.split(':')[1]] || n.label, sans: true }],
     flowing: (l) => (l.from === CAM ? pub?.pc.connectionState === 'connected'
       : l.to === SCREEN ? sub?.pc.connectionState === 'connected' : false),

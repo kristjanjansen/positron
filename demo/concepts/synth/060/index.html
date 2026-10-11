@@ -213,7 +213,7 @@
 
   // ── the patchbay ────────────────────────────────────────────────────────
   const sounding = () => armed && level > 0.002;
-  const pb = createPatchbay(bay, {
+  const pb = createPatchbay(bay, { room: ROOM, 
     flowing: (l) => (l.from === SYNTH_AUDIO ? sounding() : armed),
   });
   setInterval(() => pb.refresh?.(), 500);
