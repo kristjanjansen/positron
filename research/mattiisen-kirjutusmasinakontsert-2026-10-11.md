@@ -132,3 +132,123 @@ said "composed by In Spe"; UNCONFIRMED and likely a metadata shortcut.
 - Whether a score exists and where: a question to EMIC (emic.ee).
 - Whether Mattiisen ever named Leroy Anderson: an interview from 1984 to 1985 in the
   Estonian press (digar.ee or dea.digar.ee newspaper search for "kirjutusmasina kontsert").
+
+## Score: where it might be
+
+Searched 2026-10-11, catalogue and listing pages only, a handful of page reads per
+site. No audio was opened (the emic.ee works page carries an embedded mp3 player; the
+file was not fetched). This section supersedes the "Score" section above, whose
+"no published score was found" is still true but is no longer the whole answer.
+
+### The answer: the manuscripts are at the Theatre and Music Museum
+
+DOCUMENTED. The emic.ee works list carries a "Käsikiri" link under the entry, which
+opens EMIC's manuscript register:
+https://www.emic.ee/index.php?sisu=kasikirjad&mid=229&lang=est&action=view&id=13319
+(read 2026-10-11). Title there: *Kirjutusmasinakontsert D-duur*, genre LEVIMUUSIKA,
+4 movements, 1984. It lists five items, all with location **Eesti Teatri- ja
+Muusikamuuseum** (TMM):
+
+| type | kind | pages | status | sketch | TMM number | note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Autorikäsikiri (autograph) | Partituur (full score) | 52 | Lõpetatud (finished) | | ETMM_10510 M 441:2/23 | |
+| Valguskoopia (blueprint or photocopy) | Partituur | 98 | Lõpetatud | | ETMM_11841 M 441:2/30 | |
+| Autorikäsikiri | Instrumentaalpartiid (parts) | 8 | Lõpetatud | Jah | ETMM_11841 M 441:2/30 | **Kirjutusmasinapartii** (the typewriter part) |
+| Autorikäsikiri | Klaviir (piano reduction) | 28 | Lõpetatud | Jah | ETMM_11841 M 441:2/30 | |
+| Autorikäsikiri | Partituur | 20 | | Jah | ETMM_11841 M 441:2/30 | 1. ja 2. osa (movements 1 and 2) |
+
+So a finished autograph full score exists, a 98 page copy of a score exists, and an
+8 page autograph typewriter part exists. That last one is the document that would say
+how Mattiisen notated the typewriter (keys, bell, carriage return). Nothing about its
+content is known yet.
+
+UNCONFIRMED: whether "M 441" is a Mattiisen personal fonds at TMM, and whether any of
+these pages are among the roughly 4,000 TMM manuscripts digitised into MuIS in the
+2020 project (ERR, 16 Dec 2020,
+https://kultuur.err.ee/1209109/teatri-ja-muusikamuuseum-digiteerib-eesti-heliloojate-4000-originaalkasikirja
+names other composers, not Mattiisen). A plain fetch of the MuIS search
+(https://www.muis.ee/search?q=Kirjutusmasinakontsert) returned only the empty search
+form, so this needs a person in a browser, or the question to the museum.
+
+### A performance in two weeks, so performable material exists somewhere
+
+DOCUMENTED. **25 October 2026, 17:00, Tallinna Filharmoonia Mustpeade maja, Valge saal**,
+programme *Concerto grosso III. Eino Tamberg*: Eesti Sinfonietta, conductor Maria
+Seletskaja, with Maila Laidna (piano), Kristin Müürsepp (flute), Soo-Young Lee
+(clarinet), Rene Laur (alto saxophone), Stefan Heinrich Kerstan (bassoon), Mart Kivi
+(trumpet) and Estonian Percussion Group. Programme: Pärt Uusberg *Klaveripala c-moll*,
+**Alo Mattiisen *Kirjutusmasinakontsert in D***, Veljo Tormis *Reminiscentia:
+Sügismaastikud*, Eino Tamberg *Concerto grosso* op. 5. The note says the work won the
+best composition prize from the 1984 Tartu Levimuusikapäevad expert council and calls
+Mattiisen "Eino Tambergi õpilane". Organiser: Eesti Kammermuusika Ühing MTÜ.
+Sources (read 2026-10-11):
+https://www.estoniansinfonietta.ee/kontserdid/tulekul and
+https://www.filharmoonia.ee/event-details/concerto-grosso-iii-eino-tamberg
+
+UNCONFIRMED: which version is played (In Spe's band scoring, or an arrangement for
+sinfonietta and percussion), who arranged it, who plays the typewriter (Estonian
+Percussion Group is the obvious candidate: Karl Johann Lattikas, Lauri Metsvahi, Tiit
+Joamets, Tanel-Eiko Novikov, per https://estonianpercussiongroup.ee/en/ansamblist/ as
+summarised by search), and where the parts came from. Neither page says. Whoever
+prepared the parts for this concert has, by necessity, read the TMM manuscripts or an
+equivalent, so they are the shortest route to a working copy and to the rights holder's
+answer.
+
+### Each place searched
+
+| place | what was looked for | result | tag |
+| --- | --- | --- | --- |
+| EMIC works list, https://www.emic.ee/?action=view&id=57&lang=est&method=teosed&mid=32&sisu=heliloojad | publisher, "Levitaja", shop or rental marker | No publisher and no "Levitaja" line. Other Mattiisen works do carry one (the *Tšellosonaat* 1989 edition "müügil EMIKi Muusikapoes"; *Viis ärkamisaegset laulu* "Levitaja: [Noodiriiul]"). The entry links to the manuscript register above | DOCUMENTED |
+| EMIC manuscript register, id 13319 (URL above) | where the manuscript is | Five items, all at TMM (table above) | DOCUMENTED |
+| EMIC lending terms, https://www.emic.ee/laenutustingimused | rental of parts | EMIC rents orchestral material by price list, a month's notice, return within two weeks of the last performance, no copying. Nothing says it holds this work; the register places it at TMM | DOCUMENTED (terms), not applicable to this work as far as read |
+| EMIC services, https://www.emic.ee/teenused | reading room | Archive open to researchers by prior arrangement, on-site use only | DOCUMENTED |
+| ESTER, all libraries, word search "mattiisen kirjutusmasin" | a printed or manuscript score in any Estonian library, EMTA included | 3 hits, all recordings: Melodiya LP c1985 (record b2052500, held by EMTA library among others), Musea CD 1994 (b5352779), a Riho Sibul 3 CD set 2012 (b2896504). No notated music | DOCUMENTED |
+| EMTA library | manuscript or score | Searched through ESTER (EMTA catalogues there); nothing beyond the LP | DOCUMENTED (absence in ESTER only) |
+| MuIS (museums' database) | TMM item ETMM 10510 or 11841 | Search page renders client side, nothing readable | UNCONFIRMED |
+| TMM collections access, https://ajaloomuuseum.ee/muuseumist/muuseumi-kogud/kogude-kasutamine | how to see or copy | TMM's collection is covered. Requests to kogud@list.ajaloomuuseum.ee, visits Tue to Fri 10:00 to 16:00 by arrangement at least three working days ahead with the curator. Digital copy fees: 2.50 EUR if an image exists, 6 EUR a page minimum for archival digitisation, double for rush | DOCUMENTED |
+| Rahvusarhiiv (AIS), digar | Mattiisen manuscripts | Not reached by search; the EMIC register already answers where the manuscripts are, so this was not pursued | not searched in depth |
+| EAÜ, https://eau.org/en/contact/ | rights holder | General contact eau@eau.org, +372 668 4360, Lille 13 Tallinn (search summary). EAÜ represents authors and heirs; whether Mattiisen's estate is a member is not stated | DOCUMENTED (contact), UNCONFIRMED (membership) |
+| Alo Mattiiseni Fond (foundation) | heirs, rights, archive | SA Alo Mattiiseni Fond, registry code 90012691, founded 26 Feb 2014 to keep Mattiisen's music and memory, board member Anna-Mariita (Mariita) Mattiisen, his daughter; Facebook page https://www.facebook.com/alomattiisenifond/ . A search summary gives the YouTube channel's contact alo.mattiisen@gmail.com and says the channel is run by the daughter "who has inherited all the rights"; the YouTube about page redirected to a consent wall and was not read | DOCUMENTED (foundation, via registry summaries), UNCONFIRMED (email and rights sentence) |
+| Daughter's interview, ERR Eeter, 21 Jan 2025, https://eeter.err.ee/1609974498/alo-mattiiseni-tutar-vahel-motlen-kull-sellele-et-olen-viimane-mattiisen | archive, rights | Nothing on manuscripts or this work | DOCUMENTED (absence) |
+| Postimees, 31 May 1997, https://www.postimees.ee/2509665/alo-mattiisen-seisab-plaadil-ajaga-silmitsi | estate, papers | About the *Ajaga silmitsi* CD; nothing on the score | DOCUMENTED (absence) |
+| In Spe members' interviews | how the typewriter part was written, who played it | Nothing found in the searches run. The 8 page typewriter part at TMM is now the better source | UNCONFIRMED |
+| ERR archive | the 1984 premiere | A series page *Tartu levimuusikapäevad* exists, http://arhiiv.err.ee/seeria/tartu-levimuusikapaevad/0/0/default/koik (listed by search, not opened, renders client side). Whether 1984 is in it is not known | UNCONFIRMED |
+
+### Whom to email
+
+1. **The museum, for the manuscripts** (the primary source). kogud@list.ajaloomuuseum.ee
+   (collections of Eesti Ajaloomuuseum, which covers TMM).
+   > Tere! Soovin tutvuda Eesti Teatri- ja Muusikamuuseumis hoitavate Alo Mattiiseni
+   > "Kirjutusmasinakontsert D-duur" käsikirjadega (ETMM_10510 M 441:2/23 ja ETMM_11841
+   > M 441:2/30, eriti kirjutusmasinapartii), kas need on digiteeritud või saab tellida
+   > koopiad uurimiseks?
+
+2. **The concert organiser, for the performing material and its source.** Eesti
+   Sinfonietta, executive director Kaia Lattikas, kaia.lattikas@gmail.com (listed as
+   organiser contact on the Philharmonic event page), +372 5663 1542
+   (https://www.estoniansinfonietta.ee/kontakt).
+   > Tere! Nägin, et 25. oktoobril kõlab Mustpeade majas Alo Mattiiseni
+   > Kirjutusmasinakontsert, kas oskate öelda, kelle seades see kõlab ja kust partituur
+   > ning kirjutusmasinapartii pärinevad?
+
+3. **The rights holder, before anything is reproduced.** SA Alo Mattiiseni Fond, via
+   alo.mattiisen@gmail.com (UNCONFIRMED address, see table) or the foundation's
+   Facebook page; fall back to EAÜ, eau@eau.org, who can pass a request to the heirs.
+   > Tere! Uurin Alo Mattiiseni Kirjutusmasinakontserti (1984) ja selle
+   > kirjutusmasinapartii noodistust mittetulunduslikuks uurimisprojektiks, kas
+   > fond saaks loa anda TMM-is hoitavate käsikirjade koopiate tegemiseks ja uurimiseks?
+
+4. **EMIC, only if 1 to 3 stall.** emic@emic.ee, +372 6454 395. They hold the register
+   that points to TMM and can say whether a copy was ever deposited with them.
+   > Tere! Teie käsikirjaregistri järgi on Alo Mattiiseni Kirjutusmasinakontserdi
+   > käsikirjad Teatri- ja Muusikamuuseumis, kas EMIK-is on neist ka koopia või
+   > teate, kes on teose noodimaterjali viimati kasutanud?
+
+### What this changes for positron
+
+- The rights position above stands: copies obtained for study are not a licence to
+  publish. Reproducing or transcribing the score on a page still needs the heirs.
+- Once the typewriter part has been seen, the "how Mattiisen notated the typewriter"
+  question in the Score section can be answered from the document, not from inference.
+- The 25 October concert is a live chance to see the piece without opening anybody's
+  stream.
