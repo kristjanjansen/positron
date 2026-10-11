@@ -28,7 +28,7 @@
 // *changed* every five seconds redraws `/graph/` on every beat and nobody sees
 // why.
 
-import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS, BOARD_SITE, boardPort } from './graph-registry.mjs';
+import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS, BOARD_SITE, boardPort, jackRows, JACK_ENDS } from './graph-registry.mjs';
 import { createBay } from './bay.mjs';
 
 let pass = 0, fail = 0;
@@ -362,6 +362,58 @@ console.log('\n== into a bay ==');
     graphProblem({ v: 1, site: 'web-ab12', kind: 'browser', nodes: [], ports: [{ id: 'web-ab12:keys:out', dir: 'out', medium: 'midi' }] }) === '');
   ok('NEGATIVE CONTROL: and so does one that says nothing about its kind',
     graphProblem({ v: 1, site: 'cf-store', nodes: [], ports: [{ id: 'cf-store:history:in', dir: 'in', medium: 'value' }] }) === '');
+}
+
+console.log('\n== the JACK ends, and one bay link as JACK rows (2026-10-11) ==');
+
+{
+  // 🔴 THE BAY HALF OF THE JACK ARM (plans/plan-nodes-revisited.md §3 item 3).
+  // Twelve asserts, six of them NEGATIVE CONTROLS. Sabotaged 2026-10-11, one
+  // fault at a time, against 95 green: `jackRows` pairing by index whatever the
+  // counts takes 3 red; `boardGraph` defaulting `jack` on takes 4 (one of them
+  // here, three older ones that count nodes and transports); `bay.mjs` dropping
+  // its same-site test takes 1, the two-board control below.
+  const plain = desk();
+  ok('NEGATIVE CONTROL: a board graph without jack announces no JACK end and no granulator node',
+    !plain.ports.some((p) => p.jack) && !node(plain, 'pi-1:pappus') && !node(plain, 'pi-1:capture'));
+  const g = desk({ jack: true, inputs: [{ ...INPUTS[0], jack: true, take: 1 }] });
+  ok('with jack, Yoshimi keeps its id and relay address and names its two JACK ports',
+    JSON.stringify(port(g, 'pi-1:yoshimi:audio-out')?.jack) === JSON.stringify(JACK_ENDS.yoshimi)
+    && port(g, 'pi-1:yoshimi:audio-out').address === 'studio-1' && port(g, 'pi-1:yoshimi:audio-out').transports.includes('relay'));
+  ok('the Circuit on JACK is its one taken channel', JSON.stringify(port(g, 'pi-1:circuit:audio-out')?.jack) === '["circuit:capture_1"]');
+  ok('the granulator and the capture are nodes that travel by JACK only, and the graph is still legal',
+    port(g, 'pi-1:pappus:audio-in')?.transports.join() === 'jack' && port(g, 'pi-1:capture:audio-in')?.dir === 'in'
+    && graphProblem(g) === '', graphProblem(g));
+  ok('NEGATIVE CONTROL: an input not on JACK names no JACK port',
+    !port(desk({ jack: true }), 'pi-1:circuit:audio-out').jack);
+  ok('two into two is one to one, two into one sums, one into two spreads',
+    JSON.stringify(jackRows(['a:l', 'a:r'], ['b:1', 'b:2'])) .includes('"from":"a:r","to":"b:2"')
+    && jackRows(['a:l', 'a:r'], ['cap:in']).rows.length === 2 && jackRows(['a:l', 'a:r'], ['cap:in']).rows.every((r) => r.to === 'cap:in')
+    && jackRows(['c:1'], ['g:1', 'g:2']).rows.map((r) => r.to).join() === 'g:1,g:2');
+  ok('NEGATIVE CONTROL: two into three is refused in words', jackRows(['a', 'b'], ['x', 'y', 'z']).ok === false
+    && /2 channels into 3/.test(jackRows(['a', 'b'], ['x', 'y', 'z']).why));
+  const bay = createBay();
+  for (const n of g.nodes) bay.addNode(n);
+  for (const p of g.ports) bay.addPort(p);
+  const v = bay.validate('pi-1:circuit:audio-out', 'pi-1:pappus:audio-in');
+  ok('the Circuit into the granulator is a jack session carrying the two rows it means',
+    v.ok && v.session?.transport === 'jack' && v.session.rows.map((r) => `${r.from}>${r.to}`).join()
+      === 'circuit:capture_1>SuperCollider:in_1,circuit:capture_1>SuperCollider:in_2', JSON.stringify(v.session ?? v.why));
+  bay.addNode({ id: 'web-x:screen', kind: 'screen', label: 'screen', place: 'browser' });
+  bay.addPort({ id: 'web-x:screen:audio-in', label: 'screen', dir: 'in', medium: 'audio', shape: {} });
+  const out = bay.validate('pi-1:pappus:audio-out', 'web-x:screen:audio-in');
+  ok('NEGATIVE CONTROL: the granulator straight to a page is refused, because JACK never leaves the board',
+    !out.ok && /never leaves pi-1/.test(out.why), out.why);
+  const yo = bay.validate('pi-1:yoshimi:audio-out', 'web-x:screen:audio-in');
+  ok('and Yoshimi to a page still rides the relay, so no page that links it moved', yo.ok && yo.session.transport === 'relay', yo.session?.transport);
+  const two = desk({ jack: true, site: 'pi-2', room: 'studio-2' });
+  for (const n of two.nodes) bay.addNode(n);
+  for (const p of two.ports) bay.addPort(p);
+  const across = bay.validate('pi-2:yoshimi:audio-out', 'pi-1:pappus:audio-in');
+  ok('NEGATIVE CONTROL: Yoshimi on a second board into this board\'s granulator is refused, two JACK servers share no row',
+    !across.ok && /never leaves pi-1/.test(across.why), across.why || across.session?.transport);
+  const asSource = bay.validate('pi-1:pappus:audio-in', 'pi-1:capture:audio-in');
+  ok('NEGATIVE CONTROL: the granulator\'s input as a source is refused', !asSource.ok && /is an input/.test(asSource.why), asSource.why);
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);

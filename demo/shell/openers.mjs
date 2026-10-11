@@ -57,6 +57,8 @@ export const BY_TRANSPORT = {
   'relay-h264': ['video'],
   ingest: ['record'],
   https: ['play'],
+  // A link inside one board's JACK graph, 2026-10-11: the board applies it.
+  jack: ['jack'],
 };
 /** Every opener this file has, `remote` first because it is decided first. */
 export const OPENER_KINDS = ['remote', ...new Set(Object.values(BY_TRANSPORT).flat())];
@@ -138,6 +140,7 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
       video: () => a.medium === 'video' && is(l.to, 'screenVideo') && !!a.address,
       record: () => a.medium === 'audio' && kindOfNode(b, l.to) === 'store' && !!a.address && kindOfNode(b, l.from) !== 'store',
       play: () => a.medium === 'audio' && kindOfNode(b, l.from) === 'store' && is(l.to, 'screenAudio'),
+      jack: () => a.medium === 'audio' && Array.isArray(l.session?.rows) && !!l.session.address,
     };
     const kind = may.find((k) => fits[k]());
     return kind ? { kind, transport }
@@ -452,6 +455,43 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
     };
   }
 
+  /**
+   * 🔴 A LINK INSIDE THE BOARD'S JACK GRAPH, 2026-10-11. Nothing crosses a wire
+   * but the request: the page asks the board's room for `jack.link`, the board
+   * resolves the two ids from its OWN announcement, applies the rows and
+   * answers the graph read back. `count()` is the rows the board read back as
+   * connected, which is the far side; a page that wants to know whether they
+   * are still there asks `jack.links`.
+   * ⚠️ CLOSING UNLINKS, AND THE BOARD CUTS ONLY WHAT NOTHING ELSE WANTS: a link
+   * that repeats the board's own chain leaves the room sounding when it closes.
+   */
+  async function jack(l, b) {
+    const room = l.session.address;
+    const line = `${l.from} -> ${l.to}`;
+    const board = await boardOn(room);
+    const r = await board.ask({ type: 'jack.link', link: line }, 'jack.linked', 8000);
+    if (!r || !r.ok) {
+      board.close();
+      throw new Error(!r ? 'the board did not answer within 8 s'
+        : [...(r.problems ?? []), r.hint].filter(Boolean).join('. ') || 'the board read back something else');
+    }
+    const connected = (r.rows ?? []).filter((x) => (r.feeding?.[x.to] ?? []).includes(x.from)).length;
+    log(`${line} is ${r.rows.length} JACK row${r.rows.length === 1 ? '' : 's'} on the board, ${r.says}, ${connected} read back`, 'ok');
+    return {
+      kind: 'jack',
+      via: () => 'jack',
+      state: () => `${connected} of ${r.rows.length} rows`,
+      count: () => connected,
+      rows: () => r.rows,
+      close: () => {
+        board.ask({ type: 'jack.unlink', link: line }, 'jack.unlinked', 8000).then((u) => {
+          if (!u) log(`${line}: the board did not answer the unlink`, 'warn');
+          else log(`${line} unlinked, ${u.cut?.length ?? 0} row(s) cut and ${u.kept?.length ?? 0} kept because the board still wants them`, u.ok ? 'ok' : 'warn');
+        }).finally(() => board.close());
+      },
+    };
+  }
+
   /** The table a page opens through, by kind. Every entry is `(link, bay) => Promise<handle>`. */
   const table = {
     remote: (l) => remote(l),
@@ -462,6 +502,7 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
     notes: async (l, b) => keys(l, b, true),
     record: (l, b) => record(l, b),
     play: () => play(),
+    jack: (l, b) => jack(l, b),
   };
 
   return { pick, table, holdSource, dropSource, sources, boardOn };

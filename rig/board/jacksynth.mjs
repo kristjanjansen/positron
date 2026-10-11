@@ -90,7 +90,9 @@ const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
 export function wire(doc, { onLog, what = 'jack' } = {}) {
   const g = listJack();
   if (g.error) { onLog?.(`${what}: ${g.error}, nothing patched`); return { ok: false, planned: null, ran: [], reason: g.error }; }
-  const planned = jackPlan(doc, g.rows);
+  // 🔴 THE BAY'S LINKS RIDE ON EVERY RE-PATCH (see `setBayRows`), so a document
+  // that owns an input keeps a bay link into it instead of cutting it.
+  const planned = jackPlan(withBay(doc, g.rows), g.rows);
   if (!planned.ok) {
     onLog?.(`${what}: refused, ${planned.problems.join('; ')}`);
     return { ok: false, planned, ran: [], reason: planned.problems.join('; ') };
@@ -101,6 +103,58 @@ export function wire(doc, { onLog, what = 'jack' } = {}) {
   return { ...r, planned };
 }
 const l = (from, to) => ({ from, to });
+
+/**
+ * 🔴 THE BAY'S JACK LINKS, AND WHO WINS AGAINST THE BOARD'S OWN CHAIN.
+ * Decided 2026-10-11 (plans/plan-nodes-revisited.md §5 item 6, not answered by
+ * the owner): A BAY LINK IS PART OF WHAT THE BOARD BELIEVES. Until then
+ * `fx.pappus` and `jack.rebuild` owned the capture and the granulator's inputs
+ * and would cut anything they did not name, so the Circuit patched into the
+ * granulator from a page would have lasted until the next press of the
+ * granulator's switch. Now `board.mjs` keeps the rows of every bay link it
+ * applied here, `wire()` adds them to every document it patches, and
+ * `jackChain` counts them as wanted, so a rebuild puts them back rather than
+ * taking them out.
+ * ⚠️ A ROW WHOSE PORT IS NOT ON THE GRAPH IS SKIPPED, NOT REFUSED. The
+ * granulator going away does not unmake the link; it comes back with the
+ * granulator, because the re-patch that raises it carries the row.
+ * ⚠️ IN MEMORY ONLY. A service restart forgets every bay link, which is the same
+ * as every other piece of state this board holds (the insert, the source), and
+ * a page that wants one back makes it again.
+ */
+let bayRows = [];
+export function setBayRows(rows) { bayRows = Array.isArray(rows) ? rows.map((r) => l(r.from, r.to)) : []; }
+export function getBayRows() { return bayRows.map((r) => l(r.from, r.to)); }
+const present = (rows, port) => rows.some((r) => r.port === port);
+const bayOnGraph = (rows) => bayRows.filter((r) => present(rows, r.from) && present(rows, r.to));
+function withBay(doc, rows) {
+  const extra = bayOnGraph(rows);
+  return extra.length ? { ...doc, links: [...(doc.links ?? []), ...extra] } : doc;
+}
+
+/**
+ * jackd, raised if JACK does not answer. Shared by the instrument chain and by
+ * the hardware inputs on JACK (`inputs.mjs` `via: "jack"`), which need a server
+ * before any instrument has been asked for.
+ */
+export async function ensureJackd({ onLog } = {}) {
+  // Ask JACK, not the process table. `pgrep -x jackd` reports a server this
+  // process may not be able to REACH, in a different mount namespace or as a
+  // different user, and skipping the start on that basis leaves every client
+  // unable to connect. jack_lsp answers the question actually being asked.
+  if (sh('jack_lsp 2>/dev/null').trim()) return { ok: true, started: false };
+  sh('pkill -9 -x jackd 2>/dev/null');            // a server we cannot reach is worse than none
+  await wait(400);
+  spawn('jackd', ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'],
+    { stdio: 'ignore', detached: true }).unref();
+  // Poll rather than sleep a guessed amount: 2.5 s was enough on a warm board
+  // and not on a cold one, which is the worst kind of timing constant.
+  let up = false;
+  for (let i = 0; i < 20 && !up; i++) { await wait(500); up = !!sh('jack_lsp 2>/dev/null').trim(); }
+  if (!up) return { ok: false, reason: 'jackd would not start' };
+  onLog?.('jackd up');
+  return { ok: true, started: true };
+}
 
 /**
  * The instruments this module knows how to raise.
@@ -499,6 +553,10 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
     }
   }
 
+  // The bay's links are wanted too, since 2026-10-11 (`setBayRows`), so a
+  // rebuild puts a page's link back rather than cutting it as a stray.
+  for (const r of bayOnGraph(rows)) if (!want.some(([f, t]) => f === r.from && t === r.to)) want.push([r.from, r.to]);
+
   // Anything ELSE feeding those sinks. This is the half that re-running the
   // connect commands can never find: a link that should not be there sums into
   // the capture, and nothing downstream can tell it from the instrument. The
@@ -637,17 +695,9 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // And ask JACK, not the process table: `pgrep -x jackd` reports a server this
   // process may not be able to REACH, and skipping the start on that basis
   // leaves every client unable to connect.
-  if (!sh('jack_lsp 2>/dev/null').trim()) {
-    sh('pkill -9 -x jackd 2>/dev/null');            // a server we cannot reach is worse than none
-    await wait(400);
-    spawn('jackd', ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'],
-      { stdio: 'ignore', detached: true }).unref();
-    // Poll rather than sleep a guessed amount: 2.5 s was enough on a warm board
-    // and not on a cold one, which is the worst kind of timing constant.
-    let up = false;
-    for (let i = 0; i < 20 && !up; i++) { await wait(500); up = !!sh('jack_lsp 2>/dev/null').trim(); }
-    if (!up) return { ok: false, reason: 'jackd would not start' };
-    onLog?.('jackd up');
+  {
+    const j = await ensureJackd({ onLog });
+    if (!j.ok) return { ok: false, reason: j.reason };
   }
 
   // ⚠️ STEP 2 WAS A FEEDER AND IT LEFT WITH hexter, 2026-09-16. A def could

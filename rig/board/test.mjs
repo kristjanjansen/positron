@@ -7,7 +7,7 @@
 // gap that is written down.
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY } from './alsa.mjs';
 import { parseBanks, parseInstance, chooseRoot, yoshimiPatches, flatten, MAX_PROGRAM } from './yoshimi.mjs';
-import { parseJackLsp, jackChain, jackRebuild } from './jacksynth.mjs';
+import { parseJackLsp, jackChain, jackRebuild , setBayRows } from './jacksynth.mjs';
 import * as jack from './jack.mjs';
 import { parseInputs, takeChannel, createByteOrder, leaseExpired, createInputs, midiVerdict, SYNTH_CC } from './inputs.mjs';
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
@@ -255,6 +255,25 @@ const goneRows = parseJackLsp(jackText.replace(/^posboard:input_1\n(   .*\n)*/m,
 is('a capture that has gone is reported', jackChain({ ...yosh, graph: { graph: goneRows } }).capture.present, false);
 is('nothing playing is not intact either', jackChain({ graph }).intact, false);
 
+console.log('jack: a bay link is part of what the board believes (2026-10-11)');
+// `setBayRows` is what `jack.link` hands over. The same stray as above, made
+// on purpose from a page, is wanted rather than cut, so `jack.rebuild` and
+// `fx.pappus` keep it. Four asserts, two NEGATIVE CONTROLS.
+// A real graph lists the stray as a port of its own as well, which is what the
+// bay's "is it on the graph" test reads.
+const ghostRows = parseJackLsp(`ghost:out_1\n   posboard:input_1\n${jackText.replace('posboard:input_1\n   yoshimi:left',
+                                                'posboard:input_1\n   ghost:out_1\n   yoshimi:left')}`);
+setBayRows([{ from: 'ghost:out_1', to: 'posboard:input_1' }]);
+const kept = jackChain({ ...yosh, graph: { graph: ghostRows } });
+is('a source a bay link put into the capture is wanted, so the chain is intact', [kept.intact, kept.extra], [true, []]);
+is('and it is one of the links a rebuild would make', kept.want.some(([f]) => f === 'ghost:out_1'), true);
+setBayRows([{ from: 'SuperCollider:out_1', to: 'posboard:input_1' }]);
+is('NEGATIVE CONTROL: a bay row whose port is not on the graph is skipped, not planned against nothing',
+  jackChain({ ...yosh, graph }).want.length, 2);
+setBayRows([]);
+is('NEGATIVE CONTROL: with the bay link gone the same source is a stray again', jackChain({ ...yosh, graph: { graph: ghostRows } }).extra,
+  [['ghost:out_1', 'posboard:input_1']]);
+
 console.log('jack: the insert, and the material');
 // With the granulator in, the instrument feeds IT and it feeds the capture,
 // so the same healthy-looking graph above is wrong, which is the whole reason
@@ -425,7 +444,7 @@ console.log('jack: the board\'s own chain, through jack.mjs');
 console.log('inputs: a name, a room and a lease');
 {
   const good = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1}}');
-  is('a good entry is read whole', good.inputs.get('circuit'), { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, midi: null });
+  is('a good entry is read whole', good.inputs.get('circuit'), { name: 'circuit', device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, midi: null, via: 'arecord' });
   const bad = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":3},"Bad Name":{"device":"x"},"ok":{"device":"default"}}');
   is('a take past the channel count is refused', bad.inputs.has('circuit'), false);
   is('a name with spaces is refused', bad.inputs.has('Bad Name'), false);
@@ -528,6 +547,53 @@ console.log('inputs: a name, a room and a lease');
   const st = JSON.parse(sockets[0].sent.filter((x) => typeof x === 'string').at(-1));
   is('status in the input room says what is playing', [st.type, st.ok, st.source], ['audio.started', false, 'circuit']);
   hw.close();
+
+  // ── an input on JACK, 2026-10-11 (inputs.mjs `via: "jack"`) ───────────────
+  // Fourteen asserts, five NEGATIVE CONTROLS. What is graded is the order of
+  // things and what each process is asked for; whether alsa_in really puts the
+  // Circuit on the graph at the right level is measured on the Pi, not here.
+  const jc = parseInputs(JSON.stringify({ circuit: { device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, via: 'jack' } }));
+  is('via jack is read', jc.inputs.get('circuit')?.via, 'jack');
+  is('NEGATIVE CONTROL: any other via is refused by name',
+    /via is arecord or jack/.test(parseInputs(JSON.stringify({ c: { device: 'hw:0', via: 'pulse' } })).problems[0] ?? ''), true);
+  spawned.length = 0; sockets.length = 0;
+  const wired = [], timers = [];
+  let ensured = 0;
+  const jhw = createInputs({
+    inputs: jc.inputs, room: 'studio-1', relay: 'wss://relay', frame: 4, rate: 48000, name: 'pi', id: 'pi-1',
+    spawn: fakeSpawn, WebSocket: FakeWS, format: fmt, parse: prs, randomId: () => 'abc', now: () => t,
+    leaseMs: 60_000, beatMs: 5_000, setTimer: (fn) => timers.push(fn),
+    jack: { ensure: () => { ensured++; return { ok: true }; }, wire: (doc) => { wired.push(doc); return { ok: true }; } },
+  });
+  const jcirc = jhw.get('circuit');
+  jcirc.connect(); jcirc.startBridge();
+  await new Promise((r) => setImmediate(r));
+  is('the bridge starts with nobody asking, after JACK was made sure of', [ensured, spawned.map((x) => x.cmd)], [1, ['alsa_in']]);
+  const ai = spawned[0].args;
+  is('alsa_in names the input as its JACK client, at the configured channel count',
+    [ai[ai.indexOf('-j') + 1], ai[ai.indexOf('-c') + 1]], ['circuit', '2']);
+  is('NEGATIVE CONTROL: through plughw, never the bare hw device that read 48 dB hot', ai[ai.indexOf('-d') + 1], 'plughw:CARD=Pro,DEV=0');
+  is('NEGATIVE CONTROL: and no arecord, which would fight alsa_in for the card', spawned.some((x) => x.cmd === 'arecord'), false);
+  jcirc.handle({ type: 'input.want', id: 'j1' });
+  is('asking starts a JACK reader, not a second bridge', spawned.map((x) => x.cmd), ['alsa_in', 'ffmpeg']);
+  const rd = spawned[1].args;
+  is('the reader is a JACK client of its own, one channel', [rd[rd.indexOf('-i') + 1], rd[rd.indexOf('-channels') + 1]], ['poscircuit', '1']);
+  timers.shift()();
+  is('and it is fed the taken channel, owning its input so nothing else sums in',
+    wired.at(-1), { v: 1, links: [{ from: 'circuit:capture_1', to: 'poscircuit:input_1' }], own: ['poscircuit:input_1'] });
+  spawned[1].p.stdout.emit('data', Buffer.from(new Int16Array([1, 2, 3, 4]).buffer));
+  const jbin = sockets[0].sent.find((x) => Buffer.isBuffer(x));
+  is('a mono frame off JACK goes out untouched, no channel taken twice', jbin && [...new Int16Array(jbin.buffer.slice(jbin.byteOffset + 12, jbin.byteOffset + jbin.length))], [1, 2, 3, 4]);
+  t += 61_000; jcirc.s.lastHeard = t; jcirc.beat();
+  is('past the lease the reader stops', spawned[1].p.killed, true);
+  is('NEGATIVE CONTROL: and the bridge does not, so a bay link through it keeps sounding', !!spawned[0].p.killed, false);
+  spawned[0].p.emit('exit', 1);
+  timers.at(-1)();
+  await new Promise((r) => setImmediate(r));
+  const second = spawned.filter((x) => x.cmd === 'alsa_in')[1];
+  is('a bridge that dies is started again, not left gone', !!second && !second.p.killed, true);
+  jhw.close();
+  is('NEGATIVE CONTROL: closing the board does take the bridge down', !!second?.p.killed, true);
 }
 
 console.log('inputs: what a page may send the Circuit');
@@ -820,6 +886,14 @@ console.log('\nbeat: the graph on the hello and on every beat');
   const bytes = Buffer.byteLength(JSON.stringify(alive));
   console.log(`         board.alive is ${bytes} bytes with the graph, ${Buffer.byteLength(JSON.stringify({ ...alive, graph: undefined }))} without`);
   ok('the beat stays under 4 KB', bytes < 4096, `${bytes} bytes`);
+  // 2026-10-11: the JACK ends add the granulator, the capture and a `jack` list
+  // on Yoshimi and on the Circuit, and the beat carries all of it.
+  const jackFacts = { ...graphFacts, jack: true,
+    inputs: [...(graphFacts.inputs instanceof Map ? graphFacts.inputs.values() : graphFacts.inputs)].map((i) => ({ ...i, via: 'jack' })) };
+  const jackAlive = aliveMsg({ ...alive, graphFacts: jackFacts });
+  const jbytes = Buffer.byteLength(JSON.stringify(jackAlive));
+  ok('with the JACK ends announced the beat still stays under 4 KB, and carries them',
+    jbytes < 4096 && jackAlive.graph.ports.some((p) => p.id === 'pi-1:circuit:audio-out' && p.jack?.[0] === 'circuit:capture_1'), `${jbytes} bytes`);
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

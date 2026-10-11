@@ -36,6 +36,7 @@ import { boardGraph } from '../../demo/shell/graph-registry.mjs';
  * @param {number} f.frameMs
  * @param {boolean} f.gpu           `videoAvailable()`
  * @param {function} [f.midiPresent] `(port) => boolean`, is that ALSA card there now
+ * @param {boolean} [f.jack]         the board has a JACK graph, so its JACK ends are announced
  */
 const present = (f, port) => (typeof f.midiPresent === 'function'
   ? f.midiPresent(port)
@@ -54,8 +55,10 @@ export function graphOf(f) {
     // every beat (one lookup), so a replug shows up within five seconds; with
     // no answer to ask, the ALSA list from the last hello decides.
     inputs: inputs.map((i) => ({ name: i.name, channels: i.channels,
-      midi: i.midi && present(f, i.midi.port) ? i.midi : null })),
-    alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false,
+      midi: i.midi && present(f, i.midi.port) ? i.midi : null,
+      // An input on JACK announces its JACK port (graph-registry `inputJack`).
+      ...(i.via === 'jack' ? { jack: true, take: i.take ?? 1 } : {}) })),
+    alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, jack: f.jack === true,
   });
 }
 

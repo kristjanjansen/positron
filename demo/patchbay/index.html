@@ -954,6 +954,22 @@
       cam.kind === null && cam.transport === 'whep' && /nothing here opens whep/.test(cam.why || ''), `${cam.kind} by ${cam.transport}: ${cam.why}`);
   }
   {
+    // 2026-10-11: a link between two of the Pi's own audio ports rides its JACK
+    // graph, and the board applies it (`jack.link`, openers.mjs `jack`). Graded
+    // on a scratch bay; the far side, the graph read back and the sound in the
+    // room, is `rig/board/jack-bay-live.mjs` against the real board.
+    const reg2 = createRegistry();
+    reg2.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { yoshimi: true, pappusFx: true },
+      inputs: [{ name: 'circuit', jack: true, take: 1, midi: null }], jack: true }) });
+    const t2 = reg2.fill(createBay());
+    const r2 = t2.link('pi-1:circuit:audio-out', 'pi-1:pappus:audio-in');
+    const l2 = t2.links().find((x) => x.id === r2.id);
+    const p2 = l2 ? openers.pick(l2, t2) : { kind: null, transport: r2.why };
+    d.assert('the Circuit into the Pi\u2019s granulator is opened by the board over JACK, as the two rows it means',
+      p2.kind === 'jack' && p2.transport === 'jack' && l2?.session?.rows?.length === 2 && l2.session.address === 'studio-1',
+      `${p2.kind} by ${p2.transport}, ${l2?.session?.rows?.length ?? 0} rows`);
+  }
+  {
     // The badge rule, the stage's, fed fixtures (link-badge.mjs).
     const w = (o) => linkStateOf({ now: 10_000, ...o });
     d.assert('a link badge says starting after a press, receiving while the far count grows, stalled when it stops',

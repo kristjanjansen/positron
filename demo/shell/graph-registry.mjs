@@ -75,6 +75,60 @@ export function withBoardTransports(g) {
 const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
 
 /**
+ * 🔴 THE JACK PORTS BEHIND A BOARD'S AUDIO PORTS, SINCE 2026-10-11
+ * (plans/plan-nodes-revisited.md §3 item 3, the bay half). A bay port is a
+ * SOUND and the transport is how it travels: `pi-1:yoshimi:audio-out` is
+ * Yoshimi, and it reaches a page over the relay and reaches the granulator over
+ * JACK. So the port keeps its id and its relay address, and gains a `jack` list
+ * naming the JACK ports it is on the board's graph. Nothing was renamed, which
+ * is the answer to §5 item 5 that breaks no page.
+ * ⚠️ NAMED HERE ONCE, because the page that resolves a link and the board that
+ * applies it have to agree on them, and this is the one file both import. The
+ * board's own chain (`jacksynth.mjs`) names the same strings for the same ports.
+ * ⚠️ AN INPUT ON JACK IS ITS ONE TAKEN CHANNEL. The Circuit is plugged into
+ * input 1 of a stereo interface and input 2 carries only that input's noise
+ * (`inputs.mjs` `takeChannel`), so `circuit` is `circuit:capture_1` and nothing
+ * else.
+ */
+export const JACK_ENDS = {
+  yoshimi: ['yoshimi:left', 'yoshimi:right'],
+  pappusIn: ['SuperCollider:in_1', 'SuperCollider:in_2'],
+  pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
+  capture: ['posboard:input_1'],
+};
+/** The JACK port a hardware input lands on: `alsa_in -j <name>` registers `<name>:capture_N`. */
+export const inputJack = (name, take = 1) => [`${name}:capture_${take}`];
+
+/**
+ * One bay link between two JACK lists, as JACK rows. Pure.
+ *
+ * 🔴 STEREO, DECIDED 2026-10-11 (the owner: *"Dunno stereo"*): ONE BAY LINK IS
+ * ONE WIRE ON THE PICTURE AND RESOLVES TO AS MANY JACK ROWS AS THE TWO ENDS
+ * NEED, by the one rule this board already measured honest:
+ *   - the same count each side: channel to channel (Yoshimi into the granulator);
+ *   - one input: every channel SUMS into it, which is how the capture has been
+ *     mono-sum since 2026-09-13 (mono-left read 1661 Hz where the sum read 2029);
+ *   - one output: it feeds every input (the Circuit, mono, into both of the
+ *     granulator's inputs, so its right side is not starved);
+ *   - anything else, two into three, has no honest pairing and is refused.
+ * The rows ride on the session (`bay.mjs`), so a reader is told what one wire
+ * means before it is made.
+ */
+export function jackRows(from, to) {
+  const a = Array.isArray(from) ? from : [], b = Array.isArray(to) ? to : [];
+  if (!a.length || !b.length) {
+    return { ok: false, rows: [], why: `${!a.length ? 'the source' : 'the destination'} is not on the board's JACK graph` };
+  }
+  if (a.length === b.length) {
+    return { ok: true, rows: a.map((f, i) => ({ from: f, to: b[i] })),
+             says: a.length === 1 ? 'one channel' : `${a.length} channels, one to one` };
+  }
+  if (b.length === 1) return { ok: true, rows: a.map((f) => ({ from: f, to: b[0] })), says: `${a.length} channels summed into one` };
+  if (a.length === 1) return { ok: true, rows: b.map((t) => ({ from: a[0], to: t })), says: `one channel into all ${b.length}` };
+  return { ok: false, rows: [], why: `${a.length} channels into ${b.length} has no one way to pair them` };
+}
+
+/**
  * What a Raspberry Pi board is, as a graph. Everything here is something the
  * board already has a verb for; nothing is described that it cannot do.
  * @param {object} o
@@ -91,8 +145,13 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  * @param {string} [o.label]     the human name a reader shows for this site.
  *   A fixed 'Raspberry Pi' rather than the board's hostname, because the
  *   hostname is `raspberrypi` on every fresh Pi OS (`board.mjs`, `NAME`).
+ * @param {boolean} [o.jack]     the board has a JACK graph and announces its
+ *   JACK ends: a `jack` list on Yoshimi's audio out and on every input that is
+ *   on JACK (`i.jack`), and, where the granulator is installed, the granulator
+ *   and the capture as nodes of their own. Off by default, so a page building a
+ *   board graph to test against gets exactly the graph it always got.
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi' }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, label = 'Raspberry Pi', jack = false }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -109,8 +168,30 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
     // there, and its sound comes back down the same socket.
     port(n, 'midi-in', { label: k, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'bend', 'program'], never: [], address: room });
+    const j = jack && JACK_ENDS[k] ? JACK_ENDS[k] : null;
     port(n, 'audio-out', { label: k, dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs }, address: room,
-      transports: [...BOARD_TRANSPORTS.audio] });
+      transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: [...j] } : {}) });
+  }
+  // 🔴 THE GRANULATOR AND THE CAPTURE, AS JACK ENDS, SINCE 2026-10-11. Both
+  // travel by JACK and nothing else, so a link from either to a page is refused
+  // in words by the bay rather than opened. The capture is what the board's
+  // main room HEARS: `posboard:input_1`, whose stream reaches pages as
+  // `${site}:yoshimi:audio-out` today, because Yoshimi is what the board's own
+  // chain puts in it (plans/plan-nodes-revisited.md §3 item 3).
+  // ⚠️ THE SHAPE SAYS THE RATE ONLY. The channel count of a JACK end is the
+  // length of its `jack` list, and a relay stream's `channels: 1` beside a
+  // granulator's two would refuse the link that is the whole point.
+  if (jack && instruments.pappusFx) {
+    node('pappus', 'engine', 'Granulator');
+    port('pappus', 'audio-in', { label: 'Granulator', dir: 'in', medium: 'audio', shape: { rate: 48000 },
+      transports: ['jack'], jack: [...JACK_ENDS.pappusIn] });
+    port('pappus', 'audio-out', { label: 'Granulator', dir: 'out', medium: 'audio', shape: { rate: 48000 },
+      transports: ['jack'], jack: [...JACK_ENDS.pappusOut] });
+  }
+  if (jack) {
+    node('capture', 'endpoint', 'Pi capture');
+    port('capture', 'audio-in', { label: 'Pi capture', dir: 'in', medium: 'audio', shape: { rate: 48000 },
+      transports: ['jack'], jack: [...JACK_ENDS.capture] });
   }
   if (gpu) {
     node('gpu', 'engine', 'GPU');
@@ -126,8 +207,12 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     node(n, 'device', i.name);
     // The address is the room the board's input really streams into, which
     // `rig/board/inputs.mjs` names `<room>-<input>`.
+    // An input on JACK (`BOARD_INPUTS` `via: "jack"`) is also its taken channel
+    // on the board's graph, so it can be linked inside the Pi.
+    const j = jack && i.jack ? inputJack(i.name, i.take ?? 1) : null;
     port(n, 'audio-out', { label: i.name, dir: 'out', medium: 'audio',
-      shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}`, transports: [...BOARD_TRANSPORTS.audio] });
+      shape: { rate: 48000, channels: 1, frameMs }, address: `${room}-${i.name}`,
+      transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: j } : {}) });
     if (i.midi) {
       inputPorts.add(String(i.midi.port).toLowerCase());
       port(n, 'midi-in', { label: i.name, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], never: ['sysex'],

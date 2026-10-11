@@ -142,7 +142,13 @@ export function parseInputs(text) {
       }
       midi = { port, channels: mch };
     }
-    inputs.set(name, { name, device, channels, take, midi });
+    // 🔴 `via`, SINCE 2026-10-11: `arecord` (the default, and what every board
+    // provisioned before this does) or `jack`, which puts the input on the
+    // board's JACK graph as `<name>:capture_N` so a bay link can patch it
+    // inside the Pi. See `createInputs` for what changes and what does not.
+    const via = v.via ?? 'arecord';
+    if (via !== 'arecord' && via !== 'jack') { problems.push(`${name}: via is arecord or jack, not ${JSON.stringify(via)}`); continue; }
+    inputs.set(name, { name, device, channels, take, midi, via });
   }
   return { inputs, problems };
 }
@@ -227,6 +233,9 @@ export function createInputs({
   leaseMs = LEASE_MS, beatMs = BEAT_MS,
   // 10 ms a period, four periods of buffer. See the capture below.
   periodFrames = 480, bufferFrames = 1920,
+  // `{ ensure(), wire(doc, what) }` from `jacksynth.mjs`, or null on a board
+  // with no JACK. Only an input configured `via: "jack"` uses it.
+  jack = null, setTimer = setTimeout,
 }) {
   const live = new Map();
   // The capture's unit: half a frame when a frame halves, so the direct path
@@ -238,7 +247,36 @@ export function createInputs({
       cfg, room: `${room}-${cfg.name}`, from: `board-${cfg.name}-${randomId(6)}`,
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
+      bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null,
     };
+    // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
+    // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
+    // instead of one:
+    //   alsa_in -j <name>     the device onto the graph as `<name>:capture_N`.
+    //                         ALWAYS ON while the board runs, because a bay link
+    //                         into the granulator has to work with nobody
+    //                         listening to the input's room. It costs 3.4 per
+    //                         cent of one core steady (MEASURED with `top` on the
+    //                         Pi 4) and no relay time at all.
+    //   ffmpeg -f jack        the room's stream, read back OFF the graph from
+    //                         `pos<name>:input_1`, which is fed `<name>:capture_N`
+    //                         through `jack.mjs`. LEASED exactly as `arecord` was,
+    //                         so a room nobody is in still costs nothing.
+    // 🔴 `plughw:`, NOT `hw:`, AND IT IS A MEASUREMENT. `alsa_in -d hw:CARD=Pro`
+    // on the Fast Track Pro read the input 48.2 dB HOT, which is a factor of 256:
+    // a floor of -48 dBFS where `arecord` reads -93.1 on the same card the same
+    // minute, and a Circuit note clipped flat at 32512. Through `plughw:` the
+    // floor is -93.1 with a peak of 1, the same as `arecord`. alsa_in's own S16
+    // path is the suspect and was not chased further.
+    // ⚠️ AND THE BYTE ORDER FIX DOES NOT RUN ON THIS PATH. `createByteOrder`
+    // repairs a device that sends big endian S16 under an S16_LE label, which
+    // this card did on 2026-09-30 and 2026-10-01. alsa_in resamples before
+    // anything here sees a sample, and a resampled swap cannot be swapped back.
+    // Not seen since 2026-10-01 in the journal; if it comes back, `via:
+    // "arecord"` is the one line that restores the repaired path.
+    const onJack = cfg.via === 'jack' && !!jack;
+    const reader = `pos${cfg.name}`;
+    const jackPort = `${cfg.name}:capture_${cfg.take}`;
     const send = (msg) => {
       if (s.ws?.readyState !== 1) return false;
       s.ws.send(format(msg, { from: s.from, seq: s.seq++ }));
@@ -250,7 +288,8 @@ export function createInputs({
                            direct: !!s.rtc });
     const alive = () => ({ type: 'board.alive', ...shape(), audio: s.proc ? cfg.name : null, frames: s.frames,
                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0 });
-    const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device,
+    const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device, via: onJack ? 'jack' : 'arecord',
+                            ...(onJack ? { jack: { port: jackPort, bridge: !!s.bridge, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
                             frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             direct: s.rtc ? s.rtc.status() : null,
@@ -266,8 +305,49 @@ export function createInputs({
       s.frames++;
     }
 
+    // ── the JACK half: the bridge, always on, and the leased reader ─────────
+    const quiet = (d) => String(d).split('\n').map((x) => x.trim())
+      .filter((x) => x && !/^Cannot lock down \d+ byte memory area/.test(x)).join(' ');
+    function startBridge() {
+      if (!onJack || s.bridge || s.closed) return;
+      Promise.resolve(jack.ensure?.()).then((j) => {
+        if (s.bridge || s.closed) return;
+        if (j && j.ok === false) {
+          log(`${cfg.name}: no JACK server (${j.reason}), trying again in ${s.bridgeBackoff / 1000} s`);
+          setTimer(startBridge, s.bridgeBackoff); s.bridgeBackoff = Math.min(s.bridgeBackoff * 2, 60_000);
+          return;
+        }
+        const dev = cfg.device.replace(/^hw:/, 'plughw:');
+        const p = spawn('alsa_in', ['-j', cfg.name, '-d', dev, '-c', String(cfg.channels), '-r', String(rate),
+          '-p', '256', '-n', '2'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        s.bridge = p; s.bridgeAt = now(); s.bridgeStarts++;
+        log(`${cfg.name}: ${dev} onto JACK as ${cfg.name}:capture_1..${cfg.channels}`);
+        p.stdout?.on('data', () => {});
+        p.stderr?.on('data', (d) => { const t = quiet(d); if (t) log(`${cfg.name} alsa_in: ${t.slice(0, 200)}`); });
+        p.on('exit', (code, sig) => {
+          if (s.bridge === p) s.bridge = null;
+          if (s.closed) return;
+          // A bridge that ran a while is a fresh fault, not the same one again.
+          if (now() - s.bridgeAt > 30_000) s.bridgeBackoff = 2000;
+          log(`${cfg.name}: alsa_in exited (${sig ?? code}), so ${jackPort} is gone; again in ${s.bridgeBackoff / 1000} s`);
+          setTimer(startBridge, s.bridgeBackoff); s.bridgeBackoff = Math.min(s.bridgeBackoff * 2, 60_000);
+        });
+      });
+    }
+    /** Feed the reader from the device, owning its input. Retried until both ports are up. */
+    function feedReader(p, tries = 0) {
+      if (s.proc !== p) return;
+      const w = jack.wire?.({ v: 1, links: [{ from: jackPort, to: `${reader}:input_1` }], own: [`${reader}:input_1`] },
+        `${cfg.name} into its room`);
+      if (w?.ok) { s.fed = true; log(`${cfg.name}: ${jackPort} feeds ${reader}:input_1, read back`); return; }
+      s.fed = false;
+      if (tries < 40) { setTimer(() => feedReader(p, tries + 1), 200); return; }
+      log(`${cfg.name}: ${jackPort} could not be patched into ${reader}:input_1 in 8 s${w?.reason ? `, ${w.reason}` : ''}`);
+    }
+
     function startCapture() {
       if (s.proc) return;
+      if (onJack) { startReader(); return; }
       // 🔴 A SHORT PERIOD, OR THE AUDIO LEAVES IN 125 ms LUMPS. MEASURED
       // 2026-09-30 on the Fast Track Pro: with no period asked for, ALSA gave
       // arecord 6000 frames a period in a 24000 frame buffer, so a note waited
@@ -309,6 +389,41 @@ export function createInputs({
       });
       s.proc = p; s.startedAt = now();
       log(`${cfg.name}: capturing ${cfg.device} channel ${cfg.take} of ${cfg.channels} into ${s.room}`);
+    }
+
+    // The leased half on JACK. Same frames, same pump, same relay and direct
+    // path as `arecord`: one mono channel out of ffmpeg, so `takeChannel` is a
+    // pass and the byte order fix is skipped (see the header of this block).
+    function startReader() {
+      startBridge();
+      const p = spawn('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-f', 'jack', '-channels', '1', '-i', reader,
+        '-f', 's16le', '-ar', String(rate), '-ac', '1', '-'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const IN = UNIT * 2;
+      let carry = Buffer.alloc(0), halves = [];
+      p.stdout.on('data', (chunk) => {
+        carry = carry.length ? Buffer.concat([carry, chunk]) : chunk;
+        while (carry.length >= IN) {
+          const one = new Int16Array(carry.buffer.slice(carry.byteOffset, carry.byteOffset + IN));
+          carry = carry.subarray(IN);
+          s.rtc?.pcm(one);
+          if (UNIT === frame) { sendPcm(one); continue; }
+          halves.push(one);
+          if (halves.length < frame / UNIT) continue;
+          const whole = new Int16Array(frame);
+          halves.forEach((h, i) => whole.set(h, i * UNIT));
+          halves = [];
+          sendPcm(whole);
+        }
+      });
+      p.stderr.on('data', (d) => { const t = quiet(d); if (t) log(`${cfg.name} ffmpeg:`, t.slice(0, 200)); });
+      p.on('exit', (code) => {
+        log(`${cfg.name}: the JACK reader exited ${code} after ${s.frames} frames`);
+        if (s.proc === p) { s.proc = null; s.fed = null; }
+        send(alive());
+      });
+      s.proc = p; s.startedAt = now(); s.fed = false;
+      log(`${cfg.name}: reading ${jackPort} off JACK into ${s.room}`);
+      setTimer(() => feedReader(p), 300);
     }
 
     function stopCapture(why) {
@@ -463,9 +578,10 @@ export function createInputs({
     }
 
     return {
-      s, connect, beat, handle, status, stopCapture,
+      s, connect, beat, handle, status, stopCapture, startBridge, onJack, jackPort,
       close() {
         s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); s.rtc?.close();
+        if (s.bridge) { try { s.bridge.kill('SIGTERM'); } catch { /* gone */ } s.bridge = null; }
         if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
         try { s.ws?.close(); } catch {}
       },
@@ -477,7 +593,7 @@ export function createInputs({
 
   return {
     start() {
-      for (const x of live.values()) x.connect();
+      for (const x of live.values()) { x.connect(); x.startBridge(); }
       timer = setInterval(() => { for (const x of live.values()) x.beat(); }, beatMs);
       timer.unref?.();
     },

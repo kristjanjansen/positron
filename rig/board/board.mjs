@@ -21,14 +21,15 @@ import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.m
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
 import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          pappusFx, pappusAvailable, pappusPanic, stopPappus, sourceFeed,
-         jackGraph, jackChain, jackRebuild,
+         jackGraph, jackChain, jackRebuild, ensureJackd, wire as jackWire, setBayRows, getBayRows,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
-import { helloMsg, aliveMsg } from './beat.mjs';
-import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical } from './jack.mjs';
+import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
+import { jackRows } from '../../demo/shell/graph-registry.mjs';
+import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { statSync } from 'node:fs';
 import * as fsMod from 'node:fs';
@@ -109,6 +110,9 @@ let synth = null, stopSynth = null, midiIn = null, inst = null;
 // twice.
 let starting = null;
 let fxOn = false;          // pappus inserted between the instrument and the capture
+// The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
+// applied as. See `jack.link`.
+const bayLinks = new Map();
 
 /**
  * 🔴 WHO ASKED FOR THE INSERT, AND WHEN — because two pages fight over one
@@ -1450,6 +1454,96 @@ async function handle(msg) {
         + `, read back ${r.ok ? 'agrees' : 'DISAGREES'}, ${others.length} other client(s) in the room`);
       return reply('jack.applied', { ...r, applied: !DRY, steps: planned.steps, doc: jackCanonical(msg.patch), others });
     }
+    // ── the bay half of the JACK arm, 2026-10-11 ──────────────────────────
+    //
+    // 🔴 A BAY LINK BETWEEN TWO OF THIS BOARD'S AUDIO PORTS, BY ITS BAY IDS.
+    // `jack.link { link: "<from> -> <to>" }` with ids this board ANNOUNCES
+    // (`pi-1:circuit:audio-out -> pi-1:pappus:audio-in`). The board resolves
+    // them to JACK ports from its own announcement, never from the page's
+    // copy, turns the one link into its rows (`jackRows`: one to one, summed,
+    // or spread), plans them against the live graph, applies, and answers the
+    // graph READ BACK. `jack.unlink` takes the same line. `jack.links` lists
+    // what is held, each with whether its rows are on the graph now.
+    // 🔴 A BAY LINK IS KEPT, AND THE BOARD'S OWN RE-PATCHES KEEP IT (§5 item 6,
+    // decided here): `setBayRows` hands every held row to `jacksynth.mjs`, whose
+    // `wire()` adds them to every document and whose `jackChain` counts them as
+    // wanted, so `fx.pappus` and `jack.rebuild` no longer undo a page's link.
+    // ⚠️ AN UNLINK CUTS ONLY WHAT NOTHING ELSE WANTS. `yoshimi -> capture` as a
+    // bay link is the same two rows as the board's own chain, and unlinking it
+    // must not silence the room; a row the chain or another bay link still
+    // wants stays.
+    // ⚠️ TOKENLESS, LIKE `jack.apply` (the owner, §5 item 8: *"No owner"*).
+    // Every applied change is a journal line with who asked.
+    case 'jack.link':
+    case 'jack.unlink': {
+      const unlink = msg.type === 'jack.unlink';
+      // ⚠️ `link: "<from> -> <to>"`, NEVER `from` AND `to` AS FIELDS: `from` is
+      // the envelope's sender (wire.mjs), and `format()` throws on the collision.
+      const [fromId, toId] = String(msg.link ?? '').split(/\s*->\s*/);
+      const answer = (body) => reply(unlink ? 'jack.unlinked' : 'jack.linked', { link: `${fromId} -> ${toId}`, ...body });
+      const g = graphFacts ? graphOf(graphFacts) : null;
+      const a = g?.ports.find((p) => p.id === fromId), b = g?.ports.find((p) => p.id === toId);
+      const problems = [];
+      if (!a) problems.push(`${fromId || '(nothing)'} is not a port this board announces`);
+      if (!b) problems.push(`${toId || '(nothing)'} is not a port this board announces`);
+      if (a && (a.dir !== 'out' || a.medium !== 'audio')) problems.push(`${a.id} is not an audio output`);
+      if (b && (b.dir !== 'in' || b.medium !== 'audio')) problems.push(`${b.id} is not an audio input`);
+      const jr = a && b ? jackRows(a.jack, b.jack) : null;
+      if (jr && !jr.ok) problems.push(jr.why);
+      if (problems.length) return answer({ ok: false, applied: false, problems });
+      const key = `${a.id} -> ${b.id}`;
+      const live = listJack();
+      if (live.error) return answer({ ok: false, applied: false, problems: [live.error] });
+      const flat = () => [...bayLinks.values()].flat();
+      const sinks = [...new Set(jr.rows.map((r) => r.to))];
+      const feeding = (rows) => Object.fromEntries(sinks.map((t) => [t, rows.find((r) => r.port === t)?.connected ?? null]));
+      if (!unlink) {
+        const planned = jackPlan({ v: 1, links: jr.rows }, live.rows);
+        if (!planned.ok) {
+          // Say which verb raises a missing end, rather than only that it is missing.
+          const hint = planned.problems.some((p) => /SuperCollider/.test(p)) ? ' The granulator is not running: fx.pappus on raises it.'
+            : planned.problems.some((p) => /posboard/.test(p)) ? ' The capture is not running: audio.start raises it.'
+            : planned.problems.some((p) => /yoshimi/.test(p)) ? ' Yoshimi is not running: audio.start raises it.' : '';
+          return answer({ ok: false, applied: false, rows: jr.rows, problems: planned.problems, hint: hint.trim() || null });
+        }
+        if (!DRY) { bayLinks.set(key, jr.rows); setBayRows(flat()); }
+        const r = jackApply(planned, { dry: DRY });
+        const after = DRY ? null : listJack().rows;
+        log(`jack.link by ${msg.from ?? 'nobody'}: ${key}, ${jr.says}, ${planned.steps.length} step(s), read back ${r.ok ? 'agrees' : 'DISAGREES'}`);
+        return answer({ ok: r.ok, applied: !DRY, rows: jr.rows, says: jr.says, steps: planned.steps,
+                        after: r.after ?? null, feeding: after ? feeding(after) : null, held: bayLinks.size });
+      }
+      const had = bayLinks.delete(key);
+      setBayRows(flat());
+      // Rows still wanted by the board's own chain or another bay link stay.
+      const chain = jackChain({ instrumentPort: inst?.port, instrumentPortR: inst?.portR, insert: fxOn,
+                                source: !!madeSource, graph: { graph: live.rows } });
+      const k = (r) => `${r.from}\u0000${r.to}`;
+      const keep = new Set([...getBayRows().map(k), ...chain.want.map(([f, t]) => k({ from: f, to: t }))]);
+      // Only a row that is really there is cut; one that never landed is not
+      // reported as cut, or an unlink of nothing would read as work done.
+      const cut = jr.rows.filter((r) => !keep.has(k(r)) && (live.rows.find((x) => x.port === r.to)?.connected ?? []).includes(r.from));
+      // An owned input with everything it has now, minus the cut rows, is a
+      // document that disconnects exactly those and nothing else.
+      const cutSinks = [...new Set(cut.map((r) => r.to))].filter((t) => live.rows.some((x) => x.port === t));
+      const doc = { v: 1, own: cutSinks, links: cutSinks.flatMap((t) => (live.rows.find((x) => x.port === t)?.connected ?? [])
+        .filter((f) => !cut.some((c) => c.from === f && c.to === t)).map((f) => ({ from: f, to: t }))) };
+      const planned = jackPlan(doc, live.rows);
+      if (!planned.ok) return answer({ ok: false, applied: false, held: had, problems: planned.problems });
+      const r = jackApply(planned, { dry: DRY });
+      const after = DRY ? null : listJack().rows;
+      log(`jack.unlink by ${msg.from ?? 'nobody'}: ${key}, ${planned.steps.length} step(s) cut, ${jr.rows.length - cut.length} row(s) kept because something else wants them`);
+      return answer({ ok: r.ok, applied: !DRY, held: had, rows: jr.rows, cut, kept: jr.rows.filter((x) => keep.has(k(x))),
+                      steps: planned.steps, feeding: after ? feeding(after) : null });
+    }
+    case 'jack.links': {
+      const live = listJack();
+      const links = [...bayLinks.entries()].map(([link, rows]) => {
+        const d = live.error ? null : jackDiff({ v: 1, links: rows }, live.rows);
+        return { link, rows, intact: d ? d.intact : null, missing: d?.missing ?? null };
+      });
+      return reply('jack.links', { ok: !live.error, links, ...(live.error ? { error: live.error } : {}) });
+    }
     default: return false;      // another client's traffic; the relay is verbatim
   }
 }
@@ -1476,7 +1570,11 @@ function connect() {
     // and the beat every five seconds should not be.
     const instruments = { synth: true, pappusFx: pappusAvailable(),
                           ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])) };
-    graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports,
+    // `jack`: this board has a JACK graph, so its JACK ends are announced
+    // (graph-registry.mjs `boardGraph`). Yoshimi installed or an input on JACK
+    // is the same question `startJackSynth` and `inputs.mjs` ask.
+    const jack = jackSynthAvailable('yoshimi') || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
+    graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
@@ -1607,7 +1705,10 @@ function sweepOrphans() {
   // build's instrument is still holding the JACK graph. Removing them would
   // strand exactly that board, and this list costs one `pkill` that finds
   // nothing. See `archive/box-fluidsynth-hexter/`.
-  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'jackd']) {
+  // `alsa_in` since 2026-10-11: an input on JACK (`inputs.mjs`) holds its
+  // device for as long as it runs, so one left by an old build would hold the
+  // Fast Track Pro and the new bridge would fail to open it.
+  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'alsa_in', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }
   }
@@ -1639,6 +1740,9 @@ if (inputsCfg.inputs.size) {
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
   spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a), PeerConnection,
+  // Only an input configured `via: "jack"` touches this (inputs.mjs).
+  jack: { ensure: () => ensureJackd({ onLog: (l) => log('input', l) }),
+          wire: (doc, what) => jackWire(doc, { onLog: (l) => log('input', l), what }) },
 });
 if (!DRY && !ONCE) hwInputs.start();
 

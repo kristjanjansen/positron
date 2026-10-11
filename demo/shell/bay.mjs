@@ -32,7 +32,7 @@ import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
    board (three missed five second beats), and the registry is import free on
    purpose (the Pi ships it alone), so the bay imports it rather than the other
    way round. */
-import { STALE_MS } from './graph-registry.mjs';
+import { STALE_MS, jackRows } from './graph-registry.mjs';
 export { STALE_MS };
 // Link options (`{ w 640, h 360, fps 15 }` on a video link) are not transforms; see link-options.mjs.
 import { isOption, checkOptions, printOptions } from './link-options.mjs';
@@ -147,9 +147,12 @@ export const READS = {
    graph announcing it, and every page in that room broke on `registry.fill`.
    Found building /concepts/room/030/, 2026-10-09. */
 export const TRANSPORT_NAMES = [...new Set([...Object.values(TRANSPORTS), READS]
-  .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean).concat('whip'))];
+  .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean).concat('whip', 'jack'))];
+/* `jack` is the other name the table never chooses, since 2026-10-11: two audio
+   ports on ONE board that both name their JACK ports ride the board's JACK
+   graph, which is decided by the ports in `sessionFor` and not by a cell. */
 /** The transports that never leave one machine, so `via` cannot ask for them across a wire. */
-export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb'];
+export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb', 'jack'];
 
 /**
  * Which transport a heavy link rides, from plan §5's table.
@@ -1312,6 +1315,34 @@ export function createBay({ now = () => Date.now() } = {}) {
       if (!via) return { session: null };
       return { refuse: { why: `${a.label} carries ${a.medium}, which travels inside the link itself, so there is no transport to ask for.`,
                          fix: `Make the link without via ${via}.` } };
+    }
+    /* 🔴 JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §3 item 3). Two
+       audio ports on ONE site that both travel by `jack` and both name their
+       JACK ports are a link inside one board's graph, and nothing about it
+       crosses a wire. The session carries the JACK rows the one bay link
+       stands for (`jackRows`: same count one to one, many into one summed, one
+       into many spread), so a reader sees what one wire means before it is
+       made, and the board applies exactly those rows and reads them back.
+       ⚠️ THE SAME SITE, NOT THE SAME PLACE: a site is one board, and two boards
+       in one room are two JACK servers that no row can join.
+       ⚠️ A `via` OTHER THAN jack FALLS THROUGH to the ordinary rules, which
+       already refuse a wire transport between two ports of one site. */
+    const jackable = (p) => Array.isArray(p.jack) && p.jack.length && (p.transports ?? []).includes('jack');
+    if (a.medium === 'audio' && (!via || via === 'jack') && (jackable(a) || jackable(b) || via === 'jack')) {
+      if (siteOf(a) === siteOf(b) && jackable(a) && jackable(b)) {
+        const r = jackRows(a.jack, b.jack);
+        if (!r.ok) return { refuse: { why: `${a.label} into ${b.label}: ${r.why}.`, fix: 'Link a source and a destination whose channel counts pair.' } };
+        return { session: { transport: 'jack', address: placeOf(a), shape: { ...(a.shape || {}) }, where: 'machine',
+                 says: `JACK on ${siteOf(a)}, ${r.says}, no number measured`, rows: r.rows, ...(via ? { via } : {}) } };
+      }
+      const only = [a, b].find((p) => (p.transports ?? []).length && p.transports.every((t) => t === 'jack'));
+      if (only || via === 'jack') {
+        const other = only === a ? b : a;
+        return { refuse: { why: siteOf(a) !== siteOf(b)
+            ? `${(only ?? a).label} travels by JACK, which never leaves ${siteOf(only ?? a)}, and ${other.label} is on ${siteOf(other)}.`
+            : `${other.label} is not on the board's JACK graph, so ${(only ?? a).label} cannot reach it there.`,
+          fix: 'Link it to another JACK end on the same board, or listen to what the board captures instead.' } };
+      }
     }
     const into = nodeFor(b)?.kind === 'store', outOf = !into && nodeFor(a)?.kind === 'store';
     const { where, receivers } = whereOf(a, b);
