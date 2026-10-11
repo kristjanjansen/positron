@@ -466,13 +466,16 @@
   // the 24 major and minor key profiles. Everything between the markers below
   // is plain arithmetic on the analyser's dB spectrum, no WebAudio, so the
   // offline check reads this very block out of this file and runs it on our
-  // R2 recordings.
+  // R2 recordings and on synthetic music of known key (plans/plan-key-
+  // detection.md has the method, the sources and every candidate measured).
   //
   // 1. Peaks only. Every local maximum of the spectrum between 55 Hz and 2 kHz
-  //    and within 50 dB of the loudest, its frequency refined by a parabola
+  //    and within 35 dB of the loudest, its frequency refined by a parabola
   //    through the three bins, becomes a pitch in fractional semitones. Its
   //    weight is its height above that floor in dB, which is the compression
-  //    that keeps one loud bass note from outvoting a chord.
+  //    that keeps one loud bass note from outvoting a chord, faded in over the
+  //    bottom octave of the band (55 to 110 Hz) and out over the top one (1 to
+  //    2 kHz).
   // 2. Tuning. How far the peaks sit from the equal tempered grid, as a
   //    circular mean weighted by the peaks and eased over 2 s, is taken off
   //    before a pitch is rounded to its class. A peak halfway between two
@@ -480,11 +483,11 @@
   // 3. Harmonics. A peak 19 semitones (a twelfth, the third harmonic) or 28
   //    (the fifth harmonic) over a louder one counts for 30%.
   // 4. Each frame is normalised to sum 1, so a loud moment and a quiet one
-  //    count alike, then summed into `acc` with a decay of KEY_TAU_S (and into
+  //    count alike, then summed into `acc` with a decay of 30 s (and into
   //    `now`, the picture, over half a second).
   // 5. The 24 keys are the Temperley (Kostka-Payne) profiles rotated to each
   //    tonic, scored by correlation with `acc`. The best is the key; a key
-  //    already shown stays until another beats it by KEY_STICK. Confidence is
+  //    already shown stays until another beats it by 0.05. Confidence is
   //    the winner's correlation times its margin over the runner-up (a margin
   //    of 0.1 or more counts in full).
   //
@@ -501,10 +504,35 @@
   // the one used. A 32768 point analyser (0.7 s, 1.4 Hz bins) was steadier than
   // 16384 on Raadio 4, and 20 s of decay steadier than 10 on Raadio 4 and Ida.
   //
+  // 🔴 WHY THE FADE AT THE BAND EDGES, MEASURED 2026-10-11 OFFLINE, LATER THE
+  // SAME DAY, against two things that need no listener. (a) 72 synthetic
+  // pieces of 40 s in all 24 keys (piano and saw chords, bass, melody, drums,
+  // tuned up to 30 cents off), scored MIREX style (right 1, fifth 0.5,
+  // relative 0.3, parallel 0.2). (b) Each R2 recording pitch shifted by -5 to
+  // +6 semitones: the answer should move by exactly the shift, and how often
+  // it does is a number with no ground truth in it. Before, with a hard edge
+  // at 55 Hz and 2 kHz, a 50 dB floor, 20 s of decay and a 0.02 stickiness:
+  // synthetic 0.73 (48 pieces) and 0.56 (24 held out), the shifted recordings
+  // agreed 35% (Raadio 2), 63% (Raadio 4) and 72% (Ida) of the time, mostly
+  // by jumping a FIFTH as bass notes and their harmonics crossed an edge.
+  // After, with the fade, a 35 dB floor, 30 s and 0.05: synthetic 0.78 and
+  // 0.65, shifted 82%, 99% and 98%, switches after 15 s 2, 0 and 0 against 2,
+  // 1 and 2, a first answer at 3 to 4 s either way, and about 29 against 37
+  // µs of CPU per 0.1 s hop. The fade alone did most of it (66%, 87%, 87%).
+  // Every major piece now reads right and no piece reads a fifth off. Other
+  // profiles (Albrecht-Shanahan, Shaath, Faraldo's edma and bgate, Krumhansl)
+  // scored up to 0.05 higher on the synthetic set and were less steady or less
+  // consistent on the radio, so Temperley stays.
+  //
   // ⚠️ A RELATIVE KEY IS THE SAME SEVEN NOTES. F# major and Eb minor, the two
   // readings Raadio 2 sways between, differ only in which note is home, which a
   // pitch class histogram can barely tell. The runner-up in the footer is
-  // there for that reason.
+  // there for that reason. On the synthetic set it is still the only error:
+  // 15 of 48 pieces, all minor read as their relative major. Twelve are
+  // progressions that never raise the seventh (i VI III VII, i iv VII III),
+  // whose notes are exactly the relative major's, and three are i VII VI V.
+  // Weighting the bass toward the tonic fixed some of those and broke the
+  // radio's consistency (Raadio 2 fell to 47%), so it is not in.
   // KEY CORE BEGIN
   const KEY_NAMES = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
   const KEY_PROFILES = {
@@ -516,8 +544,8 @@
   const KEY_SCALE = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
   const KEY_MIN_S = 3;             // no key until this much sound has been heard
   function keyCreate(sr, n, o = {}) {
-    const s = { sr, n, lo: o.lo ?? 55, hi: o.hi ?? 2000, tau: o.tau ?? 20, floorDb: o.floorDb ?? 50,
-      profiles: KEY_PROFILES[o.profiles ?? 'temperley'], harm: o.harm ?? 0.7, stick: o.stick ?? 0.02,
+    const s = { sr, n, lo: o.lo ?? 55, hi: o.hi ?? 2000, tau: o.tau ?? 30, floorDb: o.floorDb ?? 35,
+      taper: o.taper ?? 1, profiles: KEY_PROFILES[o.profiles ?? 'temperley'], harm: o.harm ?? 0.7, stick: o.stick ?? 0.05,
       acc: new Float64Array(12), now: new Float64Array(12), tRe: 0, tIm: 0, tuning: 0, heard: 0, last: null };
     s.k0 = Math.max(2, Math.floor(s.lo * n / sr) - 1);
     s.k1 = Math.min(n / 2 - 2, Math.ceil(s.hi * n / sr) + 1);
@@ -543,7 +571,11 @@
       const f = (k + off) * sr / n;
       if (f < s.lo || f > s.hi) continue;
       const p = 69 + 12 * Math.log2(f / 440);
-      const w = b - floor;
+      let w = b - floor;
+      // Faded in over the bottom octave of the band and out over the top one,
+      // so a note crossing an edge comes and goes gradually.
+      const x = Math.min(Math.log2(f / s.lo), Math.log2(s.hi / f)) / s.taper;
+      if (x < 1) w *= 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, x));
       const dv = p - Math.round(p);
       tRe += w * Math.cos(2 * Math.PI * dv); tIm += w * Math.sin(2 * Math.PI * dv);
       peaks.push(p, w);
