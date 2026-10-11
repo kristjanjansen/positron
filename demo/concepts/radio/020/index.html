@@ -99,11 +99,11 @@
   // The detector never touches the scope.
   bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'tempo scope', place: 'browser' });
   bay.addPort({ id: DISPLAY_IN, label: 'tempo scope', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
-  // The fx box: the radio thinner (a low cut) with a bass drum synthesised in
+  // The fx box: the radio thinner (a low cut) with a click synthesised in
   // this tab on the detector's beat grid, mixed against the untouched radio by
   // a knob of its own. It takes the tempo on one value port and the mix on the
   // second, and only its output reaches the speakers.
-  bay.addNode({ id: `${S}:fx`, kind: 'engine', label: 'low cut and drum', place: 'browser' });
+  bay.addNode({ id: `${S}:fx`, kind: 'engine', label: 'low cut and click', place: 'browser' });
   bay.addPort({ id: FX_IN, label: 'fx', dir: 'in', medium: 'audio' });
   bay.addPort({ id: FX_TEMPO, label: 'tempo', dir: 'in', medium: 'value', deliver: (ev) => fxTempo(ev) });
   bay.addPort({ id: FX_MIX, label: 'mix', dir: 'in', medium: 'value', deliver: (ev) => fxMix(ev) });
@@ -638,23 +638,30 @@
     const sure = Number.isFinite(ev.v) && Number.isFinite(ev.beatAt) && (ev.confidence ?? 0) >= DRUM_FLOOR;
     fxGrid = sure ? { bpm: ev.v, beatAt: ev.beatAt } : null;
   }
-  // A bass drum: a sine falling from 170 Hz to a 52 Hz body in 70 ms, under a
-  // 2 ms attack and a 550 ms decay, with a 4 ms click of its own top, into the
-  // saturation.
+  // A click, not a bass drum, since 2026-10-11 (*"is bd sound laggy? make click
+  // isntead"*). The drum was on its grid to 2.5 ms (MEASURED by the agent that
+  // built it), but a sine falling to a 52 Hz body puts its weight 20 to 70 ms
+  // after the onset, so it is heard late. A click has all its energy in its
+  // first 2 ms: a burst of white noise and a 2.5 kHz tick, gone in 15 ms.
+  let noise = null;
   function kick(at) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.setValueAtTime(170, at);
-    o.frequency.exponentialRampToValueAtTime(52, at + 0.07);
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(1.6, at + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.55);
-    o.connect(g).connect(fx.drums);
-    o.start(at); o.stop(at + 0.57);
-    const c = ctx.createOscillator(), cg = ctx.createGain();
-    c.type = 'triangle'; c.frequency.value = 1800;
-    cg.gain.setValueAtTime(0.3, at); cg.gain.exponentialRampToValueAtTime(0.0001, at + 0.004);
-    c.connect(cg).connect(fx.drums);
-    c.start(at); c.stop(at + 0.006);
+    if (!noise) {
+      noise = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.02), ctx.sampleRate);
+      const ch = noise.getChannelData(0);
+      for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    }
+    const n = ctx.createBufferSource(), ng = ctx.createGain();
+    n.buffer = noise;
+    ng.gain.setValueAtTime(0.9, at); ng.gain.exponentialRampToValueAtTime(0.0001, at + 0.006);
+    n.connect(ng).connect(fx.drums);
+    n.start(at); n.stop(at + 0.008);
+    const t = ctx.createOscillator(), tg = ctx.createGain();
+    t.frequency.value = 2500;
+    tg.gain.setValueAtTime(0.0001, at);
+    tg.gain.exponentialRampToValueAtTime(0.8, at + 0.0005);
+    tg.gain.exponentialRampToValueAtTime(0.0001, at + 0.015);
+    t.connect(tg).connect(fx.drums);
+    t.start(at); t.stop(at + 0.017);
   }
   // Scheduled ahead on the audio clock, every TICK_MS, so a busy main thread
   // moves when the next one is booked and never when it sounds.
