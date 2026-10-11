@@ -525,32 +525,48 @@
 
   // ── the recording: fetched once, decoded once, looped ────────────────────
   let bytes = 0;
-  // Every recording brought to one loudness once, as it is decoded (asked
-  // 2026-10-11, *"ida signal is soooo weak"*). MEASURED with ffmpeg's
-  // volumedetect: Raadio 2 -15.5 dB mean and -3.6 peak, Raadio 4 -21.4 and
-  // -8.7, Ida -27.2 and 0.0. Ida is 12 dB under Raadio 2 on average while its
-  // loudest instants already touch full scale, so plain gain would clip. Each
-  // file is raised (never lowered) toward LEVEL_RMS, and anything over KNEE is
-  // bent under 1 with a tanh, which touches only Ida's few loud transients.
-  // The detector hears the levelled sound too.
-  const LEVEL_RMS = 10 ** (-16 / 20), KNEE = 0.8;
+  // Every recording brought to one loudness once, as it is decoded, SECOND BY
+  // SECOND (asked 2026-10-11, *"ida signal is soooo weak"*, then *"still weak
+  // sinal in ida. measyre"*). MEASURED on the Ida capture in 5 s blocks: the
+  // music is -44 dB RMS with peaks at -30 for all but 25 s, and 110 to 135 s is
+  // something else at -14 dB that clips at +3. One gain for the whole file, as
+  // the first version did, was set by that loud stretch and raised the music
+  // only 8 dB, to about -36. So the gain is per LEVEL_S second block: each
+  // block raised (never lowered) toward LEVEL_RMS, by at most LEVEL_MAX_DB, the
+  // gains eased across blocks so a loud block is not pumped into, and the gain
+  // ramps between block centres. Anything over KNEE is bent under 1 with a
+  // tanh. Raadio 2 (-15.5 mean) is left almost alone. The detector hears the
+  // levelled sound too.
+  const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_S = 1, LEVEL_MAX_DB = 36, KNEE = 0.8;
   function level(b, st) {
-    let sum = 0, n = 0;
-    for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < x.length; i += 4) { sum += x[i] * x[i]; n++; } }
-    const rms = Math.sqrt(sum / Math.max(1, n));
-    const g = rms > 0 ? Math.max(1, LEVEL_RMS / rms) : 1;
-    if (g <= 1.01) return;
+    const sr = b.sampleRate, n = b.length, blk = Math.round(LEVEL_S * sr), nb = Math.ceil(n / blk);
+    const chs = Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c));
+    const gdb = new Float32Array(nb);
+    for (let k = 0; k < nb; k++) {
+      let sum = 0, m = 0;
+      for (const x of chs) for (let i = k * blk; i < Math.min(n, (k + 1) * blk); i += 2) { sum += x[i] * x[i]; m++; }
+      const rms = Math.sqrt(sum / Math.max(1, m));
+      gdb[k] = rms > 1e-6 ? Math.max(0, Math.min(LEVEL_MAX_DB, 20 * Math.log10(LEVEL_RMS / rms))) : 0;
+    }
+    // Ease: a block takes the smallest gain of itself and its two neighbours,
+    // then a three block average, so the gain never rises into a loud block.
+    const lo = gdb.map((g, k) => Math.min(g, gdb[k - 1] ?? g, gdb[k + 1] ?? g));
+    const eased = lo.map((g, k) => ((lo[k - 1] ?? g) + g + (lo[k + 1] ?? g)) / 3);
+    let raised = 0;
+    for (let k = 0; k < nb; k++) raised += eased[k];
+    if (raised / nb < 0.1) return;
     const room = 1 - KNEE;
-    for (let c = 0; c < b.numberOfChannels; c++) {
-      const x = b.getChannelData(c);
-      for (let i = 0; i < x.length; i++) {
+    for (let i = 0; i < n; i++) {
+      const pos = i / blk - 0.5, k0 = Math.max(0, Math.min(nb - 1, Math.floor(pos))), k1 = Math.min(nb - 1, k0 + 1);
+      const f = Math.max(0, Math.min(1, pos - k0));
+      const g = 10 ** ((eased[k0] * (1 - f) + eased[k1] * f) / 20);
+      for (const x of chs) {
         const v = x[i] * g, a = v < 0 ? -v : v;
         x[i] = a <= KNEE ? v : Math.sign(v) * (KNEE + room * Math.tanh((a - KNEE) / room));
       }
     }
-    d.log(`${st.label} raised ${(20 * Math.log10(g)).toFixed(1)} dB to one loudness with the others`);
+    d.log(`${st.label} levelled, raised ${(raised / nb).toFixed(1)} dB on average`);
   }
-
   function load() {
     const st = STATIONS[at], url = srcOf(st);
     if (buffers.has(st.id)) { buffer = buffers.get(st.id); return Promise.resolve(buffer); }
