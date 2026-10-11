@@ -146,7 +146,7 @@
     const scope = createGrainScope(host, { seconds: 4, height: 150, fullScale: 1 });
     scopes.set(st.key, scope);
     // The rate at the right, beside the full-screen button.
-    const p = createVideoPanel({ media: host, aspect: 'auto', left: el('span', 'cc-say', st.name) });
+    const p = createVideoPanel({ media: host, aspect: 'auto', right: false, left: el('span', 'cc-say', st.name) });
     p.el.querySelector('.pos-vp-r').prepend(el('span', 'cc-say', `${st.kbps} kbit/s`));
     return p;
   });

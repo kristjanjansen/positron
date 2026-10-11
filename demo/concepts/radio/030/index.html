@@ -196,7 +196,7 @@
     pb.refresh();
     if (playing) { stop(); play(); }
   }
-  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', right: false, left: pick.el });
 
   // The beats on the wave: a canvas over the scope, drawn on the scope's own
   // seconds (4 across, the newest at the right edge), so a mark scrolls left
