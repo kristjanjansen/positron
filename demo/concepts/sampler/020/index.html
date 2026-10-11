@@ -77,20 +77,25 @@
     L.presses.push(now);
     if (L.state === 'recording') {
       const len = now - L.t1;
-      if (len < BOUNCE_MS) { L.state = 'empty'; L.events = []; L.open.clear(); d.log('two presses under 20 ms apart, so no loop', 'warn'); face(); return; }
+      if (len < BOUNCE_MS) { L.state = 'empty'; L.events = []; L.open.clear(); deck.setLoopView(null); d.log('two presses under 20 ms apart, so no loop', 'warn'); face(); return; }
       L.len = len;
       for (const [n] of L.open) L.events.push({ at: len, d1: n, d2: 0 });
       L.open.clear();
       L.events.sort((a, b) => a.at - b.at);
       L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.fired = [];
       deck.setRange([0, len]);
-      strip.strip.fit(0, len);
+      // The loop's start and end on the timeline (asked 2026-10-11, *"show start
+      // and end of loop, in timebar above lanes"*): the strip's own loop band
+      // and edges, from the deck's loop view, with a little air either side.
+      deck.setLoopView({ a: 0, b: len, state: 'on' });
+      strip.strip.fit(-len * 0.04, len * 1.04);
       strip.strip.invalidate();
       d.log(`second press: the loop is ${(len / 1000).toFixed(3)} s with ${L.events.filter((e) => e.d2).length} notes, playing`);
     } else {
       silence();
       L.state = 'recording'; L.t1 = now; L.len = 0; L.events = []; L.open.clear();
       deck.setRange([0, VIEW_MS]);
+      deck.setLoopView({ a: 0, state: 'armed', filling: true });   // the start, the end still to come
       strip.strip.fit(0, VIEW_MS);
       strip.strip.invalidate();
       d.log('first press: recording');
@@ -101,6 +106,7 @@
   function clear() {
     silence();
     L.state = 'empty'; L.events = []; L.open.clear(); L.len = 0;
+    deck.setLoopView(null);
     strip.strip.invalidate();
     face();
   }
