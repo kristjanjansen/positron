@@ -41,7 +41,7 @@
   import { createKnobGrid } from '/shell/knob-grid.mjs';
 
   // concepts beats/000 (radio/020 until 2026-10-11, *"move radio 020 to beats group into 000"*), TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
-  // kept in our own R2 bucket (`positron-station`, read through the station
+  // and of Ida, kept in our own R2 bucket (`positron-station`, read through the station
   // worker's /media/, CORS `*`, as /concepts/sampler/000/ reads its piano),
   // played in this tab into the radio's wave, the speakers and a tempo
   // detector, whose tempo travels as events along a `value` link into a
@@ -54,14 +54,20 @@
   // the recording from our bucket, once per page, and loops it. `?src=<url>`
   // points the page at another recording (a local file for a check).
   const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
-  // 🔴 ERR's RAADIO 2 AND RAADIO 4, NOT IDA, SINCE 2026-10-11. Asked: *"Ida is
-  // offline. Work on radio 2 and 4 from err"*. The one capture of Ida was digital
-  // silence. Each station was captured ONCE, three minutes through our own relay
-  // (positron-shout, one listener, 2026-10-11 10:18 UTC), and kept in our bucket,
-  // so a visit, a play and a loop never reach ERR's servers.
+  // 🔴 ERR's RAADIO 2 AND RAADIO 4, AND IDA SINCE 2026-10-11 ~11:44 UTC. Asked
+  // first *"Ida is offline. Work on radio 2 and 4 from err"*, because the first
+  // capture of Ida was digital silence, and then *"add ida"* once a second
+  // capture had sound in it (3:09, mean -27.2 dB). Each station was captured
+  // ONCE, about three minutes through our own relay (positron-shout, one
+  // listener; Raadio 2 and 4 at 10:18 UTC, Ida from mount ida-tallinn at about
+  // 11:44 UTC), and kept in our bucket, so a visit, a play and a loop never
+  // reach ERR's or Ida's servers. Ida is ADTS AAC (44.1 kHz stereo), the other
+  // two MP3: nothing below reads the extension or the content type, and
+  // decodeAudioData sniffs the bytes.
   const STATIONS = [
     { id: 'raadio2', label: 'Raadio 2', key: 'radio/raadio2/2026-10-11.mp3' },
     { id: 'raadio4', label: 'Raadio 4', key: 'radio/raadio4/2026-10-11.mp3' },
+    { id: 'ida', label: 'Ida', key: 'radio/ida/2026-10-11.aac' },
   ];
   const asked = new URLSearchParams(location.search).get('src');
   const srcOf = (st) => asked || `${MEDIA}${st.key}`;
@@ -250,10 +256,14 @@
   //    five choices.
   // 5. The confidence is how strong that score is, 1 - exp(-score / 0.25),
   //    times how many of the last eight choices agree with it (half weight).
-  // 6. With the period known, the phase: the offset into the last four seconds
-  //    at which the envelope one period apart adds up highest is the last beat,
-  //    on this tab's audio clock. The beats on that grid since the last reading
-  //    go with it, and the wave draws them.
+  // 6. With the period known, the phase, from each band's own rises kept in a
+  //    ring beside the sum. A beat envelope weighs the bands PH_W (the low band
+  //    whole, the hats not at all). Every offset into the last PH_SPAN_S seconds
+  //    is scored as a pulse train: at each beat back, the beat envelope under a
+  //    Gaussian PH_SIG_S wide, plus HAT_BETA times the hat band half a beat
+  //    later, each beat counting less with age (PH_DECAY_S). The best offset is
+  //    the last beat, on this tab's audio clock. The beats on that grid since
+  //    the last reading go with it, and the wave draws them.
   //
   // 🔴 WHY, MEASURED 2026-10-11 OFFLINE ON BOTH RECORDINGS, after *"there is
   // very steady beat on r2"* and *"impove yr algis"*. The detector before this
@@ -263,21 +273,42 @@
   // confidence was the bare correlation at one beat of a two band envelope.
   // The kicks and bass in the low band come every 0.235 s, and the envelope
   // correlates more at 2, 4 and 8 of those than at 3, 5 and 7, so the beat is
-  // two of them: 127.5 bpm. After: 353 of 359 readings within 3% of 127.5 on
-  // Raadio 2 and every one of the 231 in Raadio 4's first two minutes, where it
-  // was 127 to 129 before as well. Raadio 4's last minute has no steady beat
-  // (a 55 s window's best score is 0.02 against 0.48 in its first two minutes)
-  // and its confidence falls there, which is right.
+  // two of them: 127.0 bpm on the kick grid. After: 358 of 359 readings within
+  // 3% of 127.0 on Raadio 2 (re-measured against the kick grid) and every one
+  // of the 231 in Raadio 4's first two minutes, where it was 127 to 129 before
+  // as well. Raadio 4's last minute has no steady beat (a 55 s window's best
+  // score is 0.02 against 0.48 in its first two minutes) and its confidence
+  // falls there, which is right.
+  //
+  // 🔴 WHY THE PHASE STEP IS A PULSE TRAIN WITHOUT THE HATS, MEASURED 2026-10-11
+  // OFFLINE after *"beats are often uppeat"* and *"radio 2 is upbeat. not
+  // good."* (research/beat-tracking-2026-10-11.md). The step before took the
+  // phase from the four band sum over 4 s, and on Raadio 2 put 48% of its
+  // beats exactly half a beat off the kick. The hat band above 4 kHz sits on
+  // the offbeat in that music and every band is log compressed on its own, so
+  // a quiet hat's rise counted as much as a loud kick's, and the low band could
+  // not outvote it because the bass comes back on the offbeat too. With the
+  // hats out of the beat envelope, a pulse train over 6 s and the hats scored
+  // half a beat later, drawn beats on the kick go from 50% to 97% on Raadio 2
+  // and half a beat off from 48% to 3%. Raadio 4 stays at 100%, and Ida (a
+  // steady kick at 131.2 bpm and almost nothing above 4 kHz) goes from 97% to
+  // 98%. The weights were chosen on Raadio 2, and the hats half a beat later is
+  // a dance music prior that would pull the wrong way where the hats land on
+  // the beat.
   const HOP = 256;
   const WIN_S = 12, MIN_S = 4;
   const LO = 60, HI = 200, PRIOR = 120, PRIOR_OCT = 0.7, HALF_W = 0.5, STICK = 0.15;
   const EVERY_S = 0.5, KEEP = 5, AGREE = 8, CAND = 5;
   const FOLLOW_HZ = 10;
   const BANDS = [['lowpass', 150, 1], ['bandpass', 400, 1], ['bandpass', 1500, 0.8], ['highpass', 4000, 1]];
+  // The phase step (6): each band's weight in the beat envelope (the hats left
+  // out), the hat band's index and its weight half a beat later, how far back it
+  // looks, the width of a pulse and how fast an older beat counts for less.
+  const PH_W = [1, 0.5, 0.25, 0], HAT = 3, HAT_BETA = 1, PH_SPAN_S = 6, PH_SIG_S = 0.012, PH_DECAY_S = 3;
   let det = null;
   function detBuild() {
     const sr = ctx.sampleRate, rate = sr / HOP, n = Math.round(WIN_S * rate);
-    const t = { rate, n, env: new Float32Array(n), w: 0, count: 0, newest: 0,
+    const t = { rate, n, env: new Float32Array(n), bands: BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,
       prev: new Float32Array(BANDS.length), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity,
       f: new Float64Array(2 * BANDS.length), h: 0, k: 1 - Math.exp(-2 * Math.PI * FOLLOW_HZ / sr) };
     t.in = ctx.createGain();
@@ -304,7 +335,10 @@
   function detHop(at) {
     const t = det;
     let o = 0;
-    for (let b = 0; b < BANDS.length; b++) { const l = Math.log1p(1e4 * t.f[2 * b + 1]); o += Math.max(0, l - t.prev[b]); t.prev[b] = l; }
+    for (let b = 0; b < BANDS.length; b++) {
+      const l = Math.log1p(1e4 * t.f[2 * b + 1]), r = Math.max(0, l - t.prev[b]);
+      t.bands[b][t.w] = r; o += r; t.prev[b] = l;
+    }
     t.env[t.w] = o; t.w = (t.w + 1) % t.n; t.count++; t.newest = at;
     if (++t.since >= Math.round(EVERY_S * t.rate)) { t.since = 0; detEstimate(); }
   }
@@ -355,11 +389,24 @@
     const agree = t.picks.filter((b) => near(b, t.est)).length / t.picks.length;
     const conf = (1 - Math.exp(-Math.max(0, chosen.s) / 0.25)) * (0.5 + 0.5 * agree);
     t.conf = conf;
-    const P = 60 / t.est * rate, span = Math.min(N, Math.round(4 * rate));
+    const P = 60 / t.est * rate, span = Math.min(N, Math.round(PH_SPAN_S * rate));
+    const sg = PH_SIG_S * rate, R = Math.ceil(2 * sg);
+    const low = new Float32Array(span), hat = new Float32Array(span);
+    for (let i = 0; i < span; i++) {
+      const j = (t.w - span + i + t.n) % t.n;
+      for (let b = 0; b < BANDS.length; b++) low[i] += PH_W[b] * t.bands[b][j];
+      hat[i] = t.bands[HAT][j];
+    }
+    const pulse = (e, c) => { let s = 0; for (let d = -R; d <= R; d++) { const i = Math.round(c + d); if (i >= 0 && i < span) s += Math.exp(-0.5 * ((i - c) / sg) ** 2) * e[i]; } return s; };
     let bestPh = 0, bestSum = -Infinity;
-    for (let ph = 0; ph < P; ph++) {
+    for (let ph = 0; ph < P; ph += 0.5) {
       let sum = 0;
-      for (let k = ph; k < span; k += P) sum += x[N - 1 - Math.round(k)];
+      for (let j = 0; ; j++) {
+        const c = span - 1 - ph - j * P;
+        if (c < R) break;
+        const w = Math.exp(-(j * P / rate) / PH_DECAY_S);
+        sum += w * (pulse(low, c) + HAT_BETA * pulse(hat, c + P / 2));
+      }
       if (sum > bestSum) { bestSum = sum; bestPh = ph; }
     }
     t.beatAt = t.newest - bestPh / rate;
