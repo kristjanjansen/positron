@@ -54,6 +54,8 @@ function curve({ drive, bits }) {
  * input -> highpass -> lowpass -> low shelf -> peak -> shaper -> dry + room -> level.
  */
 export function chain(c, ch, seed = 1) {
+  // Machine 0 is the recording as it is: no filter, no drive, no room.
+  if (ch.n === 0) { const g = c.createGain(); return { input: g, output: g }; }
   const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = ch.hp; hp.Q.value = 0.7;
   const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = ch.lp; lp.Q.value = 0.7;
   const sh = c.createBiquadFilter(); sh.type = 'lowshelf'; sh.frequency.value = ch.shelf.f; sh.gain.value = ch.shelf.g;
@@ -89,8 +91,15 @@ export function chain(c, ch, seed = 1) {
 const ALPHA = [(Math.sqrt(5) - 1) / 2, Math.SQRT2 - 1, Math.sqrt(5) - 2, Math.sqrt(3) - 1,
                Math.sqrt(7) - 2, Math.sqrt(11) - 3, Math.sqrt(13) - 3];
 
+// 🔴 MACHINE 0 IS THE ORIGINAL (asked 2026-10-11, *"machine 0 should be
+// original (no paramter to fx)"*, *"or disabed / enabled signal you choose"*):
+// the index stays the one signal, and 0 means the fx box passes the sound
+// through untouched, every key at its recorded pitch. 1 and up are generated.
+const ORIGINAL = { n: 0, name: 'Machine 0', rate: { key: 1, space: 1, return: 1, bell: 1, del: 1 }, level: 1 };
+
 export function character(n) {
-  n = Math.max(1, Math.floor(n) || 1);
+  n = Math.max(0, Math.floor(n) || 0);
+  if (n === 0) return ORIGINAL;
   const r = mulberry32(Math.imul(n, 2654435761) ^ 0x7e57c0de);
   const at = (k) => { const v = (0.5 + n * ALPHA[k] + (r() - 0.5) * 0.06) % 1; return v < 0 ? v + 1 : v; };
   const lin = (a, b, u = r()) => a + (b - a) * u;
@@ -222,6 +231,7 @@ export async function render(buffer, n, kind = 'key', trim = 1) {
 export const TARGET = 0.025;
 const trims = new Map();
 export function trimFor(buffer, n) {
+  if (n === 0) return Promise.resolve(1);
   if (!trims.has(n)) trims.set(n, render(buffer, n, 'key').then((r) => Math.min(4, Math.max(0.5, TARGET / (r.rms || TARGET)))));
   return trims.get(n);
 }

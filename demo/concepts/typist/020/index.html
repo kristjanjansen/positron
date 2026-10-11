@@ -232,11 +232,11 @@
   bay.addNode({ id: `${CF}:typewriter`, kind: 'store', label: 'samples', place: 'cloudflare', net: 'cloudflare' });
 
   // The index as it ARRIVES, at each end. Nothing sets these but a delivery.
-  let fxIndex = 1, tuning = character(1), pb = null;
+  let fxIndex = 0, tuning = character(0), pb = null;
   const arrivals = [];
   const deliverIndex = (where) => (e, l) => {
-    const n = Math.max(1, Math.floor(e?.n) || 0);
-    if (e?.of !== 'index' || !n) { d.log(`${where} takes an index, and this was not one`, 'warn'); return; }
+    const n = Math.floor(e?.n);
+    if (e?.of !== 'index' || !Number.isFinite(n) || n < 0) { d.log(`${where} takes an index, and this was not one`, 'warn'); return; }
     arrivals.push({ at: where, n, link: `${l.from} -> ${l.to}`, t: Math.round(performance.now()) });
     if (arrivals.length > 50) arrivals.shift();
     if (where === 'fx') { fxIndex = n; fx?.set(n); pb?.refresh(); }
@@ -331,16 +331,20 @@
     keys.focus({ preventScroll: true });
   } });
   // The stepper is the `web:pick` node: any positive number, sent through the
-  // bay. Its list grows as it is stepped, so there is no last machine.
-  let pickN = 1, listTo = 0;
-  const pick = (n) => {
-    pickN = Math.max(1, n);
-    if (pickN > listTo || !listTo) { listTo = Math.max(16, pickN + 8); step.options(Array.from({ length: listTo }, (_, i) => nameOf(i + 1)), pickN - 1); }
-    else step.show(nameOf(pickN), pickN - 1);
+  // bay. Its list grows as it is stepped, so there is no last machine. It
+  // starts at Machine 0, the original, and after every choice the focus goes
+  // back to the paper (asked 2026-10-11, *"when witching patchs get my focys
+  // back to typewriter"*).
+  let pickN = 0, listTo = 0;
+  const pick = (n, refocus = true) => {
+    pickN = Math.max(0, n);
+    if (pickN >= listTo || !listTo) { listTo = Math.max(17, pickN + 9); step.options(Array.from({ length: listTo }, (_, i) => nameOf(i)), pickN); }
+    else step.show(nameOf(pickN), pickN);
     bay.send(`${S}:pick:value-out`, { of: 'index', n: pickN });
+    if (refocus) keys.focus({ preventScroll: true });
   };
   const step = createStepper({ what: 'machine', prev: () => pick(pickN - 1), next: () => pick(pickN + 1),
-    pick: { options: [], onPick: (i) => pick(i + 1) } });
+    pick: { options: [], onPick: (i) => pick(i) } });
 
   const panel = createVideoPanel({ left: mute.el, centre: step.el, fullMode: 'footer' });
   panel.el.classList.add('tp-panel');
@@ -348,7 +352,7 @@
   // The fx box says which machine it is, from what last arrived at it.
   pb = createPatchbay(bay, { detail: (n) => [{ text: n.id === `${S}:fx` ? nameOf(fxIndex) : n.label, sans: true }], flowing });
   d.stack.add(panel.el, pb.el);
-  pick(1);
+  pick(0, false);
   draw();
   keys.focus({ preventScroll: true });
 
