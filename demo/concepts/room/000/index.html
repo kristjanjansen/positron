@@ -19,8 +19,6 @@
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
   .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  .pos-tbl-c .pos-pres-dot { display: inline-block; vertical-align: middle; }
-  .cc-ring::after { content: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -33,6 +31,7 @@
   import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createPortInk } from '/shell/port-ink.mjs';
 
   // The smallest multi-user chat built from patchbay blocks
   // (plans/plan-site-names.md §4h). Every tab is a SITE with one NODE and two
@@ -60,9 +59,9 @@
   const lines = createTable({
     columns: [
       { key: 'who', label: 'who', width: 96 },
-      { key: 'text', label: 'line', grow: true, hi: true },
+      { key: 'text', label: 'message', width: 240, hi: true, clip: true, hover: 'text' },
       { key: 'ago', label: 'when', width: 72 },
-      { key: 'link', label: 'link', width: 220, clip: true, hover: 'why' },
+      { key: 'link', label: 'link', grow: true, clip: true, hover: 'why' },
     ],
     minRows: 4,
     stick: true,
@@ -79,7 +78,12 @@
     if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
     return `${Math.floor(s / 86400)} d ago`;
   };
-  const draw = () => lines.set(said.map((r) => ({ ...r, ago: ago(r.at) })));
+  // The link cell is a printed link, `from -> to`, each port's name in its
+  // medium's colour as the patchbay draws it (port-ink.mjs). Every port here
+  // is named `<medium>-<dir>`, so the medium is read off the id.
+  const ink = createPortInk({ ports: () => said.flatMap((r) => r.link.split(' -> '))
+    .map((id) => ({ id, medium: id.split(':')[2]?.split('-')[0] })) }, ['value']);
+  const draw = () => { lines.set(said.map((r) => ({ ...r, ago: ago(r.at) }))); ink.paint(lines.el); };
   setInterval(() => { if (said.length) draw(); }, 30000);
   const short = (site) => site === SITE ? 'you' : `browser ${site.replace(/^web-/, '')}`;
 
@@ -96,8 +100,8 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; text.input.focus(); drawSites(); pb?.refresh(); },
-    onGraph: () => { drawSites(); pb?.refresh(); },
+    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
+    onGraph: () => { pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
 
@@ -109,7 +113,7 @@
     draw();
   }
 
-  const text = createField({ label: 'line', placeholder: 'say something', grow: 'wide' });
+  const text = createField({ label: 'message', placeholder: 'say something', grow: 'wide' });
   text.disabled(true);
   function say() {
     const t = text.value().trim();
@@ -128,40 +132,6 @@
   send.el.disabled = true;
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
 
-  // Who is in the room: the registry, as /concepts/bay/000/ draws it. Port names are
-  // shown as <medium>-<dir> (plans/plan-site-names.md §4c); the real id is on hover.
-  const DIR = { in: '\u2192\u25CB', out: '\u25CB\u2192' };
-  const sites = createTable({
-    columns: [
-      { key: 'state', label: '', width: 16 },
-      { key: 'id', label: 'port', grow: true, hi: true, clip: true },
-      { key: 'who', label: 'who', width: 120 },
-      { key: 'dir', label: 'dir', width: 48 },
-      { key: 'medium', label: 'medium', width: 72 },
-      { key: 'by', label: 'transport', width: 120 },
-    ],
-    minRows: 4,
-  });
-  function drawSites() {
-    const rows = node.registry.merged().ports.map((p) => {
-      const [site, n] = p.id.split(':');
-      return { state: p.stale ? 'stale' : 'live', id: `${site}:${n}:${p.medium}-${p.dir}`,
-        who: short(site), dir: DIR[p.dir] || p.dir, medium: p.medium, by: (p.transports || []).join(', ') };
-    }).sort((a, b) => (a.who === 'you' ? 0 : 1) - (b.who === 'you' ? 0 : 1) || a.id.localeCompare(b.id));
-    sites.set(rows);
-    for (const cell of sites.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) {
-      const t = cell.textContent;
-      if (t === 'live' || t === 'stale') {
-        const dot = document.createElement('span');
-        dot.className = 'pos-pres-dot' + (t === 'live' ? '' : ' cc-ring');
-        dot.style.color = t === 'live' ? 'var(--ok)' : 'var(--dim2)';
-        cell.textContent = '';
-        cell.append(dot);
-        cell.title = t;
-      } else if (/^(midi|audio|clock|value|video|program|file|state)$/.test(t)) cell.classList.add(`md-${t}`);
-    }
-  }
-
 
   // ── the patchbay: the two `*` links this tab holds, read from bay() itself ──
   // Before Join it is drawn from this tab's own graph, which opens nothing. A
@@ -173,6 +143,5 @@
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
   d.stack.add(join.el, row, lines.el, pb.el);
-  d.stack.titled('IN THE ROOM', sites.el);
   d.ready();
 </script>
