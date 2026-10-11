@@ -1,5 +1,5 @@
 // demo/concepts/typist/sampler.mjs: the Hermes Precisa 305 sampler of
-// /concepts/typist/010/ and 020/, lifted for /concepts/typist/030/, where
+// /concepts/typist/010/ and 020/, lifted for /concepts/typist/040/, where
 // several typewriters share ONE set of decoded buffers. 010 and 020 still carry
 // their own copy and are unchanged.
 //

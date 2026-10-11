@@ -1,5 +1,5 @@
 // demo/concepts/typist/paper.mjs: one sheet of paper, lifted out of
-// /concepts/typist/000/ for /concepts/typist/030/, which shows several.
+// /concepts/typist/000/ for /concepts/typist/040/, which shows several.
 // 000, 010 and 020 still carry their own copy and are unchanged.
 //
 // ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The

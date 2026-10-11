@@ -30,7 +30,7 @@ const WAVE = { k: 0.6, perSec: 0.4, depth: 1 };
 /* 🔴 A FEW ELEMENTS MOVED, NEVER 161 STOPS REWRITTEN, 2026-10-11. Every wire
    used to carry a 161 stop gradient whose every `stop-opacity` was written
    every frame, so a picture of 31 wires restyled about 5,000 elements sixty
-   times a second. MEASURED on /concepts/typist/030/?n=6 playing, headless,
+   times a second. MEASURED on /concepts/typist/040/?n=6 playing, headless,
    10 s: style recalculation took 35.0 % of the main thread with the patchbay
    on screen and 0.4 % with it gone. Now the SHAPE is fixed stops written once
    (a Gaussian for a pulse, one sine period with `spreadMethod="repeat"` for a
