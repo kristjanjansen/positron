@@ -30,6 +30,7 @@ export const CONCEPTS = [
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   { n: 'room/001', title: 'Chat UI', say: 'The chat as a framed window with its messages and a compose box.' },
   { n: 'room/002', title: 'Chat UI wired', say: 'The chat window wired to the patchbay, so tabs in one room talk to each other.' },
+  { n: 'room/003', title: 'Broadcast chat', say: 'The chat window with the first one in the room broadcasting to everybody in a column of its own.' },
   { n: 'room/010', title: 'History', say: 'The same chat, with a store that keeps what was said.' },
   { n: 'room/020', title: 'Admin', say: 'The chat with an admin line every tab shows on top.' },
   { n: 'room/030', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
