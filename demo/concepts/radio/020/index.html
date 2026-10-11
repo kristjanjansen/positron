@@ -34,8 +34,9 @@
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createSegment } from '/shell/segment.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
 
-  // concepts radio/020, TEMPO, 2026-10-11. A recording of Ida Radio Tallinn
+  // concepts radio/020, TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
   // kept in our own R2 bucket (`positron-station`, read through the station
   // worker's /media/, CORS `*`, as /concepts/sampler/000/ reads its piano),
   // played in this tab into the radio's wave, the speakers and a tempo
@@ -49,10 +50,20 @@
   // the recording from our bucket, once per page, and loops it. `?src=<url>`
   // points the page at another recording (a local file for a check).
   const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
-  const KEY = 'radio/ida-tallinn/2026-10-11.mp3';
-  const SRC = new URLSearchParams(location.search).get('src') || `${MEDIA}${KEY}`;
+  // 🔴 ERR's RAADIO 2 AND RAADIO 4, NOT IDA, SINCE 2026-10-11. Asked: *"Ida is
+  // offline. Work on radio 2 and 4 from err"*. The one capture of Ida was digital
+  // silence. Each station was captured ONCE, three minutes through our own relay
+  // (positron-shout, one listener, 2026-10-11 10:18 UTC), and kept in our bucket,
+  // so a visit, a play and a loop never reach ERR's servers.
+  const STATIONS = [
+    { id: 'raadio2', label: 'Raadio 2', key: 'radio/raadio2/2026-10-11.mp3' },
+    { id: 'raadio4', label: 'Raadio 4', key: 'radio/raadio4/2026-10-11.mp3' },
+  ];
+  const asked = new URLSearchParams(location.search).get('src');
+  const srcOf = (st) => asked || `${MEDIA}${st.key}`;
+  let at = 0;
   const S = 'web', CF = 'cf-r2';
-  const FILE_OUT = `${CF}:ida-tallinn:file-out`;
+  const FILE_OUT = (st) => `${CF}:${st.id}:file-out`;
   const PLAYER_IN = `${S}:player:file-in`, PLAYER_OUT = `${S}:player:audio-out`;
   const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const BPM_IN = `${S}:bpm:audio-in`, BPM_EV = `${S}:bpm:value-out`;
@@ -63,8 +74,10 @@
   // the bucket's port is `file-out` into a player, and the player's
   // `audio-out` feeds the wave, the speakers and the detector.
   const bay = createBay();
-  bay.addNode({ id: `${CF}:ida-tallinn`, kind: 'store', label: 'Ida Radio Tallinn, recorded', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: FILE_OUT, label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: SRC });
+  for (const st of STATIONS) {
+    bay.addNode({ id: `${CF}:${st.id}`, kind: 'store', label: `${st.label}, recorded`, place: 'cloudflare', net: 'cloudflare' });
+    bay.addPort({ id: FILE_OUT(st), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: srcOf(st) });
+  }
   bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });
   bay.addPort({ id: PLAYER_IN, label: 'player', dir: 'in', medium: 'file' });
   bay.addPort({ id: PLAYER_OUT, label: 'player', dir: 'out', medium: 'audio' });
@@ -92,7 +105,7 @@
     if (r.ok) held.set(k, r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
   const holds = (a, b) => held.has(`${a} ${b}`);
-  hold(FILE_OUT, PLAYER_IN);
+  for (const st of STATIONS) hold(FILE_OUT(st), PLAYER_IN);
   hold(PLAYER_OUT, WAVE_IN);
   hold(PLAYER_OUT, SPEAKER_IN);
   hold(PLAYER_OUT, BPM_IN);
@@ -101,13 +114,15 @@
   // ── the sound ───────────────────────────────────────────────────────────
   let ctx = null, pull = null, out = null, tap = null, tapBuf = null;
   let buffer = null, loading = null, fetchedAt = 0;
+  const buffers = new Map();      // station id -> decoded recording
   let src = null, playing = false;
 
   // The file wire is lit while the recording comes down and for 600 ms after;
   // the audio wires while it plays. The tempo wire pulses once per event.
   const pb = createPatchbay(bay, {
     flowing: (l, medium) => {
-      if (medium === 'file') return !!loading || (fetchedAt && performance.now() - fetchedAt < 600);
+      if (medium === 'file') return l.from === FILE_OUT(STATIONS[at]) && (!!loading || (fetchedAt && performance.now() - fetchedAt < 600));
+      if (medium === 'audio' && l.from.startsWith(CF)) return false;
       if (medium === 'audio') return playing && !!src;
       return false;
     },
@@ -116,7 +131,20 @@
   // ── the pictures ────────────────────────────────────────────────────────
   const waveHost = el('div', 'cc-wave');
   const scope = createGrainScope(waveHost, { seconds: 4, height: 150, fullScale: 1 });
-  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: el('span', 'cc-say', 'Ida Radio Tallinn, recorded') });
+  // The station, the kit picker in the wave panel's footer. Choosing one while
+  // playing switches the recording and starts a fresh tempo reading.
+  const pick = createPicker({ what: 'station', prev: () => choose(at - 1), next: () => choose(at + 1), onPick: (i) => choose(i) });
+  pick.options(STATIONS.map((st) => st.label), 0);
+  function choose(i) {
+    const n = (i + STATIONS.length) % STATIONS.length;
+    if (n === at) return;
+    at = n;
+    pick.show(STATIONS[at].label, at);
+    buffer = buffers.get(STATIONS[at].id) || null;
+    pb.refresh();
+    if (playing) { stop(); play(); }
+  }
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
 
   const disp = createSegment({ digits: 4, decimals: 1, size: 56, frame: false, title: 'tempo, bpm' });
   const strip = el('canvas', 'cc-strip');
@@ -312,17 +340,20 @@
   // ── the recording: fetched once, decoded once, looped ────────────────────
   let bytes = 0;
   function load() {
-    if (buffer) return Promise.resolve(buffer);
+    const st = STATIONS[at], url = srcOf(st);
+    if (buffers.has(st.id)) { buffer = buffers.get(st.id); return Promise.resolve(buffer); }
     loading ??= (async () => {
       pb.refresh();
-      d.log(`fetching ${SRC}`);
-      const r = await fetch(SRC);
-      if (!r.ok) throw new Error(`${r.status} from ${SRC}`);
+      d.log(`fetching ${url}`);
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status} from ${url}`);
       const ab = await r.arrayBuffer();
       bytes = ab.byteLength;
-      buffer = await ctx.decodeAudioData(ab);
-      d.log(`recording: ${(bytes / 1e6).toFixed(2)} MB, ${buffer.duration.toFixed(1)} s`);
-      return buffer;
+      const b = await ctx.decodeAudioData(ab);
+      buffers.set(st.id, b);
+      if (STATIONS[at] === st) buffer = b;
+      d.log(`${st.label}: ${(bytes / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s`);
+      return b;
     })().finally(() => { loading = null; fetchedAt = performance.now(); pb.refresh(); });
     return loading;
   }
@@ -380,7 +411,7 @@
   top.append(transport.el);
   d.stack.add(top, wavePanel.el, bpmPanel.el, pb.el);
   // Read only, for a check over CDP.
-  window.__demo.tempo = { src: SRC, bytes: () => bytes, duration: () => buffer?.duration ?? null,
+  window.__demo.tempo = { src: () => srcOf(STATIONS[at]), station: () => STATIONS[at].id, bytes: () => bytes, duration: () => buffer?.duration ?? null,
     history: () => history.slice(), conf: () => det?.conf ?? null, playing: () => playing };
   d.ready();
 </script>
