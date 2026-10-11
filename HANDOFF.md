@@ -1,3 +1,56 @@
+# Handoff, 2026-10-11, session 74: the Pi on JACK, typist, chat kit, sampler group, radio tempo
+
+## Where it is right now
+
+- **Site: BUILD `a418f7e0-055718-e06f`** (the concepts rename, 2026-10-11 morning). The owner works on local dev, so nothing after it is deployed (memory `deploy-often`, superseded: deploy only when asked). Local: `http://127.0.0.1:8890/`.
+- **Not pushed. 226 commits ahead of `origin/main`.** Push needs the account switch in CLAUDE.md.
+- Counted: **58 demos, 57 built**, **104 plans**.
+- **In flight, uncommitted:** `demo/concepts/radio/020/index.html` (a background agent was mid-way: better tempo detector, all confidences shown, BPM scope same height as the wave and 4x time zoom with labels, an fx box `web:fx` with a synthesised bass drum and a `web:knob-mix` wet/dry knob, equal loudness across the mix). Read its last report or the diff before committing; it was told to stop browser runs when the owner closed Chrome.
+- **Untracked build leftovers** in `workers/view/public/` (concepts/room/001 to 004, synth/080, typist, kit/chat, shell/chat-ui.mjs) from an agent's test build; delete them by name before any build or commit of `public/`.
+
+## The Pi (<pi>, site `pi-1`)
+
+- Site and ports renamed: `pi-1`, ports `<medium>-<dir>`; board announces `kind`/`label`.
+- **JACK runs on the Fast Track Pro itself** (`jackd -d alsa -C hw:CARD=Pro -p 512 -n 3`, capture only); the Circuit is on JACK and clean (floor about -80 dBFS, same as arecord). The arecord config is saved on the Pi. A power cycle of the Fast Track Pro cured 8 bit samples once; do it again if they return.
+- `rig/board/jack.mjs`: plan/apply JACK links, bay links between Pi audio ports become JACK connections.
+- **SysEx**: the gate allows exactly the Circuit Current Patch Dump Request and the Device Inquiry; the board reads before writing (snd-usb-audio drops replies otherwise). /concepts/synth/070/ shows the Circuit's patch name.
+- **Yoshimi** takes MIDI only from the board's virmidi (`alsa_midi_type` External), so it no longer grabs the Circuit.
+- **SuperCollider sampler** (`rig/board/scsampler.mjs`, its own scsynth on 57130) beside Yoshimi, both summed into the capture (option b). Piano and Rhodes FLACs on the card. FluidSynth removed from the Pi.
+- Board tests 445/445. Unused on the Pi, not removed, owner to decide: `/opt/positron-box` + its service, hexter, dssi-host-jack, qjackctl, supercollider-ide and Qt WebEngine, mkvtoolnix, flite, pocketsphinx, the Pi 5 kernel, ModemManager, bluetooth.
+
+## New concepts and kit
+
+| where | what |
+| --- | --- |
+| `/concepts/room/001` to `004` | chat UI, wired, broadcast chat (first in the room is admin), broadcast sign with history playback and a timeline |
+| `/concepts/typist/000` to `030` | paper, Hermes typewriter (R2), Machine n from one seeded fx rule (0 the original), multi typer 1 to 6 |
+| `/concepts/sampler/000` to `030` | piano, piano and Rhodes (`web:patch` program change), 015 sustain debugger (scope, gestures, polarity), 020 raw MIDI looper on the pedal, 030 the Pi piano |
+| `/concepts/radio/020` | Tempo: ERR Raadio 2 and 4 recordings in R2 into a tempo detector (in flight, see above) |
+| `/kit/chat/` | `demo/shell/chat-ui.mjs`: log, sign, compose, column, window, grid |
+| patchbay kit | the relay drawn as `cf-relay:<room>` boxes, per column widths, phone labels fixed, wire animation about 12x cheaper |
+
+R2 (`positron-station`, served at `https://positron-station.kristjan-jansen.workers.dev/media/`): `typewriter/hermes-precisa-305/`, `sampler/piano/`, `sampler/rhodes/`, `radio/raadio2/`, `radio/raadio4/`.
+
+## Plans and research written this session
+
+`plans/plan-nodes-revisited.md`, `plans/plan-sampler-pi-pico.md`, `plans/plan-piano-samples.md` (Salamander V3 recommended; today's piano is a FluidR3 render, one layer, out of phase, cut at 3.13 s), `research/typewriter-samples-2026-10-11.md`, `research/mattiisen-kirjutusmasinakontsert-2026-10-11.md` (the manuscripts incl. an 8 page typewriter part are at the Theatre and Music Museum; performed 25 October 2026).
+
+## Open, asked of the owner
+
+- Piano: a one hour listening test with Salamander v8 from Tone.js, or build the full Salamander set.
+- Remove the unused Pi packages listed above?
+- 015: a scope of the sampler's sound needs `output: () => out` added to `demo/concepts/sampler/sampler.mjs`.
+- Loop flags in the ruler (shared timeline) for sampler/020?
+- The rest is in `BACKLOG.md` under `## Open`.
+
+## Mistakes worth knowing
+
+- **A BACKLOG insert keyed on "## Open\n\n" silently did nothing** after an agent removed the blank line. Insert after "## Open\n" and check the file.
+- **A page setting `.disabled` on a kit button group** is undone when a press finishes; use `group.enable(id, false, reason)`.
+- **A relayed patchbay hop rebuilt every read** was a new wire every time, so MIDI never pulsed; hops keep one object.
+- **The original typewriter machine had no room settings**, so its loudness measure crashed and no trim ever applied. Check a measurement can run before trusting what it gates.
+- **Headless Chromes pile up** when many agents test in parallel; 16 were running when the owner needed Chrome closed.
+
 # Handoff, 2026-10-10, session 73: the concepts grow into groups, a kit of their own, and playable synths
 
 ## Where it is right now
