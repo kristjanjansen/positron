@@ -96,7 +96,7 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; drawSites(); pb?.refresh(); },
+    onJoin: () => { join.button('join').disabled = true; text.disabled(false); send.el.disabled = false; text.input.focus(); drawSites(); pb?.refresh(); },
     onGraph: () => { drawSites(); pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });

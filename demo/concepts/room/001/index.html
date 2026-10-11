@@ -125,7 +125,10 @@
   // ── the frame ──────────────────────────────────────────────────────────
   const list = messages(SAMPLE);
   const chat = el('div', 'rc');
-  chat.append(list.el, compose((text) => list.add({ who: ME, when: clock(), text })).el);
+  const box = compose((text) => list.add({ who: ME, when: clock(), text }));
+  chat.append(list.el, box.el);
+  // The frame's compose box takes the focus on load (asked 2026-10-11, *"autofocus compose input"*).
+  box.input.focus({ preventScroll: true });
 
   const panel = createVideoPanel({ left: false, fullMode: 'footer' });
   panel.el.classList.add('rc-panel');
