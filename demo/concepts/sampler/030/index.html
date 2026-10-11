@@ -44,7 +44,8 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
-  const d = mount({ name: 'concept sampler 030', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  const d = mount({ name: 'concept sampler 030', what: '', index: '/concepts/', indexLabel: 'concepts',
+    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms', output: 'ms', path: '' } });
   conceptNav('sampler/030');
 
   const q = new URLSearchParams(location.search);
@@ -65,6 +66,7 @@
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
   bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
   bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
+  bay.addNode({ id: `${S}:lag`, kind: 'screen', label: 'lag scope', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
 
   let board = null, armed = false, program = 0, loadingSet = null, loadedAt = 0;
@@ -74,6 +76,7 @@
     if (ev.cls === 'program') return choose(ev.d1);
     if (!armed || !board) return;
     if (ev.cls === 'note') {
+      if (ev.d2 > 0) pressed(ev.d1);
       board.send(ev.d2 > 0
         ? { type: 'note.on', node: 'sampler', note: ev.d1, vel: ev.d2, channel: 0 }
         : { type: 'note.off', node: 'sampler', note: ev.d1, channel: 0 });
@@ -90,6 +93,7 @@
     { id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
     { id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
     { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: id('lag', 'audio-in'), dir: 'in', medium: 'audio' },
     { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
@@ -99,6 +103,7 @@
     [`${CF}:piano:file-out`, SAMPLER_FILES],
     [`${CF}:rhodes:file-out`, SAMPLER_FILES],
     [SAMPLER_AUDIO, id('scope', 'audio-in')],
+    [SAMPLER_AUDIO, id('lag', 'audio-in')],
     [SAMPLER_AUDIO, id('speaker', 'audio-in')],
   ];
   for (const [from, to] of LINKS) {
@@ -122,6 +127,100 @@
     }
     requestAnimationFrame(frame);
   }
+
+  // ── the lag scope: what came back, against when the key went down ───────
+  // Asked 2026-10-11: *"add scrope to 030 samper with lags etc"*. The last
+  // LAG_VIEW of the playout's level, rolling, with a second trace that goes up
+  // when a key goes down and comes back when that key's sound reaches the
+  // speaker, so the width of each step IS the lag. Key to sound is measured
+  // per press: the first 1 ms block after the press that is over ONSET and
+  // three times what the 30 ms before it held, on the speaker's clock
+  // (`getOutputTimestamp`, so the browser's own output latency is inside it).
+  // The other cells are the parts this page can name: the Pi's round trip, the
+  // playout cushion, the browser's output latency, and the path. What is left
+  // over is the Pi's capture block and frame (JACK 512 x 3 at 48 kHz, 20 ms
+  // frames), which the page cannot see on its own.
+  const LAG_VIEW = 4000, COLS = 800, ONSET = 0.02, WAIT_MS = 1500;
+  const lagWave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '',
+    axes: { y: 'level', x: `${LAG_VIEW / 1000} s` } });
+  const env = [];          // { at, peak } per 1 ms block, performance time
+  const pending = [];      // presses still waiting for their sound
+  const spans = [];        // { at, end, lag } press to sound, kept for the trace
+  const lags = [];         // the last 20 measured lags
+  let lastLag = null, readUpTo = 0;
+  function pressed(note) {
+    const at = performance.now();
+    pending.push({ note, at });
+    while (pending.length > 8) pending.shift();
+  }
+  function listen() {
+    if (!analyser || !buf) return;
+    const ctx = board.ctx();
+    const ts = ctx.getOutputTimestamp?.();
+    if (!ts || !ts.performanceTime) return;
+    analyser.getFloatTimeDomainData(buf);
+    const sr = ctx.sampleRate, N = buf.length, blk = Math.round(sr / 1000);
+    // the buffer's last sample is the context's current time
+    const tEnd = ts.performanceTime + (ctx.currentTime - ts.contextTime) * 1000;
+    const t0 = tEnd - (N / sr) * 1000;
+    for (let i = 0; i + blk <= N; i += blk) {
+      const at = t0 + (i / sr) * 1000;
+      if (at <= readUpTo) continue;
+      let pk = 0;
+      for (let j = i; j < i + blk; j++) { const a = buf[j] < 0 ? -buf[j] : buf[j]; if (a > pk) pk = a; }
+      env.push({ at, peak: pk });
+      readUpTo = at;
+      // an onset: over ONSET and three times the 30 ms before it
+      let before = 0;
+      for (let k = env.length - 31; k < env.length - 1; k++) if (k >= 0 && env[k].peak > before) before = env[k].peak;
+      if (pk > ONSET && pk > before * 3) {
+        const p = pending.find((x) => x.at < at);
+        if (p) {
+          pending.splice(pending.indexOf(p), 1);
+          lastLag = at - p.at;
+          lags.push(lastLag); if (lags.length > 20) lags.shift();
+          spans.push({ at: p.at, end: at, lag: lastLag });
+        }
+      }
+    }
+    const now = performance.now();
+    while (env.length && env[0].at < now - LAG_VIEW - 100) env.shift();
+    while (spans.length && spans[0].end < now - LAG_VIEW) spans.shift();
+    for (let k = pending.length - 1; k >= 0; k--) if (now - pending[k].at > WAIT_MS) pending.splice(k, 1);
+  }
+  function drawLag() {
+    const now = performance.now(), t0 = now - LAG_VIEW;
+    const pts = new Array(COLS), over = new Array(COLS);
+    let k = 0;
+    for (let i = 0; i < COLS; i++) {
+      const a = t0 + (i / COLS) * LAG_VIEW, b = t0 + ((i + 1) / COLS) * LAG_VIEW;
+      let pk = 0;
+      while (k < env.length && env[k].at < a) k++;
+      for (let j = k; j < env.length && env[j].at < b; j++) if (env[j].peak > pk) pk = env[j].peak;
+      pts[i] = Math.min(1, pk / FULL) * 1.8 - 0.9;
+      const waiting = spans.some((s) => a < s.end && b > s.at) || pending.some((p) => b > p.at && a < now);
+      over[i] = waiting ? 0.95 : -0.95;
+    }
+    const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
+    lagWave.set({ points: pts, reason: null,
+      name: lastLag == null ? 'press a key' : `key to sound ${Math.round(lastLag)} ms, median ${Math.round(med)} ms`,
+      over: { points: over, name: 'key down until heard', colour: '--dim' } });
+  }
+  function lagCells() {
+    const st = board?.stats(), ctx = board?.ctx();
+    const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
+    d.set('key to sound', lastLag == null ? '' : Math.round(lastLag));
+    d.set('median', med == null ? '' : Math.round(med));
+    d.set('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    d.set('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+    d.set('output', ctx ? Math.round(((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000) : '');
+    d.set('path', st?.via ?? '');
+  }
+  function lagFrame() {
+    listen(); drawLag();
+    requestAnimationFrame(lagFrame);
+  }
+  setInterval(() => { if (board) lagCells(); }, 250);
 
   // ── the patch selector, its own node ─────────────────────────────────────
   // A pick is one program change leaving patch:midi-out. The cell shows what
@@ -200,6 +299,7 @@
         buf = new Float32Array(analyser.fftSize);
         pl.connect(analyser);
         requestAnimationFrame(frame);
+        requestAnimationFrame(lagFrame);
       }
       if (!MAY_PLAY) { say('A check is running, so nothing was sent to the shared board. Add ?board=1 to let it through', 'warn'); return; }
       let st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
@@ -212,6 +312,7 @@
         if (!r?.ok) { say(`The Pi could not start the sampler${r?.reason ? `, it said ${r.reason}` : ''}`, 'bad'); return; }
       }
       armed = true;
+      board.watchRtt(2000);
       openMidi();
       transport.setIcon('play', 'stop', 'stop');
       // The sampler on the Pi keeps its program between visitors, so ask for
@@ -224,6 +325,7 @@
   function stop() {
     if (armed && board) board.send({ type: 'note.panic', node: 'sampler' });
     armed = false;
+    board?.watchRtt(0);
     kb.panic?.();
     transport.setIcon('play', 'play', 'play');
     say('Stopped, every note of this sampler on the Pi was released');
@@ -249,11 +351,11 @@
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, wave.el, patchPick.el, host, pb.el);
+  d.stack.add(top, wave.el, lagWave.el, patchPick.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver: the scope's level, the
   // board's counters (frames, lost, peak) and the last status. Reads only.
   window.__demo.probe = () => ({ armed, level, program, said: saidLast, status: lastStatus,
-    stats: board ? board.stats() : null });
+    stats: board ? board.stats() : null, lags: [...lags] });
   d.ready();
 </script>
