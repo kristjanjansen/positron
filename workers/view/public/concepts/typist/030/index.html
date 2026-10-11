@@ -21,10 +21,11 @@
 
   /* ── the frame and the papers ─────────────────────────────────────────
      `createChatGrid` in demo/shell/chat-ui.mjs, which was lifted from this
-     page: one grid of six tracks, the seam between papers, 16:9 for one to
-     three papers and 4:3 for four to six, and a frame under 560 px (asked of
-     the frame, not the window) stacking one to three and going two across
-     for four to six. Every paper paints its own white. */
+     page: one grid of six tracks, papers edge to edge with no seam, and with
+     `fixed: true` one frame shape at every count, 16:9 at the desk and 3:4
+     under 560 px (asked: *"keep aspect ratio / h on all typist couts"*), the
+     frame (not the window) stacking one to three and going two across for
+     four to six. Every paper paints its own white. */
   .mt-choice { min-width: 0; }
 </style>
 <script type="module">
@@ -356,7 +357,7 @@
     onPick: (i) => { set = i; restart(); } });
   choice.el.classList.add('mt-choice');
 
-  frame = createChatGrid({ cells: papers.slice(1), count, left, centre: step.el });
+  frame = createChatGrid({ cells: papers.slice(1), count, left, centre: step.el, fixed: true });
   const panel = frame.panel;
 
   // `file` and `audio` are lit rather than pulsed: the file wires while the

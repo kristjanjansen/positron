@@ -33,15 +33,15 @@ const CSS = `
               resize: none; outline: 0; overflow: hidden; background: transparent;
               color: transparent; caret-color: transparent; -webkit-touch-callout: none; }
   .tpp-keys::selection { background: transparent; }
-  /* A BLOCK ONE CHARACTER WIDE, NOT A BAR, taking no width in the flow. White
-     over the sheet with difference, so it reads as a black cell and turns the
-     letter under it white. Without focus it is an outline that does not blink. */
+  /* A FILLED BAR 0.4 CHARACTER WIDE, taking no width in the flow, filled
+     whether or not the paper has focus (asked: *\"typist: always filled cursor\"*,
+     *\"but thinner\"*). White over the sheet with difference, so it reads black
+     and turns what it covers white. Without focus it stays and does not blink. */
   .tpp-cur { position: relative; }
-  .tpp-cur::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1ch;
+  .tpp-cur::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 0.4ch;
                     background: #fff; mix-blend-mode: difference;
                     animation: tpp-blink 1.06s steps(1) infinite; }
-  .tpp:not(.on) .tpp-cur::after { background: transparent; mix-blend-mode: normal; animation: none;
-                                  box-shadow: inset 0 0 0 1.5px #16161a; }
+  .tpp:not(.on) .tpp-cur::after { animation: none; }
   @keyframes tpp-blink { 0%, 54% { opacity: 1 } 55%, 100% { opacity: 0 } }
   @media (prefers-reduced-motion: reduce) { .tpp-cur::after { animation: none; } }
   .tpp-sel { background: rgba(22, 22, 26, .16); }

@@ -94,8 +94,12 @@
   const PLAYER_IN = `${S}:level:audio-in`, PLAYER_OUT = `${S}:level:audio-out`;
   const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const KEY_IN = `${S}:key:audio-in`, KEY_EV = `${S}:key:value-out`;
-  const DISPLAY_IN = `${S}:display:value-in`;
-  const KEYS_OUT = `${S}:keys:midi-out`, AUTO_OUT = `${S}:auto:midi-out`;
+  // The on-screen keyboard is ONE node: what you play leaves on its midi-out,
+  // and everything it shows arrives on its ins (the key on value-in, the chord
+  // autoplay holds or would play on value-in-2, the notes sounding on midi-in).
+  const DISPLAY_IN = `${S}:keys:value-in`, KEYS_CHORD = `${S}:keys:value-in-2`, KEYS_LIGHTS = `${S}:keys:midi-in`;
+  const AUTO_CHORD = `${S}:autoplay:value-out`, PAD_NOTES = `${S}:pad:midi-out`;
+  const KEYS_OUT = `${S}:keys:midi-out`, AUTO_OUT = `${S}:autoplay:midi-out`, AUTO_KEY = `${S}:autoplay:value-in`;
   const PAD_IN = `${S}:pad:midi-in`, PAD_OUT = `${S}:pad:audio-out`, PAD_LEVEL = `${S}:pad:value-in`;
   const ENERGY_OUT = `${S}:level:value-out`;
   const MIXER_DRY = `${S}:mixer:audio-in`, MIXER_WET = `${S}:mixer:audio-in-2`, MIXER_MIX = `${S}:mixer:value-in`, MIXER_OUT = `${S}:mixer:audio-out`;
@@ -124,17 +128,23 @@
   bay.addNode({ id: `${S}:key`, kind: 'engine', label: 'key detector', place: 'browser' });
   bay.addPort({ id: KEY_IN, label: 'key detector', dir: 'in', medium: 'audio' });
   bay.addPort({ id: KEY_EV, label: 'key', dir: 'out', medium: 'value' });
-  // The only way a reading reaches the picture: a delivered event on this
-  // port. The detector never touches the picture.
-  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'keyboard', place: 'browser' });
-  bay.addPort({ id: DISPLAY_IN, label: 'keyboard', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
-  // The keys and autoplay both play the pad synth, which sounds on the speakers.
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keys', place: 'browser' });
+  // The keyboard. Nothing paints it but what is delivered on its ins: the
+  // detector never touches it, nor does the pad or autoplay.
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   bay.addPort({ id: KEYS_OUT, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addNode({ id: `${S}:auto`, kind: 'engine', label: 'autoplay', place: 'browser' });
-  bay.addPort({ id: AUTO_OUT, label: 'autoplay', dir: 'out', medium: 'midi', emits: ['note'] });
+  bay.addPort({ id: DISPLAY_IN, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
+  bay.addPort({ id: KEYS_CHORD, label: 'chord', dir: 'in', medium: 'value', deliver: (ev) => { if (ev?.of === 'param' && ev.name === 'chord') autoMark(ev.notes || []); } });
+  bay.addPort({ id: KEYS_LIGHTS, label: 'lights', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (ev) => { if (ev?.cls === 'note') kb.lightNote(ev.d1, ev.d2 > 0); } });
+  bay.addNode({ id: `${S}:autoplay`, kind: 'engine', label: 'autoplay', place: 'browser' });
+  // Autoplay knows the key only from what arrives on its value-in, the key
+  // detector's readings on a link of their own.
+  bay.addPort({ id: AUTO_KEY, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => autoKey(ev) });
+  bay.addPort({ id: AUTO_OUT, label: 'autoplay', dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: AUTO_CHORD, label: 'chord', dir: 'out', medium: 'value' });
   bay.addNode({ id: `${S}:pad`, kind: 'engine', label: 'pad synth', place: 'browser' });
-  bay.addPort({ id: PAD_IN, label: 'pad synth', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (ev) => padEvent(ev) });
+  bay.addPort({ id: PAD_IN, label: 'pad synth', dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: (ev) => padEvent(ev) });
+  // What the pad is sounding, every note on and off, for whoever shows it.
+  bay.addPort({ id: PAD_NOTES, label: 'sounding', dir: 'out', medium: 'midi', emits: ['note'] });
   bay.addPort({ id: PAD_OUT, label: 'pad synth', dir: 'out', medium: 'audio' });
   bay.addPort({ id: PAD_LEVEL, label: 'level', dir: 'in', medium: 'value', deliver: (ev) => padLevel(ev) });
   // Wet and dry: the station is dry, the pad is wet, one knob between them.
@@ -174,6 +184,9 @@
   hold(PLAYER_OUT, KEY_IN);
   hold(PLAYER_OUT, MIXER_DRY);
   hold(KEY_EV, DISPLAY_IN);
+  hold(AUTO_CHORD, KEYS_CHORD);
+  hold(PAD_NOTES, KEYS_LIGHTS);
+  hold(KEY_EV, AUTO_KEY);
   hold(KEYS_OUT, PAD_IN);
   // Autoplay's chords also an octave down and an octave up: two more links
   // from the same port, each moving every note by twelve semitones.
@@ -216,7 +229,7 @@
     pb.refresh();
     if (playing) { stop(); play(); }
   }
-  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: pick.el });
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', right: false, left: pick.el });
 
   // The key on the kit keyboard, two octaves from C3, which fill the panel
   // without stretching a key. The seven notes of the detected key are grey
@@ -296,31 +309,45 @@
     const k = energy == null ? 1 : Math.max(0.2, Math.min(1.5, 0.2 + 0.8 * energy ** 1.5));
     padBus.gain.setTargetAtTime(PAD.level * k, ctx.currentTime, 0.05);
   }
+  // Each MIDI channel has its own level, set by CC 11 (expression) on that
+  // channel: the keys play on channel 1 and are never turned down, autoplay
+  // plays on channel 2 and turns itself up and down with the key's confidence.
+  const chGains = new Map();
+  function chGain(ch) {
+    if (!chGains.has(ch)) { const g = ctx.createGain(); g.connect(padBus); chGains.set(ch, g); }
+    return chGains.get(ch);
+  }
   function padEvent(ev) {
+    if (ev?.cls === 'cc' && ev.d1 === 11) {
+      sound();
+      // squared, so the bottom of the range is quiet rather than merely softer
+      chGain(ev.ch).gain.setTargetAtTime((ev.d2 / 127) ** 2, ctx.currentTime, 0.05);
+      return;
+    }
     if (ev?.cls !== 'note') return;
     const on = ev.d2 > 0;
-    kb.lightNote(ev.d1, on);
-    if (on) padOn(ev.d1, ev.d2 / 127); else padOff(ev.d1);
+    bay.send(PAD_NOTES, { cls: 'note', ch: ev.ch, d1: ev.d1, d2: ev.d2 });
+    if (on) padOn(ev.d1, ev.d2 / 127, ev.ch); else padOff(ev.d1, ev.ch);
   }
-  function padOn(note, vel) {
+  function padOn(note, vel, ch = 1) {
     sound();
-    padOff(note);
+    padOff(note, ch);
     const t = ctx.currentTime, f = 440 * 2 ** ((note - 69) / 12);
     const env = ctx.createGain(); env.gain.setValueAtTime(0, t);
     env.gain.linearRampToValueAtTime(vel, t + PAD.attack);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = PAD.cutoff; lp.Q.value = 0.5;
-    lp.connect(env); env.connect(padBus);
+    lp.connect(env); env.connect(chGain(ch));
     const oscs = [['sawtooth', f, -7], ['sawtooth', f, 7], ['sine', f / 2, 0]].map(([type, freq, cents]) => {
       const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = cents;
       const g = ctx.createGain(); g.gain.value = type === 'sine' ? 0.5 : 0.35;
       o.connect(g); g.connect(lp); o.start(t); return o;
     });
-    voices.set(note, { env, oscs });
+    voices.set(`${ch}/${note}`, { env, oscs });
   }
-  function padOff(note) {
-    const v = voices.get(note);
+  function padOff(note, ch = 1) {
+    const v = voices.get(`${ch}/${note}`);
     if (!v) return;
-    voices.delete(note);
+    voices.delete(`${ch}/${note}`);
     const t = ctx.currentTime;
     v.env.gain.cancelScheduledValues(t);
     v.env.gain.setValueAtTime(v.env.gain.value, t);
@@ -333,7 +360,23 @@
   // seconds each: the home chord, then the ones built on the sixth, fourth and
   // fifth notes of the scale, round again. It follows the key when it changes,
   // and waits silently while there is no key yet.
-  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4, AUTO_SURE = 0.4;
+  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4, AUTO_CH = 2;
+  // Asked: *"cinfidence level -> note volime?"*, then *"do steeper but have
+  // ineria not to be annoying"*. Autoplay's loudness is CC 11 on its own
+  // channel, a level and not a velocity, so a chord already sounding swells
+  // and fades with it. The target is silent at AUTO_CONF_LO and below and full
+  // at AUTO_CONF_HI, and the level eases toward it with a time constant of
+  // AUTO_TAU_S, so a confidence that flickers moves it hardly at all and a
+  // key that firms up brings it in over a few seconds.
+  const AUTO_CONF_LO = 0.05, AUTO_CONF_HI = 0.35, AUTO_TAU_S = 3, AUTO_EXPR_MS = 100;
+  let autoExpr = 0, autoExprSent = -1, autoExprTimer = null;
+  function autoExprTick() {
+    const c = autoReading?.confidence ?? 0;
+    const target = Math.max(0, Math.min(1, (c - AUTO_CONF_LO) / (AUTO_CONF_HI - AUTO_CONF_LO)));
+    autoExpr += (target - autoExpr) * (1 - Math.exp(-AUTO_EXPR_MS / 1000 / AUTO_TAU_S));
+    const v = Math.round(autoExpr * 127);
+    if (v !== autoExprSent) { autoExprSent = v; bay.send(AUTO_OUT, { cls: 'cc', ch: AUTO_CH, d1: 11, d2: v }); }
+  }
   let autoTimer = null, autoAt = 0, autoHeld = [];
   // Which drawn key is which note: read once off the names the keys print
   // (`C3`, `C♯3`), because the keyboard publishes no element per note.
@@ -347,6 +390,16 @@
     for (const k of keyEls.values()) k.classList.remove('cc-auto');
     for (const n of notes) for (const o of [-12, 0, 12]) keyEls.get(n + o)?.classList.add('cc-auto');
   }
+  // The last key reading that arrived on autoplay's value-in. A new key
+  // restarts the chord cycle, or moves the preview.
+  let autoReading = null;
+  function autoKey(ev) {
+    if (ev?.of !== 'param' || ev.name !== 'key') return;
+    const moved = autoReading?.v !== ev.v;
+    autoReading = ev;
+    if (!moved) return;
+    if (autoTimer) { autoAt = 0; autoChord(); } else autoPreview();
+  }
   // The three notes of the chord on scale step `step` of the reading's key.
   function chordOf(r, step) {
     const sc = KEY_SCALE[r.mode], root = KB_BASE + r.tonic;
@@ -357,40 +410,41 @@
   // notes border yellow"*). With it on, the chord it is holding is.
   function autoPreview() {
     if (autoTimer) return;
-    const r = reading;
-    autoMark(r && r.tonic != null && KEY_SCALE[r.mode] ? chordOf(r, AUTO_STEPS[0]) : []);
+    const r = autoReading;
+    autoSay(r && r.tonic != null && KEY_SCALE[r.mode] ? chordOf(r, AUTO_STEPS[0]) : []);
   }
+  // The chord autoplay holds, or would open on, leaves on its value-out.
+  const autoSay = (notes) => bay.send(AUTO_CHORD, { of: 'param', name: 'chord', notes: [...notes] });
   function autoRelease() {
-    for (const n of autoHeld) bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: 0 });
+    for (const n of autoHeld) bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 0 });
     autoHeld = [];
-    autoMark([]);
+    autoSay([]);
     autoPreview();
   }
   function autoChord() {
     autoRelease();
-    const r = reading;
+    const r = autoReading;
     if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
     const step = AUTO_STEPS[autoAt++ % AUTO_STEPS.length];
-    // Asked: *"adjust volume on autoplay notes on probalilty?"*. The chord is as
-    // loud as the key is sure: velocity 20 at confidence 0, full 110 from
-    // AUTO_SURE up, set per chord, so it follows the reading every 4 s.
-    const sure = Math.max(0, Math.min(1, (r.confidence ?? 0) / AUTO_SURE));
-    const vel = Math.round(20 + 90 * sure);
     for (const n of chordOf(r, step)) {
-      bay.send(AUTO_OUT, { cls: 'note', ch: 1, d1: n, d2: vel });
+      bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 100 });
       autoHeld.push(n);
     }
-    autoMark(autoHeld);
+    autoSay(autoHeld);
   }
   function autoSet(on) {
     clearInterval(autoTimer); autoTimer = null;
+    clearInterval(autoExprTimer); autoExprTimer = null;
     autoRelease();
     if (!on) { d.log('autoplay off'); return; }
     sound();
+    // starts silent and comes in at the key's confidence
+    autoExpr = 0; autoExprSent = -1; autoExprTick();
+    autoExprTimer = setInterval(autoExprTick, AUTO_EXPR_MS);
     autoAt = 0;
     autoChord();
     autoTimer = setInterval(autoChord, AUTO_S * 1000);
-    d.log(reading?.v ? `autoplay in ${reading.v}` : 'autoplay waits for a key');
+    d.log(autoReading?.v ? `autoplay in ${autoReading.v}` : 'autoplay waits for a key');
   }
 
   // What the picture shows is only what arrived on its in-port.
@@ -399,7 +453,7 @@
     if (ev?.of !== 'param' || ev.name !== 'key' || !Array.isArray(ev.chroma)) return;
     const moved = reading?.v !== ev.v;
     reading = ev;
-    if (moved) { paintKey(ev); if (autoTimer) { autoAt = 0; autoChord(); } else autoPreview(); }
+    if (moved) paintKey(ev);
     keyPanel.values.set('key', ev.v ?? '');
     keyPanel.values.set('conf', Number.isFinite(ev.confidence) ? ev.confidence.toFixed(2) : '');
     keyPanel.values.set('also', Array.isArray(ev.also) ? ev.also.slice(0, 2).map((k) => k.key).join(', ') : '');
@@ -722,6 +776,7 @@
     keyStart();
     energyStart();
     reading = null; paintKey(null);
+    autoReading = null; autoPreview();
     for (const k of ['key', 'conf', 'also']) keyPanel.values.set(k, '');
     route();
     // The press is the person asking to listen: only now does a stream open,
@@ -761,6 +816,7 @@
   window.__demo.key = { src: () => srcOf(STATIONS[at]), station: () => STATIONS[at].id, open: () => (leg ? leg.st.id : null),
     live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null, gain: () => (lv ? +lv.g.toFixed(3) : null),
     levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing,
-    voices: () => [...voices.keys()], marked: () => [...keyEls].filter(([, k]) => k.classList.contains('cc-auto')).map(([n]) => n), keyEls: () => keyEls.size, mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
+    links: () => bay.links().map((l) => `${l.from} -> ${l.to}${l.transforms?.length ? ' ' + JSON.stringify(l.transforms) : ''}`),
+    voices: () => [...voices.keys()].map((k) => +k.split('/')[1]), expr: () => autoExprSent, marked: () => [...keyEls].filter(([, k]) => k.classList.contains('cc-auto')).map(([n]) => n), keyEls: () => keyEls.size, mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
   d.ready();
 </script>
