@@ -58,14 +58,25 @@ const CSS = `
   .pos-chat-sign-t { margin: 0; max-width: min(32ch, 70%); font: 600 max(12px, min(max(18px, 3vw), 28px, 9cqi))/1.3 var(--brand);
                      color: var(--fg); text-wrap: balance; overflow-wrap: anywhere; white-space: pre-line; }
 
-  .pos-chat-compose { position: relative; padding: 10px 12px 12px; }
+  /* The send button sits INSIDE the field with one inset on its three sides
+     and a radius concentric with the field's (asked 2026-10-11 with a crop,
+     *"adjust botton-in-field paddings and radius to fi in"*). Before, the one
+     line field was 35.6 px for a 26 px button at 6 px from the right and the
+     bottom, which left 3.6 px above it, and both carried the same 4 px radius.
+     Now: one line is 26 + 2 x --send-in tall, the button is --send-in in from
+     the field's outer edge, and the field's radius is the button's plus the
+     inset, so the two corners share a centre. */
+  .pos-chat-compose { --send-in: 4px; position: relative; padding: 10px 12px 12px; }
   .pos-chat-compose[hidden] { display: none; }
   .pos-chat-compose .pos-field { display: block; margin: 0; }
   /* .pos-field.tall textarea is (0,2,1); this matches it and wins on order. */
   .pos-chat-compose .pos-field textarea { display: block; width: 100%; resize: none; overflow-y: hidden;
-                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45; }
+                         max-height: calc(6 * 1.45em + 16px); padding-right: 44px; line-height: 1.45;
+                         box-sizing: border-box; min-height: calc(var(--ctl-sm) + 2 * var(--send-in));
+                         padding-top: 6px; padding-bottom: 6px; border-radius: calc(var(--r) + var(--send-in)); }
   .pos-chat-compose .pos-field textarea:focus-visible { border-color: var(--chat-ink, var(--hi)); }
-  .pos-chat-send { position: absolute; right: 18px; bottom: 18px; }
+  .pos-chat-send { position: absolute; right: calc(12px + var(--send-in)); bottom: calc(12px + var(--send-in));
+                   border-radius: var(--r); }
 
   /* A column paints its own ground, wherever it sits (a window or a grid). */
   .pos-chat-col { min-width: 0; min-height: 0; background: var(--card); display: flex; flex-direction: column; }
