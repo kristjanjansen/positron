@@ -374,15 +374,13 @@
 
   // A stepped line: a controller holds its value until the next message, so a
   // sloped line between two values would draw values nobody sent. One line
-  // per port, a dot on every message, and the threshold at 64 dashed.
+  // per port and a dot on every message. The dashed threshold line at 64 went
+  // 2026-10-11 (*"rm dotted line from sustain"*).
   registerRenderer('pedal-step', (ctx, L, C) => {
     const { x, t0, t1 } = C;
     const top = L.y + 3, h = L.height - 6;
     const y = (v) => top + h - (v / 127) * h;
     ctx.save();
-    ctx.strokeStyle = '#6a7280'; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-    ctx.beginPath(); ctx.moveTo(x(t0), Math.round(y(PEDAL_ON)) + 0.5); ctx.lineTo(x(t1), Math.round(y(PEDAL_ON)) + 0.5); ctx.stroke();
-    ctx.setLineDash([]); ctx.globalAlpha = 1;
     const by = new Map();
     for (const r of pedalRows()) { if (!by.has(r.port)) by.set(r.port, []); by.get(r.port).push(r); }
     const now = Math.min(performance.now(), t1);

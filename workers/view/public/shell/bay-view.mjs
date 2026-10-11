@@ -199,7 +199,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       // vertical spans do not overlap (plans/plan-links-view-phone.md).
       /* 🔴 A TITLE THAT DOES NOT FIT BESIDE ITS PORTS GETS A LINE OF ITS OWN,
          2026-10-11. The first port row shared the title's line on every card,
-         so on /concepts/typist/030/?n=6 at 375 px the gutter took 22 lanes, the
+         so on /concepts/typist/040/?n=6 at 375 px the gutter took 22 lanes, the
          cards shrank to 159 px and `web:typewriter-k` was drawn over its own
          `value-in` (40 overlapping labels, MEASURED). Each card now measures
          its title (and the grey field under it) against the port names on the
@@ -225,7 +225,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
         // ⚠️ A FAN SHARES ONE LANE, 2026-10-11: every wire out of one outlet
         // (a sample store to six typewriters) or into one inlet (six fx boxes
         // to one speaker) runs in one lane as a trunk with branches, which is
-        // how a patch bus is drawn. One lane per wire gave typist/030 at six
+        // how a patch bus is drawn. One lane per wire gave typist/040 at six
         // papers 26 lanes, a gutter wider than its cards. Twins (same two
         // ends) keep a lane each, so they still split, run and rejoin.
         const live = links.filter((l) => at.has(l.from) && at.has(l.to));

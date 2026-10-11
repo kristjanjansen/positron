@@ -16,7 +16,7 @@
 //   createChatGrid(o)      one to six equal cells in the kit's video panel,
 //                          edge to edge, the layout following the
 //                          count and the frame's own width (lifted from
-//                          /concepts/typist/030/, the multi typer);
+//                          /concepts/typist/040/, the multi typer);
 //                          `fixed: true` keeps one shape at every count
 //
 // Nothing here opens anything: a page wires the send and the arrivals.
@@ -82,13 +82,13 @@ const CSS = `
   /* A column paints its own ground, wherever it sits (a window or a grid). */
   .pos-chat-col { min-width: 0; min-height: 0; background: var(--card); display: flex; flex-direction: column; }
 
-  /* ── the grid of one to six cells, lifted from /concepts/typist/030/ ─────
+  /* ── the grid of one to six cells, lifted from /concepts/typist/040/ ─────
      ONE GRID OF SIX TRACKS, so every count is a span and nothing is typed
      per layout: 1 spans all six, 2 span three, 3 span two, 4 span three
      (two by two), 6 span two (three by two). 5 IS THREE OVER TWO, THE TWO
      WIDER, not a three by two with a hole: an empty cell over the seam ground
      reads as a cell that failed to load. Rows share the height. NO SEAM: the
-     cells meet edge to edge, always (asked on /concepts/typist/030/: *"no
+     cells meet edge to edge, always (asked on /concepts/typist/040/: *"no
      borders between typists papers"*, then *"seam aleays false, no
      setting"*). The line coloured ground stays under them, and every cell
      paints its own. */
@@ -126,7 +126,7 @@ const CSS = `
     .pos-chat-gwin[data-n="1"] .pos-vp-stage { --vp-aspect: 4 / 5; }
   }
   /* \`fixed: true\`: one shape at every count, so the frame keeps its height as
-     cells come and go (asked on /concepts/typist/030/: *"keep aspect ratio / h
+     cells come and go (asked on /concepts/typist/040/: *"keep aspect ratio / h
      on all typist couts"*). 16:9 at the desk, 3:4 on a phone. (0,4,0) and
      after everything above, so it wins over every per-count rule. */
   .pos-chat-gwin.pos-chat-fixed[data-n] .pos-vp-stage { --vp-aspect: 16 / 9; }
@@ -263,7 +263,7 @@ export const CHAT_GRID_MAX = 6;
 
 /**
  * One to six equal cells in the kit's video panel, the multi typer's layout
- * (/concepts/typist/030/). A separate piece from the window rather than a
+ * (/concepts/typist/040/). A separate piece from the window rather than a
  * window with N columns, because the window's two columns are a CLAIM that one
  * is the main thing and the other a third wide beside it, and N equal cells
  * are the opposite claim.
