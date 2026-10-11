@@ -39,4 +39,5 @@ export const CONCEPTS = [
   { n: 'bay/010', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
   { n: 'tutorial/000', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
   { n: 'typist/000', title: 'Paper', say: 'A sheet of white paper you can type on.' },
+  { n: 'typist/010', title: 'Typewriter', say: 'The same paper with a real typewriter sounding every key.' },
 ];
