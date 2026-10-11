@@ -45,7 +45,6 @@
   .rc-send { position: absolute; right: 18px; bottom: 18px; }
 
 
-  .rc-room { font: 500 12px/1 var(--mono); color: var(--fg); letter-spacing: .04em; }
 
   /* ── the parts, each at its own size on a card ── */
   .rc-part { background: var(--card); border: var(--edge, 1px solid var(--line));
@@ -128,7 +127,7 @@
   const chat = el('div', 'rc');
   chat.append(list.el, compose((text) => list.add({ who: ME, when: clock(), text })).el);
 
-  const panel = createVideoPanel({ left: el('span', 'rc-room', ROOM), fullMode: 'footer' });
+  const panel = createVideoPanel({ left: false, fullMode: 'footer' });
   panel.el.classList.add('rc-panel');
   panel.stage.append(chat);
   d.stack.add(panel.el);
