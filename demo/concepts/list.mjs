@@ -18,9 +18,8 @@ export const CONCEPTS = [
   { n: 'synth/070', title: 'Circuit', say: 'The keyboard and a patch selector playing the Novation Circuit plugged into the Raspberry Pi.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'radio/000', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
-  // radio/020 Granulator is off the index since 2026-10-10 (*"hide 031 for now and backlog"*);
-  // the page stays at /concepts/radio/020/, row: { n: 'radio/020', title: 'Granulator', say: 'One station into a granulator that a BPM detector keeps in tempo.' }
   { n: 'radio/010', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
+  { n: 'radio/020', title: 'Tempo', say: 'A recording of Ida Radio Tallinn played from our own bucket into a tempo detector.' },
   { n: 'video/000', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: 'video/010', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },
@@ -42,4 +41,7 @@ export const CONCEPTS = [
   { n: 'typist/010', title: 'Typewriter', say: 'The same paper with a real typewriter sounding every key.' },
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
   { n: 'typist/030', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
+  { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing a sampler of piano recordings that come from our R2 bucket.' },
+  { n: 'sampler/010', title: 'Piano and Rhodes', say: 'The same sampler holding a piano and a Rhodes that a patch node switches by program change.' },
+  { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
 ];

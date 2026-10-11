@@ -16,9 +16,10 @@ import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { graphProblem, createRegistry } from '../../demo/shell/graph-registry.mjs';
 import { EventEmitter } from 'node:events';
 import { constants as FS_C } from 'node:fs';
-import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
+import { keyRanges, pianoSfz, ensurePiano, PIANO_NOTES } from './sampler.mjs';
 import { join } from 'node:path';
 
 let pass = 0, fail = 0;
@@ -1208,6 +1209,58 @@ console.log('\nbeat: the graph on the hello and on every beat');
   const jbytes = Buffer.byteLength(JSON.stringify(jackAlive));
   ok('with the JACK ends announced the beat still stays under 4 KB, and carries them',
     jbytes < 4096 && jackAlive.graph.ports.some((p) => p.id === 'pi-1:circuit:audio-out' && p.jack?.[0] === 'circuit:capture_1'), `${jbytes} bytes`);
+}
+
+// ── the sampler's piano (sampler.mjs): the sfz writer and the fetch ─────────
+// The browser pages and the Pi must play one key from one recording, so the
+// rule (nearest, tie goes lower) is graded by brute force against a key-by-key
+// nearest search, which is a second implementation rather than the same
+// arithmetic restated.
+{
+  const nearest = (notes, k) => notes.reduce((b, n) => (Math.abs(n - k) < Math.abs(b - k) ? n : b), notes[0]);
+  const owner = (ranges, k) => ranges.filter((r) => k >= r.lo && k <= r.hi).map((r) => r.note);
+  const ranges = keyRanges();
+  is('thirty regions, A0 to C8', [ranges.length, ranges[0].note, ranges.at(-1).note], [30, 21, 108]);
+  let wrong = [];
+  for (let k = 21; k <= 108; k++) { const o = owner(ranges, k); if (o.length !== 1 || o[0] !== nearest(PIANO_NOTES, k)) wrong.push(k); }
+  is('every key 21..108 belongs to exactly one region, the nearest recording', wrong, []);
+  is('each recording owns itself and one key either side', ranges.slice(1, -1).every((r) => r.lo === r.note - 1 && r.hi === r.note + 1), true);
+  // NEGATIVE CONTROL: uneven spacing makes ties, and a tie goes to the LOWER one.
+  const tie = keyRanges([60, 62, 66]);
+  is('NEGATIVE CONTROL: a tie goes to the lower recording (61 to 60, 64 to 62)',
+    [owner(tie, 61), owner(tie, 64)], [[60], [62]]);
+  wrong = [];
+  for (let k = 59; k <= 67; k++) { const o = owner(tie, k); if (o.length !== 1 || o[0] !== nearest([60, 62, 66], k)) wrong.push(k); }
+  is('NEGATIVE CONTROL: uneven ranges still tile with no gap and no overlap', wrong, []);
+  const sfz = pianoSfz({ dir: '/x/piano' });
+  const regions = sfz.split('\n').filter((l) => l.startsWith('<region>'));
+  is('the sfz has one region per recording, each naming its file and pitch centre',
+    [regions.length, regions[0], regions.at(-1)],
+    [30, '<region> sample=21.flac lokey=20 hikey=22 pitch_keycenter=21', '<region> sample=108.flac lokey=107 hikey=109 pitch_keycenter=108']);
+  ok('default_path ends in a slash, or every sample resolves next to the wrong directory', /default_path=\/x\/piano\/\n/.test(sfz), sfz.slice(0, 200));
+  ok('a release, a volume and the velocity curve are in the global header',
+    /<global>\nvolume=6 ampeg_release=0\.3 amp_veltrack=100 amp_velcurve_1=0\.0007 .*amp_velcurve_64=0\.3577 .*amp_velcurve_127=1\.0000/.test(sfz));
+  // NEGATIVE CONTROL: the curve is /nola/'s 1.5 power, not SFZ's own square, so a
+  // writer that left the curve out (square) would read 0.2540 at 64.
+  is('NEGATIVE CONTROL: the velocity curve at 64 is the 1.5 power, not the square',
+    sfz.match(/amp_velcurve_64=([\d.]+)/)?.[1], ((64 / 127) ** 1.5).toFixed(4));
+  // The fetch, against a fake network and a fake converter: it fetches what is
+  // missing, only that, and a second run fetches nothing.
+  const dir = mkdtempSync(join(tmpdir(), 'piano-'));
+  writeFileSync(join(dir, '60.flac'), 'x');
+  const asked = [];
+  const fetchImpl = async (u) => { asked.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(4) }; };
+  const convert = (src, dst) => writeFileSync(dst, readFileSync(src));
+  const one = await ensurePiano({ dir, fetchImpl, convert });
+  is('a first run fetches the 29 missing, not the one already there', [one.fetched, asked.some((u) => u.endsWith('/60.mp3')), one.missing], [29, false, []]);
+  ok('and it writes the sfz', one.wroteSfz && readFileSync(join(dir, 'piano.sfz'), 'utf8') === pianoSfz());
+  const two = await ensurePiano({ dir, fetchImpl, convert });
+  is('NEGATIVE CONTROL: a second run fetches nothing and rewrites nothing', [two.fetched, two.wroteSfz, asked.length], [0, false, 29]);
+  is('no temporary file is left on the card', readdirSync(dir).filter((f) => f.startsWith('.')), []);
+  const bad = await ensurePiano({ dir: mkdtempSync(join(tmpdir(), 'piano-')), fetchImpl: async () => ({ ok: false, status: 404 }), convert })
+    .then(() => 'resolved', (e) => e.message);
+  ok('a refused file is an error naming it, never an empty sample', /21\.mp3 answered 404/.test(bad), bad);
+  rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(`\n${pass}/${pass + fail} green`);

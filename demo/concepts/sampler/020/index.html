@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 020</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts sampler/020, LOOPER, 2026-10-11. 000's piano sampler with a MIDI
+  // looper between the keys and the sampler. Asked: *"Looper. Triggered from
+  // Sustain pedal. Shows as zoomed in timeline. First start second stop. Raw.
+  // No quant no bpm"*.
+  //
+  // THE RULES, all of them:
+  //   - The only control is the sustain: CC 64 from a plugged in keyboard, or
+  //     the Sustain button in the on-screen keyboard's footer.
+  //   - A PRESS is the pedal value crossing from below 64 to 64 or above (a
+  //     pedal sends 127 going down and 0 coming up: the 127 is the press, the 0
+  //     does nothing). One click of the Sustain button is one press.
+  //   - Press 1 starts recording. Every note still goes straight through to the
+  //     sampler while it is recorded.
+  //   - Press 2 stops recording. The loop is EXACTLY the time between the two
+  //     presses, nothing rounded, no grid, no tempo, and plays from that moment
+  //     on, round and round. A key still held at press 2 gets its note off at
+  //     the loop's end. A note off whose note on came before press 1 is dropped.
+  //   - Press 3 throws the loop away and starts a new recording (no overdub).
+  //   - `Panic` in the keyboard's footer stops the loop and empties it.
+  //   - Two presses under 20 ms apart are a bounce, not a loop, and leave it empty.
+  //
+  // `demo/shell/looper.mjs` is the kit's AUDIO looper (a ring of sound, a kept
+  // AudioBuffer, directions). None of it applies to a list of note events, so
+  // nothing is shared; what is shared is the kit timeline the loop is drawn on.
+  // NOTHING IS FETCHED ON A VISIT. MIDI access is asked for on load, as /nola/
+  // does, so a pedal on a plugged in keyboard works from the first press.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createMidi } from '/shell/midi.mjs';
+  import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
+
+  const d = mount({ name: 'concept sampler 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('sampler/020');
+
+  // ── the sampler ─────────────────────────────────────────────────────────
+  let fetchedAt = 0;
+  const sampler = createSampler({
+    instruments: [PIANO],
+    log: (line, kind) => d.log(line, kind),
+    onFetch: (on) => { if (!on) fetchedAt = performance.now(); },
+  });
+
+  // ── the looper ──────────────────────────────────────────────────────────
+  const BOUNCE_MS = 20;
+  const L = {
+    state: 'empty',          // 'empty' | 'recording' | 'looping'
+    t1: 0, len: 0,           // ms, performance.now() clock
+    lapStart: 0, lastPos: 0, lap: 0,
+    events: [],              // { at, d1, d2 } in ms from the first press, sorted
+    open: new Map(),         // note -> its note on, while recording
+    sounding: new Set(),     // notes the loop has on right now
+    pedal: 0, presses: [],   // the raw CC 64 value, and when each press landed
+    fired: [],               // { lap, at, late } for a check: how far each replay was off
+  };
+  const out = (d1, d2) => bay.send(`${S}:looper:midi-out`, { cls: 'note', ch: 1, d1, d2 });
+  function silence() { for (const n of L.sounding) out(n, 0); L.sounding.clear(); }
+
+  function press(now) {
+    L.presses.push(now);
+    if (L.state === 'recording') {
+      const len = now - L.t1;
+      if (len < BOUNCE_MS) { L.state = 'empty'; L.events = []; L.open.clear(); d.log('two presses under 20 ms apart, so no loop', 'warn'); face(); return; }
+      L.len = len;
+      for (const [n] of L.open) L.events.push({ at: len, d1: n, d2: 0 });
+      L.open.clear();
+      L.events.sort((a, b) => a.at - b.at);
+      L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.fired = [];
+      deck.setRange([0, len]);
+      strip.strip.fit(0, len);
+      strip.strip.invalidate();
+      d.log(`second press: the loop is ${(len / 1000).toFixed(3)} s with ${L.events.filter((e) => e.d2).length} notes, playing`);
+    } else {
+      silence();
+      L.state = 'recording'; L.t1 = now; L.len = 0; L.events = []; L.open.clear();
+      deck.setRange([0, VIEW_MS]);
+      strip.strip.fit(0, VIEW_MS);
+      strip.strip.invalidate();
+      d.log('first press: recording');
+    }
+    face();
+  }
+
+  function clear() {
+    silence();
+    L.state = 'empty'; L.events = []; L.open.clear(); L.len = 0;
+    strip.strip.invalidate();
+    face();
+  }
+
+  // What reaches looper:midi-in. Notes always pass through; CC 64 is the
+  // looper's own control and goes no further.
+  function looperIn(e) {
+    const now = performance.now();
+    if (e.cls === 'cc') {
+      if (e.d1 !== SUSTAIN_CC) return;
+      const was = L.pedal;
+      L.pedal = e.d2;
+      if (was < PEDAL_ON && e.d2 >= PEDAL_ON) press(now);
+      return;
+    }
+    if (e.cls !== 'note') return;
+    out(e.d1, e.d2);
+    if (L.state !== 'recording') return;
+    const at = now - L.t1;
+    if (e.d2) { L.open.set(e.d1, true); L.events.push({ at, d1: e.d1, d2: e.d2 }); }
+    else if (L.open.has(e.d1)) { L.open.delete(e.d1); L.events.push({ at, d1: e.d1, d2: 0 }); }
+    strip.strip.invalidate();
+  }
+
+  // Playback: every few ms, fire the events between where the loop was and
+  // where it is now. Positions come from the first lap's start and the loop
+  // length, never from the last tick, so the loop cannot drift.
+  function fire(ev, lapStart) {
+    const now = performance.now();
+    L.fired.push({ lap: L.lap, at: ev.at, late: +(now - (lapStart + ev.at)).toFixed(2) });
+    if (L.fired.length > 400) L.fired.shift();
+    if (ev.d2) L.sounding.add(ev.d1); else L.sounding.delete(ev.d1);
+    out(ev.d1, ev.d2);
+  }
+  setInterval(() => {
+    if (L.state !== 'looping') return;
+    const now = performance.now();
+    const elapsed = now - L.lapStart;
+    const lap = Math.floor(elapsed / L.len);
+    const pos = elapsed - lap * L.len;
+    if (lap === L.lap) {
+      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at < pos) fire(ev, L.lapStart + lap * L.len);
+    } else {
+      const old = L.lapStart + L.lap * L.len;
+      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at <= L.len) fire(ev, old);
+      L.lap = lap;
+      for (const ev of L.events) if (ev.at < pos) fire(ev, L.lapStart + lap * L.len);
+    }
+    L.lastPos = pos;
+  }, 4);
+
+  // ── the timeline: the kit's transport bar and strip, glued ───────────────
+  // The deck plays nothing (the looper does); it holds the loop's range and the
+  // playhead, which is set from the looper's own clock every frame.
+  const VIEW_MS = 4000;
+  const deck = createDeck({ items: [], range: [0, VIEW_MS],
+    adapters: { note: { caps: { rates: [1], continuous: false }, actuate() {}, reduce() { return {}; }, assertState() { return {}; } } } });
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, { toggle: false, scrub: false, loop: false, live: false });
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: false, gutter: 120,
+    lanes: [
+      { id: 'loop', kind: 'note', label: 'loop', height: 72, width: 2, as: 'ticks', terse: true,
+        rows: () => L.events.filter((e) => e.d2).map((e, i) => ({ at: e.at, id: `l${i}`, kind: 'note', payload: e })),
+        describeRow: (r) => [nameOf(r.payload.d1), `vel ${r.payload.d2}`] },
+    ],
+  });
+  const surface = createGlue(bar.el, strip.surface);
+  function tick() {
+    let p = 0;
+    const now = performance.now();
+    if (L.state === 'recording') {
+      p = now - L.t1;
+      // The view grows with the take, half again each time it fills.
+      const span = deck.range[1];
+      if (p > span * 0.95) { const next = span * 1.5; deck.setRange([0, next]); strip.strip.fit(0, next); }
+    } else if (L.state === 'looping') {
+      p = (now - L.lapStart) % L.len;
+    }
+    if (Math.abs(deck.position() - p) > 0.5) deck.seek(Math.min(p, deck.range[1]));
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const S = 'web', CF = 'cf-r2';
+  const bay = createBay();
+  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
+  bay.addNode({ id: `${S}:looper`, kind: 'store', label: 'looper', place: 'browser' });
+  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+  bay.addPort({ id: `${S}:looper:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: looperIn });
+  bay.addPort({ id: `${S}:looper:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
+  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => sampler.midi(e) });
+  bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
+  bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
+  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
+  bay.addPort({ id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  for (const [a, b] of [
+    [`${S}:keys:midi-out`, `${S}:looper:midi-in`],
+    [`${S}:looper:midi-out`, `${S}:sampler:midi-in`],
+    [`${CF}:piano:file-out`, `${S}:sampler:file-in`],
+    [`${S}:sampler:audio-out`, `${S}:speaker:audio-in`],
+  ]) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const flowing = (l, medium) => {
+    if (medium === 'file') return sampler.loading() || (fetchedAt && performance.now() - fetchedAt < 600);
+    if (medium === 'audio') return sampler.sounding() > 0;
+    return false;
+  };
+  const pb = createPatchbay(bay, { detail: (n) => [{ text: n.label, sans: true }], flowing });
+
+  // ── the keys, on screen and plugged in ───────────────────────────────────
+  const host = el('div');
+  const note = (d1, d2) => bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1, d2 });
+  const cc = (d1, d2) => bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1, d2 });
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (n, how) => { if (how !== 'midi') note(n, 100); },
+    onUp: (n, how) => { if (how !== 'midi') note(n, 0); },
+    onPanic: () => { clear(); sampler.panic(); d.log('the loop is stopped and empty'); },
+    // One click is one press of a pedal: down, then up straight away. The
+    // button is lit while the looper records, which is what it is doing.
+    sustain: true,
+    onSustain: () => { cc(SUSTAIN_CC, 127); cc(SUSTAIN_CC, 0); },
+  });
+  function face() { kb.sustain?.set(L.state === 'recording', true); }
+
+  // A plugged in keyboard plays the same keys, and its pedal is the same press.
+  createMidi({
+    log: (line, kind) => d.log(line, kind),
+    onDown: (n, vel) => { kb.lightNote?.(n, true); note(n, vel); },
+    onUp: (n) => { kb.lightNote?.(n, false); note(n, 0); },
+    onControl: (c, v) => { if (c === SUSTAIN_CC) cc(c, v); },
+  });
+
+  d.stack.add(surface, host, pb.el);
+  // The strip fits itself to its first width; this window is the empty take's.
+  requestAnimationFrame(() => strip.strip.fit(0, VIEW_MS));
+  window.__demo.bay = bay;
+  // Read only, for a check over CDP.
+  window.__demo.sampler = { stat: () => sampler.stat() };
+  window.__demo.looper = {
+    get state() { return L.state; }, get len() { return L.len; }, get lap() { return L.lap; },
+    get presses() { return [...L.presses]; }, get events() { return L.events.map((e) => ({ ...e })); },
+    get fired() { return L.fired.map((f) => ({ ...f })); },
+    get position() { return deck.position(); }, get range() { return [...deck.range]; },
+  };
+  d.ready();
+</script>
