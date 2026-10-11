@@ -5,46 +5,25 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 031</title>
+<title>POSITRON concept radio 020</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The page is the shell's stack (`createStack`, `--pos-gap`). A block that
-     belongs tight to what is under it is one `.cc-block`, its own column at 12. */
-  .cc-block { display: flex; flex-direction: column; gap: 12px; }
-  /* The granulator's two slider rows side by side (asked 2026-10-10, *"dry
-     grains sparse busy - 2 cols"*), one under the other on a phone. */
-  .cc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 32px; }
-  @media (max-width: 560px) { .cc-two { grid-template-columns: 1fr; } }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* The kit's live wave (grain-scope) as a panel's picture: the panel's stage is the
-     edge and the ground, so the scope gives up its own margin, border and corner
-     through the kit's tokens, and its always-empty caption takes no room. The stage
-     is as tall as the scope rather than 16:9 (`aspect: 'auto'`). */
+  /* The kit's live wave (grain-scope) as a panel's picture, as /concepts/radio/000/
+     draws it: the panel's stage is the edge and the ground, so the scope gives up
+     its own margin, border and corner, and its always-empty caption takes no room. */
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
-  /* The BPM detector's picture: the measured tempo on the kit's segment display,
-     and beside it the onset strip, which takes the rest of the row. The air is
-     the picture's own, inside the panel's stage. */
+  /* The tempo's picture: the display node's number on the kit's segment display,
+     and beside it the detector's onset strip, which takes the rest of the row. */
   .cc-bpm { display: flex; align-items: center; gap: 20px; padding: 20px; }
   .cc-bpm .pos-disp { flex: none; }
   .cc-strip { flex: 1 1 0; min-width: 0; height: 64px; display: block; }
-  /* A slider row: an end label, the slider, an end label, at the full width.
-     Both label columns take the width of the longest end label on the page,
-     `--end` in ch of the labels' own mono face, so every slider starts and
-     ends at the same x (asked 2026-10-10, *"label area w's on slider left and
-     right the longest one"*). */
-  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
-    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
-  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
-  /* Play on its own row: the button's own size, at the left. A block box rather
-     than an inline one, so no line box adds air under it in the stack. */
-  .cc-page > .pos-bgroup { display: flex; width: fit-content; }
-  .cc-fade .cc-end:first-child { text-align: right; }
-  .cc-fade > .sld { min-width: 0; }
-  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
+  /* Play on its own row: the button's own size, at the left. */
+  .cc-top { display: flex; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -54,249 +33,138 @@
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
   import { createSegment } from '/shell/segment.mjs';
-  import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createMp3Stream } from '/shell/mp3-stream.mjs';
-  import { createStack } from '/shell/stack.mjs';
 
-  // One station, Ida Radio Tallinn, through positron's own relay (`cf-shout`, the positron-shout worker),
-  // which holds ONE upstream connection per mount, exactly as /radio/ reaches
-  // it. The relay feeds a rhythmic granulator in this tab, and beside it a BPM
-  // detector that listens to the same sound and sends the tempo it measures,
-  // as events along a `value` link, into the granulator, whose 16th note grid
-  // then follows the station. The granulator outputs a wave (its audio, drawn
-  // in a panel) and events (one per grain, along a `value` link into that
-  // panel's wave node, which draws each one as a tick). `?base=` points the
-  // page at demo/fake-station.mjs instead.
+  // concepts radio/020, TEMPO, 2026-10-11. A recording of Ida Radio Tallinn
+  // kept in our own R2 bucket (`positron-station`, read through the station
+  // worker's /media/, CORS `*`, as /concepts/sampler/000/ reads its piano),
+  // played in this tab into the radio's wave, the speakers and a tempo
+  // detector, whose tempo travels as events along a `value` link into a
+  // display of its own. Asked: *"In radio demo we had some bpm detect demo.
+  // Dearcive. Rm granulator just a radio waves and sepatare visualizer. Use r2
+  // and ida. Bring to cocept to naming syrem"*. The granulator that stood here
+  // is in git history before this change.
   //
-  // NOTHING OPENS ON A VISIT. No AudioContext and no fetch to the station
-  // until somebody presses play. The patch is held from load so the picture
-  // does not change with play; an `external` node refuses a link out of it
-  // without `consent: true`, so the page names it where the link is made.
-  const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
-  const S = 'web';
-  const ST = { site: 'ida', node: 'tallinn', mount: 'ida-tallinn', label: 'Ida Radio Tallinn' };
-  const ST_OUT = `${ST.site}:${ST.node}:audio-out`;
-  // The relay is a hop of its own: it holds the one connection to the station
-  // and every tab reads the relay, so the station's link ends there.
-  const RELAY_IN = `cf-shout:${ST.mount}:audio-in`, RELAY_OUT = `cf-shout:${ST.mount}:audio-out`;
-  const SPEAKER_IN = `${S}:speaker:audio-in`;
-  // The granulator and its own wave. One out port feeds several links: the
-  // relay's out feeds the speakers (dry), the granulator and the detector, and
-  // the granulator's out feeds the speakers and its wave. Two links into the
-  // speakers' one in-port sum there.
-  const GRAN_IN = `${S}:gran:audio-in`, GRAN_OUT = `${S}:gran:audio-out`, GRAN_EV = `${S}:gran:value-out`;
-  const GRAN_TEMPO = `${S}:gran:value-in`;
-  const GWAVE_IN = `${S}:wave-gran:audio-in`, GWAVE_EV = `${S}:wave-gran:value-in`;
-  // The detector: audio in, one event out per tempo it settles on.
+  // NOTHING OPENS ON A VISIT, AND NOTHING EVER OPENS IDA'S SERVER. Play fetches
+  // the recording from our bucket, once per page, and loops it. `?src=<url>`
+  // points the page at another recording (a local file for a check).
+  const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
+  const KEY = 'radio/ida-tallinn/2026-10-11.mp3';
+  const SRC = new URLSearchParams(location.search).get('src') || `${MEDIA}${KEY}`;
+  const S = 'web', CF = 'cf-r2';
+  const FILE_OUT = `${CF}:ida-tallinn:file-out`;
+  const PLAYER_IN = `${S}:player:file-in`, PLAYER_OUT = `${S}:player:audio-out`;
+  const WAVE_IN = `${S}:wave:audio-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const BPM_IN = `${S}:bpm:audio-in`, BPM_EV = `${S}:bpm:value-out`;
+  const DISPLAY_IN = `${S}:display:value-in`;
 
   // ── the bay ─────────────────────────────────────────────────────────────
-  // Added in reading order: the station, the relay, the granulator, the
-  // detector, then what the granulator plays into.
+  // A recording is a FILE in the bucket and becomes sound only in this tab, so
+  // the bucket's port is `file-out` into a player, and the player's
+  // `audio-out` feeds the wave, the speakers and the detector.
   const bay = createBay();
-  bay.addNode({ id: `${ST.site}:${ST.node}`, kind: 'external', label: ST.label, place: ST.site, net: ST.site });
-  bay.addPort({ id: ST_OUT, label: ST.label, dir: 'out', medium: 'audio', transports: ['https'] });
-  bay.addNode({ id: `cf-shout:${ST.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-  bay.addPort({ id: RELAY_IN, label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-  bay.addPort({ id: RELAY_OUT, label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
-    address: `${BASE}/${ST.mount}` });
-  bay.addNode({ id: `${S}:gran`, kind: 'engine', label: 'granulator', place: 'browser' });
-  bay.addPort({ id: GRAN_IN, label: 'granulator', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: GRAN_OUT, label: 'granulator', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: GRAN_EV, label: 'grains', dir: 'out', medium: 'value' });
-  // The only way a tempo reaches the granulator's clock: a delivered event on
-  // this port. The detector never touches the clock itself.
-  bay.addPort({ id: GRAN_TEMPO, label: 'tempo', dir: 'in', medium: 'value', deliver: (ev) => tempoIn(ev) });
-  bay.addNode({ id: `${S}:bpm`, kind: 'engine', label: 'bpm detector', place: 'browser' });
-  bay.addPort({ id: BPM_IN, label: 'bpm detector', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${CF}:ida-tallinn`, kind: 'store', label: 'Ida Radio Tallinn, recorded', place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: FILE_OUT, label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: SRC });
+  bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });
+  bay.addPort({ id: PLAYER_IN, label: 'player', dir: 'in', medium: 'file' });
+  bay.addPort({ id: PLAYER_OUT, label: 'player', dir: 'out', medium: 'audio' });
+  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
+  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${S}:bpm`, kind: 'engine', label: 'tempo detector', place: 'browser' });
+  bay.addPort({ id: BPM_IN, label: 'tempo detector', dir: 'in', medium: 'audio' });
   bay.addPort({ id: BPM_EV, label: 'tempo', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:wave-gran`, kind: 'screen', label: 'granulator wave', place: 'browser' });
-  bay.addPort({ id: GWAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
-  // The only way a grain reaches the picture: a delivered event on this port.
-  // The engine never calls the scope.
-  bay.addPort({ id: GWAVE_EV, label: 'grain ticks', dir: 'in', medium: 'value',
-    deliver: (ev) => gscope?.mark({ pos: 1, level: ev.level }) });
+  // The only way a tempo reaches the number: a delivered event on this port.
+  // The detector never touches the display.
+  bay.addNode({ id: `${S}:display`, kind: 'screen', label: 'tempo display', place: 'browser' });
+  bay.addPort({ id: DISPLAY_IN, label: 'tempo display', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
   const d = mount({ name: 'concept radio 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('radio/020');
 
-  // ── the sound: one stream, one AudioContext ─────────────────────────────
-  let ctx = null, relay = null, pull = null, dryG = null, wetG = null;
-  let leg = null;                  // { stream, tap, live } while playing
-  // The granulator's state, up here because the patchbay asks `flowing` as soon as it is built.
-  // The ring is 8 s so a slice remembered at a pattern change (0.8 to 2.6 s
-  // back) is still in it when the next change comes, two bars (4.3 s at 112) later.
-  const RING_S = 8;
-  // 🔴 THE TEMPO IS THE DETECTOR'S ONCE IT HAS SPOKEN, AND 112 UNTIL THEN.
-  // `target` is the last tempo delivered on `gran:value-in`; `bpm` glides to it
-  // a share of the way on every 16th, so a new reading bends the grid over
-  // about two beats rather than jumping it.
-  const START_BPM = 112;
-  const GLIDE = 0.06;              // share of the remaining distance closed per 16th
-  const tempo = { bpm: START_BPM, target: START_BPM };
-  const stepS = () => 60 / tempo.bpm / 4;   // one 16th, 134 ms at 112
-  const SWING = 0.12;              // the off 16ths land this share of a step late
-  const BARS_PER_CELL = 2;         // a rhythm cell plays twice, then another takes over
-  const AHEAD = 0.12;              // how far ahead of the sound the steps are scheduled, in seconds
-  // Rhythm cells, 16 steps each: 3 an accent, 2 a step, 1 a ghost, 0 a rest.
-  const CELLS = [
-    [3, 0, 1, 0, 2, 0, 1, 1, 3, 0, 0, 1, 2, 0, 1, 0],   // a straight beat
-    [3, 0, 0, 2, 0, 0, 3, 0, 0, 2, 0, 0, 3, 0, 1, 1],   // threes against the bar
-    [3, 1, 1, 0, 3, 1, 0, 1, 2, 0, 3, 0, 1, 0, 2, 1],   // busy
-    [3, 0, 0, 0, 0, 0, 2, 0, 3, 0, 0, 0, 1, 0, 2, 0],   // half time
-    [3, 0, 2, 0, 1, 2, 0, 1, 0, 3, 0, 2, 1, 0, 0, 2],   // syncopated
-  ];
-  const SCALE = [0, 3, 5, 7, 10];  // minor pentatonic, in semitones; a cell's motif is four of these
-  let gran = null, det = null, grains = 0, timer = 0;
-  let seq = null;                  // { step, bar, next, cell } while playing
-  // The owner's settings, asked as *"keep this. onlu show wet"*, the mix at
-  // grains. Dry / wet works like opacity (*"on dry fade out frains"*): toward
-  // dry the grains fade out, in the speakers and in their panel alike.
-  let mix = 1;                     // 0 dry, 1 grains
-  let density = 0.6;               // 0 accents only, 1 every ghost and more ratchets
-
-  // ── the links ───────────────────────────────────────────────────────────
-  const held = new Map();          // "from to" -> link id
-  function hold(a, b, opts) {
+  // ── the links, held from load so the picture does not change with play ────
+  const held = new Map();
+  function hold(a, b) {
     const k = `${a} ${b}`;
-    if (held.has(k)) return true;
-    bay.seen(a); bay.seen(b);
-    const r = bay.link(a, b, [], { site: S, ...opts });
-    if (r.ok) { held.set(k, r.id); return true; }
-    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
-    return false;
+    if (held.has(k)) return;
+    const r = bay.link(a, b, [], { site: S });
+    if (r.ok) held.set(k, r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  hold(FILE_OUT, PLAYER_IN);
+  hold(PLAYER_OUT, WAVE_IN);
+  hold(PLAYER_OUT, SPEAKER_IN);
+  hold(PLAYER_OUT, BPM_IN);
+  hold(BPM_EV, DISPLAY_IN);
 
-  // The whole patch is held from load, so the picture is the same playing or
-  // stopped. Holding a link opens nothing: the stream opens only on play,
-  // which is the press where a person asks to listen, so the station link is
-  // made with that consent named here rather than at the press.
-  hold(ST_OUT, RELAY_IN, { consent: true, via: 'https' });
-  hold(RELAY_OUT, GRAN_IN, { via: 'https' });
-  hold(RELAY_OUT, BPM_IN, { via: 'https' });
-  hold(RELAY_OUT, SPEAKER_IN, { via: 'https' });
-  hold(BPM_EV, GRAN_TEMPO);
-  hold(GRAN_OUT, SPEAKER_IN);
-  hold(GRAN_OUT, GWAVE_IN);
-  hold(GRAN_EV, GWAVE_EV);
+  // ── the sound ───────────────────────────────────────────────────────────
+  let ctx = null, pull = null, out = null, tap = null, tapBuf = null;
+  let buffer = null, loading = null, fetchedAt = 0;
+  let src = null, playing = false;
 
-  // A stream wire is lit while its sound flows; an event wire (bpm to
-  // granulator, granulator to wave) pulses once per event on its own, from the
-  // link's `sent`.
+  // The file wire is lit while the recording comes down and for 600 ms after;
+  // the audio wires while it plays. The tempo wire pulses once per event.
   const pb = createPatchbay(bay, {
-    flowing: (l) => {
-      if (l.from === GRAN_OUT) return grains > 0 && !!leg?.live;
-      if (l.from === ST_OUT || l.from === RELAY_OUT) return !!leg?.live;
+    flowing: (l, medium) => {
+      if (medium === 'file') return !!loading || (fetchedAt && performance.now() - fetchedAt < 600);
+      if (medium === 'audio') return playing && !!src;
       return false;
     },
   });
 
-  // ── the BPM detector's block: the number, its confidence, the onsets ─────
-  // The number is the tempo the detector last SENT, so the display and the
-  // granulator can never disagree about it. Blank until there is one.
-  const disp = createSegment({ digits: 4, decimals: 1, size: 56, frame: false, title: 'detected tempo, bpm' });
+  // ── the pictures ────────────────────────────────────────────────────────
+  const waveHost = el('div', 'cc-wave');
+  const scope = createGrainScope(waveHost, { seconds: 4, height: 150, fullScale: 1 });
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', left: el('span', 'cc-say', 'Ida Radio Tallinn, recorded') });
+
+  const disp = createSegment({ digits: 4, decimals: 1, size: 56, frame: false, title: 'tempo, bpm' });
   const strip = el('canvas', 'cc-strip');
   const bpmHost = el('div', 'cc-bpm');
   bpmHost.append(disp.el, strip);
   const bpmPanel = createVideoPanel({ media: bpmHost, aspect: 'auto', right: false,
-    left: el('span', 'cc-say', 'bpm detector'),
+    left: el('span', 'cc-say', 'tempo'),
     values: [{ key: 'conf', label: 'confidence', reserve: 4 }] });
 
-  // The granulator's output. Its axis is arrival time, the last four seconds
-  // of what the granulator played, so a grain's tick goes at the moment it
-  // fired, which is where its sound starts on this wave. That is `pos: 1` on a
-  // `grainSeconds` scope: `bornAt - (1 - pos) * grainSeconds` is then
-  // `bornAt`. The grain's READ position is a place in the granulator's input
-  // buffer, which is not this wave, so it travels in the event and is not
-  // drawn here (grain-scope's own header on why the two axes must not be mixed).
-  // A tick fades in 2.4 s, about a bar at 100 bpm, so the last bar's rhythm is
-  // on screen at once: the grid, the rests and the ratchets' tight clusters.
-  const ghost = el('div', 'cc-wave');
-  const gscope = createGrainScope(ghost, { seconds: 4, height: 150, fullScale: 1, grainSeconds: 4, fadeMs: 2400 });
-  const gpanel = createVideoPanel({ media: ghost, aspect: 'auto', right: el('span', 'cc-say', 'output and grains'),
-    left: el('span', 'cc-say', 'granulator') });
-
-  // The sound follows the links the bay holds, as the archived effects concept did (archive/concepts/effects.md): the relay
-  // reaches the speakers only along relay -> speaker, the granulator only along
-  // relay -> granulator and the detector only along relay -> detector. Unlink
-  // one and that edge goes quiet.
-  const holds = (a, b) => held.has(`${a} ${b}`);
-  function route() {
-    if (!ctx) return;
-    if (leg) {
-      try { leg.tap.disconnect(); } catch { /* not connected */ }
-      leg.tap.connect(relay);
-    }
-    // The dry / grains mix sits where each link meets the speakers, so the
-    // granulator and the detector hear the dry sound whatever the mix is.
-    try { relay.disconnect(); } catch { /* not connected */ }
-    relay.connect(pull);
-    if (holds(RELAY_OUT, SPEAKER_IN)) relay.connect(dryG);
-    if (holds(RELAY_OUT, GRAN_IN)) relay.connect(gran.rec);
-    if (holds(RELAY_OUT, BPM_IN)) relay.connect(det.in);
-    try { dryG.disconnect(); } catch { /* not connected */ }
-    dryG.connect(ctx.destination);
-    try { gran.out.disconnect(); } catch { /* not connected */ }
-    gran.out.connect(gran.tap);
-    gran.out.connect(wetG);
-    try { wetG.disconnect(); } catch { /* not connected */ }
-    if (holds(GRAN_OUT, SPEAKER_IN)) wetG.connect(ctx.destination);
-    gran.wave = holds(GRAN_OUT, GWAVE_IN);
+  // What the display node shows is only what arrived on its in-port.
+  const history = [];              // every tempo delivered, { at, v, confidence }, for a check over CDP
+  function shown(ev) {
+    if (ev?.of !== 'param' || ev.name !== 'bpm' || !Number.isFinite(ev.v)) return;
+    disp.set(ev.v);
+    history.push({ at: ctx ? +ctx.currentTime.toFixed(2) : 0, v: ev.v, confidence: ev.confidence });
   }
 
-  let framing = false;
   function frame() {
-    if (!playing) { framing = false; return; }
-    framing = true;
-    if (gran?.wave && grains > 0) {
-      gran.tap.getFloatTimeDomainData(gran.buf);
-      gscope.feed(gran.buf, ctx.sampleRate);
-    }
+    if (!playing) return;
+    if (holds(PLAYER_OUT, WAVE_IN)) { tap.getFloatTimeDomainData(tapBuf); scope.feed(tapBuf, ctx.sampleRate); }
     drawStrip();
     requestAnimationFrame(frame);
   }
 
-  // ── the BPM detector. Plain WebAudio and a little arithmetic.
-  // 1. Two bands of the relay's sound, a low pass at 150 Hz (the kick and the
-  //    bass) and a band pass at 1.5 kHz (snares, hats, consonants), merged into
-  //    one two channel input.
-  // 2. Each band's energy through a follower (the square, smoothed by two
-  //    one pole low passes at FOLLOW_HZ), read every HOP samples (5.8 ms at
-  //    44.1 kHz) on a log scale, and how much it ROSE since the hop before. The
-  //    rises, summed over both bands and smoothed by a five hop triangle, are
-  //    the onset envelope: high where something starts. A plain sum of squares
-  //    per hop was tried first and aliased: a steady tone left a ripple that
-  //    moved the reading by 2 per cent.
+  // ── the tempo detector. Plain WebAudio and a little arithmetic.
+  // 1. Two bands of the sound, a low pass at 150 Hz (the kick and the bass) and
+  //    a band pass at 1.5 kHz (snares, hats, consonants), merged into one two
+  //    channel input.
+  // 2. Each band's energy through a follower (the square, smoothed by two one
+  //    pole low passes at FOLLOW_HZ), read every HOP samples on a log scale, and
+  //    how much it ROSE since the hop before. The rises, summed over both bands
+  //    and smoothed by a five hop triangle, are the onset envelope.
   // 3. Every half second, the autocorrelation of the last WIN_S seconds of that
   //    envelope, at every lag between 80 and 160 bpm. A lag scores its own
-  //    correlation plus half the correlation at twice the lag, so a beat that
-  //    also repeats a bar later beats one that does not. The best lag is refined
-  //    between samples with a parabola through it and its two neighbours, and
-  //    is folded into 80 to 160 bpm. Its correlation, 0 to 1, is the confidence.
+  //    correlation plus half the correlation at twice the lag. The best lag is
+  //    refined with a parabola and folded into 80 to 160 bpm. Its correlation,
+  //    0 to 1, is the confidence.
   // 4. The median of the last five readings, eased toward, is the estimate. It
-  //    is sent through the bay when it first settles and whenever it moves by
-  //    more than 1 bpm after that.
+  //    is sent when it first settles and whenever it moves by more than 1 bpm.
   // 5. With the period known, the phase: the offset into the last four seconds
-  //    of envelope at which onsets one period apart add up highest is the last
-  //    beat. It rides in the event as `beatAt`, on this tab's audio clock.
-  // A ScriptProcessor rather than an AudioWorklet for the same reason as the
-  // granulator below: one node, no module to load, the same in Chrome and
-  // Safari, and a steady 1024 sample block where a frame callback is not.
+  //    at which onsets one period apart add up highest is the last beat, sent
+  //    as `beatAt` on this tab's audio clock and drawn as the strip's grid.
   const HOP = 256;
-  const WIN_S = 8;                 // the autocorrelation looks this far back
-  const MIN_S = 4;                 // and starts once it has this much
-  const LO = 80, HI = 160;         // the fold
-  const EVERY_S = 0.5;             // an estimate this often
-  const KEEP = 5;                  // readings in the median
-  const SETTLE_BPM = 2;            // the last three readings within this of their median
-  const MIN_CONF = 0.25;           // under this nothing is sent
-  const MOVE_BPM = 1;              // a change bigger than this is sent again
-  const STRIP_S = 6;               // what the onset strip shows
-  const FOLLOW_HZ = 10;            // the energy follower's corner, two poles
-  const SMOOTH = 2;                // the envelope's triangle smoothing, hops either side
+  const WIN_S = 8, MIN_S = 4;
+  const LO = 80, HI = 160;
+  const EVERY_S = 0.5, KEEP = 5, SETTLE_BPM = 2, MIN_CONF = 0.25, MOVE_BPM = 1;
+  const STRIP_S = 6, FOLLOW_HZ = 10, SMOOTH = 2;
+  let det = null;
   function detBuild() {
     const sr = ctx.sampleRate, rate = sr / HOP, n = Math.round(WIN_S * rate);
     const t = { rate, n, env: new Float32Array(n), w: 0, count: 0, newest: 0,
@@ -315,7 +183,6 @@
     t.proc.onaudioprocess = (e) => {
       if (!playing) return;
       const a = e.inputBuffer.getChannelData(0), b = e.inputBuffer.getChannelData(1);
-      // The block's first sample, on the audio clock: one block before it plays out.
       const t0 = e.playbackTime - a.length / sr;
       const f = t.f, k = t.k;
       for (let i = 0; i < a.length; i++) {
@@ -331,8 +198,8 @@
     const o = Math.max(0, la - t.pa) + Math.max(0, lb - t.pb);
     t.pa = la; t.pb = lb;
     t.env[t.w] = o; t.w = (t.w + 1) % t.n; t.count++; t.newest = at;
-    // An onset, for the strip: the hop before was a local peak and stood well
-    // above the running level, and the last one was at least 100 ms ago.
+    // An onset, for the strip: a local peak well above the running level, at
+    // least 100 ms after the last one.
     t.m += (o - t.m) * 0.01; t.v += ((o - t.m) ** 2 - t.v) * 0.01;
     if (t.o1 > t.o2 && t.o1 >= o && t.o1 > t.m + 2 * Math.sqrt(t.v) && at - t.last > 0.1) {
       t.last = at - 1 / t.rate;
@@ -347,9 +214,6 @@
     if (N < MIN_S * rate) return;
     const raw = new Float32Array(N), x = new Float32Array(N);
     for (let i = 0; i < N; i++) raw[i] = t.env[(t.w - N + i + t.n) % t.n];
-    // A short triangle over the envelope. Without it what is left of the
-    // carrier after the follower alternates hop by hop, the correlation zigzags
-    // between neighbouring lags, and a slow swell read 122 for 120.
     let mean = 0;
     for (let i = 0; i < N; i++) {
       let sum = 0, wsum = 0;
@@ -370,7 +234,7 @@
     for (let L = lmin; L < A.length && L < N; L++) {
       let s = 0;
       for (let i = 0; i < N - L; i++) s += x[i] * x[i + L];
-      A[L] = (s / (N - L)) / (e0 / N);  // 1 at lag 0, unbiased by the overlap
+      A[L] = (s / (N - L)) / (e0 / N);
     }
     const score = (L) => A[L] + 0.5 * (A[2 * L] || 0);
     let best = -1, bestL = 0;
@@ -388,7 +252,6 @@
     if (t.raws.length > KEEP) t.raws.shift();
     const med = [...t.raws].sort((p, q) => p - q)[t.raws.length >> 1];
     if (t.est == null) {
-      // Settled: three readings in, the last three agree, and it is sure enough.
       const last3 = t.raws.slice(-3);
       if (last3.length === 3 && last3.every((r) => Math.abs(r - med) <= SETTLE_BPM) && conf >= MIN_CONF) t.est = med;
     } else {
@@ -396,8 +259,6 @@
     }
     bpmPanel.values.set('conf', `${Math.round(conf * 100)}%`);
     if (t.est == null) return;
-    // The phase: the offset into the last four seconds at which onsets one
-    // period apart add up highest is where the last beat was.
     const P = 60 / t.est * rate, span = Math.min(N, Math.round(4 * rate));
     let bestPh = 0, bestSum = -Infinity;
     for (let ph = 0; ph < P; ph++) {
@@ -410,14 +271,12 @@
     if (t.sent != null && Math.abs(t.est - t.sent) <= MOVE_BPM) return;
     const v = Math.round(t.est * 10) / 10;
     t.sent = v;
-    disp.set(v);
     bay.send(BPM_EV, { of: 'param', name: 'bpm', v, confidence: Math.round(conf * 100) / 100, beatAt: t.beatAt });
   }
 
   // The onset strip: the last STRIP_S seconds of the onset envelope, the
-  // onsets it found as ticks, and the beat grid the detector believes in as
-  // lines in the accent, all scrolling right to left. Canvas ink is read off
-  // the stylesheet's tokens once, because a canvas cannot read `var()`.
+  // onsets as ticks, and the detector's beat grid in the accent, scrolling right
+  // to left. Canvas ink is read off the stylesheet's tokens once.
   const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
   let ink = null;
   function drawStrip() {
@@ -450,239 +309,63 @@
     for (const on of t.onsets) g.fillRect(Math.round(x(t.newest - on)) - dpr, 0, 2 * dpr, 4 * dpr);
   }
 
-  // The granulator's tempo input. `{ of: 'param', name: 'bpm', v }` sets where
-  // the clock glides to. A `beatAt` moves the grid half the way toward the
-  // detected beats, so the bar sits on the station's beat as well as at its
-  // speed: the next quarter the grid will play is compared with the nearest
-  // beat the detector predicts, and the gap is halved.
-  function tempoIn(ev) {
-    if (ev?.of !== 'param' || ev.name !== 'bpm' || !Number.isFinite(ev.v)) return;
-    tempo.target = ev.v;
-    if (gran) gran.delay.delayTime.setTargetAtTime(60 / ev.v / 4 * 3, ctx.currentTime, 0.5);
-    if (!seq || !Number.isFinite(ev.beatAt)) return;
-    const P = 60 / ev.v, st = stepS();
-    const tq = seq.next + ((4 - seq.step % 4) % 4) * st;
-    let err = (ev.beatAt + Math.round((tq - ev.beatAt) / P) * P) - tq;
-    if (err > P / 2) err -= P; else if (err < -P / 2) err += P;
-    if (Math.abs(err) > 0.01) seq.next = Math.max(ctx.currentTime + 0.01, seq.next + err / 2);
+  // ── the recording: fetched once, decoded once, looped ────────────────────
+  let bytes = 0;
+  function load() {
+    if (buffer) return Promise.resolve(buffer);
+    loading ??= (async () => {
+      pb.refresh();
+      d.log(`fetching ${SRC}`);
+      const r = await fetch(SRC);
+      if (!r.ok) throw new Error(`${r.status} from ${SRC}`);
+      const ab = await r.arrayBuffer();
+      bytes = ab.byteLength;
+      buffer = await ctx.decodeAudioData(ab);
+      d.log(`recording: ${(bytes / 1e6).toFixed(2)} MB, ${buffer.duration.toFixed(1)} s`);
+      return buffer;
+    })().finally(() => { loading = null; fetchedAt = performance.now(); pb.refresh(); });
+    return loading;
   }
 
-  // ── the granulator: a ring of the last few seconds, and a cloud of long,
-  // grains read out of it on a tempo grid. A ScriptProcessor rather than an
-  // AudioWorklet because it is one node with no module to load and runs the
-  // same in Chrome and Safari; the looper (demo/shell/looper.mjs) keeps its
-  // ring the same way. `total` counts every sample ever written, so a slice is
-  // an absolute sample number and stays the same sound until the ring laps it.
-  function granBuild() {
-    const n = Math.round(RING_S * ctx.sampleRate);
-    const g = { ring: new Float32Array(n), w: 0, total: 0, wave: false };
-    g.rec = ctx.createScriptProcessor(4096, 1, 1);
-    g.rec.onaudioprocess = (e) => {
-      const x = e.inputBuffer.getChannelData(0);
-      for (let i = 0; i < x.length; i++) { g.ring[g.w] = x[i]; g.w = (g.w + 1) % n; }
-      g.total += x.length;
-    };
-    g.rec.connect(pull);           // a processor nothing pulls never runs
-    g.out = ctx.createGain(); g.out.gain.value = 1;
-    // Every grain goes into `voices`, which reaches `out` straight and through
-    // one feedback delay at a dotted 8th, darkened a little on each repeat. It
-    // is inside the granulator, so it is on the wet path only. The delay
-    // follows the tempo the granulator is told.
-    g.voices = ctx.createGain();
-    g.voices.connect(g.out);
-    const send = ctx.createGain(); send.gain.value = 0.28;
-    g.delay = ctx.createDelay(2); g.delay.delayTime.value = stepS() * 3;
-    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2600;
-    const fb = ctx.createGain(); fb.gain.value = 0.34;
-    g.voices.connect(send).connect(g.delay).connect(tone).connect(g.out);
-    tone.connect(fb).connect(g.delay);
-    g.tap = ctx.createAnalyser(); g.tap.fftSize = 2048;
-    g.tap.connect(pull);
-    g.buf = new Float32Array(g.tap.fftSize);
-    return g;
-  }
-  // Equal power between the dry station and the grains.
-  function applyMix() {
-    ghost.style.opacity = String(mix);
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    dryG.gain.setTargetAtTime(Math.cos(mix * Math.PI / 2), t, 0.03);
-    wetG.gain.setTargetAtTime(Math.sin(mix * Math.PI / 2) * 1.4, t, 0.03);
-  }
-  // ── the rhythm. A 16th note clock at the current tempo, scheduled AHEAD on
-  // the audio clock so the grid holds whatever the main thread is doing. A
-  // cell is a pattern of accents, steps, ghosts and rests, plus where each step
-  // reads (one of four slices remembered when the cell began) and a motif of
-  // four pitches. It plays BARS_PER_CELL bars, so the chop repeats, then
-  // another cell takes over with fresh slices.
-  const pick = (a) => a[Math.floor(Math.random() * a.length)];
-  function newCell(prev) {
-    let i;
-    do { i = Math.floor(Math.random() * CELLS.length); } while (prev && i === prev.i && CELLS.length > 1);
-    // Where each step reads: the downbeat always slice 0, other beats 0 or 1,
-    // the 16ths in between any of the four.
-    const map = CELLS[i].map((_, s) => (s === 0 ? 0 : s % 4 === 0 ? pick([0, 1]) : pick([0, 1, 2, 3])));
-    const motif = [0, pick(SCALE), pick(SCALE), pick([-5, -2, ...SCALE])];
-    const c = { i, pat: CELLS[i], map, motif };
-    slicesFor(c);
-    return c;
-  }
-  // Four slices, 0.8 to 2.6 s back, oldest first so slice 0 is the downbeat's.
-  // Until the ring holds 2.6 s (the first seconds after play) they reach only as
-  // far back as there is sound, and `full` stays false so the next step asks again.
-  function slicesFor(c) {
-    const sr = ctx.sampleRate, have = gran.total / sr;
-    const span = Math.max(0, Math.min(1.8, have - 0.8));
-    const back = [0, 1, 2, 3].map(() => 0.8 + Math.random() * span).sort((a, b) => b - a);
-    c.slices = back.map((b) => gran.total - Math.round(b * sr));
-    c.full = span >= 1.8;
-  }
-  // One grain's envelope, baked into its buffer. `hit` is a 3 ms attack and an
-  // exponential fall, `swell` rises over most of its length, `hann` is even.
-  function env(shape, i, len, sr) {
-    const x = i / (len - 1);
-    if (shape === 'hit') {
-      const a = Math.max(1, Math.round(0.003 * sr)), tail = Math.max(1, Math.round(0.004 * sr));
-      const v = i < a ? i / a : Math.exp(-5 * (i - a) / Math.max(1, len - a));
-      return i > len - tail ? v * (len - i) / tail : v;
-    }
-    if (shape === 'swell') return x < 0.7 ? Math.sin(x / 0.7 * Math.PI / 2) ** 2 : Math.cos((x - 0.7) / 0.3 * Math.PI / 2) ** 2;
-    return 0.5 * (1 - Math.cos(2 * Math.PI * x));
-  }
-  // One grain at `when` on the audio clock, read forward from an absolute
-  // sample number. Returns its event, or null when the ring no longer holds it.
-  function grain(when, { slice, dur, semis, shape, level, pan, rev }) {
-    const g = gran, sr = ctx.sampleRate, n = g.ring.length;
-    const rate = 2 ** ((semis + (Math.random() - 0.5) * 0.1) / 12);   // and a few cents either way
-    const len = Math.max(2, Math.round(dur * rate * sr));               // a grain up an octave reads twice the sound
-    const ago = g.total - slice;
-    if (ago < len || ago > n - 4096) return null;                        // not written yet, or already lapped
-    const buf = ctx.createBuffer(1, len, sr), d0 = buf.getChannelData(0);
-    let at = ((slice % n) + n) % n, peak = 0;
-    for (let i = 0; i < len; i++) {
-      const v = g.ring[at] * env(shape, rev ? len - 1 - i : i, len, sr);
-      d0[rev ? len - 1 - i : i] = v; if (Math.abs(v) > peak) peak = Math.abs(v);
-      at = (at + 1) % n;
-    }
-    const src = ctx.createBufferSource(), amp = ctx.createGain(), p = ctx.createStereoPanner();
-    src.buffer = buf; src.playbackRate.value = rate;
-    amp.gain.value = level;
-    p.pan.value = pan;
-    src.connect(amp).connect(p).connect(g.voices);
-    src.start(when);
-    src.onended = () => { try { p.disconnect(); } catch { /* gone */ } };
-    grains++;
-    return { of: 'grain', pos: 1 - ago / sr / RING_S, dur, semis, rev, pan, shape, level: Math.min(1, peak * level * 3) };
-  }
-  // One 16th: decide whether it sounds, how, and whether it ratchets.
-  function step(when, STEP) {
-    const s = seq.step, c = seq.cell, kind = c.pat[s];
-    if (!c.full) slicesFor(c);
-    let sounds;
-    if (kind === 3) sounds = true;
-    else if (kind === 2) sounds = Math.random() < 0.25 + 0.75 * density;
-    else if (kind === 1) sounds = Math.random() < 0.9 * density ** 1.5;
-    else sounds = density > 0.7 && Math.random() < (density - 0.7) * 1.2;   // a busy bar fills its rests with ghosts
-    if (!sounds || !holds(RELAY_OUT, GRAN_IN)) return;
-    const ghostly = kind <= 1, accent = kind === 3, slice = c.slices[c.map[s]];
-    let v;
-    if (accent) {
-      // Long, loud and percussive, in the middle; now and then an octave away.
-      v = { dur: STEP * 2.2, shape: 'hit', level: 0.95, rev: false, pan: (Math.random() - 0.5) * 0.3,
-        semis: Math.random() < 0.3 ? pick([12, -12]) : 0 };
-    } else if (!ghostly) {
-      // A step follows the cell's motif, and leans left or right by its place.
-      v = { dur: STEP * 1.2, shape: Math.random() < 0.5 ? 'hit' : 'hann', level: 0.6, rev: Math.random() < 0.15,
-        pan: (s % 2 ? 0.45 : -0.45) + (Math.random() - 0.5) * 0.2, semis: Math.random() < 0.6 ? c.motif[s % 4] : 0 };
-    } else {
-      // A ghost is short, quiet and soft, wide in the field.
-      v = { dur: STEP * 0.5, shape: 'swell', level: 0.3, rev: Math.random() < 0.25,
-        pan: (Math.random() * 2 - 1) * 0.75, semis: Math.random() < 0.5 ? c.motif[(s + 1) % 4] + 12 : c.motif[s % 4] };
-    }
-    // A ratchet: 2 to 4 quick hits of the same slice inside the step, falling away.
-    const n = !ghostly && s !== 0 && Math.random() < 0.04 + 0.18 * density ? pick([2, 3, 3, 4]) : 1;
-    for (let k = 0; k < n; k++) {
-      const t = when + k * STEP / n;
-      const r = n === 1 ? v : { ...v, dur: STEP / n * 0.9, shape: 'hit', level: v.level * 0.78 ** k };
-      const ev = grain(t, { slice, ...r });
-      if (!ev) continue;
-      // The tick is drawn when the grain starts, so the event leaves then.
-      Object.assign(ev, { step: s, bar: seq.bar, kind: accent ? 'accent' : ghostly ? 'ghost' : 'step', accent, ratchet: n > 1 ? `${k + 1}/${n}` : null });
-      setTimeout(() => { if (playing) bay.send(GRAN_EV, ev); }, Math.max(0, (t - ctx.currentTime) * 1000));
-    }
-  }
-  function granLoop() {
-    if (!playing) return;
-    while (seq.next < ctx.currentTime + AHEAD) {
-      tempo.bpm += (tempo.target - tempo.bpm) * GLIDE;
-      const STEP = stepS();
-      if (seq.step === 0 && seq.bar % BARS_PER_CELL === 0) seq.cell = newCell(seq.cell);
-      step(seq.next + (seq.step % 2 ? SWING * STEP : 0), STEP);
-      seq.next += STEP;
-      seq.step = (seq.step + 1) % 16;
-      if (seq.step === 0) seq.bar++;
-    }
-    timer = setTimeout(granLoop, 25);
+  // The sound follows the links the bay holds: the player reaches the
+  // speakers, the wave and the detector each only along its own link.
+  function route() {
+    try { out.disconnect(); } catch { /* not connected */ }
+    out.connect(tap);
+    tap.connect(pull);
+    if (holds(PLAYER_OUT, SPEAKER_IN)) out.connect(ctx.destination);
+    if (holds(PLAYER_OUT, BPM_IN)) out.connect(det.in);
   }
 
-  // ── play and stop ───────────────────────────────────────────────────────
-  let playing = false;
-  function play() {
+  async function play() {
     ctx ??= new AudioContext();
     ctx.resume();
-    if (!relay) {
-      relay = ctx.createGain();
-      // A silent sink that keeps every tap and processor pulled.
+    if (!out) {
       pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
-      gran = granBuild();
-      dryG = ctx.createGain(); wetG = ctx.createGain();
+      out = ctx.createGain();
+      tap = ctx.createAnalyser(); tap.fftSize = 2048; tapBuf = new Float32Array(tap.fftSize);
     }
-    // A fresh detector every play, so the number on screen is always this
-    // listen's measurement, and the clock back at 112 until it speaks.
+    playing = true;
+    face();
+    try { await load(); } catch (e) { d.log(`the recording did not load: ${e?.message || e}`, 'warn'); playing = false; face(); return; }
+    if (!playing) return;          // stopped while it loaded
+    // A fresh detector every play, so the number is this listen's measurement.
     if (det) { try { det.proc.disconnect(); det.in.disconnect(); } catch { /* gone */ } }
     det = detBuild();
     disp.set('');
     bpmPanel.values.set('conf', '');
-    tempo.bpm = tempo.target = START_BPM;
-    gran.delay.delayTime.value = stepS() * 3;
-    playing = true;
-    // The press is the person asking to listen, so the link carries consent.
-    // The relay fetches the station; the page reads the relay.
-    if (hold(ST_OUT, RELAY_IN, { consent: true, via: 'https' })) {
-      const tap = ctx.createAnalyser();
-      tap.fftSize = 2048;
-      const stream = createMp3Stream(ctx, { url: `${BASE}/${ST.mount}`, log: (m) => d.log(`${ST.label}: ${m}`) });
-      // Through the tap, not beside it: an analyser nothing pulls from reads
-      // silence, so the sound passes it on its way on, as on /radio/. The
-      // tap -> relay edge and everything after it is made by route().
-      stream.node.connect(tap);
-      const mine = { stream, tap, live: false };
-      leg = mine;
-      stream.started.then((path) => {
-        if (leg !== mine) return;
-        mine.live = true;
-        pb.refresh();
-        d.log(`${ST.label} playing, ${path}`);
-      }).catch((e) => d.log(`${ST.label} did not start: ${e?.message || e}`, 'warn'));
-    }
-    applyMix();
     route();
+    src = ctx.createBufferSource();
+    src.buffer = buffer; src.loop = true;
+    src.connect(out);
+    src.start();
     pb.refresh();
-    face();
-    if (!framing) requestAnimationFrame(frame);
-    clearTimeout(timer);
-    seq = { step: 0, bar: 0, next: ctx.currentTime + 0.05, cell: null };
-    granLoop();
+    requestAnimationFrame(frame);
   }
   function stop() {
     playing = false;
-    clearTimeout(timer);
-    if (leg) {
-      try { leg.stream.stop(); } catch { /* already stopped */ }
-      try { leg.tap.disconnect(); } catch { /* gone */ }
-    }
-    leg = null;
-    seq = null;
+    if (src) { try { src.stop(); src.disconnect(); } catch { /* already stopped */ } }
+    src = null;
     pb.refresh();
     face();
   }
@@ -690,38 +373,14 @@
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
   ] });
-  function face() {
-    transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play');
-  }
+  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
   face();
 
-  // Two controls under the granulator: dry / wet, and how busy the rhythm is.
-  // Where it reads, the pitch and freeze are not controls for now (*"no older,
-  // plain, freeze controls for now"*). Density keeps the accents at every
-  // setting, so the bar is always there; toward busy the steps, ghosts,
-  // ratchets and filled rests come in.
-  const mixS = createSlider({ label: '', aria: 'dry or grains', min: 0, max: 1, step: 0.01, value: mix,
-    onInput: (v) => { mix = v; applyMix(); } });
-  const mixRow = el('div', 'cc-fade');
-  mixRow.append(el('span', 'cc-end', 'dry'), mixS.el, el('span', 'cc-end', 'grains'));
-  const densS = createSlider({ label: '', aria: 'sparse or busy', min: 0, max: 1, step: 0.01, value: density,
-    onInput: (v) => { density = v; } });
-  const densRow = el('div', 'cc-fade');
-  densRow.append(el('span', 'cc-end', 'sparse'), densS.el, el('span', 'cc-end', 'busy'));
-
-  // The shell's stack, at the project's one gap. Play alone at the top left,
-  // then the detector, then the granulator with the sliders that work it as one
-  // block, then the patchbay.
-  const block = (...parts) => { const b = el('div', 'cc-block'); b.append(...parts); return b; };
-  const page = createStack(undefined, 'cc-page');
-  const two = el('div', 'cc-two');
-  two.append(mixRow, densRow);
-  page.add(transport.el, bpmPanel.el, block(gpanel.el, two), pb.el);
-  const out = page.el;
-  // Both label columns of every slider row take the longest end label's width.
-  const ends = [...out.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
-  out.style.setProperty('--end', `${Math.max(...ends)}ch`);
-
-  d.el.append(out);
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wavePanel.el, bpmPanel.el, pb.el);
+  // Read only, for a check over CDP.
+  window.__demo.tempo = { src: SRC, bytes: () => bytes, duration: () => buffer?.duration ?? null,
+    history: () => history.slice(), conf: () => det?.conf ?? null, playing: () => playing };
   d.ready();
 </script>
