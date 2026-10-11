@@ -169,9 +169,9 @@
       node.setGraphs([selfGraph()], [STORE]);
       join.enable('join', false, `in ${ROOM}`);
       clear.enable('clear', true);
-      startClock();
+      goLive();
       chatBox.enable(true);
-      loadHistory();
+      wakeStore();
       decide();
     },
     onGraph: () => decide(),
@@ -246,25 +246,40 @@
     casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
   }
 
-  // Wake the recorder into this room, then replay what it kept, each line
-  // handed to the bay as an event leaving the store's out port. Our own
-  // worker, asked only on a press of Join.
-  async function loadHistory() {
+  // THE HISTORY IS READ ON LOAD (asked 2026-10-11, *"load history on load.
+  // when not joined, history can be played back (add trasport button
+  // play/pause)"*). One GET of what positron-store kept, our own worker; the
+  // recorder is only woken (the POST) on a press of Join. Before Join the
+  // timeline plays the history back; Join shows all of it and goes live.
+  async function loadPast() {
+    try {
+      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
+      const rows = (await h.text()).split('\n').filter(Boolean);
+      const past = [];
+      for (const line of rows) {
+        let m; try { m = JSON.parse(line); } catch { continue; }
+        const src = String(m.source || '');
+        const text = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(src) ? m.ev?.text : undefined;
+        if (typeof text !== 'string') continue;
+        past.push({ lane: isNotice(src) ? 'cast' : 'chat', sent: Number(m.sent) || 0, text, who: src.split(':')[0] });
+      }
+      if (live) { d.log('joined before the history arrived, so it is shown as the room carries on'); }
+      for (const r of past) said(r.lane, r.sent, r.text, r.who);
+      for (const r of lines) deck.sched.schedule({ at: r.sent - origin, kind: r.lane, id: `h${r.sent}-${r.lane}-${Math.random().toString(36).slice(2, 6)}`, payload: { who: r.who, at: r.sent, text: r.text } });
+      if (!live) {
+        const end = lines.length ? Math.max(...lines.map((r) => r.sent)) - origin : 0;
+        deck.setRange([0, end + 2000]);
+        deck.seek(0);
+        strip.strip?.fit?.(0, end + 2000);
+      }
+      d.log(`${past.length} earlier line${past.length === 1 ? '' : 's'} in the store${past.length && !live ? ', press play to hear them back' : ''}`);
+    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
+  }
+  async function wakeStore() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/record`, { method: 'POST' });
       d.log(`store recording ${ROOM}: ${r.status}`);
-      const h = await fetch(`${STORE_URL}/room/${ROOM}/history?last=50`);
-      const rows = (await h.text()).split('\n').filter(Boolean);
-      const b = bay();
-      let n = 0;
-      for (const line of rows) {
-        let m; try { m = JSON.parse(line); } catch { continue; }
-        const kept = m.type === 'bay.event' && /:(chat|admin):value-out$/.test(String(m.source)) ? m.ev?.text : undefined;
-        if (typeof kept !== 'string') continue;
-        if (b.send(KEPT, { text: kept }, { sent: m.sent, speaker: String(m.source || '') })) n++;
-      }
-      d.log(`${n} earlier line${n === 1 ? '' : 's'} from the store`);
-    } catch (e) { d.log(`the store did not answer: ${e.message || e}`, 'warn'); }
+    } catch (e) { d.log(`the store did not wake: ${e.message || e}`, 'warn'); }
   }
 
   function say(text) {
@@ -344,7 +359,7 @@
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
   // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*, kept on 004):
   // the store forgets the room, and every tab in it empties both columns.
-  function wipe() { casts.clear(); chats.el.replaceChildren(); lines.length = 0; }
+  function wipe() { casts.clear(); chats.el.replaceChildren(); lines.length = 0; deck.sched.clear(); }
   async function clearAll() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
@@ -371,29 +386,53 @@
   // Asked 2026-10-11, *"add timeline with broacast and chat lanes, properly
   // coloured"*. The kit's transport bar and strip glued, as on synth/020. Every
   // line is a tick at the moment it was said, a store replay at its own time.
-  // The clock runs in real time from the earliest line or the Join, whichever
-  // came first, and nothing plays: the bar has no toggle (`toggle: false`).
+  // Before Join the bar plays the history back: each line is an item on the
+  // deck, the broadcast area shows the latest broadcast before the playhead
+  // and the chat the lines before it, on play and on every seek. On Join the
+  // page shows all of it, hides the play button and the clock runs in real
+  // time from the earliest line.
   // Broadcast is the admin's violet, chat the yellow of `you`.
   const CAST_INK = '#c39af0', CHAT_INK = '#ffd400', AIR_MS = 60000;
   const lines = [];             // { lane, sent, text, who }
   let origin = 0;
-  const deck = createDeck({ items: [], adapters: {}, range: [0, AIR_MS] });
-  function startClock() {
+  let live = false;
+  const castAd = {
+    caps: { rates: [1], continuous: false, catchUp: 'reduce' },
+    actuate(p) { if (!live) casts.add(p); },
+    reduce(ps) { return { last: ps[ps.length - 1] || null }; },
+    assertState(st) { if (!live) { if (st?.last) casts.add(st.last); else casts.clear(); } return {}; },
+  };
+  const chatAd = {
+    caps: { rates: [1], continuous: false, catchUp: 'reduce' },
+    actuate(p) { if (!live) chats.add(p); },
+    reduce(ps) { return { all: ps.slice() }; },
+    assertState(st) { if (!live) { chats.el.replaceChildren(); for (const p of st?.all || []) chats.add(p); } return {}; },
+  };
+  const deck = createDeck({ items: [], adapters: { cast: castAd, chat: chatAd }, range: [0, AIR_MS] });
+  function goLive() {
+    live = true;
+    deck.pause();
+    // all of the history on show, then the room carries on
+    casts.clear(); chats.el.replaceChildren();
+    for (const r of lines) (r.lane === 'cast' ? casts : chats).add({ who: r.who, at: r.sent, text: r.text });
+    bar.el.querySelector('.tbar-toggle')?.setAttribute('hidden', '');
     if (!origin) origin = Date.now();
+    deck.setRange([0, Math.max(AIR_MS, Date.now() - origin + AIR_MS / 2)]);
     deck.seek(Date.now() - origin);
     deck.play();
   }
   function said(lane, sent, text, who) {
     lines.push({ lane, sent, text, who });
-    if (origin && sent < origin) origin = sent;
-    const now = Date.now() - (origin || sent);
+    if (!origin || sent < origin) origin = sent;
+    if (!live) return;
+    const now = Date.now() - origin;
     deck.setRange([0, Math.max(AIR_MS, now + AIR_MS / 2)]);
-    if (origin) deck.seek(Date.now() - origin);
+    deck.seek(now);
   }
   const rowsOf = (lane) => () => lines.filter((r) => r.lane === lane)
     .map((r, i) => ({ at: r.sent - origin, id: `${lane}${i}`, kind: lane, payload: r }));
   const glue = el('div');
-  const bar = createTransportBar(glue, deck, { scrub: false, loop: false, live: false, toggle: false, publish: false });
+  const bar = createTransportBar(glue, deck, { scrub: false, loop: false, live: false, publish: false });
   const strip = createStripView(glue, deck, {
     size: 'auto', follow: true, gutter: 120,
     lanes: [
@@ -406,5 +445,6 @@
   const timeline = createGlue(bar.el, strip.surface);
 
   d.stack.add(panel.el, timeline, pb.el);
+  loadPast();
   d.ready();
 </script>
