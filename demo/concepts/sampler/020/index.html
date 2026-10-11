@@ -26,8 +26,15 @@
   //     on, round and round. A key still held at press 2 gets its note off at
   //     the loop's end. A note off whose note on came before press 1 is dropped.
   //   - Press 3 throws the loop away and starts a new recording (no overdub).
+  //   - A press under SPRING_MS after a release is the pedal springing back and
+  //     does nothing.
+  //   - A press that would close a loop under MIN_LOOP_MS does nothing, and
+  //     recording carries on.
+  //   - A press held CLEAR_HOLD_MS, pedal still down, stops and empties the
+  //     loop. The press acts the moment it lands; the clear comes only when the
+  //     hold reaches the mark and throws away what that press started. Nothing
+  //     ever waits for a second press.
   //   - `Panic` in the keyboard's footer stops the loop and empties it.
-  //   - Two presses under 20 ms apart are a bounce, not a loop, and leave it empty.
   //
   // `demo/shell/looper.mjs` is the kit's AUDIO looper (a ring of sound, a kept
   // AudioBuffer, directions). None of it applies to a list of note events, so
@@ -59,7 +66,21 @@
   });
 
   // ── the looper ──────────────────────────────────────────────────────────
-  const BOUNCE_MS = 20;
+  // The three numbers are plans/plan-sustain-pedal.md section 3, asked for with
+  // *"fix all"* on 2026-10-11. The MK-425C scans its pedal every 65.95 ms
+  // (research/sustain-pedal-pressing-2026-10-11.md section 5), so a press one
+  // tick after a release is the pedal springing back, and the owner's export
+  // showed loops of 0.132 s and 0.199 s made that way. 015 copies pressAction
+  // and these numbers to report what 020 would do; change both together.
+  const SPRING_MS = 70;          // a press this soon after a release is ignored
+  const MIN_LOOP_MS = 500;       // a press that would close a shorter loop is ignored
+  const CLEAR_HOLD_MS = 1000;    // a press held this long, still down, clears the loop
+  /** What a press does: 'spring', 'short' (both ignored), 'close' or 'start'. */
+  function pressAction(state, t1, releasedAt, now) {
+    if (now - releasedAt < SPRING_MS) return 'spring';
+    if (state === 'recording') return now - t1 < MIN_LOOP_MS ? 'short' : 'close';
+    return 'start';
+  }
   const L = {
     state: 'empty',          // 'empty' | 'recording' | 'looping'
     t1: 0, len: 0,           // ms, performance.now() clock
@@ -68,6 +89,8 @@
     open: new Map(),         // note -> its note on, while recording
     sounding: new Set(),     // notes the loop has on right now
     pedal: 0, presses: [],   // the raw CC 64 value, and when each press landed
+    releasedAt: -Infinity,   // when the pedal last came up
+    hold: 0,                 // the pending clear of the press now down, a timer
     fired: [],               // { lap, at, late } for a check: how far each replay was off
   };
   const out = (d1, d2) => bay.send(`${S}:looper:midi-out`, { cls: 'note', ch: 1, d1, d2 });
@@ -75,9 +98,20 @@
 
   function press(now) {
     L.presses.push(now);
-    if (L.state === 'recording') {
+    // The clear is armed by every press, an ignored one too: a pedal held down
+    // for a second is a hold whatever the edge before it looked like.
+    clearTimeout(L.hold);
+    L.hold = setTimeout(() => {
+      if (L.pedal < PEDAL_ON) return;
+      const had = L.state;
+      clear();
+      d.log(`pedal held ${CLEAR_HOLD_MS / 1000} s: ${had === 'empty' ? 'nothing to clear' : 'the loop is stopped and empty'}`);
+    }, CLEAR_HOLD_MS);
+    const act = pressAction(L.state, L.t1, L.releasedAt, now);
+    if (act === 'spring') { d.log(`press ${(now - L.releasedAt).toFixed(0)} ms after a release, the pedal springing back, ignored`, 'warn'); return; }
+    if (act === 'short') { d.log(`press ${(now - L.t1).toFixed(0)} ms into the take, under ${MIN_LOOP_MS / 1000} s, ignored, still recording`, 'warn'); return; }
+    if (act === 'close') {
       const len = now - L.t1;
-      if (len < BOUNCE_MS) { L.state = 'empty'; L.events = []; L.open.clear(); deck.setLoopView(null); d.log('two presses under 20 ms apart, so no loop', 'warn'); face(); return; }
       L.len = len;
       for (const [n] of L.open) L.events.push({ at: len, d1: n, d2: 0 });
       L.open.clear();
@@ -120,6 +154,7 @@
       const was = L.pedal;
       L.pedal = e.d2;
       if (was < PEDAL_ON && e.d2 >= PEDAL_ON) press(now);
+      else if (was >= PEDAL_ON && e.d2 < PEDAL_ON) { L.releasedAt = now; clearTimeout(L.hold); }
       return;
     }
     if (e.cls !== 'note') return;
@@ -260,6 +295,7 @@
     get presses() { return [...L.presses]; }, get events() { return L.events.map((e) => ({ ...e })); },
     get fired() { return L.fired.map((f) => ({ ...f })); },
     get position() { return deck.position(); }, get range() { return [...deck.range]; },
+    rules: { SPRING_MS, MIN_LOOP_MS, CLEAR_HOLD_MS }, pressAction,
   };
   d.ready();
 </script>
