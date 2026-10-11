@@ -1,5 +1,7 @@
 # plan-nodes — boxes joined by wires, and whether we have a graph to put in one (2026-09-11)
 
+> **RECONSIDERED 2026-10-11 in `plans/plan-nodes-revisited.md`.** The patchbay (`demo/shell/bay.mjs`) was built after this plan and settles most of it differently. Read that first.
+
 Companion to `plans/plan-hardware.md` §8 (the box, and *a patch is a value*),
 `plans/plan-score.md` (one document, three languages), `plans/plan-visuals.md` (the rig
 comes before the feature), and `plans/plan-ws.md` / `demo/shell/wire.mjs` (the message
