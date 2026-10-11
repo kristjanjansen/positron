@@ -122,7 +122,15 @@
   }
 
   // ── the scope: an analyser on the board's playout, full width ────────────
-  const WINDOW = 512, FULL = 0.25;
+  // The picture scales to the sound. It was a fixed 0.25 of full scale, set
+  // for Yoshimi's quiet output, and the Circuit's line out runs well past it,
+  // so the scope drew every note flattened at its edges while the sound was
+  // whole. The span widens at once to the loudest sample of the frame (held
+  // at 90% of the height) and narrows back slowly, about a 2 s fall, so a
+  // note does not pump the picture. Real clipping is a separate fact: a
+  // sample at full scale is counted and logged once per stretch.
+  const WINDOW = 512, SPAN_MIN = 0.02, SPAN_FALL = 0.992;
+  let span = 0.25, clipped = 0, clipSaid = 0;
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
   let analyser = null, buf = null, level = 0;
   function frame() {
@@ -132,8 +140,13 @@
       for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
       for (const v of buf) { const a = v < 0 ? -v : v; if (a > hi) hi = a; }
       level = hi;
+      span = Math.max(hi / 0.9, span * SPAN_FALL, SPAN_MIN);
+      if (hi >= 0.999) {
+        clipped++;
+        if (performance.now() - clipSaid > 5000) { clipSaid = performance.now(); d.log(`The Circuit's sound reaches full scale and clips (${clipped} frames so far); turn its volume down`, 'warn'); }
+      }
       const win = buf.subarray(i0, i0 + WINDOW);
-      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / span))), reason: '', name: '' });
     }
     requestAnimationFrame(frame);
   }
@@ -292,7 +305,7 @@
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
-    armed, level, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
+    armed, level, span: () => span, clipped: () => clipped, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
     patchAt, patchName, nameReads, nameMisses, lastDump, stale, names: () => Object.fromEntries(names), shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
   });
