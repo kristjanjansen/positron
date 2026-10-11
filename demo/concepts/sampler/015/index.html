@@ -80,6 +80,7 @@
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { registerRenderer } from '/timeline/strip.mjs';
   import { createSampler, PIANO } from '/concepts/sampler/sampler.mjs';
@@ -329,7 +330,7 @@
     cap: 1000, stick: true, minRows: 6,
   });
 
-  /** The whole log as text, for a check or the console: `copy(__demo.pedal.text())`. */
+  /** The whole log as text, for Copy log and a check. */
   function text() {
     const out = [`positron sampler/015, ${new Date().toISOString()}`, ''];
     for (const s of M.src.values()) {
@@ -343,6 +344,17 @@
     for (const g of M.gestures) out.push([fmt(g.at), g.port, g.kind, g.detail].join('\t'));
     return out.join('\n');
   }
+  // The one button left, asked back the same day: *"just add copy button"*.
+  async function copy() {
+    const t = text();
+    try { await navigator.clipboard.writeText(t); }
+    catch {
+      const ta = el('textarea'); ta.value = t; document.body.append(ta); ta.select();
+      try { document.execCommand('copy'); } finally { ta.remove(); }
+    }
+    d.log(`copied ${M.msgs.length} messages and ${M.gestures.length} gestures`);
+  }
+  const btns = createButtonGroup({ buttons: [{ id: 'copy', label: 'Copy log', onPress: copy }] });
   function clearAll() {
     M.msgs = []; M.gestures = []; M.floods = 0; M.seq = 0;
     M.lastAt.clear(); M.src.clear(); M.last = null; M.oddPedal.clear();
@@ -530,7 +542,7 @@
     box.append(el('h3', 'cc-h', title), ...parts);
     return box;
   };
-  d.stack.add(surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
+  d.stack.add(btns.el, surface, section('messages', msgT.el), section('gestures', gestT.el), host, pb.el);
   requestAnimationFrame(() => strip.strip.frame(performance.now(), VIEW_MS, 0.95));
   face();
 
