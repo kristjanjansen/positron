@@ -331,37 +331,23 @@
       // same keys over Cloudflare to the Circuit on the Pi, which plays the
       // Pico; a camera through Stream into a shader on the Pi's GPU), and the
       // PHONE one is two columns of at most four, one hop each.
+      // Then *"3 x 3 blocks in desktop"* and *"make them make sense"*: the
+      // copy's three places in three columns. Left what you hold (keys, a knob
+      // on a Pico, a camera), middle what Cloudflare and the Pi do with it,
+      // right where it ends up. The keys and the knob reach the Circuit on the
+      // Pi through the relay; the knob also bends the Pi's shader, which draws
+      // on your camera for this screen; the camera also goes out on Stream to
+      // every phone watching.
       const DESK = [
-        ['web:keys:midi-out', 'web:rec:midi-in'],
         ['web:keys:midi-out', 'cf-relay:room:midi-in'],
-        ['web:rec:midi-out', 'web:synth:midi-in'],
+        ['pico-1:knob:value-out', 'cf-relay:room:value-in'],
         ['cf-relay:room:midi-out', 'pi-1:circuit:midi-in'],
-        ['web:synth:audio-out', 'web:fx:audio-in'],
-        ['web:fx:audio-out', 'web:speaker:audio-in'],
-        ['web:fx:audio-out', 'r2:recordings:audio-in'],
-        ['pi-1:circuit:audio-out', 'web:speaker:audio-in'],
-        ['pi-1:circuit:midi-out', 'web:pico:midi-in'],
-        ['web:pico:video-out', 'web:oled:video-in'],
-        ['web:editor:program-out', 'pi-1:gpu:program-in'],
+        ['cf-relay:room:value-out', 'pi-1:circuit:value-in'],
+        ['pico-1:knob:value-out', 'pi-1:gpu:value-in'],
+        ['web:camera:video-out', 'pi-1:gpu:video-in'],
         ['web:camera:video-out', 'cf-stream:live:video-in'],
-        ['cf-stream:live:video-out', 'pi-1:gpu:video-in'],
         ['pi-1:gpu:video-out', 'web:screen:video-in'],
-        // Interconnected (asked: *"Make frontpage paybay more i tersti g and
-        // interconnected"*): every cross link goes one column right or
-        // further, so the five columns of three hold. The keys' mod wheel and
-        // the room's clock reach the Pi, the recorder also plays the Circuit,
-        // remote notes also play the synth here, the Circuit goes through the
-        // octaver, the shader code also flashes the Pico, Stream also shows
-        // straight on the screen, and R2 keeps the GPU's picture too.
-        ['web:keys:value-out', 'cf-relay:room:value-in'],
-        ['cf-relay:room:value-out', 'pi-1:gpu:value-in'],
-        ['cf-relay:room:clock-out', 'pi-1:circuit:clock-in'],
-        ['web:rec:midi-out', 'pi-1:circuit:midi-in'],
-        ['cf-relay:room:midi-out', 'web:synth:midi-in'],
-        ['pi-1:circuit:audio-out', 'web:fx:audio-in'],
-        ['web:editor:program-out', 'web:pico:program-in'],
-        ['cf-stream:live:video-out', 'web:screen:video-in'],
-        ['pi-1:gpu:video-out', 'r2:recordings:video-in'],
+        ['cf-stream:live:video-out', 'phone:screen:video-in'],
       ];
       // The PHONE picture is its own patch, about the phone in your hand (asked:
       // *"Make mibile and dsrsktip patchbays different"*): its touch plays the
@@ -385,6 +371,7 @@
         'web:speaker': 'speakers', 'cf-relay:room': 'Cloudflare', 'pi-1:circuit': 'Novation Circuit', 'r2:recordings': 'R2',
         'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:gpu': 'Pi GPU',
         'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream',
+        'pico-1:knob': 'a knob on a Pico', 'phone:screen': 'every phone watching',
         'phone:touch': 'touch', 'phone:tilt': 'tilt', 'phone:camera': 'camera', 'phone:mic': 'microphone' };
       const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
       function bayOf(pairs) {
@@ -427,6 +414,7 @@
         'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady,
         'web:keys:value-out': wheel(0), 'cf-relay:room:value-out': wheel(60),
         'cf-relay:room:clock-out': (t) => ({ n: 0, level: 1, flowing: true }),
+        'pico-1:knob:value-out': wheel(0),
         'phone:touch:midi-out': events(0), 'phone:tilt:value-out': wheel(0), 'phone:camera:video-out': steady,
         'phone:mic:audio-out': sound(0, 600) });
 
@@ -441,10 +429,10 @@
       const fit = () => { inner.style.zoom = String(Math.min(1, frame.clientWidth / drawW)); };
       function draw() {
         const phone = phoneQ.matches, bay = bayOf(phone ? PHONE : DESK);
-        drawW = phone ? 520 : 960;
+        drawW = phone ? 520 : 760;
         inner.style.width = `${drawW}px`;
         // Every column the same width: boxes at a row-of-n width, no stretch.
-        const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false, sizeAs: phone ? 2 : 5 });
+        const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false, sizeAs: phone ? 2 : 3 });
         inner.replaceChildren(view.el);
         frame.classList.toggle('fp-bay-phone', phone);
         const feed = feeds();
