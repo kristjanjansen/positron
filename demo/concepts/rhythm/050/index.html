@@ -159,7 +159,8 @@
   // INVERT IS A VALUE ON A WIRE: the button is a node of its own, `web:invert`,
   // whose `value-out` reaches the shader through `web:pixelate:value-in`, as a
   // knob reaches a synth on the other concept pages.
-  let invert = false, inverts = 0;
+  // Inverted by default, asked 2026-10-12: *"reverse ... default reverse setting"*.
+  let invert = true, inverts = 0;
   const INV = ID('invert', 'value-out'), PX_SET = ID('pixelate', 'value-in');
   bay.addNode({ id: `${S}:invert`, kind: 'person', label: 'invert', place: 'browser' });
   bay.addPort({ id: INV, label: 'invert:value-out', dir: 'out', medium: 'value', shape: { of: 'param' } });
@@ -219,7 +220,7 @@
   const pxPanel = createVideoPanel({ media: canvas, left: el('span') });
   // The invert button on the pixels' own footer, beside full screen, as the
   // kit's icon button with the `contrast` icon.
-  const invBtn = createIconButton({ icon: 'contrast', label: 'invert black and white', pressed: false,
+  const invBtn = createIconButton({ icon: 'contrast', label: 'invert black and white', pressed: true,
     onPress: () => bay.send(INV, { of: 'param', name: 'invert', v: invert ? 0 : 1 }) });
   const sclBtn = createIconButton({ icon: 'grid', label: 'twice as many squares and drums', pressed: false,
     onPress: () => { const now = m.api.pendingShape() ?? m.api.shape(); bay.send(SCL, { of: 'param', name: 'scale', v: now.rows === 18 ? 1 : 2 }); } });
