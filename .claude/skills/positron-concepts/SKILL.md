@@ -33,6 +33,10 @@ numbered, kept as cards in `/concepts/`.
   a 404 behind, never a redirect page. Five were removed that day (sampler/010,
   020, 035, 040 and synth/050).
 
+- 🔴 **A CONCEPT PAGE WITH A READOUT SHOWS IT ON TOP.** Instructed 2026-10-12:
+  *"yeah when concept has readout move to top"*. `joined: false` in `mount()`,
+  with the reason quoted beside it as the shell asks; the log stays at the foot.
+
 ## The index and a page's frame
 
 - `demo/concepts/index.html` holds `CONCEPTS`, rows of `[title, desc, n?]` in

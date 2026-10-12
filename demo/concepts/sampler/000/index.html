@@ -91,10 +91,10 @@
   import { createScSampler, warmOnIntent } from '/concepts/sampler/sc-sampler.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
-  // 040's four cells. (040 also passed `joined: false`; shell.mjs asks for a
-  // reason a reader can see before a page splits the readout from the log, and
-  // there was none written, so this page takes the default.)
+  // 040's four cells, under the title with the log alone at the foot. Asked
+  // 2026-10-12: *"yeah when concept has readout move to top"*.
   const d = mount({ name: 'concept sampler 000', what: '', index: '/concepts/', indexLabel: 'concepts',
+    joined: false,
     readout: { 'key to sound': 'ms', boot: 'ms', 'first note': 'ms', underruns: '' } });
   conceptNav('sampler/000');
 
