@@ -55,6 +55,7 @@ export const CONCEPTS = [
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
+  { n: 'rhythm/000', title: 'Drum machine', say: 'A 16 step grid playing four SuperCollider drums, kick, snare and two hats, each on a wire of its own.' },
   { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
   { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
   { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },

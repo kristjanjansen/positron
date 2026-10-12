@@ -48,7 +48,7 @@ export const KIT_PARTS = [
     'card-refused-and-with-buttons',
   ] },
   { part: 'devices', label: 'DEVICES', ids: [
-    'knob-grid', 'instrument-panel', 'glued-rows', 'panel-seam', 'instrument-header',
+    'step-grid-with-named-rows', 'knob-grid', 'instrument-panel', 'glued-rows', 'panel-seam', 'instrument-header',
     'stepped-knob', 'control-grid', 'instrument', 'step-grid', 'envelope',
     'filter-response', 'waveform', 'panel', 'segment-display', 'knob', 'pad',
     'fader', 'head-gap-and-foot', 'channel-strip',

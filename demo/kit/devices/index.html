@@ -157,6 +157,7 @@
   let headSpec = null;       // { acting, reporting, presses }  the two headers
   let stepSpec = null;       // { stepped, quarters, free }  the stepped knobs
   let gridSpec = null;        // { edit, read, phone, holder }
+  let namedSpec = null;       // { named }  the step grid with its rows named in words
   let envSpec = null;         // { one, two, three, flat }
   let filtSpec = null;        // { live, deep, refused }
   let waveSpec = null;        // { drawnViews, pulse, blend, two, measured, drawnNames }
@@ -245,7 +246,36 @@
 
 
   /**
-   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. A knob
+   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. A step
+   * grid whose rows are named in WORDS, 2026-10-12, for `/concepts/rhythm/000/`:
+   * *"make a 16 x 4 grid pad componetn (global one)"*. It is `createStepGrid`,
+   * not a second grid; what changed is that its label column is as wide as its
+   * widest name (`shell.css`, `.pos-pg-labs`), with the old 22 px as the floor,
+   * so the numbered grid in STEP GRID below still measures 22 px.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason every block
+   * below gives: both harnesses press that row by position.
+   */
+  section('STEP GRID WITH NAMED ROWS',
+    'The same step grid with its rows named in words, the label column as wide as the widest name.',
+    `createStepGrid({ fixed, strip, rows: 4, steps: 16,
+  label: (r) => ['kick', 'snare', 'open hat', 'closed hat'][r],
+  ticks: true })`,
+    (box) => {
+      const wrap = el('div', 'kit-pg');
+      const fixed = el('div');
+      const strip = el('div', 'kit-pg-strip');
+      wrap.append(fixed, strip);
+      const NAMES = ['kick', 'snare', 'open hat', 'closed hat'];
+      const named = createStepGrid({ fixed, strip, rows: 4, steps: 16, label: (r) => NAMES[r], ticks: true });
+      for (const [r, s] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 4], [1, 12], [2, 2], [2, 6], [2, 10], [2, 14],
+        [3, 0], [3, 3], [3, 4], [3, 7], [3, 8], [3, 11], [3, 12], [3, 15]]) named.set(r, s, true, 'quiet');
+      namedSpec = { named };
+      box.classList.add('kit-wide');
+      box.append(wrap);
+    });
+
+  /**
+   * 🔴 ONCE THE NEWEST BLOCK, NOW SECOND. A knob
    * grid, 2026-10-10, asked as *"Knobs: each has its own wrapper box, in a
    * grid, already reserve room for it. A kit component. In 40 41"*.
    *
@@ -2952,6 +2982,21 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         `-1 to 1 reserves ${res(stepSpec.free)} and 1 to 8 by ones reserves `
         + `${res(stepSpec.stepped)}`);
     }
+  }
+
+  if (namedSpec && gridSpec) {
+    /* 🔴 NOTHING IN EITHER LABEL COLUMN IS CUT, which is what a column sized to
+       its widest label promises. The numbered grid below is wider than 22 px
+       since 2026-10-12 because its corner says `beat`, which at 22 px was cut
+       to `bea`; its digits alone would sit at the 22 px floor, as /tom/'s do. */
+    const cutIn = (g) => [...g.labels, g.fixed.querySelector('.pos-pg-corner')]
+      .filter((l) => l && l.scrollWidth > l.clientWidth + 0.5).map((l) => l.textContent);
+    const cut = [...cutIn(namedSpec.named), ...cutIn(gridSpec.edit)];
+    const w = namedSpec.named.fixed.getBoundingClientRect().width;
+    const nw = gridSpec.edit.fixed.getBoundingClientRect().width;
+    d.assert('a step grid label column is as wide as its widest label, so no name and no corner word is cut',
+      cut.length === 0 && w > 22 && nw >= 22,
+      `named column ${w.toFixed(1)} px, numbered column ${nw.toFixed(1)} px, ${cut.length ? `${cut.join(', ')} cut` : 'nothing cut'}`);
   }
 
   if (gridSpec) {
