@@ -46,7 +46,7 @@ export const CONCEPTS = [
   { n: 'typist/030', title: 'Playback', say: 'One paper whose typing is kept on a timeline and played back from the first key to the last.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
   { n: 'sampler/000', title: 'Sampler', say: 'A SuperCollider piano and Rhodes behind a looper you start, overdub and stop with the sustain pedal.' },
-  // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs redirect to 000.
+  // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):

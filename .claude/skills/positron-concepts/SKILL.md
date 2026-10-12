@@ -28,6 +28,11 @@ numbered, kept as cards in `/concepts/`.
   plus a camera; 11 and 12 are 10 plus effects or a recorder), so the delta is
   the lesson.
 
+- 🔴 **NO FORWARDING FROM AN OLD ADDRESS.** Instructed 2026-10-12: *"no old
+  address forwarding"*. A concept page that moves, merges or is removed leaves
+  a 404 behind, never a redirect page. Five were removed that day (sampler/010,
+  020, 035, 040 and synth/050).
+
 ## The index and a page's frame
 
 - `demo/concepts/index.html` holds `CONCEPTS`, rows of `[title, desc, n?]` in
