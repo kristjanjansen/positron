@@ -169,9 +169,15 @@
     // scaling out as it grows, the cursor at now. Asked 2026-10-12: *"do not
     // scroll, just scale out like typist etc"*, then *"why cursor aint moving?
     // ... we need std behaviour here"*.
-    size: 'auto', follow: false, gutter: 120, footer: true, live: { minSpan: WINDOW },
+    // No footer under it and a lane as tall as the strip's floor: the crop of
+    // 2026-10-12 showed about 60 px of nothing under the lane, a 48 px footer
+    // that is empty until something is hovered plus 12 px of the 88 px floor
+    // (STRIP_AUTO_MIN) under a 56 px lane. What is under the pointer goes to the
+    // strip's own tooltip, as on every other clock page (*"rm footer from
+    // timeline"*, asked 2026-10-12).
+    size: 'auto', follow: false, gutter: 120, live: { minSpan: WINDOW },
     lanes: [{
-      id: 'lag', kind: 'note', label: 'delay', height: 56, width: 2, as: 'ticks', terse: true,
+      id: 'lag', kind: 'note', label: 'delay', height: 68, width: 2, as: 'ticks', terse: true,
       rows: () => arrived.map((a, i) => ({ at: a.at, id: `a${i}`, kind: 'note', payload: a })),
       colorOfRow: (r) => band(r.payload.ms), rankOfRow: (r) => r.payload.ms,
       describeRow: (r) => [nameOf(r.payload.n), `${r.payload.ms} ms`],

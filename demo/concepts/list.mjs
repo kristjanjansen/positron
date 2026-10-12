@@ -67,9 +67,8 @@ export const CONCEPTS = [
   { n: 'clock/010', title: 'Message lag', say: 'Keys play a synth over the relay and each note shows how long it took to arrive.' },
   { n: 'clock/020', title: 'Audio cushion', say: 'Sound over the relay waits in a cushion you set, trading lag for gaps.' },
   { n: 'clock/030', title: 'Shared clock', say: 'Two places agree the time once and play the same beat with nothing sent per beat, and a third can join mid-beat.' },
-  { n: 'clock/040', title: 'MIDI clock', say: 'The same beat sent as 24 ticks a beat or as one anchor, and how far each lands from the beat.' },
+  // clock/040 MIDI clock and clock/050 Clock drift moved to /archive/ 2026-10-12 (*"still too many clock demos, i can not distinguish"*, *"move less relevant to archive"*).
   // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
-  { n: 'clock/050', title: 'Clock drift', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.

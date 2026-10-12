@@ -222,7 +222,9 @@
     // *"do not scroll, just scale out like typist etc"*, then *"keep minimum
     // separation between event bars? ... we need std behaviour here"*. This page
     // plays a fixed pattern, so its cursor is the deck's own playhead.
-    size: 'auto', follow: false, gutter: 132, footer: true, whole: true, bin: true,
+    // No footer: what is under the pointer goes to the strip's own tooltip, as
+    // on every other clock page (*"rm footer from timeline"*).
+    size: 'auto', follow: false, gutter: 132, whole: true, bin: true,
     lanes: [laneSpec('timer', 'timer'), laneSpec('soundcard', 'sound card')],
   });
   const surface = createGlue(bar.el, view.surface);

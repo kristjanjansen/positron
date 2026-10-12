@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 040</title>
+<title>POSITRON MIDI clock</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/040, MIDI CLOCK, 2026-10-12. One idea: the same beat carried
@@ -28,7 +28,6 @@
   // clock and sound card (clock/030's note on one sound card applies).
   //
   // Nothing opens on a visit. Play joins the room.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -64,13 +63,12 @@
     { id: IN.ticks, label: 'ticks', dir: 'in', medium: 'midi', accepts: ['clock'] },
   ]);
 
-  const d = mount({ name: 'concept clock 040', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'MIDI clock', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     // Messages each way per minute, and how far each receiver's beat lands from
     // the true beat, typical and worst. Six cells, three pairs.
     readout: { ticks: '/min', anchors: '/min', 'ticks late': 'ms', 'ticks worst': 'ms', 'anchor late': 'ms', 'anchor worst': 'ms' } });
-  conceptNav('clock/040');
 
   const S = soundCard();
 

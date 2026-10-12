@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 050</title>
+<title>POSITRON Clock drift</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/050, DRIFT, 2026-10-12. One idea: two clocks that agreed once
@@ -27,7 +27,6 @@
   // than repeated.
   //
   // Nothing opens on a visit. Play joins the room.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -57,14 +56,13 @@
   const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' }],
     [{ id: IN.there, label: 'beat', dir: 'in', medium: 'clock' }]);
 
-  const d = mount({ name: 'concept clock 050', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Clock drift', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     // How far apart the beats land now and at worst since a control last
     // changed, how many times the clocks agreed again, and web-2's clock rate
     // as measured off both clocks.
     readout: { 'drift now': 'ms', worst: 'ms', resyncs: '', rate: 'ppm' } });
-  conceptNav('clock/050');
 
   const S = soundCard();
 
