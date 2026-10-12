@@ -8,11 +8,8 @@
 <title>POSITRON concept 016</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cc-top { display: flex; align-items: flex-end; gap: 12px; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* The pad and the knob group side by side on a desk. The row wraps when the
-     pad's own basis and the knob grid do not both fit, so a phone stacks them with
-     no media query: the decision is the row's width, not the window's. */
+  /* No page rules: the transport bar and its strip are one glued surface, and
+     the scope, pad, knob row and patchbay stack at the shell's gap. */
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -20,7 +17,10 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createXyPad } from '/shell/xy-pad.mjs';
   import { createSynth, KNOBS, PATCH, expo } from './modules.mjs';
@@ -30,14 +30,34 @@
   // so every move is a `{ of: 'param' }` event through the bay and the cable
   // pulses with it.
   //
-  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or
-  // play press; moving the pad before that only changes the filter's state.
+  // THE NOTES ARE A LOOPING LINE, NOT A KEYBOARD. Asked 2026-10-12: *"Rm
+  // keyboard use autoplay on xy"*. Both hands go to the pad: Play starts an
+  // eight note bass line in A on a loop, Stop ends it, and the pad shapes the
+  // filter while it runs. The line is /concepts/synth/110/'s arrangement, a kit
+  // deck (`createDeck`) playing note ons and offs out of `web:line:midi-out`,
+  // and the kit transport bar glued to a strip that draws each note, with LOOP
+  // fixed on over the whole line. Each note is let go before the next, so every
+  // one strikes the envelope again and the filter has an attack to shape.
+  //
+  // A SEEK STARTS WHAT IS SOUNDING THERE (110's chase): the deck folds the line
+  // up to the new position and the page makes the held note match it.
+  //
+  // NOTHING OPENS ON A VISIT. The AudioContext is made on the first play press;
+  // moving the pad or a knob before that only changes the synth's state.
   const d = mount({ name: 'concept draw 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('draw/000');
 
   const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay } = synth;
   const ID = synth.id;
+
+  // ── the line: eight eighth notes at 120 bpm, each held 180 ms ───────────
+  // A2 A2 A3 A2 C3 A2 G2 E2, low so the saw has overtones for the filter to take.
+  const SEQ = [45, 45, 57, 45, 48, 45, 43, 40];
+  const STEP = 250, HOLD = 180, LAP = SEQ.length * STEP;
+  const NOTES = SEQ.map((n, i) => ({ n, at: i * STEP, end: i * STEP + HOLD }));
+  /** The pitch held at `pos` inside one lap, if any. */
+  const heldAt = (pos) => NOTES.filter((x) => x.at <= pos && pos < x.end).map((x) => x.n);
 
   // ── one waveform, the output, as on /concepts/synth/040/ ────────────────────────
   const WINDOW = 512, FULL = 0.5;
@@ -52,11 +72,13 @@
   // Resolved here, above the pad: the pad paints once as it is made, and a
   // canvas font cannot read a CSS variable.
   const MONO = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
+  let padMoves = 0;
   const pad = createXyPad(el('div'), {
     label: 'filter',
     x: { label: 'cutoff', min: 0, max: 1 },
     y: { label: 'resonance', min: 1, max: 0 },
     onInput: (x, y) => {
+      padMoves++;
       bay.send(ID('xy', 'value-out'), { of: 'param', name: 'cutoff', v: CUT.to(x) });
       bay.send(ID('xy', 'value-out'), { of: 'param', name: 'q', v: y * QMAX });
     },
@@ -88,32 +110,90 @@
     label: k.name, min: k.min, max: k.max, step: k.step, value: k.raw, format: k.format, hand: true,
     onInput: (r) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v: k.value(r) }),
   })]));
-  // Three boxes across at most, so beside the pad they are one row.
   const grid = createKnobGrid(knobs, { row: true });
 
-  // The play button is the test tone: a held note out of web:tone, into the
-  // osc for its pitch and the amp for its gate (asked 2026-10-10, *"where is
-  // web:keys. there is only test tone"*).
-  const note = (n, v) => bay.send(ID('tone', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: v });
-
-  // ── play: a held A2 into the same keys:midi-out, so the pad has something
-  // to filter without holding a key. A key pressed over it plays that key and
-  // the drone comes back when it is let go (the osc plays the last held). ──
-  const DRONE = 45;
-  let ctx = null, droning = false;
+  // ── the sound, made on the first play ───────────────────────────────────
+  let ctx = null;
   function wake() {
     if (!ctx) { ctx = new AudioContext(); synth.start(ctx); synth.sound(true); requestAnimationFrame(frame); }
     ctx.resume();
   }
-  const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play', onPress: () => drone(!droning) },
-  ] });
-  function drone(v) {
-    if (v) wake();
-    droning = v;
-    note(DRONE, v ? 100 : 0);
-    transport.setIcon('play', v ? 'stop' : 'play', v ? 'stop' : 'play');
+
+  // ── the line: a kit deck plays it out of web:line:midi-out ──────────────
+  const sounding = new Set();   // pitches the line has on right now
+  let quiet = true;             // true unless the deck is rolling with sound up
+  let ons = 0, offs = 0;
+  function emit(n, on) {
+    if (on === sounding.has(n)) return;
+    if (on) { sounding.add(n); ons++; } else { sounding.delete(n); offs++; }
+    bay.send(ID('line', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: on ? 100 : 0 });
   }
+  /** THE CHASE: make what sounds equal what is held, touching nothing else. */
+  function chase(want) {
+    const w = new Set(quiet ? [] : want);
+    for (const n of [...sounding]) if (!w.has(n)) emit(n, false);
+    for (const n of w) if (!sounding.has(n)) emit(n, true);
+  }
+  const adapter = {
+    caps: { rates: [1], continuous: false },
+    actuate(pl) { if (!quiet) emit(pl.n, pl.on); },
+    reduce(_prefix, pos) { return { pos, held: heldAt(pos) }; },
+    assertState(state) { chase(state?.held || []); return state; },
+  };
+  const items = NOTES.flatMap((x, i) => [
+    { at: x.at, kind: 'note', id: `on${i}`, payload: { n: x.n, on: true } },
+    { at: x.end, kind: 'note', id: `off${i}`, payload: { n: x.n, on: false } },
+  ]);
+  const deck = createDeck({ items, adapters: { note: adapter }, range: [0, LAP] });
+
+  let arming = false;
+  function play() {
+    if (arming) return;
+    wake();
+    quiet = false;
+    chase(heldAt(deck.position()));
+    deck.play();
+    pb.refresh?.();
+  }
+  function stop() {
+    deck.pause();
+    quiet = true;
+    chase([]);
+    pb.refresh?.();
+  }
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, { scrub: false, command: { play, pause: stop } });
+
+  // ── the strip: one row, the line's notes as spans ───────────────────────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const strip = createStripView(glue, deck, { size: 'auto', follow: false, gutter: 96, lanes: [{
+    id: 'line', kind: 'note', label: 'line', height: 30, as: 'spans', stack: false, terse: true,
+    rows: () => NOTES.map((x, i) => ({ at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: HOLD } })),
+    describeRow: (r) => [nameOf(r.payload.n), `${r.payload.durMs} ms`],
+    labelOf: (sp) => nameOf(sp.row.payload.n),
+  }] });
+  const surface = createGlue(bar.el, strip.surface);
+  // The whole lap in view once the strip has a width (typist/040's reason).
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = strip.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; strip.strip.fit(0, LAP); }
+  }).observe(strip.el);
+  // LOOP ON FROM THE START, through the bar's own button, as on
+  // /concepts/synth/110/: a mark at 0 and a mark at the end. The bar starts the
+  // deck on the first mark, so `arming` swallows that play; nothing sounds on load.
+  arming = true;
+  try {
+    deck.seek(0); bar.api.pressLoop();
+    deck.seek(LAP); bar.api.pressLoop();
+  } finally { arming = false; }
+  deck.seek(0);
+  // The loop is fixed and read only, as on 110.
+  const loopBtn = bar.el.querySelector('.tbar-loop');
+  loopBtn.disabled = true;
+  loopBtn.title = 'the loop is fixed to the whole line';
+  loopBtn.setAttribute('aria-label', 'looping the whole line, fixed');
 
   function frame() {
     const buf = synth.sounding() ? synth.read() : null;
@@ -128,12 +208,11 @@
 
   // ── the patchbay ─────────────────────────────────────────────────────────
   const pb = createPatchbay(bay, { flowing: () => synth.sounding() });
+  setInterval(() => pb.refresh?.(), 500);
 
-  const top = el('div', 'cc-top');
-  top.append(transport.el);
-  // Linear, as every concept synth: scope, pad, the knob row, then the patchbay,
-  // as blocks in the shell's stack at the shell's gap.
-  d.stack.add(top, wave.el, pad.el, grid.el, pb.el);
+  // Linear, as every concept synth: the line, scope, pad, the knob row, then
+  // the patchbay, as blocks in the shell's stack at the shell's gap.
+  d.stack.add(surface, wave.el, pad.el, grid.el, pb.el);
 
   // The one patch.
   const bad = synth.load(PATCH);
@@ -141,7 +220,11 @@
   pb.refresh();
   window.__demo.synth = synth;
   window.__demo.pad = pad;
-  window.__demo.drone = drone;
   window.__demo.knobs = grid;
+  window.__demo.line = {
+    deck, bar, play, stop, notes: NOTES, lap: LAP, heldAt,
+    playing: () => deck.playing(), ctx: () => ctx, sounding: () => [...sounding],
+    counts: () => ({ ons, offs, padMoves }),
+  };
   d.ready();
 </script>
