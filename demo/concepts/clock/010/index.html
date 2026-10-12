@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept clock 010</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts clock/010, TELL IT IN ADVANCE, 2026-10-12. One idea: a note that
+  // carries its time can be handed over EARLY, and then it lands exactly.
+  //
+  // clock/000 measured how late a note ARRIVES. This page takes the arriving out
+  // (no relay, one tab) and asks what a receiver does with an event's `at`. One
+  // `pattern` node sends every note 100 ms ahead with `at`, the audio clock time
+  // it is due, along two links at once:
+  //   - `timer` sets a setTimeout for `at` and plays when it wakes, so it lands
+  //     as late as the main thread let it wake, and jitters with it;
+  //   - `audio clock` hands `at` to the AudioContext with start(at), so the sound
+  //     card plays it on its own clock, exactly.
+  // Both are MEASURED where the samples are: each lane's click carries a silent
+  // one-sample impulse into a bus of its own, an AudioWorklet ear on that bus
+  // reports the output frame it appeared on (demo/shell/impulse-worklet.js, the
+  // ear /time/'s beat tab uses), and lateness is that frame's time less `at`.
+  //
+  // Nothing opens on a visit: the AudioContext, the ears and the pattern all
+  // start on the first press of play.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+
+  const S = 'web';
+  const PAT = `${S}:pattern:midi-out`;
+  const WAKE_IN = `${S}:wake:midi-in`, AHEAD_IN = `${S}:ahead:midi-in`;
+  const WAKE_OUT = `${S}:wake:audio-out`, AHEAD_OUT = `${S}:ahead:audio-out`, SPK = `${S}:speaker:audio-in`;
+
+  const d = mount({ name: 'concept clock 010', what: '', index: '/concepts/', indexLabel: 'concepts',
+    readout: { 'timer median': 'ms', 'timer worst': 'ms', 'clock median': 'ms', 'clock worst': 'ms' } });
+  conceptNav('clock/010');
+
+  // ── the pattern: one bar of eight steps, played eight times ─────────────
+  const STEP = 250, BAR = 8 * STEP, LAPS = 8, LENGTH = BAR * LAPS;
+  const HITS = [0, 2, 3, 4, 6];
+  const AHEAD = 0.1, TICK = 25;                // hand each note over 100 ms early, look every 25 ms
+  const ROWS = [];
+  for (let lap = 0; lap < LAPS; lap++) for (const h of HITS) ROWS.push(lap * BAR + h * STEP);
+
+  // ── the audio: built on the first play, never on a visit ────────────────
+  let ctx = null, ears = null;
+  const late = { wake: new Map(), ahead: new Map() };       // position -> ms late, MEASURED by the ear
+  const due = { wake: [], ahead: [] };                      // { pos, at } handed to each lane
+  async function audio() {
+    if (ctx) return;
+    ctx = new AudioContext({ latencyHint: 'interactive' });
+    await ctx.resume();
+    await ctx.audioWorklet.addModule('/shell/impulse-worklet.js');
+    // A context that has just resumed reads a clock that has not started moving
+    // yet, and a timer set against it wakes tens of ms off. Wait for it to run.
+    const t0 = ctx.currentTime;
+    for (let i = 0; i < 40 && ctx.currentTime - t0 < 0.05; i++) await new Promise((r) => setTimeout(r, 10));
+    ears = {};
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    mute.connect(ctx.destination);
+    for (const lane of ['wake', 'ahead']) {
+      const probe = ctx.createGain();
+      // A started ConstantSource of 0 keeps the bus from going silent, or Chrome
+      // hands the ear an empty input and it hears nothing (impulse-worklet.js).
+      const hold = ctx.createConstantSource();
+      hold.offset.value = 0; hold.connect(probe); hold.start();
+      const ear = new AudioWorkletNode(ctx, 'impulse-detect');
+      ear.port.onmessage = (e) => heard(lane, e.data.at);
+      probe.connect(ear); ear.connect(mute);
+      ears[lane] = probe;
+    }
+  }
+  const impulse = () => { const b = ctx.createBuffer(1, 2, ctx.sampleRate); b.getChannelData(0)[0] = 1; return b; };
+  let IMP = null;
+  const live = new Set();                                  // sources not yet finished, stopped on pause
+  function click(lane, at, hz) {
+    IMP ??= impulse();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = hz;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.2, at + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+    o.connect(g).connect(ctx.destination);
+    o.start(at); o.stop(at + 0.06);
+    const tick = ctx.createBufferSource();
+    tick.buffer = IMP; tick.connect(ears[lane]); tick.start(at);
+    for (const n of [o, tick]) { live.add(n); n.onended = () => live.delete(n); }
+  }
+  /** The ear heard an impulse at audio time `t`: pair it with the note it was due for. */
+  function heard(lane, t) {
+    let best = null, bd = Infinity;
+    for (const x of due[lane]) { const dd = Math.abs(t - x.at); if (dd < bd) { bd = dd; best = x; } }
+    if (!best || bd > 0.1) return;
+    late[lane].set(best.pos, (t - best.at) * 1000);
+  }
+
+  // ── the bay: one pattern, two ways to play what it sends ────────────────
+  const bay = createBay();
+  for (const [n, kind, label] of [['pattern', 'engine', 'pattern'], ['wake', 'engine', 'timer'],
+    ['ahead', 'engine', 'audio clock'], ['speaker', 'screen', 'speakers']]) {
+    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  }
+  const timers = new Set();
+  const PORTS = [
+    { id: PAT, dir: 'out', medium: 'midi', emits: ['note'] },
+    // Acts when it wakes: a timer set for `at`, and the click starts NOW.
+    { id: WAKE_IN, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      const t = setTimeout(() => {
+        timers.delete(t);
+        due.wake.push({ pos: e.pos, at: e.at });
+        click('wake', ctx.currentTime, 660);
+      }, Math.max(0, (e.at - ctx.currentTime) * 1000));
+      timers.add(t);
+    } },
+    // Tells the sound card in advance: the click starts AT `at`.
+    { id: AHEAD_IN, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      due.ahead.push({ pos: e.pos, at: e.at });
+      click('ahead', e.at, 990);
+    } },
+    { id: WAKE_OUT, dir: 'out', medium: 'audio' },
+    { id: AHEAD_OUT, dir: 'out', medium: 'audio' },
+    { id: SPK, dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort(p);
+  for (const [a, b] of [[PAT, WAKE_IN], [PAT, AHEAD_IN], [WAKE_OUT, SPK], [AHEAD_OUT, SPK]]) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+
+  // ── the sender: wakes every 25 ms and hands over what is due in the next 100 ─
+  const deck = createDeck({ items: [], range: [0, LENGTH] });
+  let loop = null, anchor = null, next = 0;
+  const audioAt = (pos) => anchor.a + (pos - anchor.p) / 1000;
+  function tick() {
+    if (!deck.playing()) { stop(); return; }
+    const horizon = ctx.currentTime + AHEAD;
+    while (next < ROWS.length && audioAt(ROWS[next]) < horizon) {
+      const pos = ROWS[next++], at = audioAt(pos);
+      if (at < ctx.currentTime) continue;      // already gone by: never sent late
+      bay.send(PAT, { cls: 'note', ch: 1, d1: 60, d2: 100, at, pos });
+    }
+    measure();
+  }
+  async function start() {
+    await audio();
+    let p = deck.position();
+    if (p >= LENGTH - STEP) { p = 0; deck.seek(0); }
+    for (const lane of ['wake', 'ahead']) due[lane].length = 0;
+    anchor = { p, a: ctx.currentTime + 0.05 };
+    next = ROWS.findIndex((r) => r >= p);
+    if (next < 0) next = ROWS.length;
+    deck.play();
+    clearInterval(loop);
+    loop = setInterval(tick, TICK);
+    tick();
+  }
+  function stop() {
+    clearInterval(loop); loop = null;
+    for (const t of timers) clearTimeout(t);
+    timers.clear();
+    for (const n of live) { try { n.stop(); } catch { /* not started */ } }
+    live.clear();
+    if (deck.playing()) deck.pause();
+    measure();
+  }
+
+  // ── what it measured: readout cells, gutters and the colour of each mark ─
+  const fmt = (x) => Math.round(x * 100) / 100;
+  const sign = (x) => { const r = Math.round(x * 100) / 100 || 0; return `${r >= 0 ? '+' : ''}${r.toFixed(2)}`; };
+  const NOT_YET = '#3b424e';
+  // Green under a millisecond, amber under ten, red past that.
+  const band = (ms) => (Math.abs(ms) < 1 ? '#8fd6a8' : Math.abs(ms) < 10 ? '#ffd400' : '#e0908a');
+  function stats(m) {
+    const xs = [...m.values()].sort((a, b) => a - b);
+    if (!xs.length) return null;
+    return { p50: xs[xs.length >> 1], worst: xs.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0) };
+  }
+  function measure() {
+    for (const [lane, key] of [['wake', 'timer'], ['ahead', 'clock']]) {
+      const s = stats(late[lane]);
+      d.set(`${key} median`, s ? fmt(s.p50) : '');
+      d.set(`${key} worst`, s ? fmt(s.worst) : '');
+      const L = view.strip.lanes().find((x) => x.id === lane);
+      if (L) L.subLabel = s ? [`median ${sign(s.p50)} ms`, `worst ${sign(s.worst)} ms`] : [];
+    }
+    view.strip.invalidate();
+  }
+
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, {
+    scrub: false, loop: false, live: false,
+    command: { play: () => start(), pause: () => stop() },
+  });
+  const laneSpec = (id, label) => ({
+    id, kind: 'hit', label, height: 52, width: 2, as: 'ticks', terse: true,
+    rows: () => ROWS.map((at, i) => ({ at, id: `${id}${i}`, kind: 'hit', payload: { pos: at } })),
+    colorOfRow: (r) => (late[id].has(r.at) ? band(late[id].get(r.at)) : NOT_YET),
+    describeRow: (r) => (late[id].has(r.at) ? [label, `${sign(late[id].get(r.at))} ms`] : [label, 'not played yet']),
+  });
+  const view = createStripView(glue, deck, {
+    size: 'auto', follow: false, gutter: 132, footer: true,
+    lanes: [laneSpec('wake', 'timer'), laneSpec('ahead', 'audio clock')],
+  });
+  const surface = createGlue(bar.el, view.surface);
+
+  // ── the patchbay: one source, two links, two ways of acting on `at` ─────
+  const pb = createPatchbay(bay, { flowing: () => live.size > 0 });
+
+  // ── a busy page: the main thread blocked 40 ms in every 120 ─────────────
+  // What a page doing real work does to a timer. The audio clock does not care.
+  let busy = null;
+  const load = createChoice({ label: 'page', options: [['idle', false], ['busy', true]], at: 0, onPick: (on) => {
+    clearInterval(busy); busy = null;
+    if (on) busy = setInterval(() => { const until = performance.now() + 40; while (performance.now() < until) { /* work */ } }, 120);
+    d.log(on ? 'page busy: the main thread is blocked 40 ms in every 120' : 'page idle');
+  } });
+
+  requestAnimationFrame(() => { view.strip.fit(0, LENGTH); view.strip.invalidate(); });
+  d.stack.add(load.el, surface, pb.el);
+  addEventListener('pagehide', () => { clearInterval(busy); stop(); ctx?.close(); });
+  window.__clock = { late, due, ctx: () => ctx };
+  d.ready();
+</script>
