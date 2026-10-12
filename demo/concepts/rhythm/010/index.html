@@ -24,11 +24,11 @@
   // keeps the value it started with. Which number and why is in
   // `../voices.mjs`, `PARAMS`.
   //
-  // Knobs above the grid, as a synth page puts its knobs above its keys.
+  // Knobs under the grid, asked 2026-10-12: *"move knobs below grid"*.
   const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('rhythm/010');
   const m = createDrumMachine(d, { voices: voices({ knobs: true }) });
-  d.stack.add(m.knobs, m.surface, m.patchbay);
+  d.stack.add(m.surface, m.knobs, m.patchbay);
   window.__rhythm = m.api;
   window.__demo.knobs = m.api.knobGrid;
   d.ready();
