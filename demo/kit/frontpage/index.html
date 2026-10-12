@@ -87,6 +87,11 @@
      same numbers the hero is drawn with. */
   .fp-hero { display: flex; flex-direction: column; gap: 0; min-width: 0; }
   .fp-hero > * { margin: 0; overflow-wrap: anywhere; }
+  /* Balanced wrap on every headline, title, line and card text in the
+     specimens, so a two line heading breaks into two similar lines instead of
+     a long one and a word left alone. Asked 2026-10-12: *"use balanced wrap"*. */
+  .fp-hero-h, .fp-hero-l, .fp-hero-s, .fp-ttl-t, .fp-ttl-w, .fp-title, .fp-body,
+  .fp-rule-n, .fp-cc-card, .fp-cc-card * { text-wrap: balance; }
   .fp-hero-eye { color: var(--dim); text-transform: uppercase; }
   .fp-hero-h { color: var(--fg); margin-top: 14px; }
   .fp-hero-l { color: var(--fg); margin-top: 20px; max-width: 34em; }
