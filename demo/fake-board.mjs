@@ -3,6 +3,7 @@
 //   node demo/fake-board.mjs                                  # its own relay on :8897
 //   node demo/fake-board.mjs --relay ws://127.0.0.1:9101      # join one already running
 //   node demo/fake-board.mjs --listening                      # as if somebody else held the Circuit's lease
+//   node demo/fake-board.mjs --skew 250                       # its clock 250 ms ahead of this machine's
 //
 // Then open a board page against it:
 //   http://127.0.0.1:8890/away/?relay=ws://127.0.0.1:8897&board=1
@@ -40,6 +41,17 @@
 // reads that number is reading the board's side of the boundary, never its own
 // queue (positron-verify, `createMidiLane`'s `scheduled()`).
 //
+// 🔴 THE COLLIDE VERBS, THROUGH THE BOARD'S OWN SERVICE (2026-10-12,
+// plans/plan-pi-supercollider-defs.md step 2). `sc.load`, `sc.hit`, `sc.set`,
+// `sc.stats`, `clock.ping` and the `collide` node's notes are answered by
+// `createCollideService` from `rig/board/scollide.mjs`, the code the Pi runs,
+// over a FAKE scsynth that decodes every bundle it is sent and counts, on its
+// own side, how early each one arrived. `skewMs` moves this board's clock away
+// from the machine's, so a page has a real offset to find.
+// ⚠️ The fake scsynth makes no sound of the program: `audio.start {source:
+// 'collide'}` starts the same tone as every other source, so a page's Pi scope
+// has something to read, and nothing about it follows the program.
+//
 // ⚠️ WHAT IT IS NOT: H.264 (no GPU node is announced, so no page is offered a
 // picture that cannot come), Yoshimi (the tone is fixed and a note changes
 // nothing in it), and the direct WebRTC path (`direct: false`, so a page never
@@ -57,6 +69,8 @@ import { format, parse, randomId } from './shell/wire.mjs';
 import { helloMsg, aliveMsg } from '../rig/board/beat.mjs';
 import { createInputs, parseInputs } from '../rig/board/inputs.mjs';
 import { startRelay } from './fake-relay.mjs';
+import { createCollideService, ENGINES, PAGE_BUS } from '../rig/board/scollide.mjs';
+import { readOsc } from '../rig/board/pappus.mjs';
 
 export const RATE = 48000;
 export const FRAME = 960;                 // 20 ms, the board's relay frame
@@ -155,6 +169,53 @@ function fakeFs(written) {
 }
 
 /**
+ * A scsynth that is nobody's: it takes `/d_recv` at once, decodes every bundle
+ * it is sent, and counts on its OWN side of the wire how early each timetag
+ * arrived. A node it was told to start ends 300 ms after its time, with an
+ * `/n_end`, as a short drum hit would. `now` is the board's (skewed) clock.
+ */
+export function fakeScsynth({ now }) {
+  const readers = new Set();
+  const c = { bundles: 0, started: 0, timed: 0, immediate: 0, lateAtServer: 0, minLeadMs: null, maxLeadMs: null, recv: 0 };
+  const timers = new Set();
+  const end = (id, inMs) => {
+    const t = setTimeout(() => { timers.delete(t); for (const fn of readers) fn({ addr: '/n_end', args: [id] }); }, Math.max(0, inMs));
+    timers.add(t);
+  };
+  return {
+    ok: true, mode: 'own', port: ENGINES.own.port, bus: PAGE_BUS,
+    send(buf) {
+      if (buf.subarray(0, 8).toString('latin1') !== '#bundle\0') return;
+      c.bundles++;
+      const sec = buf.readUInt32BE(8), frac = buf.readUInt32BE(12);
+      const immediate = sec === 0 && frac === 1;
+      const t = now();
+      const atMs = immediate ? t : (sec - 2208988800) * 1000 + (frac / 4294967296) * 1000;
+      if (immediate) c.immediate++;
+      else {
+        c.timed++;
+        const lead = atMs - t;
+        if (lead < 0) c.lateAtServer++;
+        c.minLeadMs = c.minLeadMs == null ? lead : Math.min(c.minLeadMs, lead);
+        c.maxLeadMs = c.maxLeadMs == null ? lead : Math.max(c.maxLeadMs, lead);
+      }
+      for (let i = 16; i + 4 <= buf.length;) {
+        const n = buf.readInt32BE(i);
+        const m = readOsc(buf.subarray(i + 4, i + 4 + n));
+        i += 4 + n;
+        if (m.addr === '/s_new') { c.started++; end(m.args[1], atMs - t + 300); }
+      }
+    },
+    recv: async () => { c.recv++; return { ok: true }; },
+    onReply: (fn) => { readers.add(fn); return () => readers.delete(fn); },
+    cpu: async () => ({ ugens: 0, synths: 0, avg: 4, peak: 6 }),
+    stop: () => { for (const t of timers) clearTimeout(t); timers.clear(); return true; },
+    status: () => ({ standIn: true }),
+    counts: () => ({ ...c }),
+  };
+}
+
+/**
  * Start a board.
  * @param {object} [o]
  * @param {string} [o.relay]      a loopback ws:// relay. Left out, one is started.
@@ -166,11 +227,13 @@ function fakeFs(written) {
  *                               as an unplugged Circuit does, so nothing is counted
  * @param {boolean} [o.quiet]
  * @param {number} [o.beatMs]
+ * @param {number} [o.skewMs]    this board's clock is the machine's plus this,
+ *                               for `clock.ping` and every `at` it is sent
  * Returns `{ relay, room, ready, stats(), close() }`; `ready` resolves when
  * both rooms are joined and the hellos are out.
  */
 export function startBoard({ relay = null, port = 8897, room = 'studio-1', listening = false,
-  silent = false, portGone = false, quiet = false, beatMs = 5000 } = {}) {
+  silent = false, portGone = false, quiet = false, beatMs = 5000, skewMs = 0 } = {}) {
   const say = (...a) => { if (!quiet) console.log('[fake-board]', ...a); };
   let ownRelay = null;
   let resolveUrl;
@@ -221,8 +284,25 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     return { ok: !!was, stopped: was };
   }
 
+  // The collide engine: the board's own service over a fake scsynth, on a
+  // clock `skewMs` away from this machine's.
+  const boardNow = () => performance.timeOrigin + performance.now() + skewMs;
+  let scsynth = null;
+  const collide = createCollideService({
+    now: boardNow, log: (l) => say('collide', l),
+    start: async () => {
+      const s = fakeScsynth({ now: boardNow });
+      const stopIt = s.stop;
+      // The tone stops with the collide engine only when no other source holds it.
+      s.stop = () => { stopIt(); if (!source) { stopTone?.(); stopTone = null; } return true; };
+      scsynth = s; startTone();
+      return s;
+    },
+  });
+
   function handle(msg) {
     const reply = (type, body) => send({ type, re: msg.id, ...body });
+    if (collide.handles(msg)) { collide.handle(msg, reply).catch((e) => say('collide threw', e.message)); return undefined; }
     switch (msg.type) {
       case 'graph.ask': counts.asked++; send(alive()); return;
       case 'board.ping': counts.pings++; return reply('board.pong', { pongAt: Date.now() });
@@ -340,9 +420,11 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     relayServer: ownRelay,
     /** What the far side did, for a test. `midiWritten` is every message the gate let through. */
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
+      collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
       inputs: inputs ? inputs.status() : null, relay: ownRelay?.stats?.() ?? null }),
     close() {
       closed = true;
+      collide.stop();
       clearInterval(beat); clearInterval(listener);
       stopAudio();
       try { ws?.close(); } catch { /* gone */ }
@@ -354,7 +436,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
 
 if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   const arg = (k) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : null; };
-  const b = startBoard({ relay: arg('relay'), port: Number(arg('port')) || 8897, listening: process.argv.includes('--listening') });
+  const b = startBoard({ relay: arg('relay'), port: Number(arg('port')) || 8897, listening: process.argv.includes('--listening'),
+    skewMs: Number(arg('skew')) || 0 });
   b.ready.then((url) => {
     console.log(`[fake-board] ready in ${url}/room/studio-1 and studio-1-circuit (nobody's board)`);
     console.log(`[fake-board] open http://127.0.0.1:8890/away/?relay=${url}&board=1`);

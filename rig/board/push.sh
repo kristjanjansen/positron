@@ -121,13 +121,22 @@ echo "== what landed, against what was sent"
 # board.mjs and not this one would answer the new verbs with `ReferenceError` on
 # a board nobody can ssh to. An md5 that covers one of two changed files is a
 # confirmation that can be true while the deploy is broken.
+# ⚠️ AND THE COLLIDE ENGINE'S FOUR, SINCE 2026-10-12 (plans/plan-pi-supercollider-defs.md):
+# `scollide.mjs`, its limiter script, and the compiler and SynthDef reader it
+# imports from demo/shell. The compiler is the one most likely to be stale on the
+# board, because a page compiles with the laptop's copy and `same` in `sc.loaded`
+# then compares two different files.
 ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs $DEST/rig/board/pappus.mjs \
   $DEST/rig/board/scsampler.mjs $DEST/rig/board/sampler.mjs $DEST/rig/board/norns/possampler-defs.scd \
   $DEST/rig/board/norns/run-pappus.scd \
+  $DEST/rig/board/scollide.mjs $DEST/rig/board/norns/poscollide-defs.scd \
+  $DEST/demo/shell/sclang-lite.mjs $DEST/demo/shell/synthdef.mjs \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
 md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
+  "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
   || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
+     "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then

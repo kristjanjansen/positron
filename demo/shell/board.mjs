@@ -166,6 +166,25 @@ export function createBoard({
    *  itself caused. Defaults to `cushionMs`, so nothing changes unless asked. */
   directCushionMs = null,
   iceUrl = 'https://pub.positron.studio/ice',
+  /**
+   * 🔴 THE PAGE'S OWN AudioContext, SO THE BOARD'S SOUND CAN MEET THE PAGE'S.
+   * Added 2026-10-12, plans/plan-pi-supercollider-defs.md §3.2. Left out, this
+   * module makes its own 48 kHz context as it always has, and every existing
+   * caller is unchanged. Given, the playout is built in THAT context, so a page
+   * can put the board's sound through its own scope, crossfader and meter: two
+   * contexts cannot share a node.
+   * ⚠️ IT MUST RUN AT THE BOARD'S RATE. Nothing in the chain resamples (see
+   * `startAudio`), so a context at any other rate is REFUSED with a line in the
+   * log and `startAudio()` answers null, rather than playing at the wrong pitch.
+   * A page makes its context with `{ sampleRate: 48000 }` on the first gesture.
+   */
+  audioContext = null,
+  /**
+   * `false` builds the playout and its meter and connects them to nothing: the
+   * page connects `playout()` where its links say. Default `true`, which is
+   * what every caller had before the option existed.
+   */
+  toDestination = true,
 } = {}) {
   if (!room) throw new Error('board: a room is required. `studio-1` is the address of the Raspberry Pi.');
   if (!['refuse', 'allow'].includes(inSelfcheck)) {
@@ -221,7 +240,9 @@ export function createBoard({
   // something. A page polling `audio.status` is a spectator.
   const DRIVES = new Set(['ctl.set', 'note.on', 'note.off', 'note.panic',
                           'voice.select', 'params.set', 'params.random',
-                          'fx.pappus', 'source.set']);
+                          'fx.pappus', 'source.set',
+                          // the collide engine's (rig/board/scollide.mjs), since 2026-10-12
+                          'sc.load', 'sc.hit', 'sc.set']);
 
   function driverTick() {
     const on = droveAt && performance.now() - droveAt < DRIVING_MS;
@@ -264,13 +285,17 @@ export function createBoard({
 
   async function startAudio() {
     if (ctx) return ctx;
+    if (audioContext && audioContext.sampleRate !== rate) {
+      log(`this page's audio runs at ${audioContext.sampleRate} Hz and the board sends ${rate}. Nothing in the chain resamples, so the board's sound is not played into it`, 'bad');
+      return null;
+    }
     // ⚠️ ASK FOR THE BOARD'S RATE, BECAUSE NOTHING IN THIS CHAIN RESAMPLES. The
     // worklet writes the board's samples straight into a ring drained at the
     // context's own rate: on an output running at 44.1 kHz the pitch is wrong
     // by the ratio AND the ring fills faster than it drains, so the latency
     // guard trims several times a second. Periodic clicking, and every readout
     // green throughout, because frames per second is unaffected.
-    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: rate, latencyHint: 'interactive' });
+    ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)({ sampleRate: rate, latencyHint: 'interactive' });
     // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
     // and NEVER REJECTS, so awaiting it is a hang rather than an error.
     ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
@@ -351,7 +376,7 @@ export function createBoard({
     await ctx.audioWorklet.addModule(PLAYOUT_URL);
     playout = new AudioWorkletNode(ctx, 'pcm-playout',
       { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
-    playout.connect(ctx.destination);
+    if (toDestination) playout.connect(ctx.destination);
     /**
      * 🔴 A METER ON WHAT LEAVES, BECAUSE EVERY NUMBER THESE PAGES SHOW IS ABOUT
      * WHAT ARRIVES. Frames, lost, cushion, and a peak computed from the bytes as

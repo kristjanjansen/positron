@@ -17,7 +17,7 @@ export const CONCEPTS = [
   { n: 'synth/070', title: 'Circuit', say: 'The keyboard and a patch selector playing the Novation Circuit plugged into the Raspberry Pi.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
-  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
+  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, simulated here when no board answers.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits in this tab, played from a patch picker with timbre and morph on the patchbay.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keyboard, with every one of its controls a knob on the patchbay.' },
   // draw, after synth because its first page is the synth/040 voice under a pad

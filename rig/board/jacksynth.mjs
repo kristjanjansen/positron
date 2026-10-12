@@ -40,13 +40,57 @@ function oscPad(buf) {
 }
 function oscStr(str) { return oscPad(Buffer.concat([Buffer.from(str, 'ascii'), Buffer.alloc(1)])); }
 export function oscMessage(address, args = []) {
-  const tags = ',' + args.map((a) => (typeof a === 'string' ? 's' : Number.isInteger(a) ? 'i' : 'f')).join('');
+  // A Uint8Array (a Buffer is one) is a BLOB, `b`: an int32 length, the bytes,
+  // padded to four. Added 2026-10-12 for `/d_recv` (`scollide.mjs`); no caller
+  // before then passed bytes, so every message they build is unchanged.
+  const isBlob = (a) => a instanceof Uint8Array;
+  const tags = ',' + args.map((a) => (typeof a === 'string' ? 's' : isBlob(a) ? 'b' : Number.isInteger(a) ? 'i' : 'f')).join('');
   const parts = [oscStr(address), oscStr(tags)];
   for (const a of args) {
     if (typeof a === 'string') { parts.push(oscStr(a)); continue; }
+    if (isBlob(a)) {
+      const n = Buffer.alloc(4); n.writeInt32BE(a.length);
+      parts.push(n, oscPad(Buffer.from(a.buffer, a.byteOffset, a.length)));
+      continue;
+    }
     const b = Buffer.alloc(4);
     if (Number.isInteger(a)) b.writeInt32BE(a); else b.writeFloatBE(a);
     parts.push(b);
+  }
+  return Buffer.concat(parts);
+}
+
+/** Seconds from 1900 to 1970, which is where an OSC timetag counts from. */
+export const NTP_EPOCH_OFFSET = 2208988800;
+/**
+ * An OSC timetag for a moment in epoch milliseconds: `[seconds, fraction]`,
+ * both uint32. The same arithmetic as `demo/shell/scsynth.mjs` `ntpOf` in the
+ * tab, done in milliseconds so the fraction is not built from a float that has
+ * already lost its last digits. `null` is OSC's "immediately", `[0, 1]`.
+ */
+export function ntpTimetag(atMs) {
+  if (atMs == null) return [0, 1];
+  const whole = Math.floor(atMs / 1000);
+  const frac = Math.min(0xFFFFFFFF, Math.round(((atMs - whole * 1000) / 1000) * 4294967296));
+  return [whole + NTP_EPOCH_OFFSET, frac];
+}
+/**
+ * An OSC bundle: `#bundle`, the timetag, then each element as an int32 size and
+ * its bytes. `messages` is `[[address, ...args], ...]`. scsynth runs a bundle
+ * at its timetag on its own clock, so everything in one bundle starts in the
+ * same sample (the choke and the hit, `scollide.mjs`).
+ */
+export function oscBundle(timetag, messages) {
+  const [sec, frac] = Array.isArray(timetag) ? timetag : ntpTimetag(timetag);
+  const head = Buffer.alloc(16);
+  head.write('#bundle\0', 0, 'ascii');
+  head.writeUInt32BE(sec >>> 0, 8);
+  head.writeUInt32BE(frac >>> 0, 12);
+  const parts = [head];
+  for (const [address, ...args] of messages) {
+    const m = oscMessage(address, args);
+    const n = Buffer.alloc(4); n.writeInt32BE(m.length);
+    parts.push(n, m);
   }
   return Buffer.concat(parts);
 }
@@ -546,22 +590,36 @@ export function stopPappus() {
   if (pappusProc) { try { pappusProc.kill('SIGTERM'); } catch { /* gone */ } pappusProc = null; }
   // ⚠️ NOT `pkill -x scsynth` ANY MORE, SINCE 2026-10-11. The board runs a
   // second scsynth for the sampler (`scsampler.mjs`), and a name match would
-  // take somebody's piano away with the granulator. Every scsynth but the one
-  // listening on the sampler's port, by pid.
+  // take somebody's piano away with the granulator. Every scsynth but the ones
+  // listening on `KEEP_SC_PORTS` (the sampler's, and since 2026-10-12 the page
+  // programs' `poscollide`), by pid.
   for (const pid of pappusScsynthPids(sh('pgrep -ax scsynth 2>/dev/null'))) sh(`kill -9 ${pid} 2>/dev/null`);
   sh('pkill -9 -x sclang 2>/dev/null');
 }
 
 /** The sampler's scsynth listens here and nowhere else (`scsampler.mjs`). */
 export const SAMPLER_SC_PORT = 57130;
+/** The page programs' own scsynth, `poscollide`, when it has one (`scollide.mjs`). */
+export const COLLIDE_SC_PORT = 57131;
+/**
+ * 🔴 EVERY scsynth THE GRANULATOR DOES NOT OWN, AS A LIST. It was one port, the
+ * sampler's, until 2026-10-12, when `scollide.mjs` added a third server on
+ * 57131 that a granulator switch would otherwise have killed
+ * (plans/plan-pi-supercollider-defs.md §1.4). The collide port is kept whether
+ * or not that server is running, and whichever engine `scollide.mjs` chose: a
+ * port nobody listens on matches no pid, so keeping it costs nothing.
+ */
+export const KEEP_SC_PORTS = Object.freeze([SAMPLER_SC_PORT, COLLIDE_SC_PORT]);
 /**
  * The scsynth pids `stopPappus` may kill, read off `pgrep -ax scsynth`: every
- * one except a server started with `-u <SAMPLER_SC_PORT>`. Pure, so the one
- * line that decides whose sound stops is graded without a board.
+ * one except a server started with `-u <port>` for a port in `keepPorts`. Pure,
+ * so the one line that decides whose sound stops is graded without a board.
+ * A single number is still taken, as one port.
  */
-export function pappusScsynthPids(pgrepAx, keepPort = SAMPLER_SC_PORT) {
+export function pappusScsynthPids(pgrepAx, keepPorts = KEEP_SC_PORTS) {
+  const keep = [keepPorts].flat().map(Number).filter((n) => Number.isInteger(n) && n > 0);
   return String(pgrepAx).split('\n').map((x) => x.trim()).filter(Boolean)
-    .filter((line) => !new RegExp(`(^|\\s)-u\\s+${keepPort}(\\s|$)`).test(line))
+    .filter((line) => !keep.some((port) => new RegExp(`(^|\\s)-u\\s+${port}(\\s|$)`).test(line)))
     .map((line) => Number(line.split(/\s+/)[0])).filter((n) => Number.isInteger(n) && n > 0);
 }
 

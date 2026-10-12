@@ -26,6 +26,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
        } from './jacksynth.mjs';
 import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
+import { createCollideService } from './scollide.mjs';
 import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
@@ -121,6 +122,13 @@ let starting = null;
  * `startPlan` is the rule, graded in `test.mjs`.
  */
 let samp = null, sampStarting = null;
+/**
+ * Programs a page typed, on the board's scsynth (`scollide.mjs`,
+ * plans/plan-pi-supercollider-defs.md). Which scsynth is `ENGINE` there, one
+ * line. It answers `sc.*`, `clock.ping` and the `collide` node's notes and
+ * nothing else, and starts nothing until `audio.start {source: 'collide'}`.
+ */
+const collide = createCollideService({ onFrame: (f) => sendPcm(f), log: (l) => log('collide:', l), sampler: () => samp });
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
@@ -694,6 +702,7 @@ async function startSampler() {
 
 function stopSampler() {
   if (!samp) return { ok: true, was: null };
+  collide.samplerGone();
   const held = samp.stop();
   samp = null;
   if (!held) aseq = 0;            // the capture stopped too, so a new one restarts the sequence
@@ -820,6 +829,9 @@ const CTL_NAMES = {
 // back the way its question came. Absent, the answer goes into the room.
 async function handle(msg, replyVia = null) {
   const reply = replyVia || ((type, body) => send({ type, re: msg.id, ...body }));
+  // The collide engine's own verbs first, so `audio.start {source: 'collide'}`
+  // and a `note.on {node: 'collide'}` never fall through to Yoshimi.
+  if (collide.handles(msg)) return collide.handle(msg, reply).then(() => true);
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -1873,5 +1885,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); collide.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

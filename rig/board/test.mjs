@@ -1569,5 +1569,191 @@ console.log('\nbeat: the graph on the hello and on every beat');
   rmSync(sdir, { recursive: true, force: true });
 }
 
+// ── the collide engine (scollide.mjs), plans/plan-pi-supercollider-defs.md step 1 ──
+// Pure: no scsynth, no board. Every refusal the plan names, the timetag against
+// a fixture worked by hand, and the keep list.
+// SABOTAGE, MEASURED 2026-10-12 on a scratch copy of the tree, one guard broken
+// at a time, reds out of 549: any block class 1 (it was 0 until the PlayBuf
+// row below existed, because the compiler cannot emit a foreign class), any
+// name 6, the choke dropped 1, a keep list of one port 1, no ahead window 1, no
+// late window 3, no Out bus check 1, no text cap 1, no 16 name cap 1, no node
+// cap 3, no freesItself check 1, the timetag fraction off by 1000 2.
+{
+  const C = await import('./scollide.mjs');
+  const { compile: scCompile, UGENS: SC_UGENS } = await import('../../demo/shell/sclang-lite.mjs');
+  const { voices: drumVoices } = await import('../../demo/concepts/rhythm/voices.mjs');
+  const J = await import('./jacksynth.mjs');
+  // The collide program, read out of the page's own module (it imports by
+  // absolute URL, so node cannot import it; the text is the template literal).
+  const cvSrc = readFileSync(new URL('../../demo/concepts/synth/collide-voice.mjs', import.meta.url), 'utf8');
+  const PROGRAM = new Function(`return ${cvSrc.match(/export const PROGRAM = (`[\s\S]*?`);/)[1]}`)();
+  const programs = [['collide', PROGRAM],
+    ...drumVoices().map((v) => [v.name, v.program]),
+    ...drumVoices({ knobs: true }).map((v) => [`${v.name}_k`, v.program])];
+
+  let clock = 1_760_000_000_000;
+  const now = () => clock;
+  const sent = [];
+  const mk = (o = {}) => C.createCollideCore({ send: (p) => sent.push(p), now, ...o });
+  const tab = (name, text) => C.sha256(scCompile(text, { name }).bytes);
+
+  console.log('collide: every program the two pages play, compiled on the board side');
+  const core = mk();
+  const loads = programs.map(([name, text]) => core.load({ name, text, sha: tab(name, text) }));
+  ok(`all ${programs.length} load, and each is byte for byte the tab's (same: true)`,
+    loads.every((r) => r.ok && r.same === true), JSON.stringify(loads.filter((r) => !r.ok || !r.same).map((r) => r.reason ?? r.name)));
+  ok('the bytes played are pg_<name>, on the page bus, and read back block by block',
+    loads.every((r) => r.def === `pg_${r.name}` && C.checkDef(r.recv, { name: r.def, bus: C.PAGE_BUS }).ok));
+  ok('NEGATIVE CONTROL: a page hash that is not the board\'s says same: false',
+    core.load({ name: 'collide', text: PROGRAM, sha: tab('other', PROGRAM) }).same === false);
+  ok('NEGATIVE CONTROL: the same program checked against bus 0 is refused, so the Out check reads the bus',
+    !C.checkDef(loads[0].recv, { name: 'pg_collide', bus: 0 }).ok);
+  // A class the compiler cannot emit can only reach the check through bytes
+  // built some other way, which is exactly the future this check is for.
+  const { graph: sdGraph, RATE: SD_RATE } = await import('../../demo/shell/synthdef.mjs');
+  const foreign = (cls) => {
+    const g = sdGraph('pg_x');
+    const src = g.block(cls, SD_RATE.sample, [g.value(440), g.value(0)], 1);
+    g.block('Out', SD_RATE.sample, [g.value(C.PAGE_BUS), src, src], 0, 0);
+    return g.bytes();
+  };
+  const refusedIn = C.checkDef(foreign('PlayBuf'), { name: 'pg_x', bus: C.PAGE_BUS });
+  ok('a definition with a class the compiler never emits is refused, by name', !refusedIn.ok && /PlayBuf/.test(refusedIn.reason), JSON.stringify(refusedIn));
+  ok('NEGATIVE CONTROL: the same graph built with SinOsc passes', C.checkDef(foreign('SinOsc'), { name: 'pg_x', bus: C.PAGE_BUS }).ok);
+  ok('the largest is under the block cap', Math.max(...loads.map((r) => r.ugens)) <= C.BLOCK_CAP, `${Math.max(...loads.map((r) => r.ugens))}`);
+  for (const r of loads) core.commit(r);
+  is('every class the compiler can emit is on the hand list, and nothing else is',
+    [...C.ALLOWED_CLASSES].sort(), [...new Set([...C.STRUCTURAL, ...Object.keys(SC_UGENS)])].sort());
+
+  console.log('collide: refusals, each with a reason');
+  const bad = mk();
+  for (const n of ['Kick', '1kick', 'kick-1', 'k'.repeat(25), '', null]) {
+    ok(`a name that is not a name is refused: ${JSON.stringify(n)}`, bad.load({ name: n, text: PROGRAM }).ok === false);
+  }
+  ok('a 24 character name is a name', bad.load({ name: 'k'.repeat(24), text: PROGRAM }).ok);
+  const long = bad.load({ name: 'big', text: PROGRAM + ' '.repeat(C.TEXT_CAP) });
+  ok('text over 4000 characters is refused', !long.ok && /4000/.test(long.reason), long.reason);
+  const err = bad.load({ name: 'broken', text: '{ SinOsc.ar(440 }' });
+  ok('a compile error answers the compiler\'s own line and column', !err.ok && err.line === 1 && Number.isInteger(err.col), JSON.stringify(err));
+  const full = mk();
+  for (let i = 0; i < C.MAX_DEFS; i++) full.commit(full.load({ name: `p${i}`, text: PROGRAM }));
+  const seventeenth = full.load({ name: 'p16', text: PROGRAM });
+  ok('a 17th name is refused, and the refusal lists the 16', !seventeenth.ok && /p0, p1/.test(seventeenth.reason), seventeenth.reason);
+  ok('NEGATIVE CONTROL: loading one of the 16 again is a replace, not a 17th', full.load({ name: 'p3', text: PROGRAM }).ok);
+
+  const held = mk();
+  held.commit(held.load({ name: 'drone', text: '{ |freq = 220, amp = 0.1| SinOsc.ar(freq, mul: amp) }' }));
+  held.commit(held.load({ name: 'kick', text: drumVoices()[0].program }));
+  const r0 = held.hit({ hits: [{ name: 'drone', at: clock + 100 }] });
+  ok('a hit on a program that never frees itself is refused', r0.played === 0 && /never frees/.test(r0.refused[0]?.reason), JSON.stringify(r0));
+  const r3 = held.hit({ hits: [{ name: 'kick', at: clock + 3000 }] });
+  ok('an at 3 s ahead is refused', r3.played === 0 && /ahead/.test(r3.refused[0]?.reason), JSON.stringify(r3));
+  const before = held.stats().droppedLate;
+  held.hit({ hits: [{ name: 'kick', at: clock - 100 }] });
+  is('an at 100 ms behind is dropped and counted', held.stats().droppedLate - before, 1);
+  sent.length = 0;
+  held.hit({ hits: [{ name: 'kick', at: clock - 10 }] });
+  ok('an at 10 ms behind plays at once and counts late', held.stats().late === 1 && sent.at(-1)?.tt === null);
+  sent.length = 0;
+  held.hit({ hits: [{ name: 'kick', at: clock + 250 }] });
+  is('NEGATIVE CONTROL: an at 250 ms ahead is timetagged, not late', [held.stats().late, sent.at(-1)?.tt], [1, J.ntpTimetag(clock + 250)]);
+  ok('an arg the program does not declare is refused', /not a control/.test(held.hit({ hits: [{ name: 'kick', at: clock + 50, args: { cutoff: 3 } }] }).refused[0]?.reason));
+  ok('a value that is not finite is refused', /finite/.test(held.hit({ hits: [{ name: 'kick', at: clock + 50, args: { amp: NaN } }] }).refused[0]?.reason));
+  sent.length = 0;
+  held.hit({ hits: [{ name: 'kick', at: clock + 50, args: { amp: 7 } }] });
+  ok('amp is clamped to 1', sent.at(-1).msgs[0].includes(1) && !sent.at(-1).msgs[0].includes(7), JSON.stringify(sent.at(-1).msgs[0]));
+  ok('a hit on a name nobody loaded is refused', /not loaded/.test(held.hit({ hits: [{ name: 'snare', at: clock + 50 }] }).refused[0]?.reason));
+
+  console.log('collide: the choke, in the hit\'s own bundle');
+  const ch = mk();
+  for (const v of drumVoices()) ch.commit(ch.load({ name: v.name, text: v.program }));
+  sent.length = 0;
+  ch.hit({ hits: [{ name: 'hho', at: clock + 100 }] });
+  const hhoId = sent.at(-1).msgs[0][2];
+  ch.hit({ hits: [{ name: 'hhc', at: clock + 200, choke: 'hho' }] });
+  const chb = sent.at(-1);
+  ok('the closed hat closes the open hat in the same bundle, at the same timetag',
+    JSON.stringify(chb.msgs[0]) === JSON.stringify(['/n_set', hhoId, 'gate', 0]) && chb.msgs[1][0] === '/s_new' && chb.msgs[1][1] === 'pg_hhc'
+      && JSON.stringify(chb.tt) === JSON.stringify(J.ntpTimetag(clock + 200)), JSON.stringify(chb));
+  ch.hit({ hits: [{ name: 'hhc', at: clock + 50, choke: 'hho' }] });
+  ok('NEGATIVE CONTROL: a closed hat BEFORE the open hat starts chokes nothing', sent.at(-1).msgs.length === 1 && sent.at(-1).msgs[0][0] === '/s_new');
+
+  console.log('collide: node and time caps');
+  const cap = mk();
+  cap.commit(cap.load({ name: 'kick', text: drumVoices()[0].program }));
+  for (let i = 0; i < 60; i++) cap.hit({ hits: [{ name: 'kick', at: clock + 10 + i }] });
+  is('60 hits leave 48 counted live and 12 stolen', [cap.stats().live, cap.stats().stolen], [C.MAX_NODES, 12]);
+  clock += 100; cap.sweep();
+  ok('a stolen node is freed 50 ms after its gate closes', sent.at(-1).msgs.every((m) => m[0] === '/n_free') && sent.at(-1).msgs.length === 12);
+  clock += C.HIT_LIFE_MS; cap.sweep();
+  is('every hit is freed 4 s after its at if scsynth never said /n_end', [cap.stats().live, cap.stats().expired], [0, 48]);
+
+  console.log('collide: notes and knobs');
+  const nt = mk();
+  nt.commit(nt.load({ name: 'collide', text: PROGRAM }));
+  sent.length = 0;
+  const on = nt.noteOn({ name: 'collide', note: 69, vel: 127 }, { from: 'tab-a' });
+  const sn = sent.at(-1).msgs[0];
+  ok('a note is /s_new of pg_collide in the page group with freq, gate 1 and the program\'s amp',
+    on.ok && sn[0] === '/s_new' && sn[1] === 'pg_collide' && sn[4] === C.PAGE_GROUP && sn.includes('freq') && sn[sn.indexOf('freq') + 1] === 440
+      && sn[sn.indexOf('gate') + 1] === 1 && Math.abs(sn[sn.indexOf('amp') + 1] - 0.2) < 1e-9, JSON.stringify(sn));
+  const st = nt.set({ name: 'collide', param: 'bright', value: 0.9 });
+  is('a knob reaches the held note', [st.ok, st.nodes, sent.at(-1).msgs[0]], [true, 1, ['/n_set', on.id, 'bright', 0.9]]);
+  ok('NEGATIVE CONTROL: a knob may not set the gate', !nt.set({ name: 'collide', param: 'gate', value: 0 }).ok);
+  nt.noteOff({ name: 'collide', note: 69 });
+  is('letting go closes the gate, because the program reads it', sent.at(-1).msgs[0], ['/n_set', on.id, 'gate', 0]);
+  nt.noteOn({ name: 'collide', note: 60 }, { from: 'tab-b' });
+  clock += C.QUIET_MS + 1; nt.sweep();
+  is('a page that has said nothing for 15 s has its held note released', nt.stats().quietReleased, 1);
+
+  console.log('collide: the timetag and the bundle, against bytes worked by hand');
+  // 1760000000.25 s: seconds + 2208988800, and a quarter of 2^32.
+  is('the timetag of a known at', J.ntpTimetag(1760000000250), [3968988800, 1073741824]);
+  is('null is OSC\'s immediately', J.ntpTimetag(null), [0, 1]);
+  const bun = J.oscBundle(1760000000250, [['/n_free', 7]]);
+  is('the bundle, byte for byte',
+    bun.toString('hex'),
+    '2362756e646c6500' + 'ec91f680' + '40000000' + '00000010' + '2f6e5f6672656500' + '2c690000' + '00000007');
+  is('a blob is a length, the bytes and padding', J.oscMessage('/d_recv', [new Uint8Array([1, 2, 3])]).toString('hex'),
+    '2f645f7265637600' + '2c620000' + '00000003' + '01020300');
+  is('NEGATIVE CONTROL: a message with no bytes in it is what it always was', J.oscMessage('/x', [1, 'a']).toString('hex'),
+    '2f780000' + '2c697300' + '00000001' + '61000000');
+
+  console.log('collide: the keep list, and the engine switch');
+  const ps3 = '101 scsynth -u 57110\n202 scsynth -u 57130 -H default:possampler\n404 scsynth -u 57131 -H default:poscollide\n303 scsynth -u 571310\n';
+  is('stopPappus leaves both the sampler\'s and the collide server', J.pappusScsynthPids(ps3), [101, 303]);
+  is('NEGATIVE CONTROL: a keep list of one port would kill the collide server', J.pappusScsynthPids(ps3, J.SAMPLER_SC_PORT), [101, 404, 303]);
+  is('the default engine is its own server on 57131', [C.ENGINE.mode, C.ENGINE.port, C.ENGINE.client], ['own', 57131, 'poscollide']);
+  is('and the switch names the sampler\'s on 57130', [C.ENGINES.shared.mode, C.ENGINES.shared.port], ['shared', 57130]);
+  const sh0 = await C.startScCollide({ engine: C.ENGINES.shared, sampler: null });
+  ok('shared mode with no sampler running refuses in words', !sh0.ok && /sampler/.test(sh0.reason), sh0.reason);
+  is('the collide JACK ends are a client of their own', JACK_ENDS.collide, ['poscollide:out_1', 'poscollide:out_2']);
+
+  console.log('collide: the verbs over a server, as fake-board.mjs and board.mjs run them');
+  const fsent = [];
+  let replyFn = null;
+  const fake = { ok: true, mode: 'own', port: 57131, bus: C.PAGE_BUS, send: (b) => fsent.push(b), recv: async () => ({ ok: true }),
+    onReply: (fn) => { replyFn = fn; return () => { replyFn = null; }; }, cpu: async () => ({ avg: 3, peak: 5 }), stop: () => true, status: () => ({}) };
+  const svc = C.createCollideService({ start: async () => fake, now, sweepMs: 1e6, cpuMs: 1e6 });
+  const said = [];
+  const rep = (type, body) => said.push({ type, ...body });
+  ok('only collide\'s messages are collide\'s', svc.handles({ type: 'sc.hit' }) && svc.handles({ type: 'note.on', node: 'collide' })
+    && !svc.handles({ type: 'note.on' }) && !svc.handles({ type: 'note.on', node: 'sampler' }) && !svc.handles({ type: 'audio.start' }));
+  await svc.handle({ type: 'clock.ping', t0: 5 }, rep);
+  is('clock.ping answers t0 and the board\'s own clock', said.at(-1), { type: 'clock.pong', t0: 5, t1: clock });
+  await svc.handle({ type: 'sc.load', name: 'kick', text: drumVoices()[0].program }, rep);
+  ok('NEGATIVE CONTROL: a load before audio.start is refused in words', !said.at(-1).ok && /audio\.start/.test(said.at(-1).reason));
+  await svc.handle({ type: 'audio.start', source: 'collide' }, rep);
+  await svc.handle({ type: 'sc.load', name: 'kick', text: drumVoices()[0].program, sha: tab('kick', drumVoices()[0].program) }, rep);
+  ok('sc.loaded answers the def, its size and same: true, and no bytes', said.at(-1).ok && said.at(-1).def === 'pg_kick' && said.at(-1).same === true && !('recv' in said.at(-1)));
+  await svc.handle({ type: 'sc.hit', hits: [{ name: 'kick', at: clock + 200 }] }, rep);
+  ok('a hit leaves as one encoded bundle with the right timetag', fsent.at(-1).subarray(0, 8).toString() === '#bundle\0'
+    && fsent.at(-1).readUInt32BE(8) === J.ntpTimetag(clock + 200)[0] && fsent.at(-1).readUInt32BE(12) === J.ntpTimetag(clock + 200)[1]);
+  const id0 = svc.core().live()[0].id;
+  replyFn({ addr: '/n_end', args: [id0] });
+  await svc.handle({ type: 'sc.stats' }, rep);
+  is('/n_end from scsynth is counted, and sc.stats says so', [said.at(-1).started, said.at(-1).ended, said.at(-1).live, said.at(-1).engine], [1, 1, 0, 'own']);
+}
+
 console.log(`\n${pass}/${pass + fail} green`);
 process.exit(fail ? 1 : 0);

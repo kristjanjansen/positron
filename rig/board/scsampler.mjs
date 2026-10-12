@@ -321,9 +321,12 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   await new Promise((r) => udp.bind(0, '127.0.0.1', r));
   const waiting = [];
   const buffers = new Map();
+  /** Other readers of this server's replies: `scollide.mjs` when it shares this server. */
+  const listeners = new Set();
   let core = null;
   udp.on('message', (b) => {
     let m; try { m = readOsc(b); } catch { return; }
+    for (const fn of listeners) { try { fn(m); } catch { /* a reader's fault is its own */ } }
     if (m.addr === '/n_end') core?.ended(m.args[0]);
     if (m.addr === '/fail') onLog?.(`scsynth refused ${m.args.join(' ')}`);
     for (const w of [...waiting]) if (w.match(m)) { waiting.splice(waiting.indexOf(w), 1); w.resolve(m); }
@@ -417,6 +420,20 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
     loadSet: (p) => ensureSet(p),
     panic: () => core.panic(),
     status, stop,
+    /**
+     * 🔴 THIS SERVER'S OSC, FOR `scollide.mjs` WHEN IT IS TOLD TO SHARE IT
+     * (`ENGINES.shared`). scsynth runs with `-l 1`, one client, and this socket
+     * is that client, so `/n_end` for a page's node arrives HERE and nowhere
+     * else: a second socket's `/notify` would be refused. `send` takes encoded
+     * bytes (a message or a bundle); `onReply(fn)` hears every decoded reply
+     * and answers the function that stops it. Nothing calls either while the
+     * collide engine has its own server, which is the default.
+     */
+    osc: {
+      port: SC_PORT,
+      send: (buf) => udp.send(buf, 0, buf.length, SC_PORT, '127.0.0.1'),
+      onReply: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    },
     /** scsynth's own CPU, average and peak, as it reports it (`/status`). */
     cpu: async () => {
       const m = await ask('/status', [], (x) => x.addr === '/status.reply');
