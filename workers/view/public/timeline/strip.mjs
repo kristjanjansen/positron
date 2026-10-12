@@ -1236,6 +1236,11 @@ export function createStrip(canvas, deck, opts = {}) {
       // there is not. A loop drawn in one colour on the wave and another on the
       // line is two pictures of one state.
       loop: '#6a7280',
+      // How far a lane that is not active right now dims (`setActive`). An
+      // opacity, read from the kit's `--ctl-off` by `demo/shell/strip.mjs`
+      // where there is a stylesheet, so a quiet lane and a switched-off
+      // control are dimmed by the same number. This is its fallback.
+      off: 0.55,
       ...(opts.theme || {}),
     },
     gutterPx: opts.gutter ?? 92,
@@ -1269,18 +1274,25 @@ export function createStrip(canvas, deck, opts = {}) {
 
   // -- lanes as queries ------------------------------------------------------
   function setLanes(list) {
-    S.lanes = (list || []).map((l, i) => ({
-      id: l.id || l.kind || `lane-${i}`,
-      // ⚠️ 24, not 28. The default is what a lane gets when a page has not
-      // thought about it, so it is the number that decides how tall most
-      // strips are — and it was set when the gutter needed more room per line
-      // than it does. A lane carrying a name and ONE number needs 21 + a
-      // baseline, so 24 is the smallest that still says everything.
-      height: l.height ?? 24,
-      as: l.as || null,
-      show: l.show !== false,
-      ...l,
-    }));
+    S.lanes = (list || []).map((l, i) => {
+      const L = {
+        id: l.id || l.kind || `lane-${i}`,
+        // ⚠️ 24, not 28. The default is what a lane gets when a page has not
+        // thought about it, so it is the number that decides how tall most
+        // strips are, and it was set when the gutter needed more room per line
+        // than it does. A lane carrying a name and ONE number needs 21 + a
+        // baseline, so 24 is the smallest that still says everything.
+        height: l.height ?? 24,
+        as: l.as || null,
+        show: l.show !== false,
+        ...l,
+      };
+      // What the page asked for, kept apart from `height`, because an
+      // `autoHeight` strip raises `height` to what the gutter needs (see
+      // `gutterNeed`) and must be able to lower it again when the lines go.
+      L._askedH = L.height;
+      return L;
+    });
     S.spanCache.clear(); S.cacheGen = -1;
     layout();
     invalidate();
@@ -1301,6 +1313,22 @@ export function createStrip(canvas, deck, opts = {}) {
     // a client mutates a label — the only honest trigger is the text changing.
     const key = `${S.width}|${S.lanes.map((L) => (L.show ? `${L.label ?? L.id}\u0001${subLabelsOf(L).join('\u0002')}\u0001${[].concat(L.gutterReserve ?? []).join('\u0002')}` : '')).join('\u0003')}`;
     if (key !== S.gutterKey) { S.gutterKey = key; S.gutterPx = gutterWidthFor(S.width); }
+    // 🔴 A LANE IS AS TALL AS ITS DESCRIPTION PLUS AIR, ON A STRIP THAT FOLLOWS
+    // ITS LANES. Asked 2026-10-12 on /typist/: *"add more vertical spacing to
+    // lane descriptions"*. Three 36 px lanes each held a name and two numbers,
+    // last baseline at y+34, so one lane's last line ended 5.4 px above the next
+    // lane's name while the lines inside a lane sat 3.4 and 4.4 px apart: the
+    // gap between descriptions was the gap within one, and nothing grouped.
+    // `gutterNeed` is the block plus `GUT_AIR` above and below, so the gap
+    // between two descriptions is 2 x GUT_AIR against the 4 px inside one.
+    // ⚠️ A FLOOR, AND ONLY WHERE THE CANVAS FOLLOWS THE LANES (`autoHeight`).
+    // A fixed-height strip cannot grow a lane without pushing the last one off
+    // its bottom, so there the asked height stands and the old top-aligned
+    // placement in `drawGutter` is what fits.
+    for (const L of S.lanes) {
+      const asked = L._askedH ?? L.height;
+      L.height = opts.autoHeight && L.show ? Math.max(asked, gutterNeed(L)) : asked;
+    }
     let y = S.axisH;
     for (const L of S.lanes) { L.y = y; if (L.show) y += L.height; }
     /**
@@ -1825,6 +1853,47 @@ export function createStrip(canvas, deck, opts = {}) {
  * quietly costs a page its numbers goes red in one run.
  */
   const GUT_NAME_Y = 11, GUT_SUB_Y = 22, GUT_SUB_STEP = 12;
+  /** Air above and below a lane's description, so two descriptions are
+   *  2 x 8 = 16 px apart (last baseline to next cap top) against 4 to 5 px
+   *  between the lines inside one: the space around a group visibly larger
+   *  than the space within it. */
+  const GUT_AIR = 8;
+
+  /** The gutter face's cap height, measured once from the font rather than
+   *  typed, so the description block is measured on its ink. */
+  let capH = null;
+  function gutCap() {
+    if (capH !== null) return capH;
+    ctx.save();
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    capH = ctx.measureText('H').actualBoundingBoxAscent || 7;
+    ctx.restore();
+    return capH;
+  }
+
+  /** The lines a lane's gutter will draw under its name: its sub-labels,
+   *  joined onto one line when they fit side by side. ONE function for the
+   *  drawer and for `gutterNeed`, or the floor would be computed for lines
+   *  nobody draws. Assumes the gutter font is set. */
+  function gutterLinesOf(L) {
+    const subs = subLabelsOf(L);
+    if (subs.length > 1 && ctx.measureText(subs.join(', ')).width <= gutRoom(GUT_TEXT_X)) return [subs.join(', ')];
+    return subs;
+  }
+
+  /** The description block, cap top of the name to the last line's baseline. */
+  const blockH = (n) => gutCap() + (n ? (GUT_SUB_Y - GUT_NAME_Y) + (n - 1) * GUT_SUB_STEP : 0);
+
+  /** How tall a lane must be to hold its description with `GUT_AIR` round it.
+   *  A name alone needs 24 at most, which is the default lane, so a lane with
+   *  no lines under its name never grows. */
+  function gutterNeed(L) {
+    ctx.save();
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    const n = gutterLinesOf(L).length;
+    ctx.restore();
+    return n ? Math.ceil(blockH(n) + 2 * GUT_AIR) : 0;
+  }
 
   /** A lane's own lines under its name: the client's numbers when it has them,
    *  else the derived clock domain. ⚠️ Factored out because the gutter is now
@@ -1919,95 +1988,85 @@ export function createStrip(canvas, deck, opts = {}) {
       const perRow = !L.color && !!(L.colorOf || L.colorOfRow || L.byKey || L.render
         || (L.aggregate && L.bars === false));
       const st = perRow ? { ...st0, color: undefined } : st0;
-      const subs = subLabelsOf(L);
+      // A lane that is not active right now (`setActive`) dims its whole
+      // description by the theme's `off`, the same factor its marks get.
+      const k = L.active === false ? (T.off ?? 0.55) : 1;
+      const all = gutterLinesOf(L);
+      const nameOnly = all.length === 0;
+      const name = clip(String(L.label ?? L.id), gutRoom(TEXT_X));
+      const cap = gutCap();
       /**
-       * 🔴 THE SWATCH IS AS TALL AS THE TEXT BESIDE IT, WHICH IS NOT WHAT IT
-       * WAS. It ran `min(14, height - 12)` whatever the lane held, so a lane
-       * with a name and nothing else got a 14 px bar against one 10 px line:
-       * a rule down the gutter rather than a mark beside a word. With a
-       * sub-label under it there really are two lines to span and 14 is right.
-       * The swatch now measures what is there.
+       * 🔴 THE SWATCH SPANS THE WHOLE DESCRIPTION, NOT THE NAME LINE. Asked
+       * 2026-10-12: *"left border placement seemds off"*. It was `y+6` to
+       * `y+20` whatever the lane held, so beside a name and two numbers
+       * (cap top y+3.4, last baseline y+34) it covered 14 of 30.6 px, began
+       * 2.6 px under the name's top and stopped 14 px above the last line: a
+       * mark beside the name, with the numbers hanging loose under it.
+       * It now runs from the name's cap top to the last line's baseline, and
+       * the block is centred in its lane, so the bar reads as the edge of one
+       * description and the description as the label of one row.
+       * ⚠️ WHERE THE LANE IS TOO SHORT FOR THE BLOCK PLUS ITS AIR (a fixed
+       * height strip; an `autoHeight` one is raised in `layout()`), the name
+       * keeps its old place at `GUT_NAME_Y` and lines that do not fit are
+       * dropped as before, so nothing that fitted stops fitting.
        */
-      const nameOnly = subs.length === 0;
-      const swatchH = nameOnly ? 9 : Math.min(14, L.height - 12);
-      /**
-       * 🔴 A ONE LINE LANE IS CENTRED ON ITS OWN SWATCH. Asked for 2026-09-16
-       * with a screenshot of two lanes named `x` and `y`: *"vertically center
-       * single row lane labels wiuth left border"*.
-       *
-       * The name and the mark beside it were placed by two constants measured
-       * for a lane with sub-labels under it, so on a lane with none the word sat
-       * a few pixels above the middle of the bar it belongs to and the pair read
-       * as two things that had drifted apart. Both are now centred on the lane,
-       * and the text is centred against the swatch by its own ASCENT rather than
-       * by a number typed here, so it stays centred if the font ever moves.
-       * ⚠️ A LANE WITH SUB-LABELS IS UNCHANGED. There the name is the first of
-       * several lines and the swatch spans all of them, so centring the name
-       * would pull it off the top line it heads.
-       */
-      const swatchY = nameOnly
-        ? L.y + Math.round((L.height - swatchH) / 2)
-        : L.y + 6;
-      ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9;
-      ctx.fillRect(SWATCH_X, swatchY, 3, Math.max(4, swatchH));
+      let nameY, swatchY, swatchH;
+      if (nameOnly) {
+        // 🔴 A ONE LINE LANE IS CENTRED ON ITS OWN SWATCH (2026-09-16, *"vertically
+        // center single row lane labels wiuth left border"*), and the text is
+        // centred against the swatch by its own ASCENT rather than a typed number.
+        swatchH = 9;
+        swatchY = L.y + Math.round((L.height - swatchH) / 2);
+        const asc = ctx.measureText(name).actualBoundingBoxAscent || 7;
+        nameY = swatchY + swatchH / 2 + asc / 2;
+      } else {
+        const bh = blockH(all.length);
+        nameY = L.height >= bh + 2 * GUT_AIR
+          ? L.y + Math.round((L.height - bh) / 2) + cap
+          : L.y + GUT_NAME_Y;
+      }
       /**
        * 🔴 THE NAME CARRIES THE LANE'S OWN COLOUR, mixed toward the ink rather
        * than set to it. The swatch has always been coloured and the name was
        * always `T.ink`, so the one thing a reader looks at to tell two lanes
-       * apart was the one thing that said nothing: on a strip of six lanes the
-       * names were six identical greys beside six coloured ticks, and joining
-       * them up was the reader's job.
-       *
-       * ⚠️ MIXED, NOT REPLACED. A lane colour at full strength is chosen to
-       * stand out against a dark plot, and a name set in it competes with the
-       * marks it is labelling. This is the same argument `diagram.mjs` settled
-       * when a hue pushed into a near-black fill came out as mud, and the same
-       * answer: identity lives at a fraction, legibility comes first.
+       * apart was the one thing that said nothing.
+       * ⚠️ MIXED, NOT REPLACED. A lane colour at full strength competes with
+       * the marks it is labelling; identity lives at a fraction, legibility
+       * comes first (the argument `diagram.mjs` settled).
        */
       ctx.fillStyle = st.color
         ? `color-mix(in oklab, ${st.color} 42%, ${T.ink})`
         : T.ink;
-      ctx.globalAlpha = 1;
-      // ⚠️ THE NAME SITS HIGHER WHEN IT IS ALONE. `GUT_NAME_Y` was measured for
-      // a name with lines beneath it, so on a lane with none the word hung low
-      // in its own row with all the air above it.
-      const name = clip(String(L.label ?? L.id), gutRoom(TEXT_X));
-      let nameY = L.y + GUT_NAME_Y;
-      if (nameOnly) {
-        const m = ctx.measureText(name);
-        const asc = m.actualBoundingBoxAscent || 7;
-        nameY = swatchY + swatchH / 2 + asc / 2;
-      }
+      ctx.globalAlpha = k;
       ctx.fillText(name, TEXT_X, nameY);
       // the per-lane label GUTTER states the lane's own clock and whether it is
-      // AUDIBLE — proto/instrument's two ideas, which nothing else carried.
-      let all = subs;
-      // ⚠️ JOIN THE LINES WHEN THEY FIT ON ONE. Two lines cost a lane 11 px of
-      // height each, and the gutter is now wide enough that `52 ms typical` and
-      // `64 ms worst` usually fit side by side — so the same numbers arrive in
-      // a shorter lane. Measured against the real width, never assumed: where
-      // they do not fit, they stay stacked.
-      // ⚠️ `, ` rather than a middot, and it is measured with the same string it
-      // is joined with, or the fit test would be answering about a line nobody
-      // draws.
-      if (all.length > 1 && ctx.measureText(all.join(', ')).width <= gutRoom(TEXT_X)) all = [all.join(', ')];
-      ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8;
+      // AUDIBLE, or the client's own numbers (`subLabel`), joined onto one line
+      // where they fit side by side (`gutterLinesOf`).
+      ctx.fillStyle = T.dim; ctx.globalAlpha = 0.8 * k;
       // 🔴 WHAT DID NOT FIT IS RECORDED, because the break below is SILENT and
-      // the line it drops is the last one — which is where a page puts its
-      // count. `typist`'s own comment says a lane one pixel short loses a
-      // number with nothing to say it happened; that was true, and the only
-      // reason it was ever noticed is that somebody did the arithmetic by
-      // hand. `gutterFit()` publishes it, so a harness can ask 16 pages at
-      // once whether any lane is a pixel short. Cut, never ellipsized: an
-      // ellipsis at least leaves a mark, a dropped line leaves nothing.
-      let shown = 0;
+      // the line it drops is the last one, which is where a page puts its
+      // count. `gutterFit()` publishes it, so a harness can ask every strip
+      // page at once whether any lane is a pixel short. Cut, never ellipsized.
+      let shown = 0, lastY = nameY;
       for (let i = 0; i < all.length; i++) {
-        const y = L.y + GUT_SUB_Y + i * GUT_SUB_STEP;
+        const y = nameY + (GUT_SUB_Y - GUT_NAME_Y) + i * GUT_SUB_STEP;
         if (y > L.y + L.height - 2) break;         // never spill into the next lane
         ctx.fillText(clip(all[i], gutRoom(TEXT_X)), TEXT_X, y);
-        shown++;
+        shown++; lastY = y;
       }
-      L._gutterFit = { lines: all.length, shown, dropped: all.length - shown };
+      if (!nameOnly) { swatchY = Math.round(nameY - cap); swatchH = Math.max(4, Math.round(lastY - swatchY)); }
+      ctx.fillStyle = st.color || T.ink; ctx.globalAlpha = 0.9 * k;
+      ctx.fillRect(SWATCH_X, swatchY, 3, Math.max(4, swatchH));
+      L._gutterFit = {
+        lines: all.length, shown, dropped: all.length - shown,
+        // Where the description landed, relative to the lane's own top, so a
+        // check can measure the bar against the block and the row it labels.
+        box: {
+          lane: L.height,
+          swatch: [swatchY - L.y, swatchY - L.y + Math.max(4, swatchH)],
+          text: [+(nameY - L.y - (nameOnly ? (ctx.measureText(name).actualBoundingBoxAscent || 7) : cap)).toFixed(1), +(lastY - L.y).toFixed(1)],
+        },
+      };
       ctx.globalAlpha = 1;
     }
     // HOW WIDE THE VIEW IS, in the gutter's ruler row, which holds no lane
@@ -2245,6 +2304,31 @@ export function createStrip(canvas, deck, opts = {}) {
     return (L._as = 'ticks');
   }
 
+  /** One reusable layer the size of the canvas, cleared, in PLOT space and
+   *  clipped to the plot, for drawing a lane that `setActive` has quietened.
+   *  Null where there is no document to make one in, and the lane then draws
+   *  at full strength rather than not at all. */
+  let quietCv = null;
+  function quietLayer() {
+    if (!quietCv) {
+      if (typeof document === 'undefined' || !document.createElement) return null;
+      quietCv = document.createElement('canvas');
+    }
+    if (quietCv.width !== canvas.width) quietCv.width = canvas.width;
+    if (quietCv.height !== canvas.height) quietCv.height = canvas.height;
+    const q = quietCv.getContext('2d');
+    q.setTransform(1, 0, 0, 1, 0, 0);
+    q.globalAlpha = 1;
+    q.clearRect(0, 0, quietCv.width, quietCv.height);
+    // ⚠️ SAVED BEFORE THE CLIP, because a clip is not undone by
+    // `setTransform` and would otherwise narrow on every frame. The caller
+    // restores once the lane is drawn.
+    q.save();
+    q.setTransform(S.dpr, 0, 0, S.dpr, S.gutterPx * S.dpr, 0);
+    q.beginPath(); q.rect(0, 0, plotW(), S.height); q.clip();
+    return q;
+  }
+
   function draw() {
     if (S.disposed) return;
     resize();
@@ -2303,13 +2387,28 @@ export function createStrip(canvas, deck, opts = {}) {
       .sort((a, b) => (styleFor(deck, b.L.kind).tier - styleFor(deck, a.L.kind).tier) || a.i - b.i);
     for (const { L } of order) {
       const C = laneContext(L, t0, t1);
+      // A lane that is not active is drawn on a layer and laid down at the
+      // theme's `off`, because a renderer sets its own `globalAlpha` per mark
+      // (the char marks do it per glyph) and an alpha set around it would be
+      // overwritten by the first mark. Same number as its gutter text.
+      const quiet = L.active === false ? quietLayer() : null;
+      const into = quiet || g;
+      if (quiet) quiet.font = g.font;
       try {
-        if (L.render) L.render(g, L, C);
+        if (L.render) L.render(into, L, C);
         else {
           const fn = RENDERERS.get(C.as);
-          if (fn) fn(g, L, C);
+          if (fn) fn(into, L, C);
         }
       } catch (e) { note(L.id, e); }
+      if (quiet) {
+        quiet.restore();
+        g.save();
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.globalAlpha = T.off ?? 0.55;
+        g.drawImage(quiet.canvas, 0, 0);
+        g.restore();
+      }
     }
     drawLoopEdges(g);
     drawCursors();
@@ -2800,6 +2899,26 @@ export function createStrip(canvas, deck, opts = {}) {
     lanes: () => S.lanes,
     setLanes,
     show(id, on) { const L = S.lanes.find((l) => l.id === id); if (L) { L.show = on !== false; layout(); invalidate(); } return !!L; },
+    /**
+     * WHICH LANES ARE ACTIVE RIGHT NOW. Asked 2026-10-12 on
+     * /concepts/typist/040/: *"dim lanes in timeline that are not active
+     * (depends num of typist)"*. `setActive(['a', 'b'])` leaves those two at
+     * full strength and dims every other lane, its marks AND its gutter, by
+     * the theme's `off` (the kit's `--ctl-off`, the same number a switched off
+     * control's furniture dims by). `setActive(null)` makes every lane active
+     * again. A lane may also be declared `active: false` in `setLanes`.
+     * ⚠️ DIMMED, NEVER HIDDEN. The lane keeps its row, its marks and its
+     * hover, because "not in play right now" is a different claim from "not
+     * there"; `show(id, false)` is the one that removes a lane.
+     * Returns the ids that are active.
+     */
+    setActive(ids) {
+      const on = ids == null ? null : new Set([].concat(ids));
+      for (const L of S.lanes) L.active = on ? on.has(L.id) : true;
+      invalidate();
+      return api.active();
+    },
+    active: () => S.lanes.filter((L) => L.active !== false).map((L) => L.id),
     view: () => ({ ...S.view }), setView, fit, frame, zoomAt,
     zoomIn: (f = 1.5) => zoomAt(f), zoomOut: (f = 1.5) => zoomAt(1 / f),
     setFollow, follow: () => ({ on: S.follow, engaged: S.follow && !S.userScrolled }),
@@ -2859,7 +2978,8 @@ export function createStrip(canvas, deck, opts = {}) {
      *  look identical on the canvas. One call says which. Populated by the
      *  last draw; a lane that has not been drawn reports `lines: null`. */
     gutterFit: () => S.lanes.filter((L) => L.show).map((L) => ({
-      id: L.id, label: String(L.label ?? L.id), height: L.height,
+      id: L.id, label: String(L.label ?? L.id), height: L.height, asked: L._askedH ?? L.height,
+      active: L.active !== false,
       ...(L._gutterFit || { lines: null, shown: 0, dropped: 0 }),
     })),
     /** what the fingers are currently doing — the only way a headless harness

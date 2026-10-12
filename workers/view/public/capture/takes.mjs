@@ -8,7 +8,7 @@
 //     because every one of them was already drawn on the page. A tab's report
 //     has no hidden mode, and nothing graded those four, so they are gone
 //     rather than drawn twice.
-//   - Its checks used to run when a take landed after a HARNESS press of ●,
+//   - Its checks used to run when a take landed after a HARNESS press of record,
 //     one take only, so its eight sequence checks never ran under the suite.
 //     The tab's `check` records two short takes itself, so all fourteen run.
 //   - The camera is this tab's own button, not a `.pos-controls` one
@@ -16,6 +16,7 @@
 
 import { recorderMime, el, armVideo } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
+import { setIcon } from '/shell/icon-button.mjs';
 import { createStripView } from '/shell/strip.mjs';
 import { createDeck } from '/timeline/transport.mjs';
 import { mediaMaster } from '/timeline/media-master.mjs';
@@ -240,11 +241,14 @@ export function build({ panel, assert, log }) {
 
   function setRecUI(on) {
     const b = bar.extra('rec');
-    // ● to start, ■ to stop, on the same square as the play button beside them
+    // the record icon to start, the stop icon to stop, on the same square as
+    // the play button beside them. `setIcon` writes `title` as well, so the
+    // cap the bar was given is put back.
     if (b) {
       b.dataset.on = on ? '1' : '';
-      b.textContent = on ? '■' : '●';
-      b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+      const keep = b.title;
+      setIcon(b, on ? 'stop' : 'record', on ? 'Stop recording' : 'Record');
+      if (keep) b.title = keep;
     }
   }
 
@@ -343,10 +347,11 @@ export function build({ panel, assert, log }) {
   const bar = createTransportBar(barHost, deck, {
     scrub: false,          // the strip is the only position surface in this tab
     // recording is a TRANSPORT verb here, not a side action beside the page
-    extras: [{ id: 'rec', label: '●', aria: 'Record', primary: true,
+    extras: [{ id: 'rec', label: '', aria: 'Record', primary: true,
                title: `stop when you like, ${CAP_MS / 1000}s cap`,
                onClick: () => (recording ? stopRecording() : startRecording(CAP_MS)) }],
   });
+  setRecUI(false);
   const view = createStripView(barHost, deck, {
     size: 'auto', follow: false, gutter: 150, wallStyle: 'head',
     lanes: [partLane, chunkLane],
@@ -468,7 +473,7 @@ export function build({ panel, assert, log }) {
   return {
     bar,
     /**
-     * Two short takes, pressed through the bar's own ● as a person would, so
+     * Two short takes, pressed through the bar's own record button as a person would, so
      * every check above runs. The first assert is the tab's own half of
      * `tab-page.mjs` rule 1: building it asked for nothing.
      */

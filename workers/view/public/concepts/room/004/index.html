@@ -158,7 +158,7 @@
     const by = String(m.speaker || m.from);
     if (l.from === KEPT && isNotice(by)) return;
     pb?.pulse(l.from, l.to);
-    chats.add({ who: short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
+    if (!replay) chats.add({ who: short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
     said('chat', Number(m.sent) || Date.now(), String(e.text || ''), short(by.split(':')[0]));
   }
   function heardAdmin(e, l, m) {
@@ -167,7 +167,7 @@
     pb?.pulse(l.from, l.to);
     const mine = by.split(':')[0] === SITE;
     said('cast', Number(m.sent) || Date.now(), String(e.text || ''), mine ? 'you as admin' : short(by.split(':')[0]));
-    casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
+    if (!replay) casts.add({ who: mine ? 'you as admin' : short(by.split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || ''), me: mine });
   }
 
   // THE HISTORY IS READ ON LOAD (asked 2026-10-11, *"load history on load.
@@ -189,7 +189,6 @@
       }
       if (live) { d.log('joined before the history arrived, so it is shown as the room carries on'); }
       for (const r of past) said(r.lane, r.sent, r.text, r.who);
-      for (const r of lines) deck.sched.schedule({ at: r.sent - origin, kind: r.lane, id: `h${r.sent}-${r.lane}-${Math.random().toString(36).slice(2, 6)}`, payload: { who: r.who, at: r.sent, text: r.text } });
       if (!live) {
         const end = lines.length ? Math.max(...lines.map((r) => r.sent)) - origin : 0;
         deck.setRange([0, end + 2000]);
@@ -209,6 +208,7 @@
   function say(text) {
     const r = node.emit(OUT, { text }, { store: true });
     if (r.sent) { pb?.pulse(OUT, '*:chat:value-in'); pb?.pulse(OUT, KEEP); }
+    endReplay();
     chats.add({ who: 'you', at: Date.now(), text, me: true });
     said('chat', Date.now(), text, 'you');
   }
@@ -216,6 +216,7 @@
     if (!admin) return;
     const r = node.emit(AOUT, { text }, { store: true });
     if (r.sent) { pb?.pulse(AOUT, '*:notice:value-in'); pb?.pulse(AOUT, KEEP); }
+    endReplay();
     casts.add({ who: 'you as admin', at: Date.now(), text, me: true });
     said('cast', Date.now(), text, 'you as admin');
   }
@@ -231,7 +232,7 @@
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
   // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*, kept on 004):
   // the store forgets the room, and every tab in it empties both columns.
-  function wipe() { casts.clear(); chats.clear(); lines.length = 0; deck.sched.clear(); }
+  function wipe() { replay = false; casts.clear(); chats.clear(); lines.length = 0; deck.sched.clear(); }
   async function clearAll() {
     try {
       const r = await fetch(`${STORE_URL}/room/${ROOM}/clear`, { method: 'POST' });
@@ -259,33 +260,54 @@
   // Before Join the bar plays the history back: each line is an item on the
   // deck, the broadcast area shows the latest broadcast before the playhead
   // and the chat the lines before it, on play and on every seek. On Join the
-  // page shows all of it, hides the play button and the clock runs in real
-  // time from the earliest line.
+  // page shows all of it and the clock runs in real time from the earliest
+  // line; play after Join replays the room the same way (see `replay`).
   // Broadcast is the admin's violet, chat the yellow of `you`.
   const CAST_INK = '#c39af0', CHAT_INK = '#ffd400', AIR_MS = 60000;
   const lines = [];             // { lane, sent, text, who }
   let origin = 0;
   let live = false;
+  // PLAYBACK AFTER JOIN (asked 2026-10-12, *"004room. on playback clear the
+  // contents in chat ui and add them back as playback happens"*). Play while
+  // live is a replay: both columns empty to the playhead and refill as it
+  // passes each line, and a seek rebuilds them to the new position. Lines that
+  // arrive meanwhile are kept and land on the timeline, not in the columns.
+  // Playing to the end, or saying something yourself, goes back to live.
+  // Before Join the columns follow the playhead anyway.
+  let replay = false;
+  const follows = () => !live || replay;
+  let seq = 0;
   const castAd = {
     caps: { rates: [1], continuous: false, catchUp: 'reduce' },
-    actuate(p) { if (!live) casts.add(p); },
+    actuate(p) { if (follows()) casts.add(p); },
     reduce(ps) { return { last: ps[ps.length - 1] || null }; },
-    assertState(st) { if (!live) { if (st?.last) casts.add(st.last); else casts.clear(); } return {}; },
+    assertState(st) { if (follows()) { if (st?.last) casts.add(st.last); else casts.clear(); } return {}; },
   };
   const chatAd = {
     caps: { rates: [1], continuous: false, catchUp: 'reduce' },
-    actuate(p) { if (!live) chats.add(p); },
+    actuate(p) { if (follows()) chats.add(p); },
     reduce(ps) { return { all: ps.slice() }; },
-    assertState(st) { if (!live) { chats.clear(); for (const p of st?.all || []) chats.add(p); } return {}; },
+    assertState(st) { if (follows()) { chats.clear(); for (const p of st?.all || []) chats.add(p); } return {}; },
   };
   const deck = createDeck({ items: [], adapters: { cast: castAd, chat: chatAd }, range: [0, AIR_MS] });
+  function showAll() {
+    casts.clear(); chats.clear();
+    for (const r of lines) (r.lane === 'cast' ? casts : chats).add(r.payload);
+  }
+  function endReplay() {
+    if (!replay) return;
+    replay = false;
+    deck.pause();
+    showAll();
+    settle();
+  }
   function goLive() {
     live = true;
     deck.pause();
     // all of the history on show, then the room carries on
     casts.clear(); chats.clear();
-    for (const r of lines) (r.lane === 'cast' ? casts : chats).add({ who: r.who, at: r.sent, text: r.text });
-    bar.el.querySelector('.tbar-toggle')?.setAttribute('hidden', '');
+    replay = false;
+    showAll();
     if (!origin) origin = Date.now();
     settle();
   }
@@ -302,10 +324,25 @@
     deck.seek(end + TAIL_MS);
     strip?.strip?.fit?.();
   }
+  // Every line is an item on the deck, so the bar can play it back before
+  // Join and after. Positions count from the earliest line, so a line older
+  // than that (history arriving after Join) moves them all.
+  const item = (r) => ({ at: r.sent - origin, kind: r.lane, id: r.id, payload: r.payload });
   function said(lane, sent, text, who) {
-    lines.push({ lane, sent, text, who });
-    if (!origin || sent < origin) origin = sent;
+    const r = { lane, sent, text, who, id: `l${++seq}`, payload: { who, at: sent, text, me: who.startsWith('you') } };
+    lines.push(r);
+    if (!origin || sent < origin) {
+      origin = sent;
+      deck.sched.clear();
+      for (const x of lines) deck.sched.schedule(item(x));
+    } else deck.sched.schedule(item(r));
     if (!live) return;
+    if (replay) {
+      // the replay keeps playing; the range grows so it reaches this line too
+      const end = Math.max(...lines.map((x) => x.sent)) - origin;
+      deck.setRange([0, end + TAIL_MS]);
+      return;
+    }
     settle();
   }
   const rowsOf = (lane) => () => lines.filter((r) => r.lane === lane)
@@ -322,6 +359,18 @@
     ],
   });
   const timeline = createGlue(bar.el, strip.surface);
+  // Play while live starts a replay; stopping at the end of the take ends it.
+  deck.transport.onState(() => {
+    if (!live) return;
+    if (deck.playing() && !replay) {
+      replay = true;
+      deck.assertAt(deck.position());
+      d.log('playing the room back from the timeline, the columns follow the playhead');
+    } else if (!deck.playing() && replay && deck.position() >= deck.range[1] - 1) {
+      endReplay();
+      d.log('the playback reached the end, back to live');
+    }
+  });
 
   d.stack.add(panel.el, timeline, pb.el);
   loadPast();

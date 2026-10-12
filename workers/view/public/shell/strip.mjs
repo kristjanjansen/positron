@@ -192,7 +192,10 @@ export function createStripView(host, deck, { size = 'default', lanes = [], foot
     } : {}),
     // the page's own theme still wins, and a page that says nothing gets the
     // loop grey the waveform already uses
-    theme: { loop: tok('--dim2', '#6a7280'), ...(opts.theme || {}) },
+    // and a lane that `setActive` has quietened dims by the kit's own
+    // `--ctl-off`, the number a switched off control's furniture dims by, so
+    // "not in play right now" reads the same on a strip as on a panel
+    theme: { loop: tok('--dim2', '#6a7280'), off: Number(tok('--ctl-off', '0.55')) || 0.55, ...(opts.theme || {}) },
   });
   if (lanes.length) strip.setLanes(lanes);
 
