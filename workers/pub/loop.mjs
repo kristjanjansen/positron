@@ -9,7 +9,8 @@
 //
 //   1. per take: LOOP_CLEAN_MS after the take ends, the worker deletes it
 //   2. a cron every 10 minutes: anything on the input older than LOOP_OLD_MS
-//   3. before a take: refused when the account's storage is over LOOP_CEIL
+//   3. before a take: refused when the account's storage is at or over the
+//      ceiling, the LOOP_CEIL var (600 by default, loopCeil below)
 //
 // 🔴 THE INPUT IS DEDICATED, WHICH IS WHAT MAKES "DELETE EVERYTHING ON IT"
 // SAFE. Nothing here lists the account's videos and filters; it asks for the
@@ -23,6 +24,18 @@ export const LOOP_CLEAN_MS = 90_000;   // the recording exists about 60 s after 
 export const LOOP_OLD_MS = 5 * 60_000; // the cron's age floor, past any take and its clean
 export const LOOP_CEIL = 600;          // storage minutes above which a take is refused
 export const LOOP_CAP = 1000;          // the account's cap, read back from the API too
+
+/**
+ * The ceiling in force: the `LOOP_CEIL` var when it is a number (wrangler.jsonc
+ * says 600), else LOOP_CEIL. A var so the guard can be PROVED: set to 0 in a
+ * test run, every take must be refused with 507 (2026-10-12). An empty or
+ * unparsable var falls back to 600, never to "no ceiling".
+ */
+export function loopCeil(env) {
+  const v = env?.LOOP_CEIL;
+  const n = v == null || v === '' ? NaN : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : LOOP_CEIL;
+}
 
 const auth = (env) => ({ authorization: `Bearer ${env.STREAM_TOKEN}` });
 const base = (env) => `${API}/${env.ACCOUNT_ID}/stream`;

@@ -91,7 +91,11 @@
     // is deleted (loop.mjs). Public, it is in every HLS play URL. The customer
     // code is the lifecycle URL's host, as in demo/shell/live.mjs.
     "LOOP_UID": "aafa09fdefc39016203fb23129bf5df3",
-    "STREAM_CUSTOMER": "customer-mwuu1cmlyif6eluy"
+    "STREAM_CUSTOMER": "customer-mwuu1cmlyif6eluy",
+    // The account storage minutes at or over which a loopback take is refused
+    // with 507 (workers/pub/loop.mjs loopCeil), well under the 1000 cap. A var
+    // so a test can set it to 0 and prove the refusal; never leave it changed.
+    "LOOP_CEIL": "600"
   },
   // THE LOOPBACK'S SWEEP, every 10 minutes: anything on the loopback input
   // older than 5 minutes is deleted, whatever the per-take clean managed.

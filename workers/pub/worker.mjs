@@ -31,7 +31,7 @@
 
 import { Container, getContainer } from '@cloudflare/containers';
 import { DurableObject } from 'cloudflare:workers';
-import { LOOP_CLEAN_MS, LOOP_OLD_MS, LOOP_CEIL, loopReady, storage, loopVideos, lifecycle, clean } from './loop.mjs';
+import { LOOP_CLEAN_MS, LOOP_OLD_MS, loopCeil, loopReady, storage, loopVideos, lifecycle, clean } from './loop.mjs';
 
 const SWEEP_MS = 30_000;   // alarm cadence
 const WHIP_PER_HOUR = 20;  // browser publishes allowed per hour, DO-counted
@@ -83,11 +83,18 @@ const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
 // /concepts/video/030/'S LL-HLS LOOPBACK: the camera route above on an instance
 // of its own (`loop`) and an input of its own ("positron-hls-loopback",
 // LOOP_UID, src/provision-loop.sh), so a sweep can delete EVERYTHING on that
-// input. A take is 20 s on the page; LOOP_MAX_MS is the worker's own cap under
-// a page that never stops. Every take is deleted by this object LOOP_CLEAN_MS
-// after it ends, whoever ended it (loop.mjs).
+// input. The page's 30 s run from when Stream says the input is live, which is
+// a few seconds after RTMPS opens (at most 15 s, the page's own wait), so
+// LL-HLS has time to settle (2026-10-12, *"extend to 30s"*). LOOP_MAX_MS is
+// the worker's own cap under a page that never stops, counted from when ffmpeg
+// opened RTMPS, because that is when Stream starts recording: a take is at
+// most 50 s of RTMPS whatever the page does, above the page's 30 + 15. LOOP_OPEN_MS bounds
+// a session whose publisher never opened (nothing recorded, but it holds the
+// input). Every take is deleted by this object LOOP_CLEAN_MS after it ends,
+// whoever ended it (loop.mjs).
 const LOOP = 'loop';
-const LOOP_MAX_MS = 30_000;
+const LOOP_MAX_MS = 50_000;
+const LOOP_OPEN_MS = 60_000;
 const LOOP_PER_HOUR = 30;
 const LOOP_RETRY_MS = 30_000;   // a clean that left something, asked again
 const LOOP_TRIES = 6;           // then the cron has it
@@ -717,8 +724,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     let s;
     try { s = await storage(this.env); }
     catch { return { error: 'could not read the account\'s Stream storage, so no take', status: 503 }; }
-    if (s.used >= LOOP_CEIL) {
-      return { error: `the account holds ${Math.round(s.used)} of ${s.cap} Stream storage minutes, over the ${LOOP_CEIL} this loopback stops at`, status: 507, used: s.used };
+    const ceil = loopCeil(this.env);
+    if (s.used >= ceil) {
+      return { error: `the account holds ${Math.round(s.used)} of ${s.cap} Stream storage minutes, at or over the ${ceil} this loopback stops at`, status: 507, used: s.used, ceiling: ceil };
     }
     return null;
   }
@@ -747,7 +755,12 @@ const pubOn = (Base, NEXT) => class extends Base {
     const now = Date.now();
     const pending = await this.#loopGet('loopPending', []);
     const due = [];
-    if (this.#camLive()) due.push(now + CAM_TICK_MS);
+    if (this.#camLive()) {
+      due.push(now + CAM_TICK_MS);
+      // The cap lands on its own time, not on the next 5 s tick.
+      const c = this.#camState();
+      if (c) due.push(Math.max(now + 250, c.open ? (c.openAt || c.at) + LOOP_MAX_MS : c.at + LOOP_OPEN_MS));
+    }
     for (const p of pending) due.push(Math.max(p.due, now + 1000));
     if (NEXT && !this.#camLive() && (this.ctx.container.running || this.#booting)) due.push(now + 60_000);
     if (!due.length) return;
@@ -759,7 +772,8 @@ const pubOn = (Base, NEXT) => class extends Base {
     const c = this.#camLive() ? this.#camState() : null;
     if (c) {
       if (c.open && now - c.lastAt > CAM_IDLE_MS) await this.#endCam('stopped', `no video from the camera for ${Math.round((now - c.lastAt) / 1000)} s`);
-      else if (now - c.at > LOOP_MAX_MS) await this.#endCam('stopped', `a take is capped at ${LOOP_MAX_MS / 1000} s, because every one is recorded on Stream`);
+      else if (c.open && now - (c.openAt || c.at) >= LOOP_MAX_MS) await this.#endCam('stopped', `a take is capped at ${LOOP_MAX_MS / 1000} s of RTMPS, because every one is recorded on Stream`);
+      else if (!c.open && now - c.at >= LOOP_OPEN_MS) await this.#endCam('stopped', `the publisher did not open within ${LOOP_OPEN_MS / 1000} s`);
       else {
         // The take's own video, while Stream still says which it is.
         const take = await this.#loopGet('loopTake', null);
@@ -801,7 +815,7 @@ const pubOn = (Base, NEXT) => class extends Base {
   async #loopStatus(fresh) {
     const now = Date.now();
     if (!fresh && this.#loopCache && now - this.#loopCache.t < LOOP_STATUS_TTL_MS) return this.#loopCache.v;
-    const v = { input: this.env.LOOP_UID || null, take: null, recordings: null, storage: null, ceiling: LOOP_CEIL };
+    const v = { input: this.env.LOOP_UID || null, take: null, recordings: null, storage: null, ceiling: loopCeil(this.env) };
     if (!loopReady(this.env)) { v.error = 'not provisioned'; return v; }
     const take = await this.#loopGet('loopTake', null);
     v.take = this.#camLive() && take ? { sid: take.sid, ageS: Math.round((now - take.at) / 1000), uid: take.uid } : null;
@@ -847,7 +861,7 @@ const pubOn = (Base, NEXT) => class extends Base {
     // After an eviction the counters are gone. The session is taken as open
     // and fresh, so the idle check starts again; the container's own watchdog
     // is the floor under that guess.
-    this.#cam = { sid: a.sid, at: a.at || Date.now(), lastAt: Date.now(), bytes: 0, chunks: 0, open: true, chain: Promise.resolve(), ws };
+    this.#cam = { sid: a.sid, at: a.at || Date.now(), openAt: a.openAt || null, lastAt: Date.now(), bytes: 0, chunks: 0, open: true, chain: Promise.resolve(), ws };
     return this.#cam;
   }
 
@@ -1110,6 +1124,11 @@ const pubOn = (Base, NEXT) => class extends Base {
       }
       c.open = true;
       c.lastAt = Date.now();
+      // When RTMPS opened, which is when Stream starts recording: the loop's
+      // cap counts from here, and the attachment keeps it across an eviction.
+      c.openAt = c.lastAt;
+      try { ws.serializeAttachment({ ...a, openAt: c.openAt }); } catch { /* the accept time is the fallback */ }
+      if (this.#role === LOOP) await this.#loopArm();
       // ONLY NOW does the page start recording, so the first chunk, which
       // carries the WebM header, cannot arrive before ffmpeg exists.
       try { ws.send(JSON.stringify({ t: 'ready', sid: c.sid })); } catch { /* gone */ }
