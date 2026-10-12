@@ -48,7 +48,7 @@ export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46, clap: 39, tomlo: 45
 export const PARAMS = {
   kick: { name: 'pitch', value: 50, min: 30, max: 110, unit: 'Hz' },
   snare: { name: 'snap', value: 0.2, min: 0.05, max: 0.6, unit: 's' },
-  hho: { name: 'length', value: 0.5, min: 0.1, max: 1.5, unit: 's' },
+  hho: { name: 'length', value: 0.5, min: 0.1, max: 1.5, unit: 's', life: true },
   hhc: { name: 'bright', value: 7000, min: 2000, max: 12000, unit: 'Hz' },
 };
 

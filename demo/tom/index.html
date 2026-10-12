@@ -161,20 +161,16 @@
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createDrop } from '/shell/drop.mjs';
+  import { createSampleLoader } from '/shell/sample-loader.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStepper } from '/shell/stepper.mjs';
   import { createPanelLayout } from '/shell/panel-layout.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createStepGrid } from '/shell/step-grid.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { readZip } from '/shell/unzip.mjs';
   import {
-    samplesIn, toMono, summariseAll, containerOf, sampleSetIn, CONTAINER,
+    samplesIn, toMono, summariseAll, containerOf, CONTAINER,
   } from '/shell/circuit-sample.mjs';
-  // ⚠️ ONE CONSTANT AND NOT A LITERAL 350. A loose patch message is the one
-  // `.syx` in an archive that is NOT a bulk transfer, and the number that
-  // separates them already has a name in the module that reads patches.
-  import { PATCH_BYTES } from '/shell/circuit-patch.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   /**
@@ -515,6 +511,7 @@
     says: (m, kind) => d.log(m, kind),
     onOpen: (files) => openFiles(files),
   });
+  const loader = createSampleLoader({ say: (m, k) => drop.say(m, k), log: (m, k) => d.log(m, k) });
   d.stack.add(drop.el);
   /**
    * 🔴 PUBLISHED ON `__demo`, BECAUSE A DRAG CANNOT BE SYNTHESISED AND THE
@@ -1070,55 +1067,20 @@
    * is a Windows executable and another a Nintendo DS ROM, and a router with two
    * branches has to put them somewhere.
    */
+  /* The three openers are `sample-loader.mjs`'s since 2026-10-12, lifted out of
+     this page word for word in what they say, so /concepts/rhythm/020/ reads
+     a dropped pack exactly as this page does. What stays here is what this page
+     does with the samples: `setRows`. */
   async function openPack(name, bytes, from = '') {
-    const kind = containerOf(bytes);
-    if (kind.kind === CONTAINER.sysex) return openStream(name, bytes, from);
-    if (kind.kind !== CONTAINER.zip) { drop.say(`${name}: ${kind.why}`, 'bad'); return false; }
-    let list;
-    try { list = readZip(bytes); }
-    catch (e) { drop.say(`${name} did not read as a pack: ${e.message}`, 'bad'); return false; }
-    const got = await samplesIn(list);
-    if (!got.length) { drop.say(`${name} holds no samples`, 'bad'); return false; }
+    const got = await loader.openPack(name, bytes, from);
+    if (!got) return false;
     setRows(got);
-    const all = summariseAll(got.map((g) => g.wave));
-    d.log(`${name}: ${all.parsed} of ${all.count} samples read`
-      + (all.refused ? `, ${all.refused} refused` : '')
-      // ⚠️ ONLY WHERE SOMETHING PARSED. `shortest` is 0 over an empty set, and a
-      // pack of sixty four refusals reported as `0.00 s to 0.00 s` is a
-      // measurement of nothing wearing a measurement's clothes.
-      + (all.parsed ? `, ${all.shortest.toFixed(2)} s to ${all.longest.toFixed(2)} s` : ''));
-    drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
     return true;
   }
-
-  /**
-   * 🔴 A BULK TRANSFER, WHICH IS THE OTHER SHAPE A CIRCUIT PACK COMES IN.
-   * 33 sessions and a 64 slot sample table travel seven bits to the byte in 300
-   * byte carriers, and the stream declares its own unpacked length and a CRC32
-   * of its own content. `sampleSetIn` refuses a stream that fails either, which
-   * is what makes the audio below exact rather than plausible.
-   * ⚠️ WHAT IS SHOWN IS THE STREAM'S OWN ARITHMETIC AND NOT A CLAIM ABOUT THE
-   * INSTRUMENT. Whether a transfer like this WRITES FLASH is unsettled and is
-   * recorded as unsettled. Nothing on this page can send one either way.
-   */
   async function openStream(name, bytes, from = '') {
-    const set = sampleSetIn(bytes);
-    d.log(`${name} is not a zip. It is ${set.messages.toLocaleString()} sysex messages carrying `
-      + `${set.streams.length} stream(s), ${set.verified} of them verified against a checksum`
-      + (set.other ? `, and ${set.other} message(s) outside any stream` : ''), 'hi');
-    for (const s of set.streams) {
-      if (!s.ok) { d.log(`the stream at ${s.at} was refused: ${s.why}`, 'bad'); continue; }
-      d.log(`the stream at ${s.at} restores ${s.plainBytes.toLocaleString()} bytes from `
-        + `${s.carriers.toLocaleString()} carriers, crc 0x${s.crc.toString(16)}, and holds ${s.holds}`);
-    }
-    if (!set.ok) { drop.say(`${name}: ${set.why}`, 'bad'); return false; }
-    setRows(set.samples);
-    const all = summariseAll(set.samples.map((g) => g.wave));
-    const empty = set.samples.filter((g) => g.wave.frames === 0).length;
-    d.log(`${name}: ${all.parsed - empty} filled slot(s) of ${all.count}`
-      + (empty ? `, ${empty} empty` : '')
-      + `, ${all.seconds.toFixed(2)} s in total`);
-    drop.say(`${name}${from ? ` ${from}` : ''}`, 'good');
+    const got = await loader.openStream(name, bytes, from);
+    if (!got) return false;
+    setRows(got);
     return true;
   }
 
@@ -1136,30 +1098,12 @@
    * one of these and is left alone.
    */
   async function openZip(name, bytes) {
-    let list;
-    try { list = readZip(bytes); }
-    catch (e) { drop.say(`${name} did not read as a zip: ${e.message}`, 'bad'); return false; }
-    const packs = list.filter((e) => e.name.endsWith('.circuitpack'));
-    const others = list.filter((e) => e.name.endsWith('.circuittrackspack'));
-    const streams = list.filter((e) => /\.syx$/i.test(e.name) && e.size > PATCH_BYTES
-      && !e.name.startsWith('__MACOSX/'));
-    if (others.length) {
-      d.log(`${others.length} pack(s) in it are for a Circuit Tracks, not a Circuit, and were left alone`, 'bad');
-    }
-    if (!packs.length && streams.length) {
-      if (streams.length > 1) {
-        d.log(`${streams.length} bulk transfers in ${name}: `
-            + `${streams.map((e) => e.name.split('/').pop()).join(', ')}. Opening the first`, 'hi');
-      }
-      return openStream(streams[0].name.split('/').pop(), await streams[0].read(), `inside ${name}`);
-    }
-    if (!packs.length) { drop.say(`${name} holds no Circuit pack and no bulk transfer`, 'bad'); return false; }
-    if (packs.length > 1) {
-      d.log(`${packs.length} packs in ${name}: ${packs.map((e) => e.name.split('/').pop()).join(', ')}. `
-          + 'Opening the first', 'hi');
-    }
-    return openPack(packs[0].name.split('/').pop(), await packs[0].read(), `inside ${name}`);
+    const got = await loader.openZip(name, bytes);
+    if (!got) return false;
+    setRows(got);
+    return true;
   }
+
 
   /**
    * 🔴 THE PATTERN SURVIVES THE PACK. A reader can tap eight rows of steps

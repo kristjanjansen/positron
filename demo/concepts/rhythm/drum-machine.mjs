@@ -71,11 +71,16 @@ import { LIFE } from './voices.mjs';
  * @param {(lap: number) => void} [o.onBar]  called just before the first step
  *   of every bar is handed over, which is where a page sends that bar's pattern
  * @param {(link: object, playing: boolean) => boolean} [o.flowing]  which wires the patchbay lights
+ * @param {(engine: object, ctx: AudioContext) => Promise<void>} [o.onWake]  awaited
+ *   once the engine is up and the definitions are in, before the first hit
+ *   (rhythm/020 loads its samples here). A voice may also bring `def` (bytes),
+ *   `params` (several knobs) and `args()` (extra `/s_new` arguments per hit,
+ *   or null to skip the hit); see `paramsOf` and `hit`.
  * @param {boolean} [o.scopes]  one scope per drum, each a node `web:scope-<drum>`
  *   fed by that drum's own `audio-out` (rhythm/010)
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
  */
-export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false }) {
+export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -94,7 +99,17 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const AHEAD = 150, TICK = 25;              // hand each hit over 150 ms early, look every 25 ms
 
   const VOICES = voices;
-  const KNOBS = VOICES.filter((v) => v.param);
+  /**
+   * A voice's knobs: `v.params` (a list, rhythm/020's pitch and length per row)
+   * or `v.param` (one, rhythm/010). Each is `{ name, value, min, max, unit }`
+   * plus, optionally, `control` (the definition's control the value is sent as,
+   * default `name`), `label` and `sub` for the knob, `toArg(x)` (what is sent,
+   * default the value itself) and `life: true` for the one that says how long
+   * a hit rings (the open hat's choke window follows it). `name` is the bay
+   * node's (`web:knob-<name>`), so it is unique on the page.
+   */
+  const paramsOf = (v) => v.params ?? (v.param ? [v.param] : []);
+  const KNOBS = VOICES.filter((v) => paramsOf(v).length);
 
   // ── the four programs, compiled now (pure JavaScript, no fetch) ──────────
   // EACH DRUM ON A STEREO PAIR OF ITS OWN: drum i's last line goes to output
@@ -103,7 +118,10 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // `audio-out` wire real (the speaker hears exactly the drums wired to it)
   // and what lets a scope see one drum alone.
   const BUS = new Map(VOICES.map((v, i) => [v.key, 2 * i]));
+  // A voice may bring its definition as bytes (`v.def`, rhythm/020's
+  // `drumsample`, written with synthdef.mjs); it then takes its pair as `out`.
   const compiled = new Map(VOICES.map((v) => {
+    if (v.def) return [v.key, { ok: true, bytes: v.def }];
     const r = compile(v.program, { name: v.name, bus: BUS.get(v.key) });
     if (!r.ok) throw new Error(`${v.label} did not compile: ${r.message}`);
     return [v.key, r];
@@ -119,7 +137,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const nodeVoice = new Map();               // node id -> voice key, until its /n_end
   let openHat = null;                        // { id, until } the open hat that may still be ringing
   /** Each voice's knob value, sent with every hit of that voice. */
-  const values = new Map(KNOBS.map((v) => [v.key, v.param.value]));
+  const values = new Map(KNOBS.map((v) => [v.key, new Map(paramsOf(v).map((p) => [p.name, p.value]))]));
   let paramSends = 0;
 
   function heard(m) {
@@ -173,11 +191,15 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       junction.connect(an);
       route();
       const t = performance.now();
+      const sent = new Set();
       for (const v of VOICES) {
+        if (sent.has(v.name)) continue;   // one definition several rows share goes once
+        sent.add(v.name);
         const got = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000,
           '/d_recv', compiled.get(v.key).bytes);
         if (!got || got[0] !== '/done') throw new Error(`SuperCollider did not take ${v.label}`);
       }
+      if (onWake) await onWake(e, ctx);
       stat.loadMs = Math.round(performance.now() - t);
       d.log(`SuperCollider booted in ${stat.bootMs} ms and took the ${VOICES.length} drums in ${stat.loadMs} ms`);
       eng = e;
@@ -212,11 +234,19 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     }
     // A knob's value goes in the hit's own bundle, so the hit sounds with the
     // value the knob had when it was handed over.
-    const args = v.param ? [v.param.name, values.get(v.key)] : [];
+    const args = [];
+    let life = LIFE[v.key] ?? 0.5;
+    for (const p of paramsOf(v)) {
+      const x = values.get(v.key).get(p.name);
+      args.push(p.control ?? p.name, p.toArg ? p.toArg(x) : x);
+      if (p.life) life = x;
+    }
+    if (v.def) args.push('out', BUS.get(v.key));
+    if (v.args) { const more = v.args(); if (!more) return; args.push(...more); }   // null: nothing to play (no sample yet)
     eng.sendAt(at, '/s_new', v.name, id, 0, 0, ...args);
     nodeVoice.set(id, v.key);
     stat.started[v.key]++;
-    if (v.key === 'hho') openHat = { id, until: at + (v.param ? values.get(v.key) : LIFE.hho) * 1000 };
+    if (v.key === 'hho') openHat = { id, until: at + life * 1000 };
   }
 
   // ── the bay ──────────────────────────────────────────────────────────────
@@ -247,13 +277,16 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
   // A knob per drum, each a node of its own with a value wire into its voice.
   for (const v of KNOBS) {
-    const n = v.param.name;
-    bay.addNode({ id: `${S}:knob-${n}`, kind: 'person', label: `${v.label} ${n}`, place: 'browser' });
-    bay.addPort({ id: ID(`knob-${n}`, 'value-out'), label: `knob-${n}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+    const names = paramsOf(v).map((p) => p.name);
+    for (const p of paramsOf(v)) {
+      const n = p.name;
+      bay.addNode({ id: `${S}:knob-${n}`, kind: 'person', label: `${v.label} ${p.label ?? n}`, place: 'browser' });
+      bay.addPort({ id: ID(`knob-${n}`, 'value-out'), label: `knob-${n}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+    }
     bay.addPort({ id: ID(v.key, 'value-in'), label: `${v.key}:value-in`, dir: 'in', medium: 'value',
-      shape: { of: 'param', names: [n] }, deliver: (e) => {
-        if (e?.of !== 'param' || e.name !== n) return;
-        values.set(v.key, e.v); paramSends++;
+      shape: { of: 'param', names }, deliver: (e) => {
+        if (e?.of !== 'param' || !names.includes(e.name)) return;
+        values.get(v.key).set(e.name, e.v); paramSends++;
       } });
   }
   const lay = (from, to, tf = []) => { const r = bay.link(from, to, tf, { site: S }); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
@@ -265,7 +298,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       lay(SEQ, ID(`scope-${v.key}`, 'midi-in'), [{ op: 'range', lo: v.note, hi: v.note }]);
     }
   }
-  for (const v of KNOBS) lay(ID(`knob-${v.param.name}`, 'value-out'), ID(v.key, 'value-in'));
+  for (const v of KNOBS) for (const p of paramsOf(v)) lay(ID(`knob-${p.name}`, 'value-out'), ID(v.key, 'value-in'));
 
   // ── the grid ─────────────────────────────────────────────────────────────
   const panel = createPanelLayout({ side: 'left', flow: false, strip: { role: 'group', label: 'steps' } });
@@ -428,16 +461,16 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // ── the knobs, one row, each sending on its own wire ─────────────────────
   let knobs = null, knobGrid = null;
   if (KNOBS.length) {
-    knobs = new Map(KNOBS.map((v) => {
-      const p = v.param;
+    knobs = new Map(KNOBS.flatMap((v) => paramsOf(v).map((p) => {
       const knob = createKnob({
-        label: p.name, min: p.min, max: p.max, value: p.value, hand: true,
+        label: p.label ?? p.name, sub: p.sub ?? '', min: p.min, max: p.max, value: p.value, hand: true,
+        ...(p.step ? { step: p.step } : {}),
         onInput: (x) => bay.send(ID(`knob-${p.name}`, 'value-out'), { of: 'param', name: p.name, v: x }),
       });
       knob.el.dataset.param = p.name;
-      knob.el.title = `${v.label} ${p.name}, ${p.min} to ${p.max} ${p.unit}`;
+      knob.el.title = `${v.label} ${p.label ?? p.name}, ${p.min} to ${p.max} ${p.unit}`;
       return [p.name, knob];
-    }));
+    })));
     knobGrid = createKnobGrid(knobs, { row: true });
   }
 
@@ -501,6 +534,8 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     BAR, VOICES, tempo, clear, setBpm,
     paramSends: () => paramSends, patternsIn: () => patternsIn, refresh: () => pb.refresh(),
     scopeLevels, route, views,
+    /** A drum's own stereo signal (its output pair), once the engine is up. */
+    outOf: (key) => outs.get(key) ?? null,
     bpm: () => bpm, stepMs: () => stepMsAt(bpm),
     /** When absolute step k was handed over to sound, on performance.now()'s clock. */
     stepTime: (k) => handed.get(k),
