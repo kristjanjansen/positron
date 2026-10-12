@@ -1,24 +1,155 @@
 ## Open
-- **Sync as concepts: the `ahead` and `follow` link options, then clock/030 Ahead link, 040 Follow, 050 Aligned after** (2026-10-12). Asked: *"whay about sync demo?"*, then *"start it"*. plans/plan-routing-time.md §4.3; the bay change first by one agent, then the three pages; /sync/ marked not needed after.
-- **Backlog triage** (2026-10-12). Asked: *"what on backlog"*, then *"do triage"*. 244 open rows, many done or overtaken and never struck: strike each with its commit or reason, merge duplicates, report what is genuinely open by topic.
-- **Reboot the Pi** (2026-10-12). Asked: *"restart"*, *"pi i mean"*. Given to the agent working on the Pi: reboot, then check the service, md5s, JACK, what came up and the capture floor.
-- **"what i need to do? just move on"** (2026-10-12). The session decides the open choices: tempo fixes 1 and 2 of plan-tempo-key-improve built, the edma key profile left as an option (it flips more and costs Raadio 2); Pappus restarted on the Pi as it was before the push; the engine stop xruns tried; /mirror/'s H.264 receiver into a kit module and shader/010 on the real Pi; rhythm/020 sample loader with the 000 drums recorded as the default kit, pitch and length per row (8 knobs), /tom/ on the shared loader; drums on the Pi as rhythm/030 after 020.
+
+### Open, by topic (triaged 2026-10-12)
+
+102 rows still open after the triage of 2026-10-12, each named by its row title below; WAITING marks the ones blocked on the owner or on hardware.
+
+**Concepts pages** (6)
+
+- Sync concepts: ahead/follow links, clock/030, 040, 050: "Sync as concepts: the `ahead` and `follow` link options, then clock/030 Ahead link, 040 Follow, 050 Aligned after"
+- rhythm/020: drum machine on samples, generic loader: "rhythm/020: the drum machine on samples, with /tom/'s loader made generic; plan first"
+- MIDI device support for the synth concepts: "MIDI device support for the synth concepts"
+- typist group: five pages, multi-person typing: "A new concepts group, `typist`: five pages from a typing paper to multi-person typing with typewriter sounds"
+- Dot piano (synth/030) rewinds after recording like synth/020: "Concept 14 rewinds after recording, as 13 does"
+- Better sounding chord suggestions: listening test and voicing: "better sounding chords, and the session died before the research started"
+
+**Pi and hardware** (19)
+
+- Reboot the Pi and check service, md5s, JACK, capture floor: "Reboot the Pi"
+- Pico OLED and four keys on the Pi as a board node: "The Pico's OLED and four keys on the Pi, as a board node; plan" WAITING
+- SuperCollider drums on the Pi: "SuperCollider drums on the Pi, planned with Collide on the Pi"
+- shader/010 on the real Pi: "shader/010 on the real Pi"
+- synth/070 noisy output, JACK path: "070 output is noisy: the Circuit back on arecord, and the Fast Track Pro delivers 8 bit samples"
+- uart transport name and the real desk Pico 2 W build: "A `uart` transport name, and the real desk Pico"
+- Video options floor and even sizes unmeasured on the Pi: "Video options floor and even sizes are unmeasured on the Pi"
+- Synth options around the Crave, wiring a Formanta drum machine: "Synth options around the Crave, and wiring a Formanta drum machine, asked 2026-10-04" WAITING
+- Circuit has a factory reset: correct the 49 'no factory reset' lines: "the Circuit HAS a factory reset; stop treating SysEx as untouchable"
+- Wish without a laptop, the Pi as the hub: "Wish without a laptop, the Pi as the hub (plan written, nothing built)" WAITING
+- /away/ second dry-out about 5 s after the direct path opens: "`/away/`'s second dry-out about 5 s after the direct path opens"
+- Handoff waiting list: Circuit input clipping still to re-measure: ""other stuff" from the handoff's waiting list" WAITING
+- The Circuit clips on Fast Track Pro input 1: "The Circuit clips on Fast Track Pro input 1" WAITING
+- Pi camera beside the Circuit audio, off by default via env var: "NEXT STEP, the Pi camera beside the Circuit audio, OFF by default"
+- /knobs/ flaky pair of asserts, 900 ms constant stale: "`/knobs/` has a flaky pair of asserts, and the constant is 6.4x stale"
+- /wish/ diagram greys what is not plugged in: "`/wish/`'s diagram should gently grey what is not plugged in"
+- /knobs/ layout, enable midi, hand ring, keyboards listen to MIDI: "three asks on `/knobs/` and the shared keyboard, reported against a broken page" WAITING
+- grains: rename to rains, instrument panel, createLocalRemote: "`grains`: a RENAME, the instrument panel, and `createLocalRemote`" WAITING
+- MK-425C semitone flat claim in 11 files: "THE MK-425C IS DESCRIBED AS A SEMITONE FLAT IN 11 FILES, AND THE CLAIM IS NOT WRONG SO MUCH AS UNQUALIFIED." WAITING
+
+**Kit** (33)
+
+- Icons: open questions: "Icons: open questions"
+- Kit patchbay keeps its own node labels: "`/concepts/21/` keeps its own node labels"
+- Medium colours and the live dot into the kit: "Medium colours and the live dot into the kit"
+- Transport bar rewindOnStop: "Transport bar `rewindOnStop`"
+- Slide columns still overflow: "Slide columns still overflow" WAITING
+- Synths deck: sound carries across slides without Start: "Synths deck: sound keeps going without pressing Start again"
+- Synths slides: knob row draws empty in a screenshot: "Synths slides 3 to 6: the knob row draws empty in a screenshot"
+- diagram.mjs: return path drawn behind the box under it: "`diagram.mjs`: a return path into a box that is not the bottom one in its container is drawn behind the box under it"
+- diagram.mjs colours only top-level box names in notes: "`diagram.mjs` colours only top-level box names in notes"
+- One loop state machine for the bar and /flipper/: "Kit: one loop state machine for the bar and `/flipper/`"
+- Arrow key on a /kit/ slider seeks every transport bar: "A real arrow key on any slider handle on `/kit/` seeks every transport bar"
+- video-panel.mjs cannot replace its picture: "`video-panel.mjs` has no way to REPLACE its picture."
+- transport-bar.mjs has no toggle that drives another deck: "`transport-bar.mjs` has no toggle that drives another deck."
+- hidden ignored on a createGlueRows grid surface: "`hidden` does nothing on a `createGlueRows({ grid: true })` surface"
+- createPresenceButton state is a getter returning a function: "createPresenceButton's `state` is a getter returning a function, and it has bitten two pages, found not asked for"
+- field.mjs has no ariaLabel option for a captionless field: "a labelless field has no way to name itself, found not asked for"
+- plate inset should read the case's own inset (--plate-pad): "the kit puts the case's default inset over a plate, whatever the case actually insets by, found not asked for"
+- shape draws the invisible hand two ways on one screen: "shape now draws the same control two ways on one screen, found not asked for" WAITING
+- glued scope inset differs by glue depth (shell.css .pos-glue > .pos-scope): "a glued scope gets a different inset depending on how deep it is glued, found not asked for"
+- board.mjs needs dropSound() and the worklet's counters on stats(): "board.mjs cannot empty its own playout, and every page that wants to stop its sound has to reach past it, found not asked for"
+- keyboard pad row cannot hold one line at 375 px: "the keyboard's pad row cannot hold its controls on one line at 375 px"
+- instrument panel phone layout is graded by no harness: "the instrument panel's phone layout is graded by nothing"
+- control-grid pitch reports 84 while the lattice steps 94: "control-grid: the pitch is 84 and the lattice steps 94, found 2026-09-28, not asked for"
+- presence badge treatment inside glued rows: "the presence badge needs its own treatment, and stays out of generic examples" WAITING
+- quieten Safari text scaling, selection and loupe on phone: "quieten Safari's text scaling, selection and loupe on the phone"
+- composition research changes to shell.css, in order: "what the composition research says to change in `shell.css`, in order"
+- five phone defects across six instrument pages: "five phone defects, SEEN for the first time, across six instrument pages"
+- /kit/ green in harness, ten FAILs in a real browser: "`/kit/` reads 237/237 in the harness and shows ten FAILs in a real browser"
+- /wish/ remove button as a small kit variant: "`/wish/`'s remove button should be a small kit variant"
+- .panel-head-mid overflows its grid track: "`.panel-head-mid` overflows its own grid track at every width"
+- Mojibake play button and autoplay on pack upload: "The play button is MOJIBAKE, and the page it is on takes a pack upload"
+- Remote looper and distributed instrument: "the remote looper, and the distributed instrument behind it"
+- Does the loop keep time: "NOT SETTLED: WHETHER THE LOOP REALLY KEEPS TIME, AND ONLY A PERSON CAN SETTLE IT." WAITING
+
+**Patchbay** (15)
+
+- One R2 name: cf-r2:recordings: "One name for R2: `cf-r2:recordings`"
+- Revisit the patchbay details tables: "Revisit the patchbay's details (See details, the links and ports tables)"
+- Node kind becomes flags: "Node `kind` becomes flags, waiting on the owner" WAITING
+- Bay view open questions: phone box order, port columns, desk gutter: "The bay view's open questions"
+- Bay: first-join race, event before announce refused: "Bay: first-join race"
+- Bay: two browser tabs read where machine to each other: "Bay: two browser tabs read `where: 'machine'` to each other"
+- Who may hold a port: admin and store clear: "Who may hold a port: admin and clear"
+- A person's name on a site, and proof a message arrived: "A person's name on a site, and proof a message arrived"
+- State links: snapshot on link as a bay rule: "State links: snapshot on link as a bay rule"
+- value vs state vs text medium decision: "`value` vs `state` vs `text` medium"
+- Announce net: which network a site is on: "Announce `net`: which network a site is on"
+- Busy ports in an announce: "Busy ports"
+- Services announce for real: "Services announce for real"
+- Routing follow-ups from the migration agents: "Routing follow-ups from the migration agents"
+- Implement plan-routing-migration: "Implement `plans/plan-routing-migration.md`, in parallel"
+
+**Streaming** (12)
+
+- LL-HLS camera loopback like video/030; recording cleanup: "An LL-HLS camera loopback like video/030; what cleans up the recordings" WAITING
+- Time cam/pub starts on new Containers runtime vs legacy: "Time cam/pub starts on the new Containers runtime against legacy"
+- workers/pub off the frozen Container class: "`workers/pub` is built on the `Container` class Cloudflare freezes on 2026-12-31"
+- Rotate the TURN token: "Rotate the TURN token." WAITING
+- cam cold start, LL-HLS median and Safari MP4 arm unmeasured: "`cam` container cold start, a steady-state LL-HLS median, and Safari's MP4 arm are unmeasured."
+- fps cell on /llhls/ and /webrtc/ never shown a number: "the `fps` cell on /llhls/ and /webrtc/ has never shown a number"
+- A press during starting is untested by a machine: "a press during `starting` is untested by a machine"
+- control room timeline does not move: "the control room timeline does not move"
+- Merge capture group into streaming: "Merge the `capture` group into `streaming`"
+- stage: four reports (picture, zoom, on air, ghost): "four reports on `/stage/` from looking at the working tree"
+- stage: the gate owed after the loopback went: "`/stage/` lost its loopback, and the gate that replaces it is owed"
+- Native reload cooldown is undefined: "the native reload rate limit does not exist, and two files say it does"
+
+**Radio** (1)
+
+- radio waveform ring assert uses getComputedStyle, needs a canvas pixel sample: "an assert written to catch the waveform's ring could never have seen it, found not asked for"
+
+**Sampler** (1)
+
+- /pack/ lost its Loop control with the transport (5bf144b8): "nothing on /pack/ can loop a sample any more, and Loop was asked for by name" WAITING
+
+**Other** (15)
+
+- "just move on": the session's list of open choices: ""what i need to do? just move on""
+- Carried in from HANDOFF.md: leftover items: "carried in from HANDOFF.md, items that lived only there"
+- nola chord row still moves 50 px on a phone when Typed opens: "nola's chord row still moves 50 px on a phone, measured not cured"
+- which-rule-won.mjs misses a logical shorthand beating a physical longhand: "which-rule-won.mjs is blind to a logical shorthand beating a physical longhand, found not asked for"
+- one scratchpad directory per agent, as a written rule: "two agents shared one scratchpad file and one of them measured the other's page"
+- a panic can launder the knobs cushion assert, ordering held by a comment: "a panic can launder the cushion assert, and the ordering that stops it is a comment rather than a mechanism"
+- knobs em dashes and middots, sweep on the next knobs task: "knobs carries seven em dashes and six middots that predate today"
+- four /pack/ asserts never run here, needs a pack shaped fixture: "four of /pack/'s asserts have never run on this machine"
+- pack imports createReport and never calls it: "pack imports createReport and never calls it, found not asked for"
+- C+ / C^ read as C major instead of refused: "`C+` reads as C major instead of being refused"
+- Stream of per-demo requests of 2026-09-25: "a stream of per-demo requests, COLLECTED WHILE IT IS STILL ARRIVING"
+- Rename resources to niemi: "`resources` renames to `niemi`, and it is a FOURTH rename of a different kind"
+- More embedded knowledge into skills: "more embedded knowledge into skills, and the .md files tidied"
+- Carried in from HANDOFF.md 2026-09-24: "carried in from HANDOFF.md on 2026-09-24"
+- Move instrument to patch selector, no randomizer: ""move instrument to patch seletor below instrument on right, no randomizer"" WAITING
+
+- **Sync as concepts: the `ahead` and `follow` link options, then clock/030 Ahead link, 040 Follow, 050 Aligned after** (2026-10-12). Asked: *"whay about sync demo?"*, then *"start it"*. plans/plan-routing-time.md §4.3; the bay change first by one agent, then the three pages; /sync/ marked not needed after. Now: the bay's ahead and follow options are in the working tree (bay.mjs, link-options.mjs), uncommitted; clock/030 to 050 not started.
+- ~~**Backlog triage**~~ (2026-10-12). Asked: *"what on backlog"*, then *"do triage"*. 244 open rows, many done or overtaken and never struck: strike each with its commit or reason, merge duplicates, report what is genuinely open by topic. DONE: every un-struck row and Open heading under `## Open` triaged 2026-10-12, summary in the section below, not committed.
+- ~~**Reboot the Pi**~~ (2026-10-12). Asked: *"restart"*, *"pi i mean"*. Given to the agent working on the Pi: reboot, then check the service, md5s, JACK, what came up and the capture floor. DONE: the owner ran it (`ssh positron@<pi> sudo systemctl reboot`, after the auto mode classifier refused it to an agent); back on ssh in about 25 s, board service active, 28 of 28 md5s match, jackd up; Yoshimi, the capture and the engines start on demand.
+- **"what i need to do? just move on"** (2026-10-12). The session decides the open choices: tempo fixes 1 and 2 of plan-tempo-key-improve built, the edma key profile left as an option (it flips more and costs Raadio 2); Pappus restarted on the Pi as it was before the push; the engine stop xruns tried; /mirror/'s H.264 receiver into a kit module and shader/010 on the real Pi; rhythm/020 sample loader with the 000 drums recorded as the default kit, pitch and length per row (8 knobs), /tom/ on the shared loader; drums on the Pi as rhythm/030 after 020. Now: tempo fixes 1 and 2 built (ecb2d57f); rhythm/020 loader and board-video.mjs in the tree uncommitted; Pappus, engine xruns, rhythm/030 not seen. Tempo fixes 1 and 2 DONE in ecb2d57f: one detector in demo/concepts/radio/tempo.mjs; on the beat 62.9 to 77.2%, grid jumps 21.4 to 4.5 a minute; "no steady beat" 26.6% of readings (10 to 38% per recording), more than the plan's 20%.
 - ~~**On the Pi's LAN: step 4 to 6 of plan-pi-supercollider-defs, synth/100 and shader/010 on the real Pi**~~ (2026-10-12). Asked: *"im in pi lan, go with backlog stuff"*, VPN off. Push and md5 first; then the engine measurement (own vs shared), timed kicks, the piano unaffected; synth/100 relay and direct; shader/010 on the board's video (v3dpipe needs the `uSegments` line compiled). The OLED waits: not bought. DONE by a background agent: Pi 4 Model B, 13 md5s match; engine OWN (same DSP, shared needs the 202 MB sampler up first); five programs load same: true (collide compiles in 53.5 ms); timed kicks 5.1 ms median spread 8.2, late 0 over 290; the piano unaffected; synth/100 real Pi lag median about 266 ms relay, 108 ms direct, offset under 0.4 ms; v3dpipe rebuilt with uSegments, shader/010's program SHADER-LIVE at 26.2 fps. The push restart ended Yoshimi and Pappus (Yoshimi restarted, Pappus not). Open: stopping an engine costs 1 to 2 xruns; shader/010 needs /mirror/'s H.264 receiver as a kit module; drums on the Pi (plan steps 6, 7).
 - ~~**rhythm/050: eight drums instead of four**~~ (2026-10-12). Asked: *"add 4 more drum isntrumets to 050"*. Four more voices (for example clap, low tom, high tom, rim or cowbell) and four more read rows of the 16 x 9 picture; 000 and 010 keep four. Then *"add invert button on right image. make shaders bw only, (can you find icon for invert?)"*: an invert icon button on the pixelated panel, the shader black and white only; no invert in the kit's Feather set, so a `contrast` icon (a circle half filled, Lucide's shape) is added to icons.mjs. Then *"grid shold change immediately"*: the grid follows the picture every frame, not once a bar. DONE by a background agent: clap, low tom, high tom, cowbell; picture rows 2 to 9 are the eight drums (the top row dropped, black with a dotted line); a 16 x 9 readback each frame, 0 of 120 frames disagreeing with the picture; pure black and white; `web:invert` node and a `contrast` icon added to icons.mjs (kit/icons 26/26). Open: at 1280 the speaker column scrolls out of the patchbay box.
 - ~~**Pi SuperCollider definitions: steps 1 to 3 (no Pi)**~~ (2026-10-12). Asked, after plans/plan-pi-supercollider-defs.md: *"A third SuperCollider engine on the Pi, -- do we need 3?"* (answered: not necessarily; built port-agnostic so step 4 decides on the Pi's CPU) and *"start"*. Step 1 the board core, pure and tested; step 2 the page-side kit module and the stand-in board's new verbs; step 3 `createBoard` on the page's AudioContext, synth/100 on one 48 kHz context against the stand-in. DONE by a background agent: `rig/board/scollide.mjs` (ENGINE one line, own 57131 by default or shared 57130, page nodes in group 900 through a board limiter), board tests 494 to 549 with twelve sabotages; `demo/shell/board-collide.mjs` 8/8 against the stand-in (offset 0.02 ms off, 28 of 28 hits on time at AHEAD 250); `createBoard({ audioContext, toDestination })`; synth/100 asks the board for 3 s, else simulates, footer says which. Step 4 needs the Pi: push (13 md5s), CPU own vs shared, timed vs untimed kicks. The scsynth half and the limiter have never run.
-- **The Pico's OLED and four keys on the Pi, as a board node; plan** (2026-10-12). Asked: *"can i connect pi to the sceren we planned for pico?"*, answered yes in chat (0.96" 128x64 SSD1306 I2C at 0x3C, 3.3 V, pins 1/6/3/5, keys on free GPIOs), then *"yes backlog it and plan"*. Plan in plans/: the screen and keys as a board node in the patchbay, what it shows, ui.c on the Pi, steps. Pi off the LAN. PLAN DONE: plans/plan-pi-oled.md (oled-ui.wasm in the board process with a shared panel-screen.mjs, a small `oledpush` C helper on i2c-dev, keys by the gpio-key overlay, node `pi-1:panel`; keys on GPIO 5, 6, 13, 26, not 19; seven steps). Not built. The module is NOT bought (owner, 2026-10-12: *"not bought"*); the 0.96" at about 10.50 EUR or the 2.42" SSD1309 at about 35 EUR, same protocol.
+- **The Pico's OLED and four keys on the Pi, as a board node; plan** (2026-10-12). Asked: *"can i connect pi to the sceren we planned for pico?"*, answered yes in chat (0.96" 128x64 SSD1306 I2C at 0x3C, 3.3 V, pins 1/6/3/5, keys on free GPIOs), then *"yes backlog it and plan"*. Plan in plans/: the screen and keys as a board node in the patchbay, what it shows, ui.c on the Pi, steps. Pi off the LAN. PLAN DONE: plans/plan-pi-oled.md (oled-ui.wasm in the board process with a shared panel-screen.mjs, a small `oledpush` C helper on i2c-dev, keys by the gpio-key overlay, node `pi-1:panel`; keys on GPIO 5, 6, 13, 26, not 19; seven steps). Not built. The module is NOT bought (owner, 2026-10-12: *"not bought"*); the 0.96" at about 10.50 EUR or the 2.42" SSD1309 at about 35 EUR, same protocol. WAITING: on the OLED module, not bought; plan done (2fff6242 plans/plan-pi-oled.md).
 - ~~**rhythm/010: four scopes a quarter wide on top, one per drum**~~ (2026-10-12). Asked: *"add 4 scopes 1/4 each on top of 010"*. The four voices come out of one scsynth as one mix today, so each needs its own output channel to be scoped apart. Then *"scopes are very \"nervous\". what to do on 010"*: each scope triggered by its own drum's hits and held still between hits. *"is the trace separate box in patchbay?"*: four scope nodes, each with the drum's audio and the sequencer's hits on wires. *"is ti a scope feature/prop?"*: the triggered mode goes in the kit's scope component, default free. *"scope labels keep chaning size"*: labels a fixed size, live values in reserved widths. DONE: each drum on its own output pair (8 outputs, splitter, `compile(src, { bus })`), `createWaveShape({ mode: 'triggered', window, fade })` in synth-view.mjs with a TRIGGERED SCOPE specimen on /kit/devices/, four `web:scope-<drum>` nodes with audio and the hits on wires; label size fixed in the kit; measured 163 x 92 px constant, held traces identical between hits.
-- **rhythm/020: the drum machine on samples, with /tom/'s loader made generic; plan first** (2026-10-12). Asked: *"020 is tomp sample loader. sc player? knobs? how? plan fist and present"*, then *"020 is 000 or 010 but has sample parser / loader from tom demo. make it generic. what about paramers? is it another sc instance?"*. Plan presented in chat; waiting on the owner's choices (default sounds, knobs per row, /tom/ onto the shared loader).
-- **SuperCollider drums on the Pi, planned with Collide on the Pi** (2026-10-12). Asked: *"backlog pi sc drums and plan them along collide for pi"*. One plan for the board taking SynthDefs compiled in a tab (`/d_recv`) and playing them: synth/100's collide voice and rhythm/000's four drums, with timing across the relay (timestamped hits on the shared clock, clock/020) and the sound back. Plan in plans/, not built; the Pi is off the LAN. PLAN DONE: plans/plan-pi-supercollider-defs.md (a third scsynth `poscollide` on 57131, the board compiles the page's text with sclang-lite, hits on the board's clock 250 ms ahead on the relay, 150 direct; seven steps, three need no Pi). Its drums page was called rhythm/020, which the owner gave to the sample loader; renumber when built.
+- **rhythm/020: the drum machine on samples, with /tom/'s loader made generic; plan first** (2026-10-12). Asked: *"020 is tomp sample loader. sc player? knobs? how? plan fist and present"*, then *"020 is 000 or 010 but has sample parser / loader from tom demo. make it generic. what about paramers? is it another sc instance?"*. Plan presented in chat; waiting on the owner's choices (default sounds, knobs per row, /tom/ onto the shared loader). Now: choices made in the "just move on" row; rhythm/020, sample-loader.mjs and /tom/ on it are in the working tree, uncommitted.
+- **SuperCollider drums on the Pi, planned with Collide on the Pi** (2026-10-12). Asked: *"backlog pi sc drums and plan them along collide for pi"*. One plan for the board taking SynthDefs compiled in a tab (`/d_recv`) and playing them: synth/100's collide voice and rhythm/000's four drums, with timing across the relay (timestamped hits on the shared clock, clock/020) and the sound back. Plan in plans/, not built; the Pi is off the LAN. PLAN DONE: plans/plan-pi-supercollider-defs.md (a third scsynth `poscollide` on 57131, the board compiles the page's text with sclang-lite, hits on the board's clock 250 ms ahead on the relay, 150 direct; seven steps, three need no Pi). Its drums page was called rhythm/020, which the owner gave to the sample loader; renumber when built. Now: plan 9593d8ab; steps 1 to 4 done (d1f7c821, measured on the Pi ec257202); drums on the Pi (steps 6, 7) left.
 - ~~**rhythm/050: the camera, pixelated to 16 squares across, plays the drum grid**~~ (2026-10-12). Asked: *"do 050 drums with camera input and that pixelning shader you already have done on tv demos but with the size that makes 16 squares per w and according squares per h (4 ? 5? 6 ?). image sqares drive the drum grid. 1/2 camera image 1/2 pixelated one, below is drum grid. no knobs"*. Two half panels (camera, pixelated), the drum machine's grid below driven by the squares, no knobs; camera only on a press. DONE by a background agent: the frame cropped to 16 x 9 squares, rows 2, 4, 6, 8 are the four drums (the rest dimmed), on or off is the Bayer dither read back off the shader's pixels with a different matrix row per drum, taken once a bar; grid read only, no clear.
 - ~~**rhythm/010: knobs below the grid**~~ (2026-10-12). Asked: *"move knobs below grid"*. DONE by the session.
 - ~~**rhythm/010: the drum machine with one knob per drum**~~ (2026-10-12). Asked: *"next drum, same but each synth a parameter to tweak"*. rhythm/000 plus four knob nodes, one per voice (for example kick pitch or decay, snare tone, open hat length, closed hat brightness), each on a value link into its voice. DONE: kick pitch, snare snap, open hat length, closed hat bright, the value in each hit's own bundle; both pages on one `drum-machine.mjs` and `voices.mjs`.
 - ~~**rhythm/000: no step and bpm text, a bpm selector on the right, a clear button**~~ (2026-10-12). Asked: *"rm step of and bpm. use bpm selector on right and add clear button"*. As /tom/ has its bpm stepper on the bar. DONE: `createStepper` 60 to 180 by 5 in the bar's right slot, a change lands from the next unscheduled step; a trash icon clears while playing.
 - ~~**A rhythm concept group; rhythm/000 a 16 x 4 step grid playing four drum synths**~~ (2026-10-12). Asked: *"make new grpup concept rythm. make a 16 x 4 grid pad componetn (global one), 4 sc (or fau?) synths for kick snare hho hhc and patchbay. 000"*. The grid as a kit component (the kit has `demo/shell/step-grid.mjs`, used by /tom/: extend it or reuse it before writing another); kick, snare, open and closed hi-hat as SuperCollider or Faust voices in the tab; the patchbay. Then *"move tom to that group too"*: done by the session, `rhythm` in CONCEPT_GROUPS after sampler. DONE by a background agent: `createStepGrid` reused (label column sized to its names, pads sized from the content box, a NAMED ROWS specimen on /kit/devices/; tom, kit/devices, kit/slides 233 to 234); four SuperCollider voices compiled in the tab, the closed hat chokes the open; 120 bpm scheduled ahead as timestamped bundles; each voice its own node on a filtered MIDI link. Open: on an iPhone mini the pads are about 11 px.
-- **radio/030 Live tempo: the BPM is poor; "save ida"** (2026-10-12). Asked: *"save ida https://positron.studio/concepts/radio/030/ - not good perf of bmp"*. Asked the owner what "save ida" means (radio/020 already has `radio/ida/2026-10-11.aac` in R2). Answered: *"save more and evaluate bmp and keys perf. do reseach / get tooling"*. More Ida recorded into R2 (Ida only; ERR's Raadio 2 and 4 from the recordings already in R2, no new ERR connections), a reference tempo and key from established tooling, our detectors measured against it, research and a plan in plans/. DONE by a background agent: three Ida takes (radio/ida/2026-10-12-1314, 1354, 1434.aac, one relay connection each), essentia, librosa and beat_this in a venv at ~/.cache/positron-tools, research/tempo-key-eval-2026-10-12.md and plans/plan-tempo-key-improve.md. Our tempo is 84% right pooled; the beat grid is the weak part on new Ida (43 to 70% on the beat, 23 to 27 jumps a minute); Temperley key MIREX 0.64. Proposed, not built: phase keep (jumps 21.4 to 4.5 a minute), no number below confidence 0.5, the edma key profile. Waiting on the owner.
+- ~~**radio/030 Live tempo: the BPM is poor; "save ida"**~~ (2026-10-12). Asked: *"save ida https://positron.studio/concepts/radio/030/ - not good perf of bmp"*. Asked the owner what "save ida" means (radio/020 already has `radio/ida/2026-10-11.aac` in R2). Answered: *"save more and evaluate bmp and keys perf. do reseach / get tooling"*. More Ida recorded into R2 (Ida only; ERR's Raadio 2 and 4 from the recordings already in R2, no new ERR connections), a reference tempo and key from established tooling, our detectors measured against it, research and a plan in plans/. DONE by a background agent: three Ida takes (radio/ida/2026-10-12-1314, 1354, 1434.aac, one relay connection each), essentia, librosa and beat_this in a venv at ~/.cache/positron-tools, research/tempo-key-eval-2026-10-12.md and plans/plan-tempo-key-improve.md. Our tempo is 84% right pooled; the beat grid is the weak part on new Ida (43 to 70% on the beat, 23 to 27 jumps a minute); Temperley key MIREX 0.64. Proposed, not built: phase keep (jumps 21.4 to 4.5 a minute), no number below confidence 0.5, the edma key profile. Waiting on the owner. DONE: 78667cbe research and plan, ecb2d57f tempo fixes 1 and 2; the edma key profile left as an option.
 - ~~**clock pages: the timeline scales out instead of scrolling**~~ (2026-10-12). Asked: *"https://positron.studio/concepts/clock/020/ - do not scroll, just scale out like typist etc"*. The whole run always in view, as typist/030 and 040 fit theirs; 000 and 010 too if they scroll. DONE by a background agent: the strip's own `fit()` over the whole run with a ResizeObserver on all three (020 refits every 250 ms with an 8 s floor, 000 a 10 s floor); at 30 s and 60 s the whole run on screen.
 - ~~**video/030: say that it is WebRTC**~~ (2026-10-12). Asked: *"https://positron.studio/concepts/video/030/ - not clear that this is webrtc."*. DONE: titled WebRTC loopback; a WebRTC plate on the loopback picture; patchbay boxes name WHIP in and out, WHEP in and out. Open: the phone patchbay drops those lines (bay-view.mjs), and at 1280 `web:screen` gets an empty line.
-- **An LL-HLS camera loopback like video/030; what cleans up the recordings** (2026-10-12). Asked: *"how i do similar hls demo? 20sec limit yes but stream save cleanup / r2 storage cleanup?"*. Answered in chat; build waits on the owner.
+- **An LL-HLS camera loopback like video/030; what cleans up the recordings** (2026-10-12). Asked: *"how i do similar hls demo? 20sec limit yes but stream save cleanup / r2 storage cleanup?"*. Answered in chat; build waits on the owner. WAITING: on the owner, answered in chat, build not asked for yet.
 - ~~**video/040 TV: a 2x2 grid, ETV, ETV2, blend, fx blend**~~ (2026-10-12). Asked: *"tv with 3 screens: to 2x2 grid. etv etv2 just blend, fx blend"*. The plain crossfade as its own panel beside the dithered one. DONE: 2x2, `web:blend-panel` fed by the mixer, checked against the stand-in only.
 - ~~**Transport clock: equal air above, between and below**~~ (2026-10-12). Asked, on a crop of the toggle and clock: *"adjust gap in between to haev equal top and bottom padding"*. DONE by the session: `.tbar-time` gap 2 to 3.5 px; MEASURED on the digits' ink against the toggle, 6.96 / 4.56 / 6.60 became 6.21 / 6.06 / 5.85. kit/timeline 52/52.
 - ~~**video/040: the same ground on all three panels**~~ (2026-10-12). Asked, on a crop showing the middle panel darker: *"same bg on all"*. DONE: the three stages take `--bg`, the colour the dither clears to; computed rgb(11, 14, 20).
@@ -36,7 +167,7 @@
 - ~~**synth/110: remove Saw swarm**~~ (2026-10-12). Asked: *"rm saw swarm"*. DONE: seven patches left.
 - ~~**Slider: a mode with its end labels inside the rail, for crossfaders**~~ (2026-10-12). Asked: *"have mode on slider to have labels on inside the rails (crossfader case)"*. A `createSlider` option drawing the two end labels inside the lane at each end; used by the crossfaders on radio/000, video/040 and synth/100 (today `.cc-fade` rows with labels outside). Shared kit, one agent; shown on /kit/. Then *"use when threre is xfader, add to kit too"* (every crossfader) and *"its ok to obsucre lael with handle"*. DONE by a background agent: `createSlider({ ends: [left, right] })`, labels inside the lane 10 px from each end, the handle paints over; CROSSFADER specimen on /kit/input/ (91 to 94 page asserts); used on radio/000, radio/010 (the tuner dial), video/040, synth/100, /grains/ and the kit's local-remote crossfader. Open: /radio/'s dry/wet slider in a slider group, not converted, owner to decide.
 - ~~**shader/010: the mirror shader here and on the Pi**~~ (2026-10-12). Asked: *"can you do mirror shader concept with pi, next after 000? does it need pi udpates? I assume so (compiling?). when needed simulate and add to backlog the pi part"*. shader/000 plus the Pi: two half panels (this tab, the Pi), the knob and the edited shader reaching both over links, readouts on top. The Pi side simulated in the tab and labelled so until the Pi is reachable. Found by the session: the Pi's `rig/vis/v3dpipe.c` already runs the same fold and takes `seg` 2 to 64 live (`video.params` mirrors in `rig/board/board.mjs`), so the knob needs no Pi change apart from 1 being clamped to 2; an EDITED shader does. CORRECTED by the agent: the board already takes `{ type: 'video.shader', body }` (board.mjs:1335, v3dpipe compiles it as 310 es, keeps the last good, crossfades 900 ms, replies `video.shader.applied`). DONE: shader/010 with the simulated Pi on exactly those messages; knob and edits reach both, Pi lag about 200 ms modelled (34 ms up, 134 ms picture down, three frames assumed).
-- **shader/010 on the real Pi** (2026-10-12). From the row above. NO BOARD CHANGE NEEDED (the session's first reading was wrong: `video.shader` and `video.params` exist and /mirror/ uses both). Left: the Pi reachable, `video.start`, decoding its H.264 as /mirror/ does, and measuring Pi lag on real frames (a frame number or burned clock); swap in at `createPiSide()`. Lock the local frame count to the board's sequence as /mirror/ does, so the two pictures match. Check WebGL2 `#version 300 es` against what v3dpipe's GLES accepts. Also `seg` clamps at 2 on the Pi, so 1 mirror cannot be shown there. Pi not on the LAN 2026-10-12; check the board code md5 first.
+- **shader/010 on the real Pi** (2026-10-12). From the row above. NO BOARD CHANGE NEEDED (the session's first reading was wrong: `video.shader` and `video.params` exist and /mirror/ uses both). Left: the Pi reachable, `video.start`, decoding its H.264 as /mirror/ does, and measuring Pi lag on real frames (a frame number or burned clock); swap in at `createPiSide()`. Lock the local frame count to the board's sequence as /mirror/ does, so the two pictures match. Check WebGL2 `#version 300 es` against what v3dpipe's GLES accepts. Also `seg` clamps at 2 on the Pi, so 1 mirror cannot be shown there. Pi not on the LAN 2026-10-12; check the board code md5 first. Now: the shader runs on the Pi's v3dpipe at 26.2 fps (ec257202); board-video.mjs in the tree uncommitted; the page is still simulated.
 - ~~**A basic Plaits concept in the synth group**~~ (2026-10-12). Asked: *"do basic plaits concept with patchbay. play button, scope, tibre and morth params, patch selector, patchbay. pick good interesting patches. unders synths group"*. synth/110 from /muta/'s Plaits build: a play icon button, a scope, timbre and morph as knob nodes, a patch picker of chosen engine and setting combinations, the patchbay. Then: *"no bell sounds please or drums. longer stuff"*: sustained, evolving patches only. DONE by a background agent: /muta/'s worklet and wasm, eight patches (Chord pad, Saw swarm, Wavetable drift, Vowel choir, Sung vowels, Additive organ, Long string, Wind) as slow overlapping held notes; picking a patch moves both knobs over their links. Long string and Sung vowels about 15 dB quieter than the organ, may want a trim. Kit candidates: a shared Plaits voice module, the full width patch picker CSS (synth/070 and 110).
 - ~~**synth/090: the program editable**~~ (2026-10-12). Asked: *"make 090 editable"*. Compile as you type, as shader/000 and /fau/ do (`createCompileIdle`); a failed compile keeps the last good voice and shows why; the knobs follow the edited program's `\bright` and `\decay`. DONE by a background agent: `createCompileIdle`, a good compile is the voice for the next note (held notes finish on theirs), a failed one keeps the last good voice with collide's line and column in the note, a missing knob name says so; `collide-voice.mjs` gained `load(text)` and `drives(name)`; synth/100 re-run unchanged.
 - ~~**/collide/ not needed**~~ (2026-10-12). Asked: *"collide demo can be not needed?"*. Yes, on the same reading as fau against synth/080: `supersededBy: 'synth/090'`. /collide/ still has the editable program and its own presets, which 090 shows read only.
@@ -53,7 +184,7 @@
 - ~~**shader/000: the footer names the renderer and the fps**~~ (2026-10-12). Asked: *"mirror shader - repalce with what renders it and fps"*. DONE by the session: left the GPU as /mirror/ shortens it, right the frames per second over the last second.
 - ~~**shader/000: /mirror/'s own shader, fewer parameters**~~ (2026-10-12). Asked: *"use same shader you have in mirror demo, just less parameters"*. shader/000 put /mirror/'s fold over the kit test picture; it should be /mirror/'s whole shader (its own noise field), every parameter but the mirror count fixed at /mirror/'s defaults. Then: *"shader code box is below parameters"*: the code box goes under the knob row, not beside the picture. DONE by a background agent: /mirror/'s FS_BODY with uFb, uScale, uWarp, uHue as consts at its defaults, the knob on uSeg 1 to 32 (opens on 8), the picture node gone; symmetry measured at 1, 2, 8, 32.
 - ~~**synth/090 Collide synth and synth/100 the same on the Pi too**~~ (2026-10-12). Asked: *"do 090 synth, similar to 080 but with collide, local. 2 parameters that make sense. 100 is same but with local and rasperry pi rendering. 1/2 videpanel with wave on left, pi wave on right. readings on top, 2 local 2 pi ones. pi is not on lan, backlog its execution, simulate locally until then"*. 090: synth/080's shape with `/collide/`'s small SuperCollider compiled in the tab, two knobs. 100: the same voice rendered here and on the Pi, two half width panels (local wave, Pi wave), four readout cells on top (two local, two Pi); the Pi side simulated in the tab and labelled so. DONE by a background agent: `demo/concepts/synth/collide-voice.mjs`, a plucked two saw voice through RLPF, knobs bright and decay (bright doubles the high content, decay 11.5 dB over 100 to 700 ms); 100 has local and Pi lag and level on top (local 38 to 41 ms, simulated Pi 237 to 242 ms), two half panels, the Pi a second scsynth with a 34 ms and 175 ms modelled path. Kit candidates: collide-voice as a kit module (third copy), a scope as a video panel medium, an exponential knob warp, bootScsynth not wiring itself to the speakers.
-- **synth/100 on the real Pi** (2026-10-12). From the row above: *"pi is not on lan, backlog its execution"*. Swap the simulated Pi for the board's scsynth when the Pi is reachable; check the board code md5 first (handoff, session 75). One place: `createPiSide()` in synth/100. Needs on the board a `collide` node taking SynthDef bytes by `/d_recv` into an scsynth (57130?) and playing them on `note.on`; and board.mjs makes its own 48 kHz AudioContext, so the Pi scope would sit in a different context.
+- ~~**synth/100 on the real Pi**~~ (2026-10-12). From the row above: *"pi is not on lan, backlog its execution"*. Swap the simulated Pi for the board's scsynth when the Pi is reachable; check the board code md5 first (handoff, session 75). One place: `createPiSide()` in synth/100. Needs on the board a `collide` node taking SynthDef bytes by `/d_recv` into an scsynth (57130?) and playing them on `note.on`; and board.mjs makes its own 48 kHz AudioContext, so the Pi scope would sit in a different context. DONE: d1f7c821 createBoard and board-collide.mjs in synth/100; measured on the real Pi, 266 ms relay, 108 ms direct (ec257202).
 - ~~**No forwarding from old concept addresses**~~ (2026-10-12). Asked: *"no old address forwarding"*. DONE by the session: the redirect pages sampler/010, 020, 035, 040 and synth/050 removed, so those URLs 404; the rule is in the positron-concepts skill.
 - ~~**/archive/: the notes as cards, rendered**~~ (2026-10-12). Asked: *"make notes as cards. they do render"*. The notes table becomes cards like the retired ones, and a note opens as a rendered page, not plain text. DONE by the session: `demo/archive/note.html?f=<path>` renders with `demo/archive/md.mjs` (escape first, then headings, paragraphs, lists, tables, quotes, fenced and indented code); all five notes checked in node and misc-000 by screenshot.
 - ~~**A shader concept group: mirror moves there, shader/000 a local mirror shader**~~ (2026-10-12). Asked: *"in bg start new group concept shaders. move mirror there. make a concept 000 with local shader (use noneditable box to show it), 1/2 videpanel, just 1 patchbay parameter for num of mirrors (1 to 32) and patchbay"*. `demo/concepts/shader/000/`: the shader source in a read only box, a video panel at half width, one knob node for the number of mirrors (1 to 32), the patchbay. The `mirror` demo card's group becomes `shader` (list.mjs, after the archive agent is done with it). DONE: `/concepts/shader/000/` Mirror shader, /mirror/'s fold over the kit test picture, the source in a read only box (the same string the GL compiles), `web:knob-mirrors:value-out -> web:shader:value-in`; uniform and pixels measured changing at 1, 2, 8, 32. Kit candidates: `createCodeBox` readOnly, a GLSL table in code-lang.mjs, a hue on `createKnob`, and `demo/shot.mjs --gpu` (it runs `--disable-gpu`, so it cannot see a WebGL page).
@@ -81,12 +212,12 @@
 - ~~**Remove sampler/050 Loop clock**~~ (2026-10-12). Asked: *"Rm loop clock"*. DONE: the page, its row in `demo/concepts/list.mjs` and `demo/shell/loop-clock.mjs` (used by no other page) removed; recoverable from f4b6d4c0. 060 Laps and 070 Ahead in plans/plan-loop-ui.md stay unbuilt.
 - ~~**Build: overdub on sampler/020, then sampler/050 Clock**~~ (2026-10-11). Asked: *"Okay, build."*, to the overdub gesture table and plans/plan-loop-ui.md's 050 Clock. Overdub first (050 is 020 plus the clock): press while looping overdubs, press again keeps the layer, 3 s hold clears; length fixed, notes at their loop position. Then: *"I'm not that sure that I'm ready to immediately overdub when loop have stopped. I wanna wait, I wanna play a little bit on top of it, and then when I next time I push sustain button, then I'm ready to overdub from a point I'm currently am. I don't know how when loop ends, will it be overdubbing forever or how it works. And from there, cancelling just removes the last layer."*: a press while looping already overdubs from where the loop is; the 3 s hold now removes the last layer, and only an empty loop of one layer clears. DONE: overdub and layer undo in 020 (deployed a1e3ceb5); 050 Loop clock by a background agent with `demo/shell/loop-clock.mjs` (time as angle, pitch as radius, colour per layer, passed notes dim, approach rings on the next 3 onsets, the take as a red rim arc while recording).
 - ~~**Research looping UIs, a plan only**~~ (2026-10-11). Asked: *"Research different looping UIs. There is a lot of work done in those clips based work, like I think Logic has something, maybe GarageBand. It seems that there is not that much visualization going on in Ableton Live. Those clips are basically play and stop buttons and agreed. Also look at the Loopy Pro, which does the circle things. My problem in general is that it's very hard to follow really, and they are very you know, grid, 4-to-4 grid based also. It makes sense, it's easier to compose them and works with drum machines, but yeah, I'm kind of lost in loops. I can't really visually track what is going on, so maybe we should explore that space. For now, just make a plan with links and research."*. Background agent, into plans/. DONE: plans/plan-loop-ui.md. Proposed concept pages sampler/050 Clock, 060 Laps, 070 Ahead; waiting on the owner.
-- **sampler/020: the third Copy log** (2026-10-11 18:27). Section 11 of plans/plan-looper-accuracy.md: lookback 5 of 5 (up to 138.7 ms); the 3 s clear only fired on deliberate holds (3.7 to 4.7 s); an overdub attempt replaced a 15 s loop with a 1.85 s take. Waiting on the overdub gesture answer.
-- **sampler/020: Rhodes too; how to overdub** (2026-10-11). Asked: *"add rhodes sound too to looper. how i overdub?"*. Rhodes as 010 (`web:patch` program change). Overdub does not exist: a press while looping starts a new take. Proposed gesture to the owner.
+- ~~**sampler/020: the third Copy log**~~ (2026-10-11 18:27). Section 11 of plans/plan-looper-accuracy.md: lookback 5 of 5 (up to 138.7 ms); the 3 s clear only fired on deliberate holds (3.7 to 4.7 s); an overdub attempt replaced a 15 s loop with a 1.85 s take. Waiting on the overdub gesture answer. DONE: overdub built a1e3ceb5; the looper now lives in sampler/000 (c0cb4925).
+- ~~**sampler/020: Rhodes too; how to overdub**~~ (2026-10-11). Asked: *"add rhodes sound too to looper. how i overdub?"*. Rhodes as 010 (`web:patch` program change). Overdub does not exist: a press while looping starts a new take. Proposed gesture to the owner. DONE: Rhodes c91a423b, overdub a1e3ceb5; now sampler/000 (c0cb4925).
 - ~~**sampler/020: the plugged-in MIDI keyboard as its own patchbay node**~~ (2026-10-11). Asked: *"where is midi in parchbay in sampler 020. how no hold clear is clearing then"*. The MK-425C was folded into `web:keys:midi-out` by createMidi, invisible. As synth/000: a `device` node per MIDI input, notes and CC 64 into the looper, lights into the keys. Clear without a hold: Panic in the keyboard's footer. DONE: `web:midi` device nodes, midi-out to looper:midi-in and keys:midi-in, notes and CC 64 with the device timeStamp; then *"i can not reach panic. make it 3s then"*: CLEAR_HOLD_MS 3000 in 020 and 015. Untested with a real device (headless has none).
-- **sampler/020: the second Copy log** (2026-10-11 18:16). Section 10 of plans/plan-looper-accuracy.md: lookback caught all 7 opening chords (23 to 80 ms before the press); the 1 s hold clear still killed 6 loops (closing presses held 1.45 to 1.65 s while the chord rings). Proposed: hold clear at 3 s, or none; a take starting over 1 s before its first note starts at the note. Waiting on the owner.
+- ~~**sampler/020: the second Copy log**~~ (2026-10-11 18:16). Section 10 of plans/plan-looper-accuracy.md: lookback caught all 7 opening chords (23 to 80 ms before the press); the 1 s hold clear still killed 6 loops (closing presses held 1.45 to 1.65 s while the chord rings). Proposed: hold clear at 3 s, or none; a take starting over 1 s before its first note starts at the note. Waiting on the owner. DONE: hold clear at 3 s in 755bef4e; now sampler/000 (c0cb4925).
 - ~~**sampler/020: build steps 1 to 4 of plan-looper-accuracy section 9**~~ (2026-10-11). Asked: *"Yes"*. (1) no clear while recording, while looping only on a hold with no notes; (2) an empty take keeps the playing loop; (3) device timestamps in the looper; (4) a rolling buffer and a 150 to 200 ms start lookback. DONE: LOOKBACK_MS 150, SEAM_MS 150, BUFFER_MS 2000; simulated: an opening chord 100 ms before the press taken in and its repeat at the seam dropped, a hold while playing kept, an empty take kept the loop, a silent hold cleared. Found on the way: the first key on a fresh page blocks the main thread about 158 ms while the sampler wakes.
-- **sampler/020: the owner's first Copy log analysed** (2026-10-11 17:12 export, pasted). Section 9 of plans/plan-looper-accuracy.md. Keys on a ~1 ms clock, the pedal on 66 ms; 4 of 7 takes lost the opening chord (17 to 98 ms before the press); the 1 s hold clear killed 4 takes (sustain held while playing); 2 empty takes replaced a loop. Proposed fixes waiting for the owner.
+- ~~**sampler/020: the owner's first Copy log analysed**~~ (2026-10-11 17:12 export, pasted). Section 9 of plans/plan-looper-accuracy.md. Keys on a ~1 ms clock, the pedal on 66 ms; 4 of 7 takes lost the opening chord (17 to 98 ms before the press); the 1 s hold clear killed 4 takes (sustain held while playing); 2 empty takes replaced a loop. Proposed fixes waiting for the owner. DONE: section 9 steps 1 to 4 built in 213eeeb7.
 - ~~**sampler/040: warm SuperCollider before the first key**~~ (2026-10-11). Asked: *"Sure we should nit preload sc?"*, then *"Backlog it"*. Today about 1 s of the 1.3 s first note is the engine (1.7 MB wasm, compile, and a fixed 250 ms sleep after `/notify` in `demo/shell/scsynth.mjs`). Proposed, not built: (1) a prefetch hint for the wasm, download only, our own origin and cached, nothing runs; (2) boot on intent, a suspended AudioContext and the engine started on pointer over or touch of the keys, page focus, or the first Web MIDI message, resumed on the first key; (3) in the kit, wait for `/done /notify` instead of 250 ms. A full boot on every visit was not proposed: CLAUDE.md, a visit opens nothing.
 - ~~**Looper accuracy with a coarse sustain pedal: research; and a Copy button on sampler/020**~~ (2026-10-11). Asked: *"research how to improve the accuracy of Looper, because I'm especially with this Low resolution sustain. I just can't time my keyboard key pressing and sustain pressing in the same time and lose first notes and maybe not having a right end note. So research, what can be done here? I would think let's keep have a buffer, and if there is a note which is very closely cut off from beginning, take it in, or just wait looper until the first note starts. But that won't work with later re-recordings, overdubbings, and also maybe some offbeat playing. So do some research what can be done there, and also add a copy button to the looper demo, the looper concept, in order to debug, record all you have, and let's analyze it."*. Research by a background agent into plans/; the Copy button by the session. Copy button DONE: `Copy log` under the keys, every key and pedal input with the device's own timeStamp and the time the looper saw it, every decision, the loop events and replay lateness; memory only. Research DONE: plans/plan-looper-accuracy.md. Waiting on the owner: a Copy log session (about five minutes) and which steps to build.
 - ~~**sampler/040: the Pi's SuperCollider sampler running in the tab**~~ (2026-10-11). Asked: *"Build sampler/040 with the same keyboard and samples, played by the Pi's synthdefs running in the tab. Then compare the two by ear and in the readouts. - do in bg"*. Background agent; `demo/shell/scsynth.mjs` (SuperSonic wasm), `rig/board/norns/possampler-defs.scd`, `demo/shell/synthdef.mjs`. DONE by a background agent: research/scsynth-sampler-in-browser-2026-10-11.md; sounds the same (piano bit identical at recorded pitch), 1.8 MB and about 1 s more to the first note; keep both, WebAudio default. Open: the Rhodes damper tick in sampler.mjs (ramp instead of stop), the 250 ms fixed sleep in scsynth.mjs, defs byte match with the Pi.
@@ -95,7 +226,7 @@
 - ~~**The Salamander piano 404s from R2**~~ (2026-10-11). Pasted log: *"a recording did not load: web/p048-v11.m4a answered 404"*, and the same for every p0xx-v* and rel0xx file tried. FIXED: the encoded files were never uploaded; now in R2.
 - ~~**sampler/035 does not go direct on the same LAN**~~ (2026-10-11). Asked: *"why 035 is not direct when i am in same lan"*. ANSWERED: the Pi ran 11:55 board code, before the direct answer (effecddb); pushed.
 - ~~**bay and tutorial move into a last group, misc**~~ (2026-10-11). Asked: *"move bay and tutorial to last misc group"*. DONE: bay/000, bay/010, tutorial/000 are misc/000, 010, 020, last on the index; old URLs 404; references and the positron-concepts skill rewritten.
-- **rm room 010, 020, 030** (2026-10-11). Asked: *"rm room 010 020 030. since we cover it right?"*. 010 History is covered by 004, 020 Admin by 003: removed. 030 Broadcast (an admin camera on air to the room) is covered nowhere else; asked the owner before removing it.
+- ~~**rm room 010, 020, 030**~~ (2026-10-11). Asked: *"rm room 010 020 030. since we cover it right?"*. 010 History is covered by 004, 020 Admin by 003: removed. 030 Broadcast (an admin camera on air to the room) is covered nowhere else; asked the owner before removing it. DONE: 010 and 020 removed 2026-10-11, 030 removed 4d40f117 (2026-10-12).
 - ~~**room/003: no history**~~ (2026-10-11). Asked: *"no history in room/003"*. The store, its links and the replay on Join come out; history is 004's. DONE: no cf-store site, no store links, no replay, no store request on Join or Clear; Clear still empties every tab.
 - ~~**room/004 and typist/030: a calm timeline while recording**~~ (2026-10-11). Asked: *"room 004 and typist playback timelines are very nervous when recording. the moving cursor adds stress. what anout timeline mode when onlu typings moves it forward. buty still right x spacing. dunno we need cursor on recording."*. Then: *"ah, typist already compresses timeline and no autocroll. 030. so do same for chat rec"*: room/004's live view as typist/030's, the strip refit to the whole take on each line, the playhead parked at the end, no scrolling and no clock. DONE for room/004 (typist/030 already worked this way): live, the deck no longer plays; each line refits the strip to the take plus 2 s and parks the playhead at the end; follow off. Measured: the clock holds at 0:02.000 for 3 s after Join.
 - ~~**Write key detection and the sustain analysis into plans**~~ (2026-10-11). Asked: *"writte key detection to plan"*, *"sustain analysis?"*. Key detection is `plans/plan-key-detection.md` already; the sustain analysis is only in the session so far. DONE: the sustain analysis is section 5 of `research/sustain-pedal-pressing-2026-10-11.md`.
@@ -105,8 +236,8 @@
 - ~~**typist: 030 moves to 040; a new 030 is one typist recorded on the timeline and played back**~~ (2026-10-11). Asked: *"move 030 to 040. 030 is single typist but uses timeline (text visualization, see original typing demo)  and transport to play back. plays from first to last. no permanet store"*. Model: `/typist/` (`demo/typist/index.html`). In memory only. DONE: by a background agent, /typist/'s lanes on the kit strip with transport bar, memory only, typing during playback stops it and records at the cursor; plus a patchbay keys -> rec -> paper.
 - ~~**typist/030: only Letters, no text choice**~~ (2026-10-11, done: Kirjad and Concerto out, the choice and `?set=` gone). Asked: *"keep only letters on 030, no others coice"*.
 - ~~**typist: the cursor always filled, thinner; no borders between the papers**~~ (2026-10-11). Asked: *"typist: always filled cursor"*, *"but thinner"*, *"no borders between typists papers"*. DONE: a filled bar 0.4 ch wide, steady without focus, in paper.mjs and 000 to 020; the chat grid has no seam at all (gap 0 in `chat-ui.mjs`, for every page); then *"keep aspect ratio / h on all typist couts"*: `createChatGrid({ fixed: true })`, 16:9 at the desk and 3:4 on a phone, 386 px tall at 2 and at 6 papers.
-- **`radio/040`: the pad sounds churchlike, eats frequencies, lame; make it bassy plus paddy** (2026-10-11). Again: *"radio 040 sound is still orgaby and lame"*. Plan: the +12 and -12 links (an organ registration) go; the pad becomes detuned saws through a moving low filter, high passed, slow swell, reverb; a separate `web:bass` plays the chord's root an octave under the pad. Then *"its also slow to react, old chords stay"*: release 3 s to 1 s, attack 0.5 s, a 1.6 s room at 0.3. Asked: *"pad is very churchlike and eats so many fequencyies and sounds lame.  perhaps bassy + paddy"*. Not started.
-- **`radio/040` patchbay review** (2026-10-11). Asked: *"reveiw 040 patches"*, *"not sure they pain right pic"*. Found: `web:display` and `web:keys` were one keyboard as two nodes; the pad lit keys and autoplay drew its rings by calling the keyboard directly, with no link. Fixed: one `web:keys` node (midi-out, value-in key, value-in-2 chord, midi-in lights), `web:pad:midi-out` -> `web:keys:midi-in`, `web:autoplay:value-out` -> `web:keys:value-in-2`.
+- ~~**`radio/040`: the pad sounds churchlike, eats frequencies, lame; make it bassy plus paddy**~~ (2026-10-11). Again: *"radio 040 sound is still orgaby and lame"*. Plan: the +12 and -12 links (an organ registration) go; the pad becomes detuned saws through a moving low filter, high passed, slow swell, reverb; a separate `web:bass` plays the chord's root an octave under the pad. Then *"its also slow to react, old chords stay"*: release 3 s to 1 s, attack 0.5 s, a 1.6 s room at 0.3. Asked: *"pad is very churchlike and eats so many fequencyies and sounds lame.  perhaps bassy + paddy"*. Not started. DONE: 4320c088 pad as spread saws through a drifting lowpass, a separate bass on the root.
+- ~~**`radio/040` patchbay review**~~ (2026-10-11). Asked: *"reveiw 040 patches"*, *"not sure they pain right pic"*. Found: `web:display` and `web:keys` were one keyboard as two nodes; the pad lit keys and autoplay drew its rings by calling the keyboard directly, with no link. Fixed: one `web:keys` node (midi-out, value-in key, value-in-2 chord, midi-in lights), `web:pad:midi-out` -> `web:keys:midi-in`, `web:autoplay:value-out` -> `web:keys:value-in-2`. DONE: d8dfff6e one keyboard node lit only by links.
 - ~~**No full screen buttons on the radio concepts; `web:auto` becomes `web:autoplay`**~~ (2026-10-11). Asked: *"no fullscreen buttons on radio concepts"*, *"web:auto -> web:autoplay"*. radio/000 to 040; the node rename on radio/040. Then *"web:autopad should get detected keys somehow???"*: autoplay takes the key on a value-in from `web:key:value-out`, not by reading the page's variable. DONE: `right: false` on the wave panels of 000, 020, 030, 040; node renamed; autoplay's key now arrives on `web:autoplay:value-in`.
 - ~~**`radio/040`: confidence to autoplay volume, steeper, with inertia**~~ (2026-10-11). Asked: *"cinfidence level -> note volime?"*, then *"do steeper but have ineria not to be annoying"*. DONE: CC 11 on autoplay's own channel 2, silent at confidence 0.05, full at 0.35, eased with a 3 s time constant; the keys on channel 1 untouched.
 - ~~**`radio/040`: the grey rings even greyer**~~ (2026-10-11). Asked: *"nonyellow circle borders: even grayer"*. Done, `#4a5568`, between `--line2` and `--dim2`.
@@ -116,46 +247,46 @@
 - ~~**`radio/040` key detection, better, in the background**~~ (2026-10-11). Asked: *"improve in bg key detectiom. do more measurement. read about aliritms"*. Background agent: read the literature, measure offline on the R2 recordings only (no live ERR, no browser), write a plan with numbers, change only the KEY CORE block. DONE: plans/plan-key-detection.md; the KEY CORE block gets a one octave edge fade, floor 35 dB, decay 30 s, stick 0.05; MIREX 0.73 to 0.78 (held out 0.56 to 0.65), radio shift consistency 35/63/72% to 82/99/98%. Open: listening checks for the owner, relative minor vs major.
 - ~~**`radio/040` Key: wet/dry, the pad's level from the station's energy, octaves**~~ (2026-10-11, done: `web:mixer` with dry from the level node and wet from the pad, equal power, a `web:knob-mix`; `web:level:value-out` carries the station's eased RMS over -16 dBFS into `web:pad:value-in`, which scales the pad 0.2 to 1.5; autoplay's chords also on -12 and +12 transpose links; then *"suggested cricles are yellow"* and *"use std form label styling"* on the footer, both done; checked against the stand-in). Asked: *"radio 040. add wet dry. synth rough energy/volume as signal. add some octavy stuff"*. Read as: a wet/dry knob between the station and the pad; the station's rough energy (loudness envelope) as a value signal on a link into the pad's level; octave voices on the pad (parallel transpose links, as the synth concepts' octaver).
 - ~~**Readouts on every Pi-driven synth, four cells**~~ (2026-10-11, done: synth/060 and 070 carry sampler/030's four, key to sound, median, round trip, cushion, measured the same way; UNMEASURED against the Pi). Asked: *"add readouts to all pi-driven synths. 4"*. synth/060 Yoshimi and synth/070 Circuit have none; sampler/030 and 035 already carry four. Same cells as those where they apply.
-- **MIDI device support for the synth concepts** (2026-10-11). Asked: *"add midi device support for synth concepts"*. synth/000 already wires local MIDI devices in; the rest of `synth/*` (and radio/040's playable keyboard?) to follow the same way.
+- ~~**MIDI device support for the synth concepts**~~ (2026-10-11). Asked: *"add midi device support for synth concepts"*. synth/000 already wires local MIDI devices in; the rest of `synth/*` (and radio/040's playable keyboard?) to follow the same way. DUPLICATE of "MIDI device support for the synth concepts".
 - ~~**`synth/070`: the scope clips on the Circuit**~~ (2026-10-11). Asked: *"scope really clips on novation. why?"*. The page's scope had a fixed full scale of 0.25 (copied from Yoshimi's quiet 060), so the Circuit's hot line out was flattened at the edges in the PICTURE. Built: the span follows the signal (up at once, about 2 s back down), and a sample at full scale is counted and logged as real clipping. UNMEASURED against the Circuit.
-- **MIDI device support for the synth concepts** (2026-10-11). Asked: *"add midi device support for synth concepts"*. synth/000 already wires local MIDI devices in (BACKLOG, 2026-10-11); the rest of `synth/*` (and radio/040's playable keyboard?) to follow the same way.
+- **MIDI device support for the synth concepts** (2026-10-11). Asked: *"add midi device support for synth concepts"*. synth/000 already wires local MIDI devices in (BACKLOG, 2026-10-11); the rest of `synth/*` (and radio/040's playable keyboard?) to follow the same way. Now: synth/000 (fc792840) and synth/120 wire MIDI devices; synth/010 to 110 and radio/040 do not.
 - ~~**The beats group moves into radio**~~ (2026-10-11, done: beats/000 Tempo is radio/020 again, beats/005 Live tempo is radio/030, beats/010 Key is radio/040; the old beats URLs 404, as in the first rename). Asked: *"move beats concepts to radio, rename accordingly"*.
 - ~~**`beats/010` Key: the keyboard in the panel**~~ (2026-10-11, done: one border, two octaves filling the panel, the key's notes as rings, a page-local pad synth on `web:pad` played by the keys and by an Autoplay checkbox in the footer's right slot cycling I, vi, IV, V in the key; checked against the stand-in). Sent as a screenshot, no words: the keyboard's own `.kbd` box draws a second border inside the video panel, an empty band sits between it and the footer, and the eight white keys stop at about half the width. Edge to edge in the panel, no box in a box, no band. Then: *"rm double borderign arond keyboard. add playable pad synth. suggested ones are circles so playing is visible too"*: the keys play a pad synth, the key's notes are drawn as rings so a pressed key's filled dot shows through. Then: *"regular footer to keybard. autoplay button to the right"*: the keyboard's own footer row carries the key readings, and an autoplay toggle at its right end plays the pad by itself (the detected key's home chord, following the key).
 - ~~**`synth/070` Circuit: changing patch lands on patch 9, 10 etc.**~~ (2026-10-11, built, UNMEASURED against the Circuit: names cached per slot and shown at once on a revisit; a dump byte identical to the previous patch's right after a change is asked again up to three times 60 ms apart). Asked: *"synh 07: when i change patch it dropd to patch 9, 10 etc. how to avoid it? preload next or what"*, then answered that the NAME lags (the cell reads `Patch 9` until the dump comes back, or shows the previous patch's name). `demo/concepts/synth/070/index.html`, the patch selector and what it sends through the Pi.
 - ~~**`beats/010` Key: bars less dominant, thinner**~~ (2026-10-11, done: the bars are gone, the key is the kit keyboard, one octave, scale notes grey, home note in the accent). Asked: *"beats 010 - make bars less dominant? thinner?"*, then *"use keybard cimponent for viz the key"*: the key shown on the kit keyboard. Only `demo/concepts/beats/010/index.html`, `drawChroma()`.
 - ~~**`beats/005`: musical key detection**~~ (2026-10-11, built as `beats/010` Key, live stations, checked against `demo/fake-station.mjs`: decodes, 0 errors, reads the stand-in's E and A tones as A minor at 0.20; never run against ERR). Asked: *"beats 005 - key detection"*. Background agent; validated offline on the three R2 recordings, no live stream opened by anyone but the owner.
-- **`beats/005`: the Tempo page on live radio instead of the recordings** (2026-10-11). Asked: *"do beats 005 with live radios"*. Opens a station through positron-shout ONLY on Play, never on load and never under ?selfcheck=1 (ERR's listener statistics, CLAUDE.md). Background agent.
-- **`radio/020` becomes `beats/000`, a new group; Ida added as a third station** (2026-10-11). Asked: *"add ida"*, *"move radio 020 to beats group into 000"*. Ida captured ONCE, 3 minutes through positron-shout, into R2.
-- **`synth/000`: wire in local MIDI devices when there are any** (2026-10-11). Asked: *"adjust 000 demo when there are local midi devices wire them in"*, *"synth 000"*.
-- **`radio/020` Tempo: beats land on the upbeat; analyse the recordings more and find better bpm and beat detection** (2026-10-11). Asked: *"beats are often uppeat. analyze your recodings more. lauhcn bg abaluyzes for better mbp algorims for detection"*. Background agent, offline on the two R2 captures (`radio/raadio2/2026-10-11.mp3`, `radio/raadio4/2026-10-11.mp3`), no browser, nothing from ERR. Analysis and a measured recommendation first, page change after.
-- **`sampler/035`: the direct path drawn as the link, not under a relay box; and should WHIP and WHEP be renamed** (2026-10-11). Asked: *"webrtc shuld be link. also look into whep whip, should it somehow renamed?"*, after *"i thinght its 1:1 to wiring code???"*. Built: `demo/shell/bay.mjs` lets a light link between two sites say `via relay` or `via datachannel`; 035 relinks to the Pi with the path in use. UNMEASURED against the Pi. The rename is a question to the owner, not done.
-- **`sampler/030` and `035` readouts down to four cells** (2026-10-11). Asked: *"reduce readouts 30 35 to 4 items. keep relevant ones"*. Done the same day.
-- **`sampler/035` Pi piano direct: 030 over the WebRTC direct path** (2026-10-11). Asked: *"can we do sampler 035 lan/direct version. webrtc how how?"*. Built the same day as `createBoard({ direct: true })` plus `goDirect()` on play, from /away/'s path (plans/plan-away-webrtc.md). UNMEASURED: not yet played against the Pi.
-- **`sampler/030` Pi piano: a scope of the sound that comes back, with the lags** (2026-10-11). Asked: *"add scrope to 030 samper with lags etc"*. Only `demo/concepts/sampler/030/index.html`, reusing how the synth pages (070 Circuit on the Pi) scope and time the board.
-- **`sampler/015` Sustain: Follow, Clear and Copy log out, the filter out and every message always shown, the upper scope out; then read up on pedalling and analyse the owner's own presses** (2026-10-11). Asked: *"rm follow clear copy log. show alwats everything. 015 smapler. no need for upper viz, what it adds. do some reading and analyzis of my sustan-pressing. its heavy to push. doubles are hard."* Only `demo/concepts/sampler/015/index.html`. The presses live only in the open tab (`__demo.pedal.text()`), so they are read BEFORE the page changes, since a reload loses them. The analysis is about what 020's looper asks of a heavy pedal: its two-press gesture and the 250/400 ms tap and double thresholds.
+- ~~**`beats/005`: the Tempo page on live radio instead of the recordings**~~ (2026-10-11). Asked: *"do beats 005 with live radios"*. Opens a station through positron-shout ONLY on Play, never on load and never under ?selfcheck=1 (ERR's listener statistics, CLAUDE.md). Background agent. DONE: 46fbae90 beats/005 Live tempo, now radio/030 (d1ce84d5).
+- ~~**`radio/020` becomes `beats/000`, a new group; Ida added as a third station**~~ (2026-10-11). Asked: *"add ida"*, *"move radio 020 to beats group into 000"*. Ida captured ONCE, 3 minutes through positron-shout, into R2. OVERTAKEN: the beats group moved back into radio 2026-10-11 (d1ce84d5); Ida added a5a32053.
+- ~~**`synth/000`: wire in local MIDI devices when there are any**~~ (2026-10-11). Asked: *"adjust 000 demo when there are local midi devices wire them in"*, *"synth 000"*. DONE: fc792840 a plugged in MIDI keyboard as a device node on synth/000.
+- ~~**`radio/020` Tempo: beats land on the upbeat; analyse the recordings more and find better bpm and beat detection**~~ (2026-10-11). Asked: *"beats are often uppeat. analyze your recodings more. lauhcn bg abaluyzes for better mbp algorims for detection"*. Background agent, offline on the two R2 captures (`radio/raadio2/2026-10-11.mp3`, `radio/raadio4/2026-10-11.mp3`), no browser, nothing from ERR. Analysis and a measured recommendation first, page change after. DONE: cd39bba5 plan and research/beat-tracking-2026-10-11.md, detector in 85b90c39.
+- ~~**`sampler/035`: the direct path drawn as the link, not under a relay box; and should WHIP and WHEP be renamed**~~ (2026-10-11). Asked: *"webrtc shuld be link. also look into whep whip, should it somehow renamed?"*, after *"i thinght its 1:1 to wiring code???"*. Built: `demo/shell/bay.mjs` lets a light link between two sites say `via relay` or `via datachannel`; 035 relinks to the Pi with the path in use. UNMEASURED against the Pi. The rename is a question to the owner, not done. DONE: link label built 5f6f9ae9; 035 merged into 030 and its URL removed 2026-10-12; WHIP and WHEP names kept (video/030).
+- ~~**`sampler/030` and `035` readouts down to four cells**~~ (2026-10-11). Asked: *"reduce readouts 30 35 to 4 items. keep relevant ones"*. Done the same day. DONE: four cells in demo/concepts/sampler/030/index.html; 035 gone since 2026-10-12.
+- ~~**`sampler/035` Pi piano direct: 030 over the WebRTC direct path**~~ (2026-10-11). Asked: *"can we do sampler 035 lan/direct version. webrtc how how?"*. Built the same day as `createBoard({ direct: true })` plus `goDirect()` on play, from /away/'s path (plans/plan-away-webrtc.md). UNMEASURED: not yet played against the Pi. DONE: 54331538; now a relay or direct choice on sampler/030 (73bcbf03).
+- ~~**`sampler/030` Pi piano: a scope of the sound that comes back, with the lags**~~ (2026-10-11). Asked: *"add scrope to 030 samper with lags etc"*. Only `demo/concepts/sampler/030/index.html`, reusing how the synth pages (070 Circuit on the Pi) scope and time the board. DONE: 8eef7f67; the scope taken out again on ask (4ff2bcc2), lag cells kept.
+- ~~**`sampler/015` Sustain: Follow, Clear and Copy log out, the filter out and every message always shown, the upper scope out; then read up on pedalling and analyse the owner's own presses**~~ (2026-10-11). Asked: *"rm follow clear copy log. show alwats everything. 015 smapler. no need for upper viz, what it adds. do some reading and analyzis of my sustan-pressing. its heavy to push. doubles are hard."* Only `demo/concepts/sampler/015/index.html`. The presses live only in the open tab (`__demo.pedal.text()`), so they are read BEFORE the page changes, since a reload loses them. The analysis is about what 020's looper asks of a heavy pedal: its two-press gesture and the 250/400 ms tap and double thresholds. DONE: 25feff88 and the pedal analysis 3cc5414d; page archived 2026-10-12 (4d40f117).
 
-- **Piano samples: replace the FluidR3 piano** (2026-10-11). Asked: *"in bg do re-search for piano samples, see a aplan. current one sounds metallic thin and lame"*. Researched, not built: `plans/plan-piano-samples.md`. Verdict: Salamander V3 (CC BY 3.0), 4 layers v1/v6/v11/v16 on the same 30 notes, AAC 96 kbps stereo with an 8 s cap for the web (about 98 KB first note, 10.5 MB whole set, lazy), mono 48 kHz FLAC for the Pi. MEASURED why today's is thin: brighter than Salamander's hardest layer at every velocity, out of phase stereo above middle C (up to 12 dB lost in mono, and the Pi capture is mono), every note cut dead at 3.13 s. Open: build `demo/resources/fetch-salamander.mjs`, the module changes in plan section 4, and a listening test.
-- **`radio/020` Tempo: beats on the radio's own wave, the LCD and onset strip out, a BPM over time scope with the number and confidence in its footer, nothing shown below a confidence floor** (2026-10-11). Asked: *"020 radio. use waveform vis for beat tetections. what are small white lines on top? rm lcd wave. below show scope with bmp in y and time in x. bom num and confidence in its footer"*, then *"why show low cindidence?"*, *"there is very steady beat on r2"*, *"impove yr algis. show all condidences"*, *"bpm scope: same h as waveform . no horiz grid"*, *"zoom in time, show less hsitoric"*, *"show bpm and conf on all times"*, *"add fx box that takes in bmp and audio and gets out thinner audio, low cut off and webaudio \"bassdrum\" it takes wet dry what is separate knob"*, *"max mix make music whay thinner and bd dominent"*, *"keep volume the same in all mix settings"*, *"tempo viz: same h as in wave on top"*. Only `demo/concepts/radio/020/index.html`. Background agent. ⚠️ Built 2026-10-11; the loudness match and the panel heights after the last fix are UNMEASURED (browser runs stopped).
-- **`sampler/015` Sustain: a page for debugging the sustain pedal** (2026-10-11). Asked: *"do 015 with sustain debuggind. what you get from the port, timings, "gestures""*. Between 010 and 020, because 020's looper is driven only by CC 64 and the owner is debugging a real pedal. Every raw message with its port, hex bytes, channel, reading and the event's own `timeStamp`; timings (interval on the same controller, press length, message rate in a press, repeats); gestures as 020 reads them (press is CC 64 crossing up through 64) plus tap, hold, double, half pedal and bounce, as rows and on a kit strip; a switch or continuous and normal or inverted guess; copy log. Page `demo/concepts/sampler/015/`, row in `list.mjs`. Background agent.
-- **`sampler/030`: the piano on the Pi, now SuperCollider, option b** (2026-10-11). Asked: *"Build sfizz pi as next demo in bg"*, then redirected: *"do supercollider. rm fluidsynth"*, with option **b)** of `plans/plan-sampler-pi-pico.md` §2.2 (the sampler and Yoshimi both on JACK, summed into the one capture, nobody switched off for somebody else). FluidSynth was purged from the Pi by the session. Engine: a scsynth of its own driven by OSC from the board, piano and Rhodes as Buffers, voice stealing, sustain, program change 0/1; `pi-1:sampler` announced with `midi-in`, `audio-out`, `file-in`; page `/concepts/sampler/030/` copying synth/060. BUILT AND MEASURED ON THE PI 2026-10-11, not committed, not deployed: `rig/board/scsampler.mjs`, `norns/possampler-defs.scd`, the shared capture and standing JACK rows in `jacksynth.mjs`, `stopPappus` leaving the sampler's scsynth alone, `test.mjs` 445/445, `graph-registry-test.mjs` 99/99. Open: the row in `demo/concepts/list.mjs` (`{ n: 'sampler/030', title: 'Pi piano', ... }`), and the granulator switched on while the sampler plays has not been run on the board. (Earlier, superseded: sfizz was blocked on the install, apt has no sfizz for Debian 13 arm64. Kept from that attempt: `rig/board/sampler.mjs`, the 30 FLACs and `piano.sfz` on the card at `/opt/positron-board/samples/piano/`.)
+- ~~**Piano samples: replace the FluidR3 piano**~~ (2026-10-11). Asked: *"in bg do re-search for piano samples, see a aplan. current one sounds metallic thin and lame"*. Researched, not built: `plans/plan-piano-samples.md`. Verdict: Salamander V3 (CC BY 3.0), 4 layers v1/v6/v11/v16 on the same 30 notes, AAC 96 kbps stereo with an 8 s cap for the web (about 98 KB first note, 10.5 MB whole set, lazy), mono 48 kHz FLAC for the Pi. MEASURED why today's is thin: brighter than Salamander's hardest layer at every velocity, out of phase stereo above middle C (up to 12 dB lost in mono, and the Pi capture is mono), every note cut dead at 3.13 s. Open: build `demo/resources/fetch-salamander.mjs`, the module changes in plan section 4, and a listening test. DONE: 93ce6f63 Salamander Grand V3 in the browser sampler and on the Pi.
+- ~~**`radio/020` Tempo: beats on the radio's own wave, the LCD and onset strip out, a BPM over time scope with the number and confidence in its footer, nothing shown below a confidence floor**~~ (2026-10-11). Asked: *"020 radio. use waveform vis for beat tetections. what are small white lines on top? rm lcd wave. below show scope with bmp in y and time in x. bom num and confidence in its footer"*, then *"why show low cindidence?"*, *"there is very steady beat on r2"*, *"impove yr algis. show all condidences"*, *"bpm scope: same h as waveform . no horiz grid"*, *"zoom in time, show less hsitoric"*, *"show bpm and conf on all times"*, *"add fx box that takes in bmp and audio and gets out thinner audio, low cut off and webaudio \"bassdrum\" it takes wet dry what is separate knob"*, *"max mix make music whay thinner and bd dominent"*, *"keep volume the same in all mix settings"*, *"tempo viz: same h as in wave on top"*. Only `demo/concepts/radio/020/index.html`. Background agent. ⚠️ Built 2026-10-11; the loudness match and the panel heights after the last fix are UNMEASURED (browser runs stopped). DONE: 85b90c39; the detector replaced by tempo.mjs in ecb2d57f.
+- ~~**`sampler/015` Sustain: a page for debugging the sustain pedal**~~ (2026-10-11). Asked: *"do 015 with sustain debuggind. what you get from the port, timings, "gestures""*. Between 010 and 020, because 020's looper is driven only by CC 64 and the owner is debugging a real pedal. Every raw message with its port, hex bytes, channel, reading and the event's own `timeStamp`; timings (interval on the same controller, press length, message rate in a press, repeats); gestures as 020 reads them (press is CC 64 crossing up through 64) plus tap, hold, double, half pedal and bounce, as rows and on a kit strip; a switch or continuous and normal or inverted guess; copy log. Page `demo/concepts/sampler/015/`, row in `list.mjs`. Background agent. DONE: 2078e5c3; archived 2026-10-12 (4d40f117, archive/concepts/sampler-015.md).
+- ~~**`sampler/030`: the piano on the Pi, now SuperCollider, option b**~~ (2026-10-11). Asked: *"Build sfizz pi as next demo in bg"*, then redirected: *"do supercollider. rm fluidsynth"*, with option **b)** of `plans/plan-sampler-pi-pico.md` §2.2 (the sampler and Yoshimi both on JACK, summed into the one capture, nobody switched off for somebody else). FluidSynth was purged from the Pi by the session. Engine: a scsynth of its own driven by OSC from the board, piano and Rhodes as Buffers, voice stealing, sustain, program change 0/1; `pi-1:sampler` announced with `midi-in`, `audio-out`, `file-in`; page `/concepts/sampler/030/` copying synth/060. BUILT AND MEASURED ON THE PI 2026-10-11, not committed, not deployed: `rig/board/scsampler.mjs`, `norns/possampler-defs.scd`, the shared capture and standing JACK rows in `jacksynth.mjs`, `stopPappus` leaving the sampler's scsynth alone, `test.mjs` 445/445, `graph-registry-test.mjs` 99/99. Open: the row in `demo/concepts/list.mjs` (`{ n: 'sampler/030', title: 'Pi piano', ... }`), and the granulator switched on while the sampler plays has not been run on the board. (Earlier, superseded: sfizz was blocked on the install, apt has no sfizz for Debian 13 arm64. Kept from that attempt: `rig/board/sampler.mjs`, the 30 FLACs and `piano.sfz` on the card at `/opt/positron-board/samples/piano/`.) DONE: a69886a7; the list.mjs row is in.
 
-- **Plans: a sampler on the Pi, and one on the Pico** (2026-10-11). Asked: *"Can pi be similar sampler too? Pico?"*, then *"Yes to plans"*. Spec only, in `plans/`: the Pi as `pi-1:sampler` (sfizz or a node sampler behind JACK, the R2 samples cached on the SD card, sound back through the relay as Yoshimi's, its latency), and the Pico (Pico 2 W memory and flash budget, sample format, PWM against an I2S DAC, what rp2040js would need to make sound in the browser). Background agent. **Plan written 2026-10-11: `plans/plan-sampler-pi-pico.md`**, with the owner's follow up *"Can pico drive our soundcard?"* as its §4 (verdict: not as USB host, yes into the Fast Track Pro's free analog input 2, `system:capture_2`). Not committed.
+- ~~**Plans: a sampler on the Pi, and one on the Pico**~~ (2026-10-11). Asked: *"Can pi be similar sampler too? Pico?"*, then *"Yes to plans"*. Spec only, in `plans/`: the Pi as `pi-1:sampler` (sfizz or a node sampler behind JACK, the R2 samples cached on the SD card, sound back through the relay as Yoshimi's, its latency), and the Pico (Pico 2 W memory and flash budget, sample format, PWM against an I2S DAC, what rp2040js would need to make sound in the browser). Background agent. **Plan written 2026-10-11: `plans/plan-sampler-pi-pico.md`**, with the owner's follow up *"Can pico drive our soundcard?"* as its §4 (verdict: not as USB host, yes into the Fast Track Pro's free analog input 2, `system:capture_2`). Not committed. DONE: 0e995e0a plans/plan-sampler-pi-pico.md.
 
-- **Radio 020 back on the index as a tempo page: no granulator, the radio waves and a separate BPM visualiser, Ida from R2, named as the other concepts** (2026-10-11). Asked: *"In radio demo we had some bpm detect demo. Dearcive. Rm granulator just a radio waves and sepatare visualizer. Use r2 and ida. Bring to cocept to naming syrem"*. The page is `/concepts/radio/020/` (hidden as "Granulator"): Ida Radio Tallinn through `cf-shout`, a granulator and a `web:bpm` detector. Background agent. ⚠️ **PAGE BUILT, RECORDING MISSING (2026-10-11)**: no Ida recording existed in any R2 bucket, and the one capture taken through `cf-shout` (180 s, 10:07:47 to 10:10:47Z, 7,636,113 bytes, AAC 320k) was DIGITAL SILENCE, every sample 0, -91.0 dB, gzip 53,654 bytes. Not uploaded. The page plays `positron-station` key `radio/ida-tallinn/2026-10-11.mp3` and 404s until a capture with sound is put there; `?src=` takes another file. Measured on a synthetic 124 bpm file: settles at 124.0, confidence 0.97, 5 s after play.
+- ~~**Radio 020 back on the index as a tempo page: no granulator, the radio waves and a separate BPM visualiser, Ida from R2, named as the other concepts**~~ (2026-10-11). Asked: *"In radio demo we had some bpm detect demo. Dearcive. Rm granulator just a radio waves and sepatare visualizer. Use r2 and ida. Bring to cocept to naming syrem"*. The page is `/concepts/radio/020/` (hidden as "Granulator"): Ida Radio Tallinn through `cf-shout`, a granulator and a `web:bpm` detector. Background agent. ⚠️ **PAGE BUILT, RECORDING MISSING (2026-10-11)**: no Ida recording existed in any R2 bucket, and the one capture taken through `cf-shout` (180 s, 10:07:47 to 10:10:47Z, 7,636,113 bytes, AAC 320k) was DIGITAL SILENCE, every sample 0, -91.0 dB, gzip 53,654 bytes. Not uploaded. The page plays `positron-station` key `radio/ida-tallinn/2026-10-11.mp3` and 404s until a capture with sound is put there; `?src=` takes another file. Measured on a synthetic 124 bpm file: settles at 124.0, confidence 0.97, 5 s after play. DONE: 8324eb85; Ida recording in R2 since a5a32053 (radio/ida/2026-10-11.aac).
 - ~~**Build the sampler group**~~ (2026-10-11, built, not committed, not deployed). Asked: *"Build sampler group"*. 000 Piano, 010 Piano and Rhodes, 020 Looper, as the sampler entry below. Samples to R2 under `sampler/piano/` and `sampler/rhodes/` (30 and 65 files, checked present). Built: `demo/concepts/sampler/sampler.mjs` (/nola/'s sampling core pointed at R2: note to nearest recording at 2^(shift/12), Rhodes velocity layers by his SFZ crossfade with his fallbacks, the shell pedal as damper, program change 0 piano 1 Rhodes, lazy per octave or per Rhodes note, cached by URL), `000/`, `010/` (a `web:patch` picker sending program changes into `web:sampler:midi-in`; the Rhodes notes the keys on screen reach are fetched on the program change, never before), `020/` (a MIDI looper on CC 64 or the keyboard footer's Sustain: press 1 records, press 2 loops at exactly the time between the presses, press 3 starts over, no overdub, Panic empties it; drawn on the kit transport bar and strip zoomed to the loop), three rows in `list.mjs`. MEASURED headless: a visit fetches nothing; loop length equals the press gap to 0.1 ms; replays land 0.2 to 3.9 ms late. Background agent.
 - ~~**Patchbay kit: phone labels at 5 and 6 papers, and the wire animation cost**~~ (2026-10-11, done, not committed, not deployed). The owner said *"Yes"* to fixing both, found on `/concepts/typist/030/`. PHONE (`demo/shell/bay-view.mjs`): a title that does not fit beside its ports now gets a line of its own (then the grey field too), per card, re-laid until stable; every wire out of one outlet or into one inlet shares one gutter lane as a bus (twins keep a lane each); a card narrower than its longest name widens the picture and scrolls inside it. MEASURED at 375 px, overlapping labels at n=4, 5, 6: 5, 29, 40 before, 0, 0, 0 after, no sideways overflow, svg 345 px at every n. TRAFFIC (`demo/shell/bay-traffic.mjs`): the 161 stop gradient rewritten per wire per frame is gone; a stream is a fixed repeating sine gradient moved by one `gradientTransform`, a pulse is a glow path from a pool of 8 per wire with a fixed Gaussian gradient moved the same way, pulses coalesce per wire per frame, nothing is written for a still wire or a picture off screen (IntersectionObserver). MEASURED, CDP `Performance.getMetrics`, `?n=6` playing 10 s at 1280, patchbay on screen: style recalc 35.8 % to 2.9 % of the main thread, all tasks 55.4 % to 14.7 %; display none 0.4 %. `node demo/verify.mjs patchbay kit/patchbay` 61/61 before and after. Background agent.
 
-- **A new concepts group, `sampler`: the /nola/ sampler keyboard as concept pages** (2026-10-11). Asked: *"Backlog the nola-like samler keyb work. Suggest group name. Pieces. Piano souns in samler, r2 in patchbay. Piano plus rhodes in sampler. What cahnges in patcbay? Separaete Patch seleta node? Going where?"*. Group name suggested `sampler` (alternative `keys`); owner to confirm.
+- ~~**A new concepts group, `sampler`: the /nola/ sampler keyboard as concept pages**~~ (2026-10-11). Asked: *"Backlog the nola-like samler keyb work. Suggest group name. Pieces. Piano souns in samler, r2 in patchbay. Piano plus rhodes in sampler. What cahnges in patcbay? Separaete Patch seleta node? Going where?"*. Group name suggested `sampler` (alternative `keys`); owner to confirm. DONE: a4572487 the sampler group.
   - **What exists:** `/nola/` (`demo/nola/index.html`) plays a piano (`demo/nola/<note>.mp3`, 99 files, `PROVENANCE.json`) and a 1977 Rhodes (Jeff Learman's jRhodes3d, `rhodes-*.m4a`, `LICENSE-jrhodes3d`, `PROVENANCE-rhodes.json`, `research/rhodes-packs-2026-09-23.md`) from one MIDI keyboard. Both are committed and shipped by `workers/view/build.mjs`; the separate backlog line *"/nola/'s samples to R2, later"* moves them to R2 (`positron-station`, served at `/media/<key>`, as the typewriter samples are).
   - **`sampler/000` Piano:** on-screen keys -> `web:sampler` (a sampler engine) -> `web:speaker`, the piano samples as `cf-r2:piano` with `file-out -> web:sampler:file-in`. Nothing fetched until the first key press (as typist/010).
   - **`sampler/010` Piano and Rhodes:** the same sampler holding two sample sets, `cf-r2:piano` and `cf-r2:rhodes`, both `file-out -> web:sampler:file-in`. A SEPARATE patch select node, `web:patch` (the kit picker, as `/concepts/synth/070/`'s Circuit patch selector), sending a MIDI program change on `web:patch:midi-out -> web:sampler:midi-in`, the same input the keys play into, so the sampler switches instrument the way a hardware synth does and the page reads like 070. The sampler fetches only the set the program asks for, on first use. Alternative considered: an index on `web:sampler:value-in` as typist/020's fx box takes one; the MIDI route is suggested because a patch is a program change on every instrument on this desk.
   - **`sampler/020` Looper** (2026-10-11, asked: *"Then. Looper. Triggered from Sustain pedal. Shows as zoomed in timeline. First startnsecond stop. Raw. No quant no bpm"*): the sustain pedal (CC 64, from a plugged in keyboard, and the on-screen keyboard's own sustain, which `/nola/` already draws in its footer) is the looper's only control: the first press starts recording the notes, the second stops it and the loop plays back from then on, at exactly the length between the two presses. No quantising, no BPM, no grid: raw. The loop shows on the kit timeline (`demo/shell/strip.mjs`, transport bar, as `/concepts/synth/020/` records a take) zoomed to the loop, a playhead going round it. In the patchbay a `web:looper` node between the keys and the sampler (`keys:midi-out -> looper:midi-in`, `looper:midi-out -> sampler:midi-in`, and the sustain on its own or inside the keys' MIDI). Note: `demo/shell/looper.mjs` is an AUDIO looper (radio, tapes); this one loops MIDI, so check what it can share.
 - ~~**The multi typer layout into the chat kit, when 030 is ready**~~ (2026-10-11, done, not committed, not deployed). Asked: *"multitype layout to chat kit too when ready"*, then *"Run in parallel"*. Built: `createChatGrid({ cells, count, left, centre })` in `demo/shell/chat-ui.mjs` (one to six equal cells, the six track grid and seam, 16:9 for 1 to 3 and 4:3 for 4 to 6, phone layout from the frame's own width by a named container query), `/concepts/typist/030/` draws its papers with it (shots at n=2, 5, 6, 375 and 1280, byte identical to before apart from the log's timestamp), a CHAT GRID block at the top of `/kit/chat/` with a stepper and two asserts, `chat-grid` first in the `chat` row of `kit-parts.mjs`. The chat sign's type now also caps at 9cqi of its own box (floor 12 px) and centres safely, because in a third of a grid it broke `answered` in half; the window's sign measures the same. Background agent.
 - ~~**Concept typist/020: one typewriter sample set, an fx box that makes a different machine of every number**~~ (2026-10-11, built, not deployed). Asked: *"good job. do 020 as multiple sounds, do radiobuttons for 1-4. can i be separate fx box takes audio in / out and index or smth?"*, then *"can be more than 4, support somehting that makes sense and then repeating. or unique all the time, choose"* (unique chosen), *"only keep stepper"*, *"all machine n's"*, *"why handtuned? just universal logic?"*. Built: `web:fx` (`audio-in`, `audio-out`, `value-in` taking any positive index) between `web:typewriter` and `web:speaker`, the WebAudio graph wired by a `route()` reading `bay.links()`; a kit stepper as `web:pick`, its `value-out` linked to `web:fx:value-in` and to `web:typewriter:value-in-2` (the per key type playback rates). Every index is `Machine n`, generated by one rule in `demo/concepts/typist/020/fx.mjs` (irrational step per dimension plus a mulberry32 jitter), trimmed to one loudness offline, switched with a 20 ms crossfade. The multi typer pages moved one step on (multi typer 030, wired 040, with sound 050), and 050 gives each participant an index. Background agent.
-- **`/nola/`'s samples to R2, later** (2026-10-11). Asked: *"we revisit nola later with r2 approach"*. Today its 99 piano mp3s are committed in `demo/nola/` and copied into the site's static assets by `workers/view/build.mjs`; the typewriter samples (typist/010) set the R2 pattern (`positron-station`, served by the station worker at `/media/<key>`, node `cf-r2:...`). Not now.
-- **One name for R2: `cf-r2:recordings`** (2026-10-11). Asked: *"better name that cf-assets. suggest. r2? do we have those noes for other patvchbays?"*, then *"yes. lets move samples to r2"*. `r2:recordings` on `/patchbay/`, `/kit/patchbay/`, `demo/shell/bay-test.mjs`, `graph-registry-test.mjs` (and a comment in `bay.mjs`) becomes `cf-r2:recordings`, as `cf-store`, `cf-stream`, `cf-shout`, `cf-relay`; concept bay/000 already says `cf-r2`. After the typist/010 agent finishes. The typewriter samples go to R2 (`positron-station`), node `cf-r2:typewriter`.
+- ~~**`/nola/`'s samples to R2, later**~~ (2026-10-11). Asked: *"we revisit nola later with r2 approach"*. Today its 99 piano mp3s are committed in `demo/nola/` and copied into the site's static assets by `workers/view/build.mjs`; the typewriter samples (typist/010) set the R2 pattern (`positron-station`, served by the station worker at `/media/<key>`, node `cf-r2:...`). Not now. OVERTAKEN: /nola/ marked not needed 2026-10-12 (4a2aa61a); sampler/000 plays the piano from R2.
+- **One name for R2: `cf-r2:recordings`** (2026-10-11). Asked: *"better name that cf-assets. suggest. r2? do we have those noes for other patvchbays?"*, then *"yes. lets move samples to r2"*. `r2:recordings` on `/patchbay/`, `/kit/patchbay/`, `demo/shell/bay-test.mjs`, `graph-registry-test.mjs` (and a comment in `bay.mjs`) becomes `cf-r2:recordings`, as `cf-store`, `cf-stream`, `cf-shout`, `cf-relay`; concept bay/000 already says `cf-r2`. After the typist/010 agent finishes. The typewriter samples go to R2 (`positron-station`), node `cf-r2:typewriter`. Now: cf-r2:typewriter done; r2:recordings still in /patchbay/, /kit/patchbay/, bay.mjs, bay-test.mjs, graph-registry-test.mjs.
 - ~~**JACK on the Fast Track Pro, so the Circuit on JACK is clean** (2026-10-11). Asked: *"arecord is fine. what is goin on with jack?"*, then *"try 1 and maybe others in bg"*. MEASURED today through the relay, same burst: arecord floor -80.5 dBFS, HF share 0.039; JACK via alsa_in right after a restart HF share 0.15, later a silence floor of -18.8 dBFS. Suspect: jackd runs `-d dummy`, so alsa_in resamples between two clocks with a 2x256 buffer against a 1024 period. Try (1) jackd on the card itself (`-d alsa -d hw:Pro`), then (2) bigger alsa_in buffers and quality. The Circuit stays on arecord until one is proved clean over 10 minutes. Background agent.~~ DONE 2026-10-11, not committed, pushed to the Pi, and THE CIRCUIT IS ON JACK NOW. Option 1 worked and option 2 was not needed: jackd runs ON THE CARD, `jackd -r -d alsa -C hw:CARD=Pro,DEV=0 -r 48000 -p 512 -n 3`, capture only, so the Circuit is the clock and nothing resamples. Config: `"via":"jack","jackd":{"period":512,"periods":3}` in BOARD_INPUTS (backup `/etc/default/positron-board.arecord-pre-jackd-0957`; `"jackd": true` now means 512 x 3). `jack.mjs` shows `system:capture_N` as `circuit:capture_N` at its one boundary (listings renamed, connects turned back), so bay links, `graph-registry.mjs` and `jack-bay-live.mjs` are unchanged. No alsa_in. If the card will not open, jackd falls back to the dummy clock and the input to alsa_in, and the log says so (that fallback ran once for real: D-Bus device reservation, fixed with `JACK_NO_AUDIO_RESERVATION=1`). MEASURED through the relay, same burst, ten minutes each: at 256 x 3 floor -76.1 then -79.7 to -79.9 dBFS, HF share 0.0392 to 0.0415, x257 0.11 to 0.12 per cent, 0 xruns; at 512 x 3 floor -74.6 then -77.6 (scsynth idle on the board throughout), HF 0.0391 to 0.0394, 0 xruns; final at 512 with nothing else running -80.6 dBFS, HF 0.0390, against arecord -80.9 and 0.039 the same morning. 256 x 3 xruns under Yoshimi plus the granulator (about ten while sclang compiles, a few a minute playing); 512 x 3 one at the compile and none in 100 s of the same load. The 2 to 3 dB floor rise under load is the Pi's CPU, not JACK: a plain two or four core busy loop with no JACK in it raises it the same (-80.5 to -77.4), and it falls back the moment the load stops. Not A/B'd against arecord under the same load, which would cost two more restarts. Yoshimi needed `connect_jack_audio` 0 in its instance (it exits 1 with no physical playback port), set by the board before each start (`yoshimi.mjs` `ensureNoAutoconnect`); scsynth starts with `SC_JACK_DEFAULT_INPUTS/OUTPUTS` set to nothing so it cannot patch itself to the Circuit. Nothing reaches the Fast Track Pro's outputs: there are no playback ports. Checks: `rig/board/test.mjs` 352 to 383 on laptop and Pi; `yoshimi-test.mjs` 25/25; `pappus-live.mjs --only seeds` 6/7 with one CANNOT DECIDE (a statistics verdict, not a fault), the granulator graph exactly yoshimi into it and it into posboard; `/away/` 41/41 (stand-in); `/concepts/synth/060/?board=1` Yoshimi heard at 0.138, 0 lost; `/concepts/synth/070/?board=1` reads `Meeelow`, 1 read 0 misses. SEEN, NOT CAUSED HERE, FIXED THE SAME DAY (below): while Yoshimi runs it subscribes to EVERY ALSA MIDI source (`alsa_midi_type` 1), the Circuit's 44:0 included, so the board's Circuit input is EBUSY and `/concepts/synth/070/` cannot read the patch name (1 miss), and the Circuit's own MIDI out plays Yoshimi. FIXED 2026-10-11 (asked: *"Fix yoshimi subscr"*), not committed, pushed to the Pi. `alsa_midi_type` is Yoshimi's ALSA MIDI connection type, 0 Fixed, 1 Search (*"will accept input from any Alsa sources it can find"*, its own guide), 2 External (*"connection is then made externally"*). The board sets it to 2 before every start, beside `connect_jack_audio` 0, in one idempotent edit (`yoshimi.mjs` `ensureBoardInstance`, replacing `ensureNoAutoconnect`). The command line is unchanged (`-i -a -J -b=256`, now `YOSHIMI_ARGS` in `jacksynth.mjs`), because `-a` with no device does not override the type. The path to Yoshimi is unchanged too: the board writes raw bytes to virmidi (`/dev/snd/midiC0D0`, client 16) and `aconnect 16:0 <yoshimi>:0`. After that, `startJackSynth` reads `aconnect -l` and cuts with `aconnect -d` any source of Yoshimi's that is not the virmidi port, naming it in the log (`strayMidiSources`). MEASURED on the Pi: a throwaway instance at 2 came up with no subscriptions; the board's Yoshimi then showed `Connected From: 16:0` and nothing else, the Circuit with no `Connecting To`, no stray cut. `/concepts/synth/060/?board=1` headless: Yoshimi heard, peak 0.154, 0 lost. `/concepts/synth/070/?board=1` WITH YOSHIMI RUNNING: `Meeelow`, 1 read 0 misses, board log `patch for synth 1 read back, 14 ms, 350 bytes`. `rig/board/test.mjs` 383 to 399 on laptop and Pi (sabotage: External written as 1 takes 6 red, a stray filter that only drops the Circuit takes 3 red). `node demo/verify.mjs knobs away` 95/97, knobs 54/56 with the two known reds, away 41/41 (stand-in board). Yoshimi was stopped again afterwards, as it was found.
-- **A new concepts group, `typist`: five pages from a typing paper to multi-person typing with typewriter sounds** (2026-10-11). Asked, verbatim: *"add to a backlog a set of a new group called type, or rather typist. And there are first demo would be kind of type pad, I don't know what the name is, or paper, something which you similar to video panel, and there you have footer with full screen, and the top area is just white paper, white, and black or very dark type in our brand font, and there is also a cursor, a bit more blocky, and the first demo is just something you can type in, maybe a example message. Next one is multi-type, which just contains sample messages. No, sorry, forget about the second one. Second one is type with sound. So there is a sample which comes from our storage, similar where the NOLA samples are coming, but the sample is has to be public domain typewriter sound. And then there is a web audio effect block which modulates it to have different sounds on different keys. Look for the typewriter samples, maybe there are one which actually does provide multi-sampling, and maybe backspace and space have different sounds, I'm not sure. Look into those resources. So maybe you don't need a modulation in this step. Look it up, more like a sampler. So third demo is multi-typer, which supports multiple columns. So for two, it's two. For three, it's three columns. For four, it's a grid, two by two, etc. Figure out the layouts. And it just has a radio button group, which contain different text, sample texts. Doesn't have to be editable, just to show out how a layout would work. And fourth one is now the same multi-type. But now actually wired in, has multiple people typing ability. Look into how you do the character sending in the existing typing demo. And last one is merging a multi-type entry and those typewriter sounds. So each participant should have different sound of a typewriter. So different sounds between the keys, the type of keys, and also overall character of a typewriter sound has to be different."*
+- **A new concepts group, `typist`: five pages from a typing paper to multi-person typing with typewriter sounds** (2026-10-11). Asked, verbatim: *"add to a backlog a set of a new group called type, or rather typist. And there are first demo would be kind of type pad, I don't know what the name is, or paper, something which you similar to video panel, and there you have footer with full screen, and the top area is just white paper, white, and black or very dark type in our brand font, and there is also a cursor, a bit more blocky, and the first demo is just something you can type in, maybe a example message. Next one is multi-type, which just contains sample messages. No, sorry, forget about the second one. Second one is type with sound. So there is a sample which comes from our storage, similar where the NOLA samples are coming, but the sample is has to be public domain typewriter sound. And then there is a web audio effect block which modulates it to have different sounds on different keys. Look for the typewriter samples, maybe there are one which actually does provide multi-sampling, and maybe backspace and space have different sounds, I'm not sure. Look into those resources. So maybe you don't need a modulation in this step. Look it up, more like a sampler. So third demo is multi-typer, which supports multiple columns. So for two, it's two. For three, it's three columns. For four, it's a grid, two by two, etc. Figure out the layouts. And it just has a radio button group, which contain different text, sample texts. Doesn't have to be editable, just to show out how a layout would work. And fourth one is now the same multi-type. But now actually wired in, has multiple people typing ability. Look into how you do the character sending in the existing typing demo. And last one is merging a multi-type entry and those typewriter sounds. So each participant should have different sound of a typewriter. So different sounds between the keys, the type of keys, and also overall character of a typewriter sound has to be different."* Now: typist/000 to 040 built (a206c80e to 36b1689a); the wired page with real people typing in one room is not built.
   - **Where:** `demo/concepts/typist/000/` to `040/`, rows in `demo/concepts/list.mjs` under a new group `typist` (load `positron-concepts`, `positron-ui`, `positron-compose` first).
   - **000 Paper:** a frame like the kit video panel (`createVideoPanel`), footer with the full screen button; the stage is white paper with near black type in the brand face (`var(--brand)`, JetBrains Mono, `shell.css`), a blocky cursor, typeable, opening with an example message.
   - **010 Typewriter sound:** 000 plus key sounds. A PUBLIC DOMAIN typewriter sample set, ideally multisampled (separate keys, space, backspace, carriage return, bell), stored and served the way `/nola/` serves its piano (`/nola/<note>.mp3` from the site), played as a sampler. Research the sources and their licences first; a WebAudio effect that varies one sample per key only if no multisampled set exists. Nothing fetched from anybody else's server at visit time.
@@ -169,17 +300,17 @@
   - **Prior art researched 2026-10-11:** `research/mattiisen-kirjutusmasinakontsert-2026-10-11.md`, Alo Mattiisen's *Kirjutusmasina kontsert D-duur* (1984, typewriter soloist with In Spe), in copyright until 2066, so a description and a link only.
   - **030 Multi typer built 2026-10-11**, not committed, not deployed. Asked: *"030 typist: layout sound and patchbay for multitype"*, then *"no distict knob, use default"*. `demo/concepts/typist/030/index.html`, a row in `list.mjs`, http://127.0.0.1:8890/concepts/typist/030/ (`?n=1..6`, `?set=0..2`). One to six papers in one video panel frame, separated by the 1 px seam: one grid of six tracks, so 1 full, 2 two columns, 3 three, 4 two by two, 5 three over two (the two wider, no hole), 6 three by two; a frame under 560 px (a phone) stacks 1 to 3 and goes two across for 4 to 6. A play button starts typists that type sample texts (Letters, Kirjad, Concerto, the last a text only nod to Mattiisen) at a jittered human pace; a person can type into any paper too. Paper k is Machine k through its own `web:fx-k`, at the default distinctness, no knob. Lifted for it: `demo/concepts/typist/paper.mjs` (the paper) and `sampler.mjs` (shared decoded samples, a voice per typewriter); 000, 010 and 020 still carry their own copies. Background agent. OPEN: the bay view at 5 and 6 papers on a phone draws `web:typewriter-k` over its port names (shared `bay-view.mjs`), and the wire animation costs about 35 per cent main thread style work at 6 papers headless (shared `bay-traffic`).
 - ~~**Why SysEx gets no answer through the Pi** (2026-10-11). Asked: *"dig pi side in bg"*. MEASURED from the Mac (Circuit on the M2, Chrome Web MIDI with sysex): the Device Inquiry got a 17 byte Novation reply (`F0 7E 00 06 02 00 20 29 79 00 00 00 03 05 09 02 ..`) and the Current Patch Dump Request a 350 byte patch, Synth 1 `Unstable Pad`. Through the Pi both go out (Tx counters move) and only clock comes back. So the instrument answers and the Pi side does not deliver. Background agent.~~ DONE 2026-10-11, not committed, pushed to the Pi. THE CAUSE WAS THE BOARD'S READER, NOT USB, THE DRIVER OR THE CIRCUIT. `amidi -p hw:7,0,0 -S 'F0 7E 7F 06 01 F7' -d -t 2` on the Pi got the same 17 byte reply the Mac did. snd-usb-audio runs its input URBs from probe and drops whatever arrives for a substream that is open but not yet triggered, and the trigger is the first read or poll. The board opened the input, wrote the request, and made its first read 10 ms later, and the Circuit answers faster than that, so the reply was dropped in the kernel and never counted in `/proc/asound/Circuit/midi0` Rx while the clock after it was. amidi reads once before it sends ("trigger reading"). MEASURED with one script on the Pi, board stopped for about 6 s: read before write, the 17 byte identity 2 of 2; write before read, nothing 2 of 2. FIX in `askBack` (`rig/board/inputs.mjs`): one non-blocking read into a buffer after the input is opened and before the request is written, its bytes discarded because they came before the question (a zero length `readSync` never reaches the kernel from node). `rig/board/test.mjs` 347 to 352 on laptop and Pi, with a fake that drops an answer landing on an untriggered input; taking the read out takes 5 red. MEASURED through the relay after the push: identity read back in 16 ms, Synth 1's patch in 12 ms and 350 bytes, `readPatch` names it `Unstable Pad`, and `/concepts/synth/070/?board=1` driven headless shows `Unstable Pad` in the selector (1 read, 0 misses). `/away/` 41/41. SEEN, NOT FIXED: after the Circuit was replugged at 08:40 the board still held an fd on the deleted `/dev/snd/midiC7D0`, so the first message after a replug fails with ENODEV and is lost (the write path then closes it and the next message reopens).
-- **Device Inquiry to the Circuit, to learn whether it answers SysEx at all** (2026-10-11). Asked: *"Add it and test"*, to letting the universal read only Device Inquiry `F0 7E 7F 06 01 F7` through the Pi's gate as a second allowed SysEx, after the Current Patch Dump Request went out and nothing but clock came back. Background agent (the one that built the dump request). BUILT AND SENT 2026-10-11, AND THE CIRCUIT DOES NOT ANSWER IT EITHER. The gate lets out exactly `F0 7E 7F 06 01 F7` (`isDeviceInquiry` in `rig/board/inputs.mjs`, device 7F only, nothing documented asks for 00), refuses 5 and 7 byte forms, sub id 06 02 (the reply) and every other sub id, and the board passes back only a Novation Identity Reply (`F0 7E <id> 06 02 00 20 29 ... F7`) as `midi.identity`, listening 1000 ms, one question at a time shared with the dump request. `rig/board/test.mjs` 330 to 347; a prefix match sabotage takes 5 red. MEASURED on the Pi at 07:22:34 UTC, sent once over the relay: the Circuit Tx counter rose 1416 to 1422, exactly the 6 bytes, and Rx rose 131385 to 131441, 56 bytes, all real time (clock), 0 SysEx. So the dump request was not retried. What it says: the silence is not about command `40` or its format, this unit answers no SysEx at all on this path while notes and program changes on the same raw port work. OPEN, not measured: whether the Circuit receives SysEx over USB from a Linux host at all (Components does it from a Mac over CoreMIDI), whether its state (Setup page, Components open elsewhere, a running sequence) matters, and whether the Pi's USB MIDI driver delivers SysEx out intact. The cheapest next check is the same inquiry from the Mac with the Circuit plugged into it.
-- **070 output is noisy: the Circuit back on arecord, and the Fast Track Pro delivers 8 bit samples** (2026-10-11). Asked: *"output is super noiry"* about `/concepts/synth/070/`. MEASURED through the relay, same 4 note burst both ways: on JACK (`alsa_in` on `plughw:`) the floor was -93.5 dBFS and the notes peaked -8.5 dBFS with 0 clipped, byte order correct, but the notes carried 12,410 zero crossings a second and a sample difference energy ratio of 0.39, against 497 and 0.017 on `arecord`. So the JACK path adds broadband noise on the note itself. DONE: `via` removed from `/etc/default/positron-board` and the service restarted (JACK config kept as `positron-board.jack-2026-10-11`); the owner reported *"less noise now"*. No code changed, rig tests 296/296 laptop and Pi, `/away/` 41/41. STILL OPEN, two things. (1) THE CARD ITSELF IS 8 BIT: a bare `arecord -D hw:CARD=Pro` with no board code gives every loud sample a high byte equal to its low byte (values in steps of 257, runs of up to 48 identical samples during a note, peak 32640), before and after a USB re-authorize. That is about 48 dB of resolution and grit on every note on either path; the byte order detector is blind to it because such a sample is its own swap. A port reset (`usbreset 0763:2012`, the card only, never the hub because the Circuit is on it) was the next step and was not tried. (2) Why `alsa_in` adds noise is unmeasured: the suspect is its 512 frame buffer (`-p 256 -n 2`) against jackd's 1024 frame period. Retry on JACK only once (1) is fixed. UPDATE 2026-10-11: (1) FIXED BY A POWER CYCLE of the Fast Track Pro (asked *"ftp cycled, measure again"*). Same capture through the relay: loud samples on multiples of 257 went from 64.7 per cent to 0.4 per cent (chance), distinct loud values from 172 to 26,983, notes peak -1.8 dBFS with 0 clipped; the silence floor reads -80.5 dBFS (it read -93 before because 8 bit quantisation rounded quiet samples to zero). A software re-authorize did not fix it and a power cycle did. (2) is open: JACK can be retried now.
-- **070 shows the Circuit's current patch name, read with Current Patch Dump Request** (2026-10-11). Asked: *"show initial patch name on selector"*, then *"1"* to: let exactly the 9 byte `0x40` Current Patch Dump Request out through the Pi's MIDI gate, every other SysEx still refused, pass the dump reply back, decode the name (bytes 0 to 15) with `demo/shell/circuit-patch.mjs`, show it on play and after each patch change. Read only, nothing written to the Circuit. BUILT 2026-10-11, AND THE CIRCUIT DOES NOT ANSWER. The gate (`dumpRequestSynth` in `rig/board/inputs.mjs`) lets out exactly `F0 00 20 29 01 60 40 <00|01> F7`, matched by length and every byte, read off the reference guide 1.3 p13 table (the plans disagree, 9 against 10 bytes, and the table says 9). The board opens the Circuit's raw input non-blocking BEFORE writing the request, polls it for 1000 ms, and passes back only a 350 byte Replace Current Patch for the synth asked for, as `midi.patch` to the same room; the page decodes the name with `readPatch` and shows it in the selector on play and 30 ms after each patch change. `rig/board/test.mjs` 296 to 330, three sabotages take 5, 1 and 3 red. MEASURED on the Pi: the request leaves (the Circuit's Tx counter rose 9 bytes a request), and nothing comes back but clock, 55 bytes a second, every one real time, 0 SysEx, also with 4000 ms of listening. So the selector shows nothing and the log says why. OPEN: why the Circuit is silent. Not tested, because the gate allows no other SysEx: whether this unit answers any SysEx at all (a Device Inquiry would say), whether its firmware still honours `40`, and whether Components being open or a Setup state matters. Needs the owner to decide whether to try a second message.
-- **Concept synth/070: the Circuit on the Pi** (2026-10-11). Asked: *"move 070 to 080. 070 is circuit on the pi. patch selector as sepate box in web: ?"*. Faust moved to synth/080. 070 is 060's shape for the Novation Circuit on the Pi, with the patch selector as its own `web:` node. Background agent. BUILT 2026-10-11, not committed, not deployed: `demo/concepts/synth/070/index.html` plus its row in `demo/concepts/list.mjs`. Driven headless against the real Pi in `studio-1-circuit`: 649 frames, 0 lost, notes peak 0.94 to 1.00 against a silence of 0.0000, a program change `[192,0]` (Patch 1 on channel 1) was sent and nothing was refused. Knob CCs were not driven.
-- **Concept room/001: the chat as UI only** (2026-10-11). Asked: *"room 001 is ui only. looks like slide frame or videopanel, contains room name and fullscreen button. inside, there is a ~ 1/3 right sidebar + chat compose window (autogrow, send icon in right bottom corner). below are parts of the chat, listed kit-style"*. `demo/concepts/room/001/index.html`, one row in `list.mjs`.
+- ~~**Device Inquiry to the Circuit, to learn whether it answers SysEx at all**~~ (2026-10-11). Asked: *"Add it and test"*, to letting the universal read only Device Inquiry `F0 7E 7F 06 01 F7` through the Pi's gate as a second allowed SysEx, after the Current Patch Dump Request went out and nothing but clock came back. Background agent (the one that built the dump request). BUILT AND SENT 2026-10-11, AND THE CIRCUIT DOES NOT ANSWER IT EITHER. The gate lets out exactly `F0 7E 7F 06 01 F7` (`isDeviceInquiry` in `rig/board/inputs.mjs`, device 7F only, nothing documented asks for 00), refuses 5 and 7 byte forms, sub id 06 02 (the reply) and every other sub id, and the board passes back only a Novation Identity Reply (`F0 7E <id> 06 02 00 20 29 ... F7`) as `midi.identity`, listening 1000 ms, one question at a time shared with the dump request. `rig/board/test.mjs` 330 to 347; a prefix match sabotage takes 5 red. MEASURED on the Pi at 07:22:34 UTC, sent once over the relay: the Circuit Tx counter rose 1416 to 1422, exactly the 6 bytes, and Rx rose 131385 to 131441, 56 bytes, all real time (clock), 0 SysEx. So the dump request was not retried. What it says: the silence is not about command `40` or its format, this unit answers no SysEx at all on this path while notes and program changes on the same raw port work. OPEN, not measured: whether the Circuit receives SysEx over USB from a Linux host at all (Components does it from a Mac over CoreMIDI), whether its state (Setup page, Components open elsewhere, a running sequence) matters, and whether the Pi's USB MIDI driver delivers SysEx out intact. The cheapest next check is the same inquiry from the Mac with the Circuit plugged into it. DONE: afcd7a96 gate; the reply was dropped by the board's reader, fixed 369f6ecb, identity read back in 16 ms.
+- **070 output is noisy: the Circuit back on arecord, and the Fast Track Pro delivers 8 bit samples** (2026-10-11). Asked: *"output is super noiry"* about `/concepts/synth/070/`. MEASURED through the relay, same 4 note burst both ways: on JACK (`alsa_in` on `plughw:`) the floor was -93.5 dBFS and the notes peaked -8.5 dBFS with 0 clipped, byte order correct, but the notes carried 12,410 zero crossings a second and a sample difference energy ratio of 0.39, against 497 and 0.017 on `arecord`. So the JACK path adds broadband noise on the note itself. DONE: `via` removed from `/etc/default/positron-board` and the service restarted (JACK config kept as `positron-board.jack-2026-10-11`); the owner reported *"less noise now"*. No code changed, rig tests 296/296 laptop and Pi, `/away/` 41/41. STILL OPEN, two things. (1) THE CARD ITSELF IS 8 BIT: a bare `arecord -D hw:CARD=Pro` with no board code gives every loud sample a high byte equal to its low byte (values in steps of 257, runs of up to 48 identical samples during a note, peak 32640), before and after a USB re-authorize. That is about 48 dB of resolution and grit on every note on either path; the byte order detector is blind to it because such a sample is its own swap. A port reset (`usbreset 0763:2012`, the card only, never the hub because the Circuit is on it) was the next step and was not tried. (2) Why `alsa_in` adds noise is unmeasured: the suspect is its 512 frame buffer (`-p 256 -n 2`) against jackd's 1024 frame period. Retry on JACK only once (1) is fixed. UPDATE 2026-10-11: (1) FIXED BY A POWER CYCLE of the Fast Track Pro (asked *"ftp cycled, measure again"*). Same capture through the relay: loud samples on multiples of 257 went from 64.7 per cent to 0.4 per cent (chance), distinct loud values from 172 to 26,983, notes peak -1.8 dBFS with 0 clipped; the silence floor reads -80.5 dBFS (it read -93 before because 8 bit quantisation rounded quiet samples to zero). A software re-authorize did not fix it and a power cycle did. (2) is open: JACK can be retried now. Now: the 8 bit card fixed by a power cycle (707d5b67); why alsa_in on JACK adds noise is unmeasured.
+- ~~**070 shows the Circuit's current patch name, read with Current Patch Dump Request**~~ (2026-10-11). Asked: *"show initial patch name on selector"*, then *"1"* to: let exactly the 9 byte `0x40` Current Patch Dump Request out through the Pi's MIDI gate, every other SysEx still refused, pass the dump reply back, decode the name (bytes 0 to 15) with `demo/shell/circuit-patch.mjs`, show it on play and after each patch change. Read only, nothing written to the Circuit. BUILT 2026-10-11, AND THE CIRCUIT DOES NOT ANSWER. The gate (`dumpRequestSynth` in `rig/board/inputs.mjs`) lets out exactly `F0 00 20 29 01 60 40 <00|01> F7`, matched by length and every byte, read off the reference guide 1.3 p13 table (the plans disagree, 9 against 10 bytes, and the table says 9). The board opens the Circuit's raw input non-blocking BEFORE writing the request, polls it for 1000 ms, and passes back only a 350 byte Replace Current Patch for the synth asked for, as `midi.patch` to the same room; the page decodes the name with `readPatch` and shows it in the selector on play and 30 ms after each patch change. `rig/board/test.mjs` 296 to 330, three sabotages take 5, 1 and 3 red. MEASURED on the Pi: the request leaves (the Circuit's Tx counter rose 9 bytes a request), and nothing comes back but clock, 55 bytes a second, every one real time, 0 SysEx, also with 4000 ms of listening. So the selector shows nothing and the log says why. OPEN: why the Circuit is silent. Not tested, because the gate allows no other SysEx: whether this unit answers any SysEx at all (a Device Inquiry would say), whether its firmware still honours `40`, and whether Components being open or a Setup state matters. Needs the owner to decide whether to try a second message. DONE: 5b8dc1d4 gate, 369f6ecb read fix; the selector shows Unstable Pad.
+- ~~**Concept synth/070: the Circuit on the Pi**~~ (2026-10-11). Asked: *"move 070 to 080. 070 is circuit on the pi. patch selector as sepate box in web: ?"*. Faust moved to synth/080. 070 is 060's shape for the Novation Circuit on the Pi, with the patch selector as its own `web:` node. Background agent. BUILT 2026-10-11, not committed, not deployed: `demo/concepts/synth/070/index.html` plus its row in `demo/concepts/list.mjs`. Driven headless against the real Pi in `studio-1-circuit`: 649 frames, 0 lost, notes peak 0.94 to 1.00 against a silence of 0.0000, a program change `[192,0]` (Patch 1 on channel 1) was sent and nothing was refused. Knob CCs were not driven. DONE: 76890b46 synth/070 Circuit on the Pi.
+- ~~**Concept room/001: the chat as UI only**~~ (2026-10-11). Asked: *"room 001 is ui only. looks like slide frame or videopanel, contains room name and fullscreen button. inside, there is a ~ 1/3 right sidebar + chat compose window (autogrow, send icon in right bottom corner). below are parts of the chat, listed kit-style"*. `demo/concepts/room/001/index.html`, one row in `list.mjs`. OVERTAKEN: room/001 removed 2026-10-12 (4d40f117).
 - ~~**JACK bay half, and the Circuit onto JACK** (2026-10-11). Asked, in reply to the five questions in `plans/plan-nodes-revisited.md` §5 items 5 to 9: *"Fix all. Ciruit is on now, do via jack. No onwner. Dunno stereo."* So: build the bay half; the Circuit's input moves onto JACK (it is powered and plugged in now); `jack.apply` stays tokenless, no `owner`/`heldBy`; stereo is the agent's call, stated in the plan. Questions 1 and 2 (what `pi-1:yoshimi:audio-out` means, bay link versus the board's own chain) were not answered: decided by the agent with reasons in the plan. Background agent.~~ DONE 2026-10-11, not committed, pushed to the Pi at <pi> and its `BOARD_INPUTS` set to `"via":"jack"` (backup at `/etc/default/positron-board.bak-2026-10-11`). The Circuit is `circuit:capture_1` on JACK through `alsa_in` on `plughw:CARD=Pro,DEV=0` (the bare `hw:` read 48.2 dB hot); its room is read back off JACK by `ffmpeg -f jack`, floor -93 dBFS and note peaks -4 dBFS as with `arecord`, press to arrival about 5 to 17 ms slower at the median. The board announces JACK ends (`jack` lists on Yoshimi and the Circuit, new `pi-1:pappus` and `pi-1:capture` nodes) and the bay gives a link between two of them a `jack` session with its rows; the board applies it with `jack.link`/`jack.unlink`/`jack.links`, and `/patchbay/`'s openers open it. Decisions for §5 items 5 to 9 are written in `plans/plan-nodes-revisited.md` §3 item 3. `rig/board/jack-bay-live.mjs` 15/15 and 22/22 with `--pappus` against the board, 10/15 with `--sabotage`. Website not deployed: `/patchbay/` gained one assert (46/46) and `demo/shell/openers.mjs`, `bay.mjs`, `graph-registry.mjs` changed.
 - ~~**Concepts move to `/concepts/<group>/0x/`** (2026-10-11). Asked: *"Lets rename concepst /comcepts/group/0x propose group names"*. Group names proposed in chat, waiting for the owner's pick; the numbering form (`01` per group) to be confirmed with one example before any file moves.~~ DONE 2026-10-11: synth, radio, video, device, room, bay, tutorial; 000, 010 inside a group; old URLs 404, no group page.
 - ~~**JACK patchbaying on the Pi** (2026-10-11). Asked: *"Do the jack patchbaying"*. `plans/plan-nodes-revisited.md` §3 item 3 (from `plans/plan-nodes.md` §5.4): `rig/board/jack.mjs` parses `jack_lsp -c`, a JACK arm in plan/apply, the 21 hard coded `jack_connect`/`jack_disconnect` lines in `rig/board/jacksynth.mjs` become one document, and bay links on `pi-1:*:audio-*` ports become real JACK connections. Background agent. PARTLY DONE 2026-10-11, not committed, pushed to the Pi at <pi>: items 1 to 3 and the wire verbs are built and measured on the Pi (`rig/board/jack.mjs`, fixtures captured off the board, no hard coded connects left in `jacksynth.mjs`, `jack.list`/`jack.plan`/`jack.apply`, `test.mjs` 235 to 277 green on laptop and Pi, 017 and `/knobs/` 54/56 and `/away/` 41/41 unchanged).~~ DONE 2026-10-11: the bay half landed with the line above (`jack.link`, the JACK ends announced, the Circuit on JACK).
 - ~~**Reconsider the node based UI plan in the light of the patchbay** (2026-10-11). Asked: *"Read nondebased ui plan and recosnider it in the light of patchbay"*.~~ DONE 2026-10-11 as `plans/plan-nodes-revisited.md`, spec only, nothing built.
 - ~~**Pi fixes and protocol fixes, from the Pi's LAN** (2026-10-10, session 74). Asked: *"do pi fixes and protocol fixes, i am in pi lan"*, *"in bg"*. Pi: push the waiting board code (`kind`/`label`, `transports`, mirror `gpu` value-in, Circuit by name) with `rig/board/push.sh`, then try 017 Yoshimi against it. Protocol: the decided id sweep, site `pi-1` and ports `<medium>-<dir>` (`plans/plan-site-names.md` §0, §4b, §4c). Background agent.~~ DONE 2026-10-10, not committed, two pushes from <laptop> to the Pi at <pi>. The Pi had the same rig code as the tree and only stale `graph-registry.mjs` and `wire.mjs`; after the push every shipped md5 matches. `board.alive` in `studio-1` now reads `site pi-1, place studio-1, kind board, label Raspberry Pi`, every port `<medium>-<dir>`, transports on every out port, and passes the new `graphProblem`. 017 against the real Pi: Yoshimi starts cold in about 10 s, PCM arrives over the relay at about 50 frames a second with 0 lost, silence 0.0000 and a held A3 about 0.085 peak, resonance 127 lifts level and brightness clearly; cutoff 10 against 127 is inconclusive on the page's crude brightness figure. NOT DONE here: mirror's `gpu` value-in (never built, see its own line), and no `circuit:midi-in` is announced because the Circuit's USB MIDI is not present on the board today. `push.sh` no longer ships macOS `._*` files or xattr headers.
-- **031 Granulator is hidden, to come back to** (2026-10-10). Asked: *"hide 031 for now and backlog"*. Off the index in `demo/concepts/list.mjs` (the row is kept in a comment there); the page stays at /concepts/031/. Open: what it needs before it returns was not said, so ask.
+- ~~**031 Granulator is hidden, to come back to**~~ (2026-10-10). Asked: *"hide 031 for now and backlog"*. Off the index in `demo/concepts/list.mjs` (the row is kept in a comment there); the page stays at /concepts/031/. Open: what it needs before it returns was not said, so ask. OVERTAKEN: 031 became radio/020 (a418f7e0) and was rebuilt as Tempo with no granulator 2026-10-11 (8324eb85).
 - ~~**015 LFO flattened the wave; 066 blend removed** (2026-10-10). Asked: *"015: lfo just flattens osc. fix"*, *"rm blend from 066"*.~~ DONE 2026-10-10, the LFO moves the filter's detune in octaves.
 - ~~**018 a playable Faust voice; 017 status lines capitalised; 001 hidden** (2026-10-10). Asked: *"make fau synth more interesting"*, *"reaching: Reaching"*, *"hide concepts/001 now"*.~~ DONE 2026-10-10. 018 compiles in the tab, about 1 MB on the first press.
 - ~~**Concepts 017 Yoshimi and 018 Faust synth** (2026-10-10). Asked: *"where is fau and yoshimi concepts???"*, *"go. add asap"*. 017 untested against the real Pi; 018 loads its Faust node on a press.~~ DONE 2026-10-10.
@@ -196,7 +327,7 @@
 - ~~**Concepts in named groups** (2026-10-10). Asked: *"lets clean up concepts / rename. add subtitles to index page and rename"* with synths, radio, camera, pico, chat, misc, and *"tv is separate"*. 040 and 045 are 015 and 016, Pico 007 is 070, TV 008 is 040, misc 001 002 050 are 090 091 092; the index draws a heading per group.~~ DONE 2026-10-10. Open: *"chat: 003 004 005 006 (rename title)"*, what to rename was not settled.
 - ~~**Concept numbers are the original ones zero-padded** (2026-10-10). Asked: *"numbers are messed up. you just added 0 to end not start"* and *"i want grouping based on 10s (as original). just support beyond 100 so we have always 3 digits"*. Every number divided by ten and padded (100 to 010, 450 to 045, 620 to 062); the index groups by tens. The new Faust copy of 040 is 041; 080 (TV) becomes 008 when its agent lands.~~ DONE 2026-10-10.
 - ~~**070 one octave up toggle; concepts index in groups; 410 is 450** (2026-10-10). Asked: *"only octave up"*, *"have groups in concepts index. no titles"*, *"rename 410 to 450"*.~~ DONE 2026-10-10.
-- **Concept 041 (was asked as 410): 040 with a Faust engine and its external knobs** (2026-10-10). Asked: *"410 is copy of 400 but with fau and its "external knobs""*.
+- ~~**Concept 041 (was asked as 410): 040 with a Faust engine and its external knobs**~~ (2026-10-10). Asked: *"410 is copy of 400 but with fau and its "external knobs""*. DONE: the Faust synth, now synth/080 (c6fb5ac4), every parameter a knob.
 - ~~**Concept 080, ETV and ETV2 side by side** (2026-10-10). Asked: *"make 080 (do we have it free) with etv etv2 1/2 videopanels like fliiper but just startstopbutotns, videopanels, crossfader and patchbay"*. Two half-width panels playing ERR's live channels as /flipper/ does, a start/stop button, a crossfader, a patchbay. Two ERR connections per press, which ERR counts; opens nothing on a visit; graded only against demo/fake-err.mjs.~~ DONE 2026-10-10 as concept 008, against the stand-in only.
 - ~~**Site names three characters with one digit** (2026-10-10). Asked: *"web-soxe ??"*, then *"make sure its 3 chars and icludes 1 num"*. `randomSite` gives `web-8kt`; tests 42/42, and the five pages that check the shape follow.~~ DONE 2026-10-10.
 - ~~**Concept 650 fades faster, both panels** (2026-10-10). Asked: *"fade out bit faster, both videopanels"*. 3 s, both pictures together.~~ DONE 2026-10-10.
@@ -207,7 +338,7 @@
 - ~~**Concept 620, WebRTC loopback of the camera** (2026-10-10). Asked: *"do 620 webrtc loopback camera"*. 600's camera sent through two RTCPeerConnections in the same tab and shown back, beside the local picture, with the patchbay naming the hop.~~ DONE 2026-10-10. The bay knows no WebRTC transport, so the peer hop rides `page`.
 - ~~**Video panel footers: one line, no USB id, values at the right, full screen back on 60** (2026-10-10). Asked: *"no wrapping for footer. is id needed? move rest to right (same for kbs etc in radio concepts). add fullscreenbutton"* and *"no empty "camera" labe"*. 30, 31, 60, and 61 by its agent.~~ DONE 2026-10-10.
 - **Revisit the patchbay's details (See details, the links and ports tables)** (2026-10-10). Asked: *"archvie see details of patchbay component. revisit later"* and *"add that to backlog the revisit"*. Archived in place: `createPatchbay` builds them and shows them only with `details: true`, which no page passes. Decide what a reader needs from them, and whether they come back.
-- **Concept numbers in three digits** (2026-10-10). Asked: *"rename all dmos to 10 -> 010, 20 -> 020 etc. we are running out of room"*, then *"10 slots are fine. i just want to have 3 digis on all. 090,100,110 (and inbetweens)"*. Every concept number times ten, padded to three digits (1 to 010, 10 to 100, 31 to 310, 40 to 400); folders, list rows, `conceptNav`, mount names and every link to a concept page. No redirects. After the 31 and 60 agents land.
+- ~~**Concept numbers in three digits**~~ (2026-10-10). Asked: *"rename all dmos to 10 -> 010, 20 -> 020 etc. we are running out of room"*, then *"10 slots are fine. i just want to have 3 digis on all. 090,100,110 (and inbetweens)"*. Every concept number times ten, padded to three digits (1 to 010, 10 to 100, 31 to 310, 40 to 400); folders, list rows, `conceptNav`, mount names and every link to a concept page. No redirects. After the 31 and 60 agents land. DONE: f12cb6e7, then a418f7e0 three digits counting in tens inside a group.
 - ~~**Concept 070, the Pico emulator routing keys to a synth, with a binary dump** (2026-10-10). Asked: *"can we use pico emulator to show off basic web: routing for keyboard to synth or smth. also have binary dump? concept 070"*.~~ DONE 2026-10-10; the router firmware routes unchanged (scene 1 thru, scene 2 octave up on channel 2).
 - ~~**Invisible hand on every concept knob; 40's step 3 is wave; freq on 5 amp** (2026-10-10). Asked: *"on all concept knobs add inviible hand mode"*, *"3 saw -> 3 wave"*, *"keep freq on 5 amp"*. `hand: true` on 14, 40, 41, 50; freq on 40's steps 5 and 6.~~ DONE 2026-10-10.
 - ~~**Knob area keeps its height with no knob** (2026-10-10). Asked: *"in individual knobs demos fix their area h even when no know is shown"*.~~ DONE 2026-10-10 on 40.
@@ -221,14 +352,14 @@
 - ~~**Concept 31 layout, and slider end labels in one width** (2026-10-10). Asked: *"in 31: move play to top left, under title. make crossfader and dry full w. global cnage: label area w's on slider left ad right the longest one"*. Play on its own row under the title; every slider row full width; the end labels on both sides take the width of the longest one on the page, so the sliders line up. Also 30, which has the same crossfader row.~~ DONE 2026-10-10, page-local in 30 and 31; older, plain and freeze removed (*"no older, plain, freeze controls for now"*).
 - ~~**Stream wires: much longer bands** (2026-10-10). Asked: *"make streamy connectoins animation waaaay longer than currentlu"*.~~ DONE 2026-10-10.
 - ~~**Concept 41 pad labels the wrong size** (2026-10-10). Asked: *"wrong font size on xy"*. Sized from the pad's on-screen width, 13 px.~~ DONE 2026-10-10.
-- **Concept synths laid out one way** (2026-10-10). Asked: *"have standard logic for istrument panes when you lay out concept syths. they are linear execpt knobs that are are independet in the knobs area, horiz scrollable. no half col scope, scope is always full w"*. Rule in the positron-concepts skill; `createKnobGrid` gains a one-row scrolling mode; 40, 41 and 50 follow it.
+- ~~**Concept synths laid out one way**~~ (2026-10-10). Asked: *"have standard logic for istrument panes when you lay out concept syths. they are linear execpt knobs that are are independet in the knobs area, horiz scrollable. no half col scope, scope is always full w"*. Rule in the positron-concepts skill; `createKnobGrid` gains a one-row scrolling mode; 40, 41 and 50 follow it. DONE: the rule in the positron-concepts skill; createKnobGrid row mode in knob-grid.mjs.
 - ~~**Concept 41: the keys box with no keyboard** (2026-10-10). Asked: *"where is web:keys. there is only test tone"*. The node is `web:tone`, labelled test tone.~~ DONE 2026-10-10.
 - ~~**XY pad mark: no ring, a ground-coloured border** (2026-10-10). Asked, with a crop of 41's pad: *"rm extra outline. make bg-colored border on yellow dot"*.~~ DONE 2026-10-10.
 - ~~**Tutorial layouts: slide, building area and patchbay together** (2026-10-10). Asked, in the background: a concept page where a tutorial's slide-like section, an area where the component is built, and the patchbay picture fit together, the patchbay either as a footer segment or a right sidebar, with a mobile answer (slides on a phone scroll their secondary text under the main content). Several layouts on a small sandbox (a couple of boxes, a keyboard), switchable, plus a written comparison. `/concepts/50/` and `plans/plan-tutorial-layout.md`.~~ BUILT 2026-10-10 as a sandbox and a plan; six open questions for the owner at the end of `plans/plan-tutorial-layout.md`.
 - ~~**Transport icons on every concept, an icon button in the kit** (2026-10-10). Asked: *"Use transport icons on all our convepts. Keep them square. Kit iconbutton(group?)"*. Feather play, pause, stop and record from `demo/shell/icons.mjs` in square buttons; a kit `createIconButton` (and a group if a row of them needs one), then every concept page's own play, stop and record buttons use it (12, 13 and 14's record, 30, 31, 40, 41). Waits for the knob grid agent, which is editing 40, 41 and `shell.css`.~~ DONE 2026-10-10. Left open: the shared transport bar's own play toggle is still a CSS glyph beside the new outline record icon on 13 and 14.
 - ~~**A knob grid kit component** (2026-10-10). Asked: *"Knobs:each has its own wrapper box, in a grid, already reserve room for it. A kit component. In 40 41"*. Each knob in a box of its own, the boxes in a grid whose slots are reserved, used on concepts 40 and 41.~~ DONE 2026-10-10.
 - ~~**Concept 41: no keyboard, a labelled pad with a 2x2 grid** (2026-10-10). Asked: *"Rm keyboard from 41. Make xy have labels and 2x2 grid lines, similar to draw (can you reuse?)"*.~~ DONE 2026-10-10.
-- **Icons: open questions** (2026-10-10, from the icons agent). Feather has no keyboard, plug, cable, knob, unlink or broadcast icon (Lucide has them, refused for eccm as rounded); positron keeps Feather's round caps where eccm squares them; at 375 px `fullscreen-exit` breaks after its hyphen. No page uses `icons.mjs` yet.
+- **Icons: open questions** (2026-10-10, from the icons agent). Feather has no keyboard, plug, cable, knob, unlink or broadcast icon (Lucide has them, refused for eccm as rounded); positron keeps Feather's round caps where eccm squares them; at 375 px `fullscreen-exit` breaks after its hyphen. No page uses `icons.mjs` yet. Now: icons.mjs is used by 7 files; still no keyboard, plug, cable, knob, unlink or broadcast icon.
 - ~~**Concept 40 knobs named `web:knob-<name>`** (2026-10-10). Asked: *"web:knob:…?"*, then *"Yes"* to `web:knob-cutoff:value-out`.~~ DONE 2026-10-10.
 - ~~**Concept 41, a basic synth with an XY pad on the filter** (2026-10-10). Asked: *"Make next demo with basic syth but with xy pad controlling filter"*. `demo/concepts/41/`, from 40's modules, the kit's `xy-pad.mjs` as a bay node cabled to the filter.~~ DONE 2026-10-10.
 - ~~**An icon set, and a kit icons page** (2026-10-10). Asked: *"In bg see ../ eccm icon syarem. We need one from icones. Make a sample sheet in one of kit pages called icons"*. Read how `~/personal/eccm` does icons, pick one set from Icones (icones.js.org, Iconify), vendor what positron needs, and show a sample sheet at `/kit/icons/`. Background agent.~~ DONE 2026-10-10.
@@ -246,47 +377,47 @@
 - ~~**A patchbay component** (2026-10-10). Asked: *"make a patchbacy component that shows view. patchbay title has 'details' button (secodnary small) on the right and when clicked it shows out links table. make ir generic (rm send headd), add mode data on links and ports you know. use it on all concepts except 1 and 2"*. A shell module: `patchbay` heading, a small secondary `details` button at its right, the bay view, and on press the links and ports tables. Generic columns, no `sent` / `heard`, every field the bay knows about a link and a port. Concepts 3, 4, 5, 6, 10, 11, 12, 13, 14 use it in place of their own picture and tables.~~ DONE 2026-10-10.
 - ~~**Concepts reshuffle** (2026-10-10). Asked: *"move 21 to kit, patchbay card. rm 21. replace 10 with 20. use bay view in concept 3 and beyond. rm 20."* So: `/concepts/21/`'s pictures become a `patchbay` part of the kit (`demo/kit/patchbay/`, `kit-parts.mjs`, manifest row); `bay-view.mjs`, `bay-traffic.mjs`, `port-ink.mjs` move to `demo/shell/` (kit and pages share them); `/concepts/10/` becomes what 20 is; concepts 3, 4, 5, 6, 11, 12, 13, 14 draw their links with `createBayView`; 20 and 21 leave `list.mjs` and the tree.~~ DONE 2026-10-10.
 
-- **Node `kind` becomes flags, waiting on the owner** (2026-10-10). `plans/plan-node-kind.md`: `{ store?, consent?, synth? }` replace the seven kinds; five open questions in its last section (field names, eccm, how long desk tabs stay open). Nothing built.
-- **The bay view's open questions** (2026-10-10, `plans/plan-links-view-phone.md`): box order on a phone (link depth today), one port column (built) or two, and whether the desk layout takes the gutter too, which would stop wires crossing boxes on `/concepts/21/`'s pictures of 6 and 14.
-- **`/concepts/21/` keeps its own node labels** (2026-10-10). Its `INFO` table (`on-screen keyboard`, `Pico OLED, 128x64`) is a copy, not what the concept pages declare (`keyboard`, `OLED`). Either the pages take the longer labels or 21 reads them from the pages.
-- **`heard` reads `received` on `/concepts/20/` only** (2026-10-10). Asked as *"heard -> received?"*; concepts 10 to 14 still say `heard`.
+- **Node `kind` becomes flags, waiting on the owner** (2026-10-10). `plans/plan-node-kind.md`: `{ store?, consent?, synth? }` replace the seven kinds; five open questions in its last section (field names, eccm, how long desk tabs stay open). Nothing built. WAITING: on the owner's answers in plans/plan-node-kind.md; kinds still in bay.mjs.
+- **The bay view's open questions** (2026-10-10, `plans/plan-links-view-phone.md`): box order on a phone (link depth today), one port column (built) or two, and whether the desk layout takes the gutter too, which would stop wires crossing boxes on `/concepts/21/`'s pictures of 6 and 14. Now: concept 21's pictures are /kit/patchbay/ since 9aefa81b (2026-10-10); box order, port columns and the desk gutter are still open in the plan.
+- **`/concepts/21/` keeps its own node labels** (2026-10-10). Its `INFO` table (`on-screen keyboard`, `Pico OLED, 128x64`) is a copy, not what the concept pages declare (`keyboard`, `OLED`). Either the pages take the longer labels or 21 reads them from the pages. Now: /concepts/21/ is /kit/patchbay/ since 9aefa81b; its INFO table still copies labels (on-screen keyboard, Pico OLED) while pages say keyboard.
+- ~~**`heard` reads `received` on `/concepts/20/` only**~~ (2026-10-10). Asked as *"heard -> received?"*; concepts 10 to 14 still say `heard`. OVERTAKEN: /concepts/20/ removed and the sent/heard tables replaced by patchbay.mjs (columns messages, no heard), 9aefa81b 2026-10-10.
 
-- **Concept 14 rewinds after recording, as 13 does** (2026-10-09). 13's `stopRecording()` sets the range to the take plus 500 ms (2 s minimum), seeks 0 and fits; 14 has the same recorder and not the fix.
+- **Concept 14 rewinds after recording, as 13 does** (2026-10-09). 13's `stopRecording()` sets the range to the take plus 500 ms (2 s minimum), seeks 0 and fits; 14 has the same recorder and not the fix. Now: concept 14 is /concepts/synth/030/ Dot piano; its stopRecording() still only pauses, no seek 0 or fit as synth/020 does.
 - ~~**Concepts 5 and 6 chat through the bay** (2026-10-09). They still `node.send` raw `chat.line` / `chat.admin`; 3 and 4 use `node.emit` and `*` links (§4h). Port them, notices included (`admin:out -> *:notice:in`).~~ DONE 2026-10-10.
 - **Bay: first-join race** (2026-10-09, §4h). A `bay.event` that arrives before its sender's announce is refused as an unknown source. Rare, real.
 - **Bay: two browser tabs read `where: 'machine'` to each other** (2026-10-09). `whereOf` sees both placed `browser`; harmless for light links, wrong label for a WHEP between two tabs.
-- **Who may hold a port: admin and clear** (2026-10-09, `plans/plan-site-names.md` §4i item 8, §4f item 4). Any tab can be Admin and any tab can clear `positron-store` history (no key). Spec before `/stage/` uses it.
+- **Who may hold a port: admin and clear** (2026-10-09, `plans/plan-site-names.md` §4i item 8, §4f item 4). Any tab can be Admin and any tab can clear `positron-store` history (no key). Spec before `/stage/` uses it. Now: room/003 picks admin as first in the room with nothing proving it; positron-store /clear still takes no key.
 - **A person's name on a site, and proof a message arrived** (2026-10-09, §4f items 4 and 6). Not built.
 - **State links: snapshot on link as a bay rule** (2026-10-09, §4i item 2). Concept 14 sends on change plus one snapshot by hand.
 - **`value` vs `state` vs `text` medium** (2026-10-09, §4i item 5). Decide once a page must refuse one by medium.
 - **A `uart` transport name, and the real desk Pico** (2026-10-09, §4i item 7). `rig/pico/rings/` builds for the RP2040 emulator only; the desk board is a Pico 2 W (`pico2_w`). Build it for that board and link the real one; never send it SysEx.
-- **Shader `program-in`** (2026-10-09, §4i item 6). Optional: GLSL arriving over a link, as `/mirror/` does to the Pi.
-- **Medium colours and the live dot into the kit** (2026-10-09). `--md-*` colours and the dot-in-a-cell hack are copied page-locally into concepts 1, 3, 4, 5, 6, 10 to 14. Move the colours to `shell.css` and give `table.mjs` a cell renderer (dot, medium colour) so pages stop post-processing cells by text.
+- ~~**Shader `program-in`**~~ (2026-10-09, §4i item 6). Optional: GLSL arriving over a link, as `/mirror/` does to the Pi. DONE: 3be24ac8 shader/010 Shader on Pi, a browser shader node takes GLSL on program-in over a link.
+- **Medium colours and the live dot into the kit** (2026-10-09). `--md-*` colours and the dot-in-a-cell hack are copied page-locally into concepts 1, 3, 4, 5, 6, 10 to 14. Move the colours to `shell.css` and give `table.mjs` a cell renderer (dot, medium colour) so pages stop post-processing cells by text. Now: patchbay.mjs carries the medium colours; --md-* still copied in synth/000 to 030, room/000, room/040, device/000, not in shell.css.
 - ~~**Concept 12's play glyph** (2026-10-09). U+25B6 `▶` has an emoji form (positron-ui); use `►` U+25BA.~~ DONE 2026-10-10.
 - ~~**Concept 6: drop `filled()` and its stale comment** (2026-10-09). `bay.mjs` knows `whip` now.~~ DONE 2026-10-10.
-- **Transport bar `rewindOnStop`** (2026-10-09). Only if a third page records: `/stage/` and concept 13 each rewind by hand.
-- **Mirror opens its picture through the opener** (2026-10-09). Then `{ w h fps }` link options apply to it; today it sends its own `video.start` (traced, kept).
+- **Transport bar `rewindOnStop`** (2026-10-09). Only if a third page records: `/stage/` and concept 13 each rewind by hand. Now: a third recording page exists (video/020), and it, synth/020 and synth/030 still rewind by hand; no rewindOnStop in the bar.
+- ~~**Mirror opens its picture through the opener**~~ (2026-10-09). Then `{ w h fps }` link options apply to it; today it sends its own `video.start` (traced, kept). OVERTAKEN: /mirror/ marked not needed, supersededBy shader/010, 4a2aa61a 2026-10-12.
 - **Video options floor and even sizes are unmeasured on the Pi** (2026-10-09). `link-options.mjs` refuses below 16 and odd sizes on reasoning only; two viewers asking different sizes is the lease's question.
-- **Commit `4c9f5ae` is mislabelled** (2026-10-09). It carries the built copies of the lane colour fix and concept 13's rewind; its message is about concept 14. Leave it (pushed); noted here so archaeology finds it.
+- ~~**Commit `4c9f5ae` is mislabelled**~~ (2026-10-09). It carries the built copies of the lane colour fix and concept 13's rewind; its message is about concept 14. Leave it (pushed); noted here so archaeology finds it. DONE: nothing to do by its own words; 4c9f5ae9 is still in history with its message, as noted.
 - ~~**Concepts pages are not deployed**~~ DEPLOYED 2026-10-09 by a build rule, `conceptFiles()` in `workers/view/build.mjs`: any new `demo/concepts/<n>/` ships with no edit, not in the manifest, off the front page. Was (found 2026-10-09). `build.mjs` copies only manifest demos, so `/concepts/` and its pages exist on the local server only. For the presentation they need a manifest row (probably `unlisted: true`) or a build rule. Owner to decide.
-- **Concepts 6 broadcast shares /cam/'s WHIP input** (2026-10-09). One camera at a time (409 otherwise), a hold over 5 min can be taken over by `/cam/`, 20 publishes an hour. One headless loop measured 512 frames up to 1280x720. Its `filled()` workaround for `whip` can go now that `bay.mjs` knows `whip`.
-- **Concepts 5: toward stage, an admin chat message** (2026-10-09). Asked: *"concept 5: lets move towards stage. for now do concepts 4 copy to 5 and have concept of "admin chat message" somehow. First on page or figure it out"*. `demo/concepts/5/`.
+- ~~**Concepts 6 broadcast shares /cam/'s WHIP input**~~ (2026-10-09). One camera at a time (409 otherwise), a hold over 5 min can be taken over by `/cam/`, 20 publishes an hour. One headless loop measured 512 frames up to 1280x720. Its `filled()` workaround for `whip` can go now that `bay.mjs` knows `whip`. OVERTAKEN: concept 6 became room/030 Broadcast, removed 2026-10-12 (4d40f117); video/030 keeps the WHIP and WHEP round trip.
+- ~~**Concepts 5: toward stage, an admin chat message**~~ (2026-10-09). Asked: *"concept 5: lets move towards stage. for now do concepts 4 copy to 5 and have concept of "admin chat message" somehow. First on page or figure it out"*. `demo/concepts/5/`. DONE: built as concept 5, later room/020 Admin; room/003 carries the admin chat since 27c9c302, room/020 removed 3dde7d74.
 - ~~**Bay: chat core, a `*` link and a light link across the network**~~ BUILT 2026-10-09 (§4h): `value` carries text, `*` site link one to many, `bay.event` over the room via `node.emit`; concepts 3 and 4 rebuilt on it, never run in two tabs. Open: first-join race (event before announce is refused), two tabs read `where: machine` to each other. Concepts 5 still on raw `chat.line`, port it.
 - ~~**Store announces itself while recording** (2026-10-09, §4g).~~ DEPLOYED 2026-10-09, `positron-store` version `dc221b61`, heard live in a throwaway room at 0.5 s and 9.8 s; not committed. Follow-up: `/concepts/4/` and `/5/` still announce it locally too, harmless, remove later.
-- **Time cam/pub starts on the new Containers runtime against legacy** (2026-10-09). Asked: *"13.5 s on the new runtime against 1.2 s on the old = sound bad. add to backlog to test"*. pub runs `"PUB_RT": "next"` since `df0db93` (2026-10-08, `https://pub.positron.studio/` reports `"runtime":"next"`), and `/cam/`'s container is inside pub. The only number is ONE cold start right after an image push, 13.5 s vs 1.2 s (HANDOFF.md:70), which may be the image pull and not the runtime. Measure: several cold starts and several warm starts on each runtime, same input, `https://positron.studio/cam/` press-to-first-frame. Rollback if next loses: `PUB_RT` to `legacy` and redeploy from `workers/pub`. Note legacy's `Container` class is frozen 2026-12-31, so losing means fixing next, not staying.
-- **Concepts pages, patchbay first** (2026-10-09). Asked: *"simple demo pages demo1 demo2 ... where we unpack concepts in a clear way"*, then *"make concepts/1 ... keep that list as cards in /concepts"*. `demo/concepts/index.html` (cards, one `['1', '']` row, descriptions filled as we go) and `demo/concepts/1/index.html` (table of ports announced in `studio-1`: who, port, dir `→○`/`○→`, medium colour, live dot). Not in the manifest, not deployed. The 8 medium colours (`--md-*`) live on that page only; if kept they move to `shell.css` and `table.mjs`. The 7 dropped card ideas are in this session's chat: link as text, media, ends, transforms, checking, transport choice, heavy media as session, patch as file.
-- **Announce `net`: which network a site is on** (2026-10-09, from *"what else is missing in terms of advertise"*). The Pi's graph has no `net`, browsers send none, and `chooseTransport` in `demo/shell/bay.mjs` decides machine / LAN / internet from exactly that. The Pi can say its LAN; a browser cannot reliably know its own, which is the hard half.
+- **Time cam/pub starts on the new Containers runtime against legacy** (2026-10-09). Asked: *"13.5 s on the new runtime against 1.2 s on the old = sound bad. add to backlog to test"*. pub runs `"PUB_RT": "next"` since `df0db93` (2026-10-08, `https://pub.positron.studio/` reports `"runtime":"next"`), and `/cam/`'s container is inside pub. The only number is ONE cold start right after an image push, 13.5 s vs 1.2 s (HANDOFF.md:70), which may be the image pull and not the runtime. Measure: several cold starts and several warm starts on each runtime, same input, `https://positron.studio/cam/` press-to-first-frame. Rollback if next loses: `PUB_RT` to `legacy` and redeploy from `workers/pub`. Note legacy's `Container` class is frozen 2026-12-31, so losing means fixing next, not staying. Now: research/cf-containers-next-2026-10-07.md says the 13.5 s was the image pull; the repeated cold and warm timings are still not taken.
+- ~~**Concepts pages, patchbay first**~~ (2026-10-09). Asked: *"simple demo pages demo1 demo2 ... where we unpack concepts in a clear way"*, then *"make concepts/1 ... keep that list as cards in /concepts"*. `demo/concepts/index.html` (cards, one `['1', '']` row, descriptions filled as we go) and `demo/concepts/1/index.html` (table of ports announced in `studio-1`: who, port, dir `→○`/`○→`, medium colour, live dot). Not in the manifest, not deployed. The 8 medium colours (`--md-*`) live on that page only; if kept they move to `shell.css` and `table.mjs`. The 7 dropped card ideas are in this session's chat: link as text, media, ends, transforms, checking, transport choice, heavy media as session, patch as file. DONE: demo/concepts/index.html and list.mjs, cards per group; concept 1 became misc/000 Announce, archived 2026-10-12.
+- **Announce `net`: which network a site is on** (2026-10-09, from *"what else is missing in terms of advertise"*). The Pi's graph has no `net`, browsers send none, and `chooseTransport` in `demo/shell/bay.mjs` decides machine / LAN / internet from exactly that. The Pi can say its LAN; a browser cannot reliably know its own, which is the hard half. Now: the board carries BOARD_NET when set (965c67d5); browsers still send no net.
 - **Busy ports** (2026-10-09, same question). Nothing in an announce says a port is linked or a synth is held; a person learns it only from a refused link. Needs a design for who holds a port and how it shows, bigger than a field.
-- **Services announce for real** (2026-10-09). `plans/plan-site-names.md` §4d: `kind: 'service'`, `CF <product>` labels, transports on the port. Simulated on `/concepts/1/`. Trace `/cam/` before building, the ports there are read from its description.
+- **Services announce for real** (2026-10-09). `plans/plan-site-names.md` §4d: `kind: 'service'`, `CF <product>` labels, transports on the port. Simulated on `/concepts/1/`. Trace `/cam/` before building, the ports there are read from its description. Now: services are still drawn page-locally (room/004 cf-store, patchbay.mjs relay box); no worker announces itself.
 - ~~**Pi site `pi-1` and port names `<medium>-<dir>`** (2026-10-09, decided by the owner, `plans/plan-site-names.md` §0, §4b, §4c). Every id changes once: one rig deploy, a sweep of `demo/patchbay/index.html`, `midi-node.mjs`'s stand-in board, the tests. Simulated on `/concepts/1/` (port names only).~~ DONE 2026-10-10, not committed, on the Pi, site not deployed. `boardGraph` takes `site` (default `BOARD_SITE = 'pi-1'`, `board.mjs --site` or `BOARD_SITE` for a second board), the room stays `studio-1` and every stream address is unchanged; `boardPort(node, name)` is how a page names a Pi port. `graphProblem` holds a `kind: 'board'` graph to `<medium>-<dir>` names, boards only, because browser pages and the store still announce `keys:out` and `history:in`. Swept: patchbay (Pi ids and its own ports), kit/patchbay, mirror, knobs, away, evo, concepts 017, 090, 091, `midi-node.mjs`, `openers.mjs` (its video opener took the ROOM from the port's site, now from the node's place), bay and registry tests. STILL OLD: every other page's own browser ports (`keys:out`, `screen:audio`, `here:circuit:in` on `/wish/`), a separate sweep.
-- **Mirror: knobs through the bay** (2026-10-09, `plans/plan-site-names.md` §4e). `boardGraph` gives `gpu` a `value-in`, `/mirror/` announces `knobs:value-out` and sends `video.params` through the link. Needs the Pi deploy, ride with step 1's `rig/board/push.sh`.
+- ~~**Mirror: knobs through the bay**~~ (2026-10-09, `plans/plan-site-names.md` §4e). `boardGraph` gives `gpu` a `value-in`, `/mirror/` announces `knobs:value-out` and sends `video.params` through the link. Needs the Pi deploy, ride with step 1's `rig/board/push.sh`. OVERTAKEN: /mirror/ marked not needed 2026-10-12 (4a2aa61a); shader/010 sends the knob through the bay to a simulated Pi value-in.
   - 2026-10-10: still not built. The Pi deploy it waited on has happened (site `pi-1`), so it now needs its own push; the port would be `pi-1:gpu:value-in`.
 - ~~**Video size and fps as link options**~~ BUILT 2026-10-09, not committed: `{ w 640, h 360, fps 15 }` in the link body as `link.options` (`demo/shell/link-options.mjs`, 34 checks), ranges from the board's clamps, floor 16 and even sizes not measured on the Pi. Was (2026-10-09, §4e). `openers.mjs:239` hard codes `video.start` 1280x720 at 30; make them `{ w h fps }` on the link.
 - ~~**Mirror's own `video.start`**~~ TRACED 2026-10-09 and KEPT: mirror opens its picture itself (status first, joins a running encoder, own decode and heartbeat) and only asks `openers.pick`; moving it onto the opener is a larger change, not done. Was (2026-10-09, §4e). `mirror/index.html:1677` sends it beside the opener's. Trace whether it is a leftover and remove it if so.
 - ~~**Mirror announces its left pane** (2026-10-09, §4e).~~ BUILT 2026-10-09, not committed, not deployed: `webgl:video`, `left:video`, the bay picks `page`; `verify-gl.mjs mirror` 50/50 to 52/52.
 - ~~**The bay accepts a wire transport inside one tab**~~ FIXED 2026-10-09, refused when both ends are one site, `bay-test` R. Was (found 2026-10-09 building the above). `via: 'whep'` on a same-tab link answers `ok: true, transport: 'whep', where: 'machine'`. `MACHINE_ONLY` stops a one-machine transport crossing a wire, nothing stops the reverse. Decide whether `bay.link` refuses it.
 - ~~**A browser port's derived address is per place, not per site**~~ FIXED 2026-10-09, `addressOf` includes the site when it differs from place, `bay-test` S. Was (found 2026-10-09). `browser-webgl-video` for every mirror tab, so two tabs collide the moment a browser-placed port gets a wire transport. Harmless for `page` today.
-- **Sites say what they are: `kind` and `label` on the graph** (2026-10-09). Asked: *"i do not what is m2 (me) m1 pi"* and *"check can you properly fix pi with new spec. if too much, backlog"*. Spec `plans/plan-site-names.md`: optional `kind`/`label`, ids unchanged, `v` stays 1, "you" decided by the reader, Pi site rename refused for now. Touches `graph-registry.mjs` (`boardGraph`, `merged().sites`, `graphProblem`), `patchbay` `SELF`/`STORE`, `concepts/1` "who" column, one rig deploy. Step 1 (`kind`/`label`) plus the Circuit announced by name (`circuit:in`; the agent found its MIDI is its own USB card, not the FastTrack, already configured, and announced only while the Circuit is present) handed to a background agent 2026-10-09: *"do the specced changes in bg, backlog others"*. Was: spec only, being worked through with the owner before anything is built (*"do not implement, lets work it through"*). A stopped first attempt at step 1 is parked as a patch in the session scratchpad, not in the tree. STEP 2, spec only, not started: port names become `<medium>-<dir>` (`screen:audio-in`) together with the Pi site rename, §4b/§4c; owner: *"i do not care about saved links"*. 2026-10-10: step 1 is on the Pi, and step 2 is done for the Pi's ids and `/patchbay/` (see the `pi-1` line above).
+- ~~**Sites say what they are: `kind` and `label` on the graph**~~ (2026-10-09). Asked: *"i do not what is m2 (me) m1 pi"* and *"check can you properly fix pi with new spec. if too much, backlog"*. Spec `plans/plan-site-names.md`: optional `kind`/`label`, ids unchanged, `v` stays 1, "you" decided by the reader, Pi site rename refused for now. Touches `graph-registry.mjs` (`boardGraph`, `merged().sites`, `graphProblem`), `patchbay` `SELF`/`STORE`, `concepts/1` "who" column, one rig deploy. Step 1 (`kind`/`label`) plus the Circuit announced by name (`circuit:in`; the agent found its MIDI is its own USB card, not the FastTrack, already configured, and announced only while the Circuit is present) handed to a background agent 2026-10-09: *"do the specced changes in bg, backlog others"*. Was: spec only, being worked through with the owner before anything is built (*"do not implement, lets work it through"*). A stopped first attempt at step 1 is parked as a patch in the session scratchpad, not in the tree. STEP 2, spec only, not started: port names become `<medium>-<dir>` (`screen:audio-in`) together with the Pi site rename, §4b/§4c; owner: *"i do not care about saved links"*. 2026-10-10: step 1 is on the Pi, and step 2 is done for the Pi's ids and `/patchbay/` (see the `pi-1` line above). DONE: e329be87 kind and label, 589ea15c pi-1 and medium-dir ports, on the Pi 2026-10-10.
   - **Step 1 is in the tree, not committed, not on the Pi** (agent, 2026-10-09). `graph-registry.mjs`: `SITE_KINDS` is `board, browser, store, node, mac, service`, `boardGraph` sends `kind: 'board', label: 'Raspberry Pi'`, `merged().sites` carries both, `graphProblem` refuses a kind outside the list. `/patchbay/` `SELF` and `STORE` and `/concepts/1/` `SELF` carry them; `/concepts/1/`'s who column reads them and falls back to the `place` guess. Registry test 60/60 to 72/72, bay-node 33/33, patchbay 45/45.
   - **The Circuit's MIDI does NOT go through the Fast Track Pro, and its `midi` entry is ALREADY configured.** From the repo: HANDOFF 2026-09-30 records `BOARD_INPUTS='{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}'`, ALSA client `Circuit` and `/proc/asound/Circuit` as its own USB card; the Fast Track Pro carries only its AUDIO (left out into input 1). MEASURED today through the relay (`node rig/board/ask.mjs --room studio-1 audio.status`): the running board reports `midi: { port: 'Circuit', channels: [1,2,10] }` on the `circuit` input. So `studio-1:circuit:in` is missing because `beat.mjs` `graphOf` announces an input's MIDI only while its ALSA card is present (the 2026-10-04 ENOENT fix), and the owner says the Circuit may be offline. Nothing to change in config; it should appear within one beat of the Circuit being plugged in and powered. `midi-fasttrack-pro:in/out` are the Fast Track Pro's own DIN MIDI ports, a separate device. Not confirmed on a powered Circuit today.
   - ~~**Pi deploy waiting.**~~ DONE 2026-10-10 from the Pi's LAN: md5s match, `board.alive` carries `kind=board label=Raspberry Pi`, and since the same day site `pi-1`. Was: Not reachable over ssh (this laptop was on a phone hotspot, 172.20.10.x; the board answered over the relay). The step, from the board's LAN: `rig/board/push.sh` (or `rig/board/push.sh <pi>`), which ships `rig/board` plus `demo/shell/graph-registry.mjs` to `/opt/positron-board` and restarts the service, then compare `md5sum /opt/positron-board/demo/shell/graph-registry.mjs` with the tree and listen in `studio-1` for `board.alive` with `kind=board label=Raspberry Pi`. Until then the Pi sends neither field and `/concepts/1/` falls back to the guess.
@@ -297,7 +428,7 @@
 - ~~**`positron-station`'s cron throws every run** (found session 70).~~ DONE 2026-10-08: `"triggers": { "crons": [] }` in `workers/station/wrangler.jsonc`, deployed `2f794895`, the schedules API reads `[]`
 - ~~**Sweep the other recording inputs** (session 70 open item).~~ DONE 2026-10-08: recording read per input; `low-latency-demo` and `latency-rig-llhls` are `automatic` and are swept now (`a39d9409`), `positron-stage`, `whep-rig` and `positron-cam-whip` are `off`, `Maria` is not positron's and is left alone
 
-- **`positron-station`'s cron throws on every run** (found 2026-10-08, not asked). `workersInvocationsScheduled` reads `scriptThrewException` for `*/5 * * * *` at 10:25, 10:30, 10:35 and 10:40 UTC. The station moved to eccm on 2026-10-02 and the repo's `workers/station` has NO cron and NO `scheduled` handler: the trigger outlived the code, because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. The fix is that line and a redeploy; nothing changed yet.
+- ~~**`positron-station`'s cron throws on every run**~~ (found 2026-10-08, not asked). `workersInvocationsScheduled` reads `scriptThrewException` for `*/5 * * * *` at 10:25, 10:30, 10:35 and 10:40 UTC. The station moved to eccm on 2026-10-02 and the repo's `workers/station` has NO cron and NO `scheduled` handler: the trigger outlived the code, because `wrangler deploy` leaves an existing cron alone unless the config says `"triggers": { "crons": [] }`. The fix is that line and a redeploy; nothing changed yet. DONE: e403b38d crons [] in workers/station/wrangler.jsonc, deployed 2026-10-08 (struck row above it says so).
 
 - ~~**A scheduled cleanup of Stream recordings** (2026-10-08). Asked: *"yes to both"*, to a scheduled sweep after storage reached 75 per cent (764 of 1000 minutes; 158 test pattern recordings deleted by hand on 2026-10-07). A cron that deletes `positron-demo` and `positron-cam` recordings older than a day, never one in state `live-inprogress`.~~ DONE 2026-10-08, `workers/sweep` (`positron-sweep`, cron `41 * * * *`, `POST /sweep` with `SWEEP_TOKEN` from `.env`, `?dry=1` lists only). First run deleted 8 `positron-cam` recordings, 14.97 min; storage 2.46 of 1000
 
@@ -347,7 +478,7 @@
 
 - ~~**A `positron` deck from `what-is-positron.md`, the speaker notes shortened to the body text** (2026-10-07). Asked: *"~/Downloads/what-is-positron.md make slides. shorten speaker notes to body text"*. Headings kept as written, one short body sentence per slide from its notes, the full notes kept in `notes` (not drawn). `demo/shell/decks.mjs`, a `slides/positron` row, `demo/slides/positron/`. ~~ DONE 2026-10-07, BUILD `b9170d0-105908-90cf`, 12 slides
 
-- **Slide columns still overflow** (2026-10-07). Asked: *"cols still overflow!?!"*, interrupted by the request above before it was looked at. NOT REPRODUCED 2026-10-08: every slide stepped and every element measured against its `.sl-in` (outside it, or clipped with `overflow: hidden`) on `/slides/synths/`, `/slides/positron/`, the front page's two half-width players and `/kit/slides/`, each at 375 and 1280. Nothing spills. The only hit is the synths volume slide's `volume` knob label at 0 px wide, inside a knob row that is 0x0 until Start compiles (not drawn). Waiting on which deck, which slide and which width it was seen at.
+- **Slide columns still overflow** (2026-10-07). Asked: *"cols still overflow!?!"*, interrupted by the request above before it was looked at. NOT REPRODUCED 2026-10-08: every slide stepped and every element measured against its `.sl-in` (outside it, or clipped with `overflow: hidden`) on `/slides/synths/`, `/slides/positron/`, the front page's two half-width players and `/kit/slides/`, each at 375 and 1280. Nothing spills. The only hit is the synths volume slide's `volume` knob label at 0 px wide, inside a knob row that is 0x0 until Start compiles (not drawn). Waiting on which deck, which slide and which width it was seen at. WAITING: on the owner naming the deck, slide and width; not reproduced 2026-10-08, positron deck parked a9b1adbb.
 
 - ~~**Slide decks from the synthesis plan, written by the `positron-slides` skill** (2026-10-07). Asked: *"do some slide decs based on the slides skill and synthesis plan"*. Source `plans/plan-synthesis-2026-10-07.md` (sections 2, 5, 6, 12, 13). Each deck is a `DECKS` entry in `demo/shell/decks.mjs`, a `slides/<name>` row in `demo/manifest.mjs` and a copy of `demo/slides/synths/index.html`. Words only, no slots, so no new controls. Claims checked against `demo/draw/index.html`, `demo/shell/timebase.mjs`, `timeline/score.mjs`, `timeline/transport.mjs`; proposals labelled as proposals. ~~ DONE 2026-10-07, BUILD `9d95a2a-085221-93e2`: `studio` 7, `evidence` 8, `timing` 7 slides. Found on the way, NOT asked: the deck spill assert could not see evidence overflowing a centred `.sl-ev` over its headline and caption; it measures the children's rects now, went red on 14 first-draft slides and stays green on `synths`. REMOVED 2026-10-07, asked: *"rm new slides. not useful"*; the stronger spill check stays.
 
@@ -356,39 +487,39 @@
 - ~~**Synths deck: hide the sawtooth slide and the sine / saw choice slide** (2026-10-06). Asked: *"hide sawtooth and its selection. what shold be after freq?"*. Slides 5 and 6 (`saw`, `wave`) out of the deck, kept in `synth-steps.mjs` and their AOT artefacts; `deck-checks.mjs` drops what graded them. The question about the next slide is answered in chat, not built. ~~ DONE 2026-10-06
 
 - ~~**Front page slides: reserve each player's frame before it loads, lazy load what is inside** (2026-10-06). Asked: *"in frontpage slides load longer and make content jump. provice frames and lazyload contents"*. `mountDecks()` in `demo/shell/decks.mjs`, both index renderers; the frame is the 16:9 box (plus its footer) drawn at once, the deck built when it comes near the viewport. ~~ DONE 2026-10-06, asked again as *"slides \"pop in\" in frontpage. show the frame, lazyload ocntents\"*
-- **Synths deck: sound keeps going without pressing Start again** (2026-10-06). Asked: *"can you make it so i do not have to push 'start' again to get sound. small sound break is ok when needed?"*. `demo/shell/slide-synth.mjs`: once Start was pressed, a step to the next synth slide (and an edit) carries the sound over to the new program; Stop is the only thing that ends it.
+- **Synths deck: sound keeps going without pressing Start again** (2026-10-06). Asked: *"can you make it so i do not have to push 'start' again to get sound. small sound break is ok when needed?"*. `demo/shell/slide-synth.mjs`: once Start was pressed, a step to the next synth slide (and an edit) carries the sound over to the new program; Stop is the only thing that ends it. Now: slide-synth.mjs still stops the tone on leaving a slide; deck is unlisted at /slides/synths/ since 1c54afbd.
 
 - **Synths slides 3 to 6: the knob row draws empty in a screenshot** (2026-10-06, found while shooting the phone layout, NOT asked). The live site (BUILD `192103c`) shows a thin empty band between the code and the plate on slide 3 at 1280, in the page and in full screen, while the check *"slide 3 draws its volume knob ... at 0.50"* passes. Also: on a desk in full screen the FAU panel's plate is cut at the slide's foot. Neither diagnosed; measure the knob row's rect and the knob's own before believing the check.
 - ~~**The phone layout of a split ONLY in full screen** (2026-10-06). Asked: *"In mobile change layout in fullscreen"*, then *"Non when in nonfulkscreen"*. In the page the slide stays 16:9 with columns; full screen on an upright phone it stacks. ~~ DONE 2026-10-06
 - ~~**kit/hardware KEY LABELS: split into two blocks, without a header and with one, each in both orientations** (2026-10-06). Asked: *"KEY LABELS - aplit into without header with headers both havw 2 orientations"*. `demo/kit/hardware/index.html:251` and its assert at :623; the Pico's screen code in `demo/shell/pico.mjs`. ~~ DONE 2026-10-06
 - ~~**kit/slides: the synths deck out, THE PLAYER first, NAMES FROM THE CODE lower, the slide body in the sans** (2026-10-06). Asked: *"SYNTHS DECK - rm from slides kit page. Move player to top, move hilited word to dowwards. Use sans for slides body"*. The deck's checks move to its own page (`deckPage` in `demo/shell/decks.mjs`) so its audio coverage is not lost. ~~ DONE 2026-10-06
 - ~~**A split slide stacks on a phone: columns on the desk, rows on a phone** (2026-10-06). Asked: *"On mobile use horiz layout for vertical cols in desktop"*. `split` in `demo/shell/slide.css`, decided by the slide's own width (container query), the synths deck slides 2 to 6 first. ~~ DONE 2026-10-06
-- **Synths slide 6: a radio choice between sine and saw** (2026-10-06). Asked: *"how to make it a radio (sawtooth?)"*, then *"yes"* to slide 6. `nentry("wave[style:radio{'sine':0;'saw':1}]", ...)` with `select2`; the slot draws a radio style slider as a kit choice. A background agent.
-- **The shared AudioContext races when slides change hands quickly** (2026-10-06, found by kit/slides): after stepping across synth slides, a Start reported sounding while the node never took its knob value and measured silent; a broken edit's Stop left the context running. Both intermittent, both failed together twice, each run then lost 6 later asserts. Suspect `demo/shell/audio.mjs` suspend/resume ordering against `release()` on a step. A background agent.
-- **Variable names in slide text in monospace, a markup for any slide, and a kit/slides block showing it** (2026-10-06). Asked: *"var name is in monospace inside text. add vars example to slides kit too"*. Handed to the freq knob agent.
-- **Synths slides 3 and 4 words: "Code constant to an interactive knob", variable names in the text coloured by their knob's hue; slide 4 volume then freq with comments** (2026-10-06). Asked: *"A volume knob -> Code constant to a interactive knob. in the text use variable name with colorcoding."*, *"slide 4 is freq"*, *"volume ... freq ... this order, progressing. add comments"*. Handed to the freq knob agent.
-- **Synths deck: slide 3 a frequency knob, the volume knob moves to slide 4** (2026-10-06). Asked: *"slide 3 is freq knob"*, read as the 440 on a knob, then a slide with both knobs. A background agent.
-- **Synths deck: 1:2 columns, useful slide texts, words at the bottom** (2026-10-06). Asked: *"use 1:2 cols layout. make useful slide texts. align text to bottom of slide"*. Handed to the slide 3 agent (a `cols: '1:2'` option on `split`).
-- **Synths deck slide 3: the sine's 0.5 as a knob from 0 to 1** (2026-10-06). Asked: *"slode 3: make 0.5 into knob 0..1"*. A background agent.
-- **A page per deck at `/slides/<slug>/`, the deck's title in the half width footer linking to it; `/kit/logo/` from the brand slides, then the brand deck removed** (2026-10-06). Asked: *"add slides/*slug* page on each slode deck. title is on footer on 1/2 w it replaces page count and becomes link to slides/*slug* page. add kit/logo page and use individual slides from the brand slides. rm brand slids after it"*. A background agent.
-- **Routing follow-ups from the migration agents** (2026-10-06): (1) one `engine-node.mjs` in the kit, today two different copies (`demo/fau/` used by nola, and `demo/collide/` with a byte copy in `demo/muta/`); (2) `openers.mjs` `video()` to take an existing canvas and a per-chunk hook so `/mirror/` can drop its own decoder, and a `program` opener; (3) the `listen` opener to hand frames to the page (`onPcm`) so `/away/` can use it; (4) a page to page MIDI opener (blocks the patchbay's keys into a browser engine and taps on other tabs); (5) `fake-board.mjs` to announce `gpu:*` and answer `video.*` so `/mirror/` is graded locally; (6) `verify.mjs` `BOARD_PAGES` to include evo with `board=1`; (7) `/nola/` sits at the harness's 24 s collection limit (`GROWTH_TRIES`), 2 of 3 runs lost its last 5 asserts; (8) `createMidi` to say which port a message came from; (9) the Pi's graph declares `transports` only after `rig/board/push.sh` (DONE 2026-10-10, pushed, transports seen on the live beat).
+- ~~**Synths slide 6: a radio choice between sine and saw**~~ (2026-10-06). Asked: *"how to make it a radio (sawtooth?)"*, then *"yes"* to slide 6. `nentry("wave[style:radio{'sine':0;'saw':1}]", ...)` with `select2`; the slot draws a radio style slider as a kit choice. A background agent. DONE: 8f32a708 slide 6 wave as a radio choice; later hidden (hidden: true in synth-steps.mjs) per the hide-sawtooth ask.
+- ~~**The shared AudioContext races when slides change hands quickly**~~ (2026-10-06, found by kit/slides): after stepping across synth slides, a Start reported sounding while the node never took its knob value and measured silent; a broken edit's Stop left the context running. Both intermittent, both failed together twice, each run then lost 6 later asserts. Suspect `demo/shell/audio.mjs` suspend/resume ordering against `release()` on a step. A background agent. DONE: 70ef0172 audio.mjs release waits for an in-flight resume, 0 of 40 silent starts after.
+- ~~**Variable names in slide text in monospace, a markup for any slide, and a kit/slides block showing it**~~ (2026-10-06). Asked: *"var name is in monospace inside text. add vars example to slides kit too"*. Handed to the freq knob agent. DONE: 4beb03e1 code.sl-var in slide.mjs, NAMES FROM THE CODE block on /kit/slides/.
+- ~~**Synths slides 3 and 4 words: "Code constant to an interactive knob", variable names in the text coloured by their knob's hue; slide 4 volume then freq with comments**~~ (2026-10-06). Asked: *"A volume knob -> Code constant to a interactive knob. in the text use variable name with colorcoding."*, *"slide 4 is freq"*, *"volume ... freq ... this order, progressing. add comments"*. Handed to the freq knob agent. DONE: 4beb03e1 slide 3 volume, slide 4 volume then freq with comments, names in knob hues.
+- ~~**Synths deck: slide 3 a frequency knob, the volume knob moves to slide 4**~~ (2026-10-06). Asked: *"slide 3 is freq knob"*, read as the 440 on a knob, then a slide with both knobs. A background agent. OVERTAKEN: the later ask in the row above put volume on slide 3 and freq on slide 4 (4beb03e1, 2026-10-06).
+- ~~**Synths deck: 1:2 columns, useful slide texts, words at the bottom**~~ (2026-10-06). Asked: *"use 1:2 cols layout. make useful slide texts. align text to bottom of slide"*. Handed to the slide 3 agent (a `cols: '1:2'` option on `split`). DONE: 64ea8c7c cols 1:2 and bottom on split, new slide words.
+- ~~**Synths deck slide 3: the sine's 0.5 as a knob from 0 to 1**~~ (2026-10-06). Asked: *"slode 3: make 0.5 into knob 0..1"*. A background agent. DONE: 64ea8c7c slide 3 volume hslider 0 to 1.
+- ~~**A page per deck at `/slides/<slug>/`, the deck's title in the half width footer linking to it; `/kit/logo/` from the brand slides, then the brand deck removed**~~ (2026-10-06). Asked: *"add slides/*slug* page on each slode deck. title is on footer on 1/2 w it replaces page count and becomes link to slides/*slug* page. add kit/logo page and use individual slides from the brand slides. rm brand slids after it"*. A background agent. DONE: bc38cdb2 /slides/<slug>/ pages, footer link, /kit/logo/, brand deck removed.
+- **Routing follow-ups from the migration agents** (2026-10-06): (1) one `engine-node.mjs` in the kit, today two different copies (`demo/fau/` used by nola, and `demo/collide/` with a byte copy in `demo/muta/`); (2) `openers.mjs` `video()` to take an existing canvas and a per-chunk hook so `/mirror/` can drop its own decoder, and a `program` opener; (3) the `listen` opener to hand frames to the page (`onPcm`) so `/away/` can use it; (4) a page to page MIDI opener (blocks the patchbay's keys into a browser engine and taps on other tabs); (5) `fake-board.mjs` to announce `gpu:*` and answer `video.*` so `/mirror/` is graded locally; (6) `verify.mjs` `BOARD_PAGES` to include evo with `board=1`; (7) `/nola/` sits at the harness's 24 s collection limit (`GROWTH_TRIES`), 2 of 3 runs lost its last 5 asserts; (8) `createMidi` to say which port a message came from; (9) the Pi's graph declares `transports` only after `rig/board/push.sh` (DONE 2026-10-10, pushed, transports seen on the live beat). Now: (9) done; (1)(2)(5)(7) concern fau, collide, muta, mirror, nola, now marked not needed in concepts/list.mjs; (3)(4)(6)(8) left.
 - **Synths deck: remove slides c to f, rework the intro and the oscillator slide** (2026-10-06). Asked: *"rm fau slides c-f. first layout / Synths / in code / (better desc), no body text / --- / in right: (instrument panel with waveform from muta, then editable code, hardcoded params for minimal sine and then fau nameplate and test tone button on right / in left / title / desc what is goint on"*. A background agent; the compiler (1 MB) loads only on a test tone press after the code was edited.
-- **`workers/pub` is built on the `Container` class Cloudflare freezes on 2026-12-31** (2026-10-06, from `research/cloudflare-birthday-week-2026-10-06.md`). The new `ctx.container` runtime claims median start 648 ms against just over 4 s. Measure `pub`'s cold start first (never measured), then port before the date. Also: read the account's monthly log volume before the 2026-12-01 observability pricing.
-- **Implement `plans/plan-routing-migration.md`, in parallel** (2026-10-06). Asked: *"implement plans/plan-routing-migration, parallelize"*. DONE 2026-10-06 for steps 0 to 5: 14 of 54 pages on the patchbay; follow-ups below.
-- **`/patchbay/` announces into the owner's room on every visit and every suite run** (2026-10-06, found by the routing analysis, READ not observed). `ROOM = 'studio-1'` hard-coded (`demo/patchbay/index.html:160`), joined on load (`:917`), the harness's `?room=` ignored, not `room: 'fixed'` in the manifest. The same defect fixed for partitur and wall in `c296c5b`. Step 1 of `plans/plan-routing-migration.md` fixes it.
-- **Analysis: moving every demo onto universal routing / the patchbay, and what is missing** (2026-10-06). Asked: *"make analysis in bg what it takes to move all demos to universal routing / patchbay and what is still missing"*. Written to `plans/plan-routing-migration.md` 2026-10-06 (the older `plans/plan-universal-routing.md` is the plan it measures against).
-- **Deck "Synths in code" on the front page, Faust, playable** (2026-10-06). Asked: *"do slide deck / Synths / in code / in the fau examples. / intro / basic osc (2 col view, synth in side) / osc paramters / ...add elements to synth... / keep it simple. add to frontpage"*. A background agent: the steps compiled ahead of time (build-faust-aot.mjs generalised), a shared slot `demo/shell/slide-synth.mjs`, the deck in `decks.mjs`, graded on `/kit/slides/`.
-- **Favicon to the brand mark** (2026-10-06). Asked: *"update favicon to brand one"*. The inline β+ chosen on the brand deck's favicon slide (*"keep these for icons"*). Touches `workers/view/build.mjs` `favicon()` and the shell's inline icon.
-- **Brand font for page titles and subtitles everywhere** (2026-10-06). Asked: *"use brand font for page titles and subtitles everywhere"*. The brand face is the slide face, JetBrains Mono (vendored in `demo/shell/vendor/`); titles are `.pos-name`, subtitles `.pos-what`, in `demo/shell/shell.css`.
-- **Slides: keyboard control in full screen and mobile support** (2026-10-06). Asked: *"add keyboard control to slides in fullscreen and mobile support"*. Touches `demo/shell/slide.mjs` (`createSlidePlayer`), maybe `slide.css`.
-- **Kit cards titled by the part alone, and the slides group above kit on the front page** (2026-10-06). Asked: *"no need to \"kit/...\" in titles. move slides above kit in index page"*. Handed to the kit split agent with step 4, since it is editing `demo/manifest.mjs`.
-- **Implement `plans/plan-kit-split.md`** (2026-10-06). Asked: *"in bg implenetn kit plan"*. Steps 1 to 3 LIVE 2026-10-06 (BUILD 97fdd97-064000-8661): seven part pages listed, `kit` row unlisted. Step 4 (SLIDES to `/kit/slides/`, the forwarder at `/kit/`) approved with *"go"* and handed back to the same agent. Defaults taken where the plan asked: forwarder at `/kit/`, BRAND already gone to the front page deck, the kit group left out of the front page count, HARDWARE behind a start button.
-- **Synth-on-page infra from `plans/plan-live-slides.md`, no slides** (2026-10-06). Asked: *"implement synth-on-page infra. no slides. in bg"*. Steps 1 to 3 and 8 of the plan: `demo/shell/audio.mjs` + test, the Faust ahead of time build (`demo/resources/build-faust-aot.mjs`, artefacts, PROVENANCE, `build.mjs` by-name lines and stale refusal), `demo/shell/faust.mjs`, and `/fau/` moved onto them. A background agent; it does not commit.
-- **Plan: working synths and other live instruments on a slide** (2026-10-06). Asked: *"in bg figure out to build working exmaples of stynths etc on a slide. does it need a separate page or can somehow lazyload its stuff. when on a page, can it use stuff from the page (a la fau loadaer / compiler)"*. A background agent writes `plans/plan-live-slides.md`.
-- **Brand deck: icon simulations, favicon and PWA, from β+, superscript and inline** (2026-10-06). Asked: *"add icons simulations to brand slides (ico and pwa) using β+ (no superscript?) try both actually"*. Touches `demo/shell/decks.mjs`, `demo/shell/slide.css`.
-- **`/kit/` SLIDES: a slide with the hardware screen left and four buttons stacked on the right** (2026-10-06). Asked: *"to the slides kit add example with hw screen on left and 4 buttons vertcally grouped on the right (mix of our primary and secodary buttons, shimmering on push)."* Touches `demo/kit/index.html` (SLIDES), maybe `slide.css` / `shell.css` for the shimmer.
-- **Front page group Slides, two columns, and a first deck Brand holding the logo** (2026-10-06). Asked: *"add grpup to frontpage: Slides (2 col) and add a first slidedeck Brand where you move our positron logo attempt. run local dev server and gimme link"*. Moves the LOGO block out of `/kit/` BRAND into a deck page; touches `demo/manifest.mjs` (GROUPS, a row), `demo/kit/index.html` (BRAND tab and its checks), a new `demo/brand/`.
-- **Plan splitting `/kit/` into separate pages linked from front page cards** (2026-10-06). Asked: *"we are pressing limits of tabs in kit page. for your testng you have page size issue. i am proposing split page up to sepatare ones, link from frotpage cards. can be something else. plan in bg"*; group stays titled `kit`, no `#` links, pages at `/kit/<part>/`. A background agent is writing `plans/plan-kit-split.md`; nothing is built until the owner reads it. A first try (hash cards, `b4bd04b`) was reverted unpushed and never deployed.
+- **`workers/pub` is built on the `Container` class Cloudflare freezes on 2026-12-31** (2026-10-06, from `research/cloudflare-birthday-week-2026-10-06.md`). The new `ctx.container` runtime claims median start 648 ms against just over 4 s. Measure `pub`'s cold start first (never measured), then port before the date. Also: read the account's monthly log volume before the 2026-12-01 observability pricing. Now: pub runs PubNext on the new runtime since df0db930 (PUB_RT next); the monthly log volume is still unread.
+- **Implement `plans/plan-routing-migration.md`, in parallel** (2026-10-06). Asked: *"implement plans/plan-routing-migration, parallelize"*. DONE 2026-10-06 for steps 0 to 5: 14 of 54 pages on the patchbay; follow-ups below. Now: steps 0 to 5 done in a3bfe312; step 6, the five hard pages, not started.
+- ~~**`/patchbay/` announces into the owner's room on every visit and every suite run**~~ (2026-10-06, found by the routing analysis, READ not observed). `ROOM = 'studio-1'` hard-coded (`demo/patchbay/index.html:160`), joined on load (`:917`), the harness's `?room=` ignored, not `room: 'fixed'` in the manifest. The same defect fixed for partitur and wall in `c296c5b`. Step 1 of `plans/plan-routing-migration.md` fixes it. DONE: a3bfe312 /patchbay/ uses roomFor from bay-node.mjs, run rooms under SELFCHECK, join on press.
+- ~~**Analysis: moving every demo onto universal routing / the patchbay, and what is missing**~~ (2026-10-06). Asked: *"make analysis in bg what it takes to move all demos to universal routing / patchbay and what is still missing"*. Written to `plans/plan-routing-migration.md` 2026-10-06 (the older `plans/plan-universal-routing.md` is the plan it measures against). DONE: 5d648e49 plans/plan-routing-migration.md.
+- ~~**Deck "Synths in code" on the front page, Faust, playable**~~ (2026-10-06). Asked: *"do slide deck / Synths / in code / in the fau examples. / intro / basic osc (2 col view, synth in side) / osc paramters / ...add elements to synth... / keep it simple. add to frontpage"*. A background agent: the steps compiled ahead of time (build-faust-aot.mjs generalised), a shared slot `demo/shell/slide-synth.mjs`, the deck in `decks.mjs`, graded on `/kit/slides/`. DONE: 1163e11a the deck, slide-synth.mjs, AOT build; off the front page since 1c54afbd (2026-10-10).
+- ~~**Favicon to the brand mark**~~ (2026-10-06). Asked: *"update favicon to brand one"*. The inline β+ chosen on the brand deck's favicon slide (*"keep these for icons"*). Touches `workers/view/build.mjs` `favicon()` and the shell's inline icon. DONE: 9e89e226 demo/favicon.ico is the inline β+.
+- ~~**Brand font for page titles and subtitles everywhere**~~ (2026-10-06). Asked: *"use brand font for page titles and subtitles everywhere"*. The brand face is the slide face, JetBrains Mono (vendored in `demo/shell/vendor/`); titles are `.pos-name`, subtitles `.pos-what`, in `demo/shell/shell.css`. DONE: 9e89e226 Brand JetBrains Mono on .pos-name and .pos-what in shell.css.
+- ~~**Slides: keyboard control in full screen and mobile support**~~ (2026-10-06). Asked: *"add keyboard control to slides in fullscreen and mobile support"*. Touches `demo/shell/slide.mjs` (`createSlidePlayer`), maybe `slide.css`. DONE: ded2a770 keys in full screen, a swipe on a phone (slide.mjs swipeStep).
+- ~~**Kit cards titled by the part alone, and the slides group above kit on the front page**~~ (2026-10-06). Asked: *"no need to \"kit/...\" in titles. move slides above kit in index page"*. Handed to the kit split agent with step 4, since it is editing `demo/manifest.mjs`. DONE: ef1376e4 cards titled by the part, slides above kit; the slides group left the front page 1c54afbd.
+- ~~**Implement `plans/plan-kit-split.md`**~~ (2026-10-06). Asked: *"in bg implenetn kit plan"*. Steps 1 to 3 LIVE 2026-10-06 (BUILD 97fdd97-064000-8661): seven part pages listed, `kit` row unlisted. Step 4 (SLIDES to `/kit/slides/`, the forwarder at `/kit/`) approved with *"go"* and handed back to the same agent. Defaults taken where the plan asked: forwarder at `/kit/`, BRAND already gone to the front page deck, the kit group left out of the front page count, HARDWARE behind a start button. DONE: 97fdd970 seven part pages, ef1376e4 step 4 kit/slides and the /kit/ forwarder.
+- ~~**Synth-on-page infra from `plans/plan-live-slides.md`, no slides**~~ (2026-10-06). Asked: *"implement synth-on-page infra. no slides. in bg"*. Steps 1 to 3 and 8 of the plan: `demo/shell/audio.mjs` + test, the Faust ahead of time build (`demo/resources/build-faust-aot.mjs`, artefacts, PROVENANCE, `build.mjs` by-name lines and stale refusal), `demo/shell/faust.mjs`, and `/fau/` moved onto them. A background agent; it does not commit. DONE: 0cb3c1f5 audio.mjs, faust.mjs, AOT build, /fau/ on them.
+- ~~**Plan: working synths and other live instruments on a slide**~~ (2026-10-06). Asked: *"in bg figure out to build working exmaples of stynths etc on a slide. does it need a separate page or can somehow lazyload its stuff. when on a page, can it use stuff from the page (a la fau loadaer / compiler)"*. A background agent writes `plans/plan-live-slides.md`. DONE: plans/plan-live-slides.md (0cb3c1f5).
+- ~~**Brand deck: icon simulations, favicon and PWA, from β+, superscript and inline**~~ (2026-10-06). Asked: *"add icons simulations to brand slides (ico and pwa) using β+ (no superscript?) try both actually"*. Touches `demo/shell/decks.mjs`, `demo/shell/slide.css`. DONE: bcf56e11 icon simulations raised and inline; now blocks of /kit/logo/ in brand-slides.mjs.
+- ~~**`/kit/` SLIDES: a slide with the hardware screen left and four buttons stacked on the right**~~ (2026-10-06). Asked: *"to the slides kit add example with hw screen on left and 4 buttons vertcally grouped on the right (mix of our primary and secodary buttons, shimmering on push)."* Touches `demo/kit/index.html` (SLIDES), maybe `slide.css` / `shell.css` for the shimmer. DONE: bcf56e11 screen and keys slide, now in demo/kit/slides/index.html.
+- ~~**Front page group Slides, two columns, and a first deck Brand holding the logo**~~ (2026-10-06). Asked: *"add grpup to frontpage: Slides (2 col) and add a first slidedeck Brand where you move our positron logo attempt. run local dev server and gimme link"*. Moves the LOGO block out of `/kit/` BRAND into a deck page; touches `demo/manifest.mjs` (GROUPS, a row), `demo/kit/index.html` (BRAND tab and its checks), a new `demo/brand/`. DONE: bcf56e11 slides group and brand deck; brand deck moved to /kit/logo/ bc38cdb2, group off the front page 1c54afbd.
+- ~~**Plan splitting `/kit/` into separate pages linked from front page cards**~~ (2026-10-06). Asked: *"we are pressing limits of tabs in kit page. for your testng you have page size issue. i am proposing split page up to sepatare ones, link from frotpage cards. can be something else. plan in bg"*; group stays titled `kit`, no `#` links, pages at `/kit/<part>/`. A background agent is writing `plans/plan-kit-split.md`; nothing is built until the owner reads it. A first try (hash cards, `b4bd04b`) was reverted unpushed and never deployed. DONE: plans/plan-kit-split.md, implemented 97fdd970 and ef1376e4.
 - **`diagram.mjs`: a return path into a box that is not the bottom one in its container is drawn behind the box under it** (2026-10-05, found by the /wire/ diagram agent). `cuts` stays empty because the overlap check tests text only. Worked around on /wire/ by box order.
 - ~~**`/kit/` BRAND tab with a LOGO block** (2026-10-05): *"add kit tab: brand and logo sectop slide engine to draw β+ in large type and positron studio under it"*. Drawn with the slide engine; check β is in the vendored JetBrains subset. Handed to the kit slides agent.~~ Done 2026-10-05.
 - ~~**`/kit/` DEVICES and PANEL as one tab** (2026-10-05): *"unify devices and panel in kit"*. Block ids kept. Handed to the kit slides agent.~~ Done 2026-10-05.
@@ -400,8 +531,8 @@
 - ~~**Kit slides: TOM slide with 32 steps, no tempo arrows, drawable** (2026-10-05): *"more lines on slide tom, 32?. no prev next. drawable"*.~~ Done 2026-10-05: 6 rows of 32 steps at 18 px pads scrolling in the panel, drawable, kit 350/350.
 - ~~**Kit slides: STEP GRID ON A SLIDE as a split with the /tom/ instrument, no labels** (2026-10-05): *"STEP GRID ON A SLIDE - convert to col layout with tom instrument (no labels)"*.~~ Done 2026-10-05, kit 345/345.
 - ~~**A scrolling keyboard reaches its holder's edge** (2026-10-05): *"allow keyboaed overflor reach to the edge (general rule of keyb and panels)"*.~~ Done in shell.css, a keyboard that fits does not move. kit 340/340.
-- **`/kit/` runs two checks for visitors and prints them as FAIL in the log**: "a pad with nothing above it still reserves the slot" and "a waveform on both sides is two different pictures", seen in screenshots taken without `?selfcheck`. Breaks *"a self-check never runs for a visitor"*. Found 2026-10-05, not fixed.
-- **`/fau/` reads 75/76**: its own diagram reports a cut label, `notes` (`demo/fau/index.html:1729`). Present before the keyboard change, cause not looked at.
+- ~~**`/kit/` runs two checks for visitors and prints them as FAIL in the log**~~: "a pad with nothing above it still reserves the slot" and "a waveform on both sides is two different pictures", seen in screenshots taken without `?selfcheck`. Breaks *"a self-check never runs for a visitor"*. Found 2026-10-05, not fixed. DONE: both checks now sit inside if (SELFCHECK): kit/devices/index.html:1983, kit/timeline/index.html:826.
+- ~~**`/fau/` reads 75/76**~~: its own diagram reports a cut label, `notes` (`demo/fau/index.html:1729`). Present before the keyboard change, cause not looked at. OVERTAKEN: /fau/ marked not needed, superseded by synth/080 (e5d2e2d1, 2026-10-12).
 - ~~**Kit slides: THE PLAYER drops slide 3, slide 2 becomes a component slide** (2026-10-05): *"rm slide 3 from THE PLAYER and replace slide 2 from something below"*. Diagram slide proposed. Handed to the running slides agent.~~ Done 2026-10-05, kit 340/340.
 - ~~**Kit slides: FAU on a slide, split, keyboard overflowing** (2026-10-05): *"build fau into slide. overflow keyboard. col layout"*. The /fau/ instrument from kit parts, no compiler load. Handed to the strip and bar agent.~~ Done 2026-10-05, kit 340/340.
 - ~~**Kit slides: a timeline strip and a transport bar on slides** (2026-10-05): *"do 6 and 7"*, from the list of what is missing: a strip view on a slide, and a transport bar on a slide with its keys scoped so Space does not leave the deck.~~ Done 2026-10-05, kit 340/340.
@@ -416,7 +547,7 @@
 - ~~**Kit slides: thicker diagram borders, spacing to match** (2026-10-05): *"make diagrams thinker borders in slides, adjust spacing accordinglu"*. Slides only. Handed to the same agent.~~ Done 2026-10-05, kit 329/329.
 - ~~**Kit slides: a full screen button on every sample, shown on hover** (2026-10-05): *"add go to fullscreen button (active when mouseover) on all kit slide samples"*. Handed to the tables and logs agent, same files.~~ Done 2026-10-05, kit 329/329.
 - ~~**Kit slides: real tables, and live logs in two columns** (2026-10-05): *"i do not see tables layout. horiz lines but try with rounded corner outer border and not"*, then *"show 2col layout with live logs / live tabular logs"*. Table slides with a line between rows, one with a rounded outer border and one without; split slides with a live scrolling log and a live tabular log in one column. `demo/shell/slide.mjs`, `slide.css`, `demo/kit/index.html`.~~ Done 2026-10-05, kit 329/329.
-- **`/talk/` archived, work in the kit, then slide sets and talks** (2026-10-05): *"There is no need for a talk slide. Keep the slides and let's work inside the kit only. And then let's see how we actually can make different slide sets and talks, etc."*. `/talk/` archived with no redirect; `/slides/` kept; the SLIDES tab in `/kit/` first; after it, a plan for how several slide sets and talks are made from the kit component.
+- ~~**`/talk/` archived, work in the kit, then slide sets and talks**~~ (2026-10-05): *"There is no need for a talk slide. Keep the slides and let's work inside the kit only. And then let's see how we actually can make different slide sets and talks, etc."*. `/talk/` archived with no redirect; `/slides/` kept; the SLIDES tab in `/kit/` first; after it, a plan for how several slide sets and talks are made from the kit component. DONE: archive/demos/talk-index.html; several decks as DECKS with /slides/<slug>/ pages (bc38cdb2).
 - ~~**`/kit/` SLIDES tab, slide parts built up methodically** (2026-10-05): *"keep slides as it was for an archive with font picker and sample content etc let it be then let's focus on the kit make a new tab there slides and methodically slide by slide you don't have to be a slide player there it's player is maybe a first component but the rest are just the slides and it needs to show off all the different parts of a slide starting from the largest type there then the type scale all the way to the smallest one then the combination of those then maybe at some point you need to introduce layouts so title on top text on bottom also left and right alignment left and right with illustration or interactive element on the left or right"*. `/slides/` and `/talk/` stay as they are (an archive). A new SLIDES tab in `/kit/`: the player as the first block, then single static slides, one per block: the largest step, every step of the scale down to the smallest, combinations, then layouts (title top and text bottom, left and right alignment, split with an illustration or interactive element left or right). Kit component in `demo/shell/`.~~ Done 2026-10-05: `slide.mjs`, 31 blocks in a SLIDES tab, kit 320/320.
   Added the same minute: *"Also work on the actual components, interactive elements on a page. Maybe figure out how to show off hardware screens, sliders, knobs, waveforms, videos, diagrams, etc."*. Slides that hold the kit's real interactive parts at slide scale: an OLED screen, a slider, a knob, a wave view, a video panel, a diagram, and how each sits in a layout.
 - ~~**The deck engine into the kit** (2026-10-05): *"Move out to kit"*. `demo/slides/deck.mjs`, `deck.css` and the seven faces in `demo/slides/vendor/` move to `demo/shell/` (fonts in `demo/shell/vendor/`), `/slides/` and `/talk/` import from `/shell/`, the build list follows, and `/kit/` gets a DECK block at the top as the newest component.~~ STOPPED by the owner mid-move and reverted; replaced by the line below.
@@ -436,7 +567,7 @@
 - ~~**`/slides/` faces all monospace, and more of them** (2026-10-05): *"is atkinson monospace!?"*, then *"all monos. add more"*. The first five mixed in three proportional faces because the brief said "mono or not", against the original ask for monotype. Default Atkinson Hyperlegible Mono, every face on the switcher monospace, more than five. `demo/slides/index.html`, `demo/slides/vendor/`, `workers/view/build.mjs`, `plans/plan-slides.md`.~~ Done 2026-10-05: eight OFL monospace faces, Atkinson Hyperlegible Mono by default, a picker, the specimen names each face. 36/36.
 - ~~**`/flipper/` do not mute the first when starting the second** (2026-10-05): *"do not mute first when startic second"*.~~ Done `2b14c5a`, 44/44.
 - ~~**`/flipper/` LOOP per panel, LIVE becomes >>** (2026-10-05): *"flipper add live buttons"*, then *"i mean loop button. replace live to >>"*. Each panel's footer gains a LOOP that behaves like the transport bar's LOOP (same marks, same look), and LIVE is relabelled to a catch-up glyph. `demo/flipper/index.html`.~~ Done 2026-10-05: ► ►► Loop ⊘ ⛶ per panel, the bar's live-loop behaviour, page-local; a shared loop helper and a `--tbar-btn` fallback are the kit follow-ups. 44/44, deep 55/55.
-- **Kit: one loop state machine for the bar and `/flipper/`** (2026-10-05, from the flipper loop agent): the bar's loop is tied to `deck.seek`, wrong for a media-mastered deck, so `/flipper/` carries a page copy (`drawLoop`, `startLoop`, `pressLoop`, `loopTick`). Move it to `demo/shell/` with a `seek`/`position` from the caller, and give `.tbar-x`, `.tbar-loop`, `.tbar-slot` a `var(--tbar-btn, 34px)` fallback in `shell.css`.
+- **Kit: one loop state machine for the bar and `/flipper/`** (2026-10-05, from the flipper loop agent): the bar's loop is tied to `deck.seek`, wrong for a media-mastered deck, so `/flipper/` carries a page copy (`drawLoop`, `startLoop`, `pressLoop`, `loopTick`). Move it to `demo/shell/` with a `seek`/`position` from the caller, and give `.tbar-x`, `.tbar-loop`, `.tbar-slot` a `var(--tbar-btn, 34px)` fallback in `shell.css`. Now: /flipper/ still carries drawLoop, startLoop, pressLoop, loopTick; --tbar-btn is set on .tbar.
 - ~~**`/slides/` type, centring, no LCD** (2026-10-05): *"look for type alternatives. 5 of them. this one dos not work. center content below titles (diagram). no backlit lcs example."*. Five alternative typefaces to the system mono, shown on the page so they can be compared at LARGE and EXTRA LARGE; the live content under a headline (the diagram) centred; the seven-segment counter slide removed. `demo/slides/index.html`, `plans/plan-slides.md`.~~ Done 2026-10-05: five self-hosted OFL faces with a switcher and a specimen slide, Atkinson Hyperlegible Next by default; content centred under headlines; the LCD slide gone. 34/34.
 - ~~**`/flipper/` both channels at once, no shared bar** (2026-10-05): *"make them work on same time or is it blocked?. no common transport lane"*. Not blocked: one-at-a-time was carried over from the old flipper. Each panel plays on its own press and keeps playing when the other starts; its play, LIVE and mute go in its own footer, and its own line (watched, served, schedule) sits under it in the panel's `under`. The shared transport bar and shared strip go. `demo/flipper/index.html`.~~ Done 2026-10-05: per-channel controls and line, both play, the second mutes the first. 38/38, deep 49/49.
 - ~~**Presentations, background track** (2026-10-05): *"Bg track to presentations i need to do. Use videopanel for in page placement and prev next. Investigate and make sample page for extra large and large monotype. On page live examples. Look for slide design skills for wording etc lui keep our live elements edge"*. Slides as positron pages: a slide sits in the page in a `createVideoPanel` with prev and next, type in two sizes of the mono face (large and extra large), real live elements on the slides rather than pictures of them. Research slide design guidance on wording and layout first (plans/ has nothing on slides, checked). Sample page unlisted at `/slides/`. `demo/slides/index.html`, plan in `plans/plan-slides.md`.~~ Sample page and plan done 2026-10-05 (`6551903`); real talks wait on their content.
@@ -483,7 +614,7 @@
 
 ### Found 2026-10-05 by the kit selfcheck agent, not fixed
 
-- **`/kit/` turns a specimen knob on every visit**: around `demo/kit/index.html:6096` a `Home` keydown goes to the `rel` knob with no `SELFCHECK` gate, leaving it at 0.05 instead of 1.50. The asserts after it may lean on that state.
+- ~~**`/kit/` turns a specimen knob on every visit**~~: around `demo/kit/index.html:6096` a `Home` keydown goes to the `rel` knob with no `SELFCHECK` gate, leaving it at 0.05 instead of 1.50. The asserts after it may lean on that state. DONE: the Home keydown is in kit/input/index.html:1307, inside the if (SELFCHECK) block at :1165.
 - **A real arrow key on any slider handle on `/kit/` seeks every transport bar** (`transport-bar.mjs` window listener, about line 1429). Making bars ignore already-handled keys would break the step grid, whose space deliberately bubbles to the bar as play. A decision about the shared bar, not a page fix.
 
 ### Found 2026-10-04 by the tab groundwork agent, not fixed
@@ -496,7 +627,7 @@
   visible transport bar on the page by 2 per cent (why kit shots show bars at
   0:01.200). Breaks *"a self-check never runs for a visitor"*.~~ Done 2026-10-05 `97a3ccf`: gated and the keys no longer bubble, 294/294.
 
-### Checks way lighter, two tiers, asked 2026-10-04
+### ~~Checks way lighter, two tiers, asked 2026-10-04~~ DONE: c5f4e98f checks: two tiers, a9292cfb stream pages ordinary and deep (DEMO_DEEP=1).
 
 *"make checks way ligher (2 tiers?)"*, after `/keep/`'s fix made every harness
 run of it hold a Cloudflare WHEP leg for 20 to 30 s and record two takes. Two
@@ -504,12 +635,12 @@ tiers: the default run grades what can be graded from this machine alone and
 quickly; the deep tier, asked for by name, does the round trips, recordings and
 anything that costs Stream minutes or another machine's attention.
 
-### Kit in the first group on the index, asked 2026-10-04
+### ~~Kit in the first group on the index, asked 2026-10-04~~ DONE: f403a3d0 index: the kit group first. Since moved last (3efba4ed, 2026-10-07) and kit unlisted.
 
 *"move kit to first group in index page"*. `demo/manifest.mjs`, the `kit` row's
 group.
 
-### Do the demo restructure, decided 2026-10-04
+### ~~Do the demo restructure, decided 2026-10-04~~ DONE: 9e3ed76b looper, graph, rout to archive/demos; d2075b77 and 6670d8fd sync, time, capture tabbed pages.
 
 *"names ok, looper retires, no redrect, capture is fine"*, answering
 `plans/plan-demo-structure.md`'s four questions: `/sync/`, `/time/`, `/wire/`,
@@ -519,7 +650,7 @@ is in scope, Stream cost per check run accepted. Work in the plan's §5 order:
 shared pieces once, then one agent per page, the session owns `manifest.mjs`,
 the archive moves and every commit.
 
-### Time fields, a two-clock demo, and the message format, asked 2026-10-04
+### ~~Time fields, a two-clock demo, and the message format, asked 2026-10-04~~ DONE: 7a1c9fca envelope stamp is sent, at means when, due folded in; the regrouping proposal is plans/plan-demo-structure.md.
 
 *"Can we cosolidate due at when? Can we do demo on synving thing and two clocks
 ehatever. Wonder ou our message format ties into all this"*. Three things: (1)
@@ -534,7 +665,7 @@ envelope's send stamp becomes `sent`. And instead of a two-clocks page:
 structure of denis for this suff of times messages ayncs routes etc"*, so a
 proposal for regrouping the time, message, sync and routing demos comes first.
 
-### One demo page for timing light signals against heavy ones, asked 2026-10-04
+### ~~One demo page for timing light signals against heavy ones, asked 2026-10-04~~ DONE: 1dcdf3a9 /sync/, one page for plan-routing-time, cues against a picture that arrives late.
 
 *"Put to single demo"*, after plan-routing-time's step 2 was offered as
 `/partitur/` plus `/wall/`. One page instead: a stage picture behind a link with
@@ -543,7 +674,7 @@ ms), a score sending cues and lights, and two walls side by side, one firing on
 arrival and one following the picture through `demo/shell/timebase.mjs`.
 Opens nothing on load and asks no server for anything.
 
-### Universal routing: syncing light signals to rich ones, asked 2026-10-04
+### ~~Universal routing: syncing light signals to rich ones, asked 2026-10-04~~ DONE: ba508f30 plans/plan-routing-time.md and demo/shell/timebase.mjs.
 
 *"expand and work with universal router plan about those syncing stuff having
 lightweight signals sync to the rich signals like cues and messages to a video
@@ -553,7 +684,7 @@ and audio stuff"*. Extend `plans/plan-universal-routing.md` (its §12 still list
 transport positron uses, live and recorded, and start on the smallest piece
 that can be built and graded without a device.
 
-### OLED: the right key column under the header, and a hold banner that never wraps, asked 2026-10-04
+### ~~OLED: the right key column under the header, and a hold banner that never wraps, asked 2026-10-04~~ DONE: ed903c16 pico: key column under a full-width header, a hold banner that never wraps.
 
 *"Try to fit right buttons under header. No wrapping on hold confirm, shoren
 words"*. The header goes back to full width with the four label cells under it
@@ -562,7 +693,7 @@ asked for), and the hold banner picks the first of a ladder of shorter wordings
 that fits on one line instead of breaking onto two. `rig/pico/firmware/ui.c`,
 `main.c`, the wasm build, `run-router.mjs` and `/kit/`'s parts.
 
-### Hardware kit: button labels on the right, and a finer breakdown, asked 2026-10-04
+### ~~Hardware kit: button labels on the right, and a finer breakdown, asked 2026-10-04~~ DONE: eb9eeaa4 key labels down the right and the OLED UI kit in parts on /kit/; 3 px air in rig/pico/firmware/ui.c.
 
 *"Add oprion to hw kit to have button labels on right. Break down hw ui some
 more on kit"*. The module's photo (oomipood, IMG35801442160.jpg) shows the four
@@ -575,6 +706,8 @@ either side of a label in the right column instead of 2.
 
 ### Synth options around the Crave, and wiring a Formanta drum machine, asked 2026-10-04
 
+WAITING: the model on the desk read off its label and the trigger threshold measured; no trigger output in rig/pico/firmware yet. (triaged 2026-10-12)
+
 *"Other options aroond crave? I need ro wire formanta pds drum machine too"*.
 Searches find a Formanta **UDS** (Soviet analogue drum synth, 7 channels, one
 1/4 inch trigger input per channel, no MIDI as built, passive pads too weak to
@@ -584,7 +717,7 @@ note-to-trigger output (C1 to G1, the retrofit convention) on 7 GPIOs. The
 threshold voltage is unmeasured. Audio back competes with the Circuit and a
 Crave for the Fast Track Pro's two inputs.
 
-### Plan: universal patchbay plus XR plus many people, after Dance Tonite, asked 2026-10-04
+### ~~Plan: universal patchbay plus XR plus many people, after Dance Tonite, asked 2026-10-04~~ DONE: 11b41150 plans/plan-xr-together.md.
 
 *"Still need plan to univesral router and xp and multiuse. See lcd soundsystem
 and google cardboard interactive experiment"*. "xp" is read as XR. The reference
@@ -595,7 +728,7 @@ watch the accumulated crowd. Output: one plan in `plans/` tying
 `plan-universal-routing.md` to `plan-xr*.md` and many simultaneous or
 asynchronous participants. Reported in full when it lands.
 
-### Synths, effects, CV and modulation that run on the Pico chips, asked 2026-10-04
+### ~~Synths, effects, CV and modulation that run on the Pico chips, asked 2026-10-04~~ DONE: d146e3b8 research/pico-synths-and-cv-2026-10-04.md.
 
 *"look at the synths and general effect and CV and modulation stuff which can be
 built on that chip maybe in the eurorack context or those DX7 style stuff ...
@@ -605,7 +738,7 @@ Mutable ports, effects, modulation and CV generators), what we could compile int
 our firmware, the ways sound gets out (PWM, I2S DAC, USB audio, Eurorack), and
 whether the emulator could produce audible sound in the browser.
 
-### Universal patchbay: the rest of the plan, asked 2026-10-04
+### ~~Universal patchbay: the rest of the plan, asked 2026-10-04~~ DONE: 07a9731b storage as a sink on /patchbay/, 09500bf0 curve, velcurve, notecc vectors 23 to 26, c982080d open table.
 
 *"Continue also work on the universal patch bay, whatever was there in a plan or
 to do."* What was left: storage as a sink (record a link into R2 and play it
@@ -613,14 +746,14 @@ back), route-core's `curve`, `vel curve` and plain `note->cc` in JS and C with
 vectors, the plan's open table updated with what was settled this week, and the
 `/kit/#hardware` check bug.
 
-### Pico wifi patchbay node, secure by default, asked 2026-10-04
+### ~~Pico wifi patchbay node, secure by default, asked 2026-10-04~~ DONE: cf1bf9cf rig/pico/net, a wss node for the Pico 2 W, TLS 1.3 with GTS Root R4 pinned.
 
 *"Maybe it's just something that you can try and would be nice to have it always
 secured. You can start the item one"*: plan-pico §1, the Pico 2 W joining
 `studio-1` over **wss** (TLS) as the aim, plain ws only as a fallback, testable
 before the board arrives.
 
-### Research the plan's open issues, and modular-ready boards, asked 2026-10-04
+### ~~Research the plan's open issues, and modular-ready boards, asked 2026-10-04~~ DONE: d146e3b8 research/pico-open-issues-and-modular-2026-10-04.md.
 
 *"regarding those open issues to do some research and in general would be cool to
 have some kind of modular support maybe there are boards which are ready at the
@@ -630,7 +763,7 @@ in plan-pico's open list, and survey Eurorack-ready programmable boards (RP2040 
 RP2350 first, at modular voltages) for playing a modular remotely
 (`research/music-jamming-2026-08.md`, playasynth).
 
-### `/kit/` opened at `#hardware` logs two red checks, found 2026-10-04
+### ~~`/kit/` opened at `#hardware` logs two red checks, found 2026-10-04~~ DONE: 2026-10-04 per its own body, the checks say not measured when the tab is closed.
 
 "two blocks in one part sit the project's one gap apart" and "typing then a
 pause starts one compile" assume the page opened on its default tab; opened at
@@ -640,20 +773,20 @@ rather than fail.
 DONE 2026-10-04: the gap check takes one gap, the compile-note check grades
 behaviour and says its geometry was not measured when its tab is closed.
 
-### Plan everything the Pico could do for positron, asked 2026-10-04
+### ~~Plan everything the Pico could do for positron, asked 2026-10-04~~ DONE: 4b26e523 plans/plan-pico.md.
 
 *"Plan all of them"*: the Pico 2 W as a patchbay node over wifi, light output
 (WS2812 and DMX) for the timeline's light lane, sound (PWM, I2S DAC, USB audio),
 a clock box, BLE MIDI, physical controls and CV. One plan in `plans/`.
 DONE 2026-10-04: `plans/plan-pico.md`.
 
-### `/kit/`: HARDWARE becomes DEVICES, the Pico tab is HARDWARE, asked 2026-10-04
+### ~~`/kit/`: HARDWARE becomes DEVICES, the Pico tab is HARDWARE, asked 2026-10-04~~ DONE: c0319ee6 kit: the HARDWARE tab is DEVICES; now /kit/devices/ and /kit/hardware/ pages.
 
 *"Rename hardware to devices in kit and pico to hardware"*. The existing tab
 (instrument panel parts) is renamed, id and label; the coming Pico firmware tab
 takes the name HARDWARE.
 
-### The hardware UI kit as a new tab in `/kit/`, asked 2026-10-04
+### ~~The hardware UI kit as a new tab in `/kit/`, asked 2026-10-04~~ DONE: 59d37346 kit: a HARDWARE tab running the Pico router firmware in the browser.
 
 *"Can you make demo of hw kit in psoitron kit new tab?"*: the OLED UI kit
 (`rig/pico/firmware/ui.c`) shown on `/kit/` in a tab of its own. Best form: the
@@ -661,7 +794,7 @@ real router firmware running in the browser in rp2040js (pure JS), its screen
 drawn live and its four buttons pressable. Waits on the UI kit agent.
 DONE 2026-10-04: the HARDWARE tab, 277/277.
 
-### A small UI kit for the 128x64 OLED, asked 2026-10-04
+### ~~A small UI kit for the 128x64 OLED, asked 2026-10-04~~ DONE: 98f62d33 rig/pico/firmware/ui.c.
 
 *"Hard to undesramd ui. Block gfx? Do small ui kit for it"*, about the router
 screen (seven lines of 8x8 text). A C kit in `rig/pico/firmware/`: an inverted
@@ -670,7 +803,7 @@ banner, a footer naming what the four buttons do. The router screen rebuilt on
 it, checked in the emulator, screenshots looked at.
 DONE 2026-10-04: `ui.c`, six fonts, glcd5x7 default, 32 checks PASS.
 
-### The C router firmware for the Pico, tested in the local emulator, asked 2026-10-04
+### ~~The C router firmware for the Pico, tested in the local emulator, asked 2026-10-04~~ DONE: 51574fdf rig/pico/firmware, the C router, all PASS in the emulator.
 
 *"Do it. What is k1 k2 etc"*: Pico SDK firmware with `rig/route-core/`
 inside, the SSD1306 screen and four buttons (K1 previous scene, K2 next, K3
@@ -680,7 +813,7 @@ Pico (to emulate) and the Pico 2 W (to flash), and driven in `rig/pico/sim/`
 with bytes in, bytes out and screenshots. USB MIDI host comes after.
 DONE 2026-10-04: `rig/pico/firmware/`, all 14 emulator steps PASS.
 
-### Drive the Pico emulation locally, asked 2026-10-04
+### ~~Drive the Pico emulation locally, asked 2026-10-04~~ DONE: 220a2637 rig/pico/sim.
 
 *"can you not drive wokwi itself / run locally or smth"*: rp2040js (Wokwi's open
 emulator core, plain JS in Node) running MicroPython plus `rig/pico/oled/main.py`,
@@ -688,7 +821,7 @@ with an SSD1306 model on its I2C and the four buttons pressed from a script, the
 screen written out as a PNG. RP2040 only; the RP2350 is not emulated.
 DONE 2026-10-04: `rig/pico/sim/`, end to end in about 2 s.
 
-### Scenes: saved sets of links in `/patchbay/`, then a scene lane, asked 2026-10-04
+### ~~Scenes: saved sets of links in `/patchbay/`, then a scene lane, asked 2026-10-04~~ DONE: 29a952a0 /patchbay/ saves and recalls scenes, /partitur/ gains a scene lane.
 
 *"go"* to (a) then (b): (a) `/patchbay/` saves the current links as a named
 scene and recalls one (unlink what is not in it, link what is, the routing core
@@ -696,7 +829,7 @@ releasing held notes); (b) a scene lane in `/partitur/` whose events recall
 scenes at points in the score.
 DONE 2026-10-04: patchbay 30/30, partitur 27/27.
 
-### More lanes as patchbay sources, asked 2026-10-04
+### ~~More lanes as patchbay sources, asked 2026-10-04~~ DONE: d7f89659 lanes as patchbay sources; the scene lane landed in 29a952a0.
 
 *"Do"* to: `/patchbay/` able to open a lane's link itself (a `link.request`
 to the page that owns the source port, answered by `link.state`), the siren
@@ -705,7 +838,7 @@ stage cues as a source a `/wall/` shows, and scenes as a lane (held for a
 decision, see the reply).
 DONE 2026-10-04 except scenes: /patchbay/ opens a lane link by asking its page, the Ton lane plays any MIDI input, cues go to a wall's captions; measured across three tabs. Found on the way: the Circuit was unplugged and still offered, now announced only when present.
 
-### A timeline lane as a patchbay source: `/partitur/`'s light lane on a real surface, asked 2026-10-04
+### ~~A timeline lane as a patchbay source: `/partitur/`'s light lane on a real surface, asked 2026-10-04~~ DONE: 0173a0fa light lane drives /wall/; /wall/ became a WALL tab of /partitur/ in c296c5bf.
 
 After *"how universl patchbay and timeline relate"*, *"Yea"* to trying the
 smallest step directly: a lane gets a `to` port and is linked through the
@@ -714,7 +847,7 @@ phone's screen (Moholy's projection wall made real).
 DONE 2026-10-04: `/wall/` plus a wall choice on `/partitur/`, measured across two tabs.
 
 
-### `/rout/` and `/graph/` become one page, `/patchbay/`, asked 2026-10-04
+### ~~`/rout/` and `/graph/` become one page, `/patchbay/`, asked 2026-10-04~~ DONE: e69d78c3 /patchbay/; /rout/ and /graph/ then archived (9e3ed76b) rather than unlisted.
 
 *"i am cofused over rout and graph demo. unify? better name?"*, then on the
 name *"Patchbay"*. One page: the live desk (today's `/graph/`), MIDI links that
@@ -723,7 +856,7 @@ readout, `/rout/`'s test cases as the contract, and one picture of both layers.
 `/rout/` and `/graph/` leave the index (`unlisted: true`) and keep their URLs.
 DONE 2026-10-04: `/patchbay/`, 26/26, a real note through the core to the Circuit.
 
-### The 4-button OLED on a Pico: a Wokwi project and a wiring diagram, asked 2026-10-04
+### ~~The 4-button OLED on a Pico: a Wokwi project and a wiring diagram, asked 2026-10-04~~ DONE: ee12a17a rig/pico/oled.
 
 *"yes but i also want a wiring diagram. are there services that can render it
 and you can access?"*: a paste-ready Wokwi project (`diagram.json`, `main.py`)
@@ -731,13 +864,13 @@ for a Pico with the SSD1306 OLED and four buttons on GP4/GP5 and GP10 to GP13,
 and a wiring diagram rendered with WireViz in Docker. Files under `rig/pico/`.
 DONE 2026-10-04: `rig/pico/oled/`.
 
-### Screens and panels for the Pi, available in Estonia, asked 2026-10-04
+### ~~Screens and panels for the Pi, available in Estonia, asked 2026-10-04~~ DONE: b0ee1afd research/pi-screens-estonia-2026-10-04.md.
 
 *"In bg research basic screens/panels for pi a ailable in est"*. A background
 research agent; result to `research/`.
 DONE 2026-10-04: `research/pi-screens-estonia-2026-10-04.md`.
 
-### Universal routing step 4, links that really start things, asked 2026-10-04
+### ~~Universal routing step 4, links that really start things, asked 2026-10-04~~ DONE: da48e84b and 2df55549 links open for real; recording to storage, the one kind left, landed in 07a9731b on /patchbay/.
 
 *"Yes"* to: pressing a link on `/graph/` actually starts it, using the board's
 existing verbs (`input.want` and its lease for a hardware input's sound,
@@ -750,7 +883,7 @@ open for real. Later the same day: a board synth's sound (424 frames in 9 s), th
 GPU's video (209 decoded frames in 9 s) and these keys to a synth open too.
 Recording to storage is the one kind left.
 
-### Universal routing step 3, the registry, asked 2026-10-04
+### ~~Universal routing step 3, the registry, asked 2026-10-04~~ DONE: 965c67d5 the Pi announces its graph; /graph/ since folded into /patchbay/.
 
 *"U iversal router demo?"* then *"Yes"* to: the Pi's `board.hello` and
 `board.alive` announce its real nodes and ports, pages announce theirs, and
@@ -760,7 +893,7 @@ links that really start things, comes after.
 DONE 2026-10-04: the Pi announces 5 nodes on every beat and answers `graph.ask` in
 64 ms; `/graph/` defaults to the live desk.
 
-### Moholy-Nagy's score as positron data, and a page that plays it, asked 2026-10-04
+### ~~Moholy-Nagy's score as positron data, and a page that plays it, asked 2026-10-04~~ DONE: a9223b91 /partitur/.
 
 *"Do it. Better name"*, in reply to the ranked suggestions in
 `research/moholy-nagy-partiturskizze-2026-10-04.md`: (1) the plate and
@@ -769,7 +902,7 @@ plate transcribed as data from the public-domain 1925 scan, every row marked
 seen or inferred, and then (3) a page that plays it, which wants a better name
 than the agent's `exzentrik`. DONE 2026-10-04 as `/partitur/`, 21/21.
 
-### Moholy-Nagy's Partiturskizze, researched against the timeline, asked 2026-10-04
+### ~~Moholy-Nagy's Partiturskizze, researched against the timeline, asked 2026-10-04~~ DONE: 9fc9cbdd research/moholy-nagy-partiturskizze-2026-10-04.md.
 
 Four photographs of L. Moholy-Nagy, *Partiturskizze zu einer mechanischen
 Exzentrik. Synthese von Form, Bewegung, Ton, Licht (Farbe) und Geruch*, a
@@ -778,7 +911,7 @@ assess this bauhaus work and give context relevance to our timelime work"*. The
 photos are in the session's uploads; the written result goes to `research/`.
 DONE 2026-10-04: `research/moholy-nagy-partiturskizze-2026-10-04.md`.
 
-### Universal routing step 2, and a new demo for it, asked 2026-10-04
+### ~~Universal routing step 2, and a new demo for it, asked 2026-10-04~~ DONE: b4e90a88 bay.mjs eight media and /graph/; /graph/ since folded into /patchbay/ (9e3ed76b).
 
 *"What about route-anything work?"* then *"Do it. Pico hold. Nee demo, suggest
 name"* and *"New"*: `plans/plan-universal-routing.md` §11 step 2, `bay.mjs`
@@ -788,7 +921,7 @@ learns the new media (`value`, `video`, `program`, `file`, `state`) and a
 links across media. The Pico firmware is ON HOLD by instruction.
 DONE 2026-10-04: bay.mjs 71 to 112, /graph/ 19/19, deployed.
 
-### Route core: what the C port found, 2026-10-03
+### ~~Route core: what the C port found, 2026-10-03~~ DONE: 393745f3 vectors 18 to 22 in JS and C.
 
 `rig/route-core/` passes all 17 vectors (65/65 in Docker). It found five things
 the vectors do not yet decide. All five DONE 2026-10-03, vectors 18 to 22, JS
@@ -813,7 +946,7 @@ subscribes today, so it has not happened. Repair: open with `O_WRONLY |
 O_NONBLOCK` so a busy device is an error the log names, and grade it in
 `rig/board/test.mjs`. Needs a push to the Pi.
 
-### `/rout/` says what is going on, with a diagram, asked 2026-10-03
+### ~~`/rout/` says what is going on, with a diagram, asked 2026-10-03~~ DONE: be72d840 /rout/ says why it exists with a How it works picture; /rout/ archived 9e3ed76b.
 
 *"Make the root page clear what is going on. Maybe also add a diagram.
 Especially the lower level thing and why we're doing it. You can also add some
@@ -823,7 +956,7 @@ enough for a microcontroller (`plans/plan-route-core.md`), and the vectors are
 the contract a C port must pass too. Files: `demo/rout/index.html`, maybe its
 manifest `one` line. Loads `positron-diagram`. Done 2026-10-03, see the commit.
 
-### A demo page that shows off the routing core, asked 2026-10-03
+### ~~A demo page that shows off the routing core, asked 2026-10-03~~ DONE: 387f4b3c /rout/; archived 9e3ed76b, its vectors now the contract on /patchbay/.
 
 *"can we have a demo page to show off all this? propose a name"*, said while
 steps 1 to 4 of HANDOFF's routing next steps were in flight: the one MIDI kind
@@ -903,25 +1036,33 @@ Same message: *"webrtc for away"*. Read as the go the plan waited on, and as yes
 
 ### Open 2026-10-03: the Circuit HAS a factory reset; stop treating SysEx as untouchable
 
+Now: CLAUDE.md, skill and plan-wish-dawless fixed (d0f3e723); 42 lines in 29 files still match 'no factory reset', some of them corrections. (triaged 2026-10-12)
+
 ASKED, VERBATIM: *"Don't be so protective about the circuit. It does have a factory reset. Look it up. And we also protected our or stored our custom resets. So be careful, but don't be so afraid of sysacks. It's just any other device with some precautions and etc."* LOOKED UP the same day: Novation's support article *"Using Components to reset a product to Factory Settings"* restores a Circuit's factory content through Components (Send to Circuit on the Circuit Factory Pack, plus a firmware reinstall). It does not bring back the owner's sessions, and those are backed up in `<private-pack-repo>`. So the repeated line "no factory reset and therefore no undo" is FALSE as written: **49 places** say it (`grep -rn -i 'no factory reset'` over CLAUDE.md, .claude, demo, rig, plans, research, BACKLOG, LESSONS, HANDOFF). CLAUDE.md, the `positron-hardware` skill and `plans/plan-wish-dawless.md` corrected in the same pass; the rest per page as each is touched. The SysEx gate in `rig/board/inputs.mjs` stays as a precaution, not as a wall.
 
-### Open 2026-10-03: routing as abstract as possible, small enough for a microcontroller, inputs as one of many
+### ~~Open 2026-10-03: routing as abstract as possible, small enough for a microcontroller, inputs as one of many~~ DONE: plans/plan-route-core.md, then built: bbb70735 midi-kinds.mjs, route-core.mjs, 94613c52 rig/route-core C, 51574fdf Pico router.
 
 ASKED, VERBATIM: *"maybe not make that routing so be specific. So something which you can also use on smaller hardware. Microcontrollers with smaller cortex chips on them. I think we discussed it back in the day in the early, early days of prototype when we didn't have P idea yet. So think about it and plan it as a, as abstract as possible. And the wish thing, my voice control, is just one of the many of those. Possible input methods, but there are definitely should be more. Try to separate what is universal and what is particular in particular hardware setup with different instruments, input methods, etc."* Prior plans to build on, found after `plan-wish-dawless` was written and should have been read first: `plans/plan-patchbay.md` (2026-09-21, Node/Port/Link, control plane not signal path) and `plans/plan-hardware.md` (ESP32-S3, Teensy, Daisy, 2026-09-10). PLAN WRITTEN 2026-10-03: `plans/plan-route-core.md`, nothing built; next is its step 0, one class vocabulary.
 
-### Open 2026-10-03: one routing model for audio, video, messages, renderers, scenes and storage
+### ~~Open 2026-10-03: one routing model for audio, video, messages, renderers, scenes and storage~~ DONE: plans/plan-universal-routing.md; steps 2 to 4 since built (b4e90a88, 965c67d5, 2df55549), now /patchbay/.
 
 ASKED, VERBATIM: *"Maybe at the end, maybe a new, new plan, I don't know. Think about a more universal routing. When I can ask, okay, I want this, this video there, this WebGL renderer there, this scene there, in all those different routings, what we have done in Positron so far. Is there a way to abstract those audio, audio, video, and all different kind of messaging, routing, including storage? Is there a way to abstract it? Maybe not the whole thing, but the ones are more easier to adopt to this universal routing model."* PLAN WRITTEN 2026-10-03: `plans/plan-universal-routing.md`, from an inventory of every routing in the repository, nothing built.
 
 ### Open 2026-10-03: Wish without a laptop, the Pi as the hub (plan written, nothing built)
 
+WAITING: the owner's go on plan-wish-dawless §9 step 1; rig/board/routes.mjs does not exist. (triaged 2026-10-12)
+
 ASKED, VERBATIM: *"Giving the ideqa about wish and general mapp anything to anywhere how it would fit it into dawless setups. What is hun? Pi? What listens? A phone browser? Pi attached cheap mike? Camera interepting gestures? Random ideas"*, then *"Add plan etc"*. Plan: `plans/plan-wish-dawless.md`, all reasoning, nothing measured. Slug `wish` (https://positron.studio/wish/), files `rig/board/` (a new `routes.mjs`), `demo/wish/index.html`, `demo/wish-local.mjs`. Recommendation: the Pi owns the route table and forwards offline through the existing MIDI gate; the phone is hold to talk and the screen; the model only writes rows. Not started, waiting for a go on §9 step 1.
 
 ### Open 2026-09-30: `/away/`'s second dry-out about 5 s after the direct path opens
 
+Now: unmeasured since; the board audio moved to JACK on the Fast Track Pro 2026-10-11 (babab4eb), so the 09-30 runs predate it. (triaged 2026-10-12)
+
 Found while measuring the direct path, not asked for. In five of seven runs the playout ran dry a second time 9.5 to 10.5 s into the page, about 5 s after the switch, which ratchets the cushion from ~35 to ~64 ms and puts `lag` at ~80 ms rather than ~48. Five seconds is the board's beat (`BEAT_MS`, `inputs.mjs`), so that is the first suspect; not measured. Files: `rig/board/inputs.mjs`, `demo/shell/board.mjs`.
 
 ### Open 2026-09-30: "other stuff" from the handoff's waiting list
+
+WAITING: on the owner turning Fast Track Pro input 1 gain down, then one measurement. The reel and circuit reds are done in 6fb037d1. (triaged 2026-10-12)
 
 Same message: *"and other stuff"*. What can move without an owner decision: measure the Circuit input for clipping now the LAN is reachable (it read 4,108 samples at full scale before the gain was turned down, and nobody measured after); `/reel/`'s red `pointing at a mark says what it is`; `/circuit/` 48/49 name spacing. Owner's calls, NOT touched: the capitals rule, `/fau/`'s library sliders, the clipping ranges on three patches, the Pi camera.
 - ⚠️ **THE CIRCUIT INPUT STILL CLIPS, MEASURED THROUGH `/away/` 2026-09-30 ~15:45**: 8 to 29 samples at full scale per run of six to eight Synth 1 notes, rms about -33 dBFS. So the input 1 gain was not turned down enough, or not at all. Owner's hand on the Fast Track Pro; nothing in software can fix a clipped converter.
@@ -1032,37 +1173,39 @@ ASKED, VERBATIM: *"...shorten in both index and in page"*. Now *"Play and turn t
 
 ASKED, VERBATIM: *"rm yellow circle aroind invisible hands button on knobs"*. MEASURED in Chrome: a mouse press leaves `.pos-knob-hand` matching `:focus-visible`, so the shell's `outline: 1px solid var(--hi)` drew a yellow circle round it (the ground's 50% radius shapes it) until focus moved. `demo/shell/shell.css` now gives that button `outline: none` on focus, with the ink stepping to `--fg` as the keyboard cue. The lit glyph is still yellow. ⚠️ `.sld-hand` on sliders was not looked at and may do the same.
 
-### Open 2026-09-30: `/shape/` works with the Circuit on the Pi, and makes a sound to hear the change
+### ~~Open 2026-09-30: `/shape/` works with the Circuit on the Pi, and makes a sound to hear the change~~ DONE: 9ccba934 shape joins studio-1-circuit via the board with the kit keyboard, gate passes the 52 synth CCs; Pi carried it by abfdcbb9 (193/193 on the Pi).
 
 ASKED, VERBATIM, ACROSS TWO MESSAGES: *"https://positron.studio/shape/ - make it work with pi circuit. test tone button?"*, then *"or keyboard?"*. Today `/shape/` edits a Circuit's synth over local Web MIDI (`demo/shell/circuit-cc.mjs`, 98 CC parameters) and needs the instrument on this USB port. The Circuit on the desk now hangs off the Pi (`studio-1`, input `circuit`, room `studio-1-circuit`), which `/away/` already reaches through `createBoard`: Listen via the `input.want` lease, notes through the board.
 🔴 **THE BOARD REFUSES EVERY CC BUT 123 TODAY.** `rig/board/inputs.mjs:40` `midiVerdict` lets only note on, note off and CC 123 value 0 through, on channels 1, 2 and 10, because the Circuit has no factory reset. So `/shape/` over the Pi needs that gate widened to the CC numbers `circuit-cc.mjs` lists for the synth channels, and nothing that writes flash (no SysEx, no program change). A CC edits the current patch in RAM; that is the claim to check against `plans/plan-circuit-patches.md` before widening, and `rig/board/test.mjs` needs a sabotage for it. The board change then has to be copied to the Pi and the service restarted.
 ⚠️ **TEST TONE OR KEYBOARD, UNDECIDED.** A test tone is one button playing a held note so a knob turn is heard; the kit keyboard (as on `/away/`) lets you play. `/away/` already has both the Listen waveform and the keyboard, so the keyboard may be the cheaper one. Files: `demo/shape/index.html`, `rig/board/inputs.mjs`, `rig/board/test.mjs`.
 
-### Open 2026-09-30: the streaming pages' toggle names its transport, WEBRTC OFF / WEBRTC ON
+### ~~Open 2026-09-30: the streaming pages' toggle names its transport, WEBRTC OFF / WEBRTC ON~~ DONE: 6e1498a8 streamSays() in presence.mjs, used by webrtc, llhls and moq.
 
 ASKED, VERBATIM: *"webrtc demo: button labels: WEBRTC OFF / WEBRTC ON. analogue titles form moq / llhls"*. So `/webrtc/` reads WEBRTC OFF, STARTING, WEBRTC ON, `/llhls/` LL-HLS OFF / LL-HLS ON and `/moq/` MOQ OFF / MOQ ON, replacing the shared `STREAM` words (`stream off`, `starting`, `on`) in `demo/shell/presence.mjs`. The /cam/ `CAMERA` words are the precedent. No assert reads the words.
 
 ### Open 2026-09-30: carried in from HANDOFF.md, items that lived only there
 
+Now: 253 MB film, stage at 375 and circuit 48/49 are done; TURN token, video-panel replace, transport-bar toggle, grid hidden, cam measures and clipping are left. (triaged 2026-10-12)
+
 Collected 2026-09-30 on *"collect todos"*. Each one was listed in `HANDOFF.md` under a "waiting" or "open" heading and had no line in this file.
 
-- **Rotate the TURN token.** `TURN_KEY_API_TOKEN` was visible as a secret name and is in a transcript. Suggested, not done.
+- **Rotate the TURN token.** `TURN_KEY_API_TOKEN` was visible as a secret name and is in a transcript. Suggested, not done. WAITING: on the owner rotating TURN_KEY_API_TOKEN in the Cloudflare dashboard; no rotation in git or BACKLOG since.
 - ~~**Test the TURN relay with the VPN on.**~~ ✅ DONE 2026-09-30, VPN on: `DEMO_BASE=https://positron.studio node demo/verify.mjs webrtc` **28/28, 22 page asserts**, `connected`, frames RENDERED 1280x720, ping 26 ms, footer `relay`, path `local relay, remote host, udp, relay over tcp`, 7 ICE urls of which 6 TURN. ⚠️ The first run the same minute read 8/8 with **2** page asserts, which is the cold container, not a pass. /cam/'s MoQ under the VPN is still unlooked at.
-- **`video-panel.mjs` has no way to REPLACE its picture.** A page emptying `panel.stage` loses the caption slot and the full screen exit (the /stage/ questions bug, 2026-09-30).
-- **`transport-bar.mjs` has no toggle that drives another deck.** /stage/'s play button is borrowed from the hidden archive bar.
-- **/stage/ streams the 253 MB film into an unseen canvas on every show.**
-- **`hidden` does nothing on a `createGlueRows({ grid: true })` surface**, a `shell.css` specificity problem found by the stage agent.
-- **/stage/ at 375 px**: long link lines through containers and stacked labels.
-- **`cam` container cold start, a steady-state LL-HLS median, and Safari's MP4 arm are unmeasured.**
-- **`/circuit/` reads 48/49**: `the printed names sit the same distance from the top and both sides`, top 41 against 21. Pre-existing.
+- **`video-panel.mjs` has no way to REPLACE its picture.** A page emptying `panel.stage` loses the caption slot and the full screen exit (the /stage/ questions bug, 2026-09-30). Now: still no replace method in demo/shell/video-panel.mjs (glue, mode, under only).
+- **`transport-bar.mjs` has no toggle that drives another deck.** /stage/'s play button is borrowed from the hidden archive bar. Now: /stage/ still builds the archive bar off-page so Play recording can drive it.
+- ~~**/stage/ streams the 253 MB film into an unseen canvas on every show.**~~ DONE: 39d206b5 stage, the local film is gone (2026-10-05).
+- **`hidden` does nothing on a `createGlueRows({ grid: true })` surface**, a `shell.css` specificity problem found by the stage agent. Now: by reading, .pos-glue[hidden] (shell.css:1097) still loses to .pos-rows.pos-rows-grid display:grid (:1149), same specificity, later rule.
+- ~~**/stage/ at 375 px**~~: long link lines through containers and stacked labels. DONE: 2eaae3bc stacked diagram layout, struck at BACKLOG line 463.
+- **`cam` container cold start, a steady-state LL-HLS median, and Safari's MP4 arm are unmeasured.** Now: only two LL-HLS spot readings (5.4 s, 6.1 s, line 1180); cold start overlaps the runtime timing row at line 276.
+- ~~**`/circuit/` reads 48/49**~~: `the printed names sit the same distance from the top and both sides`, top 41 against 21. Pre-existing. DONE: 6fb037d1 reel and circuit long-red asserts green (circuit 34/34).
 - ~~**`/away/`'s readout wraps three and one on a phone**~~ ✅ fixed 2026-09-30 in `shell.css`, four cells are 2 + 2 under 560 px.
-- **The Circuit clips on Fast Track Pro input 1**: 4,108 of 467,520 samples at full scale. The owner was asked to turn the gain down a third; nothing has been measured since.
+- **The Circuit clips on Fast Track Pro input 1**: 4,108 of 467,520 samples at full scale. The owner was asked to turn the gain down a third; nothing has been measured since. WAITING: on the owner turning input 1 gain down; still clipping 8 to 29 samples per run on 2026-09-30, unmeasured since.
 
 ### Done 2026-09-30: plan the WebRTC path for /away/ (plans/plan-away-webrtc.md)
 
 ASKED, VERBATIM: *"write webrtc path to plan"*. A plan in `plans/`, not code: a direct browser to Pi path for the Circuit's audio and notes, with the relay kept for signalling and as the fallback. Reported in full when written.
 
-### Open 2026-09-30: bring the /away/ round trip down
+### ~~Open 2026-09-30: bring the /away/ round trip down~~ DONE: abfdcbb9 direct WebRTC path, board round trip 72 ms to 4, key to speakers about 175 ms to 48.
 
 ASKED, VERBATIM: *"can we bring roundtrip more down"*. Measured the same day: press to the note arriving back 151 to 180 ms, median about 170, relay legs about 18 ms each way from both ends, and `arecord` on the Pi at ALSA's default 6000 frame period (125 ms) in a 24000 frame buffer, so frames arrive in 117 ms lumps and the page needs a 160 ms cushion to ride them. First cut: a short `arecord` period in `rig/board/inputs.mjs`, then a smaller cushion on `/away/`, each measured before and after.
 
@@ -1099,6 +1242,8 @@ DONE: readout removed, state in `__demo.chain`, live states in the log, fixed wo
 ASKED, VERBATIM: *"rm, put non-realtime versions to diagram"*, pasting the /stage/ readout `local 12 pieces, 1.79 MiB in IndexedDB / R2 uploads when the show stops / playback plays from R2 once it is there`. Remove the `stage-chain` glue rows (`demo/stage/index.html` ~1929 to 1950, every `chainSay` call). The fixed sentences (pieces kept in IndexedDB, uploaded to R2 when the show stops, played back from R2) become diagram boxes or notes. The live states (`uploading N%`, the refusals and failures) must still reach the log, and the R2 playback link must still be reachable if a visitor needs it to play. Also retires the `hidden` on a grid glue row problem for this surface. Asserts that read the chain move to `__demo`.
 
 ### Open 2026-09-30: NEXT STEP, the Pi camera beside the Circuit audio, OFF by default
+
+Now: not started; rig/board/video.mjs renders a shader, no camera and no env gate. (triaged 2026-10-12)
 
 ASKED, VERBATIM: *"note that next step would be using pi camera along with audio. off by default, toggled via env var (privacy)"*. Not started. The camera must be impossible to switch on from a page: an env var in `/etc/default/positron-board` enables it, and with it unset the board does not open the camera at all. The board already streams video to `<room>-video` (`rig/board/video.mjs`); check whether that path opens a camera today and gate it on the same variable. `/away/` would show the picture next to the waveform.
 
@@ -1147,7 +1292,7 @@ DONE: fetched on the press on all three, a `path` cell beside the ping, `readIce
 
 ASKED, VERBATIM: *"do in bg"*, after *"should they ask for relay servers? what it improves?"*. `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` are on positron-pub since 2026-09-30 and `GET https://pub.positron.studio/ice` answers 200 with `turns:...:443?transport=tcp` among 7 servers. Pass them to every RTCPeerConnection on those pages, fetched on the PRESS and never on load, and show `direct` or `relay` from the selected candidate pair beside the latency, because a relayed latency is not comparable to a direct one. MoQ gets no help from TURN. `demo/webrtc/index.html`, `demo/stage/index.html`, `demo/keep/index.html`, maybe `demo/shell/live.mjs`.
 
-### Open 2026-09-30: fix /stage/, the MIM film not the test screen, WebRTC only, local storage to R2 to playback. PRIORITY
+### ~~Open 2026-09-30: fix /stage/, the MIM film not the test screen, WebRTC only, local storage to R2 to playback. PRIORITY~~ DONE: 8c20c579 stage on its own container playing the MIM film, WebRTC only, recording browser to R2 to playback.
 
 ASKED, VERBATIM: *"can you fix stage? do we need another container instace not
 to conflict to tohte? i still see test screen i want mim stuff. can you have
@@ -1197,7 +1342,7 @@ camera leg is told. `workers/pub/worker.mjs`, `workers/pub/container/server.mjs`
   and a camera alternating on one input is exactly the case the tuned player's
   rebuild exists for. Say what it costs in seconds.
 
-### Open 2026-09-30: cam must work on a network that drops UDP ("make it work!")
+### ~~Open 2026-09-30: cam must work on a network that drops UDP ("make it work!")~~ DONE: 37fef98e cam says This network blocks UDP and fetches /ice TURN servers; TURN on webrtc/stage verified with VPN on (line 1050).
 
 ASKED, VERBATIM: *"make it work!"*, with a screenshot of https://positron.studio/cam/
 at a cafe: the camera shows, `WebRTC could not start`, MoQ black, and logs
@@ -1230,7 +1375,7 @@ and `/moq/` (`All promises were rejected`).
 - Every page with a WebRTC leg would gain from the same TURN route: `/webrtc/`,
   `/stage/`, `/keep/`.
 
-### Open 2026-09-30: all secondary buttons in capitals
+### ~~Open 2026-09-30: all secondary buttons in capitals~~ DONE: e7f3fba4 shell.css secondary buttons in capitals (2026-10-01).
 
 ASKED, VERBATIM: *"cap: all secondary buttons"*. Read as: every secondary
 button label in upper case, as the primary ones are. Which component draws a
@@ -1239,7 +1384,7 @@ page is to be measured, not assumed; check `positron-ui` for what "secondary"
 means in the kit. If "cap" meant something else (a cap on count? a cap
 height?), the words are here.
 
-### Open 2026-09-30: cam, "Local camera" becomes "Camera"
+### ~~Open 2026-09-30: cam, "Local camera" becomes "Camera"~~ DONE: 37fef98e the panel reads Camera; no Local camera left in demo/cam/index.html.
 
 ASKED, VERBATIM: *"Local camera -> Camera"*. The top left panel's footer label
 in `demo/cam/index.html`, and the diagram and any assert that names it.
@@ -1357,7 +1502,7 @@ yesterday: `burn()` and the filter generator in `demo/shell/pattern.mjs`, and
 - Deploying the container is `positron-streaming` work and costs a restart of
   the live leg; load it first.
 
-### Open 2026-09-30: a new demo `cam`, one webcam through four paths in a 2x2 grid
+### ~~Open 2026-09-30: a new demo `cam`, one webcam through four paths in a 2x2 grid~~ DONE: f74c4a3a demo/cam built with four diagrams; MoQ carries the camera and LL-HLS has its own input (sections at lines 1135, 1180). moq.mjs:335 log still has a middot.
 
 ASKED, VERBATIM: *"in bg make demo called cam. 2x2 videopanels, button: [Start
 camera] grid: Local camera LLHLS / WEBRTC MOQ. figure out how to to llhls from
@@ -1512,6 +1657,8 @@ ASKED, VERBATIM: *"Move moq to streaming as well and do same ui treatment"*.
 
 ### Open 2026-09-29: createPresenceButton's `state` is a getter returning a function, and it has bitten two pages, found not asked for
 
+Now: presence.mjs still exposes state as a getter returning a function; no positron-ui line about it. (triaged 2026-10-12)
+
 `demo/shell/presence.mjs`. `createPresence`'s api exposes `state: () => now`, a
 FUNCTION, and `createPresenceButton` hands it through a getter, so
 `btn.state === 'offline'` compares against a function object and is false for
@@ -1530,6 +1677,8 @@ first run after the edits read **16/16 green with `page asserted something` at
 
 ### Open 2026-09-29: the `fps` cell on /llhls/ and /webrtc/ has never shown a number
 
+Now: llhls and webrtc still set fps from watchPresentedFps with no assert reading it. (triaged 2026-10-12)
+
 `watchPresentedFps` counts frames through `requestVideoFrameCallback` and
 reports `null`, never `0`, where the API is absent. Every screenshot is taken
 without a press, so the picture is always empty, and nothing asserts on the
@@ -1547,7 +1696,7 @@ harness presses each control once. They were READ and they are simple, which is
 reading rather than measuring. Driving a second press costs another container
 wake, which is why it was not done.
 
-### Open 2026-09-29: the container's burn overlay is dormant, so the test pattern fix is invisible in production
+### ~~Open 2026-09-29: the container's burn overlay is dormant, so the test pattern fix is invisible in production~~ DONE: d8c95d33 wrangler.jsonc sets PUB_SOURCE testsrc2 and PUB_BURN 1, pub deployed (line 1327).
 
 `workers/pub/wrangler.jsonc` sets only `PUB_W`, `PUB_H` and `PUB_FPS`.
 `PUB_SOURCE` defaults to the mimproject film and `PUB_BURN` has been off since
@@ -1728,7 +1877,7 @@ and possibly one new module in `demo/shell/`.
   stream wherever the two can be separated, and do not leave a harness holding
   the socket.
 
-### Open 2026-09-29: the index cards should carry the demo's own description
+### ~~Open 2026-09-29: the index cards should carry the demo's own description~~ DONE: 1d08b466 index cards: every card carries its own page first sentence.
 
 ASKED, VERBATIM: *"copy demo descs (or their first sentence) to index page
 cards"*. `demo/manifest.mjs` and every `demo/<slug>/index.html`.
@@ -2733,6 +2882,8 @@ the answer to *"which declaration won"*, so an absence it reports is trusted.
 
 ### Open 2026-09-29: the kit puts the case's default inset over a plate, whatever the case actually insets by, found not asked for
 
+Now: shell.css still sets var(--panel-pad) on .panel-case > .panel-plate; /twelve/ still overrides it at :175. (triaged 2026-10-12)
+
 **FOUND BY THE `/twelve/` AGENT WHILE ANSWERING THE NAMEPLATE ASK, AND
 DELIBERATELY NOT WRITTEN THERE**, because `demo/shell/` was closed to it.
 
@@ -2756,6 +2907,8 @@ lands, and the full note is in `demo/twelve/index.html` at the assert's comment
 so the next reader finds it where they will look.
 
 ### Open 2026-09-29: shape now draws the same control two ways on one screen, found not asked for
+
+WAITING: on the owner, whether lane hands also come apart or the top hand loses its ring. (triaged 2026-10-12)
 
 **FOUND BY THE `/shape/` AGENT AFTER DOING EXACTLY WHAT WAS ASKED**, and it is
 the argument the 2026-09-28 join was built on, arriving from the other side.
@@ -2809,7 +2962,7 @@ right and `/pack/` should have kept it, or it is wrong and two pages are drawing
 a box inside a box. `/radio/` cannot be looked at, so this needs `/tapes/`
 against its stand-in and a decision about what a glued picture's inset IS.
 
-### Open 2026-09-29: on a phone muta reads picker, name, button, so the nameplate is not literally last
+### ~~Open 2026-09-29: on a phone muta reads picker, name, button, so the nameplate is not literally last~~ DONE: 90e7f3db muta foot, the name drops below the Test tone and picker group on a phone, per the owner's sketch.
 
 **FOUND BY THE SHARED AGENT IMMEDIATELY AFTER LANDING THE ASK IT ANSWERS**, and
 reported rather than written, because the fix reaches six pages.
@@ -2828,7 +2981,7 @@ would put the name under the button on this page and change what
 `.pos-ipanel-name` stacks as on all six. **Refused in writing, waiting on the
 owner.**
 
-### Open 2026-09-29: the plate row's order moves the paint and not the tab stop
+### ~~Open 2026-09-29: the plate row's order moves the paint and not the tab stop~~ OVERTAKEN: refused in writing 2026-09-29 as the known cost of order, recorded in shell.css beside the 560 px block.
 
 **FOUND BY THE SHARED AGENT WHILE WRITING THE `order` ABOVE**, and recorded in
 `shell.css` rather than worked around.
@@ -2843,6 +2996,8 @@ row at every width and undo what the ask asked for. **Left as is, deliberately,
 and written down so nobody reports it as new.**
 
 ### Open 2026-09-29: two agents shared one scratchpad file and one of them measured the other's page
+
+Now: briefs give each agent its own scratchpad directory, but the rule is in no skill or CLAUDE.md yet. (triaged 2026-10-12)
 
 🔴 **THE SHARED AGENT'S PROBE FILE WAS OVERWRITTEN MID-TASK BY A PEER**, in the
 session scratchpad root, and its next four measurements came back as another
@@ -2892,6 +3047,8 @@ passed because something upstream had cleared its evidence.
 
 ### Open 2026-09-29: knobs carries seven em dashes and six middots that predate today
 
+Now: still 7 em dashes and 6 middots in demo/knobs/index.html. (triaged 2026-10-12)
+
 **MEASURED BY THE `/knobs/` AGENT AND DELIBERATELY NOT SWEPT**: `grep` reads
 **7 lines with em dashes and 6 middots** in that page's log lines and assert
 details, none of them written today. `git diff` of today's change contains
@@ -2903,6 +3060,8 @@ gets made. **The rule is per demo, when that demo is being worked on**, so this
 is the note for the next `/knobs/` task.
 
 ### Open 2026-09-29: nothing on /pack/ can loop a sample any more, and Loop was asked for by name
+
+WAITING: on the owner, whether Loop comes back to /pack/ as its own control. (triaged 2026-10-12)
 
 🔴 **`Loop` WENT WITH THE TRANSPORT IN `5bf144b`, WHICH IS WHAT TODAY'S ASK
 REQUIRED, AND IT IS A CONTROL SOMEBODY ASKED FOR BY NAME.** 2026-09-21: *"move
@@ -2936,12 +3095,14 @@ else's**, and building one is the open job.
 
 ### Open 2026-09-29: pack imports createReport and never calls it, found not asked for
 
+Now: still imported at demo/pack/index.html:147 and never called. (triaged 2026-10-12)
+
 `demo/pack/index.html:141` imports `createReport` and `grep -c "createReport("`
 is **0**. Dead since the readout was removed on 2026-09-21. **Left alone on
 purpose**: it is unrelated to the sample player and would put noise in a commit
 about it. One line to delete.
 
-### Open 2026-09-29: muta's foot has a 230 px hole at the desk, and the scope is the page's largest blank
+### ~~Open 2026-09-29: muta's foot has a 230 px hole at the desk, and the scope is the page's largest blank~~ OVERTAKEN: 90e7f3db 2026-09-29, the owner's sketch puts MUTA alone at one end and the two controls at the other.
 
 **BOTH FOUND BY THE `/muta/` AGENT AFTER LANDING `0f617fb`, AND NEITHER IS A
 FAULT.** They are the two things a second pair of eyes should look at on
@@ -2954,7 +3115,7 @@ https://positron.studio/muta/ at 1280.
 - **The scope's empty field is now the largest blank area on the page** while
   nothing is sounding. It was already that shape at 525 px and is simply bigger.
 
-### Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for
+### ~~Open 2026-09-28: step-grid sizes itself against the scroller's own padding, so the last column hangs over the edge, found not asked for~~ DONE: 78fc18b5 step-grid.mjs size() subtracts the strip's inline padding.
 
 **FOUND BY THE `/tom/` AGENT WHILE MEASURING SOMETHING ELSE, AND DELIBERATELY
 NOT FIXED THERE**, because it is a kit line and that agent's file was the page.
@@ -2984,7 +3145,7 @@ not evidence for the unrelated edit.
 **The fix is subtracting the scroller's inline padding inside `size()`, one line**,
 and it reaches `/kit/`'s three specimens and `/pack/` as well as `/tom/`.
 
-### Open 2026-09-28: createChoice has no slot for a trailing control, found not asked for (ANSWERED 2026-09-29, and it is not wanted)
+### ~~Open 2026-09-28: createChoice has no slot for a trailing control, found not asked for (ANSWERED 2026-09-29, and it is not wanted)~~ OVERTAKEN: answered 2026-09-29, the hand left the segmented row (ff56973c), no trailing option wanted.
 
 ✅ **ANSWERED 2026-09-29 BY AN ASK THAT GOES THE OTHER WAY, SO NO `trailing`
 OPTION IS WANTED.** Asked: *"shape: ... invisible hand is a separat e button not a
@@ -3026,6 +3187,8 @@ that is an eleven call site decision, so no radio group is being polluted and
 the glyph keeps its own `aria-label`. **No screen reader has been on it.**
 
 ### Open 2026-09-28: the keyboard's pad row cannot hold its controls on one line at 375 px
+
+Now: with no Evolution the tempo and ratio cells go and /nola/ reads one line (750c751b); with one plugged in it still wraps. (triaged 2026-10-12)
 
 FOUND while answering *"keyboard lower bittons (+- panic etc) go to the same
 line"*. That ask got the repair it needed (the row is two ends in two boxes now,
@@ -3246,7 +3409,7 @@ on purpose, because *a suite run must not be a hand on somebody's instrument*.
 Moving this button INTO a row the harness sweeps would start a hand on every
 run.
 
-### Open 2026-09-28: muta, the Test tone button fills the phone (DONE) and the knob grid has nothing to centre in (REFUSED, the decision ANSWERED 2026-09-29)
+### ~~Open 2026-09-28: muta, the Test tone button fills the phone (DONE) and the knob grid has nothing to centre in (REFUSED, the decision ANSWERED 2026-09-29)~~ DONE: half two 040f266b; half one answered by the 2026-09-29 ask, done in 0f617fbc.
 
 🔴 **THE DECISION THAT WAS WAITING HERE IS ANSWERED, 2026-09-29, AND THE ANSWER
 IS NO.** Asked: *"muta: full content w in deskop, center the knobs group. align
@@ -4001,6 +4164,8 @@ their homes, the hand, the send gate and the board path are byte-identical.
   on the second with no code between them. Not chased, on the standing rule.
 
 ### control-grid: the pitch is 84 and the lattice steps 94, found 2026-09-28, not asked for
+
+Now: the knobs ask in it is done (Done 2026-09-28 knobs rotary grid); control-grid.mjs:71 still says the gap is inside the pitch. (triaged 2026-10-12)
 
 FOUND while putting `/knobs/` on the lattice. `demo/shell/control-grid.mjs`
 calls its track the PITCH, and the distance between two centres is `pitch +
@@ -4834,7 +4999,7 @@ runs for a visitor, so "on loading" has to stay inside this page's own assets.
 line 668 already records that the browser build of libfaust has three backends
 and C++ is not one of them.
 
-### crate: a dead branch round `.pos-readout`, found 2026-09-28, not asked for
+### ~~crate: a dead branch round `.pos-readout`, found 2026-09-28, not asked for~~ OVERTAKEN: /crate/ retired to archive/demos/crate-index.html and out of the manifest on 2026-10-02 (fdc5677a).
 
 FOUND by the kit agent while making the joined report the default, READ off
 `shell.mjs` rather than measured on the page, and NOT fixed because nobody asked
@@ -5376,6 +5541,8 @@ reinterpet in svg)"*. Four asks, all on `demo/eccm/`:
 
 ### Open 2026-09-26: the presence badge needs its own treatment, and stays out of generic examples
 
+WAITING: on the owner saying what "extra care" means for a badge in a glued row. Badges left the glued examples in f55126d2. (triaged 2026-10-12)
+
 ⚠️ **ASKED:** *"rm online components from glued examples"*, then *"they need
 extra care"*. Done in the kit the same minute: five badges out of the glued rows
 block, the two justified rows given a `MUTE` button as their second end, the two
@@ -5514,7 +5681,7 @@ assess and propose."* Read-only. Lands in `plans/plan-instrument-audit.md` and i
 reported here in full.
 
 
-### Open 2026-09-26: the presence badge's own inset, the justified-to-linear rule, full-width glue
+### ~~Open 2026-09-26: the presence badge's own inset, the justified-to-linear rule, full-width glue~~ DONE: 4d978e6a, grid rows share a label and control column (subgrid), a justified row goes linear below --row-min, createGlueRows full: true, Notes off is Panic.
 
 ⚠️ **TWO MORE IN THE SAME STREAM, VERBATIM.** With a crop of the settings list:
 *"board offline does not comply with the label / control grid. make it a general
@@ -5560,6 +5727,8 @@ JSON API once, no crawling loop, because it is somebody else's server.
 
 ### Open 2026-09-26: quieten Safari's text scaling, selection and loupe on the phone
 
+Now: parked on instruction. shell.css has only the 2026-09-04 -webkit-text-size-adjust: 100% on body; the EDS Chart css has not been read. (triaged 2026-10-12)
+
 ⚠️ **ASKED, VERBATIM, AND PARKED ON INSTRUCTION:** *"try to minimize safari scaling
 and selecting and loupe effects. put this to backlog. see
 ~/projects/enefit-design-systems Chart component css for inspiration, write that
@@ -5590,7 +5759,7 @@ files, which is where a component is used and not where it is written):
 under a system text-size change. Nothing here is decided until that is read.
 
 
-### Open 2026-09-26: the keyboard's inset inside a glue, and more glued rows examples
+### ~~Open 2026-09-26: the keyboard's inset inside a glue, and more glued rows examples~~ DONE: f8e5743e (--kbd-pad: 0px inside a glue, an assert for row child insets) and 8cd91f5d (--edge/--r/--inset tokens, six glued surfaces, no loop button).
 
 🔴 **ASKED, WITH THREE CROPS:** *"keyboard padding is not consistent from the
 rest. fix systematically"*, then *"rm its padding/margin (component without
@@ -5606,6 +5775,8 @@ that already pads 20, so the keys sat at 29 while `NOLA` and every knob sat at
 
 
 ### Open 2026-09-26: what the composition research says to change in `shell.css`, in order
+
+Now: item 2 done (b14de8a1); subgrid landed for glued rows (4d978e6a) but not the control row; shell.css still has 0 @layer and 2 !important, no stylelint config. (triaged 2026-10-12)
 
 🔴 **FROM `research/cascade-cures-2026-09-26.md`, `glued-containers`, `layout-systems`
 AND THE CORRECTION TAXONOMY, ALL WRITTEN 2026-09-26.** None of these is done. Each is
@@ -5667,6 +5838,8 @@ is `@layer`'s job, item 1.
 
 ### Open 2026-09-26: five phone defects, SEEN for the first time, across six instrument pages
 
+Now: A answered for glued rows (4d978e6a, linear below --row-min); D still rows by cell count (shell.mjs ceil(n / 6)); B, C, E not re-measured. (triaged 2026-10-12)
+
 🔴 **THE FIRST PHONE SHOTS THIS PROJECT HAS EVER TAKEN OF ITSELF, 2026-09-26,
 WITH `node demo/shot.mjs <slug> 390`.** Instructed: *"always look how things
 look in mobile. figure out how to see it."* Six pages at 390 px, none dragging
@@ -5720,6 +5893,8 @@ fix. `demo/shot.mjs` is 200 lines and it took an afternoon of being told.
 
 ### Open 2026-09-26: `/kit/` reads 237/237 in the harness and shows ten FAILs in a real browser
 
+Now: /kit/ was split into /kit/<part>/ pages on 2026-10-06, so the 237 count no longer exists; the selfcheck=1 reading was never taken. (triaged 2026-10-12)
+
 🔴 **SEEN 2026-09-26 WHILE LOOKING AT THE NEW PANEL BLOCKS, AND IT IS NOT
 THEIRS.** `node demo/verify.mjs kit` is **237/237 green**. The same page opened
 by hand in Chrome at `http://127.0.0.1:8890/kit/`, read off `__demo.asserts`,
@@ -5766,7 +5941,7 @@ because 64 label rows beside 16 scrolling steps need a fixed column. One kit rul
 was owed and is in: `.pos-rows-r > :only-child` takes the row whether or not the
 row has an inset, asked for independently by `/shape/` and `/tom/` on one day.
 
-### The original ask, kept
+### ~~The original ask, kept~~ DONE: 040f437f (glue.mjs rows and instrument-panel.mjs), applied to five pages 2026-09-28 per the Done heading above.
 
 🔴 **ASKED, VERBATIM, WITH A SKETCH:** *"do a instrument panel coponent properly
 in kit. its our glued style"*, then the sketch, then *"where name is nameplate.
@@ -5821,6 +5996,8 @@ whole page reads red when `d.ready()` misses the wait.
 
 ### Open 2026-09-26: `C+` reads as C major instead of being refused
 
+Now: + reads as augmented since 0b2a3d2f (CHORD_GAP in chords.mjs); ^ is still eaten, so C^ still reads as C major. (triaged 2026-10-12)
+
 🔴 **FOUND 2026-09-26 WHILE ADDING `2`, AND IT IS WORSE THAN A MISSING ROW:
 A VISITOR GETS A WRONG CHORD RATHER THAN A REFUSAL.** MEASURED:
 `parseChords('C+')` returns **C major with no bad token**.
@@ -5836,7 +6013,7 @@ exists**, so this is about not lying rather than about coverage.
 
 ✅ **`+` DONE 2026-09-30, UNCOMMITTED AT THE TIME OF WRITING: READ AS AUGMENTED, NOT REFUSED.** It is the ordinary spelling, the corpora write it, and `classOf` and `SPELL_ALIAS` already fold it onto `aug`. The splitter keeps `+` as a chord character (exported as `CHORD_GAP`), a `+` standing alone is still a gap so `C + G` is two chords, and `C+7` is refused in words. `C+` is `Caug`, notes 60 64 68. ⚠️ **`^` IS STILL EATEN**, so `C^` still reads as C major with nothing refused. `chords-test.mjs` 7i asserts that on purpose so it cannot change quietly.
 
-### Open 2026-09-26: `CLASS_OF` files 14 of 26 qualities as major, `dim7` included
+### ~~Open 2026-09-26: `CLASS_OF` files 14 of 26 qualities as major, `dim7` included~~ DONE: 0b2a3d2f, CLASS_OF has a row for all 26 qualities and suggest-test walks them. The 37 missing qualities are a separate, not yet asked step.
 
 🔴 **MEASURED 2026-09-26: 14 of the 26 qualities `parseChord` can return fall
 back to `maj` in `suggest.mjs` today**, namely `6 9 11 13 add9 dim7 maj6 maj9
@@ -5852,7 +6029,7 @@ thing, not a reason the rows are wrong.
 
 ✅ **CLASSES DONE 2026-09-30, UNCOMMITTED AT THE TIME OF WRITING.** `CLASS_OF` has a row for all 26 qualities and `suggest-test.mjs` walks every quality `parseChord` or `name.mjs` can return against the build's own `classOf` in `chord-corpus.mjs`. MEASURED against the old code: **9 qualities** reached the table in the wrong class (`min6 min9 min11 min13` as major, `9 11 13` as major, `dim7` as major, `2` as major); the six `maj` extensions and `add9` were right by accident. Two named disagreements with `classOf`: `2` is `sus` (its regex says dominant) and `add9` is `maj` (it says nothing). **The 37 missing qualities are still not added**; that is now one row here plus one row in `chords.mjs` each.
 
-### Open 2026-09-26: `2` can be typed and will never be suggested
+### ~~Open 2026-09-26: `2` can be typed and will never be suggested~~ DONE: recorded as a fact, not a defect; since 0b2a3d2f a typed C2 reaches the table as sus.
 
 ⚠️ **MEASURED: `2` is written 0 times in 159,644 corpus chords**, so a table’s
 `spell` map has nothing to offer it. The SOUND is still reachable under the name
@@ -6171,7 +6348,7 @@ recomputes the implementation proves nothing.
 that file’s own stated division and is also how this can be worked while another
 agent holds `keyboard.mjs`.
 
-### Closed 2026-09-28 by deleting its subject: the keyboard’s note naming pair reads N and D, not Nt and Dg
+### ~~Closed 2026-09-28 by deleting its subject: the keyboard’s note naming pair reads N and D, not Nt and Dg~~ OVERTAKEN: the N | D pair left keyboard.mjs on 2026-09-28 (1bb044c9).
 
 🔴 **THE PAIR IS GONE FROM THE COMPONENT SINCE 2026-09-28** on *"finally: rm
 N | D setting from keyboard component"*, so this line has nothing left to
@@ -6197,7 +6374,7 @@ and degrees in full. **A private vocabulary on a control a visitor has to be tol
 about is exactly what `positron-ui` bans**, and `/nola/` already paid for it once
 with *"i do not know what spelled close leading means"*.
 
-### Open 2026-09-25: the keyboard footer rule is edge to edge, and it belongs to the kit
+### ~~Open 2026-09-25: the keyboard footer rule is edge to edge, and it belongs to the kit~~ DONE: 34fcd25f, keyboard.mjs owns its footer and .kbd-foot bleeds through --kbd-pad; .nola-foot is gone; plate letter inset 8891fd38.
 
 🔴 **ASKED, VERBATIM, WITH A SCREENSHOT, AND IT IS A CRITICISM OF HOW THIS
 IS BEING WORKED RATHER THAN OF ONE BORDER:** *"the border on top of footer goes
@@ -6234,6 +6411,8 @@ inherited the defect and not the fix"*, re-reported on `/plai/`. The `/shape/`
 agent refused a page local `padding-block` the same hour for the same reason.
 
 ### Open 2026-09-25: `/knobs/` has a flaky pair of asserts, and the constant is 6.4x stale
+
+Now: demo/knobs/index.html still waits a fixed wait(900) before reading movedTo; only the sibling wait is derived from lapMs. (triaged 2026-10-12)
 
 🔴 **TWO ASSERTS ON `/knobs/` ARE A COIN TOSS, PROVED ACROSS THREE RUNS:**
 `a wheel and an arrow key each take the dial back in one frame` and `and it picks
@@ -6272,7 +6451,7 @@ own 2026-09-25 banded measurement recorded. The assert now prints the surface
 width and the scroll figures beside the box, rather than asserting the box
 against a quantity the box itself sets, which is what made it dead.
 
-### Closed 2026-09-25 line, kept for its measurement
+### ~~Closed 2026-09-25 line, kept for its measurement~~ DONE: closed by the instrument panel, see the Done 2026-09-28 full: true heading above.
 
 ⚠️ **FOUND 2026-09-25 while repairing an assert that could never fail.**
 `.kbd.kbd-full` is `width: 100%` of a `max-content` host, **so the option has no
@@ -6284,7 +6463,7 @@ reads **582.0 px, the case’s own content width**, with the keys scrolling insi
 it, 777 px in 564 px. **The repair is the band**, so this waits on the band
 rhythm work rather than gaining a page local workaround.
 
-### Open 2026-09-25: a synth on/off says ON and OFF, not FAU ON and FAU OFF
+### ~~Open 2026-09-25: a synth on/off says ON and OFF, not FAU ON and FAU OFF~~ DONE: 34fcd25f, instrument.mjs header status passes showName: false, so it reads ON and OFF; of stays in the aria label.
 
 🔴 **REFINED IN THE SAME STREAM, VERBATIM:** *"just [() ON] and [() OFF]
 (same w)"*. Two things, and the second answers the open question below.
@@ -6337,7 +6516,7 @@ was asked back. **Dropping the name changes the widest phrase**, and a reserve
 computed on a phrase that no longer exists leaves the dot floating with a gap,
 which reads as a stray mark rather than part of a label.
 
-### Open 2026-09-25: the chord name moves about one character left in the keyboard
+### ~~Open 2026-09-25: the chord name moves about one character left in the keyboard~~ DONE: 34fcd25f, .kpad-chord has margin-left: -1ch in shell.css with the reserve kept.
 
 ⚠️ **ASKED, VERBATIM:** *"move chordname ca 1ch left in keyboar"*. A nudge,
 not a re-layout: *ca 1ch* is about one character width.
@@ -6460,7 +6639,7 @@ own border rather than eyeballed.
 the plate change lands in `demo/shell/`, it is SHARED, done once, `/kit/` re-run.
 
 
-### Open 2026-09-25: `/shape/` loses its left rail and the plate moves to the top right
+### ~~Open 2026-09-25: `/shape/` loses its left rail and the plate moves to the top right~~ DONE: 54a1d024 (left rail gone, plate top right); later moved by the instrument panel in d6cb031c.
 
 🔴 **ASKED, VERBATIM, WITH A SCREENSHOT:** *"rm left panel / section. use
 nameplate on top right. shape demo"*. The crop shows the rack's `VOICE` section,
@@ -6500,7 +6679,7 @@ that header row or puts the plate in the rack's first row. `instrument.mjs:108`
 is the header and its right cell is the plate's home, at `end` and never `ends`.
 
 
-### Part done 2026-09-25: an edge to edge horizontal separator on every button group
+### ~~Part done 2026-09-25: an edge to edge horizontal separator on every button group~~ DONE: kit half 8ea1b591; the remainder is covered by the glued instrument panel (040f437f) on fau, knobs, muta, shape and tom since 2026-09-28.
 
 ✅ **THE KIT HALF IS DONE, COMMIT `8ea1b59`. MEASURED: `/kit/` 217/217 before
 (205 page asserts) and 221/221 after (209), so the four new asserts are the whole
@@ -6793,7 +6972,7 @@ that matters, and whatever ships says so in the log rather than silently lying i
 the picture.
 
 
-### Open 2026-09-25: a closed page leaves the show running, and it is billed
+### ~~Open 2026-09-25: a closed page leaves the show running, and it is billed~~ DONE: 8c20c579 gives /stage/ its own pub instance held by a socket (holdPublisher, about 60 s grace, then stop); HLS leg gone; hourly Stream sweep df0db930.
 
 🔴 **ASKED, VERBATIM, WITH A SCREENSHOT OF THE CONTROL ROOM ON AIR:** *"i see
 mix of old hls. you need to stop streaming immediately when pae closes"*, then
@@ -6830,7 +7009,7 @@ whatever is built must not mistake a waking container for a dead one.
 playlist being served is not the same fault as a publisher left running, and one
 can be true without the other. **Check which before fixing either.**
 
-### Open 2026-09-25: `/stage/`'s transport buttons are hand rolled, so they lost the shimmer
+### ~~Open 2026-09-25: `/stage/`'s transport buttons are hand rolled, so they lost the shimmer~~ DONE: 3f9a2304 (a shimmer until on air); the start is now a transport-bar extras button, Start show (dcac6528).
 
 **ASKED, VERBATIM:** *"when i start start hls / webrtc, there is no shimmer. you
 lost std buttons"*.
@@ -6849,6 +7028,8 @@ all three is the same: **stop building these by hand.**
 
 ### Open 2026-09-25: `/wish/`'s remove button should be a small kit variant
 
+Now: the kit has button.pos-sm with a small glyph square (627b04fd); /wish/ still re-declares its own 34 px square. (triaged 2026-10-12)
+
 **ASKED, VERBATIM, WITH A CROP:** *"just [x] button, use small variant (create in
 kit if not exists)"*. The crop shows the `on` checkbox and a large square `×`
 under it in the row's action column.
@@ -6863,7 +7044,7 @@ specimen on that page. `shell.css` gained `button[data-glyph="1"]` at 34 by 34 o
 2026-09-25 and the small variant belongs beside it, not in a page.
 
 
-### Open 2026-09-25: `PLAY RECORDING` is clipped to `PL RECOR`
+### ~~Open 2026-09-25: `PLAY RECORDING` is clipped to `PL RECOR`~~ DONE: 3f9a2304 removed the film bar under the control room; 65232cd3 made PLAY RECORDING the transport bar toggle.
 
 **ASKED, VERBATIM, WITH A CROP:** *"fix button, use regular button"*. The crop
 shows the control room bar's right hand control wrapping to two lines and being
@@ -6882,6 +7063,8 @@ read the label's ink through `measureText` against its content box, and
 
 
 ### Open 2026-09-25: the control room timeline does not move
+
+Now: follow is wired (setFollow on air, showDeck plays only when live, 3f9a2304) but no assert reads the control room strip moving. (triaged 2026-10-12)
 
 **ASKED, VERBATIM:** *"timeline does not move on controlroom"*.
 
@@ -6908,7 +7091,7 @@ that explicitly. Any new assert here selects the control room, waits two frames,
 and reads the strip twice.
 
 
-### Open 2026-09-25: two more on `/stage/`, one of them a live defect
+### ~~Open 2026-09-25: two more on `/stage/`, one of them a live defect~~ DONE: buttons sentence case, now one Start show (dcac6528); stopShow pauses showDeck first and an assert reads the cursor home on stop (65232cd3).
 
 **ASKED, VERBATIM, WITH A CROP OF THE TWO TRANSPORT BUTTONS:** *"rm uppercase,
 regular buttons. when i stop ils, timer couner still run"*.
@@ -6938,7 +7121,7 @@ mirror and must not be able to pass vacuously**: press stop, then read that the
 position does not move across two samples.
 
 
-### Open 2026-09-25: the control room's time footer, ASKED THREE TIMES
+### ~~Open 2026-09-25: the control room's time footer, ASKED THREE TIMES~~ DONE: 3f9a2304, soloFooter, the film bar with 22:11.850 is gone and the control room has one footer, asserted.
 
 🔴 **ASKED, VERBATIM, WITH A CROP, AND THE WORDS ARE A COMPLAINT ABOUT THIS
 FILE:** *"rm this footer from controlroom. asked 3x"*.
@@ -6962,6 +7145,8 @@ clock stays, its picture goes.
 
 
 ### Open 2026-09-25: three asks on `/knobs/` and the shared keyboard, reported against a broken page
+
+WAITING: on the owner deciding if every keyboard page may prompt for MIDI. Done: layout e4adba4b, hand ring 7f574f86, N | D 1bb044c9; enable midi still shows when not granted. (triaged 2026-10-12)
 
 🔴 **`/knobs/` WAS LEFT BROKEN AND IT WAS REPORTED WITH A SCREENSHOT:**
 *"you broke knobs"*. The agent that edited it on 2026-09-25 **never ran a single
@@ -7042,6 +7227,8 @@ should ask is worth one sentence from the owner before it is built.
 
 
 ### Open 2026-09-25: better sounding chords, and the session died before the research started
+
+Now: plan-better-chords-2026-09-25 written; 773c0abe and 0b2a3d2f fixed slot B (no dim, true unigram); the listening test and voicing are not built; /nola/ is not needed since 2026-10-12. (triaged 2026-10-12)
 
 🔴 **ASKED, VERBATIM, WITH THREE SCREENSHOTS OF `/nola/`'s SUGGESTION LANES:**
 *"better soudning chords. labme soundin susggestion, recording my played
@@ -7140,6 +7327,8 @@ WITH `/kit/` RE-RUN.**
 
 ### Open 2026-09-25: `.panel-head-mid` overflows its own grid track at every width
 
+Now: shell.css:7484 still has min-width: 0 with justify-self: end on .panel-head-mid. (triaged 2026-10-12)
+
 🔴 **FOUND BY MEASURING, NOT REPORTED BY ANYBODY**, while `/muta/` tried
 to put a `Test tone` button in a header. `demo/shell/shell.css`'s
 `.panel-head-mid` carries `min-width: 0` with `justify-self: end`, so it is laid
@@ -7160,6 +7349,8 @@ not.
 
 ### Open 2026-09-25: a stream of per-demo requests, COLLECTED WHILE IT IS STILL ARRIVING
 
+Now: most per-demo items landed 2026-09-25 (22294ed5, e5ae7933); left are the capture merge, resources to niemi, grains, and the mojibake cause. (triaged 2026-10-12)
+
 🔴 **THE STREAM IS NOT FINISHED.** Said in the same message: *"i will
 give moer requests nor per demo"* and *"...more coming..."*. Nothing below is
 being worked yet, by the 2026-09-19 rule: *"lets work demo by demo. i will give
@@ -7173,7 +7364,7 @@ parallelized effort to fix it all"*. **Write now, fan out when the stream ends.*
 BEFORE any page agent starts, or four agents write four versions of it in one
 checkout.
 
-#### `typist`: add the loop modes
+#### ~~`typist`: add the loop modes~~ OVERTAKEN: /typist/ archived 2026-10-12 (archive/typist.md).
 
 ⚠️ **ASKED, VERBATIM:** *"add loop modes to typist"*
 
@@ -7208,7 +7399,7 @@ readout cell on this page.** Both `verify.mjs` and `verify-quest.mjs` read
 ⚠️ **IF ANY OF IT LANDS IN `demo/shell/looper.mjs` OR
 `transport-bar.mjs` IT IS SHARED**, done once, `/kit/` re-run.
 
-#### The four `timeline` demos: glue the transport to the timeline
+#### ~~The four `timeline` demos: glue the transport to the timeline~~ OVERTAKEN: transport, lanes, loops and score retired into /time/ 2026-10-04 (6670d8fd, archive/demos/).
 
 ⚠️ **ASKED, VERBATIM:** *"timeline demos: glue transport and
 timelines"*
@@ -7231,7 +7422,7 @@ point, not a hint."* A glue that repoints a container is not a glue that merges
 its contents, which is the same page's other lesson (`LESSONS.md` #116). **After
 gluing, count the bars and the strips on each page rather than looking at it.**
 
-#### `loops`: add the loop modes
+#### ~~`loops`: add the loop modes~~ OVERTAKEN: /loops/ retired into /time/ 2026-10-04 (6670d8fd, archive/demos/loops-index.html).
 
 ⚠️ **ASKED, VERBATIM:** *"add loop modes to loops"*
 
@@ -7284,6 +7475,8 @@ Done once, by one agent, with `/kit/` re-run.
 
 #### Merge the `capture` group into `streaming`
 
+Now: the capture group holds only capture (take, keep, record, replay, show archived) and is still its own group, demo/manifest.mjs:1305. (triaged 2026-10-12)
+
 ⚠️ **ASKED, VERBATIM:** *"merge capture and streaming into streaming"*
 
 MEASURED 2026-09-25, so the size of it is known rather than guessed:
@@ -7317,7 +7510,7 @@ ROUND.** It collides with the archive work (`bay` and `able` rows leaving) and
 with all four renames. **Sequence it with them, not against them.**
 ⚠️ **COUNT THE DEMOS AND THE GROUPS AFTER, NEVER REMEMBER THEM.**
 
-#### The lane jumps sideways when play starts, and it is `/transport/`, not `mars`
+#### ~~The lane jumps sideways when play starts, and it is `/transport/`, not `mars`~~ OVERTAKEN: /transport/ retired into /time/ 2026-10-04 (6670d8fd, archive/demos/transport-index.html).
 
 ⚠️ **ASKED, VERBATIM, WITH TWO SCREENSHOTS:** *"mars: lane is jumping
 position when start playing"*
@@ -7376,6 +7569,8 @@ shared work done once**, and `/kit/` grades it.
 
 #### `resources` renames to `niemi`, and it is a FOURTH rename of a different kind
 
+Now: not done, demo/resources/ and the resources row are unchanged. (triaged 2026-10-12)
+
 🔴 **AND IT WAS ASKED A SECOND TIME ON 2026-09-25, AS *"rename resources
 demo to niemi"*, WHILE THIS ENTRY WAS ALREADY SITTING IN THIS FILE UNWORKED.**
 A repeat is this file failing at its one job, the same way the control room
@@ -7433,7 +7628,7 @@ the rename, or the two collide on one file.
 nothing else in flight, and `positron-history` loads before it and gains a line
 after it.
 
-#### `tapes`: a proxy for unreadable sound, inertia in two more places, and one row out
+#### ~~`tapes`: a proxy for unreadable sound, inertia in two more places, and one row out~~ DONE: 22294ed5, proxy via tapes.positron.studio, inertia on rate and loop mode, Saharan uni I dropped by a rule in corpus.json.
 
 ⚠️ **ASKED, VERBATIM:** *"this recordin wil noot allow read its sound:
 make proxy. tapes demo. use varispeed/inertia on rate change and also
@@ -7494,7 +7689,7 @@ varispeed/inertia on switching looping modes / rm 6/24 Saharan uni I 1967 line"*
    this change is weaker evidence than it looks**, and the assert count is what
    to read.
 
-#### THREE RENAMES, ONE SCHEME, AND A SUBSTRING TRAP THAT WOULD WRECK THE REPOSITORY
+#### ~~THREE RENAMES, ONE SCHEME, AND A SUBSTRING TRAP THAT WOULD WRECK THE REPOSITORY~~ OVERTAKEN: click became a tab of /csound/ (396ca4b8, 2026-10-05), sound became und then csound (917c379d); grains is its own row below.
 
 ⚠️ **ASKED, VERBATIM, ACROSS TWO MESSAGES:** *"grains -> rename to
 rains"*, then *"click: rename to lick, move to the last item in index groupd"*
@@ -7547,7 +7742,7 @@ and **8** naming `grains`. All stay.
 after, because a slug that stops resolving is this project's most repeated
 defect in its cheapest form.
 
-##### `click` also moves in the index
+##### ~~`click` also moves in the index~~ OVERTAKEN: /click/ retired into /csound/ 2026-10-05 (396ca4b8).
 
 ⚠️ **ASKED:** *"move to the last item in index groupd"*.
 `demo/manifest.mjs:81` is `{ name: 'click', group: 'vain', act: 0, created:
@@ -7564,6 +7759,8 @@ necessarily the same position. **Establish which one puts it where the owner
 means before moving the line.**
 
 #### `grains`: a RENAME, the instrument panel, and `createLocalRemote`
+
+WAITING: on the owner bringing /grains/ back; unlisted 2026-09-28 "bring it back when we have time". Rename, panel and createLocalRemote not done. (triaged 2026-10-12)
 
 ⚠️ **ASKED, VERBATIM:** *"grains -> rename to rains / wrap to isntument
 panel. use createLocalRemote"*
@@ -7603,7 +7800,7 @@ today before swapping**, because the blend is the demo.
 60000`, SuperCollider on the Raspberry Pi. **`positron-hardware` loads first**,
 and the same rule as `/shape/` applies to anything that reaches the board.
 
-#### `knobs`: the instrument panel, real rotaries, a 25 key keyboard and a footer
+#### ~~`knobs`: the instrument panel, real rotaries, a 25 key keyboard and a footer~~ DONE: e4adba4b instrument panel and midi button, 86c3a970 rotaries, full width keyboard and Pi badge in the foot (demo/knobs/index.html).
 
 ⚠️ **ASKED, VERBATIM:** *"knobs: / wrap into instument panel. left to
 rotaries cutoff reseonance, right is 'knobs' namepate. make keyboard 25 full w.
@@ -7650,7 +7847,7 @@ invented, and `room: 'fixed'` in the manifest exists so no harness renames it.
    this project asks for MIDI, and deciding them apart is how two pages end up
    disagreeing.** Settle the pair together and write down why they differ.
 
-#### `able`: move the demo to the archive, out of the index
+#### ~~`able`: move the demo to the archive, out of the index~~ DONE: archived 2026-09-25 (22294ed5), archive/demos/able-index.html, row out of manifest.
 
 ⚠️ **ASKED, VERBATIM:** *"arhcive able demo and rm from index"*
 
@@ -7675,7 +7872,7 @@ anything, which is the same separation the `bay` entry asks for.
 ⚠️ `positron-history` loads before the move, and the demo count in
 CLAUDE.md is recounted after it and never remembered.
 
-#### `dump`: empty tables at a fixed height instead of two placeholder sentences
+#### ~~`dump`: empty tables at a fixed height instead of two placeholder sentences~~ DONE: 22294ed5, demo/dump/index.html.
 
 ⚠️ **ASKED, VERBATIM:** *"dump: nothing asked yet / press Listen, then
 play something / show empthy tables / miditables immidately with fixed heigh. no
@@ -7712,7 +7909,7 @@ it gets an assert that reads the rendered height before and after rows arrive.
 `/dump/` is one of the pages where the harness drives real MIDI, so check what
 its checks already do before adding to them.
 
-#### `tom`: the gutter lost the second digit of every number
+#### ~~`tom`: the gutter lost the second digit of every number~~ DONE: e5ae7933, shell.css label column fix for the clipped two digit numbers.
 
 ⚠️ **ASKED, VERBATIM, WITH A SCREENSHOT:** *"you lost 2-digin numbers
 from tom demo"*
@@ -7738,6 +7935,8 @@ somewhere upstream is a live candidate.
 standing rule removes when this page is worked on.
 
 #### The play button is MOJIBAKE, and the page it is on takes a pack upload
+
+Now: autoplay on pack upload done (22294ed5, tom); the transport glyph became an icon button 6db4cf1f; the mojibake cause was never found. (triaged 2026-10-12)
 
 ⚠️ **ASKED, VERBATIM, WITH A SCREENSHOT:** *"what happened to play
 button? autoplay when i upload saple pack"*
@@ -7778,7 +7977,7 @@ upload is a gesture a person made, so playing what they just handed the page is
 a consequence of that gesture. **A visit must still open nothing**, and that is
 the line to hold while building this.
 
-#### `evo`: make all buttons interactive
+#### ~~`evo`: make all buttons interactive~~ DONE: 22294ed5, demo/evo/index.html, 0 of 24 controls off.
 
 ⚠️ **ASKED, VERBATIM:** *"evo: / make all buttons interactive"*
 
@@ -7795,7 +7994,7 @@ run, so making inert buttons live changes what the suite DOES to this page.
 would reach before enabling them. **The `/shape/` rule applies wherever it
 fits: nothing that writes to somebody's instrument belongs in that row.**
 
-#### `shape`: three controls on one line, and the third one is the DANGEROUS one
+#### ~~`shape`: three controls on one line, and the third one is the DANGEROUS one~~ DONE: 22294ed5, demo/shape/index.html:17, three controls on one line.
 
 ⚠️ **ASKED, VERBATIM:** *"shape: but butotns in one line"*, with a
 sketch: *"[circuit connected] [Synth1|Synths] [⇄] <- square button, makes
@@ -7844,7 +8043,7 @@ is not drawn. `HAND_CEILING = 600` control changes a second at `:322`, and
 random position on every control at once is the worst case that pacing exists
 for, so measure what leaves rather than assuming the coalescer holds.
 
-#### `shape`: drop the MIDI log's empty caption
+#### ~~`shape`: drop the MIDI log's empty caption~~ DONE: 22294ed5, caption removed (demo/shape/index.html:2026).
 
 ⚠️ **ASKED, VERBATIM:** *"rm move a slider and what it sends is listed
 here"*
@@ -7856,7 +8055,7 @@ the option. An empty box with no caption at all may be the thing this project
 calls *"an empty box is a line"*, which `roll.mjs:111` names. If the component
 needs a placeholder, this is a shorter one rather than none.
 
-#### `shape`: wrap it in the instrument box, with a vertical nameplate
+#### ~~`shape`: wrap it in the instrument box, with a vertical nameplate~~ OVERTAKEN: built 22294ed5, then reversed the same day by the row at line 6463 (plate to the top right).
 
 ⚠️ **ASKED, VERBATIM:** *"shape: / wrap into isntrument box. nameplate
 is \"shape\" vertical glued section"*
@@ -7899,7 +8098,7 @@ CLAUDE.md are about what gets WRITTEN to that instrument. Wrapping the page in a
 box changes none of it, and nobody wandering into this task has a reason to send
 anything to the Circuit.
 
-#### `wish`: enable the connections, and a remove button in the column that was reserved for it
+#### ~~`wish`: enable the connections, and a remove button in the column that was reserved for it~~ DONE: 22294ed5 rows connect through bay.mjs; b5dc84b0 remove button.
 
 ⚠️ **ASKED, VERBATIM:** *"wish: when connections (diagram rows) are
 there, enable them. add small remove button on each to the right of the row"*
@@ -7947,7 +8146,7 @@ assert count moves and the harness will now press however many rows exist.
 buttons are inside that selector is a decision, not an accident: pressing every
 remove button in order would empty the page mid-check.
 
-#### `bay`: move the demo to the archive
+#### ~~`bay`: move the demo to the archive~~ DONE: archived 2026-09-25 (22294ed5), archive/demos/bay-index.html, bay.mjs kept for /wish/.
 
 ⚠️ **ASKED, VERBATIM:** *"move bay demo to archive"*
 
@@ -7991,7 +8190,7 @@ old way inside it.
 ⚠️ **COUNT THE DEMOS AFTER, NEVER REMEMBER THEM.** The row count in
 CLAUDE.md moves with this and has been wrong twice in one day before.
 
-#### `muta`: four, and THREE OF THEM REVERSE AN EARLIER EXPLICIT ASK
+#### ~~`muta`: four, and THREE OF THEM REVERSE AN EARLIER EXPLICIT ASK~~ DONE: 22294ed5, 77790c15 test tone, 7760954c Warps out; /muta/ is not needed since 2026-10-12.
 
 🔴 **ASKED, VERBATIM:** *"muta / fix sound routing. / rm midi on button.
 its should be listening. set up midi listening / permission when i turn either
@@ -8066,7 +8265,7 @@ same commit as the code.**
    both explanations are consistent with the source. This is very likely the
    whole of item 1.
 
-#### `nola`: five, and the first one DEPENDS on the keyboard work above
+#### ~~`nola`: five, and the first one DEPENDS on the keyboard work above~~ DONE: 22294ed5 and e5ae7933 (roll gap, samples box, typed field, piano and Rhodes foot).
 
 🔴 **ASKED, VERBATIM, WITH A SCREENSHOT:** *"nola / rm chord from top
 left (as it moves to keyb compoentn) / rm gap in piano roll vert lines /
@@ -8130,7 +8329,7 @@ vertical rules visibly broken by a horizontal gap between rows.
    `positron-ui` task and the component may be where it belongs rather than the
    page.
 
-#### `keyboard` component, shared: the naming toggle loses its words
+#### ~~`keyboard` component, shared: the naming toggle loses its words~~ DONE: 34fcd25f; asked again later as N | D (line 6183).
 
 ⚠️ **ASKED, VERBATIM:** *"keyboard component: Notes | Degreens -> Nt |
 Dg."*
@@ -8147,7 +8346,7 @@ moves in the same commit**, rather than being left to contradict the code.
 is not what is being shortened, so it stays and carries the meaning the label
 just gave up.
 
-#### `keyboard` component, shared: a chord name in the footer
+#### ~~`keyboard` component, shared: a chord name in the footer~~ DONE: e5ae7933, demo/shell/keyboard.mjs:924.
 
 ⚠️ **ASKED, VERBATIM:** *"add chord name to the footer, right from the
 transpose message. avoind text moving in x axis"*
@@ -8166,7 +8365,7 @@ chord name are two facts and therefore two cells.
 exist and already name chords. **Find out what they answer before writing a
 namer**, because a hand-rolled second one is this project's named defect.
 
-#### `fau`: all sizes in kB
+#### ~~`fau`: all sizes in kB~~ DONE: 22294ed5, demo/fau/index.html.
 
 ⚠️ **ASKED, VERBATIM:** *"faust all sizes in kb"*
 
@@ -8183,7 +8382,7 @@ sentence.
 ⚠️ **DECIDE kB ONCE AND WRITE IT DOWN**: 1000 or 1024, and one decimal
 or none. Two conventions on one page is worse than bytes.
 
-#### `fau`: more patches
+#### ~~`fau`: more patches~~ DONE: 22294ed5, demo/fau/presets.mjs.
 
 ⚠️ **ASKED, VERBATIM:** *"add more patches if you have"*
 
@@ -8196,7 +8395,7 @@ harness press, so the thing to look at is `/fau/`'s per-page assert count before
 against after, and `/fau/` has already lost coverage to a control change once:
 its compile button took three asserts' meaning with it on 2026-09-24.
 
-#### A BLANK LINE AFTER EVERY COMMENT, AND THE FORMAT IS NOW EXACT
+#### ~~A BLANK LINE AFTER EVERY COMMENT, AND THE FORMAT IS NOW EXACT~~ DONE: 22294ed5, blank lines in the fau listing (demo/fau/presets.mjs).
 
 ⚠️ **ASKED, VERBATIM:** *"add nl after comments"*, then clarified with a
 worked example rather than a description:
@@ -8223,6 +8422,8 @@ Not a repository-wide sweep and not a convention for new code. **It is a
 
 
 ### Open 2026-09-25: four reports on `/stage/` from looking at the working tree
+
+Now: 3f9a2304 did the picture per tab, nothing before air and no ghost lane; HLS leg gone 2026-09-30. Zooming the transport out was not found. (triaged 2026-10-12)
 
 🔴 **ASKED, VERBATIM, ALL FOUR IN ONE MESSAGE:** *"no hls video on
 conrtol room. is it tab swithcing? zoom out transport a lot its frntic. it
@@ -8271,7 +8472,7 @@ and four things a person can see are still wrong.
 and these four sit in one dirty working tree.
 
 
-### Open 2026-09-25: a stale question appears on `/stage/` while the page is OFF AIR
+### ~~Open 2026-09-25: a stale question appears on `/stage/` while the page is OFF AIR~~ DONE: 3f9a2304, a private room per load (demo/stage/index.html:109).
 
 🔴 **REPORTED WITH A SCREENSHOT AND NEVER WRITTEN DOWN UNTIL NOW**, which
 is the defect this file exists to prevent. It lived in `HANDOFF.md` only, so it
@@ -8298,7 +8499,7 @@ a show and an off-air page has no show, so a visitor arriving at a dead page
 should not be shown somebody else's question from hours ago whatever the room is
 called. Where the question is persisted and served from is the thing to find.
 
-### Open 2026-09-25: the active tab on `/stage/` has a vertical rule down each side
+### ~~Open 2026-09-25: the active tab on `/stage/` has a vertical rule down each side~~ DONE: e5ae7933, the clipped focus ring (shell.css:308).
 
 ⚠️ **ASKED WITH A CROP** of `CONTROLROOM` showing a border on the left
 and the right of the active tab. The exact words are not recorded and the ask was
@@ -8309,7 +8510,7 @@ never written here until now. Nobody has looked at it.
 tabbed page, and it is decided ONCE by the session rather than by whoever is
 working `/stage/`. Diagnose, name the file and the rule, say which pages move,
 and stop there.
-### Open 2026-09-25: FIVE UI ASKS ON `/stage/`, COLLECTED AS A STREAM
+### ~~Open 2026-09-25: FIVE UI ASKS ON `/stage/`, COLLECTED AS A STREAM~~ DONE: 3f9a2304 (room, one footer, question on the picture, tab ring); 65232cd3 standard play button; the film item was refused.
 
 🔴 **ASKED, VERBATIM, ONE MESSAGE, AFTER** *"can we please in the name of god fix
 the stage ui 1 asked 1000000 times"*. Collected here first and worked second,
@@ -8448,6 +8649,8 @@ existed for an unrelated reason.
 
 ### Open 2026-09-25: `/stage/` lost its loopback, and the gate that replaces it is owed
 
+Now: harness half done, an ordinary run starts no show (a9292cfb); the visitor gate is not built. (triaged 2026-10-12)
+
 🔴 **ASKED:** *"go both real leg. we build gate later. taavet (that my friend)
 wants demo"*, then *"jusr rm loopback and add note about it somewhere"*. This is
 the note.
@@ -8479,7 +8682,7 @@ limit on WHO and HOW LONG. The harness is the easy half, because `SELFCHECK` is 
 flag a person never has. The visitor half is the real question and it is not
 answered here.
 
-### Open 2026-09-25: the control room UI is DONE and 14 asserts are one timing cascade
+### ~~Open 2026-09-25: the control room UI is DONE and 14 asserts are one timing cascade~~ OVERTAKEN: the cascade was an onPress miswire (3f9a2304), the HLS leg went 2026-09-30, the show moved to the deep tier (a9292cfb).
 
 ✅ **SHIPPED.** One bar in the control room: `START HLS` and `START WEBRTC` on
 the left, the timers and `PLAY RECORDING` on the right, no play glyph, one
@@ -8515,7 +8718,7 @@ is what a harness can carry, and it exercises the SAME recorder, archive and
 strip. The check block should press `START HLS` rather than `START WEBRTC`.
 That is a restructure of the check, not a patch, and it is the next thing.
 
-### Open 2026-09-25: WHEP MEDIA DOES NOT FLOW FROM THIS MACHINE, AND IT IS NOT THE CODE
+### ~~Open 2026-09-25: WHEP MEDIA DOES NOT FLOW FROM THIS MACHINE, AND IT IS NOT THE CODE~~ OVERTAKEN: withdrawn by the Done row at line 8551; WHEP connects here (3f9a2304, 389 frames).
 
 🔴 **MEASURED WITH NO POSITRON PAGE INVOLVED, IN A REAL HEADFUL CHROME, AGAINST
 THE LIVE INPUT.** A bare `RTCPeerConnection`, two recvonly transceivers, the
@@ -8573,7 +8776,7 @@ frames and 3,554,870 bytes with no VPN involved.
 ⚠️ **THE ORIGINAL ENTRY IS KEPT BELOW UNCHANGED**, because the wrong first
 answer is the reason the rule is worth anything, and this repository says so.
 
-### Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all
+### ~~Open 2026-09-25: `/webrtc/` has been GREEN WITH ZERO COVERAGE, and WHEP does not connect here at all~~ DONE: 3f9a2304, /webrtc/ asserts reachable, 16/16; owed item 2 is the row at line 8482.
 
 🔴 **`node demo/verify.mjs webrtc` READS 8/8 GREEN AND THE PAGE'S OWN CHECKS
 HAVE NEVER RUN.** MEASURED 2026-09-25: `page asserted something · 2`, and those
@@ -8612,7 +8815,7 @@ whole time.
    this session opened one. It may well be fine for a visitor, and that is the
    first thing to establish before anybody treats `/stage/` as broken.
 
-### Open 2026-09-25: `/stage/` is DEPLOYED AT 37/49 and its WebRTC start fails cold
+### ~~Open 2026-09-25: `/stage/` is DEPLOYED AT 37/49 and its WebRTC start fails cold~~ OVERTAKEN: cause found as onPress (3f9a2304), page rebuilt WebRTC only 2026-09-30 (8c20c579).
 
 🔴 **THE LIVE PAGE IS NOT GREEN AND I REPORTED THAT IT WAS.** MEASURED cold on
 2026-09-25 against the deployed commit: **37/49**, the show never reaches
@@ -8651,7 +8854,7 @@ does not classify as a console error**, and the suite reports a confident
 into the page.
 ✅ **THE COUNT IS THE ONLY THING THAT CAUGHT IT**, every time.
 
-### Open 2026-09-25: `/stage/`'s control room has two ways to start and it confuses
+### ~~Open 2026-09-25: `/stage/`'s control room has two ways to start and it confuses~~ DONE: one Start show button, dcac6528 (2026-10-05); HLS leg gone 2026-09-30.
 
 🔴 **ASKED, VERBATIM:** *"double play and start in stage control room is
 confusing. make just start primary button (or Start HLS | Start WebRTC?) and rm
@@ -8681,6 +8884,8 @@ button's presses were standing in for before removing it.
 the show"*, which is exactly the thing being removed.
 
 ### Open 2026-09-25: the native reload rate limit does not exist, and two files say it does
+
+Now: src/low-latency-player.js:564 still reads the undefined nativeReloadCooldownMs. (triaged 2026-10-12)
 
 🔴 **FOUND while answering the config question, not looked for.**
 `src/low-latency-player.js:564` reads `if (since < cfg.nativeReloadCooldownMs)
@@ -8815,6 +9020,8 @@ input's key from here is to fetch the key, which is the exact call
 
 ### Open 2026-09-24: more embedded knowledge into skills, and the .md files tidied
 
+Now: the root .md tidy is done (8253846d); moving page comments into skills is unscoped. (triaged 2026-10-12)
+
 🔴 **ASKED:** *"add more of this embedded knowledge to skills. clean up .md
 files"*, after *"the key is to use cf services in coherent composing way as
 positron does"*.
@@ -8857,7 +9064,7 @@ GUESSING.** Two halves:
 this is a `LAYOUT.md` question; the plans move of 2026-09-20 is the precedent,
 and it cost 129 files holding a path by name.
 
-### Open 2026-09-24: the repo goes public, and a README somebody can paste
+### ~~Open 2026-09-24: the repo goes public, and a README somebody can paste~~ DONE: public since 2026-09-24, README.md, LICENSE, positron-start skill, pack and profiles out of history. rig/moq/mtx/moq-key.pem is still tracked.
 
 🔴 **ASKED, VERBATIM, ACROSS FIVE MESSAGES:** *"make repo public. add to
 readme a prompt how one can replicate similar setup with cf
@@ -9094,7 +9301,7 @@ the slug too.
 build ran (`stamp e0158ba-120343-75bb`) so `workers/view/public/` matches, and
 `positron.studio` still serves the old front page until somebody deploys.
 
-### Open 2026-09-24: `/fau/`'s second round, and four wrong answers before the right one
+### ~~Open 2026-09-24: `/fau/`'s second round, and four wrong answers before the right one~~ DONE: 93e1135c, 2bb8aac0 (2026-09-24).
 
 🔴 **ASKED, VERBATIM, ACROSS SIX MESSAGES:** *"double border, rm"* with a crop,
 *"add padding under nameplate"*, *"you ui skills are pathetic"*, *"its just
@@ -9153,7 +9360,7 @@ about right.
 MEASURED throughout: `/fau/` **45/45 with 39 page asserts**, unchanged across
 every state of this.
 
-### Open 2026-09-24: `/fau/`'s panel, four asks and one of them is a repeat
+### ~~Open 2026-09-24: `/fau/`'s panel, four asks and one of them is a repeat~~ DONE: 324d7c34 (2026-09-24).
 
 🔴 **ASKED, VERBATIM:** *"fau: as i told you: input edge to edge of container w,
 add paddign on top, add line in top. glued instrument feel like waveforms on
@@ -9224,6 +9431,8 @@ change**, so nothing went silent.
 
 ### Open 2026-09-24: the remote looper, and the distributed instrument behind it
 
+Now: plans/plan-remote-looper.md only; no part.mjs, /num/ archived, numloop.mjs survives on /kit/input/. (triaged 2026-10-12)
+
 🔴 **ASKED, VERBATIM:** *"in bg, plan the "remote looper" feature. I am in
 desktop browser, midi keyb connected but i want mobile browser on same webpage
 have 3x3 grid buttons to toggle the looper"*, and a message later *"think wider
@@ -9277,6 +9486,8 @@ inference until a phone posts its own round trip to the device log.
 
 ### Open, carried in from HANDOFF.md on 2026-09-24
 
+Now: three items are left, all waiting on the owner or a device. (triaged 2026-10-12)
+
 🔴 **THESE SIX LIVED IN `HANDOFF.md` UNDER `Still open` AND NOT IN THIS FILE,
 WHICH IS THE WRONG FILE BY THIS PROJECT'S OWN RULE.** `## Open` here held
 nothing unfinished at all: every bullet above the 2026-09-18 audit divider is
@@ -9285,7 +9496,7 @@ would have found an empty list and a wall of finished work, and the four live
 asks were invisible to it. Moved rather than copied, and `HANDOFF.md` points
 here now.
 
-- ✅ **DONE 2026-09-24. `/fau/`: *"rm compile button next to fau on"*.** It was
+- ✅ ~~**DONE 2026-09-24. `/fau/`: *"rm compile button next to fau on"*.**~~ It was
   the only entry left in `.pos-controls` after the presets moved to the panel
   footer on 2026-09-23, so the page now declares no `controls` key at all and
   `shell.mjs` hides the empty row, which it has to: that row carries 14 px under
@@ -9320,16 +9531,16 @@ here now.
   for a reason that outlived it.
   MEASURED: baseline **43/43 with 37 page asserts**, after **45/45 with 39**,
   which is exactly the two added and nothing gone silent, stable across two runs,
-  and the page's last assert still runs so nothing was truncated.
+  and the page's last assert still runs so nothing was truncated. DONE: 5ab29a95 (2026-09-24).
 
-- ⚠️ **`/fau/`: *"secondary. should shimmer"*, and it names no subject.** There is
+- ⚠️ ~~**`/fau/`: *"secondary. should shimmer"*, and it names no subject.**~~ There is
   no shimmer anywhere in `demo/fau/index.html`, MEASURED by grep on 2026-09-24,
   so there is nothing to change and nothing to point at. It needs one word from
-  the person who asked: WHAT should shimmer. Blocked on that and not on work.
+  the person who asked: WHAT should shimmer. Blocked on that and not on work. OVERTAKEN: /fau/ is not needed since 2026-10-12 (synth/080); the subject was never named.
 
 - ⚠️ **"move instrument to patch seletor below instrument on right, no
   randomizer"**, asked with no page named, and asking got no answer. Candidates
-  are the pages that have both an instrument and a patch selector. Blocked.
+  are the pages that have both an instrument and a patch selector. Blocked. WAITING: on the owner naming the page.
 
 - 🔴 **THE MK-425C IS DESCRIBED AS A SEMITONE FLAT IN 11 FILES, AND THE CLAIM IS
   NOT WRONG SO MUCH AS UNQUALIFIED.** MEASURED by grep 2026-09-24, excluding
@@ -9363,12 +9574,12 @@ here now.
   ⚠️ **AND NOBODY IS TO "FIX" THE DRAWING.** `createKeyboard` picks black or
   white from the OFFSET off the base note, so `/evo/`'s `base: 47` draws the
   right C-to-C shaped 25 key picture and only the printed NAMES carry the minus
-  one. Changing the key pattern would draw an instrument that does not exist.
+  one. Changing the key pattern would draw an instrument that does not exist. WAITING: on a power cycle of the MK-425C on the desk and playing the bottom key.
 
-- ⚠️ **`/circuit/` reads 33/34 on a printed-names inset.** Pre-existing, and
-  proved to be so rather than assumed.
+- ⚠️ ~~**`/circuit/` reads 33/34 on a printed-names inset.**~~ Pre-existing, and
+  proved to be so rather than assumed. DONE: circuit 34/34, the doubled top inset fixed (row at line 928).
 
-- ⚠️ **`/nola/` timeline order has no assert.**
+- ⚠️ ~~**`/nola/` timeline order has no assert.**~~ OVERTAKEN: /nola/ is not needed since 2026-10-12 (sampler/000).
 
 - 🔴 **NOT SETTLED: WHETHER THE LOOP REALLY KEEPS TIME, AND ONLY A PERSON CAN
   SETTLE IT.** The `/kit/` drift check is COARSE, measured rather than suspected:
@@ -9376,7 +9587,7 @@ here now.
   **1.5 ms**, and 1.5 passes. Separating drift from jitter properly needs about
   twenty turns, which is five seconds, and `verify.mjs` stops growing about two
   seconds after the last new assert. The instrument exists and is committed at
-  `demo/resources/read-loop-take.mjs`:
+  `demo/resources/read-loop-take.mjs`: WAITING: on the owner playing a take and reading it with demo/resources/read-loop-take.mjs.
 
   ```sh
   # open https://positron.studio/nola/?rec=1 , play, loop something, let it turn,
