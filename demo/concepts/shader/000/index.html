@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept shader 000</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The picture at half the content width and the program it runs beside it
+     (asked 2026-10-12, *"1/2 videpanel"*). Two columns on a desk, never a
+     stack there; one column on a phone, the picture first. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  .cc-pair canvas { display: block; width: 100%; height: 100%; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { PARAM_HUES } from '/shell/code-lang.mjs';
+  import { burn, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+
+  // A mirror shader running in this tab. The kit's test picture goes in on
+  // `web:picture:video-out`, the shader folds it into N mirrored wedges, and
+  // the screen shows `web:shader:video-out`. N is ONE knob, a node of its own,
+  // cabled into `web:shader:value-in`: the shader keeps no number of its own
+  // and reads N only off that link, so a turn is a value crossing a wire.
+  //
+  // THE FOLD IS /mirror/'s (`fold()` in its `HEAD`, the same expression as
+  // `rig/vis/v3dpipe.c`), only broken over more lines to fit half a page. /mirror/ folds a noise field it makes
+  // itself; here the fold is put in front of a texture, so what is folded is
+  // a picture somebody can recognise.
+  //
+  // NOTHING OPENS ON A VISIT. The picture is drawn in this tab from
+  // `pattern.mjs`; there is no camera, no fetch and no room.
+  const S = 'web';
+  const PIC = `${S}:picture:video-out`;
+  const SH_IN = `${S}:shader:video-in`, SH_OUT = `${S}:shader:video-out`, SH_VAL = `${S}:shader:value-in`;
+  const SCREEN = `${S}:screen:video-in`;
+  const KNOB_OUT = `${S}:knob-mirrors:value-out`;
+
+  const d = mount({ name: 'Mirror shader', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('shader/000');
+
+  // ── the program, the one string both the GL and the box are given ────────
+  const VS = `#version 300 es
+in vec2 p;
+void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
+  const FS = `#version 300 es
+precision highp float;
+
+uniform sampler2D uPicture; // video-in
+uniform float uMirrors;     // value-in
+uniform vec2 uRes;          // screen px
+
+out vec4 o;
+
+// Fold the angle into one wedge,
+// mirrored, as /mirror/ does.
+vec2 fold(vec2 p) {
+  float seg = 6.2831853 / uMirrors;
+  float a = atan(p.y, p.x);
+  float r = length(p);
+  a = abs(mod(a + 0.5 * seg, seg)
+          - 0.5 * seg);
+  return vec2(cos(a), sin(a)) * r;
+}
+
+void main() {
+  vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+  vec2 k = fold(p);
+  // Point the wedge down from the middle
+  // of the right clock, the part of the
+  // test picture that moves.
+  k = vec2(k.y, -k.x);
+  vec2 uv = k * vec2(uRes.y / uRes.x, 1.0)
+          + vec2(0.7, 0.5);
+  o = texture(uPicture, uv);
+}`;
+
+  // GLSL for the code box, page local (see the report: a kit candidate).
+  // `params` marks the knob's uniform, so the declaration and every use of
+  // it wear the knob's hue.
+  const GLSL = {
+    name: 'glsl',
+    rules: [
+      [/\/\/[^\n]*/, 'comment'],
+      [/\/\*[\s\S]*?(?:\*\/|$)/, 'comment'],
+      [/#[a-z]+[^\n]*/, 'keyword'],
+      [/\b(?:uniform|in|out|precision|highp|mediump|lowp|const|return|if|else|for|void)\b/, 'keyword'],
+      [/\b(?:float|int|bool|vec[234]|ivec[234]|mat[234]|sampler2D)\b/, 'class'],
+      [/\b(?:atan|abs|mod|cos|sin|length|texture|mix|floor|fract|step|smoothstep|min|max|clamp)\b/, 'builtin'],
+      [/\b\d+(?:\.\d*)?|\.\d+/, 'number'],
+      [/[A-Za-z_]\w*/, ''],
+    ],
+    params(src) {
+      const m = /uniform\s+float\s+(uMirrors)\b/.exec(src);
+      if (!m) return [];
+      const from = m.index + m[0].length - m[1].length;
+      return [{ name: 'uMirrors', from, to: from + m[1].length, nameFrom: from, nameTo: from + m[1].length, kind: 'arg' }];
+    },
+  };
+  const HUE = PARAM_HUES[0];
+
+  // ── the shader node's one parameter, set only through value-in ──────────
+  const P = { mirrors: null };
+  let delivered = 0;
+  function setParam(e) {
+    if (e?.of !== 'param' || e.name !== 'mirrors') { d.log('the shader takes one parameter, mirrors, and this was not it', 'warn'); return; }
+    P.mirrors = Math.min(32, Math.max(1, Math.round(e.v)));
+    delivered++;
+    count.textContent = `${P.mirrors} ${P.mirrors === 1 ? 'mirror' : 'mirrors'}`;
+  }
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const bay = createBay();
+  bay.addNode({ id: `${S}:picture`, kind: 'device', label: 'test picture', place: 'browser' });
+  bay.addNode({ id: `${S}:knob-mirrors`, kind: 'person', label: 'knob', place: 'browser' });
+  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'mirror shader', place: 'browser' });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'screen', place: 'browser' });
+  bay.addPort({ id: PIC, label: 'picture:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: KNOB_OUT, label: 'knob-mirrors:value-out', dir: 'out', medium: 'value', shape: { of: 'param', names: ['mirrors'] } });
+  bay.addPort({ id: SH_IN, label: 'shader:video-in', dir: 'in', medium: 'video' });
+  bay.addPort({ id: SH_VAL, label: 'shader:value-in', dir: 'in', medium: 'value',
+    shape: { of: 'param', names: ['mirrors'] }, deliver: setParam });
+  bay.addPort({ id: SH_OUT, label: 'shader:video-out', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addPort({ id: SCREEN, label: 'screen', dir: 'in', medium: 'video' });
+
+  const held = new Set();
+  function hold(a, b) {
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S });
+    if (r.ok) held.add(`${a} ${b}`);
+    else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  hold(PIC, SH_IN);
+  hold(KNOB_OUT, SH_VAL);
+  hold(SH_OUT, SCREEN);
+
+  // ── the picture source: the kit's test picture, drawn here ──────────────
+  const pic = document.createElement('canvas');
+  pic.width = FRAME_W; pic.height = FRAME_H;
+  const pctx = pic.getContext('2d', { alpha: false });
+  let frameNo = 0;
+
+  // ── the screen ──────────────────────────────────────────────────────────
+  const canvas = el('canvas');
+  canvas.width = FRAME_W; canvas.height = FRAME_H;
+  const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
+  const name = el('span', 'cc-say', 'mirror shader');
+  const count = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: canvas, left: name });
+  panel.el.querySelector('.pos-vp-r').prepend(count);
+
+  let prog = null, fsShader = null, tex = null;
+  const U = {};
+  if (gl) {
+    const sh = (t, s) => {
+      const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x);
+      if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) d.log(`the shader did not compile: ${gl.getShaderInfoLog(x)}`, 'bad');
+      return x;
+    };
+    fsShader = sh(gl.FRAGMENT_SHADER, FS);
+    prog = gl.createProgram();
+    gl.bindAttribLocation(prog, 0, 'p');          // before the link, or it does nothing
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, fsShader);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      d.log(`the shader did not link: ${gl.getProgramInfoLog(prog)}`, 'bad');
+      prog = null;
+    } else {
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      for (const u of ['uPicture', 'uRes', 'uMirrors']) U[u] = gl.getUniformLocation(prog, u);
+      tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.uniform1i(U.uPicture, 0);
+      gl.uniform2f(U.uRes, FRAME_W, FRAME_H);
+    }
+  } else d.log('this browser has no WebGL2, so there is no shader and the screen stays dark', 'bad');
+
+  // The routing follows the links: no picture -> shader, the shader folds
+  // nothing; no shader -> screen, the screen is the page's ground; no value
+  // yet, the shader has no N and draws nothing either.
+  function render() {
+    if (!gl) return;
+    gl.viewport(0, 0, FRAME_W, FRAME_H);
+    const ready = prog && holds(SH_OUT, SCREEN) && holds(PIC, SH_IN) && P.mirrors != null;
+    if (!ready) { gl.clearColor(11 / 255, 14 / 255, 20 / 255, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+    burn(pctx, FRAME_W, FRAME_H, frameNo++);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, pic);
+    gl.uniform1f(U.uMirrors, P.mirrors);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  let raf = 0, drawing = false;
+  function frame() { render(); raf = requestAnimationFrame(frame); }
+
+  // ── the code box, read only, holding FS itself ──────────────────────────
+  const code = createCodeBox({ language: GLSL, value: FS, rows: 13, label: '',
+    hues: { hueOf: (n) => (n === 'uMirrors' ? HUE : null) },
+    ariaLabel: 'the fragment shader this page compiles, read only' });
+  code.input.readOnly = true;
+
+  const pair = el('div', 'cc-pair');
+  pair.append(panel.el, code.el);
+
+  // ── the knob: its own node, a turn is one event on its value-out ────────
+  const knob = createKnob({ label: 'mirrors', min: 1, max: 32, step: 1, value: 6, hand: true,
+    format: (v) => `${Math.round(v)}`,
+    onInput: (v) => bay.send(KNOB_OUT, { of: 'param', name: 'mirrors', v }) });
+  // The knob wears the uniform's hue, so the box and the knob read as one name.
+  knob.el.dataset.param = 'mirrors';
+  knob.el.style.setProperty('--param-hue', HUE);
+  const grid = createKnobGrid(new Map([['mirrors', knob]]), { row: true });
+
+  const lit = (l) => drawing && (l.from === PIC || l.from === SH_OUT);
+  const pb = createPatchbay(bay, { flowing: lit });
+
+  d.stack.add(pair, grid.el, pb.el);
+
+  // The knob's starting value goes over the wire too, so the first N the
+  // shader ever sees came along the link and not out of a default.
+  bay.send(KNOB_OUT, { of: 'param', name: 'mirrors', v: knob.value?.() ?? 6 });
+  if (prog) { drawing = true; raf = requestAnimationFrame(frame); pb.refresh(); }
+
+  window.__demo.knobs = grid;
+  window.__demo.shader = {
+    knob,
+    source: () => (fsShader ? gl.getShaderSource(fsShader) : null),
+    shown: () => code.value(),
+    mirrors: () => P.mirrors,
+    delivered: () => delivered,
+    uniform: () => (prog ? gl.getUniform(prog, U.uMirrors) : null),
+    /** Draw one frame now and read it back, before the buffer is swapped. */
+    sample() {
+      render();
+      const W = 160, H = 90, px = new Uint8Array(FRAME_W * FRAME_H * 4);
+      gl.readPixels(0, 0, FRAME_W, FRAME_H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const out = new Uint8Array(W * H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = ((y * 8) * FRAME_W + x * 8) * 4;
+        out[y * W + x] = (px[i] * 2 + px[i + 1] * 5 + px[i + 2]) >> 3;
+      }
+      return Array.from(out);
+    },
+  };
+  d.ready();
+</script>
