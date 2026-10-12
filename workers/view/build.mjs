@@ -510,6 +510,7 @@ const FILES = [
   ...extraPages(),
   ...demoFiles(),
   ...conceptFiles(),
+  ...archiveFiles(),
 ];
 
 /**
@@ -667,6 +668,27 @@ function conceptFiles(rel = 'demo/concepts') {
     if (e.isDirectory()) out.push(...conceptFiles(src));
     else if (e.isFile() && OK.has(extname(e.name))) out.push([src, src.replace(/^demo\//, '')]);
   }
+  return out;
+}
+
+/**
+ * `/archive/`, 2026-10-12 (*"make "/arhive" page and move csound and tutotial
+ * slide there"*): `demo/archive/` deployed whole at /archive/, as conceptFiles()
+ * does for /concepts/, with no manifest row. Beside it the markdown notes that
+ * describe removed pages, `archive/typist.md` and `archive/concepts/*.md`,
+ * deployed at their repository paths so the dev server (which serves the repo
+ * root) and the deploy answer the same URL. `_headers` below serves them as
+ * plain text. Only `.md`, from those two places, so nothing else in archive/
+ * (old pages, captures) reaches public/.
+ */
+function archiveFiles() {
+  const out = [];
+  for (const e of readdirSync(join(REPO, 'demo/archive'), { withFileTypes: true })) {
+    if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name))) out.push([`demo/archive/${e.name}`, `archive/${e.name}`]);
+  }
+  const notes = ['archive/typist.md',
+    ...readdirSync(join(REPO, 'archive/concepts')).filter((f) => extname(f) === '.md').map((f) => `archive/concepts/${f}`)];
+  for (const n of notes) out.push([n, n]);
   return out;
 }
 
@@ -850,7 +872,10 @@ await writeFile(join(OUT, 'favicon.ico'), favicon());
 // To turn indexing back on when the site IS ready: delete this block, delete
 // `NOINDEX`/`marked()`/`ROBOTS` from src/index.js, and drop the meta pass in
 // the copy loop below. Nothing else knows about any of it.
-await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n');
+// The second block serves archiveFiles()'s markdown notes as plain text, so a
+// browser shows them rather than offering a download.
+await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n'
+  + '/archive/*.md\n  Content-Type: text/plain; charset=utf-8\n');
 
 // ── the noindex meta, on every page, whoever wrote the page ─────────────────
 //

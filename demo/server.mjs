@@ -24,6 +24,8 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
   '.wasm': 'application/wasm',
+  // the markdown notes /archive/ links to, as the deploy's _headers serves them
+  '.md': 'text/plain; charset=utf-8',
   // ⚠️ A FONT IS SERVED BY THIS TOO, and the deploy's static assets set the type
   // from the extension by themselves — so a missing entry here shows up ONLY on
   // the dev server and only as a browser being fussy, which is the shape of bug

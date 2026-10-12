@@ -1,4 +1,4 @@
-// demo/concepts/synth/050/modules.mjs: the mono WebAudio synth of /concepts/synth/040/, as one
+// demo/concepts/draw/000/modules.mjs (was synth/050 until 2026-10-12): the mono WebAudio synth of /concepts/synth/040/, as one
 // fixed patch, with an XY pad as a node of its own that plays the filter.
 //
 // ⚠️ A COPY OF demo/concepts/synth/040/modules.mjs, NOT AN IMPORT, ON PURPOSE. The two

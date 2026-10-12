@@ -69,7 +69,9 @@ export const ACTS = new Map([
 
 export const DEMOS = [
   // `und` until 2026-10-05, renamed on "rename und to csound", no redirect.
-  { name: 'csound', group: 'technologies', act: 0, created: '2026-09-07', built: true,
+  // `unlisted: true` since 2026-10-12 (*"make "/arhive" page and move csound and
+  // tutotial slide there"*): still built and deployed at /csound/, listed on /archive/.
+  { name: 'csound', group: 'technologies', act: 0, created: '2026-09-07', built: true, unlisted: true,
     one: 'Csound scores turned into timelines you can start anywhere, whether typed here or written for U:\u2019s vClick click track.',
     tags: ['timeline', 'Csound', 'WebAudio'] },
   // `click` was its own page 2026-09-14 and is the CLICK tab of /csound/ since
@@ -688,9 +690,8 @@ export const DEMOS = [
   // each change DID to the document, which is what makes a seek a fold rather
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
-  { name: 'typist', group: 'th', act: 0, created: '2026-09-13', built: true,
-    one: 'every change while typing is written down as where the text changed and what it changed to, so any moment can be put back or run backwards',
-    tags: ['timeline', 'text', 'local only'] },
+  // `typist` was here until 2026-10-12, archived on *"archive/mdfy typist"*:
+  // archive/typist.md, and /concepts/typist/030/ shows the same idea. /typist/ is a 404.
   // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
   // two pages about one subject and the split cost the better half of each:
   // `dust` had the picture — a granulator in the page reports every grain it
