@@ -216,7 +216,12 @@ function addWhy(row, text, kind) {
   const meta = row.querySelector('.pos-meta, .pos-card-f');
   if (!meta || !text) return;
   const el = document.createElement('span');
-  el.className = kind === 'soft' ? 'pos-why soft' : 'pos-why';
+  // 🔴 A CARD'S WHY IS `.pos-card-why`, A ROW'S IS `.pos-why`. Until 2026-10-12
+  // this stamped the row's class on cards too, so a card's `no camera on this
+  // device` came out in the row chip's mono with a dashed border while
+  // `card.mjs` and `.pos-card-why` said Geist: the card rule was never reached.
+  const base = row.classList.contains('pos-card') ? 'pos-card-why' : 'pos-why';
+  el.className = kind === 'soft' ? `${base} soft` : base;
   el.textContent = text;
   meta.append(el);
 }

@@ -29,6 +29,7 @@ import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createChoice } from '/shell/choice.mjs';
 import { createTimebase } from '/shell/timebase.mjs';
 import { tabDiagram } from './how.mjs';
+import { font as monoFont } from '/shell/canvas-font.mjs';
 
 const CUE_MS = 2000;           // one cue every two seconds of the score
 const LIGHT_MS = 30;           // the relay leg a cue message rides, MEASURED 27 to 38 ms
@@ -218,7 +219,7 @@ export function build({ panel, log, set }) {
     return (r * 299 + gg * 587 + b * 114) / 1000 > 128 ? '#0b0e14' : '#f0f0f0';
   };
   const colour = (k) => (k < 0 ? '#0b0e14' : PALETTE[k % PALETTE.length]);
-  const font = (px) => `${px}px ui-monospace, Menlo, monospace`;
+  const font = (px) => monoFont(400, px);   // redrawn every frame, so no reload hook
 
   // Three surfaces: the picture across the top, the two walls under it.
   function paintBox(x, y, w, h, k, label) {

@@ -4990,8 +4990,11 @@ a.pos-card:hover .pos-card-t, a.pos-card:focus-visible .pos-card-t { color: var(
 /* Pushed to the bottom of whatever height the row settled on, so the tags of
    every card in a row sit on one line however tall the cards had to be. */
 .pos-card-f { margin-top: auto; display: flex; flex-wrap: wrap; gap: 4px 5px; padding-top: 4px; }
+/* ⚠️ A TAG NAMES (`WebRTC`, `MIDI`), SO IT IS THE MONO SINCE 2026-10-12, the
+   site's font rule. 400 rather than 500: there is no 500 file, and CSS font
+   matching drew the 400 for it anyway. */
 .pos-card-g {
-  font: 500 10px/1 var(--sans); letter-spacing: .05em; color: var(--dim2);
+  font: 400 10px/1 var(--mono); letter-spacing: .05em; color: var(--dim2);
   border: 1px solid var(--line2); border-radius: 3px; padding: 3px 5px;
   white-space: nowrap;
 }
@@ -4999,6 +5002,8 @@ a.pos-card:hover .pos-card-t, a.pos-card:focus-visible .pos-card-t { color: var(
    argument `caps.mjs` makes: a row that vanishes claims the thing does not
    exist, which is a different and false statement. */
 .pos-card-why { font: 400 11px/1.35 var(--sans); color: var(--warn); }
+/* A capability the page only wants: said, never enforced, as `.pos-why.soft`. */
+.pos-card-why.soft { color: var(--dim2); }
 .pos-card[data-off="1"] { opacity: .62; }
 /* Buttons on a card. See card.mjs for why a card that has them stops being one
    big link.

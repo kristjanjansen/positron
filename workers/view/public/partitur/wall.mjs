@@ -25,6 +25,7 @@
 // arrives only because somebody linked a lane to this wall.
 
 import { createVideoPanel } from '/shell/video-panel.mjs';
+import { font, whenFaces } from '/shell/canvas-font.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
 import { createBayNode, roomFor, randomSite } from '/shell/bay-node.mjs';
 
@@ -67,7 +68,7 @@ export function build({ panel, log, set }) {
     if (caption) {
       const [rr, gg, bb] = [1, 3, 5].map((i) => parseInt(now.hex.slice(i, i + 2), 16));
       g.fillStyle = (rr * 299 + gg * 587 + bb * 114) / 1000 > 128 ? '#000000' : '#ffffff';
-      g.font = `${Math.max(14, Math.round(H / 14))}px ui-monospace, Menlo, monospace`;
+      g.font = font(400, Math.max(14, Math.round(H / 14)));
       g.fillText(caption, Math.round(W * 0.04), Math.round(H * 0.92));
     }
     // 🔴 UNTIL A LIGHT ARRIVES THE WALL SAYS WHAT IT IS AND WHAT IT IS CALLED,
@@ -76,7 +77,7 @@ export function build({ panel, log, set }) {
     // so with two walls open nobody could tell which one to pick.
     if (!heard) {
       g.fillStyle = '#8a93a6';
-      g.font = `${Math.max(13, Math.round(H / 22))}px ui-monospace, Menlo, monospace`;
+      g.font = font(400, Math.max(13, Math.round(H / 22)));
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       const px = Math.max(13, Math.round(H / 22));
@@ -87,6 +88,9 @@ export function build({ panel, log, set }) {
     }
   }
   new ResizeObserver(paint).observe(video.stage);
+  // The wall is painted on events, not every frame, so a first paint made
+  // before JetBrains Mono arrived would keep the fallback until the next light.
+  whenFaces(paint);
 
   const GRAPH = {
     v: 1, site: SITE, place: 'browser',

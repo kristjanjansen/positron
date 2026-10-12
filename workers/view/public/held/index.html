@@ -13,6 +13,7 @@
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
+  import { font, whenFaces } from '/shell/canvas-font.mjs';
   import { createDeck } from '/timeline/transport.mjs';
 
   /**
@@ -539,7 +540,7 @@
              against its band's left edge lost its first letter to the hatching
              and read `heutral`. */
           const holdW = xb - holdX;
-          g.font = '9px ui-monospace, Menlo, monospace';
+          g.font = font(400, 9);
           if (holdW > g.measureText(t.value).width + 16) {
             g.fillStyle = C.theme.bg; g.globalAlpha = 0.82;
             g.fillText(t.value, holdX + 10, top + h - 5);
@@ -595,7 +596,7 @@
         // The value where it holds, which is a constant per scene and so may be
         // written on the picture: it never changes while anybody is looking.
         g.globalAlpha = 1; g.fillStyle = DIM;
-        g.font = '9px ui-monospace, Menlo, monospace';
+        g.font = font(400, 9);
         for (let i = 0; i < roomSteps.length; i++) {
           const st = roomSteps[i];
           const end = roomSteps[i + 1]?.at ?? KNOWN;
@@ -832,7 +833,7 @@
       let size = Math.max(9, Math.min(20, Math.round(w / 40)));
       let lines = [];
       for (; size >= 8; size--) {
-        g.font = `${size}px ui-monospace, Menlo, monospace`;
+        g.font = font(400, size);
         lines = [];
         for (const para of text.split('\n')) {
           if (!para) { lines.push(''); continue; }
@@ -1094,6 +1095,11 @@
       if (key !== lastKey) { lastKey = key; draw(); }
       requestAnimationFrame(follow);
     })();
+    /* The picture and the lane names are canvas text, and a canvas keeps the
+       face it was drawn in. Both redraw only when something moved, so once
+       JetBrains Mono has arrived they are asked to draw again, or a first
+       paint made with the fallback would stand until the playhead moved. */
+    whenFaces(() => { lastKey = ''; strip?.invalidate?.(); strip?.draw?.(); });
 
     const creditsEv = data.events.find((e) => e.id === 'transition:credits');
     const waitCredits = data.events.find((e) => e.id === 'wait:credits-until-intro');
