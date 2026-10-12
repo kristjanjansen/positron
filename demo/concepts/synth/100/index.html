@@ -16,6 +16,16 @@
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
+  /* The crossfader row, as /concepts/radio/000/ and /concepts/video/040/: an
+     end label, the slider, an end label, both label columns as wide as the
+     longer end label. */
+  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
+    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
+  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
+  .cc-fade .cc-end:first-child { text-align: right; }
+  .cc-fade > .sld { min-width: 0; }
+  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
+  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 <script type="module">
   import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
@@ -27,6 +37,7 @@
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
+  import { createSlider } from '/shell/slider.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { BOARD_FRAME_MS, BOARD_CHANNELS } from '/shell/board.mjs';
@@ -50,9 +61,21 @@
   //                          `outputLatency`, which is what is still between
   //                          the analyser and the speakers. Measured only on a
   //                          note that starts from silence on that side, so a
-  //                          tail still ringing cannot pass for the new note.
-  //   local level / Pi level the loudest 21 ms window of that note, in dBFS,
-  //                          over the second after the key went down.
+  //                          tail still ringing cannot pass for the new note,
+  //                          and only once that side's engine is up, so the
+  //                          first key's boot is not a lag.
+  //   local spread / Pi spread  the worst minus the best of those lags over
+  //                          every note so far, empty until there are two.
+  //                          Replaced the two level cells 2026-10-12: *"local
+  //                          pi levels have no value"* (both sides play one
+  //                          program, so they read the same number).
+  //
+  // THE CROSSFADER, asked the same day: *"add crossfader to collide on pi"*.
+  // Its own node, `web:xfade`, with the local sound on `audio-in` and the Pi's
+  // on `audio-in-2`, its `audio-out` to the speakers, and the slider a node of
+  // its own, `web:fader:value-out`, cabled into `web:xfade:value-in`. Equal
+  // power, as /concepts/radio/000/. The scopes and the cells read each side
+  // BEFORE the crossfade, so a side faded out still shows its wave.
   //
   // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
   // opens. A pointer over the keys fetches the engine (our origin); the first
@@ -62,7 +85,7 @@
     // The four cells under the title, the log alone at the foot (*"readings on
     // top"*), as /concepts/sampler/030/ does.
     joined: false,
-    readout: { 'local lag': 'ms', 'local level': 'dB', 'Pi lag': 'ms', 'Pi level': 'dB' },
+    readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms' },
   });
   conceptNav('synth/100');
 
@@ -145,6 +168,10 @@
     ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'], ['speaker', 'screen', 'speakers'],
   ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi, simulated', place: 'studio-1' });
+  bay.addNode({ id: `${S}:fader`, kind: 'person', label: 'fader', place: 'browser' });
+  bay.addNode({ id: `${S}:xfade`, kind: 'engine', label: 'crossfader', place: 'browser' });
+  /** 0 is all here, 1 is all Pi. Opens at the middle. */
+  let x = 0.5, fades = 0;
   let notesIn = 0, piNotesIn = 0, paramSends = 0, piParamSends = 0;
   const PORTS = [
     { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
@@ -170,6 +197,14 @@
     { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
     { id: ID('scope-pi', 'audio-in'), dir: 'in', medium: 'audio' },
     { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+      if (e?.of !== 'param' || e.name !== 'x') return;
+      x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
+    } },
+    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
   const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
@@ -177,31 +212,42 @@
   lay(ID('keys', 'midi-out'), PI('midi-in'));
   for (const n of NAMES) { lay(ID(`knob-${n}`, 'value-out'), ID('collide', 'value-in')); lay(ID(`knob-${n}`, 'value-out'), PI('value-in')); }
   lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
-  lay(ID('collide', 'audio-out'), ID('speaker', 'audio-in'));
+  lay(ID('collide', 'audio-out'), ID('xfade', 'audio-in'));
   lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
-  lay(PI('audio-out'), ID('speaker', 'audio-in'));
+  lay(PI('audio-out'), ID('xfade', 'audio-in-2'));
+  lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
+  lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
 
   // ── the sound, made on the first key ─────────────────────────────────────
-  let ctx = null, master = null, on = false;
+  let ctx = null, master = null, mix = null, mixMeter = null, mixBuf = null, on = false;
   /** Per side: the scope's analyser, the meter's, and the note being timed. */
   const SIDES = {
-    local: { voice: local, from: ID('collide', 'audio-out'), scope: ID('scope', 'audio-in'), an: null, buf: null, meter: null, mbuf: null, timing: null },
-    pi: { voice: pi, from: PI('audio-out'), scope: ID('scope-pi', 'audio-in'), an: null, buf: null, meter: null, mbuf: null, timing: null },
+    local: { voice: local, from: ID('collide', 'audio-out'), scope: ID('scope', 'audio-in'), fadeIn: ID('xfade', 'audio-in'), gain: null, an: null, buf: null, meter: null, mbuf: null, timing: null },
+    pi: { voice: pi, from: PI('audio-out'), scope: ID('scope-pi', 'audio-in'), fadeIn: ID('xfade', 'audio-in-2'), gain: null, an: null, buf: null, meter: null, mbuf: null, timing: null },
   };
+  /** Equal power: cos and sin of a quarter turn, as /concepts/radio/000/. */
+  const fadeGains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];
+  function applyFade() {
+    if (!ctx) return;
+    const g = fadeGains();
+    [SIDES.local, SIDES.pi].forEach((s, i) => s.gain?.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02));
+  }
   /** THE ROUTER: each side's sound goes where the bay's audio links say. */
   function route() {
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
     for (const s of Object.values(SIDES)) {
       const out = s.voice.out();
       if (!out) continue;
       try { out.disconnect(); } catch { /* not connected */ }
       // The meter is always on: the cells measure what the side makes.
       out.connect(s.meter);
-      for (const l of bay.links()) {
-        if (l.from !== s.from) continue;
-        if (l.to === s.scope) out.connect(s.an);
-        if (l.to === ID('speaker', 'audio-in')) out.connect(master);
-      }
+      if (held(s.from, s.scope)) out.connect(s.an);
+      if (held(s.from, s.fadeIn)) out.connect(s.gain);
     }
+    try { mix.disconnect(); } catch { /* not connected */ }
+    if (held(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'))) mix.connect(master);
+    mix.connect(mixMeter);
+    applyFade();
   }
   async function start() {
     if (!ctx) {
@@ -209,7 +255,12 @@
       ctx = new AudioContext({ latencyHint: 'interactive' });
       master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
       const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      // The crossfader: one gain per side into one sum, metered after.
+      mix = ctx.createGain();
+      mixMeter = ctx.createAnalyser(); mixMeter.fftSize = 2048; mixMeter.connect(pull);
+      mixBuf = new Float32Array(mixMeter.fftSize);
       for (const s of Object.values(SIDES)) {
+        s.gain = ctx.createGain(); s.gain.gain.value = 0; s.gain.connect(mix);
         s.an = ctx.createAnalyser(); s.an.fftSize = 2048; s.an.connect(pull);
         s.buf = new Float32Array(s.an.fftSize);
         // 1024 samples, 21 ms at 48 kHz: short, so an onset is seen early.
@@ -228,14 +279,15 @@
 
   // ── the cells ────────────────────────────────────────────────────────────
   const SILENT_DB = -50;
-  const KEY = { local: ['local lag', 'local level'], pi: ['Pi lag', 'Pi level'] };
-  const measured = { local: { lag: null, level: null }, pi: { lag: null, level: null } };
+  const KEY = { local: ['local lag', 'local spread'], pi: ['Pi lag', 'Pi spread'] };
+  const measured = { local: { lag: null, lags: [] }, pi: { lag: null, lags: [] } };
   let poll = 0;
   /** A key went down at `t`: time each side's onset and hold its loudest window. */
   function timeNote(t) {
     for (const [k, s] of Object.entries(SIDES)) {
-      const quiet = !s.meter || dbfs(rmsOf(s.meter, s.mbuf)) < SILENT_DB;
-      s.timing = { t, quiet, heard: false, peak: -Infinity };
+      // Timed only when that side is up and quiet at the press.
+      const quiet = !!s.meter && !!s.voice.out() && dbfs(rmsOf(s.meter, s.mbuf)) < SILENT_DB;
+      s.timing = { t, quiet, heard: false };
     }
     if (!poll) poll = setInterval(tick, 2);
   }
@@ -245,22 +297,20 @@
     for (const [k, s] of Object.entries(SIDES)) {
       const tm = s.timing;
       if (!tm || !s.meter) { if (tm && now - tm.t < 4000) busy = true; continue; }
-      if (now - tm.t > 1000 + (tm.heard ? 0 : 3000)) {
-        if (tm.heard) { measured[k].level = tm.peak; d.set(KEY[k][1], tm.peak.toFixed(1)); }
-        s.timing = null;
-        continue;
-      }
+      if (tm.heard || now - tm.t > 4000) { s.timing = null; continue; }
       busy = true;
       const db = dbfs(rmsOf(s.meter, s.mbuf));
       if (!tm.heard && db >= SILENT_DB) {
         tm.heard = true; tm.at = now;
         if (tm.quiet && ctx) {
           const lag = now - tm.t + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
-          measured[k].lag = lag;
+          const m = measured[k];
+          m.lag = lag;
+          m.lags.push(lag);
           d.set(KEY[k][0], lag.toFixed(0));
+          if (m.lags.length > 1) d.set(KEY[k][1], (Math.max(...m.lags) - Math.min(...m.lags)).toFixed(0));
         }
       }
-      if (tm.heard) tm.peak = Math.max(tm.peak, db);
     }
     if (!busy) { clearInterval(poll); poll = 0; }
   }
@@ -333,6 +383,12 @@
   const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
     flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || local.held().length > 0),
   });
+  // The crossfader's slider, the kit's, in radio/000's row; a move leaves on
+  // `web:fader:value-out` and reaches the sound only over its link.
+  const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
+    onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
+  const fade = el('div', 'cc-fade');
+  fade.append(el('span', 'cc-end', 'here'), fader.el, el('span', 'cc-end', 'Pi'));
   const pair = el('div', 'cc-pair');
   pair.append(left.panel.el, right.panel.el);
   // The program both sides run, read only; a sixth of its height as on 090.
@@ -340,14 +396,18 @@
   const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
   code.input.readOnly = true;
-  d.stack.add(pair, code.el, grid.el, host, pb.el);
+  // Knobs above the code (*"when there are code and knobs on concepts, move knobs on top of code"*).
+  d.stack.add(pair, fade, grid.el, code.el, host, pb.el);
+  const ends = [...fade.querySelectorAll('.cc-end')].map((e) => e.textContent.length);
+  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
 
   const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
   window.__demo.collide = {
     bay, local, pi, knobs, names: NAMES, model: { UP_MS, DOWN_MS, JACK_MS, CUSHION_MS, FRAME_MS: BOARD_FRAME_MS },
-    measured, ctx: () => ctx,
+    measured, ctx: () => ctx, fader, x: () => x, fades: () => fades,
+    mixLevel: () => (mixMeter ? rmsOf(mixMeter, mixBuf) : 0),
     notesIn: () => notesIn, piNotesIn: () => piNotesIn, paramSends: () => paramSends, piParamSends: () => piParamSends,
     samples: samplesOf(SIDES.local), piSamples: samplesOf(SIDES.pi),
     code: PROGRAM,
