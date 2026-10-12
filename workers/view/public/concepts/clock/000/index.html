@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept clock 000</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts clock/000, LAG, 2026-10-12. Asked: *"start building"* on BACKLOG.md
+  // "Time and sync as concept pages". One idea: EVERY LINK HAS A DELAY.
+  //
+  // /concepts/synth/000/'s keyboard and sine synth, split over two sites joined
+  // by the relay: `here` holds the keys, `there` holds the synth. Both sites are
+  // sockets of this one tab (as /sync/'s arrival tab does), so a note leaves one
+  // socket as one `bay.event`, crosses Cloudflare and arrives on the other, and
+  // the delay read off the envelope's `sent` stamp is between two reads of ONE
+  // clock: no clock agreement is needed to trust it. That is clock/020's subject.
+  //
+  // Nothing opens on a visit. The first press (Join, or a key) opens both sockets.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+
+  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
+  const asked = new URLSearchParams(location.search).get('room');
+  // A room of this tab's own: the two sites meet there and nobody else's keys do.
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `lag-${rand(6)}`;
+  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
+  const KEYS = `${HERE}:keys:midi-out`, SYNTH = `${THERE}:synth:midi-in`;
+  const AOUT = `${THERE}:synth:audio-out`, SPK = `${THERE}:speaker:audio-in`;
+
+  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
+  const G_HERE = graphOf(HERE, 'here', [{ id: `${HERE}:keys`, kind: 'person', label: 'keyboard', place: 'browser' }],
+    [{ id: KEYS, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] }]);
+  const G_THERE = graphOf(THERE, 'there', [
+    { id: `${THERE}:synth`, kind: 'engine', label: 'sine', place: 'browser' },
+    { id: `${THERE}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' },
+  ], [
+    { id: SYNTH, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] },
+    { id: AOUT, label: 'synth', dir: 'out', medium: 'audio' },
+    { id: SPK, label: 'speakers', dir: 'in', medium: 'audio' },
+  ]);
+
+  const d = mount({ name: 'concept clock 000', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The cells under the title and the log alone at the foot, asked 2026-10-12:
+    // *"move readouts to top"*.
+    joined: false,
+    readout: { median: 'ms', worst: 'ms', last: 'ms', notes: '' } });
+  conceptNav('clock/000');
+
+  // ── the synth, on the `there` site: one sine per held note ──────────────
+  let ctx = null;
+  const voices = new Map();
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  function noteOn(n, vel) {
+    ctx ??= new AudioContext();
+    if (voices.has(n)) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.2 * (vel / 127), t + 0.01);
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    voices.set(n, { o, g });
+  }
+  function noteOff(n) {
+    const v = voices.get(n);
+    if (!v) return;
+    const t = ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
+    v.o.stop(t + 0.06);
+    voices.delete(n);
+  }
+
+  // ── what arrived, and how long it took ──────────────────────────────────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const arrived = [];             // { at: ms since join, n, ms }
+  let t0 = 0;
+  const WINDOW = 10000;
+  // Green inside what the relay promises (p50 about 36 ms, bay.mjs), amber past
+  // twice that, red past a quarter of a second.
+  const band = (ms) => (ms < 60 ? '#8fd6a8' : ms < 250 ? '#ffd400' : '#e0908a');
+  const sorted = () => arrived.map((a) => a.ms).sort((a, b) => a - b);
+
+  function heard(e, l, m) {
+    const ms = Date.now() - Number(m.sent);
+    if (e.d2) noteOn(e.d1, e.d2); else noteOff(e.d1);
+    if (!e.d2 || !Number.isFinite(ms)) return;
+    arrived.push({ at: Date.now() - t0, n: e.d1, ms });
+    pb.pulse(plain(KEYS), plain(SYNTH));
+    const s = sorted();
+    d.set('median', s[s.length >> 1]);
+    d.set('worst', s[s.length - 1]);
+    d.set('last', ms);
+    d.set('notes', arrived.length);
+    const lane = view.strip.lanes().find((L) => L.id === 'lag');
+    if (lane) lane.subLabel = [`median ${s[s.length >> 1]} ms`, `worst ${s[s.length - 1]} ms`];
+    show();
+  }
+
+  // ── two sites, two sockets, one room ────────────────────────────────────
+  // `here` emits along its link; the room carries ONE bay.event; `there`'s bay
+  // delivers it only along the link it holds into its synth.
+  function bayHere() {
+    const b = here.registry.fill(createBay());
+    if (b.port(SYNTH)) b.link(KEYS, SYNTH, [], { site: HERE });
+    return b;
+  }
+  function bayThere() {
+    const b = there.registry.fill(createBay());
+    b.addPort({ ...b.port(SYNTH), deliver: heard });
+    if (b.port(KEYS)) b.link(KEYS, SYNTH, [], { site: THERE });
+    return b;
+  }
+  const log = (line, kind) => d.log(line, kind);
+  const here = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
+  const there = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let joining = null;
+  function join() {
+    if (joining) return joining;
+    joining = (async () => {
+      await Promise.all([here.join(), there.join()]);
+      // Each site has to have heard the other announce before its bay can hold the link.
+      for (let i = 0; i < 60 && !(bayHere().port(SYNTH) && bayThere().port(KEYS)); i++) await sleep(50);
+      const ok = !!bayHere().links().length && !!bayThere().links().length;
+      t0 = Date.now();
+      btns.enable('join', false, `in ${ROOM}`);
+      d.log(ok ? `joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}` : `joined ${ROOM}, but the two sites did not hear each other`, ok ? 'hi' : 'bad');
+      return ok;
+    })();
+    return joining;
+  }
+
+  // Key presses go out in order, after the join their first press started.
+  let chain = Promise.resolve();
+  const play = (ev) => { chain = chain.then(() => join()).then((ok) => { if (ok) here.emit(KEYS, ev); }); };
+
+  const btns = createButtonGroup({ buttons: [{ id: 'join', label: 'Join', title: `room ${ROOM}`, onPress: () => join() }] });
+
+  const host = el('div');
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') play({ cls: 'note', ch: 1, d1: note, d2: 100 }); },
+    onUp: (note, how) => { if (how !== 'midi') play({ cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+
+  // ── the timeline: one mark per note, where it arrived ───────────────────
+  const deck = createDeck({ items: [], range: [0, WINDOW] });
+  const shelf = el('div');
+  const view = createStripView(shelf, deck, {
+    size: 'auto', follow: false, gutter: 120, footer: true,
+    lanes: [{
+      id: 'lag', kind: 'note', label: 'delay', height: 56, width: 2, as: 'ticks', terse: true,
+      rows: () => arrived.map((a, i) => ({ at: a.at, id: `a${i}`, kind: 'note', payload: a })),
+      colorOfRow: (r) => band(r.payload.ms),
+      describeRow: (r) => [nameOf(r.payload.n), `${r.payload.ms} ms`],
+    }],
+  });
+  function show() {
+    const end = Math.max(WINDOW, (arrived.at(-1)?.at || 0) + 1000);
+    deck.setRange([0, end]);
+    view.strip.fit(Math.max(0, end - WINDOW), end);
+    view.strip.invalidate();
+  }
+
+  // ── plain names on screen, the real ids on hover ──────────────────────────
+  // Asked 2026-10-12: *"labels are super confusing"*. Three made-up codes
+  // (`here-xj5`, `lag-fs3fmz`, `there-6f3`) told a reader nothing about which end
+  // was which. The wire keeps the random ids, so two tabs never collide, and the
+  // picture shows SIMULATED names (positron-concepts): this browser is `web-1`, the
+  // other place `web-2`, the relay `cf-relay:<role>`. The real id is on hover.
+  // ⚠️ PAGE LOCAL: bay-view draws a box's title from `node.id` and has no display
+  // name hook, and patchbay.mjs types `Cloudflare` under the relay box itself.
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const g of root.querySelectorAll('.lv-box')) {
+        if (g.querySelector('title')) continue;
+        const id = g.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
+        g.prepend(t);
+        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
+  // ── the patchbay: the link and the relay that carries it ────────────────
+  // Drawn from this tab's own two graphs, so it is whole before Join.
+  const pic = createBay();
+  for (const g of [G_HERE, G_THERE]) {
+    for (const n of g.nodes) pic.addNode(n);
+    for (const p of g.ports) pic.addPort(p);
+  }
+  pic.link(KEYS, SYNTH);
+  pic.link(AOUT, SPK);
+  const pb = createPatchbay(named(pic), { room: 'lag', flowing: () => voices.size > 0 });
+  hovers(pb.el, 'lag');
+
+  requestAnimationFrame(show);
+  d.stack.add(btns.el, host, view.surface, pb.el);
+  addEventListener('pagehide', () => { here.leave(); there.leave(); });
+  d.ready();
+</script>

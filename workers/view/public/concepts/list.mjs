@@ -13,10 +13,15 @@ export const CONCEPTS = [
   { n: 'synth/020', title: 'Timeline', say: 'The recorder on the kit transport bar and timeline.' },
   { n: 'synth/030', title: 'Dot piano', say: 'The same notes drawn by a shader and by C firmware on an emulated Pico.' },
   { n: 'synth/040', title: 'Synth', say: 'A WebAudio synth built one patched module at a time.' },
-  { n: 'synth/050', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: 'synth/060', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
   { n: 'synth/070', title: 'Circuit', say: 'The keyboard and a patch selector playing the Novation Circuit plugged into the Raspberry Pi.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
+  { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
+  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
+  // draw, after synth because its first page is the synth/040 voice under a pad
+  // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
+  // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
+  { n: 'draw/000', title: 'XY filter', say: 'The synth with an XY pad that sweeps its filter.' },
   { n: 'radio/000', title: 'Radio', say: 'Two stations on one crossfader, patched from the stations to the speakers.' },
   { n: 'radio/010', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
   { n: 'radio/020', title: 'Tempo', say: 'Recordings of Raadio 2, Raadio 4 and Ida played from our own bucket into a tempo detector.' },
@@ -27,6 +32,7 @@ export const CONCEPTS = [
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },
   { n: 'video/030', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
   { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
+  { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ running in this tab with only the number of mirrors left to turn.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
@@ -42,16 +48,19 @@ export const CONCEPTS = [
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
   { n: 'typist/030', title: 'Playback', say: 'One paper whose typing is kept on a timeline and played back from the first key to the last.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
-  { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing piano recordings from our R2 bucket through SuperCollider in this tab.' },
-  { n: 'sampler/010', title: 'Piano and Rhodes', say: 'One SuperCollider sampler holding a piano and a Rhodes that a patch node switches by program change.' },
+  { n: 'sampler/000', title: 'Sampler', say: 'A SuperCollider piano and Rhodes behind a looper you start, overdub and stop with the sustain pedal.' },
+  // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
-  { n: 'sampler/020', title: 'Looper', say: 'The SuperCollider piano behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
-  { n: 'sampler/040', title: 'SuperCollider piano', say: 'The same SuperCollider sampler with its key to sound, boot and first note measured.' },
+  { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
+  { n: 'clock/010', title: 'In advance', say: 'One pattern played by a timer that wakes up and by the audio clock told ahead, with how late each lands.' },
+  { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
-  { n: 'misc/020', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
+  // misc/020 Tutorial slide moved to /archive/ 2026-10-12 (*"make "/arhive" page and move
+  // csound and tutotial slide there"*): the page stays deployed, its card is on
+  // /archive/ (demo/archive/index.html), and misc has no concept page left.
 ];
 
 // The front page's demos on this index (asked 2026-10-12, *"inegrate fronpage
@@ -66,15 +75,15 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'radio', 'video', 'streaming', 'device', 'room', 'typist', 'sampler', 'clock', 'misc'];
+export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'clock'];
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
-  csound: { group: 'synth', say: 'Csound scores as timelines you can start anywhere.' },
-  fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.' },
+  // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
+  fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.', supersededBy: 'synth/080' },
   collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.' },
   muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.' },
-  mirror: { group: 'video', say: 'One shader drawn by this browser and by a Raspberry Pi.' },
+  mirror: { group: 'shader', say: 'One shader drawn by this browser and by a Raspberry Pi.' },
   llhls: { group: 'streaming', say: 'The tuned low latency HLS player against a live input.' },
   webrtc: { group: 'streaming', say: 'The same live picture delivered over WHEP.', supersededBy: 'video/030' },
   moq: { group: 'streaming', say: 'A test picture sent from this browser over MoQ and back.' },
@@ -88,12 +97,12 @@ export const DEMO_CARDS = {
   pack: { group: 'device', say: 'The patches, sessions and samples inside a Circuit pack.' },
   wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.' },
   patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
-  typist: { group: 'typist', say: 'Every edit written down, so any moment can be put back.', supersededBy: 'typist/030' },
+  // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.' },
   tom: { group: 'sampler', say: 'A 16 step grid playing the samples out of a pack.' },
   time: { group: 'clock', say: 'The clock every page runs on and what is built on it.' },
   sync: { group: 'clock', say: 'Four ways two places agree on when something happens.' },
-  draw: { group: 'clock', say: 'A line drawn by hand, recorded against the clock.' },
+  draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'Every 1965 newsreel in ERR\'s archive on one line of days.' },
   floor: { group: 'archives', say: 'Every 1965 newsreel face up on a floor you walk over.' },

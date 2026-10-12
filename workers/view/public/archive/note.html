@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON archive note</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<!-- /archive/note.html?f=<path>, 2026-10-12. Asked: "make notes as cards.
+     they do render". One archive note, rendered from its markdown by md.mjs.
+     Only paths under /archive/ ending in .md are fetched, our own origin. -->
+<style>
+  .md { max-width: 78ch; line-height: 1.6; font-size: 15px; }
+  .md h1 { font-size: 22px; margin: 0 0 16px; }
+  .md h2 { font-size: 17px; margin: 32px 0 10px; }
+  .md h3, .md h4 { font-size: 15px; margin: 24px 0 8px; }
+  .md p, .md ul, .md ol { margin: 0 0 14px; }
+  .md li { margin: 4px 0; }
+  .md code { font: 13px var(--mono); background: var(--card2); padding: 1px 4px; border-radius: 3px; }
+  .md pre { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 12px; overflow-x: auto; }
+  .md pre code { background: none; padding: 0; }
+  .md blockquote { margin: 0 0 14px; padding-left: 14px; border-left: 2px solid var(--line); color: var(--dim); }
+  .md-tbl { overflow-x: auto; margin: 0 0 14px; }
+  .md table { border-collapse: collapse; font-size: 13.5px; }
+  .md th, .md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+  .md th { color: var(--dim); font-weight: 500; white-space: nowrap; }
+  .md a { color: var(--fg); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { renderMarkdown } from './md.mjs';
+
+  const d = mount({ name: 'archive note', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
+  const f = (new URLSearchParams(location.search).get('f') || '').replace(/\/$/, '');
+  const body = el('div', 'md');
+  d.stack.add(body);
+  const h1 = document.querySelector('.pos-name');
+  if (!/^\/archive\/[\w/-]+\.md$/.test(f)) {
+    body.textContent = 'No such note.';
+  } else {
+    const r = await fetch(f);
+    if (!r.ok) body.textContent = `The note did not load (${r.status}).`;
+    else {
+      body.innerHTML = renderMarkdown(await r.text());
+      const top = body.querySelector('h1');
+      if (top && h1) { h1.textContent = top.textContent; document.title = top.textContent; top.remove(); }
+    }
+  }
+  d.ready();
+</script>
+</html>

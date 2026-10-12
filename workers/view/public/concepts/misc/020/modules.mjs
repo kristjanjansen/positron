@@ -1,8 +1,8 @@
-// demo/concepts/misc/020/modules.mjs: the mono WebAudio synth of /concepts/synth/050/, cut
+// demo/concepts/misc/020/modules.mjs: the mono WebAudio synth of /concepts/draw/000/ (synth/050 until 2026-10-12), cut
 // down to the chain a tutorial slide teaches in three steps: keys, oscillator,
 // filter, scope, speakers.
 //
-// ⚠️ A COPY OF demo/concepts/synth/050/modules.mjs, NOT AN IMPORT, ON PURPOSE, as 41
+// ⚠️ A COPY OF demo/concepts/draw/000/modules.mjs, NOT AN IMPORT, ON PURPOSE, as 41
 // is a copy of 40: the pages stay independent while each is still moving. What
 // changed in the copy: the amp is folded into the oscillator (its `midi-in`
 // gates its own level), so the bay is one chain and draws as one row in the

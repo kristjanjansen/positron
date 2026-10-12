@@ -32,8 +32,8 @@
   //
   // NOTHING OPENS ON A VISIT. The AudioContext is made on the first key or
   // play press; moving the pad before that only changes the filter's state.
-  const d = mount({ name: 'concept synth 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('synth/050');
+  const d = mount({ name: 'concept draw 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('draw/000');
 
   const synth = createSynth({ log: (m, lv) => d.log(m, lv) });
   const { bay } = synth;

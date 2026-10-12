@@ -34,9 +34,18 @@
   }
   .cc-card.cc-demo .cc-n { color: var(--cc-demo); }
   .cc-card.cc-demo:hover { border-color: var(--cc-demo); }
-  /* A demo a concept page now covers: a quiet word, never red, and the page
-     that covers it on the card's last line. */
-  .cc-demo .cc-off { margin-left: auto; padding-left: 10px; font: 400 12px var(--mono); color: var(--dim2); }
+  /* A demo a concept page now covers: an inverted badge, light ink filled with
+     the page's dark as its text, uppercase like the kit's `.pos-tag`, never red
+     and never the brand `--hi` (asked 2026-10-12, *"make label more visible,
+     ivert badge"*), and the page that covers it on the card's last line. Its
+     line box is the title's, so the card keeps its size. */
+  .cc-demo .cc-off {
+    flex: none; margin-left: auto; align-self: center;
+    padding: 0 6px; border-radius: 3px;
+    background: var(--fg2); color: var(--bg);
+    font: 600 10px/1.6 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    white-space: nowrap;
+  }
   .cc-demo .cc-t:has(.cc-off) { display: flex; align-items: baseline; }
   .cc-demo .cc-by { margin: auto 0 0; font: 400 12px var(--mono); color: var(--dim2); }
   /* A use case card carries more: the front page's group above the title and
@@ -50,6 +59,9 @@
   .cc-case .cc-g { font: 400 12px var(--mono); color: var(--cc-case); }
   .cc-case .cc-t { font-size: 17px; }
   .cc-case .cc-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
+  /* The way to what retired, one quiet line under the last group. */
+  .cc-more { margin: 0; font: 400 12px var(--mono); color: var(--dim2); }
+  .cc-more a { color: var(--dim); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -117,5 +129,10 @@
     g.append(...list);
     d.stack.titled(group, g);
   }
+  // Retired pages and the notes on removed ones (asked 2026-10-12, *"make
+  // "/arhive" page and move csound and tutotial slide there"*).
+  const more = el('p', 'cc-more');
+  more.append(el('a', '', 'archive', { href: '/archive/' }));
+  d.stack.add(more);
   d.ready();
 </script>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON archive</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<!-- /archive/, 2026-10-12. Asked: "make "/arhive" page and move csound and
+     tutotial slide there". Not a manifest demo: workers/view/build.mjs copies
+     demo/archive/ to /archive/ with archiveFiles(), the way conceptFiles()
+     copies /concepts/, and also deploys the markdown notes listed below at
+     their repository paths, served as plain text. The dev server finds both by
+     itself: /archive/ is not a directory at the repo root, so it falls through
+     to demo/archive/, and /archive/<x>.md is the repo's own file. -->
+<style>
+  /* The concepts index's cards (demo/concepts/index.html), same size. */
+  .ar-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .ar-card {
+    display: flex; flex-direction: column; gap: 6px;
+    min-height: 110px;
+    padding: var(--inset, 12px);
+    background: var(--card);
+    border: var(--edge, 1px solid var(--line));
+    border-radius: var(--r, 4px);
+    color: inherit; text-decoration: none;
+  }
+  .ar-card:hover { border-color: var(--fg); }
+  .ar-t { margin: 0; font-size: 15px; }
+  .ar-t .ar-n { font: 400 12px var(--mono); color: var(--dim); margin-right: 10px; }
+  .ar-s { margin: 0; color: var(--dim); font-size: 13.5px; }
+  .ar-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+
+  const d = mount({
+    name: 'archive',
+    what: 'Pages that left the concepts index, and notes on the ones that are gone.',
+    readout: null, index: '/concepts/', indexLabel: 'concepts',
+  });
+
+  // Still deployed, off /concepts/ and off the front page.
+  const RETIRED = [
+    { kind: 'demo', title: 'Csound', href: '/csound/', say: 'Csound scores as timelines you can start anywhere.' },
+    { kind: 'misc 020', title: 'Tutorial slide', href: '/concepts/misc/020/', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
+  ];
+
+  // Removed pages, kept as a markdown description in archive/. The files are
+  // deployed at the same paths as plain text, and note.html renders one.
+  const NOTES = [
+    { title: 'Typist', href: '/archive/typist.md', what: 'The front page text recorder that wrote down edits instead of keys.' },
+    { title: 'Sustain', href: '/archive/concepts/sampler-015.md', what: 'Concept sampler/015, a debugger for a real sustain pedal.' },
+    { title: 'Announce', href: '/archive/concepts/misc-000.md', what: 'Concept misc/000, every port the studio room could hear.' },
+    { title: 'Mirror', href: '/archive/concepts/misc-010.md', what: 'Concept misc/010, the mirror demo as the patchbay sees it.' },
+    { title: 'Effects', href: '/archive/concepts/effects.md', what: 'Concept 093, a MIDI octaver and a low pass filter on the patchbay.' },
+  ];
+
+  const cards = el('div', 'ar-cards');
+  for (const r of RETIRED) {
+    const a = el('a', 'ar-card', '', { href: r.href });
+    const h = el('h3', 'ar-t');
+    h.append(el('span', 'ar-n', r.kind), document.createTextNode(r.title));
+    a.append(h, el('p', 'ar-s', r.say), el('span', 'ar-u', r.href));
+    cards.append(a);
+  }
+  d.stack.titled('retired', cards);
+
+  // Asked 2026-10-12: *"make notes as cards. they do render"*. Each opens
+  // as a page, note.html rendering the markdown.
+  const noteCards = el('div', 'ar-cards');
+  for (const n of NOTES) {
+    const a = el('a', 'ar-card', '', { href: `/archive/note.html?f=${n.href}` });
+    const h = el('h3', 'ar-t');
+    h.append(el('span', 'ar-n', 'note'), document.createTextNode(n.title));
+    a.append(h, el('p', 'ar-s', n.what), el('span', 'ar-u', n.href));
+    noteCards.append(a);
+  }
+  d.stack.titled('notes', noteCards);
+
+  d.ready();
+</script>
+</html>
