@@ -84,7 +84,7 @@ export const DEMO_CARDS = {
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.', supersededBy: 'synth/080' },
   collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.', supersededBy: 'synth/090' },
-  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.' },
+  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.', supersededBy: 'synth/110' },
   mirror: { group: 'shader', say: 'One shader drawn by this browser and by a Raspberry Pi.' },
   llhls: { group: 'streaming', say: 'The tuned low latency HLS player against a live input.' },
   webrtc: { group: 'streaming', say: 'The same live picture delivered over WHEP.', supersededBy: 'video/030' },
