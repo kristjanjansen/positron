@@ -1180,7 +1180,10 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
         return { r, inside: r.left >= lane.left - 0.5 && r.right <= lane.right + 0.5
           && r.top >= lane.top - 0.5 && r.bottom <= lane.bottom + 0.5,
           centred: Math.abs((r.top + r.bottom) / 2 - (lane.top + lane.bottom) / 2) <= 1,
-          oneLine: cs.whiteSpace === 'nowrap' && r.height <= 12, quiet: cs.pointerEvents === 'none',
+          // one line is under one and a half of the font's size: a typed 12 px
+          // was the system mono's line box, and JetBrains Mono's is 12.5 at
+          // 9.5 px (2026-10-12), while two lines are over 20
+          oneLine: cs.whiteSpace === 'nowrap' && r.height < 1.5 * parseFloat(cs.fontSize), quiet: cs.pointerEvents === 'none',
           upper: cs.textTransform === 'uppercase', hits: at === s.el.querySelector('.sld-lane') || s.el.querySelector('.sld-lane').contains(at) };
       });
       return { lane, names };
@@ -2244,7 +2247,7 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
       const belowL = nameAt(b0.left + 2, b0.bottom + 8);
       const belowR = nameAt(b0.right - 2, b0.bottom + 8);
       d.assert('where a raised sharp covers a white key the sharp wins, on BOTH sides, and only where it covers',
-        overC === 'C\u266f4' && overD === 'C\u266f4' && belowL === 'C4' && belowR === 'D4',
+        overC === 'C#4' && overD === 'C#4' && belowL === 'C4' && belowR === 'D4',
         `over its left white: ${overC} · over its right white: ${overD} · `
         + `below it: ${belowL} then ${belowR}`);
     }

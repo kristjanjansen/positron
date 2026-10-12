@@ -274,46 +274,31 @@ const FILES = [
   // LICENCE: MIT, Copyright (c) 2019 Amazon —
   // `@webxr-input-profiles/assets@1.0.20`, `immersive-web/webxr-input-profiles`.
   // 217,984 + 213,868 bytes. The text and the provenance ship beside them.
-  // ── three accidentals from Bravura Text, for every keyboard ───────────────
-  //
-  // 🔴 UNDER `demo/shell/`, NOT UNDER A DEMO, AND FOR THE REASON THE CONTROLLER
-  // MESHES ABOVE ARE: the consumer is `demo/shell/keyboard.mjs`, which eight
-  // pages draw. A font under `demo/nola/vendor/` would be served out of a
-  // directory named after one page and read by all of them, which is the
-  // `moq.mjs` failure this file warns about twice. Said in one line when it was
-  // nearly put there: *"demo/nola/vendor/ - keyboad is global component"*.
-  //
-  // ✅ 4,508 BYTES, SUBSET FROM 457,872. `demo/resources/subset-bravura.mjs`
-  // rebuilds it and prints both numbers. `shell.css` binds it to
-  // `unicode-range: U+266D-266F`, so it carries `♭ ♮ ♯` and nothing else and
-  // every letter beside them stays in the mono face.
-  //
-  // LICENCE: SIL Open Font License 1.1, Steinberg Media Technologies, reserved
-  // font name "Bravura". Ships beside the binary.
-  ['demo/shell/vendor/bravura-text-accidentals.woff2', 'shell/vendor/bravura-text-accidentals.woff2'],
-  ['demo/shell/vendor/LICENSE-bravura', 'shell/vendor/LICENSE-bravura'],
 
   // ── the slide face, JetBrains Mono, for `demo/shell/slide.mjs` ──────────
   //
-  // COPIED from `demo/slides/vendor/`, not moved: `/slides/` is an archive and
-  // keeps its own seven. Under `shell/` for the reason the accidentals above
-  // are: the consumer is a kit component, and a kit module loading a font out
-  // of one demo's folder is the cross-page import this file refuses. 400 and
-  // 600, Latin subset, @fontsource 5.3.0, SIL OFL 1.1, licence beside them.
+  // The site's one mono since 2026-10-12 (`--mono`, `--brand` and the slide
+  // face all read these files), and the archived `/slides/` deck reads them
+  // too since its own vendor folder and its byte-identical copy went
+  // (plans/plan-fonts-minimal.md). Under `shell/` because the consumers are kit
+  // components, and a kit module loading a font out of one demo's folder is
+  // the cross-page import this file refuses. 400 and 600, Latin subset, plus
+  // the Greek 600 subset for the logo's β, @fontsource 5.3.0, SIL OFL 1.1,
+  // licence beside them.
   ['demo/shell/vendor/jetbrains-mono-latin-400-normal.woff2', 'shell/vendor/jetbrains-mono-latin-400-normal.woff2'],
   ['demo/shell/vendor/jetbrains-mono-latin-600-normal.woff2', 'shell/vendor/jetbrains-mono-latin-600-normal.woff2'],
   ['demo/shell/vendor/jetbrains-mono-greek-600-normal.woff2', 'shell/vendor/jetbrains-mono-greek-600-normal.woff2'],
   ['demo/shell/vendor/LICENSE-jetbrains-mono', 'shell/vendor/LICENSE-jetbrains-mono'],
 
-  // ── six sans faces set beside the brand mono, for `/kit/frontpage/` ──────
+  // ── Geist, the site's `--sans` from 2026-10-12 ──────────────────────────
   //
-  // 2026-10-12, *"we need sans serif to match our brand mono. bring in
-  // something matchin it, not just Inter"*. A SAMPLER, not the site's `--sans`:
-  // only `demo/kit/frontpage/index.html` loads them. Under `shell/` so the one
-  // that wins can become `--sans` without moving. 400 and 600, Latin subset,
-  // @fontsource 5.3.x (Onest 5.3.1) off cdn.jsdelivr.net, every one SIL OFL 1.1,
-  // licence beside each.
-  ...['geist', 'manrope', 'ibm-plex-sans', 'schibsted-grotesk', 'onest', 'space-grotesk'].flatMap((f) => [
+  // Picked from six sans faces sampled beside the brand mono on
+  // `/kit/frontpage/` (*"we need sans serif to match our brand mono"*), and the
+  // other five deleted with plans/plan-fonts-minimal.md. Under `shell/` because
+  // `shell.css` declares it as `Brand Geist` and every page reads it through
+  // `--sans`. 400 and 600, Latin subset, @fontsource/geist 5.3.0 off
+  // cdn.jsdelivr.net, SIL OFL 1.1, licence beside it.
+  ...['geist'].flatMap((f) => [
     [`demo/shell/vendor/${f}-latin-400-normal.woff2`, `shell/vendor/${f}-latin-400-normal.woff2`],
     [`demo/shell/vendor/${f}-latin-600-normal.woff2`, `shell/vendor/${f}-latin-600-normal.woff2`],
     [`demo/shell/vendor/LICENSE-${f}`, `shell/vendor/LICENSE-${f}`],
@@ -381,20 +366,6 @@ const FILES = [
   ['demo/weight/vendor/gabarito-latin.woff2', 'weight/vendor/gabarito-latin.woff2'],
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
-
-  // ── the seven monospaced faces `/slides/` can be set in, vendored ──────────
-  //
-  // Listed by name for the same reason as Gabarito above. Latin subset, 400 and
-  // 600, from the @fontsource 5.3.0 packages, SIL OFL 1.1, licence beside each.
-  // plans/plan-slides.md section 9 has why these seven (Martian Mono was the
-  // eighth, removed on the owner's word 2026-10-05).
-  ...['atkinson-hyperlegible-mono', 'jetbrains-mono', 'geist-mono', 'ibm-plex-mono',
-    'intel-one-mono', 'fira-code', 'source-code-pro']
-    .flatMap((f) => [
-      [`demo/slides/vendor/${f}-latin-400-normal.woff2`, `slides/vendor/${f}-latin-400-normal.woff2`],
-      [`demo/slides/vendor/${f}-latin-600-normal.woff2`, `slides/vendor/${f}-latin-600-normal.woff2`],
-      [`demo/slides/vendor/LICENSE-${f}`, `slides/vendor/LICENSE-${f}`],
-    ]),
 
   // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
   //

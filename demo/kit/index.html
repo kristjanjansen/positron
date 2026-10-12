@@ -18,8 +18,11 @@
     color: inherit; text-decoration: none;
   }
   .kit-card:hover { border-color: var(--fg); }
-  .kit-card-t { margin: 0; font-size: 15px; }
+  /* The title names a part, so it is the mono; the line under it is read
+     through, so it is Geist (`--sans`, the body's face), as /concepts/ does. */
+  .kit-card-t { margin: 0; font-size: 15px; font-family: var(--mono); }
   .kit-card-s { margin: 0; color: var(--dim); font-size: 13.5px; }
+  .kit-card-t, .kit-card-s { text-wrap: balance; }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';

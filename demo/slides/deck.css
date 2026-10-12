@@ -5,40 +5,17 @@
    looks like is here; a page carries no slide CSS of its own.
    plans/plan-slides.md has the research behind every number. */
 
-/* THE SEVEN FACES, SELF-HOSTED, AND EVERY ONE IS MONOSPACED. Latin subset,
-   400 and 600 only, from the @fontsource 5.3.0 packages, each with its SIL
-   OFL 1.1 licence beside it in vendor/. plans/plan-slides.md section 9 has
-   why these seven (Martian Mono was an eighth and was removed on the owner's
-   word, *"rm martian mono"*, 2026-10-05). Nothing on a deck is fetched from
-   another host. */
-@font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Atkinson Hyperlegible Mono'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-600-normal.woff2') format('woff2'); }
+/* ONE FACE, JETBRAINS MONO, READ FROM `/shell/vendor/` SINCE 2026-10-12.
+   The archive offered seven monospaced faces behind a picker until
+   plans/plan-fonts-minimal.md cut the site to two families; the other six and
+   this folder's byte-identical copy of JetBrains Mono went, and the deck now
+   reads the files the rest of the site ships. Latin subset, 400 and 600,
+   @fontsource 5.3.0, SIL OFL 1.1, licence beside them in `shell/vendor/`.
+   Nothing on a deck is fetched from another host. */
 @font-face { font-family: 'SL JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+  src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'SL JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Geist Mono'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/geist-mono-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Geist Mono'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/geist-mono-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL IBM Plex Mono'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL IBM Plex Mono'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/ibm-plex-mono-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Intel One Mono'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/intel-one-mono-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Intel One Mono'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/intel-one-mono-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Fira Code'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/fira-code-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Fira Code'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/fira-code-latin-600-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Source Code Pro'; font-weight: 400; font-style: normal; font-display: block;
-  src: url('/slides/vendor/source-code-pro-latin-400-normal.woff2') format('woff2'); }
-@font-face { font-family: 'SL Source Code Pro'; font-weight: 600; font-style: normal; font-display: block;
-  src: url('/slides/vendor/source-code-pro-latin-600-normal.woff2') format('woff2'); }
+  src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
 
 /* THE DECK: the panel and, under it, the speaker notes. It is an inline size
    container so the notes, which sit outside the slide, can still be set at

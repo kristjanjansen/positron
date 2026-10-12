@@ -8,8 +8,8 @@
 // sources, better avoid"*, and the rule there is about whose server it is rather
 // than about which harm has been named. The cache is `tmp/chord-corpora/`, which
 // is gitignored, so neither corpus is in the repository and neither is in the
-// deploy. `demo/resources/fetch-jrhodes3d.mjs` and `subset-bravura.mjs` are the
-// same shape and carry the same rule at the top of them.
+// deploy. `demo/resources/fetch-jrhodes3d.mjs` is the same shape and carries
+// the same rule at the top of it.
 //
 // ⚠️ NO HARNESS EVER RUNS THIS AND NO PAGE EVER FETCHES FROM EITHER HOST. What
 // ships is a TABLE counted out of these files, never the files.

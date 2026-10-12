@@ -465,6 +465,40 @@ when that bar sits in a closed `data-own-keys` panel. MEASURED: taking the
 closed-tab line out turns `/kit/`'s *"a key from the page does not reach a bar
 in a closed tab"* red (294/294 to 293/294, 30000 -> 0) and nothing else.
 
+## Two faces: the mono names, Geist reads
+
+🔴 **THE SITE IS SET IN TWO FAMILIES SINCE 2026-10-12, AND A PAGE ADDS NO
+THIRD.** Decided as *"A is fine. Impelent font update everywhere"*, spec in
+`plans/plan-fonts-minimal.md`, shown live on `/kit/frontpage/` (THE RULE, IN
+USE).
+
+- **`var(--mono)` is JetBrains Mono, for everything that NAMES**: page and card
+  titles, headings, eyebrows, buttons and every control, readout cells and
+  keys, logs, tables, key labels, slide headlines. `--brand` is an alias of it.
+- **`var(--sans)` is Geist, for everything READ THROUGH**: body text, the line
+  under a title (`.pos-what`, `.pos-tabs-about-t`), card descriptions, kit notes
+  (`.kit-n`), a slide's body.
+- Both are self hosted under `demo/shell/vendor/`, 400 and 600, Latin subset,
+  declared once in `shell.css`. **Write the token, never a stack**: a typed
+  `ui-sans-serif, ...` or `ui-monospace, ...` is the system face and not the
+  site's. A canvas cannot read `var()`, so it reads the token's computed value
+  (see *Drawing* below). Weight 400 or 600 only; there is no variable file, and
+  CSS font matching draws a 500 with the 400 file, so buttons read at 400.
+- Arrow ligatures are off site wide (`html { font-variant-ligatures:
+  no-contextual }`), so `->` in a log reads as the two characters typed.
+- Titles, the line under them, section headings and card text take
+  `text-wrap: balance`.
+- The only other faces: the JetBrains Mono Greek 600 subset (the logo's β,
+  fetched only when a β is laid out) and Gabarito on `/weight/`, which is that
+  artwork's material. The archived `/slides/` deck has one face, the same mono.
+- 🔴 **A SHARP ON A KEY IS `#`, NOT `♯`.** Neither vendored face carries
+  U+266F, so `♯` falls back glyph by glyph to whatever system face has it and
+  sits off the line differently on every platform. `#` in the mono sits on the
+  line by construction and matches `chords.mjs`, which was always ASCII. The
+  2026-09-23 choice of `♯` drawn in a Bravura subset was reversed on
+  *"no bravura needed i hope. can we do without?"*; the reasoning is at
+  `keyboard.mjs` `NOTE_NAMES`.
+
 ## Lanes and colour
 
 - **A number belongs to the lane that can answer for it.** Report each lane's

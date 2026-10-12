@@ -20,7 +20,11 @@
   }
   .cc-card:hover { border-color: var(--fg); }
   .cc-n { font: 400 12px var(--mono); color: var(--dim); }
-  .cc-t { margin: 0; font-size: 15px; }
+  /* The title names the page, so it is the mono; the line under it is read
+     through, so it is Geist (`--sans`, the body's face). Both balanced, as
+     /kit/frontpage/ sets them. */
+  .cc-t { margin: 0; font-size: 15px; font-family: var(--mono); }
+  .cc-t, .cc-s { text-wrap: balance; }
   /* The page number before the title, quieter than the title it belongs to. */
   .cc-t .cc-n { color: var(--dim); margin-right: 10px; font-variant-numeric: tabular-nums; }
   .cc-s { margin: 0; color: var(--dim); font-size: 13.5px; }

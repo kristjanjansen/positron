@@ -2,7 +2,7 @@
 //
 // A talk is a list of slide objects. This module turns the list into slides
 // inside a `createVideoPanel`, steps them, presents them full screen, sets them
-// in one of seven monospaced faces, shows speaker notes when asked, and grades
+// in JetBrains Mono, shows speaker notes when asked, and grades
 // the result. `/slides/` (the sample and the system) and `/talk/` (the talk
 // about positron) both import it from `/slides/deck.mjs` and link
 // `/slides/deck.css`; neither page carries deck code of its own.
@@ -15,7 +15,6 @@
 import { el, createReport } from '/shell/shell.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createStepper } from '/shell/stepper.mjs';
-import { createPicker } from '/shell/picker.mjs';
 import { createDiagram, TECH_HUE } from '/shell/diagram.mjs';
 import { createStepGrid } from '/shell/step-grid.mjs';
 import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
@@ -23,19 +22,16 @@ import { burn, videoHue, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-// ── the faces ───────────────────────────────────────────────────────────────
-// Seven self-hosted monospaced faces, in the order the switcher steps them.
-// `id` is what the address carries (`?face=plex`), `name` is what the picker
-// shows. The first is the default: JetBrains Mono since 2026-10-05, the owner's
-// choice (*"jetbrains default"*), plans/plan-slides.md section 9.
+// ── the face ────────────────────────────────────────────────────────────────
+// ONE FACE SINCE 2026-10-12. This was seven self-hosted monospaced faces behind
+// a picker, with `?face=plex` in the address, and JetBrains Mono the default
+// since 2026-10-05 (*"jetbrains default"*, plans/plan-slides.md section 9).
+// plans/plan-fonts-minimal.md cut the site to JetBrains Mono and Geist, so the
+// other six left with their files, the picker went (a choice of one is not a
+// choice) and `?face=` is ignored. `FACES` stays a list so the measuring pass
+// below, which loops over it, reads the same with one entry.
 export const FACES = [
   { id: 'jetbrains', name: 'JetBrains',   family: 'SL JetBrains Mono' },
-  { id: 'atkinson',  name: 'Atkinson',    family: 'SL Atkinson Hyperlegible Mono' },
-  { id: 'geist',     name: 'Geist',       family: 'SL Geist Mono' },
-  { id: 'plex',      name: 'Plex',        family: 'SL IBM Plex Mono' },
-  { id: 'intel',     name: 'Intel One',   family: 'SL Intel One Mono' },
-  { id: 'fira',      name: 'Fira Code',   family: 'SL Fira Code' },
-  { id: 'source',    name: 'Source Code', family: 'SL Source Code Pro' },
 ];
 const faceStack = (f) => `'${f.family}', var(--mono)`;
 
@@ -454,35 +450,15 @@ export function createDeck(d, { slides, hues = null }) {
     notesEl.append(p);
   }
 
-  // The face. A page setting, so it sits under the deck and not in the panel's
-  // footer, and the address carries it so a slide can be sent in a given face.
-  let face = FACES.find((f) => f.id === new URLSearchParams(location.search).get('face')) || FACES[0];
-  function setFace(f, quiet = false) {
+  // The face, one since 2026-10-12, so there is no picker and the address
+  // carries no `?face=`.
+  let face = FACES[0];
+  function setFace(f) {
     face = f;
     wrap.style.setProperty('--sl-face', faceStack(f));
-    const u = new URL(location.href);
-    if (f === FACES[0]) u.searchParams.delete('face'); else u.searchParams.set('face', f.id);
-    history.replaceState(null, '', u);
-    if (!quiet) d.log(`face: ${f.family.replace(/^SL /, '')}`);
     return document.fonts.load(`600 20px '${f.family}'`);
   }
-  // ⚠️ A PICKER AND NOT A SEGMENTED CHOICE, for the reason `/kit/`'s font row
-  // gives: seven names side by side do not fit a phone, and a picker is one
-  // name wide at any count.
-  const pickFace = (i, quiet = false) => {
-    const f = FACES[((i % FACES.length) + FACES.length) % FACES.length];
-    facePick.show(f.name, FACES.indexOf(f));
-    return setFace(f, quiet);
-  };
-  const facePick = createPicker({
-    label: 'face', what: 'face',
-    prev: () => pickFace(FACES.indexOf(face) - 1),
-    next: () => pickFace(FACES.indexOf(face) + 1),
-    onPick: (i) => pickFace(i),
-  });
-  facePick.options(FACES.map((f) => f.name), FACES.indexOf(face));
-  d.stack.add(facePick.el);
-  pickFace(FACES.indexOf(face), true);
+  setFace(face);
 
   let at = -1;
   function go(i) {
@@ -541,7 +517,7 @@ export function createDeck(d, { slides, hues = null }) {
 
   const deck = {
     d, SLIDES, nodes, panel, stepper, count, wrap, notesEl,
-    go, blank, setFace, pickFace, showNotes,
+    go, blank, setFace, showNotes,
     at: () => at, face: () => face, notesOn: () => notesOn,
   };
   window.__demo.slides = {
@@ -641,22 +617,21 @@ export async function checkDeck(deck, { range = [12, 16], kitLive = [], minLive 
   const A = d.assert;
   const go = deck.go, at = () => deck.at();
   const t0 = performance.now();
-  // Every face in before counting requests, because the switcher fetches the
-  // six that were not chosen, from this origin.
+  // The face in before counting requests. It loads from `/shell/vendor/`,
+  // the files every page of the site ships, since 2026-10-12.
   const loaded = await Promise.all(FACES.map((f) => Promise.all([
     document.fonts.load(`600 20px '${f.family}'`), document.fonts.load(`400 20px '${f.family}'`)])));
   const missing = FACES.filter((f, i) => !loaded[i].every((l) => l.length)
     || !document.fonts.check(`600 20px '${f.family}'`));
-  A(`all ${FACES.length} faces load, at 400 and 600, from the deck's own vendor folder`,
+  A(`the deck's face loads at 400 and 600 from the site's own vendor folder`,
     missing.length === 0, missing.map((f) => f.family).join(', ') || FACES.map((f) => f.id).join(' '));
   const resBefore = performance.getEntriesByType('resource')
     .filter((r) => new URL(r.name).pathname !== '/_log').length;
 
-  const noFace = new URLSearchParams(location.search).get('face');
   const famNow = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
-  A('with no face in the address the talk is set in JetBrains Mono',
-    FACES[0].id === 'jetbrains' && (noFace !== null || famNow.includes('JetBrains Mono')),
-    `${noFace ?? 'no ?face'}, ${famNow}`);
+  A('the talk is set in JetBrains Mono, whatever the address says',
+    FACES.length === 1 && FACES[0].id === 'jetbrains' && famNow.includes('JetBrains Mono'),
+    famNow);
 
   const [lo, hi] = range;
   A(`the talk is ${lo} to ${hi} slides and the panel holds every one`,
@@ -892,17 +867,6 @@ export async function checkDeck(deck, { range = [12, 16], kitLive = [], minLive 
     A('no diagram on a slide draws its own small text, no box sub, no line label and no caption line',
       native === 0 && capShown === 0, `${native} sub or label, ${capShown} caption lines shown`);
   }
-
-  // The face is in the address and every slide follows it.
-  const plex = FACES.find((f) => f.id === 'plex');
-  await deck.pickFace(FACES.indexOf(plex)); await frame();
-  const inUrl = new URLSearchParams(location.search).get('face');
-  const capNode = nodes.find((n) => n.cap);
-  const fam = getComputedStyle(nodes[0].node.querySelector('.sl-say')).fontFamily;
-  const capFam = getComputedStyle(capNode.cap).fontFamily;
-  await deck.pickFace(FACES.indexOf(was), true); await frame();
-  A('picking a face puts it in the address and every headline and caption follows',
-    inUrl === 'plex' && fam.includes('IBM Plex Mono') && capFam.includes('IBM Plex Mono'), `${inUrl}, ${fam}, ${capFam}`);
 
   // Every face really is monospaced: `i` and `m` take one advance each.
   const notMono = FACES.filter((f) => {
