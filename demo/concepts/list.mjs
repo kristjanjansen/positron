@@ -64,7 +64,7 @@ export const CONCEPTS = [
   { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
   { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
   { n: 'clock/030', title: 'Ahead link', say: 'Keys in one place play a synth in another on a link that carries the shared clock, so both sound together.' },
-  { n: 'clock/040', title: 'Follow', say: 'A cue link waits for a late picture link and lands on its frame instead of when it arrived.' },
+  // clock/040 Follow moved to /archive/ 2026-10-12 (*"move to archive https://positron.studio/concepts/clock/040/"*); the page stays deployed.
   { n: 'clock/050', title: 'Aligned after', say: 'Keys and a picture are recorded, then played back with the recording as the clock.' },
   { n: 'clock/060', title: 'MIDI clock', say: 'One beat sent to a second place as 24 clock ticks a beat and as one anchor, with how far each lands from the true beat.' },
   { n: 'clock/070', title: 'Join late', say: 'A third place joins while the beat runs, gets the anchor and its clock error, and lands on the right beat at once.' },
@@ -116,7 +116,7 @@ export const DEMO_CARDS = {
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'A 16 step grid playing the samples out of a pack.' },
   time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/010' },
-  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/040' },
+  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/030' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'Every 1965 newsreel in ERR\'s archive on one line of days.' },
