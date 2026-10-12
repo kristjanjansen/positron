@@ -100,7 +100,7 @@
   .fp-big { display: flex; flex-direction: column; min-width: 0; padding: 24px 0 var(--pos-gap); }
   .fp-big > * { margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
   .fp-big-eye { font: 400 13px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
-  .fp-big-eye b { color: var(--hi); font-weight: 600; }
+  .fp-big-eye b, .fp-big-h b { color: var(--hi); font-weight: inherit; }
   .fp-big-h { font: 600 clamp(32px, 7vw, 56px)/1.08 var(--mono); letter-spacing: -.04em; color: var(--fg); margin-top: 18px; }
   .fp-big-l { font: 400 clamp(18px, 2.3vw, 22px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 24px; max-width: 32em; }
   .fp-big-s { font: 400 clamp(14px, 1.5vw, 16px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
@@ -315,7 +315,11 @@
       const big = el('div', 'fp-big');
       const eye = el('p', 'fp-big-eye');
       eye.append('POSITRON', el('b', '', '.'), 'STUDIO');
-      big.append(eye, el('h2', 'fp-big-h', HERO.head), el('p', 'fp-big-l', HERO.line), el('p', 'fp-big-s', HERO.small));
+      // The headline's full stop in the accent too, as the wordmark's dot
+      // (asked: *"g. -> yellow dot"*).
+      const head = el('h2', 'fp-big-h');
+      head.append(HERO.head.replace(/\.$/, ''), el('b', '', '.'));
+      big.append(eye, head, el('p', 'fp-big-l', HERO.line), el('p', 'fp-big-s', HERO.small));
       // The imaginary patchbay: the web, Cloudflare, a Pi and a microcontroller
       // in one picture. Nothing here runs; the boxes and wires are made up.
       // The standard medium colours, as every patchbay on the site draws them
