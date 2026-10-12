@@ -693,7 +693,9 @@ export const DEMOS = [
   // been given a page — hold 24.19 px against Catmull-Rom 0.036, and 93.4% of
   // the drawn line invented. The adapter was the asset; its hand-rolled UI is
   // what the kit replaces.
-  { name: 'draw', group: 'technologies', act: 0, created: '2026-09-13', built: true,
+  // `unlisted: true` since 2026-10-12 (*"Revert xy changes, archive cy and draw"*): still built
+  // and deployed at /draw/, listed on /archive/ with the other retired pages.
+  { name: 'draw', group: 'technologies', act: 0, created: '2026-09-13', built: true, unlisted: true,
     one: 'press record, then draw a line with a finger or a mouse',
     tags: ['pointer', 'timeline', 'canvas'] },
   // The last of the protos to be given a page, promoted from proto/text/: the

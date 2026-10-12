@@ -24,7 +24,7 @@ export const CONCEPTS = [
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
-  { n: 'draw/000', title: 'XY filter', say: 'Play a looping bass line and drag the pad. Left to right opens the filter, upward adds resonance.' },
+  // draw/000 XY filter moved to /archive/ 2026-10-12 (*"Revert xy changes, archive cy and draw"*), and the draw group with it.
   { n: 'radio/000', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { n: 'radio/010', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
   { n: 'radio/020', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
@@ -91,7 +91,7 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
@@ -114,7 +114,7 @@ export const DEMO_CARDS = {
   nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid.' },
   // time and sync archived 2026-10-12 (*"archive time and sync demos"*): still served, listed on /archive/.
-  draw: { group: 'draw', say: 'Draw a line and play it back from a recording, to see how much of the gesture playback has to guess.' },
+  // draw archived 2026-10-12 with XY filter: still served, listed on /archive/.
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },
   floor: { group: 'archives', say: 'ERR\'s 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset.' },
