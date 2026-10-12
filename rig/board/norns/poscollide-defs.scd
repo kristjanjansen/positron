@@ -11,15 +11,18 @@
 // and on a shared server the piano, which writes to the outputs directly, never
 // passes through it.
 //
-// `level` is `scsampler.mjs` LOUDEST / 2 per channel, because the capture sums
-// out_1 and out_2 into one mono stream. INFERRED; step 4 of
-// plans/plan-pi-supercollider-defs.md measures it in the capture.
+// `fold` is 0.5 because the capture SUMS out_1 and out_2 into one JACK input
+// while a page's analyser and speakers AVERAGE stereo to mono, so the same note
+// reads the same level in the tab and from the Pi. `level` is per channel after
+// the fold (0.49, so the capture tops out at 0.98): a guard against the s16
+// capture clipping, not a loudness cap. Both are sent by `scollide.mjs`
+// (`FOLD`, `LIMIT_LEVEL`), which says what was measured, 2026-10-12.
 (
 var dir = "POS_DEFDIR".getenv ?? "/opt/positron-board/samples/defs";
 File.mkdir(dir);
-SynthDef(\posCollideOut, { |in = 64, level = 0.15|
+SynthDef(\posCollideOut, { |in = 64, fold = 0.5, level = 0.49|
 	var sig = In.ar(in, 2);
-	Out.ar(0, Limiter.ar(sig, level, 0.01));
+	Out.ar(0, Limiter.ar(sig * fold, level, 0.01));
 }).writeDefFile(dir);
 ("POSCOLLIDE DEFS WRITTEN " ++ dir).postln;
 0.exit;

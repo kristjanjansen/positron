@@ -56,7 +56,7 @@ import { readSynthDef } from '../../demo/shell/synthdef.mjs';
 import { JACK_ENDS, jackRows } from '../../demo/shell/graph-registry.mjs';
 import { oscMessage, oscBundle, ntpTimetag, ensureJackd, ensureCapture, releaseCapture, setStandingRows, wire,
   SAMPLER_SC_PORT, COLLIDE_SC_PORT } from './jacksynth.mjs';
-import { scsynthArgs, SC_ENV, DEF_DIR, LOUDEST, QUIT_GRACE_MS } from './scsampler.mjs';
+import { scsynthArgs, SC_ENV, DEF_DIR, QUIT_GRACE_MS } from './scsampler.mjs';
 import { readOsc } from './pappus.mjs';
 
 // ── the engine switch ───────────────────────────────────────────────────────
@@ -82,11 +82,23 @@ export const LIMITER_DEF = 'posCollideOut';
  */
 export const PAGE_BUS = 64;
 /**
- * Per channel. The capture sums out_1 and out_2 into one mono stream, so two
- * channels each at `LOUDEST / 2` land no louder than the sampler's one hard
- * note (`scsampler.mjs` `LOUDEST`). INFERRED; step 4 measures it in the capture.
+ * 🔴 THE FOLD. The capture SUMS out_1 and out_2 into one JACK input, while a
+ * page's analyser and its speakers AVERAGE a stereo node to mono (Web Audio's
+ * `speakers` downmix, (L+R)/2). Every program `sclang-lite.mjs` compiles has
+ * two channels (a mono last line is written to both), so without this the Pi
+ * read the same note 2x (6 dB) louder than the tab. MEASURED 2026-10-12 on
+ * synth/100, one note, max RMS here -33.2 against the Pi -28.4 dBFS.
  */
-export const LIMIT_LEVEL = LOUDEST / 2;
+export const FOLD = 0.5;
+/**
+ * Per channel, AFTER the fold, so the capture tops out at twice this: 0.98, a
+ * guard against the s16 capture clipping, not a loudness policy. It was
+ * `LOUDEST / 2` (0.15), which squashed every drum: MEASURED 2026-10-12 on
+ * rhythm/030 the kick read -5.9 dBFS RMS here and -19.3 on the Pi, 13 dB down,
+ * with the Pi's 90th percentile 1 dB under its peak. A page is now exactly as
+ * loud on the Pi as in the tab, which is what both pages compare.
+ */
+export const LIMIT_LEVEL = 0.49;
 /**
  * Node ids for page programs start here. The sampler allocates from 2000 up on
  * the same counter forever, so on a shared server the two cannot meet before
@@ -691,7 +703,7 @@ export async function startScCollide({ engine = ENGINE, onLog, onFrame, sampler 
   if (!dl || dl.addr !== '/done') { stop(); return { ok: false, reason: `scsynth did not load ${LIMITER_DEF}` }; }
   // The page group at the head of the server, the limiter straight after it.
   sendBuf(oscMessage('/g_new', [PAGE_GROUP, 0, 0]));
-  sendBuf(oscMessage('/s_new', [LIMITER_DEF, LIMITER_NODE, 3, PAGE_GROUP, 'in', PAGE_BUS, 'level', LIMIT_LEVEL]));
+  sendBuf(oscMessage('/s_new', [LIMITER_DEF, LIMITER_NODE, 3, PAGE_GROUP, 'in', PAGE_BUS, 'fold', FOLD, 'level', LIMIT_LEVEL]));
 
   let wired = null;
   if (engine.mode === 'own') {
