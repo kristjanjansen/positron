@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 070</title>
+<title>POSITRON Pico router</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The Pico block: its screen, and its two keys under it. */
@@ -26,7 +26,6 @@
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -194,8 +193,7 @@
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'concept device 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('device/000');
+  const d = mount({ name: 'Pico router', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
   // ── the links ───────────────────────────────────────────────────────────
   const WANT = [

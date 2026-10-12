@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 066</title>
+<title>POSITRON TV</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script src="/proto/remixer/hls.min.js"></script>
 <style>
@@ -37,7 +37,6 @@
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -114,8 +113,7 @@
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
 
-  const d = mount({ name: 'concept video 040', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('video/040');
+  const d = mount({ name: 'TV', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
   // ── the dither's one parameter, set only through value-in ───────────────
   const KNOBS = [
