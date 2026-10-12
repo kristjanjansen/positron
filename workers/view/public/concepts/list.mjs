@@ -105,13 +105,10 @@ export const DEMO_CARDS = {
   cam: { group: 'streaming', say: 'Your webcam beside what comes back over WebRTC, MoQ and LL-HLS, each with its glass to glass delay.' },
   // flipper archived 2026-10-12 (*"archive flipper"*): archive/demos/flipper-index.html.
   capture: { group: 'streaming', say: 'Four ways of keeping what came over a link, from takes recorded end to end to what a receiver got.' },
-  circuit: { group: 'device', say: 'A Novation Circuit on screen that follows the real one plugged in here, and sends nothing back.' },
-  evo: { group: 'device', say: 'An Evolution MK-425C drawn control for control, lighting up as you touch the real one plugged in.' },
-  twelve: { group: 'device', say: 'A TASCAM Model 12 drawn with only its MIDI controls, moving with the real one when it is plugged in.' },
+  // circuit, evo, twelve and pack archived 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+  // still served at their URLs, listed on /archive/ under devices.
   dump: { group: 'device', say: 'Every message a MIDI instrument plugged in here sends, as raw bytes beside a plain reading.' },
-  pack: { group: 'device', say: 'Look inside a Novation Circuit pack or a zip of WAVs you drop in: its patches, sessions and samples.' },
-  wire: { group: 'room', say: 'A message as the exact bytes it becomes, and notes played into a second tab, each timed on landing.', supersededBy: 'clock/010' },
-  patchbay: { group: 'room', say: 'Write a link between two ports and the patchbay checks it, and says why when one cannot work.' },
+  // wire and patchbay archived 2026-10-12 (*"archive wire and patchbay"*): still served, listed on /archive/.
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid.' },
