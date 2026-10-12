@@ -346,6 +346,22 @@
         ['web:camera:video-out', 'cf-stream:live:video-in'],
         ['cf-stream:live:video-out', 'pi-1:gpu:video-in'],
         ['pi-1:gpu:video-out', 'web:screen:video-in'],
+        // Interconnected (asked: *"Make frontpage paybay more i tersti g and
+        // interconnected"*): every cross link goes one column right or
+        // further, so the five columns of three hold. The keys' mod wheel and
+        // the room's clock reach the Pi, the recorder also plays the Circuit,
+        // remote notes also play the synth here, the Circuit goes through the
+        // octaver, the shader code also flashes the Pico, Stream also shows
+        // straight on the screen, and R2 keeps the GPU's picture too.
+        ['web:keys:value-out', 'cf-relay:room:value-in'],
+        ['cf-relay:room:value-out', 'pi-1:gpu:value-in'],
+        ['cf-relay:room:clock-out', 'pi-1:circuit:clock-in'],
+        ['web:rec:midi-out', 'pi-1:circuit:midi-in'],
+        ['cf-relay:room:midi-out', 'web:synth:midi-in'],
+        ['pi-1:circuit:audio-out', 'web:fx:audio-in'],
+        ['web:editor:program-out', 'web:pico:program-in'],
+        ['cf-stream:live:video-out', 'web:screen:video-in'],
+        ['pi-1:gpu:video-out', 'r2:recordings:video-in'],
       ];
       const PHONE = [
         ['web:keys:midi-out', 'pi-1:circuit:midi-in'],
@@ -388,12 +404,16 @@
         heard = due; lvl *= Math.exp(-(t - prev) / decay); prev = t;
         return { n: 0, level: lvl, flowing: lvl > 0.03 }; }; };
       const steady = (t) => ({ n: 0, level: 0.75 + 0.15 * Math.sin(t / 700), flowing: true });
+      // the mod wheel moved for a second in every eight, 30 events a second
+      const wheel = (ms) => { let next = 0; return (t) => { let n = 0; if (((t - ms) % 8000) < 1000 && t >= next) { n = 1; next = t + 33; } return { n, level: 0.5 }; }; };
       const edits = () => { let next = 2000; return (t) => { let n = 0; if (t >= next) { n = 1; next = t + 5000 + Math.random() * 4000; } return { n, level: 0 }; }; };
       const feeds = () => ({
         'web:keys:midi-out': events(0), 'web:rec:midi-out': events(30), 'cf-relay:room:midi-out': events(60),
         'pi-1:circuit:midi-out': events(120), 'web:synth:audio-out': sound(40, 380), 'web:fx:audio-out': sound(50, 380),
         'pi-1:circuit:audio-out': sound(110, 500), 'web:pico:video-out': sound(20, 900), 'web:editor:program-out': edits(),
-        'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady });
+        'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady,
+        'web:keys:value-out': wheel(0), 'cf-relay:room:value-out': wheel(60),
+        'cf-relay:room:clock-out': (t) => ({ n: 0, level: 1, flowing: true }) });
 
       const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
       frame.append(inner);
