@@ -18,7 +18,7 @@
   .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
+  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -337,7 +337,7 @@
   pair.append(left.panel.el, right.panel.el);
   // The program both sides run, read only; a sixth of its height as on 090.
   const lines = PROGRAM.split('\n').length;
-  const code = createCodeBox({ language: 'sclang', rows: Math.max(3, Math.round(lines / 6)), label: '', value: PROGRAM,
+  const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
   code.input.readOnly = true;
   d.stack.add(pair, code.el, grid.el, host, pb.el);

@@ -3,6 +3,11 @@
 import { el } from '/shell/shell.mjs';
 import { CONCEPTS } from './list.mjs';
 
+// How many lines a concept page's code box shows before it scrolls, one number
+// for every page. Asked 2026-10-12: *"too little h. fix is something sensible
+// on all code wins"*, after half of each page's own count left four lines.
+export const CODE_ROWS = 14;
+
 export function conceptNav(n) {
   const head = document.querySelector('.pos-head');
   const back = head?.querySelector('.pos-back');

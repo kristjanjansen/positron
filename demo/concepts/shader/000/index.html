@@ -18,7 +18,7 @@
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
+  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -263,7 +263,7 @@ void main(){
   // breathing in the box's corner and `Did not compile` left standing with
   // the GL's log in its `title` (and in the log below) while the last good
   // program keeps drawing.
-  const code = createCodeBox({ language: GLSL, value: FS, rows: 11, label: '',
+  const code = createCodeBox({ language: GLSL, value: FS, rows: CODE_ROWS, label: '',
     hues: { hueOf: (n) => (n === 'uSeg' ? HUE : null) },
     ariaLabel: 'the fragment shader this page runs, edit it and it recompiles' });
   // ⚠️ A PROGRAM WITH NO `uSeg` COMPILES AND RUNS, AND THE KNOB THEN DRIVES

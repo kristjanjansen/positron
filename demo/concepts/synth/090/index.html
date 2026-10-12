@@ -8,7 +8,7 @@
 <title>Collide synth</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
+  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -161,7 +161,7 @@
   // *"make code win 1/2 less h"* (2026-10-12); it scrolls, and the padding is
   // nav.mjs's for every concept page.
   const lines = PROGRAM.split('\n').length;
-  const code = createCodeBox({ language: 'sclang', rows: Math.max(3, Math.round(lines / 6)), label: '', value: PROGRAM,
+  const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program this synth plays, read only' });
   code.input.readOnly = true;
   d.stack.add(wave.el, code.el, grid.el, host, pb.el);
