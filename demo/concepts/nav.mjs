@@ -25,7 +25,11 @@ export function conceptNav(n) {
     const st = el('style');
     st.id = 'cc-nav-css';
     st.textContent = '.cc-nav { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }'
-      + ' .cc-nav-pn { display: flex; gap: 20px; }';
+      + ' .cc-nav-pn { display: flex; gap: 20px; }'
+      // Code boxes on concept pages: three times the kit field's 7px 9px.
+      // Asked 2026-10-12: *"make code win 1/2 less h and add 3x padding. same
+      // on other code wins"*; the pages halve their own `rows`.
+      + ' .pos-code { --field-pad: 21px 27px; }';
     document.head.append(st);
   }
 }
