@@ -56,7 +56,7 @@ import { readSynthDef } from '../../demo/shell/synthdef.mjs';
 import { JACK_ENDS, jackRows } from '../../demo/shell/graph-registry.mjs';
 import { oscMessage, oscBundle, ntpTimetag, ensureJackd, ensureCapture, releaseCapture, setStandingRows, wire,
   SAMPLER_SC_PORT, COLLIDE_SC_PORT } from './jacksynth.mjs';
-import { scsynthArgs, SC_ENV, DEF_DIR, LOUDEST } from './scsampler.mjs';
+import { scsynthArgs, SC_ENV, DEF_DIR, LOUDEST, QUIT_GRACE_MS } from './scsampler.mjs';
 import { readOsc } from './pappus.mjs';
 
 // ── the engine switch ───────────────────────────────────────────────────────
@@ -676,9 +676,11 @@ export async function startScCollide({ engine = ENGINE, onLog, onFrame, sampler 
     try { sendBuf(oscMessage('/g_freeAll', [PAGE_GROUP])); sendBuf(oscMessage('/n_free', [LIMITER_NODE])); } catch { /* gone */ }
     if (engine.mode === 'own') {
       setStandingRows('collide', []);
-      try { sendBuf(oscMessage('/quit')); } catch { /* gone */ }
-      setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* gone */ } }, 500).unref?.();
-      try { udp.close(); } catch { /* closed */ }
+      // The same stop as `scsampler.mjs`'s, for the same measured reason.
+      const quit = oscMessage('/quit');
+      try { udp.send(quit, 0, quit.length, engine.port, '127.0.0.1', () => { try { udp.close(); } catch { /* closed */ } }); }
+      catch { try { udp.close(); } catch { /* closed */ } }
+      setTimeout(() => { if (proc.exitCode === null && proc.signalCode === null) { try { proc.kill('SIGKILL'); } catch { /* gone */ } } }, QUIT_GRACE_MS).unref?.();
       return releaseCapture('collide');
     }
     return true;

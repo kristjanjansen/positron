@@ -1,4 +1,5 @@
 ## Open
+- **Next time on the Pi's LAN, VPN off** (2026-10-12). Left by the Pi agent when the VPN came on: (1) `rig/board/push.sh <pi>` for the engine stop fix (scsampler.mjs and scollide.mjs close the socket in the send callback, SIGKILL only after QUIT_GRACE_MS 3000; a hand `/quit` exited in 183 ms with 0 xruns against 1 to 2 xruns per stop before), md5s, re-measure the stop xruns, then restart Yoshimi (`audio.start` yoshimi) and Pappus (`fx.pappus on`); (2) the real-Pi browser checks of /mirror/ on `demo/shell/board-video.mjs` and of shader/010's real path (scripts in `research/tools/pi-checks/`: `node research/tools/pi-checks/drive.mjs "http://127.0.0.1:8890/concepts/shader/010/" research/tools/pi-checks/shader-real.mjs`); (3) the Fast Track Pro ch1 floor at -72.4 dBFS, 8 dB above -80, after the reboot.
 
 ### Open, by topic (triaged 2026-10-12)
 

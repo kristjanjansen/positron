@@ -37,6 +37,8 @@
 // the damper lands. The FluidR3 piano is program 2, on /nola/'s (v/127)^1.5.
 import { spawn, execFileSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
+/** How long scsynth gets to leave the JACK graph by itself after /quit. */
+export const QUIT_GRACE_MS = 3000;
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createPedal, SUSTAIN_CC } from '../../demo/shell/pedal.mjs';
@@ -405,9 +407,19 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   function stop() {
     stopping = true;
     setStandingRows('sampler', []);
-    try { send('/quit'); } catch { /* gone */ }
-    setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* gone */ } }, 500).unref?.();
-    try { udp.close(); } catch { /* closed */ }
+    // 🔴 /quit HAS TO LEAVE BEFORE THE SOCKET CLOSES, AND scsynth HAS TO BE
+    // GIVEN TIME TO TAKE ITSELF OFF THE JACK GRAPH. MEASURED 2026-10-12 on the
+    // Pi with Yoshimi running: this stop cost 1 to 2 jackd xruns every time
+    // (`possampler was not finished`), and the process was gone about 600 ms
+    // after the stop, which is the SIGKILL below. The same server sent /quit
+    // by hand exited by itself in 183 ms with no xrun at all. `udp.close()`
+    // straight after an async `send` can drop the datagram, so the kill landed
+    // on a client still running in the graph. So: close in the send callback,
+    // and kill only a process still there after QUIT_GRACE_MS.
+    const quit = oscMessage('/quit');
+    try { udp.send(quit, 0, quit.length, SC_PORT, '127.0.0.1', () => { try { udp.close(); } catch { /* closed */ } }); }
+    catch { try { udp.close(); } catch { /* closed */ } }
+    setTimeout(() => { if (proc.exitCode === null && proc.signalCode === null) { try { proc.kill('SIGKILL'); } catch { /* gone */ } } }, QUIT_GRACE_MS).unref?.();
     return releaseCapture('sampler');
   }
   const status = () => ({ ok: true, source: 'sampler', pid: proc.pid, port: SC_PORT, client: SC_CLIENT,

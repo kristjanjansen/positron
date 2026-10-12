@@ -137,7 +137,7 @@
   import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
   import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
   import { pickQuad } from '/shell/xr-pick.mjs';
-  import { RELAY_BASE } from '/shell/wire.mjs';
+  import { createBoardVideo } from '/shell/board-video.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, printLink } from '/shell/bay.mjs';
   import { createRegistry, boardGraph, boardPort, BOARD_SITE } from '/shell/graph-registry.mjs';
@@ -477,7 +477,7 @@
    * dark pill and a hidden child does not make it `:empty`.
    */
   const badge = createLinkBadge({
-    count: () => (vws ? farDecoded : null),
+    count: () => (bv.isOpen() ? bv.decoded() : null),
     onChange: (st) => { far.panel.slots.tag.hidden = st === 'unknown'; },
   });
   far.panel.slots.tag.append(badge.el);
@@ -821,7 +821,7 @@
     // ── the right panel: what crossed the network ────────────────────────
     // One second is the same silence this page already treats as "the box
     // stopped sending" when it unlocks the local frame counter.
-    const boxLive = farDecoded > 0 && performance.now() - lockedAt < 1000;
+    const boxLive = bv.decoded() > 0 && performance.now() - lockedAt < 1000;
     panelBox.draw({
       source: boxLive ? far.c : null,
       state: boxLive ? 'live' : 'the Raspberry Pi is not sending',
@@ -876,7 +876,7 @@
     const now = performance.now();
     if (now - glowAt < 200) return;
     glowAt = now;
-    const src = (gl && drewAny > 0) ? local.c : (farDecoded > 0 ? far.c : null);
+    const src = (gl && drewAny > 0) ? local.c : (bv.decoded() > 0 ? far.c : null);
     if (!src) { glowAmp = 0; return; }
     try {
       tinyCtx.drawImage(src, 0, 0, 8, 8);
@@ -1672,7 +1672,7 @@
       // question tore this one's decoder down and built it again — which showed
       // up as a bar reading "not arriving" next to a live frame rate.
       far.pres.checking(false).because(null);
-      if (!vws) openPicture(msg);
+      if (!bv.isOpen()) openPicture(msg);
     }
     if (msg.type === 'video.stopped') { d.log(`the box stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
   }
@@ -1688,7 +1688,7 @@
       await new Promise((r) => setTimeout(r, 100));
       describeLinks();
     }
-    if (vws) return;
+    if (bv.isOpen()) return;
     if (linked.why) { d.log(`the picture is not opened: ${linked.why}`, 'warn'); return; }
     if (!linked.video) d.log('the board has not described itself yet, so its picture is opened without a link', 'warn');
     openVideo(info.room, info);
@@ -1716,13 +1716,50 @@
   function scheduleRetry() {
     if (retry) return;
     retry = setInterval(() => {
-      if (vws) { clearInterval(retry); retry = null; return; }
+      if (bv.isOpen()) { clearInterval(retry); retry = null; return; }
       send({ type: 'video.status' });
     }, 5000);
     retry.unref?.();
   }
 
-  let vws = null, decoder = null, farFps = 0, farBytes = 0, farGaps = 0, farDecoded = 0, waitingForKey = true;
+  // 🔴 THE RECEIVER IS THE KIT'S SINCE 2026-10-12, `demo/shell/board-video.mjs`,
+  // so /concepts/shader/010/ decodes the board's picture with this same code
+  // rather than a second copy of it. What stays here is what this page DOES
+  // with a frame: the lock to the board's counter, the badge, the log lines.
+  let farFps = 0;
+  const bv = createBoardVideo({
+    canvas: far.c, send,
+    onFrame: () => farNone.remove(),
+    onSeq: (s) => {
+      // The board's sequence number is its frame counter. See the comment at
+      // `lockedFrame`. Taken here, before the decode, because a frame the
+      // decoder refuses is still a frame the board drew.
+      const wasFree = lockedFrame === null;
+      lockedFrame = s; lockedAt = performance.now();
+      // It spoke, stamped with this clock at the moment it arrived. Cheap on
+      // purpose: it records the time and derives only when the answer could
+      // have changed.
+      far.pres.seen();
+      if (wasFree) {
+        relabel('here');
+        // The other edge of the state change above: this pane has stopped
+        // counting for itself and is now drawing the board's frame number, so
+        // anything still different between the two pictures is the pipeline.
+        d.log('this pane is locked to the board\u2019s frame number');
+      }
+    },
+    // ⚠️ A DECODER MUST START ON A KEYFRAME, so a joiner waits up to one
+    // second at this GOP, which is a GOP choice and not a fault.
+    onKey: () => d.log('a keyframe arrived. The box\u2019s picture starts here'),
+    // ⚠️ THE COUNTER IS IN THE PAYLOAD BECAUSE A BINARY FRAME HAS NO ENVELOPE,
+    // and the relay drops frames with no error, no close and no backpressure.
+    // Measured: at 8 Mbit/s it lost 101 of 361 frames and nothing else on the
+    // path said so. It reports into the log rather than a cell under the picture.
+    onLost: (n) => sayLinkLost(n),
+    onRate: (kbit, fps) => { farFps = fps; stat('box', { fps: farFps }); sayLinkRate(kbit); },
+    onClose: () => d.log('the box’s video socket closed'),
+    onError: (line) => d.log(line, 'bad'),
+  });
 
   /**
    * 🔴 WHAT THE LINK COSTS IS SAID IN THE LOG AND ON THE BEACON, NOT IN A ROW
@@ -1746,7 +1783,7 @@
   let saidRate = false, saidLost = 0, saidLostAt = 0, beaconedLost = false;
   function sayLinkRate(kbit) {
     window.__demo.link.kbit = kbit;
-    window.__demo.link.frames = farDecoded;
+    window.__demo.link.frames = bv.decoded();
     if (saidRate) return;
     saidRate = true;
     d.log(`the box\u2019s picture is arriving at ${kbit.toFixed(0)} kbit/s`);
@@ -1773,15 +1810,11 @@
   // clean close leaves one behind. `document.hidden` is checked because a tab
   // in the background is not a viewer either, and a socket count could never
   // have seen that.
-  setInterval(() => {
-    if (vws && !document.hidden) send({ type: 'video.watching' });
-  }, 10000);
-  const fctx = far.c.getContext('2d');
+  // The ten second `video.watching` is sent by `createBoardVideo` while its
+  // socket is open and the tab is not hidden, exactly as it was here.
 
   function closeVideo() {
-    try { vws?.close(); } catch { /* already */ }
-    try { decoder?.close(); } catch { /* already */ }
-    vws = null; decoder = null;
+    const { decoded: farDecoded, lost: farGaps } = bv.close();
     // Back to free-running, and SAY SO. A pane that silently stopped being
     // locked would be two different claims wearing one label.
     lockedFrame = null;
@@ -1810,81 +1843,15 @@
 
   function openVideo(room, info) {
     closeVideo();
-    if (typeof VideoDecoder !== 'function') {
-      farWaits('this browser has no WebCodecs, so the box’s picture cannot be decoded here');
+    saidRate = false; saidLost = 0; saidLostAt = 0; beaconedLost = false;
+    window.__demo.link = { kbit: null, lost: 0, frames: 0 };
+    const r = bv.open(room, info);
+    if (!r.ok) {
+      farWaits(r.reason);
       d.log('there is no WebCodecs here, so the right pane cannot be decoded on this browser', 'bad');
       return;
     }
-    waitingForKey = true; farDecoded = 0; farGaps = 0; farBytes = 0;
-    saidRate = false; saidLost = 0; saidLostAt = 0; beaconedLost = false;
-    window.__demo.link = { kbit: null, lost: 0, frames: 0 };
-    decoder = new VideoDecoder({
-      output: (vf) => {
-        if (far.c.width !== vf.displayWidth) { far.c.width = vf.displayWidth; far.c.height = vf.displayHeight; }
-        fctx.drawImage(vf, 0, 0);
-        vf.close();
-        farDecoded++;
-        farNone.remove();
-
-      },
-      error: (e) => d.log(`decode error: ${String(e.message ?? e).slice(0, 80)}`, 'bad'),
-    });
-    decoder.configure({ codec: info.codec ?? 'avc1.42E01E', optimizeForLatency: true });
-
-    vws = new WebSocket(`${RELAY_BASE}/room/${room}/ws`);
     badge.start();
-    vws.binaryType = 'arraybuffer';
-    let last = -1, tick = 0, at = performance.now();
-    vws.onmessage = (e) => {
-      if (typeof e.data === 'string') return;
-      const dv = new DataView(e.data);
-      const s = dv.getUint32(0, true), key = (dv.getUint32(4, true) & 1) === 1;
-      // ⚠️ THE COUNTER IS IN THE PAYLOAD BECAUSE A BINARY FRAME HAS NO
-      // ENVELOPE, and the relay drops frames with no error, no close and no
-      // backpressure. Measured: at 8 Mbit/s it lost 101 of 361 frames and
-      // nothing else on the path said so. This counter is the only witness, and
-      // it reports into the log rather than into a cell under the picture.
-      if (last >= 0 && s > last + 1) { farGaps += s - last - 1; sayLinkLost(farGaps); }
-      last = s;
-      // The board's sequence number is its frame counter — see the comment at
-      // `lockedFrame`. Taken here, before the decode, because a frame the
-      // decoder refuses is still a frame the board drew.
-      const wasFree = lockedFrame === null;
-      lockedFrame = s; lockedAt = performance.now();
-      // It spoke, stamped with this clock at the moment it arrived. Cheap on
-      // purpose: it records the time and derives only when the answer could
-      // have changed.
-      far.pres.seen();
-      if (wasFree) {
-        relabel('here');
-        // The other edge of the state change above: this pane has stopped
-        // counting for itself and is now drawing the board's frame number, so
-        // anything still different between the two pictures is the pipeline.
-        d.log('this pane is locked to the board\u2019s frame number');
-      }
-      farBytes += e.data.byteLength;
-      // ⚠️ A DECODER MUST START ON A KEYFRAME. Feeding it a delta frame first
-      // is an error it reports once and then stays broken through, so a joiner
-      // waits — up to one second at this GOP, which is a GOP choice and not a
-      // fault.
-      if (waitingForKey) { if (!key) return; waitingForKey = false; d.log('a keyframe arrived. The box\u2019s picture starts here'); }
-      try {
-        decoder.decode(new EncodedVideoChunk({
-          type: key ? 'key' : 'delta',
-          timestamp: s * 1e6 / (info.fps ?? 30),
-          data: new Uint8Array(e.data, 8),
-        }));
-      } catch (err) { d.log(`chunk refused: ${String(err.message ?? err).slice(0, 70)}`, 'bad'); }
-      tick++;
-      const now = performance.now();
-      if (now - at >= 1000) {
-        farFps = tick * 1000 / (now - at);
-        stat('box', { fps: farFps });
-        sayLinkRate(farBytes * 8 / (now - at));
-        tick = 0; at = now; farBytes = 0;
-      }
-    };
-    vws.onclose = () => d.log('the box’s video socket closed');
   }
 
   // ── what a harness can check ─────────────────────────────────────────────
@@ -2224,9 +2191,9 @@
 
       // The far pane, only if the board answered. A lane with nothing to say
       // says so in words rather than counting as a failure.
-      if (farDecoded > 0) {
-        d.assert('the box’s picture decoded here', farDecoded > 5, `${farDecoded} frames`);
-        d.assert('and arrived without the relay dropping any', farGaps === 0, `${farGaps} lost`);
+      if (bv.decoded() > 0) {
+        d.assert('the box’s picture decoded here', bv.decoded() > 5, `${bv.decoded()} frames`);
+        d.assert('and arrived without the relay dropping any', bv.lost() === 0, `${bv.lost()} lost`);
       } else {
         d.log('the box is not sending, so the right pane has nothing to report', 'warn');
       }
@@ -2345,8 +2312,8 @@
       if (SELFCHECK || !node.joining()) {
         const st = node.stats();
         d.assert('nothing joined a room on load, so the board was asked for nothing',
-          !node.joining() && !node.joined() && st.announced === 0 && st.asked === 0 && !st.ticking && !vws,
-          `joining ${node.joining()}, joined ${node.joined()}, ${st.announced} announced, ${st.asked} asked, clock ${st.ticking ? 'running' : 'stopped'}, ${vws ? 'a video socket is open' : 'no video socket'}`);
+          !node.joining() && !node.joined() && st.announced === 0 && st.asked === 0 && !st.ticking && !bv.isOpen(),
+          `joining ${node.joining()}, joined ${node.joined()}, ${st.announced} announced, ${st.asked} asked, clock ${st.ticking ? 'running' : 'stopped'}, ${bv.isOpen() ? 'a video socket is open' : 'no video socket'}`);
       }
       d.assert('a person gets the studio, and a harness run gets a room of its own',
         SELFCHECK ? ROOM !== 'studio-1' : ROOM === (new URLSearchParams(location.search).get('room') || 'studio-1'),
@@ -2408,7 +2375,7 @@
         const s3 = linkStateOf({ now: t0 + 400 + LINK_STALL_MS * 2 + 50, startedAt: t0, lastCountAt: t0 + 400 });
         d.assert('the badge on the board’s picture reads starting, then receiving, then stalled',
           s1 === 'coming' && s2 === 'online' && s3 === 'offline', `${s1}, ${s2}, ${s3}`);
-        if (!vws) {
+        if (!bv.isOpen()) {
           d.assert('and with no link open it draws nothing on the picture',
             getComputedStyle(far.panel.slots.tag).display === 'none' && badge.state() === 'unknown',
             `tag ${getComputedStyle(far.panel.slots.tag).display}, badge ${badge.state()}`);
@@ -2534,10 +2501,10 @@
   // page that was drawing a moment later. Measured 2026-10-06, so it waits for
   // a drawn frame, bounded at the same twelve seconds.
   (async () => {
-    for (let i = 0; i < 30 && (node.joining() ? farDecoded === 0 : (gl && drewAny === 0)); i++) {
+    for (let i = 0; i < 30 && (node.joining() ? bv.decoded() === 0 : (gl && drewAny === 0)); i++) {
       await new Promise((r) => setTimeout(r, 400));
     }
-    if (node.joining() && farDecoded === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
+    if (node.joining() && bv.decoded() === 0) d.log('the box did not send in 12 s. Checking the left pane only', 'warn');
     runChecks();
   })();
 
