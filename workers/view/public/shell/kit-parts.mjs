@@ -40,7 +40,7 @@ export const KIT_PARTS = [
     'midi-log', 'presence', 'readout-and-log', 'table',
   ] },
   { part: 'timeline', label: 'TIMELINE', ids: [
-    'local-and-remote', 'note-grid', 'transport-bar', 'glued-transport-bar',
+    'live-run', 'note-grid', 'transport-bar', 'glued-transport-bar',
     'strip-view', 'video-panel',
   ] },
   { part: 'layout', label: 'LAYOUT', ids: [
@@ -91,6 +91,12 @@ export const KIT_PARTS = [
   // the pieces the /concepts/room/ pages draw their chat with.
   { part: 'chat', label: 'CHAT', ids: [
     'chat-grid', 'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
+  ] },
+  // `frontpage` IS THE THIRTEENTH, 2026-10-12 (*"add new kit card / page. name
+  // it fronpage. lets work on it. first do typograpy sampler"*): the faces the
+  // site is set in today, and the sans faces measured against the brand mono.
+  { part: 'frontpage', label: 'FRONTPAGE', ids: [
+    'recommendation', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
   ] },
 ];
 

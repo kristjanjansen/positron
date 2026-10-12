@@ -8,317 +8,231 @@
 <title>POSITRON concept clock 020</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  // concepts clock/020, SHARED CLOCK, 2026-10-12. One idea: two places agree on
-  // the time ONCE, and then every beat is worked out at each end, nothing sent.
+  // concepts clock/020, CUSHION, 2026-10-12. One idea: sound that crosses a
+  // network has to wait in a cushion before it plays, and the size of the
+  // cushion trades lag against gaps.
   //
-  // clock/010's lesson (tell the sound card the time in advance) across clock/000's
-  // relay. Two sites in this one tab, each with a socket of its own:
-  //   - `here` holds a `clock` node and a `beat` node,
-  //   - `there` holds a `beat` node, and its clock is set wrong by a random
-  //     100 to 300 ms on Join, which it is not told (as /sync/'s ahead tab does).
-  // On Join both run peer.mjs over the relay (bursts of pings, the fastest round
-  // trip kept, NTP style), so `there` finds its own error. Then the clock node
-  // sends `{ bpm, epoch }` ONCE, along `clock-out -> *:beat:clock-in`, as one
-  // `bay.event`, once per start: the tempo is fixed at 120 (asked 2026-10-12,
-  // *"fix temo to 120"*). Each beat node computes
-  // beat k as `epoch + k * 60000 / bpm` on its own corrected clock and hands it to
-  // the AudioContext ahead. The patchbay's clock wire lights per message, so it
-  // lights once and stays dark while the beats go on.
+  // clock/010's two places, with sound on the wire instead of notes. `web-1`
+  // makes a test tone (a four note arpeggio, so a gap is audible) and cuts it
+  // into 20 ms frames of 48 kHz mono, sent as int16 over the relay, one message
+  // a frame, paced against the true clock so a late timer sends two at once.
+  // `web-2` puts every frame into the kit's `pcm-playout` worklet
+  // (proto/jam/playout-worklet.js, the one board.mjs uses), whose floor is the
+  // cushion the stepper sets: it waits until that much sound is in hand, then
+  // plays; when it runs dry it goes silent (a dropout, counted in the audio
+  // thread) and waits for the cushion to fill again.
+  // Measured, all on this tab's one clock and one sound card:
+  //   - lag: the true time when the worklet's read head reached a sample, less
+  //     the true time that sample was made at `web-1`. Read from the worklet's
+  //     own counters (`played` plus `trimmed` is the index under the head);
+  //   - late frames: a frame whose trip took longer than the fastest trip so far
+  //     plus the cushion, which is a frame the cushion could not cover;
+  //   - dropouts: the worklet's starve events since the cushion was last set.
+  // Changing the cushion re-arms the worklet's floor and starts the counts again.
   //
-  // ⚠️ ONE TAB, SO ONE SOUND CARD. Both beat nodes schedule on this tab's one
-  // AudioContext, and how far apart they land is the difference between the two
-  // audio times they chose, which is the honest reading: both places read the
-  // same audio clock, so all that separates them is their two notions of now.
+  // Nothing opens on a visit. Play joins the room and starts the tone.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createStepper } from '/shell/stepper.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { DEFAULT_RELAY } from '/shell/wire.mjs';
-  import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
+  import { PLAYOUT_URL } from '/shell/board.mjs';
+  import { epochNow } from '/proto/looper/peer.mjs';
+  import { rand, sleep, fmt, median, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
-  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
   const asked = new URLSearchParams(location.search).get('room');
-  const ROOM = asked && ROOM_RE.test(asked) ? asked : `clock-${rand(6)}`;
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `cushion-${rand(6)}`;
   const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
-  const CLK = `${HERE}:clock:clock-out`;
-  const IN = { here: `${HERE}:beat:clock-in`, there: `${THERE}:beat:clock-in` };
+  const OUT = `${HERE}:tone:audio-out`, IN = `${THERE}:speaker:audio-in`;
+  const RATE = 48000, FRAME_MS = 20, FRAME = RATE * FRAME_MS / 1000;
+  const CUSHIONS = [20, 40, 60, 100, 150, 200, 300];
 
-  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
-  const G_HERE = graphOf(HERE, 'here', [
-    { id: `${HERE}:clock`, kind: 'engine', label: 'clock', place: 'browser' },
-    { id: `${HERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' },
-  ], [
-    { id: CLK, label: 'clock', dir: 'out', medium: 'clock' },
-    { id: IN.here, label: 'beat', dir: 'in', medium: 'clock' },
-  ]);
-  const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' }],
-    [{ id: IN.there, label: 'beat', dir: 'in', medium: 'clock' }]);
+  const G_HERE = graphOf(HERE, 'here', [{ id: `${HERE}:tone`, kind: 'engine', label: 'test tone', place: 'browser' }],
+    [{ id: OUT, label: 'tone', dir: 'out', medium: 'audio', transports: ['relay'] }]);
+  const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' }],
+    [{ id: IN, label: 'speakers', dir: 'in', medium: 'audio', transports: ['relay'] }]);
 
   const d = mount({ name: 'concept clock 020', what: '', index: '/concepts/', indexLabel: 'concepts',
-    // The cells under the title and the log alone at the foot, asked 2026-10-12:
-    // *"move readouts to top"*.
+    // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
-    // Four cells, asked 2026-10-12: *"do 4 readouts that make sense"*. What the
-    // second place found its clock off by, the round trip that finding rests on,
-    // and how far apart the two places' beats land, typical and worst. A count
-    // of clocks sent was always 1 once the tempo was fixed, so it went.
-    readout: { 'offset found': 'ms', 'round trip': 'ms', apart: 'ms', worst: 'ms' } });
+    readout: { cushion: 'ms', lag: 'ms', dropouts: '', 'late frames': '' } });
   conceptNav('clock/020');
 
-  // ── one sound card, read by both places ─────────────────────────────────
-  let ctx = null, anchor = null;
-  async function audio() {
-    if (ctx) return;
-    ctx = new AudioContext({ latencyHint: 'interactive' });
-    ctx.resume();            // not awaited: a resume waits on a gesture and never rejects (positron-verify)
-    const t0 = ctx.currentTime;
-    for (let i = 0; i < 40 && ctx.currentTime - t0 < 0.05; i++) await new Promise((r) => setTimeout(r, 10));
-  }
-  /** The true clock against the audio clock, the tightest of five reads. */
-  function reanchor() {
-    let best = null;
-    for (let i = 0; i < 5; i++) {
-      const w1 = epochNow(), a = ctx.currentTime, w2 = epochNow();
-      if (!best || w2 - w1 < best.spread) best = { e: (w1 + w2) / 2, a, spread: w2 - w1 };
+  const S = soundCard({ sampleRate: RATE });
+
+  // ── web-1: the tone, cut into frames, paced against the true clock ──────
+  const NOTES = [60, 64, 67, 72], NOTE_S = RATE / 4;      // a note every 250 ms
+  const tone = { start: 0, frames: 0, phase: 0, timer: null };
+  function frame(n) {
+    const f = new Int16Array(FRAME);
+    for (let i = 0; i < FRAME; i++) {
+      const s = n * FRAME + i, inNote = s % NOTE_S;
+      const hz = 440 * 2 ** ((NOTES[Math.floor(s / NOTE_S) % NOTES.length] - 69) / 12);
+      tone.phase += 2 * Math.PI * hz / RATE;
+      const env = Math.min(1, inNote / 240) * Math.exp(-inNote / (RATE * 0.12));
+      f[i] = Math.round(Math.sin(tone.phase) * env * 0.25 * 32767);
     }
-    anchor = best;
+    return f;
   }
-  function click(at, hz) {
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.frequency.value = hz;
-    g.gain.setValueAtTime(0.0001, at);
-    g.gain.exponentialRampToValueAtTime(0.2, at + 0.002);
-    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
-    o.connect(g).connect(ctx.destination);
-    o.start(at); o.stop(at + 0.06);
-    live.add(o); o.onended = () => live.delete(o);
+  const b64 = (i16) => { const u = new Uint8Array(i16.buffer); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+  function sendFrames() {
+    const owed = Math.floor((epochNow() - tone.start) / FRAME_MS);
+    while (tone.frames <= owed) {
+      const n = tone.frames++;
+      nodeHere.send({ type: 'pcm', n, t: tone.start + n * FRAME_MS, pcm: b64(frame(n)) });
+      if (n % 25 === 0) pb.pulse(plain(OUT), plain(IN));
+    }
   }
-  const live = new Set();                // clicks already handed to the sound card, stopped on stop
 
-  // ── a place: its own clock, its correction, and the beats it plays ──────
-  // `raw()` is the place's own clock. `here`'s is the true one; `there`'s is off by
-  // `skew`, which only the measurement finds.
-  const AHEAD = 100, TICK = 25;
-  function place(name, hz) {
-    const P = { name, hz, skew: 0, peer: null, clock: null, played: new Map() };
-    P.raw = () => epochNow() + P.skew;
-    /** What this place's clock says, corrected by what it measured. */
-    P.now = () => P.raw() + (P.peer ? P.peer.offsetMs() : 0);
-    /** The audio time at which this place's corrected clock will read `T`. */
-    P.audioAt = (T) => anchor.a + (T - (P.peer ? P.peer.offsetMs() : 0) - P.skew - anchor.e) / 1000;
-    P.tick = () => {
-      const c = P.clock;
-      if (!c || !ctx) return;
-      const step = 60000 / c.bpm, now = P.now();
-      for (let k = Math.max(0, Math.ceil((now - c.epoch) / step)); c.epoch + k * step < now + AHEAD; k++) {
-        const key = `${c.epoch}:${k}`;
-        if (P.played.has(key)) continue;
-        const at = P.audioAt(c.epoch + k * step);
-        if (at < ctx.currentTime) continue;
-        click(at, hz);
-        P.played.set(key, { at, T: c.epoch + k * step });
-      }
-    };
-    return P;
+  // ── web-2: every frame into the playout, and what it measured ───────────
+  let node = null;
+  const rx = { frames: [], fastest: Infinity, late: 0, base: null, stats: null, lags: [], starves: [] };
+  function onPcm(m) {
+    if (!node) return;
+    const arrived = epochNow(), trip = arrived - (m.t + FRAME_MS);   // from the moment its last sample existed
+    rx.fastest = Math.min(rx.fastest, trip);
+    const late = trip > rx.fastest + cushion;
+    if (late) rx.late++;
+    rx.frames.push({ T: m.t, trip, late });
+    const bin = atob(m.pcm), i16 = new Int16Array(bin.length / 2);
+    for (let i = 0; i < i16.length; i++) i16[i] = (bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8)) << 16 >> 16;
+    const f32 = new Float32Array(i16.length);
+    for (let i = 0; i < i16.length; i++) f32[i] = i16[i] / 32768;
+    node.port.postMessage({ pcm: f32 }, [f32.buffer]);
   }
-  const here = place('web-1', 880), there = place('web-2', 1320);
+  function onStats(st) {
+    rx.stats = st;
+    rx.base ??= { underruns: st.underruns };
+    if (!st.started || !tone.start) return;
+    // The sample under the read head (every sample played or trimmed so far),
+    // and the true moment it was made at web-1.
+    const made = tone.start + (st.played / 2) / RATE * 1000 + st.trimmedMs;
+    rx.lags.push(S.epochOf(st.ct) - made);
+    if (rx.lags.length > 12) rx.lags.shift();
+  }
 
-  // ── the bays: the clock leaves `here` once and crosses the room to `there` ─
-  function bayHere() {
-    const b = nodeHere.registry.fill(createBay());
-    b.addPort({ ...b.port(IN.here), deliver: (e) => onClock(here, e) });
-    b.link(CLK, IN.here, [], { site: HERE });
-    b.link(CLK, '*:beat:clock-in', [], { site: HERE });
-    return b;
-  }
-  function bayThere() {
-    const b = nodeThere.registry.fill(createBay());
-    b.addPort({ ...b.port(IN.there), deliver: (e) => onClock(there, e) });
-    b.link('*:clock:clock-out', IN.there, [], { site: THERE });
-    return b;
-  }
+  // ── play ─────────────────────────────────────────────────────────────────
   const log = (line, kind) => d.log(line, kind);
-  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
-  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
-
-  function onClock(P, e) {
-    P.clock = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
-    if (P === there) pb.pulse(plain(CLK), plain(IN.there));
-    else pb.pulse(plain(CLK), plain(IN.here));
-    d.log(`${P.name} heard the clock: ${e.bpm} bpm from ${new Date(e.epoch).toISOString().slice(11, 23)}`);
-  }
-
-  const BPM = 120;
-  function sendClock(bpm) {
-    // The epoch is a moment half a second ahead on the shared clock, so both
-    // places have the message before the first beat is due.
-    const epoch = Math.round(here.now() + 500);
-    const r = nodeHere.emit(CLK, { bpm, epoch });
-    if (!r.far.length) d.log('the clock reached nobody in another place', 'warn');
-  }
-
-  // ── join, measure, send the clock once ──────────────────────────────────
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  let loop = null, joined = false, busy = false;
+  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: () => null, log });
+  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: () => null, log,
+    onMessage: (m) => { if (m.type === 'pcm') onPcm(m); } });
+  let joined = false, busy = false, cushion = 60;
   async function join() {
     if (joined || busy) return;
     busy = true;
-    await audio();
-    there.skew = Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
+    const ctx = await S.open();
+    if (!node) {
+      await ctx.audioWorklet.addModule(PLAYOUT_URL);
+      node = new AudioWorkletNode(ctx, 'pcm-playout', { outputChannelCount: [1] });
+      node.connect(ctx.destination);
+      node.port.onmessage = (e) => {
+        if (e.data.stats) onStats(e.data.stats);
+        if (e.data.starve) rx.starves.push(S.epochOf(e.data.starve.ct));
+      };
+    }
+    node.port.postMessage({ cmd: 'reset' });
+    node.port.postMessage({ cmd: 'inChannels', n: 1 });
+    setCushion(cushion, true);
     await Promise.all([nodeHere.join(), nodeThere.join()]);
-    const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
-    const tag = rand(6);
-    here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: here.raw });
-    there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw });
-    d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
-    // Wait until each site has heard the other announce and the clock has a round trip.
-    const has = () => !!bayHere().targets(CLK).find((t) => t.to === IN.there)
-      && there.peer.peers().some((p) => Number.isFinite(p.rttMs));
-    for (let i = 0; i < 80 && !has(); i++) await sleep(50);
-    await sleep(600);              // one more burst of pings, so the fastest is kept
-    reanchor();
-    loop = setInterval(() => { here.tick(); there.tick(); }, TICK);
-    sendClock(BPM);
+    await sleep(300);
+    S.reanchor();
+    Object.assign(rx, { frames: [], fastest: Infinity, late: 0, base: null, lags: [], starves: [] });
+    tone.start = epochNow(); tone.frames = 0; tone.phase = 0;
+    first = tone.start;            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
+    tone.timer = setInterval(sendFrames, 5);
+    d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}; web-1 sends 50 frames a second of 20 ms each`, 'hi');
     joined = true; busy = false;
     btns.setIcon('go', 'stop', 'Stop');
   }
   function leave() {
-    clearInterval(loop); loop = null;
+    clearInterval(tone.timer); tone.timer = null;
     nodeHere.leave(); nodeThere.leave();
-    for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; P.clock = null; }
-    for (const o of live) { try { o.stop(); } catch { /* not started */ } }
-    live.clear();
+    node?.port.postMessage({ cmd: 'reset' });
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
-    d.log('stopped: both places left the room, both clock peers stopped pinging and closed their sockets');
+    d.log(`stopped after ${tone.frames} frames, ${rx.late} late and ${dropouts()} dropouts at a ${cushion} ms cushion`);
   }
-
-  // One square button, asked 2026-10-12: *"start/stop icon button"*. Play joins
-  // the room and starts both places; stop leaves it.
   const btns = createButtonGroup({ buttons: [
     { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (joined ? leave() : join()) },
   ] });
 
-  // ── what it measured ────────────────────────────────────────────────────
-  const fmt = (x) => Math.round(x * 100) / 100;
-  /** Every beat both places played, and how far apart in audio time, in ms. */
-  function gaps() {
-    const out = [];
-    for (const [k, h] of here.played) { const t = there.played.get(k); if (t) out.push({ T: h.T, ms: (t.at - h.at) * 1000 }); }
-    return out;
+  // ── the cushion ──────────────────────────────────────────────────────────
+  const dropouts = () => (rx.stats && rx.base ? rx.stats.underruns - rx.base.underruns : 0);
+  function setCushion(ms, quiet = false) {
+    cushion = ms;
+    node?.port.postMessage({ cmd: 'floor', ms, adaptive: false });
+    rx.late = 0; rx.base = null; rx.lags = [];
+    step.show(`${ms} ms`, CUSHIONS.indexOf(ms));
+    d.set('cushion', ms);
+    if (!quiet) d.log(`the cushion is ${ms} ms now, and the counts start again`);
   }
-  const band = (ms) => (Math.abs(ms) < 3 ? '#8fd6a8' : Math.abs(ms) < 20 ? '#ffd400' : '#e0908a');
+  const at = () => CUSHIONS.indexOf(cushion);
+  const step = createStepper({ what: 'cushion', prev: () => setCushion(CUSHIONS[Math.max(0, at() - 1)]),
+    next: () => setCushion(CUSHIONS[Math.min(CUSHIONS.length - 1, at() + 1)]),
+    pick: { options: CUSHIONS.map((c) => `${c} ms`), at: CUSHIONS.indexOf(cushion), onPick: (i) => setCushion(CUSHIONS[i]) } });
+  const controls = el('div', 'cc-row');
+  controls.append(btns.el, step.el);
+
+  // ── what it measured ─────────────────────────────────────────────────────
   let first = null;
-  const WINDOW = 8000;           // the shortest run shown, so the first beats are not the whole width
+  const WINDOW = 8000;
   setInterval(() => {
-    if (!there.peer) return;
-    const ps = there.peer.peers().filter((p) => Number.isFinite(p.rttMs));
-    d.set('offset found', ps.length ? fmt(there.peer.offsetMs()) : '');
-    d.set('round trip', ps.length ? fmt(Math.min(...ps.map((p) => p.rttMs))) : '');
-    const g = gaps().slice(-16);
-    if (g.length) {
-      const s = g.map((x) => x.ms).sort((a, b) => a - b);
-      d.set('apart', fmt(s[s.length >> 1]));
-      d.set('worst', fmt(s.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0)));
-      const L = view.strip.lanes().find((x) => x.id === 'there');
-      if (L) L.subLabel = [`median ${fmt(s[s.length >> 1])} ms`, `worst ${fmt(s.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0))} ms`];
-    }
-    if (first == null && here.played.size) first = [...here.played.values()][0].T;
-    if (first != null) {
-      const end = here.now() - first + 1000;
-      deck.setRange([0, Math.max(WINDOW, end)]);
-      view.strip.fit();
-    }
+    d.set('cushion', cushion);
+    if (!joined) return;
+    if (rx.lags.length) d.set('lag', Math.round(median(rx.lags)));
+    d.set('dropouts', dropouts());
+    d.set('late frames', rx.late);
+    const L = view.strip.lanes().find((x) => x.id === 'trip');
+    const trips = rx.frames.slice(-100).map((f) => f.trip - rx.fastest);
+    if (L && trips.length) L.subLabel = [`median +${fmt(median(trips))} ms`, `worst +${fmt(Math.max(...trips))} ms`];
     view.strip.invalidate();
   }, 250);
 
-  // ── the timeline: each place's beats, the second coloured by its gap ────
+  // ── the timeline: every frame's trip, and every dropout ─────────────────
   const deck = createDeck({ items: [], range: [0, WINDOW] });
   const shelf = el('div');
-  const rowsOf = (P) => () => (first == null ? [] : [...P.played.entries()]
-    .filter(([, v]) => v.T <= here.now())
-    .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'beat', payload: { k } })));
-  const gapOf = (k) => { const h = here.played.get(k), t = there.played.get(k); return h && t ? (t.at - h.at) * 1000 : null; };
   const view = createStripView(shelf, deck, {
-    // No footer under the strip, asked 2026-10-12: *"rm footer from timeline"*;
-    // what is under the pointer goes to the strip's own tooltip instead.
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    // 50 frames a second is exactly the lane that drew as one solid bar before.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
-      { id: 'here', kind: 'beat', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
-        rows: rowsOf(here), describeRow: () => ['web-1', 'the clock it keeps'] },
-      { id: 'there', kind: 'beat', label: 'web-2', height: 44, width: 2, as: 'ticks', terse: true,
-        rows: rowsOf(there),
-        colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
-        describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
+      { id: 'trip', kind: 'frame', label: 'frames', height: 40, width: 1, as: 'ticks', terse: true,
+        rows: () => (first == null ? [] : rx.frames.map((f, i) => ({ at: f.T - first, id: `f${i}`, kind: 'frame', payload: f }))),
+        colorOfRow: (r) => (r.payload.late ? '#e0908a' : '#8fd6a8'),
+        rankOfRow: (r) => r.payload.trip,
+        describeRow: (r) => ['frame', `+${fmt(r.payload.trip - rx.fastest)} ms over the fastest`, r.payload.late ? 'later than the cushion' : 'inside the cushion'] },
+      { id: 'drop', kind: 'mark', label: 'dropouts', height: 24, width: 2, as: 'ticks', terse: true, color: '#e0908a',
+        rows: () => (first == null ? [] : rx.starves.map((t, i) => ({ at: t - first, id: `d${i}`, kind: 'mark', payload: {} }))),
+        describeRow: () => ['dropout', 'the cushion ran dry'] },
     ],
   });
 
-  // ── plain names on screen, the real ids on hover ──────────────────────────
-  // Asked 2026-10-12: *"labels are super confusing"*. Three made-up codes
-  // (`here-xj5`, `lag-fs3fmz`, `there-6f3`) told a reader nothing about which end
-  // was which. The wire keeps the random ids, so two tabs never collide, and the
-  // picture shows SIMULATED names (positron-concepts): this browser is `web-1`, the
-  // other place `web-2`, the relay `cf-relay:<role>`. The real id is on hover.
-  // ⚠️ PAGE LOCAL: bay-view draws a box's title from `node.id` and has no display
-  // name hook, and patchbay.mjs types `Cloudflare` under the relay box itself.
-  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
-  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
-  const realOf = new Map();
-  const named = (src) => ({
-    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
-    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
-    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
-  });
-  function hovers(root, relay) {
-    const fix = () => {
-      for (const g of root.querySelectorAll('.lv-box')) {
-        if (g.querySelector('title')) continue;
-        const id = g.querySelector('.lv-title')?.textContent || '';
-        const isRelay = id === `cf-relay:${relay}`;
-        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        t.textContent = isRelay ? `simulated name, real room ${ROOM}`
-          : id === plain(`${THERE}:beat`) ? `simulated name, real id ${realOf.get(id) || id}\nreached by web-1's * link, clock-out -> *:beat:clock-in, every other place in the room`
-          : `simulated name, real id ${realOf.get(id) || id}`;
-        g.prepend(t);
-        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
-      }
-    };
-    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
-    fix();
-  }
-
-  // ── the patchbay: the clock wire lights per message, never per beat ─────
-  // 🔴 THE PICTURE NAMES BOTH PLACES THE PAGE RUNS, 2026-10-12. Asked, on a
-  // screenshot: *"there is no web-2 in pathbay but is in lane"*. It was web-1's
-  // own held picture, so the far end was a `*:beat` box, while the timeline's
-  // lanes said web-1 and web-2. It is drawn from both places' graphs now, the
-  // clock reaching `web-2:beat` by name; the real link is web-1's `*` one, and
-  // that fact is on the `web-2:beat` box's hover.
+  // ── names, and the patchbay ─────────────────────────────────────────────
+  const { plain, named, hovers } = plainNames(new Map([[HERE, 'web-1'], [THERE, 'web-2']]), ROOM, (id) =>
+    id === plain(`${THERE}:speaker`) ? 'plays through the pcm-playout worklet, the cushion is its floor' : '');
   const picture = (() => {
     const b = createBay();
-    for (const g of [G_HERE, G_THERE]) { for (const n of g.nodes) b.addNode(n); for (const p of g.ports) b.addPort(p); }
-    b.link(CLK, IN.here);
-    b.link(CLK, IN.there);
+    for (const g of [G_HERE, G_THERE]) { for (const nd of g.nodes) b.addNode(nd); for (const p of g.ports) b.addPort(p); }
+    b.link(OUT, IN, [], { via: 'relay' });   // the frames ride the relay room, asked for by name (bay.mjs sessionFor)
     return b;
   })();
-  const pb = createPatchbay(named(picture), { room: 'clock' });
-  hovers(pb.el, 'clock');
+  const pb = createPatchbay(named(picture), { room: 'cushion', flowing: () => joined });
+  hovers(pb.el, 'cushion');
 
-  // The whole run in view, scaling out as it grows, never a moving window. Asked
-  // 2026-10-12: *"do not scroll, just scale out like typist etc"*. Fit with the
-  // strip's own fit(), and again whenever its width changes, as /concepts/typist/040/
-  // does: a canvas has no width until it is on the page.
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
-  d.stack.add(btns.el, view.surface, pb.el);
-  addEventListener('pagehide', () => { if (joined) leave(); ctx?.close(); });
-  window.__clock = { here, there, gaps, view: () => view.strip.view(), first: () => first };
+  const st = el('style');
+  st.textContent = '.cc-row { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; }';
+  document.head.append(st);
+  d.stack.add(controls, view.surface, pb.el);
+  addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
+  window.__clock = { rx, tone, setCushion, dropouts, get cushion() { return cushion; } };
   d.ready();
 </script>

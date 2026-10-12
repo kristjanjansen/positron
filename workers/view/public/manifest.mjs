@@ -982,6 +982,11 @@ export const DEMOS = [
   { name: 'kit/chat', title: 'chat', group: 'kit', act: 0, created: '2026-10-11', built: true, unlisted: true,
     one: 'the pieces a chat page is drawn with, a window, columns, a log, a sign and a compose box',
     tags: ['shell', 'no network'] },
+  // The thirteenth part, 2026-10-12: *"add new kit card / page. name it
+  // fronpage. lets work on it. first do typograpy sampler"*.
+  { name: 'kit/frontpage', title: 'frontpage', group: 'kit', act: 0, created: '2026-10-12', built: true, unlisted: true,
+    one: 'the faces this site is set in, at every size, and six sans faces measured against the brand mono',
+    tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
   // title is on footer on 1/2 w it replaces page count and becomes link to

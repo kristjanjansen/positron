@@ -351,7 +351,21 @@ void main(){
   // calm frames, and half again over their largest). A segment count change
   // is a jump and lands on its first frame; a shader fades in over 900 ms on
   // the Pi, so its lag is to the first frame where the fade shows.
-  const ASK_MS = 3000;
+  //
+  // 🔴 THE PROGRAM WAITS FOR THE PI'S FIRST FRAME (2026-10-12, found on the real
+  // Pi). `video.started` answers as soon as v3dpipe is spawned, while it is
+  // still bringing up EGL and compiling its own program, and it reads its stdin
+  // only inside the render loop. A `video.shader` sent then sat in the pipe past
+  // the 1500 ms the board waits for the renderer's verdict
+  // (`rig/board/video.mjs`), so the board answered "the renderer did not
+  // answer". A decoded frame is proof the loop is running, because v3dpipe
+  // writes pixels only from inside it, so the page holds the program (and any
+  // edit made meanwhile, the newest kept) until the first frame is decoded here.
+  // Not a retry on that refusal: the refused line is still queued in the pipe
+  // and is compiled once the loop starts, so a retry would compile it twice and
+  // the board would hand the first one's verdict to the second waiter. The knob
+  // is not held: `video.params` has no timer and lands on the first frame.
+  const ASK_MS = 3000, FIRST_FRAME_MS = 10000;
   const PROBE_W = 64, PROBE_H = 36, GIVE_UP_MS = 3000;
   function createPiSide({ onReply, onShown, onMode = () => {}, log }) {
     const sim = createSimulatedPi({ onReply, onShown });
@@ -362,7 +376,16 @@ void main(){
     probe.width = PROBE_W; probe.height = PROBE_H;
     const pctx = probe.getContext('2d', { willReadFrequently: true });
     let prev = null, calm = [], pending = null, quiet = 0, seenSeq = null;
+    let drawing = false, held = null, heldTimer = null;
     const lags = [];
+    /** The held program goes to the board, once. */
+    function release(why) {
+      clearTimeout(heldTimer); heldTimer = null;
+      const h = held; held = null;
+      if (!h || !board) return;
+      log(`Pi: ${why}, so the program goes now`);
+      board.send({ type: 'video.shader', body: h.body });
+    }
     const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
     const video = createBoardVideo({
       canvas: sim.view,
@@ -372,6 +395,7 @@ void main(){
       onLost: (n) => log(`Pi: the relay has dropped ${n} frame${n === 1 ? '' : 's'} of the picture`, 'warn'),
       onError: (line) => log(`Pi: ${line}`, 'bad'),
       onFrame: (n, vf) => {
+        if (!drawing) { drawing = true; release('the renderer drew its first frame'); }
         pctx.drawImage(vf, 0, 0, PROBE_W, PROBE_H);
         const px = pctx.getImageData(0, 0, PROBE_W, PROBE_H).data;
         let diff = 0;
@@ -439,7 +463,13 @@ void main(){
       // What this page shows goes to the board at once, so the two pictures
       // start from one program and one segment count, as /mirror/ does on start.
       board.send({ type: 'video.params', mirrors: segments });
-      if (body) board.send({ type: 'video.shader', body });
+      drawing = video.decoded() > 0;
+      held = body ? { body } : null;
+      if (held && drawing) release('the picture is already arriving');
+      else if (held) {
+        log('Pi: the program waits for the renderer\u2019s first frame');
+        heldTimer = setTimeout(() => release(`no frame in ${FIRST_FRAME_MS / 1000} s`), FIRST_FRAME_MS);
+      }
       return mode;
     }
     function leave(stop = true) {
@@ -448,6 +478,7 @@ void main(){
       if (stop && started) board?.send({ type: 'video.stop' });
       log(`Pi: left after ${was.decoded} frames decoded, ${was.lost} lost${started && stop ? ', and the picture this page started was stopped' : ''}`);
       started = false; pending = null;
+      clearTimeout(heldTimer); heldTimer = null; held = null; drawing = false;
       setTimeout(() => { board?.close(); board = null; }, 300);
       say('simulated');
     }
@@ -462,6 +493,9 @@ void main(){
       send(msg, at = performance.now()) {
         if (!real()) return sim.send(msg, at);
         if (msg?.type === 'video.params') mark('knob', at);
+        // An edit before the first frame replaces the held program and is not
+        // timed: its lag would be the renderer's start, not the edit's.
+        if (msg?.type === 'video.shader' && !drawing) { held = { body: msg.body }; return true; }
         if (msg?.type === 'video.shader') mark('shader', at);
         return !!board?.send(msg);
       },

@@ -69,10 +69,14 @@
   //   DOWN_MS  139, a sound on the Pi to this tab's speakers on the relay:
   //            ~175 ms key to speakers for Yoshimi minus that 36 (plan §3.1,
   //            COMPUTED from a measurement). A MODEL, NOT THE BOARD.
+  //   ⚠️ MEASURED ON THE REAL PI 2026-10-12, Pi lag (first hit after a start):
+  //   176 to 317 ms on the relay and 82 to 112 ms direct, so the model's 139
+  //   is short on the relay by 40 to 180 ms.
   //
   // THE FOUR CELLS, on top (a concept page with a readout shows it on top):
   //   Pi late     the board's own `late + droppedLate` from `sc.stats` every
-  //               2 s: hits that reached its scsynth after their time. The
+  //               2 s, counted from this join: hits that reached its scsynth
+  //               after their time. The
   //               simulation's count of the same thing in simulation.
   //   Pi lag      from a hit's time S to the first sound of it back from the
   //               Pi, at the Pi side's meter plus this context's output
@@ -182,7 +186,7 @@
    * or `simulated`. `join(ctx)`, `leave()`, `hits(list)`, `out()`.
    */
   function createPiSide({ log, onMode = () => {} }) {
-    let mode = 'idle', board = null, kit = null, sim = null, joining = null, timer = 0, last = null, loaded = [];
+    let mode = 'idle', board = null, kit = null, sim = null, joining = null, timer = 0, last = null, base = null, loaded = [];
     let dropped = 0, simHanded = 0;
     const say = (m) => { mode = m; onMode(m); };
     const real = () => ['relay', 'direct', 'turn'].includes(mode);
@@ -219,7 +223,7 @@
     async function poll() {
       if (!real()) return;
       const st = await kit.stats();
-      if (st && real()) { last = st; onStats(st); }
+      if (st && real()) { base ??= st; last = st; onStats(st, base); }
     }
     return {
       mode: () => mode,
@@ -248,7 +252,7 @@
         clearInterval(timer); timer = 0;
         if (real()) kit.panic();
         kit?.stop(); board?.close(); sim?.close();
-        board = null; kit = null; sim = null; last = null;
+        board = null; kit = null; sim = null; last = null; base = null;
         say('idle');
       },
       out: () => (real() ? board.playout() : sim ? sim.out() : null),
@@ -383,11 +387,13 @@
     }
     if (now - timing.S > GIVE_UP_MS) done();
   }
-  function onStats(st) {
-    d.set('Pi late', String((st.late ?? 0) + (st.droppedLate ?? 0)));
+  /** The board's counts run from its engine's start, so the cell counts from this join (`base`). */
+  function onStats(st, base) {
+    const lateOf = (s) => (s.late ?? 0) + (s.droppedLate ?? 0);
+    d.set('Pi late', String(lateOf(st) - lateOf(base)));
     const rtt = pi.board()?.stats().rttMs;
     d.set('round trip', Number.isFinite(rtt) ? rtt.toFixed(0) : '');
-    if (st.refused && st.refused !== onStats.refused) { onStats.refused = st.refused; d.log(`the board refused ${st.refused} so far: ${Object.keys(st.reasons ?? {}).join('; ')}`, 'warn'); }
+    if (st.refused > base.refused && st.refused !== onStats.refused) { onStats.refused = st.refused; d.log(`the board refused ${st.refused} so far: ${Object.keys(st.reasons ?? {}).join('; ')}`, 'warn'); }
   }
   // The simulation's late count, read the same way, every 2 s.
   setInterval(() => { const s = pi.sim(); if (s && pi.mode() === 'simulated') d.set('Pi late', String(s.stat.late)); }, STATS_MS);
@@ -460,6 +466,8 @@
   window.__rhythm = m.api;
   window.__demo.drums = {
     m: m.api, bay, pi, fader, lags, AHEAD,
+    /** Each side's meter, for a check that reads the returned sound itself (the choke). */
+    sides: SIDES,
     piIn: () => piIn, x: () => x, fades: () => fades, ctx: () => ctx,
     /** Move the crossfader as the slider does: over its wire. */
     fade: (v) => { fader.set(v); bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }); },

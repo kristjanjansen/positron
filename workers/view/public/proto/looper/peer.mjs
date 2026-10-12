@@ -84,7 +84,8 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
   let offsetMs = 0;                 // add to local shared-time to reach the reference
   let grid = null;                  // {loopMs, origin, by}
   let seq = 0, pingTimer = null;
-  const pending = new Map();        // seq -> t0
+  const pending = new Map();        // seq -> { t0, answered: Set of peer ids }
+  const PENDING_KEEP = 256;         // seqs remembered; older ones are forgotten
   const rxLayers = [];              // sessions received, in arrival order
   const log = [];                   // every protocol event, for measurement
 
@@ -94,11 +95,23 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
   function send(obj) { transport.send({ ...obj, p: PROTO, from: id }); }
 
   // --- the skew estimator ---------------------------------------------------
+  // 🔴 A PONG ANSWERS THE PEER THAT PINGED, AND ONLY IT. Until 2026-10-12 a
+  // pong was matched by `seq` alone, every peer counts from 1, and a room hands
+  // every message to every other socket, so with three peers in one room B's
+  // pong to A's ping #3 reached C and C took it for the answer to its own #3,
+  // and the first answer to a ping deleted the slot, so of the two peers that
+  // answer each ping only one was ever measured. Found on /concepts/clock/080/.
+  // The pong now names who it answers (`to`), and the echoed `t0` must be the
+  // one this peer sent, which also keeps a peer still running the old code,
+  // whose pong has no `to`, from being mistaken for an answer to somebody else.
+  // One `t0` is stamped and the same value sent, so the echo can be compared.
   function ping() {
     for (let i = 0; i < pingBurst; i++) {
       const s = ++seq;
-      pending.set(s, now());
-      send({ type: 'ping', seq: s, t0: now() });
+      const t0 = now();
+      pending.set(s, { t0, answered: new Set() });
+      if (pending.size > PENDING_KEEP) pending.delete(pending.keys().next().value);
+      send({ type: 'ping', seq: s, t0 });
     }
   }
 
@@ -107,9 +120,11 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
    * `rtt` is the round trip. Keep the minimum-RTT sample and nothing else.
    */
   function onPong(m) {
-    const t0 = pending.get(m.seq);
-    if (t0 == null) return;
-    pending.delete(m.seq);
+    if (m.to != null && m.to !== id) return;        // somebody else's answer
+    const ask = pending.get(m.seq);
+    if (!ask || m.t0 !== ask.t0 || ask.answered.has(m.from)) return;
+    ask.answered.add(m.from);                        // every other peer answers once
+    const t0 = ask.t0;
     const t2 = now();
     const { rtt, offset } = skewSample(t0, m.t1, t2);
     let p = peers.get(m.from);
@@ -191,7 +206,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
     }
     p.lastSeen = now();
     switch (m.type) {
-      case 'ping': send({ type: 'pong', seq: m.seq, t0: m.t0, t1: now() }); break;
+      case 'ping': send({ type: 'pong', to: m.from, seq: m.seq, t0: m.t0, t1: now() }); break;
       case 'pong': onPong(m); break;
       case 'grid': onGridMsg(m); break;
       case 'hello': break;

@@ -637,6 +637,97 @@ const TONE = { skirt: 0.30, core: 0.88, crisp: 0.85, ghost: 0.10, bar: 0.92 };
 const RENDERERS = new Map();
 export function registerRenderer(name, fn) { RENDERERS.set(name, fn); return () => RENDERERS.delete(name); }
 
+/**
+ * 🔴 MARKS KEEP A MINIMUM SEPARATION, AND WHERE THEY CANNOT THEY ARE BINNED,
+ * NEVER MERGED. Asked 2026-10-12 on /concepts/clock/090/: a lane of 50 marks a
+ * second over a 33 s run drew as ONE solid green bar, *"hard to understand.
+ * keep minimum separation between event bars?"*. 1650 two pixel ticks on about
+ * 1000 px overlap into a slab that says neither how many there were nor which
+ * one was late.
+ *
+ * THE RULE: a mark is `markPx` wide (the lane's width, rounded, at least 1)
+ * and owns a bin of `markPx + BIN_GAP_PX`. If every pair of neighbouring marks
+ * in view is at least one bin apart, they draw one by one as before. If any
+ * pair is closer, the whole lane draws one mark per bin: its COLOUR is the
+ * worst row in the bin, its HEIGHT is how many rows the bin holds against the
+ * fullest bin in view (all full when the bins differ by one row at most, which
+ * is the pixel grid rather than the data). Zoom in until the marks have their
+ * room and they draw one by one again.
+ *
+ * ⚠️ WHY 2 px OF SPACE. With 1 px marks and 1 px of space the lane is half ink
+ * and half ground, which the eye reads as a flat tint at any normal distance,
+ * and at a fractional device pixel ratio the two antialias into each other. Two
+ * pixels of ground between 1 px marks is a third ink, which still reads as a
+ * comb of separate marks that can be counted when looked at, and is the
+ * smallest gap that stays a gap at 1x.
+ *
+ * ⚠️ WORST IS THE LANE'S OWN CALL. `rankOfRow(row)` returns a number, higher
+ * is worse (a lateness, say). A lane that gives none is ranked by colour: the
+ * colour that is RAREST among the marks in view wins its bin, so one late mark
+ * among thirty on time is not outvoted. That default is a guess about what
+ * matters, so a lane whose colours carry a severity should say `rankOfRow`.
+ *
+ * OPT IN: the strip's `bin: true` (on by itself under `live`), or a lane's own
+ * `bin: true`. A lane's `bin: false` keeps it out. `marks: 'char'` lanes are
+ * never binned, their dots already say what does not fit.
+ */
+export const BIN_GAP_PX = 2;
+
+/** The spans a live view steps through, in ms: round numbers a ruler reads. */
+export const LIVE_STEPS = [1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000,
+  1200000, 1800000, 3600000, 7200000, 3 * 3600000, 6 * 3600000, 12 * 3600000, 24 * 3600000];
+
+/** A line of width `lw` CSS px centred so both its edges land on whole device
+ *  pixels: the left edge on the device pixel nearest `xv`. */
+function snapX(xv, lw, dpr = 1) {
+  const wDev = Math.max(1, Math.round(lw * dpr));
+  return (Math.round(xv * dpr) + wDev / 2) / dpr;
+}
+/** A tick's colour, the one rule the renderer and the hover share. */
+function tickColour(L, r, pos, style) {
+  const fired = !!L.latch && r.at <= pos;
+  return (L.colorOfRow && L.colorOfRow(r, fired)) || (fired ? (L.firedColor || '#7fd18c') : style.color);
+}
+/** How many marks in view wear each colour, for a lane that gives no rank. */
+function colourRarity(L, rows, colourOf) {
+  const m = new Map();
+  if (!L.rankOfRow) for (const r of rows) { const c = colourOf(r); m.set(c, (m.get(c) || 0) + 1); }
+  return m;
+}
+/** The worst row of a set, by the lane's `rankOfRow` or by colour rarity. */
+function worstRow(L, rows, colourOf, rarity) {
+  let best = rows[0], bestK = -Infinity;
+  for (const r of rows) {
+    const k = L.rankOfRow ? Number(L.rankOfRow(r)) || 0 : -(rarity.get(colourOf(r)) || 0);
+    if (k >= bestK) { bestK = k; best = r; }
+  }
+  return best;
+}
+
+/** Group the rows in view into bins of `binPx`, or say they need none. Pure
+ *  arithmetic on the x of each row, so the renderer and the hover agree. */
+function binRows(L, all, x, style, width) {
+  // only what is in view counts: a lane whose rows ignore the window (a page's
+  // own `rows`) must not be binned, or scaled, by marks off either edge
+  const rows = all.filter((r) => { const px = x(r.at); return px >= -8 && px <= width + 8; });
+  const markPx = Math.max(1, Math.round(L.width ?? style.width ?? 1));
+  const binPx = markPx + BIN_GAP_PX;
+  const xs = rows.map((r) => x(r.at)).sort((a, b) => a - b);
+  let minGap = Infinity;
+  for (let i = 1; i < xs.length; i++) minGap = Math.min(minGap, xs[i] - xs[i - 1]);
+  if (!(minGap < binPx)) return { binned: false, markPx, binPx, minGapPx: Number.isFinite(minGap) ? minGap : null };
+  const bins = new Map();
+  for (const r of rows) {
+    const i = Math.floor(x(r.at) / binPx);
+    let b = bins.get(i);
+    if (!b) bins.set(i, (b = { i, rows: [] }));
+    b.rows.push(r);
+  }
+  let maxN = 0, minN = Infinity;
+  for (const b of bins.values()) { maxN = Math.max(maxN, b.rows.length); minN = Math.min(minN, b.rows.length); }
+  return { binned: true, markPx, binPx, bins, maxN, minN, minGapPx: minGap };
+}
+
 /** discrete ticks — one mark per row. `latch` recolours marks BEHIND the
  *  playhead (replay-grid's fired-cue idea) and, because it is recomputed from
  *  the position every frame, un-fires them on rewind. */
@@ -659,6 +750,35 @@ registerRenderer('ticks', (ctx, L, C) => {
   // whose whole subject is uncertainty, quietly reporting certainty. A flag on
   // the lane costs one word; that costs the reader a false claim.
   const charMarks = L.marks === 'char' && !!L.glyphOf;
+  // ── the binned path (see BIN_GAP_PX) ──
+  const wantBin = !charMarks && (L.bin === true || (L.bin !== false && C.bin));
+  const B = wantBin ? binRows(L, C.rows, x, style, C.width) : null;
+  if (B && B.binned) {
+    const colourOf = (r) => tickColour(L, r, C.pos, style);
+    const rarity = colourRarity(L, C.rows, colourOf);
+    const top = y0 + 2, full = Math.max(1, h - 4);
+    const drawn = [];
+    for (const b of [...B.bins.values()].sort((p, q) => p.i - q.i)) {
+      const w = worstRow(L, b.rows, colourOf, rarity);
+      // A bin of one is a third of the lane at the least, so a lone mark among
+      // crowded ones is still a mark rather than a speck.
+      // ⚠️ AND A DIFFERENCE OF ONE ROW IS THE PIXEL GRID, NOT THE DATA. Marks
+      // that come at a steady rate fall 1, 1, 1, 2 into equal bins, and on a
+      // page of beats that drew every fifth beat taller, an accent that was
+      // never played (MEASURED on clock/070 and 080 at 375 px). So heights only
+      // differ when the bins differ by more than one row.
+      const flat = B.maxN - B.minN <= 1;
+      const bh = flat ? full : Math.max(3, Math.round(full * (0.35 + 0.65 * (b.rows.length / B.maxN))));
+      const bx = C.snap ? Math.round(b.i * B.binPx * C.dpr) / C.dpr : b.i * B.binPx;
+      ctx.fillStyle = colourOf(w);
+      ctx.fillRect(bx, top + full - bh, B.markPx, bh);
+      drawn.push({ x: bx, w: B.markPx, n: b.rows.length });
+    }
+    L._bin = { binned: true, markPx: B.markPx, binPx: B.binPx, gapPx: BIN_GAP_PX, rows: C.rows.length, bins: drawn.length, maxN: B.maxN, drawn };
+    ctx.restore();
+    return;
+  }
+  L._bin = B ? { binned: false, markPx: B.markPx, binPx: B.binPx, gapPx: BIN_GAP_PX, rows: C.rows.length, minGapPx: B.minGapPx } : null;
   const glyphs = [];
   for (const r of C.rows) {
     const px = Math.round(x(r.at)) + 0.5;
@@ -677,7 +797,10 @@ registerRenderer('ticks', (ctx, L, C) => {
     // separate subject rather than an annotation on this one.
     ctx.lineWidth = (L.widthOfRow && L.widthOfRow(r, fired)) || style.width || 1.4;
     if (style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(px, y0 + 2); ctx.lineTo(px, y0 + h - 2); ctx.stroke();
+    // On a LIVE strip a mark sits on whole DEVICE pixels, its line centred so
+    // its edges do too, so nothing shimmers between steps or at 2x and 3x.
+    const lx = C.snap ? snapX(x(r.at), ctx.lineWidth, C.dpr) : px;
+    ctx.beginPath(); ctx.moveTo(lx, y0 + 2); ctx.lineTo(lx, y0 + h - 2); ctx.stroke();
     if (L.glyphOf) glyphs.push([px, r, col]);
   }
   // WHAT THE MARK WAS, DRAWN ON THE MARK — but only where the zoom has made
@@ -1269,6 +1392,11 @@ export function createStrip(canvas, deck, opts = {}) {
     // CALENDAR AXIS: ruled in real years, months and days rather than in ms
     // multiples (see `calendarLOD`). Opt in, and only for an absolute domain.
     calendar: !!opts.calendar,
+    // LIVE RUN MODE (see `startLive`). null on every strip that did not ask.
+    live: opts.live ? { from: 0, minSpan: 8000, ...(typeof opts.live === 'object' ? opts.live : {}),
+                        started: false, running: false, held: false } : null,
+    // MINIMUM SEPARATION (see BIN_GAP_PX): off unless asked, on under `live`.
+    bin: opts.bin !== undefined ? !!opts.bin : !!opts.live,
   };
   const T = S.theme;
 
@@ -1501,6 +1629,7 @@ export function createStrip(canvas, deck, opts = {}) {
   }
   /** zoom about a screen x, so the point under the cursor stays put */
   function zoomAt(factor, screenX = plotW() / 2) {
+    holdLive();
     const t = tAt(screenX);
     const pps = Math.max(1e-9, capPps(S.view.pxPerSecond * factor, t));
     S.view.pxPerSecond = pps;
@@ -1539,6 +1668,7 @@ export function createStrip(canvas, deck, opts = {}) {
     return Number.isFinite(t) ? t : S.pos;
   }
   function followTick() {
+    if (S.live && S.live.started && !S.live.held) return;   // the live fit owns the view
     if (!S.follow || S.userScrolled) return;
     const px = x(followPos()), w = plotW();
     if (px > w * S.followEdge || px < 0) S.view.scrollX += px - w * S.followBack;
@@ -1562,6 +1692,7 @@ export function createStrip(canvas, deck, opts = {}) {
     return S.follow;
   }
   function disengage() {
+    holdLive();
     if (!S.follow || S.userScrolled) return;
     S.userScrolled = true;
     opts.onFollowChange && opts.onFollowChange(S.follow, true);
@@ -1590,9 +1721,83 @@ export function createStrip(canvas, deck, opts = {}) {
   }
   function wallPos() {
     if (!S.wallAnchor) return null;
+    if (S.wallAnchor.frozen != null) return S.wallAnchor.frozen;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     return S.wallAnchor.pos + (now - S.wallAnchor.wall);
   }
+  // -- live run mode ---------------------------------------------------------
+  /**
+   * 🔴 A LIVE RUN IS A STANDARD, NOT A PAGE'S TIMER. Asked 2026-10-12 on
+   * /concepts/clock/090/: the strip of a run being written showed its cursor
+   * parked at 0 while marks arrived, *"why cursor aint moving? ... we need std
+   * behaviour here"*. Every clock page refitted the view by hand on a 250 ms
+   * timer and none of them had a cursor, because the only cursor was the deck's
+   * playhead and nothing was playing.
+   *
+   * `live: true` (or `{ minSpan, from }`) on the strip, then:
+   *   startLive(at = 0)  the run starts, and the write head is at `at` now. It is
+   *                      the WALL CURSOR (`armWall(at)`), so it moves with real
+   *                      time whether or not a deck plays.
+   *   stopLive()         the write head freezes where it is, and stays drawn.
+   * While a run is live the view holds the whole run from `from`, in round
+   * steps (LIVE_STEPS, see `liveFit`), never narrower than `minSpan` ms: the
+   * head walks across a step and the view zooms out to the next one only when
+   * the head reaches its right edge. The deck's playhead is not drawn: on a live strip the
+   * write head is the cursor, drawn in the playhead's own shape.
+   * ⚠️ A READER'S ZOOM OR PAN HOLDS THE VIEW where they put it, the way follow
+   * disengages; a double click on the strip hands it back to the live fit.
+   * ⚠️ AND IT TURNS BINNING ON (BIN_GAP_PX), because a live run is the case
+   * that grows past the marks' room by itself.
+   */
+  function startLive(at = 0, o = {}) {
+    S.live = { from: 0, minSpan: 8000, ...(S.live || {}), ...o, started: true, running: true, held: false, span: 0 };
+    if (opts.bin === undefined) S.bin = true;
+    armWall(at);
+    return liveState();
+  }
+  function stopLive() {
+    if (!S.live || !S.live.running) return liveState();
+    if (S.wallAnchor) S.wallAnchor.frozen = wallPos();
+    S.live.running = false;
+    invalidate();
+    return liveState();
+  }
+  function holdLive() { if (S.live && S.live.started && !S.live.held) S.live.held = true; }
+  function resumeLive() { if (S.live && S.live.held) { S.live.held = false; invalidate(); } return liveState(); }
+  function liveState() {
+    return S.live ? { from: S.live.from, minSpan: S.live.minSpan, started: S.live.started, running: S.live.running,
+                      held: S.live.held, at: wallPos(), span: S.live.span ?? null } : null;
+  }
+  /** A few pixels of air each side, so the head's triangle is never cut. */
+  const LIVE_AIR_PX = 6;
+  /**
+   * 🔴 THE LIVE VIEW IS STEPPED, NOT REFITTED EVERY FRAME. Asked 2026-10-12 on
+   * /concepts/clock/010/: *"lines move very nervously here"*. A view refitted
+   * to the head on every frame rescales every frame, so every mark on the
+   * strip slid a fraction of a pixel sixty times a second. Now the view holds
+   * one span from LIVE_STEPS, the cursor walks across it, and only when the
+   * head passes LIVE_EDGE of the span does the view zoom out to the next step.
+   * Between steps nothing but the cursor moves, so the marks stand still.
+   * The first span is the smallest step at least `minSpan` long, and a run's
+   * span only grows, so a stopped run keeps the last view it had.
+   */
+  const LIVE_EDGE = 0.92;
+  function liveSpan(Lv, now) {
+    const need = Math.max(Lv.minSpan, (Number.isFinite(now) ? now - Lv.from : 0) / LIVE_EDGE);
+    const prev = Lv.span || 0;
+    if (prev >= need) return prev;
+    return LIVE_STEPS.find((st) => st >= need) ?? Math.ceil(need / LIVE_STEPS.at(-1)) * LIVE_STEPS.at(-1);
+  }
+  function liveFit() {
+    const Lv = S.live;
+    if (!Lv || Lv.held) return;
+    Lv.span = liveSpan(Lv, Lv.started ? wallPos() : null);
+    const pps = capPps(Math.max(1, plotW() - 2 * LIVE_AIR_PX) * 1000 / Lv.span, Lv.from + Lv.span);
+    S.view.pxPerSecond = pps;
+    S.view.originTime = Lv.from - (LIVE_AIR_PX / pps) * 1000;
+    S.view.scrollX = 0;
+  }
+
   // 🔴 OFF UNLESS A PAGE ASKS, AND THE EVIDENCE IS THE PAGES THEMSELVES. This
   // armed on the first play by default, and of the thirteen pages that use a
   // strip, TEN pass `armWall: false` and the other three call `armWall(anchor)`
@@ -1669,6 +1874,7 @@ export function createStrip(canvas, deck, opts = {}) {
       // WHERE follow is looking, so a check can tell the two targets apart
       // rather than inferring it from a view that moved.
       followPos: followPos(), followsPlayhead: !S.followTarget,
+      live: liveState(), bin: S.bin,
       errors: S.errors.slice(),
     };
   }
@@ -2177,6 +2383,21 @@ export function createStrip(canvas, deck, opts = {}) {
     const w = plotW();
     ctx.save();
     const wp = wallPos();
+    if (S.live) {
+      // LIVE: the write head is the cursor, in the playhead's shape and ink,
+      // and nothing else is drawn. Before the run starts there is no head.
+      if (wp !== null) {
+        const wx = Math.round(x(wp)) + 0.5;
+        if (wx >= -1 && wx <= w + 1) {
+          ctx.globalAlpha = 1; ctx.strokeStyle = T.playhead; ctx.lineWidth = 1.5; ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(wx, 0); ctx.lineTo(wx, S.contentH); ctx.stroke();
+          ctx.fillStyle = T.playhead;
+          ctx.beginPath(); ctx.moveTo(wx - 4, 0); ctx.lineTo(wx + 4, 0); ctx.lineTo(wx, 6); ctx.closePath(); ctx.fill();
+        }
+      }
+      ctx.restore();
+      return;
+    }
     if (wp !== null && opts.wallStyle === 'head') {
       // A SECOND PLAYHEAD, in the wall colour. `take` arms this line as a
       // RECORDING head, and a recording head is a position like any other — so
@@ -2266,6 +2487,9 @@ export function createStrip(canvas, deck, opts = {}) {
       // so a renderer that states a length (the aggregate's legend) says it
       // in the same units as the ruler above it
       calendar: S.calendar,
+      bin: S.bin,
+      // whole device pixels for marks on a live strip (see `snapX`)
+      snap: !!S.live, dpr: S.dpr,
     };
     const as = L.as || autoKind(L);
     if (as === 'spans') C.spans = spansFor(L).filter((s) => (Number.isFinite(s.to) ? s.to : t1) >= t0 && s.from <= t1);
@@ -2346,6 +2570,14 @@ export function createStrip(canvas, deck, opts = {}) {
     }
     S.pos = deck.position ? deck.position() : 0;
     followTick();
+    liveFit();
+    if (opts.whole && !S.userScrolled) {
+      // `whole: true` keeps the deck's whole range in view at every width, the
+      // fixed-length counterpart of `live`.
+      const r = deck.range || [0, 1000];
+      const key = `${plotW()}|${r[0]}|${r[1]}`;
+      if (key !== S.wholeKey) { S.wholeKey = key; fit(); }
+    }
     const g = ctx;
     g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0);
     g.clearRect(0, 0, S.width, S.height);
@@ -2554,6 +2786,18 @@ export function createStrip(canvas, deck, opts = {}) {
       }
       return loose || { lane: L, t };
     }
+    // A BINNED lane is hit by its bin, the same arithmetic the renderer used,
+    // and answers with how many rows the bin holds and the worst of them.
+    if (C.as === 'ticks' && L._bin && L._bin.binned) {
+      const bp = L._bin.binPx, i = Math.floor(px / bp);
+      const all = rowsFor(L, tAt(0), tAt(plotW()));
+      const rows = all.filter((r) => Math.floor(x(r.at) / bp) === i);
+      if (!rows.length) return { lane: L, t };
+      const style = L._style || styleFor(deck, L.kind, { color: L.color, width: L.width });
+      const colourOf = (r) => tickColour(L, r, S.pos, style);
+      const worst = worstRow(L, rows, colourOf, colourRarity(L, all, colourOf));
+      return { lane: L, row: worst, t, bin: { n: rows.length, ms: (bp / S.view.pxPerSecond) * 1000 } };
+    }
     let best = null, bd = Infinity;
     for (const r of C.rows || []) { const d = Math.abs(r.at - t); if (d < bd) { bd = d; best = r; } }
     if (best && bd <= tol * 3) return { lane: L, row: best, t };
@@ -2592,7 +2836,12 @@ export function createStrip(canvas, deck, opts = {}) {
       else if (s.kind === 'vagueness') out.push('no exact date exists');
       if (s.verbatim) out.push(String(s.verbatim).slice(0, 48));
     }
-    if (r) {
+    if (r && hit.bin) {
+      // A BIN: how many it holds, then the worst of them in the lane's own words.
+      const ms = hit.bin.ms >= 10 ? Math.round(hit.bin.ms) : +hit.bin.ms.toFixed(1);
+      const what = L.describeRow ? [].concat(L.describeRow(r) || []).join(', ') : '';
+      out.push(hit.bin.n === 1 ? `1 in ${ms} ms${what ? `: ${what}` : ''}` : `${hit.bin.n} in ${ms} ms, worst${what ? `: ${what}` : ''}`);
+    } else if (r) {
       // `terse` drops the identity and provenance lines. They exist for the
       // heritage case, where "attested" against "RESTORED tier 2" is the whole
       // point — and on a lane with no restorations in it they are noise that
@@ -2712,7 +2961,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // `S.pos` sitting wherever the deck was last told; a finger landing within
     // the slop of an INVISIBLE line would start scrubbing a line nobody can
     // see, and the pan and the tap it stole are both gone.
-    touchGesture = opts.playhead !== false && Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
+    touchGesture = opts.playhead !== false && !S.live && Math.abs(px - x(S.pos)) <= TOUCH.slop ? 'scrub' : 'undecided';
     S.dragX = px;
     if (touchGesture === 'scrub') { S.dragging = true; disengage(); holdForScrub(); }
   }
@@ -2848,6 +3097,8 @@ export function createStrip(canvas, deck, opts = {}) {
     canvas.addEventListener('gesturestart', onGesture);
     canvas.addEventListener('gesturechange', onGesture);
     if (opts.zoom !== false) canvas.addEventListener('wheel', onWheel, { passive: false });
+    // a live strip a reader has zoomed or panned goes back to the whole run
+    canvas.addEventListener('dblclick', () => { if (S.live && S.live.held) resumeLive(); });
   }
 
   // -- the loop --------------------------------------------------------------
@@ -2871,7 +3122,7 @@ export function createStrip(canvas, deck, opts = {}) {
   function loop() {
     if (S.disposed) return;
     const p = deck.position ? deck.position() : 0;
-    if (S.dirty || p !== S.pos || S.wallAnchor) draw();
+    if (S.dirty || p !== S.pos || (S.wallAnchor && S.wallAnchor.frozen == null)) draw();
     S.raf = requestAnimationFrame(loop);
   }
 
@@ -2923,6 +3174,9 @@ export function createStrip(canvas, deck, opts = {}) {
     zoomIn: (f = 1.5) => zoomAt(f), zoomOut: (f = 1.5) => zoomAt(1 / f),
     setFollow, follow: () => ({ on: S.follow, engaged: S.follow && !S.userScrolled }),
     setFollowTarget, followPos,
+    startLive, stopLive, resumeLive, live: liveState,
+    /** How the last draw drew a ticks lane: one by one or binned, and where. */
+    binState: (id) => { const L = S.lanes.find((l) => l.id === id); return L ? (L._bin || null) : null; },
     armWall, disarmWall, wallPos, gapMs: () => (wallPos() === null ? null : wallPos() - S.pos),
     /** E3: the strip asks the DECK. It never filters rows itself, so an
      *  evidence-only view is the deck refusing to serve, not a hidden layer. */

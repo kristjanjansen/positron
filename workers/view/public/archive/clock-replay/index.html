@@ -5,17 +5,17 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 050</title>
+<title>POSITRON Replay</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-rec { color: var(--rec, #e5484d); }
   .cc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 </style>
 <script type="module">
-  // concepts clock/050, ALIGNED AFTER, 2026-10-12. One idea: once a show is
+  // concepts clock/070, ALIGNED AFTER, 2026-10-12. One idea: once a show is
   // recorded, nothing travels any more, and the recording is the clock.
   //
-  // clock/040 with a recorder added. The same two places, `there`'s clock set
+  // Follow (archived, now /archive/clock-follow/) with a recorder added. The same two places, `there`'s clock set
   // wrong and corrected by peer.mjs. `web-1` has the keyboard and a camera; the
   // camera is a canvas that flashes on every key, so a key press is in the
   // PICTURE as well as in the notes. `web-2` holds a recorder:
@@ -38,7 +38,6 @@
   // recorder's start gap unmeasured); see `record()` for what was found.
   //
   // Nothing opens on a visit. Record joins the room and starts the recorder.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -84,12 +83,11 @@
     { id: SCREEN, label: 'screen', dir: 'in', medium: 'video' },
   ]);
 
-  const d = mount({ name: 'concept clock 050', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Replay', what: '', index: '/archive/', indexLabel: 'archive',
     joined: false,
     // How far each note lands from its own flash in the recording, typical and
     // worst; the same against arrival times; and how many notes the take holds.
     readout: { 'off by': 'ms', worst: 'ms', 'by arrival': 'ms', notes: '' } });
-  conceptNav('clock/050');
 
   // ── one sound card ──────────────────────────────────────────────────────
   let ctx = null, anchor = null;
@@ -122,7 +120,7 @@
     live.add(o); o.onended = () => live.delete(o);
   }
 
-  // ── two places and their clocks, as clock/030 ───────────────────────────
+  // ── two places and their clocks, as clock/060 ───────────────────────────
   function place(name) {
     const P = { name, skew: 0, peer: null };
     P.raw = () => epochNow() + P.skew;
@@ -233,6 +231,7 @@
        read a median of -9.0 and +2.7 ms, worst 17.8 and 26.2. */
     take.T0 = take.T0call;
     take.startLocal = epochNow();
+    view.strip.startLive(0);     // media time 0 is now, and the strip's cursor is the recording head
     face();
     d.set('notes', 0);
     d.log(`recording: the camera into the recorder, and every key with the shared time it was pressed. The recorder said it started ${Math.round(take.T0start - take.T0call)} ms after it was asked`);
@@ -244,6 +243,7 @@
     r.stop();
     await done;
     take.durationMs = epochNow() - take.startLocal;
+    view.strip.stopLive();
     take.blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
     player.src = take.blobUrl;
     face();
@@ -340,23 +340,24 @@
   const rowsBy = (field, ref) => () => [...marks.values()].filter((m) => m[field] != null)
     .map((m) => ({ at: m[field], id: `${field}${m.k}`, kind: 'note', payload: { m, err: ref && m.flashMs != null ? m.flashMs - m[field] : null } }));
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`) while the take records: the
+    // whole take in view, the cursor at the recording head, and after Stop the
+    // head stays at the take's end. Marks too close to draw apart are binned.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: 4000 },
     lanes: [
       { id: 'picture', kind: 'note', label: 'picture', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsBy('flashMs', false), describeRow: (r) => ['flash', nameOf(r.payload.m.n)] },
       { id: 'at', kind: 'note', label: 'by at', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('atMs', true),
         colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
         describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
       { id: 'arrival', kind: 'note', label: 'by arrival', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('arrMs', true),
         colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
         describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
     ],
   });
-  function show() {
-    deck.setRange([0, Math.max(4000, take.durationMs || 0)]);
-    view.strip.fit();
-    view.strip.invalidate();
-  }
+  const show = () => view.strip.invalidate();
 
   // ── controls, keys ──────────────────────────────────────────────────────
   const btns = createButtonGroup({ buttons: [
@@ -385,7 +386,7 @@
     onUp: () => {},
   });
 
-  // ── plain names on screen, the real ids on hover, as clock/020 ──────────
+  // ── plain names on screen, the real ids on hover, as clock/030 ──────────
   const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
   const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
   const realOf = new Map();
@@ -429,11 +430,6 @@
 
   const two = el('div', 'cc-two');
   two.append(camPanel.el, playPanel.el);
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
   d.stack.add(btns.el, two, host, view.surface, pb.el);
   let raf = 0;
   const loop = () => { drawCam(); raf = requestAnimationFrame(loop); };

@@ -5,14 +5,14 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 080</title>
+<title>POSITRON Clock drift</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  // concepts clock/080, DRIFT, 2026-10-12. One idea: two clocks that agreed once
+  // concepts clock/050, DRIFT, 2026-10-12. One idea: two clocks that agreed once
   // do not stay agreed, because no two run at exactly the same rate, so the
   // agreement has to be made again now and then.
   //
-  // clock/020 plus a rate. `web-2`'s clock is still set wrong by 100 to 300 ms,
+  // clock/030 plus a rate. `web-2`'s clock is still set wrong by 100 to 300 ms,
   // and now it also RUNS a chosen number of parts per million fast (the picker),
   // simulated by scaling that place's clock: its reading gains `ppm / 1e6` ms
   // for every true ms. Real crystals sit around 20 to 100 ppm apart; 1000 is a
@@ -22,12 +22,11 @@
   // says: off, every 10 s or every 60 s. A resync is a fresh peer and fresh
   // bursts, and the old correction stays in use until the new one is in hand.
   // `drift now` is how far web-2's latest beat lands from web-1's, on the one
-  // sound card both share (clock/020's note); `rate` is web-2's clock against
+  // sound card both share (clock/030's note); `rate` is web-2's clock against
   // the true one, read off both clocks, so the picker's number is checked rather
   // than repeated.
   //
   // Nothing opens on a visit. Play joins the room.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -38,7 +37,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, worst, band, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `drift-${rand(6)}`;
@@ -57,14 +56,13 @@
   const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' }],
     [{ id: IN.there, label: 'beat', dir: 'in', medium: 'clock' }]);
 
-  const d = mount({ name: 'concept clock 080', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Clock drift', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     // How far apart the beats land now and at worst since a control last
     // changed, how many times the clocks agreed again, and web-2's clock rate
     // as measured off both clocks.
     readout: { 'drift now': 'ms', worst: 'ms', resyncs: '', rate: 'ppm' } });
-  conceptNav('clock/080');
 
   const S = soundCard();
 
@@ -120,20 +118,24 @@
   }
 
   // ── agreeing: a fresh pair of peers, two bursts, the fastest round trip kept ─
-  // 🔴 A FRESH ROOM FOR EVERY AGREEMENT, BOTH ENDS NEW. peer.mjs matches a pong
-  // to its ping by `seq` alone and every peer counts from 1, so in one room an
-  // old peer's pongs to web-1's pings consumed the new peer's pending seqs and
-  // its own answers were thrown away. MEASURED on the first two drives: the first
-  // resync worked and the next one never got five samples. Two peers, one room,
-  // closed when the number is in hand, and nothing else is listening.
+  // ⚠️ BOTH ENDS NEW FOR EVERY AGREEMENT, BECAUSE A PEER KEEPS ITS FASTEST SAMPLE
+  // FOR EVER. A drifting clock needs a measurement taken now, and a peer that
+  // had a faster round trip a minute ago would go on answering with that
+  // minute-old offset. One room for all of them since 2026-10-12: this page used
+  // a fresh room per agreement while peer.mjs matched a pong by `seq` alone, so a
+  // closing peer's pongs ate the new one's answers (the first resync worked, the
+  // next never got five samples). A pong now names the peer it answers, and
+  // proto/looper/peer-test.mjs holds three peers in one room. The ids carry the
+  // agreement's number so a socket still closing is never mistaken for the new one.
   let tag = '', n = 0;
   const run = { resyncs: 0, marks: [], worst: 0, rate0: null, busy: false };
   async function agree() {
     if (run.busy) return false;
     run.busy = true;
-    const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp-${n++}/ws`;
-    const ref = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: epochNow, pingEveryMs: 0 });
-    const peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw, pingEveryMs: 0 });
+    const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
+    const k = n++;
+    const ref = createPeer({ id: `a-${tag}-${k}`, transport: wsTransport(url), now: epochNow, pingEveryMs: 0 });
+    const peer = createPeer({ id: `b-${tag}-${k}`, transport: wsTransport(url), now: there.raw, pingEveryMs: 0 });
     const got = (k) => peer.peers().some((p) => p.id === ref.id && p.samples >= k);
     for (let burst = 1; burst <= 2; burst++) {
       for (let i = 0; i < 300 && !got(5 * burst); i++) await sleep(10);
@@ -188,6 +190,7 @@
     here.clock = there.clock = null; there.offset = 0;
     S.hush();
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log(`stopped after ${run.resyncs} resyncs`);
   }
@@ -236,7 +239,8 @@
       if (dt > 2000) d.set('rate', Math.round(((there.raw() - run.rate0.raw) - dt) / dt * 1e6));
     }
     if (first == null && here.played.size) first = here.clock.epoch;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
+    // the strip is LIVE (timeline/strip.mjs `startLive`): its cursor is the write head from the first beat
+    if (first != null && joined && !view.strip.live()?.running) view.strip.startLive(epochNow() - first);
     view.strip.invalidate();
   }, 250);
 
@@ -247,12 +251,14 @@
     .filter(([, v]) => v.T <= epochNow())
     .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'beat', payload: { k } })));
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip: the whole run in view, the cursor at now, dense marks binned.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
       { id: 'here', kind: 'beat', label: 'web-1', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsOf(here), describeRow: () => ['web-1', 'the true clock'] },
       { id: 'there', kind: 'beat', label: 'web-2', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsOf(there),
         colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
+        rankOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? -1 : Math.abs(g); },
         describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
       { id: 'sync', kind: 'mark', label: 'resync', height: 24, width: 2, as: 'ticks', terse: true, color: '#c9ced6',
         rows: () => (first == null ? [] : run.marks.map((t, i) => ({ at: t - first, id: `s${i}`, kind: 'mark', payload: {} }))),
@@ -275,7 +281,6 @@
   const st = el('style');
   st.textContent = '.cc-row { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; }';
   document.head.append(st);
-  fitOnResize(view);
   d.stack.add(controls, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
   window.__clock = { here, there, run, gaps, ppmPick, syncPick };

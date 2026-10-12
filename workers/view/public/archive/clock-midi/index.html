@@ -5,30 +5,29 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 060</title>
+<title>POSITRON MIDI clock</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  // concepts clock/060, MIDI CLOCK, 2026-10-12. One idea: the same beat carried
+  // concepts clock/040, MIDI CLOCK, 2026-10-12. One idea: the same beat carried
   // two ways at once, as a tick per message and as one anchor, and only the
   // ticks carry the relay's jitter into the sound.
   //
-  // clock/020 plus a second wire. `web-1` keeps the true clock and plays the
+  // clock/030 plus a second wire. `web-1` keeps the true clock and plays the
   // beat itself. It sends that beat to `web-2` two ways:
   //   - as MIDI clock: 24 ticks a beat (the `0xF8` byte, class `clock`), each its
   //     own `bay.event` over the relay, along `midiclock:midi-out ->
   //     web-2:ticks:midi-in`. The tick receiver counts them and plays a beat on
   //     every 24th, the moment it arrives, which is what a MIDI clock follower does;
   //   - as the anchor `{ bpm, epoch }`, sent ONCE along `clock-out ->
-  //     *:beat:clock-in`, exactly clock/020's way: `web-2`'s clock is set wrong by
+  //     *:beat:clock-in`, exactly clock/030's way: `web-2`'s clock is set wrong by
   //     100 to 300 ms, peer.mjs finds the error, and the anchor receiver works out
   //     every beat on its own corrected clock and tells the sound card in advance.
   // Each receiver's beat is measured against the TRUE beat, `epoch + k * 500` on
   // web-1's clock: the tick receiver from the moment its 24th tick arrived, the
   // anchor receiver from the audio time it chose, both read on the one tab's
-  // clock and sound card (clock/020's note on one sound card applies).
+  // clock and sound card (clock/030's note on one sound card applies).
   //
   // Nothing opens on a visit. Play joins the room.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -38,7 +37,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `midiclock-${rand(6)}`;
@@ -64,13 +63,12 @@
     { id: IN.ticks, label: 'ticks', dir: 'in', medium: 'midi', accepts: ['clock'] },
   ]);
 
-  const d = mount({ name: 'concept clock 060', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'MIDI clock', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     // Messages each way per minute, and how far each receiver's beat lands from
     // the true beat, typical and worst. Six cells, three pairs.
     readout: { ticks: '/min', anchors: '/min', 'ticks late': 'ms', 'ticks worst': 'ms', 'anchor late': 'ms', 'anchor worst': 'ms' } });
-  conceptNav('clock/060');
 
   const S = soundCard();
 
@@ -104,7 +102,7 @@
   }
 
   // ── web-2: two receivers ─────────────────────────────────────────────────
-  // The anchor receiver: clock/020's `there`, a clock set wrong and corrected.
+  // The anchor receiver: clock/030's `there`, a clock set wrong and corrected.
   const anchorRx = { skew: 0, peer: null, clock: null, played: new Map() };
   anchorRx.raw = () => epochNow() + anchorRx.skew;
   anchorRx.off = () => (anchorRx.peer ? anchorRx.peer.offsetMs() : 0);
@@ -189,6 +187,9 @@
     // web-1 also needs the anchor to start sending ticks, and it has it now.
     ref.clock = ref.clock || { bpm: BPM, epoch };
     tickTimer = setInterval(sendTicks, 5);
+    runClock = ref.clock;
+    first = epochNow();            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
     joined = true; busy = false;
     btns.setIcon('go', 'stop', 'Stop');
   }
@@ -199,6 +200,7 @@
     ref.clock = null; anchorRx.clock = null;
     S.hush();
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log(`stopped: ${sent.ticks} ticks and ${sent.anchors} anchor sent for the same beat`);
   }
@@ -208,7 +210,9 @@
 
   // ── what it measured ─────────────────────────────────────────────────────
   const lates = (m) => [...m.values()].map((v) => v.late).slice(-32);
-  let first = null;
+  // `runClock` keeps the run's beat grid after Stop clears `ref.clock`, so a
+  // stopped run's marks stay where they were drawn.
+  let first = null, runClock = null;
   const WINDOW = 8000;
   setInterval(() => {
     if (!joined) return;
@@ -223,25 +227,27 @@
     const L = (id) => view.strip.lanes().find((x) => x.id === id);
     if (t.length && L('ticks')) L('ticks').subLabel = [`median ${fmt(median(t))} ms`, `worst ${fmt(worst(t))} ms`];
     if (a.length && L('anchor')) L('anchor').subLabel = [`median ${fmt(median(a))} ms`, `worst ${fmt(worst(a))} ms`];
-    if (first == null && ref.played.size) first = ref.clock.epoch;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
     view.strip.invalidate();
   }, 250);
 
   // ── the timeline: the true beat, then each receiver's, coloured by how late ─
   const deck = createDeck({ items: [], range: [0, WINDOW] });
   const shelf = el('div');
-  const due = (k) => ref.clock ? ref.clock.epoch + k * STEP : 0;
+  const due = (k) => runClock ? runClock.epoch + k * STEP : 0;
   const rowsOf = (m, id) => () => (first == null ? [] : [...m.entries()]
     .filter(([k]) => due(k) <= epochNow())
     .map(([k, v]) => ({ at: due(k) - first + (v.late || 0), id: `${id}${k}`, kind: 'beat', payload: { k, late: v.late } })));
   const lane = (id, label, m, hz) => ({ id, kind: 'beat', label, height: 40, width: 2, as: 'ticks', terse: true,
     rows: rowsOf(m, id),
     ...(id === 'ref' ? { color: '#6f7d94', describeRow: () => ['web-1', 'the true beat'] }
-      : { colorOfRow: (r) => band(r.payload.late),
+      : { colorOfRow: (r) => band(r.payload.late), rankOfRow: (r) => Math.abs(r.payload.late || 0),
           describeRow: (r) => [label, `${r.payload.late >= 0 ? '+' : ''}${fmt(r.payload.late)} ms from the true beat`] }) });
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [lane('ref', 'web-1', ref.played), lane('ticks', 'web-2 ticks', tickRx.played), lane('anchor', 'web-2 anchor', anchorRx.played)],
   });
 
@@ -260,7 +266,6 @@
   const pb = createPatchbay(named(picture), { room: 'midiclock' });
   hovers(pb.el, 'midiclock');
 
-  fitOnResize(view);
   d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
   window.__clock = { sent, tickRx, anchorRx, ref, lates };

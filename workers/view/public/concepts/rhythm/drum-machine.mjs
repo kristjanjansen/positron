@@ -88,10 +88,18 @@ import { LIFE } from './voices.mjs';
  *   the mix is NOT connected to the speakers: the page routes `api.mixOut()`
  *   where its own wires say (rhythm/030's crossfader). Left out, the node is
  *   `web:speaker` and the mix goes to the speakers.
+ * @param {{ rows: number, steps: number }} [o.shape]  how many of `voices` are
+ *   rows (the first n) and how many steps a loop has, 16 by default. Changed
+ *   with `api.setShape`, which lands at the next loop while playing
+ *   (rhythm/050's 1x and 2x). The other rows' drums stay loaded on the engine
+ *   and leave the grid and the patchbay.
+ * @param {(shape: {rows: number, steps: number}) => void} [o.onShape]  called as
+ *   a new shape lands, before its first step is read, so a page that writes the
+ *   pattern can write it for the new shape first
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
-  ahead = 150, context = null, mix = null }) {
+  ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -104,14 +112,17 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // stepper, 60 to 180 in fives (asked 2026-10-12: *"rm step of and bpm. use
   // bpm selector on right and add clear button"*), the kit's `createStepper`
   // as /tom/ wears it.
-  const BPM_AT_START = 120, BPM_MIN = 60, BPM_MAX = 180, BPM_STEP = 5, STEPS = 16;
+  const BPM_AT_START = 120, BPM_MIN = 60, BPM_MAX = 180, BPM_STEP = 5;
+  let STEPS = shapeOpt?.steps ?? 16;
   const stepMsAt = (b) => 60000 / (b * 4);
   let bpm = BPM_AT_START;
   const BAR = STEPS * stepMsAt(BPM_AT_START);
   const TICK = 25;                           // look every 25 ms
   const aheadMs = () => (typeof ahead === 'function' ? ahead() : ahead);   // hand each hit over this early, 150 by default
 
-  const VOICES = voices;
+  const ALL = voices;
+  /** The drums that are rows now: the first `shape.rows` of `voices`. */
+  let VOICES = ALL.slice(0, shapeOpt?.rows ?? ALL.length);
   /**
    * A voice's knobs: `v.params` (a list, rhythm/020's pitch and length per row)
    * or `v.param` (one, rhythm/010). Each is `{ name, value, min, max, unit }`
@@ -122,7 +133,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
    * node's (`web:knob-<name>`), so it is unique on the page.
    */
   const paramsOf = (v) => v.params ?? (v.param ? [v.param] : []);
-  const KNOBS = VOICES.filter((v) => paramsOf(v).length);
+  const KNOBS = ALL.filter((v) => paramsOf(v).length);
 
   // ── the four programs, compiled now (pure JavaScript, no fetch) ──────────
   // EACH DRUM ON A STEREO PAIR OF ITS OWN: drum i's last line goes to output
@@ -130,10 +141,18 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // engine's output can be split per drum, which is what makes a drum's
   // `audio-out` wire real (the speaker hears exactly the drums wired to it)
   // and what lets a scope see one drum alone.
-  const BUS = new Map(VOICES.map((v, i) => [v.key, 2 * i]));
+  //
+  // 🔴 UNLESS THERE ARE MORE THAN SIXTEEN DRUMS. An AudioWorkletNode carries at
+  // most 32 channels in Chrome, so 16 pairs is the ceiling; rhythm/050's 2x has
+  // eighteen. Then every drum plays on busses 0 and 1, the engine has two
+  // outputs, and a drum's `audio-out` wire is honoured at the hit instead (a
+  // drum with no wire to the speakers starts no hits). Nothing with scopes has
+  // that many drums.
+  const SPLIT = 2 * ALL.length <= 32;
+  const BUS = new Map(ALL.map((v, i) => [v.key, SPLIT ? 2 * i : 0]));
   // A voice may bring its definition as bytes (`v.def`, rhythm/020's
   // `drumsample`, written with synthdef.mjs); it then takes its pair as `out`.
-  const compiled = new Map(VOICES.map((v) => {
+  const compiled = new Map(ALL.map((v) => {
     if (v.def) return [v.key, { ok: true, bytes: v.def }];
     const r = compile(v.program, { name: v.name, bus: BUS.get(v.key) });
     if (!r.ok) throw new Error(`${v.label} did not compile: ${r.message}`);
@@ -146,7 +165,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const outs = new Map(), scopeAn = new Map();
   let nextId = 3000;
   const stat = { bootMs: null, loadMs: null, started: {}, ended: {}, chokes: 0, fails: 0 };
-  for (const v of VOICES) { stat.started[v.key] = 0; stat.ended[v.key] = 0; }
+  for (const v of ALL) { stat.started[v.key] = 0; stat.ended[v.key] = 0; }
   const nodeVoice = new Map();               // node id -> voice key, until its /n_end
   let openHat = null;                        // { id, until } the open hat that may still be ringing
   /** Each voice's knob value, sent with every hit of that voice. */
@@ -167,7 +186,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     if (eng) return Promise.resolve(eng);
     waking ??= (async () => {
       const e = await bootScsynth({ audioContext: ctx, log: d.log, onReply: heard,
-        scsynthOptions: { numOutputBusChannels: 2 * VOICES.length, numInputBusChannels: 2 } });
+        scsynthOptions: { numOutputBusChannels: SPLIT ? 2 * ALL.length : 2, numInputBusChannels: 2 } });
       stat.bootMs = Math.round(e.bootMs);
       // The engine's sound goes where the bay says, so it comes off the
       // speakers here. A silent branch to the destination stays, because Web
@@ -177,10 +196,11 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       e.out.connect(pull);
       // Eight channels in, one stereo pair per drum out.
-      const split = ctx.createChannelSplitter(2 * VOICES.length);
-      e.out.connect(split);
+      const split = SPLIT ? ctx.createChannelSplitter(2 * ALL.length) : null;
+      if (split) e.out.connect(split);
       stat.channels = e.out.channelCount;
-      VOICES.forEach((v, i) => {
+      if (!SPLIT) outs.set('*', e.out);
+      (SPLIT ? ALL : []).forEach((v, i) => {
         const pair = ctx.createChannelMerger(2);
         split.connect(pair, 2 * i, 0);
         split.connect(pair, 2 * i + 1, 1);
@@ -198,14 +218,15 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       junction = ctx.createGain();
       // Eight drums at once (050) sum about 3 dB hotter than four, and the
       // loudest bar measured -1.5 dBFS RMS, so the mix comes down to 0.7 there.
-      junction.gain.value = VOICES.length > 4 ? 0.7 : 1;
+      // Eighteen (050 at 2x) come down to 0.5.
+      junction.gain.value = ALL.length > 9 ? 0.5 : ALL.length > 4 ? 0.7 : 1;
       if (!mix) junction.connect(ctx.destination);
       an = ctx.createAnalyser(); an.fftSize = 1024; buf = new Float32Array(an.fftSize);
       junction.connect(an);
       route();
       const t = performance.now();
       const sent = new Set();
-      for (const v of VOICES) {
+      for (const v of ALL) {
         if (sent.has(v.name)) continue;   // one definition several rows share goes once
         sent.add(v.name);
         const got = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000,
@@ -214,7 +235,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       }
       if (onWake) await onWake(e, ctx);
       stat.loadMs = Math.round(performance.now() - t);
-      d.log(`SuperCollider booted in ${stat.bootMs} ms and took the ${VOICES.length} drums in ${stat.loadMs} ms`);
+      d.log(`SuperCollider booted in ${stat.bootMs} ms and took the ${ALL.length} drums in ${stat.loadMs} ms`);
       eng = e;
       return e;
     })().catch((err) => { waking = null; d.log(`SuperCollider did not start: ${err?.message || err}`, 'bad'); throw err; });
@@ -223,7 +244,13 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
 
   /** THE ROUTER: each drum's pair goes where its `audio-out` wires say. */
   function route() {
-    for (const v of VOICES) {
+    if (!SPLIT) {
+      // One mix: it reaches the speakers whole, and each drum's wire is read at the hit.
+      const o = outs.get('*');
+      if (o) { try { o.disconnect(); } catch { /* not connected */ } o.connect(junction); }
+      return;
+    }
+    for (const v of ALL) {
       const o = outs.get(v.key);
       if (!o) continue;
       try { o.disconnect(); } catch { /* not connected */ }
@@ -236,8 +263,12 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
 
   /** One hit, at `at` on performance.now()'s clock, as a timestamped bundle. */
+  /** Whether a drum's sound has a wire to the speakers (read at the hit when the outputs are not split). */
+  const wired = (key) => bay.links().some((l) => l.from === ID(key, 'audio-out') && l.to === SPK);
+
   function hit(v, at) {
     if (!eng) return;
+    if (!SPLIT && !wired(v.key)) return;
     const id = nextId++;
     if (v.key === 'hhc' && openHat && at < openHat.until) {
       // The choke, in the same bundle time as the closed hat itself.
@@ -265,11 +296,11 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // ── the bay ──────────────────────────────────────────────────────────────
   const bay = createBay();
   bay.addNode({ id: `${S}:sequencer`, kind: 'engine', label: 'sequencer', place: 'browser' });
-  for (const v of VOICES) bay.addNode({ id: `${S}:${v.key}`, kind: 'engine', label: `${v.label}, SuperCollider`, place: 'browser' });
+  for (const v of ALL) bay.addNode({ id: `${S}:${v.key}`, kind: 'engine', label: `${v.label}, SuperCollider`, place: 'browser' });
   bay.addNode({ id: `${S}:${OUT}`, kind: mix ? 'engine' : 'screen', label: mix ? mix.label : 'speakers', place: 'browser' });
   bay.addPort({ id: SEQ, label: 'sequencer:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
   const heardBy = {};
-  for (const v of VOICES) {
+  for (const v of ALL) {
     heardBy[v.key] = 0;
     bay.addPort({ id: ID(v.key, 'midi-in'), label: `${v.key}:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
       deliver: (e) => { if (e.d1 !== v.note || !e.d2) return; heardBy[v.key]++; hit(v, e.at); } });
@@ -277,7 +308,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
   bay.addPort({ id: SPK, label: `${OUT}:audio-in`, dir: 'in', medium: 'audio' });
   if (mix) bay.addPort({ id: ID(OUT, 'audio-out'), label: `${OUT}:audio-out`, dir: 'out', medium: 'audio' });
-  if (wantScopes) for (const v of VOICES) {
+  if (wantScopes) for (const v of ALL) {
     bay.addNode({ id: `${S}:scope-${v.key}`, kind: 'screen', label: 'scope', place: 'browser' });
     bay.addPort({ id: ID(`scope-${v.key}`, 'audio-in'), label: `scope-${v.key}:audio-in`, dir: 'in', medium: 'audio' });
     // What starts a trace arrives on a wire too: the drum's own note, filtered
@@ -286,7 +317,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       deliver: (e) => {
         if (e.d1 !== v.note || !e.d2) return;
         if (!bay.links().some((l) => l.from === ID(v.key, 'audio-out') && l.to === ID(`scope-${v.key}`, 'audio-in'))) return;
-        views?.[VOICES.indexOf(v)].trigger(e.at);
+        views?.[ALL.indexOf(v)].trigger(e.at);
       } });
   }
   // A knob per drum, each a node of its own with a value wire into its voice.
@@ -304,7 +335,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       } });
   }
   const lay = (from, to, tf = []) => { const r = bay.link(from, to, tf, { site: S }); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
-  for (const v of VOICES) {
+  for (const v of ALL) {
     lay(SEQ, ID(v.key, 'midi-in'), [{ op: 'range', lo: v.note, hi: v.note }]);
     lay(ID(v.key, 'audio-out'), SPK);
     if (wantScopes) {
@@ -316,7 +347,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
 
   // ── the grid ─────────────────────────────────────────────────────────────
   const panel = createPanelLayout({ side: 'left', flow: false, strip: { role: 'group', label: 'steps' } });
-  const grid = createStepGrid({
+  const makeGrid = () => createStepGrid({
     fixed: panel.fixed, strip: panel.strip, rows: VOICES.length, steps: STEPS,
     label: (r) => VOICES[r].label,
     title: (r) => `${VOICES[r].label}, note ${VOICES[r].note}`,
@@ -324,6 +355,21 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     ticks: true, readOnly: patternIn,
     onToggle: (r, s, lit, why) => { if (why !== 'quiet') d.log(`${VOICES[r].label} step ${s + 1} ${lit ? 'on' : 'off'}`); },
   });
+  let grid = makeGrid();
+  /** A new shape: the grid is built again for it, empty, in the same panel. */
+  function reshape(sh) {
+    VOICES = ALL.slice(0, sh.rows);
+    STEPS = sh.steps;
+    grid.destroy();
+    panel.fixed.textContent = '';
+    panel.strip.textContent = '';
+    grid = makeGrid();
+    if (playing) grid.live(true);
+    api.grid = grid;
+    onShape?.({ rows: sh.rows, steps: sh.steps });
+    pb.refresh();
+  }
+  let pendingShape = null;
   // A plain four on the floor, backbeat snare, open hats on the offbeats and
   // closed hats around them, each closed hat after an open one choking it.
   const START = {
@@ -350,6 +396,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // its end, which would stop the loop through the bar's own command.
   const deck = createDeck({ items: [], range: [0, 24 * 3600e3] });
   let loop = null, raf = 0, t0 = 0, next = 0, playing = false, laps = 0, shown = -1;
+  /** The absolute step the current loop began at, so a loop can change length at its end. */
+  let loopStart = 0, loopIndex = 0;
+  const stepOf = new Map();                       // absolute step -> [the step of the grid it played, which loop]
   /**
    * WHEN EACH STEP SOUNDS, AS AN ANCHOR AND A STEP LENGTH. A tempo change moves
    * the anchor to the first step not yet handed over, at the time it already
@@ -363,9 +412,15 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   function tick() {
     const horizon = performance.now() + aheadMs();
     while (heardAt(next) < horizon) {
-      const s = next % STEPS, at = heardAt(next);
+      if (next - loopStart >= STEPS) {
+        loopStart = next; loopIndex++;
+        // A new shape lands here, at the top of a loop, before its first step is read.
+        if (pendingShape) { const sh = pendingShape; pendingShape = null; reshape(sh); }
+      }
+      const s = next - loopStart, at = heardAt(next);
       handed.set(next, at);
-      handed.delete(next - 64);
+      stepOf.set(next, [s, loopIndex]);
+      handed.delete(next - 128); stepOf.delete(next - 128);
       next++;
       if (s === 0 && onBar) onBar(Math.floor((next - 1) / STEPS));
       if (at < performance.now()) continue;      // already gone by: never sent late
@@ -385,8 +440,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     while (handed.has(k + 1) && handed.get(k + 1) <= now) k++;
     if (k !== shown && k >= 0) {
       shown = k;
-      grid.at(k % STEPS);
-      laps = Math.floor(k / STEPS);
+      const [s, lap] = stepOf.get(k) ?? [0, laps];
+      grid.at(s);
+      laps = lap;
     }
     sample(now);
     drawScopes();
@@ -405,7 +461,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     // where a first hit 80 ms ahead would reach the Pi after its time).
     t0 = performance.now() + 80 + Math.max(0, aheadMs() - 150);
     anchor = { k: 0, t: t0, ms: stepMsAt(bpm) };
-    next = 0; laps = 0; shown = -1; handed.clear(); openHat = null;
+    next = 0; laps = 0; shown = -1; handed.clear(); stepOf.clear(); loopStart = 0; loopIndex = 0; openHat = null;
     grid.at(0); grid.live(true);
     deck.seek(0); deck.play();
     clearInterval(loop);
@@ -473,7 +529,14 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
 
   // ── the patchbay ─────────────────────────────────────────────────────────
   // A page that adds wires of its own (050's camera) says when those flow.
-  const pb = createPatchbay(bay, { flowing: (l) => (flowing ? flowing(l, playing) : playing) });
+  // The patchbay shows the drums that are rows now; the others stay loaded and leave the picture.
+  const offRow = (id) => { const k = id.split(':')[1]; return ALL.some((v) => v.key === k) && !VOICES.some((v) => v.key === k); };
+  const view = SPLIT && !shapeOpt ? bay : {
+    nodes: () => bay.nodes().filter((n) => !offRow(n.id)),
+    ports: () => bay.ports().filter((p) => !offRow(p.id)),
+    links: () => bay.links().filter((l) => !offRow(l.from) && !offRow(l.to)),
+  };
+  const pb = createPatchbay(view, { flowing: (l) => (flowing ? flowing(l, playing) : playing) });
 
   // ── the knobs, one row, each sending on its own wire ─────────────────────
   let knobs = null, knobGrid = null;
@@ -494,7 +557,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // ── the scopes, one per drum, each fed by that drum's own wire ───────────
   /** Each scope's loudness over the last frames, for a check that one drum
    *  is on its own scope and nowhere else. */
-  const scopeLevels = new Map(VOICES.map((v) => [v.key, []]));
+  const scopeLevels = new Map(ALL.map((v) => [v.key, []]));
   /**
    * TRIGGERED, HELD SCOPES, asked 2026-10-12: *"scopes are very "nervous"."*.
    * Each scope takes its drum's window from the hit's onset (it knows the
@@ -507,13 +570,13 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
    */
   const WINDOW = { kick: 250, snare: 200, hho: 500, hhc: 80 };
   // The analyser exists only once the engine is up, so it is handed over then (`listen`).
-  const views = wantScopes ? VOICES.map((v) => createWaveShape({ reason: null, colour: '--hi', height: 90, name: v.label,
+  const views = wantScopes ? ALL.map((v) => createWaveShape({ reason: null, colour: '--hi', height: 90, name: v.label,
     axes: { x: `${WINDOW[v.key]} ms` }, mode: 'triggered', window: WINDOW[v.key], fade: 1, full: 0.6 })) : null;
   /** Each scope's own loudness, measured per frame, for a check that one drum
    *  is on its own scope and nowhere else. Not drawn. */
   function drawScopes() {
     if (!views) return;
-    VOICES.forEach((v) => {
+    ALL.forEach((v) => {
       const s = scopeAn.get(v.key);
       if (!s) return;
       s.an.getFloatTimeDomainData(s.buf);
@@ -548,7 +611,10 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
 
   const api = {
     bay, grid, deck, bar, stat, heardBy, levels, compiled, values, knobs, knobGrid,
-    BAR, VOICES, tempo, clear, setBpm,
+    BAR, tempo, clear, setBpm,
+    /** The drums that are rows now (every one of `voices` unless a shape says fewer). */
+    get VOICES() { return VOICES; },
+    ALL,
     paramSends: () => paramSends, patternsIn: () => patternsIn, refresh: () => pb.refresh(),
     scopeLevels, route, views,
     /** A drum's own stereo signal (its output pair), once the engine is up. */
@@ -564,6 +630,13 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     /** The mix's loudness right now, read off the analyser, 0 before the first play. */
     level: () => { if (!an) return 0; an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); },
     start, stop,
+    /** The shape now, and a new one: at once when stopped, at the top of the next loop when playing. */
+    shape: () => ({ rows: VOICES.length, steps: STEPS }),
+    setShape(sh) {
+      if (sh.rows === VOICES.length && sh.steps === STEPS) { pendingShape = null; return; }
+      if (playing) pendingShape = sh; else reshape(sh);
+    },
+    pendingShape: () => pendingShape,
   };
   return { surface, knobs: knobGrid?.el ?? null, scopes: views ? views.map((w) => w.el) : null, patchbay: pb.el, api };
 }
