@@ -37,17 +37,17 @@
   /* A demo a concept page now covers: an inverted badge, light ink filled with
      the page's dark as its text, uppercase like the kit's `.pos-tag`, never red
      and never the brand `--hi` (asked 2026-10-12, *"make label more visible,
-     ivert badge"*), and the page that covers it on the card's last line. Its
-     line box is the title's, so the card keeps its size. */
+     ivert badge"*), the covering page's name just left of it. Its line box is
+     the title's, so the card keeps its size. */
   .cc-demo .cc-off {
-    flex: none; margin-left: auto; align-self: center;
+    flex: none; margin-left: 8px; align-self: center;
     padding: 0 6px; border-radius: 3px;
     background: var(--fg2); color: var(--bg);
     font: 600 10px/1.6 var(--mono); letter-spacing: .07em; text-transform: uppercase;
     white-space: nowrap;
   }
   .cc-demo .cc-t:has(.cc-off) { display: flex; align-items: baseline; }
-  .cc-demo .cc-by { margin: auto 0 0; font: 400 12px var(--mono); color: var(--dim2); }
+  .cc-demo .cc-by { margin-left: auto; padding-left: 10px; font: 400 12px var(--mono); color: var(--dim2); white-space: nowrap; }
   /* A use case card carries more: the front page's group above the title and
      its address under the line, so it keeps a taller size of its own. */
   .cc-card.cc-case {
@@ -110,8 +110,10 @@
       const by = at?.supersededBy && CONCEPTS.find((c) => c.n === at.supersededBy);
       if (at?.supersededBy && !by) console.warn(`concepts: ${row.name} is superseded by ${at.supersededBy}, which is not in CONCEPTS`);
       if (by) {
-        h.append(el('span', 'cc-off', 'not needed'));
-        a.append(el('p', 'cc-by', `${by.title} covers it`));
+        // The covering page's name left of the badge, no line of its own.
+        // Asked 2026-10-12: *"rm covers it line, put the name ledt of not
+        // needed badge"*.
+        h.append(el('span', 'cc-by', by.title), el('span', 'cc-off', 'not needed'));
         a.title = `not needed\n/concepts/${by.n}/ shows the same idea`;
       }
       cards.get(group).push(a);
