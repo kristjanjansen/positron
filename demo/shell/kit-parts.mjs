@@ -96,6 +96,7 @@ export const KIT_PARTS = [
   // it fronpage. lets work on it. first do typograpy sampler"*): the faces the
   // site is set in today, and the sans faces measured against the brand mono.
   { part: 'frontpage', label: 'FRONTPAGE', ids: [
+    'hero', 'titles-and-subtitles', 'pairings-on-a-slide',
     'recommendation', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
   ] },
 ];
