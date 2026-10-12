@@ -357,12 +357,25 @@
      all yet, and colouring an unmeasured thing as though it passed is an
      assertion nothing made, which is the transport bar's oldest rule. */
   --ai: #b39ae8;
-  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
+  /* 🔴 TWO FAMILIES, AND THE RULE FOR WHICH IS WHICH, SINCE 2026-10-12
+     (*"Impelent font update everywhere"*, plans/plan-fonts-minimal.md).
+     `--mono` is JetBrains Mono, for everything that NAMES: titles, headings,
+     eyebrows, controls, readouts, logs, keys, tables. `--sans` is Geist, for
+     everything READ THROUGH: body, the line under a title, card text, kit
+     notes, slide body. The system faces behind each are fallbacks only, for
+     the moment before a file lands. No third family on a page that loads
+     this file, except `/weight/`'s Gabarito, which is that artwork's material. */
+  --mono: 'Brand JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: 'Brand Geist', -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
+/* ⚠️ NO ARROW LIGATURES. JetBrains Mono joins `->`, `=>`, `!=` and `<=` into one
+   glyph through contextual alternates, on by default, so a log line, a Faust
+   source box and a readout would draw `->` as an arrow that is not the text.
+   `no-contextual` turns that off and leaves Geist's ordinary ligatures on. */
+html { font-variant-ligatures: no-contextual; }
 /* 🔴 NO SIDEWAYS RUBBER BAND ON A PHONE. iOS and Android bounce the whole
    document horizontally the moment a drag has any x in it, and almost every
    drag on these pages does: the strip pans, the transport scrubs, a headset
@@ -486,14 +499,37 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Brand JetBrains Mono'; font-weight: 600; font-style: normal; font-display: swap;
   src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
-:root { --brand: 'Brand JetBrains Mono', var(--mono); }
+:root { --brand: var(--mono); }   /* an alias since 2026-10-12, when `--mono` became this face */
+/* 🔴 GEIST IS `--sans` SINCE 2026-10-12, the face for everything READ
+   THROUGH: body text, the line under a title, card text, kit notes, a
+   slide's body. Picked on `/kit/frontpage/` from six sans faces sampled
+   beside the brand mono (plans/plan-fonts-minimal.md); the system stack
+   behind it in `--sans` is the fallback while the file lands, at 0.4 per
+   cent wider over a 109 character sentence (MEASURED there). 400 and 600,
+   Latin subset, @fontsource/geist 5.3.0, SIL OFL 1.1, 26,328 bytes for both,
+   from this origin. `swap` for the reason the brand mono gives above. */
+@font-face { font-family: 'Brand Geist'; font-weight: 400; font-style: normal; font-display: swap;
+  src: url('/shell/vendor/geist-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Brand Geist'; font-weight: 600; font-style: normal; font-display: swap;
+  src: url('/shell/vendor/geist-latin-600-normal.woff2') format('woff2'); }
 .pos-title { display: flex; align-items: center; gap: 10px; }
 .pos-name {
   font: 600 17px/1.2 var(--brand); letter-spacing: .01em; margin: 0;
 }
+/* 🔴 BALANCED WRAP ON A TITLE, THE LINE UNDER IT AND A SECTION HEADING, SITE
+   WIDE, asked 2026-10-12 with the font change: two similar lines rather than a
+   long one and a word left alone, as `/kit/frontpage/` sets its specimens.
+   Chromium balances only a handful of lines and falls back to greedy past
+   that, so a long `what` wraps as it did. */
+.pos-name, .pos-what, .pos-tabs-about-t, .pos-sec-h { text-wrap: balance; }
 /* One look for the sentence that says what a page is and the one that says
-   what a tab is (`.pos-tabs-about-t`, below), so the two cannot drift apart. */
-.pos-what, .pos-tabs-about-t { color: var(--dim); font-family: var(--brand); font-size: 13.5px; max-width: 62ch; }
+   what a tab is (`.pos-tabs-about-t`, below), so the two cannot drift apart.
+   ⚠️ GEIST SINCE 2026-10-12, NOT THE BRAND MONO. The 2026-10-06 ask put both
+   the title and this line in the brand face; the font rule that replaced it
+   (*"Impelent font update everywhere"*) is mono for what NAMES and Geist for
+   what is READ THROUGH, and this line is a sentence read through. The title
+   above it stays mono. */
+.pos-what, .pos-tabs-about-t { color: var(--dim); font-family: var(--sans); font-size: 13.5px; max-width: 62ch; }
 .pos-what { margin: 6px 0 0; }
 /* the front page's sentence at the heading's own size, asked 2026-10-07 as
    *"same size as title"*; every other page keeps 13.5 */
@@ -1891,7 +1927,7 @@ video[hidden] { display: none; }
    answer was horizontal and that moving the name LEFT everywhere would put it
    under the black key on the other shoulder. Both halves are honoured here. */
 .k .kn { grid-row: 1; color: var(--dim2); font-weight: 400;
-         font-family: 'positron-accidentals', var(--mono);
+         font-family: var(--mono);
          transform: translateX(var(--kn-x, 0px)); }
 /* 🔴 THE DOT IS THE STATE AND THE KEY'S GROUND NO LONGER MOVES. Asked
    2026-09-23: *"do not change bg colors. do colored dots istead. rm wasd hints,
@@ -3898,49 +3934,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
    from how wide the glyph happens to be in whatever font arrived. */
 .step button.ico { width: 34px; padding: 0; font-size: 15px; line-height: 1; }
 
-/* ── the accidentals, in a real notation face ──────────────────────────────
-   demo/shell/vendor/bravura-text-accidentals.woff2
-
-   🔴 THREE GLYPHS AND NOTHING ELSE: `♭` U+266D, `♮` U+266E, `♯` U+266F. Asked
-   2026-09-23, *"can we use good notation font insteead?"*, then *"do Bravura
-   Text"*, *"on keys and labels"*.
-
-   ✅ AND IT IS 4,508 BYTES BECAUSE IT WAS SUBSET. Bravura Text is **457,872
-   bytes** as published, which is 70 per cent of `/nola/`'s entire sample pack
-   for three characters, on every page that draws a keyboard. Subset to the
-   three it is **0.98 per cent of that**, MEASURED both ways with the command in
-   `demo/resources/subset-bravura.mjs`.
-
-   🔴 `unicode-range` IS THE WHOLE MECHANISM AND IT IS NOT AN OPTIMISATION. It
-   says these three codepoints ONLY, so every letter, digit and symbol beside
-   them stays in the mono face they were designed with: a key reads `C` in
-   SFMono and `♯` in Bravura, in one string, with no markup. Without it the
-   whole label would fall into a notation font that has no letters.
-   ⚠️ AND THE TEXT STILL ROUND-TRIPS. SMuFL fonts keep their glyphs in the
-   Private Use Area, and a page built on those would copy out as junk; Bravura
-   TEXT maps the real Unicode codepoints, so `C♯4` selected off the page is
-   `C♯4` in the clipboard.
-   ⚠️ `font-display: block` DELIBERATELY. This is 4.5 KB and a swap would show
-   the system glyph first and reflow a key label a moment later, which is the
-   one thing a live picture may not do. There is nothing to see while it loads.
-
-   ⚠️ IT WAS MEASURED BEFORE IT WAS DECIDED, AND THE SYSTEM FACE IS NOT BROKEN.
-   `ui-monospace` carries all three properly drawn: MEASURED as rendered ink
-   against a deliberate tofu box, `♯` 20 px, `♭` 17, `♮` 12, tofu 44. Width
-   could not have said so, because in a mono face every glyph is one advance
-   including the tofu. What this buys is notation proportions rather than a
-   missing glyph.
-
-   LICENCE: SIL Open Font License 1.1, Steinberg Media Technologies, reserved
-   font name "Bravura". The text ships beside the binary as
-   `LICENSE-bravura`. */
-@font-face {
-  font-family: 'positron-accidentals';
-  src: url('/shell/vendor/bravura-text-accidentals.woff2') format('woff2');
-  unicode-range: U+266D-266F;
-  font-display: block;
-}
-
 /* ── the keyboard's pad (demo/shell/keyboard.mjs) ─────────────────────────
    Octave down, octave up, notes off — drawn under the keys by the keyboard
    itself, on every page that draws one. They used to be ordinary controls in
@@ -4477,7 +4470,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
   display: flex; align-items: center; padding: 0 2px 0 6px;
   /* ⚠️ 9.5px: *"make chord labels bit smaller"*, 2026-09-23. It is a caption on
      a picture rather than a heading over it, and the picture is the dots. */
-  font: 500 9.5px/1 'positron-accidentals', var(--mono);
+  font: 500 9.5px/1 var(--mono);
   color: var(--fg); white-space: nowrap;
   /* ⚠️ NO GROUND BEHIND IT: *"no bg for chord labels"*, 2026-09-23. It carried
      a fade of `--card` so a dot underneath could not collide with it, and on a
@@ -4545,9 +4538,12 @@ button.pos-pg-lab:hover { color: var(--fg); }
    deleted rather than left to match nothing: a stylesheet rule for an element no
    component builds any more is this project's dead rule, which reads as correct
    and is the second most expensive kind of defect here.
-   ⚠️ AND THE ACCIDENTALS FACE STAYS, because `.k .kn` and `.kpad-chord` use
-   it for `♯` and `♭` in note and chord names. It was the degree table's `♭2`
-   that needed it here and nothing else. */
+   ⚠️ AND THE ACCIDENTALS FACE THAT OUTLIVED IT LEFT ON 2026-10-12. Bravura's
+   three glyphs were kept here for `.k .kn` and `.kpad-chord`, but the chord
+   names were always ASCII (`chords.mjs`) and the key names became `#` on
+   *"no bravura needed i hope. can we do without?"*, so no label anywhere drew
+   one and the face, its file and its licence went
+   (plans/plan-fonts-minimal.md section 3). */
 
 .kpad-at {
   min-width: 3.2em; font: 500 11px/1 var(--mono); color: var(--dim);
@@ -4590,7 +4586,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    would have moved the ink by the same amount and reintroduced exactly the
    movement the cell exists to prevent. */
 .kpad-chord {
-  font: 500 11px/1 'positron-accidentals', var(--mono); color: var(--dim2);
+  font: 500 11px/1 var(--mono); color: var(--dim2);
   font-variant-numeric: tabular-nums; white-space: nowrap;
   margin-left: -1ch;
 }
@@ -4979,8 +4975,11 @@ a.pos-card:hover, a.pos-card:focus-visible {
   background: var(--card2); border-color: var(--line2);
 }
 a.pos-card:hover .pos-card-t, a.pos-card:focus-visible .pos-card-t { color: var(--hi); }
+/* ⚠️ THE TITLE IS THE MONO SINCE 2026-10-12, the description stays Geist: a
+   card's title NAMES a page and its line is READ THROUGH, the site's font rule
+   (`:root`, `--mono` and `--sans`). Balanced like every other title. */
 .pos-card-t {
-  font: 600 15px/1.2 var(--sans); color: var(--fg);
+  font: 600 15px/1.2 var(--mono); color: var(--fg); text-wrap: balance;
   overflow-wrap: anywhere;
   transition: color 120ms ease;
 }

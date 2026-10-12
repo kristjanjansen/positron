@@ -13,9 +13,8 @@
    properties by `scaleCss()`. Every rule below reads them. */
 
 /* THE FACE: JetBrains Mono, 400 and 600, Latin subset, from @fontsource 5.3.0,
-   SIL OFL 1.1 with its licence beside it. COPIED from the archive's vendor
-   folder rather than moved, because `/slides/` keeps its seven faces.
-   `workers/view/build.mjs` lists the three files by name. */
+   SIL OFL 1.1 with its licence beside it, the same files the site's `--mono`
+   reads. `workers/view/build.mjs` lists the three files by name. */
 @font-face { font-family: 'Slide JetBrains Mono'; font-weight: 400; font-style: normal; font-display: block;
   src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;

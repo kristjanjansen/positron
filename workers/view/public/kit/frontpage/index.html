@@ -10,40 +10,13 @@
 <link rel="stylesheet" href="/shell/kit-page.css">
 <style>
   /* 🔴 EVERY FACE HERE IS SELF HOSTED, AND A VISIT ASKS NOBODY ELSE FOR ONE.
-     The six candidates are under /shell/vendor/ (workers/view/build.mjs lists
-     them, with source and licence); the archive's monospaced faces and
-     Gabarito are read from where their own pages already serve them, so what
-     is shown is the file those pages ship rather than a copy of it. The
-     brand mono and the accidentals are declared in shell.css already. */
+     JetBrains Mono and Geist are under /shell/vendor/ (workers/view/build.mjs
+     lists them, with source and licence) and are declared in shell.css;
+     Gabarito is read from /weight/'s own folder, so what is shown is the file
+     that page ships rather than a copy of it. */
 
-  /* the six candidates: @fontsource 5.3.x, Latin subset, SIL OFL 1.1 */
-  @font-face { font-family: 'FP Geist'; font-weight: 400; font-display: swap; src: url('/shell/vendor/geist-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Geist'; font-weight: 600; font-display: swap; src: url('/shell/vendor/geist-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Manrope'; font-weight: 400; font-display: swap; src: url('/shell/vendor/manrope-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Manrope'; font-weight: 600; font-display: swap; src: url('/shell/vendor/manrope-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP IBM Plex Sans'; font-weight: 400; font-display: swap; src: url('/shell/vendor/ibm-plex-sans-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP IBM Plex Sans'; font-weight: 600; font-display: swap; src: url('/shell/vendor/ibm-plex-sans-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Schibsted Grotesk'; font-weight: 400; font-display: swap; src: url('/shell/vendor/schibsted-grotesk-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Schibsted Grotesk'; font-weight: 600; font-display: swap; src: url('/shell/vendor/schibsted-grotesk-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Onest'; font-weight: 400; font-display: swap; src: url('/shell/vendor/onest-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Onest'; font-weight: 600; font-display: swap; src: url('/shell/vendor/onest-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Space Grotesk'; font-weight: 400; font-display: swap; src: url('/shell/vendor/space-grotesk-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Space Grotesk'; font-weight: 600; font-display: swap; src: url('/shell/vendor/space-grotesk-latin-600-normal.woff2') format('woff2'); }
-
-  /* the faces in use elsewhere, read from their own pages' folders */
+  /* /weight/'s face, read from its own folder */
   @font-face { font-family: 'FP Gabarito'; font-weight: 200 800; font-display: swap; src: url('/weight/vendor/gabarito-latin.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Atkinson Hyperlegible Mono'; font-weight: 400; font-display: swap; src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Atkinson Hyperlegible Mono'; font-weight: 600; font-display: swap; src: url('/slides/vendor/atkinson-hyperlegible-mono-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Fira Code'; font-weight: 400; font-display: swap; src: url('/slides/vendor/fira-code-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Fira Code'; font-weight: 600; font-display: swap; src: url('/slides/vendor/fira-code-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Geist Mono'; font-weight: 400; font-display: swap; src: url('/slides/vendor/geist-mono-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Geist Mono'; font-weight: 600; font-display: swap; src: url('/slides/vendor/geist-mono-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP IBM Plex Mono'; font-weight: 400; font-display: swap; src: url('/slides/vendor/ibm-plex-mono-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP IBM Plex Mono'; font-weight: 600; font-display: swap; src: url('/slides/vendor/ibm-plex-mono-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Intel One Mono'; font-weight: 400; font-display: swap; src: url('/slides/vendor/intel-one-mono-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Intel One Mono'; font-weight: 600; font-display: swap; src: url('/slides/vendor/intel-one-mono-latin-600-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Source Code Pro'; font-weight: 400; font-display: swap; src: url('/slides/vendor/source-code-pro-latin-400-normal.woff2') format('woff2'); }
-  @font-face { font-family: 'FP Source Code Pro'; font-weight: 600; font-display: swap; src: url('/slides/vendor/source-code-pro-latin-600-normal.woff2') format('woff2'); }
 
   /* A list of faces: the gap between two faces is two steps above the gap
      inside one, so a face's name, its facts and its specimens read as one
@@ -122,12 +95,11 @@
   .fp-sl .sl-say { font-family: var(--fp-head); }
 
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
-     THROUGH. Two custom properties on each real piece, so every kit
-     component inside it (the readout, the log, the slide's text) takes the
-     rule without a rule of its own being touched. */
-  .fp-rule { --mono: 'Brand JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-             --sans: 'FP Geist', -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
-             min-width: 0; }
+     THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
+     in shell.css are these two faces, so nothing here sets either and every
+     kit component inside (the readout, the log, the slide's text) is drawn
+     exactly as on its own page. */
+  .fp-rule { min-width: 0; }
   /* 🔴 THE CLEAR GAP UNDER THE LAST REAL PIECE IS ITS OWN PADDING, NOT A
      LARGER MARGIN. The stack owns the margin between blocks and the page's
      check holds every pair of blocks to --pos-gap, so the extra --pos-gap
@@ -157,18 +129,12 @@
   .fp-ph-w { margin: 4px 0 0; font: 400 15px/1.5 var(--sans); color: var(--dim); max-width: 62ch; }
   .fp-ph-r { margin-top: 20px; }
 
-  /* SHARP TEST: three ways to write a sharp, every other letter the brand
-     mono. Page-local on purpose (plans/plan-fonts-minimal.md decides shell.css
-     and keyboard.mjs); (0,3,0) against the keyboard's own `.k .kn` (0,2,0). */
-  .fp-sh { --mono: 'Brand JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-           display: flex; flex-direction: column; gap: var(--ctl-gap); min-width: 0; }
-  .fp-sh-a .k .kn, .fp-sh-c .k .kn { font-family: var(--mono); }
+  /* SHARP TEST: the sharp as shipped, `#` in the brand mono, on real keys and
+     on a chord line. The keys are the keyboard's own labels, untouched. */
+  .fp-sh { display: flex; flex-direction: column; gap: var(--ctl-gap); min-width: 0; }
   .fp-sh-n { margin: 0; font: 600 15px/1.3 var(--mono); color: var(--fg); }
-  .fp-sh-big { margin: 0; font-size: 32px; line-height: 1.2; color: var(--fg); overflow-wrap: anywhere; }
-  .fp-sh-line { margin: 0; font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--dim2); }
-  .fp-sh-a .fp-sh-big, .fp-sh-a .fp-sh-line, .fp-sh-c .fp-sh-big, .fp-sh-c .fp-sh-line { font-family: var(--mono); }
-  .fp-sh-b .fp-sh-big, .fp-sh-b .fp-sh-line { font-family: 'positron-accidentals', var(--mono); }
-  .fp-sh-list { display: flex; flex-direction: column; gap: var(--pos-gap); }
+  .fp-sh-big { margin: 0; font: 400 32px/1.2 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
+  .fp-sh-line { margin: 0; font: 500 11px/1.4 var(--mono); color: var(--dim2); }
 </style>
 <script type="module">
   import { el, createReport } from '/shell/shell.mjs';
@@ -187,10 +153,13 @@
    * typograpy sampler: all fonts we use at the momet in diffeetn sizes. we need
    * sans serif to match our brand mono. bring in something matchin it, not just
    * Inter"*, and the name confirmed as *"frontpage"*.
-   * ⚠️ A SAMPLER, NOT A CHANGE. `--sans` in shell.css is untouched; the
-   * candidates reach only this page, each scoped by setting `--sans` on its own
-   * specimen, which is how a card here is drawn in the face without the card
-   * knowing.
+   * ⚠️ IT WAS A SAMPLER AND IS NOW THE RECORD OF A CHANGE. Six sans faces were
+   * set here beside the brand mono, each by setting `--sans` on its own
+   * specimen; the owner picked Geist, and on 2026-10-12 (*"A is fine.
+   * Impelent font update everywhere"*) shell.css made `--mono` JetBrains Mono
+   * and `--sans` Geist, and the other faces were deleted with their files
+   * (plans/plan-fonts-minimal.md). THE RULE, IN USE is what every page does
+   * now, and the specimens below it are what the choice was made from.
    * ⚠️ THE NUMBERS ARE MEASURED IN THIS BROWSER, on a canvas, after each face
    * has loaded: the top of an `x` and of an `H` at 100 px, and the width of
    * one sentence divided by its length. The OS/2 table values the face files
@@ -200,7 +169,7 @@
    */
   const { d, section, out, land, checkPage } = createKitPage({
     part: 'frontpage',
-    what: 'The faces this site is set in today, and six sans faces measured against the brand mono for the front page.',
+    what: 'The two faces this site is set in, JetBrains Mono for what names and Geist for what is read through.',
   });
 
   const SENTENCE = 'A Raspberry Pi in another building plays the same bar as this page, and the readout says how late it was: 1374 ms on a bad day, 38 on a good one.';
@@ -210,34 +179,18 @@
   /* ── the brand, the reference every candidate is measured against ── */
   const BRAND = "'Brand JetBrains Mono'";
 
-  /* 🔴 THE SIX CANDIDATES, AND WHY EACH IS HERE. Chosen against JetBrains Mono's
-     three traits: a tall x-height (0.55 em, x over cap 0.75), rounds that lean
-     rectangular, and open apertures. Measured and NOT shipped: Hanken Grotesk
-     (x/cap 0.707), Instrument Sans (0.708), Albert Sans (0.714), all a step
-     shorter in the lower case. JetBrains Sans is not here because it is not
-     openly licensed: JetBrains serves it from its own domains only
-     (youtrack.jetbrains.com WRS-2431). Inter is not here by request.
+  /* 🔴 GEIST WON, AND THE OTHER FIVE LEFT WITH THEIR FILES, 2026-10-12.
+     Six openly licensed sans faces were sampled here against JetBrains Mono's
+     three traits (a tall x-height, rounds that lean rectangular, open
+     apertures): Geist, Manrope, IBM Plex Sans, Schibsted Grotesk, Onest and
+     Space Grotesk. The owner asked for the brand mono with Geist, and
+     plans/plan-fonts-minimal.md deleted the other five (181,476 bytes).
      `table` is the face file's own OS/2 numbers, read with a WOFF parser on
      2026-10-12; `bytes` is 400 plus 600 off `ls -l`. */
   const CANDIDATES = [
-    { id: 'geist', name: 'Geist', family: "'FP Geist'", pkg: '@fontsource/geist 5.3.0',
+    { id: 'geist', name: 'Geist', family: "'Brand Geist'", pkg: '@fontsource/geist 5.3.0',
       src: 'github.com/vercel/geist-font', table: { x: 0.530, cap: 0.710 }, bytes: [12956, 13372],
       why: 'Drawn as the sans to Geist Mono, so its proportions were set beside a mono from the start, and its rounds are slightly squared.' },
-    { id: 'manrope', name: 'Manrope', family: "'FP Manrope'", pkg: '@fontsource/manrope 5.3.0',
-      src: 'github.com/sharanda/manrope', table: { x: 0.540, cap: 0.720 }, bytes: [14108, 14172],
-      why: 'The tallest lower case here, semi condensed with flattened rounds, the closest of the six to the mono’s rectangular o.' },
-    { id: 'ibm-plex-sans', name: 'IBM Plex Sans', family: "'FP IBM Plex Sans'", pkg: '@fontsource/ibm-plex-sans 5.3.0',
-      src: 'github.com/IBM/plex', table: { x: 0.516, cap: 0.698 }, bytes: [22588, 24252],
-      why: 'An engineered grotesk with squared curves and open apertures, made as one family with Plex Mono.' },
-    { id: 'schibsted-grotesk', name: 'Schibsted Grotesk', family: "'FP Schibsted Grotesk'", pkg: '@fontsource/schibsted-grotesk 5.3.0',
-      src: 'github.com/schibsted/schibsted-grotesk', table: { x: 0.527, cap: 0.703 }, bytes: [24344, 25180],
-      why: 'A newspaper grotesk with the mono’s x over cap ratio to the third decimal and plain, wide open terminals.' },
-    { id: 'onest', name: 'Onest', family: "'FP Onest'", pkg: '@fontsource/onest 5.3.1',
-      src: 'github.com/simpals/onest', table: { x: 0.527, cap: 0.707 }, bytes: [14748, 15412],
-      why: 'A geometric grotesk with a tall x-height and generous spacing, the softest of the six.' },
-    { id: 'space-grotesk', name: 'Space Grotesk', family: "'FP Space Grotesk'", pkg: '@fontsource/space-grotesk 5.3.0',
-      src: 'github.com/floriankarsten/space-grotesk', table: { x: 0.486, cap: 0.700 }, bytes: [13388, 13284],
-      why: 'Cut from Space Mono, so it carries a mono’s quirks into a sans, and it is here as the one whose lower case is measurably short.' },
   ];
   const JBM_TABLE = { x: 0.550, cap: 0.730 };
 
@@ -245,31 +198,16 @@
   const SYS_MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
   const SYS_SANS = '-apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif';
   const IN_USE = [
-    { id: 'brand', name: 'Brand JetBrains Mono', family: BRAND, weights: [400, 600],
+    { id: 'brand', name: 'JetBrains Mono', family: BRAND, weights: [400, 600],
       files: [['/shell/vendor/jetbrains-mono-latin-400-normal.woff2', 21168], ['/shell/vendor/jetbrains-mono-latin-600-normal.woff2', 21860]],
-      where: 'Page titles at 600 and 17 px and the sentence under them at 13.5 px, as --brand. The same two files are Slide JetBrains Mono on every slide, with a 4,308 byte Greek file at 600 for the β.',
+      where: 'Everything that names, as --mono (and --brand, its alias): page titles, section headings, eyebrows, buttons, readout cells, logs, keys and tables. The same two files are Slide JetBrains Mono on every slide, with a 4,308 byte Greek file at 600 for the β.',
       slides: true },
-    { id: 'mono', name: '--mono, the device’s mono', family: 'var(--mono)', weights: [400, 600], files: [],
-      where: `Buttons, readout cells, logs, keys and tables, 87 font rules in shell.css. It is ${SYS_MONO}, so SF Mono on a Mac and iPhone and Menlo or the platform mono elsewhere.` },
-    { id: 'sans', name: '--sans, the device’s sans', family: 'var(--sans)', weights: [400, 600], files: [],
-      where: 'Body text at 15 px, every card on the front page and on /kit/, and the card tags. SF Pro on Apple, Segoe UI on Windows, Roboto on Android.' },
-    { id: 'kit-prose', name: 'ui-sans-serif, the kit’s notes', family: 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', weights: [400], files: [],
-      where: 'The note under every heading on a kit page, kit-page.css .kit-n at 13.5 px. A second spelling of the device sans, and on Apple the same face.' },
-    { id: 'accidentals', name: 'positron-accidentals', family: "'positron-accidentals', var(--mono)", weights: [400],
-      files: [['/shell/vendor/bravura-text-accidentals.woff2', 4508]], sample: 'C♯ D♭ E♮ F♯ G♭ A♮ B♭',
-      where: 'Three glyphs from Bravura Text, ♭ ♮ ♯ and nothing else, on every keyboard; the letters beside them stay in --mono. SIL OFL 1.1.' },
+    { id: 'geist', name: 'Geist', family: "'Brand Geist'", weights: [400, 600],
+      files: [['/shell/vendor/geist-latin-400-normal.woff2', 12956], ['/shell/vendor/geist-latin-600-normal.woff2', 13372]],
+      where: 'Everything read through, as --sans: body text, the line under a page title, card text, the kit’s notes and a slide’s body. SIL OFL 1.1.' },
     { id: 'gabarito', name: 'Gabarito', family: "'FP Gabarito'", weights: [400, 600],
       files: [['/weight/vendor/gabarito-latin.woff2', 34320]],
-      where: 'The words drawn on the /weight/ canvas, as weight-display and weight-text, one variable file from 200 to 800 plus a 12,220 byte latin-ext file for Š and Ž. SIL OFL 1.1.' },
-    ...[['atkinson-hyperlegible-mono', 'Atkinson Hyperlegible Mono', [10056, 10040]],
-      ['fira-code', 'Fira Code', [23312, 23316]],
-      ['geist-mono', 'Geist Mono', [9864, 10144]],
-      ['ibm-plex-mono', 'IBM Plex Mono', [14708, 15620]],
-      ['intel-one-mono', 'Intel One Mono', [15764, 17908]],
-      ['source-code-pro', 'Source Code Pro', [11656, 11628]]].map(([slug, name, b]) => ({
-      id: slug, name, family: `'FP ${name}'`, weights: [400, 600],
-      files: [[`/slides/vendor/${slug}-latin-400-normal.woff2`, b[0]], [`/slides/vendor/${slug}-latin-600-normal.woff2`, b[1]]],
-      where: 'One of the faces the archived deck at /slides/ can be switched to, and nowhere else. SIL OFL 1.1.' })),
+      where: 'Only /weight/’s, the words drawn on its canvas, as weight-display and weight-text, one variable file from 200 to 800 plus a 12,220 byte latin-ext file for Š and Ž. SIL OFL 1.1.' },
   ];
 
   const SIZES = [
@@ -310,7 +248,7 @@
   /* ── 2026-10-12, second round: *"to test samples for mixing brand font and
      geist in different size and weights. slides, titles / subtitles"*, with a
      hero crop for the front page set in a plain light sans ── */
-  const G = `'FP Geist', ${SYS_SANS}`;
+  const G = `'Brand Geist', ${SYS_SANS}`;
   const M = `${BRAND}, ${SYS_MONO}`;
   const nameOf = (face) => (face === G ? 'Geist' : 'JetBrains Mono');
   // one line of type: face, weight, size in px, tracking in em, line height
@@ -426,36 +364,31 @@
     }, { bare: true });
 
   // 🔴 SHARP TEST, 2026-10-12: *"Add sharp test"*, then *"Visual sample i
-  // mean"*. plans/plan-fonts-minimal.md proposes dropping Bravura for `#` in
-  // the brand mono; this puts the three choices on real keys and a chord line
-  // to be judged by eye. The keyboards are `createKeyboard` at its real key
-  // size, and only their note labels are changed, here, after they are built.
-  const SH_NOTES = 'C♯4  F♯3  G♯2  A♯5  B♭3';
-  const SHARPS = [
-    { id: 'a', name: '# in JetBrains Mono', swap: true },
-    { id: 'b', name: 'the Bravura sharp, as today' },
-    { id: 'c', name: 'the system’s sharp, no Bravura' },
-  ];
+  // mean"*. It put three ways to write a sharp on real keys: A, `#` in
+  // JetBrains Mono; B, the Bravura sharp the keys drew then; C, the system's
+  // `♯` with no Bravura. The owner said *"A is fine"*, the keys print `#`
+  // since (keyboard.mjs NOTE_NAMES), and A is what is left here, drawn by the
+  // keyboard itself with nothing swapped.
+  // ⚠️ B AND C WENT, AND NOT FOR TIDINESS. B's face, Bravura, was deleted with
+  // its file. C was told apart from the other faces by measuring it in front
+  // of Bravura (a face with the sharp and no `#`), so with Bravura gone the
+  // page could no longer say which face drew C's sharp, and a specimen whose
+  // caption cannot be measured is one this page does not show.
+  const SH_NOTES = 'C#4  F#3  G#2  A#5  Bb3';
   const sharps = [];
   section('SHARP TEST',
-    'The same note names written three ways, on real keys, on a chord line at its real size and at 32 px.',
+    'The sharp as the keys print it, # in the brand mono, on real keys, on a chord line at its real size and at 32 px.',
     null, (box) => {
       box.classList.add('kit-wide');
-      const list = el('div', 'fp-sh-list');
-      for (const v of SHARPS) {
-        const wrap = el('div', `fp-sh fp-sh-${v.id}`);
-        const host = el('div');
-        const kb = createKeyboard(host, { ...keyRange(14), base: 48, letters: false, pad: false, chord: false });
-        const txt = (s) => (v.swap ? s.replace(/♯/g, '#').replace(/♭/g, 'b') : s);
-        for (const kn of host.querySelectorAll('.kn')) kn.textContent = txt(kn.textContent);
-        const line = el('p', 'fp-sh-line', txt(SH_NOTES));
-        const big = el('p', 'fp-sh-big', txt(SH_NOTES));
-        const cap = el('p', 'fp-label-r', 'measuring');
-        wrap.append(el('p', 'fp-sh-n', `${v.id.toUpperCase()}. ${v.name}`), host, line, big, cap);
-        list.append(wrap);
-        sharps.push({ v, host, kb, line, big, cap });
-      }
-      box.append(list);
+      const wrap = el('div', 'fp-sh');
+      const host = el('div');
+      const kb = createKeyboard(host, { ...keyRange(14), base: 48, letters: false, pad: false, chord: false });
+      const line = el('p', 'fp-sh-line', SH_NOTES);
+      const big = el('p', 'fp-sh-big', SH_NOTES);
+      const cap = el('p', 'fp-label-r', 'measuring');
+      wrap.append(el('p', 'fp-sh-n', 'A. # in JetBrains Mono, as shipped'), host, line, big, cap);
+      box.append(wrap);
+      sharps.push({ host, kb, line, big, cap });
     });
 
   /* WHICH FACE DREW THE SHARP, read rather than assumed: the label's own
@@ -463,7 +396,6 @@
      the way the page does, and the ink box of the sharp it draws is matched
      against the ink box each candidate face draws on its own. */
   const SH_FACES = [
-    ['Bravura', "'positron-accidentals'"],
     ['JetBrains Mono', "'Brand JetBrains Mono'"],
     ['SF Mono', 'SFMono-Regular'],
     ['Menlo', 'Menlo'],
@@ -485,26 +417,23 @@
     const got = ink(`400 100px ${canvasStack(fam)}`, ch);
     for (const [name, f] of SH_FACES) {
       // a face that lacks the glyph falls through to whatever is behind it,
-      // so it is put in front of two partners that draw the glyph unlike each
-      // other (Bravura has the sharps and no #, Geist has # and no sharps):
-      // only a face that has the glyph measures the same in front of both.
-      // Two generics are not enough, MEASURED: the system fallback for a
-      // sharp is the same face behind serif and behind monospace.
-      const x = ink(`400 100px ${f}, 'positron-accidentals', serif`, ch);
-      const y = ink(`400 100px ${f}, 'FP Geist', monospace`, ch);
+      // so it is put in front of two partners that draw `#` unlike each other
+      // (the system serif and Geist): only a face that has the glyph measures
+      // the same in front of both.
+      const x = ink(`400 100px ${f}, serif`, ch);
+      const y = ink(`400 100px ${f}, 'Brand Geist', monospace`, ch);
       if (same(x, y) && same(x, got)) return name;
     }
     return 'another system face';
   }
   const shReady = (async () => {
-    await document.fonts.load("400 11px 'positron-accidentals'", '♯♭');
     await document.fonts.load("400 11px 'Brand JetBrains Mono'", 'F#b');
     await document.fonts.ready;
     for (const s of sharps) {
-      const ch = s.v.swap ? '#' : '♯';
+      const ch = '#';
       const fam = getComputedStyle(s.big).fontFamily;
       s.face = whoDrew(fam, ch);
-      const kn = [...s.host.querySelectorAll('.kn')].find((n) => /^F[#♯]/.test(n.textContent));
+      const kn = [...s.host.querySelectorAll('.kn')].find((n) => /^F#/.test(n.textContent));
       s.keyFace = whoDrew(getComputedStyle(kn).fontFamily, ch);
       const stack = `400 100px ${canvasStack(fam)}`;
       const sh = ink(stack, ch), F = ink(stack, 'F');
@@ -547,8 +476,8 @@
   // heading with its note, in four mixes, four steps at 600 and one at 400.
   const TITLE_STEPS = [[17, 13.5], [20, 15], [24, 15], [32, 17]];
   const MIXES = [
-    { name: 'Mono title, mono line (the shell today, at 17 and 13.5)', title: M, what: M },
-    { name: 'Mono title, Geist line', title: M, what: G },
+    { name: 'Mono title, mono line (the shell from 2026-10-06 to 2026-10-12)', title: M, what: M },
+    { name: 'Mono title, Geist line (the shell since 2026-10-12, at 17 and 13.5)', title: M, what: G },
     { name: 'Geist title, Geist line', title: G, what: G },
     { name: 'Geist title, mono line', title: G, what: M },
   ];
@@ -579,7 +508,7 @@
         const hh = el('h4', 'fp-ttl-h', 'Matching sans');
         const hs = t(mx.title, 600, 11, 0.16, 1.2);
         apply(hh, hs);
-        const hn = el('p', 'fp-ttl-w', 'Six openly licensed sans faces, each set beside the brand mono.');
+        const hn = el('p', 'fp-ttl-w', 'Geist for the lines, set beside the brand mono for the names.');
         const ns = t(mx.what, 400, 13.5, 0, 1.6);
         apply(hn, ns);
         sh.append(hh, hn, el('p', 'fp-label-r', `${describe('section heading', hs)}, uppercase; ${describe('note', ns)}`));
@@ -619,17 +548,17 @@
   const measured = new Map();         // id -> { ok, x, cap, w }
   let jbm = null;
 
-  // RECOMMENDATION, the last thing decided, so the first thing on the page.
+  // THE CHOICE, recorded with the measurement it rests on.
   let recBox = null;
-  section('RECOMMENDATION',
-    'One face to set the front page’s prose in beside the brand mono, and the measurement it rests on.',
+  section('THE CHOICE',
+    'The sans the site is set in beside the brand mono, and the measurement it rests on.',
     null, (box) => {
       box.classList.add('kit-wide');
       recBox = el('p', 'fp-rec', 'measuring');
       box.append(recBox);
     });
 
-  // MEASURED, the six against the brand, as a table.
+  // MEASURED, Geist against the brand, as a table.
   let table = null;
   section('MEASURED AGAINST THE BRAND MONO',
     'Lower case height, the lower case over the capitals, and the width of one character, each measured in this browser at 100 px.',
@@ -647,10 +576,10 @@
       box.append(out('x-ht and width in em; size is the 400 and 600 Latin files together'));
     });
 
-  // MATCHING SANS, every candidate set beside the brand mono.
+  // MATCHING SANS, Geist set beside the brand mono.
   const specs = [];
   section('MATCHING SANS',
-    'Six openly licensed sans faces, each set beside the brand mono in a paragraph, under a mono title, over a readout and on a card.',
+    'Geist set beside the brand mono in a paragraph, under a mono title, over a readout and on a card.',
     null, (box) => {
       box.classList.add('kit-wide');
       const list = el('div', 'fp-faces');
@@ -765,18 +694,15 @@
     rows.sort((a, b) => b._x - a._x);
     table.set([{ face: 'JetBrains Mono, the brand', x: fmt(jbm.x), xr: '100%', xc: fmt(jbm.x / jbm.cap), w: fmt(jbm.w), kb: kb(21168 + 21860) }, ...rows]);
 
-    // 🔴 THE RECOMMENDATION IS WRITTEN FROM THE NUMBERS ON THIS PAGE, and
-    // the face it names is a decision taken by looking (REC below), so a
-    // change of mind is one line and the numbers beside it stay measured.
-    const REC = 'manrope';
-    const r = measured.get(REC);
-    const rc = CANDIDATES.find((c) => c.id === REC);
+    // 🔴 THE CHOICE IS RECORDED, AND THE NUMBERS IN IT ARE MEASURED HERE, so
+    // the sentence cannot drift from the face the site loads.
+    const r = measured.get('geist');
+    const rc = CANDIDATES.find((c) => c.id === 'geist');
     recBox.textContent = '';
     if (r?.ok) {
-      recBox.append(el('b', '', rc.name), ` sits closest to JetBrains Mono: its lower case is ${Math.round(r.x / jbm.x * 100)} per cent of the mono’s at the same size, `
-        + `its x over cap is ${fmt(r.x / r.cap)} against the mono’s ${fmt(jbm.x / jbm.cap)}, and its flattened rounds and open apertures read as the same hand, `
-        + `so a mono title and a sans paragraph under it look like one voice at ${kb(rc.bytes[0] + rc.bytes[1])} for both weights.`);
-    } else recBox.textContent = `${rc.name} did not load, so there is nothing measured to recommend it on.`;
+      recBox.append(el('b', '', rc.name), ` is the site’s sans since 2026-10-12, chosen from six faces sampled here: its lower case is ${Math.round(r.x / jbm.x * 100)} per cent of the mono’s at the same size, `
+        + `its x over cap is ${fmt(r.x / r.cap)} against the mono’s ${fmt(jbm.x / jbm.cap)}, and both weights weigh ${kb(rc.bytes[0] + rc.bytes[1])}.`);
+    } else recBox.textContent = `${rc.name} did not load, so there is nothing measured to show.`;
   })();
 
   if (SELFCHECK) {
@@ -794,7 +720,7 @@
         rule.rep.readoutEl.querySelector('.pos-v'), rule.rep.readoutEl.querySelector('.pos-k'), rule.rep.logEl, rule.slide.parts.say];
       const reading = [rule.hero.line, rule.hero.small, rule.what, ...rule.cards.map((c) => c.s), rule.slide.parts.text];
       const bad = [...naming.filter((n) => !n || !MONO.includes(first(n))).map((n) => `naming ${n ? first(n) : 'missing'}`),
-        ...reading.filter((n) => !n || first(n) !== 'FP Geist').map((n) => `reading ${n ? first(n) : 'missing'}`)];
+        ...reading.filter((n) => !n || first(n) !== 'Brand Geist').map((n) => `reading ${n ? first(n) : 'missing'}`)];
       const words = [rule.hero.eye, rule.hero.head, rule.hero.line, rule.hero.small].map((n) => n.textContent);
       d.assert('THE RULE, IN USE: everything that names is in the brand mono and everything read through is in Geist, and the hero is the owner’s copy',
         bad.length === 0 && rule.cards.length === 4 && words.join('|') === [HERO.eye, HERO.head, HERO.line, HERO.small].join('|'),
@@ -809,15 +735,16 @@
         Math.abs(gap - want) <= 0.5, `${gap.toFixed(1)} px against ${want} px`);
     }
 
-    // SHARP TEST: each variant is drawn by the face its label names, on the
-    // keys and on the line
+    // SHARP TEST: the keyboard's own labels say `#`, and JetBrains Mono draws
+    // it on the keys and on the line
     {
       await shReady;
-      const want = { a: (f) => f === 'JetBrains Mono', b: (f) => f === 'Bravura', c: (f) => f !== 'Bravura' && f !== 'JetBrains Mono' };
-      const bad = sharps.filter((s) => !want[s.v.id](s.face) || !want[s.v.id](s.keyFace));
-      d.assert('SHARP TEST: # is drawn by JetBrains Mono, the Bravura sharp by Bravura, and the third by a system face, on the keys and on the line',
-        sharps.length === 3 && bad.length === 0,
-        sharps.map((s) => `${s.v.id.toUpperCase()} ${s.face}, keys ${s.keyFace}`).join('; '));
+      const s = sharps[0];
+      const names = [...s.host.querySelectorAll('.kn')].map((n) => n.textContent);
+      const sharpNames = names.filter((n) => /#/.test(n));
+      d.assert('SHARP TEST: the keyboard names its sharps with #, never ♯, and JetBrains Mono draws the # on the keys and on the line',
+        sharps.length === 1 && sharpNames.length > 0 && !names.some((n) => /[♯♭]/.test(n)) && s.face === 'JetBrains Mono' && s.keyFace === 'JetBrains Mono',
+        `${sharpNames.length} sharp keys, ${sharpNames.slice(0, 3).join(' ')}; line ${s.face}, keys ${s.keyFace}`);
     }
 
     // HERO, TITLES, SLIDES: every specimen is drawn in the face its label
@@ -840,7 +767,7 @@
       for (const { sp, s } of slides) {
         if (first(s.parts.say) !== want(sp.head) || first(s.parts.text) !== want(sp.body)) bad.push(`slide ${sp.name} ${first(s.parts.say)} over ${first(s.parts.text)}`);
       }
-      const both = heroes.some(({ parts }) => first(parts.head) === 'FP Geist') && heroes.some(({ parts }) => first(parts.head) === 'Brand JetBrains Mono');
+      const both = heroes.some(({ parts }) => first(parts.head) === 'Brand Geist') && heroes.some(({ parts }) => first(parts.head) === 'Brand JetBrains Mono');
       d.assert('every hero, title and slide specimen is drawn in the face, weight and size its label names, and both faces appear',
         bad.length === 0 && both && heroes.length === PAIRINGS.length && slides.length === 3,
         bad.length ? bad.slice(0, 4).join(', ') : `${heroes.length} heroes, ${titles.length} titles and ${slides.length} slides, each in its own pairing`);
@@ -866,7 +793,7 @@
         }
       }
       const jOk = Math.abs(jbm.x - JBM_TABLE.x) <= 0.01 && Math.abs(jbm.cap - JBM_TABLE.cap) <= 0.01;
-      d.assert('every candidate loaded, and the x-height and cap height measured here are the ones its own file declares',
+      d.assert('Geist loaded, and the x-height and cap height measured here are the ones its own file declares',
         bad.length === 0 && jOk,
         bad.length || !jOk ? `${bad.join(', ')}${jOk ? '' : `; brand x ${fmt(jbm.x)} cap ${fmt(jbm.cap)}`}`
           : `${CANDIDATES.length} faces and the brand, each within 0.01 em of its OS/2 table`);

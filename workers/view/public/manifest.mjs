@@ -985,7 +985,7 @@ export const DEMOS = [
   // The thirteenth part, 2026-10-12: *"add new kit card / page. name it
   // fronpage. lets work on it. first do typograpy sampler"*.
   { name: 'kit/frontpage', title: 'frontpage', group: 'kit', act: 0, created: '2026-10-12', built: true, unlisted: true,
-    one: 'the faces this site is set in, at every size, and six sans faces measured against the brand mono',
+    one: 'the two faces this site is set in, JetBrains Mono for what names and Geist for what is read through',
     tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.

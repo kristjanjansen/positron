@@ -97,7 +97,7 @@ export const KIT_PARTS = [
   // site is set in today, and the sans faces measured against the brand mono.
   { part: 'frontpage', label: 'FRONTPAGE', ids: [
     'the-rule-in-use', 'sharp-test', 'hero', 'titles-and-subtitles', 'pairings-on-a-slide',
-    'recommendation', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
+    'the-choice', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
   ] },
 ];
 

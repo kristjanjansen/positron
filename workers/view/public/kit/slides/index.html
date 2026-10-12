@@ -1802,12 +1802,24 @@ createTransportBar(fitBox(host, 560).inner, deck, { publish: false, command })`,
       // diagram's own logical px: the screen distance over the fit's scale
       const fitIn = dg.subject().closest('.sl-fit-in');
       const k = parseFloat(fitIn.style.getPropertyValue('--fit-k')) || 1;
+      const inkCv = document.createElement('canvas').getContext('2d');
       const clear = [...dg.subject().querySelectorAll('.pos-dg-n')].map((g) => {
         const box = g.querySelector('.pos-dg-box'), lab = g.querySelector('.pos-dg-lab');
         if (!box || !lab) return Infinity;
         const b = box.getBoundingClientRect(), t = lab.getBoundingClientRect();
         const inner = edge / 2 * k;
-        return Math.min(t.left - (b.left + inner), t.top - (b.top + inner), (b.right - inner) - t.right) / k;
+        // ⚠️ THE TOP IS THE INK'S, NOT THE FONT BOX'S. A text rect starts at
+        // the face's ascent, which is a fact about the font file: JetBrains
+        // Mono's sits about 0.07 em higher than the system mono's, and the
+        // switch on 2026-10-12 read that as 0.4 px of lost air on a label
+        // whose letters had not moved. The ink top is placed in the rect by
+        // the canvas's own measure of this face.
+        const cs = getComputedStyle(lab);
+        inkCv.font = `${cs.fontWeight} 100px ${cs.fontFamily}`;
+        const im = inkCv.measureText(lab.textContent || 'H');
+        const fh = im.fontBoundingBoxAscent + im.fontBoundingBoxDescent;
+        const inkTop = t.top + (im.fontBoundingBoxAscent - im.actualBoundingBoxAscent) / fh * t.height;
+        return Math.min(t.left - (b.left + inner), inkTop - (b.top + inner), (b.right - inner) - t.right) / k;
       }).filter(Number.isFinite);
       const least = Math.min(...clear);
       d.assert('SLIDES: a diagram on a slide draws its edges and arrows at the slide width and keeps the declared air inside every box',

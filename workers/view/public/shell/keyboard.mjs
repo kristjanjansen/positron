@@ -453,12 +453,21 @@ export function createKeyboard(host, {
   // The note goes on TOP because it is the one that changes — an octave shift
   // moves every note name and no letter — and because a player reading a
   // keyboard is looking for a pitch, not for a keystroke.
-  /* 🔴 `♯` U+266F, NOT `#`. The number sign is a transcription of the sharp
-     that a typewriter could reach, and `shell.css` now binds U+266D to U+266F
-     to a subset of Bravura Text so it is drawn as notation rather than as
-     punctuation. The letters beside it stay in the mono face, which is what the
-     `unicode-range` is for. */
-  const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  /* 🔴 `#`, NOT `♯` U+266F, SINCE 2026-10-12, AND IT IS A REVERSAL. On
+     2026-09-23 this chose `♯` over `#` so a sharp was drawn as notation rather
+     than as punctuation, with `shell.css` binding U+266D to U+266F to a 4,508
+     byte subset of Bravura Text. Asked 2026-10-12: *"no bravura needed i hope.
+     can we do without?"*, and decided on the /kit/frontpage/ SHARP TEST as
+     *"A is fine"*, which is `#` in JetBrains Mono.
+     ⚠️ WHY `#`: neither vendored face carries U+266F (MEASURED off each
+     woff2's cmap), so `♯` would fall per glyph to a different system face on
+     every platform. `#` in the mono sits on the line by construction, ink
+     73.0 to 0.0 at 100 px against the `F` beside it at 73.1 to 0, and it is
+     what the chord labels on the same pad already print (`chords.mjs`), so a
+     key and a chord stop spelling one note two ways. What it gives up is the
+     notation shape, and that was the owner's call
+     (plans/plan-fonts-minimal.md section 3). */
+  const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   /**
    * 🔴 A KEY IS NAMED AS A NOTE, AND SINCE 2026-09-28 THERE IS NO SECOND
    * NAMING TO CHOOSE. Instructed: *"finally: rm N | D setting from keyboard

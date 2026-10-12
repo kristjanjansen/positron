@@ -65,9 +65,9 @@
 // slides or inside `createSlidePlayer`. What is missing for a set page is
 // written in plans/plan-slides.md section 13.
 //
-// THE FACE IS JETBRAINS MONO, self-hosted under `shell/vendor/` (copied from
-// the archive's own vendor folder, which keeps its seven). One face, no picker:
-// the picker is the archive's.
+// THE FACE IS JETBRAINS MONO, self-hosted under `shell/vendor/`, the same
+// files the site's `--mono` reads since 2026-10-12. One face, no picker; the
+// archive's picker went the same day.
 //
 // 🔴 KEYS BELONG TO THE PLAYER'S OWN PANEL, NEVER TO `window`. `/kit/` has
 // transport bars, a keyboard with a letter row and step grids, all of which
