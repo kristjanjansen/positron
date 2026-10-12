@@ -112,8 +112,7 @@ export const DEMO_CARDS = {
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid.' },
-  time: { group: 'clock', say: 'The clock every page here runs on, in five tabs from scheduling to dates two thousand years long.', supersededBy: 'clock/000' },
-  sync: { group: 'clock', say: 'Four ways two places agree when something happens, from on arrival to lined up after on a recording.', supersededBy: 'clock/030' },
+  // time and sync archived 2026-10-12 (*"archive time and sync demos"*): still served, listed on /archive/.
   draw: { group: 'draw', say: 'Draw a line and play it back from a recording, to see how much of the gesture playback has to guess.' },
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },

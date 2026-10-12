@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /time/ and /sync/**~~ (2026-10-12). Asked: *"archive time and sync demos"*. DONE by the session as the six before: `unlisted: true`, still served, DEMO_CARDS entries out, listed on /archive/ under retired.
 - **synth/100 scopes: "very nervous visualization. think what to do"** (2026-10-12), on a shot of the two scopes (here: a dense jittering band; Pi: a slow sine with hiss on it). Diagnose and propose first.
 - **clock/010: autoplay instead of the keyboard** (2026-10-12). Asked: *"https://positron.studio/concepts/clock/010/ use autoplay stuff here no keyboard"*. The keyboard goes; a looping line plays on its own (the autoplay synth/110 and others use), started by the page's play.
 - ~~**rhythm/020: rm the per-row sample pickers**~~ (2026-10-12). Asked: *"rm"* on a shot of the kick, snare, open hat, closed hat pickers. DONE by the session: rows play their default by name or order from what was loaded or dropped last.
