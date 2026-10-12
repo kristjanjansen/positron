@@ -17,6 +17,11 @@
 //                                      its OWN WebRTC input (CAM_WHIP_URL)
 //   /stage/watch /stage/status         the same four routes on /stage/'s own
 //   /stage/start /stop                 instance: the MIM film on WHIP, nothing else
+//   wss://pub.positron.studio/loop     /concepts/video/030/'s LL-HLS loopback: the
+//                                      /cam route on its own instance and its OWN
+//                                      input (LOOP_STREAM_KEY), every take deleted
+//   GET  /loop/status                  recordings on that input, account storage
+//   POST /loop/sweep                   the cron's clean, now (once a minute)
 //
 // WHY REFERENCE COUNTING AND NOT sleepAfter ALONE: the Container base class
 // sleeps on REQUEST idleness, and ffmpeg publishing generates no incoming
@@ -26,6 +31,7 @@
 
 import { Container, getContainer } from '@cloudflare/containers';
 import { DurableObject } from 'cloudflare:workers';
+import { LOOP_CLEAN_MS, LOOP_OLD_MS, LOOP_CEIL, loopReady, storage, loopVideos, lifecycle, clean } from './loop.mjs';
 
 const SWEEP_MS = 30_000;   // alarm cadence
 const WHIP_PER_HOUR = 20;  // browser publishes allowed per hour, DO-counted
@@ -74,6 +80,19 @@ const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
 // WebRTC input answers `live: true` with nothing publishing to it, so it is no
 // signal here. Such a session blocks the next camera for at most CAM_MAX_MS and
 // is then replaced.
+// /concepts/video/030/'S LL-HLS LOOPBACK: the camera route above on an instance
+// of its own (`loop`) and an input of its own ("positron-hls-loopback",
+// LOOP_UID, src/provision-loop.sh), so a sweep can delete EVERYTHING on that
+// input. A take is 20 s on the page; LOOP_MAX_MS is the worker's own cap under
+// a page that never stops. Every take is deleted by this object LOOP_CLEAN_MS
+// after it ends, whoever ended it (loop.mjs).
+const LOOP = 'loop';
+const LOOP_MAX_MS = 30_000;
+const LOOP_PER_HOUR = 30;
+const LOOP_RETRY_MS = 30_000;   // a clean that left something, asked again
+const LOOP_TRIES = 6;           // then the cron has it
+const LOOP_SWEEP_GAP_MS = 60_000; // the public sweep route, at most this often
+const LOOP_STATUS_TTL_MS = 5_000; // /loop/status asks Stream at most this often
 const CAM_WHIP_MISSING = 'the camera WebRTC input is not provisioned: the owner runs src/provision-cam-whip.sh, which stores CAM_WHIP_URL';
 
 /**
@@ -156,6 +175,7 @@ const pubOn = (Base, NEXT) => class extends Base {
 
   /** NEXT: a camera session ended, so come back in a minute and retire the box. */
   async #camRetireLater() {
+    if ((await this.#getRole()) === LOOP) return this.#loopArm();
     if (!NEXT || this.#camLive()) return;
     try { await this.ctx.storage.setAlarm(Date.now() + 60_000); } catch { /* the timeout is the floor */ }
   }
@@ -283,7 +303,7 @@ const pubOn = (Base, NEXT) => class extends Base {
   async fetch(request) {
     const url = new URL(request.url);
     const hdr = request.headers.get('x-pub-role');
-    const told = hdr === STAGE ? STAGE : hdr === CAM ? CAM : 'main';
+    const told = hdr === STAGE ? STAGE : hdr === CAM ? CAM : hdr === LOOP ? LOOP : 'main';
     if ((await this.#getRole()) !== told) {
       this.#role = told;
       try { await this.ctx.storage.put('role', told); } catch { /* re-told on the next request */ }
@@ -323,7 +343,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     // a bare close with no reason. The socket is accepted, told
     // `{t:'busy', status: 409, error}` and closed with 4409, and the page can
     // say why in words. A plain GET answers the same question with a real 409.
-    if (url.pathname === '/cam' && (await this.#getRole()) === CAM) {
+    const role = await this.#getRole();
+    if (url.pathname === '/cam' && (role === CAM || role === LOOP)) {
+      const loop = role === LOOP;
       const busy = this.#camBusy();
       if (request.headers.get('Upgrade') !== 'websocket') {
         return json(busy || { free: true }, busy ? 409 : 200);
@@ -331,9 +353,11 @@ const pubOn = (Base, NEXT) => class extends Base {
       const pair = new WebSocketPair();
       const now = Date.now();
       this.#camHits = this.#camHits.filter((t) => now - t < 3600_000);
+      const perHour = loop ? LOOP_PER_HOUR : CAM_PER_HOUR;
       const refuse = busy
-        || (this.#camHits.length >= CAM_PER_HOUR ? { error: 'too many camera sessions this hour', limit: CAM_PER_HOUR, status: 429 } : null)
-        || (!this.env.CAM_STREAM_KEY ? { error: 'no camera stream key on this worker', status: 503 } : null);
+        || (this.#camHits.length >= perHour ? { error: 'too many camera sessions this hour', limit: perHour, status: 429 } : null)
+        || (!this.#camKey() ? { error: 'no camera stream key on this worker', status: 503 } : null)
+        || (loop ? await this.#loopGuard() : null);
       if (refuse) {
         this.ctx.acceptWebSocket(pair[1], ['cam-refused']);
         pair[1].serializeAttachment({ role: 'refused' });
@@ -348,9 +372,23 @@ const pubOn = (Base, NEXT) => class extends Base {
       this.ctx.acceptWebSocket(pair[1], ['cam']);
       pair[1].serializeAttachment({ role: 'cam', sid, at: now });
       this.#cam = { sid, at: now, lastAt: now, bytes: 0, chunks: 0, open: false, chain: Promise.resolve(), ws: pair[1] };
+      if (loop) await this.#loopPut('loopTake', { sid, at: now, uid: null });
       await this.ctx.storage.setAlarm(now + CAM_TICK_MS);
-      try { pair[1].send(JSON.stringify({ t: 'hello', sid, maxS: CAM_MAX_MS / 1000 })); } catch { /* raced */ }
+      try { pair[1].send(JSON.stringify({ t: 'hello', sid, maxS: this.#camMax() / 1000 })); } catch { /* raced */ }
       return new Response(null, { status: 101, webSocket: pair[0] });
+    }
+
+    if (role === LOOP && url.pathname === '/status') return json(await this.#loopStatus(url.searchParams.get('fresh') === '1'));
+    if (role === LOOP && url.pathname === '/sweep' && request.method === 'POST') {
+      const cron = request.headers.get('x-pub-cron') === '1';
+      const last = await this.ctx.storage.get('loopSweep');
+      if (!cron && last && Date.now() - Date.parse(last.at) < LOOP_SWEEP_GAP_MS) {
+        return json({ error: 'swept less than a minute ago', last }, 429);
+      }
+      const r = await clean(this.env, { olderThanMs: LOOP_OLD_MS, why: cron ? 'cron' : 'asked' });
+      await this.#loopPut('loopSweep', r);
+      this.#loopCache = null;
+      return json(r);
     }
 
     if (url.pathname === '/status') {
@@ -661,6 +699,121 @@ const pubOn = (Base, NEXT) => class extends Base {
    * because a viewer socket accepted before tags existed is restored untagged
    * after a deploy, and it is still somebody watching.
    */
+  /** Which input a camera session goes to, by role. */
+  #camKey() { return this.#role === LOOP ? this.env.LOOP_STREAM_KEY : this.env.CAM_STREAM_KEY; }
+  #camMax() { return this.#role === LOOP ? LOOP_MAX_MS : CAM_MAX_MS; }
+
+  async #loopPut(k, v) { try { await this.ctx.storage.put(k, v); } catch { /* the cron is the floor */ } }
+  async #loopGet(k, d) { try { return (await this.ctx.storage.get(k)) ?? d; } catch { return d; } }
+
+  /**
+   * 🔴 A TAKE IS REFUSED WHEN THE ACCOUNT IS NEAR ITS CAP, so even a cleanup
+   * that failed every time cannot fill the 1000 minutes during a demo. And
+   * refused when the storage cannot be read, for the same reason: a take
+   * nobody can account for is the one this guard exists to stop.
+   */
+  async #loopGuard() {
+    if (!loopReady(this.env)) return { error: 'the loopback input is not provisioned: the owner runs src/provision-loop.sh', status: 503 };
+    let s;
+    try { s = await storage(this.env); }
+    catch { return { error: 'could not read the account\'s Stream storage, so no take', status: 503 }; }
+    if (s.used >= LOOP_CEIL) {
+      return { error: `the account holds ${Math.round(s.used)} of ${s.cap} Stream storage minutes, over the ${LOOP_CEIL} this loopback stops at`, status: 507, used: s.used };
+    }
+    return null;
+  }
+
+  /**
+   * A take ended, however it ended (the page's stop, a closed tab, the idle
+   * check, the cap). Its clean is queued in STORAGE with the uid read off the
+   * lifecycle while it ran, and the alarm comes back LOOP_CLEAN_MS later. No
+   * page is involved from here on.
+   */
+  async #loopEnded(sid) {
+    if ((await this.#getRole()) !== LOOP) return;
+    const take = await this.#loopGet('loopTake', null);
+    const pending = await this.#loopGet('loopPending', []);
+    const now = Date.now();
+    if (!pending.some((p) => p.sid && p.sid === (take?.sid || sid))) {
+      pending.push({ sid: take?.sid || sid || null, uid: take?.uid || null, endedAt: now, due: now + LOOP_CLEAN_MS, tries: 0 });
+    }
+    await this.#loopPut('loopPending', pending);
+    try { await this.ctx.storage.delete('loopTake'); } catch { /* replaced by the next take */ }
+    await this.#loopArm();
+  }
+
+  /** One alarm per object, so the loop role sets it to the EARLIEST thing due. */
+  async #loopArm() {
+    const now = Date.now();
+    const pending = await this.#loopGet('loopPending', []);
+    const due = [];
+    if (this.#camLive()) due.push(now + CAM_TICK_MS);
+    for (const p of pending) due.push(Math.max(p.due, now + 1000));
+    if (NEXT && !this.#camLive() && (this.ctx.container.running || this.#booting)) due.push(now + 60_000);
+    if (!due.length) return;
+    try { await this.ctx.storage.setAlarm(Math.min(...due)); } catch { /* the cron is the floor */ }
+  }
+
+  async #loopAlarm() {
+    const now = Date.now();
+    const c = this.#camLive() ? this.#camState() : null;
+    if (c) {
+      if (c.open && now - c.lastAt > CAM_IDLE_MS) await this.#endCam('stopped', `no video from the camera for ${Math.round((now - c.lastAt) / 1000)} s`);
+      else if (now - c.at > LOOP_MAX_MS) await this.#endCam('stopped', `a take is capped at ${LOOP_MAX_MS / 1000} s, because every one is recorded on Stream`);
+      else {
+        // The take's own video, while Stream still says which it is.
+        const take = await this.#loopGet('loopTake', null);
+        if (take && !take.uid) {
+          try {
+            const l = await lifecycle(this.env);
+            if (l?.live && l.videoUID) await this.#loopPut('loopTake', { ...take, uid: l.videoUID });
+          } catch { /* the list at clean time is the other half */ }
+        }
+      }
+    }
+    // Every clean that is due. A clean that leaves something (a recording not
+    // yet finished, a failed DELETE) is asked again; after LOOP_TRIES the cron
+    // has it, and it never lets go of anything older than five minutes.
+    const pending = await this.#loopGet('loopPending', []);
+    const left = [];
+    for (const p of pending) {
+      if (p.due > now) { left.push(p); continue; }
+      const r = await clean(this.env, { uids: [p.uid], why: `take ${p.sid || '?'} ended ${Math.round((now - p.endedAt) / 1000)} s ago` });
+      r.take = p.sid;
+      await this.#loopPut('loopClean', r);
+      this.#loopCache = null;
+      // Asked again: a failure, a recording still closing with no take running,
+      // or nothing found yet on the first two passes (a video can be listed late).
+      const rest = !r.ok || r.kept.some((k) => k.why === 'still live' && !this.#camLive())
+        || (r.deleted.length === 0 && p.tries < 2);
+      if (rest && p.tries + 1 < LOOP_TRIES) left.push({ ...p, tries: p.tries + 1, due: now + LOOP_RETRY_MS });
+    }
+    await this.#loopPut('loopPending', left);
+    if (!this.#camLive()) {
+      const last = Math.max(0, ...pending.map((p) => p.endedAt || 0));
+      if (now - last >= 60_000) await this.#retire();
+    }
+    await this.#loopArm();
+  }
+
+  #loopCache = null;
+  /** What is on the loopback input right now, and the account's storage. */
+  async #loopStatus(fresh) {
+    const now = Date.now();
+    if (!fresh && this.#loopCache && now - this.#loopCache.t < LOOP_STATUS_TTL_MS) return this.#loopCache.v;
+    const v = { input: this.env.LOOP_UID || null, take: null, recordings: null, storage: null, ceiling: LOOP_CEIL };
+    if (!loopReady(this.env)) { v.error = 'not provisioned'; return v; }
+    const take = await this.#loopGet('loopTake', null);
+    v.take = this.#camLive() && take ? { sid: take.sid, ageS: Math.round((now - take.at) / 1000), uid: take.uid } : null;
+    try { v.recordings = await loopVideos(this.env); } catch (e) { v.recordingsError = String(e.message || e); }
+    try { v.storage = await storage(this.env); } catch (e) { v.storageError = String(e.message || e); }
+    v.pending = (await this.#loopGet('loopPending', [])).map((p) => ({ sid: p.sid, uid: p.uid, inS: Math.max(0, Math.round((p.due - now) / 1000)), tries: p.tries }));
+    v.lastClean = await this.#loopGet('loopClean', null);
+    v.lastSweep = await this.#loopGet('loopSweep', null);
+    this.#loopCache = { t: now, v };
+    return v;
+  }
+
   viewers() {
     return this.ctx.getWebSockets().length
       - this.ctx.getWebSockets('cam').length
@@ -715,6 +868,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         body: JSON.stringify({ sid: c?.sid, why }),
       }));
     } catch { /* the container's watchdog is the floor */ }
+    await this.#loopEnded(c?.sid);
     await this.#camRetireLater();
   }
 
@@ -786,6 +940,7 @@ const pubOn = (Base, NEXT) => class extends Base {
     // a clock, a socket that went quiet without closing and the length cap,
     // checked every CAM_TICK_MS while a camera is live. It never runs the
     // viewer sweep below, which is about the test pattern.
+    if ((await this.#getRole()) === LOOP) return this.#loopAlarm();
     if ((await this.#getRole()) === CAM) {
       const c = this.#camLive() ? this.#camState() : null;
       // NEXT: no camera left, so the box goes (see #retire). The alarm that
@@ -885,6 +1040,7 @@ const pubOn = (Base, NEXT) => class extends Base {
             body: JSON.stringify({ sid: a.sid, why: 'the camera page closed its socket' }),
           }));
         } catch { /* the container's watchdog is the floor */ }
+        await this.#loopEnded(a.sid);
         await this.#camRetireLater();
       }
       return;
@@ -904,6 +1060,9 @@ const pubOn = (Base, NEXT) => class extends Base {
   async webSocketMessage(ws, msg) {
     const a = ws.deserializeAttachment?.() || {};
     if (a.role !== 'cam') return;
+    // 🔴 THE ROLE DECIDES THE INPUT (#camKey), and a woken object has
+    // forgotten it: read it back before anything here can need it.
+    await this.#getRole();
     const c = this.#camState();
     if (!c || c.sid !== a.sid) return;
     if (typeof msg === 'string') {
@@ -926,7 +1085,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         for (let i = 0; i < 5; i++) {
           r = await this.#c(new Request('http://c/cam/open', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ key: this.env.CAM_STREAM_KEY, fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
+            body: JSON.stringify({ key: this.#camKey(), fmt: m.fmt === 'mp4' ? 'mp4' : 'webm', sid: c.sid }),
           }));
           if (r.status !== 503 || this.#cam !== c) break;
           await new Promise((ok) => setTimeout(ok, 3000));
@@ -1036,6 +1195,17 @@ export default {
       req.headers.set('x-pub-role', CAM);
       return getContainer(ns(env, url), CAM).fetch(req);
     }
+    // /loop, /loop/status and /loop/sweep are the loopback instance: the
+    // camera route on the loopback's own input, and what is on that input.
+    if (url.pathname === '/loop' || url.pathname === '/loop/status' || url.pathname === '/loop/sweep') {
+      url.pathname = url.pathname === '/loop' ? '/cam' : url.pathname.slice('/loop'.length);
+      const req = new Request(url, request);
+      req.headers.set('x-pub-role', LOOP);
+      req.headers.delete('x-pub-cron');
+      // The NEW runtime only, whatever ?rt= says: `Pub` is capped at three
+      // instances and all three are taken (wrangler.jsonc).
+      return getContainer(env.PUB_NEXT || env.PUB, LOOP).fetch(req);
+    }
     // /cam and /cam/status are the camera instance, and nothing else reaches it.
     if (url.pathname === '/cam' || url.pathname === '/cam/status') {
       if (url.pathname === '/cam/status') url.pathname = '/status';
@@ -1046,5 +1216,21 @@ export default {
     const req = new Request(request);
     req.headers.delete('x-pub-role');
     return getContainer(ns(env, url), NAME).fetch(req);
+  },
+
+  /**
+   * THE LOOPBACK'S CRON, every 10 minutes (wrangler.jsonc): delete anything on
+   * the loopback input older than five minutes, whatever happened to the
+   * per-take clean. Run inside the loopback's object so the last sweep is
+   * readable at /loop/status, and logged for the dashboard.
+   * ⚠️ IT REACHES THE OBJECT ON THE NEW RUNTIME, as /loop does, and only the
+   * loop role's /sweep, which starts no container.
+   */
+  async scheduled(_event, env, ctx) {
+    const url = new URL('https://pub.positron.studio/sweep');
+    const req = new Request(url, { method: 'POST', headers: { 'x-pub-role': LOOP, 'x-pub-cron': '1' } });
+    ctx.waitUntil(getContainer(env.PUB_NEXT || env.PUB, LOOP).fetch(req)
+      .then((r) => r.text())
+      .then((t) => console.log(`loop sweep ${t}`), (e) => console.log(`loop sweep failed ${e}`)));
   },
 };

@@ -46,7 +46,9 @@
       // after the application is created", so `Pub` above cannot be switched.
       // This policy refuses `image`, `instance_type` and `max_instances`: the
       // size above travels in code (NEXT_INSTANCE in worker.mjs), and the cap
-      // of three is the entry worker's three instance names.
+      // of three is the entry worker's three instance names. FOUR since
+      // 2026-10-12: `loop`, the LL-HLS loopback, exists on this runtime only,
+      // so `?rt=legacy` cannot reach it (`Pub` above stays capped at three).
       "class_name": "PubNext",
       "scheduling_policy": "durable_object",
       "images": { "pub": { "dockerfile": "./container/Dockerfile" } }
@@ -83,7 +85,19 @@
     // WHICH CLASS ANSWERS: "legacy" is `Pub`, "next" is `PubNext`. `?rt=` on
     // any request overrides it, which is how the new one was driven live
     // before anybody's viewers were moved.
-    "PUB_RT": "next"
+    "PUB_RT": "next",
+    // /concepts/video/030/'s LL-HLS LOOPBACK INPUT, "positron-hls-loopback"
+    // (src/provision-loop.sh), by uid and never by name: every recording on it
+    // is deleted (loop.mjs). Public, it is in every HLS play URL. The customer
+    // code is the lifecycle URL's host, as in demo/shell/live.mjs.
+    "LOOP_UID": "aafa09fdefc39016203fb23129bf5df3",
+    "STREAM_CUSTOMER": "customer-mwuu1cmlyif6eluy"
   },
+  // THE LOOPBACK'S SWEEP, every 10 minutes: anything on the loopback input
+  // older than 5 minutes is deleted, whatever the per-take clean managed.
+  // Cron triggers are per ACCOUNT: 250 on Workers Paid (this account runs
+  // Containers, which need Paid); positron-ingest and positron-sweep hold one
+  // each in this repository, so this is the third.
+  "triggers": { "crons": ["*/10 * * * *"] },
   "observability": { "enabled": true }
 }
