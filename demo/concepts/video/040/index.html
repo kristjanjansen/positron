@@ -13,25 +13,25 @@
      group, so it sits on no text line. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* Three pictures side by side, each a third of the content width (asked
-     2026-10-12, *"add 1/3 1/3 1/3 videpanels. etv, mix, etv2"*): ETV as it
-     arrives, the dithered mix, ETV2 as it arrives. On a phone they stack in the
-     same order, so the mix still sits between the two pictures it is made of. */
-  .cc-tri { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-  @media (max-width: 560px) { .cc-tri { grid-template-columns: minmax(0, 1fr); } }
-  /* A side panel whose link is let go shows its ground, not a frozen frame.
+  /* Four pictures in a 2x2 grid (asked 2026-10-12, *"tv with 3 screens: to
+     2x2 grid. etv etv2 just blend, fx blend"*): the two channels as they
+     arrive on top, the plain crossfade and the dithered one under them. On a
+     phone they stack in that order, sources first, then what is made of them. */
+  .cc-quad { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 560px) { .cc-quad { grid-template-columns: minmax(0, 1fr); } }
+  /* A panel whose link is let go shows its ground, not a frozen frame.
      `visibility` and not `[hidden]`: the kit's `display: block` on a stage's
      video beats the browser's own `[hidden]`. */
-  .cc-tri .pos-vp-stage > video.cc-off { visibility: hidden; }
+  .cc-quad .pos-vp-stage > .cc-off { visibility: hidden; }
   /* The kit's bare `video` rule gives every video a card, an edge and a radius,
      which inside a panel's stage draws a box within the box. Through the kit's
-     own tokens, so the stage's ground shows as it does under the middle
-     canvas. Belongs in shell.css at `.pos-vp-stage > video`. */
-  .cc-tri .pos-vp-stage > video { --edge: 0px; --r: 0px; background: transparent; }
-  /* One ground for all three, the page's own dark: the dither clears its
-     canvas to it (11, 14, 20) before a frame, so the side stages match it.
-     Asked 2026-10-12: *"same bg on all"*. */
-  .cc-tri .pos-vp-stage { background: var(--bg); }
+     own tokens, so the stage's ground shows as it does under the two blend
+     canvases. Belongs in shell.css at `.pos-vp-stage > video`. */
+  .cc-quad .pos-vp-stage > video { --edge: 0px; --r: 0px; background: transparent; }
+  /* One ground for all four, the page's own dark: the dither clears its
+     canvas to it (11, 14, 20) before a frame, the mixer fills its own with the
+     same, and the channel stages match it. Asked 2026-10-12: *"same bg on all"*. */
+  .cc-quad .pos-vp-stage { background: var(--bg); }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -50,15 +50,16 @@
   import { CHANNELS, NATIVE_HLS, readPlaylist, findServedEdge, wallHandler } from '/shell/err-live.mjs';
 
   // Two ERR television channels live, mixed into one picture, dithered, and
-  // shown between the two pictures it is made of. The chain is ETV and ETV2
-  // into `web:mixer`, the mixer into `web:dither`, the dither into
-  // `web:screen` (the middle panel), and each channel also straight into a
-  // panel of its own (`web:etv-panel`, `web:etv2-panel`), so what goes into
-  // the mix is on screen beside it. Every step follows the links the bay holds.
+  // shown under the two pictures it is made of. The chain is ETV and ETV2
+  // into `web:mixer`, the mixer into `web:blend-panel` (the plain crossfade)
+  // and into `web:dither`, the dither into `web:screen` (the fx blend), and
+  // each channel also straight into a panel of its own (`web:etv-panel`,
+  // `web:etv2-panel`), so what goes into the mix is on screen above it. Every
+  // step follows the links the bay holds.
   //
-  // THE SIDE PANELS SHOW THE RAW SOURCE, NOT A DITHERED ONE. The mixer takes
+  // THE CHANNEL PANELS SHOW THE RAW SOURCE, NOT A DITHERED ONE. The mixer takes
   // the channels as they arrive and the dither runs once, after the mix, so
-  // the raw picture is exactly what goes into the mix. A dithered side panel
+  // the raw picture is exactly what goes into the mix. A dithered channel panel
   // would show something no wire on the patchbay carries, and the dither's
   // effect would be invisible because nothing undithered stood beside it. The pictures come straight from ERR's own CDN
   // (live.err.ee), not through positron's relay, and the patchbay says so.
@@ -108,6 +109,7 @@
   const MIX_IN = `${S}:mixer:video-in`, MIX_OUT = `${S}:mixer:video-out`;
   const DITH_IN = `${S}:dither:video-in`, DITH_OUT = `${S}:dither:video-out`, DITH_VAL = `${S}:dither:value-in`;
   const SCREEN_IN = `${S}:screen:video-in`;
+  const BLEND_IN = `${S}:blend-panel:video-in`;
   const SIDE_IN = (c) => `${S}:${c.id}-panel:video-in`;
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
@@ -155,8 +157,11 @@
     bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: 'knob', place: 'browser' });
     bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
   }
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'mix panel', place: 'browser' });
-  bay.addPort({ id: SCREEN_IN, label: 'mix panel', dir: 'in', medium: 'video' });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'fx blend panel', place: 'browser' });
+  bay.addPort({ id: SCREEN_IN, label: 'fx blend panel', dir: 'in', medium: 'video' });
+  // The mixer's picture as it is, before the dither: one out to two ins.
+  bay.addNode({ id: `${S}:blend-panel`, kind: 'screen', label: 'blend panel', place: 'browser' });
+  bay.addPort({ id: BLEND_IN, label: 'blend panel', dir: 'in', medium: 'video' });
   // A panel per channel, fed by the same picture-out that feeds the mixer: one
   // out to two ins, the source seen as it is and as it goes into the mix.
   for (const c of ON_PAGE) {
@@ -189,6 +194,7 @@
     hold(vOut(c), MIX_IN, { consent: true, via: 'llhls' });
     hold(aOut(c), FADER_IN, { consent: true, via: 'llhls' });
   }
+  hold(MIX_OUT, BLEND_IN);
   hold(MIX_OUT, DITH_IN);
   hold(DITH_OUT, SCREEN_IN);
   for (const k of KNOBS) hold(KNOB_OUT(k.name), DITH_VAL);
@@ -228,7 +234,8 @@
   function drawMix() {
     mctx.globalCompositeOperation = 'source-over';
     mctx.globalAlpha = 1;
-    mctx.fillStyle = '#000';
+    // The page's ground, so the blend panel matches the other three.
+    mctx.fillStyle = 'rgb(11, 14, 20)';
     mctx.fillRect(0, 0, FRAME_W, FRAME_H);
     let n = 0;
     // ETV first, at full strength, as the base layer.
@@ -245,19 +252,23 @@
     if (mixHas) lastMix = performance.now();
   }
 
-  // ── the middle panel: one canvas, the dither's output ───────────────────
+  // ── the blend panel: the mixer's own canvas, shown as it is ─────────────
+  const blendWho = el('span', 'cc-say', '');
+  const blendPanel = createVideoPanel({ media: mix, left: blendWho });
+
+  // ── the fx blend panel: one canvas, the dither's output ─────────────────
   const canvas = el('canvas');
   canvas.width = FRAME_W; canvas.height = FRAME_H;
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
-  // One footer line per panel. The middle says what it mixes at the left and
-  // the dither size at the right; each side panel names its channel and its
-  // resolution, so the middle no longer repeats one of them.
+  // One footer line per panel. The fx blend names itself at the left and
+  // the dither size at the right; each channel panel names its channel and its
+  // resolution.
   const who = el('span', 'cc-say', '');
   const dsize = el('span', 'cc-say', gl ? '' : 'no WebGL2');
   const panel = createVideoPanel({ media: canvas, left: who });
   panel.el.querySelector('.pos-vp-r').prepend(dsize);
-  const tri = el('div', 'cc-tri');
-  tri.append(tv[0].panel.el, panel.el, tv[1].panel.el);
+  const quad = el('div', 'cc-quad');
+  quad.append(tv[0].panel.el, tv[1].panel.el, blendPanel.el, panel.el);
 
   let prog = null, tex = null, U = {}, tainted = false;
   if (gl) {
@@ -341,7 +352,7 @@
   }
 
   // A frame arrived when the playhead moved. Read off the draw loop rather
-  // than requestVideoFrameCallback, because a side panel whose link is let go
+  // than requestVideoFrameCallback, because a channel panel whose link is let go
   // hides its picture and a browser may skip presenting what nobody can see.
   function watchFrames() {
     const now = performance.now();
@@ -356,15 +367,17 @@
       if (first) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
     }
   }
-  // A side panel follows its own link: let go, it shows its ground.
+  // A channel panel and the blend panel follow their own links: let go, they
+  // show their ground.
   function sides() {
     for (const ch of tv) ch.video.classList.toggle('cc-off', !holds(vOut(ch.c), SIDE_IN(ch.c)));
+    mix.classList.toggle('cc-off', !holds(MIX_OUT, BLEND_IN));
   }
   function render() { watchFrames(); drawMix(); dither(); sides(); }
   let raf = 0;
   function frame() { render(); if (playing) raf = requestAnimationFrame(frame); }
 
-  // Each side panel's own resolution, under its own picture.
+  // Each channel panel's own resolution, under its own picture.
   function showSize() {
     for (const ch of tv) {
       const v = ch.video;
@@ -374,7 +387,8 @@
   // The footers name no shares (asked 2026-10-10, *"rm ETV 34 ETV2 66"*): the
   // fader's end labels already say which is which. Empty while stopped.
   function showWho() {
-    who.textContent = playing ? 'mix' : '';
+    who.textContent = playing ? 'fx blend' : '';
+    blendWho.textContent = playing ? 'blend' : '';
     for (const ch of tv) ch.name.textContent = playing ? ch.c.name : '';
   }
   function showDither() {
@@ -570,14 +584,14 @@
   const grid = createKnobGrid(knobs, { row: true });
 
   applyFade();
-  // Linear, as every concept instrument: the three pictures, the fader under
+  // Linear, as every concept instrument: the four pictures, the fader under
   // them (ETV at its left end under ETV, ETV2 at its right under ETV2), then
   // the knobs area, then the patchbay.
-  d.stack.add(top, tri, fader.el, grid.el, pb.el);
+  d.stack.add(top, quad, fader.el, grid.el, pb.el);
   window.__demo.knobs = grid;
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,
-    footer: () => ({ left: who.textContent, right: dsize.textContent,
+    footer: () => ({ left: who.textContent, right: dsize.textContent, blend: blendWho.textContent,
       sides: tv.map((ch) => ({ left: ch.name.textContent, right: ch.res.textContent })) }),
     dither: () => ({ gl: !!gl, compiled: !!prog, size: P.size, tainted, mixing: mixHas }),
     channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames,
