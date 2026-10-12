@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 060</title>
+<title>POSITRON Play together</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/060, AHEAD LINK, 2026-10-12. One idea: a link can carry the
@@ -29,7 +29,6 @@
   // two audio times the two synths chose for one note.
   //
   // Nothing opens on a visit. Play, or the first key, joins the room.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -64,13 +63,12 @@
   const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:synth`, kind: 'engine', label: 'synth', place: 'browser' }],
     [{ id: SYN.there, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] }]);
 
-  const d = mount({ name: 'concept clock 060', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Play together', what: '', index: '/archive/', indexLabel: 'archive',
     // The cells under the title and the log alone at the foot, as clock/030.
     joined: false,
     // How far apart the two places sound one note, typical and worst; what the
     // second place found its clock off by, and the round trip that rests on.
     readout: { apart: 'ms', worst: 'ms', 'offset found': 'ms', 'round trip': 'ms' } });
-  conceptNav('clock/060');
 
   // ── one sound card, read by both places ─────────────────────────────────
   let ctx = null, anchor = null;

@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 070</title>
+<title>POSITRON Replay</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-rec { color: var(--rec, #e5484d); }
@@ -38,7 +38,6 @@
   // recorder's start gap unmeasured); see `record()` for what was found.
   //
   // Nothing opens on a visit. Record joins the room and starts the recorder.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -84,12 +83,11 @@
     { id: SCREEN, label: 'screen', dir: 'in', medium: 'video' },
   ]);
 
-  const d = mount({ name: 'concept clock 070', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Replay', what: '', index: '/archive/', indexLabel: 'archive',
     joined: false,
     // How far each note lands from its own flash in the recording, typical and
     // worst; the same against arrival times; and how many notes the take holds.
     readout: { 'off by': 'ms', worst: 'ms', 'by arrival': 'ms', notes: '' } });
-  conceptNav('clock/070');
 
   // ── one sound card ──────────────────────────────────────────────────────
   let ctx = null, anchor = null;

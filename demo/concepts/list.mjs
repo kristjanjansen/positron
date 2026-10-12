@@ -68,9 +68,8 @@ export const CONCEPTS = [
   { n: 'clock/020', title: 'Audio cushion', say: 'Sound over the relay waits in a cushion you set, trading lag for gaps.' },
   { n: 'clock/030', title: 'Shared clock', say: 'Two places agree the time once and play the same beat with nothing sent per beat, and a third can join mid-beat.' },
   { n: 'clock/040', title: 'MIDI clock', say: 'The same beat sent as 24 ticks a beat or as one anchor, and how far each lands from the beat.' },
+  // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
   { n: 'clock/050', title: 'Clock drift', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
-  { n: 'clock/060', title: 'Play together', say: 'A link carrying the shared clock makes one note sound at the same moment in two places.' },
-  { n: 'clock/070', title: 'Replay', say: 'Keys and a picture recorded, then played back with the recording as the clock.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
@@ -117,7 +116,7 @@ export const DEMO_CARDS = {
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'A 16 step grid playing the samples out of a pack.' },
   time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/000' },
-  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/060' },
+  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/030' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'Every 1965 newsreel in ERR\'s archive on one line of days.' },
