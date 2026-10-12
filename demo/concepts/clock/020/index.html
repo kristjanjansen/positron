@@ -214,7 +214,7 @@
   }
   const band = (ms) => (Math.abs(ms) < 3 ? '#8fd6a8' : Math.abs(ms) < 20 ? '#ffd400' : '#e0908a');
   let first = null;
-  const WINDOW = 8000;
+  const WINDOW = 8000;           // the shortest run shown, so the first beats are not the whole width
   setInterval(() => {
     if (!there.peer) return;
     const ps = there.peer.peers().filter((p) => Number.isFinite(p.rttMs));
@@ -232,7 +232,7 @@
     if (first != null) {
       const end = here.now() - first + 1000;
       deck.setRange([0, Math.max(WINDOW, end)]);
-      view.strip.fit(Math.max(0, end - WINDOW), Math.max(WINDOW, end));
+      view.strip.fit();
     }
     view.strip.invalidate();
   }, 250);
@@ -294,9 +294,17 @@
   const pb = createPatchbay(named(heldPicture(bayHere, HERE, { star: 'every other place' })), { room: 'clock' });
   hovers(pb.el, 'clock');
 
-  requestAnimationFrame(() => { view.strip.fit(0, WINDOW); view.strip.invalidate(); });
+  // The whole run in view, scaling out as it grows, never a moving window. Asked
+  // 2026-10-12: *"do not scroll, just scale out like typist etc"*. Fit with the
+  // strip's own fit(), and again whenever its width changes, as /concepts/typist/040/
+  // does: a canvas has no width until it is on the page.
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = view.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
+  }).observe(view.el);
   d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); ctx?.close(); });
-  window.__clock = { here, there, gaps };
+  window.__clock = { here, there, gaps, view: () => view.strip.view(), first: () => first };
   d.ready();
 </script>
