@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Plaits synth</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Play alone at the top left, as /concepts/synth/070/. */
+  .cc-top { display: flex; align-items: center; gap: 12px; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  /* The patch selector is a full width block under the scope, as 070: the
+     name cell takes the width between the two arrows. (0,2,0) beats the
+     cell's own width. */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+
+  // A basic Plaits concept. Asked 2026-10-12 (BACKLOG, "A basic Plaits
+  // concept"): *"do basic plaits concept with patchbay. play button, scope,
+  // tibre and morth params, patch selector, patchbay. pick good interesting
+  // patches. unders synths group"*.
+  //
+  // THE VOICE IS /muta/'s, NOT A COPY: the same `muta-worklet.js` processor
+  // (`plai-voice`) and the same `plai.wasm`, Emilie Gillet's Plaits compiled
+  // unmodified. The bytes are fetched on the main thread and posted to the
+  // worklet, because a worklet cannot fetch (the worklet's header has why).
+  //
+  // PLAY IS A SLOW SEQUENCE OF HELD NOTES. One held note forever would be a
+  // static drone that never shows the engine changing pitch or re-striking,
+  // and short triggers were refused (*"no bell sounds please or drums. longer
+  // stuff"*). So the pattern node steps through four or five notes that belong
+  // to the patch, every 1.5 to 2.6 s, each held open for about as long again,
+  // so neighbours overlap and the long `decay` lets each one ring out.
+  //
+  // THE BAY, every arrow a link the sound actually follows:
+  //   web:pattern:midi-out  -> web:plaits:midi-in   the held notes, on and off
+  //   web:patch:midi-out    -> web:plaits:midi-in   program change: engine,
+  //                                                 harmonics, decay, colour
+  //   web:patch:midi-out    -> web:pattern:midi-in  the same program change
+  //                                                 picks the pattern's notes
+  //   web:knob-timbre:value-out -> web:plaits:value-in
+  //   web:knob-morph:value-out  -> web:plaits:value-in
+  //   web:plaits:audio-out  -> web:scope:audio-in, web:speaker:audio-in
+  // Picking a patch moves the two knobs to that patch's values, and the knobs
+  // send them over their own links, so the values cross the same wires a hand
+  // would use.
+  //
+  // NOTHING OPENS ON A VISIT. A pointer over (or focus on) play fetches the
+  // wasm from this origin; the first press makes the AudioContext and boots.
+  const d = mount({ name: 'Plaits synth', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('synth/110');
+
+  const PLAI_URL = '/muta/vendor/plai.wasm';
+  const WORKLET_URL = '/muta/muta-worklet.js';
+  // The parameter ids, as muta-worklet.js and plai_shim.cc spell them.
+  const P = { engine: 0, note: 1, harmonics: 2, timbre: 3, morph: 4, decay: 5, lpgColour: 6 };
+  const VOICES = 6;
+
+  // The patches, in the order worth hearing them, all sustained (asked the
+  // same day: *"no bell sounds please or drums. longer stuff"*). `engine` is
+  // the index in `plaits/dsp/voice.cc`'s list (as /muta/'s MODELS). `notes`
+  // and `step` are the slow sequence that shows the engine off, `hold` how
+  // long each note's gate stays open in ms; a hold longer than the step lets
+  // two notes overlap, and `decay` sets how long the gate takes to close.
+  const PATCHES = [
+    { name: 'Chord pad', engine: 6, harmonics: 0.45, timbre: 0.35, morph: 0.3, decay: 0.85, colour: 0.4,
+      notes: [57, 53, 48, 55], step: 2400, hold: 2300 },
+    { name: 'Saw swarm', engine: 8, harmonics: 0.55, timbre: 0.6, morph: 0.55, decay: 0.85, colour: 0.5,
+      notes: [45, 52, 50, 48], step: 2000, hold: 3200 },
+    { name: 'Wavetable drift', engine: 5, harmonics: 0.3, timbre: 0.3, morph: 0.55, decay: 0.85, colour: 0.6,
+      notes: [50, 57, 53, 60, 55], step: 1600, hold: 2600 },
+    { name: 'Vowel choir', engine: 3, harmonics: 0.4, timbre: 0.45, morph: 0.5, decay: 0.85, colour: 0.5,
+      notes: [57, 60, 64, 62], step: 1800, hold: 3000 },
+    { name: 'Sung vowels', engine: 7, harmonics: 0.25, timbre: 0.5, morph: 0.35, decay: 0.85, colour: 0.5,
+      notes: [55, 58, 53, 57], step: 2200, hold: 2100 },
+    { name: 'Additive organ', engine: 4, harmonics: 0.35, timbre: 0.4, morph: 0.6, decay: 0.8, colour: 0.6,
+      notes: [48, 55, 52, 57], step: 2000, hold: 3000 },
+    { name: 'Long string', engine: 11, harmonics: 0.2, timbre: 0.45, morph: 0.92, decay: 0.9, colour: 0.5,
+      notes: [43, 50, 55, 47], step: 1500, hold: 1400 },
+    { name: 'Wind', engine: 9, harmonics: 0.35, timbre: 0.55, morph: 0.4, decay: 0.9, colour: 0.6,
+      notes: [60, 67, 64, 72], step: 2600, hold: 3600 },
+  ];
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const bay = createBay();
+  for (const [n, kind, label] of [
+    ['pattern', 'engine', 'pattern'], ['patch', 'person', 'patch'],
+    ['knob-timbre', 'person', 'timbre'], ['knob-morph', 'person', 'morph'],
+    ['plaits', 'engine', 'Plaits'], ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
+  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+
+  let at = 0;                 // the patch the voice holds
+  let patternAt = 0;          // the patch the pattern plays
+  let notesIn = 0, programsIn = 0, paramsIn = 0;
+  const PORTS = [
+    { id: ID('pattern', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: ID('pattern', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['program'], deliver: (e) => {
+      if (e?.cls === 'program' && PATCHES[e.d1]) { patternAt = e.d1; step = 0; }
+    } },
+    { id: ID('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
+    { id: ID('knob-timbre', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('knob-morph', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('plaits', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note', 'program'], deliver: (e) => {
+      // holdMs 0 holds the gate open until the note off (the shim's
+      // `level_patched` path), so a note sustains for as long as it is held.
+      if (e?.cls === 'note' && e.d2 > 0) { notesIn++; send({ t: 'noteOn', note: e.d1, holdMs: 0, level: e.d2 / 127 }); }
+      else if (e?.cls === 'note') send({ t: 'noteOff', note: e.d1 });
+      else if (e?.cls === 'program' && PATCHES[e.d1]) { programsIn++; at = e.d1; loadPatch(PATCHES[e.d1]); }
+    } },
+    { id: ID('plaits', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['timbre', 'morph'] }, deliver: (e) => {
+      if (e?.of !== 'param' || !(e.name in P)) return;
+      paramsIn++;
+      send({ t: 'param', id: P[e.name], value: e.v });
+    } },
+    { id: ID('plaits', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(ID('pattern', 'midi-out'), ID('plaits', 'midi-in'));
+  lay(ID('patch', 'midi-out'), ID('plaits', 'midi-in'));
+  lay(ID('patch', 'midi-out'), ID('pattern', 'midi-in'));
+  lay(ID('knob-timbre', 'value-out'), ID('plaits', 'value-in'));
+  lay(ID('knob-morph', 'value-out'), ID('plaits', 'value-in'));
+  lay(ID('plaits', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('plaits', 'audio-out'), ID('speaker', 'audio-in'));
+
+  // ── the voice: /muta/'s worklet and wasm, made on the first press ────────
+  let ctx = null, node = null, out = null, master = null, analyser = null, buf = null, freq = null;
+  let ready = null, bytesP = null;
+  const queue = [];
+  const send = (m) => { if (ready === true) node.port.postMessage(m); else queue.push(m); };
+  /** Intent: a pointer over play or focus on it fetches the bytes, nothing else. */
+  const warm = () => (bytesP ||= fetch(PLAI_URL).then((r) => {
+    if (!r.ok) throw new Error(`${PLAI_URL} answered ${r.status}`);
+    return r.arrayBuffer();
+  }));
+  function loadPatch(p) {
+    for (const [k, v] of [['engine', p.engine], ['harmonics', p.harmonics], ['decay', p.decay], ['lpgColour', p.colour]]) {
+      send({ t: 'param', id: P[k], value: v });
+    }
+  }
+  async function boot() {
+    if (ready) return ready;
+    // Made here, synchronously inside the press. 48000 by name, because Plaits
+    // is compiled for it (/muta/ says why).
+    ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+    ctx.resume();
+    ready = (async () => {
+      const t0 = performance.now();
+      const [bytes] = await Promise.all([warm(), ctx.audioWorklet.addModule(WORKLET_URL)]);
+      node = new AudioWorkletNode(ctx, 'plai-voice', { outputChannelCount: [2] });
+      node.onprocessorerror = () => d.log('the audio thread dropped the Plaits voice', 'bad');
+      const up = new Promise((res, rej) => {
+        const timer = setTimeout(() => rej(new Error('the worklet never answered')), 5000);
+        node.port.onmessage = (e) => {
+          const m = e.data;
+          if (m?.t === 'ready') { clearTimeout(timer); res(m); }
+          if (m?.t === 'fail') { clearTimeout(timer); rej(new Error(m.why)); }
+        };
+      });
+      node.port.postMessage({ t: 'wasm', bytes, rate: ctx.sampleRate });
+      const m = await up;
+      // Channel 0 is Plaits' main jack, channel 1 its aux jack (worklet header).
+      const split = ctx.createChannelSplitter(2);
+      node.connect(split);
+      out = ctx.createGain();
+      split.connect(out, 0);
+      master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+      analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
+      buf = new Float32Array(analyser.fftSize); freq = new Float32Array(analyser.frequencyBinCount);
+      const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      analyser.connect(pull);
+      route();
+      node.port.postMessage({ t: 'voices', n: VOICES });
+      ready = true;
+      for (const q of queue.splice(0)) node.port.postMessage(q);
+      d.log(`Plaits up in ${(performance.now() - t0).toFixed(0)} ms, ${m.engines} engines, ${Math.round(ctx.sampleRate)} Hz, ${VOICES} voices`, m.rateOk ? 'ok' : 'warn');
+      requestAnimationFrame(frame);
+      return true;
+    })().catch((e) => { ready = null; d.log(`Plaits did not start: ${e.message || e}`, 'bad'); return false; });
+    return ready;
+  }
+  /** THE ROUTER: the voice's sound goes where the bay's audio links say. */
+  function route() {
+    if (!out) return;
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+    try { out.disconnect(); } catch { /* not connected */ }
+    if (held(ID('plaits', 'audio-out'), ID('speaker', 'audio-in'))) out.connect(master);
+    if (held(ID('plaits', 'audio-out'), ID('scope', 'audio-in'))) out.connect(analyser);
+  }
+
+  // ── the pattern: one trigger per step, at the patch's own pace ──────────
+  let playing = false, step = 0, timer = 0, steps = 0;
+  const offs = new Set();   // the note offs still to come
+  function tick() {
+    if (!playing) return;
+    const p = PATCHES[patternAt];
+    const note = p.notes[step % p.notes.length];
+    step++; steps++;
+    bay.send(ID('pattern', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+    const t = setTimeout(() => { offs.delete(t); bay.send(ID('pattern', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); }, p.hold);
+    offs.add(t);
+    timer = setTimeout(tick, p.step);
+  }
+  async function start() {
+    const up = boot();
+    playing = true;
+    transport.setIcon('play', 'stop', 'stop');
+    if (!(await up)) { stop(); return; }
+    if (!playing) return;
+    clearTimeout(timer); step = 0; tick();
+    pb.refresh?.();
+  }
+  function stop() {
+    playing = false;
+    clearTimeout(timer);
+    for (const t of offs) clearTimeout(t);
+    offs.clear();
+    send({ t: 'allOff' });
+    transport.setIcon('play', 'play', 'play');
+    pb.refresh?.();
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : start()) },
+  ] });
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) {
+    transport.el.addEventListener(ev, () => { warm().catch(() => { bytesP = null; }); }, { once: true, passive: true });
+  }
+
+  // ── the scope, full width ────────────────────────────────────────────────
+  const WINDOW = 512, SPAN_MIN = 0.02, SPAN_FALL = 0.992;
+  let span = 0.25, level = 0;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+  function frame() {
+    if (analyser) {
+      analyser.getFloatTimeDomainData(buf);
+      let i0 = 0, hi = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      for (const v of buf) { const a = v < 0 ? -v : v; if (a > hi) hi = a; }
+      level = hi;
+      span = Math.max(hi / 0.9, span * SPAN_FALL, SPAN_MIN);
+      wave.set({ points: Array.from(buf.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / span))), reason: '', name: '' });
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── the two knobs, each a node of its own ───────────────────────────────
+  const knobs = new Map(['timbre', 'morph'].map((name) => [name, createKnob({
+    label: name, min: 0, max: 1, value: PATCHES[0][name], home: PATCHES[0][name], hand: true,
+    onInput: (v) => bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v }),
+  })]));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── the patch selector: a program change on web:patch ───────────────────
+  function pick(i) {
+    at = i;
+    patchPick.show(PATCHES[i].name, i);
+    bay.send(ID('patch', 'midi-out'), { cls: 'program', ch: 1, d1: i });
+    // The knobs take the patch's values and send them over their own links.
+    for (const [name, k] of knobs) {
+      const v = PATCHES[i][name];
+      if (k.value() === v) bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v });
+      else k.set(v, { from: 'patch' });
+    }
+  }
+  const stepPatch = (by) => pick((at + by + PATCHES.length) % PATCHES.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => stepPatch(-1), next: () => stepPatch(+1), onPick: (i) => pick(i) });
+  patchPick.options(PATCHES.map((p) => p.name), 0);
+  // The voice comes up on the first patch: queued until the wasm is in.
+  pick(0);
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const pb = createPatchbay(bay, {
+    flowing: (l) => (l.from === ID('plaits', 'audio-out') ? playing && level > 0.002 : playing),
+  });
+  setInterval(() => pb.refresh?.(), 500);
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wave.el, patchPick.el, grid.el, pb.el);
+
+  /** What the voice sounds like right now: RMS, zero crossings a sample, and the spectral centroid in Hz. */
+  function features() {
+    if (!analyser) return null;
+    analyser.getFloatTimeDomainData(buf);
+    let s = 0, z = 0;
+    for (let i = 0; i < buf.length; i++) { s += buf[i] * buf[i]; if (i && (buf[i - 1] < 0) !== (buf[i] < 0)) z++; }
+    analyser.getFloatFrequencyData(freq);
+    let num = 0, den = 0;
+    const hz = ctx.sampleRate / analyser.fftSize;
+    for (let i = 1; i < freq.length; i++) { const m = 10 ** (freq[i] / 20); num += m * i * hz; den += m; }
+    return { rms: Math.sqrt(s / buf.length), zcr: z / buf.length, centroid: den ? num / den : 0 };
+  }
+  window.__demo.knobs = grid;
+  window.__demo.plaits = {
+    bay, patches: PATCHES, knobs, pick, start, stop, features,
+    at: () => at, patternAt: () => patternAt, playing: () => playing, ready: () => ready === true,
+    ctx: () => ctx, wasmAsked: () => !!bytesP,
+    counts: () => ({ notesIn, programsIn, paramsIn, steps }),
+  };
+  d.ready();
+</script>
