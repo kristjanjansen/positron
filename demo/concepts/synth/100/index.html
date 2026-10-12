@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Collide here and on the Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The two waves at half width each, here on the left and the Pi on the
+     right (asked 2026-10-12, *"1/2 videpanel with wave on left, pi wave on
+     right"*). Side by side on a desk, never stacked there; stacked on a phone,
+     here first. The same pair rule as /concepts/shader/000/. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  .cc-pair canvas { display: block; width: 100%; height: 100%; }
+  .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_FRAME_MS, BOARD_CHANNELS } from '/shell/board.mjs';
+  import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/concepts/synth/collide-voice.mjs';
+
+  // /concepts/synth/090/ plus the same voice rendered on the Raspberry Pi as
+  // well. Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"):
+  // *"100 is same but with local and rasperry pi rendering. 1/2 videpanel with
+  // wave on left, pi wave on right. readings on top, 2 local 2 pi ones. pi is
+  // not on lan, backlog its execution, simulate locally until then"*.
+  //
+  // 🔴 THE PI SIDE IS SIMULATED IN THIS TAB AND THE PAGE SAYS SO, on the Pi
+  // node's label and in the right panel's footer. `createPiSide` below is the
+  // one place the real board goes in (BACKLOG, "synth/100 on the real Pi").
+  //
+  // THE READOUT, every cell measured here and none typed:
+  //   local lag / Pi lag     from the key going down (`performance.now()` in
+  //                          the key's own handler) to the first window of
+  //                          that side's sound above -50 dBFS at its analyser,
+  //                          plus the context's own `baseLatency` and
+  //                          `outputLatency`, which is what is still between
+  //                          the analyser and the speakers. Measured only on a
+  //                          note that starts from silence on that side, so a
+  //                          tail still ringing cannot pass for the new note.
+  //   local level / Pi level the loudest 21 ms window of that note, in dBFS,
+  //                          over the second after the key went down.
+  //
+  // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
+  // opens. A pointer over the keys fetches the engine (our origin); the first
+  // key makes the AudioContext and boots both engines.
+  const d = mount({
+    name: 'Collide here and on the Pi', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The four cells under the title, the log alone at the foot (*"readings on
+    // top"*), as /concepts/sampler/030/ does.
+    joined: false,
+    readout: { 'local lag': 'ms', 'local level': 'dB', 'Pi lag': 'ms', 'Pi level': 'dB' },
+  });
+  conceptNav('synth/100');
+
+  // ── the Pi side: THE ONE PLACE THE REAL BOARD GOES IN ────────────────────
+  //
+  // The page talks to the Pi through five calls and nothing else: `wake(ctx)`,
+  // `noteOn(note, vel)`, `noteOff(note)`, `param(name, v)` and `out()` (its
+  // sound, as an AudioNode in `ctx`). Today they are a second scsynth in this
+  // tab running the same program, with the trip modelled around it:
+  //
+  //   up     UP_MS before a note or a knob reaches the engine: half the Mac to
+  //          Pi relay round trip, 64 to 69 ms measured 2026-09-14 (PROGRESS.md,
+  //          quoted in research/pi-drum-machines-2026-09-21.md section 2.3).
+  //   back   DOWN_MS of delay on the sound: the board's JACK period (1024 at
+  //          48 kHz on the dummy backend, `rig/board/jacksynth.mjs`, 21.3 ms),
+  //          one board frame (`BOARD_FRAME_MS`, read from board.mjs), the
+  //          relay back (the same 34 ms), and the playout cushion board.mjs
+  //          opens with (`cushionMs = 100`). The sound is folded to
+  //          `BOARD_CHANNELS` (one) on the way, because the board sends mono.
+  //   ⚠️ A MODEL, NOT A MEASUREMENT OF THE BOARD. Its total, about 210 ms,
+  //   sits inside the 160 to 220 ms that research file estimates for press to
+  //   sound through this rig, and that number has never been measured either
+  //   (same file, section 2.3). The `Pi lag` cell measures the MODEL.
+  //
+  // THE REAL BOARD, when it is on the network again: `createBoard({ room:
+  // 'studio-1', log })` from `/shell/board.mjs` gives the socket, the presence
+  // and the playout; `noteOn` becomes `board.send({ type: 'note.on', node:
+  // 'collide', note, vel })` as /concepts/sampler/030/ does for the sampler,
+  // `param` a `cc`-like message the board turns into `/n_set`, and `out()` the
+  // board's playout node. ⚠️ TWO THINGS DO NOT EXIST YET AND ARE NOT THIS
+  // PAGE'S: the board has no `collide` node (it needs to take these SynthDef
+  // bytes, `/d_recv` them into an scsynth such as `rig/board/scsampler.mjs`'s
+  // on 57130, and play them on `note.on`), and board.mjs's playout lives in an
+  // AudioContext of its OWN at 48 kHz (`startAudio`), so `out()` would be in
+  // another context and the Pi's scope would read the board's analyser rather
+  // than this page's.
+  const UP_MS = 34;
+  const JACK_MS = 1024 / 48000 * 1000;
+  const CUSHION_MS = 100;
+  const DOWN_MS = JACK_MS + BOARD_FRAME_MS + UP_MS + CUSHION_MS;
+
+  function createPiSide({ log }) {
+    const v = createCollideVoice({ log: (line, kind) => log(`Pi (simulated): ${line}`, kind), who: 'SuperCollider' });
+    let tail = null;
+    const later = (fn) => setTimeout(fn, UP_MS);
+    return {
+      simulated: true,
+      compiled: v.compiled, values: v.values, stat: v.stat, held: v.held, warm: v.warm,
+      async wake(ctx) {
+        await v.wake(ctx);
+        if (!tail) {
+          const fold = ctx.createGain();
+          fold.channelCount = BOARD_CHANNELS; fold.channelCountMode = 'explicit'; fold.channelInterpretation = 'speakers';
+          tail = ctx.createDelay(1);
+          tail.delayTime.value = DOWN_MS / 1000;
+          v.out().connect(fold).connect(tail);
+        }
+      },
+      out: () => tail,
+      noteOn: (note, vel) => later(() => v.noteOn(note, vel)),
+      noteOff: (note) => later(() => v.noteOff(note)),
+      param: (name, x) => { if (!v.values.has(name)) return false; later(() => v.param(name, x)); return true; },
+    };
+  }
+
+  // ── the two sides ────────────────────────────────────────────────────────
+  const local = createCollideVoice({ log: d.log, who: 'SuperCollider here' });
+  const pi = createPiSide({ log: d.log });
+  const NAMES = local.compiled.knobs.map((k) => k.name);
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const PI = (port) => `${BOARD_SITE}:collide:${port}`;
+  const bay = createBay();
+  for (const [n, kind, label] of [
+    ['keys', 'person', 'keyboard'],
+    ...NAMES.map((n) => [`knob-${n}`, 'person', n]),
+    ['collide', 'engine', 'SuperCollider here'],
+    ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'], ['speaker', 'screen', 'speakers'],
+  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi, simulated', place: 'studio-1' });
+  let notesIn = 0, piNotesIn = 0, paramSends = 0, piParamSends = 0;
+  const PORTS = [
+    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    ...NAMES.map((n) => ({ id: ID(`knob-${n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+    { id: ID('collide', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note') return;
+      notesIn++;
+      if (e.d2) local.noteOn(e.d1, e.d2); else local.noteOff(e.d1);
+    } },
+    { id: ID('collide', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
+      if (e?.of === 'param' && local.param(e.name, e.v)) paramSends++;
+    } },
+    { id: ID('collide', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note') return;
+      piNotesIn++;
+      if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
+    } },
+    { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
+      if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++;
+    } },
+    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('scope-pi', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(ID('keys', 'midi-out'), ID('collide', 'midi-in'));
+  lay(ID('keys', 'midi-out'), PI('midi-in'));
+  for (const n of NAMES) { lay(ID(`knob-${n}`, 'value-out'), ID('collide', 'value-in')); lay(ID(`knob-${n}`, 'value-out'), PI('value-in')); }
+  lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('collide', 'audio-out'), ID('speaker', 'audio-in'));
+  lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
+  lay(PI('audio-out'), ID('speaker', 'audio-in'));
+
+  // ── the sound, made on the first key ─────────────────────────────────────
+  let ctx = null, master = null, on = false;
+  /** Per side: the scope's analyser, the meter's, and the note being timed. */
+  const SIDES = {
+    local: { voice: local, from: ID('collide', 'audio-out'), scope: ID('scope', 'audio-in'), an: null, buf: null, meter: null, mbuf: null, timing: null },
+    pi: { voice: pi, from: PI('audio-out'), scope: ID('scope-pi', 'audio-in'), an: null, buf: null, meter: null, mbuf: null, timing: null },
+  };
+  /** THE ROUTER: each side's sound goes where the bay's audio links say. */
+  function route() {
+    for (const s of Object.values(SIDES)) {
+      const out = s.voice.out();
+      if (!out) continue;
+      try { out.disconnect(); } catch { /* not connected */ }
+      // The meter is always on: the cells measure what the side makes.
+      out.connect(s.meter);
+      for (const l of bay.links()) {
+        if (l.from !== s.from) continue;
+        if (l.to === s.scope) out.connect(s.an);
+        if (l.to === ID('speaker', 'audio-in')) out.connect(master);
+      }
+    }
+  }
+  async function start() {
+    if (!ctx) {
+      // Made here, synchronously inside the key's gesture.
+      ctx = new AudioContext({ latencyHint: 'interactive' });
+      master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+      const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      for (const s of Object.values(SIDES)) {
+        s.an = ctx.createAnalyser(); s.an.fftSize = 2048; s.an.connect(pull);
+        s.buf = new Float32Array(s.an.fftSize);
+        // 1024 samples, 21 ms at 48 kHz: short, so an onset is seen early.
+        s.meter = ctx.createAnalyser(); s.meter.fftSize = 1024; s.meter.connect(pull);
+        s.mbuf = new Float32Array(s.meter.fftSize);
+      }
+      requestAnimationFrame(frame);
+    }
+    ctx.resume();
+    try { await Promise.all([local.wake(ctx), pi.wake(ctx)]); } catch { return false; }
+    route();
+    on = true;
+    pb.refresh();
+    return true;
+  }
+
+  // ── the cells ────────────────────────────────────────────────────────────
+  const SILENT_DB = -50;
+  const KEY = { local: ['local lag', 'local level'], pi: ['Pi lag', 'Pi level'] };
+  const measured = { local: { lag: null, level: null }, pi: { lag: null, level: null } };
+  let poll = 0;
+  /** A key went down at `t`: time each side's onset and hold its loudest window. */
+  function timeNote(t) {
+    for (const [k, s] of Object.entries(SIDES)) {
+      const quiet = !s.meter || dbfs(rmsOf(s.meter, s.mbuf)) < SILENT_DB;
+      s.timing = { t, quiet, heard: false, peak: -Infinity };
+    }
+    if (!poll) poll = setInterval(tick, 2);
+  }
+  function tick() {
+    const now = performance.now();
+    let busy = false;
+    for (const [k, s] of Object.entries(SIDES)) {
+      const tm = s.timing;
+      if (!tm || !s.meter) { if (tm && now - tm.t < 4000) busy = true; continue; }
+      if (now - tm.t > 1000 + (tm.heard ? 0 : 3000)) {
+        if (tm.heard) { measured[k].level = tm.peak; d.set(KEY[k][1], tm.peak.toFixed(1)); }
+        s.timing = null;
+        continue;
+      }
+      busy = true;
+      const db = dbfs(rmsOf(s.meter, s.mbuf));
+      if (!tm.heard && db >= SILENT_DB) {
+        tm.heard = true; tm.at = now;
+        if (tm.quiet && ctx) {
+          const lag = now - tm.t + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+          measured[k].lag = lag;
+          d.set(KEY[k][0], lag.toFixed(0));
+        }
+      }
+      if (tm.heard) tm.peak = Math.max(tm.peak, db);
+    }
+    if (!busy) { clearInterval(poll); poll = 0; }
+  }
+
+  // ── the keyboard: its notes leave on `keys:midi-out` and nowhere else ────
+  const host = el('div');
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      timeNote(performance.now());
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+      if (!on) start();
+    },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => local.warm(), { once: true, passive: true });
+
+  // ── the two knobs, each a node of its own, each cabled into both synths ─
+  const book = createHueBook().assign(NAMES);
+  const knobs = new Map(local.compiled.knobs.map((k) => {
+    const knob = createKnob({
+      label: k.name, min: k.spec.min, max: k.spec.max, value: k.value, hand: true,
+      onInput: (v) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v }),
+    });
+    knob.el.dataset.param = k.name;
+    knob.el.style.setProperty('--param-hue', String(book.hueOf(k.name)));
+    return [k.name, knob];
+  }));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── the two waves, each in a video panel at half width ───────────────────
+  const W = 640, H = 360;
+  function wavePanel(name, foot) {
+    const canvas = el('canvas');
+    canvas.width = W; canvas.height = H;
+    const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-say', name), right: el('span', 'cc-say', foot) });
+    return { panel, g: canvas.getContext('2d') };
+  }
+  const left = wavePanel('SuperCollider here', 'this tab');
+  const right = wavePanel('SuperCollider on the Pi', 'simulated');
+  const css = getComputedStyle(document.documentElement);
+  const colour = (n, f) => css.getPropertyValue(n).trim() || f;
+  const INK = colour('--hi', '#f5c84c'), GROUND = colour('--card2', '#151a24'), LINE = colour('--line', '#2a3140');
+  function draw(g, s) {
+    g.fillStyle = GROUND; g.fillRect(0, 0, W, H);
+    const scoped = on && bay.links().some((l) => l.from === s.from && l.to === s.scope);
+    if (!scoped) return;
+    s.an.getFloatTimeDomainData(s.buf);
+    const WINDOW = 512, FULL = 0.5;
+    let i0 = 0;
+    for (let i = 1; i < s.buf.length - WINDOW; i++) if (s.buf[i - 1] < 0 && s.buf[i] >= 0) { i0 = i; break; }
+    g.fillStyle = LINE; g.fillRect(0, H / 2, W, 1);
+    g.strokeStyle = INK; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i < WINDOW; i++) {
+      const v = Math.max(-1, Math.min(1, s.buf[i0 + i] / FULL));
+      const x = i / (WINDOW - 1) * W, y = H / 2 - v * (H / 2 - 12);
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.stroke();
+  }
+  function frame() {
+    draw(left.g, SIDES.local);
+    draw(right.g, SIDES.pi);
+    requestAnimationFrame(frame);
+  }
+  draw(left.g, SIDES.local); draw(right.g, SIDES.pi);
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
+    flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || local.held().length > 0),
+  });
+  const pair = el('div', 'cc-pair');
+  pair.append(left.panel.el, right.panel.el);
+  // The program both sides run, read only; a sixth of its height as on 090.
+  const lines = PROGRAM.split('\n').length;
+  const code = createCodeBox({ language: 'sclang', rows: Math.max(3, Math.round(lines / 6)), label: '', value: PROGRAM,
+    hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
+  code.input.readOnly = true;
+  d.stack.add(pair, code.el, grid.el, host, pb.el);
+
+  const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };
+  window.__demo.knobs = grid;
+  window.__demo.keyboard = kb;
+  window.__demo.collide = {
+    bay, local, pi, knobs, names: NAMES, model: { UP_MS, DOWN_MS, JACK_MS, CUSHION_MS, FRAME_MS: BOARD_FRAME_MS },
+    measured, ctx: () => ctx,
+    notesIn: () => notesIn, piNotesIn: () => piNotesIn, paramSends: () => paramSends, piParamSends: () => piParamSends,
+    samples: samplesOf(SIDES.local), piSamples: samplesOf(SIDES.pi),
+    code: PROGRAM,
+  };
+  d.ready();
+</script>

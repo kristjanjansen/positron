@@ -16,6 +16,8 @@ export const CONCEPTS = [
   { n: 'synth/060', title: 'Yoshimi', say: 'The keyboard and knobs playing Yoshimi on the Raspberry Pi in another building.' },
   { n: 'synth/070', title: 'Circuit', say: 'The keyboard and a patch selector playing the Novation Circuit plugged into the Raspberry Pi.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
+  { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
+  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
