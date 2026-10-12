@@ -156,6 +156,19 @@
   .fp-ph-t { margin: 0; font: 600 24px/1.2 var(--mono); letter-spacing: .01em; color: var(--fg); }
   .fp-ph-w { margin: 4px 0 0; font: 400 15px/1.5 var(--sans); color: var(--dim); max-width: 62ch; }
   .fp-ph-r { margin-top: 20px; }
+
+  /* SHARP TEST: three ways to write a sharp, every other letter the brand
+     mono. Page-local on purpose (plans/plan-fonts-minimal.md decides shell.css
+     and keyboard.mjs); (0,3,0) against the keyboard's own `.k .kn` (0,2,0). */
+  .fp-sh { --mono: 'Brand JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+           display: flex; flex-direction: column; gap: var(--ctl-gap); min-width: 0; }
+  .fp-sh-a .k .kn, .fp-sh-c .k .kn { font-family: var(--mono); }
+  .fp-sh-n { margin: 0; font: 600 15px/1.3 var(--mono); color: var(--fg); }
+  .fp-sh-big { margin: 0; font-size: 32px; line-height: 1.2; color: var(--fg); overflow-wrap: anywhere; }
+  .fp-sh-line { margin: 0; font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--dim2); }
+  .fp-sh-a .fp-sh-big, .fp-sh-a .fp-sh-line, .fp-sh-c .fp-sh-big, .fp-sh-c .fp-sh-line { font-family: var(--mono); }
+  .fp-sh-b .fp-sh-big, .fp-sh-b .fp-sh-line { font-family: 'positron-accidentals', var(--mono); }
+  .fp-sh-list { display: flex; flex-direction: column; gap: var(--pos-gap); }
 </style>
 <script type="module">
   import { el, createReport } from '/shell/shell.mjs';
@@ -163,6 +176,7 @@
   import { createKitPage } from '/shell/kit-page.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createTable } from '/shell/table.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { CONCEPTS, DEMO_CARDS } from '/concepts/list.mjs';
   import { DEMOS, GROUPS } from '/manifest.mjs';
   import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
@@ -410,6 +424,98 @@
       wrap.append(rule.slide.frame);
       add(wrap);
     }, { bare: true });
+
+  // 🔴 SHARP TEST, 2026-10-12: *"Add sharp test"*, then *"Visual sample i
+  // mean"*. plans/plan-fonts-minimal.md proposes dropping Bravura for `#` in
+  // the brand mono; this puts the three choices on real keys and a chord line
+  // to be judged by eye. The keyboards are `createKeyboard` at its real key
+  // size, and only their note labels are changed, here, after they are built.
+  const SH_NOTES = 'C♯4  F♯3  G♯2  A♯5  B♭3';
+  const SHARPS = [
+    { id: 'a', name: '# in JetBrains Mono', swap: true },
+    { id: 'b', name: 'the Bravura sharp, as today' },
+    { id: 'c', name: 'the system’s sharp, no Bravura' },
+  ];
+  const sharps = [];
+  section('SHARP TEST',
+    'The same note names written three ways, on real keys, on a chord line at its real size and at 32 px.',
+    null, (box) => {
+      box.classList.add('kit-wide');
+      const list = el('div', 'fp-sh-list');
+      for (const v of SHARPS) {
+        const wrap = el('div', `fp-sh fp-sh-${v.id}`);
+        const host = el('div');
+        const kb = createKeyboard(host, { ...keyRange(14), base: 48, letters: false, pad: false, chord: false });
+        const txt = (s) => (v.swap ? s.replace(/♯/g, '#').replace(/♭/g, 'b') : s);
+        for (const kn of host.querySelectorAll('.kn')) kn.textContent = txt(kn.textContent);
+        const line = el('p', 'fp-sh-line', txt(SH_NOTES));
+        const big = el('p', 'fp-sh-big', txt(SH_NOTES));
+        const cap = el('p', 'fp-label-r', 'measuring');
+        wrap.append(el('p', 'fp-sh-n', `${v.id.toUpperCase()}. ${v.name}`), host, line, big, cap);
+        list.append(wrap);
+        sharps.push({ v, host, kb, line, big, cap });
+      }
+      box.append(list);
+    });
+
+  /* WHICH FACE DREW THE SHARP, read rather than assumed: the label's own
+     computed font stack is set on a canvas, which resolves fallback per glyph
+     the way the page does, and the ink box of the sharp it draws is matched
+     against the ink box each candidate face draws on its own. */
+  const SH_FACES = [
+    ['Bravura', "'positron-accidentals'"],
+    ['JetBrains Mono', "'Brand JetBrains Mono'"],
+    ['SF Mono', 'SFMono-Regular'],
+    ['Menlo', 'Menlo'],
+    ['Apple Symbols', "'Apple Symbols'"],
+    ['DejaVu Sans Mono', "'DejaVu Sans Mono'"],
+    ['Consolas', 'Consolas'],
+  ];
+  const shCv = document.createElement('canvas').getContext('2d');
+  const ink = (font, ch) => {
+    shCv.font = font;
+    const m = shCv.measureText(ch);
+    return { l: m.actualBoundingBoxLeft, r: m.actualBoundingBoxRight, a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent, w: m.width };
+  };
+  const same = (p, q) => ['l', 'r', 'a', 'd', 'w'].every((k) => Math.abs(p[k] - q[k]) < 0.6);
+  // a stack the canvas will take: ui-monospace is not a canvas family, so it
+  // is dropped, and SFMono-Regular behind it names the same face on a Mac
+  const canvasStack = (fam) => fam.split(',').map((s) => s.trim()).filter((s) => !/^ui-/.test(s)).join(', ');
+  function whoDrew(fam, ch) {
+    const got = ink(`400 100px ${canvasStack(fam)}`, ch);
+    for (const [name, f] of SH_FACES) {
+      // a face that lacks the glyph falls through to whatever is behind it,
+      // so it is put in front of two partners that draw the glyph unlike each
+      // other (Bravura has the sharps and no #, Geist has # and no sharps):
+      // only a face that has the glyph measures the same in front of both.
+      // Two generics are not enough, MEASURED: the system fallback for a
+      // sharp is the same face behind serif and behind monospace.
+      const x = ink(`400 100px ${f}, 'positron-accidentals', serif`, ch);
+      const y = ink(`400 100px ${f}, 'FP Geist', monospace`, ch);
+      if (same(x, y) && same(x, got)) return name;
+    }
+    return 'another system face';
+  }
+  const shReady = (async () => {
+    await document.fonts.load("400 11px 'positron-accidentals'", '♯♭');
+    await document.fonts.load("400 11px 'Brand JetBrains Mono'", 'F#b');
+    await document.fonts.ready;
+    for (const s of sharps) {
+      const ch = s.v.swap ? '#' : '♯';
+      const fam = getComputedStyle(s.big).fontFamily;
+      s.face = whoDrew(fam, ch);
+      const kn = [...s.host.querySelectorAll('.kn')].find((n) => /^F[#♯]/.test(n.textContent));
+      s.keyFace = whoDrew(getComputedStyle(kn).fontFamily, ch);
+      const stack = `400 100px ${canvasStack(fam)}`;
+      const sh = ink(stack, ch), F = ink(stack, 'F');
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const top = r2((sh.a - F.a) / 100), bot = r2(sh.d / 100);
+      const topSay = top === 0 ? 'level with the top of the F' : `${Math.abs(top).toFixed(2)} em ${top > 0 ? 'above' : 'below'} the top of the F`;
+      const botSay = bot === 0 ? 'on the line' : `${Math.abs(bot).toFixed(2)} em ${bot > 0 ? 'below' : 'above'} the line`;
+      const w = kn.getBoundingClientRect().width;
+      s.cap.textContent = `drawn by ${s.face} on the line and by ${s.keyFace} on the keys. Ink ${topSay}, bottom ${botSay}. ${kn.textContent} is ${w.toFixed(1)} px wide on its key.`;
+    }
+  })();
 
   const heroes = [];
   section('HERO',
@@ -697,10 +803,21 @@
       // the clear gap to the specimens: twice the page's block rhythm,
       // measured from the last real piece's ink to the next block's heading
       const want = 2 * Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
-      const next = document.getElementById('hero');
+      const next = document.getElementById('sharp-test');
       const gap = next.getBoundingClientRect().top - rule.slide.frame.getBoundingClientRect().bottom;
       d.assert('a clear gap of twice the block rhythm separates the real pieces from the specimens below',
         Math.abs(gap - want) <= 0.5, `${gap.toFixed(1)} px against ${want} px`);
+    }
+
+    // SHARP TEST: each variant is drawn by the face its label names, on the
+    // keys and on the line
+    {
+      await shReady;
+      const want = { a: (f) => f === 'JetBrains Mono', b: (f) => f === 'Bravura', c: (f) => f !== 'Bravura' && f !== 'JetBrains Mono' };
+      const bad = sharps.filter((s) => !want[s.v.id](s.face) || !want[s.v.id](s.keyFace));
+      d.assert('SHARP TEST: # is drawn by JetBrains Mono, the Bravura sharp by Bravura, and the third by a system face, on the keys and on the line',
+        sharps.length === 3 && bad.length === 0,
+        sharps.map((s) => `${s.v.id.toUpperCase()} ${s.face}, keys ${s.keyFace}`).join('; '));
     }
 
     // HERO, TITLES, SLIDES: every specimen is drawn in the face its label
