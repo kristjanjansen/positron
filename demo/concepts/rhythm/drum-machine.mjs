@@ -76,6 +76,11 @@ import { LIFE } from './voices.mjs';
  *   (rhythm/020 loads its samples here). A voice may also bring `def` (bytes),
  *   `params` (several knobs) and `args()` (extra `/s_new` arguments per hit,
  *   or null to skip the hit); see `paramsOf` and `hit`.
+ * @param {(ctx: AudioContext) => Promise<void>} [o.onStart]  awaited on every
+ *   press of Play, after the engine is up and before the first hit, while the
+ *   bar shows it is busy (rhythm/030 joins the Pi here, so the lead is the
+ *   Pi's path from the first hit)
+ * @param {() => void} [o.onStop]  called on every stop (rhythm/030 leaves the Pi)
  * @param {boolean} [o.scopes]  one scope per drum, each a node `web:scope-<drum>`
  *   fed by that drum's own `audio-out` (rhythm/010)
  * @param {number | (() => number)} [o.ahead]  how far ahead each hit is handed
@@ -99,7 +104,7 @@ import { LIFE } from './voices.mjs';
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
-  ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null }) {
+  onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -454,6 +459,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     ctx.resume();
     bar.el.dataset.busy = '1';
     try { await wake(); } catch { delete bar.el.dataset.busy; return; }
+    if (onStart) { try { await onStart(ctx); } catch (e) { d.log(`before play: ${e.message}`, 'warn'); } }
     delete bar.el.dataset.busy;
     playing = true;
     // The first step is handed over at once, so it gets the lead the rest get:
@@ -472,6 +478,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
   async function stop() {
     playing = false;
+    if (onStop) onStop();
     clearInterval(loop); loop = null;
     cancelAnimationFrame(raf); raf = 0;
     if (deck.playing()) deck.pause();

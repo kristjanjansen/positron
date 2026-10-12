@@ -64,8 +64,6 @@
   .cc-case .cc-t { font-size: 17px; }
   .cc-case .cc-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
   /* The way to what retired, one quiet line under the last group. */
-  .cc-more { margin: 0; font: 400 12px var(--mono); color: var(--dim2); }
-  .cc-more a { color: var(--dim); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -135,10 +133,7 @@
     g.append(...list);
     d.stack.titled(group, g);
   }
-  // Retired pages and the notes on removed ones (asked 2026-10-12, *"make
-  // "/arhive" page and move csound and tutotial slide there"*).
-  const more = el('p', 'cc-more');
-  more.append(el('a', '', 'archive', { href: '/archive/' }));
-  d.stack.add(more);
+  // No link to /archive/ from here since 2026-10-12 (*"rm arhive link"*); the
+  // page stays at its URL.
   d.ready();
 </script>

@@ -14,15 +14,12 @@
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
-  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createSlider } from '/shell/slider.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { createBoard, BOARD_RATE, BOARD_CHANNELS } from '/shell/board.mjs';
   import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
@@ -50,16 +47,20 @@
   // (`at` on the board's clock, which `board-collide.mjs` keeps with
   // `clock.ping` and the fastest round trip). So both sides are handed over
   // on the Pi's path: 250 ms early on the relay, 150 direct (plan §2.4,
-  // `AHEAD` in board-collide.mjs). Before the Pi joins, 150, as on 000.
+  // `AHEAD` in board-collide.mjs).
   //
-  // THE PI BUTTON JOINS, NOTHING ON A VISIT. A press makes the page's 48 kHz
-  // context, asks the board in `studio-1` for `audio.status` and gives it
-  // ASK_MS; no answer, or a run under a harness (`createBoard` will not drive
-  // the board under `?selfcheck=`), means the Pi side is SIMULATED here, and
+  // PLAY JOINS THE PI, NOTHING ON A VISIT. Asked 2026-10-12: *"rm, play button
+  // reaches for pi too"*, so the separate Pi button is gone. A press of Play
+  // makes the page's 48 kHz context, boots this tab's scsynth, then (the
+  // drum machine's `onStart`, while the bar shows busy) asks the board in
+  // `studio-1` for `audio.status` and gives it ASK_MS. No answer, or a run
+  // under a harness (`createBoard` will not drive the board under
+  // `?selfcheck=` unless `?board=1`), means the Pi side is SIMULATED here, and
   // the Pi panel's footer, the Pi node's label and the `path` cell say so. A
   // board that answers is started (`audio.start {source: 'collide'}`), given
   // the four programs as text (`sc.load`, `same` says whether its compile is
-  // this tab's), and its clock found before the first hit is sent.
+  // this tab's), and its clock found before the first hit is sent, so the
+  // first hit already has the Pi's lead. Stop leaves the Pi (`onStop`).
   //
   // SIMULATED: a second scsynth in this tab with the same four programs,
   // each hit started UP_MS after it is handed over (so a lead shorter than the
@@ -86,7 +87,7 @@
   //               after a start. ⚠️ The stand-in board's sound is a constant
   //               tone, so against it this cell stays empty.
   //   round trip  the board's own answer time on the path, `board.stats().rttMs`.
-  //   path        relay, direct, simulated, or empty before the Pi is joined.
+  //   path        relay, direct, simulated, or empty while stopped.
   //
   // THE ASSERT THE PLAN NAMES, read by a check through `__demo.drums.check()`:
   // hits handed over to the board equal the hits it started.
@@ -278,6 +279,9 @@
     context: getCtx,
     mix: { node: 'mix', label: 'drums mixed' },
     onWake: async () => { m.api.mixOut().connect(localTap); route(); },
+    // One press: the drums here and the Pi. The Pi joins before the first hit.
+    onStart: (c) => pi.join(c),
+    onStop: () => { if (pi.joined()) pi.leave(); },
     flowing: (l, playing) => playing && (l.from === SEQ_PI.from && l.to === SEQ_PI.to ? pi.joined()
       : l.from.startsWith(`${BOARD_SITE}:`) ? pi.joined() : true),
   });
@@ -408,15 +412,13 @@
     return { panel, g: canvas.getContext('2d'), foot: footEl };
   }
   const left = wavePanel('SuperCollider here', 'this tab');
-  const right = wavePanel('SuperCollider on the Pi', 'not joined');
-  let join = null;
+  const right = wavePanel('SuperCollider on the Pi', 'stopped');
   function showMode(md) {
-    right.foot.textContent = md === 'idle' ? 'not joined' : md;
+    right.foot.textContent = md === 'idle' ? 'stopped' : md;
     piNode.label = md === 'simulated' ? 'drums on the Pi, simulated' : 'drums on the Pi';
     d.set('path', md === 'idle' || md === 'checking' ? '' : md);
     if (md === 'idle' || md === 'checking') { d.set('Pi late', ''); d.set('round trip', ''); }
     if (md === 'simulated') d.set('round trip', '');
-    join?.setIcon('pi', md === 'idle' ? 'board' : 'stop', md === 'idle' ? 'play the drums on the Pi too' : 'leave the Pi');
     route();
     m.api.refresh();
   }
@@ -445,21 +447,11 @@
   draw(left.g, SIDES.local); draw(right.g, SIDES.pi);
 
   // ── the page ─────────────────────────────────────────────────────────────
-  join = createButtonGroup({ buttons: [
-    { id: 'pi', icon: 'board', label: 'play the drums on the Pi too',
-      onPress: () => {
-        if (pi.joined()) { pi.leave(); return undefined; }
-        const c = getCtx(); c.resume();
-        return pi.join(c);
-      } },
-  ] });
   const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
     ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
-  const top = el('div', 'cc-top');
-  top.append(join.el);
   const pair = el('div', 'cc-pair');
   pair.append(left.panel.el, right.panel.el);
-  d.stack.add(top, pair, fader.el, m.surface, m.patchbay);
+  d.stack.add(pair, fader.el, m.surface, m.patchbay);
   showMode('idle');
 
   const level = (s) => (s?.meter && s.out() ? rmsOf(s.meter, s.mbuf) : 0);
