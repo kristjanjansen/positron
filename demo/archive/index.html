@@ -34,7 +34,6 @@
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
-  import { createTable } from '/shell/table.mjs';
 
   const d = mount({
     name: 'archive',
@@ -49,7 +48,7 @@
   ];
 
   // Removed pages, kept as a markdown description in archive/. The files are
-  // deployed at the same paths and read as plain text.
+  // deployed at the same paths as plain text, and note.html renders one.
   const NOTES = [
     { title: 'Typist', href: '/archive/typist.md', what: 'The front page text recorder that wrote down edits instead of keys.' },
     { title: 'Sustain', href: '/archive/concepts/sampler-015.md', what: 'Concept sampler/015, a debugger for a real sustain pedal.' },
@@ -68,14 +67,17 @@
   }
   d.stack.titled('retired', cards);
 
-  const notes = createTable({
-    columns: [
-      { key: 'title', label: 'page', width: 100, link: 'href', hi: true },
-      { key: 'what', label: 'what', grow: true },
-    ],
-  });
-  for (const n of NOTES) notes.add(n);
-  d.stack.titled('notes', notes.el);
+  // Asked 2026-10-12: *"make notes as cards. they do render"*. Each opens
+  // as a page, note.html rendering the markdown.
+  const noteCards = el('div', 'ar-cards');
+  for (const n of NOTES) {
+    const a = el('a', 'ar-card', '', { href: `/archive/note.html?f=${n.href}` });
+    const h = el('h3', 'ar-t');
+    h.append(el('span', 'ar-n', 'note'), document.createTextNode(n.title));
+    a.append(h, el('p', 'ar-s', n.what), el('span', 'ar-u', n.href));
+    noteCards.append(a);
+  }
+  d.stack.titled('notes', noteCards);
 
   d.ready();
 </script>
