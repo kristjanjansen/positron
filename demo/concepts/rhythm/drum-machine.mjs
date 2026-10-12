@@ -78,13 +78,25 @@ import { LIFE } from './voices.mjs';
  *   or null to skip the hit); see `paramsOf` and `hit`.
  * @param {boolean} [o.scopes]  one scope per drum, each a node `web:scope-<drum>`
  *   fed by that drum's own `audio-out` (rhythm/010)
+ * @param {number | (() => number)} [o.ahead]  how far ahead each hit is handed
+ *   over, ms, read on every tick; 150 by default. rhythm/030 hands over on the
+ *   Pi's path, 250 on the relay and 150 direct (plans/plan-pi-supercollider-defs.md §2.4)
+ * @param {() => AudioContext} [o.context]  the page's own context, made on the
+ *   first press; left out, the machine makes one (rhythm/030 needs 48 kHz)
+ * @param {{ node: string, label: string }} [o.mix]  the drums go into a node
+ *   of this name (`web:<node>:audio-in`) with an `audio-out` of its own, and
+ *   the mix is NOT connected to the speakers: the page routes `api.mixOut()`
+ *   where its own wires say (rhythm/030's crossfader). Left out, the node is
+ *   `web:speaker` and the mix goes to the speakers.
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
  */
-export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null }) {
+export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
+  ahead = 150, context = null, mix = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
-  const SPK = ID('speaker', 'audio-in');
+  const OUT = mix ? mix.node : 'speaker';
+  const SPK = ID(OUT, 'audio-in');
 
   // ── the tempo and the bar ────────────────────────────────────────────────
   // 120 bpm, the house default, four steps to a beat: a step is 125 ms and the
@@ -96,7 +108,8 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const stepMsAt = (b) => 60000 / (b * 4);
   let bpm = BPM_AT_START;
   const BAR = STEPS * stepMsAt(BPM_AT_START);
-  const AHEAD = 150, TICK = 25;              // hand each hit over 150 ms early, look every 25 ms
+  const TICK = 25;                           // look every 25 ms
+  const aheadMs = () => (typeof ahead === 'function' ? ahead() : ahead);   // hand each hit over this early, 150 by default
 
   const VOICES = voices;
   /**
@@ -186,7 +199,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       // Eight drums at once (050) sum about 3 dB hotter than four, and the
       // loudest bar measured -1.5 dBFS RMS, so the mix comes down to 0.7 there.
       junction.gain.value = VOICES.length > 4 ? 0.7 : 1;
-      junction.connect(ctx.destination);
+      if (!mix) junction.connect(ctx.destination);
       an = ctx.createAnalyser(); an.fftSize = 1024; buf = new Float32Array(an.fftSize);
       junction.connect(an);
       route();
@@ -253,7 +266,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const bay = createBay();
   bay.addNode({ id: `${S}:sequencer`, kind: 'engine', label: 'sequencer', place: 'browser' });
   for (const v of VOICES) bay.addNode({ id: `${S}:${v.key}`, kind: 'engine', label: `${v.label}, SuperCollider`, place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addNode({ id: `${S}:${OUT}`, kind: mix ? 'engine' : 'screen', label: mix ? mix.label : 'speakers', place: 'browser' });
   bay.addPort({ id: SEQ, label: 'sequencer:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
   const heardBy = {};
   for (const v of VOICES) {
@@ -262,7 +275,8 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       deliver: (e) => { if (e.d1 !== v.note || !e.d2) return; heardBy[v.key]++; hit(v, e.at); } });
     bay.addPort({ id: ID(v.key, 'audio-out'), label: `${v.key}:audio-out`, dir: 'out', medium: 'audio' });
   }
-  bay.addPort({ id: SPK, label: 'speaker:audio-in', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: SPK, label: `${OUT}:audio-in`, dir: 'in', medium: 'audio' });
+  if (mix) bay.addPort({ id: ID(OUT, 'audio-out'), label: `${OUT}:audio-out`, dir: 'out', medium: 'audio' });
   if (wantScopes) for (const v of VOICES) {
     bay.addNode({ id: `${S}:scope-${v.key}`, kind: 'screen', label: 'scope', place: 'browser' });
     bay.addPort({ id: ID(`scope-${v.key}`, 'audio-in'), label: `scope-${v.key}:audio-in`, dir: 'in', medium: 'audio' });
@@ -347,7 +361,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const heardAt = (k) => anchor.t + (k - anchor.k) * anchor.ms;   // performance.now() ms of absolute step k
   const handed = new Map();                       // absolute step -> the time it was handed over for
   function tick() {
-    const horizon = performance.now() + AHEAD;
+    const horizon = performance.now() + aheadMs();
     while (heardAt(next) < horizon) {
       const s = next % STEPS, at = heardAt(next);
       handed.set(next, at);
@@ -380,13 +394,16 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
   async function start() {
     if (playing) return;
-    ctx ??= new AudioContext({ latencyHint: 'interactive' });
+    ctx ??= context ? context() : new AudioContext({ latencyHint: 'interactive' });
     ctx.resume();
     bar.el.dataset.busy = '1';
     try { await wake(); } catch { delete bar.el.dataset.busy; return; }
     delete bar.el.dataset.busy;
     playing = true;
-    t0 = performance.now() + 80;
+    // The first step is handed over at once, so it gets the lead the rest get:
+    // 80 ms at the 150 default, and 100 more at 250 (rhythm/030 on the relay,
+    // where a first hit 80 ms ahead would reach the Pi after its time).
+    t0 = performance.now() + 80 + Math.max(0, aheadMs() - 150);
     anchor = { k: 0, t: t0, ms: stepMsAt(bpm) };
     next = 0; laps = 0; shown = -1; handed.clear(); openHat = null;
     grid.at(0); grid.live(true);
@@ -536,6 +553,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     scopeLevels, route, views,
     /** A drum's own stereo signal (its output pair), once the engine is up. */
     outOf: (key) => outs.get(key) ?? null,
+    /** With `mix`: the drums' sum, once the engine is up, for the page to route. */
+    mixOut: () => junction,
+    aheadMs,
     bpm: () => bpm, stepMs: () => stepMsAt(bpm),
     /** When absolute step k was handed over to sound, on performance.now()'s clock. */
     stepTime: (k) => handed.get(k),

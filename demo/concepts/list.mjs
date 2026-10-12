@@ -58,6 +58,7 @@ export const CONCEPTS = [
   { n: 'rhythm/000', title: 'Drum machine', say: 'A 16 step grid playing four SuperCollider drums, kick, snare and two hats, each on a wire of its own.' },
   { n: 'rhythm/010', title: 'Drum knobs', say: 'The same drum machine with one knob per drum, kick pitch, snare snap, open hat length and closed hat brightness.' },
   { n: 'rhythm/020', title: 'Sample drums', say: 'The drum machine playing samples on SuperCollider, a default kit or any pack or WAVs you drop, with pitch and length per row.' },
+  { n: 'rhythm/030', title: 'Drums on the Pi', say: 'The drum machine played in this tab and on the Raspberry Pi at the same moment, with a crossfader between them.' },
   { n: 'rhythm/050', title: 'Camera drums', say: 'The local camera cut into sixteen squares across, whose lit squares play the drum grid.' },
   { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
   { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
