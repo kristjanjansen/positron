@@ -19,6 +19,7 @@ export const CONCEPTS = [
   { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
   { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits in this tab, played from a patch picker with timbre and morph on the patchbay.' },
+  { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keyboard, with every one of its controls a knob on the patchbay.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
@@ -84,7 +85,7 @@ export const DEMO_CARDS = {
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.', supersededBy: 'synth/080' },
   collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.', supersededBy: 'synth/090' },
-  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.', supersededBy: 'synth/110' },
+  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.', supersededBy: 'synth/120' },
   mirror: { group: 'shader', say: 'One shader drawn by this browser and by a Raspberry Pi.', supersededBy: 'shader/010' },
   llhls: { group: 'streaming', say: 'The tuned low latency HLS player against a live input.' },
   webrtc: { group: 'streaming', say: 'The same live picture delivered over WHEP.', supersededBy: 'video/030' },
