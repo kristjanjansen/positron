@@ -78,7 +78,7 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
@@ -102,7 +102,7 @@ export const DEMO_CARDS = {
   patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
-  tom: { group: 'sampler', say: 'A 16 step grid playing the samples out of a pack.' },
+  tom: { group: 'rhythm', say: 'A 16 step grid playing the samples out of a pack.' },
   time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/010' },
   sync: { group: 'clock', say: 'Four ways two places agree on when something happens.' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
