@@ -339,7 +339,9 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
   const code = createCodeBox({ language: 'faust', rows: CODE_ROWS, label: '', value: CODE.replace(/\n$/, ''),
     ariaLabel: 'the Faust program this synth plays, read only' });
   code.input.readOnly = true;
-  d.stack.add(wave.el, code.el, grid.el, host, pb.el);
+  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
+  // concepts, move knobs on top of code"*.
+  d.stack.add(wave.el, grid.el, code.el, host, pb.el);
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
   window.__demo.fau = {

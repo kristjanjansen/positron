@@ -37,6 +37,11 @@ numbered, kept as cards in `/concepts/`.
   *"yeah when concept has readout move to top"*. `joined: false` in `mount()`,
   with the reason quoted beside it as the shell asks; the log stays at the foot.
 
+- 🔴 **KNOBS ABOVE THE CODE.** Instructed 2026-10-12: *"when there are code and
+  knobs on concepts, move knobs on top of code"*. Order on a synth or shader
+  page: picture, knob row, code box (`CODE_ROWS` lines from `nav.mjs`), keys,
+  patchbay.
+
 ## The index and a page's frame
 
 - `demo/concepts/index.html` holds `CONCEPTS`, rows of `[title, desc, n?]` in
