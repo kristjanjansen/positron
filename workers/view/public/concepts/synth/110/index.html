@@ -217,7 +217,7 @@
     const w = strip.el.clientWidth;
     if (w && w !== fitW) { fitW = w; strip.strip.fit(0, LAP); }
   }).observe(strip.el);
-  // LOOP ON BY DEFAULT, through the bar's own button: a mark at 0 and a mark
+  // LOOP ON FROM THE START, through the bar's own button: a mark at 0 and a mark
   // at the end. The bar starts the deck on the first mark, so `arming`
   // swallows that play; nothing sounds on load. (Kit candidate: a `loop`
   // range option on createTransportBar.)
@@ -227,6 +227,14 @@
     deck.seek(LAP); bar.api.pressLoop();
   } finally { arming = false; }
   deck.seek(0);
+  // THE LOOP IS FIXED AND READ ONLY (*"loop is on, readonly"*). The bar has no
+  // option for a fixed loop, so its LOOP button keeps its on paint and is
+  // disabled with the reason as its hover. No direction button is built
+  // (`loopWays` is off by default). (Kit candidate: a fixed `loop: [a, b]`.)
+  const loopBtn = bar.el.querySelector('.tbar-loop');
+  loopBtn.disabled = true;
+  loopBtn.title = 'the loop is fixed to the whole sequence';
+  loopBtn.setAttribute('aria-label', 'looping the whole sequence, fixed');
   for (const ev of ['pointerenter', 'focusin', 'touchstart']) {
     surface.addEventListener(ev, () => { voice.warm().catch(() => {}); }, { once: true, passive: true });
   }

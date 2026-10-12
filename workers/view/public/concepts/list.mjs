@@ -28,7 +28,7 @@ export const CONCEPTS = [
   { n: 'radio/010', title: 'Tuner', say: 'Four stations and a noise source tuned through one crackly AM dial.' },
   { n: 'radio/020', title: 'Tempo', say: 'Recordings of Raadio 2, Raadio 4 and Ida played from our own bucket into a tempo detector.' },
   { n: 'radio/030', title: 'Live tempo', say: 'The same tempo detector listening to live Raadio 2, Raadio 4 and Ida through our relay.' },
-  { n: 'radio/040', title: 'Key', say: 'The live stations into a key detector that shows their key on a keyboard you can play along on.' },
+  { n: 'radio/040', title: 'Live key', say: 'The live stations into a key detector that shows their key on a keyboard you can play along on.' },
   { n: 'video/000', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: 'video/010', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },

@@ -12,14 +12,6 @@
   .pos-pick.cc-patch { display: flex; width: 100%; }
   .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
   .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
-  /* TWO KNOB ROWS, ONE BLOCK. Asked 2026-10-12: *"2 row patamters perhaps to
-     mimic muta grouping"*, an exception to the one row knob rule. Row one is
-     /muta/'s own four (frequency, harmonics, timbre, morph) with the model in
-     front, row two its six extras (the three CV amounts, decay, colour,
-     voices). The rows are one group, so they sit at the control gap, not the
-     page's block gap; each still scrolls sideways on its own. */
-  .cc-rows { display: flex; flex-direction: column; gap: var(--ctl-gap, 8px); min-width: 0; }
-  .cc-rows > * { min-width: 0; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -40,9 +32,11 @@
   // a knob of its own.
   //
   // EVERY KNOB IS A NODE, `web:knob-<name>`, with a value link into
-  // `web:plaits:value-in`, so turning one is a value crossing a wire:
-  //   row 1  model, pitch, harmonics, timbre, morph
-  //   row 2  timbre CV, FM CV, morph CV, decay, colour, voices
+  // `web:plaits:value-in`, so turning one is a value crossing a wire. ONE ROW
+  // in /muta/'s order, scrolling sideways when it does not fit (*"synth 120,
+  // all params in one line, scrollabel"*): model, pitch, harmonics, timbre,
+  // morph, timbre CV, FM CV, morph CV, decay, colour. No voices knob (*"rm
+  // voices param"*); the voice count stays the shared voice's 6.
   // THE MODEL IS A STEPPED KNOB, not a second picker: it is a Plaits parameter
   // like the others, so it gets the same node and link, and a second picker
   // beside the patch picker would be two controls that look alike and do
@@ -71,7 +65,7 @@
   const SHORT = ['analog', 'shaper', 'FM', 'formant', 'additive', 'table', 'chord', 'speech',
     'swarm', 'noise', 'dust', 'string', 'modal', 'kick', 'snare', 'hat'];
   const P0 = PATCHES[0];
-  // The knobs, in /muta/'s two groups. `to` is what the value does at Plaits.
+  // The knobs, in /muta/'s order. `to` is what the value does at Plaits.
   // `short` is the word under a dial whose name would be cut with an ellipsis
   // (the knob cell holds about six letters); the full name is its hover, its
   // node's label and the value's name on the wire.
@@ -91,7 +85,6 @@
       { name: 'morph CV', short: 'M CV', id: 'morph-cv', min: -1, max: 1, value: 0, to: (v) => param(P.morphModAmount, v) },
       { name: 'decay', value: P0.decay, to: (v) => param(P.decay, v) },
       { name: 'colour', value: P0.colour, to: (v) => param(P.lpgColour, v) },
-      { name: 'voices', min: 1, max: 8, step: 1, value: 6, to: (v) => voice.send({ t: 'voices', n: Math.round(v) }) },
     ],
   ];
   const ALL = ROWS.flat().map((k) => ({ min: 0, max: 1, id: k.name, ...k }));
@@ -108,6 +101,7 @@
   ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
 
   const voice = createPlaitsVoice({ log: d.log, voices: 6, onUp: () => route() });
+  voice.setGain(P0.gain);   // the first patch's level trim
   const held = new Set();        // keys down that have reached Plaits, by key note
   const playing = new Map();     // key note -> the note Plaits was handed
   let notesIn = 0, paramsIn = 0;
@@ -175,8 +169,7 @@
   // Every knob sends its starting value once, so the voice holds what the
   // panel shows (queued until the voice is up).
   for (const k of ALL) bay.send(ID(`knob-${k.id}`, 'value-out'), { of: 'param', name: k.name, v: k.value });
-  const rows = el('div', 'cc-rows');
-  for (const row of ROWS) rows.append(createKnobGrid(new Map(row.map((k) => [k.name, knobs.get(k.name)])), { row: true }).el);
+  const grid = createKnobGrid(knobs, { row: true });
 
   // ── the patch picker: it moves the knobs, the knobs send ────────────────
   let at = 0;
@@ -184,6 +177,7 @@
     at = i;
     patchPick.show(PATCHES[i].name, i);
     const p = PATCHES[i];
+    voice.setGain(p.gain);
     const want = { model: p.engine, harmonics: p.harmonics, timbre: p.timbre, morph: p.morph, decay: p.decay, colour: p.colour };
     for (const [name, v] of Object.entries(want)) {
       const k = knobs.get(name);
@@ -265,12 +259,13 @@
       access.onstatechange = () => devices(access);
     }, () => {});
   }
-  d.stack.add(voice.scope.el, patchPick.el, rows, host, pb.el);
+  d.stack.add(voice.scope.el, patchPick.el, grid.el, host, pb.el);
 
   window.__demo.keyboard = kb;
+  window.__demo.knobs = grid;
   window.__demo.plaits = {
     bay, knobs, pick, patches: PATCHES, features: voice.features, ready: voice.ready, ctx: voice.ctx,
-    wasmAsked: voice.asked, at: () => at, transpose: () => transpose,
+    wasmAsked: voice.asked, level: voice.level, at: () => at, transpose: () => transpose,
     playing: () => [...playing.values()].sort(),
     key: (n, on) => bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: on ? 100 : 0 }),
     counts: () => ({ notesIn, paramsIn }),

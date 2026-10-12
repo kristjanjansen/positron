@@ -13,11 +13,21 @@
      group, so it sits on no text line. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* The panel shows one canvas, the dither's output. The two videos are decode
-     sources only: kept in the document so they go on decoding, one pixel and
-     invisible, never the picture. */
-  .cc-tv canvas { display: block; width: 100%; height: 100%; }
-  .cc-src { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+  /* Three pictures side by side, each a third of the content width (asked
+     2026-10-12, *"add 1/3 1/3 1/3 videpanels. etv, mix, etv2"*): ETV as it
+     arrives, the dithered mix, ETV2 as it arrives. On a phone they stack in the
+     same order, so the mix still sits between the two pictures it is made of. */
+  .cc-tri { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 560px) { .cc-tri { grid-template-columns: minmax(0, 1fr); } }
+  /* A side panel whose link is let go shows its ground, not a frozen frame.
+     `visibility` and not `[hidden]`: the kit's `display: block` on a stage's
+     video beats the browser's own `[hidden]`. */
+  .cc-tri .pos-vp-stage > video.cc-off { visibility: hidden; }
+  /* The kit's bare `video` rule gives every video a card, an edge and a radius,
+     which inside a panel's stage draws a box within the box. Through the kit's
+     own tokens, so the stage's ground shows as it does under the middle
+     canvas. Belongs in shell.css at `.pos-vp-stage > video`. */
+  .cc-tri .pos-vp-stage > video { --edge: 0px; --r: 0px; background: transparent; }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -36,9 +46,17 @@
   import { CHANNELS, NATIVE_HLS, readPlaylist, findServedEdge, wallHandler } from '/shell/err-live.mjs';
 
   // Two ERR television channels live, mixed into one picture, dithered, and
-  // shown. The chain is ETV and ETV2 into `web:mixer`, the mixer into
-  // `web:dither`, the dither into `web:screen`, and every step follows the
-  // links the bay holds. The pictures come straight from ERR's own CDN
+  // shown between the two pictures it is made of. The chain is ETV and ETV2
+  // into `web:mixer`, the mixer into `web:dither`, the dither into
+  // `web:screen` (the middle panel), and each channel also straight into a
+  // panel of its own (`web:etv-panel`, `web:etv2-panel`), so what goes into
+  // the mix is on screen beside it. Every step follows the links the bay holds.
+  //
+  // THE SIDE PANELS SHOW THE RAW SOURCE, NOT A DITHERED ONE. The mixer takes
+  // the channels as they arrive and the dither runs once, after the mix, so
+  // the raw picture is exactly what goes into the mix. A dithered side panel
+  // would show something no wire on the patchbay carries, and the dither's
+  // effect would be invisible because nothing undithered stood beside it. The pictures come straight from ERR's own CDN
   // (live.err.ee), not through positron's relay, and the patchbay says so.
   // `?base=` points every ERR URL at demo/fake-err.mjs instead, through
   // `errUrl` in err-live.mjs, which is how this page is tested.
@@ -86,6 +104,7 @@
   const MIX_IN = `${S}:mixer:video-in`, MIX_OUT = `${S}:mixer:video-out`;
   const DITH_IN = `${S}:dither:video-in`, DITH_OUT = `${S}:dither:video-out`, DITH_VAL = `${S}:dither:value-in`;
   const SCREEN_IN = `${S}:screen:video-in`;
+  const SIDE_IN = (c) => `${S}:${c.id}-panel:video-in`;
   const FADER_IN = `${S}:fader:audio-in`, FADER_OUT = `${S}:fader:audio-out`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
 
@@ -132,8 +151,14 @@
     bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: 'knob', place: 'browser' });
     bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
   }
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'TV panel', place: 'browser' });
-  bay.addPort({ id: SCREEN_IN, label: 'TV panel', dir: 'in', medium: 'video' });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'mix panel', place: 'browser' });
+  bay.addPort({ id: SCREEN_IN, label: 'mix panel', dir: 'in', medium: 'video' });
+  // A panel per channel, fed by the same picture-out that feeds the mixer: one
+  // out to two ins, the source seen as it is and as it goes into the mix.
+  for (const c of ON_PAGE) {
+    bay.addNode({ id: `${S}:${c.id}-panel`, kind: 'screen', label: `${c.name} panel`, place: 'browser' });
+    bay.addPort({ id: SIDE_IN(c), label: `${c.name} panel`, dir: 'in', medium: 'video', transports: ['llhls'] });
+  }
   bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
@@ -156,6 +181,7 @@
   // which is the press where a person asks to watch, so the consent is named
   // here rather than at the press.
   for (const c of ON_PAGE) {
+    hold(vOut(c), SIDE_IN(c), { consent: true, via: 'llhls' });
     hold(vOut(c), MIX_IN, { consent: true, via: 'llhls' });
     hold(aOut(c), FADER_IN, { consent: true, via: 'llhls' });
   }
@@ -172,6 +198,13 @@
     video.crossOrigin = 'anonymous';
     const ch = { c, video, hls: null, src: null, tap: null, gain: null, buf: null,
       lastFrame: 0, lastT: -1, lastSound: 0, frames: 0, refused: false };
+    // The channel's own panel shows this element itself: ERR's picture as it
+    // arrives, before the mixer or the dither touch it.
+    const res = el('span', 'cc-say', '');
+    const name = el('span', 'cc-say', '');
+    const panel = createVideoPanel({ media: video, left: name });
+    panel.el.querySelector('.pos-vp-r').prepend(res);
+    Object.assign(ch, { res, name, panel });
     video.addEventListener('resize', () => showSize());
     return ch;
   });
@@ -208,22 +241,19 @@
     if (mixHas) lastMix = performance.now();
   }
 
-  // ── the panel: one canvas, the dither's output ──────────────────────────
+  // ── the middle panel: one canvas, the dither's output ───────────────────
   const canvas = el('canvas');
   canvas.width = FRAME_W; canvas.height = FRAME_H;
   const gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
-  // One footer line, as the camera pages: which channels at the left, the
-  // resolution, the dither size and the panel's own full-screen button at the
-  // right.
+  // One footer line per panel. The middle says what it mixes at the left and
+  // the dither size at the right; each side panel names its channel and its
+  // resolution, so the middle no longer repeats one of them.
   const who = el('span', 'cc-say', '');
-  const size = el('span', 'cc-say', '');
   const dsize = el('span', 'cc-say', gl ? '' : 'no WebGL2');
   const panel = createVideoPanel({ media: canvas, left: who });
-  panel.el.classList.add('cc-tv');
-  panel.el.querySelector('.pos-vp-r').prepend(size, dsize);
-  const srcs = el('div', 'cc-src');
-  srcs.append(...tv.map((ch) => ch.video));
-  panel.el.querySelector('.pos-vp-stage').append(srcs);
+  panel.el.querySelector('.pos-vp-r').prepend(dsize);
+  const tri = el('div', 'cc-tri');
+  tri.append(tv[0].panel.el, panel.el, tv[1].panel.el);
 
   let prog = null, tex = null, U = {}, tainted = false;
   if (gl) {
@@ -307,8 +337,8 @@
   }
 
   // A frame arrived when the playhead moved. Read off the draw loop rather
-  // than requestVideoFrameCallback, because the sources are invisible and a
-  // browser may skip presenting what nobody can see.
+  // than requestVideoFrameCallback, because a side panel whose link is let go
+  // hides its picture and a browser may skip presenting what nobody can see.
   function watchFrames() {
     const now = performance.now();
     for (const ch of tv) {
@@ -322,19 +352,26 @@
       if (first) { showSize(); d.log(`${ch.c.name}: first frame, ${v.videoWidth}x${v.videoHeight}`, 'hi'); }
     }
   }
-  function render() { watchFrames(); drawMix(); dither(); }
+  // A side panel follows its own link: let go, it shows its ground.
+  function sides() {
+    for (const ch of tv) ch.video.classList.toggle('cc-off', !holds(vOut(ch.c), SIDE_IN(ch.c)));
+  }
+  function render() { watchFrames(); drawMix(); dither(); sides(); }
   let raf = 0;
   function frame() { render(); if (playing) raf = requestAnimationFrame(frame); }
 
-  // The stronger picture's resolution, the one a viewer is mostly looking at.
+  // Each side panel's own resolution, under its own picture.
   function showSize() {
-    const v = tv[x < 0.5 ? 0 : 1].video;
-    size.textContent = playing && v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
+    for (const ch of tv) {
+      const v = ch.video;
+      ch.res.textContent = playing && v.videoWidth && v.videoHeight ? `${v.videoWidth}x${v.videoHeight}` : '';
+    }
   }
-  // The footer names no shares (asked 2026-10-10, *"rm ETV 34 ETV2 66"*): the
+  // The footers name no shares (asked 2026-10-10, *"rm ETV 34 ETV2 66"*): the
   // fader's end labels already say which is which. Empty while stopped.
   function showWho() {
-    who.textContent = playing ? `${tv[0].c.name} and ${tv[1].c.name}` : '';
+    who.textContent = playing ? 'mix' : '';
+    for (const ch of tv) ch.name.textContent = playing ? ch.c.name : '';
   }
   function showDither() {
     if (!gl) { dsize.textContent = 'no WebGL2'; return; }
@@ -529,13 +566,15 @@
   const grid = createKnobGrid(knobs, { row: true });
 
   applyFade();
-  // Linear, as every concept instrument: the picture, its fader,
-  // then the knobs area, then the patchbay.
-  d.stack.add(top, panel.el, fader.el, grid.el, pb.el);
+  // Linear, as every concept instrument: the three pictures, the fader under
+  // them (ETV at its left end under ETV, ETV2 at its right under ETV2), then
+  // the knobs area, then the patchbay.
+  d.stack.add(top, tri, fader.el, grid.el, pb.el);
   window.__demo.knobs = grid;
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,
-    footer: () => ({ left: who.textContent, right: `${size.textContent} ${dsize.textContent}`.trim() }),
+    footer: () => ({ left: who.textContent, right: dsize.textContent,
+      sides: tv.map((ch) => ({ left: ch.name.textContent, right: ch.res.textContent })) }),
     dither: () => ({ gl: !!gl, compiled: !!prog, size: P.size, tainted, mixing: mixHas }),
     channels: () => tv.map((ch) => ({ id: ch.c.id, frames: ch.frames,
       size: ch.video.videoWidth ? `${ch.video.videoWidth}x${ch.video.videoHeight}` : '',
