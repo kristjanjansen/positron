@@ -112,7 +112,7 @@
      bay's own stacking width) and scaled to the column; the frame takes the
      scaled height, so five by three sits near 16:9 and two by four is
      simply as tall as it is. */
-  .fp-bay { display: flex; justify-content: center; margin-top: 32px; overflow: hidden; }
+  .fp-bay { display: flex; justify-content: center; margin-top: 32px; }
   .fp-bay-in { flex: none; }
 
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
@@ -367,10 +367,22 @@
       // *"Make mibile and dsrsktip patchbays different"*): its touch plays the
       // Circuit on the Pi, its tilt bends the Pi's shader, its camera goes out
       // through Stream, its microphone is kept on R2. Two columns of four.
+      // Then *"So so boring"*: four one to one wires were. Every sense now fans
+      // out, so the two columns cross: touch plays the Circuit, pulses the
+      // shader and is written down on R2; tilt is the Circuit's filter and the
+      // shader's angle; the camera goes out on Stream, into the shader and onto
+      // R2; the microphone goes out with it, drives the shader and is kept.
       const PHONE = [
         ['phone:touch:midi-out', 'pi-1:circuit:midi-in'],
+        ['phone:touch:midi-out', 'pi-1:gpu:midi-in'],
+        ['phone:touch:midi-out', 'r2:recordings:midi-in'],
+        ['phone:tilt:value-out', 'pi-1:circuit:value-in'],
         ['phone:tilt:value-out', 'pi-1:gpu:value-in'],
         ['phone:camera:video-out', 'cf-stream:live:video-in'],
+        ['phone:camera:video-out', 'pi-1:gpu:video-in'],
+        ['phone:camera:video-out', 'r2:recordings:video-in'],
+        ['phone:mic:audio-out', 'cf-stream:live:audio-in'],
+        ['phone:mic:audio-out', 'pi-1:gpu:audio-in'],
         ['phone:mic:audio-out', 'r2:recordings:audio-in'],
       ];
       const LABELS = { 'web:keys': 'keyboard', 'web:rec': 'recorder', 'web:synth': 'sine synth', 'web:fx': 'octaver',
