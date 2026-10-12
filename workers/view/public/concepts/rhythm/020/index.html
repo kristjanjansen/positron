@@ -11,15 +11,12 @@
   /* As /concepts/rhythm/010/: four scopes a quarter each, two by two on a phone. */
   .cc-scopes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 560px) { .cc-scopes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .cc-lab { font-size: 12px; color: var(--dim); }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createSampleLoader } from '/shell/sample-loader.mjs';
-  import { createPicker } from '/shell/picker.mjs';
-  import { createGlueRows } from '/shell/glue.mjs';
   import { createDrumMachine } from '/concepts/rhythm/drum-machine.mjs';
   import { sampleVoices, createSampleBank, defaultPick, DEFAULT_KIT } from '/concepts/rhythm/sample-voices.mjs';
 
@@ -32,7 +29,7 @@
   // DROP a `.circuitpack`, a zip of WAVs or loose WAVs anywhere on the page
   // (`/shell/sample-loader.mjs`, the reader /tom/ uses) and they replace it;
   // each row then picks its sample by name (kick, snare, hat) or takes the
-  // first four in order, and its picker changes it.
+  // first four in order.
   //
   // EIGHT KNOBS, a pitch and a length per row, each its own bay node on a value
   // wire into its row, in one row that scrolls sideways when it does not fit.
@@ -48,38 +45,20 @@
   const bufOf = (key) => { const s = bank.loaded()[pick.get(key) ?? -1]; return s ? s.buf : null; };
   const VOICES = sampleVoices({ bufOf });
 
-  // ── a picker per row, of the samples loaded ──────────────────────────────
-  const rows = createGlueRows({ grid: true });
-  const pickers = new Map(VOICES.map((v) => {
-    const at = () => pick.get(v.key) ?? 0;
-    const n = () => bank.loaded().length || names.length || 1;
-    const p = createPicker({ what: `${v.label} sample`,
-      prev: () => choose(v.key, (at() - 1 + n()) % n()),
-      next: () => choose(v.key, (at() + 1) % n()),
-      onPick: (i) => choose(v.key, i) });
-    rows.row([el('span', 'cc-lab', v.label), p]);
-    return [v.key, p];
-  }));
+  // No picker per row since 2026-10-12 (asked: *"rm"* on a shot of the four
+  // row pickers): each row plays its default, by name or by order, from
+  // whatever was loaded or dropped last.
   let names = [];
-  function choose(key, i) {
-    pick.set(key, i);
-    pickers.get(key).show(names[i] ?? '', i);
-    d.log(`${VOICES.find((v) => v.key === key).label} plays ${names[i] ?? 'nothing'}`);
-  }
-  /** New names: each row takes its default, and the pickers list them. */
+  /** New names: each row takes its default. */
   function offer(list) {
     names = list.map((x) => x.name.replace(/\.wav$/i, ''));
     VOICES.forEach((v, r) => {
       const i = defaultPick(names, v.key, r);
       pick.set(v.key, i);
-      const p = pickers.get(v.key);
-      p.options(names);
-      p.show(names[i] ?? '', i);
     });
   }
 
-  // The default kit's names are known before anything is fetched, so the
-  // pickers say what will play from the start.
+  // The default kit's names are known before anything is fetched.
   offer(DEFAULT_KIT.map((name) => ({ name })));
 
   const m = createDrumMachine(d, {
@@ -112,9 +91,9 @@
 
   const scopes = el('div', 'cc-scopes');
   scopes.append(...m.scopes);
-  d.stack.add(scopes, m.surface, rows.el, m.knobs, drop.el, m.patchbay);
+  d.stack.add(scopes, m.surface, m.knobs, drop.el, m.patchbay);
   window.__rhythm = m.api;
-  window.__samples = { bank, pick, pickers, names: () => names, dropped: () => dropped, open: (files) => drop.open(files) };
+  window.__samples = { bank, pick, names: () => names, dropped: () => dropped, open: (files) => drop.open(files) };
   window.__demo.knobs = m.api.knobGrid;
   d.ready();
 </script>
