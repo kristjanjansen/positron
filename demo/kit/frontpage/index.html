@@ -105,6 +105,17 @@
   .fp-big-l { font: 400 clamp(18px, 2.3vw, 22px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 24px; max-width: 32em; }
   .fp-big-s { font: 400 clamp(14px, 1.5vw, 16px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
 
+  /* An imaginary patchbay under the large hero (2026-10-12, *"create
+     imaginary parchbay that fits into 16:9 size under it"*): made up boxes
+     drawn by the real bay view, in a 16:9 frame. */
+  .fp-bay { aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center;
+            padding: 20px; margin-top: 32px; overflow: hidden;
+            background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+  /* Drawn at one desk width and scaled to the frame, so a phone sees the
+     same row picture smaller rather than the bay's stacked phone layout,
+     which a 16:9 frame would cut off. */
+  .fp-bay-in { width: 640px; flex: none; transform-origin: center; }
+
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
      THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
      in shell.css are these two faces, so nothing here sets either and every
@@ -155,6 +166,10 @@
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { CONCEPTS, DEMO_CARDS } from '/concepts/list.mjs';
+  import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
+  import { createBayTraffic } from '/shell/bay-traffic.mjs';
+  import { createPortInk } from '/shell/port-ink.mjs';
+  import { MEDIA } from '/shell/bay.mjs';
   import { DEMOS, GROUPS } from '/manifest.mjs';
   import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
 
@@ -301,6 +316,73 @@
       const eye = el('p', 'fp-big-eye');
       eye.append('POSITRON', el('b', '', '.'), 'STUDIO');
       big.append(eye, el('h2', 'fp-big-h', HERO.head), el('p', 'fp-big-l', HERO.line), el('p', 'fp-big-s', HERO.small));
+      // The imaginary patchbay: the web, Cloudflare, a Pi and a microcontroller
+      // in one picture. Nothing here runs; the boxes and wires are made up.
+      document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS }));
+      const LINKS = [
+        ['web:keys:midi-out', 'cf-relay:room:midi-in'],
+        ['pico-1:knob:value-out', 'cf-relay:room:value-in'],
+        ['web:camera:video-out', 'cf-stream:live:video-in'],
+        ['cf-relay:room:midi-out', 'pi-1:synth:midi-in'],
+        ['cf-relay:room:value-out', 'pi-1:synth:value-in'],
+        ['cf-stream:live:video-out', 'web:screen:video-in'],
+        ['pi-1:synth:audio-out', 'web:speaker:audio-in'],
+      ];
+      const LABELS = { 'web:keys': 'your keyboard', 'pico-1:knob': 'a knob on a Pico', 'web:camera': 'your camera',
+        'cf-relay:room': 'Cloudflare', 'cf-stream:live': 'Cloudflare Stream', 'pi-1:synth': 'a Pi in another building',
+        'web:screen': 'every screen', 'web:speaker': 'every speaker' };
+      const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
+      const ports = new Map(), nodes = new Map();
+      const links = LINKS.map(([from, to], i) => {
+        for (const [id, dir] of [[from, 'out'], [to, 'in']]) {
+          if (!nodes.has(nodeOf(id))) nodes.set(nodeOf(id), { id: nodeOf(id), label: LABELS[nodeOf(id)] || '' });
+          if (!ports.has(id)) ports.set(id, { id, dir, medium: id.split(':')[2].replace(/-(in|out)$/, '') });
+        }
+        return { id: `l${i}`, from, to };
+      });
+      const view = createBayView({ nodes: () => [...nodes.values()], ports: () => [...ports.values()], links: () => links },
+        { detail: (n) => [{ text: n.label }] });
+      const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
+      inner.append(view.el);
+      frame.append(inner);
+      big.append(frame);
+      const fit = () => {
+        const k = Math.min(1, (frame.clientWidth - 40) / 640, (frame.clientHeight - 40) / (inner.offsetHeight || 1));
+        inner.style.transform = `scale(${k})`;
+      };
+      new ResizeObserver(fit).observe(frame);
+      // "Working" (asked: *"make it \"working\""*): stand-in traffic, one
+      // player for the whole picture, so it reads as one thing happening. The
+      // keys play a phrase, the relay passes each note on 40 ms later, the
+      // Pi sounds it, a knob on the Pico is turned now and then, and the
+      // camera streams steadily. Nothing leaves the page.
+      const notes = [];
+      let nextNote = 0;
+      const playing = (t) => (t % 5000) < 3600;     // a phrase, then a breath
+      const keys = (t) => {
+        let n = 0;
+        if (playing(t) && t >= nextNote) { n = 1; notes.push(t); nextNote = t + 180 + Math.random() * 260; }
+        while (notes.length && notes[0] < t - 4000) notes.shift();
+        return { n, level: 0 };
+      };
+      const later = (ms) => { let seen = 0; return (t) => { const due = notes.filter((x) => x + ms <= t).length; const n = Math.max(0, due - seen); seen = due; return { n, level: 0 }; }; };
+      const fromRelay = later(40);
+      let lvl = 0, prev = 0, heard = 0;
+      const sound = (t) => {
+        const due = notes.filter((x) => x + 80 <= t).length;
+        if (due > heard) lvl = 0.7 + Math.random() * 0.3;
+        heard = due; lvl *= Math.exp(-(t - prev) / 420); prev = t;
+        return { n: 0, level: lvl, flowing: lvl > 0.03 };
+      };
+      let knobNext = 0; const knobOn = (t) => (t % 5200) < 900;
+      const knob = (t) => { let n = 0; if (knobOn(t) && t >= knobNext) { n = 1; knobNext = t + 40; } return { n, level: 0.5 }; };
+      const knobOut = (() => { let next = 0; return (t) => { let n = 0; if (knobOn(t - 40) && t >= next) { n = 1; next = t + 40; } return { n, level: 0.5 }; }; })();
+      const video = (t) => ({ n: 0, level: 0.75 + 0.15 * Math.sin(t / 700), flowing: true });
+      const FEED = { 'web:keys:midi-out': keys, 'cf-relay:room:midi-out': fromRelay, 'pico-1:knob:value-out': knob,
+        'cf-relay:room:value-out': knobOut, 'web:camera:video-out': video, 'cf-stream:live:video-out': video, 'pi-1:synth:audio-out': sound };
+      const life = createBayTraffic();
+      for (const l of links) life.add(view, l.id, ports.get(l.from).medium, FEED[l.from]);
+      createPortInk({ ports: () => [...ports.values()] }, MEDIA).paint(frame);
       add(big);
     }, { bare: true });
 
