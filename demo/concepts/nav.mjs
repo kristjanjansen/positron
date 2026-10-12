@@ -29,7 +29,12 @@ export function conceptNav(n) {
       // Code boxes on concept pages: three times the kit field's 7px 9px.
       // Asked 2026-10-12: *"make code win 1/2 less h and add 3x padding. same
       // on other code wins"*; the pages halve their own `rows`.
-      + ' .pos-code { --field-pad: 21px 27px; }';
+      // Then *"30% less padding on code boxes. 15% more line height"*: 15px
+      // 19px, and the code field's 1.45 times 1.15. MEASURED: the kit sets it
+      // in `.pos-field.tall.code textarea` (0,3,1), so this ties that weight
+      // and wins by coming later.
+      + ' .pos-code { --field-pad: 15px 19px; }'
+      + ' .pos-field.code.pos-code textarea { line-height: 1.67; }';
     document.head.append(st);
   }
 }
