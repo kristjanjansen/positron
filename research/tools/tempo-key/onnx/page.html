@@ -1,0 +1,189 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>beat_this small in a tab</title>
+<pre id="out">loading</pre>
+<script type="module">
+// Throwaway: beat_this small0 exported to ONNX, run with onnxruntime-web on
+// 12 s windows every 2 s, with a JS front end matching beat_this's LogMelSpect
+// (22050 Hz, n_fft 1024, hop 441, 30 to 11000 Hz, 128 slaney mels, magnitude
+// normalised by frame length, log1p(1000 x)). Query:
+//   mode=fixture | run     names=r2,r4,...    threads=1|4    limit=<windows>
+//   model=small0 | small0-f16      ep=wasm | webgpu
+// LAYOUT, because it is a scratch tool and the paths are absolute: copy this
+// folder to <work>/btx/, run `npm i onnxruntime-web` (1.30.0 measured) and
+// export.py there, and put the six recordings decoded by research/tools/
+// tempo-key's ffmpeg line (44.1 kHz mono f32le) in <work>/tk/ beside ref-*.json
+// and final-*.json. `node drive.mjs '<query>' out.json [--noiso] [--gpu]` serves
+// <work> with COOP/COEP (so threads > 1 work), drives headless Chrome over CDP
+// and kills it on every exit. toeval.mjs, hykeep.mjs and gate.mjs turn out.json
+// into tempo readings that eval.mjs scores.
+const q = new URLSearchParams(location.search);
+const EP = q.get('ep') || 'wasm';
+const ort = await import(EP === 'webgpu' ? '/btx/node_modules/onnxruntime-web/dist/ort.webgpu.min.mjs' : '/btx/node_modules/onnxruntime-web/dist/ort.wasm.min.mjs');
+const out = document.getElementById('out');
+const say = (s) => { out.textContent += '\n' + s; };
+const R = (window.__result = { done: false, log: [] });
+const now = () => performance.now();
+
+ort.env.wasm.wasmPaths = '/btx/node_modules/onnxruntime-web/dist/';
+ort.env.wasm.numThreads = +(q.get('threads') || 1);
+
+const SR = 22050, NFFT = 1024, HOP = 441, NM = 128, FPS = 50;
+// ---- mel filterbank, torchaudio melscale_fbanks(slaney, norm None) ----
+const hz2mel = (f) => (f < 1000 ? f / (200 / 3) : 15 + Math.log(f / 1000) / (Math.log(6.4) / 27));
+const mel2hz = (m) => (m < 15 ? m * (200 / 3) : 1000 * Math.exp((Math.log(6.4) / 27) * (m - 15)));
+const NF = NFFT / 2 + 1;
+const FB = (() => {
+  const m0 = hz2mel(30), m1 = hz2mel(11000), fp = [];
+  for (let i = 0; i < NM + 2; i++) fp.push(mel2hz(m0 + (m1 - m0) * i / (NM + 1)));
+  const fb = [];               // per mel: [firstBin, weights]
+  for (let m = 0; m < NM; m++) {
+    const w = new Float32Array(NF); let lo = -1, hi = -1;
+    for (let k = 0; k < NF; k++) {
+      const f = (SR / 2) * k / (NF - 1);
+      const down = (f - fp[m]) / (fp[m + 1] - fp[m]), up = (fp[m + 2] - f) / (fp[m + 2] - fp[m + 1]);
+      const v = Math.max(0, Math.min(down, up)); w[k] = v; if (v > 0) { if (lo < 0) lo = k; hi = k; }
+    }
+    fb.push(lo < 0 ? [0, new Float32Array(0)] : [lo, w.slice(lo, hi + 1)]);
+  }
+  return fb;
+})();
+const WIN = new Float32Array(NFFT); let wsum = 0;
+for (let i = 0; i < NFFT; i++) { WIN[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / NFFT); wsum += WIN[i] ** 2; }
+const NORM = 1 / Math.sqrt(NFFT);   // torch.stft(normalized=True): frame_length ** -0.5
+// ---- radix 2 complex FFT, in place ----
+const COS = new Float64Array(NFFT / 2), SIN = new Float64Array(NFFT / 2);
+for (let i = 0; i < NFFT / 2; i++) { COS[i] = Math.cos(-2 * Math.PI * i / NFFT); SIN[i] = Math.sin(-2 * Math.PI * i / NFFT); }
+const REV = new Uint32Array(NFFT); for (let i = 0, b = Math.log2(NFFT); i < NFFT; i++) { let r = 0; for (let j = 0; j < b; j++) r |= ((i >> j) & 1) << (b - 1 - j); REV[i] = r; }
+const re = new Float64Array(NFFT), im = new Float64Array(NFFT);
+function fft() {
+  for (let i = 0; i < NFFT; i++) { const j = REV[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let s = 2; s <= NFFT; s <<= 1) {
+    const h = s >> 1, st = NFFT / s;
+    for (let i = 0; i < NFFT; i += s) for (let j = 0; j < h; j++) {
+      const c = COS[j * st], sn = SIN[j * st], a = i + j, b = a + h;
+      const tr = re[b] * c - im[b] * sn, ti = re[b] * sn + im[b] * c;
+      re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+    }
+  }
+}
+const mag = new Float32Array(NF);
+// log mel of a 22050 Hz window, center=True with reflect padding, as torchaudio
+function logmel(x, pad = 6) {
+  const L = x.length, T = 1 + Math.floor(L / HOP), P = NFFT / 2;
+  const outM = new Float32Array((T + 2 * pad) * NM);     // zero frames either side, as beat_this's zeropad
+  const at = (i) => (i < 0 ? x[-i] : i >= L ? x[2 * (L - 1) - i] : x[i]);
+  for (let t = 0; t < T; t++) {
+    const s = t * HOP - P;
+    for (let i = 0; i < NFFT; i++) { re[i] = at(s + i) * WIN[i]; im[i] = 0; }
+    fft();
+    for (let k = 0; k < NF; k++) mag[k] = Math.hypot(re[k], im[k]) * NORM;
+    const o = (t + pad) * NM;
+    for (let m = 0; m < NM; m++) { const [lo, w] = FB[m]; let a = 0; for (let k = 0; k < w.length; k++) a += w[k] * mag[lo + k]; outM[o + m] = Math.log1p(1000 * a); }
+  }
+  return { mel: outM, T };
+}
+// ---- 2:1 decimation, a Kaiser windowed sinc lowpass at 10.6 kHz (soxr stands in for this offline) ----
+const TAPS = 191, H = (() => {
+  const h = new Float64Array(TAPS), fc = 10600 / 44100, beta = 8.6, M = TAPS - 1;
+  const I0 = (z) => { let s = 1, t = 1; for (let k = 1; k < 30; k++) { t *= (z / 2 / k) ** 2; s += t; } return s; };
+  let sum = 0;
+  for (let n = 0; n < TAPS; n++) { const m = n - M / 2; const sinc = m === 0 ? 2 * fc : Math.sin(2 * Math.PI * fc * m) / (Math.PI * m); h[n] = sinc * I0(beta * Math.sqrt(1 - (2 * n / M - 1) ** 2)) / I0(beta); sum += h[n]; }
+  for (let n = 0; n < TAPS; n++) h[n] /= sum; return h;
+})();
+function decimate(x) {     // whole buffer, centred filter; the cost is reported per second of audio
+  const n = Math.floor(x.length / 2), y = new Float32Array(n), D = (TAPS - 1) / 2;
+  for (let i = 0; i < n; i++) { const c = 2 * i; let a = 0; for (let k = 0; k < TAPS; k++) { const j = c + k - D; if (j >= 0 && j < x.length) a += H[k] * x[j]; } y[i] = a; }
+  return y;
+}
+// ---- beat_this minimal postprocessing ----
+function peaks(logits, T, pad) {
+  const b = [];
+  for (let t = 0; t < T; t++) {
+    const v = logits[t + pad]; if (v <= 0) continue;
+    let mx = -Infinity; for (let k = -3; k <= 3; k++) { const j = t + k; if (j >= 0 && j < T) mx = Math.max(mx, logits[j + pad]); }
+    if (v === mx) b.push(t);
+  }
+  const res = []; let p = null, c = 0;           // deduplicate_peaks width 1
+  for (const f of b) { if (p !== null && f - p <= 1) { c++; p += (f - p) / c; } else { if (p !== null) res.push(p); p = f; c = 1; } }
+  if (p !== null) res.push(p);
+  return res.map((f) => f / FPS);
+}
+const f32 = async (u) => new Float32Array(await (await fetch(u)).arrayBuffer());
+async function memory() {
+  const m = { jsHeapUsed: performance.memory?.usedJSHeapSize ?? null };
+  if (crossOriginIsolated && performance.measureUserAgentSpecificMemory) { try { m.uaBytes = (await performance.measureUserAgentSpecificMemory()).bytes; } catch (e) { m.uaErr = String(e); } }
+  return m;
+}
+
+R.isolated = crossOriginIsolated; R.ep = EP; R.adapter = navigator.gpu ? !!(await navigator.gpu.requestAdapter()) : 'no navigator.gpu'; R.threads = ort.env.wasm.numThreads;
+R.mem0 = await memory();
+let t0 = now();
+const session = await ort.InferenceSession.create('/btx/' + (q.get('model') || 'small0') + '.onnx', { executionProviders: [EP], graphOptimizationLevel: 'all' });
+R.createMs = now() - t0;
+async function infer(mel, T, pad) {
+  const t = new ort.Tensor('float32', mel, [1, T + 2 * pad, NM]);
+  const o = await session.run({ spect: t });
+  return o.beat.data;
+}
+R.mem1 = await memory();
+
+if (q.get('mode') === 'fixture') {
+  const w44 = await f32('/btx/fx-wave44.f32'), w22 = await f32('/btx/fx-wave22.f32'), mref = await f32('/btx/fx-mel.f32'), bref = await f32('/btx/fx-beat.f32');
+  const cmp = (a, b, off = 0) => { let mx = 0, s = 0; for (let i = 0; i < b.length; i++) { const d = Math.abs(a[i + off] - b[i]); mx = Math.max(mx, d); s += d; } return { max: +mx.toFixed(5), mean: +(s / b.length).toFixed(6) }; };
+  t0 = now(); const a = logmel(w22, 0); R.melMs = now() - t0; R.melFrames = a.T;
+  R.melFromSoxr = cmp(a.mel, mref);
+  t0 = now(); const d = decimate(w44); R.decMs = now() - t0;
+  const b = logmel(d.length === w22.length ? d : d.subarray(0, w22.length), 0); R.melFromJsDecimate = cmp(b.mel, mref);
+  // model on the exact reference mel
+  const padded = new Float32Array((mref.length / NM + 12) * NM); padded.set(mref, 6 * NM);
+  t0 = now(); const lg = await infer(padded, mref.length / NM, 6); R.firstRunMs = now() - t0;
+  R.logitsOnRefMel = cmp(lg, bref);
+  const lg2 = await infer(b.mel.length ? (() => { const p = new Float32Array((b.T + 12) * NM); p.set(b.mel, 6 * NM); return p; })() : null, b.T, 6);
+  R.logitsOnJsMel = cmp(lg2, bref);
+  const pk = (l) => peaks(l, mref.length / NM, 6);
+  R.beatsRef = peaks(bref, mref.length / NM, 6);
+  R.beatsOnnxRefMel = pk(lg); R.beatsOnnxJsMel = pk(lg2);
+  R.done = true; say(JSON.stringify(R, null, 1));
+} else {
+  const names = (q.get('names') || 'r2').split(','), limit = +(q.get('limit') || 1e9);
+  R.runs = {};
+  let first = true;
+  for (const name of names) {
+    const x44 = await f32(`/tk/${name}.f32`);
+    t0 = now(); const x = decimate(x44); const decMs = now() - t0;
+    const secs = x.length / SR;
+    const W = 12 * SR, STEP = 2;
+    const readings = [], times = { mel: [], infer: [], post: [] };
+    let n = 0;
+    for (let end = 12; end <= secs && n < limit; end += STEP, n++) {
+      const seg = x.subarray(Math.round((end - 12) * SR), Math.round(end * SR));
+      let t = now(); const { mel, T } = logmel(seg, 6); times.mel.push(now() - t);
+      t = now(); const lg = await infer(mel, T, 6); const im = now() - t; times.infer.push(im);
+      if (first) { R.firstInferMs = im; first = false; }
+      t = now();
+      const b = peaks(lg, T, 6).map((v) => v + end - 12);
+      let reading = null;
+      if (b.length >= 4) {
+        const ibi = b.slice(1).map((v, i) => v - b[i]).sort((p, q) => p - q), med = ibi[ibi.length >> 1];
+        const k = b.map((v) => Math.round((v - b[0]) / med)), N = b.length;
+        const mk = k.reduce((s, v) => s + v, 0) / N, mb = b.reduce((s, v) => s + v, 0) / N;
+        let sxy = 0, sxx = 0; for (let i = 0; i < N; i++) { sxy += (k[i] - mk) * (b[i] - mb); sxx += (k[i] - mk) ** 2; }
+        const per = sxx > 0 ? sxy / sxx : med;
+        reading = { bpm: Math.round(600 / per) / 10, conf: 1, beatAt: b[b.length - 1], cand: [] };
+      }
+      times.post.push(now() - t);
+      for (let i = 0; i < 4; i++) if (reading) readings.push({ t: end + 0.5 * i, ...reading, beats: i === 0 ? b : undefined });
+      if (n % 25 === 0) { R.progress = `${name} ${end}s`; await new Promise((r) => setTimeout(r, 0)); }
+    }
+    const sum = (a) => a.reduce((s, v) => s + v, 0);
+    const pct = (a, p) => { const s = [...a].sort((u, v) => u - v); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+    R.runs[name] = { seconds: secs, windows: n, decMs, decMsPerSec: decMs / (x44.length / 44100),
+      melMean: sum(times.mel) / n, inferMean: sum(times.infer) / n, inferP50: pct(times.infer, 0.5), inferP95: pct(times.infer, 0.95), inferMax: Math.max(...times.infer), postMean: sum(times.post) / n,
+      readings };
+    say(`${name}: ${n} windows, infer mean ${(sum(times.infer) / n).toFixed(1)} ms, mel ${(sum(times.mel) / n).toFixed(1)} ms`);
+  }
+  R.mem2 = await memory();
+  R.done = true;
+}
+</script>

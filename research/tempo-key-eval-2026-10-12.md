@@ -428,3 +428,167 @@ favour Temperley; the radio favours edma. Both are true.
 - **The essentia profile numbers** in `our-key.mjs` were read from Essentia's
   `key.cpp` through a summariser and not byte checked; Albrecht-Shanahan as
   music21 carries it.
+
+## 8. beat_this small in a tab, MEASURED 2026-10-12 evening
+
+Asked as item (c) of *"do open stuff"*: install onnx, export beat_this small,
+measure it in Chrome, grade it beside `demo/concepts/radio/tempo.mjs` (which
+since commit 5f9c8733 scores on the beat 81.3% pooled and shown wrong 5.0%).
+**This replaces the ESTIMATED browser cost in 4.5 and in item 5 of the plan.**
+Nothing on any page changed.
+
+### 8.1 What ran
+
+- `pip install --only-binary=:all: onnx` in `~/.cache/positron-tools/venv`:
+  onnx 1.23.2, protobuf 7.36.2, ml_dtypes 0.6.0, all wheels, nothing compiled.
+- **Export:** `small0` (2,099,960 parameters) through the TorchScript exporter,
+  opset 17, the time axis dynamic. `onnx.checker` passes. **10,498,987 bytes**
+  at float32, **6,310,140** with the weights stored as float16 and cast back to
+  float32 at load (the arithmetic is unchanged). Logits through onnx's own
+  reference evaluator against a fresh torch run: max difference 6e-5.
+- **Runtime:** onnxruntime-web 1.30.0 from npm, the `wasm` build
+  (`ort.wasm.min.mjs`, `ort-wasm-simd-threaded.wasm`), in headless Chrome 155
+  on this laptop over CDP, served by a local static server. Also the
+  `webgpu` build once, with the GPU allowed.
+- **Front end in JS**, matching beat_this's `LogMelSpect`: 22,050 Hz, n_fft
+  1024 with a periodic Hann window, hop 441 (50 frames a second), centred
+  frames with reflect padding, magnitude, 128 slaney mels from 30 to 11,000 Hz,
+  `log1p(1000 x)`, six zero frames either side as `zeropad` does, and the
+  minimal postprocessing (a local maximum over 7 frames with a logit above 0,
+  adjacent peaks merged). The page's audio is 44.1 kHz, so a 191 tap Kaiser
+  windowed lowpass at 10.6 kHz and 2:1 decimation stands in for soxr.
+- **Run as `bt-window.py` runs it:** the last 12 s every 2 s, no future, the
+  same tempo line through the window's beats, readings in `our-tempo.mjs`'s
+  shape, graded by `eval.mjs` against the same soft truth as section 4.
+- The tools are in `research/tools/tempo-key/onnx/` (`export.py`, the test
+  page, its driver and the three scripts that turn its output into readings);
+  the page's header says how to lay out a working folder.
+
+⚠️ **TWO TRAPS, BOTH CAUGHT BY THE FIXTURE BEFORE ANY NUMBER WAS BELIEVED.**
+`normalized='frame_length'` in torchaudio divides by `sqrt(n_fft)` (32), not
+by the window's energy (19.6): the first JS mel sat **0.48 above torchaudio in
+every bin**, which is `ln(32 / 19.6)`. And logits taken from the same torch
+model instance right after `torch.onnx.export` differed from a fresh instance
+by up to **6.9**, so the first comparison blamed the ONNX graph for a fault in
+the reference; the fixture is now taken from a fresh model.
+
+**Fidelity, MEASURED on a 12 s Raadio 2 window:** JS mel against torchaudio on
+the same soxr audio, max difference 4e-5. onnxruntime-web logits against torch
+on the reference mel, max 5e-5. With the JS decimation in place of soxr: mel
+mean difference 0.005 (max 1.3, in the top bands), logits max 0.63, and **the
+26 beats identical**. Over all six recordings the tab's model alone reads tempo
+exact **78.2%** against 78% for PyTorch in 4.5, so the port is the model.
+
+### 8.2 Cost in Chrome (MEASURED, this laptop)
+
+| | wasm, 1 thread | wasm, 4 threads | WebGPU |
+| --- | --- | --- | --- |
+| inference per 12 s window (613 frames) | **mean 520 ms**, p50 509 to 525, p95 524 to 578, max 593 (1,153 windows) | 162 ms wall | **p50 47 ms**, p95 53 ms (40 windows) |
+| renderer CPU per window | 520 ms | about 690 ms (the pool spins) | not separated (the GPU process was not counted) |
+| at a 2 s cadence, per 1 s of audio | **about 276 ms, 27.6% of a core** | more CPU, less latency | |
+| needs | nothing | `crossOriginIsolated` (COOP and COEP), which positron.studio does not send | a GPU; WebGPU on the visitor's browser |
+
+- The rest of the work per window: log mel 15.3 ms, peak picking 0.02 ms; the
+  decimation 6.6 to 10.3 ms per second of audio as written (a polyphase
+  halfband would be a fraction of that). 276 ms per second of audio is
+  520 / 2 + 15.3 / 2 + about 8; **`tempo.mjs` is 4.1 ms, so about 68 times
+  less.**
+- Every 4 s instead of 2: about 146 ms per second of audio with our detector
+  added, 14.6% of a core. Every 8 s: about 79 ms, 7.9%.
+- ⚠️ **On the main thread a 520 ms run blocks the page for half a second
+  every two.** The test page ran it there; any real page would need a Worker
+  (`ort.env.wasm.proxy` or its own), which was not measured.
+- **First inference:** session create 590 to 606 ms (compile and model load,
+  served locally so the download is not in it), first run 570 to 593 ms, so
+  about 1.2 s from the files arriving to the first beats, after the 12 s of
+  audio the first window needs. WebGPU: create 1,108 ms, first run 856 ms,
+  then 47 ms.
+- **Download, MEASURED bytes:**
+
+| file | raw | brotli 11 |
+| --- | --- | --- |
+| `ort.wasm.min.mjs` + `ort-wasm-simd-threaded.mjs` | 74,507 | 22,552 |
+| `ort-wasm-simd-threaded.wasm` | 14,239,897 | 2,300,583 (jsDelivr serves it as 3,073,897 br) |
+| `small0.onnx` (float32) | 10,498,987 | 7,787,080 |
+| `small0-f16.onnx` (float16 weights) | 6,310,140 | 3,772,289 |
+| `ort-wasm-simd-threaded.asyncify.wasm` (the WebGPU build instead) | 26,781,914 | 3,866,678 |
+
+  So the wasm path with float16 weights is **about 6.1 to 6.9 MB over the
+  wire** and 20.6 MB uncompressed. The float16 file grades within 0.1 point of
+  the float32 one on every column of 8.3 (tempo exact 78.2 against 78.1).
+- **Memory, MEASURED** with `performance.measureUserAgentSpecificMemory`:
+  0.69 MB before the session, **52.8 MB** after it with float32 weights and
+  **44.4 MB** with float16; JS heap 9 to 13 MB of that. The peak during a run
+  was not separated from the test page's own audio buffers.
+- The WebGPU beats were identical to the wasm beats on all 40 windows tried.
+
+### 8.3 Graded, pooled over the six recordings (MEASURED)
+
+Phase against beat_this `final0`, the same family, so every "on" number for a
+row that uses the model is an upper bound (section 3).
+
+| detector | exact | octave | on / half off | jumps / min | flips / min | no steady beat | shown right | shown wrong | ms per s of audio |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `tempo.mjs` today | **84.3** | 5.1 | 81.3 / 8.0 | 3.8 | 2.0 | 25.0 | **75.9** | **5.0** | **4.1** |
+| model alone, every 2 s | 78.2 | 8.1 | **92.4 / 4.5** | **1.6** | 6.1 | 0 | 78.2 | 21.8 | 276 |
+| model alone, shown only when its beats are regular (spacing CV under 0.1) | 78.2 | 8.1 | 92.4 / 4.5 | 1.6 | 6.1 | 34.6 | 63.9 | 4.8 | 276 |
+| our tempo, the model's phase every window | 84.3 | 5.1 | 86.2 / 6.8 | 5.1 | 2.0 | 25.0 | 75.9 | 5.0 | 280 |
+| **our tempo, the model's phase with memory** (adopted after two windows in a row disagree by over 1/8 beat) | 84.3 | 5.1 | **86.7 / 5.6** | **2.3** | 2.0 | 25.0 | 75.9 | 5.0 | 280 |
+| same, a window every 4 s | 84.3 | 5.1 | 84.1 / 5.4 | 1.2 | 2.0 | 25.0 | 75.9 | 5.0 | 146 |
+| same, a window every 8 s | 84.3 | 5.1 | 78.2 / 7.8 | 1.3 | 2.0 | 25.0 | 75.9 | 5.0 | 79 |
+
+Per recording, the hybrid with memory against `tempo.mjs`, on the beat:
+Raadio 2 86.8 against 91.5, Raadio 4 90.4 against 89.1, Ida 10-11 97.7
+against 97.4, **Ida 1314 95.5 against 87.4**, **Ida 1354 72.1 against 63.6**,
+Ida 1434 86.6 against 80.6.
+
+- **The model does not help the number a visitor reads.** Alone, its tempo is
+  exact 78.2% against our 84.3% and flips three times as often; given a
+  confidence of its own it shows right 63.9% against our 75.9% at the same
+  5% wrong. In the hybrid the number, the confidence and therefore shown
+  right and wrong are ours, unchanged.
+- **What it buys is the grid: +5.4 points on the beat and 1.5 fewer jumps a
+  minute**, against its own family.
+- ⚠️ **Against essentia's beats, the independent reference, the gain is
+  zero:** on / half off 71.7 / 11.0 for the hybrid with memory against 72.0 /
+  12.9 for `tempo.mjs`, per recording 25/70, 88/6, 95/1, 96/2, 49/7, 72/6
+  against 39/59, 88/4, 95/2, 88/8, 52/14, 75/3. It wins on Ida 1314 (+8) and
+  loses Raadio 2 (-14), where essentia sits on the hats and the hand counted
+  kick grid of 2026-10-11 sides with beat_this. So the gain is real on Ida 1314
+  by both references and otherwise rests on beat_this grading beat_this.
+
+### 8.4 Recommendation: do not ship it in the tab; at most an opt-in page
+
+1. **Not by default.** 27.6% of a core on one thread (68 times `tempo.mjs`),
+   6 to 7 MB before the first beat, a Worker the page does not have, for a
+   grid gain of 5.4 points measured against the model's own family and zero
+   against the independent one. The tempo number and what is shown right or
+   wrong do not move at all.
+2. **An opt-in is defensible only as its own concept page**, "a neural beat
+   tracker in the tab", and only in this shape: our tempo and confidence, the
+   model's phase with memory, a window every 4 s (84.1 / 5.4, 1.2 jumps,
+   14.6% of a core), float16 weights, WebGPU when the browser has it (47 ms a
+   window here) and wasm in a Worker when it does not, loaded on a press.
+3. **Before either, listen.** The places in the plan's "Where to listen"
+   table, Ida 1314 from 1:00 to 4:00 first, decide whether beat_this's grid
+   is the right one. If it is, item 1 of the plan already got most of the way
+   there for 0.4% of a core.
+
+### 8.5 What could not be measured
+
+- **No phone and no Safari.** Every cost is this laptop in headless Chrome.
+  A phone's wasm is likely several times slower (ESTIMATED), which would put
+  a 2 s cadence past real time.
+- **The WebGPU run's GPU time and the GPU process's CPU** were not counted,
+  and it was 40 windows of one recording.
+- **A Worker** was not built, so the main thread blocking and any proxy
+  overhead are unmeasured.
+- **The download time** on a real network: the files came from a local
+  server. Whether positron.studio's worker would serve the wasm and the model
+  compressed was not checked.
+- **int8 quantisation** needs onnxruntime's Python quantiser, which is not in
+  the venv and was not installed.
+- **The live path**: the test page read decoded recordings, not
+  `createMp3Stream` with its gaps.
+- **Peak memory** during inference, separately from the page's buffers.
+- Every phase number still has beat_this as its reference; no human labels.
