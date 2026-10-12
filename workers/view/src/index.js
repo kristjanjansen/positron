@@ -450,6 +450,13 @@ const routes = {
       return env.ASSETS.fetch(new URL('/notes/index.html', url.origin));
     }
 
+    // ── /frontpage, 2026-10-12 ─────────────────────────────────────────────
+    // Asked three times for https://positron.studio/frontpage: the samples live
+    // at /kit/frontpage/. 302, because a real /frontpage/ page may come.
+    if (p === '/frontpage' || p === '/frontpage/') {
+      return Response.redirect(`${url.origin}/kit/frontpage/${url.search}`, 302);
+    }
+
     // ── /eccm/* moved out, 2026-09-27 ──────────────────────────────────────
     // The eccm demo lived under demo/eccm/ for two days and its URLs were
     // handed over from here; the project is its own repository now and the
