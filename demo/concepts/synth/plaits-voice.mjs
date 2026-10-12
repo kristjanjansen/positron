@@ -34,18 +34,32 @@ export const MODELS = [
   'modal', 'bass drum', 'snare drum', 'hi-hat',
 ];
 
-// The patches, in the order worth hearing them, all sustained (asked
-// 2026-10-12: *"no bell sounds please or drums. longer stuff"*, then *"rm saw
-// swarm"*). `engine` is an index into MODELS, `decay` sets how long the gate
+// The patches, in the order worth hearing them, and both pages open on the
+// first (*"make wavetabl drift default"*), all sustained (asked
+// 2026-10-12: *"no bell sounds please or drums. longer stuff"*, *"rm saw
+// swarm"*, then *"replace additive organ and chord pad. bring in bette
+// stuff"*). `engine` is an index into MODELS, `decay` sets how long the gate
 // takes to close after a note off.
+// `gain` EVENS THE LEVELS, MEASURED rather than guessed: a held A3 on each
+// patch read 0.022 (Long string) to 0.146 (Soft FM) RMS at the scope, about
+// 16 dB apart, so each patch carries the trim that brings its held note to
+// about 0.1. Applied on Plaits' own output, so the scope and the speakers
+// both see the evened level.
 export const PATCHES = [
-  { name: 'Chord pad', engine: 6, harmonics: 0.45, timbre: 0.35, morph: 0.3, decay: 0.85, colour: 0.4 },
-  { name: 'Wavetable drift', engine: 5, harmonics: 0.3, timbre: 0.3, morph: 0.55, decay: 0.85, colour: 0.6 },
-  { name: 'Vowel choir', engine: 3, harmonics: 0.4, timbre: 0.45, morph: 0.5, decay: 0.85, colour: 0.5 },
-  { name: 'Sung vowels', engine: 7, harmonics: 0.25, timbre: 0.5, morph: 0.35, decay: 0.85, colour: 0.5 },
-  { name: 'Additive organ', engine: 4, harmonics: 0.35, timbre: 0.4, morph: 0.6, decay: 0.8, colour: 0.6 },
-  { name: 'Long string', engine: 11, harmonics: 0.2, timbre: 0.45, morph: 0.92, decay: 0.9, colour: 0.5 },
-  { name: 'Wind', engine: 9, harmonics: 0.35, timbre: 0.55, morph: 0.4, decay: 0.9, colour: 0.6 },
+  { name: 'Wavetable drift', engine: 5, harmonics: 0.3, timbre: 0.3, morph: 0.55, decay: 0.85, colour: 0.6, gain: 1.05 },
+  // The two operator FM set low and soft (a low ratio, a modest index, a
+  // little feedback): it sings rather than rings. It is the steadiest tone of
+  // the set on one held note (centroid within 5 Hz over 3 s on A3), so what
+  // moves is the overlapping line, and the timbre knob takes it from a near
+  // sine to a reedy tone.
+  { name: 'Soft FM', engine: 2, harmonics: 0.25, timbre: 0.4, morph: 0.3, decay: 0.85, colour: 0.5, gain: 0.75 },
+  { name: 'Vowel choir', engine: 3, harmonics: 0.4, timbre: 0.45, morph: 0.5, decay: 0.85, colour: 0.5, gain: 1 },
+  // The waveshaper as a low growling drone: a triangle folded by timbre,
+  // asymmetry from morph. The one rough, buzzing voice of the set.
+  { name: 'Growl drone', engine: 1, harmonics: 0.3, timbre: 0.6, morph: 0.35, decay: 0.85, colour: 0.5, gain: 0.8 },
+  { name: 'Sung vowels', engine: 7, harmonics: 0.25, timbre: 0.5, morph: 0.35, decay: 0.85, colour: 0.5, gain: 2.2 },
+  { name: 'Long string', engine: 11, harmonics: 0.2, timbre: 0.45, morph: 0.92, decay: 0.9, colour: 0.5, gain: 3.5 },
+  { name: 'Wind', engine: 9, harmonics: 0.35, timbre: 0.55, morph: 0.4, decay: 0.9, colour: 0.6, gain: 1 },
 ];
 
 /**
@@ -56,7 +70,7 @@ export const PATCHES = [
  */
 export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} } = {}) {
   let ctx = null, node = null, out = null, master = null, analyser = null, buf = null, freq = null;
-  let ready = null, bytesP = null, level = 0;
+  let ready = null, bytesP = null, level = 0, gain = 1;
   const queue = [];
 
   function send(m) {
@@ -95,6 +109,7 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} 
       const split = ctx.createChannelSplitter(2);
       node.connect(split);
       out = ctx.createGain();
+      out.gain.value = gain;
       split.connect(out, 0);
       master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
       analyser = ctx.createAnalyser(); analyser.fftSize = 2048;
@@ -112,8 +127,14 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} 
     return ready;
   }
 
-  /** A patch's engine, harmonics, decay and colour (timbre and morph are the page's knobs). */
+  /** The patch's level trim on Plaits' output. */
+  function setGain(g) {
+    gain = Number.isFinite(g) ? g : 1;
+    if (out) out.gain.setTargetAtTime(gain, ctx.currentTime, 0.02);
+  }
+  /** A patch's engine, harmonics, decay, colour and level trim (timbre and morph are the page's knobs). */
   function loadPatch(p) {
+    setGain(p.gain);
     for (const [k, v] of [['engine', p.engine], ['harmonics', p.harmonics], ['decay', p.decay], ['lpgColour', p.colour]]) {
       send({ t: 'param', id: P[k], value: v });
     }
@@ -148,7 +169,7 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} 
   }
 
   return {
-    warm, boot, send, loadPatch, features, scope,
+    warm, boot, send, loadPatch, setGain, features, scope,
     noteOn: (note, vel = 100) => send({ t: 'noteOn', note, holdMs: 0, level: vel / 127 }),
     noteOff: (note) => send({ t: 'noteOff', note }),
     allOff: () => send({ t: 'allOff' }),
