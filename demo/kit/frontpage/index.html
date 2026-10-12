@@ -363,16 +363,21 @@
         ['cf-stream:live:video-out', 'web:screen:video-in'],
         ['pi-1:gpu:video-out', 'r2:recordings:video-in'],
       ];
+      // The PHONE picture is its own patch, about the phone in your hand (asked:
+      // *"Make mibile and dsrsktip patchbays different"*): its touch plays the
+      // Circuit on the Pi, its tilt bends the Pi's shader, its camera goes out
+      // through Stream, its microphone is kept on R2. Two columns of four.
       const PHONE = [
-        ['web:keys:midi-out', 'pi-1:circuit:midi-in'],
-        ['web:keys:midi-out', 'web:pico:midi-in'],
-        ['web:editor:program-out', 'pi-1:gpu:program-in'],
-        ['web:camera:video-out', 'cf-stream:live:video-in'],
+        ['phone:touch:midi-out', 'pi-1:circuit:midi-in'],
+        ['phone:tilt:value-out', 'pi-1:gpu:value-in'],
+        ['phone:camera:video-out', 'cf-stream:live:video-in'],
+        ['phone:mic:audio-out', 'r2:recordings:audio-in'],
       ];
       const LABELS = { 'web:keys': 'keyboard', 'web:rec': 'recorder', 'web:synth': 'sine synth', 'web:fx': 'octaver',
         'web:speaker': 'speakers', 'cf-relay:room': 'Cloudflare', 'pi-1:circuit': 'Novation Circuit', 'r2:recordings': 'R2',
         'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:gpu': 'Pi GPU',
-        'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream' };
+        'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream',
+        'phone:touch': 'touch', 'phone:tilt': 'tilt', 'phone:camera': 'camera', 'phone:mic': 'microphone' };
       const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
       function bayOf(pairs) {
         const ports = new Map(), nodes = new Map();
@@ -413,7 +418,9 @@
         'pi-1:circuit:audio-out': sound(110, 500), 'web:pico:video-out': sound(20, 900), 'web:editor:program-out': edits(),
         'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady,
         'web:keys:value-out': wheel(0), 'cf-relay:room:value-out': wheel(60),
-        'cf-relay:room:clock-out': (t) => ({ n: 0, level: 1, flowing: true }) });
+        'cf-relay:room:clock-out': (t) => ({ n: 0, level: 1, flowing: true }),
+        'phone:touch:midi-out': events(0), 'phone:tilt:value-out': wheel(0), 'phone:camera:video-out': steady,
+        'phone:mic:audio-out': sound(0, 600) });
 
       const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
       frame.append(inner);

@@ -19,6 +19,10 @@ export function conceptNav(n) {
   const me = CONCEPTS[i];
   const h1 = head.querySelector('.pos-name');
   if (me && h1) { h1.textContent = me.title; document.title = me.title; }
+  // The card's description under the title, on every concept page, from the
+  // one list the cards read. Asked 2026-10-12: *"Add convepts descs under each
+  // concept totle in each concept page"*. A page that set its own `what` keeps it.
+  if (me?.say && !head.querySelector('.pos-what')) head.append(el('p', 'pos-what', me.say));
   const row = el('div', 'cc-nav');
   back.replaceWith(row);
   row.append(back);
