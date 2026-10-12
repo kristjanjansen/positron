@@ -1,8 +1,9 @@
 // demo/concepts/sampler/sc-sampler.mjs: the sampler pages' ONE SuperCollider
 // sampler, since 2026-10-12. Asked: *"should we go all on supercollider
 // sampler?"*, then *"all in"* (BACKLOG, "All in on the SuperCollider sampler").
-// /concepts/sampler/000/, 010/, 020/ and 040/ play through this; the WebAudio
-// `createSampler` in sampler.mjs stays as it was for anything else.
+// /concepts/sampler/000/ plays through this (010, 020 and 040 were merged into
+// it 2026-10-12 and forward there); the WebAudio `createSampler` in sampler.mjs
+// stays as it was for anything else.
 //
 // WHAT IT IS: wasm scsynth in the tab (`/shell/scsynth.mjs`, SuperSonic)
 // running the board's two SynthDefs, driven by the board's voice rules. It was
