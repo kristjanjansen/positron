@@ -57,6 +57,7 @@ somebody broke it.
 | `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
 | `positron-slides` | writing or revising any slide text, deck outline, speaker notes or playable lesson, including a deck in `demo/shell/decks.mjs`. It is the words half; drawing a slide is `positron-ui` |
 | `positron-concepts` | building or changing any page under `demo/concepts/` or a card on `/concepts/`, or explaining a patchbay idea as a small page |
+| `positron-describe` | writing or changing any card description (`say`), manifest `one` line, page `what` text or readout key a visitor reads, or checking somebody's proposed copy against a page |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control
@@ -678,6 +679,13 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
   OCCASION TO CUT: the same paragraph doubled in length over four rounds of
   additions, because each one appended and none subtracted. Re-read the whole
   thing against the rule below, do not staple a clause on the end.
+- 🔴 **CARD DESCRIPTIONS MAY BE TWO SHORT SENTENCES SINCE 2026-10-12.** The
+  owner's editorial brief that day (before and after rewrites for every group)
+  uses two, and supersedes the one sentence rule below for card `say` lines:
+  a second sentence only when it carries a second fact the reader needs. How to
+  decide, and how to verify every claim against the page first, is the
+  `positron-describe` skill. The rest of the rule below (no colon, semicolon or
+  dash buying a clause, no history, no justification) still holds.
 - 🔴 **ONE SENTENCE. A DESCRIPTION IS NOT AN ESSAY, AND IT IS NOT A PARAGRAPH
   EITHER.** Instructed 2026-09-19: *"descs are single sentences (do not stretch
   them with : ; -- etc)"*, and asked again in the same stream for page after
