@@ -16,6 +16,7 @@
 
 <script type="module">
   import { mount, guard, el } from '/shell/shell.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
   import { createSlider, createSliderGroup } from '/shell/slider.mjs';
   import { createXyPad, PAD } from '/shell/xy-pad.mjs';
   import { holdSample, lerpSample, catmullSample, makePointerAdapter } from '/shell/pointer-adapter.mjs';
@@ -930,9 +931,12 @@
      * record read the other way and the line simply draws itself in reverse.
      */
     loopWays: true,
-    extras: [{ id: 'rec', title: 'Record', label: '\u25CF',
+    extras: [{ id: 'rec', title: 'Record', label: '', aria: 'Record',
                onClick: () => setRecording(!recording) }],
   });
+  // The record face is the kit's icon, not a font glyph (asked 2026-10-12:
+  // *"global: change transport buttons to proper icon buttons"*).
+  setIcon(bar.extra('rec'), 'record', 'Record');
 
   function setRecording(on) {
     recording = on;
@@ -940,8 +944,7 @@
     const b = bar.extra('rec');
     if (b) {
       b.dataset.on = on ? '1' : '';
-      b.textContent = on ? '\u25A0' : '\u25CF';
-      b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+      setIcon(b, on ? 'stop' : 'record', on ? 'Stop recording' : 'Record');
     }
     // Arming clears what was there, so the take you are about to make is the
     // whole of what the numbers describe.

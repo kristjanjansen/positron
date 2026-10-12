@@ -17,6 +17,10 @@
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
 import { createChoice } from './choice.mjs';
+// 🔴 THE TOGGLE'S FACE IS AN ICON FROM THE KIT'S SET, NOT A FONT GLYPH IN
+// `::before`. Asked 2026-10-12: *"global: change transport buttons to proper
+// icon buttons"*. See `FACES` below.
+import { icon } from './icons.mjs';
 // 🔴 THE `LIVE` CHIP IS A PRESENCE BADGE NOW, AND IT IS THE PROJECT'S ONE
 // ONLINE INDICATOR. See `ON_AIR` below for why a hand-rolled span was the
 // defect rather than the style.
@@ -352,7 +356,7 @@ export function createTransportBar(host, deck, {
    * ⚠️ IT IS A CLASS AND A LABEL, NOT A SECOND BUTTON. The element, its
    * `.tbar-toggle` class, its `data-state` and everything that presses it are
    * untouched, so `demo/verify.mjs`'s play drill and every page holding the bar
-   * keep working. Only the glyph and what a screen reader hears change.
+   * keep working. Only the face and what a screen reader hears change.
    */
   /**
    * 🔴 `verb: ['start', 'stop']` MAKES THE TOGGLE TWO WORDS INSTEAD OF A GLYPH.
@@ -388,10 +392,9 @@ export function createTransportBar(host, deck, {
    * `.tbar-toggle` class, its `data-state` and everything that presses it are
    * untouched, so `verify.mjs`'s play drill and every page holding a bar keep
    * working. That is the same argument `verb: 'record'` already makes above.
-   * ⚠️ AND THE GLYPH IS `■`, U+25A0, WHICH HAS NO EMOJI FORM. `positron-ui`
-   * records that `⏹` and its neighbours default to emoji presentation and
-   * render full colour at the wrong size and baseline, and that U+FE0E is
-   * honoured inconsistently across machines.
+   * ⚠️ AND THE FACE IS THE KIT'S `stop` ICON, a drawn square, since
+   * 2026-10-12. It was `■` U+25A0 in `::before`, chosen because `⏹` defaults to
+   * emoji presentation; an icon has no presentation to get wrong.
    */
   const STOPS = verb === 'stop';
   const toggle = el('button',
@@ -403,6 +406,35 @@ export function createTransportBar(host, deck, {
   // is visible from `data-state`, which the bar already maintains, so there is
   // no second place that has to remember which word is showing.
   if (WORDS) toggle.append(el('span', 'tbar-w0', WORDS[0]), el('span', 'tbar-w1', WORDS[1]));
+  /**
+   * 🔴 THE GLYPH TOGGLE WEARS ICONS FROM `icons.mjs`, ONE PER STATE, AND THE
+   * STYLESHEET PICKS THE ONE ON SHOW FROM `data-state`. Asked 2026-10-12:
+   * *"global: change transport buttons to proper icon buttons"*. It was ▶, ❚❚,
+   * ■, ●, ◌ and ↺ typed into `::before`, each a font glyph with its own
+   * advance, baseline and size override; an icon is a drawn picture on a 24
+   * unit grid in `currentColor`, so the square's `place-items: center` centres
+   * its ink with nothing measured.
+   * ⚠️ ALL THE FACES ARE IN THE BUTTON AT ONCE, NOT ONE SWAPPED BY `setIcon`.
+   * That is the two-span arrangement `tbar-word` already uses one rule up: the
+   * bar writes `data-state` and nothing else, so there is no second place that
+   * has to remember which face is showing, and a check that sets `data-state`
+   * by hand (`/tom/` does) sees the face it set. `pos-icobtn` and `data-glyph`
+   * are what `setIcon` stamps, so the toggle is the kit's icon button in every
+   * rule that matters, at the bar's own `--tbar-btn` square.
+   * ⚠️ `buffering` IS NOT WRITTEN BY THIS BAR TODAY; the face exists because
+   * `shell.css` drew one for it, and a state with no face is an empty square.
+   */
+  const FACES = RECORD ? { rest: 'record', playing: 'stop', ended: 'record', buffering: 'clock' }
+    : { rest: 'play', playing: STOPS ? 'stop' : 'pause', ended: 'refresh', buffering: 'clock' };
+  if (!WORDS) {
+    toggle.classList.add('pos-icobtn');
+    toggle.dataset.glyph = '1';
+    for (const [face, name] of Object.entries(FACES)) {
+      const svg = icon(name, { size: 16 });
+      svg.dataset.face = face;
+      toggle.append(svg);
+    }
+  }
   const scrub = el('div', 'tbar-scrub', '', { role: 'slider', tabindex: '0', 'aria-label': 'position' });
   const fill = el('div', 'tbar-fill');
   const headDot = el('div', 'tbar-head');

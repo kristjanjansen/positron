@@ -1300,31 +1300,30 @@ button.pos-pri[data-busy="1"] {
   flex: none; width: var(--tbar-btn); height: var(--tbar-btn); padding: 0;
   display: grid; place-items: center; font-size: 13px;
 }
-.tbar-toggle::before { content: "▶"; }
-.tbar-toggle[data-state="playing"]::before { content: "❚❚"; font-size: 10px; }
-/* 🔴 `verb: 'stop'` SHOWS A SQUARE WHILE PLAYING, because on that bar the second
-   press stops and rewinds rather than pausing. A `❚❚` over a control that
-   returns the playhead to the top is a face describing a verb the button does
-   not perform.
-   ⚠️ `■` IS U+25A0 AND HAS NO EMOJI FORM, which is why it is not `⏹`: that one
-   defaults to emoji presentation and renders full colour at the wrong size and
-   baseline, and U+FE0E is honoured inconsistently across machines.
-   ⚠️ IT SITS AFTER THE `playing` RULE IT OVERRIDES, and carries one more class,
-   so neither source order nor a later edit can take it back. */
-.tbar-toggle.tbar-stop[data-state="playing"]::before { content: "■"; font-size: 12px; }
-.tbar-toggle[data-state="buffering"]::before { content: "◌"; }
-/* parked at the end: the button restarts, so it must not look like plain play */
-.tbar-toggle[data-state="ended"]::before { content: "↺"; font-size: 15px; }
-/* 🔴 A RECORD BUTTON IS THE SAME CONTROL WITH A DIFFERENT VERB ON IT, for a bar
-   whose press puts something on air rather than plays it back. The dot is RED
-   and is the one place in this stylesheet that says so in a literal colour: a
-   record control is a convention older than any of this, and a hue token would
-   make it agree with a theme instead of with every other record button anybody
-   has used. Stopping is a square, never a pause, because a show that has stopped
-   does not resume. */
-.tbar-toggle.tbar-rec::before { content: "●"; color: #e5484d; font-size: 15px; }
-.tbar-toggle.tbar-rec[data-state="playing"]::before { content: "■"; color: #e5484d; font-size: 13px; }
-.tbar-toggle.tbar-rec[data-state="ended"]::before { content: "●"; color: #e5484d; font-size: 15px; }
+/* 🔴 THE FACE IS AN ICON PER STATE, ALL OF THEM IN THE BUTTON, AND THIS PICKS
+   ONE FROM `data-state`. Asked 2026-10-12: *"global: change transport buttons
+   to proper icon buttons"*. It was ▶ ❚❚ ■ ● ◌ ↺ in `::before`, each a font glyph
+   with its own size override because each had a different advance and
+   baseline. `transport-bar.mjs` builds the faces from `icons.mjs` (play, pause
+   or stop, record, refresh at the end, clock while buffering) and marks each
+   with `data-face`; the bar writes `data-state` and nothing else.
+   ⚠️ (0,2,1) TO HIDE AND (0,3,1) TO SHOW, ON PURPOSE. `.pos-icobtn > svg` sets
+   `display: block` at (0,1,1) much further down, so a plain `.tbar-toggle >
+   svg` here would lose on source order and every face would show at once.
+   ⚠️ `verb: 'stop'` SHOWS A SQUARE WHILE PLAYING and `verb: 'record'` a dot
+   that becomes a square: the second press on those bars stops, and a pause
+   face over a control that does not pause is a face describing the wrong verb.
+   A show that has stopped does not resume, so a record bar never pauses. */
+.tbar-toggle.pos-icobtn > svg { display: none; }
+.tbar-toggle:not([data-state]) > svg[data-face="rest"],
+.tbar-toggle[data-state="paused"] > svg[data-face="rest"],
+.tbar-toggle[data-state="playing"] > svg[data-face="playing"],
+.tbar-toggle[data-state="ended"] > svg[data-face="ended"],
+.tbar-toggle[data-state="buffering"] > svg[data-face="buffering"] { display: block; }
+/* 🔴 A RECORD BUTTON IS RED, and `--rec` is the one place this stylesheet says
+   so: a record control is a convention older than any of this, and the dot and
+   the square that stops it are both that colour. */
+.tbar-toggle.tbar-rec { color: var(--rec); }
 
 /* 🔴 A TOGGLE THAT SAYS ITS TWO STATES IN WORDS, AND BOTH WORDS ARE THE SAME
    WIDTH. Asked 2026-09-19 for `/stage/`: *"replace timeline-glued transport
@@ -1342,10 +1341,8 @@ button.pos-pri[data-busy="1"] {
    ⚠️ `visibility`, NEVER `display: none` or `hidden`: a removed child claims no
    grid space, which is the whole trick, and the button would resize under the
    pointer the moment it was pressed.
-   ⚠️ AND THE GLYPH HAS TO BE TURNED OFF EXPLICITLY. `.tbar-toggle::before`
-   carries ▶/❚❚/↺ for every state, and a state rule weighs the same (0,2,0) as
-   a plain `.tbar-word` one, so the `[data-state]` selector here is what makes
-   sure a word button never draws a triangle beside its word. */
+   ⚠️ A WORD TOGGLE CARRIES NO ICON FACES: `transport-bar.mjs` only builds
+   them for a glyph toggle, so there is nothing here to turn off. */
 /* 🔴 A WORD BUTTON ON THE BAR IS AN ORDINARY BUTTON. Asked 2026-09-25 with a
    crop of `Start HLS` and `Start WebRTC` beside `Send` and `Send in 10s`:
    *"these buttons should be same (like below ones). how you have different
@@ -1363,8 +1360,6 @@ button.pos-pri[data-busy="1"] {
   font: 500 13px/1 var(--mono);
   color: var(--fg);
 }
-.tbar-toggle.tbar-word::before,
-.tbar-toggle.tbar-word[data-state]::before { content: none; }
 .tbar-toggle.tbar-word > span { grid-area: 1 / 1; visibility: hidden; }
 .tbar-toggle.tbar-word > .tbar-w0 { visibility: visible; }
 .tbar-toggle.tbar-word[data-state="playing"] > .tbar-w0 { visibility: hidden; }

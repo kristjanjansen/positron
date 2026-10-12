@@ -1579,21 +1579,24 @@
    * *"replace pause icon with stop icon"* and is the half that can go quietly
    * wrong: the behaviour changed this evening and a `❚❚` over it would have
    * been a control describing a verb it does not perform.
-   * ⚠️ READ OFF THE COMPUTED `content` OF THE PSEUDO ELEMENT, not off a class.
-   * A class is the page's intent; the glyph is what a reader sees, and the two
-   * part company the day a stylesheet rule loses to another one. This project
-   * has measured five dead CSS rules that read as correct.
+   * ⚠️ READ OFF WHICH ICON IS COMPUTED ON SCREEN, not off a class. Since
+   * 2026-10-12 the toggle holds one icon per state and `shell.css` shows one
+   * from `data-state`, so the face is whichever svg is not `display: none`.
+   * A class is the page's intent; the computed display is what a reader sees,
+   * and the two part company the day a stylesheet rule loses to another one.
    */
   if (SELFCHECK) {
     const tog = bar.el.querySelector('.tbar-toggle');
-    const face = () => getComputedStyle(tog, '::before').content;
+    const face = () => [...tog.querySelectorAll('svg')]
+      .filter((s) => getComputedStyle(s).display !== 'none').map((s) => s.dataset.icon).join('+') || 'nothing';
+    const was = tog.dataset.state;
+    tog.dataset.state = 'paused';
     const resting = face();
     tog.dataset.state = 'playing';
     const running = face();
-    delete tog.dataset.state;
+    if (was === undefined) delete tog.dataset.state; else tog.dataset.state = was;
     d.assert('the transport shows play at rest and a STOP square while it runs, never a pause',
-      /\u25B6|\u25BA/.test(resting) && running.includes('\u25A0')
-      && !running.includes('\u275A') && tog.getAttribute('aria-label') === 'play/stop',
+      resting === 'play' && running === 'stop' && tog.getAttribute('aria-label') === 'play/stop',
       `${resting} at rest, ${running} while playing, announced as `
       + `"${tog.getAttribute('aria-label')}"`);
   }

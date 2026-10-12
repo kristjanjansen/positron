@@ -21,6 +21,7 @@
 //     the first press of Send and receive, and the log says so on open.
 
 import { el, armVideo, recorderMime } from '/shell/shell.mjs';
+import { setIcon } from '/shell/icon-button.mjs';
 import { putWhole, fetchBack } from '/shell/ingest.mjs';
 import { whipPublish, whepPlay, whep, fetchIceServers, readIcePath } from '/shell/live.mjs';
 import { createPanelValues } from '/shell/video-panel.mjs';
@@ -293,8 +294,11 @@ export function build({ panel, assert, log }) {
     const b = bar.extra('rec');
     if (!b) return;
     b.dataset.on = on ? '1' : '';
-    b.textContent = on ? '■' : '●';
-    b.setAttribute('aria-label', on ? 'Stop recording' : 'Record');
+    // the kit's record and stop icons; `setIcon` writes `title` too, so the
+    // cap the bar was given is put back
+    const keep = b.title;
+    setIcon(b, on ? 'stop' : 'record', on ? 'Stop recording' : 'Record');
+    if (keep) b.title = keep;
   }
 
   async function landPart(part) {
@@ -434,13 +438,14 @@ export function build({ panel, assert, log }) {
   const bar = createTransportBar(tl, deck, {
     scrub: false,
     publish: false,
-    extras: [{ id: 'rec', label: '●', aria: 'Record', primary: true,
+    extras: [{ id: 'rec', label: '', aria: 'Record', primary: true,
                title: `stop when you like. ${CAP_MS / 1000}s cap`,
                onClick: () => {
                  if (checking) { log('the checks are recording, this press waits for them'); return; }
                  return recording ? stopRecording() : startRecording();
                } }],
   });
+  setRecUI(false);
   const view = createStripView(tl, deck, {
     size: 'auto', follow: false, gutter: 150, wallStyle: 'head',
     lanes: [takeLane],
