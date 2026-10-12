@@ -28,6 +28,10 @@
      own tokens, so the stage's ground shows as it does under the middle
      canvas. Belongs in shell.css at `.pos-vp-stage > video`. */
   .cc-tri .pos-vp-stage > video { --edge: 0px; --r: 0px; background: transparent; }
+  /* One ground for all three, the page's own dark: the dither clears its
+     canvas to it (11, 14, 20) before a frame, so the side stages match it.
+     Asked 2026-10-12: *"same bg on all"*. */
+  .cc-tri .pos-vp-stage { background: var(--bg); }
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
