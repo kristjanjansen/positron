@@ -32,7 +32,7 @@ export const CONCEPTS = [
   { n: 'video/000', title: 'Camera', say: 'Turn on your camera and see it on the page while the patchbay holds the link from camera to screen.' },
   { n: 'video/010', title: 'Camera shader', say: 'Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.' },
   { n: 'video/020', title: 'Camera recorder', say: 'Record up to ten seconds of your camera and play it back on a timeline, kept in this browser.' },
-  { n: 'video/030', title: 'WebRTC loopback', say: 'Watch your camera return from Cloudflare Stream over WebRTC beside the original and see the delay.' },
+  { n: 'video/030', title: 'WebRTC loopback', say: 'Your camera back from Cloudflare over WebRTC and LL-HLS beside the original, each delay timed.' },
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
   { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ with one knob for its mirrors, and code that recompiles as you edit.' },
   { n: 'shader/010', title: 'Shader on Pi', say: 'The same kaleidoscope in this tab and on the Raspberry Pi, each change timed to its first frame.' },
