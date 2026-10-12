@@ -63,6 +63,10 @@ export const CONCEPTS = [
   { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
   { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
   { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
+  { n: 'clock/060', title: 'MIDI clock', say: 'One beat sent to a second place as 24 clock ticks a beat and as one anchor, with how far each lands from the true beat.' },
+  { n: 'clock/070', title: 'Join late', say: 'A third place joins while the beat runs, gets the anchor and its clock error, and lands on the right beat at once.' },
+  { n: 'clock/080', title: 'Drift', say: 'Two clocks running a chosen number of parts per million apart drift off the beat until they agree the time again.' },
+  { n: 'clock/090', title: 'Cushion', say: 'Sound sent over the relay waits in a cushion you set, and a small one plays sooner with gaps while a big one plays smooth and late.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
