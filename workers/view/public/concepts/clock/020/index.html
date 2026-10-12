@@ -7,10 +7,6 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON concept clock 020</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* the room buttons and the tempo on one row, spaced the way a control row is */
-  .cc-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap, 8px) 24px; }
-</style>
 <script type="module">
   // concepts clock/020, SHARED CLOCK, 2026-10-12. One idea: two places agree on
   // the time ONCE, and then every beat is worked out at each end, nothing sent.
@@ -23,7 +19,8 @@
   // On Join both run peer.mjs over the relay (bursts of pings, the fastest round
   // trip kept, NTP style), so `there` finds its own error. Then the clock node
   // sends `{ bpm, epoch }` ONCE, along `clock-out -> *:beat:clock-in`, as one
-  // `bay.event`, and again only when the tempo changes. Each beat node computes
+  // `bay.event`, once per start: the tempo is fixed at 120 (asked 2026-10-12,
+  // *"fix temo to 120"*). Each beat node computes
   // beat k as `epoch + k * 60000 / bpm` on its own corrected clock and hands it to
   // the AudioContext ahead. The patchbay's clock wire lights per message, so it
   // lights once and stays dark while the beats go on.
@@ -39,7 +36,6 @@
   import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createChoice } from '/shell/choice.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
@@ -67,7 +63,11 @@
     // The cells under the title and the log alone at the foot, asked 2026-10-12:
     // *"move readouts to top"*.
     joined: false,
-    readout: { correction: 'ms', 'round trip': 'ms', apart: 'ms', worst: 'ms', 'clock sent': '', beats: '' } });
+    // Four cells, asked 2026-10-12: *"do 4 readouts that make sense"*. What the
+    // second place found its clock off by, the round trip that finding rests on,
+    // and how far apart the two places' beats land, typical and worst. A count
+    // of clocks sent was always 1 once the tempo was fixed, so it went.
+    readout: { 'offset found': 'ms', 'round trip': 'ms', apart: 'ms', worst: 'ms' } });
   conceptNav('clock/020');
 
   // ── one sound card, read by both places ─────────────────────────────────
@@ -96,7 +96,9 @@
     g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
     o.connect(g).connect(ctx.destination);
     o.start(at); o.stop(at + 0.06);
+    live.add(o); o.onended = () => live.delete(o);
   }
+  const live = new Set();                // clicks already handed to the sound card, stopped on stop
 
   // ── a place: its own clock, its correction, and the beats it plays ──────
   // `raw()` is the place's own clock. `here`'s is the true one; `there`'s is off by
@@ -144,22 +146,19 @@
   const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
   const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
 
-  let heardClock = 0;
   function onClock(P, e) {
     P.clock = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
-    if (P === there) { heardClock++; pb.pulse(plain(CLK), '*:beat:clock-in'); }
+    if (P === there) pb.pulse(plain(CLK), '*:beat:clock-in');
     else pb.pulse(plain(CLK), plain(IN.here));
     d.log(`${P.name} heard the clock: ${e.bpm} bpm from ${new Date(e.epoch).toISOString().slice(11, 23)}`);
   }
 
-  let sent = 0;
+  const BPM = 120;
   function sendClock(bpm) {
     // The epoch is a moment half a second ahead on the shared clock, so both
     // places have the message before the first beat is due.
     const epoch = Math.round(here.now() + 500);
     const r = nodeHere.emit(CLK, { bpm, epoch });
-    sent++;
-    d.set('clock sent', sent);
     if (!r.far.length) d.log('the clock reached nobody in another place', 'warn');
   }
 
@@ -184,28 +183,26 @@
     await sleep(600);              // one more burst of pings, so the fastest is kept
     reanchor();
     loop = setInterval(() => { here.tick(); there.tick(); }, TICK);
-    sendClock(tempo.value());
+    sendClock(BPM);
     joined = true; busy = false;
-    btns.enable('join', false, `in ${ROOM}`);
-    btns.enable('leave', true);
+    btns.setIcon('go', 'stop', 'Stop');
   }
   function leave() {
     clearInterval(loop); loop = null;
     nodeHere.leave(); nodeThere.leave();
     for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; P.clock = null; }
+    for (const o of live) { try { o.stop(); } catch { /* not started */ } }
+    live.clear();
     joined = false;
-    btns.enable('join', true, `room ${ROOM}`);
-    btns.enable('leave', false, 'not in a room');
-    d.log('left the room, so both places stop');
+    btns.setIcon('go', 'play', 'Play');
+    d.log('stopped: both places left the room, both clock peers stopped pinging and closed their sockets');
   }
 
+  // One square button, asked 2026-10-12: *"start/stop icon button"*. Play joins
+  // the room and starts both places; stop leaves it.
   const btns = createButtonGroup({ buttons: [
-    { id: 'join', label: 'Join', title: `room ${ROOM}`, onPress: () => join() },
-    { id: 'leave', label: 'Leave', onPress: () => leave() },
+    { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (joined ? leave() : join()) },
   ] });
-  btns.enable('leave', false, 'not in a room');
-  const tempo = createChoice({ label: 'tempo', options: [['90', 90], ['120', 120], ['150', 150]], at: 1,
-    onPick: (bpm) => { if (joined) sendClock(bpm); } });
 
   // ── what it measured ────────────────────────────────────────────────────
   const fmt = (x) => Math.round(x * 100) / 100;
@@ -221,7 +218,7 @@
   setInterval(() => {
     if (!there.peer) return;
     const ps = there.peer.peers().filter((p) => Number.isFinite(p.rttMs));
-    d.set('correction', ps.length ? fmt(there.peer.offsetMs()) : '');
+    d.set('offset found', ps.length ? fmt(there.peer.offsetMs()) : '');
     d.set('round trip', ps.length ? fmt(Math.min(...ps.map((p) => p.rttMs))) : '');
     const g = gaps().slice(-16);
     if (g.length) {
@@ -231,7 +228,6 @@
       const L = view.strip.lanes().find((x) => x.id === 'there');
       if (L) L.subLabel = [`median ${fmt(s[s.length >> 1])} ms`, `worst ${fmt(s.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0))} ms`];
     }
-    d.set('beats', there.played.size || '');
     if (first == null && here.played.size) first = [...here.played.values()][0].T;
     if (first != null) {
       const end = here.now() - first + 1000;
@@ -249,7 +245,9 @@
     .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'beat', payload: { k } })));
   const gapOf = (k) => { const h = here.played.get(k), t = there.played.get(k); return h && t ? (t.at - h.at) * 1000 : null; };
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132, footer: true,
+    // No footer under the strip, asked 2026-10-12: *"rm footer from timeline"*;
+    // what is under the pointer goes to the strip's own tooltip instead.
+    size: 'auto', follow: false, gutter: 132,
     lanes: [
       { id: 'here', kind: 'beat', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsOf(here), describeRow: () => ['web-1', 'the clock it keeps'] },
@@ -296,10 +294,8 @@
   const pb = createPatchbay(named(heldPicture(bayHere, HERE, { star: 'every other place' })), { room: 'clock' });
   hovers(pb.el, 'clock');
 
-  const row = el('div', 'cc-row');
-  row.append(btns.el, tempo.el);
   requestAnimationFrame(() => { view.strip.fit(0, WINDOW); view.strip.invalidate(); });
-  d.stack.add(row, view.surface, pb.el);
+  d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); ctx?.close(); });
   window.__clock = { here, there, gaps };
   d.ready();

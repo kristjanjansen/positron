@@ -68,19 +68,36 @@ export const PROGRAM = `// a key opens the gate and letting it go closes it
 export const DEF = 'collide';
 
 /**
- * One engine playing PROGRAM.
+ * One engine playing PROGRAM, or whatever `load(text)` last compiled.
  * @param {object} [o]
  * @param {(line: string, kind?: string) => void} [o.log]
  * @param {string} [o.who]  what the log calls this engine
+ *
+ * 🔴 AN EDIT REPLACES THE VOICE FOR THE NEXT NOTE, AND A HELD NOTE FINISHES
+ * ON THE ONE IT STARTED WITH. Asked 2026-10-12, *"make 090 editable"*. Every
+ * compile is sent under the one name `DEF`, as /collide/ does, and scsynth
+ * keeps the old graph for a node already running until that node ends; a
+ * note's `/n_set gate 0` still reaches it, and how it is let go is read off
+ * the program it started on (`held` keeps that), not the one loaded since.
+ * A failed compile changes nothing: `compiled` stays the last good one.
+ *
+ * THE KNOBS FOLLOW THE NAMES, NOT THE PROGRAM. `values` is keyed by the knob
+ * names PROGRAM declares (the page's knobs are fixed), and a key sends all of
+ * them in its `/s_new`; a name the loaded program does not have is a control
+ * scsynth ignores, so that knob drives nothing, which `drives(name)` says.
  */
 export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {}) {
   const t0 = performance.now();
-  const compiled = compile(PROGRAM, { name: DEF });
+  let compiled = compile(PROGRAM, { name: DEF });
   const compileMs = performance.now() - t0;
   if (!compiled.ok) throw new Error(`the voice did not compile: ${compiled.message}`);
   /** name -> value, from the program's own defaults, then whatever a knob said. */
   const values = new Map(compiled.knobs.map((k) => [k.name, k.value]));
-  const ampDefault = compiled.controls.find((c) => c.name === 'amp')?.value ?? 0.2;
+  const ampOf = (r) => r.controls.find((c) => c.name === 'amp')?.value ?? null;
+  /** The program the engine holds now, which is what the next `/s_new` names. */
+  let onServer = null;
+  /** One queue, so loads reach the server in the order they compiled. */
+  let chain = Promise.resolve();
 
   let eng = null, waking = null, junction = null, nextId = 2000;
   /** note -> node id, for the keys held now. */
@@ -122,10 +139,8 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
       e.out.connect(pull);
       junction = ctx.createGain();
       e.out.connect(junction);
-      const t = performance.now();
-      const got = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000, '/d_recv', compiled.bytes);
-      if (!got || got[0] !== '/done') throw new Error(`${who} did not take the program: ${got ? got.slice(2).join(' ') : 'no answer'}`);
-      stat.loadMs = Math.round(performance.now() - t);
+      const sent = await send(e, compiled);
+      if (!sent.ok) throw new Error(sent.error);
       eng = e;
       log(`${who} took the program in ${stat.loadMs} ms, booted in ${stat.bootMs} ms`);
       for (const [n, v] of waiting) noteOn(n, v);
@@ -135,6 +150,37 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
     return waking;
   }
 
+  /** `/d_recv` one compile and wait for the engine's own `/done`. */
+  async function send(e, r) {
+    const t = performance.now();
+    const got = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000, '/d_recv', r.bytes);
+    if (!got || got[0] !== '/done') return { ok: false, error: `${who} did not take the program: ${got ? got.slice(2).join(' ') : 'no answer'}` };
+    stat.loadMs = Math.round(performance.now() - t);
+    onServer = r;
+    return { ok: true, ms: stat.loadMs };
+  }
+
+  /**
+   * Compile `text` and, once the engine is up, hand it over. A failure keeps
+   * the last good program everywhere and answers `{ ok: false, error }` with
+   * the compiler's own words (a line and a column).
+   */
+  function load(text) {
+    const run = chain.then(async () => {
+      const t = performance.now();
+      const r = compile(text, { name: DEF });
+      const ms = performance.now() - t;
+      if (!r.ok) return { ok: false, error: r.message, ms };
+      if (eng) { const sent = await send(eng, r); if (!sent.ok) return sent; }
+      compiled = r;
+      return { ok: true, ms, bytes: r.bytes.length, warnings: r.warnings, missing: [...values.keys()].filter((n) => !drives(n)) };
+    });
+    chain = run.catch(() => {});
+    return run;
+  }
+  /** Whether the program loaded now has a control called `name`. */
+  const drives = (name) => compiled.controls.some((c) => c.name === name);
+
   /** The engine's sound for the page's router, null until it is up. */
   const out = () => (eng ? junction : null);
 
@@ -143,20 +189,28 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
     if (!eng) { waiting.set(note, vel); return null; }
     if (held.has(note)) noteOff(note);
     const id = nextId++;
-    const args = ['freq', mtof(note), 'gate', 1, 'amp', ampDefault * vel / 127];
+    const def = onServer;
+    const args = ['freq', mtof(note), 'gate', 1];
+    // A velocity scales the program's own `amp`, 127 being what it wrote.
+    const amp = ampOf(def);
+    if (amp != null) args.push('amp', amp * vel / 127);
     for (const [k, v] of values) args.push(k, v);
     eng.send('/s_new', DEF, id, 0, 0, ...args);
-    held.set(note, id);
+    held.set(note, { id, def });
     live.add(id);
     stat.started++;
     return id;
   }
   function noteOff(note) {
     waiting.delete(note);
-    const id = held.get(note);
-    if (id == null) return;
+    const h = held.get(note);
+    if (!h) return;
     held.delete(note);
-    eng?.send('/n_set', id, 'gate', 0);
+    // How a note is let go is the program it started on, as /collide/ does:
+    // a gate an EnvGen reads closes it, a program that never frees itself is
+    // cut, and one that frees itself with no gate is left to end.
+    if (h.def.gateUsed && h.def.freesItself) eng?.send('/n_set', h.id, 'gate', 0);
+    else if (!h.def.freesItself) { eng?.send('/n_free', h.id); live.delete(h.id); }
   }
   /** A knob: the value for every note to come, and `/n_set` to every node still sounding. */
   function param(name, v) {
@@ -171,7 +225,8 @@ export function createCollideVoice({ log = () => {}, who = 'SuperCollider' } = {
   }
 
   return {
-    compiled, compileMs, values, stat, warm, wake, out, noteOn, noteOff, param, panic,
+    get compiled() { return compiled; },
+    compileMs, values, stat, warm, wake, load, drives, out, noteOn, noteOff, param, panic,
     engine: () => eng, held: () => [...held.keys()], live: () => live.size,
   };
 }

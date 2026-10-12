@@ -21,15 +21,6 @@
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
-  /* The crossfader row, as /concepts/radio/000/: an end label, the slider, an end
-     label, both label columns as wide as the longest end label on the page. */
-  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
-    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
-  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
-  .cc-fade .cc-end:first-child { text-align: right; }
-  .cc-fade > .sld { min-width: 0; }
-  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -523,10 +514,9 @@
     transport.setIcon('tv', playing ? 'stop' : 'play', playing ? 'stop both channels' : 'start ETV and ETV2');
   }
 
+  // The crossfader, its two channels named inside the lane (the kit's `ends`).
   const fader = createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: x,
-    onInput: (v) => { x = v; applyFade(); } });
-  const fade = el('div', 'cc-fade');
-  fade.append(el('span', 'cc-end', ON_PAGE[0].name), fader.el, el('span', 'cc-end', ON_PAGE[1].name));
+    ends: [ON_PAGE[0].name, ON_PAGE[1].name], onInput: (v) => { x = v; applyFade(); } });
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
@@ -541,9 +531,7 @@
   applyFade();
   // Linear, as every concept instrument: the picture, its fader,
   // then the knobs area, then the patchbay.
-  d.stack.add(top, panel.el, fade, grid.el, pb.el);
-  const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
-  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  d.stack.add(top, panel.el, fader.el, grid.el, pb.el);
   window.__demo.knobs = grid;
   window.__demo.tv = {
     fader, mode: () => mode, playing: () => playing,

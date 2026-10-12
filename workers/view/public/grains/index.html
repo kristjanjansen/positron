@@ -70,20 +70,10 @@
   .pane .hd b { font: 600 12px/1.5 var(--mono); color: var(--fg); font-weight: 600; }
   .pane .hd span { display: block; font: 400 10.5px/1.5 var(--mono); color: var(--dim2); }
   /* the crossfade reads as a line between the two panes, so its ends are
-     labelled where they point rather than in the paragraph above */
-  /* 🔴 THE SLIDER TAKES THE ROW. A `.sld` is `inline-flex`, so between two
-     `max-content` end labels it sat at its standalone 96 px with the whole
-     content width empty either side — photographed, and it reads as a control
-     that failed to lay out rather than one that is small. `1fr` on the middle
-     item and the lane stretching inside it is what makes the track the width of
-     the thing it is blending. */
-  .fade { display: flex; gap: 14px; align-items: center; }
-  .fade .end { font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim2); white-space: nowrap; }
-  .fade > .sld { flex: 1 1 auto; min-width: 0; }
-  .fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  /* with no label there is no head to show, and an empty one would still take
-     its gap */
-  .fade > .sld > .sld-head:empty, .fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
+     named inside its lane (the kit's `ends`, 2026-10-12), and the slider takes
+     the whole row: the lane, the empty head and the names are the component's. */
+  .fade { display: flex; align-items: center; }
+  .fade > .sld { flex: 1 1 auto; }
 </style>
 
 <script type="module">
@@ -1148,6 +1138,7 @@
     // not need a name; it needs room.
     // ⚠️ `aria` still gets one, because a screen reader has no ends to read.
     label: '', aria: 'blend', min: 0, max: 100, step: 1, value: 0, unit: '%',
+    ends: ['this page', 'the board'],
     // The slider IS the gesture, so it is also what starts the engine in this
     // tab — an AudioContext needs one and this is the first thing a hand
     // touches. ⚠️ It is also 1.7 MB of WebAssembly, which is why nothing here
@@ -1197,7 +1188,7 @@
   // UNDER the two cards, not above them: it is the line BETWEEN the panes, so
   // it belongs where the eye already is after reading both of them.
   const fadeBar = el('div', 'pos-controls fade');
-  fadeBar.append(el('span', 'end', 'this page'), fade.el, el('span', 'end', 'the board'));
+  fadeBar.append(fade.el);
   panes.after(fadeBar);
 
   // ── drawing ──────────────────────────────────────────────────────────────

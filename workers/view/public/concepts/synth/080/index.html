@@ -10,7 +10,7 @@
 <style>
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
+  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -336,10 +336,12 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
   const lines = CODE.replace(/\n$/, '').split('\n').length;
   // A third of the program's height; it scrolls (asked 2026-10-10, *"make faust
   // source code 1/3 of current h"*).
-  const code = createCodeBox({ language: 'faust', rows: Math.max(3, Math.round(lines / 6)), label: '', value: CODE.replace(/\n$/, ''),
+  const code = createCodeBox({ language: 'faust', rows: CODE_ROWS, label: '', value: CODE.replace(/\n$/, ''),
     ariaLabel: 'the Faust program this synth plays, read only' });
   code.input.readOnly = true;
-  d.stack.add(wave.el, code.el, grid.el, host, pb.el);
+  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
+  // concepts, move knobs on top of code"*.
+  d.stack.add(wave.el, grid.el, code.el, host, pb.el);
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
   window.__demo.fau = {

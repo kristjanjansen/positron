@@ -8,7 +8,7 @@
 <title>Collide synth</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
+  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -18,6 +18,7 @@
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
+  import { createCompileIdle } from '/shell/compile-idle.mjs';
   import { createCollideVoice, PROGRAM, rmsOf } from '/concepts/synth/collide-voice.mjs';
 
   // /concepts/synth/080/'s shape with the sound made by a program in
@@ -156,15 +157,53 @@
   const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
     flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || voice.held().length > 0),
   });
-  // The program, read only, in the kit's code box, its two knob names in the
-  // knobs' own hues. A sixth of its height, as 080 shows its Faust since
-  // *"make code win 1/2 less h"* (2026-10-12); it scrolls, and the padding is
-  // nav.mjs's for every concept page.
-  const lines = PROGRAM.split('\n').length;
-  const code = createCodeBox({ language: 'sclang', rows: Math.max(3, Math.round(lines / 6)), label: '', value: PROGRAM,
-    hues: book, ariaLabel: 'the SuperCollider program this synth plays, read only' });
-  code.input.readOnly = true;
-  d.stack.add(wave.el, code.el, grid.el, host, pb.el);
+  // The program in the kit's code box, its two knob names in the knobs' own
+  // hues (the box finds `\name.kr` in whatever is typed, so an edited text
+  // keeps them). EDITABLE since 2026-10-12, *"make 090 editable"*: the kit's
+  // idle compile, as /fau/ and /concepts/shader/000/ use it, `IDLE_MS` (600)
+  // after the last key, no button. A good compile is the voice for the NEXT
+  // note; a note already held finishes on the program it started with
+  // (`collide-voice.mjs`, the header of `createCollideVoice`). A failed one
+  // leaves `Did not compile` in the box's corner with collide's own error (a
+  // line and a column) in its title and in the log, and the keys go on
+  // playing the last good program.
+  const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
+    hues: book, ariaLabel: 'the SuperCollider program this synth plays, edit it and it recompiles' });
+  // ⚠️ A PROGRAM WITHOUT `\bright` OR `\decay` COMPILES AND PLAYS, AND THAT
+  // KNOB THEN DRIVES NOTHING. The kit's note has no state for "compiled, with
+  // a caveat", so the page writes that line into it once the compile has
+  // settled, as shader/000 does for `uSeg`; the next compile paints over it.
+  let compiles = 0, refused = 0;
+  const idle = createCompileIdle({
+    input: code.input,
+    host: code.el,
+    compile: async (text) => {
+      const out = await voice.load(text);
+      if (!out.ok) {
+        refused++;
+        d.log(`the edit did not compile, the last good program keeps playing: ${out.error}`, 'warn');
+        return out;
+      }
+      compiles++;
+      const gone = out.missing;
+      d.log(`the edit compiled in ${out.ms.toFixed(1)} ms into ${out.bytes} B and plays from the next note`
+        + (gone.length ? `, and has no ${gone.join(' or ')}, so ${gone.length > 1 ? 'those knobs drive' : 'that knob drives'} nothing` : ''),
+        gone.length ? 'warn' : '');
+      for (const w of out.warnings) d.log(w);
+      if (gone.length) idle.settled().then(() => {
+        if (idle.state() !== 'idle' || voice.drives(gone[0])) return;
+        const note = idle.el;
+        note.dataset.state = 'error';
+        note.textContent = `No ${gone.join(' or ')}, ${gone.length > 1 ? 'those knobs drive' : 'the knob drives'} nothing`;
+        note.title = `the program has no \\${gone.join(' or \\')}, so ${gone.length > 1 ? 'those knobs have' : 'that knob has'} nothing to set`;
+        note.hidden = false;
+      });
+      return out;
+    },
+  });
+  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
+  // concepts, move knobs on top of code"*.
+  d.stack.add(wave.el, grid.el, code.el, host, pb.el);
 
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
@@ -174,7 +213,8 @@
     ctx: () => ctx,
     level: () => (an ? rmsOf(an, buf) : 0),
     samples: () => { if (!an) return []; an.getFloatTimeDomainData(buf); return Array.from(buf); },
-    code: PROGRAM,
+    code: PROGRAM, box: code, idle,
+    compiles: () => compiles, refused: () => refused,
   };
   d.ready();
 </script>

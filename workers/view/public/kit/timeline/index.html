@@ -1330,8 +1330,8 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
 
     /**
      * 🔴 THE LABELS MOVE HOUSE, AND THERE IS STILL ONLY ONE OF EACH. Given as
-     * two drawings: wide is one footer holding two labels with the fader
-     * between them, narrow is a footer per pane with the fader as a band under
+     * two drawings: wide is one footer holding the fader with the two labels
+     * inside its lane (the slider's `ends`, 2026-10-12), narrow is a footer per pane with the fader as a band under
      * both. The cheap way to build that is two label elements, one per
      * arrangement, with the other hidden, and that is a readout living in two
      * files: two rows that can disagree. `video-panel.mjs` settled the same
@@ -1343,11 +1343,11 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
      */
     {
       const homes = (lr) => ['local', 'remote'].map((k) =>
-        lr[k].labelEl.parentElement.className.split(' ').find((c) => c.startsWith('pos-')));
+        lr[k].labelEl.parentElement.className.split(' ').find((c) => c.startsWith('pos-') || c === 'sld-end'));
       const counts = [lrWide, lrPhone].map((lr) => lr.el.querySelectorAll('.pos-lr-lab').length);
       const wideHomes = homes(lrWide), narrowHomes = homes(lrPhone);
       d.assert('a label is one element with two homes, and moving it never makes a second one',
-        wideHomes.every((h) => h === 'pos-lr-bar')
+        wideHomes.every((h) => h === 'sld-end')
         && narrowHomes.every((h) => h === 'pos-vp-slot')
         && counts.every((c) => c === 2),
         `wide puts both in ${wideHomes.join(' and ')}, narrow puts them in `
@@ -1640,9 +1640,9 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       const sameAfterNarrow = spare.local.labelEl === node;
       spare.arrange('wide');
       const wideHome = node.parentElement.className;
-      d.assert('the label that went into the pane’s footer is the one that came back to the bar',
+      d.assert('the label that went into the pane’s footer is the one that came back into the fader',
         sameAfterNarrow && spare.local.labelEl === node
-        && /pos-vp-c/.test(narrowHome) && /pos-lr-bar/.test(wideHome)
+        && /pos-vp-c/.test(narrowHome) && /sld-end/.test(wideHome)
         && spare.el.querySelectorAll('.pos-lr-lab').length === 2,
         `it went to "${narrowHome.trim()}" and came back to "${wideHome.trim()}", `
         + `still one node, and the component holds `

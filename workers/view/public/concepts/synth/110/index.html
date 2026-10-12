@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Plaits synth</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The patch selector is a full width block under the scope, as 070: the
+     name cell takes the width between the two arrows. (0,2,0) beats the
+     cell's own width. */
+  .pos-pick.cc-patch { display: flex; width: 100%; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createPlaitsVoice, PATCHES, P } from '../plaits-voice.mjs';
+
+  // A basic Plaits concept. Asked 2026-10-12 (BACKLOG, "A basic Plaits
+  // concept"): *"do basic plaits concept with patchbay. play button, scope,
+  // tibre and morth params, patch selector, patchbay. pick good interesting
+  // patches. unders synths group"*.
+  //
+  // THE VOICE IS /muta/'s, NOT A COPY: the same worklet and wasm, Emilie
+  // Gillet's Plaits compiled unmodified, through `../plaits-voice.mjs`, which
+  // /concepts/synth/120/ plays too, with the same patches.
+  //
+  // THE NOTES ARE ONE SEQUENCE ON A TIMELINE, THE SAME FOR EVERY PATCH.
+  // Asked 2026-10-12: *"add timeline to plaits concepts looping. play stop
+  // movest to transport bar"*, then *"can it be same sequence all the time?"*.
+  // So a patch change changes the sound and never the notes. The sequence is
+  // a slow root line, A F C G, each note held 3 s and starting every 2 s, so
+  // neighbours overlap by a second and G's tail runs over the loop point into
+  // the next A. Short triggers were refused (*"no bell sounds please or drums.
+  // longer stuff"*). The chord engine makes a chord of each root, the other
+  // engines play it as a melody, and it sits mid register so Long string and
+  // Wind still speak.
+  //
+  // A kit deck (`createDeck`) holds the note ons and offs and plays them
+  // through `web:sequence:midi-out`; the kit transport bar is play, stop and
+  // LOOP, glued to a strip that draws each note from its start to its note
+  // off. LOOP is on from the start, over the whole 8 s.
+  //
+  // A SEEK STARTS WHAT IS SOUNDING THERE, IT DOES NOT SKIP IT. The deck folds
+  // the score up to the new position (`reduce`) and the page asserts that
+  // state (`assertState`), which here is a MIDI chase: notes held at the new
+  // position that are not sounding are started, notes sounding that are not
+  // held there are released, and a note held across both is left alone, so
+  // the loop's wrap does not re-strike G's tail. Play from any point does the
+  // same before the deck rolls.
+  //
+  // THE BAY, every arrow a link the sound actually follows:
+  //   web:sequence:midi-out -> web:plaits:midi-in   the held notes, on and off
+  //   web:patch:midi-out    -> web:plaits:midi-in   program change: engine,
+  //                                                 harmonics, decay, colour
+  //   web:knob-timbre:value-out -> web:plaits:value-in
+  //   web:knob-morph:value-out  -> web:plaits:value-in
+  //   web:plaits:audio-out  -> web:scope:audio-in, web:speaker:audio-in
+  // Picking a patch moves the two knobs to that patch's values, and the knobs
+  // send them over their own links, so the values cross the same wires a hand
+  // would use.
+  //
+  // NOTHING OPENS ON A VISIT. A pointer over (or focus on) the transport bar
+  // fetches the wasm from this origin; the first play makes the AudioContext
+  // and boots. A seek before that moves the playhead and sounds nothing.
+  const d = mount({ name: 'Plaits synth', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('synth/110');
+
+  // The one sequence, for every patch: the notes, a note every STEP ms, each
+  // held HOLD ms. LAP is the loop.
+  const SEQ = [57, 53, 60, 55];
+  const STEP = 2000, HOLD = 3000, LAP = SEQ.length * STEP;
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const bay = createBay();
+  for (const [n, kind, label] of [
+    ['sequence', 'engine', 'sequence'], ['patch', 'person', 'patch'],
+    ['knob-timbre', 'person', 'timbre'], ['knob-morph', 'person', 'morph'],
+    ['plaits', 'engine', 'Plaits'], ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
+  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+
+  let at = 0;                 // the patch the voice holds
+  let notesIn = 0, programsIn = 0, paramsIn = 0;
+  const PORTS = [
+    { id: ID('sequence', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: ID('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
+    { id: ID('knob-timbre', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('knob-morph', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('plaits', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note', 'program'], deliver: (e) => {
+      // holdMs 0 holds the gate open until the note off (the shim's
+      // `level_patched` path), so a note sustains for as long as it is held.
+      if (e?.cls === 'note' && e.d2 > 0) { notesIn++; send({ t: 'noteOn', note: e.d1, holdMs: 0, level: e.d2 / 127 }); }
+      else if (e?.cls === 'note') send({ t: 'noteOff', note: e.d1 });
+      else if (e?.cls === 'program' && PATCHES[e.d1]) { programsIn++; at = e.d1; loadPatch(PATCHES[e.d1]); }
+    } },
+    { id: ID('plaits', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['timbre', 'morph'] }, deliver: (e) => {
+      if (e?.of !== 'param' || !(e.name in P)) return;
+      paramsIn++;
+      send({ t: 'param', id: P[e.name], value: e.v });
+    } },
+    { id: ID('plaits', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(ID('sequence', 'midi-out'), ID('plaits', 'midi-in'));
+  lay(ID('patch', 'midi-out'), ID('plaits', 'midi-in'));
+  lay(ID('knob-timbre', 'value-out'), ID('plaits', 'value-in'));
+  lay(ID('knob-morph', 'value-out'), ID('plaits', 'value-in'));
+  lay(ID('plaits', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('plaits', 'audio-out'), ID('speaker', 'audio-in'));
+
+  // ── the voice: /muta/'s worklet and wasm, made on the first play ───────
+  // (`../plaits-voice.mjs`, shared with /concepts/synth/120/).
+  const voice = createPlaitsVoice({ log: d.log, voices: 6, onUp: () => route() });
+  const send = voice.send;
+  const loadPatch = voice.loadPatch;
+  /** THE ROUTER: the voice's sound goes where the bay's audio links say. */
+  function route() {
+    const out = voice.out();
+    if (!out) return;
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+    try { out.disconnect(); } catch { /* not connected */ }
+    if (held(ID('plaits', 'audio-out'), ID('speaker', 'audio-in'))) out.connect(voice.speakers());
+    if (held(ID('plaits', 'audio-out'), ID('scope', 'audio-in'))) out.connect(voice.scopeIn());
+  }
+
+  // ── the sequence: a kit deck plays it out of web:sequence:midi-out ────
+  /** Each note as a span: its pitch, start, and note off (past LAP for G). */
+  const NOTES = SEQ.map((n, i) => ({ n, at: i * STEP, end: i * STEP + HOLD }));
+  /** The pitches held at `pos` inside one lap, the wrapped tail included. */
+  const heldAt = (pos) => NOTES.filter((x) => (x.at <= pos && pos < x.end) || (x.end > LAP && pos < x.end - LAP)).map((x) => x.n);
+  const sounding = new Set();   // pitches the sequence has on right now
+  let quiet = true;             // true unless the deck is rolling with the voice up
+  let ons = 0, offs = 0, chased = 0;
+  function emit(n, on) {
+    if (on === sounding.has(n)) return;
+    if (on) { sounding.add(n); ons++; } else { sounding.delete(n); offs++; }
+    bay.send(ID('sequence', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: on ? 100 : 0 });
+  }
+  /** THE CHASE: make what sounds equal what is held, touching nothing else. */
+  function chase(want) {
+    const w = new Set(quiet ? [] : want);
+    for (const n of [...sounding]) if (!w.has(n)) emit(n, false);
+    for (const n of w) if (!sounding.has(n)) { emit(n, true); chased++; }
+  }
+  const adapter = {
+    caps: { rates: [1], continuous: false },
+    actuate(pl) { if (!quiet) emit(pl.n, pl.on); },
+    reduce(_prefix, pos) { return { pos, held: heldAt(pos) }; },
+    assertState(state) { chase(state?.held || []); return state; },
+  };
+  // A note off past the lap end is scheduled at its wrapped place, so the
+  // second lap onward lets G go a second into it.
+  const items = NOTES.flatMap((x, i) => [
+    { at: x.at, kind: 'note', id: `on${i}`, payload: { n: x.n, on: true } },
+    { at: x.end < LAP ? x.end : x.end - LAP, kind: 'note', id: `off${i}`, payload: { n: x.n, on: false } },
+  ]);
+  const deck = createDeck({ items, adapters: { note: adapter }, range: [0, LAP] });
+
+  async function play() {
+    if (arming) return;
+    bar.el.dataset.busy = '1';
+    const ok = await voice.boot();
+    delete bar.el.dataset.busy;
+    if (!ok) return;
+    quiet = false;
+    chase(heldAt(deck.position()));
+    deck.play();
+    pb.refresh?.();
+  }
+  function stop() {
+    deck.pause();
+    quiet = true;
+    chase([]);
+    send({ t: 'allOff' });
+    pb.refresh?.();
+  }
+  const glue = el('div');
+  let arming = false;
+  const bar = createTransportBar(glue, deck, { scrub: false, command: { play, pause: stop } });
+
+  // ── the strip: two rows, so the overlapping notes sit side by side ──────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const ROWS = Math.ceil(HOLD / STEP);
+  const lanes = Array.from({ length: ROWS }, (_, k) => ({
+    id: `voice-${k + 1}`, kind: 'note', label: `voice ${k + 1}`, height: 30, as: 'spans', stack: false, terse: true,
+    rows: () => NOTES.flatMap((x, i) => (i % ROWS !== k ? [] : [
+      { at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: Math.min(x.end, LAP) - x.at } },
+      ...(x.end > LAP ? [{ at: 0, id: `t${i}`, kind: 'note', payload: { n: x.n, durMs: x.end - LAP } }] : []),
+    ])),
+    describeRow: (r) => [nameOf(r.payload.n), `${(r.payload.durMs / 1000).toFixed(1)} s`],
+    labelOf: (sp) => nameOf(sp.row.payload.n),
+  }));
+  const strip = createStripView(glue, deck, { size: 'auto', follow: false, gutter: 96, lanes });
+  const surface = createGlue(bar.el, strip.surface);
+  // The whole lap in view once the strip has a width (typist/040's reason).
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = strip.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; strip.strip.fit(0, LAP); }
+  }).observe(strip.el);
+  // LOOP ON BY DEFAULT, through the bar's own button: a mark at 0 and a mark
+  // at the end. The bar starts the deck on the first mark, so `arming`
+  // swallows that play; nothing sounds on load. (Kit candidate: a `loop`
+  // range option on createTransportBar.)
+  arming = true;
+  try {
+    deck.seek(0); bar.api.pressLoop();
+    deck.seek(LAP); bar.api.pressLoop();
+  } finally { arming = false; }
+  deck.seek(0);
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) {
+    surface.addEventListener(ev, () => { voice.warm().catch(() => {}); }, { once: true, passive: true });
+  }
+
+  // ── the two knobs, each a node of its own ───────────────────────────────
+  const knobs = new Map(['timbre', 'morph'].map((name) => [name, createKnob({
+    label: name, min: 0, max: 1, value: PATCHES[0][name], home: PATCHES[0][name], hand: true,
+    onInput: (v) => bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v }),
+  })]));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── the patch selector: a program change on web:patch ───────────────────
+  function pick(i) {
+    at = i;
+    patchPick.show(PATCHES[i].name, i);
+    bay.send(ID('patch', 'midi-out'), { cls: 'program', ch: 1, d1: i });
+    // The knobs take the patch's values and send them over their own links.
+    for (const [name, k] of knobs) {
+      const v = PATCHES[i][name];
+      if (k.value() === v) bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v });
+      else k.set(v, { from: 'patch' });
+    }
+  }
+  const stepPatch = (by) => pick((at + by + PATCHES.length) % PATCHES.length);
+  const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => stepPatch(-1), next: () => stepPatch(+1), onPick: (i) => pick(i) });
+  patchPick.options(PATCHES.map((p) => p.name), 0);
+  // The voice comes up on the first patch: its settings wait for the wasm.
+  pick(0);
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const pb = createPatchbay(bay, {
+    flowing: (l) => (l.from === ID('plaits', 'audio-out') ? deck.playing() && voice.level() > 0.002 : deck.playing()),
+  });
+  setInterval(() => pb.refresh?.(), 500);
+  d.stack.add(surface, voice.scope.el, patchPick.el, grid.el, pb.el);
+
+  window.__demo.knobs = grid;
+  window.__demo.plaits = {
+    bay, deck, bar, patches: PATCHES, knobs, pick, play, stop, features: voice.features, heldAt, notes: NOTES, lap: LAP,
+    at: () => at, playing: () => deck.playing(), ready: voice.ready,
+    ctx: voice.ctx, wasmAsked: voice.asked, sounding: () => [...sounding].sort(),
+    counts: () => ({ notesIn, programsIn, paramsIn, ons, offs, chased }),
+  };
+  d.ready();
+</script>

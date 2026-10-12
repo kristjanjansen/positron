@@ -203,9 +203,32 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  *   `{ on, move, why, says, coarse }`, so the page can put a line in its log.
  *   A state change belongs in the log and nowhere else: it is the only channel
  *   that survives a screenshot taken a minute later.
+ *
+ * @param {Array<string|Node>} [o.ends]  two names drawn INSIDE the lane, one at
+ *   each end: the left source's at the left, the right source's at the right.
+ *   For a crossfader. Asked 2026-10-12: *"have mode on slider to have labels on
+ *   inside the rails (crossfader case)"*, then *"use when threre is xfader, add
+ *   to kit too"*. A string is printed; a Node is moved in as it is, so a
+ *   component whose name has another home on a phone (`local-remote.mjs`) can
+ *   keep ONE element and move it.
+ *   ⚠️ THE HANDLE IS PAINTED OVER A NAME AND HIDES IT, ON PURPOSE. Decided by
+ *   the owner the same day: *"its ok to obsucre lael with handle"*. The handle
+ *   sits at an end only when the fader is all that end, and then the handle is
+ *   the reading; the other name is in full view, which is the one worth
+ *   reading. No fade, no swap of ink, no second channel.
+ *   ⚠️ THE NAMES TAKE NO ROOM AND NO POINTER: absolutely placed in the lane,
+ *   `nowrap`, `pointer-events: none`, so the lane is the same box with or
+ *   without them and a press on a name is a press on the lane.
+ *   ⚠️ A SLIDER WITH ENDS FILLS ITS ROW (`.sld[data-ends]`), because a name
+ *   inside a 96 px lane leaves nothing to drag through, and a crossfader is as
+ *   wide as the thing it blends. With no `label` its head is not drawn either,
+ *   which is the rule `/grains/` settled: two named ends need no third word.
  */
 export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, value, unit = '',
-                               digits, warp, onInput, onChange, hand = false, onHand } = {}) {
+                               digits, warp, onInput, onChange, hand = false, onHand, ends } = {}) {
+  if (ends !== undefined && !(Array.isArray(ends) && ends.length === 2)) {
+    throw new Error('slider: `ends` is two names, the left end and the right end');
+  }
   let span = max - min;
   let exp = warp === 'exp';
   if (exp && !(min > 0)) throw new Error('slider: warp "exp" needs min > 0');
@@ -264,6 +287,14 @@ export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, va
   // face is monospaced and the cell is `tabular-nums`.
   const widest = Math.max(...[min, max].map((v) => `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`.length));
   read.style.minWidth = `${widest}ch`;
+  // The names go in BEFORE the handle, so the handle paints over them.
+  const endEls = ends ? ends.map((x, i) => {
+    const e = el('span', `sld-end sld-end-${i ? 'r' : 'l'}`, null, { 'aria-hidden': 'true' });
+    if (x instanceof Node) e.append(x); else e.textContent = x ?? '';
+    lane.append(e);
+    return e;
+  }) : null;
+  if (ends) wrap.dataset.ends = '';
   lane.append(knob);
   // 🔴 THE NUMBER GOES UNDER ITS OWN LABEL, NOT ON THE FAR SIDE OF THE LANE.
   // Asked for, and it fixes a spacing complaint that was never about spacing.
@@ -496,6 +527,8 @@ export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, va
     el: wrap,
     /** the invisible hand, or `null` on a slider that was not given one */
     hand: handApi,
+    /** the two name slots inside the lane, left then right, or `null` */
+    ends: endEls,
     get: () => v,
     set,
     /**

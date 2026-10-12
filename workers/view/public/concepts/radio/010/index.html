@@ -15,22 +15,15 @@
   /* The kit's live wave as the panel's picture, as /concepts/radio/000/. */
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
-  /* The slider row from /concepts/radio/000/: an end label, the slider, an end label,
-     both label columns as wide as the longest end label (`--end`). A second
-     grid row holds the dial scale under the lane, in the lane's own column. */
-  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
-    align-items: center; column-gap: 14px; row-gap: 6px; width: 100%; font: 400 12px/1 var(--mono); }
-  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
+  /* The dial and, under it, the dial scale, at the full width. The band's two
+     ends are named inside the lane (the kit's `ends`). */
+  .cc-dial { display: flex; flex-direction: column; gap: 6px; width: 100%; font: 400 12px/1 var(--mono); }
   .pos-stack > .pos-bgroup { align-self: flex-start; width: auto; }
-  .cc-fade .cc-end:first-child { text-align: right; }
-  .cc-fade > .sld { min-width: 0; }
-  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
   /* The dial scale: each station's name centred on the point the engine tunes
      it at. The point is a share of the handle's TRAVEL, not of the lane, which
      is how slider.mjs places its handle, so a name sits under the handle when
      the handle sits on that station. */
-  .cc-scale { grid-column: 2; position: relative; height: 14px; }
+  .cc-scale { position: relative; height: 14px; }
   .cc-mark { position: absolute; top: 0; font-size: 11px; transform: translateX(-50%); color: var(--dim2);
     white-space: nowrap; transition: color .12s; }
   .cc-mark.on { color: var(--hi); }
@@ -321,7 +314,7 @@
 
   // ── the dial: a slider whose every move is one event out of dial:value-out
   const dial = createSlider({ label: '', aria: 'tune', min: 0, max: 1, step: 0.001, value: tune,
-    onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
+    ends: ['531', '1602'], onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
   const scale = el('div', 'cc-scale');
   const marks = STATIONS.map((st) => {
     const m = el('span', 'cc-mark', st.short);
@@ -333,15 +326,12 @@
     const m = mix(tune);
     marks.forEach((el, i) => el.classList.toggle('on', m.st[i].clear > 0.5));
   }
-  const fade = el('div', 'cc-fade');
-  fade.append(el('span', 'cc-end', '531'), dial.el, el('span', 'cc-end', '1602'),
-    el('span'), scale);
+  const fade = el('div', 'cc-dial');
+  fade.append(dial.el, scale);
   paintScale();
 
   const tunerBlock = el('div', 'cc-tuner');
   tunerBlock.append(panel.el, fade);
-  const ends = [...fade.querySelectorAll('.cc-end')].map((e) => e.textContent.length);
-  fade.style.setProperty('--end', `${Math.max(...ends)}ch`);
   // Play alone top left, then the tuner, then the patchbay, at the page's own
   // block gap (the shell's stack, as every concept page now is).
   d.stack.add(transport.el, tunerBlock, pb.el);

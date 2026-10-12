@@ -53,7 +53,7 @@
     // The cells under the title and the log alone at the foot, asked 2026-10-12:
     // *"move readouts to top"*.
     joined: false,
-    readout: { median: 'ms', worst: 'ms', last: 'ms', notes: '' } });
+    readout: { median: 'ms', worst: 'ms', last: 'ms', spread: 'ms' } });
   conceptNav('clock/000');
 
   // ── the synth, on the `there` site: one sine per held note ──────────────
@@ -103,7 +103,9 @@
     d.set('median', s[s.length >> 1]);
     d.set('worst', s[s.length - 1]);
     d.set('last', ms);
-    d.set('notes', arrived.length);
+    // How far apart the fastest and slowest note landed, in place of a count
+    // of notes. Asked 2026-10-12: *"lag notes readout has no value"*.
+    d.set('spread', s[s.length - 1] - s[0]);
     const lane = view.strip.lanes().find((L) => L.id === 'lag');
     if (lane) lane.subLabel = [`median ${s[s.length >> 1]} ms`, `worst ${s[s.length - 1]} ms`];
     show();

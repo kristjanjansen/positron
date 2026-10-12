@@ -18,6 +18,8 @@ export const CONCEPTS = [
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
   { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
+  { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits in this tab, played from a patch picker with timbre and morph on the patchbay.' },
+  { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keyboard, with every one of its controls a knob on the patchbay.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
@@ -33,6 +35,7 @@ export const CONCEPTS = [
   { n: 'video/030', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
   { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
   { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ running in this tab with only the number of mirrors left to turn.' },
+  { n: 'shader/010', title: 'Shader on Pi', say: 'The mirror shader drawn in this tab and on the Raspberry Pi, the Pi simulated until it is reachable.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
@@ -53,7 +56,7 @@ export const CONCEPTS = [
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
   { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
-  { n: 'clock/010', title: 'In advance', say: 'One pattern played by a timer that wakes up and by the audio clock told ahead, with how late each lands.' },
+  { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
   { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
@@ -81,9 +84,9 @@ export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.', supersededBy: 'synth/080' },
-  collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.' },
-  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.' },
-  mirror: { group: 'shader', say: 'One shader drawn by this browser and by a Raspberry Pi.' },
+  collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.', supersededBy: 'synth/090' },
+  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.', supersededBy: 'synth/120' },
+  mirror: { group: 'shader', say: 'One shader drawn by this browser and by a Raspberry Pi.', supersededBy: 'shader/010' },
   llhls: { group: 'streaming', say: 'The tuned low latency HLS player against a live input.' },
   webrtc: { group: 'streaming', say: 'The same live picture delivered over WHEP.', supersededBy: 'video/030' },
   moq: { group: 'streaming', say: 'A test picture sent from this browser over MoQ and back.' },
@@ -95,12 +98,12 @@ export const DEMO_CARDS = {
   twelve: { group: 'device', say: 'A TASCAM Model 12 on screen, moving when the real one moves.' },
   dump: { group: 'device', say: 'Every message an instrument sends, as raw bytes and a reading.' },
   pack: { group: 'device', say: 'The patches, sessions and samples inside a Circuit pack.' },
-  wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.' },
+  wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.', supersededBy: 'clock/000' },
   patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
-  nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.' },
+  nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
   tom: { group: 'sampler', say: 'A 16 step grid playing the samples out of a pack.' },
-  time: { group: 'clock', say: 'The clock every page runs on and what is built on it.' },
+  time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/010' },
   sync: { group: 'clock', say: 'Four ways two places agree on when something happens.' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
   // use cases: actual content, played with the wiring in view

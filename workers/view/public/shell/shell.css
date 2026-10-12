@@ -2141,6 +2141,34 @@ video[hidden] { display: none; }
   background: var(--hi); border-radius: 4px; pointer-events: none;
 }
 .sld-lane[aria-disabled] { opacity: .4; cursor: default; }
+/* 🔴 A CROSSFADER'S TWO NAMES SIT INSIDE ITS LANE, ONE AT EACH END (`ends` in
+   slider.mjs). Asked 2026-10-12: *"have mode on slider to have labels on inside
+   the rails (crossfader case)"*. They replace a row of end label, slider, end
+   label that four concept pages each wrote out as `.cc-fade`.
+   ⚠️ ABSOLUTE, `nowrap`, NO POINTER: the lane is the same box with or without
+   them and a press on a name is a press on the lane. Each is held to half the
+   lane less its inset, so two long names clip rather than run into each other.
+   ⚠️ INSET BY HALF A HANDLE, which is a relationship and so it is `--sld-knob`
+   read back rather than a typed number.
+   ⚠️ THE HANDLE COVERS A NAME WHEN IT SITS ON IT, by order in the lane: the
+   names go in first. The owner's call the same day, *"its ok to obsucre lael
+   with handle"*. The ink is the kit's label ink, `.sld-l`'s, uppercase. */
+.sld-end {
+  position: absolute; top: 0; bottom: 0; display: flex; align-items: center;
+  max-width: calc(50% - var(--sld-knob) / 2); overflow: hidden;
+  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  color: var(--dim2); white-space: nowrap; pointer-events: none;
+}
+.sld-end-l { left: calc(var(--sld-knob) / 2); }
+.sld-end-r { right: calc(var(--sld-knob) / 2); }
+/* A slider with ends fills its row: a name inside a 96 px lane leaves nothing
+   to drag through. With no label its head is not drawn, `/grains/`'s rule: two
+   named ends need no third word. `.sld-group .sld { display: contents }` is the
+   same weight and comes later, so a group still owns its columns. */
+.sld[data-ends] { display: flex; min-width: 0; }
+.sld[data-ends] > .sld-lane,
+.sld[data-ends] > .sld-hand-row { width: auto; flex: 1 1 auto; min-width: 0; }
+.sld[data-ends] > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 
 /* ── the invisible hand's button (slider.mjs, hand.mjs) ──────────────────
    One button on the right of the lane, joined to it the way the transport's
@@ -7714,16 +7742,14 @@ button.pos-linkbtn:active { background: none; }
   min-width: 0;
 }
 .pos-lr-fade { flex: 1 1 auto; min-width: 0; display: flex; }
-.pos-lr-fade > .sld { flex: 1 1 auto; min-width: 0; }
-.pos-lr-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-/* With no label there is no head worth showing, and an empty one still takes
-   its gap. Lifted from `/grains/`, which found it. */
-.pos-lr-fade > .sld > .sld-head:empty,
-.pos-lr-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
+.pos-lr-fade > .sld { flex: 1 1 auto; }
+/* The lane, the empty head and the two names inside the lane are the slider's
+   own since 2026-10-12 (`.sld[data-ends]`), so nothing about them is here. */
 
-/* 🔴 THE TWO ENDS ARE LABELLED WHERE THEY POINT. `max-content` and `nowrap`,
-   because a label that wraps is the row reporting that it does not fit, and it
-   reports it in the one place a reader cannot act on. */
+/* 🔴 THE TWO ENDS ARE LABELLED WHERE THEY POINT: inside the fader's lane in
+   the wide arrangement (`.sld-end`, which sets the same ink), in each pane's
+   footer in the narrow one. `nowrap`, because a label that wraps is the row
+   reporting that it does not fit, in the one place a reader cannot act on. */
 .pos-lr-lab {
   font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
   color: var(--dim2); white-space: nowrap; flex: 0 0 auto;

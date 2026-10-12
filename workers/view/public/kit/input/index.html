@@ -138,6 +138,35 @@
    * ⚠️ `codeSpec` IS DECLARED ABOVE THE BLOCK, for the reason `cnoteSpec` is.
    */
   /**
+   * THE NEWEST BLOCK ON THIS PAGE, 2026-10-12, AND THE FIRST CALL TO
+   * `section()`. Asked as *"have mode on slider to have labels on inside the
+   * rails (crossfader case)"* and *"use when threre is xfader, add to kit
+   * too"*. The slider's `ends`: two names inside the lane. The second
+   * specimen sits at its left end, so its handle covers `here`, which the owner
+   * ruled fine the same day (*"its ok to obsucre lael with handle"*).
+   * ⚠️ `xfadeSpec` IS DECLARED HERE, ABOVE ITS BLOCK, for the reason the
+   * holders above give.
+   */
+  let xfadeSpec = null;
+  section('CROSSFADER',
+    'A slider between two sources, with each source named inside its end of the lane.',
+    `createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: 0.5,
+  ends: ['here', 'Pi'] })`,
+    (box) => {
+      const o = out('');
+      const mid = createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: 0.5,
+        ends: ['here', 'Pi'], onInput: (v) => { o.textContent = `here ${(1 - v).toFixed(2)}, Pi ${v.toFixed(2)}`; } });
+      const left = createSlider({ label: '', aria: 'crossfade, all here', min: 0, max: 1, step: 0.01, value: 0,
+        ends: ['here', 'Pi'] });
+      const plain = createSlider({ label: 'mix', min: 0, max: 1, step: 0.01, value: 0.5 });
+      const col = el('div');
+      col.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;';
+      col.append(mid.el, left.el, plain.el);
+      box.append(col, o);
+      xfadeSpec = { mid, left, plain };
+    });
+
+  /**
    * THE NEWEST BLOCK ON THIS PAGE, 2026-10-10, AND THE FIRST CALL TO
    * `section()`. Asked as *"create linkbutton component, but it next to
    * patchbay comppnent title See details"*. A button that reads as a link,
@@ -1136,6 +1165,44 @@ createKeyboard(parent, { letters: false })   // a second one on the same page`,
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
+  {
+    // CROSSFADER: both names inside the lane's rect, centred on its height, one
+    // line each, taking no pointer; the lane as tall as a plain slider's; and a
+    // press on a name lands on the lane.
+    const sp = xfadeSpec;
+    const rows = sp ? [sp.mid, sp.left].map((s) => {
+      const lane = s.el.querySelector('.sld-lane').getBoundingClientRect();
+      const names = s.ends.map((e) => {
+        // The ink, not the slot: the slot is the lane's height by design.
+        const rg = document.createRange(); rg.selectNodeContents(e);
+        const r = rg.getBoundingClientRect(), cs = getComputedStyle(e);
+        const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { r, inside: r.left >= lane.left - 0.5 && r.right <= lane.right + 0.5
+          && r.top >= lane.top - 0.5 && r.bottom <= lane.bottom + 0.5,
+          centred: Math.abs((r.top + r.bottom) / 2 - (lane.top + lane.bottom) / 2) <= 1,
+          oneLine: cs.whiteSpace === 'nowrap' && r.height <= 12, quiet: cs.pointerEvents === 'none',
+          upper: cs.textTransform === 'uppercase', hits: at === s.el.querySelector('.sld-lane') || s.el.querySelector('.sld-lane').contains(at) };
+      });
+      return { lane, names };
+    }) : [];
+    const plainH = sp ? sp.plain.el.querySelector('.sld-lane').getBoundingClientRect().height : 0;
+    const f = (x) => x.toFixed(1);
+    d.assert('CROSSFADER draws both names inside the lane, centred on it, one line each, under no pointer',
+      rows.length === 2 && rows.every((r) => r.names.every((n) => n.inside && n.centred && n.oneLine && n.quiet && n.upper && n.hits)),
+      rows.map((r) => `lane ${f(r.lane.left)}..${f(r.lane.right)} x ${f(r.lane.top)}..${f(r.lane.bottom)}, names `
+        + r.names.map((n) => `${f(n.r.left)}..${f(n.r.right)} x ${f(n.r.top)}..${f(n.r.bottom)}`
+          + `${n.inside ? '' : ' OUTSIDE'}${n.centred ? '' : ' off centre'}${n.hits ? '' : ' blocks the lane'}`).join(' and ')).join('; '));
+    d.assert('CROSSFADER keeps the lane a plain slider\'s height, and its names change nothing about its box',
+      rows.length === 2 && rows.every((r) => Math.abs(r.lane.height - plainH) < 0.5 && Math.abs(r.lane.height - 34) < 0.5),
+      `lanes ${rows.map((r) => f(r.lane.height)).join(' and ')} px against a plain lane of ${f(plainH)} px`);
+    // At 0 the handle sits over the left name and is painted after it.
+    const lk = sp?.left.el.querySelector('.sld-knob').getBoundingClientRect();
+    const ln = sp?.left.ends[0].getBoundingClientRect();
+    d.assert('CROSSFADER at its left end puts the handle over the left name, which the owner ruled fine',
+      !!lk && lk.left <= ln.left && lk.right > ln.left
+        && sp.left.ends[0].compareDocumentPosition(sp.left.el.querySelector('.sld-knob')) & Node.DOCUMENT_POSITION_FOLLOWING,
+      lk ? `handle ${f(lk.left)}..${f(lk.right)}, name starts at ${f(ln.left)}` : 'not built');
+  }
   {
     const b = linkSpec?.more.el, cs = b && getComputedStyle(b);
     const flat = !!cs && cs.borderTopStyle === 'none' && cs.backgroundColor === 'rgba(0, 0, 0, 0)'
