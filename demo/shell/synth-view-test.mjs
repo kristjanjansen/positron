@@ -32,7 +32,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  shapeFor, waveSample, wavePoints, WAVE_SHAPES, traceOf,
+  shapeFor, waveSample, wavePoints, WAVE_SHAPES, traceOf, onsetIndex, captureTrace,
   envelopePath, HOLD_SHARE,
   filterShapeFor, filterCurve, DB_TOP, DB_FLOOR, Q_MIN, Q_MAX,
 } from './synth-view.mjs';
@@ -297,6 +297,30 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     && lp.zeroY > 0 && lp.zeroY < 1, `0 dB is ${lp.zeroY.toFixed(3)} up the box`);
   ok('the resonance scale starts flat and ends somewhere worth looking at',
     Q_MIN < 1 && Q_MAX >= 10);
+}
+
+// ── the triggered scope's arithmetic (2026-10-12, /concepts/rhythm/010/) ──
+// A buffer of 1000 samples at 1000 Hz ending at t = 10 s, with a hit (a burst
+// of 1s) starting at sample 700, so at t = 9.7 s. NEGATIVE CONTROLS: a clock
+// that is 3 ms off still lands on sample 700 (the gate finds the edge), an
+// onset whose window would run past the end is refused (-1), and the capture
+// keeps a one sample spike that a plain decimation would step over.
+{
+  const buf = new Float32Array(1000);
+  for (let i = 700; i < 760; i++) buf[i] = i % 2 ? 0.8 : -0.8;
+  const at = onsetIndex(buf, { rate: 1000, end: 10, onset: 9.7, windowS: 0.2 });
+  ok('triggered: the onset is found where the clock says the hit is', at === 700, `index ${at}`);
+  const slop = onsetIndex(buf, { rate: 1000, end: 10, onset: 9.697, windowS: 0.2 });
+  ok('triggered: 3 ms of clock slop still lands on the same edge, so traces do not jitter', slop === 700, `index ${slop}`);
+  const late = onsetIndex(buf, { rate: 1000, end: 10, onset: 9.9, windowS: 0.2 });
+  ok('NEGATIVE CONTROL triggered: a window that would run past the buffer is refused, not padded', late === -1, `index ${late}`);
+  const spike = new Float32Array(1000); spike[503] = -0.9;
+  const tr = captureTrace(spike, 0, 1000, 100);
+  ok('triggered: the capture keeps a one sample spike, sign and all', Math.min(...tr) === Math.fround(-0.9) && tr.length === 100,
+    `min ${Math.min(...tr).toFixed(2)} over ${tr.length} points`);
+  const same = captureTrace(buf, 700, 200, 50), again = captureTrace(buf, 700, 200, 50);
+  ok('triggered: the same window gives the same trace, which is what holding still means',
+    same.every((x, i) => x === again[i]) && same[0] !== 0, `${same.length} points, first ${same[0]}`);
 }
 
 // ── what the file says about itself ────────────────────────────────────────

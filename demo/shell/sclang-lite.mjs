@@ -343,15 +343,18 @@ const RATE_WORD = ['scalar', 'control', 'audio'];
  * Compile one function literal to a SynthDef.
  *
  * @param {string} src
- * @param {{name?: string}} [o]
+ * @param {{name?: string, bus?: number}} [o]  `bus` is the output bus the last
+ *   line goes to, 0 by default. Added 2026-10-12 so `/concepts/rhythm/` can put
+ *   each drum on a stereo pair of its own; the engine has to be booted with that
+ *   many output channels, or the bus is an input.
  * @returns {{ok: true, bytes: Uint8Array, name: string, params: {name: string, value: number}[],
  *   channels: number, blocks: number, wires: number, gate: boolean, gateUsed: boolean,
  *   freesItself: boolean, kinds: string[], warnings: string[]}
  *   | {ok: false, error: string, line: number, col: number, message: string}}
  */
-export function compile(src, { name = 'collide' } = {}) {
+export function compile(src, { name = 'collide', bus = 0 } = {}) {
   try {
-    return compileOrThrow(String(src ?? ''), name);
+    return compileOrThrow(String(src ?? ''), name, Math.max(0, Math.floor(Number(bus) || 0)));
   } catch (e) {
     if (!(e instanceof SclError)) throw e;
     return { ok: false, error: e.message, line: e.line, col: e.col,
@@ -359,7 +362,7 @@ export function compile(src, { name = 'collide' } = {}) {
   }
 }
 
-function compileOrThrow(src, name) {
+function compileOrThrow(src, name, bus = 0) {
   const toks = lex(src);
   let p = 0;
   const peek = (k = 0) => toks[Math.min(p + k, toks.length - 1)];
@@ -921,7 +924,7 @@ function compileOrThrow(src, name) {
     if (c.rate !== RATE.sample) throw new SclError(`the last line is ${RATE_WORD[c.rate]} rate and Out.ar needs audio rate, so make it .ar`, lastAt);
   }
   if (chans.length === 1) chans = [chans[0], chans[0]];
-  g.out(...chans.map((c) => c.ref));
+  if (bus) g.outAt(bus, ...chans.map((c) => c.ref)); else g.out(...chans.map((c) => c.ref));
   blocks.push({ cls: 'Out', rate: RATE.sample, inputs: chans.map((c) => c.ref), outs: 0, special: 0 });
 
   const bytes = g.bytes();
