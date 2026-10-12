@@ -64,6 +64,9 @@
     [{ id: IN.there, label: 'beat', dir: 'in', medium: 'clock' }]);
 
   const d = mount({ name: 'concept clock 020', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The cells under the title and the log alone at the foot, asked 2026-10-12:
+    // *"move readouts to top"*.
+    joined: false,
     readout: { correction: 'ms', 'round trip': 'ms', apart: 'ms', worst: 'ms', 'clock sent': '', beats: '' } });
   conceptNav('clock/020');
 
@@ -121,7 +124,7 @@
     };
     return P;
   }
-  const here = place('here', 880), there = place('there', 1320);
+  const here = place('web-1', 880), there = place('web-2', 1320);
 
   // ── the bays: the clock leaves `here` once and crosses the room to `there` ─
   function bayHere() {
@@ -144,8 +147,8 @@
   let heardClock = 0;
   function onClock(P, e) {
     P.clock = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
-    if (P === there) { heardClock++; pb.pulse(CLK, '*:beat:clock-in'); }
-    else pb.pulse(CLK, IN.here);
+    if (P === there) { heardClock++; pb.pulse(plain(CLK), '*:beat:clock-in'); }
+    else pb.pulse(plain(CLK), plain(IN.here));
     d.log(`${P.name} heard the clock: ${e.bpm} bpm from ${new Date(e.epoch).toISOString().slice(11, 23)}`);
   }
 
@@ -173,7 +176,7 @@
     const tag = rand(6);
     here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: here.raw });
     there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw });
-    d.log(`joined ${ROOM}. ${there.name}'s clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
+    d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
     // Wait until each site has heard the other announce and the clock has a round trip.
     const has = () => !!bayHere().targets(CLK).find((t) => t.to === IN.there)
       && there.peer.peers().some((p) => Number.isFinite(p.rttMs));
@@ -191,13 +194,13 @@
     nodeHere.leave(); nodeThere.leave();
     for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; P.clock = null; }
     joined = false;
-    btns.enable('join', true, `Join ${ROOM}`);
+    btns.enable('join', true, `room ${ROOM}`);
     btns.enable('leave', false, 'not in a room');
     d.log('left the room, so both places stop');
   }
 
   const btns = createButtonGroup({ buttons: [
-    { id: 'join', label: `Join ${ROOM}`, onPress: () => join() },
+    { id: 'join', label: 'Join', title: `room ${ROOM}`, onPress: () => join() },
     { id: 'leave', label: 'Leave', onPress: () => leave() },
   ] });
   btns.enable('leave', false, 'not in a room');
@@ -248,17 +251,50 @@
   const view = createStripView(shelf, deck, {
     size: 'auto', follow: false, gutter: 132, footer: true,
     lanes: [
-      { id: 'here', kind: 'beat', label: 'here', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
-        rows: rowsOf(here), describeRow: () => ['here', 'the clock it keeps'] },
-      { id: 'there', kind: 'beat', label: 'there', height: 44, width: 2, as: 'ticks', terse: true,
+      { id: 'here', kind: 'beat', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
+        rows: rowsOf(here), describeRow: () => ['web-1', 'the clock it keeps'] },
+      { id: 'there', kind: 'beat', label: 'web-2', height: 44, width: 2, as: 'ticks', terse: true,
         rows: rowsOf(there),
         colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
-        describeRow: (r) => { const g = gapOf(r.payload.k); return ['there', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from here`]; } },
+        describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
     ],
   });
 
+  // ── plain names on screen, the real ids on hover ──────────────────────────
+  // Asked 2026-10-12: *"labels are super confusing"*. Three made-up codes
+  // (`here-xj5`, `lag-fs3fmz`, `there-6f3`) told a reader nothing about which end
+  // was which. The wire keeps the random ids, so two tabs never collide, and the
+  // picture shows SIMULATED names (positron-concepts): this browser is `web-1`, the
+  // other place `web-2`, the relay `cf-relay:<role>`. The real id is on hover.
+  // ⚠️ PAGE LOCAL: bay-view draws a box's title from `node.id` and has no display
+  // name hook, and patchbay.mjs types `Cloudflare` under the relay box itself.
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const g of root.querySelectorAll('.lv-box')) {
+        if (g.querySelector('title')) continue;
+        const id = g.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : id.startsWith('*:') ? 'a * end, every other place in the room' : `simulated name, real id ${realOf.get(id) || id}`;
+        g.prepend(t);
+        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
   // ── the patchbay: the clock wire lights per message, never per beat ─────
-  const pb = createPatchbay(heldPicture(bayHere, HERE, { star: 'every other place' }), { room: ROOM });
+  const pb = createPatchbay(named(heldPicture(bayHere, HERE, { star: 'every other place' })), { room: 'clock' });
+  hovers(pb.el, 'clock');
 
   const row = el('div', 'cc-row');
   row.append(btns.el, tempo.el);

@@ -42,6 +42,9 @@
   const WAKE_OUT = `${S}:wake:audio-out`, AHEAD_OUT = `${S}:ahead:audio-out`, SPK = `${S}:speaker:audio-in`;
 
   const d = mount({ name: 'concept clock 010', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The cells under the title and the log alone at the foot, asked 2026-10-12:
+    // *"move readouts to top"*.
+    joined: false,
     readout: { 'timer median': 'ms', 'timer worst': 'ms', 'clock median': 'ms', 'clock worst': 'ms' } });
   conceptNav('clock/010');
 

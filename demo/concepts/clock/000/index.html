@@ -50,6 +50,9 @@
   ]);
 
   const d = mount({ name: 'concept clock 000', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The cells under the title and the log alone at the foot, asked 2026-10-12:
+    // *"move readouts to top"*.
+    joined: false,
     readout: { median: 'ms', worst: 'ms', last: 'ms', notes: '' } });
   conceptNav('clock/000');
 
@@ -95,7 +98,7 @@
     if (e.d2) noteOn(e.d1, e.d2); else noteOff(e.d1);
     if (!e.d2 || !Number.isFinite(ms)) return;
     arrived.push({ at: Date.now() - t0, n: e.d1, ms });
-    pb.pulse(KEYS, SYNTH);
+    pb.pulse(plain(KEYS), plain(SYNTH));
     const s = sorted();
     d.set('median', s[s.length >> 1]);
     d.set('worst', s[s.length - 1]);
@@ -135,7 +138,7 @@
       const ok = !!bayHere().links().length && !!bayThere().links().length;
       t0 = Date.now();
       btns.enable('join', false, `in ${ROOM}`);
-      d.log(ok ? `joined ${ROOM} as ${HERE} and ${THERE}` : `joined ${ROOM}, but the two sites did not hear each other`, ok ? 'hi' : 'bad');
+      d.log(ok ? `joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}` : `joined ${ROOM}, but the two sites did not hear each other`, ok ? 'hi' : 'bad');
       return ok;
     })();
     return joining;
@@ -145,7 +148,7 @@
   let chain = Promise.resolve();
   const play = (ev) => { chain = chain.then(() => join()).then((ok) => { if (ok) here.emit(KEYS, ev); }); };
 
-  const btns = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => join() }] });
+  const btns = createButtonGroup({ buttons: [{ id: 'join', label: 'Join', title: `room ${ROOM}`, onPress: () => join() }] });
 
   const host = el('div');
   const kb = createKeyboard(host, {
@@ -173,6 +176,38 @@
     view.strip.invalidate();
   }
 
+  // ── plain names on screen, the real ids on hover ──────────────────────────
+  // Asked 2026-10-12: *"labels are super confusing"*. Three made-up codes
+  // (`here-xj5`, `lag-fs3fmz`, `there-6f3`) told a reader nothing about which end
+  // was which. The wire keeps the random ids, so two tabs never collide, and the
+  // picture shows SIMULATED names (positron-concepts): this browser is `web-1`, the
+  // other place `web-2`, the relay `cf-relay:<role>`. The real id is on hover.
+  // ⚠️ PAGE LOCAL: bay-view draws a box's title from `node.id` and has no display
+  // name hook, and patchbay.mjs types `Cloudflare` under the relay box itself.
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const g of root.querySelectorAll('.lv-box')) {
+        if (g.querySelector('title')) continue;
+        const id = g.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
+        g.prepend(t);
+        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
   // ── the patchbay: the link and the relay that carries it ────────────────
   // Drawn from this tab's own two graphs, so it is whole before Join.
   const pic = createBay();
@@ -182,7 +217,8 @@
   }
   pic.link(KEYS, SYNTH);
   pic.link(AOUT, SPK);
-  const pb = createPatchbay(pic, { room: ROOM, flowing: () => voices.size > 0 });
+  const pb = createPatchbay(named(pic), { room: 'lag', flowing: () => voices.size > 0 });
+  hovers(pb.el, 'lag');
 
   requestAnimationFrame(show);
   d.stack.add(btns.el, host, view.surface, pb.el);
