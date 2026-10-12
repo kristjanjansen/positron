@@ -115,6 +115,42 @@
      already reads --sans (slide.css), so a frame changes face by setting two
      custom properties and no slide rule is overridden but this one. */
   .fp-sl .sl-say { font-family: var(--fp-head); }
+
+  /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
+     THROUGH. Two custom properties on each real piece, so every kit
+     component inside it (the readout, the log, the slide's text) takes the
+     rule without a rule of its own being touched. */
+  .fp-rule { --mono: 'Brand JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+             --sans: 'FP Geist', -apple-system, BlinkMacSystemFont, "SF Pro Text", Segoe UI, Roboto, sans-serif;
+             min-width: 0; }
+  /* 🔴 THE CLEAR GAP UNDER THE LAST REAL PIECE IS ITS OWN PADDING, NOT A
+     LARGER MARGIN. The stack owns the margin between blocks and the page's
+     check holds every pair of blocks to --pos-gap, so the extra --pos-gap
+     sits inside this last block, which makes the air to the specimens below
+     2 x --pos-gap with no divider (the kit draws none between blocks). */
+  .fp-rule-end { padding-bottom: var(--pos-gap); }
+  .fp-rule-h { font: 600 11px/1.2 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); margin: 0; }
+  .fp-rule-n { font: 400 15px/1.5 var(--sans); color: var(--dim); margin: 6px 0 0; max-width: 58ch; }
+  /* the concepts index's own cards (demo/concepts/index.html .cc-card), the
+     title in mono and the line in Geist */
+  .fp-cc { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); margin-top: 20px; }
+  .fp-cc-card { display: flex; flex-direction: column; gap: 6px; min-height: 115px; padding: var(--inset, 12px);
+                background: var(--card); border: var(--edge, 1px solid var(--line)); border-radius: var(--r, 4px);
+                color: inherit; text-decoration: none; }
+  .fp-cc-card:hover { border-color: var(--fg); }
+  .fp-cc-t { margin: 0; font: 600 15px/1.3 var(--mono); color: var(--fg); }
+  .fp-cc-n { font: 400 12px var(--mono); color: var(--dim); margin-right: 10px; font-variant-numeric: tabular-nums; }
+  .fp-cc-s { margin: 0; font: 400 14px/1.45 var(--sans); color: var(--dim); }
+  .fp-cc-card.fp-case { min-height: 140px; --cc-case: #d68fc6;
+    background: color-mix(in srgb, var(--cc-case) 7%, var(--card));
+    border-color: color-mix(in srgb, var(--cc-case) 35%, var(--line)); }
+  .fp-case .fp-cc-g { font: 400 12px var(--mono); color: var(--cc-case); }
+  .fp-case .fp-cc-t { font-size: 17px; }
+  .fp-case .fp-cc-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
+  /* a concept page's header at the rule's page step, 24 over 15 */
+  .fp-ph-t { margin: 0; font: 600 24px/1.2 var(--mono); letter-spacing: .01em; color: var(--fg); }
+  .fp-ph-w { margin: 4px 0 0; font: 400 15px/1.5 var(--sans); color: var(--dim); max-width: 62ch; }
+  .fp-ph-r { margin-top: 20px; }
 </style>
 <script type="module">
   import { el, createReport } from '/shell/shell.mjs';
@@ -122,6 +158,8 @@
   import { createKitPage } from '/shell/kit-page.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createTable } from '/shell/table.mjs';
+  import { CONCEPTS, DEMO_CARDS } from '/concepts/list.mjs';
+  import { DEMOS, GROUPS } from '/manifest.mjs';
   import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
 
   /**
@@ -286,6 +324,88 @@
     { n: 'F', name: 'All Geist, light, like the crop', light: true,
       eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
   ];
+  // 🔴 THE RULE, IN USE, 2026-10-12: *"do make samples on top of real usage.
+  // add sapce in between woth the rest. use my copy."* The rule the session
+  // put to the owner, applied to real pieces of the site: hero C in the
+  // owner's words, the concepts index's cards from list.mjs, a concept page's
+  // header with a readout and a log, and the deck's own `connect` slide.
+  // Nothing here is written for the sampler except the readout's numbers.
+  const rule = {};
+  section('THE RULE, IN USE',
+    'JetBrains Mono for everything that names, Geist for everything read through, on real pieces of the site.',
+    null, (add) => {
+      // 1. the hero, pairing C, the owner's copy word for word
+      const C = PAIRINGS.find((p) => p.n === 'C');
+      const hero = el('div', 'fp-hero fp-rule');
+      rule.hero = {};
+      for (const [role, cls] of [['eye', 'fp-hero-eye'], ['head', 'fp-hero-h'], ['line', 'fp-hero-l'], ['small', 'fp-hero-s']]) {
+        const node = el(role === 'head' ? 'h2' : 'p', cls, HERO[role]);
+        apply(node, C[role]);
+        rule.hero[role] = node;
+        hero.append(node);
+      }
+      add(hero);
+
+      // 2. the front page continuing: a section heading and its note, three
+      // concept cards and one use case card, all real rows
+      const front = el('div', 'fp-rule');
+      front.append(el('h3', 'fp-rule-h', 'Concepts'),
+        el('p', 'fp-rule-n', 'The ideas behind positron and the projects that use them.'));
+      const grid = el('div', 'fp-cc');
+      rule.cards = [];
+      for (const n of ['synth/000', 'clock/010', 'radio/010']) {
+        const c = CONCEPTS.find((x) => x.n === n);
+        if (!c) continue;
+        const a = el('a', 'fp-cc-card', '', { href: `/concepts/${c.n}/` });
+        const h = el('h4', 'fp-cc-t');
+        h.append(el('span', 'fp-cc-n', c.n.split('/')[1]), document.createTextNode(c.title));
+        const s = el('p', 'fp-cc-s', c.say);
+        a.append(h, s);
+        grid.append(a);
+        rule.cards.push({ h, s });
+      }
+      const row = DEMOS.find((r) => r.name === 'away');
+      if (row && DEMO_CARDS.away) {
+        const a = el('a', 'fp-cc-card fp-case', '', { href: '/away/' });
+        const h = el('h4', 'fp-cc-t', row.title || row.name);
+        const s = el('p', 'fp-cc-s', DEMO_CARDS.away.say);
+        a.append(el('span', 'fp-cc-g', GROUPS.get(row.group) || row.group), h, s, el('span', 'fp-cc-u', '/away/'));
+        grid.append(a);
+        rule.cards.push({ h, s });
+      }
+      front.append(grid);
+      add(front);
+
+      // 3. a concept page's header, its readout and its log, as clock/010
+      // (Message lag) draws them; the numbers are typical of the relay's
+      // p50 of about 36 ms (bay.mjs) and the log lines are that page's own
+      const lag = CONCEPTS.find((x) => x.n === 'clock/010');
+      const page = el('div', 'fp-rule');
+      rule.title = el('h2', 'fp-ph-t', lag?.title || 'Message lag');
+      rule.what = el('p', 'fp-ph-w', lag?.say || '');
+      const rep = createReport({ readout: { median: 'ms', worst: 'ms', last: 'ms', spread: 'ms' } });
+      rep.set('median', 36); rep.set('worst', 61); rep.set('last', 38); rep.set('spread', 25);
+      rep.line('joining lag-k3x9qa', null, 118);
+      rep.line('joining lag-k3x9qa', null, 121);
+      rep.line('joined lag-k3x9qa, web-1 as here-4fz and web-2 as there-p2m', 'hi', 336);
+      const r = el('div', 'fp-ph-r');
+      r.append(rep.report);
+      page.append(rule.title, rule.what, r);
+      rule.rep = rep;
+      add(page);
+
+      // 4. the deck's own `connect` slide (demo/shell/decks.mjs), title in
+      // mono, the words in Geist through the slide's own --sans
+      const wrap = el('div', 'fp-rule fp-rule-end');
+      rule.slide = createSlide({ name: 'connect', say: 'Connect instruments and streams',
+        text: 'Link notes, sound, video and code between your browser and a Raspberry Pi, each link checked before it opens', textStep: 2,
+        cap: 'positron.studio/patchbay' });
+      rule.slide.el.classList.add('fp-sl');
+      rule.slide.el.style.setProperty('--fp-head', `'Slide JetBrains Mono', ${SYS_MONO}`);
+      wrap.append(rule.slide.frame);
+      add(wrap);
+    }, { bare: true });
+
   const heroes = [];
   section('HERO',
     'The front page’s opening in six pairings of the brand mono and Geist, at the front page’s own column width, each labelled with what it is set in.',
@@ -553,6 +673,30 @@
     const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
     await frames(3);
     checkPage();
+
+    // THE RULE, IN USE: what names is in the brand mono, what is read through
+    // is in Geist, read off every real piece as rendered
+    {
+      const first = (n) => getComputedStyle(n).fontFamily.split(',')[0].replace(/["']/g, '').trim();
+      const MONO = ['Brand JetBrains Mono', 'Slide JetBrains Mono'];
+      const naming = [rule.hero.eye, rule.hero.head, rule.title, ...rule.cards.map((c) => c.h),
+        rule.rep.readoutEl.querySelector('.pos-v'), rule.rep.readoutEl.querySelector('.pos-k'), rule.rep.logEl, rule.slide.parts.say];
+      const reading = [rule.hero.line, rule.hero.small, rule.what, ...rule.cards.map((c) => c.s), rule.slide.parts.text];
+      const bad = [...naming.filter((n) => !n || !MONO.includes(first(n))).map((n) => `naming ${n ? first(n) : 'missing'}`),
+        ...reading.filter((n) => !n || first(n) !== 'FP Geist').map((n) => `reading ${n ? first(n) : 'missing'}`)];
+      const words = [rule.hero.eye, rule.hero.head, rule.hero.line, rule.hero.small].map((n) => n.textContent);
+      d.assert('THE RULE, IN USE: everything that names is in the brand mono and everything read through is in Geist, and the hero is the owner’s copy',
+        bad.length === 0 && rule.cards.length === 4 && words.join('|') === [HERO.eye, HERO.head, HERO.line, HERO.small].join('|'),
+        bad.length ? bad.join(', ') : `${naming.length} naming and ${reading.length} reading elements, ${rule.cards.length} cards from list.mjs`);
+
+      // the clear gap to the specimens: twice the page's block rhythm,
+      // measured from the last real piece's ink to the next block's heading
+      const want = 2 * Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pos-gap'));
+      const next = document.getElementById('hero');
+      const gap = next.getBoundingClientRect().top - rule.slide.frame.getBoundingClientRect().bottom;
+      d.assert('a clear gap of twice the block rhythm separates the real pieces from the specimens below',
+        Math.abs(gap - want) <= 0.5, `${gap.toFixed(1)} px against ${want} px`);
+    }
 
     // HERO, TITLES, SLIDES: every specimen is drawn in the face its label
     // names, read off the rendered style rather than the data
