@@ -161,7 +161,7 @@ const Bn = D.BANDS.length, rate = SR / D.HOP, n = Math.round(D.WIN_S * rate);
 const out = [];
 const DUMP = !!opt('--dump', null), dumped = [];
 let seen = 0;
-const take = (t) => { while (seen < sent.length) { const ev = sent[seen++]; out.push({ t: +t.newest.toFixed(3), bpm: ev.v, conf: ev.confidence, beatAt: +ev.beatAt.toFixed(4), cand: ev.candidates.map((c) => c.bpm), ...(ev.offHats != null ? { offHats: ev.offHats } : {}) }); } };
+const take = (t) => { while (seen < sent.length) { const ev = sent[seen++]; out.push({ t: +t.newest.toFixed(3), bpm: ev.v, conf: ev.confidence, beatAt: +ev.beatAt.toFixed(4), cand: ev.candidates.map((c) => c.bpm), ...(ev.offHats != null ? { offHats: ev.offHats } : {}), ...(ev.debug ? { debug: ev.debug } : {}) }); } };
 const t0 = performance.now();
 if (PAGE) {
   const t = { rate, n, env: new Float32Array(n), bands: D.BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,

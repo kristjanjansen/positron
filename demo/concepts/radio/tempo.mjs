@@ -30,11 +30,13 @@
 // 4. The chosen one is the best candidate, with a bonus of STICK for staying
 //    within 3% of the last choice, and the line is the median of the last
 //    five choices.
-// 5. The confidence is how strong that score is, 1 - exp(-score / 0.25),
-//    times how many of the last eight choices agree with it (half weight).
+// 5. The confidence is how strong that score is, 1 - exp(-score / CONF_K),
+//    times how many of the last eight choices agree with it (half weight),
+//    times how far the best peak stands above the second (CONF_R0, CONF_P).
 // 6. With the period known, the phase, from each band's own rises kept in a
-//    ring beside the sum. A beat envelope weighs the bands PH_W (the low band
-//    whole, the hats not at all). Every offset into the last PH_SPAN_S seconds
+//    ring beside the sum, compressed less than the tempo's (PH_LOGK). A beat
+//    envelope weighs the bands PH_W (the low band whole, the hats not at
+//    all). Every offset into the last PH_SPAN_S seconds
 //    is scored as a pulse train: at each beat back, the beat envelope under a
 //    Gaussian PH_SIG_S wide, plus HAT_BETA times the hat band half a beat
 //    later, each beat counting less with age (PH_DECAY_S). The best offset is
@@ -93,11 +95,37 @@
 // Keep alone, without (b), cut the jumps and left "on" at 62%: it held the
 // wrong grid as steadily as the right one. PH_RATIO 1, 1.5 and 2 gave 75, 77
 // and 78% on, so it is not knife edge. Chosen on those six recordings.
+//
+// 🔴 WHY THE PHASE HAS ITS OWN LOG SCALE AND THE CONFIDENCE ASKS FOR A CLEAR
+// WINNER, MEASURED 2026-10-12 OFFLINE after *"Build better tempo detector."*,
+// same six recordings and tooling. Each band's level is log1p(K * energy) before
+// its rise is taken. At the tempo's K = 1e4 a quiet band's rise counts nearly as
+// much as a loud one's, which is right for finding a period and wrong for
+// placing a beat: the phase reads its own rises at PH_LOGK = 5e2, where the
+// loud kick outweighs the rest. On the beat 77.2% to 81.3%, half off 11.0% to
+// 8.0%, grid jumps 4.5 to 3.8 a minute; Raadio 2 82.5 to 91.5% on. 1e2, 2e2,
+// 3e2, 5e2, 1e3, 3e3 and 1e4 were tried (on 79.8, 81.1, 80.5, 81.3, 79.9, 77.1,
+// 77.2); the same 1e3 on the TEMPO's rises cost Ida 1354 2 points exact and was
+// dropped. The tempo is untouched by it.
+// The confidence was the score and the agreement only, and a reading whose
+// second best period scored nearly as high as the first was shown as steady as
+// one with a clear winner. Times ((1 - r2) / (1 - CONF_R0)) ** CONF_P, capped at
+// 1, where r2 is the second peak's score over the first: shown right 73.4% to
+// 75.9% of scored readings, shown wrong 6.3% to 5.0%, no steady beat 26.6% to
+// 25.0%. CONF_P = 0.5 and CONF_R0 = 0.5 with CONF_K = 0.16 gives 75.2, 4.0 and
+// 26.6 instead: fewer wrong, no more often confident. Chosen on these six
+// recordings; left out one at a time the fitted constants move (K 0.12 to 0.13,
+// R0 0.6 to 0.7) and the held out recording gained or held in five of six.
 export const HOP = 256;
 export const WIN_S = 12, MIN_S = 4;
 export const LO = 60, HI = 200, PRIOR = 120, PRIOR_OCT = 0.7, HALF_W = 0.5, STICK = 0.15;
 export const EVERY_S = 0.5, KEEP = 5, AGREE = 8, CAND = 5;
 export const FOLLOW_HZ = 10;
+// The phase step's own log scale for each band's rises (the tempo's is 1e4).
+export const PH_LOGK = 5e2;
+// The confidence: the score's scale, and how clear a winner the best period
+// has to be over the second (r2 at or under CONF_R0 costs nothing).
+export const CONF_K = 0.17, CONF_R0 = 0.4, CONF_P = 0.25;
 export const BANDS = [['lowpass', 150, 1], ['bandpass', 400, 1], ['bandpass', 1500, 0.8], ['highpass', 4000, 1]];
 // The phase step (6): each band's weight in the beat envelope (the hats left
 // out), the hat band's index and its weight half a beat later, how far back it
@@ -119,7 +147,7 @@ export const steady = (ev) => Number.isFinite(ev?.v) && (ev?.confidence ?? 0) >=
 export function detState(sampleRate) {
   const rate = sampleRate / HOP, n = Math.round(WIN_S * rate);
   return { sr: sampleRate, rate, n, env: new Float32Array(n), bands: BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,
-    prev: new Float32Array(BANDS.length), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity, offHats: null,
+    prev: new Float32Array(BANDS.length), pprev: new Float32Array(BANDS.length), pbands: BANDS.map(() => new Float32Array(n)), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity, offHats: null,
     f: new Float64Array(2 * BANDS.length), h: 0, k: 1 - Math.exp(-2 * Math.PI * FOLLOW_HZ / sampleRate), onReading: null };
 }
 
@@ -163,6 +191,7 @@ export function detHop(t, at) {
   for (let b = 0; b < BANDS.length; b++) {
     const l = Math.log1p(1e4 * t.f[2 * b + 1]), r = Math.max(0, l - t.prev[b]);
     t.bands[b][t.w] = r; o += r; t.prev[b] = l;
+    const pl = Math.log1p(PH_LOGK * t.f[2 * b + 1]); t.pbands[b][t.w] = Math.max(0, pl - t.pprev[b]); t.pprev[b] = pl;
   }
   t.env[t.w] = o; t.w = (t.w + 1) % t.n; t.count++; t.newest = at;
   if (++t.since >= Math.round(EVERY_S * t.rate)) {
@@ -218,15 +247,16 @@ export function detEstimate(t) {
   const last = t.picks.slice(-KEEP).sort((p, q) => p - q);
   t.est = last[last.length >> 1];
   const agree = t.picks.filter((b) => near(b, t.est)).length / t.picks.length;
-  const conf = (1 - Math.exp(-Math.max(0, chosen.s) / 0.25)) * (0.5 + 0.5 * agree);
+  const byS = [...peaks].sort((p, q) => q.s - p.s), r2 = byS[1] ? byS[1].s / byS[0].s : 0;
+  const conf = (1 - Math.exp(-Math.max(0, chosen.s) / CONF_K)) * (0.5 + 0.5 * agree) * Math.min(1, Math.max(0, (1 - r2) / (1 - CONF_R0))) ** CONF_P;
   t.conf = conf;
   const P = 60 / t.est * rate, span = Math.min(N, Math.round(PH_SPAN_S * rate));
   const sg = PH_SIG_S * rate, R = Math.ceil(2 * sg);
   const low = new Float32Array(span), hat = new Float32Array(span);
   for (let i = 0; i < span; i++) {
     const j = (t.w - span + i + t.n) % t.n;
-    for (let b = 0; b < BANDS.length; b++) low[i] += PH_W[b] * t.bands[b][j];
-    hat[i] = t.bands[HAT][j];
+    for (let b = 0; b < BANDS.length; b++) low[i] += PH_W[b] * t.pbands[b][j];
+    hat[i] = t.pbands[HAT][j];
   }
   const pulse = (e, c) => { let s = 0; for (let d = -R; d <= R; d++) { const i = Math.round(c + d); if (i >= 0 && i < span) s += Math.exp(-0.5 * ((i - c) / sg) ** 2) * e[i]; } return s; };
   // A pulse train on envelope `e` at phase `ph`, `off` hops later, each beat
@@ -237,7 +267,7 @@ export function detEstimate(t) {
   for (let ph = 0; ph < P; ph += 0.5) { const s = train(low, ph, 0); if (s > sL) { sL = s; phL = ph; } }
   const offHats = train(hat, phL, P / 2) > PH_RATIO * train(hat, phL, 0);
   const env = offHats ? low : new Float32Array(span);
-  if (!offHats) for (let i = 0; i < span; i++) { const j = (t.w - span + i + t.n) % t.n; for (let b = 0; b < BANDS.length; b++) env[i] += PH_Y[b] * t.bands[b][j]; }
+  if (!offHats) for (let i = 0; i < span; i++) { const j = (t.w - span + i + t.n) % t.n; for (let b = 0; b < BANDS.length; b++) env[i] += PH_Y[b] * t.pbands[b][j]; }
   const score = (ph) => train(env, ph, 0) + (offHats ? HAT_BETA * train(hat, ph, P / 2) : 0);
   let bestPh = 0, bestSum = -Infinity;
   for (let ph = 0; ph < P; ph += 0.5) { const s = score(ph); if (s > bestSum) { bestSum = s; bestPh = ph; } }
