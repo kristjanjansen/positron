@@ -53,3 +53,61 @@ export const CONCEPTS = [
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
   { n: 'misc/020', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
 ];
+
+// The front page's demos on this index (asked 2026-10-12, *"inegrate fronpage
+// index and concepts, prefering the latter"*). Every listed, built row of
+// DEMOS in demo/manifest.mjs is here once, under a GROUP. A concept group puts
+// it beside the concept pages as a demo card; a group in CASE_GROUPS puts it
+// below them as a use case card. Moving a demo between the two is changing its
+// group, one word. Kept out of CONCEPTS on purpose, so nav.mjs's pager walks
+// the concept pages only. `say` is the card's short line; the manifest's `one`
+// stays the front page's. `supersededBy: '<group>/<number>'` marks a concept
+// like demo whose idea a concept page now shows (asked 2026-10-12, *"add label
+// "no needed" on conceptlike demo boxes that are superceded by simular/newer
+// concept"*): its card reads `not needed` and names that page. Delete the field
+// to take the label off.
+export const CONCEPT_GROUPS = ['synth', 'radio', 'video', 'streaming', 'device', 'room', 'typist', 'sampler', 'clock', 'misc'];
+export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
+export const DEMO_CARDS = {
+  // concept like: one mechanism or technology each
+  csound: { group: 'synth', say: 'Csound scores as timelines you can start anywhere.' },
+  fau: { group: 'synth', say: 'A synth typed in Faust and compiled as you type.' },
+  collide: { group: 'synth', say: 'A synth typed in a small SuperCollider and compiled as you type.' },
+  muta: { group: 'synth', say: 'Eight voices of the Plaits firmware compiled to WebAssembly.' },
+  mirror: { group: 'video', say: 'One shader drawn by this browser and by a Raspberry Pi.' },
+  llhls: { group: 'streaming', say: 'The tuned low latency HLS player against a live input.' },
+  webrtc: { group: 'streaming', say: 'The same live picture delivered over WHEP.', supersededBy: 'video/030' },
+  moq: { group: 'streaming', say: 'A test picture sent from this browser over MoQ and back.' },
+  cam: { group: 'streaming', say: 'One webcam beside what comes back over WebRTC, MoQ and LL-HLS.' },
+  flipper: { group: 'streaming', say: 'ETV and ETV2 live, each over a line ending at the present.' },
+  capture: { group: 'streaming', say: 'Recording what came over a link, near or far.' },
+  circuit: { group: 'device', say: 'A Novation Circuit on screen, moving when the real one moves.' },
+  evo: { group: 'device', say: 'An Evolution MK-425C on screen, moving when the real one moves.' },
+  twelve: { group: 'device', say: 'A TASCAM Model 12 on screen, moving when the real one moves.' },
+  dump: { group: 'device', say: 'Every message an instrument sends, as raw bytes and a reading.' },
+  pack: { group: 'device', say: 'The patches, sessions and samples inside a Circuit pack.' },
+  wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.' },
+  patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
+  typist: { group: 'typist', say: 'Every edit written down, so any moment can be put back.', supersededBy: 'typist/030' },
+  nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.' },
+  tom: { group: 'sampler', say: 'A 16 step grid playing the samples out of a pack.' },
+  time: { group: 'clock', say: 'The clock every page runs on and what is built on it.' },
+  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.' },
+  draw: { group: 'clock', say: 'A line drawn by hand, recorded against the clock.' },
+  // use cases: actual content, played with the wiring in view
+  reel: { group: 'archives', say: 'Every 1965 newsreel in ERR\'s archive on one line of days.' },
+  floor: { group: 'archives', say: 'Every 1965 newsreel face up on a floor you walk over.' },
+  resources: { group: 'archives', say: 'Every reachable source for Erkki Kurenniemi\'s work.' },
+  tapes: { group: 'archives', say: 'Every Kurenniemi recording laid end to end as one tape.' },
+  making: { group: 'archives', say: 'What outlived MIMproject\'s own website.' },
+  partitur: { group: 'performances', say: 'Moholy-Nagy\'s 1924 score played as a timeline.' },
+  held: { group: 'performances', say: 'Held in Human played back from its own score.' },
+  stage: { group: 'performances', say: 'A 2011 MIMproject church scene broadcast live.' },
+  weight: { group: 'performances', say: 'One sentence broken across four walls.' },
+  radio: { group: 'stations', say: 'Six live stations granulated by hand or by sliders.' },
+  videoradio: { group: 'stations', say: 'A radio station fed through a granulator.' },
+  knobs: { group: 'instruments', say: 'A synthesizer on a Raspberry Pi in another building.' },
+  away: { group: 'instruments', say: 'A Novation Circuit in another building, played and heard.' },
+  shape: { group: 'instruments', say: 'A Circuit\'s sound edited while it plays.' },
+  wish: { group: 'instruments', say: 'Say which instrument plays which and a model wires it.' },
+};
