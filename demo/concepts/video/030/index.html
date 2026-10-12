@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>Camera loopback</title>
+<title>WebRTC loopback</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* Start and stop on their own row at the left, the camera picker after them
@@ -14,14 +14,9 @@
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   .cc-top > .pos-pick[hidden] { display: none; }
-  /* The camera as it leaves the page across the full width, and the two
-     returns side by side under it, each half the width. Three a third wide
-     were 219 px each in this 688 px column, where the burned clock is 11 px
-     and a footer holds one cell, so the original takes the top row instead
-     (the recordings table that held the fourth cell went 2026-10-12, *"rm
-     recordings on Stream"*). On a phone all three stack, the original first. */
+  /* The camera as it leaves the page and the picture that comes back, side by
+     side, each half the width. On a phone they stack, the original first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-  .cc-pair > :first-child { grid-column: 1 / -1; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); }
@@ -32,112 +27,74 @@
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
-  import { mount, el, armVideo } from '/shell/shell.mjs';
+  import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createPicker } from '/shell/picker.mjs';
-  import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
-  import { fetchIceServers, camWhipPublish, camWhep, whepPlay, camPublish, LIVE, CAM_WHIP_PROXY } from '/shell/live.mjs';
-  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
+  import { fetchIceServers, camWhipPublish, camWhep, whepPlay, CAM_WHIP_PROXY } from '/shell/live.mjs';
+  import { createLoopCamera, createPicture, returnVideo, meter, median, delayText, warm, fadeAt } from '/concepts/video/loopback.mjs';
 
-  // /concepts/video/000/ with two round trips through Cloudflare beside it. The
-  // camera, with a clock burned into it, feeds three pictures: the original as
-  // it leaves the page; a WebRTC loopback, camera -> Stream WebRTC input by WHIP
-  // -> back by WHEP; and an LL-HLS loopback, camera -> pub.positron.studio/loop
-  // (the /stage/ and /cam/ publisher, a container rewrapping the browser's own
-  // H.264 to RTMPS) -> a Stream input of its own -> back as LL-HLS through the
-  // player /llhls/ uses. The two returned pictures carry the clock row, so each
-  // footer reads its glass to glass delay off the frames actually shown.
-  // Both publishes go through the worker, so no input key reaches this page.
+  // /concepts/video/000/ with one round trip through Cloudflare beside it. The
+  // camera, with a clock burned into it, feeds two pictures: the original as
+  // it leaves the page, and a WebRTC loopback, camera -> Stream WebRTC input
+  // by WHIP -> back by WHEP. The returned picture carries the clock row, so
+  // its footer reads the glass to glass delay off the frames actually shown.
+  // The publish goes through the worker, so no input key reaches this page.
+  // Until 2026-10-12 this page also held the LL-HLS round trip; that is
+  // /concepts/video/060/ now (*"Split hls and webrtc loopbacks"*), and what the
+  // two share is /concepts/video/loopback.mjs.
   //
   // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND THE CAP IS 30 SECONDS
-  // FROM WHEN STREAM SAYS THE LL-HLS INPUT IS LIVE. Billed by the minute
-  // delivered whatever the protocol (positron-streaming). Asked for: "limit to
-  // 10 sec. just fade out", then "limit to 20sec. fade out sloowly", then
-  // (2026-10-12) the cap counted from Stream's live rather than from the first
-  // leg, so the LL-HLS delay has time to settle, and "extend to 30s". Thirty
-  // seconds after that all three pictures have faded to the ground over their
-  // last three and the page stops itself exactly as a stop press does. With
-  // no LL-HLS leg the WebRTC publish starts the count, as before.
-  //
-  // 🔴 THE LL-HLS LEG IS A STREAM RECORDING, AND THE WORKER DELETES IT. RTMPS
-  // cannot have recording turned off, so every take is a video counted against
-  // the account's 1000 storage minutes. The loopback has an input of its own
-  // ("positron-hls-loopback", src/provision-loop.sh), and positron-pub deletes
-  // a take about 90 s after it ends however it ended (this page's stop, a
-  // closed tab, its own cap of 50 s of RTMPS), sweeps the input every 10
-  // minutes, and refuses a take when the account is at or over 600 minutes
-  // (workers/pub/loop.mjs). Nothing here has to stay open for any of it. The
-  // LL-HLS footer counts what is on that input and the account's storage
-  // minutes, read from /loop/status after a press.
+  // FROM WHEN THE WHIP PUBLISH IS ACCEPTED. Billed by the minute delivered
+  // whatever the protocol (positron-streaming). Asked for: "limit to 10 sec.
+  // just fade out", then "limit to 20sec. fade out sloowly", then (2026-10-12)
+  // "extend to 30s". Thirty seconds after that both pictures have faded to the
+  // ground over their last three and the page stops itself exactly as a stop
+  // press does. WHIP records nothing, so there is nothing left to delete.
   //
   // 🔴 THE WebRTC LEG SHARES /cam/'s ONE WHIP INPUT. The worker allows one
   // camera on it at a time, so a publish answered 409 means /cam/ is on air.
-  // That is said in words, and nothing is retried. The LL-HLS input is this
-  // page's own; a second take on it while one runs is refused the same way.
+  // That is said in words, and nothing is retried.
   //
   // ⚠️ A VPN PASSES THE HANDSHAKE AND DROPS THE MEDIA. With the Check Point
   // tunnel up, WHIP and WHEP both answer 201 and no frame ever arrives (CLAUDE.md,
   // measured 2026-09-25). So when the play side has signalled and no frame has
   // been decoded after a while, the log names that as one possibility, never as
-  // the cause. The LL-HLS leg is HTTPS end to end and does not have this shape.
+  // the cause.
   //
-  // NOTHING OPENS ON A VISIT. The camera, the relay servers, both publishes,
-  // both plays and the status read are all made on the start press.
-  const Q = new URLSearchParams(location.search);
-  // ?pub= points the LL-HLS leg's worker routes elsewhere: the laptop
-  // stand-in for positron-pub runs the real worker module with real Stream
-  // (workerd cannot run on this machine). Never needed on the site. The
-  // WebRTC leg always uses the deployed /cam/whip.
-  const PUB = (Q.get('pub') || 'https://pub.positron.studio').replace(/\/$/, '');
-  const LOOP_WS = `${PUB.replace(/^http/, 'ws')}/loop`;
-  const LOOP_STATUS = `${PUB}/loop/status`;
-  const LOOP_UID = 'aafa09fdefc39016203fb23129bf5df3';
-  const loopLlhls = () => `https://${LIVE.customer}.cloudflarestream.com/${LOOP_UID}/manifest/video.m3u8?protocol=llhls`;
-  const loopLifecycle = () => `https://${LIVE.customer}.cloudflarestream.com/${LOOP_UID}/lifecycle`;
+  // NOTHING OPENS ON A VISIT. The camera, the relay servers, the publish and
+  // the play are all made on the start press.
 
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const LIVE_IN = 'cf-stream:live:video-in', LIVE_OUT = 'cf-stream:live:video-out';
   const LOOP = `${S}:loopback:video-in`;
-  const HLS_IN = 'cf-stream:hls:video-in', HLS_OUT = 'cf-stream:hls:video-out';
-  const HLS_BACK = `${S}:hls:video-in`;
-  // 30 s a press from Stream's live, the last 3 of them a fade (asked
+  // 30 s a press from the accepted publish, the last 3 of them a fade (asked
   // 2026-10-10, *"fade out bit faster, both videopanels"*; 2026-10-12, *"extend
-  // to 30s (all 20s limits)"*). BACKSTOP_MS arms the cap anyway if no leg has
-  // started it by then (a publisher that never opens, say).
+  // to 30s (all 20s limits)"*). BACKSTOP_MS arms the cap anyway if the publish
+  // has not started it by then.
   const NO_MEDIA_MS = 7000, CAP_MS = 30000, FADE_MS = 3000, BACKSTOP_MS = 45000;
-  // How many presented frames a delay is the median of: three seconds at 30 fps.
-  const WINDOW = 90;
 
   // No readout: every number is in the footer of the picture it is about
   // (asked 2026-10-12, *"move readout data to videpanel footers"*).
   const d = mount({ name: 'concept video 030', what: '', index: '/concepts/', indexLabel: 'concepts',
     readout: null });
   conceptNav('video/030');
+  const log = (m, k) => d.log(m, k);
 
   // ── the bay ─────────────────────────────────────────────────────────────
-  // The camera's video goes to Stream's WebRTC input by WHIP and comes back by
-  // WHEP, and to the LL-HLS input (through the publisher, which the box's grey
-  // line names) and comes back as LL-HLS.
+  // The camera's video goes to Stream's WebRTC input by WHIP and comes back by WHEP.
   const bay = createBay();
   const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
   camNode('camera');
   bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
   bay.addNode({ id: 'cf-stream:live', kind: 'endpoint', label: 'Stream WebRTC input', place: 'cloudflare', net: 'cloudflare' });
   bay.addNode({ id: `${S}:loopback`, kind: 'screen', label: 'WebRTC', place: 'browser' });
-  bay.addNode({ id: 'cf-stream:hls', kind: 'endpoint', label: 'Stream LL-HLS input', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:hls`, kind: 'screen', label: 'LL-HLS', place: 'browser' });
   bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video' });
   bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
   bay.addPort({ id: LIVE_IN, label: 'video', dir: 'in', medium: 'video', transports: ['whip'] });
   bay.addPort({ id: LIVE_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['whep'] });
   bay.addPort({ id: LOOP, label: 'WebRTC', dir: 'in', medium: 'video', transports: ['whep'] });
-  bay.addPort({ id: HLS_IN, label: 'video', dir: 'in', medium: 'video' });
-  bay.addPort({ id: HLS_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['llhls'] });
-  bay.addPort({ id: HLS_BACK, label: 'LL-HLS', dir: 'in', medium: 'video', transports: ['llhls'] });
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b, via) {
@@ -151,105 +108,25 @@
   }
   const holds = (a, b) => held.has(`${a} ${b}`);
   // Held from load, so the picture of the patch is the same running or not.
-  // Holding a link opens nothing; the camera and every leg wait for the press.
+  // Holding a link opens nothing; the camera and the leg wait for the press.
   hold(CAM, SCREEN);
   hold(CAM, LIVE_IN, 'whip');
   hold(LIVE_OUT, LOOP, 'whep');
-  hold(CAM, HLS_IN);
-  hold(HLS_OUT, HLS_BACK, 'llhls');
 
-  // ── the camera, the burned frame, and the pictures that come back ───────
-  const video = el('video');
-  video.muted = true; video.playsInline = true; video.autoplay = true;
-  const back = el('video');
-  back.muted = true; back.playsInline = true; back.autoplay = true;
-  const hlsV = el('video');
-  hlsV.muted = true; hlsV.playsInline = true; hlsV.autoplay = true;
-  hlsV.disableRemotePlayback = true;   // ManagedMediaSource opens only with it (positron-streaming)
-  // What leaves the page: the camera, uncropped and undimmed, with the clock
-  // row and its two clocks burned over it. Both legs send THIS, so each
-  // returned frame says when it left, read back on the same clock.
-  const src = el('canvas');
-  src.width = FRAME_W; src.height = FRAME_H;
-  const sctx = src.getContext('2d', { alpha: false });
-  let send = null, drawT = 0, frameN = 0;
-  let cam = null, gen = 0, raf = 0;
-  let devices = [], deviceId = null;
-  let pub = null, sub = null, statsTimer = 0, ice = null, noMedia = 0, capTimer = 0, endAt = 0, capFrom = '';
-  // When the last frame was presented, per video element: what lights a video wire.
-  const last = new Map([[video, 0], [back, 0], [hlsV, 0]]);
-  function watchFrames(v) {
-    if (typeof v.requestVideoFrameCallback !== 'function') return;
-    const tick = () => { if (!cam) return; last.set(v, performance.now()); v.requestVideoFrameCallback(tick); };
-    v.requestVideoFrameCallback(tick);
-  }
-  const fresh = (v) => !!cam && performance.now() - last.get(v) < 500;
+  // ── the camera and the picture that comes back ──────────────────────────
+  const back = returnVideo();
+  let gen = 0, pub = null, sub = null, statsTimer = 0, ice = null, noMedia = 0, capTimer = 0, endAt = 0, capFrom = '';
+  let rtc = null;   // the delay meter on the returned picture
+  const camera = createLoopCamera({ log, start: () => start(), stop: () => stop(), render: () => render(), extra: [back] });
 
-  /**
-   * Glass to glass off the burned clock, per PRESENTED frame, as /cam/ does:
-   * this one page stamps the row and reads it, so one clock is on both ends
-   * and the difference is exact. A frame whose row does not read (its checksum
-   * fails, which a scaled or mid-ramp frame can) is skipped, never guessed.
-   */
-  function meter(v) {
-    const m = { samples: [], frames: 0, read: 0, live: true, firstAt: null };
-    const scratch = document.createElement('canvas');
-    if (typeof v.requestVideoFrameCallback !== 'function') return m;
-    const tick = () => {
-      if (!m.live) return;
-      m.frames++;
-      const at = readBurnedFrom(v, scratch);
-      if (at != null) {
-        if (m.firstAt == null) m.firstAt = performance.now();
-        m.samples.push(performance.timeOrigin + performance.now() - at);
-        if (m.samples.length > WINDOW) m.samples.shift();
-        m.read++;
-      }
-      v.requestVideoFrameCallback(tick);
-    };
-    v.requestVideoFrameCallback(tick);
-    return m;
-  }
-  const median = (a) => {
-    if (!a.length) return null;
-    const s = a.slice().sort((x, y) => x - y);
-    return s[Math.floor(s.length / 2)];
-  };
-  const delayText = (x) => (x == null ? '' : x < 1000 ? `${Math.round(x)} ms` : `${(x / 1000).toFixed(1)} s`);
-  const meters = { rtc: null, hls: null };
-
-  // ── the three pictures ──────────────────────────────────────────────────
-  // The original is the burned frame itself; the two returns are drawn by the
-  // test picture's own `drawCamera`, contained, no scrim, so the only
-  // difference between the three is the trip.
-  const GROUND = '#0b0e14';
-  function canvasPanel() {
-    const c = el('canvas');
-    c.width = FRAME_W; c.height = FRAME_H;
-    const ctx = c.getContext('2d', { alpha: false });
-    return { c, ctx };
-  }
-  const L = canvasPanel(), R = canvasPanel(), H = canvasPanel();
-  // Footers as on /concepts/video/000/: one line, empty until on, the name at the
-  // left and the value at the right beside the full-screen button.
-  const name = el('span', 'cc-say', '');
-  const size = el('span', 'cc-say', '');
-  const panel = createVideoPanel({ media: L.c, left: name });
-  panel.el.querySelector('.pos-vp-r').prepend(size);
-  // The WebRTC footer: the delay read off the clock, then what getStats() of
-  // the WHEP connection measured, each cell empty until it has been read. The
+  // The footer: the delay read off the clock, then what getStats() of the
+  // WHEP connection measured, each cell empty until it has been read. The
   // word at the left is where the round trip has got to.
   // ⚠️ THREE CELLS, BECAUSE THE STATE WORD AND THREE IS WHAT FITS ONE LINE OF
-  // A HALF PANEL AT 1280. `delay` took the place of `size` on 2026-10-12, when
-  // the page started measuring it, and with four cells beside it the state
-  // was cut to `playin` and the rtt to one digit (MEASURED in a 1280 shot).
-  // The size and the rtt went into the row's hover beside the codec and the
-  // decoded and dropped counts.
-  // 2026-10-12, *"cound time for warmup. move readout data to videpanel
-  // footers"*: `warmup` counts whole seconds from the press while nothing has
-  // come back (the word at the left says `warming up`), then holds the time
-  // the first frame took, to a tenth. The state word clears once frames
-  // arrive, because the numbers beside it already say so.
+  // A HALF PANEL AT 1280 (MEASURED in a 1280 shot, 2026-10-12: with four the
+  // state was cut to `playin` and the rtt to one digit). The size and the rtt
+  // are in the row's hover beside the codec and the decoded and dropped counts.
+  const R = createPicture();
   const state = el('span', 'cc-say', '');
   const loopPanel = createVideoPanel({ media: R.c, left: state, values: [
     { key: 'warmup', label: 'warmup', reserve: 5 },
@@ -259,50 +136,20 @@
   const V = loopPanel.values;
   // 🔴 THE PICTURE SAYS WEBRTC, ALWAYS, EVEN STOPPED. Reported 2026-10-12:
   // *"not clear that this is webrtc"*. On the panel's own tag plate, top left
-  // of the picture, where it stays in full screen. LL-HLS the same way.
+  // of the picture, where it stays in full screen.
   loopPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'WebRTC'));
-  const hstate = el('span', 'cc-say', '');
-  // The LL-HLS footer also carries what is on the loopback input (`rec`, the
-  // recordings Stream holds for it, from /loop/status), which is the number
-  // the worker's delete takes back to 0. The account's storage minutes and the
-  // picture size are in the row's hover: MEASURED 2026-10-12, a fifth cell
-  // made the row 334 px wide at 1280 scroll its last cell out of sight.
-  const hlsPanel = createVideoPanel({ media: H.c, left: hstate, values: [
-    { key: 'warmup', label: 'warmup', reserve: 5 },
-    { key: 'delay', label: 'delay', reserve: 6 },
-    { key: 'rec', label: 'rec', reserve: 1 },
-  ] });
-  const hover = { size: '', storage: '' };
-  const hoverHls = () => { HV.el.title = [hover.size, hover.storage].filter(Boolean).join('\n'); };
-  const HV = hlsPanel.values;
-  hlsPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'LL-HLS'));
 
   const pair = el('div', 'cc-pair');
-  pair.append(panel.el, loopPanel.el, hlsPanel.el);
+  pair.append(camera.panel.el, loopPanel.el);
 
   // The routing follows the links: without camera -> original the left panel
-  // is the ground; without a leg's link its picture is.
-  // `alpha` below 1 lays the picture over the ground at that strength, which
-  // is how the pictures fade out over the last seconds of the cap.
-  function paint(p, v, on, alpha = 1) {
-    p.ctx.globalAlpha = 1;
-    if (on && alpha < 1) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
-    const ready = v instanceof HTMLCanvasElement || (v.readyState >= 2 && v.videoWidth > 0);
-    if (on && alpha > 0 && ready) {
-      p.ctx.globalAlpha = alpha;
-      if (v instanceof HTMLCanvasElement) p.ctx.drawImage(v, 0, 0, FRAME_W, FRAME_H);
-      else drawCamera(p.ctx, v, FRAME_W, FRAME_H, { scrim: 0 });
-      p.ctx.globalAlpha = 1;
-    } else if (!on || alpha <= 0) { p.ctx.fillStyle = GROUND; p.ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
-  }
-  const fade = () => (endAt ? Math.max(0, Math.min(1, (endAt - performance.now()) / FADE_MS)) : 1);
+  // is the ground; without the leg's link the right one is. Both fade
+  // together as the press runs out.
   function render() {
-    // All three fade together as the press runs out.
-    paint(L, src, !!cam && holds(CAM, SCREEN), fade());
-    paint(R, back, !!cam && !!sub && holds(LIVE_OUT, LOOP), fade());
-    paint(H, hlsV, !!cam && !!HLS.player && holds(HLS_OUT, HLS_BACK), fade());
+    const a = fadeAt(endAt, FADE_MS);
+    camera.picture.paint(camera.src, camera.on && holds(CAM, SCREEN), a);
+    R.paint(back, camera.on && !!sub && holds(LIVE_OUT, LOOP), a);
   }
-  function frame() { render(); if (cam) raf = requestAnimationFrame(frame); }
   render();
 
   // ── what getStats() says, about once a second ───────────────────────────
@@ -355,38 +202,15 @@
       codec: codec?.mimeType || null, dropped: vin.framesDropped,
     });
   }
-  // Warmup, per leg: from the press to the first frame back whose burned
-  // clock reads. While it runs the cell counts whole seconds and the word at
-  // the left says so; then the cell holds the measured time.
   const RTC = { askedAt: null, firstMs: null };
-  function warm(cells, word, leg, m, label) {
-    if (leg.askedAt == null) return;
-    if (leg.firstMs == null && m?.firstAt != null) {
-      leg.firstMs = m.firstAt - leg.askedAt;
-      d.log(`${label}: first frame back ${(leg.firstMs / 1000).toFixed(1)} s after the press`, 'hi');
-    }
-    if (leg.firstMs != null) {
-      cells.set('warmup', `${(leg.firstMs / 1000).toFixed(1)} s`);
-      if (word.textContent === 'warming up' || word.textContent.startsWith('no media yet')) word.textContent = '';
-    } else if (leg.live !== false) {
-      cells.set('warmup', `${Math.floor((performance.now() - leg.askedAt) / 1000)} s`);
-    }
-  }
   function readDelays() {
-    V.set('delay', delayText(median(meters.rtc?.samples || [])));
-    HV.set('delay', delayText(median(meters.hls?.samples || [])));
-    warm(V, state, RTC, meters.rtc, 'webrtc');
-    warm(HV, hstate, HLS, meters.hls, 'll-hls');
-    hover.size = hlsV.videoWidth ? `${hlsV.videoWidth}x${hlsV.videoHeight}` : '';
-    hoverHls();
+    V.set('delay', delayText(median(rtc?.samples || [])));
+    warm(V, state, RTC, rtc, 'webrtc', log);
   }
   async function readStats() { await Promise.all([readPub(), readPlay()]); readDelays(); pb.refresh(); }
   const clearStats = () => {
     for (const k of V.keys()) V.set(k, '');
-    // The LL-HLS leg's warmup and the input's counts stay after a stop: the
-    // count is what the worker's delete changes, and it is read on after.
-    for (const k of HV.keys()) if (k === 'delay') HV.set(k, '');
-    if (HLS.firstMs == null) HV.set('warmup', '');
+    // The warmup stays after a stop: it is the one number a take leaves.
     if (RTC.firstMs != null) V.set('warmup', `${(RTC.firstMs / 1000).toFixed(1)} s`);
     V.el.title = '';
     Object.assign(stat, { sent: 0, sending: false, bytes: 0, at: 0, decoded: 0, arriving: false, cname: '' });
@@ -399,12 +223,6 @@
     return e?.responseStatus || '';
   };
 
-  // The cap starts when Stream says the LL-HLS input is live (the lifecycle
-  // URL answers live with a video), so the LL-HLS delay has the whole 30 s to
-  // settle. When there is no LL-HLS leg (its link not held, refused, failed),
-  // the WebRTC publish being accepted starts it, as it always did. Either way
-  // it ends as a stop press, and BACKSTOP_MS arms it if nothing else has.
-  const hlsCounts = () => !!HLS.pub && (HLS.st == null || HLS.st === 'ready');
   function armCap(mine, why) {
     if (endAt || gen !== mine) return;
     if (why) d.log(`the ${CAP_MS / 1000} s cap starts now: ${why}`);
@@ -427,7 +245,7 @@
     if (gen !== mine) return;
     let p;
     try {
-      p = await camWhipPublish(send, { iceServers: ice.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
+      p = await camWhipPublish(camera.send, { iceServers: ice.iceServers, log: (m, k) => d.log(`webrtc ${m}`, k) });
     } catch (e) {
       if (gen !== mine) return;
       const busy = /\b409\b/.test(e.message);
@@ -442,7 +260,7 @@
     pub = p;
     stat.pub = pub.pc.connectionState;
     d.log(`WHIP publish answered ${statusOf(CAM_WHIP_PROXY) || 'ok'}: ${CAM} -> ${LIVE_IN}`, 'hi');
-    if (!hlsCounts()) armCap(mine, 'the WebRTC publish was accepted and there is no LL-HLS leg');
+    armCap(mine, 'the WebRTC publish was accepted');
     pub.pc.addEventListener('connectionstatechange', () => {
       stat.pub = pub?.pc.connectionState || 'closed';
       if (stat.pub === 'failed') d.log('the publish could not reach Cloudflare: UDP blocked, or a VPN, are both possible', 'bad');
@@ -463,8 +281,8 @@
     sub = s;
     stat.play = sub.pc.connectionState;
     d.log(`WHEP play answered ${statusOf(camWhep()) || 'ok'}: ${LIVE_OUT} -> ${LOOP}`, 'hi');
-    watchFrames(back);
-    meters.rtc = meter(back);
+    camera.watchFrames(back);
+    rtc = meter(back);
     sub.pc.addEventListener('connectionstatechange', () => {
       stat.play = sub?.pc.connectionState || 'closed';
       d.log(`WHEP leg ${stat.play}`, stat.play === 'connected' ? 'hi' : stat.play === 'failed' ? 'bad' : '');
@@ -480,288 +298,65 @@
     }, NO_MEDIA_MS);
   }
 
-  // ── the LL-HLS round trip ───────────────────────────────────────────────
-  // The burned frame recorded with MediaRecorder (H.264 in WebM, 2 s
-  // keyframes), sent over the worker's socket, rewrapped to RTMPS by the
-  // publisher container with no encode, and played back from Stream with the
-  // low latency player (camPublish in live.mjs, plans/plan-cam-llhls.md).
-  const HLS = { pub: null, player: null, st: null, askedAt: null, readyAt: null, liveAt: null, firstMs: null, uid: null, rebuilds: 0 };
-  const HLS_SAY = { busy: 'refused', stopped: 'stopped', closed: 'lost the publisher', unsupported: 'needs Chrome or Edge' };
-  // hls.js is a classic script that sets `window.Hls`, which the player reads.
-  // Loaded on the press, never on the visit: 600 KB nobody asked for otherwise.
-  let hlsLib = null;
-  const loadHlsJs = () => (window.Hls ? Promise.resolve() : (hlsLib ||= new Promise((ok, no) => {
-    const sc = document.createElement('script');
-    sc.src = '/proto/remixer/hls.min.js';
-    sc.onload = ok;
-    sc.onerror = () => { hlsLib = null; no(new Error('hls.js did not load')); };
-    document.head.append(sc);
-  })));
-  // Until Stream says the input is live: a player built before that meets an
-  // empty manifest and rebuilds through it. One small GET on our own input.
-  async function streamLive(mine, capMs = 15000) {
-    const t0 = performance.now();
-    while (gen === mine && HLS.st === 'ready' && performance.now() - t0 < capMs) {
-      try {
-        const j = await (await fetch(loopLifecycle(), { cache: 'no-store' })).json();
-        if (j.live && j.videoUID) return j.videoUID;
-      } catch { /* ask again */ }
-      await new Promise((r) => setTimeout(r, 400));
-    }
-    return null;
-  }
-  function startHls(mine) {
-    if (!holds(CAM, HLS_IN)) { d.log(`${CAM} -> ${HLS_IN} is not held, so nothing is sent`); return; }
-    Object.assign(HLS, { st: null, askedAt: performance.now(), readyAt: null, liveAt: null, firstMs: null, uid: null, rebuilds: 0, live: true });
-    hstate.textContent = 'warming up';
-    loadHlsJs().catch((e) => d.log(`ll-hls: ${e.message}`, 'bad'));
-    HLS.pub = camPublish(send, {
-      url: LOOP_WS,
-      log: (m) => d.log(`ll-hls ${m}`),
-      onState: ({ t, why }) => {
-        if (gen !== mine) return;
-        HLS.st = t;
-        if (t === 'ready') {
-          HLS.readyAt = performance.now();
-          d.log(`ll-hls: the publisher is sending to the loopback input, ${((HLS.readyAt - HLS.askedAt) / 1000).toFixed(1)} s after asking`, 'hi');
-          pollStatus();
-          if (!holds(HLS_OUT, HLS_BACK)) {
-            d.log(`${HLS_OUT} -> ${HLS_BACK} is not held, so nothing is played back`);
-            HLS.live = false; HV.set('warmup', '');
-            armCap(mine, 'the LL-HLS publish is sending and nothing plays it back');
-            return;
-          }
-          Promise.all([loadHlsJs(), streamLive(mine)]).then(([, uid]) => {
-            if (gen !== mine || HLS.st !== 'ready') return;
-            HLS.liveAt = performance.now();
-            HLS.uid = uid;
-            d.log(uid
-              ? `ll-hls: Stream has the take live (video ${uid.slice(0, 8)}), ${((HLS.liveAt - HLS.readyAt) / 1000).toFixed(1)} s after sending began`
-              : 'll-hls: Stream did not say the input was live within 15 s, playing anyway', uid ? 'hi' : 'warn');
-            armCap(mine, uid ? 'Stream says the LL-HLS input is live' : 'Stream did not say live within 15 s');
-            HLS.player = createLowLatencyPlayer(hlsV, loopLlhls())
-              .on('rebuild', ({ why: w }) => { HLS.rebuilds++; d.log(`ll-hls: player rebuilt (${w})`); });
-            watchFrames(hlsV);
-            meters.hls = meter(hlsV);
-          }).catch((e) => {
-            d.log(`ll-hls: ${e.message}`, 'bad'); hstate.textContent = 'could not play';
-            HLS.live = false; HV.set('warmup', '');
-            if (pub) armCap(mine, 'the LL-HLS leg cannot play, so the WebRTC leg counts');
-          });
-          return;
-        }
-        d.log(`ll-hls: ${why || t}`, t === 'stopped' ? 'warn' : 'bad');
-        hstate.textContent = HLS_SAY[t] || 'stopped';
-        try { HLS.player?.destroy(); } catch { /* gone */ }
-        HLS.player = null;
-        if (meters.hls) meters.hls.live = false;
-        if (HLS.firstMs == null) { HLS.live = false; HV.set('warmup', ''); }
-        // No LL-HLS leg left to count from: a running WebRTC leg does.
-        if (pub) armCap(mine, 'the LL-HLS leg ended, so the WebRTC leg counts');
-      },
-    });
-  }
-  function stopHls() {
-    try { HLS.pub?.stop(); } catch { /* gone */ }
-    try { HLS.player?.destroy(); } catch { /* gone */ }
-    const had = !!HLS.pub;
-    HLS.pub = null; HLS.player = null;
-    if (meters.hls) meters.hls.live = false;
-    try { hlsV.removeAttribute('src'); hlsV.load(); } catch { /* fine */ }
-    return had;
-  }
-
-  // ── what is on the loopback input, from the worker ──────────────────────
-  // Read after a press and every 10 s while a take runs or a clean is still
-  // owed, then it stops by itself: a visit reads nothing.
-  let statusT = 0;
-  const minutes = (x) => (x == null ? '' : x < 10 ? x.toFixed(1) : Math.round(x));
-  async function readStatus() {
-    let j;
-    try { j = await (await fetch(LOOP_STATUS, { cache: 'no-store' })).json(); }
-    catch { d.log('could not read what is on the loopback input', 'warn'); return null; }
-    const list = j.recordings || [];
-    HV.set('rec', j.recordings ? list.length : '');
-    hover.storage = j.storage ? `${minutes(j.storage.used)} of ${j.storage.cap} storage minutes on the account` : '';
-    hoverHls();
-    // Only a clean that ran after this page's own take ended is news: the
-    // first read of a new take otherwise reports the LAST take's clean as if
-    // it had just happened (seen in a run of three takes).
-    const lc = j.lastClean;
-    if (lc && lc.at !== readStatus.seen) {
-      readStatus.seen = lc.at;
-      if (endedAt && Date.parse(lc.at) >= endedAt) d.log(`the worker cleaned the loopback input: ${lc.deleted.length} deleted${lc.minutesFreed ? `, ${lc.minutesFreed} min freed` : ''}${lc.failed.length ? `, ${lc.failed.length} failed` : ''}`, lc.ok ? 'hi' : 'warn');
-    }
-    return j;
-  }
-  readStatus.seen = null;
-  let endedAt = 0;   // when this page's last LL-HLS take ended, epoch ms
-  function pollStatus() {
-    clearTimeout(statusT);
-    const tick = async () => {
-      const j = await readStatus();
-      const owed = !!cam || !!j?.take || (j?.pending || []).length > 0;
-      if (owed) statusT = setTimeout(tick, 10_000);
-      else if (j) d.log(`nothing owed on the loopback input: ${(j.recordings || []).length} recordings, ${minutes(j.storage?.used)} storage minutes on the account`);
-    };
-    tick();
-  }
-
   const lit = (l) => {
-    if (l.from === CAM && l.to === SCREEN) return !!cam;
+    if (l.from === CAM && l.to === SCREEN) return camera.on;
     if (l.from === CAM && l.to === LIVE_IN) return stat.pub === 'connected' && stat.sending;
     if (l.from === LIVE_OUT) return stat.play === 'connected' && stat.arriving;
-    if (l.from === CAM && l.to === HLS_IN) return HLS.st === 'ready';
-    if (l.from === HLS_OUT) return fresh(hlsV);
     return false;
   };
   // Each box's grey line: the label beside the title, and under it what the
-  // ports are carried by, so the two legs are named on the picture of the
-  // patch and not only in a table.
+  // ports are carried by, so the leg is named on the picture of the patch.
   const pb = createPatchbay(bay, { flowing: lit, detail: (n) => (
     n.id === 'cf-stream:live' ? [n.label, 'WHIP in', 'WHEP out']
-      : n.id === 'cf-stream:hls' ? [n.label, 'RTMPS in from the publisher', 'LL-HLS out']
       : n.id === `${S}:loopback` ? [n.label, 'WHEP in']
-      : n.id === `${S}:hls` ? [n.label, 'LL-HLS in']
-      : n.id === `${S}:camera` ? [n.label, null, 'WHIP and WebSocket out']
+      : n.id === `${S}:camera` ? [n.label, null, 'WHIP out']
       : [n.label]) });
 
   // ── start and stop ──────────────────────────────────────────────────────
   async function start() {
     const mine = ++gen;
-    armVideo(video); armVideo(back); armVideo(hlsV);   // before any await, or iOS refuses later
-    let s;
-    try {
-      s = await navigator.mediaDevices.getUserMedia({
-        video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-          width: { ideal: FRAME_W }, height: { ideal: FRAME_H }, frameRate: { ideal: 30 } },
-        audio: false,
-      });
-    } catch (e) {
-      const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
-        : e?.name === 'NotFoundError' ? 'this machine has no camera'
-        : `the camera did not start (${e?.name || e})`;
-      d.log(`${why}, so nothing was sent anywhere`, 'bad');
-      face(false);
-      return;
-    }
-    if (gen !== mine) { s.getTracks().forEach((t) => t.stop()); return; }
-    cam = s;
-    const track = cam.getVideoTracks()[0];
-    const set = track.getSettings();
-    deviceId = set.deviceId || deviceId;
-    video.srcObject = cam;
-    video.play().catch(() => {});
-    // A camera's label ends in its USB ids, `(2C0E:82E3)`, which name nothing a reader needs.
-    const label = (track.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
-    name.textContent = label;
-    size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
-    camNode(label || 'camera');
-    d.log(`camera on: ${track.label || 'default'} at ${set.width}x${set.height}`, 'hi');
-    // The frame that leaves: camera, then the clock, 30 times a second.
-    drawT = setInterval(() => {
-      drawCamera(sctx, video, FRAME_W, FRAME_H, { scrim: 0 });
-      burn(sctx, FRAME_W, FRAME_H, frameN++, { field: false, scrim: true });
-    }, 1000 / 30);
-    send = src.captureStream(30);
-    watchFrames(video);
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(frame);
+    const label = await camera.open(() => gen === mine);
+    if (!label) return;
+    camNode(label);
     statsTimer = setInterval(readStats, 1000);
-    face(true);
     pb.refresh();
-    d.log('this costs Cloudflare Stream minutes: a WHIP publish and a WHEP play, an RTMPS publish, its recording until the worker deletes it, and an LL-HLS play', 'warn');
-    // Both legs at once. LL-HLS is not awaited: its publisher may be waking.
-    capTimer = setTimeout(() => armCap(mine, `no leg started the count within ${BACKSTOP_MS / 1000} s`), BACKSTOP_MS);
-    startHls(mine);
+    d.log('this costs Cloudflare Stream minutes: a WHIP publish and a WHEP play', 'warn');
+    capTimer = setTimeout(() => armCap(mine, `the publish did not start the count within ${BACKSTOP_MS / 1000} s`), BACKSTOP_MS);
     try { await roundTrip(mine); } catch (e) { d.log(`the round trip did not start: ${e?.message || e}`, 'bad'); }
     pb.refresh();
-    await listCameras();
+    await camera.listCameras();
   }
 
   function stop() {
     gen++;
-    clearInterval(statsTimer); clearTimeout(noMedia); clearTimeout(capTimer); clearInterval(drawT);
+    clearInterval(statsTimer); clearTimeout(noMedia); clearTimeout(capTimer);
     endAt = 0;
     const p = pub, s = sub;
     pub = sub = null;
     try { s?.pc.close(); } catch { /* fine */ }
     p?.stop();
-    const hadHls = stopHls();
-    if (meters.rtc) meters.rtc.live = false;
-    meters.rtc = meters.hls = null;
+    if (rtc) rtc.live = false;
+    rtc = null;
     stat.pub = 'closed'; stat.play = 'closed';
-    for (const v of [video, back]) {
-      v.srcObject?.getTracks?.().forEach((t) => t.stop());
-      try { v.pause(); } catch { /* fine */ }
-      v.srcObject = null;
-    }
-    send?.getTracks().forEach((t) => t.stop());
-    send = null;
-    cam?.getTracks().forEach((t) => t.stop());
-    cam = null;
-    cancelAnimationFrame(raf);
-    name.textContent = ''; size.textContent = ''; state.textContent = ''; hstate.textContent = '';
+    back.srcObject?.getTracks?.().forEach((t) => t.stop());
+    try { back.pause(); } catch { /* fine */ }
+    back.srcObject = null;
+    state.textContent = '';
     clearStats();
-    render();
+    camera.close();
     pb.refresh();
-    face(false);
-    d.log(p || s || hadHls ? 'off air: both publishes ended, both plays closed, every track stopped' : 'camera off, every track stopped');
-    if (hadHls) {
-      endedAt = Date.now();
-      d.log('the worker deletes this take\'s recording about 90 s from now, whether or not this page stays open');
-      pollStatus();
-    }
-  }
-  addEventListener('pagehide', () => { if (cam) stop(); });
-
-  // ── which camera, once there is more than one ───────────────────────────
-  // Device labels are empty until the camera has been allowed, so the list is
-  // read after the first start and never on a visit.
-  const picker = createPicker({ what: 'camera',
-    prev: () => pick((at() - 1 + devices.length) % devices.length),
-    next: () => pick((at() + 1) % devices.length),
-    onPick: (i) => pick(i) });
-  picker.el.hidden = true;
-  const at = () => Math.max(0, devices.findIndex((x) => x.deviceId === deviceId));
-  async function listCameras() {
-    try {
-      devices = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput');
-    } catch { devices = []; }
-    picker.options(devices.map((x, i) => x.label || `camera ${i + 1}`));
-    picker.show(at());
-    picker.el.hidden = devices.length < 2;
-  }
-  async function pick(i) {
-    const dev = devices[i];
-    if (!dev || dev.deviceId === deviceId) return;
-    deviceId = dev.deviceId;
-    picker.show(i);
-    if (cam) { stop(); await start(); }
+    d.log(p || s ? 'off air: the publish ended, the play closed, every track stopped' : 'camera off, every track stopped');
   }
 
-  const transport = createButtonGroup({ buttons: [
-    { id: 'cam', icon: 'video', label: 'start the camera', onPress: () => (cam ? stop() : start()) },
-  ] });
-  // The group itself disables the button while a press's promise runs, so a
-  // second press cannot start a second camera while the prompt is up.
-  function face(on) {
-    transport.setIcon('cam', on ? 'stop' : 'video', on ? 'stop the camera' : 'start the camera');
-  }
-
-  const top = el('div', 'cc-top');
-  top.append(transport.el, picker.el);
-  d.stack.add(top, pair, pb.el);
+  d.stack.add(camera.top, pair, pb.el);
   window.__demo.loopback = {
-    stat, hls: HLS,
-    delays: () => ({ webrtc: median(meters.rtc?.samples || []), hls: median(meters.hls?.samples || []),
-      webrtcRead: meters.rtc?.read ?? 0, hlsRead: meters.hls?.read ?? 0 }),
+    stat,
+    delay: () => ({ webrtc: median(rtc?.samples || []), read: rtc?.read ?? 0 }),
     values: () => Object.fromEntries(V.keys().map((k) => [k, V.cell(k).textContent])),
-    hlsValues: () => Object.fromEntries(HV.keys().map((k) => [k, HV.cell(k).textContent])),
-    warmup: () => ({ webrtc: RTC.firstMs, hls: HLS.firstMs }),
+    warmup: () => RTC.firstMs,
     capFrom: () => capFrom,
-    state: () => state.textContent, hlsState: () => hstate.textContent,
-    status: () => readStatus(),
+    state: () => state.textContent,
+    links: () => bay.links().map((l) => `${l.from} -> ${l.to}`),
   };
   d.ready();
 </script>

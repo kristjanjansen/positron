@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>LL-HLS loopback</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Start and stop on their own row at the left, the camera picker after them
+     once there is more than one camera. A flex row blockifies the group, so it
+     sits on no text line; on a phone the picker wraps under it. */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .cc-top > .pos-pick[hidden] { display: none; }
+  /* The camera as it leaves the page and the picture that comes back, side by
+     side, each half the width. On a phone they stack, the original first. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  .cc-pair canvas { display: block; width: 100%; height: 100%; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  /* A footer line never wraps: one line, cut at the slot's edge. */
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  /* The word on the picture's plate is read against a picture, so full ink. */
+  .pos-vp-tag > .cc-proto { color: var(--fg); }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { camPublish, LIVE } from '/shell/live.mjs';
+  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
+  import { createLoopCamera, createPicture, returnVideo, meter, median, delayText, warm, fadeAt } from '/concepts/video/loopback.mjs';
+
+  // /concepts/video/000/ with an LL-HLS round trip through Cloudflare beside
+  // it. The camera, with a clock burned into it, feeds two pictures: the
+  // original as it leaves the page, and an LL-HLS loopback, camera ->
+  // pub.positron.studio/loop (the /stage/ and /cam/ publisher, a container
+  // rewrapping the browser's own H.264 to RTMPS) -> a Stream input of its own
+  // -> back as LL-HLS through the player /llhls/ uses. The returned picture
+  // carries the clock row, so its footer reads the glass to glass delay off
+  // the frames actually shown. The publish goes through the worker, so no
+  // input key reaches this page. Split out of /concepts/video/030/ on
+  // 2026-10-12 (*"Split hls and webrtc loopbacks"*); what the two share is
+  // /concepts/video/loopback.mjs.
+  //
+  // WHY 060 AND NOT 040: /archive/ labels the archived TV page `video 040`, so
+  // a new page at 040 would carry a number a visitor has already seen on
+  // something else, and /concepts/video/040/ would silently become a
+  // different page (positron-concepts: no forwarding from an old address, and
+  // no reusing one). 050 is MoQ loopback; 060 is the next free number.
+  //
+  // 🔴 EACH PRESS IS REAL CLOUDFLARE STREAM MINUTES, AND THE CAP IS 30 SECONDS
+  // FROM WHEN STREAM SAYS THE INPUT IS LIVE. Billed by the minute delivered
+  // whatever the protocol (positron-streaming). Asked for: "limit to 10 sec.
+  // just fade out", then "limit to 20sec. fade out sloowly", then (2026-10-12)
+  // the cap counted from Stream's live rather than from the first leg, so the
+  // LL-HLS delay has time to settle, and "extend to 30s". Thirty seconds after
+  // that both pictures have faded to the ground over their last three and the
+  // page stops itself exactly as a stop press does.
+  //
+  // 🔴 THE TAKE IS A STREAM RECORDING, AND THE WORKER DELETES IT. RTMPS cannot
+  // have recording turned off, so every take is a video counted against the
+  // account's 1000 storage minutes. The loopback has an input of its own
+  // ("positron-hls-loopback", src/provision-loop.sh), and positron-pub deletes
+  // a take about 90 s after it ends however it ended (this page's stop, a
+  // closed tab, its own cap of 50 s of RTMPS), sweeps the input every 10
+  // minutes, and refuses a take when the account is at or over 600 minutes
+  // (workers/pub/loop.mjs). Nothing here has to stay open for any of it. The
+  // footer counts what is on that input (`rec`) and the account's storage
+  // minutes (in the hover), read from /loop/status after a press. A second
+  // take on the input while one runs is refused, and that is said in words.
+  //
+  // NOTHING OPENS ON A VISIT. The camera, the publish, the play and the status
+  // read are all made on the start press.
+  const Q = new URLSearchParams(location.search);
+  // ?pub= points the worker routes elsewhere: the laptop stand-in for
+  // positron-pub runs the real worker module with real Stream (workerd cannot
+  // run on this machine). Never needed on the site.
+  const PUB = (Q.get('pub') || 'https://pub.positron.studio').replace(/\/$/, '');
+  const LOOP_WS = `${PUB.replace(/^http/, 'ws')}/loop`;
+  const LOOP_STATUS = `${PUB}/loop/status`;
+  const LOOP_UID = 'aafa09fdefc39016203fb23129bf5df3';
+  const loopLlhls = () => `https://${LIVE.customer}.cloudflarestream.com/${LOOP_UID}/manifest/video.m3u8?protocol=llhls`;
+  const loopLifecycle = () => `https://${LIVE.customer}.cloudflarestream.com/${LOOP_UID}/lifecycle`;
+
+  const S = 'web';
+  const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
+  const HLS_IN = 'cf-stream:hls:video-in', HLS_OUT = 'cf-stream:hls:video-out';
+  const HLS_BACK = `${S}:hls:video-in`;
+  // 30 s a press from Stream's live, the last 3 of them a fade (asked
+  // 2026-10-10, *"fade out bit faster, both videopanels"*; 2026-10-12, *"extend
+  // to 30s (all 20s limits)"*). BACKSTOP_MS arms the cap anyway if Stream has
+  // not started it by then (a publisher that never opens, say).
+  const CAP_MS = 30000, FADE_MS = 3000, BACKSTOP_MS = 45000;
+
+  // No readout: every number is in the footer of the picture it is about
+  // (asked 2026-10-12, *"move readout data to videpanel footers"*).
+  const d = mount({ name: 'concept video 060', what: '', index: '/concepts/', indexLabel: 'concepts',
+    readout: null });
+  conceptNav('video/060');
+  const log = (m, k) => d.log(m, k);
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  // The camera's video goes to the LL-HLS input (through the publisher, which
+  // the box's grey line names) and comes back as LL-HLS.
+  const bay = createBay();
+  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
+  camNode('camera');
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
+  bay.addNode({ id: 'cf-stream:hls', kind: 'endpoint', label: 'Stream LL-HLS input', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${S}:hls`, kind: 'screen', label: 'LL-HLS', place: 'browser' });
+  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video' });
+  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
+  bay.addPort({ id: HLS_IN, label: 'video', dir: 'in', medium: 'video' });
+  bay.addPort({ id: HLS_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['llhls'] });
+  bay.addPort({ id: HLS_BACK, label: 'LL-HLS', dir: 'in', medium: 'video', transports: ['llhls'] });
+
+  const held = new Map();          // "from to" -> link id
+  function hold(a, b, via) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return true;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...(via ? { via } : {}) });
+    if (r.ok) { held.set(k, r.id); return true; }
+    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return false;
+  }
+  const holds = (a, b) => held.has(`${a} ${b}`);
+  // Held from load, so the picture of the patch is the same running or not.
+  // Holding a link opens nothing; the camera and the leg wait for the press.
+  hold(CAM, SCREEN);
+  hold(CAM, HLS_IN);
+  hold(HLS_OUT, HLS_BACK, 'llhls');
+
+  // ── the camera and the picture that comes back ──────────────────────────
+  const hlsV = returnVideo();
+  hlsV.disableRemotePlayback = true;   // ManagedMediaSource opens only with it (positron-streaming)
+  let gen = 0, statsTimer = 0, capTimer = 0, endAt = 0, capFrom = '';
+  let hm = null;   // the delay meter on the returned picture
+  const camera = createLoopCamera({ log, start: () => start(), stop: () => stop(), render: () => render(), extra: [hlsV] });
+
+  // The footer carries what is on the loopback input (`rec`, the recordings
+  // Stream holds for it, from /loop/status), which is the number the worker's
+  // delete takes back to 0. The account's storage minutes and the picture
+  // size are in the row's hover: MEASURED 2026-10-12, a fifth cell made the
+  // row 334 px wide at 1280 scroll its last cell out of sight.
+  const H = createPicture();
+  const hstate = el('span', 'cc-say', '');
+  const hlsPanel = createVideoPanel({ media: H.c, left: hstate, values: [
+    { key: 'warmup', label: 'warmup', reserve: 5 },
+    { key: 'delay', label: 'delay', reserve: 6 },
+    { key: 'rec', label: 'rec', reserve: 1 },
+  ] });
+  const HV = hlsPanel.values;
+  const hover = { size: '', storage: '' };
+  const hoverHls = () => { HV.el.title = [hover.size, hover.storage].filter(Boolean).join('\n'); };
+  // The picture says LL-HLS on its tag plate, always, even stopped (reported
+  // 2026-10-12 of the WebRTC one: *"not clear that this is webrtc"*).
+  hlsPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'LL-HLS'));
+
+  const pair = el('div', 'cc-pair');
+  pair.append(camera.panel.el, hlsPanel.el);
+
+  // The routing follows the links: without camera -> original the left panel
+  // is the ground; without the leg's link the right one is. Both fade
+  // together as the press runs out.
+  const HLS = { pub: null, player: null, st: null, askedAt: null, readyAt: null, liveAt: null, firstMs: null, uid: null, rebuilds: 0 };
+  function render() {
+    const a = fadeAt(endAt, FADE_MS);
+    camera.picture.paint(camera.src, camera.on && holds(CAM, SCREEN), a);
+    H.paint(hlsV, camera.on && !!HLS.player && holds(HLS_OUT, HLS_BACK), a);
+  }
+  render();
+
+  function readDelays() {
+    HV.set('delay', delayText(median(hm?.samples || [])));
+    warm(HV, hstate, HLS, hm, 'll-hls', log);
+    hover.size = hlsV.videoWidth ? `${hlsV.videoWidth}x${hlsV.videoHeight}` : '';
+    hoverHls();
+  }
+  function readStats() { readDelays(); pb.refresh(); }
+  const clearStats = () => {
+    // The warmup and the input's count stay after a stop: the count is what
+    // the worker's delete changes, and it is read on after.
+    HV.set('delay', '');
+    if (HLS.firstMs == null) HV.set('warmup', '');
+  };
+
+  // The cap starts when Stream says the input is live (the lifecycle URL
+  // answers live with a video), so the LL-HLS delay has the whole 30 s to
+  // settle. It ends as a stop press, and BACKSTOP_MS arms it if nothing else has.
+  function armCap(mine, why) {
+    if (endAt || gen !== mine) return;
+    if (why) d.log(`the ${CAP_MS / 1000} s cap starts now: ${why}`);
+    endAt = performance.now() + CAP_MS;
+    capFrom = why || '';
+    clearTimeout(capTimer);
+    capTimer = setTimeout(() => {
+      if (gen !== mine) return;
+      d.log(`${CAP_MS / 1000} s is the most one press runs through Cloudflare`);
+      stop();
+    }, CAP_MS);
+  }
+
+  // ── the LL-HLS round trip ───────────────────────────────────────────────
+  // The burned frame recorded with MediaRecorder (H.264 in WebM, 2 s
+  // keyframes), sent over the worker's socket, rewrapped to RTMPS by the
+  // publisher container with no encode, and played back from Stream with the
+  // low latency player (camPublish in live.mjs, plans/plan-cam-llhls.md).
+  const HLS_SAY = { busy: 'refused', stopped: 'stopped', closed: 'lost the publisher', unsupported: 'needs Chrome or Edge' };
+  // hls.js is a classic script that sets `window.Hls`, which the player reads.
+  // Loaded on the press, never on the visit: 600 KB nobody asked for otherwise.
+  let hlsLib = null;
+  const loadHlsJs = () => (window.Hls ? Promise.resolve() : (hlsLib ||= new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = '/proto/remixer/hls.min.js';
+    sc.onload = ok;
+    sc.onerror = () => { hlsLib = null; no(new Error('hls.js did not load')); };
+    document.head.append(sc);
+  })));
+  // Until Stream says the input is live: a player built before that meets an
+  // empty manifest and rebuilds through it. One small GET on our own input.
+  async function streamLive(mine, capMs = 15000) {
+    const t0 = performance.now();
+    while (gen === mine && HLS.st === 'ready' && performance.now() - t0 < capMs) {
+      try {
+        const j = await (await fetch(loopLifecycle(), { cache: 'no-store' })).json();
+        if (j.live && j.videoUID) return j.videoUID;
+      } catch { /* ask again */ }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return null;
+  }
+  function startHls(mine) {
+    if (!holds(CAM, HLS_IN)) { d.log(`${CAM} -> ${HLS_IN} is not held, so nothing is sent`); return; }
+    Object.assign(HLS, { st: null, askedAt: performance.now(), readyAt: null, liveAt: null, firstMs: null, uid: null, rebuilds: 0, live: true });
+    hstate.textContent = 'warming up';
+    loadHlsJs().catch((e) => d.log(`ll-hls: ${e.message}`, 'bad'));
+    HLS.pub = camPublish(camera.send, {
+      url: LOOP_WS,
+      log: (m) => d.log(`ll-hls ${m}`),
+      onState: ({ t, why }) => {
+        if (gen !== mine) return;
+        HLS.st = t;
+        if (t === 'ready') {
+          HLS.readyAt = performance.now();
+          d.log(`ll-hls: the publisher is sending to the loopback input, ${((HLS.readyAt - HLS.askedAt) / 1000).toFixed(1)} s after asking`, 'hi');
+          pollStatus();
+          if (!holds(HLS_OUT, HLS_BACK)) {
+            d.log(`${HLS_OUT} -> ${HLS_BACK} is not held, so nothing is played back`);
+            HLS.live = false; HV.set('warmup', '');
+            armCap(mine, 'the LL-HLS publish is sending and nothing plays it back');
+            return;
+          }
+          Promise.all([loadHlsJs(), streamLive(mine)]).then(([, uid]) => {
+            if (gen !== mine || HLS.st !== 'ready') return;
+            HLS.liveAt = performance.now();
+            HLS.uid = uid;
+            d.log(uid
+              ? `ll-hls: Stream has the take live (video ${uid.slice(0, 8)}), ${((HLS.liveAt - HLS.readyAt) / 1000).toFixed(1)} s after sending began`
+              : 'll-hls: Stream did not say the input was live within 15 s, playing anyway', uid ? 'hi' : 'warn');
+            armCap(mine, uid ? 'Stream says the LL-HLS input is live' : 'Stream did not say live within 15 s');
+            HLS.player = createLowLatencyPlayer(hlsV, loopLlhls())
+              .on('rebuild', ({ why: w }) => { HLS.rebuilds++; d.log(`ll-hls: player rebuilt (${w})`); });
+            camera.watchFrames(hlsV);
+            hm = meter(hlsV);
+          }).catch((e) => {
+            d.log(`ll-hls: ${e.message}`, 'bad'); hstate.textContent = 'could not play';
+            HLS.live = false; HV.set('warmup', '');
+            armCap(mine, 'the LL-HLS leg cannot play');
+          });
+          return;
+        }
+        d.log(`ll-hls: ${why || t}`, t === 'stopped' ? 'warn' : 'bad');
+        hstate.textContent = HLS_SAY[t] || 'stopped';
+        try { HLS.player?.destroy(); } catch { /* gone */ }
+        HLS.player = null;
+        if (hm) hm.live = false;
+        if (HLS.firstMs == null) { HLS.live = false; HV.set('warmup', ''); }
+      },
+    });
+  }
+  function stopHls() {
+    try { HLS.pub?.stop(); } catch { /* gone */ }
+    try { HLS.player?.destroy(); } catch { /* gone */ }
+    const had = !!HLS.pub;
+    HLS.pub = null; HLS.player = null;
+    if (hm) hm.live = false;
+    hm = null;
+    try { hlsV.removeAttribute('src'); hlsV.load(); } catch { /* fine */ }
+    return had;
+  }
+
+  // ── what is on the loopback input, from the worker ──────────────────────
+  // Read after a press and every 10 s while a take runs or a clean is still
+  // owed, then it stops by itself: a visit reads nothing.
+  let statusT = 0;
+  const minutes = (x) => (x == null ? '' : x < 10 ? x.toFixed(1) : Math.round(x));
+  let endedAt = 0;   // when this page's last take ended, epoch ms
+  async function readStatus() {
+    let j;
+    try { j = await (await fetch(LOOP_STATUS, { cache: 'no-store' })).json(); }
+    catch { d.log('could not read what is on the loopback input', 'warn'); return null; }
+    const list = j.recordings || [];
+    HV.set('rec', j.recordings ? list.length : '');
+    hover.storage = j.storage ? `${minutes(j.storage.used)} of ${j.storage.cap} storage minutes on the account` : '';
+    hoverHls();
+    // Only a clean that ran after this page's own take ended is news: the
+    // first read of a new take otherwise reports the LAST take's clean as if
+    // it had just happened (seen in a run of three takes).
+    const lc = j.lastClean;
+    if (lc && lc.at !== readStatus.seen) {
+      readStatus.seen = lc.at;
+      if (endedAt && Date.parse(lc.at) >= endedAt) d.log(`the worker cleaned the loopback input: ${lc.deleted.length} deleted${lc.minutesFreed ? `, ${lc.minutesFreed} min freed` : ''}${lc.failed.length ? `, ${lc.failed.length} failed` : ''}`, lc.ok ? 'hi' : 'warn');
+    }
+    return j;
+  }
+  readStatus.seen = null;
+  function pollStatus() {
+    clearTimeout(statusT);
+    const tick = async () => {
+      const j = await readStatus();
+      const owed = camera.on || !!j?.take || (j?.pending || []).length > 0;
+      if (owed) statusT = setTimeout(tick, 10_000);
+      else if (j) d.log(`nothing owed on the loopback input: ${(j.recordings || []).length} recordings, ${minutes(j.storage?.used)} storage minutes on the account`);
+    };
+    tick();
+  }
+
+  const lit = (l) => {
+    if (l.from === CAM && l.to === SCREEN) return camera.on;
+    if (l.from === CAM && l.to === HLS_IN) return HLS.st === 'ready';
+    if (l.from === HLS_OUT) return camera.fresh(hlsV);
+    return false;
+  };
+  // Each box's grey line: the label beside the title, and under it what the
+  // ports are carried by, so the leg is named on the picture of the patch.
+  const pb = createPatchbay(bay, { flowing: lit, detail: (n) => (
+    n.id === 'cf-stream:hls' ? [n.label, 'RTMPS in from the publisher', 'LL-HLS out']
+      : n.id === `${S}:hls` ? [n.label, 'LL-HLS in']
+      : n.id === `${S}:camera` ? [n.label, null, 'WebSocket out']
+      : [n.label]) });
+
+  // ── start and stop ──────────────────────────────────────────────────────
+  async function start() {
+    const mine = ++gen;
+    const label = await camera.open(() => gen === mine);
+    if (!label) return;
+    camNode(label);
+    statsTimer = setInterval(readStats, 1000);
+    pb.refresh();
+    d.log('this costs Cloudflare Stream minutes: an RTMPS publish, its recording until the worker deletes it, and an LL-HLS play', 'warn');
+    capTimer = setTimeout(() => armCap(mine, `Stream did not start the count within ${BACKSTOP_MS / 1000} s`), BACKSTOP_MS);
+    startHls(mine);
+    pb.refresh();
+    await camera.listCameras();
+  }
+
+  function stop() {
+    gen++;
+    clearInterval(statsTimer); clearTimeout(capTimer);
+    endAt = 0;
+    const hadHls = stopHls();
+    hstate.textContent = '';
+    clearStats();
+    camera.close();
+    pb.refresh();
+    d.log(hadHls ? 'off air: the publish ended, the play closed, every track stopped' : 'camera off, every track stopped');
+    if (hadHls) {
+      endedAt = Date.now();
+      d.log('the worker deletes this take\'s recording about 90 s from now, whether or not this page stays open');
+      pollStatus();
+    }
+  }
+
+  d.stack.add(camera.top, pair, pb.el);
+  window.__demo.loopback = {
+    hls: HLS,
+    delay: () => ({ hls: median(hm?.samples || []), read: hm?.read ?? 0 }),
+    values: () => Object.fromEntries(HV.keys().map((k) => [k, HV.cell(k).textContent])),
+    warmup: () => HLS.firstMs,
+    capFrom: () => capFrom,
+    state: () => hstate.textContent,
+    status: () => readStatus(),
+    links: () => bay.links().map((l) => `${l.from} -> ${l.to}`),
+  };
+  d.ready();
+</script>
