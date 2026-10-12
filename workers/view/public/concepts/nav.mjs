@@ -35,6 +35,16 @@ export function conceptNav(n) {
     st.id = 'cc-nav-css';
     st.textContent = '.cc-nav { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }'
       + ' .cc-nav-pn { display: flex; gap: 20px; }'
+      // Prev and next as the titles are written, bigger, and on a phone their
+      // own row right under the back link, spread to both edges. Asked
+      // 2026-10-12: *"Move prev next closer to vackling, bigther, sentence
+      // case, justify between"*. The row keeps the back link's air under it,
+      // so the links inside it give up their own.
+      + ' .cc-nav { row-gap: 10px; margin-bottom: 20px; }'
+      + ' .cc-nav .pos-back { margin-bottom: 0; }'
+      + ' .cc-nav-pn .pos-back { font-size: 13px; letter-spacing: 0; text-transform: none; }'
+      + ' @media (min-width: 600px) { .cc-nav { margin-bottom: 30px; } }'
+      + ' @media (max-width: 599px) { .cc-nav-pn { flex: 1 1 100%; justify-content: space-between; } }'
       // Code boxes on concept pages: three times the kit field's 7px 9px.
       // Asked 2026-10-12: *"make code win 1/2 less h and add 3x padding. same
       // on other code wins"*; the pages halve their own `rows`.
