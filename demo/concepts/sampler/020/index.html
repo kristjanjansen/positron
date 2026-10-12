@@ -47,6 +47,14 @@
   // nothing is shared; what is shared is the kit timeline the loop is drawn on.
   // NOTHING IS FETCHED ON A VISIT. MIDI access is asked for on load, as /nola/
   // does, so a pedal on a plugged in keyboard works from the first press.
+  //
+  // SINCE 2026-10-12 THE SAMPLER IS SUPERCOLLIDER IN THE TAB
+  // (/concepts/sampler/sc-sampler.mjs, *"all in"*), and a replay is a
+  // TIMESTAMPED OSC BUNDLE: the looper hands each note over AHEAD_MS before
+  // its time with the time it should be heard, and scsynth starts it on that
+  // sample rather than whenever the 4 ms timer next ran. A download hint for
+  // the wasm is all a visit costs; a pointer over the keys, a touch, a focus
+  // or the first MIDI message boots the engine.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -58,7 +66,8 @@
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
-  import { createSampler, PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+  import { PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+  import { createScSampler, warmOnIntent } from '/concepts/sampler/sc-sampler.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
   const d = mount({ name: 'concept sampler 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
@@ -70,7 +79,7 @@
   // to looper"*): a `web:patch` node sends a program change straight into the
   // sampler, so the loop plays back in whichever sound is picked now.
   const INSTRUMENTS = [PIANO, RHODES];
-  const sampler = createSampler({
+  const sampler = createScSampler({
     instruments: INSTRUMENTS,
     onProgram: (ins) => patchPick?.show(ins.name, INSTRUMENTS.indexOf(ins)),
     log: (line, kind) => d.log(line, kind),
@@ -119,14 +128,14 @@
     layer: 0,                // the layer being recorded: 0 the first take, 1 and up overdubs
     dub: new Map(),          // note -> its overdub note on event, while overdubbing
     t1: 0, len: 0,           // ms, performance.now() clock
-    lapStart: 0, lastPos: 0, lap: 0,
+    lapStart: 0, lastPos: 0, lap: 0, headLap: 0,   // lap: the clock's; headLap: the scheduler's, AHEAD_MS in front
     events: [],              // { at, d1, d2 } in ms from the first press, sorted
     open: new Map(),         // note -> its note on, while recording
     sounding: new Set(),     // notes the loop has on right now
     pedal: 0, presses: [],   // the raw CC 64 value, and when each press landed
     releasedAt: -Infinity,   // when the pedal last came up
     hold: 0,                 // the pending clear of the press now down, a timer
-    fired: [],               // { lap, at, late } for a check: how far each replay was off
+    fired: [],               // { lap, at, late, sound } for a check: when each replay was handed over, and set to sound
     buffer: [],              // { t, d1, d2 } the last BUFFER_MS of keys, device time
     shift: 0,                // ms the take start was moved back to a note
     notesInHold: 0,          // note ons since the pedal last went down
@@ -148,7 +157,8 @@
     J.decisions.push({ at: +performance.now().toFixed(2), what, state: L.state, detail });
     if (J.decisions.length > 5000) J.decisions.shift();
   };
-  const out = (d1, d2) => bay.send(`${S}:looper:midi-out`, { cls: 'note', ch: 1, d1, d2 });
+  // `at` is when the note should be heard, `performance.now()`'s clock; none is now.
+  const out = (d1, d2, at) => bay.send(`${S}:looper:midi-out`, { cls: 'note', ch: 1, d1, d2, ...(at == null ? {} : { at }) });
   function silence() { for (const n of L.sounding) out(n, 0); L.sounding.clear(); }
 
   function press(now) {
@@ -204,7 +214,7 @@
     }
     if (act === 'keep') {
       const pos = loopPos(now);
-      for (const [n] of L.dub) addEvent({ at: pos, d1: n, d2: 0, layer: L.layer, skipLap: L.lap });
+      for (const [n] of L.dub) addEvent({ at: pos, d1: n, d2: 0, layer: L.layer, skipLap: lapOf(now) });
       L.dub.clear();
       const n = L.events.filter((e) => e.d2 && e.layer === L.layer).length;
       L.state = 'looping';
@@ -220,7 +230,7 @@
       if (!L.events.some((e) => e.d2) && L.prev) {
         // A take with no notes keeps the loop it would have replaced.
         L.events = L.prev.events; L.len = L.prev.len; L.prev = null;
-        L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.fired = [];
+        L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.headLap = 0; L.fired = [];
         deck.setRange([0, L.len]); deck.setLoopView({ a: 0, b: L.len, state: 'on' });
         strip.strip.fit(-L.len * 0.04, L.len * 1.04); strip.strip.invalidate();
         d.log('second press: that take had no notes, so the loop before it plays on', 'warn');
@@ -246,7 +256,7 @@
         });
         jdo('seam', `${drop.size} note${drop.size === 1 ? '' : 's'} at the end repeated the opening, dropped: ${[...drop].map((e) => e.d1).join(' ')}`);
       }
-      L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.fired = [];
+      L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.headLap = 0; L.fired = [];
       deck.setRange([0, len]);
       // The loop's start and end on the timeline (asked 2026-10-11, *"show start
       // and end of loop, in timebar above lanes"*): the strip's own loop band
@@ -285,6 +295,8 @@
   // A note added now must not also replay in this lap (it was just played
   // live), so it carries the lap it was played in and is skipped there.
   const loopPos = (t) => (((t - L.lapStart) % L.len) + L.len) % L.len;
+  /** The lap the loop's own clock is in at `t`: the lap a note played live at `t` was heard in. */
+  const lapOf = (t) => Math.floor((t - L.lapStart) / L.len);
   function addEvent(ev) {
     let i = L.events.length;
     while (i > 0 && L.events[i - 1].at > ev.at) i--;
@@ -293,12 +305,12 @@
   function dubNote(d1, d2, t) {
     const at = loopPos(t);
     if (d2) {
-      const ev = { at, d1, d2, layer: L.layer, skipLap: L.lap };
+      const ev = { at, d1, d2, layer: L.layer, skipLap: lapOf(t) };
       L.dub.set(d1, ev);
       addEvent(ev);
     } else if (L.dub.has(d1)) {
       L.dub.delete(d1);
-      addEvent({ at, d1, d2: 0, layer: L.layer, skipLap: L.lap });
+      addEvent({ at, d1, d2: 0, layer: L.layer, skipLap: lapOf(t) });
     }
     strip.strip.invalidate();
   }
@@ -339,30 +351,46 @@
     strip.strip.invalidate();
   }
 
-  // Playback: every few ms, fire the events between where the loop was and
-  // where it is now. Positions come from the first lap's start and the loop
-  // length, never from the last tick, so the loop cannot drift.
-  function fire(ev, lapStart) {
-    if (ev.skipLap === L.lap) return;
+  // Playback: every few ms, hand over the events between where the loop's
+  // HEAD was and where it is now. Positions come from the first lap's start and
+  // the loop length, never from the last tick, so the loop cannot drift.
+  //
+  // 🔴 THE HEAD RUNS AHEAD_MS IN FRONT OF THE CLOCK, AND EACH NOTE CARRIES THE
+  // TIME IT SHOULD BE HEARD (`at`). The sampler sends it to scsynth as a
+  // timestamped bundle, so the 4 ms timer's own lateness, measured 0.1 to 4.1
+  // ms before this, no longer reaches the sound. A note is set to sound at its
+  // place in the loop plus the live path's latency (`sampler.latencyMs()`), so
+  // a replay lands where the same note played live did, not that much early.
+  // ⚠️ 40 ms is ten timer ticks and well inside SuperSonic's 500 ms direct
+  // window; a timer stalled longer than that hands a note over late, and the
+  // engine plays a late bundle at once.
+  const AHEAD_MS = 40;
+  function fire(ev, lapStart, lap) {
+    if (ev.skipLap === lap) return;
     const now = performance.now();
-    L.fired.push({ lap: L.lap, at: ev.at, late: +(now - (lapStart + ev.at)).toFixed(2) });
+    const due = lapStart + ev.at;
+    const at = due + sampler.latencyMs();
+    // `late`: when it was handed over against its place in the loop, negative
+    // when ahead. `sound`: how far after its place it is set to be heard.
+    L.fired.push({ lap, at: ev.at, late: +(now - due).toFixed(2), sound: +(at - due).toFixed(2) });
     if (L.fired.length > 400) L.fired.shift();
     if (ev.d2) L.sounding.add(ev.d1); else L.sounding.delete(ev.d1);
-    out(ev.d1, ev.d2);
+    out(ev.d1, ev.d2, at);
   }
   setInterval(() => {
     if (L.state !== 'looping' && L.state !== 'overdub') return;
     const now = performance.now();
-    const elapsed = now - L.lapStart;
+    L.lap = lapOf(now);
+    const elapsed = now + AHEAD_MS - L.lapStart;
     const lap = Math.floor(elapsed / L.len);
     const pos = elapsed - lap * L.len;
-    if (lap === L.lap) {
-      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at < pos) fire(ev, L.lapStart + lap * L.len);
+    if (lap === L.headLap) {
+      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at < pos) fire(ev, L.lapStart + lap * L.len, lap);
     } else {
-      const old = L.lapStart + L.lap * L.len;
-      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at <= L.len) fire(ev, old);
-      L.lap = lap;
-      for (const ev of L.events) if (ev.at < pos) fire(ev, L.lapStart + lap * L.len);
+      const old = L.lapStart + L.headLap * L.len;
+      for (const ev of L.events) if (ev.at >= L.lastPos && ev.at <= L.len) fire(ev, old, L.headLap);
+      L.headLap = lap;
+      for (const ev of L.events) if (ev.at < pos) fire(ev, L.lapStart + lap * L.len, lap);
     }
     L.lastPos = pos;
   }, 4);
@@ -407,7 +435,7 @@
   const bay = createBay();
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   bay.addNode({ id: `${S}:looper`, kind: 'store', label: 'looper', place: 'browser' });
-  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
+  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'SuperCollider sampler', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
   bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
@@ -463,6 +491,8 @@
     onSustain: () => { const t = performance.now(); jin('screen', 'cc', SUSTAIN_CC, 127, 1, t); jin('screen', 'cc', SUSTAIN_CC, 0, 1, t); cc(SUSTAIN_CC, 127); cc(SUSTAIN_CC, 0); },
   });
   function face() { kb.sustain?.set(L.state === 'recording' || L.state === 'overdub', true); }
+  // A pointer over the keys, a touch or a focus boots SuperCollider. A visit boots nothing.
+  warmOnIntent(host, sampler);
 
   // ── keyboards plugged into this machine ────────────────────────────────
   // As /concepts/synth/000/ (asked: *"where is midi in parchbay in sampler
@@ -479,6 +509,8 @@
   function fromDevice(e) {
     const node = slots.get(e.target.id);
     if (!node || !plugged.has(node)) return;
+    // The first message from a plugged in keyboard is an intent: boot the engine.
+    sampler.warm('MIDI message');
     const [b0, d1, d2 = 0] = e.data;
     const st = b0 & 0xf0, ch = (b0 & 0x0f) + 1, t = e.timeStamp;
     if (st === 0xb0 && d1 === SUSTAIN_CC) {
@@ -530,7 +562,8 @@
   function text() {
     const f = (x) => (Number.isFinite(x) ? x.toFixed(2) : '');
     const o = [`positron sampler/020 looper, ${new Date().toISOString()}`,
-      `rules: SPRING_MS ${SPRING_MS}, MIN_LOOP_MS ${MIN_LOOP_MS}, CLEAR_HOLD_MS ${CLEAR_HOLD_MS}, LOOKBACK_MS ${LOOKBACK_MS}, SEAM_MS ${SEAM_MS}, PEDAL_ON ${PEDAL_ON}`,
+      `rules: SPRING_MS ${SPRING_MS}, MIN_LOOP_MS ${MIN_LOOP_MS}, CLEAR_HOLD_MS ${CLEAR_HOLD_MS}, LOOKBACK_MS ${LOOKBACK_MS}, SEAM_MS ${SEAM_MS}, PEDAL_ON ${PEDAL_ON}, AHEAD_MS ${AHEAD_MS}`,
+      `sampler: SuperCollider in this tab, ${JSON.stringify(sampler.stat().timing)}, live path ${f(sampler.latencyMs())} ms`,
       `state ${L.state}, loop ${f(L.len)} ms, lap ${L.lap}, take started at ${f(L.t1)}`,
       '', 'inputs: sent ms (device stamp)\tseen ms (looper)\tsrc\tkind\td1\td2\tch'];
     for (const r of J.inputs) o.push([f(r.sent), f(r.seen), r.src, r.kind, r.d1, r.d2, r.ch].join('\t'));
@@ -541,7 +574,9 @@
     const late = L.fired.map((x) => x.late);
     if (late.length) {
       const s = [...late].sort((a, b) => a - b);
-      o.push('', `replays: ${late.length}, lateness ms median ${f(s[s.length >> 1])}, max ${f(s[s.length - 1])}`);
+      const snd = L.fired.map((x) => x.sound).sort((a, b) => a - b);
+      o.push('', `replays: ${late.length}, handed to SuperCollider ms against their place median ${f(s[s.length >> 1])}, latest ${f(s[s.length - 1])} (negative is ahead), `
+        + `set to sound ms after their place median ${f(snd[snd.length >> 1])} (the live path's latency), scheduled ${AHEAD_MS} ms ahead`);
     }
     return o.join('\n');
   }
@@ -568,7 +603,7 @@
     get fired() { return L.fired.map((f) => ({ ...f })); },
     get position() { return deck.position(); }, get range() { return [...deck.range]; },
     get buffer() { return L.buffer.map((b) => ({ ...b })); },
-    rules: { SPRING_MS, MIN_LOOP_MS, CLEAR_HOLD_MS, LOOKBACK_MS, SEAM_MS, BUFFER_MS }, pressAction, text,
+    rules: { SPRING_MS, MIN_LOOP_MS, CLEAR_HOLD_MS, LOOKBACK_MS, SEAM_MS, BUFFER_MS, AHEAD_MS }, pressAction, text,
   };
   d.ready();
 </script>

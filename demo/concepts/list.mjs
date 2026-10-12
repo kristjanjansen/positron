@@ -42,12 +42,12 @@ export const CONCEPTS = [
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
   { n: 'typist/030', title: 'Playback', say: 'One paper whose typing is kept on a timeline and played back from the first key to the last.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
-  { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing a sampler of piano recordings that come from our R2 bucket.' },
-  { n: 'sampler/010', title: 'Piano and Rhodes', say: 'The same sampler holding a piano and a Rhodes that a patch node switches by program change.' },
+  { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing piano recordings from our R2 bucket through SuperCollider in this tab.' },
+  { n: 'sampler/010', title: 'Piano and Rhodes', say: 'One SuperCollider sampler holding a piano and a Rhodes that a patch node switches by program change.' },
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
-  { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
+  { n: 'sampler/020', title: 'Looper', say: 'The SuperCollider piano behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
-  { n: 'sampler/040', title: 'SuperCollider piano', say: 'The same piano and Rhodes played by the Raspberry Pi\'s SuperCollider sampler running in this tab.' },
+  { n: 'sampler/040', title: 'SuperCollider piano', say: 'The same SuperCollider sampler with its key to sound, boot and first note measured.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.

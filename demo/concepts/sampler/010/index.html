@@ -23,7 +23,10 @@
   // play, so the sampler switches the way a hardware synth does
   // (/concepts/synth/070/). Asked: *"Piano plus rhodes in sampler. What
   // cahnges in patcbay? Separaete Patch seleta node?"*.
-  // NOTHING OPENS ON A VISIT. The Rhodes is fetched only once program 1
+  // SINCE 2026-10-12 BOTH SETS PLAY THROUGH SUPERCOLLIDER IN THE TAB
+  // (/concepts/sampler/sc-sampler.mjs, the Pi's SynthDefs on wasm scsynth).
+  // NOTHING OPENS ON A VISIT; an intent over the keys or a MIDI message boots
+  // the engine. The Rhodes is fetched only once program 1
   // arrives: the notes the keys on screen reach, so its first note is not a
   // cold fetch, and any other note on its first press.
   import { conceptNav } from '/concepts/nav.mjs';
@@ -33,14 +36,15 @@
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createSampler, PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+  import { PIANO, RHODES } from '/concepts/sampler/sampler.mjs';
+  import { createScSampler, warmOnIntent } from '/concepts/sampler/sc-sampler.mjs';
 
   const d = mount({ name: 'concept sampler 010', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('sampler/010');
 
   // ── the sampler ─────────────────────────────────────────────────────────
   let fetchedAt = 0;
-  const sampler = createSampler({
+  const sampler = createScSampler({
     instruments: [PIANO, RHODES],
     // the keys on screen, C3 to A4
     warm: [48, 69],
@@ -55,7 +59,7 @@
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'sampler', place: 'browser' });
+  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'SuperCollider sampler', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
   bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
@@ -109,6 +113,9 @@
     onUp: (note, how) => { if (how !== 'midi') send(note, 0); },
     onPanic: () => sampler.panic(),
   });
+  // A pointer over the keys, a touch or a focus boots SuperCollider, so the
+  // first key finds it up. A visit boots nothing.
+  warmOnIntent(host, sampler);
 
   // A plugged in keyboard plays through the same keys node, so it follows the
   // patch and its pedal is the sampler's sustain (found 2026-10-11, *"sampler
@@ -116,6 +123,8 @@
   // midi"*: this page never opened one, so a 020 tab was the one playing).
   createMidi({
     log: (line, kind) => d.log(line, kind),
+    // The first message from a plugged in keyboard is an intent too.
+    onAny: () => sampler.warm('MIDI message'),
     onDown: (n, vel) => { kb.lightNote?.(n, true); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: vel }); },
     onUp: (n) => { kb.lightNote?.(n, false); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: n, d2: 0 }); },
     onControl: (c, v) => { if (c === 64) bay.send(`${S}:keys:midi-out`, { cls: 'cc', ch: 1, d1: c, d2: v }); },

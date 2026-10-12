@@ -20,6 +20,54 @@
 // with its licence files beside it. See LAYOUT.md rule 6.
 
 const VENDOR = '/shell/vendor/';
+const WASM = `${VENDOR}scsynth-nrt.wasm`;
+const MODULE = `${VENDOR}supersonic.js`;
+
+/**
+ * A download hint for the engine, and nothing else: two `<link rel=prefetch>`
+ * for the wasm and the module, both on our origin. Nothing is compiled, no
+ * context is made and nothing runs. Asked 2026-10-12 (BACKLOG, *"sampler/040:
+ * warm SuperCollider before the first key"*), when every sampler page went to
+ * scsynth and the first note on each of them paid the boot.
+ * ⚠️ IT IS A HINT. The local server answers `no-store`, which a browser will
+ * not keep, so on `node demo/server.mjs` this saves nothing and only the
+ * deploy can show what it is worth. `loadScsynth` is the half that does not
+ * depend on a cache.
+ */
+export function prefetchScsynth() {
+  if (typeof document === 'undefined') return;
+  for (const href of [WASM, MODULE]) {
+    if (document.head.querySelector(`link[rel="prefetch"][href="${href}"]`)) continue;
+    const l = document.createElement('link');
+    l.rel = 'prefetch';
+    l.href = href;
+    document.head.append(l);
+  }
+}
+
+let loading = null;
+/**
+ * The module and the wasm bytes, fetched once per page and kept. A page calls
+ * this on intent (a pointer over the keys, a focus, the first MIDI message),
+ * which is the download; `bootScsynth` then takes the bytes from here rather
+ * than asking SuperSonic to fetch them again. A failure is forgotten so the
+ * next ask tries again.
+ */
+export function loadScsynth() {
+  loading ??= (async () => {
+    const t0 = performance.now();
+    const [mod, wasm] = await Promise.all([
+      import(MODULE),
+      fetch(WASM).then((r) => {
+        if (!r.ok) throw new Error(`${WASM} answered ${r.status}`);
+        return r.arrayBuffer();
+      }),
+    ]);
+    return { SuperSonic: mod.SuperSonic, osc: mod.osc, wasmBytes: wasm, ms: performance.now() - t0 };
+  })();
+  loading.catch(() => { loading = null; });
+  return loading;
+}
 
 /**
  * Bring scsynth up in this tab.
@@ -33,7 +81,7 @@ const VENDOR = '/shell/vendor/';
  */
 export async function bootScsynth({ audioContext, input = null, log = () => {}, onReply = null, scsynthOptions = null } = {}) {
   const t0 = performance.now();
-  const { SuperSonic } = await import(`${VENDOR}supersonic.js`);
+  const { SuperSonic, osc, wasmBytes } = await loadScsynth();
   const moduleMs = performance.now() - t0;
 
   // ⚠️ `coreBaseURL` ALONE DOES NOT WORK (research §7): the engine fetches
@@ -51,6 +99,9 @@ export async function bootScsynth({ audioContext, input = null, log = () => {}, 
     baseURL: VENDOR,
     wasmBaseURL: VENDOR,
     workletUrl: `${VENDOR}clockwork_audio_worklet.js`,
+    // A copy: the engine posts these bytes to its worklet, and a second boot
+    // on the same page must not be handed a buffer the first one gave away.
+    wasmBytes: wasmBytes.slice(0),
     ...(scsynthOptions ? { scsynthOptions } : {}),
     ...(audioContext ? { audioContext } : {}),
   });
@@ -63,7 +114,10 @@ export async function bootScsynth({ audioContext, input = null, log = () => {}, 
   });
 
   const t1 = performance.now();
-  await sonic.init();
+  // A failed init (an AudioContext that never started, most often) leaves an
+  // engine half up; it is taken down so the caller can boot again.
+  try { await sonic.init(); }
+  catch (e) { try { await sonic.destroy(); } catch { /* already down */ } throw e; }
   const bootMs = performance.now() - t1;
   const ctx = sonic.audioContext;
 
@@ -180,13 +234,33 @@ export async function bootScsynth({ audioContext, input = null, log = () => {}, 
     };
   }
 
-  sonic.send('/notify', 1);
-  await sleep(250);
+  // 🔴 THE ENGINE'S OWN `/done /notify`, NOT A FIXED SLEEP. This was
+  // `await sleep(250)` after the send, a quarter of every boot measured on
+  // /concepts/sampler/040/ (research/scsynth-sampler-in-browser-2026-10-11.md
+  // section 3). scsynth answers `/notify` with `/done /notify <client>`, and
+  // that answer is the fact the sleep was standing in for. If no answer comes
+  // in a second the boot goes on, as it always did, and says so.
+  const tn = performance.now();
+  const told = await sendAndWait((m) => m[0] === '/done' && m[1] === '/notify', 1000, '/notify', 1);
+  const notifyMs = performance.now() - tn;
+  if (!told) log('SuperCollider did not answer /notify within 1 s, going on without it');
+
+  /**
+   * One message, timestamped: it runs when the speakers reach `perfMs`, on
+   * `performance.now()`'s clock. SuperSonic maps an OSC timetag to the
+   * context's output through `getOutputTimestamp` (its NTPTiming), so a bundle
+   * tagged T is heard at T rather than started at T. A time already past runs
+   * at once, late, and the engine counts it.
+   */
+  const ntpOf = (perfMs) => (performance.timeOrigin + perfMs) / 1000 + 2208988800;
+  const sendAt = (perfMs, address, ...args) => sonic.sendOSC(osc.encodeBundle(ntpOf(perfMs),
+    [[address, ...args.map((a) => (a instanceof ArrayBuffer ? new Uint8Array(a) : a))]]));
 
   return {
     sonic, ctx, out, meter, replies,
-    bootMs, moduleMs,
+    bootMs, moduleMs, notifyMs, notified: !!told,
     send: (...m) => sonic.send(...m),
+    sendAt,
     waitFor, sendAndWait, status, recvDef, sleep,
     /** the server's own answer about its node tree — never inferred here */
     queryTree: () => sendAndWait((m) => String(m[0]) === '/g_queryTree.reply', 5000, '/g_queryTree', 0, 0),
