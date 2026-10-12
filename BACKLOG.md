@@ -1,4 +1,5 @@
 ## Open
+- ~~**/kit/frontpage/: the hero bigger, yellow dot in the wordmark**~~ (2026-10-12). Asked: *"do bit bigger version of it. yellow dot in positron stuio"*, with the hero copy pasted. DONE by the session: THE HERO, LARGE on top, eyebrow POSITRON.STUDIO with the dot in --hi, headline mono 600 up to 68 px, line Geist up to 25 px.
 - ~~**/frontpage, clock/030 cut, shape archived**~~ (2026-10-12). Asked: *"where is frontpage. https://positron.studio/frontpage i am askind 3rd time"*, *"Cut it,"* (clock/030 Shared clock, simulated in one tab), *"archiev shape"*. DONE by the session: /frontpage redirects (302) to /kit/frontpage/; clock/030 moved to /archive/clock-shared/; shape unlisted, still served, on /archive/ under devices.
 - ~~**/concepts/: rm the archive link**~~ (2026-10-12). Asked: *"rm arhive link"*. DONE by the session; /archive/ stays served.
 - ~~**Archive /time/ and /sync/**~~ (2026-10-12). Asked: *"archive time and sync demos"*. DONE by the session as the six before: `unlisted: true`, still served, DEMO_CARDS entries out, listed on /archive/ under retired.

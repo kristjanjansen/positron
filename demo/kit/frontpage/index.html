@@ -94,6 +94,17 @@
      custom properties and no slide rule is overridden but this one. */
   .fp-sl .sl-say { font-family: var(--fp-head); }
 
+  /* THE HERO, LARGE (2026-10-12, *"do bit bigger version of it. yellow dot in
+     positron stuio"*): pairing C at front page size. The eyebrow is the
+     wordmark with its dot in the accent, as /kit/logo/ draws it. */
+  .fp-big { display: flex; flex-direction: column; min-width: 0; padding: 24px 0 var(--pos-gap); }
+  .fp-big > * { margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+  .fp-big-eye { font: 400 15px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+  .fp-big-eye b { color: var(--hi); font-weight: 600; }
+  .fp-big-h { font: 600 clamp(36px, 8vw, 68px)/1.08 var(--mono); letter-spacing: -.04em; color: var(--fg); margin-top: 22px; }
+  .fp-big-l { font: 400 clamp(19px, 2.6vw, 25px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 28px; max-width: 32em; }
+  .fp-big-s { font: 400 clamp(15px, 1.7vw, 17px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
+
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
      THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
      in shell.css are these two faces, so nothing here sets either and every
@@ -281,6 +292,18 @@
     { n: 'F', name: 'All Geist, light, like the crop', light: true,
       eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
   ];
+  // THE HERO, LARGE, on top: the owner's copy at front page size, the
+  // wordmark's dot in the accent.
+  section('THE HERO, LARGE',
+    'The hero at front page size, the wordmark with its dot in the accent.',
+    null, (add) => {
+      const big = el('div', 'fp-big');
+      const eye = el('p', 'fp-big-eye');
+      eye.append('POSITRON', el('b', '', '.'), 'STUDIO');
+      big.append(eye, el('h2', 'fp-big-h', HERO.head), el('p', 'fp-big-l', HERO.line), el('p', 'fp-big-s', HERO.small));
+      add(big);
+    }, { bare: true });
+
   // 🔴 THE RULE, IN USE, 2026-10-12: *"do make samples on top of real usage.
   // add sapce in between woth the rest. use my copy."* The rule the session
   // put to the owner, applied to real pieces of the site: hero C in the
