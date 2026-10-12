@@ -24,7 +24,7 @@ export const CONCEPTS = [
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
-  { n: 'draw/000', title: 'XY filter', say: 'Drag the pad over a held note. Left to right opens the filter, bottom to top raises its resonance.' },
+  { n: 'draw/000', title: 'XY filter', say: 'Play a looping bass line and drag the pad. Left to right opens the filter, upward adds resonance.' },
   { n: 'radio/000', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { n: 'radio/010', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
   { n: 'radio/020', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },

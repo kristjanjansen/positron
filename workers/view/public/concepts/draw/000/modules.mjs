@@ -14,7 +14,7 @@
 //
 // NOTHING OPENS ON IMPORT. The modules keep their parameters as plain state
 // until `start(ctx)` is handed an AudioContext, which the page makes on the
-// first key or play press.
+// first play press.
 
 import { createBay, parsePatch } from '/shell/bay.mjs';
 
@@ -52,11 +52,11 @@ const NAMES = {
   amp: ['attack', 'decay', 'sustain', 'release'],
 };
 
-/** The one patch. Keys to osc and amp, osc to filter to amp to speaker and
- *  scope, the pad to the filter, and a cable per knob. */
+/** The one patch. The looping line to osc and amp, osc to filter to amp to
+ *  speaker and scope, the pad to the filter, and a cable per knob. */
 export const PATCH = [
-  'web:tone:midi-out -> web:osc:midi-in',
-  'web:tone:midi-out -> web:amp:midi-in',
+  'web:line:midi-out -> web:osc:midi-in',
+  'web:line:midi-out -> web:amp:midi-in',
   'web:osc:audio-out -> web:filter:audio-in',
   'web:filter:audio-out -> web:amp:audio-in',
   'web:amp:audio-out -> web:speaker:audio-in',
@@ -73,7 +73,7 @@ export function createSynth({ log = () => {} } = {}) {
   const bay = createBay();
   // Parameters as plain state, so a knob turned or the pad moved before any
   // sound exists is already the sound the first press makes. The osc starts
-  // on A2, the drone's note.
+  // on A2, the line's first note.
   const P = {
     osc: { freq: 110, detune: 0, wave: 'sawtooth' },
     filter: { cutoff: 600, q: 8 },
@@ -108,7 +108,7 @@ export function createSynth({ log = () => {} } = {}) {
     setParam(mod, e.name, e.v);
   };
 
-  // The osc is mono and plays the last key still held.
+  // The osc is mono and plays the last note still held.
   const oscNotes = [];
   function oscNote(e) {
     const i = oscNotes.indexOf(e.d1);
@@ -118,7 +118,7 @@ export function createSynth({ log = () => {} } = {}) {
     if (n !== undefined) { P.osc.freq = hz(n); if (ctx) glide(N.osc.osc.frequency, hz(n), 0.004); }
   }
 
-  // The amp opens on the first key down and closes when the last one is up.
+  // The amp opens on the first note on and closes when the last one is off.
   const ampHeld = new Set();
   let releaseEnd = 0;
   function ampGate(e) {
@@ -141,7 +141,9 @@ export function createSynth({ log = () => {} } = {}) {
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
-    ['tone', 'person', 'test tone'],
+    // The looping line the page's deck plays (was a held test tone and, before
+    // that, a keyboard, until 2026-10-12: *"Rm keyboard use autoplay on xy"*).
+    ['line', 'engine', 'looping line'],
     ['xy', 'person', 'xy pad'],
     ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
@@ -152,7 +154,7 @@ export function createSynth({ log = () => {} } = {}) {
   const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
     shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
   const PORTS = [
-    { id: id('tone', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: id('line', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
     // No `names` on a knob or the pad: the bay's shape check wants names to be
     // equal, and a knob names one of a module's several. The module ignores and
     // logs a name it does not have.
@@ -246,7 +248,7 @@ export function createSynth({ log = () => {} } = {}) {
     if (master) master.gain.setTargetAtTime(v ? 0.7 : 0, at(), 0.03);
   }
 
-  /** Is a voice audible: sound on, and a key held or still releasing. */
+  /** Is a voice audible: sound on, and a note held or still releasing. */
   function sounding() {
     if (!ctx || !on) return false;
     return ampHeld.size > 0 || at() < releaseEnd;
