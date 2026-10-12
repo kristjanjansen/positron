@@ -29,14 +29,14 @@ export const CONCEPTS = [
   { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
-  { n: 'room/001', title: 'Chat UI', say: 'The chat as a framed window with its messages and a compose box.' },
+  // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
   { n: 'room/002', title: 'Chat UI wired', say: 'The chat window wired to the patchbay, so tabs in one room talk to each other.' },
   { n: 'room/003', title: 'Broadcast chat', say: 'The chat window with the first one in the room broadcasting to everybody in a column of its own.' },
   { n: 'room/004', title: 'Chat timeline', say: 'The broadcast chat with a timeline that plays the room\'s history back until you join.' },
   // room/010 History and room/020 Admin removed 2026-10-11 (*"rm room 010 020
   // 030. since we cover it right?"*): room/004 keeps the history, room/003 the
   // admin. Their pages are in git history before that commit.
-  { n: 'room/030', title: 'Broadcast', say: 'The admin chat with a camera the admin can put on air.' },
+  // room/030 Broadcast removed 2026-10-12 (*"rm 030room"*); video/030 keeps the WHIP and WHEP round trip.
   { n: 'typist/000', title: 'Paper', say: 'A sheet of white paper you can type on.' },
   { n: 'typist/010', title: 'Typewriter', say: 'The same paper with a real typewriter sounding every key.' },
   { n: 'typist/020', title: 'Typewriters', say: 'The same typewriter through an fx box that turns every number into a different machine.' },
@@ -44,13 +44,12 @@ export const CONCEPTS = [
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typing sample texts side by side, each through a typewriter of its own.' },
   { n: 'sampler/000', title: 'Piano', say: 'The keyboard playing a sampler of piano recordings that come from our R2 bucket.' },
   { n: 'sampler/010', title: 'Piano and Rhodes', say: 'The same sampler holding a piano and a Rhodes that a patch node switches by program change.' },
-  { n: 'sampler/015', title: 'Sustain', say: 'Every message a sustain pedal sends with its timing and the presses it makes.' },
+  // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   { n: 'sampler/020', title: 'Looper', say: 'The piano sampler behind a looper you start and stop with the sustain pedal.' },
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
   { n: 'sampler/040', title: 'SuperCollider piano', say: 'The same piano and Rhodes played by the Raspberry Pi\'s SuperCollider sampler running in this tab.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
-  { n: 'misc/000', title: 'Announce', say: 'Every port the studio room can hear.' },
-  { n: 'misc/010', title: 'Mirror', say: 'The mirror demo as the patchbay sees it.' },
+  // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
   { n: 'misc/020', title: 'Tutorial slide', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
 ];

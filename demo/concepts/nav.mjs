@@ -9,12 +9,17 @@ export function conceptNav(n) {
   if (!head || !back) return;
   const i = CONCEPTS.findIndex((c) => c.n === n);
   const prev = CONCEPTS[i - 1], next = CONCEPTS[i + 1];
+  // The heading is the concept's title from list.mjs, not `concept <group> <n>`.
+  // Asked 2026-10-12: *"use real title. rm numbers from titles and <> pagers"*.
+  const me = CONCEPTS[i];
+  const h1 = head.querySelector('.pos-name');
+  if (me && h1) { h1.textContent = me.title; document.title = me.title; }
   const row = el('div', 'cc-nav');
   back.replaceWith(row);
   row.append(back);
   const side = el('span', 'cc-nav-pn');
-  if (prev) side.append(el('a', 'pos-back', `‹ ${prev.n.split('/')[1]} ${prev.title}`, { href: `/concepts/${prev.n}/` }));
-  if (next) side.append(el('a', 'pos-back', `${next.n.split('/')[1]} ${next.title} ›`, { href: `/concepts/${next.n}/` }));
+  if (prev) side.append(el('a', 'pos-back', `‹ ${prev.title}`, { href: `/concepts/${prev.n}/` }));
+  if (next) side.append(el('a', 'pos-back', `${next.title} ›`, { href: `/concepts/${next.n}/` }));
   row.append(side);
   if (!document.getElementById('cc-nav-css')) {
     const st = el('style');

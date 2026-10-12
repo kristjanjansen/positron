@@ -19,8 +19,10 @@
   .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
   .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
   .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*). */
-  .cc-row[hidden] { display: none; }
+  /* No compose box before Join (asked 2026-10-11, *"do not show chat boxes before joining"*),
+     and its room kept so nothing jumps on Join (asked 2026-10-12, *"reserve empty space for
+     input+send when not logged to avoid layout jup"*): invisible, not gone. */
+  .cc-row.cc-off { visibility: hidden; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -96,7 +98,7 @@
   const node = createBayNode({
     room: ROOM, graphs: [SELF], bay,
     log: (line, kind) => d.log(line, kind),
-    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.hidden = false; text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); joined = true; row.classList.remove('cc-off'); text.disabled(false); send.el.disabled = false; text.input.focus(); pb?.refresh(); },
     onGraph: () => { pb?.refresh(); },
     onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
   });
@@ -136,8 +138,7 @@
     { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
 
 
-  const row = el('div', 'cc-row');
-  row.hidden = true;
+  const row = el('div', 'cc-row cc-off');
   row.append(text.el, send.el);
   // Blocks in the shell's stack; a heading and its table are one block.
   d.stack.add(join.el, row, lines.el, pb.el);
