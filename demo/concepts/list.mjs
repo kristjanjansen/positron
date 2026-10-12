@@ -60,16 +60,17 @@ export const CONCEPTS = [
   { n: 'rhythm/020', title: 'Sample drums', say: 'The drum machine playing samples on SuperCollider, a default kit or any pack or WAVs you drop, with pitch and length per row.' },
   { n: 'rhythm/030', title: 'Drums on the Pi', say: 'The drum machine played in this tab and on the Raspberry Pi at the same moment, with a crossfader between them.' },
   { n: 'rhythm/050', title: 'Camera drums', say: 'The local camera cut into sixteen squares across, whose lit squares play the drum grid.' },
-  { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
-  { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
-  { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
-  { n: 'clock/030', title: 'Ahead link', say: 'Keys in one place play a synth in another on a link that carries the shared clock, so both sound together.' },
-  // clock/040 Follow moved to /archive/ 2026-10-12 (*"move to archive https://positron.studio/concepts/clock/040/"*); the page stays deployed.
-  { n: 'clock/050', title: 'Aligned after', say: 'Keys and a picture are recorded, then played back with the recording as the clock.' },
-  { n: 'clock/060', title: 'MIDI clock', say: 'One beat sent to a second place as 24 clock ticks a beat and as one anchor, with how far each lands from the true beat.' },
-  { n: 'clock/070', title: 'Join late', say: 'A third place joins while the beat runs, gets the anchor and its clock error, and lands on the right beat at once.' },
-  { n: 'clock/080', title: 'Drift', say: 'Two clocks running a chosen number of parts per million apart drift off the beat until they agree the time again.' },
-  { n: 'clock/090', title: 'Cushion', say: 'Sound sent over the relay waits in a cushion you set, and a small one plays sooner with gaps while a big one plays smooth and late.' },
+  // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
+  // one machine first, then the relay, then two places on one clock. Old 070 Join late merged into Shared clock;
+  // old 040 Follow is archived at /archive/clock-follow/. The old numbers 404 (no forwarding).
+  { n: 'clock/000', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and by the sound card told the time ahead, and how late each lands.' },
+  { n: 'clock/010', title: 'Message lag', say: 'Keys play a synth over the relay and each note shows how long it took to arrive.' },
+  { n: 'clock/020', title: 'Audio cushion', say: 'Sound over the relay waits in a cushion you set, trading lag for gaps.' },
+  { n: 'clock/030', title: 'Shared clock', say: 'Two places agree the time once and play the same beat with nothing sent per beat, and a third can join mid-beat.' },
+  { n: 'clock/040', title: 'MIDI clock', say: 'The same beat sent as 24 ticks a beat or as one anchor, and how far each lands from the beat.' },
+  { n: 'clock/050', title: 'Clock drift', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
+  { n: 'clock/060', title: 'Play together', say: 'A link carrying the shared clock makes one note sound at the same moment in two places.' },
+  { n: 'clock/070', title: 'Replay', say: 'Keys and a picture recorded, then played back with the recording as the clock.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
@@ -110,13 +111,13 @@ export const DEMO_CARDS = {
   twelve: { group: 'device', say: 'A TASCAM Model 12 on screen, moving when the real one moves.' },
   dump: { group: 'device', say: 'Every message an instrument sends, as raw bytes and a reading.' },
   pack: { group: 'device', say: 'The patches, sessions and samples inside a Circuit pack.' },
-  wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.', supersededBy: 'clock/000' },
+  wire: { group: 'room', say: 'A message as the bytes that travel and how late it lands.', supersededBy: 'clock/010' },
   patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
   tom: { group: 'rhythm', say: 'A 16 step grid playing the samples out of a pack.' },
-  time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/010' },
-  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/030' },
+  time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/000' },
+  sync: { group: 'clock', say: 'Four ways two places agree on when something happens.', supersededBy: 'clock/060' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'Every 1965 newsreel in ERR\'s archive on one line of days.' },

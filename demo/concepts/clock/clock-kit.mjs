@@ -1,9 +1,9 @@
-// demo/concepts/clock/clock-kit.mjs: what clock/060 to clock/090 share, so four
-// pages do not carry four copies of it. Written 2026-10-12 beside them.
+// demo/concepts/clock/clock-kit.mjs: what clock/020 to clock/050 share (numbered
+// as renumbered 2026-10-12), so four pages do not carry four copies of it. Written 2026-10-12 beside them.
 //
-// ⚠️ PAGE HELPERS, NOT KIT. It is what clock/020 wrote inline (plain names on
+// ⚠️ PAGE HELPERS, NOT KIT. It is what Shared clock (clock/030) first wrote inline (plain names on
 // screen with the real id on hover, one sound card read against the true clock)
-// lifted once. 000 to 050 keep their own copies,
+// lifted once. 000, 010, 060 and 070 keep their own copies,
 // because another agent was editing them when this was written.
 import { epochNow } from '/proto/looper/peer.mjs';
 
@@ -13,7 +13,7 @@ export const fmt = (x) => Math.round(x * 100) / 100;
 export const median = (xs) => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
 /** The value furthest from zero, sign kept. */
 export const worst = (xs) => xs.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0);
-/** Green inside 3 ms, amber inside 20, red past it, as clock/020 colours a beat. */
+/** Green inside 3 ms, amber inside 20, red past it, as clock/030 colours a beat. */
 export const band = (ms) => (Math.abs(ms) < 3 ? '#8fd6a8' : Math.abs(ms) < 20 ? '#ffd400' : '#e0908a');
 
 export const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
@@ -59,7 +59,7 @@ export function soundCard({ sampleRate } = {}) {
 }
 
 /**
- * Plain names on screen, the real ids on hover (clock/020's way, positron-concepts:
+ * Plain names on screen, the real ids on hover (clock/030's way, positron-concepts:
  * port names are simulated). `show` maps a real site id to `web-1`, `web-2`.
  * `extra(id)` may add a second hover line for one box.
  */

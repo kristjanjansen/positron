@@ -8,222 +8,239 @@
 <title>POSITRON concept clock 000</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  // concepts clock/000, LAG, 2026-10-12. Asked: *"start building"* on BACKLOG.md
-  // "Time and sync as concept pages". One idea: EVERY LINK HAS A DELAY.
+  // concepts clock/000, SCHEDULING, 2026-10-12. One idea: one pattern played two
+  // ways. A TIMER wakes up at each note's time and then says play now, so it lands
+  // late, and later still when the page is busy. The SOUND CARD is told each
+  // note's time in advance and plays it itself, exactly. Reworded on the same day
+  // from in advance / wake / ahead: *"make no sense to me. help me understand,
+  // reword"*.
   //
-  // /concepts/synth/000/'s keyboard and sine synth, split over two sites joined
-  // by the relay: `here` holds the keys, `there` holds the synth. Both sites are
-  // sockets of this one tab (as /sync/'s arrival tab does), so a note leaves one
-  // socket as one `bay.event`, crosses Cloudflare and arrives on the other, and
-  // the delay read off the envelope's `sent` stamp is between two reads of ONE
-  // clock: no clock agreement is needed to trust it. That is clock/020's subject.
+  // clock/010 measures how late a note ARRIVES. This page leaves the arriving out
+  // (no relay, one tab) and asks what a receiver does with an event's `at`. One
+  // `pattern` node sends every note 100 ms ahead with `at`, the audio clock time
+  // it is due, along two links at once:
+  //   - `timer` sets a setTimeout for `at` and plays when it wakes up, so it
+  //     lands as late as the main thread let it wake, and jitters with it;
+  //   - `soundcard` hands `at` to the AudioContext with start(at), so the sound
+  //     card plays it on its own clock, exactly.
+  // Both are MEASURED where the samples are: each lane's click carries a silent
+  // one-sample impulse into a bus of its own, an AudioWorklet ear on that bus
+  // reports the output frame it appeared on (demo/shell/impulse-worklet.js, the
+  // ear /time/'s beat tab uses), and lateness is that frame's time less `at`.
   //
-  // Nothing opens on a visit. The first press (Join, or a key) opens both sockets.
+  // Nothing opens on a visit: the AudioContext, the ears and the pattern all
+  // start on the first press of play.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createDeck } from '/timeline/transport.mjs';
 
-  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
-  const asked = new URLSearchParams(location.search).get('room');
-  // A room of this tab's own: the two sites meet there and nobody else's keys do.
-  const ROOM = asked && ROOM_RE.test(asked) ? asked : `lag-${rand(6)}`;
-  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
-  const KEYS = `${HERE}:keys:midi-out`, SYNTH = `${THERE}:synth:midi-in`;
-  const AOUT = `${THERE}:synth:audio-out`, SPK = `${THERE}:speaker:audio-in`;
-
-  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
-  const G_HERE = graphOf(HERE, 'here', [{ id: `${HERE}:keys`, kind: 'person', label: 'keyboard', place: 'browser' }],
-    [{ id: KEYS, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] }]);
-  const G_THERE = graphOf(THERE, 'there', [
-    { id: `${THERE}:synth`, kind: 'engine', label: 'sine', place: 'browser' },
-    { id: `${THERE}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' },
-  ], [
-    { id: SYNTH, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] },
-    { id: AOUT, label: 'synth', dir: 'out', medium: 'audio' },
-    { id: SPK, label: 'speakers', dir: 'in', medium: 'audio' },
-  ]);
+  const S = 'web';
+  const PAT = `${S}:pattern:midi-out`;
+  const TIMER_IN = `${S}:timer:midi-in`, CARD_IN = `${S}:soundcard:midi-in`;
+  const TIMER_OUT = `${S}:timer:audio-out`, CARD_OUT = `${S}:soundcard:audio-out`, SPK = `${S}:speaker:audio-in`;
 
   const d = mount({ name: 'concept clock 000', what: '', index: '/concepts/', indexLabel: 'concepts',
     // The cells under the title and the log alone at the foot, asked 2026-10-12:
     // *"move readouts to top"*.
     joined: false,
-    readout: { median: 'ms', worst: 'ms', last: 'ms', spread: 'ms' } });
+    readout: { 'timer median': 'ms', 'timer worst': 'ms', 'sound card median': 'ms', 'sound card worst': 'ms' } });
   conceptNav('clock/000');
 
-  // ── the synth, on the `there` site: one sine per held note ──────────────
-  let ctx = null;
-  const voices = new Map();
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
-  function noteOn(n, vel) {
-    ctx ??= new AudioContext();
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.2 * (vel / 127), t + 0.01);
+  // ── the pattern: one bar of eight steps, played eight times ─────────────
+  const STEP = 250, BAR = 8 * STEP, LAPS = 8, LENGTH = BAR * LAPS;
+  const HITS = [0, 2, 3, 4, 6];
+  const AHEAD = 0.1, TICK = 25;                // hand each note over 100 ms early, look every 25 ms
+  const ROWS = [];
+  for (let lap = 0; lap < LAPS; lap++) for (const h of HITS) ROWS.push(lap * BAR + h * STEP);
+
+  // ── the audio: built on the first play, never on a visit ────────────────
+  let ctx = null, ears = null;
+  const late = { timer: new Map(), soundcard: new Map() };       // position -> ms late, MEASURED by the ear
+  const due = { timer: [], soundcard: [] };                      // { pos, at } handed to each lane
+  async function audio() {
+    if (ctx) return;
+    ctx = new AudioContext({ latencyHint: 'interactive' });
+    await ctx.resume();
+    await ctx.audioWorklet.addModule('/shell/impulse-worklet.js');
+    // A context that has just resumed reads a clock that has not started moving
+    // yet, and a timer set against it wakes tens of ms off. Wait for it to run.
+    const t0 = ctx.currentTime;
+    for (let i = 0; i < 40 && ctx.currentTime - t0 < 0.05; i++) await new Promise((r) => setTimeout(r, 10));
+    ears = {};
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    mute.connect(ctx.destination);
+    for (const lane of ['timer', 'soundcard']) {
+      const probe = ctx.createGain();
+      // A started ConstantSource of 0 keeps the bus from going silent, or Chrome
+      // hands the ear an empty input and it hears nothing (impulse-worklet.js).
+      const hold = ctx.createConstantSource();
+      hold.offset.value = 0; hold.connect(probe); hold.start();
+      const ear = new AudioWorkletNode(ctx, 'impulse-detect');
+      ear.port.onmessage = (e) => heard(lane, e.data.at);
+      probe.connect(ear); ear.connect(mute);
+      ears[lane] = probe;
+    }
+  }
+  const impulse = () => { const b = ctx.createBuffer(1, 2, ctx.sampleRate); b.getChannelData(0)[0] = 1; return b; };
+  let IMP = null;
+  const live = new Set();                                  // sources not yet finished, stopped on pause
+  function click(lane, at, hz) {
+    IMP ??= impulse();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = hz;
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.2, at + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
     o.connect(g).connect(ctx.destination);
-    o.start();
-    voices.set(n, { o, g });
+    o.start(at); o.stop(at + 0.06);
+    const tick = ctx.createBufferSource();
+    tick.buffer = IMP; tick.connect(ears[lane]); tick.start(at);
+    for (const n of [o, tick]) { live.add(n); n.onended = () => live.delete(n); }
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
-
-  // ── what arrived, and how long it took ──────────────────────────────────
-  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
-  const arrived = [];             // { at: ms since join, n, ms }
-  let t0 = 0;
-  const WINDOW = 10000;          // the shortest run shown, so a first note is not the whole width
-  // Green inside what the relay promises (p50 about 36 ms, bay.mjs), amber past
-  // twice that, red past a quarter of a second.
-  const band = (ms) => (ms < 60 ? '#8fd6a8' : ms < 250 ? '#ffd400' : '#e0908a');
-  const sorted = () => arrived.map((a) => a.ms).sort((a, b) => a - b);
-
-  function heard(e, l, m) {
-    const ms = Date.now() - Number(m.sent);
-    if (e.d2) noteOn(e.d1, e.d2); else noteOff(e.d1);
-    if (!e.d2 || !Number.isFinite(ms)) return;
-    arrived.push({ at: Date.now() - t0, n: e.d1, ms });
-    pb.pulse(plain(KEYS), plain(SYNTH));
-    const s = sorted();
-    d.set('median', s[s.length >> 1]);
-    d.set('worst', s[s.length - 1]);
-    d.set('last', ms);
-    // How far apart the fastest and slowest note landed, in place of a count
-    // of notes. Asked 2026-10-12: *"lag notes readout has no value"*.
-    d.set('spread', s[s.length - 1] - s[0]);
-    const lane = view.strip.lanes().find((L) => L.id === 'lag');
-    if (lane) lane.subLabel = [`median ${s[s.length >> 1]} ms`, `worst ${s[s.length - 1]} ms`];
-    show();
+  /** The ear heard an impulse at audio time `t`: pair it with the note it was due for. */
+  function heard(lane, t) {
+    let best = null, bd = Infinity;
+    for (const x of due[lane]) { const dd = Math.abs(t - x.at); if (dd < bd) { bd = dd; best = x; } }
+    if (!best || bd > 0.1) return;
+    late[lane].set(best.pos, (t - best.at) * 1000);
   }
 
-  // ── two sites, two sockets, one room ────────────────────────────────────
-  // `here` emits along its link; the room carries ONE bay.event; `there`'s bay
-  // delivers it only along the link it holds into its synth.
-  function bayHere() {
-    const b = here.registry.fill(createBay());
-    if (b.port(SYNTH)) b.link(KEYS, SYNTH, [], { site: HERE });
-    return b;
+  // ── the bay: one pattern, two ways to play what it sends ────────────────
+  const bay = createBay();
+  for (const [n, kind, label] of [['pattern', 'engine', 'pattern'], ['timer', 'engine', 'wakes up, then plays'],
+    ['soundcard', 'engine', 'told the time ahead'], ['speaker', 'screen', 'speakers']]) {
+    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
   }
-  function bayThere() {
-    const b = there.registry.fill(createBay());
-    b.addPort({ ...b.port(SYNTH), deliver: heard });
-    if (b.port(KEYS)) b.link(KEYS, SYNTH, [], { site: THERE });
-    return b;
-  }
-  const log = (line, kind) => d.log(line, kind);
-  const here = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
-  const there = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  let joining = null;
-  function join() {
-    if (joining) return joining;
-    joining = (async () => {
-      await Promise.all([here.join(), there.join()]);
-      // Each site has to have heard the other announce before its bay can hold the link.
-      for (let i = 0; i < 60 && !(bayHere().port(SYNTH) && bayThere().port(KEYS)); i++) await sleep(50);
-      const ok = !!bayHere().links().length && !!bayThere().links().length;
-      t0 = Date.now();
-      // The run starts here: the strip's write head is the cursor from now on.
-      view.strip.startLive(0);
-      btns.enable('join', false, `in ${ROOM}`);
-      d.log(ok ? `joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}` : `joined ${ROOM}, but the two sites did not hear each other`, ok ? 'hi' : 'bad');
-      return ok;
-    })();
-    return joining;
+  const timers = new Set();
+  const PORTS = [
+    { id: PAT, dir: 'out', medium: 'midi', emits: ['note'] },
+    // The timer: wakes up at `at`, then says play now.
+    { id: TIMER_IN, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      const t = setTimeout(() => {
+        timers.delete(t);
+        due.timer.push({ pos: e.pos, at: e.at });
+        click('timer', ctx.currentTime, 660);
+      }, Math.max(0, (e.at - ctx.currentTime) * 1000));
+      timers.add(t);
+    } },
+    // The sound card: told `at` in advance, it starts the click exactly then.
+    { id: CARD_IN, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      due.soundcard.push({ pos: e.pos, at: e.at });
+      click('soundcard', e.at, 990);
+    } },
+    { id: TIMER_OUT, dir: 'out', medium: 'audio' },
+    { id: CARD_OUT, dir: 'out', medium: 'audio' },
+    { id: SPK, dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort(p);
+  for (const [a, b] of [[PAT, TIMER_IN], [PAT, CARD_IN], [TIMER_OUT, SPK], [CARD_OUT, SPK]]) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
   }
 
-  // Key presses go out in order, after the join their first press started.
-  let chain = Promise.resolve();
-  const play = (ev) => { chain = chain.then(() => join()).then((ok) => { if (ok) here.emit(KEYS, ev); }); };
+  // ── the sender: wakes every 25 ms and hands over what is due in the next 100 ─
+  const deck = createDeck({ items: [], range: [0, LENGTH] });
+  let loop = null, anchor = null, next = 0;
+  const audioAt = (pos) => anchor.a + (pos - anchor.p) / 1000;
+  function tick() {
+    if (!deck.playing()) { stop(); return; }
+    const horizon = ctx.currentTime + AHEAD;
+    while (next < ROWS.length && audioAt(ROWS[next]) < horizon) {
+      const pos = ROWS[next++], at = audioAt(pos);
+      if (at < ctx.currentTime) continue;      // already gone by: never sent late
+      bay.send(PAT, { cls: 'note', ch: 1, d1: 60, d2: 100, at, pos });
+    }
+    measure();
+  }
+  async function start() {
+    await audio();
+    let p = deck.position();
+    if (p >= LENGTH - STEP) { p = 0; deck.seek(0); }
+    for (const lane of ['timer', 'soundcard']) due[lane].length = 0;
+    anchor = { p, a: ctx.currentTime + 0.05 };
+    next = ROWS.findIndex((r) => r >= p);
+    if (next < 0) next = ROWS.length;
+    deck.play();
+    clearInterval(loop);
+    loop = setInterval(tick, TICK);
+    tick();
+  }
+  function stop() {
+    clearInterval(loop); loop = null;
+    for (const t of timers) clearTimeout(t);
+    timers.clear();
+    for (const n of live) { try { n.stop(); } catch { /* not started */ } }
+    live.clear();
+    if (deck.playing()) deck.pause();
+    measure();
+  }
 
-  const btns = createButtonGroup({ buttons: [{ id: 'join', label: 'Join', title: `room ${ROOM}`, onPress: () => join() }] });
+  // ── what it measured: readout cells, gutters and the colour of each mark ─
+  const fmt = (x) => Math.round(x * 100) / 100;
+  const sign = (x) => { const r = Math.round(x * 100) / 100 || 0; return `${r >= 0 ? '+' : ''}${r.toFixed(2)}`; };
+  const NOT_YET = '#3b424e';
+  // Green under a millisecond, amber under ten, red past that.
+  const band = (ms) => (Math.abs(ms) < 1 ? '#8fd6a8' : Math.abs(ms) < 10 ? '#ffd400' : '#e0908a');
+  function stats(m) {
+    const xs = [...m.values()].sort((a, b) => a - b);
+    if (!xs.length) return null;
+    return { p50: xs[xs.length >> 1], worst: xs.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0) };
+  }
+  function measure() {
+    for (const [lane, key] of [['timer', 'timer'], ['soundcard', 'sound card']]) {
+      const s = stats(late[lane]);
+      d.set(`${key} median`, s ? fmt(s.p50) : '');
+      d.set(`${key} worst`, s ? fmt(s.worst) : '');
+      const L = view.strip.lanes().find((x) => x.id === lane);
+      if (L) L.subLabel = s ? [`median ${sign(s.p50)} ms`, `worst ${sign(s.worst)} ms`] : [];
+    }
+    view.strip.invalidate();
+  }
 
-  const host = el('div');
-  const kb = createKeyboard(host, {
-    ...keyRange(21), base: 48,
-    onDown: (note, how) => { if (how !== 'midi') play({ cls: 'note', ch: 1, d1: note, d2: 100 }); },
-    onUp: (note, how) => { if (how !== 'midi') play({ cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, {
+    scrub: false, loop: false, live: false,
+    command: { play: () => start(), pause: () => stop() },
   });
-
-  // ── the timeline: one mark per note, where it arrived ───────────────────
-  const deck = createDeck({ items: [], range: [0, WINDOW] });
-  const shelf = el('div');
-  const view = createStripView(shelf, deck, {
-    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view,
-    // scaling out as it grows, the cursor at now. Asked 2026-10-12: *"do not
-    // scroll, just scale out like typist etc"*, then *"why cursor aint moving?
-    // ... we need std behaviour here"*.
-    size: 'auto', follow: false, gutter: 120, footer: true, live: { minSpan: WINDOW },
-    lanes: [{
-      id: 'lag', kind: 'note', label: 'delay', height: 56, width: 2, as: 'ticks', terse: true,
-      rows: () => arrived.map((a, i) => ({ at: a.at, id: `a${i}`, kind: 'note', payload: a })),
-      colorOfRow: (r) => band(r.payload.ms), rankOfRow: (r) => r.payload.ms,
-      describeRow: (r) => [nameOf(r.payload.n), `${r.payload.ms} ms`],
-    }],
+  const laneSpec = (id, label) => ({
+    id, kind: 'hit', label, height: 52, width: 2, as: 'ticks', terse: true,
+    rows: () => ROWS.map((at, i) => ({ at, id: `${id}${i}`, kind: 'hit', payload: { pos: at } })),
+    colorOfRow: (r) => (late[id].has(r.at) ? band(late[id].get(r.at)) : NOT_YET),
+    rankOfRow: (r) => (late[id].has(r.at) ? Math.abs(late[id].get(r.at)) : -1),
+    describeRow: (r) => (late[id].has(r.at) ? [label, `${sign(late[id].get(r.at))} ms`] : [label, 'not played yet']),
   });
-  const show = () => view.strip.invalidate();
-
-  // ── plain names on screen, the real ids on hover ──────────────────────────
-  // Asked 2026-10-12: *"labels are super confusing"*. Three made-up codes
-  // (`here-xj5`, `lag-fs3fmz`, `there-6f3`) told a reader nothing about which end
-  // was which. The wire keeps the random ids, so two tabs never collide, and the
-  // picture shows SIMULATED names (positron-concepts): this browser is `web-1`, the
-  // other place `web-2`, the relay `cf-relay:<role>`. The real id is on hover.
-  // ⚠️ PAGE LOCAL: bay-view draws a box's title from `node.id` and has no display
-  // name hook, and patchbay.mjs types `Cloudflare` under the relay box itself.
-  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
-  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
-  const realOf = new Map();
-  const named = (src) => ({
-    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
-    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
-    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  const view = createStripView(glue, deck, {
+    // The whole pattern in view at every width (`whole`), and marks too close
+    // to draw apart binned (`bin`), as on every clock page. Asked 2026-10-12:
+    // *"do not scroll, just scale out like typist etc"*, then *"keep minimum
+    // separation between event bars? ... we need std behaviour here"*. This page
+    // plays a fixed pattern, so its cursor is the deck's own playhead.
+    size: 'auto', follow: false, gutter: 132, footer: true, whole: true, bin: true,
+    lanes: [laneSpec('timer', 'timer'), laneSpec('soundcard', 'sound card')],
   });
-  function hovers(root, relay) {
-    const fix = () => {
-      for (const g of root.querySelectorAll('.lv-box')) {
-        if (g.querySelector('title')) continue;
-        const id = g.querySelector('.lv-title')?.textContent || '';
-        const isRelay = id === `cf-relay:${relay}`;
-        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
-        g.prepend(t);
-        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
-      }
-    };
-    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
-    fix();
-  }
+  const surface = createGlue(bar.el, view.surface);
 
-  // ── the patchbay: the link and the relay that carries it ────────────────
-  // Drawn from this tab's own two graphs, so it is whole before Join.
-  const pic = createBay();
-  for (const g of [G_HERE, G_THERE]) {
-    for (const n of g.nodes) pic.addNode(n);
-    for (const p of g.ports) pic.addPort(p);
-  }
-  pic.link(KEYS, SYNTH);
-  pic.link(AOUT, SPK);
-  const pb = createPatchbay(named(pic), { room: 'lag', flowing: () => voices.size > 0 });
-  hovers(pb.el, 'lag');
+  // ── the patchbay: one source, two links, two ways of acting on `at` ─────
+  const pb = createPatchbay(bay, { flowing: () => live.size > 0 });
 
-  d.stack.add(btns.el, host, view.surface, pb.el);
-  addEventListener('pagehide', () => { here.leave(); there.leave(); });
+  // ── a busy page: the main thread blocked 40 ms in every 120 ─────────────
+  // What a page doing real work does to a timer. The sound card does not care.
+  let busy = null;
+  const load = createChoice({ label: 'page', options: [['idle', false], ['busy', true]], at: 0, onPick: (on) => {
+    clearInterval(busy); busy = null;
+    if (on) busy = setInterval(() => { const until = performance.now() + 40; while (performance.now() < until) { /* work */ } }, 120);
+    d.log(on ? 'page busy: the main thread is blocked 40 ms in every 120' : 'page idle');
+  } });
+
+  d.stack.add(load.el, surface, pb.el);
+  addEventListener('pagehide', () => { clearInterval(busy); stop(); ctx?.close(); });
+  window.__clock = { late, due, ctx: () => ctx };
   d.ready();
 </script>

@@ -2,7 +2,9 @@
 
 Asked: *"move to archive https://positron.studio/concepts/clock/040/. add short
 summary what you said on it"*. The page stays deployed at
-`/concepts/clock/040/` and is off the concepts index. It was built in commit
+`/archive/clock-follow/` (it was at `/concepts/clock/040/` until the clock pages
+were renumbered the same day; that address is gone) and is off the concepts
+index. It was built in commit
 `fafd676b` together with the bay's `ahead` and `follow` link options.
 
 ## What it was for

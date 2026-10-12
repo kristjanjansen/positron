@@ -7,283 +7,440 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON concept clock 070</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-rec { color: var(--rec, #e5484d); }
+  .cc-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+</style>
 <script type="module">
-  // concepts clock/070, JOIN LATE, 2026-10-12. One idea: a place that arrives
-  // while the groove runs needs only the anchor and its own clock's error, and
-  // then it lands on the right beat at once, with nothing replayed.
+  // concepts clock/070, ALIGNED AFTER, 2026-10-12. One idea: once a show is
+  // recorded, nothing travels any more, and the recording is the clock.
   //
-  // clock/020 plus a third place. Play starts `web-1` (the true clock) and
-  // `web-2` exactly as clock/020 does. Join, pressed while they play, brings in
-  // `web-3`: a third socket in the room, its clock set wrong by its own random
-  // 100 to 300 ms. Two things reach it:
-  //   - the anchor `{ bpm, epoch }`. `web-1` sends it again when a newcomer
-  //     asks the room for its graphs and its `clock-out -> *:beat:clock-in` link
-  //     reaches a place it has not sent to, so a newcomer is answered and nobody
-  //     sends a beat;
-  //   - its clock's error, from three bursts of peer.mjs pings against `web-1`.
-  // With both in hand `web-3` works out which beat is next on its corrected
-  // clock and hands it to the sound card ahead, as the other two do.
-  // `join to beat` is from the press to the audio time of `web-3`'s first beat,
-  // on the true clock; `first beat` is how far that beat lands from `web-1`'s.
+  // Follow (archived, now /archive/clock-follow/) with a recorder added. The same two places, `there`'s clock set
+  // wrong and corrected by peer.mjs. `web-1` has the keyboard and a camera; the
+  // camera is a canvas that flashes on every key, so a key press is in the
+  // PICTURE as well as in the notes. `web-2` holds a recorder:
+  //   - the picture is recorded with MediaRecorder, and its media time 0 is
+  //     written down as `T0`, the shared time the recorder was started;
+  //   - every key crosses the relay as one `bay.event` stamped with `at`, the
+  //     shared time it was pressed (plan-routing-time §4.2, *aligned after*),
+  //     and the recorder logs it beside the shared time it ARRIVED.
+  // Play puts the take back on one timeline, the video's own: each note is due
+  // at `at - T0` of media time, and the sound card is told when that frame
+  // reaches the glass, by requestVideoFrameCallback. `off by` is measured from
+  // the recording itself: the media time of the frame where a flash first
+  // shows, against the media time the log says its note belongs to. `by
+  // arrival` is the same measured against the arrival times instead, which is
+  // the relay leg a log without `at` would have kept.
   //
-  // Nothing opens on a visit. Play joins the room; Join is off until it has.
+  // ⚠️ THE PICTURE IS A CANVAS IN THIS TAB, NOT A CAMERA, so the press can be
+  // found in the frames without a person in front of a lens. Where media time
+  // 0 sits is part of what `off by` measures (plan-routing-time §3 called the
+  // recorder's start gap unmeasured); see `record()` for what was found.
+  //
+  // Nothing opens on a visit. Record joins the room and starts the recorder.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
+  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
   const asked = new URLSearchParams(location.search).get('room');
-  const ROOM = asked && ROOM_RE.test(asked) ? asked : `late-${rand(6)}`;
-  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`, LATE = `late-${rand(3)}`;
-  const CLK = `${HERE}:clock:clock-out`;
-  const IN = { here: `${HERE}:beat:clock-in`, there: `${THERE}:beat:clock-in`, late: `${LATE}:beat:clock-in` };
-  const BPM = 120, STEP = 60000 / BPM;
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `after-${rand(6)}`;
+  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
+  const KEYS = `${HERE}:keys:midi-out`, CAM = `${HERE}:cam:video-out`, MON = `${HERE}:synth:midi-in`;
+  const REC = { midi: `${THERE}:rec:midi-in`, video: `${THERE}:rec:video-in`, mout: `${THERE}:rec:midi-out`, vout: `${THERE}:rec:video-out` };
+  const SYN = `${THERE}:synth:midi-in`, SCREEN = `${THERE}:screen:video-in`;
+  const FPS = 60;
 
+  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
   const G_HERE = graphOf(HERE, 'here', [
-    { id: `${HERE}:clock`, kind: 'engine', label: 'clock', place: 'browser' },
-    { id: `${HERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' },
+    { id: `${HERE}:keys`, kind: 'person', label: 'keyboard', place: 'browser' },
+    { id: `${HERE}:cam`, kind: 'device', label: 'camera', place: 'browser' },
+    { id: `${HERE}:synth`, kind: 'engine', label: 'synth', place: 'browser' },
   ], [
-    { id: CLK, label: 'clock', dir: 'out', medium: 'clock' },
-    { id: IN.here, label: 'beat', dir: 'in', medium: 'clock' },
+    { id: KEYS, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: CAM, label: 'camera', dir: 'out', medium: 'video' },
+    { id: MON, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] },
   ]);
-  const beatGraph = (site, label, port) => graphOf(site, label, [{ id: `${site}:beat`, kind: 'engine', label: 'beat', place: 'browser' }],
-    [{ id: port, label: 'beat', dir: 'in', medium: 'clock' }]);
-  const G_THERE = beatGraph(THERE, 'there', IN.there), G_LATE = beatGraph(LATE, 'late', IN.late);
+  const G_THERE = graphOf(THERE, 'there', [
+    { id: `${THERE}:rec`, kind: 'store', label: 'recorder', place: 'browser' },
+    { id: `${THERE}:synth`, kind: 'engine', label: 'synth', place: 'browser' },
+    { id: `${THERE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
+  ], [
+    { id: REC.midi, label: 'rec', dir: 'in', medium: 'midi', accepts: ['note'] },
+    { id: REC.video, label: 'rec', dir: 'in', medium: 'video' },
+    { id: REC.mout, label: 'rec', dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: REC.vout, label: 'rec', dir: 'out', medium: 'video' },
+    { id: SYN, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] },
+    { id: SCREEN, label: 'screen', dir: 'in', medium: 'video' },
+  ]);
 
   const d = mount({ name: 'concept clock 070', what: '', index: '/concepts/', indexLabel: 'concepts',
-    // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
-    // All about web-3: how long from Join to its first beat, how far that first
-    // beat landed from web-1's, and then how far apart its beats land.
-    readout: { 'join to beat': 'ms', 'first beat': 'ms', apart: 'ms', worst: 'ms' } });
+    // How far each note lands from its own flash in the recording, typical and
+    // worst; the same against arrival times; and how many notes the take holds.
+    readout: { 'off by': 'ms', worst: 'ms', 'by arrival': 'ms', notes: '' } });
   conceptNav('clock/070');
 
-  const S = soundCard();
+  // ── one sound card ──────────────────────────────────────────────────────
+  let ctx = null, anchor = null;
+  async function audio() {
+    if (ctx) return;
+    ctx = new AudioContext({ latencyHint: 'interactive' });
+    ctx.resume();            // not awaited: a resume waits on a gesture and never rejects (positron-verify)
+    reanchor();
+  }
+  function reanchor() {
+    let best = null;
+    for (let i = 0; i < 5; i++) {
+      const w1 = epochNow(), a = ctx.currentTime, w2 = epochNow();
+      if (!best || w2 - w1 < best.spread) best = { e: (w1 + w2) / 2, a, spread: w2 - w1 };
+    }
+    anchor = best;
+  }
+  const audioAt = (local) => Math.max(ctx.currentTime, anchor.a + (local - anchor.e) / 1000);
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  const live = new Set();
+  function pluck(at, n, vel, bright) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = bright ? 'triangle' : 'sine';
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.18 * (vel / 127), at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.35);
+    o.connect(g).connect(ctx.destination);
+    o.start(at); o.stop(at + 0.4);
+    live.add(o); o.onended = () => live.delete(o);
+  }
 
-  // ── a place: its own clock, its correction, and the beats it plays ──────
-  const AHEAD = 100, TICK = 25;
-  function place(name, hz) {
-    const P = { name, hz, skew: 0, peer: null, ready: false, clock: null, played: new Map() };
+  // ── two places and their clocks, as clock/060 ───────────────────────────
+  function place(name) {
+    const P = { name, skew: 0, peer: null };
     P.raw = () => epochNow() + P.skew;
-    P.off = () => (P.peer ? P.peer.offsetMs() : 0);
-    P.now = () => P.raw() + P.off();
-    P.audioAt = (T) => S.audioOf(T - P.off() - P.skew);
-    P.tick = () => {
-      const c = P.clock;
-      if (!c || !P.ready || !S.ctx) return;
-      const now = P.now();
-      for (let k = Math.max(0, Math.ceil((now - c.epoch) / STEP)); c.epoch + k * STEP < now + AHEAD; k++) {
-        if (P.played.has(k)) continue;
-        const at = P.audioAt(c.epoch + k * STEP);
-        if (at < S.ctx.currentTime) continue;
-        S.click(at, hz);
-        P.played.set(k, { at, T: c.epoch + k * STEP });
-        P.onFirst?.(k, at);
-        P.onFirst = null;
-      }
+    P.offset = () => {
+      if (!P.peer) return null;
+      const agreed = (there.peer?.peers() || []).some((p) => Number.isFinite(p.rttMs));
+      return agreed ? P.skew + P.peer.offsetMs() : null;
     };
+    P.now = () => { const o = P.offset(); return o == null ? null : epochNow() + o; };
     return P;
   }
-  const here = place('web-1', 880), there = place('web-2', 1320), late = place('web-3', 1760);
-  here.ready = true;
-  const P_OF = { [IN.here]: here, [IN.there]: there, [IN.late]: late };
+  const here = place('web-1'), there = place('web-2');
 
-  // ── the bays ─────────────────────────────────────────────────────────────
+  // ── the camera: a canvas that flashes on every key ──────────────────────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const cam = document.createElement('canvas');
+  cam.width = 320; cam.height = 180;
+  const cg = cam.getContext('2d');
+  let flash = null;              // { n, until } the key being shown
+  function drawCam() {
+    const t = epochNow();
+    const on = flash && t < flash.until;
+    cg.fillStyle = on ? '#f0f0f0' : '#151b26';
+    cg.fillRect(0, 0, 320, 180);
+    // A bar that always moves, so the stream always has a new frame to send.
+    cg.fillStyle = on ? '#0b0e14' : '#3b424e';
+    cg.fillRect(0, 170, ((t % 2000) / 2000) * 320, 10);
+    cg.font = '40px ui-monospace, Menlo, monospace';
+    cg.fillStyle = on ? '#0b0e14' : '#6f7d94';
+    cg.fillText(on ? nameOf(flash.n) : 'camera', 20, 100);
+  }
+  const camPanel = createVideoPanel({ media: cam, left: false });
+
+  // ── the recorder at web-2 ───────────────────────────────────────────────
+  let rec = null, chunks = [];
+  const take = { T0: null, notes: [], blobUrl: null, durationMs: 0 };   // notes: { k, n, vel, at, arrived }
+  function onRec(e, l, m) {
+    if (!rec || !e.d2) return;
+    const arrived = there.now();
+    take.notes.push({ k: e.k, n: e.d1, vel: e.d2, at: Number.isFinite(m.at) ? m.at : null, arrived });
+    pb.pulse(plain(KEYS), plain(REC.midi));
+    d.set('notes', take.notes.length);
+  }
+
+  // ── the bays ────────────────────────────────────────────────────────────
   function bayHere() {
     const b = nodeHere.registry.fill(createBay());
-    b.addPort({ ...b.port(IN.here), deliver: (e) => onClock(here, e) });
-    b.link(CLK, IN.here, [], { site: HERE });
-    b.link(CLK, '*:beat:clock-in', [], { site: HERE });
+    b.addPort({ ...b.port(MON), deliver: (e) => { if (ctx && e.d2) pluck(ctx.currentTime, e.d1, e.d2, false); } });
+    b.link(KEYS, MON, [], { site: HERE });
+    if (b.port(REC.midi)) b.link(KEYS, REC.midi, [], { site: HERE });
     return b;
   }
-  const bayFar = (node, site, port, P) => () => {
-    const b = node.registry.fill(createBay());
-    b.addPort({ ...b.port(port), deliver: (e) => onClock(P, e) });
-    b.link('*:clock:clock-out', port, [], { site });
+  function bayThere() {
+    const b = nodeThere.registry.fill(createBay());
+    b.addPort({ ...b.port(REC.midi), deliver: onRec });
+    if (b.port(KEYS)) b.link(KEYS, REC.midi, [], { site: THERE });
     return b;
-  };
+  }
   const log = (line, kind) => d.log(line, kind);
-  // 🔴 THE ANSWER RIDES web-1's OWN graph.ask REPLY. A newcomer announces and then
-  // asks; web-1 announces back and sends the anchor right after, on the same
-  // socket, so the newcomer has web-1's graph before the anchor arrives and its
-  // bay accepts it. Sending when the target first appeared raced that graph and
-  // was refused (MEASURED on the first drive: web-3 never heard the anchor).
-  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log,
-    onMessage: (m) => { if (m.type === 'graph.ask') answerNewcomers(); } });
-  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: () => bayThere(), log });
-  const nodeLate = createBayNode({ room: ROOM, graphs: [G_LATE], bay: () => bayLate(), log });
-  const bayThere = bayFar(nodeThere, THERE, IN.there, there), bayLate = bayFar(nodeLate, LATE, IN.late, late);
+  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
+  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
 
-  function onClock(P, e) {
-    const c = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
-    const again = P.clock && P.clock.epoch === c.epoch;
-    P.clock = c;
-    const port = Object.keys(P_OF).find((k) => P_OF[k] === P);
-    pb.pulse(plain(CLK), plain(port));
-    if (!again) d.log(`${P.name} heard the anchor: ${e.bpm} bpm from ${new Date(c.epoch).toISOString().slice(11, 23)}`);
-    if (P === late) late.heardAt ??= epochNow();
+  // ── join and agree the time, on the first press of record ───────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let joining = null;
+  function join() {
+    if (joining) return joining;
+    joining = (async () => {
+      await audio();
+      there.skew = Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
+      await Promise.all([nodeHere.join(), nodeThere.join()]);
+      const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
+      const tag = rand(6);
+      here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: here.raw });
+      there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw });
+      d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
+      const has = () => !!bayHere().targets(KEYS).find((t) => t.to === REC.midi) && here.offset() != null;
+      for (let i = 0; i < 80 && !has(); i++) await sleep(50);
+      await sleep(600);
+      const ok = has();
+      d.log(ok ? `the clocks agree, web-2 corrects its clock by ${fmt(there.peer.offsetMs())} ms` : 'the two places did not hear each other', ok ? 'hi' : 'bad');
+      return ok;
+    })();
+    return joining;
   }
 
-  // ── web-1 answers a newcomer with the same anchor, once per place ───────
-  let anchor = null;
-  const answered = new Set();
-  const sent = { anchors: 0 };
-  function sendAnchor(why) {
-    const r = nodeHere.emit(CLK, anchor);
-    sent.anchors++;
-    for (const to of r.far) answered.add(to);
-    d.log(`web-1 sent the anchor ${why}, ${sent.anchors} sent so far`);
+  // ── record ──────────────────────────────────────────────────────────────
+  async function record() {
+    if (rec) return stopRecording();
+    if (!(await join())) return;
+    stopPlay();
+    chunks = []; take.notes = []; take.T0 = null; seen.length = 0; marks.clear();
+    if (take.blobUrl) URL.revokeObjectURL(take.blobUrl);
+    const stream = cam.captureStream(FPS);
+    rec = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    const started = new Promise((r) => { rec.onstart = r; });
+    take.T0call = there.now();
+    rec.start(250);
+    await started;
+    take.T0start = there.now();
+    /* 🔴 T0 IS THE SHARED TIME OF THE start() CALL, NOT OF THE `start` EVENT.
+       MEASURED 2026-10-12, headless Chrome, a 30 fps canvas: the event fired
+       111 ms after the call, and with T0 taken there every flash in the take
+       sat 104 to 134 ms after its note; with T0 at the call, 0 to 21 ms, which
+       is under one frame. Media time 0 is the call. At 60 fps (FPS) two runs
+       read a median of -9.0 and +2.7 ms, worst 17.8 and 26.2. */
+    take.T0 = take.T0call;
+    take.startLocal = epochNow();
+    view.strip.startLive(0);     // media time 0 is now, and the strip's cursor is the recording head
+    face();
+    d.set('notes', 0);
+    d.log(`recording: the camera into the recorder, and every key with the shared time it was pressed. The recorder said it started ${Math.round(take.T0start - take.T0call)} ms after it was asked`);
   }
-  function answerNewcomers() {
-    if (!anchor) return;
-    const fresh = bayHere().targets(CLK).map((t) => t.to).filter((to) => to !== IN.here && !answered.has(to));
-    if (fresh.length) sendAnchor(`again, because ${fresh.map((t) => plain(t).split(':')[0]).join(', ')} arrived`);
-  }
-
-  // ── play: web-1 and web-2, as clock/020 ─────────────────────────────────
-  let loop = null, playing = false, busy = false, tag = '';
-  const url = () => `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
-  const skewOf = () => Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
-  async function play() {
-    if (playing || busy) return;
-    busy = true;
-    await S.open();
-    there.skew = skewOf();
-    await Promise.all([nodeHere.join(), nodeThere.join()]);
-    tag = rand(6);
-    here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url()), now: here.raw });
-    there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url()), now: there.raw });
-    d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
-    const has = () => !!bayHere().targets(CLK).find((t) => t.to === IN.there)
-      && there.peer.peers().some((p) => Number.isFinite(p.rttMs));
-    for (let i = 0; i < 80 && !has(); i++) await sleep(50);
-    await sleep(600);
-    S.reanchor();
-    there.ready = true;
-    loop = setInterval(() => { here.tick(); there.tick(); late.tick(); }, TICK);
-    anchor = { bpm: BPM, epoch: Math.round(here.now() + 500) };
-    sendAnchor('once, to start');
-    first = epochNow();            // the run starts here, and the strip's cursor with it
-    view.strip.startLive(0);
-    playing = true; busy = false;
-    btns.setIcon('go', 'stop', 'Stop');
-    btns.enable('join', true);
-  }
-
-  // ── join: web-3 arrives while the groove runs ───────────────────────────
-  let joinedLate = false;
-  const lateRun = { pressed: 0, first: null };
-  async function joinLate() {
-    if (!playing || joinedLate) return;
-    joinedLate = true;
-    btns.enable('join', false, 'web-3 is in the room');
-    late.skew = skewOf();
-    lateRun.pressed = epochNow();
-    late.heardAt = null;
-    late.onFirst = (k, at) => {
-      lateRun.first = { k, at, onTrue: S.epochOf(at) };
-      const g = gapOf(late, k);
-      d.log(`web-3 played its first beat, number ${k}, ${fmt(S.epochOf(at) - lateRun.pressed)} ms after Join, ${g == null ? '' : `${fmt(g)} ms from web-1's`}`, 'hi');
-    };
-    d.log(`web-3 joins ${ROOM} as ${LATE}, its clock set ${Math.abs(late.skew)} ms ${late.skew > 0 ? 'fast' : 'slow'} and not told`, 'hi');
-    await nodeLate.join();
-    late.peer = createPeer({ id: `c-${tag}`, transport: wsTransport(url()), now: late.raw });
-    // Ready once it has the anchor and three bursts of pings have come back from
-    // web-1, the fastest kept. ONE burst was not enough: MEASURED on the second
-    // drive, the first burst's best round trip put web-3's first beat 62 ms off,
-    // and the next bursts brought it to 1.85.
-    const ref = `a-${tag}`;
-    const got = (n) => late.peer.peers().some((p) => p.id === ref && p.samples >= n);
-    for (let burst = 1; burst <= 3; burst++) {
-      for (let i = 0; i < 100 && !got(5 * burst); i++) await sleep(10);
-      if (burst < 3) late.peer.ping();
-    }
-    for (let i = 0; i < 100 && !late.clock; i++) await sleep(20);
-    late.ready = !!late.clock;
-    d.log(`web-3 has the anchor at +${fmt((late.heardAt ?? epochNow()) - lateRun.pressed)} ms and its clock's error, ${fmt(late.off())} ms, at +${fmt(epochNow() - lateRun.pressed)} ms`);
-  }
-
-  function stop() {
-    clearInterval(loop); loop = null;
-    for (const n of [nodeHere, nodeThere, nodeLate]) n.leave();
-    for (const P of [here, there, late]) { P.peer?.dispose(); P.peer = null; P.clock = null; }
-    late.ready = there.ready = false;
-    S.hush();
-    anchor = null; answered.clear();
-    playing = false; joinedLate = false;
+  async function stopRecording() {
+    const r = rec;
+    rec = null;
+    const done = new Promise((res) => { r.onstop = res; });
+    r.stop();
+    await done;
+    take.durationMs = epochNow() - take.startLocal;
     view.strip.stopLive();
-    btns.setIcon('go', 'play', 'Play');
-    btns.enable('join', false, 'Play first');
-    d.log(`stopped: the anchor was sent ${sent.anchors} times, once per place, and no beat was ever sent`);
+    take.blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+    player.src = take.blobUrl;
+    face();
+    d.log(`took ${fmt(take.durationMs / 1000)} s and ${take.notes.length} notes; press play to put them back on the video's own clock`);
+    show();
+  }
+  function face() {
+    const b = btns.button('rec');
+    setIcon(b, rec ? 'stop' : 'record', rec ? 'stop recording' : 'record');
+    b.classList.toggle('cc-rec', !rec);
+    btns.enable('play', !rec && !!take.blobUrl, rec ? 'recording' : 'nothing recorded yet');
   }
 
-  const btns = createButtonGroup({ buttons: [
-    { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (playing ? stop() : play()) },
-    { id: 'join', label: 'Join', title: 'web-3 joins while the beat runs', onPress: () => joinLate() },
-  ] });
-  btns.enable('join', false, 'Play first');
-
-  // ── what it measured ────────────────────────────────────────────────────
-  const gapOf = (P, k) => { const h = here.played.get(k), t = P.played.get(k); return h && t ? (t.at - h.at) * 1000 : null; };
-  const gaps = (P) => [...P.played.keys()].map((k) => gapOf(P, k)).filter((x) => x != null);
-  let first = null;
-  const WINDOW = 8000;
-  setInterval(() => {
+  // ── play the take back: the video is the clock ──────────────────────────
+  const player = el('video', '', null, { playsinline: '', muted: '' });
+  player.muted = true;
+  const playPanel = createVideoPanel({ media: player, left: false });
+  const seen = [];               // media ms of each frame where a flash first shows
+  const marks = new Map();       // k -> { atMs, arrMs, flashMs }
+  let playing = false, lastFlash = false, scheduled = new Set();
+  const probe = document.createElement('canvas');
+  probe.width = 4; probe.height = 4;
+  const pg = probe.getContext('2d', { willReadFrequently: true });
+  function onFrame(now, meta) {
     if (!playing) return;
-    if (lateRun.first) {
-      d.set('join to beat', fmt(lateRun.first.onTrue - lateRun.pressed));
-      const g0 = gapOf(late, lateRun.first.k);
-      if (g0 != null) d.set('first beat', fmt(g0));
+    const mediaMs = meta.mediaTime * 1000;
+    // What this frame shows: is the flash on.
+    pg.drawImage(player, 0, 0, 4, 4);
+    const px = pg.getImageData(1, 1, 1, 1).data;
+    const on = px[0] + px[1] + px[2] > 384;
+    if (on && !lastFlash) seen.push(mediaMs);
+    lastFlash = on;
+    // When this frame is on the glass, and so when every note due soon is.
+    const local = performance.timeOrigin + meta.expectedDisplayTime;
+    for (const x of take.notes) {
+      if (scheduled.has(x.k) || x.at == null) continue;
+      const due = x.at - take.T0;
+      if (due > mediaMs + 150) continue;
+      scheduled.add(x.k);
+      pluck(audioAt(local + (due - mediaMs) / player.playbackRate), x.n, x.vel, true);
+      pb.pulse(plain(REC.mout), plain(SYN));
     }
-    const g = gaps(late).slice(-16);
-    if (g.length) { d.set('apart', fmt(median(g))); d.set('worst', fmt(worst(g))); }
-    for (const P of [there, late]) {
-      const L = view.strip.lanes().find((x) => x.id === P.name), gg = gaps(P).slice(-16);
-      if (L && gg.length) L.subLabel = [`median ${fmt(median(gg))} ms`, `worst ${fmt(worst(gg))} ms`];
-    }
-    view.strip.invalidate();
-  }, 250);
+    pb.pulse(plain(REC.vout), plain(SCREEN));
+    player.requestVideoFrameCallback(onFrame);
+  }
+  async function play() {
+    if (!take.blobUrl) return;
+    if (playing) return stopPlay();
+    seen.length = 0; scheduled = new Set(); lastFlash = false;
+    reanchor();
+    player.currentTime = 0;
+    playing = true;
+    player.requestVideoFrameCallback(onFrame);
+    await player.play();
+    setIcon(btns.button('play'), 'stop', 'stop playing');
+    d.log('playing the take: each note is put on the video\'s own clock at its at less T0');
+    await new Promise((r) => { player.onended = r; });
+    stopPlay();
+    measure();
+  }
+  function stopPlay() {
+    if (!playing) return;
+    playing = false;
+    player.pause();
+    setIcon(btns.button('play'), 'play', 'play the take');
+  }
 
-  // ── the timeline: three places, the newcomer's lane starting where it joined ─
-  const deck = createDeck({ items: [], range: [0, WINDOW] });
+  // ── what it measured: each flash in the picture against its note in the log ─
+  const fmt = (x) => Math.round(x * 100) / 100;
+  const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : null; };
+  const worstOf = (xs) => xs.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
+  function measure() {
+    const ns = take.notes.filter((x) => x.at != null).sort((a, b) => a.at - b.at);
+    marks.clear();
+    ns.forEach((x, i) => marks.set(x.k, { k: x.k, n: x.n, atMs: x.at - take.T0, arrMs: x.arrived - take.T0, flashMs: seen[i] ?? null }));
+    const ok = [...marks.values()].filter((m) => m.flashMs != null);
+    const off = ok.map((m) => m.flashMs - m.atMs), arr = ok.map((m) => m.flashMs - m.arrMs);
+    d.set('off by', off.length ? fmt(med(off)) : '');
+    d.set('worst', off.length ? fmt(worstOf(off)) : '');
+    d.set('by arrival', arr.length ? fmt(med(arr)) : '');
+    for (const [id, xs] of [['at', off], ['arrival', arr]]) {
+      const L = view.strip.lanes().find((x) => x.id === id);
+      if (L && xs.length) L.subLabel = [`median ${fmt(med(xs))} ms`, `worst ${fmt(worstOf(xs))} ms`];
+    }
+    d.log(`${ok.length} of ${ns.length} notes found as flashes in the picture: by at a median ${off.length ? fmt(med(off)) : '?'} ms off, by arrival ${arr.length ? fmt(med(arr)) : '?'} ms`);
+    show();
+    return { notes: ns.length, flashes: seen.length, off, arr };
+  }
+
+  // ── the timeline is the take's own: media time ──────────────────────────
+  const deck = createDeck({ items: [], range: [0, 10000] });
   const shelf = el('div');
-  const rowsOf = (P) => () => (first == null ? [] : [...P.played.entries()]
-    .filter(([, v]) => v.T <= epochNow())
-    .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'beat', payload: { k } })));
-  const lane = (P) => ({ id: P.name, kind: 'beat', label: P.name, height: 40, width: 2, as: 'ticks', terse: true, rows: rowsOf(P),
-    ...(P === here ? { color: '#6f7d94', describeRow: () => ['web-1', 'the clock it keeps'] }
-      : { colorOfRow: (r) => { const g = gapOf(P, r.payload.k); return g == null ? '#3b424e' : band(g); },
-          rankOfRow: (r) => { const g = gapOf(P, r.payload.k); return g == null ? -1 : Math.abs(g); },
-          describeRow: (r) => { const g = gapOf(P, r.payload.k); return [P.name, g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } }) });
-  // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
-  // Play, scaling out as it grows, the cursor at now, and marks too close to
-  // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
-  // std behaviour here"*.
-  const view = createStripView(shelf, deck, { size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
-    lanes: [lane(here), lane(there), lane(late)] });
+  const band = (ms) => (Math.abs(ms) < 34 ? '#8fd6a8' : Math.abs(ms) < 100 ? '#ffd400' : '#e0908a');
+  const rowsBy = (field, ref) => () => [...marks.values()].filter((m) => m[field] != null)
+    .map((m) => ({ at: m[field], id: `${field}${m.k}`, kind: 'note', payload: { m, err: ref && m.flashMs != null ? m.flashMs - m[field] : null } }));
+  const view = createStripView(shelf, deck, {
+    // A LIVE strip (timeline/strip.mjs `startLive`) while the take records: the
+    // whole take in view, the cursor at the recording head, and after Stop the
+    // head stays at the take's end. Marks too close to draw apart are binned.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: 4000 },
+    lanes: [
+      { id: 'picture', kind: 'note', label: 'picture', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
+        rows: rowsBy('flashMs', false), describeRow: (r) => ['flash', nameOf(r.payload.m.n)] },
+      { id: 'at', kind: 'note', label: 'by at', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('atMs', true),
+        colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
+        describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
+      { id: 'arrival', kind: 'note', label: 'by arrival', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('arrMs', true),
+        colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
+        describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
+    ],
+  });
+  const show = () => view.strip.invalidate();
 
-  // ── names, and the patchbay: the anchor wire lights once per place ──────
-  const { plain, named, hovers } = plainNames(new Map([[HERE, 'web-1'], [THERE, 'web-2'], [LATE, 'web-3']]), ROOM, (id) =>
-    id === plain(`${LATE}:beat`) ? "arrives on Join, reached by web-1's * link, clock-out -> *:beat:clock-in"
-    : id === plain(`${THERE}:beat`) ? "reached by web-1's * link, clock-out -> *:beat:clock-in" : '');
+  // ── controls, keys ──────────────────────────────────────────────────────
+  const btns = createButtonGroup({ buttons: [
+    { id: 'rec', icon: 'record', label: 'record', title: `record, room ${ROOM}`, onPress: () => record() },
+    { id: 'play', icon: 'play', label: 'play the take', onPress: () => play() },
+  ] });
+  btns.button('rec').classList.add('cc-rec');
+  btns.enable('play', false, 'nothing recorded yet');
+
+  let seq = 0, chain = Promise.resolve();
+  function press(n, vel = 100) {
+    flash = { n, until: epochNow() + 120 };
+    chain = chain.then(() => join()).then((ok) => {
+      if (!ok) return;
+      // Stamped at the source with the shared time it was pressed: the log's
+      // `at` (plan-routing-time §4.2, aligned after). A plain link, so it is
+      // delivered on arrival and the recorder keeps both times.
+      nodeHere.emit(KEYS, { cls: 'note', ch: 1, d1: n, d2: vel, k: seq++ }, { at: here.now() });
+    });
+    return chain;
+  }
+  const host = el('div');
+  createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') press(note); },
+    onUp: () => {},
+  });
+
+  // ── plain names on screen, the real ids on hover, as clock/030 ──────────
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const gg of root.querySelectorAll('.lv-box')) {
+        if (gg.querySelector('title')) continue;
+        const id = gg.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
+        gg.prepend(t);
+        if (isRelay) for (const f of gg.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
+  // ── the patchbay, from both graphs; the picture links are in this tab ───
   const picture = (() => {
     const b = createBay();
-    for (const g of [G_HERE, G_THERE, G_LATE]) { for (const n of g.nodes) b.addNode(n); for (const p of g.ports) b.addPort(p); }
-    b.link(CLK, IN.here); b.link(CLK, IN.there); b.link(CLK, IN.late);
+    for (const gr of [G_HERE, G_THERE]) { for (const n of gr.nodes) b.addNode(n); for (const p of gr.ports) b.addPort(p); }
+    b.link(KEYS, MON);
+    b.link(KEYS, REC.midi);
+    b.link(CAM, REC.video);
+    b.link(REC.mout, SYN);
+    b.link(REC.vout, SCREEN);
     return b;
   })();
-  const pb = createPatchbay(named(picture), { room: 'late' });
-  hovers(pb.el, 'late');
+  const pb = createPatchbay(named({
+    nodes: () => picture.nodes(), ports: () => picture.ports(),
+    links: () => picture.links().map((l) => (l.session ? { ...l, session: { ...l.session, transport: 'in this tab' } } : l)),
+  }), { room: 'after', flowing: (l, medium) => medium === 'video' && (!!rec || playing) });
+  hovers(pb.el, 'after');
 
-  d.stack.add(btns.el, view.surface, pb.el);
-  addEventListener('pagehide', () => { if (playing) stop(); S.ctx?.close(); });
-  window.__clock = { here, there, late, lateRun, sent, gaps, joinLate, peers: () => late.peer?.peers().map((p) => [p.id, p.rttMs, p.offsetMs, p.samples]) };
+  const two = el('div', 'cc-two');
+  two.append(camPanel.el, playPanel.el);
+  d.stack.add(btns.el, two, host, view.surface, pb.el);
+  let raf = 0;
+  const loop = () => { drawCam(); raf = requestAnimationFrame(loop); };
+  raf = requestAnimationFrame(loop);
+  addEventListener('pagehide', () => {
+    cancelAnimationFrame(raf);
+    try { rec?.stop(); } catch { /* stopped */ }
+    nodeHere.leave(); nodeThere.leave(); here.peer?.dispose(); there.peer?.dispose(); ctx?.close();
+  });
+  window.__clock = { take, press, record, stopRecording, play, measure, here, there, seen: () => [...seen] };
   d.ready();
 </script>

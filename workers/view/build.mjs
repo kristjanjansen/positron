@@ -305,6 +305,20 @@ const FILES = [
   ['demo/shell/vendor/jetbrains-mono-greek-600-normal.woff2', 'shell/vendor/jetbrains-mono-greek-600-normal.woff2'],
   ['demo/shell/vendor/LICENSE-jetbrains-mono', 'shell/vendor/LICENSE-jetbrains-mono'],
 
+  // ── six sans faces set beside the brand mono, for `/kit/frontpage/` ──────
+  //
+  // 2026-10-12, *"we need sans serif to match our brand mono. bring in
+  // something matchin it, not just Inter"*. A SAMPLER, not the site's `--sans`:
+  // only `demo/kit/frontpage/index.html` loads them. Under `shell/` so the one
+  // that wins can become `--sans` without moving. 400 and 600, Latin subset,
+  // @fontsource 5.3.x (Onest 5.3.1) off cdn.jsdelivr.net, every one SIL OFL 1.1,
+  // licence beside each.
+  ...['geist', 'manrope', 'ibm-plex-sans', 'schibsted-grotesk', 'onest', 'space-grotesk'].flatMap((f) => [
+    [`demo/shell/vendor/${f}-latin-400-normal.woff2`, `shell/vendor/${f}-latin-400-normal.woff2`],
+    [`demo/shell/vendor/${f}-latin-600-normal.woff2`, `shell/vendor/${f}-latin-600-normal.woff2`],
+    [`demo/shell/vendor/LICENSE-${f}`, `shell/vendor/LICENSE-${f}`],
+  ]),
+
   ['demo/shell/vendor/meta-quest-touch-plus-left.glb', 'shell/vendor/meta-quest-touch-plus-left.glb'],
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
@@ -683,9 +697,17 @@ function conceptFiles(rel = 'demo/concepts') {
  */
 function archiveFiles() {
   const out = [];
-  for (const e of readdirSync(join(REPO, 'demo/archive'), { withFileTypes: true })) {
-    if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name))) out.push([`demo/archive/${e.name}`, `archive/${e.name}`]);
-  }
+  // One level of subdirectories as well, for a retired page kept whole
+  // (`demo/archive/clock-follow/`, the old concepts clock/040, moved there
+  // 2026-10-12 when the clock pages were renumbered).
+  const walk = (rel) => {
+    for (const e of readdirSync(join(REPO, 'demo/archive', rel), { withFileTypes: true })) {
+      const p = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory() && !rel) walk(p);
+      else if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name))) out.push([`demo/archive/${p}`, `archive/${p}`]);
+    }
+  };
+  walk('');
   const notes = ['archive/typist.md',
     ...readdirSync(join(REPO, 'archive/concepts')).filter((f) => extname(f) === '.md').map((f) => `archive/concepts/${f}`)];
   for (const n of notes) out.push([n, n]);
