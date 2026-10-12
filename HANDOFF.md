@@ -33,7 +33,7 @@
 
 ## Open, asked of the owner
 
-- **Overdub and the Loop clock are untested on the real keyboard.** A Copy log from 050 is the next thing to read.
+- **Overdub on sampler/020 works on the real keyboard**, the owner said 2026-10-12 (*"Oberdub is ok"*). The Loop clock (050) was removed the same day, BUILD `41224ad9-050134-0a88`.
 - Overdub that stops by itself after one full lap: offered as an option, not chosen.
 - **060 Laps and 070 Ahead** from `plans/plan-loop-ui.md`: not built.
 - **Start a take at its first note** when it starts more than about 1 s early (design 2.2): proposed twice, not built.
