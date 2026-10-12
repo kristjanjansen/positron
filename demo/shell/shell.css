@@ -3280,16 +3280,46 @@ button.pos-pg-lab:hover { color: var(--fg); }
    demo/shell/note-grid.mjs. One row per pattern, sixteen steps across, pitch up
    the row on one scale for the whole picture. Velocity is alpha and never
    colour: colour on this site says how a thing LANDED, and a note in a file has
-   not landed anywhere.
-   ⚠️ SAME ARRANGEMENT AS `.pos-scope`, deliberately. A picture with a caption
-   under it is a shape this project already has, and a second one that behaved
-   differently inside a glue would be two answers to one question. */
-.pos-ngrid { margin: 0; }
-.pos-ngrid-c { display: block; width: 100%; border: var(--edge); border-radius: var(--r);
-  background: var(--card); }
-.pos-ngrid-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0;
-  min-height: 1.5em; }
-.pos-glue > .pos-ngrid { margin: 0; background: var(--card); padding: 10px 12px; }
+   not landed anywhere. The one note in focus is in the accent, because it is
+   the one thing chosen.
+   🔴 ONE SURFACE: the picture with its headings, and the footer under a seam.
+   The grid is a CSS grid, so the pattern column, the beat headings and the
+   picture share tracks and cannot disagree: the column is `max-content`, as
+   wide as its widest label, and the sixteen step tracks are equal, so the
+   canvas's own `width / 16` is the track width by construction.
+   ⚠️ STICKY NEEDS A GROUND. The corner, the headings and the pattern column
+   paint `--card` or the notes scroll through them. */
+.pos-ngrid { width: 100%; border: var(--edge); border-radius: var(--r);
+  background: var(--card); overflow: clip; }
+.pos-ngrid[hidden] { display: none; }
+.pos-ngrid-scroll { overflow: auto; max-height: min(70vh, 560px);
+  overscroll-behavior-x: contain; }
+.pos-ngrid-grid { display: grid; min-width: min-content;
+  grid-template-columns: max-content repeat(16, minmax(18px, 1fr));
+  grid-template-rows: 20px repeat(var(--ng-rows, 1), var(--ng-row, 40px)); }
+.pos-ngrid-corner, .pos-ngrid-beat, .pos-ngrid-lab {
+  font: 400 11px/1 var(--mono); color: var(--dim2); background: var(--card);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pos-ngrid-corner, .pos-ngrid-beat { position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; box-shadow: inset 0 -1px var(--line); }
+.pos-ngrid-corner { left: 0; z-index: 3; grid-column: 1; grid-row: 1; padding: 0 10px; }
+.pos-ngrid-beat { grid-row: 1; padding-left: 4px; }
+.pos-ngrid-lab { position: sticky; left: 0; z-index: 1; grid-column: 1;
+  display: flex; align-items: center; padding: 0 10px; }
+.pos-ngrid-lane { grid-column: 2 / -1; position: relative; min-width: 0; }
+.pos-ngrid-c { position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  cursor: default; touch-action: pan-x pan-y; }
+.pos-ngrid-c:focus-visible { outline: 1px solid var(--hi); outline-offset: -1px; }
+.pos-ngrid-foot { padding: 10px 12px; border-top: 1px solid var(--line); }
+/* The kit's footer row scrolls on one line; here it is COLUMNS, six, three, two
+   or one, chosen by the component from its own width against its widest
+   reserved cell, so the rows are balanced and the shape is a fact about the box
+   and never about the note. */
+.pos-ngrid-foot > .pos-vp-vals { display: grid; overflow: visible; gap: 6px 14px;
+  grid-template-columns: repeat(var(--ng-cols, 3), minmax(0, 1fr)); }
+.pos-ngrid-foot > .pos-vp-vals[hidden] { display: none; }
+.pos-ngrid-foot .pos-vp-cell { justify-self: start; }
+.pos-glue > .pos-ngrid { margin: 0; }
 
 /* ── message list ─────────────────────────────────────────────────────────
    demo/shell/messages.mjs. One renderer for live traffic and for a history of

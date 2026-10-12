@@ -56,6 +56,7 @@
   // above give: a `let` left beside a block that moves is read in its dead zone.
   let liveSpec = null;        // the live run whose dense lane is binned, newest block
   let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
+  let ngSpec = null;          // { grid, ev }
   let glueSpec = null;        // { panel, bar, deck, mute }
   let fsxSpec = null;         // { host, exit, out }, a cover with a way back
   let footSpec = null;        // the strip whose footer says what is hovered
@@ -143,21 +144,26 @@ v.strip.stopLive()      // the head freezes where it is`,
    * and the thing worth seeing is PITCH, which a strip has no axis for.
    */
   section('NOTE GRID',
-    'Note events where they fall in a pattern: one row per pattern, sixteen steps '
-    + 'across, pitch up the row on one scale for the whole picture and velocity as alpha.',
-    `const grid = createNoteGrid(host)
-grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity }]`,
+    'Note events where they fall in a pattern, one row per pattern under its beats, '
+    + 'with the note in focus named in the footer.',
+    `const grid = createNoteGrid(host, { onPick })
+grid.set(notesIn(sessionBytes))   // [{ region, step, note, velocity, gate, length? }]`,
     (box) => {
+      box.classList.add('kit-wide');
       /* Two patterns a reader can check by eye: a rising line and a falling
-         one, at the same steps, so the axis is provable from the picture
-         rather than only from the caption. */
+         one, at alternate steps, so the axis is provable from the picture
+         rather than only from the footer. Lengths in steps on one of them, so
+         both footer forms are on the page: `2 steps` and a raw `gate 13`. */
       const ev = [];
       for (let i = 0; i < 8; i++) {
-        ev.push({ region: 0, step: i * 2, note: 52 + i * 3, velocity: 20 + i * 15 });
-        ev.push({ region: 4, step: i * 2 + 1, note: 73 - i * 3, velocity: 127 - i * 14 });
+        ev.push({ region: 0, step: i * 2, note: 52 + i * 3, velocity: 20 + i * 15,
+          length: i % 2 ? 1.5 : 1 });
+        ev.push({ region: 4, step: i * 2 + 1, note: 73 - i * 3, velocity: 127 - i * 14,
+          gate: 6 + i });
       }
       const grid = createNoteGrid(box, { label: 'one rising pattern and one falling' });
       grid.set(ev);
+      ngSpec = { grid, ev };
       /* 🔴 THE AXIS IS ASSERTED RATHER THAN DESCRIBED, which is what this page
          is for: a specimen nothing grades is a picture of a component that may
          already have stopped working. A higher note must sit higher, and two
@@ -603,6 +609,77 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
+
+  /**
+   * 🔴 THE NOTE GRID'S FIVE CLAIMS, asked 2026-10-12 as *"its a mess. rm hover
+   * intereacvtion. add footer to show note info. figure out left lane col.
+   * column headers?"*. Each is a measurement, and the pointer ones dispatch the
+   * events a real pointer would, at a real note's position.
+   */
+  if (ngSpec) {
+    const { grid, ev } = ngSpec;
+    const c = grid.canvas, cb = c.getBoundingClientRect();
+    const f = grid.facts(), colW = cb.width / f.steps;
+    const centre = (e) => { const p = grid.place(e);
+      return { clientX: cb.left + (p.step + 0.5) * colW, clientY: cb.top + p.y + 6 }; };
+    const ptr = (type, e) => c.dispatchEvent(new PointerEvent(type,
+      { bubbles: true, pointerId: 1, ...centre(e) }));
+
+    // 1. Pointing changes nothing.
+    const before = JSON.stringify(grid.footer()), was = grid.picked(), inkWas = grid.ink();
+    ptr('pointermove', ev[9]); ptr('pointerover', ev[9]);
+    d.assert('the note grid has no hover: a pointer over a note changes neither the footer nor the picture',
+      grid.picked() === was && JSON.stringify(grid.footer()) === before && grid.ink() === inkWas
+      && !c.title, `focus still ${grid.footer().note} at ${grid.footer().start}, ink ${grid.ink()} of ${inkWas}`);
+
+    // 2. A press and the arrows move the note in focus, and the footer names it.
+    ptr('pointerdown', ev[9]);
+    const pressed = grid.picked() === ev[9] && grid.footer().note === 'C#3'
+      && grid.footer().pattern === '5' && grid.footer().start === '3.2';
+    const key = (k) => c.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    key('ArrowRight'); const right = grid.picked() === ev[11];
+    key('ArrowUp'); const up = grid.picked()?.region === 0 && grid.picked().step === 12;
+    d.assert('a press picks the note under it and the arrows walk the notes, named in the footer',
+      pressed && right && up,
+      `press ${pressed}, right ${right}, up ${up}, footer ${JSON.stringify(grid.footer())}`);
+
+    // 3. The footer is cells in reserved widths: one height and one set of
+    //    lefts whatever note it names.
+    const shape = () => { const fb = grid.el.querySelector('.pos-ngrid-foot').getBoundingClientRect();
+      return `${fb.height.toFixed(1)}|` + ['note', 'number', 'pattern', 'start', 'length', 'velocity']
+        .map((k) => grid.footCell(k).getBoundingClientRect().left.toFixed(1)).join(','); };
+    const shapes = new Set();
+    for (const e of [ev[0], ev[1], ev[3], ev[14], ev[15]]) {
+      grid.pick(e); shapes.add(shape());
+    }
+    grid.pick(ev[0]);
+    d.assert('the footer holds one shape whatever note it names, because every cell is reserved',
+      shapes.size === 1, `${shapes.size} shape(s): ${[...shapes][0]}`);
+
+    // 4. The headings and the pattern column share the picture's tracks.
+    const beats = [...grid.el.querySelectorAll('.pos-ngrid-beat')].map((b) => b.getBoundingClientRect().left - cb.left);
+    const labs = [...grid.el.querySelectorAll('.pos-ngrid-lab')].map((l) => {
+      const r = l.getBoundingClientRect(); return [r.top - cb.top, r.height]; });
+    const beatOff = Math.max(...beats.map((x, i) => Math.abs(x - i * f.beat * colW)));
+    const labOff = Math.max(...labs.map(([t, h], i) => Math.abs(t - i * f.rowH) + Math.abs(h - f.rowH)));
+    d.assert('the beat headings sit on the beat lines and each pattern label is its row',
+      beats.length === 4 && labs.length === f.regions && beatOff < 0.5 && labOff < 0.5,
+      `4 headings at ${beats.map((x) => x.toFixed(1)).join(', ')} px, off by ${beatOff.toFixed(2)}; `
+      + `${labs.length} labels off by ${labOff.toFixed(2)}`);
+
+    // 5. Sticky when it scrolls sideways: squeeze the box, scroll, measure.
+    const sc = grid.scroller, oldW = grid.el.style.width;
+    grid.el.style.width = '240px';
+    sc.scrollLeft = 120;
+    const sb = sc.getBoundingClientRect(), lab = grid.el.querySelector('.pos-ngrid-lab').getBoundingClientRect();
+    const corner = grid.el.querySelector('.pos-ngrid-corner').getBoundingClientRect();
+    const moved = sc.scrollLeft;
+    const stuck = moved > 0 && Math.abs(lab.left - sb.left) < 0.5 && Math.abs(corner.left - sb.left) < 0.5;
+    sc.scrollLeft = 0; grid.el.style.width = oldW;
+    d.assert('in a narrow box the grid scrolls sideways under a pattern column that stays put',
+      stuck, `scrolled ${moved} px, label ${(lab.left - sb.left).toFixed(1)} px and corner `
+      + `${(corner.left - sb.left).toFixed(1)} px from the box's left edge`);
+  }
 
 
   /**

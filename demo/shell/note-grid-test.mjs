@@ -16,7 +16,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { layout, place, noteName, STEPS, ROW_H, NOTE_H } from './note-grid.mjs';
+import { layout, place, noteName, startOf, lengthOf, stepFrom, footOf, FOOT, STEPS, ROW_H, NOTE_H }
+  from './note-grid.mjs';
 
 let pass = 0, fail = 0;
 function ok(what, cond, detail = '') {
@@ -104,6 +105,53 @@ ok('NEGATIVE CONTROL: a number that cannot be a MIDI note gets no name at all',
 
 ok('a Circuit pattern is sixteen steps, read from the decoder rather than typed twice',
   STEPS === 16);
+
+// ── the footer and the walk, 2026-10-12 ────────────────────────────────────
+//
+// 🔴 THE FOOTER NAMES THE NOTE IN FOCUS AND THE ARROWS MOVE IT, so the two
+// pure halves are graded here: what each cell says, and where a key goes.
+ok('a start is counted as beat then step, which is what the column headings print',
+  startOf(0) === '1.1' && startOf(5) === '2.2' && startOf(15) === '4.4' && startOf(-1) === '',
+  `${startOf(0)} ${startOf(5)} ${startOf(15)}`);
+ok('a length in steps is printed as steps, and a raw gate as a gate, never as steps',
+  lengthOf({ length: 2 }) === '2 steps' && lengthOf({ length: 1 }) === '1 step'
+  && lengthOf({ length: 13 / 6 }) === '2.17 steps' && lengthOf({ gate: 13 }) === 'gate 13'
+  && lengthOf({}) === '',
+  `${lengthOf({ length: 13 / 6 })}, ${lengthOf({ gate: 13 })}`);
+{
+  /* NEGATIVE CONTROL: the number above the MIDI range gets no name, and the
+     footer says so in words rather than printing a name it does not have. */
+  const f = footOf({ region: 3, step: 9, note: 130, velocity: 90, gate: 4 });
+  ok('NEGATIVE CONTROL: a note number above 127 is `not MIDI` in the footer, with its number beside it',
+    f.note === 'not MIDI' && f.number === '130' && f.pattern === '4' && f.start === '3.2',
+    JSON.stringify(f));
+  const widest = { note: 'not MIDI', number: '132', pattern: '16', start: '4.4',
+    length: lengthOf({ length: 95 / 6 }), velocity: '127' };
+  ok('every footer cell reserves the widest thing it can say',
+    FOOT.every((c) => widest[c.key].length <= c.reserve) && FOOT.length % 2 === 0,
+    FOOT.map((c) => `${c.key} ${widest[c.key].length}/${c.reserve}`).join(', '));
+  ok('no note is an empty footer, every cell empty',
+    Object.values(footOf(null)).every((v) => v === ''));
+}
+{
+  const ev = [
+    { region: 0, step: 4, note: 60 }, { region: 0, step: 4, note: 64 },
+    { region: 0, step: 8, note: 62 }, { region: 2, step: 7, note: 50 },
+    { region: 2, step: 9, note: 55 },
+  ];
+  const p = layout(ev);
+  const go = (from, k) => stepFrom(ev, p, from, k);
+  ok('with nothing in focus the walk starts at the first note of the first pattern',
+    go(null, 'ArrowRight') === ev[0]);
+  ok('right walks a chord low to high and then on in time; left comes back',
+    go(ev[0], 'ArrowRight') === ev[1] && go(ev[1], 'ArrowRight') === ev[2]
+    && go(ev[2], 'ArrowLeft') === ev[1]);
+  ok('down lands on the nearest note in time in the next pattern, the higher one on a tie',
+    go(ev[2], 'ArrowDown') === ev[4] && go(ev[0], 'ArrowDown') === ev[3]);
+  ok('up from the top pattern and right from the last note go nowhere, rather than wrapping',
+    go(ev[0], 'ArrowUp') === null && go(ev[2], 'ArrowRight') === null && go(ev[0], 'Home') === null
+    && go(ev[0], 'End') === ev[2] && go(ev[0], 'a') === null);
+}
 
 // ── the owner's pack, where it is on this disk ─────────────────────────────
 const here = path.dirname(fileURLToPath(import.meta.url));
