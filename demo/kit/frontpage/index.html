@@ -108,12 +108,12 @@
   /* An imaginary patchbay under the large hero (2026-10-12, *"create
      imaginary parchbay that fits into 16:9 size under it"*): made up boxes
      drawn by the real bay view, in a 16:9 frame. */
-  .fp-bay { aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center;
-            margin-top: 32px; overflow: hidden; }
-  /* Drawn at one desk width and scaled to the frame, so a phone sees the
-     same row picture smaller rather than the bay's stacked phone layout,
-     which a 16:9 frame would cut off. */
-  .fp-bay-in { flex: none; transform-origin: center; }
+  /* Drawn at a fixed width (960 at the desk, 520 on a phone, each above the
+     bay's own stacking width) and scaled to the column; the frame takes the
+     scaled height, so five by three sits near 16:9 and two by four is
+     simply as tall as it is. */
+  .fp-bay { display: flex; justify-content: center; margin-top: 32px; overflow: hidden; }
+  .fp-bay-in { flex: none; }
 
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
      THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
@@ -323,53 +323,52 @@
       const MD = `:root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }\n`
         + MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n');
       document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS + MD }));
-      // Made of the site's real patches (kit/patchbay's examples): the keys
-      // recorded and replayed into a synth through an effect, the same keys
-      // over the relay to the Circuit on the Pi, recorded to R2, a Pico
-      // drawing the notes on its screen, a shader edited here running on the
-      // Pi's GPU, and a camera through Stream.
-      const LINKS = [
+      // Made of the site's real patches (kit/patchbay's examples). Asked:
+      // *"Make it 3 cols, max 4 rows in mob. 5x 3 will fit in in desktop?"*,
+      // then *"2 col max 4 in mobile"*. So two pictures: the DESK one is five
+      // columns of at most three, every box on a chain the column count
+      // places (keys to recorder to synth to octaver to speakers and R2; the
+      // same keys over Cloudflare to the Circuit on the Pi, which plays the
+      // Pico; a camera through Stream into a shader on the Pi's GPU), and the
+      // PHONE one is two columns of at most four, one hop each.
+      const DESK = [
         ['web:keys:midi-out', 'web:rec:midi-in'],
         ['web:keys:midi-out', 'cf-relay:room:midi-in'],
-        ['web:keys:midi-out', 'web:pico:midi-in'],
         ['web:rec:midi-out', 'web:synth:midi-in'],
+        ['cf-relay:room:midi-out', 'pi-1:circuit:midi-in'],
         ['web:synth:audio-out', 'web:fx:audio-in'],
         ['web:fx:audio-out', 'web:speaker:audio-in'],
-        ['cf-relay:room:midi-out', 'pi-1:circuit:midi-in'],
+        ['web:fx:audio-out', 'r2:recordings:audio-in'],
         ['pi-1:circuit:audio-out', 'web:speaker:audio-in'],
-        ['pi-1:circuit:audio-out', 'r2:recordings:audio-in'],
+        ['pi-1:circuit:midi-out', 'web:pico:midi-in'],
         ['web:pico:video-out', 'web:oled:video-in'],
         ['web:editor:program-out', 'pi-1:gpu:program-in'],
-        ['pi-1:gpu:video-out', 'web:screen:video-in'],
         ['web:camera:video-out', 'cf-stream:live:video-in'],
-        ['cf-stream:live:video-out', 'web:screen:video-in'],
+        ['cf-stream:live:video-out', 'pi-1:gpu:video-in'],
+        ['pi-1:gpu:video-out', 'web:screen:video-in'],
+      ];
+      const PHONE = [
+        ['web:keys:midi-out', 'pi-1:circuit:midi-in'],
+        ['web:keys:midi-out', 'web:pico:midi-in'],
+        ['web:editor:program-out', 'pi-1:gpu:program-in'],
+        ['web:camera:video-out', 'cf-stream:live:video-in'],
       ];
       const LABELS = { 'web:keys': 'keyboard', 'web:rec': 'recorder', 'web:synth': 'sine synth', 'web:fx': 'octaver',
         'web:speaker': 'speakers', 'cf-relay:room': 'Cloudflare', 'pi-1:circuit': 'Novation Circuit', 'r2:recordings': 'R2',
         'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:gpu': 'Pi GPU',
         'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream' };
       const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
-      const ports = new Map(), nodes = new Map();
-      const links = LINKS.map(([from, to], i) => {
-        for (const [id, dir] of [[from, 'out'], [to, 'in']]) {
-          if (!nodes.has(nodeOf(id))) nodes.set(nodeOf(id), { id: nodeOf(id), label: LABELS[nodeOf(id)] || '' });
-          if (!ports.has(id)) ports.set(id, { id, dir, medium: id.split(':')[2].replace(/-(in|out)$/, '') });
-        }
-        return { id: `l${i}`, from, to };
-      });
-      const view = createBayView({ nodes: () => [...nodes.values()], ports: () => [...ports.values()], links: () => links },
-        { detail: (n) => [{ text: n.label }] });
-      const DRAW_W = 960;
-      const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
-      inner.style.width = `${DRAW_W}px`;
-      inner.append(view.el);
-      frame.append(inner);
-      big.append(frame);
-      const fit = () => {
-        const k = Math.min(1, frame.clientWidth / DRAW_W, frame.clientHeight / (inner.offsetHeight || 1));
-        inner.style.transform = `scale(${k})`;
-      };
-      new ResizeObserver(fit).observe(frame);
+      function bayOf(pairs) {
+        const ports = new Map(), nodes = new Map();
+        const links = pairs.map(([from, to], i) => {
+          for (const [id, dir] of [[from, 'out'], [to, 'in']]) {
+            if (!nodes.has(nodeOf(id))) nodes.set(nodeOf(id), { id: nodeOf(id), label: LABELS[nodeOf(id)] || '' });
+            if (!ports.has(id)) ports.set(id, { id, dir, medium: id.split(':')[2].replace(/-(in|out)$/, '') });
+          }
+          return { id: `l${i}`, from, to };
+        });
+        return { nodes: () => [...nodes.values()], ports: () => [...ports.values()], links: () => links, portMap: ports };
+      }
       // "Working": stand-in traffic from ONE player, so the picture reads as
       // one thing happening. Every midi wire carries the keys' notes, each hop
       // a little later; each sound flares on the notes that reach it; the
@@ -389,15 +388,37 @@
         heard = due; lvl *= Math.exp(-(t - prev) / decay); prev = t;
         return { n: 0, level: lvl, flowing: lvl > 0.03 }; }; };
       const steady = (t) => ({ n: 0, level: 0.75 + 0.15 * Math.sin(t / 700), flowing: true });
-      const edits = (() => { let next = 2000; return (t) => { let n = 0; if (t >= next) { n = 1; next = t + 5000 + Math.random() * 4000; } return { n, level: 0 }; }; })();
-      const FEED = {
+      const edits = () => { let next = 2000; return (t) => { let n = 0; if (t >= next) { n = 1; next = t + 5000 + Math.random() * 4000; } return { n, level: 0 }; }; };
+      const feeds = () => ({
         'web:keys:midi-out': events(0), 'web:rec:midi-out': events(30), 'cf-relay:room:midi-out': events(60),
-        'web:synth:audio-out': sound(40, 380), 'web:fx:audio-out': sound(50, 380), 'pi-1:circuit:audio-out': sound(110, 500),
-        'web:pico:video-out': sound(20, 900), 'web:editor:program-out': edits,
-        'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady };
+        'pi-1:circuit:midi-out': events(120), 'web:synth:audio-out': sound(40, 380), 'web:fx:audio-out': sound(50, 380),
+        'pi-1:circuit:audio-out': sound(110, 500), 'web:pico:video-out': sound(20, 900), 'web:editor:program-out': edits(),
+        'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady });
+
+      const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
+      frame.append(inner);
+      big.append(frame);
       const life = createBayTraffic();
-      for (const l of links) life.add(view, l.id, ports.get(l.from).medium, FEED[l.from]);
-      createPortInk({ ports: () => [...ports.values()] }, MEDIA).paint(frame);
+      const phoneQ = matchMedia('(max-width: 560px)');
+      let drawW = 0;
+      // `zoom`, not a transform: a zoomed box takes its scaled size in the
+      // layout, so the frame is exactly as tall as the picture it shows.
+      const fit = () => { inner.style.zoom = String(Math.min(1, frame.clientWidth / drawW)); };
+      function draw() {
+        const phone = phoneQ.matches, bay = bayOf(phone ? PHONE : DESK);
+        drawW = phone ? 520 : 960;
+        inner.style.width = `${drawW}px`;
+        const view = createBayView(bay, { detail: (n) => [{ text: n.label }] });
+        inner.replaceChildren(view.el);
+        frame.classList.toggle('fp-bay-phone', phone);
+        const feed = feeds();
+        for (const l of bay.links()) life.add(view, l.id, bay.portMap.get(l.from).medium, feed[l.from]);
+        createPortInk({ ports: () => bay.ports() }, MEDIA).paint(frame);
+        requestAnimationFrame(fit);
+      }
+      draw();
+      phoneQ.addEventListener('change', draw);
+      new ResizeObserver(fit).observe(frame);
       add(big);
     }, { bare: true });
 
