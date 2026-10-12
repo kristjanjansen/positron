@@ -75,15 +75,17 @@
    * /concepts/clock/090/ as *"keep minimum separation between event bars? why
    * cursor aint moving? ... we need std behaviour here"*. A lane of 50 marks a
    * second, one in 37 late, that has been running for 20 s when the page
-   * opens: the whole run is in view, the write head is the cursor and moves
-   * with now, and the marks are binned because they are closer than their
-   * room. It stops by itself after a minute and the head stays where it was.
+   * opens: the whole run is in view at a round span, the write head is the
+   * cursor and walks across it, the view steps out only when the head reaches
+   * the edge (*"lines move very nervously here"*, on clock/010, was a view
+   * refitted every frame), and the marks are binned because they are closer
+   * than their room. It stops by itself after a minute and the head stays.
    * ⚠️ NOTHING IS FETCHED AND NO TIMER WRITES ROWS. The rows are a function of
    * the strip's own write head, so a visit costs one canvas and nothing else.
    */
   section('LIVE RUN',
-    'A strip of something being written right now: the whole run in view, the '
-    + 'cursor at now, and marks too close to draw apart binned rather than merged.',
+    'A strip of something being written right now: the whole run in view at a '
+    + 'round span, the cursor walking to now, and marks too close to draw apart binned.',
     `const v = createStripView(host, deck, { live: { minSpan: 8000 }, lanes })
 v.strip.startLive(0)    // the run starts, the cursor is the write head
 v.strip.stopLive()      // the head freezes where it is`,
@@ -902,13 +904,18 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
       !!b && b.binned && b.bins < b.rows && closest >= 2,
       b ? `${b.rows} rows in ${b.bins} bins of ${b.binPx} px, ${b.markPx} px marks, closest ${closest} px apart` : 'no bin state');
 
-    const h0 = s.wallPos(), x0 = s.timeToX(h0);
+    // A STEPPED view: the head walks, the marks stand still until a step.
+    const span0 = s.live()?.span, h0 = s.wallPos(), x0 = s.timeToX(h0), m0 = s.timeToX(10000);
     await new Promise((r) => setTimeout(r, 400));
     s.draw();
-    const h1 = s.wallPos(), x1 = s.timeToX(h1), [, right] = s.visible(), plot = s.timeToX(right);
-    d.assert('the cursor is the write head, it moves with now and stays at the right edge of the whole run',
-      s.live()?.running && h1 - h0 >= 300 && x1 <= plot && plot - x1 <= 8 && s.visible()[0] <= 0,
-      `head ${(h0 / 1000).toFixed(2)} s then ${(h1 / 1000).toFixed(2)} s, at x ${x0.toFixed(1)} then ${x1.toFixed(1)} of ${plot.toFixed(1)}, view from ${(s.visible()[0] / 1000).toFixed(2)} s`);
+    const span1 = s.live()?.span, h1 = s.wallPos(), x1 = s.timeToX(h1), m1 = s.timeToX(10000);
+    const [left, right] = s.visible(), plot = s.timeToX(right);
+    d.assert('the cursor is the write head and walks across a view held at a round span',
+      s.live()?.running && h1 - h0 >= 300 && x1 > x0 && x1 < plot && span0 === span1
+      && [10000, 20000, 30000, 60000].includes(span1) && left <= 0 && right >= span1,
+      `head ${(h0 / 1000).toFixed(2)} s then ${(h1 / 1000).toFixed(2)} s, at x ${x0.toFixed(1)} then ${x1.toFixed(1)} of ${plot.toFixed(1)}, a ${span1 / 1000} s view`);
+    d.assert('between steps a mark does not move: the one at 10 s is at the same x in both frames',
+      span0 === span1 && m0 === m1, `x ${m0.toFixed(3)} then ${m1.toFixed(3)} under a ${span1 / 1000} s view`);
 
     // hover a bin: the box under the strip says how many and the worst
     const cv = liveSpec.el, rc = cv.getBoundingClientRect();
@@ -935,6 +942,15 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
     const spare = el('div');
     document.body.append(spare);
     const v2 = createStripView(spare, createDeck({ items: [], range: [0, 1000] }), { size: 'auto', live: true, lanes: [] });
+    // and the view steps out only when the head reaches its right edge
+    v2.strip.startLive(9150, { minSpan: 10000 });
+    v2.strip.draw();
+    const before = v2.strip.live().span;
+    await new Promise((r) => setTimeout(r, 120));
+    v2.strip.draw();
+    const after = v2.strip.live().span;
+    d.assert('a head reaching the right edge steps the view out to the next round span, once',
+      before === 10000 && after === 20000, `${before / 1000} s with the head at 9.15 s, ${after / 1000} s once it passed 9.2 s`);
     v2.strip.startLive(0);
     await new Promise((r) => setTimeout(r, 120));
     v2.strip.stopLive();

@@ -673,6 +673,16 @@ export function registerRenderer(name, fn) { RENDERERS.set(name, fn); return () 
  */
 export const BIN_GAP_PX = 2;
 
+/** The spans a live view steps through, in ms: round numbers a ruler reads. */
+export const LIVE_STEPS = [1000, 2000, 5000, 10000, 20000, 30000, 60000, 120000, 300000, 600000,
+  1200000, 1800000, 3600000, 7200000, 3 * 3600000, 6 * 3600000, 12 * 3600000, 24 * 3600000];
+
+/** A line of width `lw` CSS px centred so both its edges land on whole device
+ *  pixels: the left edge on the device pixel nearest `xv`. */
+function snapX(xv, lw, dpr = 1) {
+  const wDev = Math.max(1, Math.round(lw * dpr));
+  return (Math.round(xv * dpr) + wDev / 2) / dpr;
+}
 /** A tick's colour, the one rule the renderer and the hover share. */
 function tickColour(L, r, pos, style) {
   const fired = !!L.latch && r.at <= pos;
@@ -759,7 +769,7 @@ registerRenderer('ticks', (ctx, L, C) => {
       // differ when the bins differ by more than one row.
       const flat = B.maxN - B.minN <= 1;
       const bh = flat ? full : Math.max(3, Math.round(full * (0.35 + 0.65 * (b.rows.length / B.maxN))));
-      const bx = b.i * B.binPx;
+      const bx = C.snap ? Math.round(b.i * B.binPx * C.dpr) / C.dpr : b.i * B.binPx;
       ctx.fillStyle = colourOf(w);
       ctx.fillRect(bx, top + full - bh, B.markPx, bh);
       drawn.push({ x: bx, w: B.markPx, n: b.rows.length });
@@ -787,7 +797,10 @@ registerRenderer('ticks', (ctx, L, C) => {
     // separate subject rather than an annotation on this one.
     ctx.lineWidth = (L.widthOfRow && L.widthOfRow(r, fired)) || style.width || 1.4;
     if (style.dash) ctx.setLineDash(style.dash); else ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(px, y0 + 2); ctx.lineTo(px, y0 + h - 2); ctx.stroke();
+    // On a LIVE strip a mark sits on whole DEVICE pixels, its line centred so
+    // its edges do too, so nothing shimmers between steps or at 2x and 3x.
+    const lx = C.snap ? snapX(x(r.at), ctx.lineWidth, C.dpr) : px;
+    ctx.beginPath(); ctx.moveTo(lx, y0 + 2); ctx.lineTo(lx, y0 + h - 2); ctx.stroke();
     if (L.glyphOf) glyphs.push([px, r, col]);
   }
   // WHAT THE MARK WAS, DRAWN ON THE MARK — but only where the zoom has made
@@ -1726,10 +1739,10 @@ export function createStrip(canvas, deck, opts = {}) {
    *                      the WALL CURSOR (`armWall(at)`), so it moves with real
    *                      time whether or not a deck plays.
    *   stopLive()         the write head freezes where it is, and stays drawn.
-   * While a run is live the view is the whole run, `from` to the write head,
-   * refitted on every frame, never narrower than `minSpan` ms (so the first
-   * seconds are not the whole width and the head walks across before the run
-   * starts to scale out). The deck's playhead is not drawn: on a live strip the
+   * While a run is live the view holds the whole run from `from`, in round
+   * steps (LIVE_STEPS, see `liveFit`), never narrower than `minSpan` ms: the
+   * head walks across a step and the view zooms out to the next one only when
+   * the head reaches its right edge. The deck's playhead is not drawn: on a live strip the
    * write head is the cursor, drawn in the playhead's own shape.
    * ⚠️ A READER'S ZOOM OR PAN HOLDS THE VIEW where they put it, the way follow
    * disengages; a double click on the strip hands it back to the live fit.
@@ -1737,7 +1750,7 @@ export function createStrip(canvas, deck, opts = {}) {
    * that grows past the marks' room by itself.
    */
   function startLive(at = 0, o = {}) {
-    S.live = { from: 0, minSpan: 8000, ...(S.live || {}), ...o, started: true, running: true, held: false };
+    S.live = { from: 0, minSpan: 8000, ...(S.live || {}), ...o, started: true, running: true, held: false, span: 0 };
     if (opts.bin === undefined) S.bin = true;
     armWall(at);
     return liveState();
@@ -1753,18 +1766,33 @@ export function createStrip(canvas, deck, opts = {}) {
   function resumeLive() { if (S.live && S.live.held) { S.live.held = false; invalidate(); } return liveState(); }
   function liveState() {
     return S.live ? { from: S.live.from, minSpan: S.live.minSpan, started: S.live.started, running: S.live.running,
-                      held: S.live.held, at: wallPos() } : null;
+                      held: S.live.held, at: wallPos(), span: S.live.span ?? null } : null;
   }
-  /** The whole run in view, a few pixels of air each side so the head's
-   *  triangle is never cut by the edge. */
+  /** A few pixels of air each side, so the head's triangle is never cut. */
   const LIVE_AIR_PX = 6;
+  /**
+   * 🔴 THE LIVE VIEW IS STEPPED, NOT REFITTED EVERY FRAME. Asked 2026-10-12 on
+   * /concepts/clock/010/: *"lines move very nervously here"*. A view refitted
+   * to the head on every frame rescales every frame, so every mark on the
+   * strip slid a fraction of a pixel sixty times a second. Now the view holds
+   * one span from LIVE_STEPS, the cursor walks across it, and only when the
+   * head passes LIVE_EDGE of the span does the view zoom out to the next step.
+   * Between steps nothing but the cursor moves, so the marks stand still.
+   * The first span is the smallest step at least `minSpan` long, and a run's
+   * span only grows, so a stopped run keeps the last view it had.
+   */
+  const LIVE_EDGE = 0.92;
+  function liveSpan(Lv, now) {
+    const need = Math.max(Lv.minSpan, (Number.isFinite(now) ? now - Lv.from : 0) / LIVE_EDGE);
+    const prev = Lv.span || 0;
+    if (prev >= need) return prev;
+    return LIVE_STEPS.find((st) => st >= need) ?? Math.ceil(need / LIVE_STEPS.at(-1)) * LIVE_STEPS.at(-1);
+  }
   function liveFit() {
     const Lv = S.live;
     if (!Lv || Lv.held) return;
-    const now = Lv.started ? wallPos() : null;
-    const end = Math.max(Lv.from + Lv.minSpan, Number.isFinite(now) ? now : Lv.from);
-    const span = Math.max(1, end - Lv.from);
-    const pps = capPps(Math.max(1, plotW() - 2 * LIVE_AIR_PX) * 1000 / span, end);
+    Lv.span = liveSpan(Lv, Lv.started ? wallPos() : null);
+    const pps = capPps(Math.max(1, plotW() - 2 * LIVE_AIR_PX) * 1000 / Lv.span, Lv.from + Lv.span);
     S.view.pxPerSecond = pps;
     S.view.originTime = Lv.from - (LIVE_AIR_PX / pps) * 1000;
     S.view.scrollX = 0;
@@ -2460,6 +2488,8 @@ export function createStrip(canvas, deck, opts = {}) {
       // in the same units as the ruler above it
       calendar: S.calendar,
       bin: S.bin,
+      // whole device pixels for marks on a live strip (see `snapX`)
+      snap: !!S.live, dpr: S.dpr,
     };
     const as = L.as || autoKind(L);
     if (as === 'spans') C.spans = spansFor(L).filter((s) => (Number.isFinite(s.to) ? s.to : t1) >= t0 && s.from <= t1);
