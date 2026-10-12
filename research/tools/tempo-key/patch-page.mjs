@@ -5,10 +5,17 @@
 //
 // Each candidate replaces an exact string and refuses to run if the string is
 // not there, so a page that moved on cannot be measured as if it had not.
+//
+// SINCE 2026-10-12 THE PAGE NO LONGER CARRIES THE DETECTOR. The `adapt
+// ratio=1.5,keep=0.5` candidate was built into demo/concepts/radio/tempo.mjs,
+// which radio/020 and 030 import, and these anchors are gone from the page.
+// FROM=<html> names the page to patch; the one this was written against is
+// `git show 78667cbe:demo/concepts/radio/030/index.html`. A new candidate is
+// better written against the module and run with our-tempo.mjs --det.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [cand, dest, param] = process.argv.slice(2);
-const PAGE = new URL('../../../demo/concepts/radio/030/index.html', import.meta.url).pathname;
+const PAGE = process.env.FROM || new URL('../../../demo/concepts/radio/030/index.html', import.meta.url).pathname;
 let html = readFileSync(PAGE, 'utf8');
 const swap = (a, b) => { if (!html.includes(a)) throw new Error(`${cand}: anchor not found: ${a.slice(0, 60)}`); html = html.replace(a, b); };
 

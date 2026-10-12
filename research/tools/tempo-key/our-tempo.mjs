@@ -1,7 +1,14 @@
-// Runs the tempo detector of /concepts/radio/030/ (identical to radio/020's)
-// offline over a mono float32 file, and prints its readings as JSON.
+// Runs the tempo detector of /concepts/radio/020/ and 030/ offline over a mono
+// float32 file, and prints its readings as JSON.
 //
-//   node research/tools/tempo-key/our-tempo.mjs <in.f32> [--level agc030|static020|none] [--page path] [--set 'NAME=value;...'] > out.json
+//   node research/tools/tempo-key/our-tempo.mjs <in.f32> [--level agc030|static020|none] [--det module.mjs | --page page.html] [--set 'NAME=value;...'] > out.json
+//
+// SINCE 2026-10-12 THE DETECTOR IS A MODULE, demo/concepts/radio/tempo.mjs,
+// and by default this imports that very file, so what is measured is what the
+// pages run. `--det` points it at another copy of the module. `--page` keeps the
+// old way for a page that still carries the detector inline (radio/030 as of
+// 78667cbe, `git show 78667cbe:demo/concepts/radio/030/index.html`), which is
+// how the "before" numbers are re-run.
 //
 // <in.f32> is raw little endian float32 mono at 44100 Hz, as made by
 // `ffmpeg -i x -ac 1 -ar 44100 -f f32le x.f32` (the page's ScriptProcessor and
@@ -27,26 +34,38 @@ const args = process.argv.slice(2);
 const file = args[0];
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const LEVEL = opt('--level', 'agc030');
-const PAGE = opt('--page', new URL('../../../demo/concepts/radio/030/index.html', import.meta.url).pathname);
+const PAGE = opt('--page', null);
+const DET = opt('--det', new URL('../../../demo/concepts/radio/tempo.mjs', import.meta.url).pathname);
 const SR = 44100;
 
-const html = readFileSync(PAGE, 'utf8');
-const a = html.indexOf('const HOP = 256;'), b = html.indexOf('// Canvas ink is read');
-if (a < 0 || b < 0) throw new Error('detector block not found in ' + PAGE);
-let block = html.slice(a, b);
-// --set 'HAT_BETA=0;PH_W=[1, 0.5, 0.25, 0]' rewrites the page's own constants
-// for a candidate, and refuses a name it cannot find, so a typo is not a run
-// of the unchanged page under a new label.
-for (const pair of (opt('--set', '') || '').split(';').filter(Boolean)) {
-  const [name, ...rest] = pair.split('='), val = rest.join('=');
-  const re = new RegExp(`\\b${name} = (\\[[^\\]]*\\]|[^,;\\n]+)`);
-  if (!re.test(block)) throw new Error(`--set: ${name} not found`);
-  block = block.replace(re, `${name} = ${val}`);
-}
+// --set 'HAT_BETA=0;PH_W=[1, 0.5, 0.25, 0]' rewrites the detector's own
+// constants for a candidate, and refuses a name it cannot find, so a typo is
+// not a run of the unchanged detector under a new label.
+const setAll = (src) => {
+  for (const pair of (opt('--set', '') || '').split(';').filter(Boolean)) {
+    const [name, ...rest] = pair.split('='), val = rest.join('=');
+    const re = new RegExp(`\\b${name} = (\\[[^\\]]*\\]|[^,;\\n]+)`);
+    if (!re.test(src)) throw new Error(`--set: ${name} not found`);
+    src = src.replace(re, `${name} = ${val}`);
+  }
+  return src;
+};
 const sent = [];
-const bay = { send: (port, ev) => sent.push(ev) };
-const make = new Function('bay', 'ctx', 'playing', 'BPM_EV', `${block}\nreturn { detHop, detEstimate, setDet: (x) => { det = x; }, BANDS, HOP, FOLLOW_HZ, WIN_S, EVERY_S };`);
-const D = make(bay, { sampleRate: SR }, true, 'bpm');
+let D;
+if (PAGE) {
+  const html = readFileSync(PAGE, 'utf8');
+  const a = html.indexOf('const HOP = 256;'), b = html.indexOf('// Canvas ink is read');
+  if (a < 0 || b < 0) throw new Error('detector block not found in ' + PAGE);
+  const block = setAll(html.slice(a, b));
+  const bay = { send: (port, ev) => sent.push(ev) };
+  const make = new Function('bay', 'ctx', 'playing', 'BPM_EV', `${block}\nreturn { detHop, detEstimate, setDet: (x) => { det = x; }, BANDS, HOP, FOLLOW_HZ, WIN_S, EVERY_S };`);
+  D = make(bay, { sampleRate: SR }, true, 'bpm');
+} else {
+  // The module has no imports, so a rewritten copy loads from a data: URL.
+  const src = setAll(readFileSync(DET, 'utf8'));
+  const M = opt('--set', '') ? await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64')) : await import(DET);
+  D = { BANDS: M.BANDS, HOP: M.HOP, FOLLOW_HZ: M.FOLLOW_HZ, WIN_S: M.WIN_S, EVERY_S: M.EVERY_S, M };
+}
 
 const raw = readFileSync(file);
 const x = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength >> 2).slice();
@@ -139,22 +158,36 @@ const bands = D.BANDS.map(([type, hz, q]) => {
 
 // ── the detector, driven as onaudioprocess drives it ────────────────────
 const Bn = D.BANDS.length, rate = SR / D.HOP, n = Math.round(D.WIN_S * rate);
-const t = { rate, n, env: new Float32Array(n), bands: D.BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,
-  prev: new Float32Array(Bn), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity,
-  f: new Float64Array(2 * Bn), h: 0, k: 1 - Math.exp(-2 * Math.PI * D.FOLLOW_HZ / SR) };
-D.setDet(t);
-const f = t.f, kk = t.k;
 const out = [];
 const DUMP = !!opt('--dump', null), dumped = [];
 let seen = 0;
+const take = (t) => { while (seen < sent.length) { const ev = sent[seen++]; out.push({ t: +t.newest.toFixed(3), bpm: ev.v, conf: ev.confidence, beatAt: +ev.beatAt.toFixed(4), cand: ev.candidates.map((c) => c.bpm), ...(ev.offHats != null ? { offHats: ev.offHats } : {}) }); } };
 const t0 = performance.now();
-for (let i = 0; i < y.length; i++) {
-  for (let b = 0; b < Bn; b++) { const v = bands[b][i]; f[2 * b] += (v * v - f[2 * b]) * kk; f[2 * b + 1] += (f[2 * b] - f[2 * b + 1]) * kk; }
-  if (++t.h === D.HOP) {
-    t.h = 0; D.detHop((i + 1) / SR);
-    if (DUMP) { const j = (t.w - 1 + t.n) % t.n; for (let b = 0; b < Bn; b++) dumped.push(t.bands[b][j]); }
-    while (seen < sent.length) { const ev = sent[seen++]; out.push({ t: +t.newest.toFixed(3), bpm: ev.v, conf: ev.confidence, beatAt: +ev.beatAt.toFixed(4), cand: ev.candidates.map((c) => c.bpm) }); }
+if (PAGE) {
+  const t = { rate, n, env: new Float32Array(n), bands: D.BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,
+    prev: new Float32Array(Bn), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity,
+    f: new Float64Array(2 * Bn), h: 0, k: 1 - Math.exp(-2 * Math.PI * D.FOLLOW_HZ / SR) };
+  D.setDet(t);
+  const f = t.f, kk = t.k;
+  for (let i = 0; i < y.length; i++) {
+    for (let b = 0; b < Bn; b++) { const v = bands[b][i]; f[2 * b] += (v * v - f[2 * b]) * kk; f[2 * b + 1] += (f[2 * b] - f[2 * b + 1]) * kk; }
+    if (++t.h === D.HOP) {
+      t.h = 0; D.detHop((i + 1) / SR);
+      if (DUMP) { const j = (t.w - 1 + t.n) % t.n; for (let b = 0; b < Bn; b++) dumped.push(t.bands[b][j]); }
+      take(t);
+    }
   }
+} else {
+  // Driven exactly as the page's ScriptProcessor drives it: 1024 samples a
+  // block, through the module's own detFeed.
+  const t = D.M.detState(SR);
+  t.onReading = (ev) => sent.push(ev);
+  const BLK = 1024;
+  for (let s0 = 0; s0 + BLK <= y.length; s0 += BLK) {
+    D.M.detFeed(t, bands.map((x) => x.subarray(s0, s0 + BLK)), BLK, s0 / SR);
+    take(t);
+  }
+  if (DUMP) throw new Error('--dump needs --page');
 }
 const ms = performance.now() - t0;
 // --dump <file>: every hop's four band rises (what detHop writes into t.bands),
@@ -163,4 +196,4 @@ if (opt('--dump', null)) {
   const { writeFileSync } = await import('node:fs');
   writeFileSync(opt('--dump'), Buffer.from(new Float32Array(dumped).buffer));
 }
-process.stdout.write(JSON.stringify({ file, level: LEVEL, set: opt('--set', ''), seconds: y.length / SR, msPerSecond: +(ms / (y.length / SR)).toFixed(2), readings: out }));
+process.stdout.write(JSON.stringify({ file, det: PAGE || DET, level: LEVEL, set: opt('--set', ''), seconds: y.length / SR, msPerSecond: +(ms / (y.length / SR)).toFixed(2), readings: out }));
