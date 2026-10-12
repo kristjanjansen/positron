@@ -96,6 +96,9 @@ export const JACK_ENDS = {
   // its own whose JACK client is named so it is never taken for the
   // granulator's `SuperCollider`.
   sampler: ['possampler:out_1', 'possampler:out_2'],
+  // The page programs' scsynth (`rig/board/scollide.mjs`, `ENGINES.own`), a
+  // third server named so it is taken for neither of the two above.
+  collide: ['poscollide:out_1', 'poscollide:out_2'],
   pappusIn: ['SuperCollider:in_1', 'SuperCollider:in_2'],
   pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
   capture: ['posboard:input_1'],

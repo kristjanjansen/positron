@@ -30,7 +30,8 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
-  import { BOARD_FRAME_MS, BOARD_CHANNELS } from '/shell/board.mjs';
+  import { createBoard, BOARD_FRAME_MS, BOARD_CHANNELS, BOARD_RATE } from '/shell/board.mjs';
+  import { createBoardCollide } from '/shell/board-collide.mjs';
   import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/concepts/synth/collide-voice.mjs';
 
   // /concepts/synth/090/ plus the same voice rendered on the Raspberry Pi as
@@ -39,9 +40,11 @@
   // wave on left, pi wave on right. readings on top, 2 local 2 pi ones. pi is
   // not on lan, backlog its execution, simulate locally until then"*.
   //
-  // 🔴 THE PI SIDE IS SIMULATED IN THIS TAB AND THE PAGE SAYS SO, on the Pi
-  // node's label and in the right panel's footer. `createPiSide` below is the
-  // one place the real board goes in (BACKLOG, "synth/100 on the real Pi").
+  // 🔴 THE PI SIDE IS THE REAL BOARD WHEN ONE ANSWERS, AND SIMULATED IN THIS TAB
+  // WHEN NONE DOES, and the page says which on the Pi node's label and in the
+  // right panel's footer (`checking`, `relay`, `direct` or `simulated`).
+  // `createPiSide` below is the one place the board goes in (2026-10-12,
+  // plans/plan-pi-supercollider-defs.md steps 3 and 5).
   //
   // THE READOUT, every cell measured here and none typed:
   //   local lag / Pi lag     from the key going down (`performance.now()` in
@@ -83,8 +86,24 @@
   //
   // The page talks to the Pi through five calls and nothing else: `wake(ctx)`,
   // `noteOn(note, vel)`, `noteOff(note)`, `param(name, v)` and `out()` (its
-  // sound, as an AudioNode in `ctx`). Today they are a second scsynth in this
-  // tab running the same program, with the trip modelled around it:
+  // sound, as an AudioNode in `ctx`).
+  //
+  // THE BOARD, since 2026-10-12. On the first key, `createBoard` with this
+  // page's own 48 kHz context and `toDestination: false`, so the board's sound
+  // is a node HERE that the router puts through the Pi scope and the
+  // crossfader. Then `audio.status` (does a board answer at all, in
+  // `ASK_MS`), `audio.start {source: 'collide'}`, and `sc.load` of PROGRAM
+  // through `/shell/board-collide.mjs`; a key is `note.on {node: 'collide'}`
+  // and a knob `sc.set`. The board compiles the TEXT with the same compiler
+  // and says `same: true` when its bytes are this tab's. `?path=direct`
+  // offers the direct path, as /concepts/sampler/030/ does.
+  // ⚠️ THE BOARD ON THIS PAGE TODAY IS THE STAND-IN: `?relay=ws://127.0.0.1:8897`
+  // with `node demo/fake-board.mjs` running. It answers every verb through the
+  // board's own `rig/board/scollide.mjs`, and its sound is a fixed tone, not
+  // the program. The real Pi has not run `scollide.mjs` yet (plan step 4).
+  //
+  // SIMULATED, when nothing answers: a second scsynth in this tab running the
+  // same program, with the trip modelled around it:
   //
   //   up     UP_MS before a note or a knob reaches the engine: half the Mac to
   //          Pi relay round trip, 64 to 69 ms measured 2026-09-14 (PROGRESS.md,
@@ -100,29 +119,16 @@
   //   sound through this rig, and that number has never been measured either
   //   (same file, section 2.3). The `Pi lag` cell measures the MODEL.
   //
-  // THE REAL BOARD, when it is on the network again: `createBoard({ room:
-  // 'studio-1', log })` from `/shell/board.mjs` gives the socket, the presence
-  // and the playout; `noteOn` becomes `board.send({ type: 'note.on', node:
-  // 'collide', note, vel })` as /concepts/sampler/030/ does for the sampler,
-  // `param` a `cc`-like message the board turns into `/n_set`, and `out()` the
-  // board's playout node. ⚠️ TWO THINGS DO NOT EXIST YET AND ARE NOT THIS
-  // PAGE'S: the board has no `collide` node (it needs to take these SynthDef
-  // bytes, `/d_recv` them into an scsynth such as `rig/board/scsampler.mjs`'s
-  // on 57130, and play them on `note.on`), and board.mjs's playout lives in an
-  // AudioContext of its OWN at 48 kHz (`startAudio`), so `out()` would be in
-  // another context and the Pi's scope would read the board's analyser rather
-  // than this page's.
   const UP_MS = 34;
   const JACK_MS = 1024 / 48000 * 1000;
   const CUSHION_MS = 100;
   const DOWN_MS = JACK_MS + BOARD_FRAME_MS + UP_MS + CUSHION_MS;
 
-  function createPiSide({ log }) {
+  function createSimulatedPi({ log }) {
     const v = createCollideVoice({ log: (line, kind) => log(`Pi (simulated): ${line}`, kind), who: 'SuperCollider' });
     let tail = null;
     const later = (fn) => setTimeout(fn, UP_MS);
     return {
-      simulated: true,
       compiled: v.compiled, values: v.values, stat: v.stat, held: v.held, warm: v.warm,
       async wake(ctx) {
         await v.wake(ctx);
@@ -141,9 +147,78 @@
     };
   }
 
+  /** How long a board has to answer `audio.status` before the Pi side is simulated. */
+  const ASK_MS = 3000;
+  const PATH = new URLSearchParams(location.search).get('path') === 'direct' ? 'direct' : 'relay';
+  /**
+   * The board if one answers, the simulation if none does. `mode()` is
+   * `checking` until it is decided, then `relay`, `direct`, `turn` or
+   * `simulated`; `onMode` hears every change.
+   */
+  function createPiSide({ log, onMode = () => {} }) {
+    const sim = createSimulatedPi({ log });
+    let mode = 'idle', board = null, kit = null, waking = null, loaded = null;
+    const say = (m) => { mode = m; onMode(m); };
+    const real = () => mode !== 'idle' && mode !== 'checking' && mode !== 'simulated';
+    async function tryBoard(ctx) {
+      board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
+        direct: PATH === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      // A harness may not drive the board (`createBoard`'s guard), so it is
+      // simulated under a check without a word on the wire.
+      if (!board.driving()) return 'this run may not drive the board';
+      // The socket opens after `createBoard` returns, and a send before it
+      // opens is no send at all, so the question waits for it inside ASK_MS.
+      const t0 = performance.now();
+      while (board.state() !== 1 && performance.now() - t0 < ASK_MS) await new Promise((r) => setTimeout(r, 50));
+      const left = ASK_MS - (performance.now() - t0);
+      if (board.state() !== 1 || !await board.ask({ type: 'audio.status' }, 'audio.started', Math.max(500, left))) {
+        return `no board answered in ${ASK_MS / 1000} s`;
+      }
+      const st = await kit.start();
+      if (!st?.ok) return `the board did not start its collide engine: ${st?.reason ?? 'no answer'}`;
+      if (!await board.startAudio()) return 'the board\'s sound cannot be played in this page\'s audio';
+      const via = PATH === 'direct' ? await board.goDirect() : 'relay';
+      loaded = await kit.load('collide', PROGRAM);
+      if (!loaded?.ok) return `the board did not take the program: ${loaded?.reason ?? 'no answer'}${loaded?.line ? ` at line ${loaded.line}` : ''}`;
+      log(`the board compiled the program to ${loaded.bytes} bytes in ${loaded.compileMs} ms, ${loaded.same ? 'the same bytes as this tab' : 'DIFFERENT bytes from this tab'}`, loaded.same ? 'hi' : 'bad');
+      kit.keepClock();
+      board.watchRtt(2000);
+      return { via: via === 'refused' ? 'relay' : via };
+    }
+    return {
+      get simulated() { return !real(); },
+      mode: () => mode,
+      board: () => board, kit: () => kit, loaded: () => loaded,
+      compiled: sim.compiled, values: sim.values, stat: sim.stat, held: sim.held, warm: sim.warm,
+      wake(ctx) {
+        waking ??= (async () => {
+          say('checking');
+          const r = await tryBoard(ctx).catch((e) => e.message);
+          if (typeof r === 'object') { say(r.via); return; }
+          log(`Pi side simulated in this tab: ${r}`);
+          board?.close(); board = null; kit = null;
+          await sim.wake(ctx);
+          say('simulated');
+        })();
+        return waking;
+      },
+      out: () => (real() ? board.playout() : sim.out()),
+      // While it is still being decided a key goes to the simulation, which
+      // holds it until its engine is up and drops it if it never wakes.
+      noteOn: (note, vel) => (real() ? kit.noteOn('collide', note, vel) : sim.noteOn(note, vel)),
+      noteOff: (note) => (real() ? kit.noteOff('collide', note) : sim.noteOff(note)),
+      param: (name, x) => {
+        if (!sim.values.has(name)) return false;
+        if (real()) { sim.values.set(name, x); kit.set('collide', name, x); } else sim.param(name, x);
+        return true;
+      },
+    };
+  }
+
   // ── the two sides ────────────────────────────────────────────────────────
   const local = createCollideVoice({ log: d.log, who: 'SuperCollider here' });
-  const pi = createPiSide({ log: d.log });
+  const pi = createPiSide({ log: d.log, onMode: (m) => showMode(m) });
   const NAMES = local.compiled.knobs.map((k) => k.name);
 
   // ── the bay ──────────────────────────────────────────────────────────────
@@ -157,7 +232,7 @@
     ['collide', 'engine', 'SuperCollider here'],
     ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'], ['speaker', 'screen', 'speakers'],
   ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi, simulated', place: 'studio-1' });
+  const piNode = bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi', place: 'studio-1' });
   bay.addNode({ id: `${S}:fader`, kind: 'person', label: 'fader', place: 'browser' });
   bay.addNode({ id: `${S}:xfade`, kind: 'engine', label: 'crossfader', place: 'browser' });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
@@ -242,7 +317,9 @@
   async function start() {
     if (!ctx) {
       // Made here, synchronously inside the key's gesture.
-      ctx = new AudioContext({ latencyHint: 'interactive' });
+      // At the board's rate, so the board's sound can be played in THIS context
+      // (`createBoard({ audioContext })` refuses any other, nothing resamples).
+      ctx = new AudioContext({ sampleRate: BOARD_RATE, latencyHint: 'interactive' });
       master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
       const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       // The crossfader: one gain per side into one sum, metered after.
@@ -260,7 +337,10 @@
       requestAnimationFrame(frame);
     }
     ctx.resume();
-    try { await Promise.all([local.wake(ctx), pi.wake(ctx)]); } catch { return false; }
+    // The Pi side may take seconds to decide (a board that never answers is
+    // waited for `ASK_MS`), so the local side does not wait for it.
+    pi.wake(ctx).then(() => { route(); pb.refresh(); }, () => {});
+    try { await local.wake(ctx); } catch { return false; }
     route();
     on = true;
     pb.refresh();
@@ -337,11 +417,19 @@
   function wavePanel(name, foot) {
     const canvas = el('canvas');
     canvas.width = W; canvas.height = H;
-    const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-say', name), right: el('span', 'cc-say', foot) });
-    return { panel, g: canvas.getContext('2d') };
+    const footEl = el('span', 'cc-say', foot);
+    const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-say', name), right: footEl });
+    return { panel, g: canvas.getContext('2d'), foot: footEl };
   }
   const left = wavePanel('SuperCollider here', 'this tab');
-  const right = wavePanel('SuperCollider on the Pi', 'simulated');
+  const right = wavePanel('SuperCollider on the Pi', 'not asked yet');
+  /** Which Pi is live, on the right panel's footer and the Pi node's label. */
+  function showMode(m) {
+    const word = m === 'simulated' ? 'simulated' : m === 'checking' ? 'checking' : m;
+    if (right.foot) right.foot.textContent = word;
+    piNode.label = m === 'simulated' ? 'SuperCollider on the Pi, simulated' : 'SuperCollider on the Pi';
+    pb.refresh();
+  }
   const css = getComputedStyle(document.documentElement);
   const colour = (n, f) => css.getPropertyValue(n).trim() || f;
   const INK = colour('--hi', '#f5c84c'), GROUND = colour('--card2', '#151a24'), LINE = colour('--line', '#2a3140');
@@ -392,6 +480,8 @@
   window.__demo.keyboard = kb;
   window.__demo.collide = {
     bay, local, pi, knobs, names: NAMES, model: { UP_MS, DOWN_MS, JACK_MS, CUSHION_MS, FRAME_MS: BOARD_FRAME_MS },
+    piMode: () => pi.mode(), piClock: () => pi.kit()?.clock() ?? null, piLoaded: () => pi.loaded(),
+    piStats: () => pi.kit()?.stats() ?? null, piBoard: () => pi.board()?.stats() ?? null,
     measured, ctx: () => ctx, fader, x: () => x, fades: () => fades,
     mixLevel: () => (mixMeter ? rmsOf(mixMeter, mixBuf) : 0),
     notesIn: () => notesIn, piNotesIn: () => piNotesIn, paramSends: () => paramSends, piParamSends: () => piParamSends,

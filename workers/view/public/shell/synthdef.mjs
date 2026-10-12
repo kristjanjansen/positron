@@ -253,6 +253,16 @@ export function graph(name) {
   function out(...channels) {
     return block('Out', RATE.sample, [value(0), ...channels], 0, 0);
   }
+  /**
+   * The same, to an output bus other than 0. Added 2026-10-12 for
+   * `/concepts/rhythm/`'s four drums, each on a stereo pair of its own so a
+   * page can split the engine's output into one scope per drum. A bus past the
+   * engine's output channels is an INPUT bus (scsynth numbers outputs first),
+   * so the caller boots the engine with enough outputs for it.
+   */
+  function outAt(bus, ...channels) {
+    return block('Out', RATE.sample, [value(bus), ...channels], 0, 0);
+  }
 
   function bytes() {
     // ⚠️ The magic is four RAW bytes, not a pstring — no length byte in front.
@@ -281,7 +291,7 @@ export function graph(name) {
     return w.done();
   }
 
-  return { name, value, params, control, block, out, bytes, count: () => blocks.length };
+  return { name, value, params, control, block, out, outAt, bytes, count: () => blocks.length };
 }
 
 // ── reading ─────────────────────────────────────────────────────────────────

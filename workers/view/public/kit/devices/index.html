@@ -157,6 +157,8 @@
   let headSpec = null;       // { acting, reporting, presses }  the two headers
   let stepSpec = null;       // { stepped, quarters, free }  the stepped knobs
   let gridSpec = null;        // { edit, read, phone, holder }
+  let namedSpec = null;       // { named }  the step grid with its rows named in words
+  let trigSpec = null;        // { held, free }  the triggered scope and a free one beside it
   let envSpec = null;         // { one, two, three, flat }
   let filtSpec = null;        // { live, deep, refused }
   let waveSpec = null;        // { drawnViews, pulse, blend, two, measured, drawnNames }
@@ -245,7 +247,78 @@
 
 
   /**
-   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. A knob
+   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. The
+   * scope's TRIGGERED mode, 2026-10-12, asked on `/concepts/rhythm/010/` as
+   * *"scopes are very "nervous""* and then *"is ti a scope feature/prop?"*.
+   * A hit's window is captured from its onset and held until the next hit, the
+   * one before it faint underneath. Free running stays the default.
+   * ⚠️ NOTHING OPENS ON A VISIT: the Hit button makes the AudioContext and one
+   * 60 ms burst. It is in the box and not in a `.pos-controls` row, for the
+   * reason every block below gives: both harnesses press that row by position.
+   */
+  section('TRIGGERED SCOPE',
+    'A scope that waits for a hit, draws that hit from its onset and holds it still until the next one.',
+    `const scope = createWaveShape({ name: 'kick', mode: 'triggered',
+  window: 250, fade: 1, axes: { x: '250 ms' } })
+scope.listen(analyser)          // once there is audio
+scope.trigger(atMs)             // a hit sounds at atMs, performance.now()'s clock
+scope.flat()                    // stopped`,
+    (box) => {
+      const held = createWaveShape({ name: 'triggered', mode: 'triggered', window: 250, fade: 1, colour: '--hi', axes: { x: '250 ms' } });
+      let actx = null, an = null, n = 0;
+      const hit = createButtonGroup({ buttons: [{ id: 'hit', label: 'Hit', onPress: () => {
+        if (!actx) {
+          actx = new AudioContext();
+          an = actx.createAnalyser(); an.fftSize = 32768;
+          const z = actx.createGain(); z.gain.value = 0; an.connect(z); z.connect(actx.destination);
+          held.listen(an);
+        }
+        actx.resume();
+        // A falling sine burst, a little different each press, sounding 100 ms from now.
+        const t = actx.currentTime + 0.1, o = actx.createOscillator(), g = actx.createGain();
+        o.frequency.setValueAtTime(160 + (n++ % 4) * 40, t);
+        o.frequency.exponentialRampToValueAtTime(50, t + 0.08);
+        g.gain.setValueAtTime(0.8, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        o.connect(g); g.connect(an); o.start(t); o.stop(t + 0.22);
+        const ts = actx.getOutputTimestamp();
+        held.trigger(ts.performanceTime + (t - ts.contextTime) * 1000);
+      } }] });
+      trigSpec = { held };
+      box.classList.add('kit-wide');
+      box.append(held.el, hit.el);
+    });
+
+  /**
+   * 🔴 ONCE THE NEWEST BLOCK, NOW SECOND. A step
+   * grid whose rows are named in WORDS, 2026-10-12, for `/concepts/rhythm/000/`:
+   * *"make a 16 x 4 grid pad componetn (global one)"*. It is `createStepGrid`,
+   * not a second grid; what changed is that its label column is as wide as its
+   * widest name (`shell.css`, `.pos-pg-labs`), with the old 22 px as the floor,
+   * so the numbered grid in STEP GRID below still measures 22 px.
+   * ⚠️ NOTHING HERE IS IN A `.pos-controls` ROW, for the reason every block
+   * below gives: both harnesses press that row by position.
+   */
+  section('STEP GRID WITH NAMED ROWS',
+    'The same step grid with its rows named in words, the label column as wide as the widest name.',
+    `createStepGrid({ fixed, strip, rows: 4, steps: 16,
+  label: (r) => ['kick', 'snare', 'open hat', 'closed hat'][r],
+  ticks: true })`,
+    (box) => {
+      const wrap = el('div', 'kit-pg');
+      const fixed = el('div');
+      const strip = el('div', 'kit-pg-strip');
+      wrap.append(fixed, strip);
+      const NAMES = ['kick', 'snare', 'open hat', 'closed hat'];
+      const named = createStepGrid({ fixed, strip, rows: 4, steps: 16, label: (r) => NAMES[r], ticks: true });
+      for (const [r, s] of [[0, 0], [0, 4], [0, 8], [0, 12], [1, 4], [1, 12], [2, 2], [2, 6], [2, 10], [2, 14],
+        [3, 0], [3, 3], [3, 4], [3, 7], [3, 8], [3, 11], [3, 12], [3, 15]]) named.set(r, s, true, 'quiet');
+      namedSpec = { named };
+      box.classList.add('kit-wide');
+      box.append(wrap);
+    });
+
+  /**
+   * 🔴 ONCE THE NEWEST BLOCK, NOW SECOND. A knob
    * grid, 2026-10-10, asked as *"Knobs: each has its own wrapper box, in a
    * grid, already reserve room for it. A kit component. In 40 41"*.
    *
@@ -2952,6 +3025,31 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
         `-1 to 1 reserves ${res(stepSpec.free)} and 1 to 8 by ones reserves `
         + `${res(stepSpec.stepped)}`);
     }
+  }
+
+  if (trigSpec) {
+    /* A triggered scope before its first hit is a flat line, drawn, in the
+       triggered mode, and says so to a screen reader; no frame loop started. */
+    const g = trigSpec.held.get();
+    d.assert('a triggered scope waits on a flat line before its first hit',
+      trigSpec.held.mode === 'triggered' && trigSpec.held.drawn() && g.points.length === 512
+      && Array.from(g.points).every((x) => x === 0) && trigSpec.held.triggers().triggered === 0,
+      `mode ${trigSpec.held.mode}, ${g.points.length} points all zero, ${trigSpec.held.triggers().triggered} hits`);
+  }
+
+  if (namedSpec && gridSpec) {
+    /* 🔴 NOTHING IN EITHER LABEL COLUMN IS CUT, which is what a column sized to
+       its widest label promises. The numbered grid below is wider than 22 px
+       since 2026-10-12 because its corner says `beat`, which at 22 px was cut
+       to `bea`; its digits alone would sit at the 22 px floor, as /tom/'s do. */
+    const cutIn = (g) => [...g.labels, g.fixed.querySelector('.pos-pg-corner')]
+      .filter((l) => l && l.scrollWidth > l.clientWidth + 0.5).map((l) => l.textContent);
+    const cut = [...cutIn(namedSpec.named), ...cutIn(gridSpec.edit)];
+    const w = namedSpec.named.fixed.getBoundingClientRect().width;
+    const nw = gridSpec.edit.fixed.getBoundingClientRect().width;
+    d.assert('a step grid label column is as wide as its widest label, so no name and no corner word is cut',
+      cut.length === 0 && w > 22 && nw >= 22,
+      `named column ${w.toFixed(1)} px, numbered column ${nw.toFixed(1)} px, ${cut.length ? `${cut.join(', ')} cut` : 'nothing cut'}`);
   }
 
   if (gridSpec) {

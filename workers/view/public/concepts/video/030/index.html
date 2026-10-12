@@ -23,6 +23,8 @@
   .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  /* The word on the picture's plate is read against a picture, so full ink. */
+  .pos-vp-tag > .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -155,6 +157,15 @@
     { key: 'rtt', label: 'rtt', reserve: 4 },
   ] });
   const V = loopPanel.values;
+  // 🔴 THE PICTURE SAYS WEBRTC, ALWAYS, EVEN STOPPED. Reported 2026-10-12:
+  // *"not clear that this is webrtc"*. Nothing on the page named the protocol:
+  // the patchbay's transports were only in its archived details tables. The
+  // footer is full (MEASURED with a full reading: a protocol cell in front of
+  // the state and four values cut the rate and lost the rtt at 1280 and at
+  // 375), so it goes on the panel's own tag plate, top left of the picture,
+  // where it stays in full screen. The Stream box in the patchbay names the
+  // two legs, WHIP in and WHEP out (`detail` below).
+  loopPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'WebRTC'));
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, loopPanel.el);
 
@@ -318,7 +329,14 @@
     if (l.from === LIVE_OUT) return stat.play === 'connected' && stat.arriving;
     return false;
   };
-  const pb = createPatchbay(bay, { flowing: lit });
+  // Each box's grey line: the label beside the title, and under it what the
+  // ports are carried by where that is WebRTC, so the two legs are named on
+  // the picture of the patch and not only in a table.
+  const pb = createPatchbay(bay, { flowing: lit, detail: (n) => (
+    n.id === 'cf-stream:live' ? [n.label, 'WHIP in', 'WHEP out']
+      : n.id === `${S}:loopback` ? [n.label, 'WHEP in']
+      : n.id === `${S}:camera` ? [n.label, null, 'WHIP out']
+      : [n.label]) });
 
   // ── start and stop ──────────────────────────────────────────────────────
   async function start() {

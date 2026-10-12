@@ -857,9 +857,69 @@ export function traceOf(t = {}, fallback = '--dim') {
  *   no legend is a picture nobody can read, and the moment a caller wants four
  *   it wants a strip with rows and labels, which this project already has.
  */
+/**
+ * 🔴 A TRIGGERED SCOPE: ONE HIT, CAPTURED FROM ITS ONSET, HELD STILL UNTIL THE
+ * NEXT. Asked 2026-10-12 on `/concepts/rhythm/010/`: *"scopes are very
+ * "nervous". what to do on 010"*, then *"is ti a scope feature/prop?"*. A
+ * free running scope redraws whatever the last 40 ms held, so a drum reads as
+ * a flicker: a hit, then its tail, then silence, sixty times a second. A drum
+ * machine knows when each hit SOUNDS, so the scope can wait for it, take a
+ * fixed window from its onset and keep that picture until the next hit.
+ *
+ * These two are the arithmetic, with no browser, and `synth-view-test.mjs`
+ * grades them (with sabotages). `createWaveShape({ mode: 'triggered' })` below
+ * is the drawing half.
+ *
+ * Where the onset is inside an analyser's buffer. The buffer's last sample is
+ * `end` (seconds, the context's clock) and the onset is `onset` (same clock),
+ * so the onset sits `(end - onset) * rate` samples back from the end. Then
+ * the first sample within `look` seconds after that whose magnitude reaches
+ * `gate` of the window's peak is taken as the real onset, which absorbs a
+ * render quantum or two of clock slop, so every trace of one drum starts on
+ * the same edge and the picture does not jitter from hit to hit.
+ * @returns {number} an index into `buf`, or -1 when the window does not fit
+ */
+export function onsetIndex(buf, { rate, end, onset, windowS, look = 0.01, gate = 0.1 }) {
+  const n = buf.length;
+  const want = Math.round(n - (end - onset) * rate);
+  const len = Math.round(windowS * rate);
+  if (!(want >= 0) || want + len > n) return -1;
+  let peak = 0;
+  for (let i = want; i < want + len; i++) peak = Math.max(peak, Math.abs(buf[i]));
+  if (!(peak > 0)) return want;
+  const lim = Math.min(n - len, want + Math.round(look * rate));
+  for (let i = Math.max(0, want - Math.round(look * rate)); i <= lim; i++) if (Math.abs(buf[i]) >= gate * peak) return i;
+  return want;
+}
+
+/**
+ * `len` samples from `from`, down to `points` values: in each bucket the
+ * sample with the largest magnitude, sign kept, so a 24,000 sample hat is still
+ * its envelope rather than an aliased handful of noise samples.
+ */
+export function captureTrace(buf, from, len, points = 512) {
+  const out = new Float32Array(points);
+  for (let p = 0; p < points; p++) {
+    const a = from + Math.floor((p * len) / points), b = Math.max(a + 1, from + Math.floor(((p + 1) * len) / points));
+    let best = 0;
+    for (let i = a; i < b && i < buf.length; i++) if (Math.abs(buf[i]) > Math.abs(best)) best = buf[i];
+    out[p] = best;
+  }
+  return out;
+}
+
 export function createWaveShape({ host, label = '', height = 96, name = '', ground = '--card2',
                                   shape, duty = 0.5, reason = '', cycles = 2,
-                                  points, colour = '--dim', over = null, axes = null, trail = 0 } = {}) {
+                                  points, colour = '--dim', over = null, axes = null, trail: trailOpt = 0,
+                                  mode = 'free', window: windowMs = 250, fade = 1, source: sourceOpt = null, full = 0.5 } = {}) {
+  /* TRIGGERED MODE: `trigger(atMs)` takes the window from that hit's onset off
+     `source` (an AnalyserNode, its fftSize long enough for the window) and
+     holds it; `fade` earlier traces stay faint underneath (the phosphor
+     below). FREE, the default, is every caller before 2026-10-12, unchanged. */
+  const TRIG = mode === 'triggered';
+  let source = sourceOpt;
+  const trail = TRIG ? Math.max(0, fade) : trailOpt;
+  if (TRIG && points === undefined) points = new Float32Array(512);   // flat until the first hit
   /* 🔴 THE SAME GROUND AS THE FILTER, ASKED FOR 2026-09-22 AS *"add same bg to
      waveform as to filter"*. Safe for the same reason it was safe there: `ink()`
      reads the field back OUT OF THE CANVAS after the fill, so the counter
@@ -868,6 +928,7 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
      oversight. Two of the three figures sit on the lighter ground. */
   const f = figure({ host, cls: 'pos-sv-wave', height, label: label || 'waveform', ground });
   let v = { name, shape: shape ?? shapeFor(name), duty, reason, cycles, points, colour, over, axes };
+  let triggered = 0, held = 0, missed = 0, gen = 0;
   let a = traceOf(v, colour);
   let b = v.over ? traceOf(v.over, '--hi') : null;
   let pts = a.pts;
@@ -939,7 +1000,11 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
       // when no signal on waveform?"*); a caller with no `axes` draws none.
       // With `reason: null` and axes the name stands alone on the foot, no
       // sentence under it (*"rm 'no signal'"*, the same day)
-      if (v.reason === null && v.axes && v.name) f.say(v.name, PAD, foot, { colour: C.ink, px: 11, room: W - PAD * 2 });
+      // 🔴 IN THE SAME TYPE AS THE DRAWN NAME BELOW, since 2026-10-12. It was
+      // 11 px in ink here and 9 px faint once a trace arrived, so a scope's
+      // name changed size every time its signal came and went, reported on
+      // /concepts/rhythm/010/ as *"scope labels keep chaning size"*.
+      if (v.reason === null && v.axes && v.name) f.say(v.name, PAD, foot, { room: W - PAD * 2 });
       if (v.axes?.y) f.say(v.axes.y, W - PAD, yTop + 9, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
       if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
       return;
@@ -1088,6 +1153,42 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
       return { ...v };
     },
     get: () => ({ ...v }),
+    mode: TRIG ? 'triggered' : 'free',
+    /**
+     * Triggered mode: a hit sounds at `atMs` (performance.now()'s clock, the
+     * time it reaches the speakers). One read of `source`, timed for when the
+     * window has finished, then the trace is drawn and held. No frame loop:
+     * one timer per hit. Returns false in free mode or with no source.
+     */
+    trigger(atMs) {
+      if (!TRIG || !source) return false;
+      const ctx = source.context;
+      const due = atMs + windowMs + 30 - performance.now();
+      const mine = gen;
+      setTimeout(() => {
+        if (mine !== gen) return;      // `flat()` since: a stopped scope stays flat
+        const ts = ctx.getOutputTimestamp?.() || {};
+        // The context time the hit was rendered at: the output pair maps the
+        // speakers' clock to the context's.
+        const onset = ts.performanceTime ? ts.contextTime + (atMs - ts.performanceTime) / 1000 : ctx.currentTime - (performance.now() - atMs) / 1000;
+        const buf = new Float32Array(source.fftSize);
+        source.getFloatTimeDomainData(buf);
+        const at = onsetIndex(buf, { rate: ctx.sampleRate, end: ctx.currentTime, onset, windowS: windowMs / 1000 });
+        triggered++;
+        if (at < 0) { missed++; return; }
+        const tr = captureTrace(buf, at, Math.round((windowMs / 1000) * ctx.sampleRate));
+        held++;
+        this.set({ points: Array.from(tr, (x) => Math.max(-1, Math.min(1, x / full))) });
+      }, Math.max(0, due));
+      return true;
+    },
+    /** Triggered mode: the analyser to capture from, for a caller whose audio
+     *  graph exists only after a press (nothing opens on a visit). */
+    listen(analyser) { source = analyser; },
+    /** Triggered mode: back to a flat line, the faint traces gone. */
+    flat() { gen++; past.length = 0; this.set({ points: Array.from(new Float32Array(512)) }); },
+    /** How many hits asked for a trace, how many were drawn, how many did not fit. */
+    triggers: () => ({ triggered, held, missed }),
     /** `false` when this wave has no shape to draw, which is the honest case. */
     drawn: () => !!pts,
     /** `false` when there is no second trace, or it has nothing to draw. */

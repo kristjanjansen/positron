@@ -16,7 +16,7 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** [group, [names]] in the order the sample sheet shows them. */
-export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","send","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
+export const GROUPS = [["transport",["play","pause","stop","record","skip-back","skip-forward","rewind","fast-forward","loop","shuffle"]],["sound",["volume","volume-low","mute","mic","mic-off","headphones","speaker","music","waveform","radio"]],["picture",["camera","video","video-off","screen","cast","fullscreen","fullscreen-exit","image","contrast"]],["wiring",["link","sliders","settings","board","power","wifi"]],["files",["upload","download","file","folder","save","copy","trash","edit"]],["people",["chat","send","user","users","lock","unlock","eye","eye-off"]],["state",["info","warning","error","check","close","help"]],["moving around",["plus","minus","arrow-left","arrow-right","chevron-left","chevron-right","chevron-down","menu","more","search","refresh","external","home","grid","list","clock"]]];
 
 /** Each name's Feather name, so the sheet can say where it came from. */
 export const SOURCE = {
@@ -48,6 +48,7 @@ export const SOURCE = {
   "fullscreen": "maximize",
   "fullscreen-exit": "minimize",
   "image": "image",
+  "contrast": "contrast (Lucide; Feather has no invert)",
   "link": "link",
   "sliders": "sliders",
   "settings": "settings",
@@ -123,6 +124,7 @@ export const BODIES = {
   "cast": "<path d=\"M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6M2 20h.01\"/>",
   "fullscreen": "<path d=\"M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3\"/>",
   "fullscreen-exit": "<path d=\"M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3\"/>",
+  "contrast": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 2a10 10 0 0 1 0 20z\" fill=\"currentColor\"/>",
   "image": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" ry=\"2\"/><circle cx=\"8.5\" cy=\"8.5\" r=\"1.5\"/><path d=\"m21 15l-5-5L5 21\"/>",
   "link": "<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\"/><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\"/>",
   "sliders": "<path d=\"M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M1 14h6m2-6h6m2 8h6\"/>",

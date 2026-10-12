@@ -496,7 +496,16 @@ export function createStepGrid({
   /* ── the measured pad ────────────────────────────────────────────────── */
 
   function size() {
-    const box = strip.clientWidth || 0;
+    /* 🔴 THE ROOM IS THE CONTENT BOX, NOT `clientWidth`, WHICH INCLUDES THE
+       PADDING. A strip inside `createPanelLayout` carries `--panel-gap` (16 px)
+       on the side facing the label column, so pads sized off `clientWidth`
+       came out 16 px too wide in total and the sixteenth was cut under the
+       scroller's edge. MEASURED 2026-10-12: `/concepts/rhythm/000/` 580 px of
+       client width against 590 of scroll width, `/tom/` 636 against 638. A
+       strip with no padding (the kit's) is unchanged. */
+    const cs = getComputedStyle(strip);
+    const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const box = Math.max(0, (strip.clientWidth || 0) - pad);
     if (!box) return false;
     const w = cellSize(box, S, PAD_GAP, minCell);
     // ⚠️ A CUSTOM PROPERTY, NEVER A WRITTEN `width`. A component that varies a

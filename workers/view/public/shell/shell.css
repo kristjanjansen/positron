@@ -1515,8 +1515,13 @@ button.pos-pri[data-busy="1"] {
    about this row inside this row. */
 .tbar > [data-end="1"] { margin-left: auto; }
 
+/* 🔴 THE GAP SPLITS THE BUTTON'S HEIGHT INTO THREE EQUAL AIRS. Asked
+   2026-10-12, on a crop of the toggle beside the clock: *"adjust gap in between
+   to haev equal top and bottom padding"*. MEASURED on the ink of the digits
+   against the 34 px toggle: at 2 px the air was 6.96 above, 4.56 between and
+   6.60 below; at 3.5 it is 6.21, 6.06 and 5.85. */
 .tbar-time {
-  flex: none; display: grid; gap: 2px; justify-items: end;
+  flex: none; display: grid; gap: 3.5px; justify-items: end;
   font: 500 10.5px/1 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--dim); white-space: nowrap;
 }
@@ -2683,10 +2688,17 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    🔴 NO DIVIDER, asked for as *"rm divider vert line next to pads"*, AND THE
    TWO DECLARATIONS THAT SAY SO ARE NOT HERE. They sit beside `.panel-fixed-l`,
    three thousand lines down, because that is the rule they have to beat and
-   this one came first. See the block there, which carries the measurement. */
+   this one came first. See the block there, which carries the measurement.
+   🔴 `--pg-lab` IS A FLOOR AND THE WIDEST NAME IS THE WIDTH, SINCE 2026-10-12.
+   Asked for as a 16 by 4 drum grid with its rows named (`/concepts/rhythm/000/`:
+   kick, snare, open hat, closed hat). At a fixed 22 px every name past two
+   letters was clipped, which is the `/tom/` defect above in a new costume.
+   `max-content` sizes the column to the widest label, so a grid of numbers
+   0 to 63 (ink 12 px plus 6 px of padding) still lays out at the 22 px floor,
+   and a grid of words gets the room its longest word needs. */
 .pos-pg-labs {
   display: flex; flex-direction: column; gap: var(--pg-gap);
-  width: var(--pg-lab);
+  width: max-content; min-width: var(--pg-lab);
 }
 /* ⚠️ THE CORNER IS RESERVED EVEN WHEN IT IS EMPTY, or the first label sits a
    ruler's height above the first row of pads and the two columns never line up

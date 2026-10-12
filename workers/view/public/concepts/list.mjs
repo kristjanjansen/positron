@@ -17,7 +17,7 @@ export const CONCEPTS = [
   { n: 'synth/070', title: 'Circuit', say: 'The keyboard and a patch selector playing the Novation Circuit plugged into the Raspberry Pi.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice played from the keyboard with every parameter a knob of its own.' },
   { n: 'synth/090', title: 'Collide synth', say: 'A small SuperCollider program played from the keyboard with two knobs, bright and decay.' },
-  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, the Pi simulated for now.' },
+  { n: 'synth/100', title: 'Collide on Pi', say: 'The same SuperCollider voice played in this tab and on the Raspberry Pi side by side, simulated here when no board answers.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits in this tab, played from a patch picker with timbre and morph on the patchbay.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keyboard, with every one of its controls a knob on the patchbay.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
@@ -32,8 +32,8 @@ export const CONCEPTS = [
   { n: 'video/000', title: 'Camera', say: 'The local camera patched to a picture on this page.' },
   { n: 'video/010', title: 'Camera shader', say: 'The local camera beside the same picture through a two tone dither shader.' },
   { n: 'video/020', title: 'Camera recorder', say: 'The local camera recorded for up to ten seconds into this browser and played back on a timeline.' },
-  { n: 'video/030', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
-  { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
+  { n: 'video/030', title: 'WebRTC loopback', say: 'The local camera beside the same picture after a WebRTC round trip through Cloudflare Stream, up by WHIP and back by WHEP.' },
+  { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live on one crossfader, shown as each channel, a plain blend and a dithered fx blend.' },
   { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ running in this tab with only the number of mirrors left to turn.' },
   { n: 'shader/010', title: 'Shader on Pi', say: 'The mirror shader drawn in this tab and on the Raspberry Pi, the Pi simulated until it is reachable.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
@@ -55,6 +55,9 @@ export const CONCEPTS = [
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   { n: 'sampler/030', title: 'Pi piano', say: 'The piano and Rhodes sampler running on the Raspberry Pi, heard back over the relay or a direct path with the time from key to sound read out.' },
+  { n: 'rhythm/000', title: 'Drum machine', say: 'A 16 step grid playing four SuperCollider drums, kick, snare and two hats, each on a wire of its own.' },
+  { n: 'rhythm/010', title: 'Drum knobs', say: 'The same drum machine with one knob per drum, kick pitch, snare snap, open hat length and closed hat brightness.' },
+  { n: 'rhythm/050', title: 'Camera drums', say: 'The local camera cut into sixteen squares across, whose lit squares play the drum grid.' },
   { n: 'clock/000', title: 'Lag', say: 'The keyboard plays a synth over the relay and every note shows how long it took to arrive.' },
   { n: 'clock/010', title: 'Scheduling', say: 'One pattern played by a timer that wakes up and plays, and by the sound card told each note\'s time in advance, with how late each lands.' },
   { n: 'clock/020', title: 'Shared clock', say: 'Two places agree on the time once and then play the same beat with nothing sent per beat.' },
@@ -78,7 +81,7 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'draw', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
@@ -102,7 +105,7 @@ export const DEMO_CARDS = {
   patchbay: { group: 'room', say: 'One patchbay linking notes, sound, video and code to the Pi.' },
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a Rhodes from one keyboard over a roll of chords.', supersededBy: 'sampler/000' },
-  tom: { group: 'sampler', say: 'A 16 step grid playing the samples out of a pack.' },
+  tom: { group: 'rhythm', say: 'A 16 step grid playing the samples out of a pack.' },
   time: { group: 'clock', say: 'The clock every page runs on and what is built on it.', supersededBy: 'clock/010' },
   sync: { group: 'clock', say: 'Four ways two places agree on when something happens.' },
   draw: { group: 'draw', say: 'A line drawn by hand, recorded against the clock.' },

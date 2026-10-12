@@ -58,6 +58,18 @@ export const epochNow = () =>
 export const PROTO = 'looper/1';
 
 /**
+ * One round trip, as NTP reads it: `t0` sent and `t2` answered on our clock,
+ * `t1` stamped on theirs. `offset` is how far THEIR clock is ahead of ours.
+ * Pure and exported since 2026-10-12 so `demo/shell/board-collide.mjs` keeps
+ * the board's clock with this very estimator rather than a copy of it
+ * (plans/plan-pi-supercollider-defs.md §2.2). Keep the sample with the
+ * smallest `rtt` and nothing else, as `onPong` below does.
+ */
+export function skewSample(t0, t1, t2) {
+  return { rtt: t2 - t0, offset: t1 - (t0 + t2) / 2 };
+}
+
+/**
  * @param {object} o
  * @param {string} o.id            this peer's id — the LOWEST id in the room is
  *                                 the time reference, so agreement needs no
@@ -99,8 +111,7 @@ export function createPeer({ id, transport, now = epochNow, onLayer = null, onLi
     if (t0 == null) return;
     pending.delete(m.seq);
     const t2 = now();
-    const rtt = t2 - t0;
-    const offset = m.t1 - (t0 + t2) / 2;
+    const { rtt, offset } = skewSample(t0, m.t1, t2);
     let p = peers.get(m.from);
     if (!p) { p = { id: m.from, offsetMs: 0, rttMs: Infinity, samples: 0, lastSeen: 0 }; peers.set(m.from, p); }
     p.samples++; p.lastSeen = now();
