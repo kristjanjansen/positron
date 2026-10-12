@@ -27,6 +27,7 @@
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
   import { PARAM_HUES } from '/shell/code-lang.mjs';
+  import { createCompileIdle } from '/shell/compile-idle.mjs';
 
   // /mirror/'s kaleidoscope, running in this tab, with one parameter left.
   // Asked 2026-10-12: *"use same shader you have in mirror demo, just less
@@ -156,45 +157,66 @@ void main(){
   const panel = createVideoPanel({ media: canvas, left: name });
   panel.el.querySelector('.pos-vp-r').prepend(count);
 
-  let prog = null, fsShader = null, A = null, B = null, last = null;
-  const U = {};
-  if (gl) {
-    const sh = (t, s) => {
-      const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x);
-      if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) d.log(`the shader did not compile: ${gl.getShaderInfoLog(x)}`, 'bad');
-      return x;
-    };
-    fsShader = sh(gl.FRAGMENT_SHADER, FS);
-    prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, fsShader);
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      d.log(`the shader did not link: ${gl.getProgramInfoLog(prog)}`, 'bad');
-      prog = null;
-    } else {
-      gl.useProgram(prog);
-      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-      const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
-      name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
-      gl.bindVertexArray(gl.createVertexArray());
-      for (const u of ['uT', 'uRes', 'uPrev', 'uSeg']) U[u] = gl.getUniformLocation(prog, u);
-      gl.uniform2f(U.uRes, W, H);
-      gl.uniform1i(U.uPrev, 0);
-      // The feedback tap, as /mirror/ does it: two targets, swapped every
-      // frame, the previous one bound as `uPrev`.
-      const target = () => {
-        const t = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, t);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        for (const q of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, q, gl.LINEAR);
-        for (const q of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, q, gl.CLAMP_TO_EDGE);
-        const f = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
-        return { t, f };
-      };
-      A = target(); B = target();
+  // `prog` and `fsShader` are the program running NOW. An edit that does not
+  // compile or link leaves them alone, so the picture keeps the last good one.
+  let prog = null, fsShader = null, vsShader = null, A = null, B = null, last = null;
+  let U = {};
+  /**
+   * Build a program from fragment text. A good one is swapped in (new uniform
+   * locations, the same feedback targets, the old program deleted); a bad one
+   * changes nothing and answers `{ ok: false, error }` with the GL's own log.
+   */
+  function build(text) {
+    if (!gl) return { ok: false, error: 'no WebGL2 here' };
+    const fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, text); gl.compileShader(fs);
+    if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+      const error = (gl.getShaderInfoLog(fs) || 'the shader did not compile').trim();
+      gl.deleteShader(fs);
+      return { ok: false, error };
     }
+    const p2 = gl.createProgram();
+    gl.attachShader(p2, vsShader); gl.attachShader(p2, fs);
+    gl.linkProgram(p2);
+    if (!gl.getProgramParameter(p2, gl.LINK_STATUS)) {
+      const error = (gl.getProgramInfoLog(p2) || 'the shader did not link').trim();
+      gl.deleteProgram(p2); gl.deleteShader(fs);
+      return { ok: false, error };
+    }
+    if (prog) { gl.deleteProgram(prog); gl.deleteShader(fsShader); }
+    prog = p2; fsShader = fs;
+    gl.useProgram(prog);
+    U = {};
+    for (const u of ['uT', 'uRes', 'uPrev', 'uSeg']) U[u] = gl.getUniformLocation(prog, u);
+    if (U.uRes) gl.uniform2f(U.uRes, W, H);
+    if (U.uPrev) gl.uniform1i(U.uPrev, 0);
+    compiles++;
+    return { ok: true, knob: !!U.uSeg };
+  }
+  let compiles = 0;
+  if (gl) {
+    vsShader = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vsShader, VS); gl.compileShader(vsShader);
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
+    gl.bindVertexArray(gl.createVertexArray());
+    // The feedback tap, as /mirror/ does it: two targets, swapped every
+    // frame, the previous one bound as `uPrev`. They outlive every program.
+    const target = () => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      for (const q of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, q, gl.LINEAR);
+      for (const q of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, q, gl.CLAMP_TO_EDGE);
+      const f = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      return { t, f };
+    };
+    A = target(); B = target();
+    const first = build(FS);
+    if (!first.ok) d.log(`the shader did not compile: ${first.error}`, 'bad');
   } else d.log('this browser has no WebGL2, so there is no shader and the screen stays dark', 'bad');
 
   // The routing follows the links: no shader -> screen, the screen is the
@@ -211,8 +233,9 @@ void main(){
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, B.f);
     gl.viewport(0, 0, W, H);
-    gl.uniform1f(U.uT, i++ / 30);
-    gl.uniform1f(U.uSeg, P.mirrors);
+    if (U.uT) gl.uniform1f(U.uT, i / 30);
+    i++;
+    if (U.uSeg) gl.uniform1f(U.uSeg, P.mirrors);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, A.t);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -233,11 +256,42 @@ void main(){
     raf = requestAnimationFrame(frame);
   }
 
-  // ── the code box, read only, holding FS itself ──────────────────────────
+  // ── the code box: the program itself, compiled once the typing stops ────
+  // Asked 2026-10-12: *"can we make shader be in compiling codebox and be
+  // editable?"*. The kit's idle compile, as /fau/ and /concepts/synth/080/
+  // use it: `IDLE_MS` after the last keystroke, never two at once, `Compiling`
+  // breathing in the box's corner and `Did not compile` left standing with
+  // the GL's log in its `title` (and in the log below) while the last good
+  // program keeps drawing.
   const code = createCodeBox({ language: GLSL, value: FS, rows: 11, label: '',
     hues: { hueOf: (n) => (n === 'uSeg' ? HUE : null) },
-    ariaLabel: 'the fragment shader this page compiles, read only' });
-  code.input.readOnly = true;
+    ariaLabel: 'the fragment shader this page runs, edit it and it recompiles' });
+  // ⚠️ A PROGRAM WITH NO `uSeg` COMPILES AND RUNS, AND THE KNOB THEN DRIVES
+  // NOTHING. The kit's note has no state for "compiled, with a caveat", so the
+  // page writes that one line into it once the compile has settled, and the
+  // next compile paints over it as usual (a kit candidate, see the report).
+  const NO_KNOB = 'No uSeg, the knob drives nothing';
+  const idle = createCompileIdle({
+    input: code.input,
+    host: code.el,
+    compile: (text) => {
+      const out = build(text);
+      if (!out.ok) d.log(`the edit did not compile, the last good shader keeps running: ${out.error}`, 'warn');
+      else {
+        d.log(out.knob ? 'the edit compiled and is running' : 'the edit compiled and is running, and has no uSeg, so the knob drives nothing',
+          out.knob ? '' : 'warn');
+        if (!out.knob) idle.settled().then(() => {
+          if (U.uSeg || idle.state() !== 'idle') return;
+          const note = idle.el;
+          note.dataset.state = 'error';
+          note.textContent = NO_KNOB;
+          note.title = 'the program has no uniform float uSeg, so the mirrors knob has nothing to set';
+          note.hidden = false;
+        });
+      }
+      return out;
+    },
+  });
 
   panel.el.classList.add('cc-half');
 
@@ -269,7 +323,10 @@ void main(){
     shown: () => code.value(),
     mirrors: () => P.mirrors,
     delivered: () => delivered,
-    uniform: () => (prog ? gl.getUniform(prog, U.uSeg) : null),
+    uniform: () => (prog && U.uSeg ? gl.getUniform(prog, U.uSeg) : null),
+    compiles: () => compiles,
+    idle,
+    code,
     /** The last frame drawn, read off its target, so reading moves nothing. */
     pixels() {
       if (!last) return null;
