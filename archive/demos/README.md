@@ -329,6 +329,26 @@ its link pointed at eccm's /radio. eccm removed its radio on 2026-10-07 (tag
 Asked in eccm as *"fix these"*: the row is out of `demo/manifest.mjs` and the
 page, still pointed at eccm's `/stream`, is here.
 
+## `flipper-index.html`, retired 2026-10-12
+
+Asked: *"archive flipper"*, in the same breath as archiving `/cam/`. `/flipper/`
+put ERR's ETV and ETV2 live in two pictures, each over its own line of clock
+time whose right end was the present moment, to go back along, loop, or
+return to live. `/now/` was folded into it on 2026-10-05 and is
+`now-index.html` here. The row is out of `demo/manifest.mjs`, its card is out
+of `DEMO_CARDS` in `demo/concepts/list.mjs`, and `/flipper/` 404s from the
+next build. No redirect, the house default.
+
+What did not move, on purpose. `demo/shell/err-live.mjs` stays: `/archive/tv/`
+(the old concepts video/040) imports it. `demo/fake-err.mjs` stays: it is how
+`/archive/tv/` is tested by hand through `?base=`, and `demo/verify.mjs` keeps
+its wiring with `ERR_PAGES` now empty, so no run starts it. `/slides/`'s
+refusals slide linked `flipper` and links `/archive/tv/` now. Prose naming
+`/flipper/` in comments, skills and dated measurements (the stand-ins slide's
+`flipper, now 52/52` among them) records which page paid for a lesson and was
+left as written. `proto/flipper/`, deployed at `/proto/flipper/`, is an older
+prototype of the same name, a different file, and was not touched.
+
 ## `graph-index.html`, `rout-index.html` and `looper-index.html`, retired 2026-10-04
 
 Decided by the owner with *"names ok, looper retires, no redrect, capture is

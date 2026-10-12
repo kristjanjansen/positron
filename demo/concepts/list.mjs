@@ -102,7 +102,7 @@ export const DEMO_CARDS = {
   webrtc: { group: 'streaming', say: 'The same live test picture delivered over WebRTC by WHEP, with the network ping and route shown.', supersededBy: 'video/030' },
   moq: { group: 'streaming', say: 'A test picture sent to Cloudflare\'s MoQ relay and back, its glass to glass delay read off a clock.' },
   cam: { group: 'streaming', say: 'Your webcam beside what comes back over WebRTC, MoQ and LL-HLS, each with its glass to glass delay.' },
-  flipper: { group: 'streaming', say: 'ETV and ETV2 live over a line of clock time ending now, to go back along, loop or return to live.' },
+  // flipper archived 2026-10-12 (*"archive flipper"*): archive/demos/flipper-index.html.
   capture: { group: 'streaming', say: 'Four ways of keeping what came over a link, from takes recorded end to end to what a receiver got.' },
   circuit: { group: 'device', say: 'A Novation Circuit on screen that follows the real one plugged in here, and sends nothing back.' },
   evo: { group: 'device', say: 'An Evolution MK-425C drawn control for control, lighting up as you touch the real one plugged in.' },

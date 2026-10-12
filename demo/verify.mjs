@@ -177,10 +177,12 @@ if (all.some((t) => t.name === 'tapes')) {
     console.log(`stand-in archive ${standIn.get('tapes')} (nobody's archive)`);
   }
 }
-// ⚠️ ONE PAGE ON THIS BROADCASTER SINCE 2026-10-05, when `/now/` merged into
-// `/flipper/`. `errAt` is kept beside it because the refusal classifier below
+// ⚠️ NO PAGE ON THIS BROADCASTER SINCE 2026-10-12, when `/flipper/` (which
+// `/now/` had merged into on 2026-10-05) was archived. The list and the
+// stand-in wiring stay so the next ERR page needs one slug here and nothing
+// else; `errAt` is kept beside it because the refusal classifier below
 // recognises the stand-in by its own address.
-const ERR_PAGES = ['flipper'];
+const ERR_PAGES = [];
 let errAt = null;
 if (all.some((t) => ERR_PAGES.includes(t.name))) {
   const err = startErr({ port: 0, quiet: true });
