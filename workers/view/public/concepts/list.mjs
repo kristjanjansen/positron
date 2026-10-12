@@ -68,7 +68,7 @@ export const CONCEPTS = [
   { n: 'clock/000', title: 'Scheduling', say: 'A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late.' },
   { n: 'clock/010', title: 'Message lag', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' },
   { n: 'clock/020', title: 'Audio cushion', say: 'A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts.' },
-  { n: 'clock/030', title: 'Shared clock', say: 'Two places in this tab, one clock set wrong on purpose, agree the time once and then share one beat.' },
+  // clock/030 Shared clock moved to /archive/ 2026-10-12 (*"Cut it"*): both places were simulated in one tab.
   // clock/040 MIDI clock and clock/050 Clock drift moved to /archive/ 2026-10-12 (*"still too many clock demos, i can not distinguish"*, *"move less relevant to archive"*).
   // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
@@ -129,6 +129,6 @@ export const DEMO_CARDS = {
   videoradio: { group: 'stations', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
   knobs: { group: 'instruments', say: 'Yoshimi on a Raspberry Pi in another building, played from the keys here and heard over the relay.' },
   away: { group: 'instruments', say: 'A Novation Circuit on a desk in another building, played from this page and heard back through a Pi.' },
-  shape: { group: 'instruments', say: 'Edit a Novation Circuit\'s sound as it plays, plugged in here or on a Pi in another building.' },
+  // shape archived 2026-10-12 (*"archiev shape"*): still served, listed on /archive/ under devices.
   wish: { group: 'instruments', say: 'Say or type which instrument plays which, and a language model on Cloudflare makes the connection.' },
 };

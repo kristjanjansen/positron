@@ -527,7 +527,9 @@ export const DEMOS = [
    * curve, so the first step of a 127 step lane lands about half a second in,
    * and that measurement is the first thing the checks make.
    */
-  { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 4000,
+  // `unlisted: true` since 2026-10-12 (*"archiev shape"*): still built and deployed at
+  // /shape/, listed on /archive/ under devices.
+  { name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true, settleMs: 4000,
     one: "edit a Novation Circuit's sound while it is playing, plugged in here or on a Raspberry Pi in another building, with sliders that can move themselves",
     tags: ['WebMIDI', 'CoreMIDI', 'WS', 'relay', 'PCM', 'live board'] },
 

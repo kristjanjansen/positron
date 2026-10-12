@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 030</title>
+<title>POSITRON Shared clock</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The Join button appears after Play. `button`'s own display beats the UA's
@@ -44,7 +44,6 @@
   // same audio clock, so all that separates them is their notions of now.
   //
   // Nothing opens on a visit. Play joins the room; Join appears once it has.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -74,7 +73,7 @@
     [{ id: port, label: 'beat', dir: 'in', medium: 'clock' }]);
   const G_THERE = beatGraph(THERE, 'there', IN.there), G_LATE = beatGraph(LATE, 'late', IN.late);
 
-  const d = mount({ name: 'concept clock 030', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Shared clock', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     // Four cells, asked 2026-10-12: *"do 4 readouts that make sense"*. What
@@ -83,7 +82,6 @@
     // web-3's counted in once it joins. Join's own numbers (press to first beat,
     // that beat against web-1's) are log lines, because they happen once.
     readout: { 'offset found': 'ms', 'round trip': 'ms', apart: 'ms', worst: 'ms' } });
-  conceptNav('clock/030');
 
   const S = soundCard();
 
