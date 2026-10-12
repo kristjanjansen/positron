@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Drum knobs</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { createDrumMachine } from '/concepts/rhythm/drum-machine.mjs';
+  import { voices } from '/concepts/rhythm/voices.mjs';
+
+  // /concepts/rhythm/000/ plus one knob per drum. Asked 2026-10-12: *"next
+  // drum, same but each synth a parameter to tweak"*.
+  //
+  // Each drum's program declares its one number as a named control
+  // (`\pitch.kr`, `\snap.kr`, `\length.kr`, `\bright.kr`), and each knob is a
+  // bay node of its own, `web:knob-<name>:value-out`, wired into that drum's
+  // `value-in`. The value travels with every hit, in the hit's own timestamped
+  // bundle, so a turn is heard from the next hit and a hit already ringing
+  // keeps the value it started with. Which number and why is in
+  // `../voices.mjs`, `PARAMS`.
+  //
+  // Knobs above the grid, as a synth page puts its knobs above its keys.
+  const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('rhythm/010');
+  const m = createDrumMachine(d, { voices: voices({ knobs: true }) });
+  d.stack.add(m.knobs, m.surface, m.patchbay);
+  window.__rhythm = m.api;
+  window.__demo.knobs = m.api.knobGrid;
+  d.ready();
+</script>
