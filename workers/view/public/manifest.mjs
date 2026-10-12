@@ -481,12 +481,16 @@ export const DEMOS = [
   // SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
   // strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
   // locally against the 7.4 s default, so it declares its own wait.
-  { name: 'time', group: 'technologies', act: 0, created: '2026-10-04', built: true, bootMs: 12000,
+  // `unlisted: true` since 2026-10-12 (*"archive time and sync demos"*): still built and
+  // deployed at /time/, listed on /archive/ with the other retired pages.
+  { name: 'time', group: 'technologies', act: 0, created: '2026-10-04', built: true, unlisted: true, bootMs: 12000,
     one: 'The clock every page here runs on, and what is built on it, from beats and loops to scores and dates two thousand years long.',
     tags: ['timeline', 'WebAudio', 'canvas'] },
   // ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
   // The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
-  { name: 'sync', group: 'technologies', act: 4, created: '2026-10-04', built: true, bootMs: 14000,
+  // `unlisted: true` since 2026-10-12 (*"archive time and sync demos"*): still built and
+  // deployed at /sync/, listed on /archive/ with the other retired pages.
+  { name: 'sync', group: 'technologies', act: 4, created: '2026-10-04', built: true, unlisted: true, bootMs: 14000,
     one: 'Four ways two places agree on when something happens, from firing on arrival to lining up on a recording.',
     tags: ['DO', 'WS', 'relay', 'HLS', 'R2', 'timeline'] },
 
