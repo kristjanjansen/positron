@@ -32,9 +32,9 @@ export function conceptNav(n) {
       // Then *"30% less padding on code boxes. 15% more line height"*: 15px
       // 19px, and the code field's 1.45 times 1.15. MEASURED: the kit sets it
       // in `.pos-field.tall.code textarea` (0,3,1), so this ties that weight
-      // and wins by coming later.
+      // and wins by coming later. Then *"5% less lineheight"*: 1.67 to 1.59.
       + ' .pos-code { --field-pad: 15px 19px; }'
-      + ' .pos-field.code.pos-code textarea { line-height: 1.67; }';
+      + ' .pos-field.code.pos-code textarea { line-height: 1.59; }';
     document.head.append(st);
   }
 }
