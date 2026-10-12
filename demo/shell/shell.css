@@ -1515,8 +1515,13 @@ button.pos-pri[data-busy="1"] {
    about this row inside this row. */
 .tbar > [data-end="1"] { margin-left: auto; }
 
+/* 🔴 THE GAP SPLITS THE BUTTON'S HEIGHT INTO THREE EQUAL AIRS. Asked
+   2026-10-12, on a crop of the toggle beside the clock: *"adjust gap in between
+   to haev equal top and bottom padding"*. MEASURED on the ink of the digits
+   against the 34 px toggle: at 2 px the air was 6.96 above, 4.56 between and
+   6.60 below; at 3.5 it is 6.21, 6.06 and 5.85. */
 .tbar-time {
-  flex: none; display: grid; gap: 2px; justify-items: end;
+  flex: none; display: grid; gap: 3.5px; justify-items: end;
   font: 500 10.5px/1 var(--mono); font-variant-numeric: tabular-nums;
   color: var(--dim); white-space: nowrap;
 }
