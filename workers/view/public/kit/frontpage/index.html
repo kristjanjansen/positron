@@ -80,6 +80,41 @@
   .fp-body { font: 400 15px/1.55 var(--sans); color: var(--dim); margin: 0; }
   .fp-rec { font: 400 15px/1.6 var(--brand); color: var(--fg); margin: 0; max-width: 66ch; }
   .fp-rec b { color: var(--hi); font-weight: 600; }
+
+  /* HERO: four lines, each with its own gap above it, the eyebrow closest to
+     the headline it labels. Every face, size, weight, tracking and line height
+     is set per pairing from the PAIRINGS data, so the label under it reads the
+     same numbers the hero is drawn with. */
+  .fp-hero { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+  .fp-hero > * { margin: 0; overflow-wrap: anywhere; }
+  .fp-hero-eye { color: var(--dim); text-transform: uppercase; }
+  .fp-hero-h { color: var(--fg); margin-top: 14px; }
+  .fp-hero-l { color: var(--fg); margin-top: 20px; max-width: 34em; }
+  .fp-hero-s { color: var(--dim2); margin-top: 14px; }
+  /* 🔴 THE LIGHT VERSION IS NOT IN THE KIT. shell.css declares one dark theme
+     and no light tokens, so this specimen re-declares the five it reads, as
+     hand-picked values, on itself only. A light front page would need these
+     decided at :root, which is a decision this sampler does not make. */
+  .fp-light { --bg: #ffffff; --fg: #111418; --dim: #5b6472; --dim2: #7a8391; background: var(--bg);
+              border-radius: var(--r, 4px); padding: 40px 32px; }
+  .fp-label { display: flex; flex-direction: column; gap: 2px; margin-top: calc(2 * var(--ctl-gap)); }
+  .fp-label-n { font: 600 12px/1.4 var(--brand); color: var(--hi); margin: 0; }
+  .fp-label-r { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 0; overflow-wrap: anywhere; }
+
+  /* TITLES AND SUBTITLES: one specimen per step, the line under the title at
+     the shell's own 4 px below it */
+  .fp-ttl { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .fp-ttl > * { margin: 0; overflow-wrap: anywhere; }
+  .fp-ttl-t { color: var(--fg); }
+  .fp-ttl-w { color: var(--dim); max-width: 62ch; }
+  .fp-ttl-h { color: var(--hi); text-transform: uppercase; }
+  .fp-mixes { display: flex; flex-direction: column; gap: var(--pos-gap); }
+  .fp-mix { display: flex; flex-direction: column; gap: 20px; }
+
+  /* PAIRINGS ON A SLIDE: the slide's headline reads --fp-head and its text
+     already reads --sans (slide.css), so a frame changes face by setting two
+     custom properties and no slide rule is overridden but this one. */
+  .fp-sl .sl-say { font-family: var(--fp-head); }
 </style>
 <script type="module">
   import { el, createReport } from '/shell/shell.mjs';
@@ -87,7 +122,7 @@
   import { createKitPage } from '/shell/kit-page.mjs';
   import { createCard } from '/shell/card.mjs';
   import { createTable } from '/shell/table.mjs';
-  import { SCALE, stepOf } from '/shell/slide.mjs';
+  import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
 
   /**
    * kit/frontpage, THE TYPE THE FRONT PAGE WILL BE SET IN, 2026-10-12. Asked:
@@ -214,6 +249,142 @@
   };
 
   /* the blocks, newest first */
+
+  /* ── 2026-10-12, second round: *"to test samples for mixing brand font and
+     geist in different size and weights. slides, titles / subtitles"*, with a
+     hero crop for the front page set in a plain light sans ── */
+  const G = `'FP Geist', ${SYS_SANS}`;
+  const M = `${BRAND}, ${SYS_MONO}`;
+  const nameOf = (face) => (face === G ? 'Geist' : 'JetBrains Mono');
+  // one line of type: face, weight, size in px, tracking in em, line height
+  const t = (face, w, px, ls, lh) => ({ face, w, px, ls, lh });
+  const apply = (node, s) => {
+    node.style.font = `${s.w} ${s.px}px/${s.lh} ${s.face}`;
+    node.style.letterSpacing = `${s.ls}em`;
+  };
+  const describe = (role, s) => `${role}: ${nameOf(s.face)} ${s.w}, ${s.px} px, tracking ${s.ls >= 0 ? '+' : ''}${s.ls} em, line ${s.lh}`;
+
+  const HERO = {
+    eye: 'POSITRON STUDIO',
+    head: 'Connect anything to everything.',
+    line: 'Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.',
+    small: 'Powered by Cloudflare services. Delivered as agentic skills.',
+  };
+  // 🔴 THE PAIRINGS ARE DATA, AND THE LABEL IS WRITTEN FROM THE SAME OBJECT
+  // THE HERO IS DRAWN WITH, so a label cannot disagree with its specimen.
+  const PAIRINGS = [
+    { n: 'A', name: 'All Geist',
+      eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
+    { n: 'B', name: 'Geist, the eyebrow in mono',
+      eye: t(M, 400, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
+    { n: 'C', name: 'Headline in mono 600, Geist below it',
+      eye: t(M, 400, 12, 0.14, 1.2), head: t(M, 600, 40, -0.04, 1.1), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
+    { n: 'D', name: 'Mono throughout',
+      eye: t(M, 400, 12, 0.14, 1.2), head: t(M, 600, 40, -0.04, 1.1), line: t(M, 400, 16, 0, 1.55), small: t(M, 400, 12.5, 0, 1.55) },
+    { n: 'E', name: 'Geist headline, the small line in mono',
+      eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(M, 400, 12.5, 0, 1.5) },
+    { n: 'F', name: 'All Geist, light, like the crop', light: true,
+      eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
+  ];
+  const heroes = [];
+  section('HERO',
+    'The front page’s opening in six pairings of the brand mono and Geist, at the front page’s own column width, each labelled with what it is set in.',
+    null, (add) => {
+      for (const p of PAIRINGS) {
+        const wrap = el('div', 'fp-hero-wrap');
+        wrap.id = `hero-${p.n.toLowerCase()}`;
+        const hero = el('div', p.light ? 'fp-hero fp-light' : 'fp-hero');
+        const parts = {};
+        for (const [role, cls] of [['eye', 'fp-hero-eye'], ['head', 'fp-hero-h'], ['line', 'fp-hero-l'], ['small', 'fp-hero-s']]) {
+          const node = el(role === 'head' ? 'h2' : 'p', cls, HERO[role]);
+          apply(node, p[role]);
+          parts[role] = node;
+          hero.append(node);
+        }
+        const label = el('div', 'fp-label');
+        label.append(el('p', 'fp-label-n', `${p.n}. ${p.name}${p.light ? ', with light colours picked for this specimen (the kit has no light theme)' : ''}`));
+        for (const [role, word] of [['eye', 'eyebrow'], ['head', 'headline'], ['line', 'line'], ['small', 'small line']]) {
+          label.append(el('p', 'fp-label-r', describe(word, p[role])));
+        }
+        wrap.append(hero, label);
+        add(wrap);
+        heroes.push({ p, parts });
+      }
+    }, { bare: true });
+
+  // TITLES AND SUBTITLES: the shell's page title and its line, and a section
+  // heading with its note, in four mixes, four steps at 600 and one at 400.
+  const TITLE_STEPS = [[17, 13.5], [20, 15], [24, 15], [32, 17]];
+  const MIXES = [
+    { name: 'Mono title, mono line (the shell today, at 17 and 13.5)', title: M, what: M },
+    { name: 'Mono title, Geist line', title: M, what: G },
+    { name: 'Geist title, Geist line', title: G, what: G },
+    { name: 'Geist title, mono line', title: G, what: M },
+  ];
+  const titles = [];
+  section('TITLES AND SUBTITLES',
+    'A page title with the line under it at four sizes and both weights, and a section heading with its note, in four mixes of the brand mono and Geist.',
+    null, (box) => {
+      box.classList.add('kit-wide');
+      const list = el('div', 'fp-mixes');
+      for (const mx of MIXES) {
+        const g = el('div', 'fp-mix');
+        g.append(el('p', 'fp-label-n', mx.name));
+        const specs = [...TITLE_STEPS.map(([a, b]) => [a, b, 600]), [24, 15, 400]];
+        for (const [tp, wp, w] of specs) {
+          const s = el('div', 'fp-ttl');
+          const tt = el('h3', 'fp-ttl-t', 'Two rooms, one clock');
+          const ts = t(mx.title, w, tp, mx.title === M ? 0.01 : -0.015, 1.2);
+          apply(tt, ts);
+          const ww = el('p', 'fp-ttl-w', 'A Raspberry Pi in another building plays the same bar as this page, and the readout says how late it was.');
+          const ws = t(mx.what, 400, wp, 0, 1.5);
+          apply(ww, ws);
+          s.append(tt, ww, el('p', 'fp-label-r', `${describe('title', ts)}; ${describe('line', ws)}`));
+          g.append(s);
+          titles.push({ mx, tt, ww });
+        }
+        // the section heading and its note, at the kit's own heading size
+        const sh = el('div', 'fp-ttl');
+        const hh = el('h4', 'fp-ttl-h', 'Matching sans');
+        const hs = t(mx.title, 600, 11, 0.16, 1.2);
+        apply(hh, hs);
+        const hn = el('p', 'fp-ttl-w', 'Six openly licensed sans faces, each set beside the brand mono.');
+        const ns = t(mx.what, 400, 13.5, 0, 1.6);
+        apply(hn, ns);
+        sh.append(hh, hn, el('p', 'fp-label-r', `${describe('section heading', hs)}, uppercase; ${describe('note', ns)}`));
+        g.append(sh);
+        list.append(g);
+      }
+      box.append(list);
+    });
+
+  // PAIRINGS ON A SLIDE. Not `SLIDES`: a block's address is its title, and
+  // `/kit/#slides` must keep forwarding to the SLIDES part (kit-parts.mjs).
+  const SLIDE_PAIRS = [
+    { name: 'Mono title, Geist body', head: `'Slide JetBrains Mono', ${SYS_MONO}`, body: G },
+    { name: 'Geist title, mono body', head: G, body: `'Slide JetBrains Mono', ${SYS_MONO}` },
+    { name: 'All Geist', head: G, body: G },
+  ];
+  const slides = [];
+  section('PAIRINGS ON A SLIDE',
+    'One slide from createSlide, a headline at step 4 over a sentence at step 3, in three pairings of the brand mono and Geist.',
+    null, (box) => {
+      box.classList.add('kit-wide');
+      const list = el('div', 'fp-faces');
+      for (const sp of SLIDE_PAIRS) {
+        const wrap = el('div', 'fp-spec');
+        const s = createSlide({ name: sp.name, layout: 'left', say: 'Connect anything to everything',
+          text: 'Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers' });
+        s.el.classList.add('fp-sl');
+        s.el.style.setProperty('--fp-head', sp.head);
+        s.el.style.setProperty('--sans', sp.body);
+        wrap.append(el('p', 'fp-label-n', sp.name), s.frame,
+          el('p', 'fp-label-r', `headline at step 4, ${+stepOf(4).size.toFixed(2)} per cent of the slide’s height, 600; text at step 3, ${+stepOf(3).size.toFixed(2)} per cent, 600 and untracked; the headline’s tracking and both line heights from SCALE`));
+        list.append(wrap);
+        slides.push({ sp, s });
+      }
+      box.append(list);
+    });
   const measured = new Map();         // id -> { ok, x, cap, w }
   let jbm = null;
 
@@ -382,6 +553,41 @@
     const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
     await frames(3);
     checkPage();
+
+    // HERO, TITLES, SLIDES: every specimen is drawn in the face its label
+    // names, read off the rendered style rather than the data
+    {
+      const first = (n) => getComputedStyle(n).fontFamily.split(',')[0].replace(/["']/g, '').trim();
+      const want = (face) => face.split(',')[0].replace(/["']/g, '').trim();
+      const bad = [];
+      for (const { p, parts } of heroes) {
+        for (const role of ['eye', 'head', 'line', 'small']) {
+          const cs = getComputedStyle(parts[role]);
+          if (first(parts[role]) !== want(p[role].face) || +cs.fontWeight !== p[role].w || Math.abs(parseFloat(cs.fontSize) - p[role].px) > 0.01) {
+            bad.push(`${p.n} ${role} ${first(parts[role])} ${cs.fontWeight} ${cs.fontSize}`);
+          }
+        }
+      }
+      for (const { mx, tt, ww } of titles) {
+        if (first(tt) !== want(mx.title) || first(ww) !== want(mx.what)) bad.push(`${mx.name} ${first(tt)} over ${first(ww)}`);
+      }
+      for (const { sp, s } of slides) {
+        if (first(s.parts.say) !== want(sp.head) || first(s.parts.text) !== want(sp.body)) bad.push(`slide ${sp.name} ${first(s.parts.say)} over ${first(s.parts.text)}`);
+      }
+      const both = heroes.some(({ parts }) => first(parts.head) === 'FP Geist') && heroes.some(({ parts }) => first(parts.head) === 'Brand JetBrains Mono');
+      d.assert('every hero, title and slide specimen is drawn in the face, weight and size its label names, and both faces appear',
+        bad.length === 0 && both && heroes.length === PAIRINGS.length && slides.length === 3,
+        bad.length ? bad.slice(0, 4).join(', ') : `${heroes.length} heroes, ${titles.length} titles and ${slides.length} slides, each in its own pairing`);
+    }
+
+    // the light hero paints its own ground and the dark ones do not
+    {
+      const bgOf = (h) => getComputedStyle(h.parts.head.parentElement).backgroundColor;
+      const light = heroes.filter((h) => h.p.light), dark = heroes.filter((h) => !h.p.light);
+      d.assert('the light hero paints a light ground of its own and the dark ones stand on the page',
+        light.length === 1 && bgOf(light[0]) === 'rgb(255, 255, 255)' && dark.every((h) => bgOf(h) === 'rgba(0, 0, 0, 0)'),
+        `light ${light.map(bgOf).join(', ')}, dark ${[...new Set(dark.map(bgOf))].join(', ')}`);
+    }
 
     // 1. every candidate loaded, and what the canvas measured is what the
     // face file declares, so no number on this page is a fallback's
