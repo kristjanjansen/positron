@@ -31,12 +31,14 @@
 
   // /mirror/'s kaleidoscope, running in this tab, with one parameter left.
   // Asked 2026-10-12: *"use same shader you have in mirror demo, just less
-  // parameters"*. The knob is a node of its own, `web:knob-mirrors`, cabled
-  // into `web:shader:value-in`, and the shader reads `uSeg` only off that
+  // parameters"*. The knob is a node of its own, `web:knob-segments`, cabled
+  // into `web:shader:value-in`, and the shader reads `uSegments` only off that
   // link, so a turn is a value crossing a wire. The shader makes its own
   // picture, so nothing feeds its video side and there is no source node.
   //
-  // THE TEXT IS /mirror/'s `FS_BODY`, TOKEN FOR TOKEN, with two changes:
+  // THE TEXT IS /mirror/'s `FS_BODY`, TOKEN FOR TOKEN, with three changes:
+  // - `uSeg` is `uSegments` (asked 2026-10-12, *"uSeg -> uSegments, Mirros
+  //   param -> Segments"*); v3dpipe sets both names from its `seg`;
   // - /mirror/'s own lines, with one long line broken in two and the uniform
   //   line split (whitespace only);
   // - `uFb`, `uScale`, `uWarp` and `uHue` are `const` at /mirror/'s own
@@ -46,7 +48,7 @@
   // feedback tap reads the previous frame through the same two-target
   // ping-pong. /mirror/'s look crossfade and headset copy are not here.
   //
-  // ⚠️ `uSeg` IS THE NUMBER OF WEDGES THE ANGLE IS FOLDED INTO, which
+  // ⚠️ `uSegments` IS THE NUMBER OF WEDGES THE ANGLE IS FOLDED INTO, which
   // /mirror/'s control calls `mirrors` and offers as 2, 8 and 24 (8 is its
   // default). The knob gives it 1 to 32 directly. At 1 the fold is a single
   // mirror down the horizontal; every N is N-fold symmetric.
@@ -55,7 +57,7 @@
   const S = 'web';
   const SH_OUT = `${S}:shader:video-out`, SH_VAL = `${S}:shader:value-in`;
   const SCREEN = `${S}:screen:video-in`;
-  const KNOB_OUT = `${S}:knob-mirrors:value-out`;
+  const KNOB_OUT = `${S}:knob-segments:value-out`;
   const W = 640, H = 360;          // /mirror/'s own render size
 
   const d = mount({ name: 'Mirror shader', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
@@ -68,7 +70,7 @@ void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
   const FS = `#version 300 es
 precision highp float;
 uniform float uT; uniform vec2 uRes; uniform sampler2D uPrev;
-uniform float uSeg;  // value-in
+uniform float uSegments;  // value-in
 // /mirror/'s defaults, fixed here:
 const float uFb = 0.78;    // feedback
 const float uScale = 4.0;  // grain, mid
@@ -81,7 +83,7 @@ float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
     mix(h(i + vec2(0,1)), h(i + vec2(1,1)), f.x), f.y); }
 void main(){
   vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
-  float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / uSeg;
+  float a = atan(uv.y, uv.x), r = length(uv), seg = 6.2831853 / uSegments;
   a = abs(mod(a + 0.5 * seg, seg) - 0.5 * seg);
   vec2 k = vec2(cos(a), sin(a)) * r;
   float w = n(k * uScale + uT * 0.3) + 0.5 * n(k * uScale * 2.0 - uT * 0.2)
@@ -106,31 +108,31 @@ void main(){
       [/[A-Za-z_]\w*/, ''],
     ],
     params(src) {
-      const m = /uniform\s+float\s+(uSeg)\b/.exec(src);
+      const m = /uniform\s+float\s+(uSegments)\b/.exec(src);
       if (!m) return [];
       const from = m.index + m[0].length - m[1].length;
-      return [{ name: 'uSeg', from, to: from + m[1].length, nameFrom: from, nameTo: from + m[1].length, kind: 'arg' }];
+      return [{ name: 'uSegments', from, to: from + m[1].length, nameFrom: from, nameTo: from + m[1].length, kind: 'arg' }];
     },
   };
   const HUE = PARAM_HUES[0];
 
   // ── the shader node's one parameter, set only through value-in ──────────
-  const P = { mirrors: null };
+  const P = { segments: null };
   let delivered = 0;
   function setParam(e) {
-    if (e?.of !== 'param' || e.name !== 'mirrors') { d.log('the shader takes one parameter, mirrors, and this was not it', 'warn'); return; }
-    P.mirrors = Math.min(32, Math.max(1, Math.round(e.v)));
+    if (e?.of !== 'param' || e.name !== 'segments') { d.log('the shader takes one parameter, segments, and this was not it', 'warn'); return; }
+    P.segments = Math.min(32, Math.max(1, Math.round(e.v)));
     delivered++;
   }
 
   // ── the bay: knob, shader, screen ───────────────────────────────────────
   const bay = createBay();
-  bay.addNode({ id: `${S}:knob-mirrors`, kind: 'person', label: 'knob', place: 'browser' });
+  bay.addNode({ id: `${S}:knob-segments`, kind: 'person', label: 'knob', place: 'browser' });
   bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'mirror shader', place: 'browser' });
   bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'screen', place: 'browser' });
-  bay.addPort({ id: KNOB_OUT, label: 'knob-mirrors:value-out', dir: 'out', medium: 'value', shape: { of: 'param', names: ['mirrors'] } });
+  bay.addPort({ id: KNOB_OUT, label: 'knob-segments:value-out', dir: 'out', medium: 'value', shape: { of: 'param', names: ['segments'] } });
   bay.addPort({ id: SH_VAL, label: 'shader:value-in', dir: 'in', medium: 'value',
-    shape: { of: 'param', names: ['mirrors'] }, deliver: setParam });
+    shape: { of: 'param', names: ['segments'] }, deliver: setParam });
   bay.addPort({ id: SH_OUT, label: 'shader:video-out', dir: 'out', medium: 'video', transports: ['page'] });
   bay.addPort({ id: SCREEN, label: 'screen', dir: 'in', medium: 'video' });
 
@@ -187,11 +189,11 @@ void main(){
     prog = p2; fsShader = fs;
     gl.useProgram(prog);
     U = {};
-    for (const u of ['uT', 'uRes', 'uPrev', 'uSeg']) U[u] = gl.getUniformLocation(prog, u);
+    for (const u of ['uT', 'uRes', 'uPrev', 'uSegments']) U[u] = gl.getUniformLocation(prog, u);
     if (U.uRes) gl.uniform2f(U.uRes, W, H);
     if (U.uPrev) gl.uniform1i(U.uPrev, 0);
     compiles++;
-    return { ok: true, knob: !!U.uSeg };
+    return { ok: true, knob: !!U.uSegments };
   }
   let compiles = 0;
   if (gl) {
@@ -224,7 +226,7 @@ void main(){
   let i = 0;
   function render() {
     if (!gl) return;
-    const ready = prog && holds(SH_OUT, SCREEN) && P.mirrors != null;
+    const ready = prog && holds(SH_OUT, SCREEN) && P.segments != null;
     if (!ready) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, W, H);
@@ -235,7 +237,7 @@ void main(){
     gl.viewport(0, 0, W, H);
     if (U.uT) gl.uniform1f(U.uT, i / 30);
     i++;
-    if (U.uSeg) gl.uniform1f(U.uSeg, P.mirrors);
+    if (U.uSegments) gl.uniform1f(U.uSegments, P.segments);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, A.t);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -264,13 +266,13 @@ void main(){
   // the GL's log in its `title` (and in the log below) while the last good
   // program keeps drawing.
   const code = createCodeBox({ language: GLSL, value: FS, rows: CODE_ROWS, label: '',
-    hues: { hueOf: (n) => (n === 'uSeg' ? HUE : null) },
+    hues: { hueOf: (n) => (n === 'uSegments' ? HUE : null) },
     ariaLabel: 'the fragment shader this page runs, edit it and it recompiles' });
-  // ⚠️ A PROGRAM WITH NO `uSeg` COMPILES AND RUNS, AND THE KNOB THEN DRIVES
+  // ⚠️ A PROGRAM WITH NO `uSegments` COMPILES AND RUNS, AND THE KNOB THEN DRIVES
   // NOTHING. The kit's note has no state for "compiled, with a caveat", so the
   // page writes that one line into it once the compile has settled, and the
   // next compile paints over it as usual (a kit candidate, see the report).
-  const NO_KNOB = 'No uSeg, the knob drives nothing';
+  const NO_KNOB = 'No uSegments, the knob drives nothing';
   const idle = createCompileIdle({
     input: code.input,
     host: code.el,
@@ -278,14 +280,14 @@ void main(){
       const out = build(text);
       if (!out.ok) d.log(`the edit did not compile, the last good shader keeps running: ${out.error}`, 'warn');
       else {
-        d.log(out.knob ? 'the edit compiled and is running' : 'the edit compiled and is running, and has no uSeg, so the knob drives nothing',
+        d.log(out.knob ? 'the edit compiled and is running' : 'the edit compiled and is running, and has no uSegments, so the knob drives nothing',
           out.knob ? '' : 'warn');
         if (!out.knob) idle.settled().then(() => {
-          if (U.uSeg || idle.state() !== 'idle') return;
+          if (U.uSegments || idle.state() !== 'idle') return;
           const note = idle.el;
           note.dataset.state = 'error';
           note.textContent = NO_KNOB;
-          note.title = 'the program has no uniform float uSeg, so the mirrors knob has nothing to set';
+          note.title = 'the program has no uniform float uSegments, so the segments knob has nothing to set';
           note.hidden = false;
         });
       }
@@ -297,13 +299,13 @@ void main(){
 
   // ── the knob: its own node, a turn is one event on its value-out ────────
   // It opens on 8, /mirror/'s own default.
-  const knob = createKnob({ label: 'mirrors', min: 1, max: 32, step: 1, value: 8, hand: true,
+  const knob = createKnob({ label: 'segments', min: 1, max: 32, step: 1, value: 8, hand: true,
     format: (v) => `${Math.round(v)}`,
-    onInput: (v) => bay.send(KNOB_OUT, { of: 'param', name: 'mirrors', v }) });
+    onInput: (v) => bay.send(KNOB_OUT, { of: 'param', name: 'segments', v }) });
   // The knob wears the uniform's hue, so the box and the knob read as one name.
-  knob.el.dataset.param = 'mirrors';
+  knob.el.dataset.param = 'segments';
   knob.el.style.setProperty('--param-hue', HUE);
-  const grid = createKnobGrid(new Map([['mirrors', knob]]), { row: true });
+  const grid = createKnobGrid(new Map([['segments', knob]]), { row: true });
 
   const lit = (l) => drawing && l.from === SH_OUT;
   const pb = createPatchbay(bay, { flowing: lit });
@@ -312,7 +314,7 @@ void main(){
 
   // The knob's starting value goes over the wire too, so the first N the
   // shader ever sees came along the link and not out of a default.
-  bay.send(KNOB_OUT, { of: 'param', name: 'mirrors', v: knob.value() });
+  bay.send(KNOB_OUT, { of: 'param', name: 'segments', v: knob.value() });
   if (prog) { drawing = true; raf = requestAnimationFrame(frame); pb.refresh(); }
 
   window.__demo.knobs = grid;
@@ -321,9 +323,9 @@ void main(){
     size: [W, H],
     source: () => (fsShader ? gl.getShaderSource(fsShader) : null),
     shown: () => code.value(),
-    mirrors: () => P.mirrors,
+    segments: () => P.segments,
     delivered: () => delivered,
-    uniform: () => (prog && U.uSeg ? gl.getUniform(prog, U.uSeg) : null),
+    uniform: () => (prog && U.uSegments ? gl.getUniform(prog, U.uSegments) : null),
     compiles: () => compiles,
     idle,
     code,

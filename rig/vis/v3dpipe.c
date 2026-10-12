@@ -215,6 +215,11 @@ static void draw_pass(GLuint prog, long i, int W, int H, GLuint src, GLuint data
   if((l=glGetUniformLocation(prog,"uT"))>=0) glUniform1f(l,(float)(i/30.0));
   if((l=glGetUniformLocation(prog,"uRes"))>=0) glUniform2f(l,(float)W,(float)H);
   if((l=glGetUniformLocation(prog,"uSeg"))>=0) glUniform1f(l,seg);
+  /* The same number under the name the concept pages use since 2026-10-12
+     (*"uSeg -> uSegments"*). Both are set, so FS_KAL above and any body
+     written for the old name keep working. NOT COMPILED: this laptop kills
+     locally built binaries, and the board was not reachable that day. */
+  if((l=glGetUniformLocation(prog,"uSegments"))>=0) glUniform1f(l,seg);
   if((l=glGetUniformLocation(prog,"uFb"))>=0) glUniform1f(l,fb);
   if((l=glGetUniformLocation(prog,"uScale"))>=0) glUniform1f(l,scale);
   if((l=glGetUniformLocation(prog,"uWarp"))>=0) glUniform1f(l,warp);
