@@ -219,6 +219,7 @@ export const DEMOS = [
   // `now` (one ERR television channel on a line whose right-hand end is the
   // present moment) merged into `flipper` 2026-10-05 on *"you promised to merge
   // flipper and now"*. The old page is archive/demos/now-index.html. No redirect.
+  // `flipper` itself was archived 2026-10-12, below.
   // `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
@@ -229,15 +230,9 @@ export const DEMOS = [
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
     // of fetching before there is much to see
     settleMs: 4000 },
-  { name: 'flipper', group: 'technologies', act: 5, created: '2026-09-04', built: true,
-    one: 'ETV and ETV2 live in two pictures that can play together, each over its own line whose right end is the present moment',
-    tags: ['HLS', 'live', 'timeline', 'DVR'],
-    // No control opens anything. Under a harness the page presses its own ETV
-    // play, runs the line's checks, plays ETV2 beside it, stops each one, then
-    // closes what it opened, all BEFORE it says ready. There is no shared bar,
-    // so the harness has no drill to race. bootMs is a ceiling for that and
-    // costs a working page nothing.
-    bootMs: 70000 },
+  // `flipper` was here until 2026-10-12: ETV and ETV2 live, each over a line whose right end is the
+  // present moment. Archived on *"archive flipper"*; the page is archive/demos/flipper-index.html
+  // (archive/demos/README.md says why). No redirect.
   // Everything that could be reached about one artist, before anything is
   // played: 122 rows out of fourteen archives, saying when it is from, who
   // holds it, what it is, whether there is a file and what its licence allows.
