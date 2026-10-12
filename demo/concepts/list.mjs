@@ -34,6 +34,7 @@ export const CONCEPTS = [
   { n: 'video/030', title: 'Camera loopback', say: 'The local camera beside the same picture after a round trip through Cloudflare Stream by WHIP and back by WHEP.' },
   { n: 'video/040', title: 'TV', say: 'ETV and ETV2 live through one crossfader into a single dithered picture.' },
   { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ running in this tab with only the number of mirrors left to turn.' },
+  { n: 'shader/010', title: 'Shader on Pi', say: 'The mirror shader drawn in this tab and on the Raspberry Pi, the Pi simulated until it is reachable.' },
   { n: 'device/000', title: 'Pico router', say: 'The keyboard plays a sine synth through an emulated Pico whose screen shows each note crossing it.' },
   { n: 'room/000', title: 'Chat', say: 'A multi-user chat built from patchbay blocks.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
