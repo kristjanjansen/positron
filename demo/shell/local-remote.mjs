@@ -294,6 +294,7 @@ export function createLocalRemote({
   const fade = createSlider({
     label: '', aria, min: 0, max: 100, step: 1,
     value: Math.round(Math.max(0, Math.min(1, value)) * 100), unit: '%',
+    ends: [sides.local.labelEl, sides.remote.labelEl],
     onInput: (v) => apply(v / 100, 'hand'),
   });
 
@@ -301,7 +302,9 @@ export function createLocalRemote({
   const fadeCell = el('div', 'pos-lr-fade');
   fadeCell.append(fade.el);
   /**
-   * 🔴 THE LABELS ARE IN THE BAR IN THE WIDE ARRANGEMENT AND IN THEIR OWN
+   * 🔴 THE LABELS ARE INSIDE THE FADER'S LANE IN THE WIDE ARRANGEMENT (the
+   * slider's `ends`, since 2026-10-12: *"use when threre is xfader, add to kit
+   * too"*; until then they stood in the bar either side of it) AND IN THEIR OWN
    * PANE'S FOOTER IN THE NARROW ONE, AND THAT IS TWO STRUCTURES RATHER THAN ONE
    * STRUCTURE AT TWO SIZES. Given as two drawings, and the second one is not a
    * reflow of the first: wide is one footer holding two labels with the fader
@@ -311,7 +314,7 @@ export function createLocalRemote({
    * the component this is built out of and the wide arrangement is the special
    * case, which is the opposite of how it would be written by default.
    */
-  bar.append(sides.local.labelEl, fadeCell, sides.remote.labelEl);
+  bar.append(fadeCell);
   root.append(sides.local.el, sides.remote.el, bar);
 
   // ── what the fader moves ─────────────────────────────────────────────────
@@ -384,7 +387,7 @@ export function createLocalRemote({
     for (const which of ['local', 'remote']) {
       const s = sides[which];
       if (next === 'narrow') s.panel.slots.centre.append(s.labelEl);
-      else bar.insertBefore(s.labelEl, which === 'local' ? fadeCell : null);
+      else fade.ends[which === 'local' ? 0 : 1].append(s.labelEl);
     }
     return arrangement;
   }

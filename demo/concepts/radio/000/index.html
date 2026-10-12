@@ -22,24 +22,10 @@
      is as tall as the scope rather than 16:9 (`aspect: 'auto'`). */
   .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
   .cc-wave .pos-scope-gut { display: none; }
-  /* Play and the crossfader, centred under the two panels. The slider takes the
-     row between its two named ends, as /grains/ draws its blend. */
-  /* A slider row: an end label, the slider, an end label, at the full width.
-     Both label columns take the width of the longest end label on the page,
-     `--end` in ch of the labels' own mono face, so every slider starts and
-     ends at the same x (asked 2026-10-10, *"label area w's on slider left and
-     right the longest one"*). */
-  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
-    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
-  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
   /* Play on its own row: the button's own size, at the left. A flex row
      blockifies it, so it sits on no text line. */
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-fade .cc-end:first-child { text-align: right; }
-  .cc-fade > .sld { min-width: 0; }
-  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -242,18 +228,14 @@
   }
   face();
 
+  // The crossfader, its two stations named inside the lane (the kit's `ends`).
   const fader = createSlider({ label: '', aria: 'crossfade', min: 0, max: 1, step: 0.01, value: x,
-    onInput: (v) => { x = v; applyFade(); } });
-  const fade = el('div', 'cc-fade');
-  fade.append(el('span', 'cc-end', 'ERR'), fader.el, el('span', 'cc-end', 'Ida'));
+    ends: ['ERR', 'Ida'], onInput: (v) => { x = v; applyFade(); } });
 
   // Play on its own row, top left under the title.
   const top = el('div', 'cc-top');
   top.append(transport.el);
   // Blocks in the shell's stack, at the shell's gap.
-  d.stack.add(top, pair, fade, pb.el);
-  // Both label columns of every slider row take the longest end label's width.
-  const ends = [...d.el.querySelectorAll('.cc-fade .cc-end')].map((e) => e.textContent.length);
-  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  d.stack.add(top, pair, fader.el, pb.el);
   d.ready();
 </script>

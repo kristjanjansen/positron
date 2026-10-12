@@ -16,16 +16,6 @@
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
-  /* The crossfader row, as /concepts/radio/000/ and /concepts/video/040/: an
-     end label, the slider, an end label, both label columns as wide as the
-     longer end label. */
-  .cc-fade { display: grid; grid-template-columns: var(--end, 6ch) minmax(0, 1fr) var(--end, 6ch);
-    align-items: center; gap: 14px; width: 100%; font: 400 12px/1 var(--mono); }
-  .cc-fade .cc-end { color: var(--dim); white-space: nowrap; }
-  .cc-fade .cc-end:first-child { text-align: right; }
-  .cc-fade > .sld { min-width: 0; }
-  .cc-fade > .sld > .sld-lane { width: auto; flex: 1 1 auto; }
-  .cc-fade > .sld > .sld-head:not(:has(.sld-l:not(:empty))) { display: none; }
 </style>
 <script type="module">
   import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
@@ -383,12 +373,10 @@
   const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
     flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || local.held().length > 0),
   });
-  // The crossfader's slider, the kit's, in radio/000's row; a move leaves on
-  // `web:fader:value-out` and reaches the sound only over its link.
+  // The crossfader's slider, the kit's, its two ends named inside the lane; a
+  // move leaves on `web:fader:value-out` and reaches the sound only over its link.
   const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
-    onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
-  const fade = el('div', 'cc-fade');
-  fade.append(el('span', 'cc-end', 'here'), fader.el, el('span', 'cc-end', 'Pi'));
+    ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
   const pair = el('div', 'cc-pair');
   pair.append(left.panel.el, right.panel.el);
   // The program both sides run, read only; a sixth of its height as on 090.
@@ -397,9 +385,7 @@
     hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
   code.input.readOnly = true;
   // Knobs above the code (*"when there are code and knobs on concepts, move knobs on top of code"*).
-  d.stack.add(pair, fade, grid.el, code.el, host, pb.el);
-  const ends = [...fade.querySelectorAll('.cc-end')].map((e) => e.textContent.length);
-  d.el.style.setProperty('--end', `${Math.max(...ends)}ch`);
+  d.stack.add(pair, fader.el, grid.el, code.el, host, pb.el);
 
   const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };
   window.__demo.knobs = grid;

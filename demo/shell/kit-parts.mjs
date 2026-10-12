@@ -30,7 +30,7 @@
 
 export const KIT_PARTS = [
   { part: 'input', label: 'INPUT', ids: [
-    'link-button', 'code-box', 'knobs-under-the-code', 'compile-on-a-pause', 'toggle',
+    'crossfader', 'link-button', 'code-box', 'knobs-under-the-code', 'compile-on-a-pause', 'toggle',
     'range-slider', 'checkbox', 'choice-standing-up', 'drop-target', 'button-group',
     'control-row', 'stepper', 'slider', 'slider-group', 'slider-group-paired',
     'invisible-hand', 'choice', 'choice-pending', 'field', 'piano-roll', 'keyboard',
