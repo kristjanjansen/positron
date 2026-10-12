@@ -32,7 +32,8 @@
 
 /** General MIDI's drum notes, which is what the sequencer sends and what each
  *  wire into a voice lets through. */
-export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46, clap: 39, tomlo: 45, tomhi: 50, cowbell: 56 };
+export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46, clap: 39, tomlo: 45, tomhi: 50, cowbell: 56, rim: 37,
+  ride: 51, crash: 49, shaker: 70, tamb: 54, claves: 75, congalo: 64, congahi: 63, tommid: 47, agogo: 67 };
 
 /**
  * The one knob per drum on 010, and why each is the one most fun to turn.
@@ -192,11 +193,100 @@ const cowbell = () => `// the 808's two square waves at 540 and 800 Hz, filtered
     HPF.ar(tone, 400) * env * amp
 }`;
 
+// A NINTH, 2026-10-12, when 050 stopped dropping a picture row (*"just split
+// the video up to squares. add more drum rows if needed"*):
+//   rim shot  the 808's own: two sines at 455 and 1667 Hz for 40 ms over a
+//             3 ms noise tick. Earlier left out because on a laptop speaker a
+//             short click reads as the closed hat's tick; with the hats above
+//             7 kHz and the cowbell's squares at 540 and 800, it is the one
+//             PITCHED, WOODY tick in the mid range, and a ninth row has room
+//             for it. A shaker or a ride would be a third noise above 7 kHz.
+const rim = () => `// the 808's rim shot: two sines, a woody tick, gone in 40 ms
+{ |amp = 0.7|
+
+    var env = EnvGen.kr(Env.perc(0.0005, 0.04), doneAction: 2);
+
+    // two partials, the upper one quieter
+    var tone = SinOsc.ar(1667) * 0.6 + SinOsc.ar(455);
+
+    // three milliseconds of noise for the stick on the rim
+    var click = HPF.ar(WhiteNoise.ar(EnvGen.kr(Env.perc(0.0002, 0.003))), 3000);
+
+    HPF.ar(tone, 300) * env + (click * 0.4) * amp
+}`;
+
 const EXTRAS = [
   { key: 'clap', label: 'clap', make: clap },
   { key: 'tomlo', label: 'low tom', make: () => tom(130, 90, 0.4, 0.45) },
   { key: 'tomhi', label: 'high tom', make: () => tom(210, 150, 0.3, 0.4) },
   { key: 'cowbell', label: 'cowbell', make: cowbell },
+  { key: 'rim', label: 'rim shot', make: rim },
+];
+
+// ── NINE MORE, FOR /concepts/rhythm/050/'s 2x ONLY ──────────────────────────
+// Asked 2026-10-12: *"can we deliver 2x more res button and drum instruments as
+// toggle?"*. At 2x the picture is 32 by 18 squares, so eighteen rows. Each of
+// these is a sound the first nine do not make:
+//   ride        six squares at inharmonic ratios, filtered high, ringing 1.2 s:
+//               a pitched wash, where the open hat is a short noisy one
+//   crash       bright noise and metal, 1.5 s: the longest thing in the kit
+//   shaker      noise with a soft 20 ms attack, 80 ms: the only sound that
+//               swells rather than strikes
+//   tambourine  jingles: four squares at 2.5 to 5.3 kHz with noise, 0.25 s
+//   claves      one sine at 2.5 kHz for 50 ms: the highest pitched wood
+//   low conga   a sine 230 to 200 Hz, 0.25 s
+//   high conga  330 to 300 Hz, 0.18 s
+//   mid tom     170 to 120 Hz, 0.35 s, between the two toms
+//   agogo       two sines at 900 and 1350 Hz, 0.3 s: a bell with a note,
+//               above the cowbell's squares
+const ride = () => `// six squares at inharmonic ratios, high passed, ringing
+{ |amp = 0.35|
+    var metal = HPF.ar(Mix(Pulse.ar([310, 456, 620, 782, 1053, 1240], 0.5, 0.25)), 3000);
+    var air = HPF.ar(WhiteNoise.ar(0.12), 7000);
+    var env = EnvGen.kr(Env.perc(0.002, 1.2), doneAction: 2);
+    metal + air * env * amp
+}`;
+const crash = () => `// bright noise and metal, long
+{ |amp = 0.3|
+    var noise = HPF.ar(WhiteNoise.ar(0.8), 4000);
+    var metal = HPF.ar(Mix(Pulse.ar([415, 587, 833, 1177], 0.5, 0.2)), 5000);
+    var env = EnvGen.kr(Env.perc(0.001, 1.5), doneAction: 2);
+    noise + metal * env * amp
+}`;
+const shaker = () => `// noise that swells in 20 ms and is gone in 80
+{ |amp = 0.6|
+    var noise = RLPF.ar(HPF.ar(WhiteNoise.ar(1), 5000), 8000, 0.6);
+    var env = EnvGen.kr(Env.new([0, 1, 0], [0.02, 0.08], -3), doneAction: 2);
+    noise * env * amp
+}`;
+const tamb = () => `// jingles: high squares and noise
+{ |amp = 0.4|
+    var jingle = HPF.ar(Mix(Pulse.ar([2500, 3200, 4100, 5300], 0.5, 0.3)), 6000);
+    var noise = HPF.ar(WhiteNoise.ar(0.4), 8000);
+    var env = EnvGen.kr(Env.perc(0.002, 0.25), doneAction: 2);
+    jingle + noise * env * amp
+}`;
+const claves = () => `// one high sine, struck
+{ |amp = 0.35|
+    var env = EnvGen.kr(Env.perc(0.001, 0.05), doneAction: 2);
+    SinOsc.ar(2500) * env * amp
+}`;
+const agogo = () => `// two sines a fifth apart, a bell with a note
+{ |amp = 0.35|
+    var env = EnvGen.kr(Env.perc(0.002, 0.3), doneAction: 2);
+    SinOsc.ar(900) + (SinOsc.ar(1350) * 0.5) * env * amp
+}`;
+
+const MORE = [
+  { key: 'ride', label: 'ride', make: ride },
+  { key: 'crash', label: 'crash', make: crash },
+  { key: 'shaker', label: 'shaker', make: shaker },
+  { key: 'tamb', label: 'tambourine', make: tamb },
+  { key: 'claves', label: 'claves', make: claves },
+  { key: 'congalo', label: 'low conga', make: () => tom(230, 200, 0.25, 0.4) },
+  { key: 'congahi', label: 'high conga', make: () => tom(330, 300, 0.18, 0.35) },
+  { key: 'tommid', label: 'mid tom', make: () => tom(170, 120, 0.35, 0.42) },
+  { key: 'agogo', label: 'agogo', make: agogo },
 ];
 
 /**
@@ -204,10 +294,11 @@ const EXTRAS = [
  * the definition's name on the server, its program, its note, and (with knobs)
  * the one parameter its knob turns.
  * `extras: true` adds the four above after them (050's eight).
- * @param {{ knobs?: boolean, extras?: boolean }} [o]
+ * `more: true` adds the nine after those (050's 2x eighteen).
+ * @param {{ knobs?: boolean, extras?: boolean, more?: boolean }} [o]
  */
-export function voices({ knobs = false, extras = false } = {}) {
-  return [...ROWS, ...(extras ? EXTRAS : [])].map((r) => ({
+export function voices({ knobs = false, extras = false, more = false } = {}) {
+  return [...ROWS, ...(extras || more ? EXTRAS : []), ...(more ? MORE : [])].map((r) => ({
     key: r.key, label: r.label, name: r.key, note: NOTE[r.key],
     program: r.make(knobs),
     param: knobs ? PARAMS[r.key] ?? null : null,

@@ -92,6 +92,12 @@ export const KIT_PARTS = [
   { part: 'chat', label: 'CHAT', ids: [
     'chat-grid', 'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
   ] },
+  // `frontpage` IS THE THIRTEENTH, 2026-10-12 (*"add new kit card / page. name
+  // it fronpage. lets work on it. first do typograpy sampler"*): the faces the
+  // site is set in today, and the sans faces measured against the brand mono.
+  { part: 'frontpage', label: 'FRONTPAGE', ids: [
+    'recommendation', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
+  ] },
 ];
 
 export const idFor = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
