@@ -272,14 +272,19 @@
     { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
-  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  const lay = (from, to, opts) => { const r = bay.link(from, to, [], opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(ID('keys', 'midi-out'), ID('collide', 'midi-in'));
   lay(ID('keys', 'midi-out'), PI('midi-in'));
   for (const n of NAMES) { lay(ID(`knob-${n}`, 'value-out'), ID('collide', 'value-in')); lay(ID(`knob-${n}`, 'value-out'), PI('value-in')); }
   lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
   lay(ID('collide', 'audio-out'), ID('xfade', 'audio-in'));
   lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
-  lay(PI('audio-out'), ID('xfade', 'audio-in-2'));
+  // ⚠️ VIA RELAY, BECAUSE THAT IS THE WIRE IT RIDES. Both Pi legs read one
+  // `board.playout()` node fed by the relay socket; without this the bay took
+  // the crossfader for a second internet receiver and gave it a MoQ session
+  // the board never opens, and the picture drew it as a wire of its own, a
+  // column wider than the box (884 px in 688 at 1280, 2026-10-12).
+  lay(PI('audio-out'), ID('xfade', 'audio-in-2'), { via: 'relay' });
   lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
   lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
 
@@ -427,7 +432,11 @@
   function showMode(m) {
     const word = m === 'simulated' ? 'simulated' : m === 'checking' ? 'checking' : m;
     if (right.foot) right.foot.textContent = word;
-    piNode.label = m === 'simulated' ? 'SuperCollider on the Pi, simulated' : 'SuperCollider on the Pi';
+    // No longer than the real label: the bay's column is as wide as its widest
+    // box, and `SuperCollider on the Pi, simulated` widened the Pi's column
+    // enough to push the patchbay 11 px past its box at 1280 (2026-10-12). The
+    // title already says `pi-1`.
+    piNode.label = m === 'simulated' ? 'SuperCollider, simulated' : 'SuperCollider on the Pi';
     pb.refresh();
   }
   const css = getComputedStyle(document.documentElement);

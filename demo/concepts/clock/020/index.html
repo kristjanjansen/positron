@@ -194,7 +194,13 @@
     view.strip.invalidate();
   }, 250);
 
-  // ── the timeline: every frame's trip, and every dropout ─────────────────
+  // ── the timeline: the late frames, and every dropout ────────────────────
+  // 🔴 A FRAME ON TIME DRAWS NOTHING, 2026-10-12. Every frame was a mark, 50 a
+  // second, and the lane was a comb whose one useful fact (which ones were
+  // late) was a colour inside it. Asked: *"Do as you suggest"*: the lane holds
+  // the late frames only, so it stays empty until something goes wrong, no
+  // baseline drawn; the hover says how many came on time this run.
+  const onTime = () => rx.frames.reduce((n, f) => n + (f.late ? 0 : 1), 0);
   const deck = createDeck({ items: [], range: [0, WINDOW] });
   const shelf = el('div');
   const view = createStripView(shelf, deck, {
@@ -202,18 +208,19 @@
     // Play, scaling out as it grows, the cursor at now, and marks too close to
     // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
     // std behaviour here"*.
-    // 50 frames a second is exactly the lane that drew as one solid bar before.
     size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
-      { id: 'trip', kind: 'frame', label: 'frames', height: 40, width: 1, as: 'ticks', terse: true,
-        rows: () => (first == null ? [] : rx.frames.map((f, i) => ({ at: f.T - first, id: `f${i}`, kind: 'frame', payload: f }))),
-        colorOfRow: (r) => (r.payload.late ? '#e0908a' : '#8fd6a8'),
+      { id: 'trip', kind: 'frame', label: 'late frames', height: 40, width: 1, as: 'ticks', terse: true, color: '#e0908a',
+        rows: () => (first == null ? [] : rx.frames.flatMap((f, i) => (f.late ? [{ at: f.T - first, id: `f${i}`, kind: 'frame', payload: f }] : []))),
         rankOfRow: (r) => r.payload.trip,
-        describeRow: (r) => ['frame', `+${fmt(r.payload.trip - rx.fastest)} ms over the fastest`, r.payload.late ? 'later than the cushion' : 'inside the cushion'] },
+        describeRow: (r) => [`+${fmt(r.payload.trip - rx.fastest)} ms over the fastest`] },
       { id: 'drop', kind: 'mark', label: 'dropouts', height: 24, width: 2, as: 'ticks', terse: true, color: '#e0908a',
         rows: () => (first == null ? [] : rx.starves.map((t, i) => ({ at: t - first, id: `d${i}`, kind: 'mark', payload: {} }))),
-        describeRow: () => ['dropout', 'the cushion ran dry'] },
+        describeRow: () => ['the cushion ran dry'] },
     ],
+    // The frames lane's hover, on a mark, a bin or the empty lane, ends with the
+    // frames it does not draw.
+    describeHit: (hit, out) => (hit.lane?.id === 'trip' && first != null ? [...out, `${onTime()} on time this run`] : null),
   });
 
   // ── names, and the patchbay ─────────────────────────────────────────────
