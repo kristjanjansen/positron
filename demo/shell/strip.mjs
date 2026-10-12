@@ -198,6 +198,8 @@ export function createStripView(host, deck, { size = 'default', lanes = [], foot
     theme: { loop: tok('--dim2', '#6a7280'), off: Number(tok('--ctl-off', '0.55')) || 0.55, ...(opts.theme || {}) },
   });
   if (lanes.length) strip.setLanes(lanes);
+  // so a harness or a shot can reach the strip behind any canvas on a page
+  canvas._strip = strip;
 
   return {
     el: canvas,

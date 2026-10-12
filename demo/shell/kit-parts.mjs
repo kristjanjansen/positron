@@ -40,7 +40,7 @@ export const KIT_PARTS = [
     'midi-log', 'presence', 'readout-and-log', 'table',
   ] },
   { part: 'timeline', label: 'TIMELINE', ids: [
-    'local-and-remote', 'note-grid', 'transport-bar', 'glued-transport-bar',
+    'live-run', 'local-and-remote', 'note-grid', 'transport-bar', 'glued-transport-bar',
     'strip-view', 'video-panel',
   ] },
   { part: 'layout', label: 'LAYOUT', ids: [

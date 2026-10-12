@@ -2,8 +2,8 @@
 // pages do not carry four copies of it. Written 2026-10-12 beside them.
 //
 // ⚠️ PAGE HELPERS, NOT KIT. It is what clock/020 wrote inline (plain names on
-// screen with the real id on hover, one sound card read against the true clock,
-// a strip fitted to its width) lifted once. 000 to 050 keep their own copies,
+// screen with the real id on hover, one sound card read against the true clock)
+// lifted once. 000 to 050 keep their own copies,
 // because another agent was editing them when this was written.
 import { epochNow } from '/proto/looper/peer.mjs';
 
@@ -91,11 +91,5 @@ export function plainNames(show, room, extra = () => '') {
   return { plain, named, hovers };
 }
 
-/** Fit the strip again whenever its width changes: a canvas has no width until it is on the page. */
-export function fitOnResize(view) {
-  let w0 = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== w0) { w0 = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
-}
+// `fitOnResize` lived here until 2026-10-12. The strip's own `live` mode
+// (timeline/strip.mjs `startLive`) fits the whole run at every width now.

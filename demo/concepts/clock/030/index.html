@@ -170,6 +170,8 @@
       for (let i = 0; i < 80 && !has(); i++) await sleep(50);
       await sleep(600);          // one more burst of pings, so the fastest round trip is kept
       joined = has();
+      first = epochNow();        // the run starts here, and the strip's cursor with it
+      view.strip.startLive(0);
       btns.setIcon('go', 'stop', 'Stop');
       pb.refresh();
       d.log(joined ? `the two places agree the time: web-2 corrects its clock by ${fmt(there.peer.offsetMs())} ms` : 'the two places did not hear each other', joined ? 'hi' : 'bad');
@@ -183,6 +185,7 @@
     for (const o of live) { try { o.stop(); } catch { /* not started */ } }
     live.clear();
     joining = null; joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log('stopped: both places left the room and the clock peers closed their sockets');
   }
@@ -243,11 +246,6 @@
       const L = view.strip.lanes().find((x) => x.id === 'there');
       if (L) L.subLabel = [`median ${fmt(s[s.length >> 1])} ms`, `worst ${fmt(w)} ms`];
     }
-    if (first == null && here.heard.size) first = [...here.heard.values()][0].T;
-    if (first != null) {
-      deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]);
-      view.strip.fit();
-    }
     view.strip.invalidate();
   }, 250);
 
@@ -261,13 +259,18 @@
     .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'note', payload: { k, n: v.n } })));
   const gapOf = (k) => { const h = here.heard.get(k), t = there.heard.get(k); return h && t ? (t.at - h.at) * 1000 : null; };
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
       { id: 'here', kind: 'note', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsOf(here), describeRow: (r) => ['web-1', nameOf(r.payload.n)] },
       { id: 'there', kind: 'note', label: 'web-2', height: 44, width: 2, as: 'ticks', terse: true,
         rows: rowsOf(there),
         colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
+        rankOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? -1 : Math.abs(g); },
         describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
     ],
   });
@@ -310,11 +313,6 @@
   const pb = createPatchbay(named(heldPicture(pic, HERE)), { room: 'ahead', flowing: () => live.size > 0 });
   hovers(pb.el, 'ahead');
 
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
   d.stack.add(row, host, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joining) leave(); ctx?.close(); });
   window.__clock = { here, there, gaps, play, join, leave, setAhead: (on) => link.set(on ? 0 : 1),

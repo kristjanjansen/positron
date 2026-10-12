@@ -42,7 +42,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { PLAYOUT_URL } from '/shell/board.mjs';
   import { epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `cushion-${rand(6)}`;
@@ -142,6 +142,8 @@
     S.reanchor();
     Object.assign(rx, { frames: [], fastest: Infinity, late: 0, base: null, lags: [], starves: [] });
     tone.start = epochNow(); tone.frames = 0; tone.phase = 0;
+    first = tone.start;            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
     tone.timer = setInterval(sendFrames, 5);
     d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}; web-1 sends 50 frames a second of 20 ms each`, 'hi');
     joined = true; busy = false;
@@ -152,6 +154,7 @@
     nodeHere.leave(); nodeThere.leave();
     node?.port.postMessage({ cmd: 'reset' });
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log(`stopped after ${tone.frames} frames, ${rx.late} late and ${dropouts()} dropouts at a ${cushion} ms cushion`);
   }
@@ -188,8 +191,6 @@
     const L = view.strip.lanes().find((x) => x.id === 'trip');
     const trips = rx.frames.slice(-100).map((f) => f.trip - rx.fastest);
     if (L && trips.length) L.subLabel = [`median +${fmt(median(trips))} ms`, `worst +${fmt(Math.max(...trips))} ms`];
-    if (first == null && tone.start) first = tone.start;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
     view.strip.invalidate();
   }, 250);
 
@@ -197,11 +198,17 @@
   const deck = createDeck({ items: [], range: [0, WINDOW] });
   const shelf = el('div');
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    // 50 frames a second is exactly the lane that drew as one solid bar before.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
       { id: 'trip', kind: 'frame', label: 'frames', height: 40, width: 1, as: 'ticks', terse: true,
         rows: () => (first == null ? [] : rx.frames.map((f, i) => ({ at: f.T - first, id: `f${i}`, kind: 'frame', payload: f }))),
         colorOfRow: (r) => (r.payload.late ? '#e0908a' : '#8fd6a8'),
+        rankOfRow: (r) => r.payload.trip,
         describeRow: (r) => ['frame', `+${fmt(r.payload.trip - rx.fastest)} ms over the fastest`, r.payload.late ? 'later than the cushion' : 'inside the cushion'] },
       { id: 'drop', kind: 'mark', label: 'dropouts', height: 24, width: 2, as: 'ticks', terse: true, color: '#e0908a',
         rows: () => (first == null ? [] : rx.starves.map((t, i) => ({ at: t - first, id: `d${i}`, kind: 'mark', payload: {} }))),
@@ -224,7 +231,6 @@
   const st = el('style');
   st.textContent = '.cc-row { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; }';
   document.head.append(st);
-  fitOnResize(view);
   d.stack.add(controls, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
   window.__clock = { rx, tone, setCushion, dropouts, get cushion() { return cushion; } };

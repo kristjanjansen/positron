@@ -233,6 +233,7 @@
        read a median of -9.0 and +2.7 ms, worst 17.8 and 26.2. */
     take.T0 = take.T0call;
     take.startLocal = epochNow();
+    view.strip.startLive(0);     // media time 0 is now, and the strip's cursor is the recording head
     face();
     d.set('notes', 0);
     d.log(`recording: the camera into the recorder, and every key with the shared time it was pressed. The recorder said it started ${Math.round(take.T0start - take.T0call)} ms after it was asked`);
@@ -244,6 +245,7 @@
     r.stop();
     await done;
     take.durationMs = epochNow() - take.startLocal;
+    view.strip.stopLive();
     take.blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
     player.src = take.blobUrl;
     face();
@@ -340,23 +342,24 @@
   const rowsBy = (field, ref) => () => [...marks.values()].filter((m) => m[field] != null)
     .map((m) => ({ at: m[field], id: `${field}${m.k}`, kind: 'note', payload: { m, err: ref && m.flashMs != null ? m.flashMs - m[field] : null } }));
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`) while the take records: the
+    // whole take in view, the cursor at the recording head, and after Stop the
+    // head stays at the take's end. Marks too close to draw apart are binned.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: 4000 },
     lanes: [
       { id: 'picture', kind: 'note', label: 'picture', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsBy('flashMs', false), describeRow: (r) => ['flash', nameOf(r.payload.m.n)] },
       { id: 'at', kind: 'note', label: 'by at', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('atMs', true),
         colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
         describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
       { id: 'arrival', kind: 'note', label: 'by arrival', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('arrMs', true),
         colorOfRow: (r) => (r.payload.err == null ? '#3b424e' : band(r.payload.err)),
+        rankOfRow: (r) => (r.payload.err == null ? -1 : Math.abs(r.payload.err)),
         describeRow: (r) => [nameOf(r.payload.m.n), r.payload.err == null ? 'no flash found' : `flash ${fmt(r.payload.err)} ms after`] },
     ],
   });
-  function show() {
-    deck.setRange([0, Math.max(4000, take.durationMs || 0)]);
-    view.strip.fit();
-    view.strip.invalidate();
-  }
+  const show = () => view.strip.invalidate();
 
   // ── controls, keys ──────────────────────────────────────────────────────
   const btns = createButtonGroup({ buttons: [
@@ -429,11 +432,6 @@
 
   const two = el('div', 'cc-two');
   two.append(camPanel.el, playPanel.el);
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
   d.stack.add(btns.el, two, host, view.surface, pb.el);
   let raf = 0;
   const loop = () => { drawCam(); raf = requestAnimationFrame(loop); };

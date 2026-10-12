@@ -38,7 +38,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `midiclock-${rand(6)}`;
@@ -189,6 +189,9 @@
     // web-1 also needs the anchor to start sending ticks, and it has it now.
     ref.clock = ref.clock || { bpm: BPM, epoch };
     tickTimer = setInterval(sendTicks, 5);
+    runClock = ref.clock;
+    first = epochNow();            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
     joined = true; busy = false;
     btns.setIcon('go', 'stop', 'Stop');
   }
@@ -199,6 +202,7 @@
     ref.clock = null; anchorRx.clock = null;
     S.hush();
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log(`stopped: ${sent.ticks} ticks and ${sent.anchors} anchor sent for the same beat`);
   }
@@ -208,7 +212,9 @@
 
   // ── what it measured ─────────────────────────────────────────────────────
   const lates = (m) => [...m.values()].map((v) => v.late).slice(-32);
-  let first = null;
+  // `runClock` keeps the run's beat grid after Stop clears `ref.clock`, so a
+  // stopped run's marks stay where they were drawn.
+  let first = null, runClock = null;
   const WINDOW = 8000;
   setInterval(() => {
     if (!joined) return;
@@ -223,25 +229,27 @@
     const L = (id) => view.strip.lanes().find((x) => x.id === id);
     if (t.length && L('ticks')) L('ticks').subLabel = [`median ${fmt(median(t))} ms`, `worst ${fmt(worst(t))} ms`];
     if (a.length && L('anchor')) L('anchor').subLabel = [`median ${fmt(median(a))} ms`, `worst ${fmt(worst(a))} ms`];
-    if (first == null && ref.played.size) first = ref.clock.epoch;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
     view.strip.invalidate();
   }, 250);
 
   // ── the timeline: the true beat, then each receiver's, coloured by how late ─
   const deck = createDeck({ items: [], range: [0, WINDOW] });
   const shelf = el('div');
-  const due = (k) => ref.clock ? ref.clock.epoch + k * STEP : 0;
+  const due = (k) => runClock ? runClock.epoch + k * STEP : 0;
   const rowsOf = (m, id) => () => (first == null ? [] : [...m.entries()]
     .filter(([k]) => due(k) <= epochNow())
     .map(([k, v]) => ({ at: due(k) - first + (v.late || 0), id: `${id}${k}`, kind: 'beat', payload: { k, late: v.late } })));
   const lane = (id, label, m, hz) => ({ id, kind: 'beat', label, height: 40, width: 2, as: 'ticks', terse: true,
     rows: rowsOf(m, id),
     ...(id === 'ref' ? { color: '#6f7d94', describeRow: () => ['web-1', 'the true beat'] }
-      : { colorOfRow: (r) => band(r.payload.late),
+      : { colorOfRow: (r) => band(r.payload.late), rankOfRow: (r) => Math.abs(r.payload.late || 0),
           describeRow: (r) => [label, `${r.payload.late >= 0 ? '+' : ''}${fmt(r.payload.late)} ms from the true beat`] }) });
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [lane('ref', 'web-1', ref.played), lane('ticks', 'web-2 ticks', tickRx.played), lane('anchor', 'web-2 anchor', anchorRx.played)],
   });
 
@@ -260,7 +268,6 @@
   const pb = createPatchbay(named(picture), { room: 'midiclock' });
   hovers(pb.el, 'midiclock');
 
-  fitOnResize(view);
   d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
   window.__clock = { sent, tickRx, anchorRx, ref, lates };

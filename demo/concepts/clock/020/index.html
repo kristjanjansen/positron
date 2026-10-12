@@ -183,6 +183,8 @@
     reanchor();
     loop = setInterval(() => { here.tick(); there.tick(); }, TICK);
     sendClock(BPM);
+    first = here.now();            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
     joined = true; busy = false;
     btns.setIcon('go', 'stop', 'Stop');
   }
@@ -193,6 +195,7 @@
     for (const o of live) { try { o.stop(); } catch { /* not started */ } }
     live.clear();
     joined = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log('stopped: both places left the room, both clock peers stopped pinging and closed their sockets');
   }
@@ -227,12 +230,6 @@
       const L = view.strip.lanes().find((x) => x.id === 'there');
       if (L) L.subLabel = [`median ${fmt(s[s.length >> 1])} ms`, `worst ${fmt(s.reduce((w, v) => (Math.abs(v) > Math.abs(w) ? v : w), 0))} ms`];
     }
-    if (first == null && here.played.size) first = [...here.played.values()][0].T;
-    if (first != null) {
-      const end = here.now() - first + 1000;
-      deck.setRange([0, Math.max(WINDOW, end)]);
-      view.strip.fit();
-    }
     view.strip.invalidate();
   }, 250);
 
@@ -246,13 +243,18 @@
   const view = createStripView(shelf, deck, {
     // No footer under the strip, asked 2026-10-12: *"rm footer from timeline"*;
     // what is under the pointer goes to the strip's own tooltip instead.
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
       { id: 'here', kind: 'beat', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsOf(here), describeRow: () => ['web-1', 'the clock it keeps'] },
       { id: 'there', kind: 'beat', label: 'web-2', height: 44, width: 2, as: 'ticks', terse: true,
         rows: rowsOf(there),
         colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
+        rankOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? -1 : Math.abs(g); },
         describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
     ],
   });
@@ -308,15 +310,6 @@
   const pb = createPatchbay(named(picture), { room: 'clock' });
   hovers(pb.el, 'clock');
 
-  // The whole run in view, scaling out as it grows, never a moving window. Asked
-  // 2026-10-12: *"do not scroll, just scale out like typist etc"*. Fit with the
-  // strip's own fit(), and again whenever its width changes, as /concepts/typist/040/
-  // does: a canvas has no width until it is on the page.
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
   d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (joined) leave(); ctx?.close(); });
   window.__clock = { here, there, gaps, view: () => view.strip.view(), first: () => first };

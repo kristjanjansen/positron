@@ -56,6 +56,7 @@
   // The four shapes a transport bar takes, and the message it refuses one pair
   // with. ⚠️ DECLARED UP HERE WITH EVERY OTHER HOLDER, for the reason the lines
   // above give: a `let` left beside a block that moves is read in its dead zone.
+  let liveSpec = null;        // the live run whose dense lane is binned, newest block
   let tbarSpec = null;        // { whole, noScrub, noToggle, refused, deck }
   let glueSpec = null;        // { panel, bar, deck, mute }
   let fsxSpec = null;         // { host, exit, out }, a cover with a way back
@@ -127,6 +128,48 @@
    * about is the arrangement and the fader, and a second frame loop on a page
    * that already runs several would cost a reader something for nothing.
    */
+
+
+  /**
+   * 🔴 NEWEST AT THE TOP: A LIVE RUN, 2026-10-12. Asked on
+   * /concepts/clock/090/ as *"keep minimum separation between event bars? why
+   * cursor aint moving? ... we need std behaviour here"*. A lane of 50 marks a
+   * second, one in 37 late, that has been running for 20 s when the page
+   * opens: the whole run is in view, the write head is the cursor and moves
+   * with now, and the marks are binned because they are closer than their
+   * room. It stops by itself after a minute and the head stays where it was.
+   * ⚠️ NOTHING IS FETCHED AND NO TIMER WRITES ROWS. The rows are a function of
+   * the strip's own write head, so a visit costs one canvas and nothing else.
+   */
+  section('LIVE RUN',
+    'A strip of something being written right now: the whole run in view, the '
+    + 'cursor at now, and marks too close to draw apart binned rather than merged.',
+    `const v = createStripView(host, deck, { live: { minSpan: 8000 }, lanes })
+v.strip.startLive(0)    // the run starts, the cursor is the write head
+v.strip.stopLive()      // the head freezes where it is`,
+    (box) => {
+      box.classList.add('kit-wide');
+      const RATE_MS = 20, BACKLOG = 20000, RUN = 60000;
+      const late = (i) => i % 37 === 11;
+      const deck = createDeck({ items: [], range: [0, 8000] });
+      liveSpec = createStripView(box, deck, {
+        size: 'auto', follow: false, gutter: 92, footer: { lines: 2 }, live: { minSpan: 8000 },
+        lanes: [{
+          id: 'frames', kind: 'frame', label: 'frames', height: 40, width: 1, as: 'ticks', terse: true,
+          rows: () => {
+            const head = Math.min(liveSpec?.strip.wallPos() ?? 0, RUN);
+            const out = [];
+            for (let i = 0; i * RATE_MS <= head; i++) out.push({ at: i * RATE_MS, id: `f${i}`, kind: 'frame', payload: { i, late: late(i) } });
+            return out;
+          },
+          colorOfRow: (r) => (r.payload.late ? '#e0908a' : '#8fd6a8'),
+          rankOfRow: (r) => (r.payload.late ? 1 : 0),
+          describeRow: (r) => (r.payload.late ? 'late' : 'on time'),
+        }],
+      });
+      liveSpec.strip.startLive(BACKLOG);
+      setTimeout(() => liveSpec.strip.stopLive(), RUN - BACKLOG);
+    });
 
 
   section('LOCAL AND REMOTE',
@@ -1030,6 +1073,67 @@ createVideoPanel({ media, left: myBadge, centre: myThing, right: false, fullMode
   // painting an edge of its own. `.pos-strip` and `.pos-glue.pos-glue > *` both
   // declare `border`, at (0,1,0) and (0,2,0), and which of them wins is the
   // specificity trap this stylesheet already records three times.
+  /**
+   * 🔴 THE LIVE RUN'S CLAIMS, EACH ONE A MEASUREMENT OF WHAT WAS DRAWN. Binned
+   * marks never touch; the cursor is the write head and moves; zoomed in far
+   * enough the same lane draws one mark per row; a bin under the pointer says
+   * how many it holds and the worst of them; and a stopped run's head stands
+   * still. The zoom one is the NEGATIVE CONTROL: a lane that binned at every
+   * zoom would pass the first claim and fail this one.
+   */
+  if (liveSpec) {
+    const s = liveSpec.strip;
+    s.draw();
+    const b = s.binState('frames');
+    let closest = Infinity;
+    for (let i = 1; i < (b?.drawn?.length || 0); i++) closest = Math.min(closest, b.drawn[i].x - (b.drawn[i - 1].x + b.drawn[i - 1].w));
+    d.assert('a live lane denser than its marks can be drawn apart is binned, and no two drawn marks touch',
+      !!b && b.binned && b.bins < b.rows && closest >= 2,
+      b ? `${b.rows} rows in ${b.bins} bins of ${b.binPx} px, ${b.markPx} px marks, closest ${closest} px apart` : 'no bin state');
+
+    const h0 = s.wallPos(), x0 = s.timeToX(h0);
+    await new Promise((r) => setTimeout(r, 400));
+    s.draw();
+    const h1 = s.wallPos(), x1 = s.timeToX(h1), [, right] = s.visible(), plot = s.timeToX(right);
+    d.assert('the cursor is the write head, it moves with now and stays at the right edge of the whole run',
+      s.live()?.running && h1 - h0 >= 300 && x1 <= plot && plot - x1 <= 8 && s.visible()[0] <= 0,
+      `head ${(h0 / 1000).toFixed(2)} s then ${(h1 / 1000).toFixed(2)} s, at x ${x0.toFixed(1)} then ${x1.toFixed(1)} of ${plot.toFixed(1)}, view from ${(s.visible()[0] / 1000).toFixed(2)} s`);
+
+    // hover a bin: the box under the strip says how many and the worst
+    const cv = liveSpec.el, rc = cv.getBoundingClientRect();
+    const many = b.drawn.find((m) => m.n > 1);
+    const L = s.lanes().find((l) => l.id === 'frames');
+    if (many) cv.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse',
+      clientX: rc.left + (rc.width - plot) + many.x + 0.5, clientY: rc.top + L.y + L.height / 2 }));
+    const said = liveSpec.footer.says().join(' / ');
+    d.assert('a bin under the pointer says how many marks it holds and the worst of them',
+      /\d+ in [\d.]+ ms, worst: /.test(said) && /late|on time/.test(said), `the box says "${said}"`);
+    cv.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true, pointerType: 'mouse' }));
+
+    s.zoomAt(60, x1);
+    s.draw();
+    const zoomed = s.binState('frames');
+    s.resumeLive();
+    s.draw();
+    const back = s.binState('frames');
+    d.assert('NEGATIVE CONTROL: zoomed in until the marks have room they draw one by one, and a double click puts the whole run back',
+      zoomed && !zoomed.binned && zoomed.minGapPx >= zoomed.binPx && back?.binned && !s.live().held,
+      zoomed ? `zoomed: ${zoomed.rows} rows one by one, ${zoomed.minGapPx?.toFixed(1)} px apart against a ${zoomed.binPx} px room; back: binned ${back?.binned}` : 'no state');
+
+    // a stopped run's head stands still, on a strip of its own off to the side
+    const spare = el('div');
+    document.body.append(spare);
+    const v2 = createStripView(spare, createDeck({ items: [], range: [0, 1000] }), { size: 'auto', live: true, lanes: [] });
+    v2.strip.startLive(0);
+    await new Promise((r) => setTimeout(r, 120));
+    v2.strip.stopLive();
+    const f0 = v2.strip.wallPos();
+    await new Promise((r) => setTimeout(r, 150));
+    const f1 = v2.strip.wallPos();
+    v2.destroy(); spare.remove();
+    d.assert('a stopped run keeps its head where it stopped',
+      f0 >= 100 && f0 === f1 && v2.strip.live().running === false, `stopped at ${f0?.toFixed(1)} ms and read ${f1?.toFixed(1)} ms 150 ms later`);
+  }
   if (footSpec) {
     const box = footSpec.surface;
     const cb = footSpec.el.getBoundingClientRect();

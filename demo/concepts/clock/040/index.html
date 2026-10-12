@@ -239,6 +239,8 @@
       const ok = has();
       start = Math.ceil((here.now() + 500) / 100) * 100;
       next = 0; cues.clear(); wallNow.a = wallNow.f = -1;
+      first = epochNow();        // the run starts here, and the strip's cursor with it
+      view.strip.startLive(0);
       btns.setIcon('go', 'stop', 'Stop');
       pb.refresh();
       d.log(ok ? `the clocks agree, web-2 corrects its clock by ${fmt(there.peer.offsetMs())} ms. A cue every ${CUE_MS / 1000} s` : 'the two places did not hear each other', ok ? 'hi' : 'bad');
@@ -250,6 +252,7 @@
     nodeHere.leave(); nodeThere.leave();
     for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; }
     start = null; joining = null;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     d.log('stopped: both places left the room and the clock peers closed their sockets');
   }
@@ -283,8 +286,6 @@
       const L = view.strip.lanes().find((x) => x.id === id);
       if (L && xs.length) L.subLabel = [`median ${fmt(med(xs))} ms ${word}`, `worst ${fmt(xs.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0))} ms`];
     }
-    if (first == null && cues.get(0)?.S != null) first = cues.get(0).S;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
     view.strip.invalidate();
   }, 250);
 
@@ -295,15 +296,21 @@
   const rowsBy = (field) => () => (first == null ? [] : [...cues.values()].filter((c) => c[field] != null)
     .map((c) => ({ at: c[field] - first, id: `${field}${c.k}`, kind: 'cue', payload: c })));
   const view = createStripView(shelf, deck, {
-    size: 'auto', follow: false, gutter: 132,
+    // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+    // Play, scaling out as it grows, the cursor at now, and marks too close to
+    // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+    // std behaviour here"*.
+    size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
     lanes: [
       { id: 'picture', kind: 'cue', label: 'web-2 picture', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
         rows: rowsBy('picAt'), describeRow: (r) => ['picture', `cue ${r.payload.k + 1}`] },
       { id: 'arrival', kind: 'cue', label: 'on arrival', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('arrivedAt'),
         colorOfRow: (r) => (r.payload.picAt == null ? '#3b424e' : band(r.payload.picAt - r.payload.arrivedAt)),
+        rankOfRow: (r) => (r.payload.picAt == null ? -1 : Math.abs(r.payload.picAt - r.payload.arrivedAt)),
         describeRow: (r) => ['on arrival', r.payload.picAt == null ? 'before the picture' : `${fmt(r.payload.picAt - r.payload.arrivedAt)} ms early`] },
       { id: 'follow', kind: 'cue', label: 'following', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('followAt'),
         colorOfRow: (r) => (r.payload.picAt == null ? '#3b424e' : band(r.payload.followAt - r.payload.picAt)),
+        rankOfRow: (r) => (r.payload.picAt == null ? -1 : Math.abs(r.payload.followAt - r.payload.picAt)),
         describeRow: (r) => ['following', r.payload.picAt == null ? 'before the picture' : `${fmt(r.payload.followAt - r.payload.picAt)} ms off`] },
     ],
   });
@@ -352,11 +359,6 @@
   }), { room: 'follow', flowing: () => start != null });
   hovers(pb.el, 'follow');
 
-  let fitW = 0;
-  new ResizeObserver(() => {
-    const w = view.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
-  }).observe(view.el);
   d.stack.add(row, video.el, view.surface, pb.el);
   raf = requestAnimationFrame(frame);
   addEventListener('pagehide', () => { cancelAnimationFrame(raf); if (joining) leave(); });

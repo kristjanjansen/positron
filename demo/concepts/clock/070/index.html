@@ -37,7 +37,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `late-${rand(6)}`;
@@ -170,6 +170,8 @@
     loop = setInterval(() => { here.tick(); there.tick(); late.tick(); }, TICK);
     anchor = { bpm: BPM, epoch: Math.round(here.now() + 500) };
     sendAnchor('once, to start');
+    first = epochNow();            // the run starts here, and the strip's cursor with it
+    view.strip.startLive(0);
     playing = true; busy = false;
     btns.setIcon('go', 'stop', 'Stop');
     btns.enable('join', true);
@@ -216,6 +218,7 @@
     S.hush();
     anchor = null; answered.clear();
     playing = false; joinedLate = false;
+    view.strip.stopLive();
     btns.setIcon('go', 'play', 'Play');
     btns.enable('join', false, 'Play first');
     d.log(`stopped: the anchor was sent ${sent.anchors} times, once per place, and no beat was ever sent`);
@@ -245,8 +248,6 @@
       const L = view.strip.lanes().find((x) => x.id === P.name), gg = gaps(P).slice(-16);
       if (L && gg.length) L.subLabel = [`median ${fmt(median(gg))} ms`, `worst ${fmt(worst(gg))} ms`];
     }
-    if (first == null && here.played.size) first = here.clock.epoch;
-    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
     view.strip.invalidate();
   }, 250);
 
@@ -259,8 +260,14 @@
   const lane = (P) => ({ id: P.name, kind: 'beat', label: P.name, height: 40, width: 2, as: 'ticks', terse: true, rows: rowsOf(P),
     ...(P === here ? { color: '#6f7d94', describeRow: () => ['web-1', 'the clock it keeps'] }
       : { colorOfRow: (r) => { const g = gapOf(P, r.payload.k); return g == null ? '#3b424e' : band(g); },
+          rankOfRow: (r) => { const g = gapOf(P, r.payload.k); return g == null ? -1 : Math.abs(g); },
           describeRow: (r) => { const g = gapOf(P, r.payload.k); return [P.name, g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } }) });
-  const view = createStripView(shelf, deck, { size: 'auto', follow: false, gutter: 132, lanes: [lane(here), lane(there), lane(late)] });
+  // A LIVE strip (timeline/strip.mjs `startLive`): the whole run in view from
+  // Play, scaling out as it grows, the cursor at now, and marks too close to
+  // draw apart binned. Asked 2026-10-12: *"why cursor aint moving? ... we need
+  // std behaviour here"*.
+  const view = createStripView(shelf, deck, { size: 'auto', follow: false, gutter: 132, live: { minSpan: WINDOW },
+    lanes: [lane(here), lane(there), lane(late)] });
 
   // ── names, and the patchbay: the anchor wire lights once per place ──────
   const { plain, named, hovers } = plainNames(new Map([[HERE, 'web-1'], [THERE, 'web-2'], [LATE, 'web-3']]), ROOM, (id) =>
@@ -275,7 +282,6 @@
   const pb = createPatchbay(named(picture), { room: 'late' });
   hovers(pb.el, 'late');
 
-  fitOnResize(view);
   d.stack.add(btns.el, view.surface, pb.el);
   addEventListener('pagehide', () => { if (playing) stop(); S.ctx?.close(); });
   window.__clock = { here, there, late, lateRun, sent, gaps, joinLate, peers: () => late.peer?.peers().map((p) => [p.id, p.rttMs, p.offsetMs, p.samples]) };
