@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept clock 030</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts clock/030, AHEAD LINK, 2026-10-12. One idea: a link can carry the
+  // shared clock, so a note lands in two places at once however long its
+  // message took to get there.
+  //
+  // clock/020 plus clock/000's keyboard. Two sites in this one tab, each with a
+  // socket of its own, and `there`'s clock set wrong by 100 to 300 ms on Play,
+  // which it is not told. Both agree the time over the relay with peer.mjs, as
+  // in clock/020. The keys at `web-1` play a synth at `web-1` and a synth at
+  // `web-2`, both over links carrying `{ ahead 150 }` (bay.mjs, link-options.mjs):
+  // the sender stamps each note `at` = its shared clock now plus 150 ms, and
+  // each receiving bay asks its own timebase (timebase.mjs) when its shared
+  // clock reads `at`, and hands the note over 100 ms early with that exact time,
+  // which the synth gives to the AudioContext (clock/010's lesson).
+  //
+  // The switch takes the option off the links: the note at `web-1` sounds the
+  // moment the key goes down, and the one at `web-2` when its message arrives,
+  // so the two drift apart by the relay leg. `apart` is measured on the one
+  // sound card both places share, as in clock/020: the difference between the
+  // two audio times the two synths chose for one note.
+  //
+  // Nothing opens on a visit. Play, or the first key, joins the room.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createTimebase } from '/shell/timebase.mjs';
+  import { DEFAULT_RELAY } from '/shell/wire.mjs';
+  import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
+
+  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `ahead-${rand(6)}`;
+  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
+  const KEYS = `${HERE}:keys:midi-out`;
+  const SYN = { here: `${HERE}:synth:midi-in`, there: `${THERE}:synth:midi-in` };
+  const AHEAD = 150;             // ms the sender stamps ahead, plan-routing-time §4.4 budget is 250
+  const HORIZON = 100;           // ms early a bay hands a note over, so the sound card is told in advance
+
+  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
+  const G_HERE = graphOf(HERE, 'here', [
+    { id: `${HERE}:keys`, kind: 'person', label: 'keyboard', place: 'browser' },
+    { id: `${HERE}:synth`, kind: 'engine', label: 'synth', place: 'browser' },
+  ], [
+    { id: KEYS, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: SYN.here, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] },
+  ]);
+  const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:synth`, kind: 'engine', label: 'synth', place: 'browser' }],
+    [{ id: SYN.there, label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] }]);
+
+  const d = mount({ name: 'concept clock 030', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // The cells under the title and the log alone at the foot, as clock/020.
+    joined: false,
+    // How far apart the two places sound one note, typical and worst; what the
+    // second place found its clock off by, and the round trip that rests on.
+    readout: { apart: 'ms', worst: 'ms', 'offset found': 'ms', 'round trip': 'ms' } });
+  conceptNav('clock/030');
+
+  // ── one sound card, read by both places ─────────────────────────────────
+  let ctx = null, anchor = null;
+  async function audio() {
+    if (ctx) return;
+    ctx = new AudioContext({ latencyHint: 'interactive' });
+    ctx.resume();            // not awaited: a resume waits on a gesture and never rejects (positron-verify)
+    const t0 = ctx.currentTime;
+    for (let i = 0; i < 40 && ctx.currentTime - t0 < 0.05; i++) await new Promise((r) => setTimeout(r, 10));
+    reanchor();
+  }
+  /** This document's clock against the audio clock, the tightest of five reads. */
+  function reanchor() {
+    let best = null;
+    for (let i = 0; i < 5; i++) {
+      const w1 = epochNow(), a = ctx.currentTime, w2 = epochNow();
+      if (!best || w2 - w1 < best.spread) best = { e: (w1 + w2) / 2, a, spread: w2 - w1 };
+    }
+    anchor = best;
+  }
+  const live = new Set();
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  function pluck(at, n, vel, bright) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = bright ? 'triangle' : 'sine';
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(0.18 * (vel / 127), at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 0.35);
+    o.connect(g).connect(ctx.destination);
+    o.start(at); o.stop(at + 0.4);
+    live.add(o); o.onended = () => live.delete(o);
+  }
+
+  // ── a place: its own clock, its correction, its timebase, its synth ─────
+  function place(name, bright) {
+    const P = { name, bright, skew: 0, peer: null, tb: createTimebase(), heard: new Map() };
+    P.raw = () => epochNow() + P.skew;
+    /** shared = local + offset, null until the round trip has been measured. */
+    P.offset = () => {
+      if (!P.peer) return null;
+      const agreed = (there.peer?.peers() || []).some((p) => Number.isFinite(p.rttMs));
+      return agreed ? P.skew + P.peer.offsetMs() : null;
+    };
+    /** A note arrived at this place's synth: play it when the bay says it is due, or now. */
+    P.deliver = (e, l, m) => {
+      if (!ctx || !e.d2) return;
+      const local = m.timing ? m.timing.local : epochNow();
+      const at = Math.max(ctx.currentTime, anchor.a + (local - anchor.e) / 1000);
+      pluck(at, e.d1, e.d2, bright);
+      P.heard.set(e.k, { at, T: local, n: e.d1 });
+      if (P === there) pb.pulse(plain(KEYS), plain(SYN.there)); else pb.pulse(plain(KEYS), plain(SYN.here));
+    };
+    return P;
+  }
+  const here = place('web-1', false), there = place('web-2', true);
+
+  // ── the bays: built fresh on every read, each with its place's timebase ──
+  let aheadOn = true;
+  const opts = (site) => ({ site, ...(aheadOn ? { options: { ahead: AHEAD } } : {}) });
+  function bayOf(P, node) {
+    P.tb.setOffset(P.offset());
+    return node.registry.fill(createBay({ timing: { timebase: P.tb, horizonMs: HORIZON } }));
+  }
+  function bayHere() {
+    const b = bayOf(here, nodeHere);
+    b.addPort({ ...b.port(SYN.here), deliver: here.deliver });
+    b.link(KEYS, SYN.here, [], opts(HERE));
+    if (b.port(SYN.there)) b.link(KEYS, SYN.there, [], opts(HERE));
+    return b;
+  }
+  function bayThere() {
+    const b = bayOf(there, nodeThere);
+    b.addPort({ ...b.port(SYN.there), deliver: there.deliver });
+    if (b.port(KEYS)) b.link(KEYS, SYN.there, [], opts(THERE));
+    return b;
+  }
+  const log = (line, kind) => d.log(line, kind);
+  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log, shared: () => { const o = here.offset(); return o == null ? null : epochNow() + o; } });
+  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
+
+  // ── join, agree the time ────────────────────────────────────────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let joining = null, joined = false;
+  function join() {
+    if (joining) return joining;
+    joining = (async () => {
+      await audio();
+      there.skew = Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
+      await Promise.all([nodeHere.join(), nodeThere.join()]);
+      const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
+      const tag = rand(6);
+      here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: here.raw });
+      there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw });
+      d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
+      const has = () => !!bayHere().targets(KEYS).find((t) => t.to === SYN.there) && here.offset() != null;
+      for (let i = 0; i < 80 && !has(); i++) await sleep(50);
+      await sleep(600);          // one more burst of pings, so the fastest round trip is kept
+      joined = has();
+      btns.setIcon('go', 'stop', 'Stop');
+      pb.refresh();
+      d.log(joined ? `the two places agree the time: web-2 corrects its clock by ${fmt(there.peer.offsetMs())} ms` : 'the two places did not hear each other', joined ? 'hi' : 'bad');
+      return joined;
+    })();
+    return joining;
+  }
+  function leave() {
+    nodeHere.leave(); nodeThere.leave();
+    for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; }
+    for (const o of live) { try { o.stop(); } catch { /* not started */ } }
+    live.clear();
+    joining = null; joined = false;
+    btns.setIcon('go', 'play', 'Play');
+    d.log('stopped: both places left the room and the clock peers closed their sockets');
+  }
+
+  // Notes go out in order, after the join their first press started.
+  let chain = Promise.resolve(), seq = 0;
+  const play = (n, vel) => {
+    chain = chain.then(() => join()).then((ok) => { if (ok) nodeHere.emit(KEYS, { cls: 'note', ch: 1, d1: n, d2: vel, k: seq++ }); });
+    return chain;
+  };
+
+  const btns = createButtonGroup({ buttons: [
+    { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (joining ? leave() : join()) },
+  ] });
+  const link = createChoice({ label: 'link', options: [[`ahead ${AHEAD}`, true], ['on arrival', false]], at: 0,
+    title: (on) => (on ? `each note stamped ${AHEAD} ms ahead on the shared clock` : 'each note played when its message lands'),
+    onPick: (on) => {
+      aheadOn = on;
+      pb.refresh();
+      d.log(on ? `the links carry ahead ${AHEAD}: both places play each note when the shared clock reads its at`
+        : 'the option is off: web-1 plays on the key, web-2 when the message lands');
+    } });
+  const row = el('div');
+  row.style.cssText = 'display: flex; gap: 16px; align-items: center; flex-wrap: wrap';
+  row.append(btns.el, link.el);
+
+  const host = el('div');
+  createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how !== 'midi') play(note, 100); },
+    onUp: () => {},
+  });
+
+  // ── what it measured ────────────────────────────────────────────────────
+  const fmt = (x) => Math.round(x * 100) / 100;
+  /** Every note both places played, and how far apart in audio time, in ms. */
+  function gaps() {
+    const out = [];
+    for (const [k, h] of here.heard) { const t = there.heard.get(k); if (t) out.push({ k, ms: (t.at - h.at) * 1000 }); }
+    return out;
+  }
+  const band = (ms) => (Math.abs(ms) < 3 ? '#8fd6a8' : Math.abs(ms) < 20 ? '#ffd400' : '#e0908a');
+  let first = null, ticks = 0;
+  const WINDOW = 10000;
+  setInterval(() => {
+    if (ctx && ++ticks % 8 === 0) reanchor();
+    if (there.peer) {
+      const ps = there.peer.peers().filter((p) => Number.isFinite(p.rttMs));
+      d.set('offset found', ps.length ? fmt(there.peer.offsetMs()) : '');
+      d.set('round trip', ps.length ? fmt(Math.min(...ps.map((p) => p.rttMs))) : '');
+    }
+    const g = gaps().slice(-16);
+    if (g.length) {
+      const s = g.map((x) => x.ms).sort((a, b) => a - b);
+      const w = s.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0);
+      d.set('apart', fmt(s[s.length >> 1]));
+      d.set('worst', fmt(w));
+      const L = view.strip.lanes().find((x) => x.id === 'there');
+      if (L) L.subLabel = [`median ${fmt(s[s.length >> 1])} ms`, `worst ${fmt(w)} ms`];
+    }
+    if (first == null && here.heard.size) first = [...here.heard.values()][0].T;
+    if (first != null) {
+      deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]);
+      view.strip.fit();
+    }
+    view.strip.invalidate();
+  }, 250);
+
+  // ── the timeline: each place's notes, lit when they sound ───────────────
+  const deck = createDeck({ items: [], range: [0, WINDOW] });
+  const shelf = el('div');
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const rowsOf = (P) => () => (first == null || !ctx ? [] : [...P.heard.entries()]
+    .filter(([, v]) => v.at <= ctx.currentTime)
+    .map(([k, v]) => ({ at: v.T - first, id: `${P.name}${k}`, kind: 'note', payload: { k, n: v.n } })));
+  const gapOf = (k) => { const h = here.heard.get(k), t = there.heard.get(k); return h && t ? (t.at - h.at) * 1000 : null; };
+  const view = createStripView(shelf, deck, {
+    size: 'auto', follow: false, gutter: 132,
+    lanes: [
+      { id: 'here', kind: 'note', label: 'web-1', height: 44, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
+        rows: rowsOf(here), describeRow: (r) => ['web-1', nameOf(r.payload.n)] },
+      { id: 'there', kind: 'note', label: 'web-2', height: 44, width: 2, as: 'ticks', terse: true,
+        rows: rowsOf(there),
+        colorOfRow: (r) => { const g = gapOf(r.payload.k); return g == null ? '#3b424e' : band(g); },
+        describeRow: (r) => { const g = gapOf(r.payload.k); return ['web-2', g == null ? 'not played yet' : `${g >= 0 ? '+' : ''}${fmt(g)} ms from web-1`]; } },
+    ],
+  });
+
+  // ── plain names on screen, the real ids on hover, as clock/020 ──────────
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const g of root.querySelectorAll('.lv-box')) {
+        if (g.querySelector('title')) continue;
+        const id = g.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
+        g.prepend(t);
+        if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
+  // ── the patchbay: drawn from this tab's two graphs, so it is whole before Play ─
+  // A link carrying `ahead` is dashed and says `ahead 150` on its wire (bay-view.mjs).
+  const pic = () => {
+    const b = createBay();
+    for (const g of [G_HERE, G_THERE]) { for (const n of g.nodes) b.addNode(n); for (const p of g.ports) b.addPort(p); }
+    const o = aheadOn ? { options: { ahead: AHEAD } } : {};
+    b.link(KEYS, SYN.here, [], o);
+    b.link(KEYS, SYN.there, [], o);
+    return b;
+  };
+  const pb = createPatchbay(named(heldPicture(pic, HERE)), { room: 'ahead', flowing: () => live.size > 0 });
+  hovers(pb.el, 'ahead');
+
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = view.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
+  }).observe(view.el);
+  d.stack.add(row, host, view.surface, pb.el);
+  addEventListener('pagehide', () => { if (joining) leave(); ctx?.close(); });
+  window.__clock = { here, there, gaps, play, join, leave, setAhead: (on) => link.set(on ? 0 : 1),
+    ahead: () => aheadOn, links: () => bayHere().links() };
+  d.ready();
+</script>

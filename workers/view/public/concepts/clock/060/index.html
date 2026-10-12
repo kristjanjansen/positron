@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept clock 060</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts clock/060, MIDI CLOCK, 2026-10-12. One idea: the same beat carried
+  // two ways at once, as a tick per message and as one anchor, and only the
+  // ticks carry the relay's jitter into the sound.
+  //
+  // clock/020 plus a second wire. `web-1` keeps the true clock and plays the
+  // beat itself. It sends that beat to `web-2` two ways:
+  //   - as MIDI clock: 24 ticks a beat (the `0xF8` byte, class `clock`), each its
+  //     own `bay.event` over the relay, along `midiclock:midi-out ->
+  //     web-2:ticks:midi-in`. The tick receiver counts them and plays a beat on
+  //     every 24th, the moment it arrives, which is what a MIDI clock follower does;
+  //   - as the anchor `{ bpm, epoch }`, sent ONCE along `clock-out ->
+  //     *:beat:clock-in`, exactly clock/020's way: `web-2`'s clock is set wrong by
+  //     100 to 300 ms, peer.mjs finds the error, and the anchor receiver works out
+  //     every beat on its own corrected clock and tells the sound card in advance.
+  // Each receiver's beat is measured against the TRUE beat, `epoch + k * 500` on
+  // web-1's clock: the tick receiver from the moment its 24th tick arrived, the
+  // anchor receiver from the audio time it chose, both read on the one tab's
+  // clock and sound card (clock/020's note on one sound card applies).
+  //
+  // Nothing opens on a visit. Play joins the room.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { DEFAULT_RELAY } from '/shell/wire.mjs';
+  import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
+  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames, fitOnResize } from '/concepts/clock/clock-kit.mjs';
+
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `midiclock-${rand(6)}`;
+  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
+  const CLK = `${HERE}:clock:clock-out`, TICK = `${HERE}:midiclock:midi-out`;
+  const IN = { here: `${HERE}:beat:clock-in`, anchor: `${THERE}:beat:clock-in`, ticks: `${THERE}:ticks:midi-in` };
+  const BPM = 120, PPQ = 24, STEP = 60000 / BPM;
+
+  const G_HERE = graphOf(HERE, 'here', [
+    { id: `${HERE}:clock`, kind: 'engine', label: 'clock', place: 'browser' },
+    { id: `${HERE}:midiclock`, kind: 'engine', label: 'midi clock', place: 'browser' },
+    { id: `${HERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' },
+  ], [
+    { id: CLK, label: 'clock', dir: 'out', medium: 'clock' },
+    { id: TICK, label: 'midi clock', dir: 'out', medium: 'midi', emits: ['clock'] },
+    { id: IN.here, label: 'beat', dir: 'in', medium: 'clock' },
+  ]);
+  const G_THERE = graphOf(THERE, 'there', [
+    { id: `${THERE}:beat`, kind: 'engine', label: 'beat', place: 'browser' },
+    { id: `${THERE}:ticks`, kind: 'engine', label: 'ticks', place: 'browser' },
+  ], [
+    { id: IN.anchor, label: 'beat', dir: 'in', medium: 'clock' },
+    { id: IN.ticks, label: 'ticks', dir: 'in', medium: 'midi', accepts: ['clock'] },
+  ]);
+
+  const d = mount({ name: 'concept clock 060', what: '', index: '/concepts/', indexLabel: 'concepts',
+    // Readouts on top, the log at the foot (positron-concepts).
+    joined: false,
+    // Messages each way per minute, and how far each receiver's beat lands from
+    // the true beat, typical and worst. Six cells, three pairs.
+    readout: { ticks: '/min', anchors: '/min', 'ticks late': 'ms', 'ticks worst': 'ms', 'anchor late': 'ms', 'anchor worst': 'ms' } });
+  conceptNav('clock/060');
+
+  const S = soundCard();
+
+  // ── web-1: the true clock, its own beat, and the ticks it sends ────────
+  const AHEAD = 100, TICK_MS = 25;
+  const ref = { clock: null, played: new Map() };       // web-1's beat, k -> { at, T }
+  function tickRef() {
+    const c = ref.clock;
+    if (!c) return;
+    const now = epochNow();
+    for (let k = Math.max(0, Math.ceil((now - c.epoch) / STEP)); c.epoch + k * STEP < now + AHEAD; k++) {
+      if (ref.played.has(k)) continue;
+      const T = c.epoch + k * STEP, at = S.audioOf(T);
+      if (at < S.ctx.currentTime) continue;
+      S.click(at, 880);
+      ref.played.set(k, { at, T });
+    }
+  }
+  const sent = { ticks: 0, anchors: 0, since: 0 };
+  let tickTimer = null;
+  /** Send every tick that is owed by the true clock now, so a late timer sends two at once, as a real one would. */
+  function sendTicks() {
+    const c = ref.clock;
+    if (!c) return;
+    const owed = Math.floor((epochNow() - c.epoch) / (STEP / PPQ));
+    while (sent.ticks <= owed) {
+      nodeHere.emit(TICK, { cls: 'clock', ch: null, d1: null, d2: null });
+      sent.ticks++;
+      if (sent.ticks % PPQ === 1) pb.pulse(plain(TICK), plain(IN.ticks));
+    }
+  }
+
+  // ── web-2: two receivers ─────────────────────────────────────────────────
+  // The anchor receiver: clock/020's `there`, a clock set wrong and corrected.
+  const anchorRx = { skew: 0, peer: null, clock: null, played: new Map() };
+  anchorRx.raw = () => epochNow() + anchorRx.skew;
+  anchorRx.off = () => (anchorRx.peer ? anchorRx.peer.offsetMs() : 0);
+  anchorRx.now = () => anchorRx.raw() + anchorRx.off();
+  /** The audio time at which this place's corrected clock reads `T`. */
+  anchorRx.audioAt = (T) => S.audioOf(T - anchorRx.off() - anchorRx.skew);
+  function tickAnchor() {
+    const c = anchorRx.clock;
+    if (!c) return;
+    const now = anchorRx.now();
+    for (let k = Math.max(0, Math.ceil((now - c.epoch) / STEP)); c.epoch + k * STEP < now + AHEAD; k++) {
+      if (anchorRx.played.has(k)) continue;
+      const at = anchorRx.audioAt(c.epoch + k * STEP);
+      if (at < S.ctx.currentTime) continue;
+      S.click(at, 1320);
+      anchorRx.played.set(k, { at, late: (at - S.audioOf(ref.clock.epoch + k * STEP)) * 1000 });
+    }
+  }
+  // The tick receiver: counts what arrives and plays every 24th the moment it lands.
+  const tickRx = { count: 0, played: new Map() };
+  function onTick() {
+    const i = tickRx.count++;
+    if (i % PPQ) return;
+    const k = i / PPQ, arrived = epochNow();
+    S.click(S.ctx.currentTime, 660);
+    tickRx.played.set(k, { arrived, late: arrived - (ref.clock.epoch + k * STEP) });
+  }
+
+  function onClock(who, e) {
+    const c = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
+    if (who === 'here') { ref.clock = c; pb.pulse(plain(CLK), plain(IN.here)); }
+    else { anchorRx.clock = c; pb.pulse(plain(CLK), plain(IN.anchor)); }
+    d.log(`${who === 'here' ? 'web-1' : 'web-2'} heard the anchor: ${e.bpm} bpm from ${new Date(c.epoch).toISOString().slice(11, 23)}`);
+  }
+
+  // ── the bays ─────────────────────────────────────────────────────────────
+  function bayHere() {
+    const b = nodeHere.registry.fill(createBay());
+    b.addPort({ ...b.port(IN.here), deliver: (e) => onClock('here', e) });
+    b.link(CLK, IN.here, [], { site: HERE });
+    b.link(CLK, '*:beat:clock-in', [], { site: HERE });
+    if (b.port(IN.ticks)) b.link(TICK, IN.ticks, [], { site: HERE });
+    return b;
+  }
+  function bayThere() {
+    const b = nodeThere.registry.fill(createBay());
+    b.addPort({ ...b.port(IN.anchor), deliver: (e) => onClock('there', e) });
+    b.addPort({ ...b.port(IN.ticks), deliver: () => onTick() });
+    b.link('*:clock:clock-out', IN.anchor, [], { site: THERE });
+    if (b.port(TICK)) b.link(TICK, IN.ticks, [], { site: THERE });
+    return b;
+  }
+  const log = (line, kind) => d.log(line, kind);
+  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log });
+  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
+
+  // ── play: join, measure, send the anchor once and the ticks for ever ────
+  let loop = null, joined = false, busy = false;
+  async function join() {
+    if (joined || busy) return;
+    busy = true;
+    await S.open();
+    anchorRx.skew = Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
+    await Promise.all([nodeHere.join(), nodeThere.join()]);
+    const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`, tag = rand(6);
+    const refPeer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: epochNow });
+    anchorRx.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: anchorRx.raw });
+    anchorRx.refPeer = refPeer;
+    d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(anchorRx.skew)} ms ${anchorRx.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
+    const has = () => !!bayHere().targets(CLK).find((t) => t.to === IN.anchor)
+      && !!bayHere().targets(TICK).find((t) => t.to === IN.ticks)
+      && anchorRx.peer.peers().some((p) => Number.isFinite(p.rttMs));
+    for (let i = 0; i < 80 && !has(); i++) await sleep(50);
+    await sleep(600);
+    S.reanchor();
+    loop = setInterval(() => { tickRef(); tickAnchor(); }, TICK_MS);
+    // The epoch half a second ahead, so the anchor lands before the first beat.
+    const epoch = Math.round(epochNow() + 500);
+    const r = nodeHere.emit(CLK, { bpm: BPM, epoch });
+    if (!r.far.length) d.log('the anchor reached nobody in another place', 'warn');
+    sent.anchors++; sent.since = epochNow();
+    // web-1 also needs the anchor to start sending ticks, and it has it now.
+    ref.clock = ref.clock || { bpm: BPM, epoch };
+    tickTimer = setInterval(sendTicks, 5);
+    joined = true; busy = false;
+    btns.setIcon('go', 'stop', 'Stop');
+  }
+  function leave() {
+    clearInterval(loop); clearInterval(tickTimer); loop = tickTimer = null;
+    nodeHere.leave(); nodeThere.leave();
+    anchorRx.peer?.dispose(); anchorRx.refPeer?.dispose(); anchorRx.peer = anchorRx.refPeer = null;
+    ref.clock = null; anchorRx.clock = null;
+    S.hush();
+    joined = false;
+    btns.setIcon('go', 'play', 'Play');
+    d.log(`stopped: ${sent.ticks} ticks and ${sent.anchors} anchor sent for the same beat`);
+  }
+  const btns = createButtonGroup({ buttons: [
+    { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (joined ? leave() : join()) },
+  ] });
+
+  // ── what it measured ─────────────────────────────────────────────────────
+  const lates = (m) => [...m.values()].map((v) => v.late).slice(-32);
+  let first = null;
+  const WINDOW = 8000;
+  setInterval(() => {
+    if (!joined) return;
+    const min = (epochNow() - sent.since) / 60000;
+    if (min > 0.02) {
+      d.set('ticks', Math.round(sent.ticks / min));
+      d.set('anchors', fmt(sent.anchors / min));
+    }
+    const t = lates(tickRx.played), a = lates(anchorRx.played);
+    if (t.length) { d.set('ticks late', fmt(median(t))); d.set('ticks worst', fmt(worst(t))); }
+    if (a.length) { d.set('anchor late', fmt(median(a))); d.set('anchor worst', fmt(worst(a))); }
+    const L = (id) => view.strip.lanes().find((x) => x.id === id);
+    if (t.length && L('ticks')) L('ticks').subLabel = [`median ${fmt(median(t))} ms`, `worst ${fmt(worst(t))} ms`];
+    if (a.length && L('anchor')) L('anchor').subLabel = [`median ${fmt(median(a))} ms`, `worst ${fmt(worst(a))} ms`];
+    if (first == null && ref.played.size) first = ref.clock.epoch;
+    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
+    view.strip.invalidate();
+  }, 250);
+
+  // ── the timeline: the true beat, then each receiver's, coloured by how late ─
+  const deck = createDeck({ items: [], range: [0, WINDOW] });
+  const shelf = el('div');
+  const due = (k) => ref.clock ? ref.clock.epoch + k * STEP : 0;
+  const rowsOf = (m, id) => () => (first == null ? [] : [...m.entries()]
+    .filter(([k]) => due(k) <= epochNow())
+    .map(([k, v]) => ({ at: due(k) - first + (v.late || 0), id: `${id}${k}`, kind: 'beat', payload: { k, late: v.late } })));
+  const lane = (id, label, m, hz) => ({ id, kind: 'beat', label, height: 40, width: 2, as: 'ticks', terse: true,
+    rows: rowsOf(m, id),
+    ...(id === 'ref' ? { color: '#6f7d94', describeRow: () => ['web-1', 'the true beat'] }
+      : { colorOfRow: (r) => band(r.payload.late),
+          describeRow: (r) => [label, `${r.payload.late >= 0 ? '+' : ''}${fmt(r.payload.late)} ms from the true beat`] }) });
+  const view = createStripView(shelf, deck, {
+    size: 'auto', follow: false, gutter: 132,
+    lanes: [lane('ref', 'web-1', ref.played), lane('ticks', 'web-2 ticks', tickRx.played), lane('anchor', 'web-2 anchor', anchorRx.played)],
+  });
+
+  // ── names, and the patchbay: the tick wire lights all the time, the anchor once ─
+  const { plain, named, hovers } = plainNames(new Map([[HERE, 'web-1'], [THERE, 'web-2']]), ROOM, (id) =>
+    id === plain(`${THERE}:beat`) ? "reached by web-1's * link, clock-out -> *:beat:clock-in"
+    : id === plain(`${THERE}:ticks`) ? 'counts 24 ticks a beat and plays each 24th as it lands' : '');
+  const picture = (() => {
+    const b = createBay();
+    for (const g of [G_HERE, G_THERE]) { for (const n of g.nodes) b.addNode(n); for (const p of g.ports) b.addPort(p); }
+    b.link(CLK, IN.here);
+    b.link(CLK, IN.anchor);
+    b.link(TICK, IN.ticks);
+    return b;
+  })();
+  const pb = createPatchbay(named(picture), { room: 'midiclock' });
+  hovers(pb.el, 'midiclock');
+
+  fitOnResize(view);
+  d.stack.add(btns.el, view.surface, pb.el);
+  addEventListener('pagehide', () => { if (joined) leave(); S.ctx?.close(); });
+  window.__clock = { sent, tickRx, anchorRx, ref, lates };
+  d.ready();
+</script>

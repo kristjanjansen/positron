@@ -15,6 +15,8 @@
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); }
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
@@ -28,6 +30,9 @@
   import { PARAM_HUES } from '/shell/code-lang.mjs';
   import { createCompileIdle } from '/shell/compile-idle.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { createBoard } from '/shell/board.mjs';
+  import { createBoardVideo, BOARD_VIDEO_ASK } from '/shell/board-video.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
 
   // /concepts/shader/000/ plus the Raspberry Pi drawing the same shader.
   // Asked 2026-10-12 (BACKLOG, "shader/010"): *"can you do mirror shader
@@ -180,7 +185,7 @@ void main(){
   o=vec4(mix(c,fb,uFb),1.0); }
 `;
 
-  function createPiSide({ onReply, onShown }) {
+  function createSimulatedPi({ onReply, onShown }) {
     const glc = document.createElement('canvas');
     glc.width = PI_W; glc.height = PI_H;
     const g = glc.getContext('webgl2', { alpha: false, antialias: false, preserveDrawingBuffer: true });
@@ -326,6 +331,145 @@ void main(){
     };
   }
 
+  // ── the real board, when one answers ─────────────────────────────────────
+  //
+  // Since 2026-10-12. A press of the board button asks the Pi in `studio-1`
+  // for `video.status` and gives it ASK_MS to answer, as /concepts/synth/100/
+  // does; no answer, a harness run (`createBoard` will not drive the board
+  // under a check) or a browser with no WebCodecs keeps the simulation, and the
+  // right panel's footer says which. A board that answers but is not drawing
+  // is asked for `video.start`, and only a picture this page started is
+  // stopped when it leaves. The picture comes back through
+  // `demo/shell/board-video.mjs`, the receiver /mirror/ uses.
+  //
+  // 🔴 PI LAG ON REAL FRAMES IS A CHANGE SEEN IN THE PICTURE, NOT A STAMP. The
+  // board's frame counter rides on every frame, but nothing says at which frame
+  // a knob turn or a shader landed, and there is no burned clock. So each
+  // decoded frame is shrunk to 64 x 36 and compared with the one before; the
+  // lag is from the change here to the first frame whose difference stands
+  // clear of the picture's own motion (three times the median of the last
+  // calm frames, and half again over their largest). A segment count change
+  // is a jump and lands on its first frame; a shader fades in over 900 ms on
+  // the Pi, so its lag is to the first frame where the fade shows.
+  const ASK_MS = 3000;
+  const PROBE_W = 64, PROBE_H = 36, GIVE_UP_MS = 3000;
+  function createPiSide({ onReply, onShown, onMode = () => {}, log }) {
+    const sim = createSimulatedPi({ onReply, onShown });
+    let mode = 'simulated', board = null, started = false, renderer = '', reason = null;
+    const say = (m) => { mode = m; onMode(m); };
+    const real = () => mode === 'relay';
+    const probe = document.createElement('canvas');
+    probe.width = PROBE_W; probe.height = PROBE_H;
+    const pctx = probe.getContext('2d', { willReadFrequently: true });
+    let prev = null, calm = [], pending = null, quiet = 0, seenSeq = null;
+    const lags = [];
+    const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0; };
+    const video = createBoardVideo({
+      canvas: sim.view,
+      send: (m) => board?.send(m),
+      onSeq: (seq) => { seenSeq = seq; },
+      onKey: () => log('Pi: a keyframe arrived, the Pi’s picture starts here'),
+      onLost: (n) => log(`Pi: the relay has dropped ${n} frame${n === 1 ? '' : 's'} of the picture`, 'warn'),
+      onError: (line) => log(`Pi: ${line}`, 'bad'),
+      onFrame: (n, vf) => {
+        pctx.drawImage(vf, 0, 0, PROBE_W, PROBE_H);
+        const px = pctx.getImageData(0, 0, PROBE_W, PROBE_H).data;
+        let diff = 0;
+        if (prev) { for (let i = 0; i < px.length; i += 4) diff += Math.abs(px[i] - prev[i]) + Math.abs(px[i + 1] - prev[i + 1]) + Math.abs(px[i + 2] - prev[i + 2]); diff /= PROBE_W * PROBE_H * 3; }
+        prev = px;
+        const now = performance.now();
+        if (!pending) {
+          if (quiet > 0) quiet--; else if (n > 2) { calm.push(diff); if (calm.length > 60) calm.shift(); }
+          return;
+        }
+        const bar = Math.max(3 * median(calm), 1.5 * Math.max(0, ...calm), 1);
+        if (calm.length >= 10 && diff > bar) {
+          lags.push({ what: pending.what, ms: now - pending.at, diff, bar, seq: seenSeq });
+          onShown(pending.at, now);
+          pending = null; quiet = 10;
+        } else if (now - pending.at > GIVE_UP_MS) {
+          log(`Pi: no frame changed enough within ${GIVE_UP_MS / 1000} s of the ${pending.what}, so no lag is measured for it`, 'warn');
+          pending = null;
+        }
+      },
+    });
+    /** A change made here; the earliest one not yet seen in the picture is the one timed. */
+    const mark = (what, at) => { if (!pending) pending = { what, at }; };
+
+    async function tryBoard() {
+      board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, log: (line, kind) => log(`Pi: ${line}`, kind),
+        onMessage: (m) => {
+          if (!real()) return;
+          if (m.type === 'video.params' || m.type === 'video.shader.applied') onReply(m);
+          if (m.type === 'video.shader.applied' && !m.ok && pending?.what === 'shader') pending = null;
+          if (m.type === 'video.stopped') { log('Pi: the board stopped its picture'); leave(false); }
+        } });
+      if (!board.driving()) return 'this run may not drive the board';
+      if (typeof VideoDecoder !== 'function') return 'this browser has no WebCodecs, so the Pi’s picture cannot be decoded here';
+      const t0 = performance.now();
+      while (board.state() !== 1 && performance.now() - t0 < ASK_MS) await new Promise((r) => setTimeout(r, 50));
+      const left = ASK_MS - (performance.now() - t0);
+      let st = board.state() === 1 ? await board.ask({ type: 'video.status' }, 'video.started', Math.max(500, left)) : null;
+      if (!st) return `no board answered in ${ASK_MS / 1000} s`;
+      if (!st.ok) {
+        if (st.available === false) return `the board cannot draw: ${st.reason}`;
+        st = await board.ask({ ...BOARD_VIDEO_ASK }, 'video.started', 10000);
+        if (!st?.ok) return `the board did not start its picture: ${st?.reason ?? 'no answer'}`;
+        started = !st.already;
+      }
+      renderer = st.renderer ?? '';
+      const r = video.open(st.room, st);
+      if (!r.ok) return r.reason;
+      log(`Pi: the board is drawing ${st.w}x${st.h} at ${st.fps} a second${started ? ', started by this page' : ''}`, 'hi');
+      return { st };
+    }
+    async function join(segments, body) {
+      if (mode !== 'simulated') return mode;
+      say('checking');
+      const r = await tryBoard().catch((e) => e.message);
+      if (typeof r !== 'object') {
+        reason = r;
+        log(`Pi side simulated in this tab: ${r}`);
+        board?.close(); board = null;
+        say('simulated');
+        return mode;
+      }
+      reason = null; prev = null; calm = []; pending = null; lags.length = 0;
+      say('relay');
+      // What this page shows goes to the board at once, so the two pictures
+      // start from one program and one segment count, as /mirror/ does on start.
+      board.send({ type: 'video.params', mirrors: segments });
+      if (body) board.send({ type: 'video.shader', body });
+      return mode;
+    }
+    function leave(stop = true) {
+      if (mode === 'simulated') return;
+      const was = video.close();
+      if (stop && started) board?.send({ type: 'video.stop' });
+      log(`Pi: left after ${was.decoded} frames decoded, ${was.lost} lost${started && stop ? ', and the picture this page started was stopped' : ''}`);
+      started = false; pending = null;
+      setTimeout(() => { board?.close(); board = null; }, 300);
+      say('simulated');
+    }
+    return {
+      view: sim.view,
+      get simulated() { return !real(); },
+      get ok() { return real() || sim.ok; },
+      mode: () => mode, reason: () => reason, join, leave, lags: () => lags.slice(),
+      board: () => board, video,
+      renderer: () => (real() ? renderer : sim.renderer()),
+      seg: sim.seg,
+      send(msg, at = performance.now()) {
+        if (!real()) return sim.send(msg, at);
+        if (msg?.type === 'video.params') mark('knob', at);
+        if (msg?.type === 'video.shader') mark('shader', at);
+        return !!board?.send(msg);
+      },
+      tick: (now) => { if (!real()) sim.tick(now); },
+      fps: () => (real() ? Math.round(video.fps()) : sim.fps()),
+    };
+  }
+
   // ── the local side, as 000 ───────────────────────────────────────────────
   const W = 640, H = 360;
   const canvas = el('canvas');
@@ -397,20 +541,34 @@ void main(){
   const piName = el('span', 'cc-say', '');
   const piSeg = el('span', 'cc-say', '');
   const replies = [];
+  const who = () => (pi.simulated ? 'Pi (simulated)' : 'Pi');
   const pi = createPiSide({
+    log: d.log,
     onShown: (at) => landed('pi', at),
     onReply: (r) => {
       replies.push(r);
       if (r.type === 'video.params' && r.ok) piSeg.textContent = `${r.mirrors} ${r.mirrors === 1 ? 'segment' : 'segments'}`;
       if (r.type === 'video.shader.applied') {
-        d.log(r.ok ? `Pi (simulated): the shader ${r.detail}, ${r.bytes} bytes` : `Pi (simulated): refused, ${r.reason}`, r.ok ? '' : 'warn');
+        d.log(r.ok ? `${who()}: the shader ${r.detail ?? 'was taken'}, ${r.bytes} bytes` : `${who()}: refused, ${r.reason}`, r.ok ? '' : 'warn');
       }
     },
+    onMode: (m) => showMode(m),
   });
-  piName.textContent = pi.ok ? `${shortName(pi.renderer())}, simulated Pi` : 'simulated Pi, no WebGL2';
+  /** The right panel's footer and the Pi node's label say which Pi this is. */
+  function showMode(m) {
+    if (m === 'relay') piName.textContent = `${shortName(pi.renderer()) || 'v3dpipe'}, Raspberry Pi`;
+    else if (m === 'checking') piName.textContent = 'asking the Pi';
+    else piName.textContent = pi.ok ? `${shortName(pi.renderer())}, simulated Pi` : 'simulated Pi, no WebGL2';
+    if (piNode) { piNode.label = m === 'relay' ? 'v3dpipe on the Pi' : 'v3dpipe on the Pi, simulated'; pb?.refresh(); }
+    join?.setIcon('pi', m === 'relay' ? 'stop' : 'board', m === 'relay' ? 'leave the Pi, back to the simulation' : 'show the real Pi\u2019s picture');
+    d.set('Pi lag', '');
+  }
+  let piNode = null, pb = null, join = null;
+  showMode('simulated');
 
   // ── the local shader node's two inputs ───────────────────────────────────
   const P = { segments: null };
+  let lastGood = FS;
   let localPending = null, lastLocal = null, delivered = 0, piDelivered = 0;
 
   // ── the bay ──────────────────────────────────────────────────────────────
@@ -423,7 +581,7 @@ void main(){
   bay.addNode({ id: `${S}:code`, kind: 'person', label: 'code box', place: 'browser' });
   bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'mirror shader here', place: 'browser' });
   bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture here', place: 'browser' });
-  bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
+  piNode = bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
   bay.addNode({ id: `${S}:screen-pi`, kind: 'screen', label: 'Pi picture', place: 'browser' });
   const PROG_SHAPE = { of: 'glsl' };
   const PORTS = [
@@ -536,6 +694,7 @@ void main(){
       lastLocal = null;
       bay.send(CODE_OUT, { of: 'program', source: text, at: performance.now() });
       const out = lastLocal ?? { ok: false, error: 'the program did not reach this tab’s shader' };
+      if (out.ok) lastGood = text;
       if (!out.ok) d.log(`the edit did not compile here, the last good shader keeps running: ${out.error}`, 'warn');
       else {
         d.log(out.knob ? 'the edit compiled here and is running' : 'the edit compiled here and has no uSegments, so the knob drives nothing',
@@ -554,9 +713,17 @@ void main(){
   });
 
   const lit = (l) => drawing && (l.from === ID('shader', 'video-out') || l.from === PI('video-out'));
-  const pb = createPatchbay(bay, { flowing: lit });
+  pb = createPatchbay(bay, { flowing: lit });
 
-  d.stack.add(pair, grid.el, code.el, pb.el);
+  // The one press that reaches the real Pi. Nothing opens on a visit.
+  join = createButtonGroup({ buttons: [
+    { id: 'pi', icon: 'board', label: 'show the real Pi\u2019s picture',
+      onPress: () => (pi.simulated ? pi.join(Math.round(knob.value()), lastGood && bodyOf(lastGood)) : pi.leave()) },
+  ] });
+  showMode(pi.mode());
+  const top = el('div', 'cc-top');
+  top.append(join.el);
+  d.stack.add(top, pair, grid.el, code.el, pb.el);
 
   // The knob's starting value goes over both wires, so the first N either
   // side sees came along a link.
@@ -565,7 +732,7 @@ void main(){
 
   window.__demo.knobs = grid;
   window.__demo.shader = {
-    knob, code, idle, pi, bay, replies, lags,
+    knob, code, idle, pi, bay, replies, lags, join,
     model: { UP_MS, DOWN_MS, PI_FPS, PI_W, PI_H },
     size: [W, H],
     source: () => (fsShader ? gl.getShaderSource(fsShader) : null),

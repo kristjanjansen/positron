@@ -39,6 +39,7 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createTempoDetector, LO, HI, STEADY, steady } from '/concepts/radio/tempo.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
 
@@ -208,6 +209,8 @@
   const beats = [];                // { at, c }: a beat instant on this tab's audio clock, and the reading's confidence
   function beatsIn(ev) {
     if (ev?.of !== 'param' || ev.name !== 'bpm' || !Array.isArray(ev.beats)) return;
+    // Under STEADY there is no beat to draw (plan-tempo-key-improve.md item 2).
+    if (!steady(ev)) return;
     for (const b of ev.beats) if (Number.isFinite(b)) beats.push({ at: b, c: ev.confidence ?? 1 });
   }
   /** Where now sits on the tempo scope: fixed at 5/6 of the width. Following
@@ -231,7 +234,7 @@
   tempoHost.append(tempoCanvas);
   const tempoPanel = createVideoPanel({ media: tempoHost, aspect: 'auto', right: false,
     left: el('span', 'cc-say', 'tempo'),
-    values: [{ key: 'bpm', reserve: 9 }, { key: 'conf', label: 'confidence', reserve: 4 }] });
+    values: [{ key: 'bpm', reserve: 14 }, { key: 'conf', label: 'confidence', reserve: 4 }] });
   // The pointer over the scope: where it is, in CSS pixels from the left, or null.
   let hoverX = null;
   tempoCanvas.addEventListener('pointermove', (e) => { hoverX = e.offsetX; drawTempo(); });
@@ -245,7 +248,10 @@
     const c = Number.isFinite(ev.confidence) ? ev.confidence : 0;
     history.push({ at: ctx ? +ctx.currentTime.toFixed(2) : 0, v: ev.v, confidence: c, beatAt: ev.beatAt ?? null,
       candidates: Array.isArray(ev.candidates) ? ev.candidates : [] });
-    tempoPanel.values.set('bpm', `${ev.v.toFixed(1)} bpm`);
+    // Under STEADY the reading is not a fact, so no number is shown: readings
+    // at 0.5 or more were 92% within 4% of the reference tools, under it 54%
+    // (research/tempo-key-eval-2026-10-12.md 4.2). The line still draws, dimmed.
+    tempoPanel.values.set('bpm', c >= STEADY ? `${ev.v.toFixed(1)} bpm` : 'no steady beat');
     tempoPanel.values.set('conf', c.toFixed(2));
   }
 
@@ -257,34 +263,10 @@
     requestAnimationFrame(frame);
   }
 
-  // ── the tempo detector. Plain WebAudio and a little arithmetic.
-  // 1. Four bands of the sound: below 150 Hz (the kick and the bass), around
-  //    400 Hz, around 1.5 kHz (snares, voices) and above 4 kHz (hats), merged
-  //    into one four channel input.
-  // 2. Each band's energy through a follower (the square, smoothed by two one
-  //    pole low passes at FOLLOW_HZ), read every HOP samples on a log scale, and
-  //    how much it ROSE since the hop before. The rises, summed over the bands,
-  //    are the onset envelope. Before it is used, its own one second running
-  //    mean is taken off and only what stands above that is kept.
-  // 3. Every half second, the autocorrelation of the last WIN_S seconds of that
-  //    envelope. Each tempo from LO to HI scores the mean of its correlation at
-  //    one, two and four beats, plus half of it at half a beat (a beat that
-  //    splits in two, as nearly all pop does), times a prior that falls off
-  //    either side of 120 bpm (a Gaussian in octaves, PRIOR_OCT wide). The
-  //    peaks of that score are the CANDIDATES, and all of them are sent.
-  // 4. The chosen one is the best candidate, with a bonus of STICK for staying
-  //    within 3% of the last choice, and the line is the median of the last
-  //    five choices.
-  // 5. The confidence is how strong that score is, 1 - exp(-score / 0.25),
-  //    times how many of the last eight choices agree with it (half weight).
-  // 6. With the period known, the phase, from each band's own rises kept in a
-  //    ring beside the sum. A beat envelope weighs the bands PH_W (the low band
-  //    whole, the hats not at all). Every offset into the last PH_SPAN_S seconds
-  //    is scored as a pulse train: at each beat back, the beat envelope under a
-  //    Gaussian PH_SIG_S wide, plus HAT_BETA times the hat band half a beat
-  //    later, each beat counting less with age (PH_DECAY_S). The best offset is
-  //    the last beat, on this tab's audio clock. The beats on that grid since
-  //    the last reading go with it, and the wave draws them.
+  // ── the tempo detector: /concepts/radio/tempo.mjs, shared with radio/020 since
+  // 2026-10-12. Every step of it, every constant and every measurement behind
+  // them is written there. It hears the player's sound on its own link and
+  // sends each reading out on BPM_EV.
   //
   // ⚠️ THE SOURCE IS LIVE HERE, AND NOTHING ABOUT WHERE A BEAT LANDS CHANGES.
   // The stream reaches this tab a few seconds behind the station (the relay,
@@ -294,165 +276,8 @@
   // before, against the very sound the speakers play, and the click is
   // scheduled on that same clock. What is new is that a reading cannot look
   // ahead or loop: the first one waits MIN_S of sound after the stream starts.
-  //
-  // 🔴 WHY, MEASURED 2026-10-11 OFFLINE ON BOTH RECORDINGS, after *"there is
-  // very steady beat on r2"* and *"impove yr algis"*. The detector before this
-  // read Raadio 2 as 127 and 84.7 by turns (84.7 is 127 times 2/3: the song's
-  // pattern repeats every one and a half beats, and the old score could not
-  // tell that from a beat), with a median confidence of 0.21, because that
-  // confidence was the bare correlation at one beat of a two band envelope.
-  // The kicks and bass in the low band come every 0.235 s, and the envelope
-  // correlates more at 2, 4 and 8 of those than at 3, 5 and 7, so the beat is
-  // two of them: 127.0 bpm on the kick grid. After: 358 of 359 readings within
-  // 3% of 127.0 on Raadio 2 (re-measured against the kick grid) and every one
-  // of the 231 in Raadio 4's first two minutes, where it was 127 to 129 before
-  // as well. Raadio 4's last minute has no steady beat (a 55 s window's best
-  // score is 0.02 against 0.48 in its first two minutes) and its confidence
-  // falls there, which is right.
-  //
-  // 🔴 WHY THE PHASE STEP IS A PULSE TRAIN WITHOUT THE HATS, MEASURED 2026-10-11
-  // OFFLINE after *"beats are often uppeat"* and *"radio 2 is upbeat. not
-  // good."* (research/beat-tracking-2026-10-11.md). The step before took the
-  // phase from the four band sum over 4 s, and on Raadio 2 put 48% of its
-  // beats exactly half a beat off the kick. The hat band above 4 kHz sits on
-  // the offbeat in that music and every band is log compressed on its own, so
-  // a quiet hat's rise counted as much as a loud kick's, and the low band could
-  // not outvote it because the bass comes back on the offbeat too. With the
-  // hats out of the beat envelope, a pulse train over 6 s and the hats scored
-  // half a beat later, drawn beats on the kick go from 50% to 97% on Raadio 2
-  // and half a beat off from 48% to 3%. Raadio 4 stays at 100%, and Ida (a
-  // steady kick at 131.2 bpm and almost nothing above 4 kHz) goes from 97% to
-  // 98%. The weights were chosen on Raadio 2, and the hats half a beat later is
-  // a dance music prior that would pull the wrong way where the hats land on
-  // the beat.
-  const HOP = 256;
-  const WIN_S = 12, MIN_S = 4;
-  const LO = 60, HI = 200, PRIOR = 120, PRIOR_OCT = 0.7, HALF_W = 0.5, STICK = 0.15;
-  const EVERY_S = 0.5, KEEP = 5, AGREE = 8, CAND = 5;
-  const FOLLOW_HZ = 10;
-  const BANDS = [['lowpass', 150, 1], ['bandpass', 400, 1], ['bandpass', 1500, 0.8], ['highpass', 4000, 1]];
-  // The phase step (6): each band's weight in the beat envelope (the hats left
-  // out), the hat band's index and its weight half a beat later, how far back it
-  // looks, the width of a pulse and how fast an older beat counts for less.
-  const PH_W = [1, 0.5, 0.25, 0], HAT = 3, HAT_BETA = 1, PH_SPAN_S = 6, PH_SIG_S = 0.012, PH_DECAY_S = 3;
   let det = null;
-  function detBuild() {
-    const sr = ctx.sampleRate, rate = sr / HOP, n = Math.round(WIN_S * rate);
-    const t = { rate, n, env: new Float32Array(n), bands: BANDS.map(() => new Float32Array(n)), w: 0, count: 0, newest: 0,
-      prev: new Float32Array(BANDS.length), since: 0, picks: [], est: null, conf: null, beatAt: null, marked: -Infinity,
-      f: new Float64Array(2 * BANDS.length), h: 0, k: 1 - Math.exp(-2 * Math.PI * FOLLOW_HZ / sr) };
-    t.in = ctx.createGain();
-    const merge = ctx.createChannelMerger(BANDS.length);
-    BANDS.forEach(([type, hz, q], i) => {
-      const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = hz; b.Q.value = q;
-      t.in.connect(b).connect(merge, 0, i);
-    });
-    t.proc = ctx.createScriptProcessor(1024, BANDS.length, 1);
-    merge.connect(t.proc);
-    t.proc.connect(pull);          // a processor nothing pulls never runs
-    t.proc.onaudioprocess = (e) => {
-      if (!playing) return;
-      const ch = BANDS.map((_, i) => e.inputBuffer.getChannelData(i));
-      const len = ch[0].length, t0 = e.playbackTime - len / sr;
-      const f = t.f, k = t.k, B = BANDS.length;
-      for (let i = 0; i < len; i++) {
-        for (let b = 0; b < B; b++) { const v = ch[b][i]; f[2 * b] += (v * v - f[2 * b]) * k; f[2 * b + 1] += (f[2 * b] - f[2 * b + 1]) * k; }
-        if (++t.h === HOP) { t.h = 0; detHop(t0 + (i + 1) / sr); }
-      }
-    };
-    return t;
-  }
-  function detHop(at) {
-    const t = det;
-    let o = 0;
-    for (let b = 0; b < BANDS.length; b++) {
-      const l = Math.log1p(1e4 * t.f[2 * b + 1]), r = Math.max(0, l - t.prev[b]);
-      t.bands[b][t.w] = r; o += r; t.prev[b] = l;
-    }
-    t.env[t.w] = o; t.w = (t.w + 1) % t.n; t.count++; t.newest = at;
-    if (++t.since >= Math.round(EVERY_S * t.rate)) { t.since = 0; detEstimate(); }
-  }
-  function detEstimate() {
-    const t = det, N = Math.min(t.count, t.n), rate = t.rate;
-    if (N < MIN_S * rate) return;
-    const raw = new Float32Array(N), x = new Float32Array(N), cs = new Float64Array(N + 1);
-    for (let i = 0; i < N; i++) { raw[i] = t.env[(t.w - N + i + t.n) % t.n]; cs[i + 1] = cs[i] + raw[i]; }
-    const W = Math.round(rate * 0.5);
-    let mean = 0;
-    for (let i = 0; i < N; i++) {
-      const a = Math.max(0, i - W), b = Math.min(N, i + W + 1);
-      x[i] = Math.max(0, raw[i] - (cs[b] - cs[a]) / (b - a)); mean += x[i];
-    }
-    mean /= N;
-    let e0 = 0;
-    for (let i = 0; i < N; i++) { x[i] -= mean; e0 += x[i] * x[i]; }
-    if (e0 < 1e-9) return;         // silence has no tempo
-    const lmin = Math.floor(60 * rate / HI), lmax = Math.ceil(60 * rate / LO);
-    const A = new Float32Array(4 * lmax + 4);
-    for (let L = 1; L < A.length && L < N; L++) {
-      let s = 0;
-      for (let i = 0; i < N - L; i++) s += x[i] * x[i + L];
-      A[L] = (s / (N - L)) / (e0 / N);
-    }
-    const at = (l) => { const i = Math.floor(l), f = l - i; return (A[i] || 0) * (1 - f) + (A[i + 1] || 0) * f; };
-    const S = new Float32Array(lmax + 2);
-    for (let L = lmin; L <= lmax; L++) {
-      const w = Math.exp(-0.5 * (Math.log2(60 * rate / L / PRIOR) / PRIOR_OCT) ** 2);
-      S[L] = w * ((at(L) + at(2 * L) + at(4 * L)) / 3 + HALF_W * at(L / 2));
-    }
-    const peaks = [];
-    for (let L = lmin + 1; L < lmax; L++) {
-      if (!(S[L] > S[L - 1] && S[L] >= S[L + 1] && S[L] > 0)) continue;
-      const den = S[L - 1] - 2 * S[L] + S[L + 1];
-      const Lf = L + (den ? Math.max(-0.5, Math.min(0.5, 0.5 * (S[L - 1] - S[L + 1]) / den)) : 0);
-      peaks.push({ bpm: 60 * rate / Lf, s: S[L] });
-    }
-    if (!peaks.length) return;
-    const near = (a, b) => b != null && Math.abs(a - b) / b < 0.03;
-    const pick = (p) => p.s * (near(p.bpm, t.est) ? 1 + STICK : 1);
-    peaks.sort((p, q) => pick(q) - pick(p));
-    const chosen = peaks[0];
-    t.picks.push(chosen.bpm);
-    if (t.picks.length > AGREE) t.picks.shift();
-    const last = t.picks.slice(-KEEP).sort((p, q) => p - q);
-    t.est = last[last.length >> 1];
-    const agree = t.picks.filter((b) => near(b, t.est)).length / t.picks.length;
-    const conf = (1 - Math.exp(-Math.max(0, chosen.s) / 0.25)) * (0.5 + 0.5 * agree);
-    t.conf = conf;
-    const P = 60 / t.est * rate, span = Math.min(N, Math.round(PH_SPAN_S * rate));
-    const sg = PH_SIG_S * rate, R = Math.ceil(2 * sg);
-    const low = new Float32Array(span), hat = new Float32Array(span);
-    for (let i = 0; i < span; i++) {
-      const j = (t.w - span + i + t.n) % t.n;
-      for (let b = 0; b < BANDS.length; b++) low[i] += PH_W[b] * t.bands[b][j];
-      hat[i] = t.bands[HAT][j];
-    }
-    const pulse = (e, c) => { let s = 0; for (let d = -R; d <= R; d++) { const i = Math.round(c + d); if (i >= 0 && i < span) s += Math.exp(-0.5 * ((i - c) / sg) ** 2) * e[i]; } return s; };
-    let bestPh = 0, bestSum = -Infinity;
-    for (let ph = 0; ph < P; ph += 0.5) {
-      let sum = 0;
-      for (let j = 0; ; j++) {
-        const c = span - 1 - ph - j * P;
-        if (c < R) break;
-        const w = Math.exp(-(j * P / rate) / PH_DECAY_S);
-        sum += w * (pulse(low, c) + HAT_BETA * pulse(hat, c + P / 2));
-      }
-      if (sum > bestSum) { bestSum = sum; bestPh = ph; }
-    }
-    t.beatAt = t.newest - bestPh / rate;
-    // The beats on this grid that no reading has placed yet, at most two seconds
-    // back, oldest first. Half a period of guard keeps a grid that shifted a
-    // little from placing the same beat twice.
-    const per = 60 / t.est, from = Math.max(t.marked + per / 2, t.newest - 2);
-    const fresh = [];
-    for (let b = t.beatAt; b > from; b -= per) fresh.unshift(+b.toFixed(3));
-    if (fresh.length) t.marked = fresh[fresh.length - 1];
-    const top = Math.max(...peaks.map((p) => p.s));
-    const candidates = [...peaks].sort((p, q) => q.s - p.s).slice(0, CAND)
-      .map((p) => ({ bpm: Math.round(p.bpm * 10) / 10, s: Math.round((p.s / top) * 100) / 100 }));
-    bay.send(BPM_EV, { of: 'param', name: 'bpm', v: Math.round(t.est * 10) / 10, confidence: Math.round(conf * 100) / 100,
-      beatAt: t.beatAt, beats: fresh, candidates });
-  }
+  const detBuild = () => createTempoDetector(ctx, { pull, playing: () => playing, onReading: (ev) => bay.send(BPM_EV, ev) });
 
   // Canvas ink is read off the stylesheet's tokens once.
   const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
@@ -515,6 +340,7 @@
     g.strokeStyle = k.fg; g.lineWidth = 1.5 * dpr; g.lineJoin = 'round';
     for (let i = 1; i < history.length; i++) {
       const p = history[i - 1], q = history[i];
+      g.strokeStyle = q.confidence >= STEADY ? k.fg : k.dim;
       g.globalAlpha = shade(q.confidence);
       g.beginPath(); g.moveTo(x(p.at), y(p.v)); g.lineTo(x(q.at), y(q.v)); g.stroke();
     }
@@ -523,11 +349,12 @@
     // drifts left between readings and jumps back when one arrives.
     const last = history[history.length - 1];
     if (last) {
+      g.strokeStyle = last.confidence >= STEADY ? k.fg : k.dim;
       g.globalAlpha = shade(last.confidence);
       g.beginPath(); g.moveTo(x(last.at), y(last.v)); g.lineTo(xNow, y(last.v)); g.stroke();
     }
     g.globalAlpha = 1;
-    if (last) { g.fillStyle = k.hi; g.beginPath(); g.arc(xNow, y(last.v), 3 * dpr, 0, 2 * Math.PI); g.fill(); }
+    if (last) { g.fillStyle = last.confidence >= STEADY ? k.hi : k.dim; g.beginPath(); g.arc(xNow, y(last.v), 3 * dpr, 0, 2 * Math.PI); g.fill(); }
     g.font = `${11 * dpr}px ${k.mono}`;
     // No labels on the line since 2026-10-11 (*"no need for annotations"*):
     // the footer says the bpm and confidence, the pointer reads any moment.
@@ -542,7 +369,7 @@
       for (const h of history) if (Math.abs(x(h.at) - hx) < Math.abs(x(r.at) - hx)) r = h;
       const rx = x(r.at);
       g.fillStyle = k.fg; g.fillRect(Math.round(rx), 0, dpr, H);
-      const l1 = `${(now - r.at).toFixed(1)} s ago  ${r.v.toFixed(1)} bpm  ${r.confidence.toFixed(2)}`;
+      const l1 = `${(now - r.at).toFixed(1)} s ago  ${r.confidence >= STEADY ? `${r.v.toFixed(1)} bpm` : 'no steady beat'}  ${r.confidence.toFixed(2)}`;
       const l2 = `also ${r.candidates.filter((c) => Math.abs(c.bpm - r.v) / r.v > 0.03).map((c) => c.bpm.toFixed(1)).join(' ')}`;
       const tw = Math.max(g.measureText(l1).width, g.measureText(l2).width), lh = 15 * dpr;
       const bx = W - tw - 12 * dpr, by = 4 * dpr;

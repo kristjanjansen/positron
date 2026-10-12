@@ -1354,5 +1354,215 @@ function V0() { return { codec: 'h264' }; }
   ok('NEGATIVE CONTROL: a light link cannot ask for a media transport', !whep.ok, whep.why);
 }
 
+// ── timed links: `ahead` and `follow` (2026-10-12, plan-routing-time §4.3) ──
+/* SABOTAGES, MEASURED 2026-10-12 on a scratch copy of demo/shell, against 196
+   here and 47 in bay-node-test.mjs (whose section 8 grades the stamp):
+     timing ignored, every timed link delivered on arrival        8 red here
+     every verdict fired at once, wait or hold                    8 red here
+     a hold fired as if it were due                               4 red here
+     follow never checked against the ports it names              2 red here
+     follow dropped, scheduled on the peer clock only             2 red here
+     port.heard counted on queueing rather than delivery          1 red here
+     a wait slept to its due, never asked again                   1 red here
+     timing options taken off the light media (link-options)     13 red here, 3 there
+     emit stamps nothing                                          3 red there
+     emit stamps without adding ahead                             2 red there
+     emit stamps even with no shared clock                        3 red there */
+/* A fake document clock and a fake timer, so every time below is exact and was
+   worked by hand. `timebase.mjs` is the real one: the bay's job is to ask it and
+   do what it says, and what it says is graded in `timebase-test.mjs`. */
+{
+  const { createTimebase } = await import('./timebase.mjs');
+  let clk = 1000;
+  let timers = [];
+  const later = (fn, ms) => { timers.push({ due: clk + ms, fn }); };
+  const advance = (ms) => {
+    const end = clk + ms;
+    for (;;) {
+      timers.sort((a, b) => a.due - b.due);
+      const t = timers[0];
+      if (!t || t.due > end) break;
+      timers.shift(); clk = t.due; t.fn();
+    }
+    clk = end;
+  };
+  const place = (offsetMs, extra = {}) => {
+    const tb = createTimebase({ offsetMs });
+    const got = [];
+    const b = createBay({ timing: { timebase: tb, local: () => clk, later, ...extra } });
+    b.addNode({ id: 'web-1:keys', kind: 'person' });
+    b.addNode({ id: 'web-2:synth', kind: 'engine' });
+    b.addPort({ id: 'web-1:keys:midi-out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+    b.addPort({ id: 'web-2:synth:midi-in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'],
+      deliver: (e, l, m) => got.push({ clk, e, m }) });
+    b.addPort({ id: 'web-1:cam:video-out', label: 'camera', dir: 'out', medium: 'video' });
+    b.addPort({ id: 'web-2:screen:video-in', label: 'screen', dir: 'in', medium: 'video' });
+    return { tb, b, got };
+  };
+  const NOTE = { cls: 'note', ch: 1, d1: 60, d2: 100 };
+  const K = 'web-1:keys:midi-out', S = 'web-2:synth:midi-in';
+
+  // 1. Absent is today: no option, delivered inside send, no timing in meta.
+  {
+    const P = place(0);
+    P.b.link(K, S);
+    P.b.send(K, NOTE, { at: clk + 150 });
+    ok('a link with no timing option delivers inside send, as before, even with a timebase and an at given',
+      P.got.length === 1 && P.got[0].clk === 1000 && !('timing' in P.got[0].m) && timers.length === 0,
+      JSON.stringify(P.got.map((g) => g.clk)));
+  }
+  // 2. ahead 150 on one clock: due at 1150, not a millisecond before.
+  {
+    timers = []; clk = 1000;
+    const P = place(0);
+    const r = P.b.link(K, S, [], { options: { ahead: 150 } });
+    P.b.send(K, NOTE, { at: 1150 });
+    const before = P.got.length, heardBefore = P.b.port(S).heard;
+    advance(149);
+    const at149 = P.got.length;
+    advance(1);
+    ok('ahead 150: the event is held until the shared clock reads at, then handed over once',
+      r.ok && before === 0 && heardBefore === 0 && at149 === 0 && P.got.length === 1 && P.got[0].clk === 1150
+      && P.got[0]?.m.timing?.local === 1150 && P.got[0]?.m.timing?.lateMs === 0 && P.got[0]?.m.timing?.option === 'ahead 150'
+      && P.b.port(S).heard === 1,
+      `at 149 ${at149}, delivered at ${P.got[0]?.clk}, ${JSON.stringify(P.got[0]?.m.timing)}`);
+  }
+  // 3. Two places, one at, their clocks 200 ms apart and both corrected: each
+  // fires when ITS shared clock reads at, which is local at - offset.
+  {
+    timers = []; clk = 1000;
+    const A = place(0), B = place(200);
+    A.b.link(K, S, [], { options: { ahead: 150 } }); B.b.link(K, S, [], { options: { ahead: 150 } });
+    A.b.send(K, NOTE, { at: 1400 }); B.b.send(K, NOTE, { at: 1400 });
+    advance(500);
+    ok('ahead: two places whose local clocks disagree by 200 ms fire on one shared moment, each at its own local at - offset',
+      A.got[0]?.clk === 1400 && B.got[0]?.clk === 1200
+      && A.got[0].clk + A.tb.offsetMs === B.got[0].clk + B.tb.offsetMs,
+      `A local ${A.got[0]?.clk}, B local ${B.got[0]?.clk}`);
+  }
+  // 4. horizonMs: handed over early with the exact time to play it at.
+  {
+    timers = []; clk = 1000;
+    const P = place(0, { horizonMs: 100 });
+    P.b.link(K, S, [], { options: { ahead: 150 } });
+    P.b.send(K, NOTE, { at: 1150 });
+    advance(200);
+    ok('horizonMs 100: handed over 100 ms early, with the local time it is due',
+      P.got[0]?.clk === 1050 && P.got[0]?.m.timing?.local === 1150, `${P.got[0]?.clk} ${JSON.stringify(P.got[0]?.m.timing)}`);
+  }
+  // 5. NEGATIVE CONTROLS: cannot tell holds, it never fires.
+  {
+    timers = []; clk = 1000;
+    const P = place(0);
+    const id = P.b.link(K, S, [], { options: { ahead: 150 } }).id;
+    P.b.send(K, NOTE, {});
+    advance(5000);
+    const l = P.b.links().find((x) => x.id === id);
+    ok('NEGATIVE CONTROL: an event with no at on an ahead link is never delivered, and is counted missed with the reason',
+      P.got.length === 0 && l?.missed === 1 && /stamped no at/.test(l?.lastWhy), `${P.got.length} ${l?.missed} ${l?.lastWhy}`);
+  }
+  {
+    timers = []; clk = 1000;
+    const P = place(null);
+    const id = P.b.link(K, S, [], { options: { ahead: 150 } }).id;
+    P.b.send(K, NOTE, { at: 1150 });
+    advance(2900);
+    const mid = P.got.length;
+    advance(200);
+    const l = P.b.links().find((x) => x.id === id);
+    ok('NEGATIVE CONTROL: with no peer clock agreed the event holds, asked again, then missed after holdMs, never fired',
+      mid === 0 && P.got.length === 0 && l?.held === 1 && l?.missed === 1 && /no peer clock/.test(l?.lastWhy),
+      `held ${l?.held}, missed ${l?.missed}, ${l?.lastWhy}`);
+  }
+  {
+    timers = []; clk = 1000;
+    const b = createBay();
+    b.addPort({ id: 'web-1:keys:midi-out', label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
+    const got = [];
+    b.addPort({ id: 'web-2:synth:midi-in', label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => got.push(e) });
+    const id = b.link(K, S, [], { options: { ahead: 150 } }).id;
+    b.send(K, NOTE, { at: Date.now() });
+    await new Promise((r) => setTimeout(r, 60));
+    const l = b.links().find((x) => x.id === id);
+    ok('NEGATIVE CONTROL: a bay given no timebase holds a timed event rather than firing it on arrival',
+      got.length === 0 && l?.held === 1, `${got.length} delivered, held ${l?.held}`);
+  }
+  // 6. follow: the receiver waits out the heavy link's observed lag here.
+  {
+    timers = []; clk = 1000;
+    const P = place(0);
+    const v = P.b.link('web-1:cam:video-out', 'web-2:screen:video-in');
+    P.tb.link('web-1:cam:video-out', { stampOffsetMs: 0 });
+    for (let t = 0; t <= 1000; t += 100) P.tb.observe('web-1:cam:video-out', { local: t, stamp: t - 2000 });
+    const r = P.b.link(K, S, [], { options: { follow: 'web-1:cam:video-out' } });
+    P.b.send(K, NOTE, { at: 1000 });
+    advance(1999);
+    const early = P.got.length;
+    advance(1);
+    ok('follow: an event stamped at 1000 on a link whose picture is 2 s behind here lands at 3000, when the picture shows it',
+      v.ok && r.ok && early === 0 && P.got[0]?.clk === 3000 && /following/.test(P.got[0]?.m.timing?.why),
+      `${P.got[0]?.clk} ${P.got[0]?.m.timing?.why}`);
+  }
+  {
+    timers = []; clk = 1000;
+    const P = place(0);
+    P.tb.link('web-1:cam:video-out', { stampOffsetMs: 0 });
+    const id = P.b.link(K, S, [], { options: { follow: 'web-1:cam:video-out' } }).id;
+    P.b.send(K, NOTE, { at: 1000 });
+    advance(4000);
+    const l = P.b.links().find((x) => x.id === id);
+    ok('NEGATIVE CONTROL: following a heavy link nothing has observed yet holds, and is missed rather than fired',
+      P.got.length === 0 && l?.missed === 1 && /cannot be told/.test(l?.lastWhy), l?.lastWhy);
+  }
+  // 6b. A wait is asked again, so a line that steps EARLIER while a cue waits
+  // brings the cue with it. Before RECHECK_MS a cue slept to the old due and
+  // fired 2 s after its picture (MEASURED on /concepts/clock/040/, +2004 ms).
+  {
+    timers = []; clk = 1000;
+    const P = place(0);
+    P.tb.link('web-1:cam:video-out', { stampOffsetMs: 0 });
+    for (let t = 0; t <= 1000; t += 100) P.tb.observe('web-1:cam:video-out', { local: t, stamp: t - 2000 });
+    P.b.link(K, S, [], { options: { follow: 'web-1:cam:video-out' } });
+    P.b.send(K, NOTE, { at: 1000 });
+    advance(500);
+    for (const t of [1500, 1510, 1520]) P.tb.observe('web-1:cam:video-out', { local: t, stamp: t });   // a drift-seek: lag 0 now
+    advance(3000);
+    ok('follow: when the picture jumps 2 s ahead while a cue waits, the cue lands within one recheck of the jump, not at the old due',
+      P.got.length === 1 && P.got[0].clk >= 1520 && P.got[0].clk <= 1570, `delivered at ${P.got[0]?.clk}`);
+  }
+  // 7. What the bay refuses, with the reason.
+  {
+    const P = place(0);
+    const light = P.b.validate(K, S, [], { options: { follow: K } });
+    ok('NEGATIVE CONTROL: follow naming the link\'s own end is refused', !light.ok && /cannot wait for itself/.test(light.why), light.why);
+    P.b.addPort({ id: 'web-1:fader:value-out', label: 'fader', dir: 'out', medium: 'value' });
+    const fl = P.b.validate(K, S, [], { options: { follow: 'web-1:fader:value-out' } });
+    ok('NEGATIVE CONTROL: follow naming a light port is refused, and says only a heavy link is worth waiting for',
+      !fl.ok && /value link/.test(fl.why) && /heavy/.test(fl.why), fl.why);
+    const unknown = P.b.validate(K, S, [], { options: { follow: 'stage-1:cam:video-out' } });
+    ok('a follow naming a link this bay has not heard of yet is allowed, and the timebase holds until it is observed', unknown.ok, unknown.why);
+    const aud = P.b.validate('web-1:cam:video-out', 'web-2:screen:video-in', [], { options: { ahead: 150 } });
+    ok('NEGATIVE CONTROL: ahead on a video link is refused, because a heavy link is not scheduled, it is followed',
+      !aud.ok && /no option called ahead/.test(aud.why), aud.why);
+    const zero = P.b.validate(K, S, [], { options: { ahead: 0 } });
+    const word = P.b.validate(K, S, [], { options: { ahead: 'soon' } });
+    ok('NEGATIVE CONTROL: ahead 0 and ahead soon are refused, each naming the range',
+      !zero.ok && /outside 1 to 10000/.test(zero.why) && !word.ok && /whole number from 1 to 10000/.test(word.why), `${zero.why} | ${word.why}`);
+  }
+  // 8. The text form round trips, and a loaded line carries its options.
+  {
+    const lines = ['web-1:keys:midi-out -> web-2:synth:midi-in { ahead 150 }',
+      'web-1:keys:midi-out -> web-2:synth:midi-in { transpose +12, follow web-1:cam:video-out }'];
+    let back = [], bad = ['not loaded'];
+    const P = place(0);
+    try { back = lines.map((x) => printLink(parseLink(x))); bad = P.b.load(lines.join('\n')); } catch (e) { back = [String(e.message)]; }
+    ok('ahead and follow round trip through the text form and load as options',
+      back.join('\n') === lines.join('\n') && bad.length === 0
+      && P.b.links()[0]?.options?.ahead === 150 && P.b.links()[1]?.options?.follow === 'web-1:cam:video-out',
+      back.join(' | '));
+  }
+  timers = [];
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

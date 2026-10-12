@@ -7,6 +7,8 @@
 // no notes: rename a port and the picture follows. Wide hosts chain left to right; a phone stacks top to
 // bottom with inlets on the top edge and outlets on the bottom.
 
+import { TIMING_NAMES, printOptions } from './link-options.mjs';
+
 const NS = 'http://www.w3.org/2000/svg';
 const s = (tag, attrs = {}, text) => {
   const e = document.createElementNS(NS, tag);
@@ -339,9 +341,43 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       } else d = across
         ? `M${a.x},${a.y} C${a.x + k},${a.y + o * 2} ${b.x - k},${b.y + o * 2} ${b.x},${b.y}`
         : `M${a.x},${a.y} C${a.x + o * 2},${a.y + k} ${b.x + o * 2},${b.y - k} ${b.x},${b.y}`;
-      const path = s('path', { d, class: `lv-wire md-${medium}` });
+      /* 🔴 A TIMED LINK SAYS SO ON ITS WIRE, SINCE 2026-10-12. `ahead` and
+         `follow` (link-options.mjs) change WHEN a message lands, which no
+         port name shows, so a wire carrying one is dashed and carries its
+         option in the link's own text form, `ahead 150`, at its middle, in the
+         medium's colour. The one typed label this view draws, and only the
+         timing ones: `w 640` on a video link changes what is asked for, not
+         when, and stays off the picture as before. */
+      const timed = printOptions(l.options, TIMING_NAMES);
+      const path = s('path', { d, class: `lv-wire md-${medium}${timed ? ' lv-timed' : ''}` });
       wires.set(l.id, path);
       svg.insertBefore(path, svg.firstChild);
+      if (timed) {
+        path.append(s('title', {}, `${timed}: the receiver fires on the time the sender stamped`));
+        let mid = null;
+        try { const n = path.getTotalLength(); mid = path.getPointAtLength(n / 2); } catch { /* not laid out */ }
+        // ⚠️ NOT ON A PHONE. There the wire's middle is its lane in the right
+        // gutter, a few px from the screen edge, and the words ran off it
+        // (MEASURED at 375 on /concepts/clock/030/). The dash and the hover stay.
+        // It has to fit between the two boxes, or it lies on their port names
+        // (MEASURED on /concepts/clock/040/, `follow web-1:cam:video-out` over
+        // a 70 px gap). The full option, then the node it follows, then the
+        // option's name alone, then nothing but the dash and the hover.
+        if (mid && across) {
+          const room = Math.abs(b.x - a.x) + 12;   // it may lap the two box edges a little
+          const t = s('text', { x: mid.x, y: mid.y - 6, 'text-anchor': 'middle', class: `lv-opt md-${medium}` }, timed);
+          svg.append(t);
+          for (const w of [timed.replace(/follow (\S+?):(\S+?):\S+/, 'follow $1:$2'), timed.split(' ')[0]]) {
+            let len = 0;
+            try { len = t.getComputedTextLength(); } catch { /* not laid out */ }
+            if (len <= room) break;
+            t.textContent = w;
+          }
+          let len = 0;
+          try { len = t.getComputedTextLength(); } catch { /* not laid out */ }
+          if (len > room) t.remove();
+        }
+      }
     }
   }
 
@@ -359,6 +395,8 @@ export const BAY_VIEW_CSS = `
   .lv-f-sans { font-family: var(--sans); }
   .lv-wire { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
   .lv-free { opacity: 0.45; }
+  .lv-timed { stroke-dasharray: 6 4; }
+  .lv-opt { font-size: ${FONT - 1}px; fill: currentColor; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 `;
 
 /** What one site holds, as something `createBayView` can draw: the site's own

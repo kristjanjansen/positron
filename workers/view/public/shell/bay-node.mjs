@@ -117,11 +117,14 @@ export function randomSite(prefix = 'web') {
  *                                `deliver`. Absent, `bay.event` is ignored.
  * @param {Function} [o.onEvent] `(msg, delivered)` for every `bay.event` heard,
  *                                `delivered` -1 when its source was refused
+ * @param {Function} [o.shared]  `() => ms | null`, this page's shared (peer)
+ *                                clock now, null until agreed. Read only when a
+ *                                link out of a source is timed (`ahead`, `follow`).
  */
 export function createBayNode({
   room, graphs = [], local = [], onLinkRequest = null, onGraph = () => {}, onMessage = () => {},
   onJoin = () => {}, log = () => {}, wire: openSocket = openWire, reannounceMs = REANNOUNCE_MS,
-  registry = createRegistry(), bay: bayNow = null, onEvent = () => {},
+  registry = createRegistry(), bay: bayNow = null, onEvent = () => {}, shared = () => null,
 } = {}) {
   if (!room || !ROOM_RE.test(room)) throw new Error(`bay-node: a room is ${ROOM_RE}, not ${JSON.stringify(room)}. Ask roomFor().`);
   let own = [...graphs], mineLocal = [...local];
@@ -202,11 +205,26 @@ export function createBayNode({
        describes something elsewhere on its behalf (the store on
        `/concepts/room/004/`), so a link into it still has to cross the room. */
     const mine = new Set(own.map((g) => g.site));
-    const far = b.targets(source).map((t) => t.to).filter((to) => !mine.has(to.split(':')[0]));
-    const here = b.send(source, ev) - far.length;
+    const out = b.targets(source);
+    const far = out.map((t) => t.to).filter((to) => !mine.has(to.split(':')[0]));
+    /* 🔴 A TIMED LINK IS STAMPED HERE, AT THE SOURCE, SINCE 2026-10-12
+       (plans/plan-routing-time.md §4.1): `at` = this page's shared clock now
+       plus the link's `ahead`, flat on the `bay.event` beside `ev`, never
+       inside it, so an event's own fields mean what they meant. A `follow`
+       link with no `ahead` is stamped with now, the moment it happened.
+       ⚠️ ONE MESSAGE, SO ONE `at`. When the timed links out of one source
+       disagree about `ahead`, the largest wins: every receiver fires on `at`,
+       and late for one link is safer than due before the message lands.
+       ⚠️ NO SHARED CLOCK, NO STAMP, and the receiver holds rather than
+       guessing. A link with neither option sends exactly what it sent before. */
+    const timed = out.filter((t) => t.link.options && (t.link.options.ahead !== undefined || t.link.options.follow !== undefined));
+    const S = timed.length ? shared() : null;
+    const at = Number.isFinite(S) ? S + Math.max(0, ...timed.map((t) => Number(t.link.options.ahead) || 0)) : null;
+    const stamp = at == null ? {} : { at };
+    const here = b.send(source, ev, stamp) - far.length;
     let sent = false;
-    if (far.length && me) { sent = send({ ...extra, type: 'bay.event', source, ev }); if (sent) counts.emitted++; }
-    return { sent, far, here };
+    if (far.length && me) { sent = send({ ...extra, ...stamp, type: 'bay.event', source, ev }); if (sent) counts.emitted++; }
+    return { sent, far, here, ...stamp };
   }
 
   /* The receiving half. The source must be on a site this socket announced,
@@ -216,7 +234,7 @@ export function createBayNode({
     const site = String(m.source || '').split(':')[0];
     const theirs = registry.graphs().some((g) => g.from === m.from && g.site === site);
     if (!theirs || !bayNow) { if (!theirs) counts.refused++; onEvent(m, theirs ? 0 : -1); return; }
-    const n = bayNow().send(String(m.source), m.ev, { sent: m.sent, by: m.from });
+    const n = bayNow().send(String(m.source), m.ev, { sent: m.sent, by: m.from, ...(Number.isFinite(m.at) ? { at: m.at } : {}) });
     counts.delivered += n;
     onEvent(m, n);
   }

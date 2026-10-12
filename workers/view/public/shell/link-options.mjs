@@ -33,6 +33,30 @@
 // been asked of the hardware encoder. Nothing between 16 and 1280 has been
 // measured on the Pi either: 1280x720 at 30 is the one size `video.mjs` records.
 
+/* 🔴 TWO TIMING OPTIONS ON EVERY LIGHT LINK, SINCE 2026-10-12
+   (plans/plan-routing-time.md §4.3, asked as BACKLOG "Sync as concepts").
+     ahead N    the SENDER stamps each event `at` = its shared clock now plus N ms,
+                and the RECEIVER fires it when its own shared clock reads `at`.
+                Two places on one shared clock then land together, whatever the
+                relay leg did to each message on the way.
+     follow X   the RECEIVER waits out the lag of the heavy link X as observed
+                HERE (`timebase.mjs`), so a cue lands on the frame or the beat it
+                belongs to rather than when its message did. X is whatever id the
+                receiver's timebase knows that link by: a bay link id or the
+                heavy port's id. The bay refuses an X it knows to be light.
+   ⚠️ NO DEFAULT, AND ABSENT IS TODAY. A link with neither delivers on arrival
+   exactly as before, which is the plan's *as it happens* mode, so nothing that
+   exists changes until a link says otherwise.
+   ⚠️ THE CEILING OF 10 s IS THIS FILE'S, NOT MEASURED. The plan's budget is
+   the light plane's p95 plus margin, 250 ms (§4.4); ten seconds is far past any
+   honest use and short enough that a typo of 150000 is refused rather than held. */
+const TIMING = {
+  ahead: { lo: 1, hi: 10000, def: undefined, even: false, says: 'milliseconds the sender schedules ahead on the shared clock' },
+  follow: { link: true, says: 'heavy link whose lag here the receiver waits out' },
+};
+/** The timing option names, which `bay-view.mjs` writes on a wire. */
+export const TIMING_NAMES = Object.keys(TIMING);
+
 /** Each medium's options, with today's value as the default. */
 export const LINK_OPTIONS = {
   video: {
@@ -40,7 +64,11 @@ export const LINK_OPTIONS = {
     h: { lo: 16, hi: 1080, def: 720, even: true, says: 'height in pixels' },
     fps: { lo: 1, hi: 60, def: 30, even: false, says: 'frames a second' },
   },
+  midi: TIMING, clock: TIMING, value: TIMING, program: TIMING,
 };
+
+/** A link id or a port id: no space, comma or brace, so it survives the text form. */
+const LINK_ID = /^[A-Za-z0-9_.*-]+(:[A-Za-z0-9_.*-]+)*$/;
 
 /** Every option name, in the order they print. */
 export const OPTION_NAMES = [...new Set(Object.values(LINK_OPTIONS).flatMap((o) => Object.keys(o)))];
@@ -70,10 +98,17 @@ export function checkOptions(medium, options) {
                fix: `Use ${Object.keys(known).join(', ')}.` };
     }
     const v = options[k];
+    if (o.link) {
+      if (typeof v !== 'string' || !LINK_ID.test(v)) {
+        return { why: `${k} names the ${o.says}, and ${v === undefined ? 'it was given no name' : `${JSON.stringify(v)} is not a link or port id`}.`,
+                 fix: `Write ${k} and the id of the video or sound link to wait for, as in ${k} web-1:cam:video-out.` };
+      }
+      continue;
+    }
     const range = `a whole number from ${o.lo} to ${o.hi}${o.even ? ', and even' : ''}`;
     if (typeof v !== 'number' || !Number.isInteger(v)) {
       return { why: `${k} is the ${o.says} and must be ${range}, and ${v === undefined ? 'it was given no value' : `${v} is not`}.`,
-               fix: `Write ${k} ${o.def}, which is what it is when it is left out.` };
+               fix: o.def === undefined ? `Write ${k} and ${range}, or leave it out.` : `Write ${k} ${o.def}, which is what it is when it is left out.` };
     }
     if (v < o.lo || v > o.hi) {
       return { why: `${k} ${v} is outside ${o.lo} to ${o.hi}${v > o.hi ? ', which is as much as the board will draw' : ''}.`,
@@ -101,7 +136,7 @@ export function videoStart(options = {}) {
 
 /** `w 640, h 360` in the fixed order, or `''`. Only what the link carries is
  *  printed, so a default is never written into a line that did not say it. */
-export function printOptions(options) {
-  return OPTION_NAMES.filter((k) => options && options[k] !== undefined)
+export function printOptions(options, names = OPTION_NAMES) {
+  return names.filter((k) => options && options[k] !== undefined)
     .map((k) => `${k} ${options[k]}`).join(', ');
 }
