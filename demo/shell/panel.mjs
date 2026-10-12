@@ -30,6 +30,8 @@
 // with a margin around its image reads as a photograph of a screen. The picture
 // goes edge to edge and the only inset is the footer's own text. Reported from
 // the device, and it is the same instinct that took the border off a television.
+import { font, whenFaces } from './canvas-font.mjs';
+
 const PAD = 10;                 // text inset inside the footer ONLY
 export const FOOT = 44;         // the footer strip's height at 1x
 const ROUND = 18;               // the corner radius, at 1x
@@ -57,10 +59,10 @@ function footerInto(ctx, footer, w, fy, tone) {
   footer.forEach(([k, v], i) => {
     const x = PAD + i * colW;
     ctx.fillStyle = tone.dim;
-    ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.font = font(400, 9);
     ctx.fillText(String(k).toUpperCase(), x, fy);
     ctx.fillStyle = v == null || v === '' ? tone.dim : tone.fg;
-    ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.font = font(600, 15);
     // ⚠️ NOTHING, NOT A ZERO. A missing measurement prints as ABSENT — a
     // zero reads as a very impressive measurement of nothing. It drew an em
     // dash until 2026-09-13; the label above the slot already says the slot
@@ -87,8 +89,9 @@ export function createPanelFooter({ width = 640, scale = 2 } = {}) {
   const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
   const tone = { fg: tok('--fg', '#e8edf5'), dim: tok('--dim2', '#7a879c'),
                  field: '#0b0e14', line: '#232c3a' };
-  let version = 0;
+  let version = 0, lastFooter = [];
   function draw(footer = []) {
+    lastFooter = footer;
     ctx.save();
     ctx.scale(scale, scale);
     ctx.clearRect(0, 0, width, FOOT);
@@ -100,6 +103,9 @@ export function createPanelFooter({ width = 640, scale = 2 } = {}) {
     return version;
   }
   draw([]);
+  // The face may arrive after the first draw, and a canvas keeps the fallback
+  // it was drawn in, so draw the last footer again once it is here.
+  whenFaces(() => draw(lastFooter));
   return { canvas, ctx, draw, dirty: () => version, height: FOOT };
 }
 
@@ -134,7 +140,10 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
    * @param {string} [o.state]   'live' | 'still' | a sentence saying why not
    * @param {boolean} [o.gazed]  is this the panel being looked at
    */
-  function draw({ source, footer = [], state = 'live', gazed = false } = {}) {
+  let lastArgs = null;
+  function draw(args = {}) {
+    lastArgs = args;
+    const { source, footer = [], state = 'live', gazed = false } = args;
     const W = canvas.width, H = canvas.height, s = scale;
     ctx.save();
     ctx.scale(s, s);
@@ -167,7 +176,7 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
     } else {
       // Not a frozen frame and not an empty box: words.
       ctx.fillStyle = DIM;
-      ctx.font = '500 13px ui-monospace, SFMono-Regular, Menlo, monospace';
+      ctx.font = font(400, 13);
       ctx.textBaseline = 'middle';
       ctx.fillText(typeof state === 'string' && state !== 'live' ? state : 'nothing arriving yet',
                    PAD + 2, picH / 2);
@@ -178,7 +187,7 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
     // thing a panel exists to show, and it said something that never changed —
     // the same rule as a readout cell that cannot move. What the panel IS
     // belongs in the footer beside its numbers, where it is read once.
-    ctx.font = '600 12px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.font = font(600, 12);
     ctx.textBaseline = 'top';
     if (state !== 'live') {
       const say = state === 'still' ? 'not live' : String(state);
@@ -208,5 +217,8 @@ export function createPanel({ width = 640, height = 400, title = '', scale = 2 }
 
   // A texture upload is only worth doing when the picture changed; `dirty()`
   // is what an XR render loop compares against its own last upload.
+  // A panel drawn once before the face loaded keeps the fallback, so draw
+  // the last one again when it arrives. A live panel would get there anyway.
+  whenFaces(() => { if (lastArgs) draw(lastArgs); });
   return { canvas, ctx, draw, dirty: () => version };
 }

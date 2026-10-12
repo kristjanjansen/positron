@@ -59,6 +59,25 @@
 /** §5b tratteggio: hatch is a function of the row's own declared TIER, never
  *  hand-assigned per lane. A tier-2 lane arrives hatched differently without a
  *  line of styling written for it. */
+// 🔴 THE STRIP'S TEXT IS SET IN THE SITE'S MONO, READ FROM `--mono`. A canvas
+// cannot read `var()`, and until 2026-10-12 every label here typed
+// `ui-monospace, Menlo, monospace`, so after the font switch the gutter and the
+// ticks drew the system mono beside a page set in JetBrains Mono. The token's
+// computed value is the `@font-face` family plus its fallbacks. Read once and
+// kept, because a font string is built for every lane on every frame; with no
+// document (a test in node) it is the old stack.
+// ⚠️ AND A CANVAS KEEPS THE FACE IT WAS DRAWN IN, so `createStrip` asks for the
+// face by name and draws again when it arrives (see `invalidate`).
+const MONO_STACK = 'ui-monospace, Menlo, monospace';
+let monoFace = null;
+function mono() {
+  if (monoFace) return monoFace;
+  let v = '';
+  try { v = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim(); } catch { /* no document */ }
+  if (v) monoFace = v;
+  return v || MONO_STACK;
+}
+
 export const HATCH = { 0: null, 1: [7, 4], 2: [3, 3], 3: [2, 6] };
 export const hatchFor = (tier) => HATCH[tier] || (tier > 3 ? [1, 5] : null);
 
@@ -820,7 +839,7 @@ registerRenderer('ticks', (ctx, L, C) => {
   // a page that says "12 of 48 letters fit" tells the reader the other 36 exist
   // and that zooming will find them. Silence there reads as 12 letters typed.
   if (glyphs.length) {
-    ctx.font = L.glyphFont || '10px ui-monospace, Menlo, monospace';
+    ctx.font = L.glyphFont || `10px ${mono()}`;
     ctx.textAlign = 'center';
     ctx.globalAlpha = 1;
     const yc = y0 + h / 2, pad = 2;
@@ -1128,7 +1147,7 @@ registerRenderer('spans', (ctx, L, C) => {
       // ⚠️ 11 px, NOT 10. REPORTED as not legible, and a monospace face at 10 px
       // over Finnish and Estonian titles is where it shows: the diacritics that
       // tell `ääniä` from `Ääniä` are the first thing to go.
-      ctx.font = '11px ui-monospace, Menlo, monospace';
+      ctx.font = `11px ${mono()}`;
       // TOP-LEFT. A label on the baseline of a tall bar floats in the middle of
       // nothing and drifts as the bar's height changes; anchored to the corner
       // it stays where the eye goes first and is the same distance from the
@@ -1193,7 +1212,7 @@ function drawAoristic(ctx, L, C, spans) {
   }
   if (L.aggregateLegend !== false && L.height >= 26 && C.width > 210) {
     ctx.globalAlpha = 0.8; ctx.fillStyle = '#8f9bb0';
-    ctx.font = '9px ui-monospace, Menlo, monospace';
+    ctx.font = `9px ${mono()}`;
     // Plain words on the canvas, asked 2026-10-05 (*"rething labelling"*): the
     // legend read `aoristic Σ 1/(b−a) · 1 bin/px ...`. The formula is still
     // `a.method`, published and asserted, for a reader who asks.
@@ -1940,7 +1959,7 @@ export function createStrip(canvas, deck, opts = {}) {
     }
     ctx.stroke();
     ctx.strokeStyle = T.axis; ctx.beginPath();
-    ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.fillStyle = T.dim;
+    ctx.font = `10px ${mono()}`; ctx.fillStyle = T.dim;
     labelEnd = -Infinity;
     const firstMajor = Math.ceil(t0 / major) * major;
     const nMajor = Math.floor((t1 - firstMajor) / major) + 1;
@@ -1973,7 +1992,7 @@ export function createStrip(canvas, deck, opts = {}) {
     }
     ctx.stroke();
     ctx.strokeStyle = T.axis; ctx.beginPath();
-    ctx.font = '10px ui-monospace, Menlo, monospace'; ctx.fillStyle = T.dim;
+    ctx.font = `10px ${mono()}`; ctx.fillStyle = T.dim;
     labelEnd = -Infinity;
     for (const t of majors.slice(0, MAX_TICKS)) {
       const px = Math.round(x(t)) + 0.5;
@@ -2071,7 +2090,7 @@ export function createStrip(canvas, deck, opts = {}) {
   function gutCap() {
     if (capH !== null) return capH;
     ctx.save();
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = `10px ${mono()}`;
     capH = ctx.measureText('H').actualBoundingBoxAscent || 7;
     ctx.restore();
     return capH;
@@ -2095,7 +2114,7 @@ export function createStrip(canvas, deck, opts = {}) {
    *  no lines under its name never grows. */
   function gutterNeed(L) {
     ctx.save();
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = `10px ${mono()}`;
     const n = gutterLinesOf(L).length;
     ctx.restore();
     return n ? Math.ceil(blockH(n) + 2 * GUT_AIR) : 0;
@@ -2135,7 +2154,7 @@ export function createStrip(canvas, deck, opts = {}) {
     const base = S.gutterBase;
     if (!S.lanes || !S.lanes.length) return base;
     ctx.save();
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = `10px ${mono()}`;
     let need = 0;
     for (const L of S.lanes) {
       if (!L.show) continue;
@@ -2167,7 +2186,7 @@ export function createStrip(canvas, deck, opts = {}) {
     ctx.fillStyle = T.gutter; ctx.fillRect(0, 0, S.gutterPx, S.height);
     ctx.strokeStyle = T.axis; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(S.gutterPx + 0.5, 0); ctx.lineTo(S.gutterPx + 0.5, S.height); ctx.stroke();
-    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.font = `10px ${mono()}`;
     // truncate by MEASUREMENT, not by a hardcoded character count: a lane label
     // must fit whatever gutter the client asked for.
     // ⚠️ ROOM AROUND THE LABEL. The swatch sat 4 px from the edge and the text
@@ -2280,7 +2299,7 @@ export function createStrip(canvas, deck, opts = {}) {
     // reads as a fact about the ruler beside it. See `zoomText()`.
     const zt = zoomText();
     if (zt) {
-      ctx.font = '9px ui-monospace, Menlo, monospace';
+      ctx.font = `9px ${mono()}`;
       const w = ctx.measureText(zt).width;
       if (w <= S.gutterPx - SWATCH_X - GUT_PAD) {
         ctx.globalAlpha = 0.75;
@@ -2438,7 +2457,7 @@ export function createStrip(canvas, deck, opts = {}) {
         // the same number twice, one of them floating over the axis, is one
         // more thing to reconcile rather than one more thing known.
         if (gap > 34 && opts.wallLabel !== false) {
-          ctx.font = '9px ui-monospace, Menlo, monospace';
+          ctx.font = `9px ${mono()}`;
           const lbl = `${((wp - S.pos) / 1000).toFixed(2)} s`;
           const w = ctx.measureText(lbl).width + 6;
           const lx = Math.min(Math.max(0, Math.min(px, wx) + gap / 2 - w / 2), Math.max(0, S.width - S.gutterPx - w));
@@ -2655,7 +2674,7 @@ export function createStrip(canvas, deck, opts = {}) {
     const h = S.hover;
     if (!h || !h.text) return;
     g.save();
-    g.font = '10px ui-monospace, Menlo, monospace';
+    g.font = `10px ${mono()}`;
     // A line may be a plain string or {text, colour}. A coloured line gets the
     // same swatch its lane's marks carry, which is the join between a number in
     // here and the ink out there — the lane-stats table earns its readability
@@ -2747,6 +2766,11 @@ export function createStrip(canvas, deck, opts = {}) {
   }
 
   function invalidate() { S.dirty = true; S.spanCache.clear(); }
+  // The face may land after the first frame; the gutter's cap height is
+  // measured once from it, so both are taken again when it does.
+  try {
+    document.fonts?.load?.(`400 10px ${mono()}`).catch(() => {}).then(() => { capH = null; invalidate(); });
+  } catch { /* no document */ }
 
   // -- interactions ----------------------------------------------------------
   const seek = (p) => (opts.onSeek ? opts.onSeek(p) : deck.seek && deck.seek(p));
