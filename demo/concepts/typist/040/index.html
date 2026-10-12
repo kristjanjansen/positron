@@ -17,7 +17,12 @@
      typewriter through its own fx box (`../020/fx.mjs`, Machine k for paper
      k, at the default distinctness), all into one speaker. Not wired to
      other people (that is 040). Nothing is fetched and nothing sounds until
-     the first press of play or of a key. */
+     the first press of play or of a key.
+     2026-10-12: *"add timeline with typing score. mov play to transport.
+     dim lanes in timeline that are not active (depends num of typist)"*. The
+     typists' seeded walk is a score now, one lane per typist under the
+     frame, played by the transport bar, and the lanes beyond the count are
+     dimmed with the strip's `setActive`. */
 
   /* ── the frame and the papers ─────────────────────────────────────────
      `createChatGrid` in demo/shell/chat-ui.mjs, which was lifted from this
@@ -29,7 +34,11 @@
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
-  import { mount } from '/shell/shell.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { makeLogDeck } from '/timeline/logdeck.mjs';
   import { createChatGrid } from '/shell/chat-ui.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -259,17 +268,23 @@
       bay.send(`${P(k, 'keys')}:value-out`, { text: e.data || '', kind: e.inputType, by: 'person' }) });
   }
 
-  // THE TYPISTS. Each walks its text one character at a time at a human pace:
-  // a base gap of its own (seeded, so the six never fall into step), jittered,
-  // longer after a space, longer still after punctuation and at a line's end,
-  // and now and then a hesitation. At the end of the text it waits, returns
-  // the carriage and starts on a fresh sheet. A paper a person is typing into
-  // holds its typist until it loses focus. One timer for all of them.
+  // THE SCORE. Each typist walks its text one character at a time at a human
+  // pace: a base gap of its own (seeded, so the six never fall into step),
+  // jittered, longer after a space, longer still after punctuation and at a
+  // line's end, and now and then a hesitation. That walk used to run live off
+  // a timer; it is worked out once here instead, so every key of every typist
+  // has a place on the line (asked 2026-10-12: *"add timeline with typing
+  // score. mov play to transport"*), and the transport plays it, seeks it and
+  // loops it. Same seeds, same gaps, so it is the same typing as before, once
+  // through each sheet.
+  const KIND = 'key';
+  const LEAD_MS = 250;            // position 0 sits this far before the first key
+  const TAIL_MS = 1200;           // and the end this far after the last
   const typists = [];
   const rnd = (seed) => { let s = seed >>> 0; return () => { s = (Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) + 0x6d2b79f5) >>> 0; return s / 2 ** 32; }; };
   for (let k = 1; k <= MAX; k++) {
     const r = rnd(k * 7919);
-    typists[k] = { r, base: 95 + r() * 60, i: 0, due: 0, wait: false, typed: 0 };
+    typists[k] = { r, base: 95 + r() * 60, typed: 0 };
   }
   const textOf = (k) => TEXTS[k - 1];
   function gap(t, ch, pace, prev) {
@@ -284,38 +299,63 @@
     if (t.r() < 0.03) ms += 250 + t.r() * 400;
     return ms * pace;
   }
-  let playing = false, timer = 0;
-  const typing = { chars: 0, since: 0 };
-  function tick() {
-    const now = performance.now();
-    for (let k = 1; k <= count; k++) {
-      const t = typists[k], p = papers[k], { text, pace = 1 } = textOf(k);
-      if (now < t.due || p.focused()) continue;
-      if (t.i >= text.length) {
-        // the end of the sheet: a carriage return, then a fresh one
-        if (!t.wait) { t.wait = true; t.due = now + 2400; continue; }
-        p.clear();
-        bay.send(`${P(k, 'keys')}:value-out`, { text: '', kind: 'insertLineBreak', by: 'clear' });
-        t.i = 0; t.wait = false; t.due = now + 900;
-        continue;
-      }
-      const prev = text[t.i - 1], ch = text[t.i++];
+  // Every key, in the order it is typed: `at` is its place on the line in ms.
+  // Starts are staggered by 140 ms a typist so the first letters do not land
+  // together, as they were when the timer ran them.
+  const score = [];
+  for (let k = 1; k <= MAX; k++) {
+    const t = typists[k], { text, pace = 1 } = textOf(k);
+    let at = LEAD_MS + (k - 1) * 140;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
       const kind = ch === BS ? 'deleteContentBackward' : ch === '\n' ? 'insertLineBreak' : 'insertText';
-      bay.send(`${P(k, 'keys')}:value-out`, { text: ch === BS ? '' : ch, kind, by: 'typist' });
-      t.typed++; typing.chars++;
-      t.due = now + gap(t, ch, pace, prev);
+      score.push({ at: Math.round(at), kind: KIND, id: `t${k}-${i}`, payload: { k, ch: ch === BS ? '' : ch, op: kind } });
+      at += gap(t, ch, pace, text[i - 1]);
     }
   }
-  function startTyping() {
-    if (playing) return;
-    playing = true;
-    const now = performance.now();
-    // staggered starts, so the first letters do not land together
-    for (let k = 1; k <= MAX; k++) typists[k].due = Math.max(typists[k].due, now + (k - 1) * 140);
-    typing.since ||= now;
-    timer = setInterval(tick, 12);
+  score.sort((a, b) => a.at - b.at);
+  const END = score.reduce((m, it) => Math.max(m, it.at), 0) + TAIL_MS;
+
+  /** What paper k says at a place on the line: its keys up to there, folded. */
+  function sheetAt(k, pos) {
+    let s = '';
+    for (const it of score) {
+      if (it.at > pos) break;
+      if (it.payload.k !== k) continue;
+      s = it.payload.op === 'deleteContentBackward' ? s.slice(0, -1) : s + it.payload.ch;
+    }
+    return s;
   }
-  function stopTyping() { playing = false; clearInterval(timer); }
+  /** Put every shown paper at the line's position, in one go (a seek, a loop's
+   *  wrap, a paper added mid play). A paper somebody is typing into is left. */
+  function foldAt(pos) {
+    for (let k = 1; k <= count; k++) {
+      const p = papers[k];
+      if (p.focused()) continue;
+      const want = sheetAt(k, pos);
+      if (p.text !== want) { p.clear(); if (want) p.type(want); }
+    }
+  }
+
+  const typing = { chars: 0, since: 0 };
+  // The deck's side of the score: a key that fires is sent from typist k's
+  // `keys` port, so it reaches paper k and typewriter k along the links the
+  // bay holds, exactly as the live typist's did. A typist beyond the count
+  // holds no links and sends nothing, and its lane is dimmed.
+  const adapter = {
+    caps: { discrete: true, continuous: false, interpolate: false, stateful: true,
+            seek: true, rate: true, catchUp: 'reduce', assertOnSeek: true, rates: [1] },
+    actuate(p) {
+      const k = p.k;
+      if (k > count || papers[k].focused()) return;
+      bay.send(`${P(k, 'keys')}:value-out`, { text: p.ch, kind: p.op, by: 'typist' });
+      typists[k].typed++; typing.chars++;
+      typing.since ||= performance.now();
+    },
+    reduce(payloads, pos) { return { pos }; },
+    assertState(st) { foldAt(st.pos); },
+  };
+  const deck = makeLogDeck({ lanes: [{ kind: KIND, rows: [], adapter }], items: score, leadInMs: LEAD_MS, tailMs: TAIL_MS, range: [0, END] });
 
   // ── the frame ────────────────────────────────────────────────────────────
   // The papers are the cells of the kit's chat grid, which places the first
@@ -323,29 +363,16 @@
   let frame = null;
   const layout = () => frame?.set(count);
 
-  // Play and pause. The first press is the gesture: it makes the AudioContext,
-  // fetches the samples, and the typists start once they are decoded, so the
-  // first letter sounds. Muted, nothing is fetched and the typists just type.
-  const play = createIconButton({ icon: 'play', label: 'play, the typists start typing', pressed: false, onPress: async () => {
-    if (playing) { stopTyping(); show(); return; }
-    if (!muted && !ctx) { play.el.dataset.busy = ''; await wake(); delete play.el.dataset.busy; }
-    else if (ctx?.state === 'suspended') ctx.resume();
-    startTyping(); show();
-  } });
-  const show = () => {
-    play.pressed(playing);
-    play.set(playing ? 'pause' : 'play', playing ? 'pause the typists' : 'play, the typists start typing');
-  };
   const mute = createIconButton({ icon: 'volume', label: 'mute the typewriters', pressed: false, onPress: () => {
     muted = !muted;
     mute.pressed(muted);
     mute.set(muted ? 'mute' : 'volume', muted ? 'unmute the typewriters' : 'mute the typewriters');
     for (let k = 1; k <= MAX; k++) if (tw[k].out) tw[k].out.gain.value = muted ? 0 : 1;
     // an unmute while the typists run is a gesture too: wake the sound then
-    if (!muted && playing && !ctx) wake();
+    if (!muted && deck.playing() && !ctx) wake();
   } });
   const left = document.createDocumentFragment();
-  left.append(play.el, mute.el);
+  left.append(mute.el);
 
   const NAMES = Array.from({ length: MAX }, (_, i) => `${i + 1} ${i ? 'typists' : 'typist'}`);
   const setCount = (n) => {
@@ -353,6 +380,10 @@
     step.show(NAMES[count - 1], count - 1);
     layout(); patch();
     if (ctx) for (let k = 1; k <= count; k++) fxOf(k);
+    // the lanes of typists beyond the count are dimmed, and a paper that has
+    // just come in is put where the line is rather than starting blank
+    activeLanes();
+    foldAt(deck.position());
   };
   const step = createStepper({ what: 'typists', prev: () => setCount(count - 1), next: () => setCount(count + 1),
     pick: { options: NAMES, at: count - 1, onPick: (i) => setCount(i + 1) } });
@@ -388,14 +419,75 @@
     return [{ text: m ? nameOf(tw[+m[1]].fxIndex) : n.label, sans: true }];
   }, flowing });
 
-  d.stack.add(panel.el, pb.el);
+  // ── the line: one lane per typist, the letter as the mark ──────────────
+  // /typist/'s way of drawing a recording, over a score instead: a letter or
+  // a digit is drawn as itself, a key with no shape (a space, a line break)
+  // gets the strip's dot, and a backspace is a dot in /typist/'s "taken back"
+  // red, so typist 2's rubbing out reads as red along its row.
+  const css = getComputedStyle(document.documentElement);
+  const tok = (n, fb) => (css.getPropertyValue(n) || '').trim() || fb;
+  const INK = { in: tok('--hi', '#ffd400'), out: tok('--bad', '#e0908a') };
+  const SAY = { ' ': 'a space', '\n': 'a new line' };
+  const lanes = Array.from({ length: MAX }, (_, i) => {
+    const k = i + 1;
+    return {
+      id: `typist-${k}`, kind: KIND, label: `typist ${k}`, as: 'ticks', terse: true,
+      color: INK.in, marks: 'char',
+      filter: (r) => r.payload?.k === k,
+      colorOfRow: (r) => (r.payload?.op === 'deleteContentBackward' ? INK.out : null),
+      glyphOf: (r) => (/[\p{L}\p{N}]/u.test(r.payload?.ch || '') ? r.payload.ch : ''),
+      describeRow: (r) => {
+        const p = r.payload;
+        return [p.op === 'deleteContentBackward' ? 'rubbed out' : SAY[p.ch] || JSON.stringify(p.ch), `typist ${k}`];
+      },
+    };
+  });
+  // Per lane, what that typist's sheet holds: letters in and letters taken
+  // back, counted off the score, so the gutter says what the lane will play.
+  for (const L of lanes) {
+    const k = +L.id.split('-')[1];
+    const mine = score.filter((it) => it.payload.k === k);
+    const out = mine.filter((it) => it.payload.op === 'deleteContentBackward').length;
+    L.subLabel = [`${mine.length - out} in, ${out} out`];
+  }
+  const glue = el('div');
+  // The first press of play is the gesture that wakes the typewriters: the
+  // AudioContext is made and the samples fetched then, and the line starts
+  // once they are decoded so the first key sounds. Muted, nothing is fetched.
+  const bar = createTransportBar(glue, deck, { scrub: false, command: {
+    play: () => {
+      if (muted || ready) return deck.play();
+      bar.el.dataset.busy = '1';
+      return wake().then(() => { delete bar.el.dataset.busy; deck.play(); });
+    },
+  } });
+  const strip = createStripView(glue, deck, { size: 'auto', follow: true, gutter: 132, lanes });
+  // The whole score in view, as /typist/ fits its line to the recording.
+  // ⚠️ NOT AT BUILD TIME: the canvas has no width until it is on the page, and
+  // a fit then MEASURED 168 px of plot and left the 38.6 s score in the first
+  // third of a 554 px line. So it fits when the strip's width is known and
+  // again whenever that width changes.
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = strip.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; strip.strip.fit(); }
+  }).observe(strip.el);
+  const surface = createGlue(bar.el, strip.surface);
+  const activeLanes = () => strip.strip.setActive(lanes.slice(0, count).map((L) => L.id));
+  activeLanes();
+
+  d.stack.add(panel.el, surface, pb.el);
   layout();
   patch();
 
   // Read only, for a check over CDP.
   window.__demo.multi = {
     get count() { return count; },
-    get playing() { return playing; },
+    get playing() { return deck.playing(); },
+    get position() { return deck.position(); },
+    get end() { return deck.range[1]; },
+    get keys() { return score.length; },
+    get active() { return strip.strip.active(); },
     get state() { return ctx?.state || 'none'; },
     get samples() { return { ...samples.stat, files: FILES.length }; },
     get papers() {

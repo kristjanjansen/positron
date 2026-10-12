@@ -624,6 +624,10 @@
       // 42/38/38 against a looser spacing, and 33 px before the name was given
       // its own step away from the numbers. `strip.gutterFit()` answers this by
       // measurement now, so nobody has to do the sum again to find out.
+      // ⚠️ SINCE 2026-10-12 36 IS A FLOOR THE STRIP RAISES: an `auto` strip
+      // makes each lane its description plus 8 px of air above and below
+      // (*"add more vertical spacing to lane descriptions"*), so these draw at
+      // 47 and the arithmetic above is what fits a fixed-height strip.
       lanes: [laneOf(OP_INSERT, 'typed', 36),
               laneOf(OP_DELETE, 'taken back', 36),
               laneOf(OP_SELECT, 'cursor', 36)],

@@ -238,7 +238,9 @@
   const bar = createTransportBar(glue, deck, { scrub: false, loop: false });
   const view = createStripView(glue, deck, {
     size: 'auto', follow: false, gutter: 132,
-    // 36 each: the gutter's name and two numbers need 34 px (see /typist/)
+    // 36 asked; an auto strip raises a lane to its description plus 8 px of
+    // air above and below (timeline/strip.mjs `gutterNeed`), so the two with
+    // two numbers draw at 47 and the cursor lane stays 36
     lanes: [laneOf(OP_INSERT, 'typed', 36), laneOf(OP_DELETE, 'taken back', 36), laneOf(OP_SELECT, 'cursor', 36)],
   });
   const surface = createGlue(bar.el, view.surface);
