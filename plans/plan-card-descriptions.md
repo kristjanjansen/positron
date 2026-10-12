@@ -221,3 +221,122 @@ Drafted for the two clock pages archived the same afternoon (07e0a6ac), kept in 
 - `demo/concepts/video/030/index.html:45`, `:58`, `:81` point at /concepts/room/030/, removed 2026-10-12.
 - room/004 fetches the store's history on load, which the owner asked for, against the open-nothing-on-a-visit rule.
 - Titles: none wrong. Suggested only: synth/040 `Synth` is generic beside eleven synths (`Synth in steps`), synth/030 `Dot piano` draws rings.
+
+## Cut to 100 characters (2026-10-12, afternoon)
+
+Asked on a crop of the WebRTC loopback card, five lines at 214 characters:
+*"too long. make a rule to skill"* (BACKLOG, "Card descriptions too long"). The
+rule is at the top of `.claude/skills/positron-describe/SKILL.md`, and
+`node demo/concepts/list-test.mjs` enforces it: at most 100 characters, no em
+dash, middot, semicolon or backtick.
+
+**Why 100.** MEASURED with `demo/shot.mjs` on /concepts/: the card text column
+is 312 px at 1280 and 317 px at 375, at 13.5 px, and three 99 to 101 character
+sentences set 3 lines at 1280 and 2 or 3 at 375, on all three card kinds.
+
+**The test before and after.** Against the committed `list.mjs` (HEAD
+a67e7e33): 83 cards, **81 failing**, median 136, longest 248. Of those, 67 were
+over 100, partitur and weight failed on a semicolon only, and **23 demo cards
+carried this file's evidence column instead of their text** (`fau/index.html:356`
+on the fau card, *"owner draft corrected, see above"* on reel, partitur and
+weight). That was a column applied by mistake in 593becda and was live on the
+index; the backtick check is in the test because of it. Without the backtick
+check the same file fails 69. After: 82 cards (device/000 Pico router left for
+/archive/ the same afternoon), **0 failing**, median 97, longest 100.
+
+**How each was cut.** From the verified text in the tables above and its
+evidence column, never fresh: one fact that sets the card apart from its
+neighbour, the second sentence kept only where both fit. No claim was added.
+Qualifiers that keep a claim true stayed (reel keeps *"where it survives"*).
+What went is mostly the second sentence: the patch name read back (synth/070),
+the simulated Pi fallback (synth/100, shader/010, rhythm/030), Autoplay
+(radio/040), the Join button (clock/030), partitur's wall, weight's turning
+round. Each is still true and is on the page.
+
+Every changed card, the committed text with its length, then the new one. A
+card that carried the evidence column is cut from the verified text in the
+section for its group above.
+
+| card | before | after |
+| --- | --- | --- |
+| synth/000 | Play a simple sine synthesizer from the on-screen keys or from a MIDI keyboard plugged into this computer. (106) | Play a sine synthesizer from the on-screen keys or a MIDI keyboard plugged into this computer. (94) |
+| synth/010 | Record what you play on the keys and play it back. Every note lands in a table with its time, velocity and length. (114) | Record what you play and play it back, every note in a table with its time, velocity and length. (96) |
+| synth/020 | The same recorder drawn on a timeline, so a take shows as notes in time and plays back from its start. (102) | The same recorder drawn on a timeline, so a take shows as notes in time and plays from its start. (97) |
+| synth/030 | Every note draws an arc on its own ring as the picture turns. The same rings are drawn twice, by a shader in this tab and by C firmware on an emulated Pico screen. (163) | Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico. (96) |
+| synth/040 | A synthesizer built up one module at a time, from a bare sine to a filter, an envelope and an LFO. Step through it and hear what each new module and its knobs change. (166) | A synth built one module at a time, from a bare sine to a filter, an envelope and an LFO. (89) |
+| synth/060 | Play Yoshimi running on a Raspberry Pi in another building, with filter cutoff and resonance on two knobs. Its sound comes back over the relay, and the time from key to sound is read out. (187) | Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here. (97) |
+| synth/070 | Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches. The patch name is read back from the instrument. (142) | Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches. (93) |
+| synth/080 | A synth voice written in Faust, compiled in this tab on the first key and played from the keyboard. Each of its ten parameters is a knob. (137) | A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters. (99) |
+| synth/090 | Play a small SuperCollider program from the keyboard and turn its two knobs, bright and decay. Edit the code and it recompiles when you stop typing. (148) | Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing. (100) |
+| synth/100 | Play one SuperCollider program in this tab and on the Raspberry Pi at once, and crossfade between the two sounds. When no board answers, a copy in this tab stands in for the Pi. (177) | Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two. (96) |
+| synth/110 | Emilie Gillet's Plaits plays one looping four note line, and a patch picker changes only the sound. Timbre and morph are two knobs. (131) | Emilie Gillet's Plaits plays one looping four note line, and a patch picker changes only the sound. (99) |
+| synth/120 | Play the same Plaits voice from the keys or a MIDI keyboard, with all ten of its controls on one scrolling row of knobs. (120) | The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs. (94) |
+| draw/000 | Press play for a held note and drag across the pad. Left to right opens the filter and bottom to top raises its resonance. (122) | Drag the pad over a held note. Left to right opens the filter, bottom to top raises its resonance. (98) |
+| radio/000 | Listen to Vikerraadio and Ida Radio Tallinn live and move a crossfader to blend between them. Each station draws its own wave as it plays. (138) | Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader. (88) |
+| radio/010 | Turn one dial across four live stations, as on an old AM set. Between stations you hear noise and a whistle, and the neighbours bleed in faintly. (145) | Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between. (98) |
+| radio/020 | Find the tempo of short recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears drawn over the wave. A mix knob thins the music under a click on those beats. (167) | Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave. (96) |
+| radio/030 | The same tempo detector on Raadio 2, Raadio 4 or Ida as they broadcast, one station at a time through our relay. (112) | The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay. (99) |
+| radio/040 | Hear a live station and see the key a detector finds in it, lit on a keyboard. Play along on the keys, or let Autoplay play chords in that key. (143) | Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it. (96) |
+| video/000 | Turn on your camera and see it on the page. The picture shows only while the patchbay holds the link from camera to screen. (123) | Turn on your camera and see it on the page while the patchbay holds the link from camera to screen. (99) |
+| video/010 | Your camera beside the same picture through a two tone dither shader. One knob sets how coarse the dither is. (109) | Your camera beside itself through a two tone dither shader, with one knob for how coarse it is. (95) |
+| video/020 | Record up to ten seconds of your camera and play it back on a timeline. The take stays in this browser, even after a reload. (124) | Record up to ten seconds of your camera and play it back on a timeline, kept in this browser. (93) |
+| video/030 | Send your camera to Cloudflare Stream over WebRTC and watch it come back beside the original for twenty seconds. The two pictures show the delay by eye, and the footer reads the return connection's round trip time. (214) | Watch your camera return from Cloudflare Stream over WebRTC beside the original and see the delay. (98) |
+| video/040 | ETV and ETV2 live, each in its own picture, crossfaded into one blend shown plain and through a dither. (103) | ETV and ETV2 live, each in its own picture, crossfaded into a blend shown plain and dithered. (93) |
+| shader/000 | The kaleidoscope from /mirror/ with one knob left, the number of mirrors. Its shader code is on the page and recompiles as you edit it. (135) | The kaleidoscope from /mirror/ with one knob for its mirrors, and code that recompiles as you edit. (99) |
+| shader/010 | The same kaleidoscope drawn in this tab and on the Raspberry Pi, with each knob turn and code edit timed to the first frame that shows it. When the Pi does not answer, the page simulates it and says so. (202) | The same kaleidoscope in this tab and on the Raspberry Pi, each change timed to its first frame. (96) |
+| room/000 | A chat built from nothing but patchbay links. Join from two tabs and every line you type crosses the room along a link you can see. (131) | A chat built from nothing but patchbay links, every line crossing the room along a link you can see. (100) |
+| room/002 | The same chat in a proper chat window, with the patchbay still doing the wiring underneath. Open it in two tabs to talk between them. (133) | The same chat in a proper chat window, with the patchbay still doing the wiring underneath. (91) |
+| room/003 | Whoever joins the room first becomes its admin and broadcasts to everyone in a column of their own. Everyone else reads the broadcast and chats beside it. (154) | Whoever joins first is admin and broadcasts in a column of their own while the rest chat beside. (96) |
+| room/004 | The broadcast chat with a memory. Before you join, the room's last fifty lines play back on a timeline at the pace they were written, and joining carries on live. (162) | The broadcast chat with a memory: until you join, the room's last fifty lines replay at their pace. (99) |
+| typist/010 | The same paper, now sounding like a typewriter. Every key, space and return plays a recording of a Hermes Precisa 305, and the bell rings near the end of a line. (161) | The same paper, now sounding like a Hermes Precisa 305 typewriter, bell and all. (80) |
+| typist/020 | The typewriter's sound runs through an effects box where a number picks the machine. Every number gives a different typewriter, and a knob sets how far apart they sound. (169) | The typewriter through an effects box where every number gives a different machine. (83) |
+| typist/030 | Everything you type, deletions included, is kept on a timeline. Play it back and the page writes itself again from the first key to the last, typewriter sounds and all. (168) | Everything you type, deletions included, is kept and played back as the page writes itself again. (97) |
+| typist/040 | Up to six papers typed at once from a written score, each through a typewriter of its own. Press play to hear them fill, or type into any paper yourself. (153) | Up to six papers typed at once from a written score, each through a typewriter of its own. (90) |
+| sampler/000 | A grand piano and a Rhodes played on SuperCollider in this tab, from the keys or a MIDI keyboard. The sustain pedal records a loop, overdubs it and clears it, with no tempo and no grid. (185) | A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid. (99) |
+| sampler/030 | The same piano and Rhodes played by the Raspberry Pi in another building. Switch between the relay and a direct connection and compare the time from key to sound. (162) | The same piano and Rhodes played by the Pi in another building, over the relay or a direct link. (96) |
+| rhythm/000 | Program a 16 step pattern for four drums made in SuperCollider: kick, snare and two hats. Each drum hangs on a wire of its own in the patchbay, and taking a wire away silences that drum. (186) | Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away. (95) |
+| rhythm/010 | The same drum machine with a knob and a scope for each drum. Turn the kick's pitch, the snare's snap, the open hat's length or the closed hat's brightness and hear it from the next hit. (185) | The same drum machine with a knob and a scope for each drum, heard from the next hit. (85) |
+| rhythm/020 | The drum machine playing samples, starting from a default kit. Drop a Circuit pack or your own WAVs on the page to replace it, and set pitch and length for each row. (165) | The drum machine playing samples from a default kit, or from a Circuit pack or WAVs you drop on it. (99) |
+| rhythm/030 | Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade between the two. When the board does not answer, the Pi side is simulated in this tab. (178) | Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade the two. (100) |
+| rhythm/050 | Point your camera and the picture becomes the drum pattern, cut into 16 by 9 squares with one drum for each of the nine rows. Brighter areas play busier, and 2x doubles it to 32 by 18 squares and eighteen drums. (211) | Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier. (100) |
+| clock/000 | One rhythm played twice at two pitches, by a JavaScript timer that wakes up to play and by the sound card told each note's time in advance. Make the page busy and the timer's notes land tens of milliseconds late while the sound card's stay on time. (248) | A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late. (99) |
+| clock/010 | Play a synth through our relay and see how long each note took to arrive. The keys and the synth are two places in this tab, so one clock times the whole trip. (159) | Play a synth through our relay and see how long each note took to arrive, timed on one clock. (93) |
+| clock/020 | A test tone crosses the relay in 20 ms pieces and waits in a cushion before it plays. Set the cushion between 20 and 300 ms and hear the trade between delay and dropouts. (170) | A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts. (100) |
+| clock/030 | Two places in this tab, one with its clock set wrong on purpose, agree the time once over the relay and then play one beat with nothing sent per beat. Press Join while it runs and a third place comes in on the beat. (215) | Two places in this tab, one clock set wrong on purpose, agree the time once and then share one beat. (100) |
+| fau | (evidence column by mistake: 86; cut from the verified text above) | A synth you write in Faust, compiled in this tab whenever you stop typing. (74) |
+| collide | (evidence column by mistake: 24; cut from the verified text above) | A synth you write in a small subset of SuperCollider, compiled in this tab whenever you stop typing. (100) |
+| muta | (evidence column by mistake: 68; cut from the verified text above) | Emilie Gillet's Plaits firmware compiled unmodified to WebAssembly, eight voices played over MIDI. (98) |
+| mirror | A kaleidoscope drawn by this browser and by a Raspberry Pi side by side. Step through its looks, or hang both pictures in a headset. (132) | A kaleidoscope drawn by this browser and by a Raspberry Pi side by side, or hung in a headset. (94) |
+| llhls | (evidence column by mistake: 72; cut from the verified text above) | A live test picture over low latency HLS, counting how far behind it plays, its stalls and switches. (100) |
+| webrtc | (evidence column by mistake: 87; cut from the verified text above) | The same live test picture delivered over WebRTC by WHEP, with the network ping and route shown. (96) |
+| moq | (evidence column by mistake: 62; cut from the verified text above) | A test picture sent to Cloudflare's MoQ relay and back, its glass to glass delay read off a clock. (98) |
+| cam | (evidence column by mistake: 58; cut from the verified text above) | Your webcam beside what comes back over WebRTC, MoQ and LL-HLS, each with its glass to glass delay. (99) |
+| flipper | (evidence column by mistake: 100; cut from the verified text above) | ETV and ETV2 live over a line of clock time ending now, to go back along, loop or return to live. (97) |
+| capture | (evidence column by mistake: 114; cut from the verified text above) | Four ways of keeping what came over a link, from takes recorded end to end to what a receiver got. (98) |
+| circuit | A Novation Circuit drawn on screen that follows the real one when it is plugged into this computer. The page only listens, and nothing is sent back. (148) | A Novation Circuit on screen that follows the real one plugged in here, and sends nothing back. (95) |
+| evo | An Evolution MK-425C keyboard controller drawn control for control. Plug one in and every key, knob and slider you touch lights up here. (136) | An Evolution MK-425C drawn control for control, lighting up as you touch the real one plugged in. (97) |
+| twelve | A TASCAM Model 12 mixer drawn with only the controls it sends as MIDI in DAW control mode. Plug one in and its faders, pans and transport move with the real ones. (162) | A TASCAM Model 12 drawn with only its MIDI controls, moving with the real one when it is plugged in. (100) |
+| dump | Listen to any MIDI instrument plugged into this computer and see every message it sends, as raw bytes beside a plain reading. Clock ticks are counted instead of filling the list. (178) | Every message a MIDI instrument plugged in here sends, as raw bytes beside a plain reading. (91) |
+| pack | Drop in a Novation Circuit pack or a zip of WAVs to look inside its patches, sessions and samples. The file is read in this browser and a sample plays when you press it. (169) | Look inside a Novation Circuit pack or a zip of WAVs you drop in: its patches, sessions and samples. (100) |
+| wire | A message shown as the exact bytes it becomes on its way out and back. A second tab plays notes into another browser and shows how late each one lands. (151) | A message as the exact bytes it becomes, and notes played into a second tab, each timed on landing. (99) |
+| patchbay | Write a link between two ports, say from a keyboard to the Pi's Circuit, and the patchbay checks it before it opens. A link that cannot work is refused with the reason, on an example desk or on the studio's live one. (216) | Write a link between two ports and the patchbay checks it, and says why when one cannot work. (93) |
+| nola | A piano and a 1977 Rhodes played from one keyboard, over a roll of chords you type in or teach it by playing. (109) | A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing. (92) |
+| tom | Drop a Circuit pack or a set of samples on the page and its sounds become the rows of a 16 step grid. (101) | Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid. (89) |
+| time | The clock every page here runs on, shown in five tabs: scheduling, outputs, loops, a score and dates two thousand years long. (125) | The clock every page here runs on, in five tabs from scheduling to dates two thousand years long. (97) |
+| sync | Four ways two places agree on when something happens: on arrival, on a shared clock, by following a late video, and lined up afterwards on a recording. (151) | Four ways two places agree when something happens, from on arrival to lined up after on a recording. (100) |
+| draw | Draw a line with a finger or a mouse and play it back from a recording. Fewer samples and less smoothing show how much of the gesture the playback has to guess. (160) | Draw a line and play it back from a recording, to see how much of the gesture playback has to guess. (100) |
+| reel | (evidence column by mistake: 50; cut from the verified text above) | A year of ERR's AK filmikroonika, each silent film played with that day's radio where it survives. (98) |
+| floor | (evidence column by mistake: 119; cut from the verified text above) | ERR's 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset. (98) |
+| resources | (evidence column by mistake: 108; cut from the verified text above) | Every source for Erkki Kurenniemi's work that could be reached, with its date, holder and licence. (98) |
+| tapes | (evidence column by mistake: 102; cut from the verified text above) | Every Erkki Kurenniemi recording that still plays, end to end, each block as long as its recording. (99) |
+| making | (evidence column by mistake: 125; cut from the verified text above) | What survives of MIMproject without its website: 26 videos from 2008 to 2018 and recovered pictures. (100) |
+| partitur | (evidence column by mistake: 68; cut from the verified text above) | László Moholy-Nagy's 1924 score sketch for a mechanical variety act, played as a timeline. (90) |
+| held | (evidence column by mistake: 170; cut from the verified text above) | Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes. (98) |
+| stage | (evidence column by mistake: 132; cut from the verified text above) | A church scene from MIMproject's 2011 MIM goes Sustainable, run live from a control room. (89) |
+| weight | (evidence column by mistake: 79; cut from the verified text above) | One sentence, "If these walls could talk", round four walls, each word as big as it is short. (93) |
+| radio | (evidence column by mistake: 143; cut from the verified text above) | Eight live radio stations from Tallinn and Helsinki, broken into grains by hand or by sliders. (94) |
+| videoradio | (evidence column by mistake: 31; cut from the verified text above) | A live radio station playing itself through a granulator, looping a few seconds of what is on air. (98) |
+| knobs | (evidence column by mistake: 55; cut from the verified text above) | Yoshimi on a Raspberry Pi in another building, played from the keys here and heard over the relay. (98) |
+| away | (evidence column by mistake: 31; cut from the verified text above) | A Novation Circuit on a desk in another building, played from this page and heard back through a Pi. (100) |
+| shape | (evidence column by mistake: 60; cut from the verified text above) | Edit a Novation Circuit's sound as it plays, plugged in here or on a Pi in another building. (92) |
+| wish | (evidence column by mistake: 120; cut from the verified text above) | Say or type which instrument plays which, and a language model on Cloudflare makes the connection. (98) |

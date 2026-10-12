@@ -682,7 +682,7 @@ git commit -F msg.txt -- demo/making/index.html      # only these paths, whateve
 - 🔴 **CARD DESCRIPTIONS MAY BE TWO SHORT SENTENCES SINCE 2026-10-12.** The
   owner's editorial brief that day (before and after rewrites for every group)
   uses two, and supersedes the one sentence rule below for card `say` lines:
-  a second sentence only when it carries a second fact the reader needs. How to
+  two short sentences within 100 characters, see `positron-describe`. How to
   decide, and how to verify every claim against the page first, is the
   `positron-describe` skill. The rest of the rule below (no colon, semicolon or
   dash buying a clause, no history, no justification) still holds.

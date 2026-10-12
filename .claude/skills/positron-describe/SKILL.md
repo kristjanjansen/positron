@@ -19,6 +19,55 @@ This skill is the editorial half. The furniture rules (no jargon, a number in a
 readout cell not a sentence, a tooltip is two lines) are `positron-ui`; the
 plain voice and the anti-slop pass are `positron-slides`. Load them too.
 
+## A card is at most 100 characters
+
+🔴 **A CARD DESCRIPTION IS AT MOST 100 CHARACTERS, COUNTED, AND
+`node demo/concepts/list-test.mjs` FAILS THE FILE WHEN ONE IS NOT.** Asked
+2026-10-12 on a crop of the WebRTC loopback card, five lines long at 214
+characters: *"too long. make a rule to skill"*. That afternoon 83 cards had a
+median of 136 characters, the longest 248, and 67 were over 100.
+
+- **Why 100: it is about three lines on a card at both widths.** MEASURED
+  2026-10-12 on /concepts/ with `demo/shot.mjs`, the `.cc-s` line at 13.5 px in
+  a text column of 312 px at 1280 and 317 px at 375: three different 99 to 101
+  character sentences set 3 lines at 1280 and 2 or 3 at 375, on a concept, a
+  demo and a use case card alike. 214 characters set 5. Cards keep one size,
+  so three lines is what fits without the box growing.
+- **One sentence by default.** A second only when both fit inside the 100, and
+  only when it carries the second fact a reader needs to choose.
+- **Cut by choosing, not by squeezing.** Find the one fact that makes this card
+  different from its neighbour and keep that. Never abbreviate, never drop
+  articles to fit (*"filter, env, LFO"*), never swap a word for a symbol. A
+  sentence that only fits telegraphically is carrying two facts; drop one.
+- **Shortening must not introduce a claim.** Cut from the verified text and its
+  evidence (below, and `plans/plan-card-descriptions.md`), never write fresh.
+  Dropping a qualifier can make a claim false: *"with that day's radio"*
+  without *"where it survives"* says every film has sound, so the condition
+  stays and something else goes.
+- **Archives and performances keep the subject and the proposition first**, and
+  the controls are what goes.
+- No em dash, no middot, no semicolon, no backtick (the test checks all four;
+  the backtick is there because thirty demo cards once carried the plan's
+  evidence column, code paths and all, as their text).
+
+Two cuts from 2026-10-12, before and after:
+
+- **video/030 WebRTC loopback**, 214 to 98. *"Send your camera to Cloudflare
+  Stream over WebRTC and watch it come back beside the original for twenty
+  seconds. The two pictures show the delay by eye, and the footer reads the
+  return connection's round trip time."* became *"Watch your camera return
+  from Cloudflare Stream over WebRTC beside the original and see the delay."*
+  The difference from video/000 is the round trip you can see. Twenty seconds
+  is the button's business, and the rtt cell is a readout key.
+- **clock/000 Scheduling**, 248 to 99. *"One rhythm played twice at two
+  pitches, by a JavaScript timer that wakes up to play and by the sound card
+  told each note's time in advance. Make the page busy and the timer's notes
+  land tens of milliseconds late while the sound card's stay on time."* became
+  *"A JavaScript timer and the sound card play one rhythm. Make the page busy
+  and the timer lands late."* Kept: the busy switch, the one control that makes
+  the point. Gone: the two pitches and the size of the lateness, which the page
+  shows.
+
 ## Who reads it, and where
 
 - **A card is read by somebody choosing where to click**, on /concepts/ or the
@@ -98,8 +147,9 @@ only if it changes what is seen or heard.
 
 ## One sentence or two
 
-One when it says the thing. A second only when it carries a second fact the
-reader needs to choose: the proposition, the difference, or the condition that
+One when it says the thing, and on a card both inside 100 characters (the rule
+at the top). A second only when it carries a second fact the reader needs to
+choose: the proposition, the difference, or the condition that
 keeps the first honest (*"When no board answers, a copy in this tab stands in
 for the Pi."*). Never a second sentence that re-says, decorates or explains why
 the page was built. No em dashes, no middots, no semicolons; a colon only
@@ -109,7 +159,9 @@ allowed to grow its box.
 
 ## What overstatement looks like here, from the 2026-10-12 drafts
 
-Each pair is the owner's proposed copy, then the verified text, then why.
+Each pair is the owner's proposed copy, then the verified text, then why. The
+verified texts here are the morning's and run past 100 characters; they were
+cut the same afternoon, and the card text today is in `demo/concepts/list.mjs`.
 
 **synth/040 Synth.** Draft: *"Build a synthesizer by connecting sound
 modules. Hear how each new connection changes the instrument."* Verified: *"A
