@@ -125,7 +125,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     // row ran off the page for one long knob name in the first column.
     const nodeW = (n) => {
       const { ins, outs } = portsOf(n);
-      const [f1, f2, f3] = fieldsR(n), fw = (f) => (f ? width(f.text, FONT, f.sans) : 0);
+      const [f1, f2, f3] = fieldsR(n), fw = (f) => (f ? width(f.text, FONT, true) : 0);
       return Math.max(width(n.id, TITLE) + fw(f1) + (f1 ? 3 : 2) * PAD,
         fw(f2) + fw(f3) + (f2 && f3 ? 3 : 2) * PAD,
         longest(ins) + longest(outs) + (ins.length && outs.length ? 3 : 2) * PAD);
@@ -252,7 +252,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
         return taken.length;
       };
       // What sits on row r of a card on its left: the title on 0, the field on 1.
-      const leftW = (n, r) => (r === 0 ? width(n.id, TITLE) : r === 1 && fieldsR(n)[0] ? width(fieldsR(n)[0].text, FONT, fieldsR(n)[0].sans) : 0);
+      const leftW = (n, r) => (r === 0 ? width(n.id, TITLE) : r === 1 && fieldsR(n)[0] ? width(fieldsR(n)[0].text, FONT, true) : 0);
       const collides = (n, bw) => {
         const { ins, outs } = portsOf(n), o = off.get(n.id);
         return [...ins, ...outs].some((p, i) => {
@@ -262,7 +262,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       };
       const minW = Math.ceil(Math.max(...order.map((n) => {
         const { ins, outs } = portsOf(n), f = fieldsR(n)[0];
-        return Math.max(width(n.id, TITLE), f ? width(f.text, FONT, f.sans) : 0, longest(ins), longest(outs)) + 2 * PAD;
+        return Math.max(width(n.id, TITLE), f ? width(f.text, FONT, true) : 0, longest(ins), longest(outs)) + 2 * PAD;
       })));
       let lanes = 0, bw = 0;
       for (let pass = 0; pass < 8; pass++) {
@@ -297,7 +297,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       g.append(s('text', { x: b.x + PAD, y: ty, class: 'lv-title' }, b.n.id));
       const [f1, f2, f3] = fieldsR(b.n), fy = ty + TGAP + DROW - 2;
       const field = (f, x, y, anchor) => f && g.append(s('text',
-        { x, y, 'text-anchor': anchor, class: `lv-f${f.sans ? ' lv-f-sans' : ''}` }, f.text));
+        { x, y, 'text-anchor': anchor, class: 'lv-f' }, f.text));
       if (b.phone) { field(f1, b.x + PAD, b.y + PAD / 2 + ROW * 1.5 + 4, 'start'); svg.append(g); continue; }
       field(f1, b.x + b.w - PAD, ty, 'end');
       field(f2, b.x + PAD, fy, 'start');
@@ -391,8 +391,10 @@ export const BAY_VIEW_CSS = `
   .lv-box rect { fill: var(--card2); stroke: var(--line2); }
   .lv-title { fill: var(--fg); font-size: ${TITLE}px; }
   .lv-pname { font-size: ${FONT}px; fill: currentColor; }
-  .lv-f { font-size: ${FONT}px; fill: var(--dim2); }
-  .lv-f-sans { font-family: var(--sans); }
+  /* Titles and port names name, so they are mono; the notes are read, so they are
+     Geist. Asked 2026-10-12: "put sans serif back to the pathcbay non-title
+     non-inlet texts". */
+  .lv-f { font-size: ${FONT}px; fill: var(--dim2); font-family: var(--sans); }
   .lv-wire { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
   .lv-free { opacity: 0.45; }
   .lv-timed { stroke-dasharray: 6 4; }
