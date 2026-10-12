@@ -32,7 +32,7 @@
 
 /** General MIDI's drum notes, which is what the sequencer sends and what each
  *  wire into a voice lets through. */
-export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46 };
+export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46, clap: 39, tomlo: 45, tomhi: 50, cowbell: 56 };
 
 /**
  * The one knob per drum on 010, and why each is the one most fun to turn.
@@ -139,17 +139,78 @@ const ROWS = [
   { key: 'hhc', label: 'closed hat', make: hhc },
 ];
 
+
+// ── FOUR MORE, FOR /concepts/rhythm/050/ ONLY ───────────────────────────────
+// Asked 2026-10-12: *"add 4 more drum isntrumets to 050"*. Chosen to read as
+// different from the four above and from each other, by ear and on a scope:
+//   clap     three quick noise bursts and a tail, the 808's clap. The one
+//            sound in a kit that is a rhythm of its own, and nothing above is
+//            made of bursts.
+//   low tom  a sine falling 130 to 90 Hz over 0.4 s: pitched like the kick but
+//            an octave up and longer, so it reads as a drum with a note.
+//   high tom the same a fifth above, 210 to 150 Hz, shorter. With the low tom
+//            it makes a fill: two notes that answer each other.
+//   cowbell  two square waves at 540 and 800 Hz (the 808's own), filtered:
+//            the only clearly PITCHED metal, where the hats are noise-like.
+// Rim shot was the other candidate and was left out: on a laptop speaker a
+// short click reads as the closed hat's tick.
+const clap = () => `// three quick bursts of noise and a tail, as many hands
+{ |amp = 0.9|
+
+    // the bursts: up, down, up, down, up, then a 0.15 s tail
+    var env = EnvGen.kr(Env.new([0, 1, 0.15, 1, 0.15, 1, 0], [0.001, 0.01, 0.001, 0.01, 0.001, 0.15], -3), doneAction: 2);
+
+    // noise with a resonance near 1.2 kHz and the lows taken off
+    var noise = HPF.ar(RLPF.ar(WhiteNoise.ar(1), 1200, 0.5), 600);
+
+    noise * env * amp
+}`;
+
+const tom = (from, to, len, amp) => `// a sine falling ${from} to ${to} Hz, with a little stick at the front
+{ |amp = ${amp}|
+
+    // the pitch falls over the first 80 ms
+    var pitch = EnvGen.kr(Env.perc(0.001, 0.08)) * ${from - to} + ${to};
+
+    // the body rings ${len} s, then the node frees itself
+    var env = EnvGen.kr(Env.perc(0.002, ${len}), doneAction: 2);
+
+    // two milliseconds of noise for the stick
+    var stick = HPF.ar(WhiteNoise.ar(EnvGen.kr(Env.perc(0.0005, 0.002))), 3000);
+
+    SinOsc.ar(pitch) * env + (stick * 0.2) * amp
+}`;
+
+const cowbell = () => `// the 808's two square waves at 540 and 800 Hz, filtered
+{ |amp = 0.5|
+
+    var tone = RLPF.ar(Mix(Pulse.ar([540, 800], 0.5, 0.5)), 2000, 0.6);
+
+    // a sharp attack that drops fast, then a short ring
+    var env = EnvGen.kr(Env.new([0, 1, 0.3, 0], [0.002, 0.05, 0.3], -4), doneAction: 2);
+
+    HPF.ar(tone, 400) * env * amp
+}`;
+
+const EXTRAS = [
+  { key: 'clap', label: 'clap', make: clap },
+  { key: 'tomlo', label: 'low tom', make: () => tom(130, 90, 0.4, 0.45) },
+  { key: 'tomhi', label: 'high tom', make: () => tom(210, 150, 0.3, 0.4) },
+  { key: 'cowbell', label: 'cowbell', make: cowbell },
+];
+
 /**
  * The four drums in grid order, top to bottom: the row's name, the bay node,
  * the definition's name on the server, its program, its note, and (with knobs)
  * the one parameter its knob turns.
- * @param {{ knobs?: boolean }} [o]
+ * `extras: true` adds the four above after them (050's eight).
+ * @param {{ knobs?: boolean, extras?: boolean }} [o]
  */
-export function voices({ knobs = false } = {}) {
-  return ROWS.map((r) => ({
+export function voices({ knobs = false, extras = false } = {}) {
+  return [...ROWS, ...(extras ? EXTRAS : [])].map((r) => ({
     key: r.key, label: r.label, name: r.key, note: NOTE[r.key],
     program: r.make(knobs),
-    param: knobs ? PARAMS[r.key] : null,
+    param: knobs ? PARAMS[r.key] ?? null : null,
   }));
 }
 

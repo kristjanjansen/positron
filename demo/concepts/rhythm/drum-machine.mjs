@@ -165,6 +165,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
         }
       });
       junction = ctx.createGain();
+      // Eight drums at once (050) sum about 3 dB hotter than four, and the
+      // loudest bar measured -1.5 dBFS RMS, so the mix comes down to 0.7 there.
+      junction.gain.value = VOICES.length > 4 ? 0.7 : 1;
       junction.connect(ctx.destination);
       an = ctx.createAnalyser(); an.fftSize = 1024; buf = new Float32Array(an.fftSize);
       junction.connect(an);
@@ -176,7 +179,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
         if (!got || got[0] !== '/done') throw new Error(`SuperCollider did not take ${v.label}`);
       }
       stat.loadMs = Math.round(performance.now() - t);
-      d.log(`SuperCollider booted in ${stat.bootMs} ms and took the four drums in ${stat.loadMs} ms`);
+      d.log(`SuperCollider booted in ${stat.bootMs} ms and took the ${VOICES.length} drums in ${stat.loadMs} ms`);
       eng = e;
       return e;
     })().catch((err) => { waking = null; d.log(`SuperCollider did not start: ${err?.message || err}`, 'bad'); throw err; });
