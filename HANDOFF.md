@@ -2,9 +2,9 @@
 
 ## Where it is right now
 
-- **Site: BUILD `c91a423b-182349-a3d3`** (sampler/020 with Rhodes), confirmed on the edge. The owner asked to "deploy now and then" (memory `deploy-often`): deploy at coherent points, not per change.
-- **GitHub:** everything pushed, `main` matches `origin/main` with this handoff. Push needs the account switch in CLAUDE.md, and switching back.
-- Counted: **58 demos, 57 built**, **108 plans**. Working tree clean. No agent running.
+- **Site: BUILD `f4b6d4c0-185706-ca13`** (sampler/050 Loop clock), confirmed on the edge. The owner asked to "deploy now and then" (memory `deploy-often`): deploy at coherent points, not per change.
+- **GitHub:** everything pushed with this handoff update, `main` matches `origin/main`. Push needs the account switch in CLAUDE.md, and switching back.
+- Counted: **58 demos, 57 built**, **109 plans**. Working tree clean. No agent running.
 - **The Pi runs the repo's board code** (pushed this session, md5 checked): the direct WebRTC answer (`node-datachannel`) and the Salamander piano, 208 files fetched from R2 onto its SD card.
 
 ## What landed this session
@@ -14,6 +14,8 @@
 | `/concepts/radio/020`, `030`, `040` | the beats group moved back into radio (Tempo, Live tempo, Key); `beats/*` URLs 404 |
 | `/concepts/radio/040/` Key | the key on the kit keyboard (grey rings for the key, yellow for the chord autoplay plays or would play, filled only when sounding); a pad (five spread saws, drifting lowpass, high passed, room) and a separate `web:bass`; Autoplay checkbox, CC 11 on channel 2 eased 3 s from the key's confidence; wet/dry `web:mixer`; the station's energy as a value into the pad; every light and ring over a link (one `web:keys` node). Key detector improved by an agent: `plans/plan-key-detection.md` |
 | `/concepts/sampler/020/` Looper | spring back 70 ms, no loop under 0.5 s, hold clear **3 s with no note**, an empty take keeps the playing loop, device timestamps, 2 s buffer and **150 ms start lookback** with the end moved alike and the repeated downbeat dropped at the seam; the plugged-in keyboard as its own `web:midi` device node; Piano and Rhodes (`web:patch`); **Copy log** (every input with the device stamp, every decision, the loop) |
+| `/concepts/sampler/020/` overdub | a press while looping overdubs from where the loop is, until the next press; notes at their loop position, length fixed, `ev.layer` per layer; a 3 s hold with no note removes the newest layer, or clears a loop of one layer. Asked as the owner plays: wait, play over the loop, then press to overdub |
+| `/concepts/sampler/050/` Loop clock | 020 plus a clock (`demo/shell/loop-clock.mjs`, a renderer with no clock of its own): seam at 12, time clockwise, pitch as radius, colour per layer, passed notes dim, approach rings on the next 3 onsets, the take as a red rim arc while recording. From `plans/plan-loop-ui.md` |
 | `/concepts/sampler/030/` | relay or direct on one page (`?path=direct`); 035 redirects there. MEASURED on the Pi: direct, round trip 3.3 ms |
 | `/concepts/sampler/040/` | the Pi's SuperCollider sampler in the tab (wasm scsynth); compared in `research/scsynth-sampler-in-browser-2026-10-11.md`: same sound, 1.8 MB and about 1 s more to the first note |
 | `/concepts/synth/060`, `070` | four lag cells as sampler/030; 070's scope scales to the Circuit's level; patch names cached per slot |
@@ -25,12 +27,15 @@
 ## Plans and research written
 
 - `plans/plan-looper-accuracy.md` with sections 9, 10, 11 from the owner's three Copy logs: the MK-425C scans its pedal every 65.95 ms, the keys are timed to about 1 ms; lookback caught every opening chord (13 to 139 ms early); the 1 s hold clear destroyed loops, 3 s only fired on deliberate holds.
+- `plans/plan-loop-ui.md`: clip launchers, circular and free loopers, what they show and hide, ten display ideas for tempo-less MIDI loops; 050 Clock built, 060 Laps and 070 Ahead proposed.
 - `plans/plan-sustain-pedal.md`, `research/sustain-pedal-pressing-2026-10-11.md` section 5.
 - `plans/plan-key-detection.md`, `research/scsynth-sampler-in-browser-2026-10-11.md`.
 
 ## Open, asked of the owner
 
-- **Overdub on the looper**: the gesture table is proposed (press while looping overdubs, press again keeps the layer, 3 s hold clears). The third log shows an overdub attempt that replaced a 15 s loop. Waiting for yes.
+- **Overdub and the Loop clock are untested on the real keyboard.** A Copy log from 050 is the next thing to read.
+- Overdub that stops by itself after one full lap: offered as an option, not chosen.
+- **060 Laps and 070 Ahead** from `plans/plan-loop-ui.md`: not built.
 - **Start a take at its first note** when it starts more than about 1 s early (design 2.2): proposed twice, not built.
 - **Length from notes** (plan section 2.3, step 5): proposed, not built.
 - room/030 Broadcast: keep or remove (asked, no answer).
