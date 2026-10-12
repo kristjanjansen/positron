@@ -176,7 +176,9 @@ export const DEMOS = [
 
   // BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); its
   // checks run before ready, so the boot wait is the check pass, MEASURED 3.8 s.
-  { name: 'wire', group: 'technologies', act: 2, created: '2026-09-10', built: true, bootMs: 20000, room: 'fixed',
+  // `unlisted: true` since 2026-10-12 (*"archive wire and patchbay"*): still built and
+  // deployed at /wire/, listed on /archive/ with the other retired pages.
+  { name: 'wire', group: 'technologies', act: 2, created: '2026-09-10', built: true, unlisted: true, bootMs: 20000, room: 'fixed',
     one: 'A message as the exact bytes that travel, and a note as how late it lands on another machine.',
     tags: ['WS', 'DO', 'SQLite'] },
 
@@ -430,7 +432,9 @@ export const DEMOS = [
    * buttons have never sent a byte anybody has captured, so they are drawn and
    * marked rather than wired by guess.
    */
-  { name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  // `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+  // still built and deployed at /circuit/, listed on /archive/ under devices.
+  { name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true,
     one: 'a Novation Circuit on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -465,7 +469,9 @@ export const DEMOS = [
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
   // `wall` was its own unlisted page 2026-10-04 and is the WALL tab of
   // /partitur/ since 2026-10-05, no redirect.
-  { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true,
+  // `unlisted: true` since 2026-10-12 (*"archive wire and patchbay"*): still built and
+  // deployed at /patchbay/, listed on /archive/ with the other retired pages.
+  { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',
     tags: ['WebCodecs'] },
   { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true,
@@ -538,7 +544,9 @@ export const DEMOS = [
    * ⚠️ `settleMs` IS FOR THE READING. 3.3 MiB unzipped, 64 patches decoded and
    * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
    */
-  { name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true, settleMs: 3000,
+  // `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+  // still built and deployed at /pack/, listed on /archive/ under devices.
+  { name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true, settleMs: 3000,
     one: 'open a Circuit pack or any zip of WAVs and look inside its patches, sessions and samples',
     tags: ['zip', 'sysex', 'DecompressionStream'] },
   /**
@@ -570,7 +578,9 @@ export const DEMOS = [
    * fourteen bit message, and six controller numbers for eight knobs.
    */
 
-  { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  // `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+  // still built and deployed at /evo/, listed on /archive/ under devices.
+  { name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true,
     one: 'an Evolution MK-425C you can work on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI'] },
 
@@ -585,7 +595,9 @@ export const DEMOS = [
    * `bay.mjs`'s prose, `xr-room.mjs`'s controller models and `/wish/`'s model
    * pickers are all untouched.
    */
-  { name: 'twelve', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+  // `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+  // still built and deployed at /twelve/, listed on /archive/ under devices.
+  { name: 'twelve', group: 'instruments', act: 4, created: '2026-09-20', built: true, unlisted: true,
     one: 'a TASCAM Model 12 on screen, moving when the real one moves',
     tags: ['WebMIDI', 'CoreMIDI', 'Mackie Control'] },
 
