@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept clock 040</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  // concepts clock/040, FOLLOW, 2026-10-12. One idea: a light link can wait for
+  // a heavy one, so a cue lands on the frame it belongs to rather than when its
+  // message did.
+  //
+  // clock/030 with a picture added. The same two places, `there`'s clock set
+  // wrong and corrected by peer.mjs. `web-1` has a camera and a cue source; every
+  // two seconds its picture turns the next cue's colour and a cue leaves along
+  // two links into two walls at `web-2`:
+  //   - `wall-a` holds a plain link, so it fires the moment the message lands;
+  //   - `wall-f` holds `{ follow <the camera's video link> }` (bay.mjs), so its
+  //     bay asks its timebase when the picture HERE will show the moment `at`
+  //     the cue was stamped with, and fires then.
+  //
+  // 🔴 THE PICTURE IS MODELLED, THE CUES ARE REAL. The cues ride the relay as
+  // one `bay.event` each, as on every clock page. The video link is drawn in
+  // this tab and held back by a lag shaped like the measurements, as /sync/'s
+  // Follow tab does (plan-routing-time §3): WebRTC 67 ms with a few ms of
+  // jitter, LL-HLS 4 s that steps to 6 s on a stall and back on a drift-seek.
+  // A real camera over WHEP or LL-HLS needs Cloudflare Stream minutes and a
+  // publisher; nothing here opens either. Each frame the screen at `web-2`
+  // tells its timebase which moment of `web-1`'s shared clock is on its glass,
+  // which is what an rVFC callback would tell it about a real stream.
+  //
+  // Nothing opens on a visit. Play joins the room and starts the cues.
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createTimebase } from '/shell/timebase.mjs';
+  import { DEFAULT_RELAY } from '/shell/wire.mjs';
+  import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
+
+  const rand = (n) => Math.random().toString(36).slice(2, 2 + n).padEnd(n, '0');
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : `follow-${rand(6)}`;
+  const HERE = `here-${rand(3)}`, THERE = `there-${rand(3)}`;
+  const CAM = `${HERE}:cam:video-out`, SCREEN = `${THERE}:screen:video-in`;
+  const CUES = `${HERE}:cues:value-out`;
+  const WALL = { a: `${THERE}:wall-a:value-in`, f: `${THERE}:wall-f:value-in` };
+  const CUE_MS = 2000;           // one cue every two seconds
+  const PALETTE = ['#e8b14a', '#4fc3ff', '#e0584f', '#7ccf6b', '#b48cf0', '#f0f0f0'];
+
+  // The modelled picture links, the numbers /sync/'s Follow tab uses.
+  const LINKS = {
+    whep: { name: 'WebRTC', lag: () => 67 + (Math.random() - 0.5) * 8 },
+    llhls: { name: 'LL-HLS', lag: (t) => ((t % 18000) < 10000 ? 4000 : 6000) },
+  };
+
+  const graphOf = (site, label, nodes, ports) => ({ v: 1, site, place: 'browser', kind: 'browser', label, nodes, ports });
+  const G_HERE = graphOf(HERE, 'here', [
+    { id: `${HERE}:cam`, kind: 'device', label: 'camera', place: 'browser' },
+    { id: `${HERE}:cues`, kind: 'engine', label: 'cues', place: 'browser' },
+  ], [
+    { id: CAM, label: 'camera', dir: 'out', medium: 'video' },
+    { id: CUES, label: 'cues', dir: 'out', medium: 'value' },
+  ]);
+  const G_THERE = graphOf(THERE, 'there', [
+    { id: `${THERE}:screen`, kind: 'screen', label: 'screen', place: 'browser' },
+    { id: `${THERE}:wall-a`, kind: 'screen', label: 'on arrival', place: 'browser' },
+    { id: `${THERE}:wall-f`, kind: 'screen', label: 'following', place: 'browser' },
+  ], [
+    { id: SCREEN, label: 'screen', dir: 'in', medium: 'video' },
+    { id: WALL.a, label: 'wall', dir: 'in', medium: 'value' },
+    { id: WALL.f, label: 'wall', dir: 'in', medium: 'value' },
+  ]);
+
+  const d = mount({ name: 'concept clock 040', what: '', index: '/concepts/', indexLabel: 'concepts',
+    joined: false,
+    // How late the picture is here, how early the arrival wall fires against
+    // it, how far off the following wall is, and how often the lag stepped.
+    readout: { 'picture late': 'ms', 'cue early': 'ms', 'off by': 'ms', 'lag steps': '' } });
+  conceptNav('clock/040');
+
+  // ── a place: its own clock and its correction, as clock/030 ─────────────
+  function place(name) {
+    const P = { name, skew: 0, peer: null };
+    P.raw = () => epochNow() + P.skew;
+    P.offset = () => {
+      if (!P.peer) return null;
+      const agreed = (there.peer?.peers() || []).some((p) => Number.isFinite(p.rttMs));
+      return agreed ? P.skew + P.peer.offsetMs() : null;
+    };
+    P.now = () => { const o = P.offset(); return o == null ? null : epochNow() + o; };
+    return P;
+  }
+  const here = place('web-1'), there = place('web-2');
+
+  // ── web-2's timebase: what the screen here observes of the camera's link ─
+  // The camera stamps its frames with web-1's shared clock, so the stamps ARE
+  // shared time: stampOffsetMs 0 (plan-routing-time §4.3).
+  const tb = createTimebase();
+  tb.link(CAM, { stampOffsetMs: 0 });
+
+  // ── what happened to each cue ───────────────────────────────────────────
+  const cues = new Map();        // k -> { S, picAt, arrivedAt, followAt } in local ms
+  const cueOf = (k) => { if (!cues.has(k)) cues.set(k, { k, S: null, picAt: null, arrivedAt: null, followAt: null }); return cues.get(k); };
+  const wallNow = { a: -1, f: -1 };
+  function onWall(which) {
+    return (e, l, m) => {
+      const c = cueOf(e.k);
+      if (which === 'a') c.arrivedAt = epochNow(); else c.followAt = epochNow();
+      wallNow[which] = Math.max(wallNow[which], e.k);
+      pb.pulse(plain(CUES), plain(WALL[which]));
+      if (which === 'f' && m.timing) c.why = m.timing.why;
+    };
+  }
+
+  // ── the bays ────────────────────────────────────────────────────────────
+  let key = 'whep';
+  function bayHere() {
+    const b = nodeHere.registry.fill(createBay());
+    if (b.port(SCREEN)) b.link(CAM, SCREEN, [], { site: HERE });
+    if (b.port(WALL.a)) b.link(CUES, WALL.a, [], { site: HERE });
+    if (b.port(WALL.f)) b.link(CUES, WALL.f, [], { site: HERE, options: { follow: CAM } });
+    return b;
+  }
+  function bayThere() {
+    tb.setOffset(there.offset());
+    const b = nodeThere.registry.fill(createBay({ timing: { timebase: tb, horizonMs: 0, holdMs: 10000 } }));
+    b.addPort({ ...b.port(WALL.a), deliver: onWall('a') });
+    b.addPort({ ...b.port(WALL.f), deliver: onWall('f') });
+    if (b.port(CAM)) {
+      b.link(CAM, SCREEN, [], { site: THERE });
+      b.link(CUES, WALL.a, [], { site: THERE });
+      b.link(CUES, WALL.f, [], { site: THERE, options: { follow: CAM } });
+    }
+    return b;
+  }
+  const log = (line, kind) => d.log(line, kind);
+  const nodeHere = createBayNode({ room: ROOM, graphs: [G_HERE], bay: bayHere, log, shared: () => here.now() });
+  const nodeThere = createBayNode({ room: ROOM, graphs: [G_THERE], bay: bayThere, log });
+
+  // ── the picture: web-1's source, and web-2's screen showing it late ─────
+  // Every surface is read off the same three numbers: the shared time of the
+  // start, the shared time on web-2's glass, and the cue that time falls in.
+  let start = null, next = 0, raf = 0, lag = 0;
+  // Cue k is due at start + LEAD + k * CUE_MS. The LEAD keeps a cue off the
+  // model's own step instants (every 18 s from start), as /sync/'s Follow tab
+  // does, so a step and a cue never fall on the same frame by construction.
+  const LEAD = 1000;
+  const cueAt = (shared) => (start == null || shared < start + LEAD ? -1 : Math.floor((shared - start - LEAD) / CUE_MS));
+  function frame() {
+    raf = requestAnimationFrame(frame);
+    const nowH = here.now(), nowT = there.now(), local = epochNow();
+    tb.setOffset(there.offset());
+    if (start == null || nowH == null || nowT == null) return paint(-1, -1);
+    // web-1: a cue leaves the moment its picture changes.
+    while (start + LEAD + next * CUE_MS <= nowH) {
+      const S = start + LEAD + next * CUE_MS;
+      cueOf(next).S = S - here.offset();          // the local time it happened, for the strip
+      nodeHere.emit(CUES, { k: next });
+      next++;
+    }
+    // web-2: the screen shows web-1's moment `nowT - lag`, and says so to the timebase.
+    lag = LINKS[key].lag(nowT - start);
+    const shown = nowT - lag;
+    tb.observe(CAM, { local, stamp: shown });
+    const k = cueAt(shown);
+    for (let i = 0; i <= k; i++) { const c = cueOf(i); if (c.picAt == null) c.picAt = local; }
+    paint(k, cueAt(nowH));
+  }
+
+  const canvas = document.createElement('canvas');
+  const g = canvas.getContext('2d');
+  const video = createVideoPanel({ media: canvas, left: false });
+  let W = 0, H = 0, dpr = 1;
+  function size() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    const r = video.stage.getBoundingClientRect();
+    if (!r.width) return;
+    W = Math.max(240, Math.round(r.width)); H = Math.max(140, Math.round(r.height));
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  }
+  new ResizeObserver(size).observe(video.stage);
+  size();
+  const ink = (hex) => {
+    const [r, gg, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return (r * 299 + gg * 587 + b * 114) / 1000 > 128 ? '#0b0e14' : '#f0f0f0';
+  };
+  const colour = (k) => (k < 0 ? '#151b26' : PALETTE[k % PALETTE.length]);
+  const font = (px) => `${px}px ui-monospace, Menlo, monospace`;
+  function box(x, y, w, h, k, label) {
+    g.fillStyle = colour(k);
+    g.fillRect(x, y, w, h);
+    g.fillStyle = k < 0 ? '#8a93a6' : ink(colour(k));
+    g.font = font(Math.max(11, Math.round(Math.min(h, w / 2) / 7)));
+    g.fillText(label, x + 10, y + Math.max(16, Math.round(h / 6)));
+    if (k >= 0) {
+      g.font = font(Math.max(16, Math.round(Math.min(h, w / 2) / 3)));
+      g.fillText(`cue ${k + 1}`, x + 10, y + h - Math.max(12, Math.round(h / 6)));
+    }
+  }
+  /** web-1's camera on the left, web-2's screen on the right, web-2's two walls under it. */
+  function paint(screenK, sourceK) {
+    if (!W) return;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.fillStyle = '#0b0e14';
+    g.fillRect(0, 0, W, H);
+    const gap = 2, half = Math.floor((W - gap) / 2), top = Math.round(H * 0.55);
+    box(0, 0, half, H, sourceK, 'web-1 camera');
+    box(half + gap, 0, W - half - gap, top - gap, screenK, `web-2 screen, ${LINKS[key].name}`);
+    const q = Math.floor((W - half - 2 * gap) / 2);
+    box(half + gap, top, q, H - top, wallNow.a, 'on arrival');
+    box(half + 2 * gap + q, top, W - half - 2 * gap - q, H - top, wallNow.f, 'following');
+  }
+
+  // ── join, agree the time, start the cues ────────────────────────────────
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let joining = null;
+  function join() {
+    if (joining) return joining;
+    joining = (async () => {
+      there.skew = Math.round((Math.random() < 0.5 ? -1 : 1) * (100 + Math.random() * 200));
+      await Promise.all([nodeHere.join(), nodeThere.join()]);
+      const url = `${DEFAULT_RELAY}/room/${ROOM}-ntp/ws`;
+      const tag = rand(6);
+      here.peer = createPeer({ id: `a-${tag}`, transport: wsTransport(url), now: here.raw });
+      there.peer = createPeer({ id: `b-${tag}`, transport: wsTransport(url), now: there.raw });
+      d.log(`joined ${ROOM}, web-1 as ${HERE} and web-2 as ${THERE}. web-2's clock is set ${Math.abs(there.skew)} ms ${there.skew > 0 ? 'fast' : 'slow'} and is not told`, 'hi');
+      const has = () => !!bayHere().targets(CUES).find((t) => t.to === WALL.f) && here.offset() != null;
+      for (let i = 0; i < 80 && !has(); i++) await sleep(50);
+      await sleep(600);
+      const ok = has();
+      start = Math.ceil((here.now() + 500) / 100) * 100;
+      next = 0; cues.clear(); wallNow.a = wallNow.f = -1;
+      btns.setIcon('go', 'stop', 'Stop');
+      pb.refresh();
+      d.log(ok ? `the clocks agree, web-2 corrects its clock by ${fmt(there.peer.offsetMs())} ms. A cue every ${CUE_MS / 1000} s` : 'the two places did not hear each other', ok ? 'hi' : 'bad');
+      return ok;
+    })();
+    return joining;
+  }
+  function leave() {
+    nodeHere.leave(); nodeThere.leave();
+    for (const P of [here, there]) { P.peer?.dispose(); P.peer = null; }
+    start = null; joining = null;
+    btns.setIcon('go', 'play', 'Play');
+    d.log('stopped: both places left the room and the clock peers closed their sockets');
+  }
+  const btns = createButtonGroup({ buttons: [
+    { id: 'go', icon: 'play', label: 'Play', title: `room ${ROOM}`, onPress: () => (joining ? leave() : join()) },
+  ] });
+  const pick = createChoice({ label: 'picture over', options: Object.entries(LINKS).map(([k, l]) => [l.name, k]), at: 0,
+    title: (k) => (k === 'whep' ? 'WebRTC, 67 ms behind, as measured' : 'LL-HLS, 4 s behind that steps to 6 s on a stall, as measured'),
+    onPick: (k) => { key = k; d.log(`the picture now arrives over ${LINKS[k].name}, modelled on what was measured`); } });
+  const row = el('div');
+  row.style.cssText = 'display: flex; gap: 16px; align-items: center; flex-wrap: wrap';
+  row.append(btns.el, pick.el);
+
+  // ── what it measured ────────────────────────────────────────────────────
+  const fmt = (x) => Math.round(x * 100) / 100;
+  const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : null; };
+  const done = () => [...cues.values()].filter((c) => c.picAt != null && c.arrivedAt != null);
+  const early = () => done().map((c) => c.picAt - c.arrivedAt);
+  const off = () => done().filter((c) => c.followAt != null).map((c) => c.followAt - c.picAt);
+  let first = null;
+  const WINDOW = 12000;
+  setInterval(() => {
+    if (start == null) return;
+    const l = tb.lag(CAM, epochNow());
+    d.set('picture late', l == null ? '' : Math.round(l));
+    const e = early().slice(-8), o = off().slice(-8);
+    d.set('cue early', e.length ? Math.round(med(e)) : '');
+    d.set('off by', o.length ? fmt(med(o)) : '');
+    d.set('lag steps', tb.stats(CAM).moves);
+    for (const [id, xs, word] of [['arrival', e, 'early'], ['follow', o, 'off']]) {
+      const L = view.strip.lanes().find((x) => x.id === id);
+      if (L && xs.length) L.subLabel = [`median ${fmt(med(xs))} ms ${word}`, `worst ${fmt(xs.reduce((m, v) => (Math.abs(v) > Math.abs(m) ? v : m), 0))} ms`];
+    }
+    if (first == null && cues.get(0)?.S != null) first = cues.get(0).S;
+    if (first != null) { deck.setRange([0, Math.max(WINDOW, epochNow() - first + 1000)]); view.strip.fit(); }
+    view.strip.invalidate();
+  }, 250);
+
+  // ── the timeline: when the picture, the arrival wall and the following wall each showed a cue ─
+  const deck = createDeck({ items: [], range: [0, WINDOW] });
+  const shelf = el('div');
+  const band = (ms) => (Math.abs(ms) < 34 ? '#8fd6a8' : Math.abs(ms) < 250 ? '#ffd400' : '#e0908a');
+  const rowsBy = (field) => () => (first == null ? [] : [...cues.values()].filter((c) => c[field] != null)
+    .map((c) => ({ at: c[field] - first, id: `${field}${c.k}`, kind: 'cue', payload: c })));
+  const view = createStripView(shelf, deck, {
+    size: 'auto', follow: false, gutter: 132,
+    lanes: [
+      { id: 'picture', kind: 'cue', label: 'web-2 picture', height: 40, width: 2, as: 'ticks', terse: true, color: '#6f7d94',
+        rows: rowsBy('picAt'), describeRow: (r) => ['picture', `cue ${r.payload.k + 1}`] },
+      { id: 'arrival', kind: 'cue', label: 'on arrival', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('arrivedAt'),
+        colorOfRow: (r) => (r.payload.picAt == null ? '#3b424e' : band(r.payload.picAt - r.payload.arrivedAt)),
+        describeRow: (r) => ['on arrival', r.payload.picAt == null ? 'before the picture' : `${fmt(r.payload.picAt - r.payload.arrivedAt)} ms early`] },
+      { id: 'follow', kind: 'cue', label: 'following', height: 40, width: 2, as: 'ticks', terse: true, rows: rowsBy('followAt'),
+        colorOfRow: (r) => (r.payload.picAt == null ? '#3b424e' : band(r.payload.followAt - r.payload.picAt)),
+        describeRow: (r) => ['following', r.payload.picAt == null ? 'before the picture' : `${fmt(r.payload.followAt - r.payload.picAt)} ms off`] },
+    ],
+  });
+
+  // ── plain names on screen, the real ids on hover, as clock/020 ──────────
+  const SHOW = new Map([[HERE, 'web-1'], [THERE, 'web-2']]);
+  const plain = (id) => { const [s, ...r] = String(id).split(':'); return [SHOW.get(s) ?? s, ...r].join(':'); };
+  const realOf = new Map();
+  const named = (src) => ({
+    nodes: () => src.nodes().map((n) => { const id = plain(n.id); realOf.set(id, n.id); return { ...n, id }; }),
+    ports: () => src.ports().map((p) => ({ ...p, id: plain(p.id) })),
+    links: () => src.links().map((l) => ({ ...l, from: plain(l.from), to: plain(l.to),
+      ...(l.options?.follow ? { options: { ...l.options, follow: plain(l.options.follow) } } : {}) })),
+  });
+  function hovers(root, relay) {
+    const fix = () => {
+      for (const gg of root.querySelectorAll('.lv-box')) {
+        if (gg.querySelector('title')) continue;
+        const id = gg.querySelector('.lv-title')?.textContent || '';
+        const isRelay = id === `cf-relay:${relay}`;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : `simulated name, real id ${realOf.get(id) || id}`;
+        gg.prepend(t);
+        if (isRelay) for (const f of gg.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
+      }
+    };
+    new MutationObserver(fix).observe(root, { childList: true, subtree: true });
+    fix();
+  }
+
+  // ── the patchbay, drawn from the two graphs so it is whole before Play ──
+  // The following link is dashed and says `follow web-1:cam:video-out` on its wire.
+  // The video link is drawn with no transport: it is modelled in this tab.
+  const pic = () => {
+    const b = createBay();
+    for (const gr of [G_HERE, G_THERE]) { for (const n of gr.nodes) b.addNode(n); for (const p of gr.ports) b.addPort(p); }
+    b.link(CAM, SCREEN);
+    b.link(CUES, WALL.a);
+    b.link(CUES, WALL.f, [], { options: { follow: CAM } });
+    return b;
+  };
+  const picture = pic();
+  const pb = createPatchbay(named({
+    nodes: () => picture.nodes(), ports: () => picture.ports(),
+    links: () => picture.links().map((l) => (l.session ? { ...l, session: { ...l.session, transport: 'modelled' } } : l)),
+  }), { room: 'follow', flowing: () => start != null });
+  hovers(pb.el, 'follow');
+
+  let fitW = 0;
+  new ResizeObserver(() => {
+    const w = view.el.clientWidth;
+    if (w && w !== fitW) { fitW = w; view.strip.fit(); view.strip.invalidate(); }
+  }).observe(view.el);
+  d.stack.add(row, video.el, view.surface, pb.el);
+  raf = requestAnimationFrame(frame);
+  addEventListener('pagehide', () => { cancelAnimationFrame(raf); if (joining) leave(); });
+  window.__clock = { here, there, tb, cues, early, off, join, leave, pick: (k) => pick.set(k === 'whep' ? 0 : 1) };
+  d.ready();
+</script>

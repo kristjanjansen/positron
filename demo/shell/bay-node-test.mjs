@@ -250,5 +250,51 @@ const graph = (site, ports = []) => ({ v: 1, site, place: 'browser', nodes: [{ i
   for (const n of [A.node, B.node, C.node, liar, solo]) n.leave();
 }
 
+{
+  // 8. A timed link is stamped at the source (2026-10-12, plan-routing-time §4.1).
+  const relay = fakeRelay();
+  const K = (s) => `${s}:keys:midi-out`, SY = (s) => `${s}:synth:midi-in`;
+  const g = (site) => ({ v: 1, site, place: 'browser', nodes: [{ id: `${site}:keys`, kind: 'person', place: 'browser' }, { id: `${site}:synth`, kind: 'engine', place: 'browser' }],
+    ports: [{ id: K(site), label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] },
+            { id: SY(site), label: 'synth', dir: 'in', medium: 'midi', accepts: ['note'] }] });
+  const sent = [];
+  const tap = (room, o) => { const w = relay.open(room, o); return { ...w, send: (m) => { sent.push(m); return w.send(m); } }; };
+  const mk = (site, options, shared) => {
+    const heard = [];
+    let node;
+    const bay = () => {
+      const b = node.registry.fill(createBay());
+      b.addPort({ ...b.port(SY(site)), deliver: (e, l, m) => heard.push({ d1: e.d1, ...m }) });
+      for (const p of b.ports()) if (p.id.endsWith(':synth:midi-in') && p.id !== SY(site)) b.link(K(site), p.id, [], options ? { options } : {});
+      for (const p of b.ports()) if (p.id.endsWith(':keys:midi-out') && p.id !== K(site)) b.link(p.id, SY(site));
+      return b;
+    };
+    node = createBayNode({ room: 'timed-test-r9', graphs: [g(site)], wire: tap, bay, shared });
+    return { node, heard };
+  };
+  const A = mk('web-a1a', { ahead: 150 }, () => 5000);
+  const B = mk('web-b2b', null, () => null);
+  const C = mk('web-c3c', { follow: 'web-c3c:cam:video-out' }, () => 7000);
+  const D = mk('web-d4d', { ahead: 150 }, () => null);
+  for (const x of [A, B, C, D]) await x.node.join();
+  await tick(20);
+  const ev = () => sent.filter((m) => m.type === 'bay.event').at(-1);
+  const ra = A.node.emit(K('web-a1a'), { cls: 'note', ch: 1, d1: 60, d2: 100 });
+  const ma = ev();
+  await tick(15);
+  ok('an emit on an ahead 150 link stamps at = shared now + 150 on the room message, beside the event and not in it',
+    ra.at === 5150 && ma.at === 5150 && !('at' in ma.ev), JSON.stringify(ma));
+  ok('and a receiver sees that at in meta', B.heard.some((h) => h.at === 5150 && h.d1 === 60), JSON.stringify(B.heard));
+  const rb = B.node.emit(K('web-b2b'), { cls: 'note', ch: 1, d1: 61, d2: 100 });
+  const mb = ev();
+  ok('NEGATIVE CONTROL: a link with no timing option sends exactly what it sent before, no at', !('at' in mb) && !('at' in rb), JSON.stringify(mb));
+  const rc = C.node.emit(K('web-c3c'), { cls: 'note', ch: 1, d1: 62, d2: 100 });
+  ok('a follow link with no ahead is stamped with now, the moment it happened', rc.at === 7000 && ev().at === 7000, JSON.stringify(ev()));
+  const rd = D.node.emit(K('web-d4d'), { cls: 'note', ch: 1, d1: 63, d2: 100 });
+  ok('NEGATIVE CONTROL: with no shared clock agreed nothing is stamped, so the receiver holds rather than guesses',
+    !('at' in rd) && !('at' in ev()), JSON.stringify(ev()));
+  for (const x of [A, B, C, D]) x.node.leave();
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

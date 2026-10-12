@@ -33,7 +33,6 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
-  import { heldPicture } from '/shell/bay-view.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createStripView } from '/shell/strip.mjs';
@@ -75,7 +74,7 @@
   async function audio() {
     if (ctx) return;
     ctx = new AudioContext({ latencyHint: 'interactive' });
-    await ctx.resume();
+    ctx.resume();            // not awaited: a resume waits on a gesture and never rejects (positron-verify)
     const t0 = ctx.currentTime;
     for (let i = 0; i < 40 && ctx.currentTime - t0 < 0.05; i++) await new Promise((r) => setTimeout(r, 10));
   }
@@ -148,7 +147,7 @@
 
   function onClock(P, e) {
     P.clock = { bpm: Number(e.bpm), epoch: Number(e.epoch) };
-    if (P === there) pb.pulse(plain(CLK), '*:beat:clock-in');
+    if (P === there) pb.pulse(plain(CLK), plain(IN.there));
     else pb.pulse(plain(CLK), plain(IN.here));
     d.log(`${P.name} heard the clock: ${e.bpm} bpm from ${new Date(e.epoch).toISOString().slice(11, 23)}`);
   }
@@ -281,7 +280,9 @@
         const id = g.querySelector('.lv-title')?.textContent || '';
         const isRelay = id === `cf-relay:${relay}`;
         const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        t.textContent = isRelay ? `simulated name, real room ${ROOM}` : id.startsWith('*:') ? 'a * end, every other place in the room' : `simulated name, real id ${realOf.get(id) || id}`;
+        t.textContent = isRelay ? `simulated name, real room ${ROOM}`
+          : id === plain(`${THERE}:beat`) ? `simulated name, real id ${realOf.get(id) || id}\nreached by web-1's * link, clock-out -> *:beat:clock-in, every other place in the room`
+          : `simulated name, real id ${realOf.get(id) || id}`;
         g.prepend(t);
         if (isRelay) for (const f of g.querySelectorAll('.lv-f')) if (f.textContent === 'Cloudflare') f.textContent = 'relay room';
       }
@@ -291,7 +292,20 @@
   }
 
   // ── the patchbay: the clock wire lights per message, never per beat ─────
-  const pb = createPatchbay(named(heldPicture(bayHere, HERE, { star: 'every other place' })), { room: 'clock' });
+  // 🔴 THE PICTURE NAMES BOTH PLACES THE PAGE RUNS, 2026-10-12. Asked, on a
+  // screenshot: *"there is no web-2 in pathbay but is in lane"*. It was web-1's
+  // own held picture, so the far end was a `*:beat` box, while the timeline's
+  // lanes said web-1 and web-2. It is drawn from both places' graphs now, the
+  // clock reaching `web-2:beat` by name; the real link is web-1's `*` one, and
+  // that fact is on the `web-2:beat` box's hover.
+  const picture = (() => {
+    const b = createBay();
+    for (const g of [G_HERE, G_THERE]) { for (const n of g.nodes) b.addNode(n); for (const p of g.ports) b.addPort(p); }
+    b.link(CLK, IN.here);
+    b.link(CLK, IN.there);
+    return b;
+  })();
+  const pb = createPatchbay(named(picture), { room: 'clock' });
   hovers(pb.el, 'clock');
 
   // The whole run in view, scaling out as it grows, never a moving window. Asked

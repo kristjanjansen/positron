@@ -19,6 +19,7 @@ import { createBayView, BAY_VIEW_CSS } from './bay-view.mjs';
 import { createBayTraffic, STREAMY } from './bay-traffic.mjs';
 import { createPortInk } from './port-ink.mjs';
 import { createLinkButton } from './link-button.mjs';
+import { TIMING_NAMES } from './link-options.mjs';
 
 // The medium colours, one place for every page that draws a bay.
 export const MEDIUM_COLOURS = {
@@ -101,6 +102,10 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
           delete hop.id; delete hop.session;
           hopCache.set(k, hop);
         }
+        /* A timed link's option is drawn once, on the hop INTO the receiver,
+           which is the end that waits (bay.mjs `schedule`). */
+        const keep = l.options && Object.fromEntries(Object.entries(l.options).filter(([k]) => to === l.to || !TIMING_NAMES.includes(k)));
+        if (keep && Object.keys(keep).length) hop.options = keep; else delete hop.options;
         hop.origs = [l]; hop.sent = l.sent || 0;
         hops.set(k, hop); links.push(hop);
       }

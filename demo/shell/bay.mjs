@@ -848,7 +848,43 @@ export function parsePatch(text) {
    and is not the same as absent. "I cannot ssh to it" is never "it is down".
    `STALE_MS` is the registry's, imported at the top of this file. */
 
-export function createBay({ now = () => Date.now() } = {}) {
+/**
+ * 🔴 A LINK CARRYING `ahead` OR `follow` IS TIMED, SINCE 2026-10-12
+ * (plans/plan-routing-time.md §4.3, link-options.mjs has the two options).
+ * The sender stamps `at` beside the event (`bay-node.mjs` `emit`, on the
+ * `bay.event` message, never inside the event), and the RECEIVING bay asks a
+ * timebase when to hand it to the port: `ahead` fires when the shared clock
+ * reads `at`, `follow` fires when the moment `at` reaches this glass on the
+ * heavy link it names. Everything time related is injected, so the bay stays
+ * pure and `bay-test.mjs` grades it with a fake clock and a fake timer.
+ *
+ *   createBay({ timing: { timebase, local, later, horizonMs, holdMs } })
+ *     timebase   a `createTimebase()`, holding this place's peer offset and
+ *                any heavy link `follow` names. Absent, every timed event holds.
+ *     local      () => this document's ms, the timebase's `local` clock
+ *     later      (fn, ms) => void, a timer. `setTimeout` by default.
+ *     horizonMs  hand an event over this early, with its exact local time in
+ *                `meta.timing.local`, so a page that plays sound can give the
+ *                sound card the time in advance (clock/010's lesson). 0 fires
+ *                on the moment, which is right for a light.
+ *     holdMs     how long a held event is asked about again before it is
+ *                counted missed and dropped. 3000.
+ *
+ * 🔴 CANNOT TELL HOLDS, IT NEVER FIRES, which is the timebase's rule carried
+ * through: no peer clock, an unstamped event on a timed link, a follow link
+ * with no observations yet. A held event is asked again every 25 ms and
+ * dropped as `missed` after `holdMs`, counted on the link, never delivered
+ * late as if on time.
+ * ⚠️ A LINK WITH NEITHER OPTION NEVER READS ANY OF THIS: `send` takes the old
+ * path, synchronous, unchanged, and `bay-test.mjs` asserts it stays so.
+ */
+const HOLD_RETRY_MS = 25;
+const RECHECK_MS = 50;
+const defaultLocal = () => (typeof performance !== 'undefined' ? performance.timeOrigin + performance.now() : Date.now());
+const timedLink = (l) => l?.options && (l.options.ahead !== undefined || l.options.follow !== undefined);
+
+export function createBay({ now = () => Date.now(), timing = null } = {}) {
+  const T = { timebase: null, local: defaultLocal, later: (fn, ms) => setTimeout(fn, ms), horizonMs: 0, holdMs: 3000, ...(timing || {}) };
   const ports = new Map();          // id -> port
   const links = new Map();          // id -> link
   const nodes = new Map();          // id -> node
@@ -1087,6 +1123,8 @@ export function createBay({ now = () => Date.now() } = {}) {
     if (badT) return { ok: false, ...badT };
     const badO = checkOptions(a.medium, opts?.options);   // link options, link-options.mjs
     if (badO) return { ok: false, ...badO };
+    const badF = followRefusal(opts?.options?.follow, a, b);
+    if (badF) return { ok: false, ...badF };
 
     // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
     // somebody has to debug; "48000 against 44100" is one they can fix.
@@ -1199,6 +1237,26 @@ export function createBay({ now = () => Date.now() } = {}) {
    * receiver, which is an opener's job, and a MIDI `*` into every site with a
    * thru is a loop at wire speed that the cycle walk cannot see.
    */
+  /**
+   * `follow` names the HEAVY link to wait for. Unknown is allowed, because a
+   * page may make the light link before the heavy one exists, and the timebase
+   * holds until it has observed it. What is refused is a name the bay KNOWS to
+   * be light, or the link's own ends: following yourself is no lag at all.
+   */
+  function followRefusal(f, a, b) {
+    if (f === undefined) return '';
+    if (f === a?.id || f === b?.id) {
+      return { why: `follow ${f} names this link's own end, and a link cannot wait for itself.`,
+               fix: 'Name the video or sound link whose picture or beat this one belongs to.' };
+    }
+    const p = ports.get(f) || ports.get(links.get(f)?.from);
+    if (p && !HEAVY.includes(p.medium)) {
+      return { why: `follow ${f} names a ${p.medium} link, and only a heavy link (${HEAVY.join(', ')}) arrives late enough to wait for.`,
+               fix: 'Name the video or sound link this one belongs to, or leave follow out.' };
+    }
+    return '';
+  }
+
   function validateAny(fromId, toId, transforms = [], opts = {}) {
     if (isAny(fromId) && isAny(toId)) {
       return { ok: false, why: 'both ends are *, so the link names nobody.',
@@ -1228,6 +1286,8 @@ export function createBay({ now = () => Date.now() } = {}) {
     }
     const badO = checkOptions(real.medium, opts?.options);   // link options, link-options.mjs
     if (badO) return { ok: false, ...badO };
+    const badF = followRefusal(opts?.options?.follow, real, null);
+    if (badF) return { ok: false, ...badF };
     const matches = expand({ from: fromId, to: toId }, opts);
     return { ok: true, why: '', matches, session: null,
              ...(matches.length ? {} : { warn: `nobody matches ${anyEnd} yet` }) };
@@ -1500,11 +1560,57 @@ export function createBay({ now = () => Date.now() } = {}) {
       if (!dst) continue;
       if (dst.medium === 'midi' && !dst.accepts.includes(e.cls)) { l.dropped++; continue; }   // the guard is at the destination
       l.sent++;
+      if (timedLink(l)) { schedule(e, l, dst, { ...meta, from: fromId, to }); out++; continue; }
       dst.heard++;
       dst.deliver?.(e, l, { ...meta, from: fromId, to });
       out++;
     }
     return out;
+  }
+
+  /**
+   * One event on a timed link: ask the timebase, then hand it over now, set a
+   * timer for it, or hold and ask again. `meta.timing` tells the port what was
+   * decided: `{ at, local, lateMs, why, option }`, `local` being the exact
+   * local ms it was due (earlier than now by up to `horizonMs`).
+   * ⚠️ `port.heard` COUNTS ON DELIVERY, NOT ON QUEUEING, because it is the
+   * far side's evidence (see `send`). `link.held` and `link.missed` count the
+   * rest, so a link that holds everything says so in numbers.
+   */
+  function schedule(e, l, dst, meta) {
+    const o = l.options;
+    const at = Number.isFinite(meta.at) ? meta.at : null;
+    const option = o.follow !== undefined ? `follow ${o.follow}` : `ahead ${o.ahead}`;
+    const tev = at == null ? null : { at, ...(o.follow !== undefined ? { follow: o.follow } : {}) };
+    const t0 = T.local();
+    l.held ??= 0; l.missed ??= 0; l.late ??= [];
+    const give = (v) => {
+      dst.heard++;
+      if (Number.isFinite(v.lateMs)) { l.late.push(v.lateMs); if (l.late.length > 64) l.late.shift(); }
+      dst.deliver?.(e, l, { ...meta, timing: { at, local: v.local, lateMs: v.lateMs, why: v.why, option } });
+    };
+    const ask = (first) => {
+      const nowL = T.local();
+      const v = !tev ? { act: 'hold', why: 'the sender stamped no at, so it had no shared clock' }
+        : !T.timebase ? { act: 'hold', why: 'this bay was given no timebase' }
+        : T.timebase.decide(tev, nowL, { horizonMs: T.horizonMs, pastWindowMs: T.holdMs });
+      if (v.act === 'fire') return give(v);
+      /* ⚠️ A WAIT IS ASKED AGAIN EVERY RECHECK_MS, NOT SLEPT THROUGH. A
+         followed link's line STEPS (an LL-HLS drift-seek moves it 2 s
+         earlier at once), and a cue that slept to the old due fired 2 s after
+         its picture: MEASURED on /concepts/clock/040/ before this line, +2004
+         ms on every cue waiting across a step back. */
+      if (v.act === 'wait') { T.later(() => ask(false), Math.min(RECHECK_MS, Math.max(0, v.local - T.horizonMs - nowL))); return; }
+      if (v.act === 'hold' && nowL - t0 < T.holdMs && tev) {
+        if (first) l.held++;
+        T.later(() => ask(false), HOLD_RETRY_MS);
+        return;
+      }
+      if (first && v.act === 'hold') l.held++;
+      l.missed++;
+      l.lastWhy = v.why;
+    };
+    ask(true);
   }
 
   return {
