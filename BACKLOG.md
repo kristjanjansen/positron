@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Share cards: the site name too big**~~ (2026-10-13, DONE). Asked: *"Toooooo big sitename"*. Wordmark 2.5 to 1.5 times the eye, TEMPLATE_V 4.
+
 - ~~**Share cards: POSITRON.STUDIO larger and at the bottom; the Instagram headline wrapped**~~ (DONE, TEMPLATE_V 3) (2026-10-13). Asked: *"Make positron. studio larger and put to bottom. Wrap ig title"*, then *"Rm delivered as line"* (on the cards; the front page keeps it unless asked). demo/shell/share-card.mjs.
 
 - ~~**Share card: no patchbay, set like the front page; and an Instagram image**~~ (DONE: TEMPLATE_V 2, /og/site-*.png and /og/ig-*.png, kit/share 15/15) (2026-10-13). Asked: *"No patchbay. Do like frontpage. Do also ig image"*. The OG card loses the bay and sets the hero type as the front page does (headline on two lines, large); an Instagram image (1080x1350) in the same style, on /kit/share/ to download, not deployed as a tag.
