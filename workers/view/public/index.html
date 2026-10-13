@@ -90,14 +90,14 @@
      page's, asked 2026-10-13 (*"Keep top whitespace, perhaps bit less"*). */
   /* the footer: three cells in Geist, no rule over them (*"no line. geist.
      nicer"*), each a quiet label over its value, in a row at the desk and a
-     column on a phone */
-  .cc-foot { display: flex; flex-wrap: wrap; gap: 24px 56px; margin-top: 88px; padding-bottom: 48px; font: 400 15px/1.45 var(--sans); }
-  .cc-foot-c { display: flex; flex-direction: column; gap: 4px; color: var(--fg); text-decoration: none; }
-  .cc-foot-k { font-size: 13px; color: var(--dim2); }
-  a.cc-foot-c .cc-foot-v { text-decoration: underline; text-decoration-color: var(--line2, #2b3546); text-underline-offset: 4px; transition: text-decoration-color .15s; }
-  a.cc-foot-c:hover .cc-foot-v { text-decoration-color: var(--hi); }
+     column on a phone; small and with no underline (*"too big lower texts. no
+     underline"*), a link lights on hover instead */
+  .cc-foot { display: flex; flex-wrap: wrap; gap: 20px 48px; margin-top: 140px; padding-bottom: 48px; font: 400 13px/1.45 var(--sans); }
+  .cc-foot-c { display: flex; flex-direction: column; gap: 2px; color: var(--dim); text-decoration: none; }
+  .cc-foot-k { font-size: 12px; color: var(--dim2); }
+  a.cc-foot-c { transition: color .15s; }
+  a.cc-foot-c:hover { color: var(--fg); }
   .cc-foot-y { margin-left: auto; }
-  .cc-foot-y .cc-foot-v { color: var(--dim); }
   @media (max-width: 599px) { .cc-foot { flex-direction: column; } .cc-foot-y { margin-left: 0; } }
   .pos-title .pos-hero-eye { margin: 0; flex: 1 1 auto; }
   .pos-hero.pos-hero-index { padding-top: 8px; }
