@@ -2952,6 +2952,15 @@ button.pos-pg-lab:hover { color: var(--fg); }
   /* an icon button in a group stays its square on a phone: the words grow to
      share the row, a picture does not */
   .pos-bgroup-row button.pos-icobtn { flex: none; }
+  /* A group in a video panel's footer slot shares its line with another
+     group and the panel's own buttons, so it keeps its own width there.
+     Reported 2026-10-13 from an iPhone: *"Join button broken"*. MEASURED at
+     375 on /room/broadcast/: `Join chat-3` was 111.8 px in a 69.3 px row,
+     because the slot's min-content came out at 8 px and the footer's
+     columns split 146.5 / 0 / 146.5. With these two rules: 184.8 / 0 / 108.2,
+     both groups whole and the full screen button inside the footer. */
+  .pos-vp-slot .pos-bgroup { width: auto; min-width: auto; }
+  .pos-vp-slot .pos-bgroup-row { min-width: auto; overflow-x: visible; }
 }
 
 /* ── button group, standing up (button-group.mjs, orient: 'column') ────────

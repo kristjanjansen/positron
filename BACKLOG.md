@@ -1,9 +1,11 @@
 ## Open
 
+- **Scan landscape: fewer knobs** (2026-10-13). Asked: *"Did you ever reduced lanacape params"* then *"What about lanacape params simplofication?"*. /shader/landscape/ shows 29 knobs (35 less the 6 measured dead on 2026-10-12). Keep the few that change the picture most, fix the rest in the patch like the grain ring. Then *"Cut more"*: 3 to 4 knobs. Card say "every number of its look on a knob" goes stale with it.
+
 - ~~**Move drums before radio; move held to archive**~~ (2026-10-13, DONE). Asked: *"Move drums before radio"*, *"Move held to archive"*. CONCEPT_GROUPS order; held `unlisted: true`, a card on /archive/.
 
-- **Chat: move Chat UI wired into Chat, remove Chat UI wired** (2026-10-13). Asked: *"Move chat ui wired to chat. Rm chat ui wired"*. /room/chat/ becomes the chat window page (demo/room/window), /room/window/ 404s, its card goes.
-- **Join button broken on the broadcast chat on iPhone** (2026-10-13). Asked: *"Join button broken"*, screenshot: the transport row reads `JOIN (` clipped beside CLEAR, at phone width. demo/room/broadcast (or room/history, both have admin).
+- ~~**Chat: move Chat UI wired into Chat, remove Chat UI wired**~~ (DONE) (2026-10-13). Asked: *"Move chat ui wired to chat. Rm chat ui wired"*. /room/chat/ becomes the chat window page (demo/room/window), /room/window/ 404s, its card goes.
+- ~~**Join button broken on the broadcast chat on iPhone**~~ (DONE) (2026-10-13). Asked: *"Join button broken"*, screenshot: the transport row reads `JOIN (` clipped beside CLEAR, at phone width. demo/room/broadcast (or room/history, both have admin).
 
 - ~~**Rename the rhythm group to drums; Drums on Pi joins it as remote drums**~~ (DONE, BUILD d85c4b57-134107-7b46) (2026-10-13). Asked: *"Renamw rythm group into drums"* then *"Move drums on pi into remote drums"*. demo/rhythm becomes demo/drums; rhythm/drums becomes drums/machine (a slug may not be its group's name); remote/drums becomes drums/remote, the same move as shader/remote. Old URLs 404.
 
