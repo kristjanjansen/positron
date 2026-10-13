@@ -1,4 +1,5 @@
 ## Open
+- ~~**rm synth/130**~~ (2026-10-13). Asked: *"rm https://positron.studio/concepts/synth/130/"*. DONE by the session: page and row removed, the dump card no longer points at it.
 - ~~**Frontpage hero: the headline's full stop yellow**~~ (2026-10-12). Asked: *"g. -> yellow dot"*. DONE by the session.
 - ~~**Frontpage desk patchbay: 3 by 3 that makes sense**~~ (2026-10-12). Asked: *"3 x 3 blocks in desktop"*, *"make them make sense"*. DONE by the session: keys, a Pico knob and a camera; Cloudflare relay, the Pi GPU and Stream; the Circuit on the Pi, this screen and every phone watching. Nine wires, each a real use. Then *"Rm one box from desktop center"*: the Pi GPU out, the middle is the relay and Stream.
 - ~~**Frontpage phone patchbay: equal columns, sensible wires, one box fewer**~~ (2026-10-12). Asked: *"make cols same size. make them make sense. rm one box from right"*. DONE by the session: R2 out, six wires each a real use, boxes at one width (stretch off, sizeAs) on both pictures.
