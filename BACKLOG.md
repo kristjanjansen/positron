@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /reel/ and /floor/**~~ (2026-10-13). Asked: *"archive reel and floor"*. DONE: unlisted, still served, cards out, on /archive/; /reel/ lives on as archives/000 Newsreels.
 - ~~**Archive /videoradio/**~~ (2026-10-13). Asked: *"archvie videoradio"*. DONE: unlisted, still served, card out, on /archive/; its picture is shader/020 Grain landscape.
 - ~~**The performances heading reads timelines**~~ (2026-10-13). Asked: *"performances = timelines"*. DONE: GROUP_TITLES; partitur and held under it.
 - **Newsreels: the standard video frame** (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/archives/000/ - use std videoframe"*. The kit's video panel (createVideoPanel) in place of the custom frame, with play, mute and full screen where that panel puts them. Then *"move mote to right, left from fullscreen. add next prev buttons in transport bard (glue to timelne). timeline/sync shoyld be its own box?"*: mute left of full screen, a transport bar with prev and next glued to the timeline, and a web:timeline box in the patchbay.

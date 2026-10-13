@@ -232,7 +232,9 @@ export const DEMOS = [
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+  // /reel/, listed on /archive/ with the other retired pages.
+  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true, unlisted: true,
     one: 'every 1965 newsreel in ERR\'s archive is a mark on one line at the day it was broadcast',
     tags: ['archive', 'timeline'] },
   // `now` (one ERR television channel on a line whose right-hand end is the
@@ -243,7 +245,9 @@ export const DEMOS = [
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
   // `node demo/verify-gl.mjs` is the grader.
-  { name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+  // `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+  // /floor/, listed on /archive/ with the other retired pages.
+  { name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, unlisted: true, gl: true, xr: true,
     one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
     tags: ['WebGL2', 'WebXR', 'archive', 'HLS'],
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds

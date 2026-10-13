@@ -143,8 +143,8 @@ export const DEMO_CARDS = {
   // time and sync archived 2026-10-12 (*"archive time and sync demos"*): still served, listed on /archive/.
   // draw archived 2026-10-12 with XY filter: still served, listed on /archive/.
   // use cases: actual content, played with the wiring in view
-  reel: { group: 'archives', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },
-  floor: { group: 'archives', say: 'ERR\'s 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset.' },
+  // reel archived 2026-10-13 (*"archive reel and floor"*): still served, listed on /archive/.
+  // floor archived 2026-10-13 (*"archive reel and floor"*): still served, listed on /archive/.
   // resources archived 2026-10-13 (*"archvie resourves"*): still served, listed on /archive/.
   // tapes archived 2026-10-13 (*"archive tapes and deck"*): still served, listed on /archive/.
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
