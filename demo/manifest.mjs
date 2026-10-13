@@ -588,7 +588,9 @@ export const DEMOS = [
    * the transport, and this page is ready 770 ms after load with the whole pack
    * unzipped, all 64 samples decoded and every check run.
    */
-  { name: 'tom', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archvie tom"*): still built and deployed at
+  // /tom/, listed on /archive/ with the other retired pages.
+  { name: 'tom', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true,
     one: 'tap a grid of 16 steps whose rows become the samples out of a Circuit pack or sample set you open here',
     tags: ['WebAudio', 'timeline', 'zip', 'sysex'] },
 

@@ -128,7 +128,7 @@ export const DEMO_CARDS = {
   // wire and patchbay archived 2026-10-12 (*"archive wire and patchbay"*): still served, listed on /archive/.
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   // nola archived 2026-10-13 (*"arvhice nola"*): still served, listed on /archive/.
-  tom: { group: 'rhythm', say: 'Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid.' },
+  // tom archived 2026-10-13 (*"archvie tom"*): still served, listed on /archive/.
   // time and sync archived 2026-10-12 (*"archive time and sync demos"*): still served, listed on /archive/.
   // draw archived 2026-10-12 with XY filter: still served, listed on /archive/.
   // use cases: actual content, played with the wiring in view

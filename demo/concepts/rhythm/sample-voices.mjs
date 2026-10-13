@@ -119,7 +119,10 @@ export function sampleRows({ nameOf, fileOf, bufOf }) {
   return Array.from({ length: MAX_ROWS }, (_, r) => ({
     key: `s${r}`, name: 'drumsample', note: 36 + r, def,
     get label() { return nameOf(r) ?? `slot ${r + 1}`; },
-    get title() { const f = fileOf(r); return f ? `${f}, row ${r + 1}` : `row ${r + 1}, nothing loaded`; },
+    // Just the row number on the grid, asked 2026-10-13: *"find a way to
+    // shorten drum grid labels: just numbers and hover?"*.
+    short: String(r + 1),
+    get title() { const f = fileOf(r), n = nameOf(r); return f ? `${r + 1} ${n ?? ''}, ${f}`.replace(' ,', ',') : `row ${r + 1}, nothing loaded`; },
     get opens() { return /open|\bo?hh?o\b|\boh\b/i.test(nameOf(r) ?? ''); },
     get closes() { return /closed|\bhhc\b|\bch\b/i.test(nameOf(r) ?? ''); },
     args: () => {
