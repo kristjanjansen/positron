@@ -52,6 +52,7 @@ export const CONCEPTS = [
   { n: 'radio/020', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
   { n: 'radio/030', title: 'Live tempo', say: 'The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.' },
   { n: 'radio/040', title: 'Live key', say: 'Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it.' },
+  // clock/000, 010 and 020 moved to /archive/ 2026-10-13 (*"archvie clock group"*), the clock group with them.
   { n: 'video/000', title: 'Camera', say: 'Turn on your camera and see it on the page while the patchbay holds the link from camera to screen.' },
   { n: 'video/010', title: 'Camera shader', say: 'Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.' },
   { n: 'video/020', title: 'Camera recorder', say: 'Record up to ten seconds of your camera and play it back on a timeline, kept in this browser.' },
@@ -90,9 +91,6 @@ export const CONCEPTS = [
   // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
   // one machine first, then the relay, then two places on one clock. Old 070 Join late merged into Shared clock;
   // old 040 Follow is archived at /archive/clock-follow/. The old numbers 404 (no forwarding).
-  { n: 'clock/000', title: 'Scheduling', say: 'A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late.' },
-  { n: 'clock/010', title: 'Message lag', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' },
-  { n: 'clock/020', title: 'Audio cushion', say: 'A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts.' },
   // clock/030 Shared clock moved to /archive/ 2026-10-12 (*"Cut it"*): both places were simulated in one tab.
   // clock/040 MIDI clock and clock/050 Clock drift moved to /archive/ 2026-10-12 (*"still too many clock demos, i can not distinguish"*, *"move less relevant to archive"*).
   // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
@@ -119,7 +117,8 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock', 'archives'];
+// room last (asked 2026-10-13, *"move room into last group"*).
+export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'typist', 'sampler', 'rhythm', 'archives', 'room'];
 // `archives` is also the first of CASE_GROUPS; as a concept group it keeps the same place on
 // /concepts/ (right after clock) and its demo rows (reel, floor, tapes) draw as demo cards beside archives/000.
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`

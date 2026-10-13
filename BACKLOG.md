@@ -1,4 +1,6 @@
 ## Open
+- ~~**The room group last**~~ (2026-10-13). Asked: *"move room into last group"*. DONE: last in CONCEPT_GROUPS, after archives.
+- ~~**Archive the clock group**~~ (2026-10-13). Asked: *"archvie clock group"*. DONE by the session: clock/000 Scheduling, 010 Message lag, 020 Audio cushion moved to /archive/clock-scheduling/, clock-message-lag/, clock-audio-cushion/; the clock group gone from /concepts/; old URLs 404.
 - ~~**shader/020 without "grains" in its name and line**~~ (2026-10-13). Asked: *"Grain landscape ... - no grains metions"*. DONE: "Scan landscape", "A radio recording drawn as a scan landscape, with every number of its look on a knob."
 - ~~**Instruments split: building instruments and instruments in code**~~ (2026-10-13). Asked: *"split oinstumets group intoto 'building instuments' and 'instuments in code'"*. DONE by the session as headings: synth/080 Faust synth and synth/090 Collide synth (their code on the page) under "instruments in code"; the rest, Sampler included, under "building instruments". No address changed.
 - ~~**Archive /reel/ and /floor/**~~ (2026-10-13). Asked: *"archive reel and floor"*. DONE: unlisted, still served, cards out, on /archive/; /reel/ lives on as archives/000 Newsreels.
