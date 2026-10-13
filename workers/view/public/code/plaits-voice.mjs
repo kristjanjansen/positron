@@ -1,5 +1,5 @@
 // demo/code/plaits-voice.mjs: the Plaits voice that /concepts/synth/110/
-// and /code/plaits-keys/ both play, with its patches and its scope.
+// and /code/plaits/ both play, with its patches and its scope.
 //
 // THE VOICE IS /muta/'s, NOT A COPY: the same `muta-worklet.js` processor
 // (`plai-voice`) and the same `plai.wasm`, Emilie Gillet's Plaits compiled

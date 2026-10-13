@@ -151,7 +151,7 @@
      ✅ **THE SELECTOR AND ITS DIE ARE ALREADY ONE THING AND NO RULE HERE SAYS
      SO.** `picker.mjs:204` appends the die INSIDE `.pos-pick`, and `shell.css`'s
      own phone block keeps it on the segment's line on purpose, written after the
-     die dropped a whole row below the arrows on `/radio/` and `/mirror/`. A
+     die dropped a whole row below the arrows on `/archive/radio/` and `/mirror/`. A
      rule here would be a second copy of one that already works, in a file that
      cannot see the first.
      🔴 **THE CELL IS SIZED TO THE LONGEST MODEL NAME AND NOT TO THE ROW.**
@@ -206,7 +206,7 @@
      have, so `min-width: 0` on the segment bought nothing: the container broke
      the line instead of spending the floor. MEASURED at 375 before this
      declaration: the segment sat at y586.8 and the die at **y624.8**, a whole
-     row below the arrows it works with, which is the exact defect `/radio/` and
+     row below the arrows it works with, which is the exact defect `/archive/radio/` and
      `/mirror/` were reported for. After it they read the same y.
      ⚠️ **AND IT IS LITERALLY THE ASK.** *"Patch selector and randomize button
      go togther and so not wrap"*.
@@ -2126,7 +2126,7 @@
           + `start at ${bTmod ? bTmod.x.toFixed(0) : '?'} px on both rows`
         : 'the first group is not on the page');
 
-    // ⚠️ AND THE STACKED COMPONENTS STILL SHARE A LEFT EDGE. `/radio/` had
+    // ⚠️ AND THE STACKED COMPONENTS STILL SHARE A LEFT EDGE. `/archive/radio/` had
     // exactly this go wrong when a `createChoice` row became a `createPicker`
     // one and the rules keyed on the old class stopped matching, and it was
     // reported three times before anybody measured it.
@@ -2339,7 +2339,7 @@
      * ⚠️ **AND THE ONE-LINE CLAIM IS TRUE AT EVERY WIDTH, WHICH IS WHY IT IS
      * NOT MARKED AS A DESK READING.** `shell.css`'s phone block keeps the die
      * beside the segment on purpose, written after it dropped a whole row below
-     * the arrows on `/radio/` and `/mirror/`.
+     * the arrows on `/archive/radio/` and `/mirror/`.
      */
     const die = pick.el.querySelector('.pos-pick-die')?.getBoundingClientRect();
     const seg = pick.el.querySelector('.pos-pick-seg')?.getBoundingClientRect();

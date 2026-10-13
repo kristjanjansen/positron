@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '5f349552-133055-9264';
+export const BUILD = '1ebb6a40-133409-a39e';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -305,7 +305,7 @@ export function mount({
    * `asserts.length === 0`. These two land at t+0 on EVERY shelled page, so
    * that test became false immediately and the wait never engaged again.
    *
-   * MEASURED the day they landed: `/radio/` makes 34 asserts, the suite
+   * MEASURED the day they landed: `/archive/radio/` makes 34 asserts, the suite
    * collected **2**, and reported **13/13 green**. A green suite with no
    * coverage, across the 28 demos that declare `settleMs`, and nothing about it
    * looked wrong from the outside.
@@ -422,7 +422,7 @@ export function mount({
      * 🔴 IT USED TO SEARCH THE CONTROL ROW ONLY, AND MOVING A BUTTON BROKE IT
      * SILENTLY. Pages move controls on purpose and are told to: `/videoradio/`
      * moved `Run in VR` under its sentence, `/tapes/` moves its own row, and
-     * `/radio/` moved `Automate` into the granulator block on instruction. The
+     * `/archive/radio/` moved `Automate` into the granulator block on instruction. The
      * button still worked; `d.button(id)` returned null, so every check that
      * read its state reported `no button` about a control plainly on the page.
      * MEASURED as three red asserts the moment `Automate` moved.

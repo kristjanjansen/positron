@@ -3,18 +3,22 @@
 // links walk it, so a new page is one row here.
 // 🔴 `id` IS `<group>/<slug>`, THE FOLDER UNDER demo/ AND THE URL, /synth/keyboard/,
 // SINCE 2026-10-13: *"when all is done, move concepts to frontpage ... rename all
-// with group/slug, rm numbers"*. The slug is the title in lowercase words joined
-// by hyphens. It was `n`, `<group>/<number>` under /concepts/ (asked 2026-10-11,
-// *"/concepts/group/0x"*), and every one of those addresses is a 404 now, with
-// no forwarding (positron-concepts). No number is shown anywhere a visitor looks.
-// The URL group is the folder; `group` sets the heading a card shows under when
-// that is not the folder (the URL groups are in CONCEPT_DIRS below, and two of
-// them differ from their heading on purpose: `stations` because /radio/ is the
-// archived radio demo, still served, and `history` because the heading reads
-// history). prev and next walk this order. There is no page per group.
+// with group/slug, rm numbers"*. It was `n`, `<group>/<number>` under /concepts/
+// (asked 2026-10-11, *"/concepts/group/0x"*), and every one of those addresses is
+// a 404 now, with no forwarding (positron-concepts). No number is shown anywhere
+// a visitor looks.
+// 🔴 THE SLUG IS ONE PLAIN LOWERCASE WORD, SINCE THE SAME EVENING: *"Resolve
+// clashes. Avoid dashes on names."* No hyphen, unique in its group, never the
+// group's own name (no /granulator/granulator/), and chosen from the title rather
+// than spelling it out: Circuit on Pi is /remote/circuit/. The title keeps its
+// words. The dashed addresses of that afternoon (/remote/circuit-on-pi/) are 404s,
+// no forwarding. demo/shell/concept-list-test.mjs checks all of it.
+// The URL group is the folder (CONCEPT_DIRS below); `group` sets the heading a
+// card shows under when that is not the folder (`history` shows as archives).
+// prev and next walk this order. There is no page per group.
 export const CONCEPTS = [
   // room/040 Patch from words is off the index since 2026-10-10 (*"hide concepts/001 now"*);
-  // the page stays at /room/patch-from-words/.
+  // the page stays at /room/words/.
   { id: 'synth/keyboard', title: 'Keyboard', say: 'Play a sine synthesizer from the on-screen keys or a MIDI keyboard plugged into this computer.' },
   { id: 'synth/recorder', title: 'Recorder', say: 'Record what you play and play it back, every note in a table with its time, velocity and length.' },
   { id: 'synth/timeline', title: 'Timeline', say: 'The same recorder drawn on a timeline, so a take shows as notes in time and plays from its start.' },
@@ -23,23 +27,23 @@ export const CONCEPTS = [
   // sine and freq knob are synth/000's, and its wave knob is the oscillator's own setting rather than a
   // module; its filter, envelope and LFO are 050. The old URL 404s (no forwarding).
   // 050, 060 and 070 were used before (draw/000, remote/000 and remote/010); those old pages are gone.
-  { id: 'synth/sound-design', title: 'Sound design', say: 'One voice from the keys through a filter, an envelope and an LFO, every knob on a wire of its own.' },
+  { id: 'synth/sound', title: 'Sound design', say: 'One voice from the keys through a filter, an envelope and an LFO, every knob on a wire of its own.' },
   // synth/060 Envelope and synth/070 LFO removed 2026-10-13 into synth/050 Sound design (*"combine
   // filter+envelope+lfo to single sound design concept"*). Their URLs 404 (no forwarding).
-  { id: 'code/faust-synth', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
-  { id: 'code/collide-synth', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
+  { id: 'code/faust', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
+  { id: 'code/collide', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
   // synth/110 Plaits patches moved to /archive/plaits-patches/ 2026-10-13 (*"arhvie plaits patches"*).
-  // Plaits keys and Piano and Rhodes under instruments in code (asked 2026-10-13, *"move plaits keys, sampler to in code instuments"*).
-  { id: 'code/plaits-keys', title: 'Plaits keys', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
+  // Plaits (titled Plaits keys until 2026-10-13, *"rm keys from name"*) and Piano and Rhodes under instruments in code (asked 2026-10-13, *"move plaits keys, sampler to in code instuments"*).
+  { id: 'code/plaits', title: 'Plaits', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // Asked 2026-10-13: *"rename synth to instruments"*, *"move sampler to instruments"*,
   // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
   // its folder and URL stay where they are, so no address changed.
-  { id: 'code/piano-and-rhodes', title: 'Piano and Rhodes', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
+  { id: 'code/piano', title: 'Piano and Rhodes', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
   // Dot piano last in its group (asked 2026-10-13, *"dot piano is last in group"*).
-  { id: 'synth/dot-piano', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
-  { id: 'granulator/granulator', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
+  { id: 'synth/dots', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
+  { id: 'granulator/grains', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
   // sampler/070 (asked 2026-10-13, *"make followup demo with ida, dub and add tempo detection and feed it into granulator"*).
-  { id: 'granulator/beat-granulator', title: 'Beat granulator', say: 'The Ida recording granulated on Dub, its echo and grains put on the beat a tempo detector hears.' },
+  { id: 'granulator/beat', title: 'Beat granulator', say: 'The Ida recording granulated on Dub, its echo and grains put on the beat a tempo detector hears.' },
   // sampler/050, the Pappus granulator, moved to /archive/ 2026-10-13 when the owner chose the light one (*"but we got rid of pappus?!? 060 ???"*): /archive/pappus/, still working.
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
   // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,
@@ -49,56 +53,56 @@ export const CONCEPTS = [
   // the Envelope and LFO pages of the synth/040 split, folded into synth/050 the same day.
   // remote/000 Yoshimi archived 2026-10-13 with Yoshimi (*"discard yoshimi"*): archive/concepts/remote-000.md.
   // The gap stays; /concepts/remote/000/ is a 404.
-  { id: 'remote/circuit-on-pi', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
-  { id: 'remote/collide-on-pi', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
-  { id: 'remote/piano-and-rhodes-on-pi', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
-  { id: 'remote/drums-on-the-pi', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
-  { id: 'remote/shader-on-pi', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
+  { id: 'remote/circuit', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
+  { id: 'remote/collide', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
+  { id: 'remote/piano', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
+  { id: 'remote/drums', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
+  { id: 'remote/shader', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
-  // there"*). draw/000 was synth/050 until then; /synth/sound-design/ is Sound design since 2026-10-13.
+  // there"*). draw/000 was synth/050 until then; /synth/sound/ is Sound design since 2026-10-13.
   // draw/000 XY filter moved to /archive/ 2026-10-12 (*"Revert xy changes, archive cy and draw"*), and the draw group with it.
-  { id: 'stations/radio', group: 'radio', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
-  { id: 'stations/tuner', group: 'radio', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
-  { id: 'stations/tempo', group: 'radio', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
-  { id: 'stations/live-tempo', group: 'radio', title: 'Live tempo', say: 'The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.' },
-  { id: 'stations/live-key', group: 'radio', title: 'Live key', say: 'Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it.' },
+  { id: 'radio/blend', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
+  { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
+  { id: 'radio/tempo', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
+  { id: 'radio/live', title: 'Live tempo', say: 'The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.' },
+  { id: 'radio/key', title: 'Live key', say: 'Hear a live station, see the key a detector finds in it lit on a keyboard, and play along in it.' },
   // clock/000, 010 and 020 moved to /archive/ 2026-10-13 (*"archvie clock group"*), the clock group with them.
   { id: 'video/camera', title: 'Camera', say: 'Turn on your camera and see it on the page while the patchbay holds the link from camera to screen.' },
-  { id: 'video/camera-shader', title: 'Camera shader', say: 'Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.' },
-  { id: 'video/camera-recorder', title: 'Camera recorder', say: 'Record up to ten seconds of your camera and play it back on a timeline, kept in this browser.' },
-  { id: 'video/webrtc-loopback', title: 'WebRTC loopback', say: 'Your camera over WebRTC to Cloudflare Stream and back beside the original, with the delay timed.' },
+  { id: 'video/shader', title: 'Camera shader', say: 'Your camera beside itself through a two tone dither shader, with one knob for how coarse it is.' },
+  { id: 'video/recorder', title: 'Camera recorder', say: 'Record up to ten seconds of your camera and play it back on a timeline, kept in this browser.' },
+  { id: 'video/webrtc', title: 'WebRTC loopback', say: 'Your camera over WebRTC to Cloudflare Stream and back beside the original, with the delay timed.' },
   // video/060 split out of video/030 2026-10-12 (*"Split hls and webrtc loopbacks"*). Not 040: /archive/ labels the archived TV page `video 040`.
-  { id: 'video/ll-hls-loopback', title: 'LL-HLS loopback', say: 'Your camera to Cloudflare Stream and back as LL-HLS beside the original, with the delay timed.' },
-  { id: 'video/moq-loopback', title: 'MoQ loopback', say: 'Your camera over MoQ to Cloudflare\'s relay and back beside the original, with the delay timed.' },
+  { id: 'video/llhls', title: 'LL-HLS loopback', say: 'Your camera to Cloudflare Stream and back as LL-HLS beside the original, with the delay timed.' },
+  { id: 'video/moq', title: 'MoQ loopback', say: 'Your camera over MoQ to Cloudflare\'s relay and back beside the original, with the delay timed.' },
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
-  { id: 'shader/mirror-shader', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
+  { id: 'shader/mirror', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
   // shader/020 and not 010: 010's old address 404s on purpose, so it is not reused for a different page.
-  { id: 'shader/scan-landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape, with every number of its look on a knob.' },
+  { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape, with every number of its look on a knob.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
   { id: 'room/chat', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
-  { id: 'room/chat-ui-wired', title: 'Chat UI wired', say: 'The same chat in a proper chat window, with the patchbay still doing the wiring underneath.' },
-  { id: 'room/broadcast-chat', title: 'Broadcast chat', say: 'Whoever joins first is admin and broadcasts in a column of their own while the rest chat beside.' },
-  { id: 'room/chat-timeline', title: 'Chat timeline', say: 'The broadcast chat with a memory: until you join, the room\'s last fifty lines replay at their pace.' },
+  { id: 'room/window', title: 'Chat UI wired', say: 'The same chat in a proper chat window, with the patchbay still doing the wiring underneath.' },
+  { id: 'room/broadcast', title: 'Broadcast chat', say: 'Whoever joins first is admin and broadcasts in a column of their own while the rest chat beside.' },
+  { id: 'room/history', title: 'Chat timeline', say: 'The broadcast chat with a memory: until you join, the room\'s last fifty lines replay at their pace.' },
   // room/010 History and room/020 Admin removed 2026-10-11 (*"rm room 010 020
   // 030. since we cover it right?"*): room/004 keeps the history, room/003 the
   // admin. Their pages are in git history before that commit.
   // room/030 Broadcast removed 2026-10-12 (*"rm 030room"*); video/030 keeps the WHIP and WHEP round trip.
   { id: 'typist/paper', title: 'Paper', say: 'A sheet of white paper to type on, with a blocky cursor and a page that opens full screen.' },
   { id: 'typist/typewriter', title: 'Typewriter', say: 'The same paper, now sounding like a Hermes Precisa 305 typewriter, bell and all.' },
-  { id: 'typist/typewriters', title: 'Typewriters', say: 'The typewriter through an effects box where every number gives a different machine.' },
+  { id: 'typist/machines', title: 'Typewriters', say: 'The typewriter through an effects box where every number gives a different machine.' },
   { id: 'typist/playback', title: 'Playback', say: 'Everything you type, deletions included, is kept and played back as the page writes itself again.' },
-  { id: 'typist/multi-typer', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
+  { id: 'typist/score', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
-  { id: 'rhythm/drum-machine', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
-  { id: 'rhythm/drum-knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
-  { id: 'rhythm/sample-drums', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
+  { id: 'rhythm/drums', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
+  { id: 'rhythm/knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
+  { id: 'rhythm/samples', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
   // rhythm/030 moved to remote/040 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
-  { id: 'rhythm/camera-drums', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
+  { id: 'rhythm/camera', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
   // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
   // one machine first, then the relay, then two places on one clock. Old 070 Join late merged into Shared clock;
   // old 040 Follow is archived at /archive/clock-follow/. The old numbers 404 (no forwarding).
@@ -121,11 +125,13 @@ export const CONCEPTS = [
 // their URLs. workers/view/build.mjs deploys each one whole and REFUSES the build
 // when one is also a demo slug in demo/manifest.mjs, a file the build lists, or
 // a row's id names a folder not here: a concept group may never take over a
-// still-served address (2026-10-13, /radio/ is why `stations` is not `radio`).
+// still-served address. The radio concepts were `stations` for one afternoon
+// because the archived radio demo still answered at /radio/; asked *"Resolve
+// clashes"*, that demo moved to /archive/radio/ and the group took `radio`.
 // `room` was the archived /room/ demo until 2026-10-01 (archive/demos/room-index.html);
 // /room/ itself stays a 404, only /room/<slug>/ answers. `archive` is not here:
 // the tutorial slide moved to /archive/tutorial-slide/ with the archived pages.
-export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'stations', 'video', 'shader', 'room', 'typist', 'rhythm', 'history'];
+export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'rhythm', 'history'];
 
 // The demos on the front page (asked 2026-10-12, *"inegrate fronpage
 // index and concepts, prefering the latter"*). Every listed, built row of
@@ -177,7 +183,7 @@ export const DEMO_CARDS = {
   // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // radio archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
-  // videoradio archived 2026-10-13 (*"archvie videoradio"*): still served, listed on /archive/; its picture lives on as /shader/scan-landscape/.
+  // videoradio archived 2026-10-13 (*"archvie videoradio"*): still served, listed on /archive/; its picture lives on as /shader/landscape/.
   // knobs archived 2026-10-13 with Yoshimi: archive/demos/knobs-index.html, /knobs/ is a 404.
   // away archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
   // shape archived 2026-10-12 (*"archiev shape"*): still served, listed on /archive/ under devices.

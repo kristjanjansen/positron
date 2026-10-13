@@ -610,7 +610,7 @@ export function createBoard({
   /**
    * 🔴 ASK ON THE DIRECT LINK OR NOT AT ALL. For a message that must never
    * reach the relay room, which is tokenless and heard by everybody in it: the
-   * Pi camera's key (/remote/circuit-on-pi/, 2026-10-13). `ask` falls back to the
+   * Pi camera's key (/remote/circuit/, 2026-10-13). `ask` falls back to the
    * relay when `ctl` is not open, which is right for a note and wrong for a
    * secret, so this answers null instead.
    */
@@ -782,7 +782,7 @@ export function createBoard({
     /**
      * Another data channel on the open direct link, or null while there is
      * none. Since 2026-10-13, for the Pi camera's `cam` channel on
-     * /remote/circuit-on-pi/: the board holds a listed label and sends nothing
+     * /remote/circuit/: the board holds a listed label and sends nothing
      * on it until it is asked over `ctl` (rig/board/rtc.mjs `channels`).
      */
     channel(label, opts = {}) {

@@ -83,7 +83,7 @@ export const MOVE_TURN = [0];
  * ⚠️ A GLYPH IS THE STATE, NOT THE NEXT PRESS, which is what `WAY_GLYPH`
  * already does for the loop.
  * 🔴 AND IT IS NOT `⇆`. That glyph already means "the loop plays there and
- * back" on `/radio/` and `/replay/`, and one picture meaning two things is one
+ * back" on `/archive/radio/` and `/replay/`, and one picture meaning two things is one
  * picture: whichever a reader learns first is the one they will read.
  */
 // ⇄, asked for 2026-09-16. `↝` was a squiggle nobody could name; two arrows

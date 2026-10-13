@@ -2,7 +2,7 @@
 // as a module. Moved out of that page on 2026-10-13 so a second page can draw
 // the same picture (BACKLOG, *"copy the visualization from videoradio and add
 // it to shaders concept. add all parameters that adjust its visualization as
-// knobs + add patchbay"*): /shader/scan-landscape/ imports it with every look
+// knobs + add patchbay"*): /shader/landscape/ imports it with every look
 // number on a knob. The shader text, the looks table and the WebGL chain were
 // moved VERBATIM, comments and all; nothing was rewritten on the way.
 //
@@ -1182,7 +1182,7 @@ export function createScanField(g, { look = LOOKS[DEFAULT_LOOK], live = false, c
      * field and the previous output to black, runs all six passes into targets
      * of its own and reads the composite: the same bytes and the same numbers
      * draw the same pixels, and nothing touches the live ping-pong. Added
-     * 2026-10-13 for /shader/scan-landscape/.
+     * 2026-10-13 for /shader/landscape/.
      */
     testFinal(bytes) {
       const GW = TEST_W >> 2, GH = TEST_H >> 2;

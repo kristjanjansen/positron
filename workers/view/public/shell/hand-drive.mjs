@@ -35,7 +35,7 @@ import {
  * this, that a live loop with no ceiling is a recording with no end.
  *
  * ⚠️ THESE TWO LIVED IN `slider.mjs` UNTIL 2026-09-22 and are re-exported from
- * there, because `/radio/`, `/kit/` and `/knobs/` all import `HAND_YIELD_MS`
+ * there, because `/archive/radio/`, `/kit/` and `/knobs/` all import `HAND_YIELD_MS`
  * from that module and a moved export is a 404 in three pages.
  */
 export const HAND_MAX_MS = 10 * 60 * 1000;

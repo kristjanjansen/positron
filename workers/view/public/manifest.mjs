@@ -367,10 +367,10 @@ export const DEMOS = [
   // same pipe. `built` flips the moment positron-shout answers.
   // ⚠️ `shout` IS OFF THE LIST AND ITS WORKER IS UNTOUCHED. The demo page was a
   // measurement OF the relay — status, CORS, bitrate, burst, underruns — and
-  // `/radio/` now makes the same relay do something you can hear, which is
+  // `/archive/radio/` now makes the same relay do something you can hear, which is
   // the better demonstration of the same fact. 🔴 `workers/shout/` STAYS AND
   // MUST: it is the thing that carries the station's plain-HTTP mount to a
-  // secure page, and deleting it takes `/radio/` and `/grains/` with it.
+  // secure page, and deleting it takes `/archive/radio/` and `/grains/` with it.
   // The page's own source is under `archive/`.
 
   // Act 5 with shout, and deliberately NOT a second copy of it: same relay,
@@ -389,9 +389,11 @@ export const DEMOS = [
   // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
   // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
   // samples and a 1.2 s deafness control before the page says anything at all.
-  // `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
-  // /radio/, listed on /archive/ with the other retired pages.
-  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 15000,
+  // `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built, listed on
+  // /archive/ with the other retired pages. And `archive/radio`, in demo/archive/radio/, since the
+  // same evening (*"Resolve clashes"*): /radio/ is the radio concepts' group now, so the old
+  // /radio/ address is a 404 (no forwarding), like the kit's `kit/<part>` rows a name with a slash.
+  { name: 'archive/radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 15000,
     one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
@@ -399,7 +401,7 @@ export const DEMOS = [
   // and loops itself in time, and the only picture is a shader of what the
   // granulator is doing rather than of what it sounds like. It imports the
   // stations, the sounds and the lanes from `demo/shell/radio-gran.mjs`.
-  // ⚠️ AND IT IS THE ONLY PAGE THAT DOES, SINCE 2026-09-16. `/radio/` imported
+  // ⚠️ AND IT IS THE ONLY PAGE THAT DOES, SINCE 2026-09-16. `/archive/radio/` imported
   // the same module while it had a tour of its own; the tour was removed on
   // instruction and those were its only imports, so the two pages now share the
   // module's subject and none of its code. See `archive/radio-automate/`.
@@ -759,7 +761,7 @@ export const DEMOS = [
   // `grains` and `knobs` were here until 2026-10-13, archived with Yoshimi on
   // *"discard yoshimi ... arhive demos using it"*: archive/demos/grains-index.html,
   // archive/demos/knobs-index.html and archive/yoshimi/README.md. /grains/ and
-  // /knobs/ are 404s; demo/grains/defs/ stays because /radio/, /videoradio/ and
+  // /knobs/ are 404s; demo/grains/defs/ stays because /archive/radio/, /videoradio/ and
   // /archive/pappus/ (the old concepts sampler/050) load it.
   /**
    * 🔴 THE FIRST PAGE TO USE `tabs.mjs`, WHICH HAS EXISTED WITH NO CALLER. It

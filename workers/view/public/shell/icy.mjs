@@ -38,7 +38,7 @@
  *   callers fed this demuxer purely to read the station's text and let an
  *   `<audio>` element fetch the SAME STREAM A SECOND TIME for the sound — so
  *   the audio bytes arriving here were simply dropped on the floor. When
- *   `/radio/` had to decode for itself (WebKit does not route a media
+ *   `/archive/radio/` had to decode for itself (WebKit does not route a media
  *   element into WebAudio — see mp3-stream.mjs), there was nowhere for the bytes
  *   to come out. ⚠️ A demuxer that throws away half of what it demuxes reads as
  *   complete right up until somebody wants the other half.

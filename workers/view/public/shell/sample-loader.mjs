@@ -5,7 +5,7 @@
 //
 // Lifted 2026-10-12 out of /tom/, whose `openPack`, `openZip` and
 // `openStream` this is, word for word in what they say, for
-// /rhythm/sample-drums/ (*"drums that play samples"*). /tom/ calls the three
+// /rhythm/samples/ (*"drums that play samples"*). /tom/ calls the three
 // it always had; the plain WAV cases are `openFiles` and are new.
 //
 // 🔴 READ ONLY, AND NOTHING LEAVES THE PAGE. It reads bytes a person handed
@@ -77,7 +77,7 @@ export function createSampleLoader({ say = () => {}, log = () => {} } = {}) {
   /**
    * A download: a zip of packs, or of one bulk transfer. With `wavs: true` a
    * zip holding neither but holding WAVs opens as a kit of those WAVs, which
-   * is what /tom/ never did and /rhythm/sample-drums/ wants.
+   * is what /tom/ never did and /rhythm/samples/ wants.
    */
   async function openZip(name, bytes, { wavs = false } = {}) {
     let list;

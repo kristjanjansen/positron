@@ -2,7 +2,7 @@
 // played from the kit's keys, a knob per parameter. It was written for three
 // pages, one module each (050 filter, 060 envelope, 070 LFO, the split of
 // synth/040), and since 2026-10-13 builds the one that replaced them,
-// /synth/sound-design/ Sound design (*"combine filter+envelope+lfo to single
+// /synth/sound/ Sound design (*"combine filter+envelope+lfo to single
 // sound design concept"*). It stays a module because the page is a patch and a
 // knob list handed to it.
 //

@@ -196,7 +196,7 @@ export function createTransportBar(host, deck, {
    * 🔴 WHAT TAKES THE LOOP BUTTON'S PLACE ON A BAR THAT HAS NO LOOP. Asked for
    * in those words, 2026-09-16: *"just replace looper with fullscreen button
    * (make component slot-able)"*, for `/videoradio/`, whose bar wants a ⛶ where
-   * `/radio/` has LOOP.
+   * `/archive/radio/` has LOOP.
    *
    * ⚠️ IT IS A SEPARATE OPTION FROM `loopExtras` BECAUSE THOSE TWO MEAN
    * DIFFERENT THINGS, and reusing one for the other would be a name that lies.
@@ -232,7 +232,7 @@ export function createTransportBar(host, deck, {
    * will play can be pressed before there is one and changes what the next
    * press of LOOP does, so it is neither inert nor hidden: it is the same
    * distinction `caps.mjs` draws between a thing you cannot do and a thing you
-   * have not done yet. `/radio/` uses it for the direction button glued to
+   * have not done yet. `/archive/radio/` uses it for the direction button glued to
    * LOOP, which is why the group below exists.
    */
   loopExtras = [],
@@ -279,7 +279,7 @@ export function createTransportBar(host, deck, {
    * Called with the new rate the instant a rate button is pressed.
    *
    * 🔴 IT REPLACES A POLL, AND THE POLL WAS A THIRD OF A REPORTED DELAY.
-   * `/radio/` owns the thing the rate actually acts on (an Icecast playout,
+   * `/archive/radio/` owns the thing the rate actually acts on (an Icecast playout,
    * not this deck's playhead), and the only way it could learn about a press
    * was to read `deck.targetRate()` on a timer. That timer was 1 Hz — *"why
    * rate change is so slooooooooow"* — then 120 ms, which is better and is
@@ -1566,7 +1566,7 @@ export function createTransportBar(host, deck, {
      * duplicate. This is what `window.__demo.transport` points at, which is the
      * only handle a CDP check has; the return value is what the PAGE holds. A
      * control reachable from one and not the other is a control the harness
-     * cannot press, which is how `/radio/`'s ways went ungraded.
+     * cannot press, which is how `/archive/radio/`'s ways went ungraded.
      */
     loopExtra: (id) => loopExtraEls.get(id) || null,
     /** a `loopSlot` button by id. Always on the bar; see the option. */

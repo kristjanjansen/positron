@@ -1,6 +1,6 @@
 // demo/shell/looper.mjs — the looper, for every page that keeps seconds of sound.
 //
-// 🔴 IT WAS `/radio/`'S AND IS NOW EVERY PAGE'S, ASKED FOR IN THOSE WORDS:
+// 🔴 IT WAS `/archive/radio/`'S AND IS NOW EVERY PAGE'S, ASKED FOR IN THOSE WORDS:
 // *"make it use same looping ui as radio (make it global)"*. What was on that
 // page was a vocabulary of ways to play a kept lap, a button glued to LOOP that
 // cycles → ← ⇆, a ring that keeps the sound, and one voice that reads the lap
@@ -40,7 +40,7 @@
 
 /**
  * 🔴 THE WAYS, AND THE ORDER OF THIS TABLE IS LOAD-BEARING. Every check in
- * `/radio/` drives a way BY NUMBER, so `pingpong` is fifth rather than third:
+ * `/archive/radio/` drives a way BY NUMBER, so `pingpong` is fifth rather than third:
  * renumbering them would make four asserts grade a different way than their own
  * labels claim. Each is a different MECHANISM rather than a different number of
  * one, which is the rule the twelve sounds were rebuilt under.

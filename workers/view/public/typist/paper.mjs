@@ -1,5 +1,5 @@
 // demo/typist/paper.mjs: one sheet of paper, lifted out of
-// /typist/paper/ for /typist/multi-typer/, which shows several.
+// /typist/paper/ for /typist/score/, which shows several.
 // 000, 010 and 020 still carry their own copy and are unchanged.
 //
 // ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The

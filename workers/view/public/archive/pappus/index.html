@@ -28,13 +28,13 @@
   //
   // Everything that is not Pappus (the sources, the scope, the grain events,
   // the knobs and their glide, the patchbay, Play and the self check) is
-  // `/granulator/grain-rig.mjs`, which /granulator/granulator/ shares. This page is the
+  // `/granulator/grain-rig.mjs`, which /granulator/grains/ shares. This page is the
   // engine and its controls. No output scope since 2026-10-13: the patch
   // picker stands alone (*"replace with just a patch selector (no
   // scope/viz/footer)"*).
   // Archived 2026-10-13: the owner chose the light Grain ring as the
   // granulator (*"but we got rid of pappus?!? 060 ???"*), which is
-  // /granulator/granulator/ again. This was concepts sampler/050 and still works
+  // /granulator/grains/ again. This was concepts sampler/050 and still works
   // here, on the board's own Pappus definitions at /grains/defs/.
   const d = mount({ name: 'Pappus granulator', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
@@ -138,7 +138,7 @@
         // `SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half])`
         // (Engine_Pappus.sc:849) arrives as `['/pgrain', nodeID, replyID, pos,
         // dur, voice, half]`; `pos` is at index 3 (the off by one /grains/ and
-        // /radio/ both record). `pos` is a fraction of the SIXTY second ring
+        // /archive/radio/ both record). `pos` is a fraction of the SIXTY second ring
         // and the engine reads only its first BUF_SECONDS, so it is rescaled
         // to the window, and the window's write head says how many seconds ago
         // the audio under that grain arrived.

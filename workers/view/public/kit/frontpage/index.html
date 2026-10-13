@@ -323,7 +323,7 @@
       const grid = el('div', 'fp-cc');
       rule.cards = [];
       // Real rows by id, no number on a card since 2026-10-13 (*"rm numbers"*).
-      for (const id of ['synth/keyboard', 'stations/tuner', 'video/camera']) {
+      for (const id of ['synth/keyboard', 'radio/tuner', 'video/camera']) {
         const c = CONCEPTS.find((x) => x.id === id);
         if (!c) continue;
         const a = el('a', 'fp-cc-card', '', { href: `/${c.id}/` });

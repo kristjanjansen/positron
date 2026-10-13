@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Drums on the Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The path choice alone at the top left, as /remote/piano/'s row
+     (Play is the drum machine's own, on its transport bar). */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/remote/path.mjs';
+  import { createOverlayScope } from '/remote/overlay-scope.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { createBoard, BOARD_RATE, BOARD_CHANNELS } from '/shell/board.mjs';
+  import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { compile } from '/shell/sclang-lite.mjs';
+  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
+  import { VOICES, LIFE } from '/rhythm/voices.mjs';
+
+  // /rhythm/drums/ with the same four drums also played on the
+  // Raspberry Pi, the way /remote/collide/ pairs a voice here with one on
+  // the Pi. plans/plan-pi-supercollider-defs.md §3.4 and §4 step 6 (the plan
+  // calls it rhythm/020; that number went to the sample drums).
+  //
+  // ONE PI NODE, NOT FOUR. `pi-1:drums` has one `midi-in` and one `audio-out`,
+  // because the board's sound comes back as one summed stream and cannot
+  // honestly offer four outs (plan §3.4). The sequencer's `midi-out` is wired
+  // to it with no filter; its `deliver`, on this page, turns General MIDI's
+  // drum notes into the four program names and gathers the hits that share a
+  // time into one `sc.hit` message. A closed hat carries `choke: 'hho'`, so
+  // the board closes every open hat still ringing in the same bundle, as the
+  // local side does with `/n_set gate 0`.
+  //
+  // ONE TIME FOR BOTH SIDES. A hit due at S on this tab's clock sounds here at
+  // S (a timestamped bundle to the scsynth in this tab) and on the Pi at S
+  // (`at` on the board's clock, which `board-collide.mjs` keeps with
+  // `clock.ping` and the fastest round trip). So both sides are handed over
+  // on the Pi's path: 250 ms early on the relay, 150 direct (plan §2.4,
+  // `AHEAD` in board-collide.mjs).
+  //
+  // PLAY JOINS THE PI, NOTHING ON A VISIT. Asked 2026-10-12: *"rm, play button
+  // reaches for pi too"*, so the separate Pi button is gone. A press of Play
+  // makes the page's 48 kHz context, boots this tab's scsynth, then (the
+  // drum machine's `onStart`, while the bar shows busy) asks the board in
+  // `studio-1` for `audio.status` and gives it ASK_MS. No answer, or a run
+  // under a harness (`createBoard` will not drive the board under
+  // `?selfcheck=` unless `?board=1`), means the Pi side is SIMULATED here, and
+  // the Pi panel's footer, the Pi node's label and the `path` cell say so. A
+  // board that answers is started (`audio.start {source: 'collide'}`), given
+  // the four programs as text (`sc.load`, `same` says whether its compile is
+  // this tab's), and its clock found before the first hit is sent, so the
+  // first hit already has the Pi's lead. Stop leaves the Pi (`onStop`).
+  //
+  // SIMULATED: a second scsynth in this tab with the same four programs,
+  // each hit started UP_MS after it is handed over (so a lead shorter than the
+  // trip makes it late, counted the way the board counts), and its sound
+  // folded to mono and delayed DOWN_MS on the way back.
+  //   UP_MS    36, tab to Pi on the relay, two ~18 ms legs (plan §2.4, MEASURED).
+  //   DOWN_MS  139, a sound on the Pi to this tab's speakers on the relay:
+  //            ~175 ms key to speakers for Yoshimi minus that 36 (plan §3.1,
+  //            COMPUTED from a measurement). A MODEL, NOT THE BOARD.
+  //   ⚠️ MEASURED ON THE REAL PI 2026-10-12, Pi lag (first hit after a start):
+  //   176 to 317 ms on the relay and 82 to 112 ms direct, so the model's 139
+  //   is short on the relay by 40 to 180 ms.
+  //
+  // THE FOUR CELLS, on top (a concept page with a readout shows it on top):
+  //   Pi late     the board's own `late + droppedLate` from `sc.stats` every
+  //               2 s, counted from this join: hits that reached its scsynth
+  //               after their time. The
+  //               simulation's count of the same thing in simulation.
+  //   Pi lag      from a hit's time S to the first sound of it back from the
+  //               Pi, at the Pi side's meter plus this context's output
+  //               latency. Timed only on a hit with no Pi hit in the 600 ms
+  //               before it and silence on the Pi side at S, so a ring or the
+  //               previous hit cannot pass for it: in practice the first hit
+  //               after a start. ⚠️ The stand-in board's sound is a constant
+  //               tone, so against it this cell stays empty.
+  //   network     the board's own answer time on the path, `board.stats().rttMs`
+  //               (`round trip` until 2026-10-13, renamed as remote/010's was).
+  //   path        relay, direct, model (the Pi simulated in this tab; the word
+  //               `simulated` did not fit the cell at 1280), or empty while stopped.
+  //
+  // THE SCOPE, asked 2026-10-13 (*"can not see viz improvements"*, on the two
+  // half width panels this page still had): remote/020's one full width
+  // scope, both sides' drums on it, here yellow and the Pi blue, from
+  // /remote/overlay-scope.mjs. Each bar's first hit is the trigger;
+  // each side's window starts at its own copy of that hit and is held until
+  // the next bar. The Pi's copy is found by its shape ('match' there), since
+  // a pattern is never quiet in the 90 to 300 ms before it arrives.
+  //
+  // THE ASSERT THE PLAN NAMES, read by a check through `__demo.drums.check()`:
+  // hits handed over to the board equal the hits it started.
+  const d = mount({
+    name: 'Drums on the Pi', what: '', index: '/', indexLabel: 'concepts',
+    // The four cells under the title, the log at the foot, as remote/020.
+    joined: false,
+    readout: { 'Pi late': '', 'Pi lag': 'ms', network: 'ms', path: '' },
+  });
+  conceptNav('remote/drums');
+
+  const q = new URLSearchParams(location.search);
+  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
+  // instruments."* The same choice, cell and fall back as remote/010 and 030
+  // (`/remote/path.mjs`): the relay unless `?path=direct`, direct
+  // offered once the board answers, the relay kept for presence and as the
+  // fall back when no channel opens in 3 s or it drops. A change of choice
+  // while playing leaves the board and joins it again on the new path.
+  const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
+  const ASK_MS = 3000;
+  const UP_MS = 36, DOWN_MS = 139;
+  const STATS_MS = 2000;
+  const NAME_OF = new Map(VOICES.map((v) => [v.note, v.name]));
+
+  // ── the context: the page's, at the board's rate, made on the first press ─
+  let ctx = null, master = null, xmix = null, mixMeter = null, mixBuf = null, localTap = null;
+  /** Per side: where its sound comes from, the scope, the meter and its fade gain. */
+  const SIDES = {
+    local: { out: () => localTap, from: 'web:mix:audio-out', scope: 'web:scope:audio-in', fadeIn: 'web:xfade:audio-in' },
+    pi: { out: () => pi.out(), from: `${BOARD_SITE}:drums:audio-out`, scope: 'web:scope:audio-in-2', fadeIn: 'web:xfade:audio-in-2' },
+  };
+  function getCtx() {
+    if (ctx) return ctx;
+    // At the board's rate, so the board's sound can be played in THIS context
+    // (`createBoard({ audioContext })` refuses any other; nothing resamples).
+    ctx = new AudioContext({ sampleRate: BOARD_RATE, latencyHint: 'interactive' });
+    master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+    const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+    localTap = ctx.createGain();
+    xmix = ctx.createGain();
+    mixMeter = ctx.createAnalyser(); mixMeter.fftSize = 2048; mixMeter.connect(pull);
+    mixBuf = new Float32Array(mixMeter.fftSize);
+    for (const s of Object.values(SIDES)) {
+      s.gain = ctx.createGain(); s.gain.gain.value = 0; s.gain.connect(xmix);
+      // 32768 samples, 0.68 s: long enough to still hold a bar's first hit
+      // here when the Pi's copy of it arrives up to 400 ms later.
+      s.an = ctx.createAnalyser(); s.an.fftSize = 32768; s.an.connect(pull);
+      // 512 samples, about 11 ms: short, so an onset is seen early.
+      s.meter = ctx.createAnalyser(); s.meter.fftSize = 512; s.meter.connect(pull);
+      s.mbuf = new Float32Array(s.meter.fftSize);
+    }
+    return ctx;
+  }
+  const rmsOf = (an, buf) => { an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); };
+  const dbfs = (r) => (r > 0 ? 20 * Math.log10(r) : -Infinity);
+
+  // ── the Pi side, simulated: a second scsynth with the same four programs ─
+  async function createSimulatedPi(c, log) {
+    const e = await bootScsynth({ audioContext: c, log: (l, k) => log(`Pi (simulated): ${l}`, k),
+      scsynthOptions: { numOutputBusChannels: 2, numInputBusChannels: 2 } });
+    // Pulled through a silent branch (an engine nobody pulls never answers),
+    // its sound folded to the board's one channel and delayed on the way back.
+    e.out.disconnect();
+    const pull = c.createGain(); pull.gain.value = 0; pull.connect(c.destination);
+    e.out.connect(pull);
+    const fold = c.createGain();
+    fold.channelCount = BOARD_CHANNELS; fold.channelCountMode = 'explicit'; fold.channelInterpretation = 'speakers';
+    const tail = c.createDelay(1);
+    tail.delayTime.value = DOWN_MS / 1000;
+    e.out.connect(fold).connect(tail);
+    for (const v of VOICES) {
+      const r = compile(v.program, { name: v.name, bus: 0 });
+      if (!r.ok) throw new Error(`${v.label} did not compile: ${r.message}`);
+      const got = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && m[1] === '/d_recv', 5000, '/d_recv', r.bytes);
+      if (!got || got[0] !== '/done') throw new Error(`the simulated Pi did not take ${v.label}`);
+    }
+    let nextId = 8000, openHat = null, closed = false;
+    const stat = { started: 0, late: 0, chokes: 0 };
+    const timers = new Set();
+    return {
+      stat, out: () => tail,
+      hit(h) {
+        // The trip up: the hit reaches the simulated board UP_MS from now.
+        const t = setTimeout(() => {
+          timers.delete(t);
+          if (closed) return;
+          if (h.perfAt < performance.now()) stat.late++;
+          if (h.choke && openHat && h.perfAt < openHat.until) { e.sendAt(h.perfAt, '/n_set', openHat.id, 'gate', 0); stat.chokes++; openHat = null; }
+          const id = nextId++;
+          e.sendAt(h.perfAt, '/s_new', h.name, id, 0, 0);
+          stat.started++;
+          if (h.name === 'hho') openHat = { id, until: h.perfAt + LIFE.hho * 1000 };
+        }, UP_MS);
+        timers.add(t);
+      },
+      close() { closed = true; for (const t of timers) clearTimeout(t); timers.clear(); try { tail.disconnect(); } catch { /* gone */ } try { e.out.disconnect(); } catch { /* gone */ } },
+    };
+  }
+
+  // ── the Pi side: THE ONE PLACE THE BOARD GOES IN ─────────────────────────
+  /**
+   * `mode()`: `idle` (not joined), `checking`, then `relay`, `direct`, `turn`
+   * or `simulated`. `join(ctx)`, `leave()`, `hits(list)`, `out()`.
+   */
+  function createPiSide({ log, onMode = () => {} }) {
+    let mode = 'idle', board = null, kit = null, sim = null, joining = null, timer = 0, last = null, base = null, loaded = [];
+    let dropped = 0, simHanded = 0;
+    const say = (m) => { mode = m; onMode(m); };
+    const real = () => ['relay', 'direct', 'turn'].includes(mode);
+    async function tryBoard(c) {
+      board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: c, toDestination: false,
+        direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      if (!board.driving()) return 'this run may not drive the board';
+      const t0 = performance.now();
+      while (board.state() !== 1 && performance.now() - t0 < ASK_MS) await new Promise((r) => setTimeout(r, 50));
+      const left = ASK_MS - (performance.now() - t0);
+      if (board.state() !== 1 || !await board.ask({ type: 'audio.status' }, 'audio.started', Math.max(500, left))) {
+        return `no board answered in ${ASK_MS / 1000} s`;
+      }
+      const st = await kit.start();
+      if (!st?.ok) return `the board did not start its collide engine: ${st?.reason ?? 'no answer'}`;
+      if (!await board.startAudio()) return 'the board\'s sound cannot be played in this page\'s audio';
+      let via = 'relay';
+      if (path.mode() === 'direct') {
+        // Before the programs and the first hit, so the clock is found on the
+        // path the hits will take. It falls back to the relay after 3 s.
+        log('Pi: opening a direct path to the board');
+        path.connecting(true);
+        try { via = await board.goDirect(); } finally { path.connecting(false); }
+        if (via === 'relay' || via === 'refused') path.fellBack();
+      }
+      loaded = [];
+      for (const v of VOICES) {
+        const r = await kit.load(v.name, v.program);
+        if (!r?.ok) return `the board did not take ${v.label}: ${r?.reason ?? 'no answer'}${r?.line ? ` at line ${r.line}` : ''}`;
+        loaded.push({ name: v.name, bytes: r.bytes, compileMs: r.compileMs, same: r.same });
+      }
+      const differ = loaded.filter((r) => r.same === false).map((r) => r.name);
+      log(`the board took the four drums, ${differ.length ? `${differ.join(', ')} compiled to DIFFERENT bytes from this tab` : 'each compiled to the same bytes as this tab'}`, differ.length ? 'bad' : 'hi');
+      // The clock before the first hit: a hit with no offset is refused, not sent.
+      await kit.keepClock();
+      if (kit.offset() == null) return 'the board did not answer clock.ping';
+      log(`the board's clock is ${kit.offset().toFixed(1)} ms from this tab's, found over a ${kit.rtt().toFixed(1)} ms round trip`);
+      board.watchRtt(STATS_MS);
+      return { via: via === 'refused' ? 'relay' : via };
+    }
+    async function poll() {
+      if (!real()) return;
+      const st = await kit.stats();
+      if (st && real()) { base ??= st; last = st; onStats(st, base); }
+    }
+    return {
+      mode: () => mode,
+      joined: () => mode !== 'idle',
+      real,
+      board: () => board, kit: () => kit, sim: () => sim, loaded: () => loaded,
+      last: () => last,
+      dropped: () => dropped,
+      /** Hits this page handed to the Pi side: to the board, or to the simulation. */
+      handed: () => (real() ? kit.handed() : simHanded),
+      /** How far ahead a hit is handed over, on this side's path. */
+      ahead: () => (real() ? AHEAD[board.stats().via === 'relay' ? 'relay' : 'direct'] : mode === 'simulated' ? AHEAD.relay : 150),
+      join(c) {
+        joining ??= (async () => {
+          say('checking');
+          const r = await tryBoard(c).catch((e) => e.message);
+          if (typeof r === 'object') { say(r.via); timer = setInterval(poll, STATS_MS); poll(); return; }
+          log(`Pi side simulated in this tab: ${r}`);
+          kit?.stop(); board?.close(); board = null; kit = null;
+          try { sim = await createSimulatedPi(c, log); } catch (e) { log(`the simulated Pi did not start: ${e.message}`, 'bad'); say('idle'); return; }
+          say('simulated');
+        })().finally(() => { joining = null; });
+        return joining;
+      },
+      leave() {
+        clearInterval(timer); timer = 0;
+        if (real()) kit.panic();
+        kit?.stop(); board?.close(); sim?.close();
+        board = null; kit = null; sim = null; last = null; base = null;
+        say('idle');
+      },
+      out: () => (real() ? board.playout() : sim ? sim.out() : null),
+      /** One step's hits, `[{ name, perfAt, choke? }]`, as one message. */
+      hits(list) {
+        if (real()) return kit.hits(list);
+        if (sim) { for (const h of list) sim.hit(h); simHanded += list.length; return true; }
+        dropped += list.length;
+        return null;
+      },
+    };
+  }
+
+  // ── the drum machine, its drums into a `mix` node the page routes ────────
+  const ID = (node, port) => `web:${node}:${port}`;
+  const PI = (port) => `${BOARD_SITE}:drums:${port}`;
+  const SEQ_PI = { from: ID('sequencer', 'midi-out'), to: PI('midi-in') };
+  let forced = null;
+  const pi = createPiSide({ log: d.log, onMode: (m) => showMode(m) });
+  const m = createDrumMachine(d, {
+    voices: VOICES,
+    ahead: () => forced ?? pi.ahead(),
+    context: getCtx,
+    mix: { node: 'mix', label: 'drums mixed' },
+    onWake: async () => { m.api.mixOut().connect(localTap); route(); },
+    // One press: the drums here and the Pi. The Pi joins before the first hit.
+    onStart: (c) => { lastStep = -1; lastAt = null; return pi.join(c); },
+    onStop: () => { if (pi.joined()) pi.leave(); },
+    flowing: (l, playing) => playing && (l.from === SEQ_PI.from && l.to === SEQ_PI.to ? pi.joined()
+      : l.from.startsWith(`${BOARD_SITE}:`) ? pi.joined() : true),
+  });
+  const bay = m.api.bay;
+
+  // ── the bay: the Pi node, the scope, the crossfader, the speakers ───────
+  const piNode = bay.addNode({ id: `${BOARD_SITE}:drums`, kind: 'engine', label: 'drums on the Pi', place: 'studio-1' });
+  for (const [n, kind, label] of [
+    // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
+    // crossfader takes them.
+    ['scope', 'screen', 'waveforms'],
+    ['fader', 'person', 'fader'], ['xfade', 'engine', 'crossfader'], ['speaker', 'screen', 'speakers'],
+  ]) bay.addNode({ id: `web:${n}`, kind, label, place: 'browser' });
+  /** 0 is all here, 1 is all Pi. Opens at the middle. */
+  let x = 0.5, fades = 0, piIn = 0;
+  /** Hits that share one time, gathered and sent as one message when this turn of the sequencer ends. */
+  const pending = new Map();
+  let flushing = false;
+  function flush() {
+    flushing = false;
+    for (const list of pending.values()) { pi.hits(list); notePiHits(list); }
+    pending.clear();
+  }
+  const PORTS = [
+    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note' || !e.d2 || !Number.isFinite(e.at)) return;
+      const name = NAME_OF.get(e.d1);
+      if (!name) return;
+      piIn++;
+      trigger(e);
+      if (!pending.has(e.at)) pending.set(e.at, []);
+      pending.get(e.at).push({ name, perfAt: e.at, ...(name === 'hhc' ? { choke: 'hho' } : {}) });
+      if (!flushing) { flushing = true; queueMicrotask(flush); }
+    } },
+    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('scope', 'audio-in-2'), dir: 'in', medium: 'audio' },
+    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+      if (e?.of !== 'param' || e.name !== 'x') return;
+      x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
+    } },
+    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(SEQ_PI.from, SEQ_PI.to);
+  lay(ID('mix', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('mix', 'audio-out'), ID('xfade', 'audio-in'));
+  lay(PI('audio-out'), ID('scope', 'audio-in-2'));
+  lay(PI('audio-out'), ID('xfade', 'audio-in-2'));
+  lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
+  lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
+
+  /** Equal power: cos and sin of a quarter turn, as /radio/blend/. */
+  const fadeGains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];
+  function applyFade() {
+    if (!ctx) return;
+    const g = fadeGains();
+    [SIDES.local, SIDES.pi].forEach((s, i) => s.gain?.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02));
+  }
+  /** THE ROUTER: each side's sound goes where the bay's audio links say. */
+  function route() {
+    if (!ctx) return;
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+    for (const s of Object.values(SIDES)) {
+      const out = s.out();
+      if (!out) continue;
+      try { out.disconnect(); } catch { /* not connected */ }
+      // The meter is always on: the cells measure what the side makes.
+      out.connect(s.meter);
+      if (held(s.from, s.scope)) out.connect(s.an);
+      if (held(s.from, s.fadeIn)) out.connect(s.gain);
+    }
+    try { xmix.disconnect(); } catch { /* not connected */ }
+    if (held(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'))) xmix.connect(master);
+    xmix.connect(mixMeter);
+    applyFade();
+  }
+
+  // ── the cells ────────────────────────────────────────────────────────────
+  const SILENT_DB = -50, GAP_MS = 600, GIVE_UP_MS = 1500;
+  const lags = [];
+  let lastPiHit = -Infinity, timing = null, tim = 0;
+  /** A Pi hit after a gap is a hit whose sound back can be timed. */
+  function notePiHits(list) {
+    if (!pi.joined() || pi.mode() === 'checking') return;
+    const S = Math.min(...list.map((h) => h.perfAt));
+    const gap = S - lastPiHit;
+    lastPiHit = Math.max(lastPiHit, ...list.map((h) => h.perfAt));
+    if (gap < GAP_MS || timing) return;
+    timing = { S, checked: false, quiet: false };
+    tim ||= setInterval(timeTick, 2);
+  }
+  function timeTick() {
+    const now = performance.now(), s = SIDES.pi;
+    const done = () => { timing = null; clearInterval(tim); tim = 0; };
+    if (!timing || !s.meter || !pi.out()) return done();
+    if (now < timing.S) return;
+    const db = dbfs(rmsOf(s.meter, s.mbuf));
+    if (!timing.checked) { timing.checked = true; timing.quiet = db < SILENT_DB; if (!timing.quiet) return done(); }
+    if (db >= SILENT_DB) {
+      const lag = now - timing.S + ((ctx.outputLatency || 0) + (ctx.baseLatency || 0)) * 1000;
+      lags.push(lag);
+      d.set('Pi lag', lag.toFixed(0));
+      return done();
+    }
+    if (now - timing.S > GIVE_UP_MS) done();
+  }
+  /** The board's counts run from its engine's start, so the cell counts from this join (`base`). */
+  function onStats(st, base) {
+    const lateOf = (s) => (s.late ?? 0) + (s.droppedLate ?? 0);
+    d.set('Pi late', String(lateOf(st) - lateOf(base)));
+    const rtt = pi.board()?.stats().rttMs;
+    d.set('network', Number.isFinite(rtt) ? rtt.toFixed(0) : '');
+    if (st.refused > base.refused && st.refused !== onStats.refused) { onStats.refused = st.refused; d.log(`the board refused ${st.refused} so far: ${Object.keys(st.reasons ?? {}).join('; ')}`, 'warn'); }
+  }
+  // The simulation's late count, read the same way, every 2 s.
+  setInterval(() => { const s = pi.sim(); if (s && pi.mode() === 'simulated') d.set('Pi late', String(s.stat.late)); }, STATS_MS);
+
+  // ── the scope: both sides on one, each from its own copy of the bar's first hit
+  // A window of 4096 samples, 85 ms at 48 kHz: a kick's attack and its first
+  // few cycles. This tab's onset may lie up to 50 ms before the hit's time,
+  // because the time is when it is HEARD and the analyser sees it earlier.
+  const overlay = createOverlayScope({ win: 4096, axis: '85 ms', find: 'match', slackMs: 50 });
+  const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
+  const sideAn = (s) => () => (s.an && s.out() && scoped(s) ? s.an : null);
+  let lastStep = -1, lastAt = null;
+  /** A hit from the sequencer: the first of each bar takes both windows. */
+  function trigger(e) {
+    if (e.at === lastAt) return;
+    const first = lastStep < 0 || e.step <= lastStep;
+    lastStep = e.step; lastAt = e.at;
+    if (!first || !ctx) return;
+    overlay.hold({ ctx, at: ctx.currentTime + (e.at - performance.now()) / 1000, sides: { local: sideAn(SIDES.local), pi: sideAn(SIDES.pi) } });
+  }
+  function showMode(md) {
+    piNode.label = md === 'simulated' ? 'drums on the Pi, simulated' : 'drums on the Pi';
+    d.set('path', md === 'idle' || md === 'checking' ? '' : md === 'simulated' ? 'model' : md);
+    if (md === 'idle' || md === 'checking') { d.set('Pi late', ''); d.set('network', ''); }
+    if (md === 'simulated') d.set('network', '');
+    route();
+    m.api.refresh();
+  }
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
+    ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
+  const top = el('div', 'cc-top');
+  top.append(path.el);
+  d.stack.add(top, overlay.el, fader.el, m.surface, m.patchbay);
+  showMode('idle');
+  hintCell(d, 'network', NETWORK_HINT);
+  hintCell(d, 'path', PATH_HINT);
+
+  // The wire each Pi link rides, the `path` cell from the board's own answer,
+  // and the fall back when direct drops (as remote/030).
+  const isPi = (l) => l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+  setInterval(() => {
+    if (!pi.real()) return;
+    const via = pi.board().stats().via;
+    d.set('path', via);
+    if (path.rewire(bay, via, isPi, d.log)) m.api.refresh();
+    if (path.mode() === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); path.fellBack(); }
+  }, 500);
+  /** A new choice while joined: leave the board and join it again on the new path. */
+  async function switchPath() {
+    if (!pi.real() || !ctx) return;   // not joined, or simulated: the next Play reads the choice
+    pi.leave();
+    path.reset();
+    await pi.join(ctx);
+    route();
+  }
+
+  const level = (s) => (s?.meter && s.out() ? rmsOf(s.meter, s.mbuf) : 0);
+  window.__rhythm = m.api;
+  window.__demo.drums = {
+    m: m.api, bay, pi, fader, lags, AHEAD,
+    /** The scope: each side's held window, how many were taken, and the Pi's lag behind this tab as matched. */
+    scope: overlay,
+    /** Each side's meter, for a check that reads the returned sound itself (the choke). */
+    sides: SIDES,
+    piIn: () => piIn, x: () => x, fades: () => fades, ctx: () => ctx,
+    /** Move the crossfader as the slider does: over its wire. */
+    fade: (v) => { fader.set(v); bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }); },
+    levels: () => ({ here: level(SIDES.local), pi: level(SIDES.pi), mix: mixMeter ? rmsOf(mixMeter, mixBuf) : 0 }),
+    /** A check's lever, never a visitor's: hand over this many ms ahead, or null for the path's. */
+    forceAhead: (ms) => { forced = ms; },
+    /** What the plan asks to be true: hits handed over equal hits the board started. */
+    async check() {
+      const st = pi.real() ? await pi.kit().stats() : null;
+      return { mode: pi.mode(), handed: pi.handed(), started: st ? st.started : pi.sim()?.stat.started ?? null,
+        late: st ? st.late : pi.sim()?.stat.late ?? null, droppedLate: st?.droppedLate ?? null, refused: st?.refused ?? null,
+        chokes: st ? st.chokes : pi.sim()?.stat.chokes ?? null, unclocked: pi.kit()?.unclocked() ?? null,
+        offset: pi.kit()?.offset() ?? null, rtt: pi.kit()?.rtt() ?? null, ahead: m.api.aheadMs(), dropped: pi.dropped() };
+    },
+  };
+  d.ready();
+</script>

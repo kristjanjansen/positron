@@ -76,7 +76,7 @@
      horiz scrollable. no half col scope, scope is always full w"*). The scope
      at the full width, then one row of the kit's own boxed knobs that scrolls
      sideways and never wraps (`createKnobGrid(..., { row: true })`, as on
-     /synth/sound-design/), then the keys. No module boxes: the band says which
+     /synth/sound/), then the keys. No module boxes: the band says which
      modules are patched, and the live knobs say which are in play. ─────── */
   .tf-build {
     grid-area: build; background: var(--bg);
@@ -198,7 +198,7 @@
     ctx.resume();
   };
   const keysHost = el('div', 'tf-keys');
-  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /synth/sound-design/:
+  // C3 to A4, 13 white keys at the kit's 49 px floor, as on /synth/sound/:
   // the build area is three quarters of 1024 now, 712 logical px inside
   createKeyboard(keysHost, {
     ...keyRange(21), base: 48,
@@ -290,7 +290,7 @@
     at = n;
     const s = STEPS[n];
     setWords(s);
-    // A knob the step does not use is not shown at all, as on /synth/sound-design/.
+    // A knob the step does not use is not shown at all, as on /synth/sound/.
     for (const n of grid.names) {
       const on = s.boxes.includes(KNOBS.find((x) => x.name === n).owner);
       grid.show(n, on); grid.cellOf(n).hidden = !on;

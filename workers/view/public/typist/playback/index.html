@@ -34,7 +34,7 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { makeLogDeck } from '/timeline/logdeck.mjs';
   import { createSamples, createVoice } from '../sampler.mjs';
-  import { character } from '../typewriters/fx.mjs';
+  import { character } from '../machines/fx.mjs';
   import { makeTextOpAdapter, deriveOp, selectOp, OP_INSERT, OP_DELETE, OP_SELECT } from '/shell/text-adapter.mjs';
   import { createPaper } from '../paper.mjs';
 
@@ -260,7 +260,7 @@
 
   // ── the patchbay: the keyboard into the paper, and a recorder beside it ─
   // The recorder takes what the keyboard sends and plays it back into the
-  // paper on a link of its own, as the recorder on /synth/dot-piano/ does.
+  // paper on a link of its own, as the recorder on /synth/dots/ does.
   const S = 'web';
   const bay = createBay();
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });

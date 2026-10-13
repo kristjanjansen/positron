@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Sample drums</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* A sample's name can be forty letters (`NOVHTG Hit - Drumstation - 808
+     Crash D1T1`), and the label column is as wide as its widest name, so it
+     is held to a fifth of the screen and no more than 22 letters, and a name
+     past that ends in an ellipsis with the whole of it in the row's hover.
+     At 375 that is 75 px beside 16 pads; at 1280 it is 132 px. */
+  .rh-samples .pos-pg-labs { max-width: min(22ch, 20vw); }
+  .rh-samples .pos-pg-lab { text-overflow: ellipsis; }
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createDrop } from '/shell/drop.mjs';
+  import { createSampleLoader } from '/shell/sample-loader.mjs';
+  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
+  import { sampleRows, rowNames, createSampleBank, MAX_ROWS } from '/rhythm/sample-voices.mjs';
+
+  // The drum machine of /rhythm/drums/ with its rows playing SAMPLES,
+  // on the same one SuperCollider engine. The definition, the default kit and
+  // the rows are in `../sample-voices.mjs`.
+  //
+  // EVERY SAMPLE IS A ROW, NAMED, AND THE GRID STARTS EMPTY. Asked 2026-10-13:
+  // *"show all samples with their names. no preatterns. "drawable" drum grid
+  // as in tom"*. The default kit's four rows show on load, named from
+  // DEFAULT_KIT before anything is fetched; a dropped `.circuitpack`, zip of
+  // WAVs or set of WAVs becomes one row per sample, up to 64 (a Circuit pack's
+  // slot count and /tom/'s row count), and the grid is built again, empty.
+  // Like /tom/, every row is on the page and the page grows tall; nothing
+  // scrolls inside it.
+  //
+  // DRAWN AS ON /tom/: the grid is the kit's `createStepGrid`, so a press and
+  // a drag paints every pad it crosses, along a row or across rows, and the
+  // first pad decides on or off for the whole stroke (a stroke that starts on
+  // a lit pad erases).
+  //
+  // THE PATCHBAY draws one box per row up to eight, and above eight one
+  // `web:samples` box with one wire in and one out, because 64 boxes is a
+  // column five thousand pixels tall. The bay itself keeps one wire per row.
+  //
+  // NOTHING OPENS ON A VISIT: the engine and the default kit wait for play, and
+  // a dropped file is read in the tab and sent nowhere.
+  const d = mount({ name: 'Sample drums', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('rhythm/samples');
+
+  const bank = createSampleBank({ log: d.log });
+  /** The rows now: the file each one plays and the name it shows. */
+  let files = [], names = [];
+  const VOICES = sampleRows({
+    nameOf: (r) => names[r] ?? null,
+    fileOf: (r) => files[r] ?? null,
+    bufOf: (r) => { const s = bank.loaded()[r]; return s && s.name === files[r] ? s.buf : null; },
+  });
+
+  let m = null;
+  /** A kit: its first 64 samples become the rows. */
+  function offer(list, { fresh = false } = {}) {
+    if (list.length > MAX_ROWS) d.log(`${list.length} samples, the first ${MAX_ROWS} are rows and ${list.length - MAX_ROWS} are left out`, 'warn');
+    files = list.slice(0, MAX_ROWS).map((x) => x.name);
+    names = rowNames(files);
+    m?.api.setShape({ rows: Math.max(1, files.length), steps: 16 }, { fresh });
+    m?.api.grid.redraw();
+    m?.api.refresh();
+  }
+
+  // The default kit's names are known before anything is fetched.
+  // No default kit since 2026-10-13 (asked: *"no default grid / player /
+  // patchbay, do all on load"*): the page opens on the SAMPLES box alone, and
+  // the grid, its transport and the patchbay appear when a kit is loaded.
+
+  m = createDrumMachine(d, {
+    voices: VOICES,
+    shape: { rows: 1, steps: 16 },
+    start: false,
+    // The level the four drums had, kept for four; more rows sum hotter.
+    gain: (rows) => (rows > 9 ? 0.5 : rows > 4 ? 0.7 : 1),
+    group: { over: 8, node: 'samples', label: (n) => `${n} samples, SuperCollider` },
+    onWake: async (e) => { const got = await bank.wake(e); if (got.length !== files.length) offer(got, { fresh: true }); },
+  });
+  m.surface.classList.add('rh-samples');
+
+  // ── the way in ───────────────────────────────────────────────────────────
+  const loader = createSampleLoader({ say: (s, k) => drop.say(s, k), log: d.log });
+  const drop = createDrop({
+    accept: ['.circuitpack', '.zip', '.syx', '.wav'],
+    title: 'SAMPLES',
+    label: 'Open files',
+    beside: 'or drop a pack, a zip of WAVs or WAVs anywhere on this page',
+    empty: '',
+    hint: 'drop a pack anywhere on this page',
+    says: (s, k) => d.log(s, k),
+    onOpen: async (picked) => {
+      const got = await loader.openFiles(picked);
+      if (!got) return false;
+      const ok = got.filter((g) => g.wave?.ok !== false && g.wave?.frames !== 0);
+      if (ok.length < got.length) d.log(`${got.length - ok.length} sample(s) did not read and are not rows`, 'warn');
+      offer(ok, { fresh: true });
+      if (!shown) { d.stack.add(m.surface, m.patchbay); shown = true; }
+      const on = await bank.use(ok.slice(0, MAX_ROWS));
+      // A sample the engine could not take is not a row either.
+      if (on && bank.loaded().length !== files.length) offer(bank.loaded(), { fresh: true });
+      dropped++;
+      return true;
+    },
+  });
+  let dropped = 0, shown = false;
+
+  // The way in first, then the grid and the patchbay.
+  d.stack.add(drop.el);
+  window.__rhythm = m.api;
+  window.__samples = { bank, names: () => names, files: () => files, dropped: () => dropped, open: (f) => drop.open(f) };
+  d.ready();
+</script>

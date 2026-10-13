@@ -170,7 +170,7 @@ ok('at half speed the head crosses in twice the time',
 
 // ── the vocabulary ──────────────────────────────────────────────────────────
 
-// 16. The order of the table is load-bearing: `/radio/`'s checks drive a way by
+// 16. The order of the table is load-bearing: `/archive/radio/`'s checks drive a way by
 //     number, so `pingpong` fifth is a fact and not a preference.
 ok('the ways are in the order the checks drive them by',
   LOOP_WAYS.map(([n]) => n).join(',') === 'round,back,half,chop,pingpong',

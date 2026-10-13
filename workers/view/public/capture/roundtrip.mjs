@@ -9,7 +9,7 @@
 // leg asserts red with that reason, and `roundTripChecks()` with them: those
 // reds are EXPECTED and say so in their detail. The leg's code is in git at
 // be7737d. A round trip that still has an input behind it is
-// /video/webrtc-loopback/ (WebRTC loopback). The picture you send goes out to Cloudflare over WHIP and comes back
+// /video/webrtc/ (WebRTC loopback). The picture you send goes out to Cloudflare over WHIP and comes back
 // over WHEP, and what you record is the copy that came back. Every frame
 // carries a clock written into the pixels before it left, so dragging the line
 // and watching that clock move by the same amount proves the seek landed.

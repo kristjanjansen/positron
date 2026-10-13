@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Collide synth</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
+  import { createCompileIdle } from '/shell/compile-idle.mjs';
+  import { createCollideVoice, PROGRAM, rmsOf } from '/code/collide-voice.mjs';
+
+  // /code/faust/'s shape with the sound made by a program in
+  // /collide/'s small subset of SuperCollider, compiled in this tab and run on
+  // scsynth compiled to WebAssembly. Asked 2026-10-12 (BACKLOG, "synth/090
+  // Collide synth and synth/100"): *"do 090 synth, similar to 080 but with
+  // collide, local. 2 parameters that make sense"*.
+  //
+  // The program and why its two knobs are `bright` and `decay` are in
+  // `../collide-voice.mjs`, shared with /remote/collide/. Each knob is a
+  // bay node of its own, `web:knob-<name>:value-out`, cabled into
+  // `web:collide:value-in`, as on 080.
+  //
+  // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
+  // opens (no fetch). A pointer over the keys or a focus on them fetches the
+  // engine from our origin, and the first key makes the AudioContext, boots
+  // scsynth and loads the program, then sounds the note it was pressed for.
+  const d = mount({ name: 'Collide synth', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('code/collide');
+
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const ENGINE_IN = ID('collide', 'value-in');
+
+  const voice = createCollideVoice({ log: d.log, who: 'SuperCollider' });
+  const NAMES = voice.compiled.knobs.map((k) => k.name);
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const bay = createBay();
+  const NODES = [
+    ['keys', 'person', 'keyboard'],
+    ...NAMES.map((n) => [`knob-${n}`, 'person', n]),
+    ['collide', 'engine', 'SuperCollider'],
+    ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
+  ];
+  for (const [n, kind, label] of NODES) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  let paramSends = 0, notesIn = 0;
+  const PORTS = [
+    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    ...NAMES.map((n) => ({ id: ID(`knob-${n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+    { id: ID('collide', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note') return;
+      notesIn++;
+      if (e.d2) voice.noteOn(e.d1, e.d2); else voice.noteOff(e.d1);
+    } },
+    { id: ENGINE_IN, dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
+      if (e?.of === 'param' && voice.param(e.name, e.v)) paramSends++;
+    } },
+    { id: ID('collide', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(ID('keys', 'midi-out'), ID('collide', 'midi-in'));
+  for (const n of NAMES) lay(ID(`knob-${n}`, 'value-out'), ENGINE_IN);
+  lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('collide', 'audio-out'), ID('speaker', 'audio-in'));
+
+  // ── the sound, made on the first key ─────────────────────────────────────
+  let ctx = null, master = null, an = null, buf = null, on = false;
+  /** THE ROUTER: the engine's sound goes where the bay's audio links say. */
+  function route() {
+    const out = voice.out();
+    if (!out) return;
+    try { out.disconnect(); } catch { /* not connected */ }
+    for (const l of bay.links()) {
+      if (l.from !== ID('collide', 'audio-out')) continue;
+      if (l.to === ID('scope', 'audio-in')) out.connect(an);
+      if (l.to === ID('speaker', 'audio-in')) out.connect(master);
+    }
+  }
+  async function start() {
+    if (!ctx) {
+      // Made here, synchronously inside the key's gesture.
+      ctx = new AudioContext();
+      master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+      // A silent sink that keeps the analyser, and so the engine, pulled.
+      const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      an = ctx.createAnalyser(); an.fftSize = 2048; an.connect(pull);
+      buf = new Float32Array(an.fftSize);
+      requestAnimationFrame(frame);
+    }
+    ctx.resume();
+    try { await voice.wake(ctx); } catch { return false; }
+    route();
+    on = true;
+    pb.refresh();
+    return true;
+  }
+
+  // ── the keyboard: its notes leave on `keys:midi-out` and nowhere else ────
+  const host = el('div');
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+      // A key is a press, so it may wake the engine; the note waits in the voice.
+      if (!on) start();
+    },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+  // Intent: fetch the engine (our origin), boot nothing.
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => voice.warm(), { once: true, passive: true });
+
+  // ── the two knobs, each a node of its own ────────────────────────────────
+  const book = createHueBook().assign(NAMES);
+  const knobs = new Map(voice.compiled.knobs.map((k) => {
+    const knob = createKnob({
+      label: k.name, min: k.spec.min, max: k.spec.max, value: k.value, hand: true,
+      onInput: (v) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v }),
+    });
+    knob.el.dataset.param = k.name;
+    knob.el.style.setProperty('--param-hue', String(book.hueOf(k.name)));
+    return [k.name, knob];
+  }));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── the scope ────────────────────────────────────────────────────────────
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+  function frame() {
+    const scoped = bay.links().some((l) => l.from === ID('collide', 'audio-out') && l.to === ID('scope', 'audio-in'));
+    if (on && scoped) {
+      an.getFloatTimeDomainData(buf);
+      const WINDOW = 512, FULL = 0.5;
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
+    flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || voice.held().length > 0),
+  });
+  // The program in the kit's code box, its two knob names in the knobs' own
+  // hues (the box finds `\name.kr` in whatever is typed, so an edited text
+  // keeps them). EDITABLE since 2026-10-12, *"make 090 editable"*: the kit's
+  // idle compile, as /fau/ and /shader/mirror/ use it, `IDLE_MS` (600)
+  // after the last key, no button. A good compile is the voice for the NEXT
+  // note; a note already held finishes on the program it started with
+  // (`collide-voice.mjs`, the header of `createCollideVoice`). A failed one
+  // leaves `Did not compile` in the box's corner with collide's own error (a
+  // line and a column) in its title and in the log, and the keys go on
+  // playing the last good program.
+  const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
+    hues: book, ariaLabel: 'the SuperCollider program this synth plays, edit it and it recompiles' });
+  // ⚠️ A PROGRAM WITHOUT `\bright` OR `\decay` COMPILES AND PLAYS, AND THAT
+  // KNOB THEN DRIVES NOTHING. The kit's note has no state for "compiled, with
+  // a caveat", so the page writes that line into it once the compile has
+  // settled, as shader/000 does for `uSeg`; the next compile paints over it.
+  let compiles = 0, refused = 0;
+  const idle = createCompileIdle({
+    input: code.input,
+    host: code.el,
+    compile: async (text) => {
+      const out = await voice.load(text);
+      if (!out.ok) {
+        refused++;
+        d.log(`the edit did not compile, the last good program keeps playing: ${out.error}`, 'warn');
+        return out;
+      }
+      compiles++;
+      const gone = out.missing;
+      d.log(`the edit compiled in ${out.ms.toFixed(1)} ms into ${out.bytes} B and plays from the next note`
+        + (gone.length ? `, and has no ${gone.join(' or ')}, so ${gone.length > 1 ? 'those knobs drive' : 'that knob drives'} nothing` : ''),
+        gone.length ? 'warn' : '');
+      for (const w of out.warnings) d.log(w);
+      if (gone.length) idle.settled().then(() => {
+        if (idle.state() !== 'idle' || voice.drives(gone[0])) return;
+        const note = idle.el;
+        note.dataset.state = 'error';
+        note.textContent = `No ${gone.join(' or ')}, ${gone.length > 1 ? 'those knobs drive' : 'the knob drives'} nothing`;
+        note.title = `the program has no \\${gone.join(' or \\')}, so ${gone.length > 1 ? 'those knobs have' : 'that knob has'} nothing to set`;
+        note.hidden = false;
+      });
+      return out;
+    },
+  });
+  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
+  // concepts, move knobs on top of code"*.
+  d.stack.add(wave.el, grid.el, code.el, host, pb.el);
+
+  window.__demo.knobs = grid;
+  window.__demo.keyboard = kb;
+  window.__demo.collide = {
+    bay, voice, knobs, names: NAMES,
+    paramSends: () => paramSends, notesIn: () => notesIn,
+    ctx: () => ctx,
+    level: () => (an ? rmsOf(an, buf) : 0),
+    samples: () => { if (!an) return []; an.getFloatTimeDomainData(buf); return Array.from(buf); },
+    code: PROGRAM, box: code, idle,
+    compiles: () => compiles, refused: () => refused,
+  };
+  d.ready();
+</script>

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>MoQ loopback</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Start and stop on their own row at the left, the camera picker after them
+     once there is more than one camera, as on /video/camera/. */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .cc-top > .pos-pick[hidden] { display: none; }
+  /* The picture as it leaves and the same picture back over MoQ, each half
+     the content width as on /video/webrtc/. On a phone they stack, the
+     original first. */
+  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
+  .cc-pair canvas { display: block; width: 100%; height: 100%; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  .cc-proto { color: var(--fg); }
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el, armVideo } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { drawCamera, burn, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { startMoq, moqSupport, MOQ_RELAY } from '/shell/moq.mjs';
+  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
+
+  // /video/camera/ with one round trip through a MoQ relay beside it.
+  // The camera, with the clock burned into it, is encoded in this tab with
+  // WebCodecs and published over MoQT (QUIC, by WebTransport) to Cloudflare's
+  // public MoQ relay; the same session subscribes to that broadcast and decodes
+  // what comes back. Both ends are this tab, so one clock stamps the frame and
+  // reads it back, and the footer's delay is a median of exact differences.
+  // The publisher and the subscriber are `startMoq` in demo/shell/moq.mjs, the
+  // one /moq/ uses, given the camera to paint instead of testsrc2.
+  //
+  // It is video/030's WebRTC leg with the transport swapped: no WHIP, no WHEP,
+  // no Stream input and no Stream minutes. The relay is Cloudflare's public
+  // draft-14 relay (MOQ_RELAY), which keeps only the live edge and bills
+  // nobody here.
+  //
+  // NOTHING OPENS ON A VISIT. The camera, the session and the subscribe are all
+  // made on the start press; stop closes the session and every track.
+  //
+  // ⚠️ A VPN THAT DROPS UDP DROPS THIS TOO. MoQ rides QUIC, which is UDP. With
+  // the Check Point tunnel up a session may not open at all (CLAUDE.md), so a
+  // session that does not open says that is one possibility, never the cause.
+  //
+  // ⚠️ SAFARI IS REFUSED, ON PURPOSE. @moq/net blocks it by user agent because
+  // of WebKit bug 319818 (positron-streaming), so moqSupport() says no and the
+  // page says why before it asks for the camera.
+  const S = 'web';
+  const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
+  const RELAY_IN = 'cf-moq:relay:video-in', RELAY_OUT = 'cf-moq:relay:video-out';
+  const BACK = `${S}:moq:video-in`;
+
+  const d = mount({ name: 'MoQ loopback', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('video/moq');
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const bay = createBay();
+  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
+  camNode('camera');
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
+  bay.addNode({ id: 'cf-moq:relay', kind: 'endpoint', label: 'MoQ relay', place: 'cloudflare', net: 'cloudflare' });
+  bay.addNode({ id: `${S}:moq`, kind: 'screen', label: 'MoQ', place: 'browser' });
+  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video' });
+  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
+  bay.addPort({ id: RELAY_IN, label: 'video', dir: 'in', medium: 'video', transports: ['moq'] });
+  bay.addPort({ id: RELAY_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['moq'] });
+  bay.addPort({ id: BACK, label: 'MoQ', dir: 'in', medium: 'video', transports: ['moq'] });
+
+  const held = new Map();
+  function hold(a, b, via) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return true;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...(via ? { via } : {}) });
+    if (r.ok) { held.set(k, r.id); return true; }
+    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return false;
+  }
+  // Held from load, so the picture of the patch is the same running or not.
+  hold(CAM, SCREEN);
+  hold(CAM, RELAY_IN, 'moq');
+  hold(RELAY_OUT, BACK, 'moq');
+
+  // ── the camera and the two pictures ─────────────────────────────────────
+  const video = el('video');
+  video.muted = true; video.playsInline = true; video.autoplay = true;
+  const GROUND = '#0b0e14';
+  const L = el('canvas'); L.width = FRAME_W; L.height = FRAME_H;
+  const lctx = L.getContext('2d', { alpha: false });
+  // `startMoq` draws every decoded frame into this canvas itself.
+  const R = el('canvas'); R.width = FRAME_W; R.height = FRAME_H;
+  const blank = (c) => { const x = c.getContext('2d'); x.fillStyle = GROUND; x.fillRect(0, 0, c.width, c.height); };
+  blank(L); blank(R);
+
+  const name = el('span', 'cc-say', '');
+  const size = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: L, left: name });
+  panel.el.querySelector('.pos-vp-r').prepend(size);
+  const state = el('span', 'cc-say', '');
+  const leftM = el('span', 'cc-left'); leftM.append(el('span', 'cc-say cc-proto', 'MoQ '), state);
+  const moqPanel = createVideoPanel({ media: R, left: leftM, values: [
+    { key: 'delay', label: '', reserve: 6 },
+    { key: 'fps', label: 'fps', reserve: 2 },
+    { key: 'codec', label: '', reserve: 3 },
+  ] });
+  const V = moqPanel.values;
+  // The protocol's name is the footer's first word, not a plate over the picture
+  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
+  // to videopanel fooers"*).
+  const pair = el('div', 'cc-pair');
+  pair.append(panel.el, moqPanel.el);
+
+  let cam = null, leg = null, gen = 0, tick = 0, lastDecoded = 0, src = null, raf = 0;
+  let devices = [], deviceId = null;
+  // What leaves the page: the camera, contained, with the clock row burned
+  // over it. `startMoq` calls this 30 times a second into its own canvas.
+  const paint = (ctx, w, h, frame) => {
+    src = ctx.canvas;
+    drawCamera(ctx, video, w, h, { scrim: 0 });
+    return burn(ctx, w, h, frame, { field: false, scrim: true });
+  };
+  // The original is the burned frame itself, copied from what was encoded.
+  function frame() {
+    if (!cam) return;
+    if (src) lctx.drawImage(src, 0, 0, FRAME_W, FRAME_H);
+    raf = requestAnimationFrame(frame);
+  }
+
+  const codecName = (c) => (!c ? '' : c.startsWith('av01') ? 'AV1' : c.startsWith('vp09') ? 'VP9'
+    : c.startsWith('vp8') ? 'VP8' : c.split('.')[0]);
+  const delayText = (x) => (x == null ? '' : x < 1000 ? `${Math.round(x)} ms` : `${(x / 1000).toFixed(1)} s`);
+  function readStats() {
+    if (!leg) return;
+    const s = leg.stats;
+    const fps = s.decoded - lastDecoded;
+    lastDecoded = s.decoded;
+    // The median of every clean clock read since the press, one per frame.
+    V.set('delay', delayText(leg.pct(0.5)));
+    if (s.decoded) {
+      V.set('fps', fps);
+      V.set('codec', codecName(s.catalog?.video?.renditions?.video?.codec ?? s.codec));
+      if (state.textContent !== 'playing') state.textContent = 'playing';
+      V.el.title = `${s.decoded} frames decoded\n${s.samples} clocks read, ${s.badRows} unreadable\np95 ${leg.pct(0.95)} ms, worst ${leg.pct(1)} ms`;
+    }
+    pb.refresh();
+  }
+
+  const pb = createPatchbay(bay, {
+    flowing: (l) => (l.from === CAM && l.to === SCREEN ? !!cam
+      : l.from === CAM ? !!leg && leg.stats.encoded > 0
+      : l.from === RELAY_OUT ? !!leg && leg.stats.decoded > 0 : false),
+    detail: (n) => (n.id === 'cf-moq:relay' ? [n.label, 'MoQT in', 'MoQT out']
+      : n.id === `${S}:moq` ? [n.label, 'MoQT in']
+      : n.id === `${S}:camera` ? [n.label, null, 'MoQT out']
+      : [n.label]),
+  });
+
+  // ── start and stop ──────────────────────────────────────────────────────
+  const support = moqSupport();
+  async function start() {
+    if (!support.ok) {
+      d.log(`MoQ needs WebTransport and WebCodecs: ${support.why}. Try Chrome or Edge`, 'bad');
+      return;
+    }
+    const mine = ++gen;
+    armVideo(video);
+    let s;
+    try {
+      s = await navigator.mediaDevices.getUserMedia({
+        video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          width: { ideal: FRAME_W }, height: { ideal: FRAME_H }, frameRate: { ideal: 30 } },
+        audio: false,
+      });
+    } catch (e) {
+      const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
+        : e?.name === 'NotFoundError' ? 'this machine has no camera'
+        : `the camera did not start (${e?.name || e})`;
+      d.log(`${why}, so nothing was sent anywhere`, 'bad');
+      face(false);
+      return;
+    }
+    if (gen !== mine) { s.getTracks().forEach((t) => t.stop()); return; }
+    cam = s;
+    const track = cam.getVideoTracks()[0];
+    const set = track.getSettings();
+    deviceId = set.deviceId || deviceId;
+    video.srcObject = cam;
+    video.play().catch(() => {});
+    const label = (track.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
+    name.textContent = label;
+    size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
+    camNode(label || 'camera');
+    d.log(`camera on: ${track.label || 'default'} at ${set.width}x${set.height}`, 'hi');
+    face(true);
+    raf = requestAnimationFrame(frame);
+    state.textContent = 'connecting';
+    // A fresh namespace per press: two publishers on one and the second dies.
+    const ns = `positron-moq-${Math.random().toString(36).slice(2, 8)}`;
+    d.log(`MoQ session to ${new URL(MOQ_RELAY).host}, broadcast ${ns}`);
+    let got;
+    try {
+      got = await startMoq({ out: R, ns, role: 'loopback', paint, log: (m, k) => d.log(m, k) });
+    } catch (e) {
+      if (gen !== mine) return;
+      d.log(`the session did not open: ${e?.message || e}. UDP blocked or a VPN are both possible`, 'bad');
+      state.textContent = 'no session';
+      return;
+    }
+    if (gen !== mine) { got.stop(); return; }
+    leg = got;
+    tick = setInterval(readStats, 1000);
+    pb.refresh();
+    await listCameras();
+  }
+
+  function stop() {
+    gen++;
+    clearInterval(tick); cancelAnimationFrame(raf);
+    const had = !!leg;
+    try { leg?.stop(); } catch { /* gone */ }
+    leg = null; src = null; lastDecoded = 0;
+    cam?.getTracks().forEach((t) => t.stop());
+    cam = null;
+    try { video.pause(); } catch { /* fine */ }
+    video.srcObject = null;
+    for (const k of V.keys()) V.set(k, '');
+    V.el.title = '';
+    name.textContent = ''; size.textContent = ''; state.textContent = '';
+    blank(L); blank(R);
+    face(false);
+    pb.refresh();
+    d.log(had ? 'session closed, the relay forgets the broadcast, every track stopped' : 'camera off, every track stopped');
+  }
+  addEventListener('pagehide', () => { if (cam) stop(); });
+
+  // ── which camera, once there is more than one ───────────────────────────
+  const picker = createPicker({ what: 'camera',
+    prev: () => pick((at() - 1 + devices.length) % devices.length),
+    next: () => pick((at() + 1) % devices.length),
+    onPick: (i) => pick(i) });
+  picker.el.hidden = true;
+  const at = () => Math.max(0, devices.findIndex((x) => x.deviceId === deviceId));
+  async function listCameras() {
+    try { devices = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput'); }
+    catch { devices = []; }
+    picker.options(devices.map((x, i) => x.label || `camera ${i + 1}`));
+    picker.show(at());
+    picker.el.hidden = devices.length < 2;
+  }
+  async function pick(i) {
+    const dev = devices[i];
+    if (!dev || dev.deviceId === deviceId) return;
+    deviceId = dev.deviceId;
+    picker.show(i);
+    if (cam) { stop(); await start(); }
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'cam', icon: 'video', label: 'start the camera', onPress: () => (cam ? stop() : start()) },
+  ] });
+  function face(on) {
+    transport.setIcon('cam', on ? 'stop' : 'video', on ? 'stop the camera' : 'start the camera');
+  }
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el, picker.el);
+  d.stack.add(top, pair, pb.el);
+  if (!support.ok) d.log(`${support.why}, so MoQ cannot run here. It needs Chrome or Edge`, 'warn');
+
+  window.__demo.moq = {
+    start, stop,
+    stats: () => (leg ? leg.stats : null),
+    delay: () => (leg ? { p50: leg.pct(0.5), p95: leg.pct(0.95), worst: leg.pct(1), n: leg.stats.samples } : null),
+    values: () => Object.fromEntries(V.keys().map((k) => [k, V.cell(k).textContent])),
+  };
+
+  // 🔴 SELF-CHECKS ONLY BEHIND ?selfcheck=1, and the round trip only behind
+  // ?selfcheck=2, as on /moq/. The ordinary tier opens nothing.
+  if (SELFCHECK) {
+    d.assert('a visit opened nothing', !cam && !leg, cam ? 'a camera is open' : leg ? 'a session is open' : 'nothing open');
+    d.assert('the returned picture is tagged MoQ', moqPanel.el.textContent.includes('MoQ'));
+    if (DEEP && support.ok) {
+      await start();
+      const t0 = performance.now();
+      while (leg && leg.stats.samples < 90 && performance.now() - t0 < 20000) await new Promise((r) => setTimeout(r, 250));
+      const s = leg?.stats;
+      d.assert('frames came back through the relay and were decoded', !!s && s.decoded > 0, `${s?.decoded ?? 0} decoded`);
+      d.assert('the burned clock was read from nine in ten frames', !!s && s.samples >= 0.9 * (s.samples + s.badRows) && s.samples > 0,
+        `${s?.samples ?? 0} clean, ${s?.badRows ?? 0} unreadable`);
+      d.assert('glass to glass in milliseconds', leg?.pct(0.5) != null && leg.pct(0.5) < 2000, `p50 ${leg?.pct(0.5)} ms`);
+      stop();
+    }
+  }
+  d.ready();
+</script>
+</html>

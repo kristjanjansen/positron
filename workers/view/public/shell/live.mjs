@@ -348,7 +348,7 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
  *
  * 🔴 `url` HAS NO DEFAULT SINCE 2026-10-13. The default was /cam/'s RTMPS camera,
  * `wss://pub.positron.studio/cam`, whose input (positron-cam) was deleted that
- * day and whose route answers 410. The one caller left is /video/ll-hls-loopback/,
+ * day and whose route answers 410. The one caller left is /video/llhls/,
  * which passes `wss://pub.positron.studio/loop` (its own input,
  * positron-hls-loopback).
  * 🔴 ITS OWN INPUT, NOT THE TEST PATTERN'S. It borrowed that one by handover
@@ -373,7 +373,7 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
 /**
  * The camera's WebRTC input ("positron-cam-whip", src/provision-cam-whip.sh,
  * recording off), published through `pub.positron.studio/cam/whip` so the key
- * stays in the worker. /video/webrtc-loopback/'s WebRTC loopback since 2026-10-13,
+ * stays in the worker. /video/webrtc/'s WebRTC loopback since 2026-10-13,
  * and the archived /cam/'s WebRTC leg. It borrowed the test pattern's WHIP
  * input until 2026-09-30 and was refused with 409 whenever somebody held the
  * (now retired) /watch. One camera at a time; a second gets 409 in words.

@@ -1,5 +1,5 @@
 // demo/video/loopback.mjs: what the two loopback pages share, the
-// WebRTC one (/video/webrtc-loopback/) and the LL-HLS one (/video/ll-hls-loopback/).
+// WebRTC one (/video/webrtc/) and the LL-HLS one (/video/llhls/).
 // Split 2026-10-12, *"Split hls and webrtc loopbacks"*: each page holds one
 // round trip and its own patchbay, and this module holds what is the same on
 // both, so it is written once:

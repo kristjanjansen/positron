@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Drum machine</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
+  import { VOICES } from '/rhythm/voices.mjs';
+
+  // A drum machine as a patchbay: a 16 step by 4 row grid, a sequencer that
+  // sends each hit as a MIDI note, and four SuperCollider voices, each a node of
+  // its own on the bay. Asked 2026-10-12 (BACKLOG, "A rhythm concept group").
+  // Everything but the frame is `../drum-machine.mjs`, shared with
+  // /rhythm/knobs/, which is this page plus a knob per drum.
+  const d = mount({ name: 'Drum machine', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('rhythm/drums');
+  const m = createDrumMachine(d, { voices: VOICES });
+  d.stack.add(m.surface, m.patchbay);
+  window.__rhythm = m.api;
+  d.ready();
+</script>

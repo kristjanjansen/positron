@@ -103,7 +103,7 @@ export const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media
 // ── the recordings ─────────────────────────────────────────────────────────
 // One gain per second of the file, raised (never lowered) toward -16 dB RMS by
 // at most 36 dB and eased across seconds, then a soft knee over 0.8. It is
-// /stations/tempo/'s levelling made shorter: MEASURED there, the Ida
+// /radio/tempo/'s levelling made shorter: MEASURED there, the Ida
 // capture is -44 dB RMS under one loud stretch, so one gain for the whole file
 // would leave it inaudible.
 const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_MAX_DB = 36, KNEE = 0.8;
@@ -183,7 +183,7 @@ const CSS = `
   .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
   .cc-patch .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
 `;
-// The kit's grain scope as a panel's picture, as /stations/tempo/ draws
+// The kit's grain scope as a panel's picture, as /radio/tempo/ draws
 // it: the panel's stage is the edge and the ground, so the scope gives up its
 // own margin, border and corner, and its always-empty caption takes no room.
 // The grains' start times over the output scope are a canvas laid exactly on
@@ -221,7 +221,7 @@ const CSS = `
  *                   the granulator and the source scope hear
  * @param o.top      elements after Play on its row (070's follow switch)
  *
- * Added 2026-10-13 for /granulator/beat-granulator/; a page that passes none of
+ * Added 2026-10-13 for /granulator/beat/; a page that passes none of
  * wire, audio, top or `engine.value` gets what it got before.
  */
 export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
@@ -262,7 +262,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   bay.addPort({ id: GRAINS_IN, label: 'grains', dir: 'in', medium: 'audio' });
   bay.addPort({ id: GRAINS_OUT, label: 'grains', dir: 'out', medium: 'audio' });
   // Every knob's value comes in here, one port for all of them, as on
-  // /code/collide-synth/; the event names its control.
+  // /code/collide/; the event names its control.
   bay.addPort({ id: GRAINS_VAL, label: 'values', dir: 'in', medium: 'value', deliver: (ev) => valueIn(ev) });
   // Every grain the engine reports leaves here as one event, so anything that
   // wants to follow the grains (the two scopes today, a picture later) holds a
