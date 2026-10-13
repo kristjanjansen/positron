@@ -121,3 +121,80 @@ not yet done**, `LESSONS.md` for why the rules below exist,
 `PROGRESS.md` for what was measured when, and **`LAYOUT.md` for where a new file
 goes** — including the two renames that were priced and rejected, so they are
 not re-litigated.
+
+## The concepts became the front page, 2026-10-13: /concepts/<group>/<number>/ to /<group>/<slug>/
+
+Instructed: *"when all is done, move concepts to frontpage. use http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE. rename all with group/slug, rm numbers"*, then *"keep same boxes style"*. The concepts index (`demo/concepts/index.html`) is the front page, `demo/index.html`, under THE HERO, LARGE (`demo/shell/hero.mjs`). `/concepts/` answers 302 to `/`. **Every old page address below is a 404 and was not forwarded**, by the concepts rule (*"no old address forwarding"*). The old front page (the manifest groups baked into `workers/view/menu.html`, and its dev twin `demo/index.html`) is in `archive/frontpage/`. The sweep rewrote paths, never verbatim quotations, never `git show <sha>:demo/concepts/...` history paths, and nothing under `archive/` or `plans/`. Two folders differ from their old group on purpose: `radio` is `stations` because `/radio/` is the archived radio demo and still served, and `archives` is `history`, the heading it shows.
+
+| old address | new address |
+| --- | --- |
+| `/concepts/synth/000/` | `/synth/keyboard/` |
+| `/concepts/synth/010/` | `/synth/recorder/` |
+| `/concepts/synth/020/` | `/synth/timeline/` |
+| `/concepts/synth/050/` | `/synth/sound-design/` |
+| `/concepts/synth/080/` | `/code/faust-synth/` |
+| `/concepts/synth/090/` | `/code/collide-synth/` |
+| `/concepts/synth/120/` | `/code/plaits-keys/` |
+| `/concepts/sampler/000/` | `/code/piano-and-rhodes/` |
+| `/concepts/synth/030/` | `/synth/dot-piano/` |
+| `/concepts/sampler/060/` | `/granulator/granulator/` |
+| `/concepts/sampler/070/` | `/granulator/beat-granulator/` |
+| `/concepts/remote/010/` | `/remote/circuit-on-pi/` |
+| `/concepts/remote/020/` | `/remote/collide-on-pi/` |
+| `/concepts/remote/030/` | `/remote/piano-and-rhodes-on-pi/` |
+| `/concepts/remote/040/` | `/remote/drums-on-the-pi/` |
+| `/concepts/remote/050/` | `/remote/shader-on-pi/` |
+| `/concepts/radio/000/` | `/stations/radio/` |
+| `/concepts/radio/010/` | `/stations/tuner/` |
+| `/concepts/radio/020/` | `/stations/tempo/` |
+| `/concepts/radio/030/` | `/stations/live-tempo/` |
+| `/concepts/radio/040/` | `/stations/live-key/` |
+| `/concepts/video/000/` | `/video/camera/` |
+| `/concepts/video/010/` | `/video/camera-shader/` |
+| `/concepts/video/020/` | `/video/camera-recorder/` |
+| `/concepts/video/030/` | `/video/webrtc-loopback/` |
+| `/concepts/video/060/` | `/video/ll-hls-loopback/` |
+| `/concepts/video/050/` | `/video/moq-loopback/` |
+| `/concepts/shader/000/` | `/shader/mirror-shader/` |
+| `/concepts/shader/020/` | `/shader/scan-landscape/` |
+| `/concepts/room/000/` | `/room/chat/` |
+| `/concepts/room/002/` | `/room/chat-ui-wired/` |
+| `/concepts/room/003/` | `/room/broadcast-chat/` |
+| `/concepts/room/004/` | `/room/chat-timeline/` |
+| `/concepts/room/040/` | `/room/patch-from-words/` |
+| `/concepts/typist/000/` | `/typist/paper/` |
+| `/concepts/typist/010/` | `/typist/typewriter/` |
+| `/concepts/typist/020/` | `/typist/typewriters/` |
+| `/concepts/typist/030/` | `/typist/playback/` |
+| `/concepts/typist/040/` | `/typist/multi-typer/` |
+| `/concepts/rhythm/000/` | `/rhythm/drum-machine/` |
+| `/concepts/rhythm/010/` | `/rhythm/drum-knobs/` |
+| `/concepts/rhythm/020/` | `/rhythm/sample-drums/` |
+| `/concepts/rhythm/050/` | `/rhythm/camera-drums/` |
+| `/concepts/archives/000/` | `/history/newsreels/` |
+| `/concepts/misc/020/` | `/archive/tutorial-slide/` |
+
+| old module | new module |
+| --- | --- |
+| `demo/concepts/list.mjs` | `demo/shell/concept-list.mjs` |
+| `demo/concepts/nav.mjs` | `demo/shell/concept-nav.mjs` |
+| `demo/concepts/list-test.mjs` | `demo/shell/concept-list-test.mjs` |
+| `demo/concepts/clock/clock-kit.mjs` | `demo/archive/clock-kit.mjs` |
+| `demo/concepts/radio/tempo.mjs` | `demo/stations/tempo.mjs` |
+| `demo/concepts/remote/overlay-scope.mjs` | `demo/remote/overlay-scope.mjs` |
+| `demo/concepts/remote/path.mjs` | `demo/remote/path.mjs` |
+| `demo/concepts/rhythm/drum-machine.mjs` | `demo/rhythm/drum-machine.mjs` |
+| `demo/concepts/rhythm/sample-voices.mjs` | `demo/rhythm/sample-voices.mjs` |
+| `demo/concepts/rhythm/voices.mjs` | `demo/rhythm/voices.mjs` |
+| `demo/concepts/sampler/grain-rig.mjs` | `demo/granulator/grain-rig.mjs` |
+| `demo/concepts/sampler/grain-ring.mjs` | `demo/granulator/grain-ring.mjs` |
+| `demo/concepts/sampler/sampler.mjs` | `demo/code/sampler.mjs` |
+| `demo/concepts/sampler/sc-sampler.mjs` | `demo/code/sc-sampler.mjs` |
+| `demo/concepts/synth/collide-voice.mjs` | `demo/code/collide-voice.mjs` |
+| `demo/concepts/synth/plaits-voice.mjs` | `demo/code/plaits-voice.mjs` |
+| `demo/concepts/synth/module-page.mjs` | `demo/synth/module-page.mjs` |
+| `demo/concepts/synth/patch-synth.mjs` | `demo/synth/patch-synth.mjs` |
+| `demo/concepts/typist/paper.mjs` | `demo/typist/paper.mjs` |
+| `demo/concepts/typist/sampler.mjs` | `demo/typist/sampler.mjs` |
+| `demo/concepts/video/loopback.mjs` | `demo/video/loopback.mjs` |
+| `demo/concepts/index.html` | `demo/index.html` (the front page) |

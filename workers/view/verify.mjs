@@ -185,44 +185,28 @@ async function common(page) {
   return o;
 }
 
-// ── 0. index menu ───────────────────────────────────────────────────────────
-console.log('\n[0] index menu');
-await goto('/', { settle: 600 });
-// ⚠️ THE TAB IS `positron`, LOWER CASE, AND DELIBERATELY NOT THE NAME ON THE
-// PAGE. `menu.html` carries `<title>positron</title>` and the `h1` carries
-// `positron: <n> media art experiments`, counted at build time (2026-09-24).
-// This asserted `POSITRON` while the tab read `positron: media art
-// experiments`, so it was red on a correct page before this line was touched.
+// ── 0. the front page ───────────────────────────────────────────────────────
+// 🔴 THE FRONT PAGE IS THE CONCEPTS INDEX SINCE 2026-10-13 (*"move concepts to
+// frontpage ... rename all with group/slug, rm numbers"*): THE HERO, LARGE over
+// one card per row of demo/shell/concept-list.mjs, plus a use case card per
+// listed, built manifest row. Until then this block graded the manifest menu
+// (one `li.pos-row` per DEMOS and NOTES row), which is in archive/frontpage/.
+console.log('\n[0] front page');
+const { CONCEPTS } = await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
+await goto('/', { settle: 1200 });
 ok('index', 'served 200 html', await evaluate(`document.title`) === 'positron', await evaluate(`document.title`));
-// The menu is the DEMO LIST, generated from demo/manifest.mjs. Assert what the
-// generator promises: one row per manifest entry, and every LINKED row pointing
-// at a real target. Deployed demos live at /<nn>-<name>/ — build.mjs strips the
-// `demo/` prefix — so the old `/demo/` check could not have passed either.
-const rows = await evaluate(`[...document.querySelectorAll('li.pos-row')].length`);
-const links = await evaluate(`[...document.querySelectorAll('li.pos-row a[href]')].map(a => a.getAttribute('href'))`);
-// Notes render as `li.pos-row` too, so the expected count is both lists — which
-// is exactly the kind of detail a typed-in number gets wrong the first time.
-ok('index', 'lists every demo and note row', rows === DEMOS.length + NOTES.length,
-   `${rows} rows, manifest has ${DEMOS.length} demos + ${NOTES.length} notes`);
-// 🔴 THE SLUG HAS NO NUMBER IN IT, AND THIS CHECK DEMANDED ONE. It tested
-// `/^\/\d\d-[a-z]+\/$/` — the PRE-RENAME url shape. CLAUDE.md: *"A demo's
-// identity is its slug and its ORDER is its position in `DEMOS` — there is no
-// number in the directory, the URL, or the page."* So this assert could not
-// pass and had not been passing: MEASURED 2026-09-14, **0 of 44 linked targets
-// matched it while all 44 answered 200**. A permanently red assert is worse
-// than no assert — it is the thing that teaches a reader a red run means
-// nothing. Another rename that moved a URL living in a harness, which is the
-// one place nothing type-checks.
-//
-// A demo row links `/<slug>/`, optionally carrying the `?xr=1` the index adds
-// to scroll a headset page's Run control under your hand.
-const linkOk = (h) => /^\/[a-z][a-z0-9-]*\/(?:\?[a-z0-9=&-]*)?$/.test(h)
-  || h.startsWith('/proto/') || h.startsWith('/notes/');
-ok('index', 'linked rows point at a demo, a proto or a note',
-   links.length > 0 && links.every(linkOk),
-   `${links.length} linked, ${links.filter((h) => !linkOk(h)).length} bad`
-   + `${links.filter((h) => !linkOk(h)).length ? ': ' + links.filter((h) => !linkOk(h)).join(' ') : ''}`);
-const tap = await evaluate(`(() => { const r = document.querySelector('li.pos-row a').getBoundingClientRect(); return Math.round(r.height); })()`);
+ok('index', 'THE HERO, LARGE is on top, its patchbay drawn',
+   await evaluate(`!!document.querySelector('.pos-hero h1') && !!document.querySelector('.pos-hero-bay svg, .pos-hero-bay *')`));
+const cards = await evaluate(`[...document.querySelectorAll('a.cc-card')].map(a => ({ href: a.getAttribute('href'), t: a.querySelector('.cc-t')?.textContent || '' }))`);
+const listed = DEMOS.filter((d) => d.built && !d.unlisted).length;
+ok('index', 'one card per concept row and per listed demo', cards.length === CONCEPTS.length + listed,
+   `${cards.length} cards, ${CONCEPTS.length} concepts + ${listed} listed demos`);
+// A concept card links /<group>/<slug>/, a demo card /<slug>/; never a number.
+const linkOk = (h) => /^\/[a-z][a-z0-9-]*\/(?:[a-z][a-z0-9-]*\/)?$/.test(h) || h.startsWith('/proto/');
+ok('index', 'every card points at /<group>/<slug>/ or a demo, with no number',
+   cards.every((c) => linkOk(c.href)) && !cards.some((c) => /\b\d{3}\b/.test(c.t)),
+   cards.filter((c) => !linkOk(c.href) || /\b\d{3}\b/.test(c.t)).map((c) => c.href).join(' '));
+const tap = await evaluate(`(() => { const r = document.querySelector('a.cc-card').getBoundingClientRect(); return Math.round(r.height); })()`);
 ok('index', 'tap targets >= 44px', tap >= 44, `${tap}px`);
 await common('index');
 await shot('0-index');

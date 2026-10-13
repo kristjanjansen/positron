@@ -14,7 +14,7 @@
   import { createModulator } from '/shell/pappus-mod.mjs';
   import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ,
     writeDiscrete, basesOf, routesOf, patternOf, createFeatures } from '/shell/radio-gran.mjs';
-  import { createGrainRig } from '/concepts/sampler/grain-rig.mjs';
+  import { createGrainRig } from '/granulator/grain-rig.mjs';
 
   // concepts sampler/050, GRANULATOR, 2026-10-13. Asked (BACKLOG): *"what is good
   // source? perhaps our recorded radios for start? witch patch selector. do we
@@ -28,13 +28,13 @@
   //
   // Everything that is not Pappus (the sources, the scope, the grain events,
   // the knobs and their glide, the patchbay, Play and the self check) is
-  // `/concepts/sampler/grain-rig.mjs`, which /concepts/sampler/060/ shares. This page is the
+  // `/granulator/grain-rig.mjs`, which /granulator/granulator/ shares. This page is the
   // engine and its controls. No output scope since 2026-10-13: the patch
   // picker stands alone (*"replace with just a patch selector (no
   // scope/viz/footer)"*).
   // Archived 2026-10-13: the owner chose the light Grain ring as the
   // granulator (*"but we got rid of pappus?!? 060 ???"*), which is
-  // /concepts/sampler/060/ again. This was concepts sampler/050 and still works
+  // /granulator/granulator/ again. This was concepts sampler/050 and still works
   // here, on the board's own Pappus definitions at /grains/defs/.
   const d = mount({ name: 'Pappus granulator', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 

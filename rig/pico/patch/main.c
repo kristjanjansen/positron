@@ -1,4 +1,4 @@
-/* rig/pico/patch/main.c: the Pico of /concepts/070/, a one link MIDI router
+/* rig/pico/patch/main.c: the Pico of /archive/pico-router/ (once /concepts/070/), a one link MIDI router
  * whose screen draws the route the way the page's patchbay does.
  *
  *   UART0 at 31250 baud, GP0 TX and GP1 RX       DIN MIDI out and in

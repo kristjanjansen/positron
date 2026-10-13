@@ -1,7 +1,7 @@
 {
   "name": "positron-pub",
   // pub.positron.studio: /stage/'s film publisher, the two loopbacks under
-  // /concepts/video/, /ice and the device log. The test pattern (/watch) and
+  // the /video/ concept pages, /ice and the device log. The test pattern (/watch) and
   // /cam/'s RTMPS camera were retired 2026-10-13 (worker.mjs header).
   //
   // instance_type "standard", not the obs-cloud rig's "standard-4": that image
@@ -87,7 +87,7 @@
     // any request overrides it, which is how the new one was driven live
     // before anybody's viewers were moved.
     "PUB_RT": "next",
-    // /concepts/video/030/'s LL-HLS LOOPBACK INPUT, "positron-hls-loopback"
+    // /video/webrtc-loopback/'s LL-HLS LOOPBACK INPUT, "positron-hls-loopback"
     // (src/provision-loop.sh), by uid and never by name: every recording on it
     // is deleted (loop.mjs). Public, it is in every HLS play URL. The customer
     // code is the lifecycle URL's host, as in demo/shell/live.mjs.

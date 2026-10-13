@@ -42,26 +42,29 @@
   const CHAT = [['web:chat:value-out', '*:chat:value-in'], ['*:chat:value-out', 'web:chat:value-in']];
   const ADMIN = [['web:admin:value-out', '*:notice:value-in'], ['*:admin:value-out', 'web:notice:value-in']];
   const KEYS = ['web:keys:midi-out', 'web:synth:midi-in'], SOUND = ['web:synth:audio-out', 'web:speaker:audio-in'];
-  const concept = (n) => `<a href="/concepts/${n}/">/concepts/${n}/</a>`;
+  // A concept page by its /<group>/<slug>/ address (2026-10-13, the numbered
+  // /concepts/<n>/ addresses are 404s); an archived one by its note.
+  const concept = (id) => `<a href="/${id}/">/${id}/</a>`;
+  const note = (md) => `<a href="/archive/concepts/${md}">/archive/concepts/${md}</a>`;
   const demo = (slug) => `<a href="/${slug}/">/${slug}/</a>`;
   const EXAMPLES = [
-    { title: 'MIRROR CONCEPT', n: 2, note: `${concept('091')}: a shader sent to the Pi and its picture back beside the local one.`,
+    { title: 'MIRROR CONCEPT', n: 2, note: `Archived, ${note('misc-010.md')}: a shader sent to the Pi and its picture back beside the local one.`,
       links: [['web:webgl:program-out', 'pi-1:gpu:program-in'], ['pi-1:gpu:video-out', 'web:right:video-in'],
         ['web:webgl:video-out', 'web:left:video-in']] },
-    { title: 'CHAT CONCEPT', n: 3, note: `${concept('003')}: a speaker and a listener link to every other tab.`, links: CHAT },
-    { title: 'HISTORY CONCEPT', n: 4, note: `${concept('004')}: the chat with a store that keeps what was said.`,
+    { title: 'CHAT CONCEPT', n: 3, note: `${concept('room/chat')}: a speaker and a listener link to every other tab.`, links: CHAT },
+    { title: 'HISTORY CONCEPT', n: 4, note: `${concept('room/chat-timeline')}: the chat with a store that keeps what was said.`,
       links: [...CHAT, ['web:chat:value-out', 'cf-store:history:value-in'], ['cf-store:history:value-out', 'web:chat:value-in']] },
-    { title: 'ADMIN CONCEPT', n: 5, note: `${concept('005')}: the chat plus an admin line every tab shows.`, links: [...CHAT, ...ADMIN] },
-    { title: 'BROADCAST CONCEPT', n: 6, note: `${concept('006')}: the admin chat with a camera through Stream.`,
+    { title: 'ADMIN CONCEPT', n: 5, note: `${concept('room/broadcast-chat')}: the chat plus an admin line every tab shows.`, links: [...CHAT, ...ADMIN] },
+    { title: 'BROADCAST CONCEPT', n: 6, note: `${concept('room/broadcast-chat')}: the admin chat with a camera through Stream.`,
       links: [...CHAT, ...ADMIN, ['web:broadcast:value-out', '*:screen:value-in'], ['*:broadcast:value-out', 'web:screen:value-in'],
         ['web:camera:video-out', 'cf-stream:live:video-in'], ['cf-stream:live:video-out', 'web:screen:video-in']] },
-    { title: 'KEYBOARD CONCEPT', n: 10, note: `${concept('010')}: the on-screen keys to a sine and the speakers.`, links: [KEYS, SOUND] },
-    { title: 'EFFECTS CONCEPT', n: 11, note: 'Archived concept 011: an octaver as three parallel links and a filter node.',
+    { title: 'KEYBOARD CONCEPT', n: 10, note: `${concept('synth/keyboard')}: the on-screen keys to a sine and the speakers.`, links: [KEYS, SOUND] },
+    { title: 'EFFECTS CONCEPT', n: 11, note: `Archived, ${note('effects.md')}: an octaver as three parallel links and a filter node.`,
       links: [KEYS, [...KEYS, 'transpose +12'], [...KEYS, 'transpose -12'],
         ['web:synth:audio-out', 'web:fx:audio-in'], ['web:fx:audio-out', 'web:speaker:audio-in']] },
-    { title: 'RECORDER CONCEPT', n: 12, note: `${concept('012')} and ${concept('013')}: a recorder taking the keys and playing back into the synth.`,
+    { title: 'RECORDER CONCEPT', n: 12, note: `${concept('synth/recorder')} and ${concept('synth/timeline')}: a recorder taking the keys and playing back into the synth.`,
       links: [KEYS, ['web:keys:midi-out', 'web:rec:midi-in'], ['web:rec:midi-out', 'web:synth:midi-in'], SOUND] },
-    { title: 'SHADER CONCEPT', n: 14, note: `${concept('014')}: the same notes drawn by a shader and by the emulated Pico.`,
+    { title: 'SHADER CONCEPT', n: 14, note: `${concept('synth/dot-piano')}: the same notes drawn by a shader and by the emulated Pico.`,
       links: [[...KEYS, 'only note'], ['web:keys:midi-out', 'web:rec:midi-in', 'only note'], ['web:rec:midi-out', 'web:synth:midi-in'], SOUND,
         ['web:keys:midi-out', 'web:midi:midi-in'], ['web:rec:midi-out', 'web:midi:midi-in'], ['web:midi:value-out', 'web:shader:value-in'],
         ['web:shader:video-out', 'web:screen:video-in'], ['web:keys:midi-out', 'web:pico:midi-in'], ['web:rec:midi-out', 'web:pico:midi-in'],

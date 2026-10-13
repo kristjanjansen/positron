@@ -41,7 +41,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { PLAYOUT_URL } from '/shell/board.mjs';
   import { epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, graphOf, soundCard, plainNames } from '/archive/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `cushion-${rand(6)}`;

@@ -88,7 +88,7 @@ export const KIT_PARTS = [
   ] },
   // ⚠️ `chat` IS THE TWELFTH, 2026-10-11 (*"make it a kit page too and keep it
   // update while we work on chat for chat components"*): demo/shell/chat-ui.mjs,
-  // the pieces the /concepts/room/ pages draw their chat with.
+  // the pieces the /room/ concept pages draw their chat with.
   { part: 'chat', label: 'CHAT', ids: [
     'chat-grid', 'chat-window', 'chat-column', 'chat-sign', 'chat-log', 'chat-compose',
   ] },

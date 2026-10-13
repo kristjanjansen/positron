@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const D = (process.env.KD2 ?? '/tmp/kd2') + '/';
 export function loadCore(page) {
   let src;
-  if (page) { const h = readFileSync('~/personal/positron/demo/concepts/radio/040/index.html', 'utf8'); src = h.slice(h.indexOf('// KEY CORE BEGIN'), h.indexOf('// KEY CORE END')); }
+  if (page) { const h = readFileSync('~/personal/positron/demo/stations/live-key/index.html', 'utf8'); src = h.slice(h.indexOf('// KEY CORE BEGIN'), h.indexOf('// KEY CORE END')); }
   else src = readFileSync(new URL('cand-core.js', import.meta.url), 'utf8');
   return new Function(`${src}\nreturn { keyCreate, keyFrame, keyRead };`)();
 }

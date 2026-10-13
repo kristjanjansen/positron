@@ -94,26 +94,8 @@
      custom properties and no slide rule is overridden but this one. */
   .fp-sl .sl-say { font-family: var(--fp-head); }
 
-  /* THE HERO, LARGE (2026-10-12, *"do bit bigger version of it. yellow dot in
-     positron stuio"*): pairing C at front page size. The eyebrow is the
-     wordmark with its dot in the accent, as /kit/logo/ draws it. */
-  .fp-big { display: flex; flex-direction: column; min-width: 0; padding: 24px 0 var(--pos-gap); }
-  .fp-big > * { margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
-  .fp-big-eye { font: 400 13px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
-  .fp-big-eye b, .fp-big-h b { color: var(--hi); font-weight: inherit; }
-  .fp-big-h { font: 600 clamp(32px, 7vw, 56px)/1.08 var(--mono); letter-spacing: -.04em; color: var(--fg); margin-top: 18px; }
-  .fp-big-l { font: 400 clamp(18px, 2.3vw, 22px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 24px; max-width: 32em; }
-  .fp-big-s { font: 400 clamp(14px, 1.5vw, 16px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
-
-  /* An imaginary patchbay under the large hero (2026-10-12, *"create
-     imaginary parchbay that fits into 16:9 size under it"*): made up boxes
-     drawn by the real bay view, in a 16:9 frame. */
-  /* Drawn at a fixed width (960 at the desk, 520 on a phone, each above the
-     bay's own stacking width) and scaled to the column; the frame takes the
-     scaled height, so five by three sits near 16:9 and two by four is
-     simply as tall as it is. */
-  .fp-bay { display: flex; justify-content: center; margin-top: 32px; }
-  .fp-bay-in { flex: none; }
+  /* THE HERO, LARGE is `.pos-hero*` in shell.css since 2026-10-13, drawn by
+     demo/shell/hero.mjs, because the front page opens with the same block. */
 
   /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
      THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
@@ -129,7 +111,7 @@
   .fp-rule-end { padding-bottom: var(--pos-gap); }
   .fp-rule-h { font: 600 11px/1.2 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); margin: 0; }
   .fp-rule-n { font: 400 15px/1.5 var(--sans); color: var(--dim); margin: 6px 0 0; max-width: 58ch; }
-  /* the concepts index's own cards (demo/concepts/index.html .cc-card), the
+  /* the front page's own cards (demo/index.html .cc-card), the
      title in mono and the line in Geist */
   .fp-cc { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); margin-top: 20px; }
   .fp-cc-card { display: flex; flex-direction: column; gap: 6px; min-height: 115px; padding: var(--inset, 12px);
@@ -137,7 +119,6 @@
                 color: inherit; text-decoration: none; }
   .fp-cc-card:hover { border-color: var(--fg); }
   .fp-cc-t { margin: 0; font: 600 15px/1.3 var(--mono); color: var(--fg); }
-  .fp-cc-n { font: 400 12px var(--mono); color: var(--dim); margin-right: 10px; font-variant-numeric: tabular-nums; }
   .fp-cc-s { margin: 0; font: 400 14px/1.45 var(--sans); color: var(--dim); }
   .fp-cc-card.fp-case { min-height: 140px; --cc-case: #d68fc6;
     background: color-mix(in srgb, var(--cc-case) 7%, var(--card));
@@ -164,12 +145,8 @@
   import { createCard } from '/shell/card.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { CONCEPTS, DEMO_CARDS } from '/concepts/list.mjs';
-  import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
-  import { createBayTraffic } from '/shell/bay-traffic.mjs';
-  import { createPortInk } from '/shell/port-ink.mjs';
-  import { MEDIA } from '/shell/bay.mjs';
-  import { MEDIUM_COLOURS } from '/shell/patchbay.mjs';
+  import { CONCEPTS, DEMO_CARDS } from '/shell/concept-list.mjs';
+  import { HERO, createHero } from '/shell/hero.mjs';
   import { DEMOS, GROUPS } from '/manifest.mjs';
   import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
 
@@ -285,12 +262,8 @@
   };
   const describe = (role, s) => `${role}: ${nameOf(s.face)} ${s.w}, ${s.px} px, tracking ${s.ls >= 0 ? '+' : ''}${s.ls} em, line ${s.lh}`;
 
-  const HERO = {
-    eye: 'POSITRON STUDIO',
-    head: 'Connect anything to everything.',
-    line: 'Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.',
-    small: 'Powered by Cloudflare services. Delivered as agentic skills.',
-  };
+  // HERO, the owner's four lines, is hero.mjs's, so the specimens below and
+  // the front page cannot set different words.
   // 🔴 THE PAIRINGS ARE DATA, AND THE LABEL IS WRITTEN FROM THE SAME OBJECT
   // THE HERO IS DRAWN WITH, so a label cannot disagree with its specimen.
   const PAIRINGS = [
@@ -312,140 +285,12 @@
   section('THE HERO, LARGE',
     'The hero at front page size, the wordmark with its dot in the accent.',
     null, (add) => {
-      const big = el('div', 'fp-big');
-      const eye = el('p', 'fp-big-eye');
-      eye.append('POSITRON', el('b', '', '.'), 'STUDIO');
-      // The headline's full stop in the accent too, as the wordmark's dot
-      // (asked: *"g. -> yellow dot"*).
-      const head = el('h2', 'fp-big-h');
-      head.append(HERO.head.replace(/\.$/, ''), el('b', '', '.'));
-      big.append(eye, head, el('p', 'fp-big-l', HERO.line), el('p', 'fp-big-s', HERO.small));
-      // The imaginary patchbay: the web, Cloudflare, a Pi and a microcontroller
-      // in one picture. Nothing here runs; the boxes and wires are made up.
-      // The standard medium colours, as every patchbay on the site draws them
-      // (patchbay.mjs MEDIUM_COLOURS); without them every wire is one grey.
-      const MD = `:root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }\n`
-        + MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n');
-      document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS + MD }));
-      // Made of the site's real patches (kit/patchbay's examples). Asked:
-      // *"Make it 3 cols, max 4 rows in mob. 5x 3 will fit in in desktop?"*,
-      // then *"2 col max 4 in mobile"*. So two pictures: the DESK one is five
-      // columns of at most three, every box on a chain the column count
-      // places (keys to recorder to synth to octaver to speakers and R2; the
-      // same keys over Cloudflare to the Circuit on the Pi, which plays the
-      // Pico; a camera through Stream into a shader on the Pi's GPU), and the
-      // PHONE one is two columns of at most four, one hop each.
-      // Then *"3 x 3 blocks in desktop"* and *"make them make sense"*: the
-      // copy's three places in three columns. Left what you hold (keys, a knob
-      // on a Pico, a camera), middle what Cloudflare and the Pi do with it,
-      // right where it ends up. The keys and the knob reach the Circuit on the
-      // Pi through the relay; the camera goes out on Stream to this screen and
-      // to every phone watching. Then *"Rm one box from desktop center"*: the
-      // Pi's GPU went, so the middle is the two Cloudflare services.
-      const DESK = [
-        ['web:keys:midi-out', 'cf-relay:room:midi-in'],
-        ['pico-1:knob:value-out', 'cf-relay:room:value-in'],
-        ['cf-relay:room:midi-out', 'pi-1:circuit:midi-in'],
-        ['cf-relay:room:value-out', 'pi-1:circuit:value-in'],
-        ['web:camera:video-out', 'cf-stream:live:video-in'],
-        ['cf-stream:live:video-out', 'web:screen:video-in'],
-        ['cf-stream:live:video-out', 'phone:screen:video-in'],
-      ];
-      // The PHONE picture is its own patch, about the phone in your hand (asked:
-      // *"Make mibile and dsrsktip patchbays different"*): its touch plays the
-      // Circuit on the Pi, its tilt bends the Pi's shader, its camera goes out
-      // through Stream, its microphone is kept on R2. Two columns of four.
-      // Then *"So so boring"*, then *"make cols same size. make them make
-      // sense. rm one box from right"*: three places, and every wire is a
-      // thing you would do. Touch plays the Circuit on the Pi; tilt is the
-      // Circuit's filter and the angle of the Pi's shader; the camera is what
-      // the shader draws on and what goes out on Stream; the microphone goes
-      // out on Stream with it.
-      const PHONE = [
-        ['phone:touch:midi-out', 'pi-1:circuit:midi-in'],
-        ['phone:tilt:value-out', 'pi-1:circuit:value-in'],
-        ['phone:tilt:value-out', 'pi-1:gpu:value-in'],
-        ['phone:camera:video-out', 'pi-1:gpu:video-in'],
-        ['phone:camera:video-out', 'cf-stream:live:video-in'],
-        ['phone:mic:audio-out', 'cf-stream:live:audio-in'],
-      ];
-      const LABELS = { 'web:keys': 'keyboard', 'web:rec': 'recorder', 'web:synth': 'sine synth', 'web:fx': 'octaver',
-        'web:speaker': 'speakers', 'cf-relay:room': 'Cloudflare', 'pi-1:circuit': 'Novation Circuit', 'r2:recordings': 'R2',
-        'web:pico': 'emulated Pico', 'web:oled': 'its screen', 'web:editor': 'shader code', 'pi-1:gpu': 'Pi GPU',
-        'web:screen': 'screen', 'web:camera': 'camera', 'cf-stream:live': 'Stream',
-        'pico-1:knob': 'a knob on a Pico', 'phone:screen': 'every phone watching',
-        'phone:touch': 'touch', 'phone:tilt': 'tilt', 'phone:camera': 'camera', 'phone:mic': 'microphone' };
-      const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
-      function bayOf(pairs) {
-        const ports = new Map(), nodes = new Map();
-        const links = pairs.map(([from, to], i) => {
-          for (const [id, dir] of [[from, 'out'], [to, 'in']]) {
-            if (!nodes.has(nodeOf(id))) nodes.set(nodeOf(id), { id: nodeOf(id), label: LABELS[nodeOf(id)] || '' });
-            if (!ports.has(id)) ports.set(id, { id, dir, medium: id.split(':')[2].replace(/-(in|out)$/, '') });
-          }
-          return { id: `l${i}`, from, to };
-        });
-        return { nodes: () => [...nodes.values()], ports: () => [...ports.values()], links: () => links, portMap: ports };
-      }
-      // "Working": stand-in traffic from ONE player, so the picture reads as
-      // one thing happening. Every midi wire carries the keys' notes, each hop
-      // a little later; each sound flares on the notes that reach it; the
-      // shader is edited now and then; the camera and the Pi's GPU stream.
-      // Nothing leaves the page.
-      const notes = [];
-      let nextNote = 0;
-      const playing = (t) => (t % 5000) < 3600;     // a phrase, then a breath
-      const tick = (t) => {
-        if (playing(t) && t >= nextNote) { notes.push(t); nextNote = t + 180 + Math.random() * 260; }
-        while (notes.length && notes[0] < t - 6000) notes.shift();
-      };
-      const events = (ms) => { let seen = -1; return (t) => { tick(t); const due = notes.filter((x) => x + ms <= t).length; const n = seen < 0 ? 0 : Math.max(0, due - seen); seen = due; return { n, level: 0 }; }; };
-      const sound = (ms, decay) => { let lvl = 0, prev = 0, heard = 0; return (t) => {
-        tick(t); const due = notes.filter((x) => x + ms <= t).length;
-        if (due > heard) lvl = 0.6 + Math.random() * 0.4;
-        heard = due; lvl *= Math.exp(-(t - prev) / decay); prev = t;
-        return { n: 0, level: lvl, flowing: lvl > 0.03 }; }; };
-      const steady = (t) => ({ n: 0, level: 0.75 + 0.15 * Math.sin(t / 700), flowing: true });
-      // the mod wheel moved for a second in every eight, 30 events a second
-      const wheel = (ms) => { let next = 0; return (t) => { let n = 0; if (((t - ms) % 8000) < 1000 && t >= next) { n = 1; next = t + 33; } return { n, level: 0.5 }; }; };
-      const edits = () => { let next = 2000; return (t) => { let n = 0; if (t >= next) { n = 1; next = t + 5000 + Math.random() * 4000; } return { n, level: 0 }; }; };
-      const feeds = () => ({
-        'web:keys:midi-out': events(0), 'web:rec:midi-out': events(30), 'cf-relay:room:midi-out': events(60),
-        'pi-1:circuit:midi-out': events(120), 'web:synth:audio-out': sound(40, 380), 'web:fx:audio-out': sound(50, 380),
-        'pi-1:circuit:audio-out': sound(110, 500), 'web:pico:video-out': sound(20, 900), 'web:editor:program-out': edits(),
-        'pi-1:gpu:video-out': steady, 'web:camera:video-out': steady, 'cf-stream:live:video-out': steady,
-        'web:keys:value-out': wheel(0), 'cf-relay:room:value-out': wheel(60),
-        'cf-relay:room:clock-out': (t) => ({ n: 0, level: 1, flowing: true }),
-        'pico-1:knob:value-out': wheel(0),
-        'phone:touch:midi-out': events(0), 'phone:tilt:value-out': wheel(0), 'phone:camera:video-out': steady,
-        'phone:mic:audio-out': sound(0, 600) });
-
-      const frame = el('div', 'fp-bay'), inner = el('div', 'fp-bay-in');
-      frame.append(inner);
-      big.append(frame);
-      const life = createBayTraffic();
-      const phoneQ = matchMedia('(max-width: 560px)');
-      let drawW = 0;
-      // `zoom`, not a transform: a zoomed box takes its scaled size in the
-      // layout, so the frame is exactly as tall as the picture it shows.
-      const fit = () => { inner.style.zoom = String(Math.min(1, frame.clientWidth / drawW)); };
-      function draw() {
-        const phone = phoneQ.matches, bay = bayOf(phone ? PHONE : DESK);
-        drawW = phone ? 520 : 760;
-        inner.style.width = `${drawW}px`;
-        // Every column the same width: boxes at a row-of-n width, no stretch.
-        const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false, sizeAs: phone ? 2 : 3 });
-        inner.replaceChildren(view.el);
-        frame.classList.toggle('fp-bay-phone', phone);
-        const feed = feeds();
-        for (const l of bay.links()) life.add(view, l.id, bay.portMap.get(l.from).medium, feed[l.from]);
-        createPortInk({ ports: () => bay.ports() }, MEDIA).paint(frame);
-        requestAnimationFrame(fit);
-      }
-      draw();
-      phoneQ.addEventListener('change', draw);
-      new ResizeObserver(fit).observe(frame);
-      add(big);
+      // The block itself is demo/shell/hero.mjs since 2026-10-13, the one the
+      // front page opens with (*"move concepts to frontpage. use
+      // http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE"*): the
+      // wordmark, the headline, the two lines and the working imaginary
+      // patchbay, a desk picture and a phone picture. This page shows it alone.
+      add(createHero().el);
     }, { bare: true });
 
   // 🔴 THE RULE, IN USE, 2026-10-12: *"do make samples on top of real usage.
@@ -477,23 +322,25 @@
         el('p', 'fp-rule-n', 'The ideas behind positron and the projects that use them.'));
       const grid = el('div', 'fp-cc');
       rule.cards = [];
-      for (const n of ['synth/000', 'clock/010', 'radio/010']) {
-        const c = CONCEPTS.find((x) => x.n === n);
+      // Real rows by id, no number on a card since 2026-10-13 (*"rm numbers"*).
+      for (const id of ['synth/keyboard', 'stations/tuner', 'video/camera']) {
+        const c = CONCEPTS.find((x) => x.id === id);
         if (!c) continue;
-        const a = el('a', 'fp-cc-card', '', { href: `/concepts/${c.n}/` });
-        const h = el('h4', 'fp-cc-t');
-        h.append(el('span', 'fp-cc-n', c.n.split('/')[1]), document.createTextNode(c.title));
+        const a = el('a', 'fp-cc-card', '', { href: `/${c.id}/` });
+        const h = el('h4', 'fp-cc-t', c.title);
         const s = el('p', 'fp-cc-s', c.say);
         a.append(h, s);
         grid.append(a);
         rule.cards.push({ h, s });
       }
-      const row = DEMOS.find((r) => r.name === 'away');
-      if (row && DEMO_CARDS.away) {
-        const a = el('a', 'fp-cc-card fp-case', '', { href: '/away/' });
+      // The use case card is `held`, the one listed demo since away was
+      // archived on 2026-10-13, so the rule still shows four real cards.
+      const row = DEMOS.find((r) => r.name === 'held');
+      if (row && DEMO_CARDS.held) {
+        const a = el('a', 'fp-cc-card fp-case', '', { href: '/held/' });
         const h = el('h4', 'fp-cc-t', row.title || row.name);
-        const s = el('p', 'fp-cc-s', DEMO_CARDS.away.say);
-        a.append(el('span', 'fp-cc-g', GROUPS.get(row.group) || row.group), h, s, el('span', 'fp-cc-u', '/away/'));
+        const s = el('p', 'fp-cc-s', DEMO_CARDS.held.say);
+        a.append(el('span', 'fp-cc-g', GROUPS.get(row.group) || row.group), h, s, el('span', 'fp-cc-u', '/held/'));
         grid.append(a);
         rule.cards.push({ h, s });
       }
@@ -503,7 +350,9 @@
       // 3. a concept page's header, its readout and its log, as clock/010
       // (Message lag) draws them; the numbers are typical of the relay's
       // p50 of about 36 ms (bay.mjs) and the log lines are that page's own
-      const lag = CONCEPTS.find((x) => x.n === 'clock/010');
+      // Message lag left the concepts on 2026-10-12 for /archive/clock-message-lag/,
+      // so its card's words are written here as /archive/ shows them.
+      const lag = { title: 'Message lag', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' };
       const page = el('div', 'fp-rule');
       rule.title = el('h2', 'fp-ph-t', lag?.title || 'Message lag');
       rule.what = el('p', 'fp-ph-w', lag?.say || '');

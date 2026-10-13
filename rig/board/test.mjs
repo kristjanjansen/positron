@@ -1416,7 +1416,7 @@ console.log('\nbeat: the graph on the hello and on every beat');
   console.log('sampler: the board\'s copy against the browser\'s module');
   // The browser module imports `/shell/pedal.mjs` by an absolute URL; that one
   // import is pointed at the real file and everything else is the page's code.
-  const src = readFileSync(new URL('../../demo/concepts/sampler/sampler.mjs', import.meta.url), 'utf8')
+  const src = readFileSync(new URL('../../demo/code/sampler.mjs', import.meta.url), 'utf8')
     .replace("'/shell/pedal.mjs'", `'${new URL('../../demo/shell/pedal.mjs', import.meta.url).href}'`);
   const web = await import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
   const diffs = [];
@@ -1487,11 +1487,11 @@ console.log('\nbeat: the graph on the hello and on every beat');
 {
   const C = await import('./scollide.mjs');
   const { compile: scCompile, UGENS: SC_UGENS } = await import('../../demo/shell/sclang-lite.mjs');
-  const { voices: drumVoices } = await import('../../demo/concepts/rhythm/voices.mjs');
+  const { voices: drumVoices } = await import('../../demo/rhythm/voices.mjs');
   const J = await import('./jacksynth.mjs');
   // The collide program, read out of the page's own module (it imports by
   // absolute URL, so node cannot import it; the text is the template literal).
-  const cvSrc = readFileSync(new URL('../../demo/concepts/synth/collide-voice.mjs', import.meta.url), 'utf8');
+  const cvSrc = readFileSync(new URL('../../demo/code/collide-voice.mjs', import.meta.url), 'utf8');
   const PROGRAM = new Function(`return ${cvSrc.match(/export const PROGRAM = (`[\s\S]*?`);/)[1]}`)();
   const programs = [['collide', PROGRAM],
     ...drumVoices().map((v) => [v.name, v.program]),

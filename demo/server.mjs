@@ -183,9 +183,17 @@ export function serve(port = PORT) {
       return;
     }
 
+    // /concepts/ forwards to the front page, as workers/view/src/index.js does on
+    // the deploy (2026-10-13, the concepts index IS the front page). Only the
+    // index: an old /concepts/<group>/<number>/ page is a 404 on both ends.
+    if (rel === 'concepts' || rel === 'concepts/') {
+      const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+      res.writeHead(302, { location: `/${q}` }).end();
+      return;
+    }
     if (rel === '') rel = 'demo/index.html';
     if (rel.endsWith('/')) rel = join(rel, 'index.html');
-    // `/concepts/2` with no slash: a directory with a page in it gets the slash,
+    // `/synth/keyboard` with no slash: a directory with a page in it gets the slash,
     // as the deployed site does, instead of a 404.
     else if (!extname(rel) && [ROOT, join(ROOT, 'demo')].some((r) => existsSync(join(r, rel, 'index.html')))) {
       const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';

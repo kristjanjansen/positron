@@ -2,6 +2,7 @@
 
 ## Where it is right now
 
+- **In the tree, NOT committed and NOT deployed (2026-10-13, late): the concepts are the front page.** `demo/index.html` is THE HERO, LARGE (`demo/shell/hero.mjs`, shared with /kit/frontpage/) over the concept cards, no numbers. Every concept page moved from `/concepts/<group>/<nnn>/` to `/<group>/<slug>/` (https://positron.studio/synth/keyboard/ once deployed; the full table is in `positron-history`), the radio ones to `/stations/` because `/radio/` is the archived demo, the newsreels to `/history/`. `/concepts/` answers 302 to `/`; the old page addresses 404. The old front page is `archive/frontpage/`. Until it is deployed, the lines below that name `/concepts/...` are the live addresses.
 - **Site: BUILD `3de40367-091104-1cea`**, confirmed on the edge. Deployed from a clean worktree of HEAD every time this session (`git worktree add --detach`, build, deploy, commit `public/` there, fast forward main), so no in-flight file ever shipped.
 - **Workers:** positron-pub and positron-sweep redeployed today (pub's test pattern and RTMPS camera routes answer 410, see the note below this section). Six workers deleted.
 - **The Pi: Yoshimi was retired 2026-10-13** (`archive/yoshimi/README.md`, `plans/plan-retire-yoshimi.md`). The board has no JACK instrument: `audio.start` needs a named source (`sampler`, `collide`, `synth`), and the granulator (`fx.pappus`) refuses for want of one, so `rig/board/insert-test.mjs` and `pappus-live.mjs` refuse (exit 2) and `jack-bay-live.mjs` holds the capture with the sampler.
@@ -62,7 +63,7 @@ to run something, check this list first.
   `node demo/verify-safari.mjs` (they drove /llhls/ and now refuse, exit 2);
   anything holding `wss://pub.positron.studio/watch`; `src/provision-cam.sh`
   (refuses). A WebRTC check with a publisher behind it today:
-  https://positron.studio/concepts/video/030/ (WebRTC loopback), or
+  https://positron.studio/concepts/video/030/ (WebRTC loopback; /video/webrtc-loopback/ after the 2026-10-13 move), or
   `DEMO_DEEP=1 node demo/verify.mjs stage`.
 
 # Handoff, 2026-10-11, session 75: looper accuracy, the Pi on direct, concepts reshuffled

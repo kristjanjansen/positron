@@ -9,7 +9,7 @@
 // The recordings are the thirty /nola/ uses (demo/nola/PROVENANCE.json:
 // FluidR3_GM's acoustic grand through midi-js-soundfonts, MIT), one every minor
 // third from A0 (21) to C8 (108), served from R2 by the station worker. The
-// browser pages (`demo/concepts/sampler/sampler.mjs`) play them by one rule and
+// browser pages (`demo/code/sampler.mjs`) play them by one rule and
 // this file writes the same rule down as SFZ so the Pi and a browser agree:
 //
 //   - a key plays the NEAREST recording, a tie going to the lower one. Three
@@ -45,7 +45,7 @@ import { join } from 'node:path';
 export const SAMPLE_BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/sampler/piano/';
 /** On the board: beside the code, outside anything push.sh deletes (it deletes nothing). */
 export const SAMPLE_DIR = process.env.BOARD_SAMPLES || '/opt/positron-board/samples/piano';
-/** Thirty notes three apart, 21 to 108, the same list as demo/concepts/sampler/sampler.mjs. */
+/** Thirty notes three apart, 21 to 108, the same list as demo/code/sampler.mjs. */
 export const PIANO_NOTES = Object.freeze(Array.from({ length: 30 }, (_, i) => 21 + i * 3));
 /** One hard note in the browser lands at 0.30 against a 0.097 file peak; see the header. */
 export const PIANO_VOLUME_DB = 6;
@@ -138,7 +138,7 @@ export async function ensurePiano({ dir = SAMPLE_DIR, base = SAMPLE_BASE, onLog 
 // (demo/nola/PROVENANCE-rhodes.json). Fifteen notes at the author's uneven
 // steps and five velocity layers, layer 1 the hardest, ten holes at the top of
 // layers 1 and 3. 🔴 THESE TABLES ARE COPIES of
-// `demo/concepts/sampler/sampler.mjs`, because that module imports
+// `demo/code/sampler.mjs`, because that module imports
 // `/shell/pedal.mjs` by an absolute URL node cannot resolve; `test.mjs` imports
 // the browser module with that one import rewritten and grades every table
 // here against it, so the two cannot drift silently.
@@ -194,7 +194,7 @@ export async function ensureRhodes({ dir = RHODES_DIR, base = RHODES_BASE, onLog
 // for it by demo/resources/fetch-salamander.mjs: MONO (the capture sums out_1
 // and out_2 anyway), 48 kHz (the scsynth rate, so BufRateScale is 1), 16 bit
 // FLAC, so nothing is converted here. 208 files, fetched once, one at a time.
-// THE BANDS AND THE NAMES ARE COPIES of demo/concepts/sampler/sampler.mjs and
+// THE BANDS AND THE NAMES ARE COPIES of demo/code/sampler.mjs and
 // test.mjs grades them against it.
 
 export const SALAMANDER_BASE = SAMPLE_BASE.replace(/piano\/$/, 'salamander/pi/');

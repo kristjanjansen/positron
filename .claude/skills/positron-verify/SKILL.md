@@ -378,7 +378,7 @@ branch. After any change to `src/low-latency-player.js`, run
 `demo/verify-native.mjs` too. ⚠️ **RETIRED 2026-10-13 FOR NOW:** it and
 `demo/verify-safari.mjs` drive /llhls/, whose input was deleted that day, so
 both refuse with exit 2 rather than read PASS about a player that never starts.
-Until one is re-pointed at /concepts/video/060/ (in `BACKLOG.md`), the native
+Until one is re-pointed at /video/ll-hls-loopback/ (in `BACKLOG.md`), the native
 branch has no harness, and that is the gap to say out loud after a player change.
 
 **Attribute a run to a build before iterating on it.** Every 06 log opens with

@@ -10,12 +10,12 @@
 <!-- /archive/, 2026-10-12. Asked: "make "/arhive" page and move csound and
      tutotial slide there". Not a manifest demo: workers/view/build.mjs copies
      demo/archive/ to /archive/ with archiveFiles(), the way conceptFiles()
-     copies /concepts/, and also deploys the markdown notes listed below at
+     copies the concept folders, and also deploys the markdown notes listed below at
      their repository paths, served as plain text. The dev server finds both by
      itself: /archive/ is not a directory at the repo root, so it falls through
      to demo/archive/, and /archive/<x>.md is the repo's own file. -->
 <style>
-  /* The concepts index's cards (demo/concepts/index.html), same size. */
+  /* The front page's cards (demo/index.html), same size. */
   .ar-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
   .ar-card {
     display: flex; flex-direction: column; gap: 6px;
@@ -38,10 +38,13 @@
   const d = mount({
     name: 'archive',
     what: 'Pages that left the concepts index, and notes on the ones that are gone.',
-    readout: null, index: '/concepts/', indexLabel: 'concepts',
+    readout: null, index: '/', indexLabel: 'concepts',
   });
 
-  // Still deployed, off /concepts/ and off the front page.
+  // Still deployed, off the front page.
+  // `kind` reads `concept` for a page that was one, with no number, since
+  // 2026-10-13 (*"rm numbers"*): the old `<group> <number>` ids are dead
+  // addresses, kept in the comments beside each row.
   const RETIRED = [
     { kind: 'demo', title: 'Partitur', href: '/partitur/', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
     { kind: 'demo', title: 'Reel', href: '/reel/', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },
@@ -62,24 +65,24 @@
     // Asked 2026-10-12: *"move to archive https://positron.studio/concepts/clock/040/. add short summary what you said on it"*.
     // Asked 2026-10-12: *"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*.
     // Asked 2026-10-12: *"arhice https://positron.studio/concepts/video/040/"*.
-    { kind: 'video 040', title: 'TV', href: '/archive/tv/', say: 'ETV and ETV2 live on one crossfader, each channel beside a plain and a dithered blend.' },
+    { kind: 'concept', title: 'TV', href: '/archive/tv/', say: 'ETV and ETV2 live on one crossfader, each channel beside a plain and a dithered blend.' },
     // Asked 2026-10-12: *"archive https://positron.studio/concepts/device/000/"*.
-    { kind: 'device 000', title: 'Pico router', href: '/archive/pico-router/', say: 'A synth played through an emulated Raspberry Pi Pico whose screen shows each note.' },
+    { kind: 'concept', title: 'Pico router', href: '/archive/pico-router/', say: 'A synth played through an emulated Raspberry Pi Pico whose screen shows each note.' },
     // Asked 2026-10-12: *"still too many clock demos, i can not distinguish"*, *"move less relevant to archive"*.
-    { kind: 'clock 040', title: 'MIDI clock', href: '/archive/clock-midi/', say: 'The same beat sent as 24 ticks a beat or as one anchor, and how far each lands from the beat.' },
-    { kind: 'clock 050', title: 'Clock drift', href: '/archive/clock-drift/', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
-    { kind: 'draw 000', title: 'XY filter', href: '/archive/draw-xy/', say: 'Drag the pad over a held note. Left to right opens the filter, bottom to top raises its resonance.' },
-    { kind: 'clock 030', title: 'Shared clock', href: '/archive/clock-shared/', say: 'Two places in this tab, one clock set wrong on purpose, agree the time once and then share one beat.' },
-    { kind: 'clock 000', title: 'Scheduling', href: '/archive/clock-scheduling/', say: 'A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late.' },
-    { kind: 'clock 010', title: 'Message lag', href: '/archive/clock-message-lag/', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' },
-    { kind: 'clock 020', title: 'Audio cushion', href: '/archive/clock-audio-cushion/', say: 'A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts.' },
-    { kind: 'synth 110', title: 'Plaits patches', href: '/archive/plaits-patches/', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
-    { kind: 'clock 060', title: 'Play together', href: '/archive/clock-play-together/', say: 'A link carrying the shared clock lands one note in two places together, but both places are in one tab with a simulated second clock.' },
-    { kind: 'clock 070', title: 'Replay', href: '/archive/clock-replay/', say: 'Keys and a picture recorded, then played back with the recording as the clock.' },
-    { kind: 'clock 040', title: 'Follow', href: '/archive/clock-follow/', say: 'A cue waits for its own late picture, but the picture is modelled in the tab, so a real LL-HLS stream would have to replace it.' },
+    { kind: 'concept', title: 'MIDI clock', href: '/archive/clock-midi/', say: 'The same beat sent as 24 ticks a beat or as one anchor, and how far each lands from the beat.' },
+    { kind: 'concept', title: 'Clock drift', href: '/archive/clock-drift/', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
+    { kind: 'concept', title: 'XY filter', href: '/archive/draw-xy/', say: 'Drag the pad over a held note. Left to right opens the filter, bottom to top raises its resonance.' },
+    { kind: 'concept', title: 'Shared clock', href: '/archive/clock-shared/', say: 'Two places in this tab, one clock set wrong on purpose, agree the time once and then share one beat.' },
+    { kind: 'concept', title: 'Scheduling', href: '/archive/clock-scheduling/', say: 'A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late.' },
+    { kind: 'concept', title: 'Message lag', href: '/archive/clock-message-lag/', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' },
+    { kind: 'concept', title: 'Audio cushion', href: '/archive/clock-audio-cushion/', say: 'A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts.' },
+    { kind: 'concept', title: 'Plaits patches', href: '/archive/plaits-patches/', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
+    { kind: 'concept', title: 'Play together', href: '/archive/clock-play-together/', say: 'A link carrying the shared clock lands one note in two places together, but both places are in one tab with a simulated second clock.' },
+    { kind: 'concept', title: 'Replay', href: '/archive/clock-replay/', say: 'Keys and a picture recorded, then played back with the recording as the clock.' },
+    { kind: 'concept', title: 'Follow', href: '/archive/clock-follow/', say: 'A cue waits for its own late picture, but the picture is modelled in the tab, so a real LL-HLS stream would have to replace it.' },
     // Moved here 2026-10-13 when the owner chose the light granulator (*"but we got rid of pappus?!? 060 ???"*).
-    { kind: 'sampler 050', title: 'Pappus granulator', href: '/archive/pappus/', say: 'Our radio recordings granulated by Pappus, the Raspberry Pi\'s granulator, running in this tab.' },
-    { kind: 'misc 020', title: 'Tutorial slide', href: '/concepts/misc/020/', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
+    { kind: 'concept', title: 'Pappus granulator', href: '/archive/pappus/', say: 'Our radio recordings granulated by Pappus, the Raspberry Pi\'s granulator, running in this tab.' },
+    { kind: 'concept', title: 'Tutorial slide', href: '/archive/tutorial-slide/', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
     // Asked 2026-10-12: *"archive wire and patchbay"*. Still served, unlisted in the manifest.
     { kind: 'demo', title: 'Wire', href: '/wire/', say: 'A message as the exact bytes it becomes, and notes played into a second tab, each timed on landing.' },
     { kind: 'demo', title: 'Draw', href: '/draw/', say: 'Draw a line and play it back from a recording, to see how much of the gesture playback has to guess.' },

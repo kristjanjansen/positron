@@ -68,8 +68,12 @@ const SCRATCH = OUT !== DEPLOY_OUT;
 // the demo story order, single-sourced from demo/manifest.mjs
 // rowHTML/noteHTML come from the manifest too. They used to be duplicated here
 // AND in demo/index.html, so fixing one left the other printing `undefined`.
-const { DEMOS: DEMO_MANIFEST, NOTES: NOTES_MANIFEST, byGroup, groupHTML, noteHTML, extraPages } =
+const { DEMOS: DEMO_MANIFEST, extraPages } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
+// The concept pages: their rows and the folders they live in. Since 2026-10-13
+// they are the front page and answer at /<group>/<slug>/ (demo/shell/concept-list.mjs).
+const { CONCEPTS, CONCEPT_DIRS } =
+  await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -325,7 +329,7 @@ const FILES = [
   ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
   ['demo/shell/vendor/LICENSE-pico-bootrom', 'shell/vendor/LICENSE-pico-bootrom'],
   ['demo/resources/pico/router-pico.uf2', 'resources/pico/router-pico.uf2'],
-  // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /concepts/14/
+  // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /synth/dot-piano/ (once /concepts/14/)
   // drawn by C on the emulated Pico (rig/pico/rings/build.sh copies it here).
   ['demo/resources/pico/rings-pico.uf2', 'resources/pico/rings-pico.uf2'],
   // rig/pico/patch/build-pico/patch.uf2, byte for byte: concept 070's own firmware,
@@ -493,6 +497,12 @@ const FILES = [
   ['demo/nola/LICENSE-jrhodes3d', 'nola/LICENSE-jrhodes3d'],
 
   ...extraPages(),
+  // 🔴 THE FRONT PAGE IS demo/index.html, COPIED AS IT IS, SINCE 2026-10-13
+  // (*"move concepts to frontpage"*): the concepts index with THE HERO, LARGE on
+  // top. Until then this file baked the manifest's groups into menu.html, and
+  // demo/index.html was a second renderer of the same rows for the dev server.
+  // Both are in archive/frontpage/. One page now, the same file on both ends.
+  ['demo/index.html', 'index.html'],
   ...demoFiles(),
   ...conceptFiles(),
   ...archiveFiles(),
@@ -629,37 +639,61 @@ function demoFiles() {
 }
 
 /**
- * `demo/concepts/` deployed WHOLE, at /concepts/ and /concepts/<n>/, with no
- * manifest row. Asked 2026-10-09: the concepts pages had to answer on the
- * deploy without a card on the front page.
+ * The concept pages, deployed WHOLE, one folder per group: demo/<group>/ at
+ * /<group>/, each page at /<group>/<slug>/, with no manifest row. Asked
+ * 2026-10-09 as `demo/concepts/` at /concepts/<n>/; moved to the front page and
+ * to /<group>/<slug>/ on 2026-10-13 (*"move concepts to frontpage ... rename
+ * all with group/slug, rm numbers"*). The folders are CONCEPT_DIRS in
+ * demo/shell/concept-list.mjs.
  *
  * ⚠️ A RULE AND NOT ROWS, ON PURPOSE. A manifest row is also a subject for
  * `demo/verify.mjs`, which grades every `built` row, `unlisted` or not, and
  * these pages publish nothing for it to grade beyond the shell's own. And a
- * row per page means a new `concepts/11/` deploys only after somebody
- * remembers to add one. This walks the directory, so a new page ships on the
- * next build with no edit anywhere.
- * ⚠️ SAME CONTAINMENT AS demoFiles(): one known subtree, filtered to the same
- * web extensions, so nothing from the repo root can reach public/.
+ * row per page means a new page deploys only after somebody remembers to add
+ * one. This walks the folders, so a new page ships on the next build.
+ * ⚠️ SAME CONTAINMENT AS demoFiles(): named subtrees, filtered to the same web
+ * extensions, so nothing from the repo root can reach public/.
+ * 🔴 AND IT REFUSES A FOLDER THAT WOULD TAKE OVER A STILL-SERVED ADDRESS. A
+ * concept group is a top-level path now, beside every demo slug, and /radio/ is
+ * the archived radio demo, still served: that is why the radio concepts are at
+ * /stations/. A demo slug, a manifest page path, or a top-level destination
+ * of the hand list above, under the same name as a concept folder, stops the
+ * build here, as does a row whose folder is not in CONCEPT_DIRS (it would not
+ * be copied and its card would 404).
  */
-function conceptFiles(rel = 'demo/concepts') {
+function conceptFiles() {
+  const taken = new Set(DEMO_MANIFEST.flatMap((d) => [d.name.split('/')[0],
+    ...(d.page ? [d.page.split('/').filter(Boolean)[0]] : [])]));
+  for (const [, dst] of extraPages()) taken.add(dst.split('/')[0]);
+  for (const t of ['shell', 'archive', 'kit', 'proto', 'src', 'timeline', 'resources', 'notes', 'concepts', 'frontpage', 'eccm', 'api', 'icy', 'err-img', 'report']) taken.add(t);
+  const clash = CONCEPT_DIRS.filter((g) => taken.has(g));
+  const stray = CONCEPTS.filter((c) => !CONCEPT_DIRS.includes(c.id.split('/')[0])).map((c) => c.id);
+  if (clash.length || stray.length) {
+    console.error('\nBUILD REFUSED: concept folders that would take an address already served, or rows outside CONCEPT_DIRS:');
+    for (const g of clash) console.error(`  /${g}/ is a demo or a site path, so a concept group may not use it`);
+    for (const id of stray) console.error(`  ${id} is in no folder of CONCEPT_DIRS`);
+    process.exit(1);
+  }
   const OK = new Set(['.html', '.mjs', '.js', '.css', '.json',
                       '.png', '.jpg', '.jpeg', '.svg', '.webp']);
-  const out = [];
-  let entries = [];
-  try { entries = readdirSync(join(REPO, rel), { withFileTypes: true }); } catch { return out; }
-  for (const e of entries) {
-    const src = `${rel}/${e.name}`;
-    if (e.isDirectory()) out.push(...conceptFiles(src));
-    else if (e.isFile() && OK.has(extname(e.name))) out.push([src, src.replace(/^demo\//, '')]);
-  }
-  return out;
+  const walk = (rel) => {
+    const out = [];
+    let entries = [];
+    try { entries = readdirSync(join(REPO, rel), { withFileTypes: true }); } catch { return out; }
+    for (const e of entries) {
+      const src = `${rel}/${e.name}`;
+      if (e.isDirectory()) out.push(...walk(src));
+      else if (e.isFile() && OK.has(extname(e.name))) out.push([src, src.replace(/^demo\//, '')]);
+    }
+    return out;
+  };
+  return CONCEPT_DIRS.flatMap((g) => walk(`demo/${g}`));
 }
 
 /**
  * `/archive/`, 2026-10-12 (*"make "/arhive" page and move csound and tutotial
  * slide there"*): `demo/archive/` deployed whole at /archive/, as conceptFiles()
- * does for /concepts/, with no manifest row. Beside it the markdown notes that
+ * does for the concept folders, with no manifest row. Beside it the markdown notes that
  * describe removed pages, `archive/typist.md` and `archive/concepts/*.md`,
  * deployed at their repository paths so the dev server (which serves the repo
  * root) and the deploy answer the same URL. `_headers` below serves them as
@@ -815,32 +849,10 @@ console.log(`stamp ${BUILD_STAMP}`);
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
-// the menu page — the only page this worker authors itself. Its list is
-// GENERATED from demo/manifest.mjs (plans/plan-demos.md step 8) so there is no second
-// place to forget. Number and name only; a row with no target renders greyed.
-{
-  // 🔴 GROUPED BY SUBJECT on the front page, story order everywhere else.
-  // `byGroup()` returns copies for exactly that reason — the array is still the
-  // sequence — and it REFUSES a row with no group rather than quietly leaving
-  // it off the one page everybody opens.
-  const rows = byGroup(DEMO_MANIFEST).map((g) => '  ' + groupHTML(g)).join('\n');
-  // 🔴 NO HEADING AND NO LIST WHEN THERE ARE NO NOTES. `NOTES` has been empty
-  // since the last one was struck, and this wrote the word `notes` over an
-  // `<ol>` with nothing in it on every build: a section that promises something
-  // and delivers a gap, which is `shell.css`'s empty-readout rule one page up.
-  // Reported as *"rm empty notes"*. A container with nothing in it must not
-  // paint its edges, and a heading is an edge.
-  const notes = NOTES_MANIFEST.length
-    ? '<h2 class="pos-act-h">notes</h2>\n<ol class="pos-acts">'
-      + NOTES_MANIFEST.map((n) => '  ' + noteHTML(n)).join('\n') + '</ol>'
-    : '';
-  const menu = await readFile(join(HERE, 'menu.html'), 'utf8');
-  if (!menu.includes('<!--DEMOS-->')) throw new Error('menu.html lost its <!--DEMOS--> marker');
-  if (!menu.includes('<!--NOTES-->')) throw new Error('menu.html lost its <!--NOTES--> marker');
-  await writeFile(join(OUT, 'index.html'),
-    menu.replace('<!--DEMOS-->', rows).replace('<!--NOTES-->', notes)
-        );
-}
+// 🔴 NO GENERATED FRONT PAGE SINCE 2026-10-13. This block baked the manifest's
+// groups (`byGroup`, `groupHTML`, `noteHTML`) into workers/view/menu.html at
+// public/index.html. The front page is demo/index.html now, copied by the list
+// above like any other page, and menu.html is archive/frontpage/menu.html.
 
 // favicon.ico — generated, not committed. Browsers request /favicon.ico for
 // every page whether or not the HTML asks for one; without this the four

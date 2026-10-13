@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Sound design</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { modulePage } from '/synth/module-page.mjs';
+
+  // Sound design: one voice through every module the synth has. The keys play
+  // the oscillator and open the amp's envelope, the oscillator goes through the
+  // low-pass filter into the amp, the amp to the speakers and the scope, and
+  // the LFO moves the filter's cutoff. Each knob is a node of its own with a
+  // wire into the module it moves, in reading order: oscillator, filter,
+  // envelope, LFO. Asked 2026-10-13, *"combine filter+envelope+lfo to single
+  // sound design concept"*: this page was the filter alone, and 060 (envelope)
+  // and 070 (LFO) were removed into it; their URLs 404 (no forwarding).
+  // The voice is ../patch-synth.mjs and the page is ../module-page.mjs.
+  const d = mount({ name: 'Sound design', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('synth/sound-design');
+  const PRESET = { wave: 'sawtooth', cutoff: 1100, q: 5, attack: 0.008, decay: 0.35, sustain: 0.55, release: 0.45, rate: 0.8, depth: 1200 };
+  const KNOBS = ['wave', 'cutoff', 'q', 'attack', 'decay', 'sustain', 'release', 'rate', 'depth'];
+  const p = modulePage(d, {
+    patch: `web:keys:midi-out -> web:osc:midi-in
+web:keys:midi-out -> web:amp:midi-in
+web:osc:audio-out -> web:filter:audio-in
+web:filter:audio-out -> web:amp:audio-in
+web:amp:audio-out -> web:speaker:audio-in
+web:amp:audio-out -> web:scope:audio-in
+web:lfo:audio-out -> web:filter:cutoff-in`,
+    knobs: KNOBS,
+    preset: PRESET,
+  });
+
+  // ── self-checks, only under ?selfcheck=1: they make a sound and turn knobs ──
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  /** Mean of `n` scope readings `gap` ms apart, and their spread over the mean. */
+  async function levels(n = 6, gap = 40) {
+    const xs = [];
+    for (let i = 0; i < n; i++) { xs.push(p.level()); await sleep(gap); }
+    const mean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    return { mean, spread: mean ? (Math.max(...xs) - Math.min(...xs)) / mean : 0 };
+  }
+  async function check() {
+    const A = d.assert;
+    const NOTE = 48;
+    A('a visit opened no audio context', p.synth.ctx() === null);
+    A('nine knobs in reading order: oscillator, filter, envelope, LFO', [...p.knobs.keys()].join(' ') === KNOBS.join(' '), [...p.knobs.keys()].join(' '));
+    const links = p.synth.bay.links().map((l) => `${l.from} -> ${l.to}`);
+    A('every knob has its own wire into its module', KNOBS.every((k) => links.some((l) => l.startsWith(`web:knob-${k}:value-out -> `))), `${links.length} links`);
+    A('the patch reads keys, osc, filter, amp, speaker and scope, with the LFO on the cutoff',
+      ['web:osc:audio-out -> web:filter:audio-in', 'web:filter:audio-out -> web:amp:audio-in', 'web:amp:audio-out -> web:scope:audio-in',
+        'web:lfo:audio-out -> web:filter:cutoff-in', 'web:keys:midi-out -> web:amp:midi-in'].every((l) => links.includes(l)));
+
+    // The LFO held still while the filter and the envelope are measured.
+    p.turn('depth', 0);
+    p.down(NOTE); await sleep(600);
+    const open = (await levels()).mean;
+    A('a key makes a sound at the scope', open > 0.02, `rms ${open.toFixed(4)}`);
+    p.turn('cutoff', 80); await sleep(400);
+    const shut = (await levels()).mean;
+    A('turning the cutoff down lowers the level', shut < open * 0.6, `rms ${open.toFixed(4)} at 1.1 kHz, ${shut.toFixed(4)} at 80 Hz`);
+    p.turn('cutoff', PRESET.cutoff);
+    p.up(NOTE); await sleep(1500);
+
+    p.down(NOTE); await sleep(120);
+    const fast = p.level();
+    p.up(NOTE); await sleep(1500);
+    p.turn('attack', 2);
+    p.down(NOTE); await sleep(120);
+    const slow = p.level();
+    p.up(NOTE);
+    A('a slow attack delays the onset', slow < fast * 0.3, `rms 120 ms after the key ${fast.toFixed(4)} at 8 ms attack, ${slow.toFixed(4)} at 2 s`);
+    p.turn('attack', PRESET.attack); await sleep(1500);
+
+    p.turn('cutoff', 500); p.turn('rate', 2);
+    p.down(NOTE); await sleep(600);
+    const still = await levels(25);
+    p.turn('depth', 3 * 1200); await sleep(300);
+    const moving = await levels(25);
+    p.up(NOTE);
+    A('LFO depth makes the level move', moving.spread > 0.3 && moving.spread > 3 * still.spread,
+      `level swing over its mean ${still.spread.toFixed(2)} at depth 0, ${moving.spread.toFixed(2)} at 3 oct`);
+    for (const k of ['cutoff', 'rate', 'depth']) p.turn(k, PRESET[k]);
+  }
+  if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
+  d.ready();
+</script>

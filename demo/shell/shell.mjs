@@ -78,7 +78,7 @@ export function mount({
   joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
-  indexLabel = 'demos',  // the word after the arrow; `/concepts/<n>/` says `concepts`
+  indexLabel = 'demos',  // the word after the arrow; a concept page at /<group>/<slug>/ says `concepts`
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();

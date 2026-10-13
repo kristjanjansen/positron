@@ -1,4 +1,4 @@
-# rig/pico/rings/CMakeLists.txt: the rings of /concepts/14/ on a Pico's OLED.
+# rig/pico/rings/CMakeLists.txt: the rings of /synth/dot-piano/ (once /concepts/14/) on a Pico's OLED.
 # Build with build.sh, which runs this inside Docker for PICO_BOARD=pico.
 cmake_minimum_required(VERSION 3.13)
 

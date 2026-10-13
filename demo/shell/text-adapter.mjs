@@ -5,7 +5,7 @@
 // through a real browser fold to the browser's own text character for
 // character (48/48, cursor [48,48]), all 10 deletions had a range no event
 // reported, and 62 of 62 ranges were settled by the post-edit cursor rather
-// than by the raw diff. `demo/typist/` was the page until 2026-10-12 (archive/typist.md); /concepts/typist/030/ uses it now.
+// than by the raw diff. `demo/typist/` was the page until 2026-10-12 (archive/typist.md); /typist/playback/ uses it now.
 //
 // (was: the `text-op` kind: a STATEFUL-DOCUMENT adapter for
 // timeline/transport.mjs.)

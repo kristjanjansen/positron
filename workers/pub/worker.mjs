@@ -1,16 +1,16 @@
 // positron-pub: /stage/'s film publisher, the two loopbacks under
-// /concepts/video/, TURN credentials and the device log.
+// the /video/ concept pages, TURN credentials and the device log.
 //
 //   GET  /ice                          short lived TURN servers, 503 with no key
 //   POST /log                          a device reports what it saw
 //   GET  /logs[?format=text]           read those reports back
 //   POST /logs/clear                   drop them
-//   POST /cam/whip, DELETE /cam/whip/<id>  /concepts/video/030/'s WebRTC
+//   POST /cam/whip, DELETE /cam/whip/<id>  /video/webrtc-loopback/'s WebRTC
 //                                      loopback publish, onto its OWN WebRTC
 //                                      input (CAM_WHIP_URL, "positron-cam-whip")
 //   /stage/watch /stage/status         /stage/'s own instance: the MIM film on
 //   /stage/start /stop                 WHIP while a viewer holds /stage/watch
-//   wss://pub.positron.studio/loop     /concepts/video/060/'s LL-HLS loopback: the
+//   wss://pub.positron.studio/loop     /video/ll-hls-loopback/'s LL-HLS loopback: the
 //                                      camera rewrap on its own instance and its
 //                                      OWN input (LOOP_STREAM_KEY), every take deleted
 //   GET  /loop/status                  recordings on that input, account storage
@@ -78,7 +78,7 @@ const CAM_TICK_MS = 5_000;     // the alarm's cadence while a loopback take is l
 // WebRTC input answers `live: true` with nothing publishing to it, so it is no
 // signal here. Such a session blocks the next camera for at most CAM_MAX_MS and
 // is then replaced.
-// /concepts/video/030/'S LL-HLS LOOPBACK: the camera route above on an instance
+// /video/webrtc-loopback/'S LL-HLS LOOPBACK: the camera route above on an instance
 // of its own (`loop`) and an input of its own ("positron-hls-loopback",
 // LOOP_UID, src/provision-loop.sh), so a sweep can delete EVERYTHING on that
 // input. The page's 30 s run from when Stream says the input is live, which is
@@ -338,7 +338,7 @@ const pubOn = (Base, NEXT) => class extends Base {
 
     // ── the LL-HLS loopback's camera, onto its own input, on its own instance ─
     //
-    // /concepts/video/060/ records its canvas with MediaRecorder and sends each
+    // /video/ll-hls-loopback/ records its canvas with MediaRecorder and sends each
     // chunk to /loop, which arrives here as /cam; this object POSTs them, in
     // order, into its container's camera leg, which rewraps them to RTMPS on the
     // loopback's OWN input (LOOP_STREAM_KEY). Only the `loop` instance answers

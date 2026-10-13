@@ -2,7 +2,7 @@
 // it a page is told.
 //
 // 🔴 ASKED 2026-10-13: *"make all concept knobs \"invisible-handed\" start from
-// remote 010"*. On /concepts/remote/010/ the eight macro knobs M1 to M8 send
+// remote 010"*. On /remote/circuit-on-pi/ the eight macro knobs M1 to M8 send
 // CC 80 to 87 to the Circuit, and a hand turning the Circuit's own macro knob
 // on the desk was not seen by the page, because nothing read the Circuit's
 // MIDI out except a patch dump request (`inputs.mjs` `askBack`).

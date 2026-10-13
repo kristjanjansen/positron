@@ -41,7 +41,7 @@ csound	1:6.18.1+dfsg-4	apt	the reverb insert (rig/board/csd/space.csd)
 ffmpeg	8:7.1.5-0+deb13u1+rpt2	apt	encodes the camera and the rendered picture; h264_v4l2m2m is the hardware path
 alsa-utils	1.2.14-1+rpt1	apt	aconnect, which is how MIDI ports are read and patched
 v4l-utils	1.30.1-1	apt	v4l2-ctl, how the camera is asked what modes it has
-rpicam-apps-lite	-	apt	rpicam-hello and rpicam-vid, how rig/board/camera.mjs finds and encodes a CSI camera for /concepts/remote/010/?cam=; version not yet seen on the board
+rpicam-apps-lite	-	apt	rpicam-hello and rpicam-vid, how rig/board/camera.mjs finds and encodes a CSI camera for /remote/circuit-on-pi/?cam=; version not yet seen on the board
 build-essential	-	apt	gcc, to build rig/vis on the board rather than cross-compiling
 libegl1	-	apt	rig/vis links against EGL; without it the renderer builds and will not run
 libgbm1	-	apt	rig/vis links against GBM, the headless surface it draws into

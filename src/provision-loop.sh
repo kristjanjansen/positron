@@ -1,5 +1,5 @@
 #!/bin/sh
-# One RTMPS live input DEDICATED to /concepts/video/030/'s LL-HLS loopback,
+# One RTMPS live input DEDICATED to /video/webrtc-loopback/'s LL-HLS loopback,
 # "positron-hls-loopback", and its stream key stored as LOOP_STREAM_KEY on
 # positron-pub. Run 2026-10-12, asked for through the session: *"A live input
 # DEDICATED to this loopback (its own id, its own name like

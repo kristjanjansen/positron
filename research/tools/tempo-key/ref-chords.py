@@ -1,5 +1,5 @@
 """A reference chord track for one recording, from essentia, for grading what
-autoplay on /concepts/radio/040/ chooses. Soft truth, not truth: nobody has
+autoplay on /stations/live-key/ chooses. Soft truth, not truth: nobody has
 labelled these recordings, and essentia's ChordsDetection knows only major and
 minor triads.
 

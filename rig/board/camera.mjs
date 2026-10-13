@@ -31,7 +31,7 @@
 //
 // ⚠️ THE HARDWARE ENCODER IS SHARED WITH THE SHADER PICTURE. On a Pi 4
 // `rpicam-vid` encodes on /dev/video11, which is the device `video.mjs` holds for
-// /concepts/remote/050/. Two users of it do not fail, they block (video.mjs
+// /remote/shader-on-pi/. Two users of it do not fail, they block (video.mjs
 // says so at length), so each refuses while the other runs.
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -412,7 +412,7 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
     if (cam) return;
     if (refusal && now() - refusal.at < 30_000) { say(refusal.msg); return; }
     refusal = null;
-    if (encoderBusy()) { say({ type: 'cam.refused', why: 'the hardware encoder is drawing the shader picture (/concepts/remote/050/), so the camera waits' }); return; }
+    if (encoderBusy()) { say({ type: 'cam.refused', why: 'the hardware encoder is drawing the shader picture (/remote/shader-on-pi/), so the camera waits' }); return; }
     sweepStrayCameras((l) => log(`camera: ${l}`));
     const found = find();
     if (!found.ok) {

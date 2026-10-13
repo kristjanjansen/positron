@@ -6,7 +6,7 @@
 > `/watch`, `/status` and `/whip` answer 410. Everything below is a dated record
 > of what was measured on it and stays as written. `run.mjs`, `publish.html`
 > and `play.html` here have no input to run against; a WebRTC round trip with
-> an input behind it today is /concepts/video/030/ (pub's `/cam/whip` onto
+> an input behind it today is /video/webrtc-loopback/ (pub's `/cam/whip` onto
 > `positron-cam-whip`).
 
 Question: does ffmpeg 9.0.1's WHIP muxer interoperate with Cloudflare Stream WHIP

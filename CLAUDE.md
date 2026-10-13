@@ -12,7 +12,20 @@ times it was a background agent reading the stale number that caught it.
 node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"
 ```
 
-The front page is ordered NEWEST FIRST, because the index answers *what is new
+🔴 **THE FRONT PAGE IS THE CONCEPTS INDEX SINCE 2026-10-13**, asked as *"when
+all is done, move concepts to frontpage. use http://127.0.0.1:8890/kit/frontpage/ on top THE HERO,
+LARGE. rename all with group/slug, rm numbers"*. `demo/index.html` is THE HERO,
+LARGE (`demo/shell/hero.mjs`, the same block /kit/frontpage/ shows) over the
+cards of `demo/shell/concept-list.mjs`, and the build copies that file as it is.
+Every concept page is at `/<group>/<slug>/` (https://positron.studio/synth/keyboard/),
+no number anywhere; `/concepts/` answers 302 to `/` and every old
+`/concepts/<group>/<number>/` is a 404. The old table is in `positron-history`.
+The listed manifest rows (today only `held`) draw as use case cards from
+`DEMO_CARDS`, skipping `built: false` and `unlisted` rows. The paragraph below
+describes the manifest-baked front page, which is in `archive/frontpage/`; what
+it says about `built: false` and the deploy is still true.
+
+The front page WAS ordered NEWEST FIRST, because the index answers *what is new
 here?*; `DEMOS` is the story order and answers *where do I start?*, and
 `byNewest()` copies it. 🔴 **`unlisted: true` HIDES A ROW FROM THE INDEX, AND
 `built: false` DOES NOT.** This line said `built: false` until 2026-09-28 and it
@@ -56,7 +69,7 @@ somebody broke it.
 | `positron-hardware` | anything under `rig/`, a page that plays real hardware, any claim about an instrument |
 | `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
 | `positron-slides` | writing or revising any slide text, deck outline, speaker notes or playable lesson, including a deck in `demo/shell/decks.mjs`. It is the words half; drawing a slide is `positron-ui` |
-| `positron-concepts` | building or changing any page under `demo/concepts/` or a card on `/concepts/`, or explaining a patchbay idea as a small page |
+| `positron-concepts` | building or changing any concept page (`demo/<group>/<slug>/`, the folders in `CONCEPT_DIRS`) or a card on the front page, or explaining a patchbay idea as a small page |
 | `positron-describe` | writing or changing any card description (`say`), manifest `one` line, page `what` text or readout key a visitor reads, or checking somebody's proposed copy against a page |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
@@ -301,7 +314,7 @@ GONE.** It played the input `whep-rig`, which Stream deleted that day with the
 test pattern feeding it, and pub's `/watch`, `/status` and `/whip` answer 410.
 The script is at `archive/check-whep.mjs` as the record of how the table below
 was measured. **The WebRTC check today is
-https://positron.studio/concepts/video/030/ (WebRTC loopback):** press, allow
+https://positron.studio/video/webrtc-loopback/ (WebRTC loopback):** press, allow
 the camera, and the WebRTC panel shows the round trip in ms. ⚠️ It asks for a
 TURN relay as well, so behind a tunnel that drops UDP it may connect through the
 relay where `check-whep.mjs` (no relay) failed; it is not the same instrument
@@ -609,9 +622,9 @@ bug was a fact true of every part and of no part's author.
   wrong: the 05/28 swap left one page still declaring its old number inside its
   own `mount()`, which only the full sweep caught. Moving a demo is now moving a
   line in the array. **`unlisted: true` hides one from the index and leaves the
-  page deployed at its URL; `built: false` takes it out of the deploy and
-  leaves a dead card on the front page.** See the measurement at the top of
-  this file.
+  page deployed at its URL; `built: false` takes it out of the deploy.** The
+  old front page left a dead card for it; the concepts front page (2026-10-13)
+  skips such a row. See the measurement at the top of this file.
 - Every demo mounts the shell (`demo/shell/shell.mjs`) and publishes
   `window.__demo` — human-openable and CDP-drivable from the same page. Assert on
   `__demo`, never on DOM ids.

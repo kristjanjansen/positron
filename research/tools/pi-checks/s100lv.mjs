@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const TAG = process.argv[2] ?? 'before';
 const QUERY = process.argv[3] ?? '';
-const PAGE = process.env.PAGE ?? 'concepts/remote/020/';
+const PAGE = process.env.PAGE ?? 'remote/collide-on-pi/';
 const OUTF = `/private/tmp/claude-501/-Users-s32863-personal-positron/0f3a0353-ddeb-41fa-a915-9abf8aa2d34d/scratchpad/s100-${TAG}.json`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const routeOk = () => /interface: en0/.test(execSync('route -n get <pi>').toString());

@@ -27,7 +27,7 @@
    * kit/chat, THE CHAT'S PIECES, 2026-10-11. Asked: *"(make it reusable) as all
    * chat ui elements"*, *"make it a kit page too and keep it update while we
    * work on chat for chat components"*. Every piece is `demo/shell/chat-ui.mjs`,
-   * the module the /concepts/room/ pages draw their chat with. Nothing here is
+   * the module the /room/ concept pages draw their chat with. Nothing here is
    * wired to a room: a line you send lands on this page only.
    * ⚠️ KEEP IT IN STEP: a piece added to chat-ui.mjs gets a block here, newest
    * first, and a row in demo/shell/kit-parts.mjs.
@@ -45,7 +45,7 @@
 
   // the blocks, newest first
   // CHAT GRID: six columns, logs and signs taking turns, the stepper showing
-  // the first n of them. The layout is the multi typer's (/concepts/typist/040/).
+  // the first n of them. The layout is the multi typer's (/typist/multi-typer/).
   const PEOPLE = ['web-2qm', 'web-7zd', 'web-k4p', 'web-91x', 'web-ab12', 'web-3fe'];
   const LINES = ['Is the Pi up today?', 'It answered a minute ago.', 'The Circuit is plugged in.',
     'Patching the keys to it now.', 'I hear it from here.', 'Doors open at eight'];

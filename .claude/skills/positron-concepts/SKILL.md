@@ -1,6 +1,6 @@
 ---
 name: positron-concepts
-description: The /concepts/ pages, small numbered pages that each unpack one patchbay idea for a presentation. Load before building or changing any page under demo/concepts/, before adding a card to /concepts/, and before explaining a patchbay idea (site, room, node, port, link, medium, transport, a `*` link, an effect, a recorder) as a small page.
+description: The concept pages, small pages at /<group>/<slug>/ that each unpack one patchbay idea for a presentation, drawn as the front page's cards. Load before building or changing any concept page (demo/<group>/<slug>/, the folders in CONCEPT_DIRS), before adding a card to the front page, and before explaining a patchbay idea (site, room, node, port, link, medium, transport, a `*` link, an effect, a recorder) as a small page.
 ---
 
 # Concepts pages
@@ -15,15 +15,52 @@ An R&D presentation in half a week. The owner asked for *"simple demo pages
 demo1 demo2 ... where we unpack concepts in a clear way"*, one idea per page,
 numbered, kept as cards in `/concepts/`.
 
+## Addresses, since 2026-10-13: `/<group>/<slug>/`, no numbers
+
+🔴 **THE CONCEPTS ARE THE FRONT PAGE, AND EVERY PAGE IS `/<group>/<slug>/`.**
+Instructed 2026-10-13: *"when all is done, move concepts to frontpage. use
+http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE. rename all with
+group/slug, rm numbers"*, then *"keep same boxes style"*. This supersedes the
+numbered scheme the rest of this file was written in (`/concepts/<group>/<nnn>/`,
+asked 2026-10-11 as *"/concepts/group/0x"*).
+- **The page is `demo/<group>/<slug>/index.html`, served at `/<group>/<slug>/`.**
+  The slug is the title in lowercase words joined by hyphens (Circuit on Pi is
+  `/remote/circuit-on-pi/`), and `demo/shell/concept-list-test.mjs` fails a row
+  whose slug is not its title's. A renamed title is a renamed folder.
+- **The group is the folder, and the folders are `CONCEPT_DIRS` in
+  `demo/shell/concept-list.mjs`.** `workers/view/build.mjs` deploys each one whole
+  and REFUSES the build when a folder is also a demo slug, a manifest page path or
+  a site path, because a concept group is a top-level address now. That is why
+  the radio pages are `/stations/` (`/radio/` is the archived radio demo, still
+  served) and the newsreels `/history/` (the heading reads history). A row's
+  `group` sets the HEADING when it is not the folder (`stations` rows show under
+  `radio`). A new group is a new folder in `CONCEPT_DIRS`, checked against
+  `ls demo` and the manifest first.
+- **No number anywhere a visitor looks**: not on a card, not in `<title>`, not in
+  `mount({ name })`, not in the pager. A row is `{ id, title, say, group? }`;
+  `id` is `<group>/<slug>`, its position in `CONCEPTS` is its order, and
+  `conceptNav(id)` walks that order.
+- **`← concepts` goes to `/`.** Every page mounts with
+  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'concepts' })`.
+- **`/concepts/` answers 302 to `/`** (workers/view/src/index.js, and
+  `demo/server.mjs` locally). Every old `/concepts/<group>/<nnn>/` is a 404, by the
+  no forwarding rule below. The full old to new table is in `positron-history`.
+- **The shared modules live with their group** (`demo/rhythm/voices.mjs`,
+  `demo/granulator/grain-rig.mjs`, `demo/code/sampler.mjs`), the list and the
+  pager in `demo/shell/` (`concept-list.mjs`, `concept-nav.mjs`), and the clock kit
+  the archived clock pages use at `demo/archive/clock-kit.mjs`.
+- **What follows still says `/concepts/<n>/`** where it records how a page was
+  built on its day. Read those as the old address of the page the table names.
+
 - 🔴 **SPEED OVER POLISH.** The owner said *"maximum speed dx"* and *"cut your
   checks"*. A concept page is checked with `node demo/check-html.mjs
-  demo/concepts/<n>/index.html` and one look in a browser, not a harness run.
+  demo/<group>/<slug>/index.html` and one look in a browser, not a harness run.
   The pages are not in `manifest.mjs`, so `demo/verify.mjs` does not grade them
   anyway.
-- Local: `node demo/server.mjs`, then `http://127.0.0.1:8890/concepts/<n>/`.
-  The server 301s a slashless directory URL (`/concepts/2` pointed at `/concepts/misc/010/`, archived 2026-10-12)
-  as the deploy does, so either form works.
-- ⚠️ **ONE IDEA PER PAGE.** A new idea is a new number. Later pages copy an
+- Local: `node demo/server.mjs`, then `http://127.0.0.1:8890/<group>/<slug>/`.
+  The server 301s a slashless directory URL (`/synth/keyboard` to
+  `/synth/keyboard/`) as the deploy does, so either form works.
+- ⚠️ **ONE IDEA PER PAGE.** A new idea is a new page, and a new slug (a new number until 2026-10-13). Later pages copy an
   earlier one and add one thing (4 is 3 plus a store, 5 is 4 plus admin, 6 is 5
   plus a camera; 11 and 12 are 10 plus effects or a recorder), so the delta is
   the lesson.
@@ -44,15 +81,16 @@ numbered, kept as cards in `/concepts/`.
 
 ## The index and a page's frame
 
-- `demo/concepts/index.html` holds `CONCEPTS`, rows of `[title, desc, n?]` in
-  teaching order. A card links to `/concepts/${n ?? i + 1}/`, so `n` lets a new
-  topic start at 10 without filler rows (Keyboard is `10`).
+- `demo/shell/concept-list.mjs` holds `CONCEPTS`, rows of `{ id, title, say,
+  group? }` in teaching order, and `demo/index.html` (the front page) draws a
+  card per row linking to `/${id}/`. (Until 2026-10-13 the rows were numbered
+  and the index was `demo/concepts/index.html` at /concepts/.)
 - **Titles one word or two, descs one short sentence.** Asked: *"update titles
   and descs, keep them short"*. The CLAUDE.md one sentence rule applies.
 - **Cards keep one size**: `.cc-card { min-height: 110px }`. Asked: *"keep card
   size"*. Do not let a long desc grow one card.
 - Every page mounts with
-  `mount({ name: 'concepts <n>', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' })`.
+  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'concepts' })`.
   Asked: *"each concept page needs link <- concepts not <- demos"*;
   `indexLabel` is the word after the arrow in `shell.mjs` and defaults to
   `demos`.
@@ -64,13 +102,14 @@ numbered, kept as cards in `/concepts/`.
 
 ## Deploying
 
-- `conceptFiles()` in `workers/view/build.mjs` copies `demo/concepts/` whole,
-  web extensions only. There are no manifest rows, so the pages are off the
-  front page and a new `demo/concepts/<n>/` ships on the next build with no
-  other edit.
+- `conceptFiles()` in `workers/view/build.mjs` copies each folder of
+  `CONCEPT_DIRS` whole, web extensions only, and refuses a folder that would take
+  a served address. There are no manifest rows, so a new
+  `demo/<group>/<slug>/` ships on the next build once its row is in
+  `concept-list.mjs` (and its folder, for a new group, in `CONCEPT_DIRS`).
 - Finished means deployed (CLAUDE.md): `cd workers/view && node build.mjs`,
   then `env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN node workers/view/deploy.mjs`,
-  quote the BUILD stamp, and hand over `https://positron.studio/concepts/<n>/`
+  quote the BUILD stamp, and hand over `https://positron.studio/<group>/<slug>/`
   with what to look at.
 - ⚠️ `workers/view/public/` is committed and a deploy ships whatever is in the
   tree, including another agent's unfinished page. Say so to peers.
@@ -84,7 +123,7 @@ numbered, kept as cards in `/concepts/`.
 - A request that arrives mid-task goes in `BACKLOG.md` first.
 - **Shared files are changed by one agent at a time**: `demo/shell/bay.mjs`,
   `bay-node.mjs`, `shell.mjs`, `table.mjs`, `manifest.mjs`. Page agents work
-  only inside their own `demo/concepts/<n>/`.
+  only inside their own `demo/<group>/<slug>/`.
 - **Agents never commit.** The session commits, path limited.
 - **Do not willy-nilly remove UI.** Asked: *"do not just willy-nilly rm stuff
   from UI"*. The owner removes what confuses (*"rm blocks table its
@@ -170,7 +209,7 @@ video are related, so they are one warm family, orange and coral.
   refusal's `why`) on hover instead of in the cell.
 - Playback lights rows with the table's own `mark(fn)` and scrolls the
   table's OWN box, `scroller()`, to centre the lit row. `scrollIntoView` would
-  move the whole page as well (`/concepts/synth/010/`, `lit()`).
+  move the whole page as well (`/synth/recorder/`, `lit()`).
 
 ## The concepts, and what each taught
 
@@ -246,7 +285,7 @@ scrollable. no half col scope, scope is always full w"*.
 - **Glyph buttons**: record `●` in red (`.cc-rec { color: var(--rec) }`, the one
   control that starts writing), stop `■`. ⚠️ `positron-ui` says `▶` U+25B6 has
   an emoji form and `►` U+25BA does not, so a play glyph is `►`.
-  `/concepts/synth/010/` uses U+25B6 today; that is a known defect, fix it when the
+  `/synth/recorder/` uses U+25B6 today; that is a known defect, fix it when the
   page is next touched.
 - **Joining** happens on a press, never on load, and a store or camera wakes
   only on a press too (Join, Start). A concept page opens nothing on a visit.

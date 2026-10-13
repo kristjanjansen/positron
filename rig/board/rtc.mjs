@@ -101,7 +101,7 @@ export function createRtc({
   iceServers = ['stun:stun.cloudflare.com:3478'], maxPeers = MAX_PEERS, idleMs = PEER_IDLE_MS,
   unitMs, rate, onGone = () => {},
   // Labels a page may open beside `pcm` and `ctl`. Since 2026-10-13: `cam`,
-  // the Pi camera's frames on /concepts/remote/010/ (camera.mjs
+  // the Pi camera's frames on /remote/circuit-on-pi/ (camera.mjs
   // `attachDirect`). A channel listed here is only HELD: nothing is sent on it
   // until its owner is asked over `ctl` and says yes. Anything not listed is
   // closed, as before.
@@ -316,7 +316,7 @@ export function createMainDirect({ PeerConnection = null, signal, handle, frame,
     /**
      * A listed extra channel a peer has opened (`channels` above), or null.
      * Since 2026-10-13, for the shader picture's `vid` channel on
-     * /concepts/remote/050/ (board.mjs `video.direct`). `has` says whether the
+     * /remote/shader-on-pi/ (board.mjs `video.direct`). `has` says whether the
      * peer exists at all, so a caller can wait for a channel still opening.
      */
     channel: (peer, label) => rtc?.peers.get(peer)?.ch?.[label] ?? null,

@@ -356,7 +356,7 @@ function sendFrame(unit, key) {
 
 // ── the picture on a direct link, since 2026-10-13 ───────────────────────────
 // Asked: *"add direct option to all remote instruments"*, which includes
-// /concepts/remote/050/ Shader on Pi. The same arrangement as the Pi camera on
+// /remote/shader-on-pi/ Shader on Pi. The same arrangement as the Pi camera on
 // remote/010 (camera.mjs `attachDirect`, inputs.mjs `camDirect`): a third data
 // channel `vid` on the page's direct link to this main socket, ORDERED and
 // RELIABLE (a decoder fed a frame with a hole is broken to the next keyframe),
@@ -1348,7 +1348,7 @@ async function handle(msg, replyVia = null) {
       if (video) return reply('video.started', { ok: true, already: true, room: VIDEO_ROOM, ...videoShape() });
       // The Pi camera (camera.mjs) encodes on the same exclusive device, and a
       // second user of it blocks rather than failing.
-      if (camera?.running()) return reply('video.started', { ok: false, reason: 'the Pi camera is using the hardware encoder for /concepts/remote/010/, so the shader picture waits' });
+      if (camera?.running()) return reply('video.started', { ok: false, reason: 'the Pi camera is using the hardware encoder for /remote/circuit-on-pi/, so the shader picture waits' });
       videoConnect();
       const r = startVideo({
         w: Math.min(msg.w ?? 1280, 1920), h: Math.min(msg.h ?? 720, 1080),

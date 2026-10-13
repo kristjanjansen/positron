@@ -755,12 +755,12 @@ export const DEMOS = [
   // than a replay — 73 edits captured through a real browser, rebuilt to the
   // browser's own text character for character.
   // `typist` was here until 2026-10-12, archived on *"archive/mdfy typist"*:
-  // archive/typist.md, and /concepts/typist/030/ shows the same idea. /typist/ is a 404.
+  // archive/typist.md, and /typist/playback/ shows the same idea. /typist/ is a 404.
   // `grains` and `knobs` were here until 2026-10-13, archived with Yoshimi on
   // *"discard yoshimi ... arhive demos using it"*: archive/demos/grains-index.html,
   // archive/demos/knobs-index.html and archive/yoshimi/README.md. /grains/ and
   // /knobs/ are 404s; demo/grains/defs/ stays because /radio/, /videoradio/ and
-  // /concepts/sampler/050/ load it.
+  // /archive/pappus/ (the old concepts sampler/050) load it.
   /**
    * 🔴 THE FIRST PAGE TO USE `tabs.mjs`, WHICH HAS EXISTED WITH NO CALLER. It
    * was on `/items/` for one commit and taken off, because three names over one

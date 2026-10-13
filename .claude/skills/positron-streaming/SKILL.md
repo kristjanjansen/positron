@@ -840,7 +840,7 @@ the reason is the one already written in the file or in this skill.
   `advance-capped`, `target-raised`, `audio-lag`, `ms`, `engine`,
   `media-error`, `waiting`. This is what makes a page gradable at all, and
   `demo/llhls/index.html` asserted on exactly these until its input was
-  retired on 2026-10-13; /concepts/video/060/ is the live caller now.
+  retired on 2026-10-13; /video/ll-hls-loopback/ is the live caller now.
 
 #### The answer, in one paragraph
 

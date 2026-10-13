@@ -58,7 +58,7 @@
 //
 // ⚠️ 2026-10-13, THE GRAIN RING'S UGENS (GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames, BufDur), `%`, `.sqrt` and 'quoted'
-// symbols, for the grain ring (/concepts/sampler/060/). MEASURED, 105 ok on the real module
+// symbols, for the grain ring (/granulator/granulator/). MEASURED, 105 ok on the real module
 // (84 before), then six sabotaged copies:
 //
 //   SendReply's replyID written after its cmdName           103/105, its layout
@@ -368,12 +368,12 @@ const { KEYED } = M;
 
 // ── the grain ring's UGens, added 2026-10-13 ─────────────────────────────────
 //
-// For the grain ring, /concepts/sampler/060/. Every expected number below is read off the
+// For the grain ring, /granulator/granulator/. Every expected number below is read off the
 // class files of supercollider develop 1995490 (GrainUGens.sc, BufIO.sc,
 // Trig.sc, Osc.sc, Noise.sc, InOut.sc, InfoUGens.sc), not off this compiler.
 
 {
-  const { PROGRAM } = await import('../concepts/sampler/grain-ring.mjs');
+  const { PROGRAM } = await import('../granulator/grain-ring.mjs');
   const r = compile(PROGRAM, { name: 'gring' });
   ok('the grain ring program compiles', r.ok, r.ok ? `${r.bytes.length} B, ${r.blocks} blocks, ${r.wires} wires` : r.message);
   const d = r.ok ? readSynthDef(r.bytes).defs[0] : null;

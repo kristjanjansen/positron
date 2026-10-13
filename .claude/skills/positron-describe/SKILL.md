@@ -1,6 +1,6 @@
 ---
 name: positron-describe
-description: How to write the words a visitor reads about a page, and how to decide what they say. Load before writing or changing any card description (a `say` in demo/concepts/list.mjs, CONCEPTS or DEMO_CARDS), a `one` line in demo/manifest.mjs, a page's `what` text, or a readout key a visitor reads, and before checking somebody's proposed copy against a page.
+description: How to write the words a visitor reads about a page, and how to decide what they say. Load before writing or changing any card description (a `say` in demo/shell/concept-list.mjs, CONCEPTS or DEMO_CARDS), a `one` line in demo/manifest.mjs, a page's `what` text, or a readout key a visitor reads, and before checking somebody's proposed copy against a page.
 ---
 
 # Describing a page
@@ -22,7 +22,7 @@ plain voice and the anti-slop pass are `positron-slides`. Load them too.
 ## A card is at most 100 characters
 
 🔴 **A CARD DESCRIPTION IS AT MOST 100 CHARACTERS, COUNTED, AND
-`node demo/concepts/list-test.mjs` FAILS THE FILE WHEN ONE IS NOT.** Asked
+`node demo/shell/concept-list-test.mjs` FAILS THE FILE WHEN ONE IS NOT.** Asked
 2026-10-12 on a crop of the WebRTC loopback card, five lines long at 214
 characters: *"too long. make a rule to skill"*. That afternoon 83 cards had a
 median of 136 characters, the longest 248, and 67 were over 100.
@@ -161,7 +161,7 @@ allowed to grow its box.
 
 Each pair is the owner's proposed copy, then the verified text, then why. The
 verified texts here are the morning's and run past 100 characters; they were
-cut the same afternoon, and the card text today is in `demo/concepts/list.mjs`.
+cut the same afternoon, and the card text today is in `demo/shell/concept-list.mjs`.
 
 **synth/040 Synth.** Draft: *"Build a synthesizer by connecting sound
 modules. Hear how each new connection changes the instrument."* Verified: *"A

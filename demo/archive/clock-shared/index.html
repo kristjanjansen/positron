@@ -53,7 +53,7 @@
   import { createDeck } from '/timeline/transport.mjs';
   import { DEFAULT_RELAY } from '/shell/wire.mjs';
   import { createPeer, wsTransport, epochNow } from '/proto/looper/peer.mjs';
-  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/concepts/clock/clock-kit.mjs';
+  import { rand, sleep, fmt, median, worst, band, graphOf, soundCard, plainNames } from '/archive/clock-kit.mjs';
 
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : `clock-${rand(6)}`;

@@ -26,7 +26,7 @@
 // for this engine at all, so nothing on the board (the Circuit included) can be
 // subscribed to it, by anybody or by itself.
 //
-// The rules a key is played by are the ones `demo/concepts/sampler/sampler.mjs`
+// The rules a key is played by are the ones `demo/code/sampler.mjs`
 // has: the nearest recording, a tie to the lower one, rate 2^(shift/12), the
 // Rhodes layer from the author's crossfade table with his fallback over the
 // holes, a key struck again damps the voice it replaces, the oldest voice taken
@@ -70,7 +70,7 @@ export const SALAMANDER_PEAK = 0.9085;
 export const RHODES_PEAK = 0.9981;
 
 // ── the rules, copied from the browser module and graded against it ────────
-// (test.mjs imports `demo/concepts/sampler/sampler.mjs` and compares every
+// (test.mjs imports `demo/code/sampler.mjs` and compares every
 // value over every input, so a change there turns these red.)
 
 /** The recording a note is played from. A tie goes to the lower one. */

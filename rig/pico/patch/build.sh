@@ -1,5 +1,5 @@
 #!/bin/bash
-# rig/pico/patch/build.sh: build the /concepts/070/ firmware for the plain RP2040 Pico,
+# rig/pico/patch/build.sh: build the /archive/pico-router/ (once /concepts/070/) firmware for the plain RP2040 Pico,
 # inside Docker, and copy the UF2 to where the page fetches it.
 #
 #   rig/pico/patch/build.sh

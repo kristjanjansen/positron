@@ -1,4 +1,4 @@
-# rig/pico/patch/CMakeLists.txt: the Pico of /concepts/070/, a one link router
+# rig/pico/patch/CMakeLists.txt: the Pico of /archive/pico-router/ (once /concepts/070/), a one link router
 # with a patchbay screen. Build with build.sh, which runs this inside Docker for
 # PICO_BOARD=pico.
 cmake_minimum_required(VERSION 3.13)

@@ -457,6 +457,16 @@ const routes = {
       return Response.redirect(`${url.origin}/kit/frontpage/${url.search}`, 302);
     }
 
+    // ── /concepts/ is the front page, 2026-10-13 ──────────────────────────
+    // *"when all is done, move concepts to frontpage"*: the concepts index is
+    // demo/index.html at / now, and the old index address forwards there. The
+    // index ONLY: a concept page's old /concepts/<group>/<number>/ address is a
+    // 404 and stays one (positron-concepts: no old address forwarding), so this
+    // matches the two exact paths and nothing under them. 302, as /frontpage.
+    if (p === '/concepts' || p === '/concepts/') {
+      return Response.redirect(`${url.origin}/${url.search}`, 302);
+    }
+
     // ── /eccm/* moved out, 2026-09-27 ──────────────────────────────────────
     // The eccm demo lived under demo/eccm/ for two days and its URLs were
     // handed over from here; the project is its own repository now and the

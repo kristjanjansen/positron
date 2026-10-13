@@ -1,4 +1,4 @@
-/* rig/pico/rings/main.c: the rings of /concepts/14/, drawn on a 128x64 SSD1306
+/* rig/pico/rings/main.c: the rings of /synth/dot-piano/ (once /concepts/14/), drawn on a 128x64 SSD1306
  * by a plain RP2040 Pico, from MIDI on its DIN in.
  *
  *   UART0 at 31250 baud, GP1 RX                   DIN MIDI in
@@ -17,7 +17,7 @@
  * ⚠️ NO FLOATS IN THE DRAWING. A Cortex-M0+ has no FPU, so an angle is a
  * uint32 where 2^32 is a whole turn, and sine comes from a 1024 entry Q14 table
  * built once at boot. Between frames the core sleeps until the next one, which
- * on the emulator in /concepts/14/ costs nothing to emulate.
+ * on the emulator in /synth/dot-piano/ (once /concepts/14/) costs nothing to emulate.
  *
  * Shares the router's display and MIDI parser, compiled from
  * rig/pico/firmware/ and never copied.

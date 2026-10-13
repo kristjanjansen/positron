@@ -4,9 +4,9 @@
 //   node demo/fake-arhiiv.mjs --port 9400
 //
 // Then open the page against it:
-//   http://127.0.0.1:8890/concepts/archives/000/?base=http://127.0.0.1:8903
+//   http://127.0.0.1:8890/history/newsreels/?base=http://127.0.0.1:8903
 //
-// WHY THIS EXISTS. /reel/ and /concepts/archives/000/ ask arhiiv.err.ee for a
+// WHY THIS EXISTS. /reel/ and /history/newsreels/ ask arhiiv.err.ee for a
 // film's stream and then play it from vod.err.ee, and ERR has told us our
 // headless browsers corrupt their audience figures (CLAUDE.md, "What costs real
 // money and somebody else's server"). So a check that plays anything plays it
