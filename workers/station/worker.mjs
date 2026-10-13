@@ -29,6 +29,11 @@ export default {
 
 async function media(req, env, key) {
 	if (!key) return new Response('no key\n', { status: 404, headers: CORS });
+	// archive/ in this bucket is cold storage, not media: the Yoshimi state
+	// tarball went there on 2026-10-13 (archive/yoshimi/README.md), and this
+	// door is the bucket's only public route (no r2.dev URL, no custom domain,
+	// both checked that day). Read it with `wrangler r2 object get --remote`.
+	if (decodeURIComponent(key).replace(/^\/+/, '').startsWith('archive/')) return new Response('no such object\n', { status: 404, headers: CORS });
 	const obj = await env.MEDIA.get(decodeURIComponent(key), { range: req.headers });
 	if (!obj) return new Response('no such object\n', { status: 404, headers: CORS });
 	const h = new Headers(CORS);

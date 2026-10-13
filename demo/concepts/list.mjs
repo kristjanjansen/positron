@@ -30,7 +30,8 @@ export const CONCEPTS = [
   // Raspberry Pi. remote/000 to 050 were synth/060, synth/070, synth/100, sampler/030, rhythm/030 and
   // shader/010 until then; the old URLs 404 (no forwarding), except synth/060 and 070, which are
   // other pages since 2026-10-13 (the split of synth/040).
-  { n: 'remote/000', title: 'Yoshimi', say: 'Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here.' },
+  // remote/000 Yoshimi archived 2026-10-13 with Yoshimi (*"discard yoshimi"*): archive/concepts/remote-000.md.
+  // The gap stays; /concepts/remote/000/ is a 404.
   { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit on the Pi from the keys or a MIDI keyboard, with its eight macro knobs.' },
   { n: 'remote/020', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
   { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes played by the Pi in another building, over the relay or a direct link.' },
@@ -72,7 +73,7 @@ export const CONCEPTS = [
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
   { n: 'sampler/000', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
   { n: 'sampler/050', title: 'Granulator', say: 'Our radio recordings granulated by Pappus in this tab, each grain marked where it read the sound.' },
-  { n: 'sampler/060', title: 'Grain ring', say: 'The same radio grains from a small SuperCollider program you can read and edit while it plays.' },
+  // sampler/060 Grain ring moved to /archive/ 2026-10-13 (*"archive https://positron.studio/concepts/sampler/060/"*): /archive/grain-ring/, still working.
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
@@ -142,7 +143,7 @@ export const DEMO_CARDS = {
   weight: { group: 'performances', say: 'One sentence, "If these walls could talk", round four walls, each word as big as it is short.' },
   radio: { group: 'stations', say: 'Eight live radio stations from Tallinn and Helsinki, broken into grains by hand or by sliders.' },
   videoradio: { group: 'stations', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
-  knobs: { group: 'instruments', say: 'Yoshimi on a Raspberry Pi in another building, played from the keys here and heard over the relay.' },
+  // knobs archived 2026-10-13 with Yoshimi: archive/demos/knobs-index.html, /knobs/ is a 404.
   away: { group: 'instruments', say: 'A Novation Circuit on a desk in another building, played from this page and heard back through a Pi.' },
   // shape archived 2026-10-12 (*"archiev shape"*): still served, listed on /archive/ under devices.
   wish: { group: 'instruments', say: 'Say or type which instrument plays which, and a language model on Cloudflare makes the connection.' },

@@ -91,7 +91,8 @@ const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
  * else.
  */
 export const JACK_ENDS = {
-  yoshimi: ['yoshimi:left', 'yoshimi:right'],
+  // `yoshimi: ['yoshimi:left', 'yoshimi:right']` until 2026-10-13, when Yoshimi
+  // left the board (archive/yoshimi/README.md says how to bring it back).
   // The board's SuperCollider sampler (`rig/board/scsampler.mjs`), a scsynth of
   // its own whose JACK client is named so it is never taken for the
   // granulator's `SuperCollider`.
@@ -187,8 +188,8 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   // travel by JACK and nothing else, so a link from either to a page is refused
   // in words by the bay rather than opened. The capture is what the board's
   // main room HEARS: `posboard:input_1`, whose stream reaches pages as
-  // `${site}:yoshimi:audio-out` today, because Yoshimi is what the board's own
-  // chain puts in it (plans/plan-nodes-revisited.md §3 item 3).
+  // whichever engine is running (`${site}:<engine>:audio-out`); it was Yoshimi's
+  // until 2026-10-13 (plans/plan-nodes-revisited.md §3 item 3).
   // ⚠️ THE SHAPE SAYS THE RATE ONLY. The channel count of a JACK end is the
   // length of its `jack` list, and a relay stream's `channels: 1` beside a
   // granulator's two would refuse the link that is the whole point.

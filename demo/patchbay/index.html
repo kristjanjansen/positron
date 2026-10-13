@@ -959,7 +959,7 @@
     // on a scratch bay; the far side, the graph read back and the sound in the
     // room, is `rig/board/jack-bay-live.mjs` against the real board.
     const reg2 = createRegistry();
-    reg2.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { yoshimi: true, pappusFx: true },
+    reg2.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { sampler: true, pappusFx: true },
       inputs: [{ name: 'circuit', jack: true, take: 1, midi: null }], jack: true }) });
     const t2 = reg2.fill(createBay());
     const r2 = t2.link('pi-1:circuit:audio-out', 'pi-1:pappus:audio-in');

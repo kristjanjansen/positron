@@ -732,54 +732,11 @@ export const DEMOS = [
   // browser's own text character for character.
   // `typist` was here until 2026-10-12, archived on *"archive/mdfy typist"*:
   // archive/typist.md, and /concepts/typist/030/ shows the same idea. /typist/ is a 404.
-  // 🔴 TWO ENGINES ON ONE PAGE, and `dust` is the other half of it. They were
-  // two pages about one subject and the split cost the better half of each:
-  // `dust` had the picture — a granulator in the page reports every grain it
-  // fires, so every mark is MEASURED — and this had the claim, which is that
-  // the same thing is running on a Raspberry Pi in another building. Side by
-  // side with a crossfade, the difference between the two panes IS the subject,
-  // and the page now checks a granulator even when the board is down.
-  // 🔴 `the same granulator` IS TRUE NOW, AND IT WAS NOT BEFORE (2026-09-13).
-  // This line said it while the left pane was a 251-line AudioWorklet written
-  // for this page — a reimplementation that sounds similar is not the same
-  // instrument. Both panes load the SAME `pappus.scsyndef`, compiled by sclang
-  // ON THE BOARD, one into wasm scsynth in the tab and one into the Pi's own
-  // sound server. ⚠️ `AudioWorklet` is off the tags for the same reason: the
-  // tag drives `caps.mjs`, and what this page now needs is WebAssembly and an
-  // audio output, not a hand-written worklet.
-  // 🔴 `unlisted: true` SINCE 2026-09-28, AND IT IS `unlisted` RATHER THAN
-  // `built: false` BECAUSE THE FIRST ANSWER WAS WRONG AND WAS DEPLOYED.
-  // Asked, verbatim: *"hide grains from index. note in handoff: bring it back
-  // when we have time"*. `built: false` was tried first, on CLAUDE.md's word
-  // that it "hides a row from the index", and MEASURED on the live site
-  // minutes later it did neither thing anybody wanted: build.mjs line 532
-  // skips an unbuilt demo when it enumerates directories, so
-  // https://positron.studio/grains/ answered **404**, while the front page
-  // still drew a `grains` card, now with no link behind it, because
-  // `byGroup()` filters on `unlisted` and never looked at `built`. A dead card
-  // over a missing page is the exact opposite of what was asked for.
-  // ✅ `unlisted` is the flag that means this, it is dropped ONCE in
-  // `byGroup()` so the two index renderers cannot disagree, and `feedback`
-  // already wears it. The page is built, deployed and reachable at its URL;
-  // only the card is gone.
-  // ⚠️ TO BRING IT BACK: delete `unlisted: true` from this row. Nothing else.
-  { name: 'grains', group: 'instruments', act: 4, created: '2026-09-12', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 10000, room: 'fixed',
-    one: 'one granulator, running in this page and on a Raspberry Pi at once, with a blend between them',
-    tags: ['SuperCollider', 'WebAssembly', 'relay', 'PCM', 'live board'] },
-
-  // 🔴 CONTROLLERS, NOT NOTES, AND THE TWO ARE DIFFERENT KINDS OF TRAFFIC. A
-  // note is an EDGE: on and off are two halves of one object and losing either
-  // wedges the instrument. A controller value is a LEVEL: every message is a
-  // complete statement of where a knob is, the last one is the only one that
-  // stays true, and losing one is harmless the instant the next arrives. So
-  // this page coalesces instead of queueing, sends at most one value per slider
-  // per 20 ms, and states the whole console again every 500 ms rather than
-  // asking for an ack. plans/plan-controller.md has the arithmetic and the reasons.
-  // ⚠️ `room: 'fixed'` because `studio-1` is the ADDRESS OF THE RASPBERRY PI.
-  // A private room does not give a second client its own board: there is one
-  // JACK graph and one instrument, so this page and `/keys/` take turns.
-  // ⚠️ `settleMs` sizes the wait after control 0 ONLY, and control 0 is `Play`,
-  // which on a cold board brings Yoshimi up over ten to forty seconds.
+  // `grains` and `knobs` were here until 2026-10-13, archived with Yoshimi on
+  // *"discard yoshimi ... arhive demos using it"*: archive/demos/grains-index.html,
+  // archive/demos/knobs-index.html and archive/yoshimi/README.md. /grains/ and
+  // /knobs/ are 404s; demo/grains/defs/ stays because /radio/, /videoradio/ and
+  // /concepts/sampler/050/ load it.
   /**
    * 🔴 THE FIRST PAGE TO USE `tabs.mjs`, WHICH HAS EXISTED WITH NO CALLER. It
    * was on `/items/` for one commit and taken off, because three names over one
@@ -817,10 +774,6 @@ export const DEMOS = [
     // in the same change, so there is no press for the picture at all.
     one: 'a church scene from a 2011 MIMproject performance, broadcast live from the control room tab',
     tags: ['WebRTC', 'canvas', 'tabs', 'R2'] },
-
-  { name: 'knobs', group: 'instruments', act: 4, created: '2026-09-16', built: true, settleMs: 20000, room: 'fixed',
-    one: 'play and turn the knobs of a synthesizer on a Raspberry Pi in another building',
-    tags: ['WS', 'relay', 'MIDI CC', 'PCM', 'live board'] },
 
   // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
   // captured by `rig/board/board.mjs` and streamed into the Pi's own room.

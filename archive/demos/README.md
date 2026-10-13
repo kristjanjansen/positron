@@ -329,6 +329,36 @@ its link pointed at eccm's /radio. eccm removed its radio on 2026-10-07 (tag
 Asked in eccm as *"fix these"*: the row is out of `demo/manifest.mjs` and the
 page, still pointed at eccm's `/stream`, is here.
 
+## `knobs-index.html`, `grains-index.html` and `grains-engine.mjs`, retired 2026-10-13
+
+Retired with Yoshimi itself. Asked: *"discard yoshimi. with possiblity to do
+dual setup in future (pi and browers, interlink). arhive demos using it"*, then
+answered: archive every demo that needs Yoshimi, and `/grains/` too, because its
+insert is hard wired to it. `plans/plan-retire-yoshimi.md` is the plan and
+`archive/yoshimi/README.md` says how to bring Yoshimi back, on the Pi and as a
+browser twin, and which of these files to start from. Both rows are out of
+`demo/manifest.mjs`, so `/knobs/` and `/grains/` 404 with no redirect.
+
+- **`knobs`** (2,578 lines): the keys and a row of controller knobs played
+  Yoshimi on the Raspberry Pi in `studio-1` through `demo/shell/board.mjs`, its
+  sound back down the same socket. The knobs were the measured non General MIDI
+  set (74 cutoff, 71 resonance, 75 bandwidth, 76 FM amplitude), sent as
+  `ctl.set` batches at most one value per knob per 20 ms; a patch stepper walked
+  the 878 reachable patches from `voices.list`. It started Yoshimi with
+  `audio.start {source: 'yoshimi'}` and was graded against
+  `demo/fake-board.mjs` (`BOARD_PAGES` in `demo/verify.mjs`, now `away` only).
+- **`grains`** (2,238 lines plus the 393 line `engine.mjs`, renamed
+  `grains-engine.mjs` here, so the page's `import './engine.mjs'` has to be
+  pointed back at it if the pair is ever served again): one granulator, the
+  Pappus SynthDef, in wasm scsynth in the tab and on the Pi at once, with a
+  blend. The Pi half was the `fx.pappus` insert, which wraps only a JACK
+  instrument (`inst.jack`), and Yoshimi was the only one, so with it gone the
+  insert answers *"nothing is playing for an insert to wrap"*.
+  ⚠️ **`demo/grains/defs/` STAYS IN `demo/`**: the two compiled SynthDefs and
+  their `PROVENANCE.json` are loaded by `/radio/` (`DEFS = '/grains/defs/'`),
+  `/videoradio/` and `/concepts/sampler/050/`, and `workers/view/build.mjs` copies them by name, so
+  `/grains/defs/*` is still deployed while `/grains/` is a 404.
+
 ## `flipper-index.html`, retired 2026-10-12
 
 Asked: *"archive flipper"*, in the same breath as archiving `/cam/`. `/flipper/`

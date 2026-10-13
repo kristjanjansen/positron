@@ -39,7 +39,7 @@ const ok = (name, cond, detail = '') => {
 
 // The board on the desk: what `board.hello` sends for instruments, the
 // HANDOFF's BOARD_INPUTS, and `addressable()` over the aconnect fixture.
-const INSTRUMENTS = { synth: true, pappusFx: true, yoshimi: true, zynaddsubfx: false };
+const INSTRUMENTS = { synth: true, pappusFx: true, collide: true, zynaddsubfx: false };
 const INPUTS = [{ name: 'circuit', channels: 2, midi: { port: 'Circuit', channels: [1, 2, 10] } }];
 const ALSA = [
   { addr: '20:0', client: 'Circuit', port: 'Circuit MIDI 1', virtual: false },
@@ -60,13 +60,13 @@ console.log('\n== what a board says it is ==');
   ok('the graph is version 1, on site pi-1 and placed in the board\'s room', g.v === GRAPH_V && g.site === 'pi-1' && g.place === 'studio-1');
   ok('and a graph built from the desk is one graphProblem accepts', graphProblem(g) === '', graphProblem(g));
   ok('a synth the board can start is an engine node',
-    node(g, 'pi-1:synth')?.kind === 'engine' && node(g, 'pi-1:yoshimi')?.kind === 'engine');
+    node(g, 'pi-1:synth')?.kind === 'engine' && node(g, 'pi-1:collide')?.kind === 'engine');
   ok('with a MIDI in that takes notes',
-    port(g, 'pi-1:yoshimi:midi-in')?.dir === 'in' && port(g, 'pi-1:yoshimi:midi-in')?.medium === 'midi'
-    && port(g, 'pi-1:yoshimi:midi-in').accepts.includes('note'));
+    port(g, 'pi-1:collide:midi-in')?.dir === 'in' && port(g, 'pi-1:collide:midi-in')?.medium === 'midi'
+    && port(g, 'pi-1:collide:midi-in').accepts.includes('note'));
   ok('and an audio out at the board\'s frame',
-    port(g, 'pi-1:yoshimi:audio-out')?.dir === 'out' && port(g, 'pi-1:yoshimi:audio-out')?.medium === 'audio'
-    && port(g, 'pi-1:yoshimi:audio-out').shape.frameMs === 20 && port(g, 'pi-1:yoshimi:audio-out').shape.rate === 48000);
+    port(g, 'pi-1:collide:audio-out')?.dir === 'out' && port(g, 'pi-1:collide:audio-out')?.medium === 'audio'
+    && port(g, 'pi-1:collide:audio-out').shape.frameMs === 20 && port(g, 'pi-1:collide:audio-out').shape.rate === 48000);
   ok('NEGATIVE CONTROL: pappusFx is an insert, so it is not a node',
     !g.nodes.some((n) => /pappus/i.test(n.id)) && !g.ports.some((p) => /pappus/i.test(p.id)));
   ok('NEGATIVE CONTROL: a synth the board cannot start is not described',
@@ -200,17 +200,17 @@ console.log('\n== into a bay ==');
               { id: 'home:page:keys', label: 'keys', dir: 'out', medium: 'midi', emits: ['note', 'cc'] }] } });
   const b = reg.fill(createBay());
   ok('fill gives a bay with every node heard', b.nodes().length === reg.merged().nodes.length, `${b.nodes().length} nodes`);
-  const bad = b.validate('pi-1:yoshimi:audio-out', 'pi-1:circuit:midi-in');
+  const bad = b.validate('pi-1:collide:audio-out', 'pi-1:circuit:midi-in');
   ok('NEGATIVE CONTROL: audio into a MIDI in is refused, for the medium',
     !bad.ok && /audio/.test(bad.why) && /midi/.test(bad.why), bad.why);
-  const good = b.link('pi-1:yoshimi:audio-out', 'home:page:audio');
+  const good = b.link('pi-1:collide:audio-out', 'home:page:audio');
   // A board synth's sound lives in the board's MAIN room (2026-10-04), so the
   // session names that room, not a derivation of the port's id.
   ok('a valid audio link is made, and carries a session in the board\'s own room',
     good.ok && good.session && good.session.address === 'studio-1', JSON.stringify(good.session));
   ok('and the session knows the two ends are on different machines',
     /^internet/.test(good.session?.where || ''), good.session?.where);
-  const keys = b.link('home:page:keys', 'pi-1:yoshimi:midi-in');
+  const keys = b.link('home:page:keys', 'pi-1:collide:midi-in');
   ok('a page\'s keys may reach a board synth, and a MIDI link has no session',
     keys.ok && keys.session === null, keys.why);
 }
@@ -340,9 +340,9 @@ console.log('\n== into a bay ==');
   ok('every board port is named for its medium and direction',
     g.ports.every((p) => p.id.split(':')[2] === `${p.medium}-${p.dir}`), names.join(','));
   ok('boardPort names a port the board really announces', BOARD_SITE === 'pi-1'
-    && g.ports.some((p) => p.id === boardPort('yoshimi', 'midi-in')) && boardPort('gpu', 'video-out') === 'pi-1:gpu:video-out');
+    && g.ports.some((p) => p.id === boardPort('collide', 'midi-in')) && boardPort('gpu', 'video-out') === 'pi-1:gpu:video-out');
   ok('the addresses still name the room, so no stream moved',
-    g.ports.find((p) => p.id === 'pi-1:yoshimi:audio-out')?.address === 'studio-1'
+    g.ports.find((p) => p.id === 'pi-1:collide:audio-out')?.address === 'studio-1'
     && g.ports.find((p) => p.id === 'pi-1:gpu:video-out')?.address === 'studio-1-video'
     && g.ports.find((p) => p.id === 'pi-1:circuit:audio-out')?.address === 'studio-1-circuit');
   const two = boardGraph({ room: 'studio-2', site: 'pi-2', instruments: { synth: true }, gpu: false });
@@ -350,10 +350,10 @@ console.log('\n== into a bay ==');
     && two.ports.every((p) => p.id.startsWith('pi-2:')) && graphProblem(two) === '', graphProblem(two));
   ok('NEGATIVE CONTROL: no board id is left on the room', !JSON.stringify(g.ports.map((p) => p.id)).includes('studio-1:'));
   const rename = (from, to) => ({ ...g, ports: g.ports.map((p) => (p.id === from ? { ...p, id: to } : p)) });
-  const old = rename('pi-1:yoshimi:audio-out', 'pi-1:yoshimi:audio');
+  const old = rename('pi-1:collide:audio-out', 'pi-1:collide:audio');
   ok('NEGATIVE CONTROL: a board port with the old bare name is refused, and the reason names it',
-    /pi-1:yoshimi:audio is named audio/.test(graphProblem(old)), graphProblem(old));
-  const backwards = rename('pi-1:yoshimi:midi-in', 'pi-1:yoshimi:midi-out');
+    /pi-1:collide:audio is named audio/.test(graphProblem(old)), graphProblem(old));
+  const backwards = rename('pi-1:collide:midi-in', 'pi-1:collide:midi-out');
   ok('NEGATIVE CONTROL: a name that says out on an in port is refused', /audio-out|midi-in/.test(graphProblem(backwards)), graphProblem(backwards));
   const wrongMedium = rename('pi-1:gpu:program-in', 'pi-1:gpu:video-in');
   ok('NEGATIVE CONTROL: a name that says the wrong medium is refused', graphProblem(wrongMedium) !== '', graphProblem(wrongMedium));
@@ -377,9 +377,9 @@ console.log('\n== the JACK ends, and one bay link as JACK rows (2026-10-11) ==')
   ok('NEGATIVE CONTROL: a board graph without jack announces no JACK end and no granulator node',
     !plain.ports.some((p) => p.jack) && !node(plain, 'pi-1:pappus') && !node(plain, 'pi-1:capture'));
   const g = desk({ jack: true, inputs: [{ ...INPUTS[0], jack: true, take: 1 }] });
-  ok('with jack, Yoshimi keeps its id and relay address and names its two JACK ports',
-    JSON.stringify(port(g, 'pi-1:yoshimi:audio-out')?.jack) === JSON.stringify(JACK_ENDS.yoshimi)
-    && port(g, 'pi-1:yoshimi:audio-out').address === 'studio-1' && port(g, 'pi-1:yoshimi:audio-out').transports.includes('relay'));
+  ok('with jack, Collide keeps its id and relay address and names its two JACK ports',
+    JSON.stringify(port(g, 'pi-1:collide:audio-out')?.jack) === JSON.stringify(JACK_ENDS.collide)
+    && port(g, 'pi-1:collide:audio-out').address === 'studio-1' && port(g, 'pi-1:collide:audio-out').transports.includes('relay'));
   ok('the Circuit on JACK is its one taken channel', JSON.stringify(port(g, 'pi-1:circuit:audio-out')?.jack) === '["circuit:capture_1"]');
   ok('the granulator and the capture are nodes that travel by JACK only, and the graph is still legal',
     port(g, 'pi-1:pappus:audio-in')?.transports.join() === 'jack' && port(g, 'pi-1:capture:audio-in')?.dir === 'in'
@@ -404,13 +404,13 @@ console.log('\n== the JACK ends, and one bay link as JACK rows (2026-10-11) ==')
   const out = bay.validate('pi-1:pappus:audio-out', 'web-x:screen:audio-in');
   ok('NEGATIVE CONTROL: the granulator straight to a page is refused, because JACK never leaves the board',
     !out.ok && /never leaves pi-1/.test(out.why), out.why);
-  const yo = bay.validate('pi-1:yoshimi:audio-out', 'web-x:screen:audio-in');
-  ok('and Yoshimi to a page still rides the relay, so no page that links it moved', yo.ok && yo.session.transport === 'relay', yo.session?.transport);
+  const yo = bay.validate('pi-1:collide:audio-out', 'web-x:screen:audio-in');
+  ok('and Collide to a page still rides the relay, so no page that links it moved', yo.ok && yo.session.transport === 'relay', yo.session?.transport);
   const two = desk({ jack: true, site: 'pi-2', room: 'studio-2' });
   for (const n of two.nodes) bay.addNode(n);
   for (const p of two.ports) bay.addPort(p);
-  const across = bay.validate('pi-2:yoshimi:audio-out', 'pi-1:pappus:audio-in');
-  ok('NEGATIVE CONTROL: Yoshimi on a second board into this board\'s granulator is refused, two JACK servers share no row',
+  const across = bay.validate('pi-2:collide:audio-out', 'pi-1:pappus:audio-in');
+  ok('NEGATIVE CONTROL: Collide on a second board into this board\'s granulator is refused, two JACK servers share no row',
     !across.ok && /never leaves pi-1/.test(across.why), across.why || across.session?.transport);
   const asSource = bay.validate('pi-1:pappus:audio-in', 'pi-1:capture:audio-in');
   ok('NEGATIVE CONTROL: the granulator\'s input as a source is refused', !asSource.ok && /is an input/.test(asSource.why), asSource.why);
@@ -428,7 +428,7 @@ console.log('\n== the sampler on the board (2026-10-11) ==');
   ok('its audio-out names its own two JACK ports, not the granulator\'s',
     JSON.stringify(port(g, 'pi-1:sampler:audio-out')?.jack) === '["possampler:out_1","possampler:out_2"]'
     && !JACK_ENDS.sampler.some((p) => p.startsWith('SuperCollider:')));
-  ok('NEGATIVE CONTROL: no other engine grows a file-in', !port(g, 'pi-1:yoshimi:file-in') && !port(g, 'pi-1:synth:file-in'));
+  ok('NEGATIVE CONTROL: no other engine grows a file-in', !port(g, 'pi-1:collide:file-in') && !port(g, 'pi-1:synth:file-in'));
   ok('NEGATIVE CONTROL: a board that cannot run the sampler announces none of it',
     !desk({ instruments: { ...INSTRUMENTS, sampler: false } }).ports.some((p) => p.id.startsWith('pi-1:sampler:')));
 }

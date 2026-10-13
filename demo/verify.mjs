@@ -207,8 +207,8 @@ if (all.some((t) => ERR_PAGES.includes(t.name))) {
 
 /**
  * 🔴 THE BOARD PAGES MEET A BOARD THAT IS NOBODY'S, AND THE RELAY GOES WITH IT.
- * plans/plan-routing-migration.md §3.8, step 4. `/away/` and `/knobs/` are
- * `room: 'fixed'`, so until this they joined the PRODUCTION relay's `studio-1`
+ * plans/plan-routing-migration.md §3.8, step 4. `/away/` (and `/knobs/` until
+ * 2026-10-13) are `room: 'fixed'`, so until this they joined the PRODUCTION relay's `studio-1`
  * rooms on every run, beside the Raspberry Pi and whoever was listening to it.
  * Now `demo/fake-board.mjs` starts its own `demo/fake-relay.mjs` on 127.0.0.1
  * and these pages get `?relay=` (wire.mjs `relayOverride`), so a run opens no
@@ -228,7 +228,8 @@ if (all.some((t) => ERR_PAGES.includes(t.name))) {
  * ⚠️ ONE LINE PER PAGE TO ADD ONE. `patchbay` and `shape` also open
  * `createBoard` and are left out on purpose until their own agents move them.
  */
-const BOARD_PAGES = ['away', 'knobs'];
+// `knobs` left 2026-10-13, archived with Yoshimi (archive/yoshimi/README.md).
+const BOARD_PAGES = ['away'];
 if (all.some((t) => BOARD_PAGES.includes(t.name))) {
   const fb = startBoard({ port: 0, quiet: true, listening: true });
   const relayUrl = await fb.ready;

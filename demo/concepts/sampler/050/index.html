@@ -11,10 +11,10 @@
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount } from '/shell/shell.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
-  import { allocBuffers, bufferPlan, startPappusSynth, applyAudibleDefaults, setParam, RING_SECONDS, PAPPUS_NODE } from '/shell/pappus.mjs';
+  import { allocBuffers, bufferPlan, startPappusSynth, applyAudibleDefaults, setParam, RING_SECONDS, PAPPUS_NODE, GATE0 } from '/shell/pappus.mjs';
   import { createModulator } from '/shell/pappus-mod.mjs';
-  import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ,
-    writeDiscrete, writeContinuous, continuousOf, basesOf, routesOf, createFeatures } from '/shell/radio-gran.mjs';
+  import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ, SCAN_RANGE,
+    writeDiscrete, basesOf, routesOf, patternOf, createFeatures } from '/shell/radio-gran.mjs';
   import { createGrainRig } from '/concepts/sampler/grain-rig.mjs';
 
   // concepts sampler/050, GRANULATOR, 2026-10-13. Asked (BACKLOG): *"what is good
@@ -27,39 +27,98 @@
   // SuperCollider and records its INPUT into a ring. The patches are
   // radio-gran.mjs's twelve, the same ones /videoradio/ tours.
   //
-  // Everything that is not Pappus (the sources, the scopes, the grain events,
-  // the knobs, the patchbay, Play and the self check) is
-  // `../grain-rig.mjs`, shared with /concepts/sampler/060/, the light twin.
-  // This page is the engine.
+  // Everything that is not Pappus (the sources, the scope, the grain events,
+  // the knobs and their glide, the patchbay, Play and the self check) is
+  // `../grain-rig.mjs`, which /archive/grain-ring/ shares. This page is the
+  // engine and its controls. No output scope since 2026-10-13: the patch
+  // picker stands alone (*"replace with just a patch selector (no
+  // scope/viz/footer)"*).
   const d = mount({ name: 'concept sampler 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('sampler/050');
 
   const sentence = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  // The knobs: the numbers the twelve patches set that a person can turn and
-  // hear the same way in every patch (asked 2026-10-13, *"expose them"*).
-  // LEFT OUT, and why: `scan` is a speed, a place or a lag depending on the
-  // patch's mode, so one knob would mean three things; the modes, the chord
-  // (`gates`, `pitches`), the figure (`pattern`, `elen`) and `contour` are
-  // choices, not amounts, and a glide between two of them is nothing; `sos`
-  // also decides how much the ring keeps recording; the spectral, tap and
-  // reverb settings are written whole by `writeContinuous` on every landing
-  // and cannot be held back for a knob to glide them (it has no `skip` for
-  // them), so a knob on one would jump and then glide.
-  const pct = (v) => `${Math.round(v * 100)}%`;
+  // ── the controls: everything the twelve patches set, as knobs ────────────
+  // Asked 2026-10-13: *"move wet/dry to first and add all knobs"*. An amount
+  // is a plain knob over the range the patches use and a little past it. A
+  // choice is a stepped knob over the choices the patches make: the scan
+  // mode, the envelope shape, the modes, freeze, and four groups the engine
+  // reads as one thing: the chord (`gates` and `pitches`), the chances
+  // (`probs`), the figure (`pattern` and `elen`) and the echo taps
+  // (`taptimes`, `tappans`, `tappitch`). A group's choices are numbered in
+  // the order the patches first use them, and `none` (or `all`) where that is
+  // what one means: a patch name was too long to sit inside a knob. `scan` is labelled plainly and left to
+  // mean what its mode says: a speed, a place or a time behind.
+  // Most audible first, after the wet/dry the rig puts at the front.
+  const pct = (v) => `${Math.round(v * 100)}%`, num = (n) => (v) => v.toFixed(n);
+  const secs = (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`);
+  const hz = (v) => (v < 1000 ? `${Math.round(v)} Hz` : `${(v / 1000).toFixed(1)} kHz`);
+  const amount = (name, label, min = 0, max = 1, warp = 'lin', fmt = pct) => ({ name, label, kind: 'knob', min, max, warp, fmt });
+  const steps = (name, label, choices) => ({ name, label, kind: 'steps', choices });
+  /** The distinct values the patches give a field or a group, numbered in the order the patches first use them. */
+  const groupChoices = (pick, none = null, noneLabel = 'none') => {
+    const seen = new Map();
+    let n = 0;
+    for (const p of PATCHES) {
+      const v = pick(p), k = JSON.stringify(v);
+      if (!seen.has(k)) seen.set(k, { label: none && none(v) ? noneLabel : String(++n), value: v });
+    }
+    return [...seen.values()];
+  };
+  const numbered = (n) => Array.from({ length: n }, (_, i) => ({ label: String(i + 1), value: i + 1 }));
+  const GROUPS = {
+    chord: (p) => ({ gates: p.gates, pitches: p.pitches }),
+    chance: (p) => p.probs,
+    figure: (p) => ({ pattern: p.pattern, elen: p.elen }),
+    taps: (p) => ({ taptimes: p.taptimes, tappans: p.tappans, tappitch: p.tappitch }),
+  };
+  // In a bank (a heading over its knobs), a control shows its short label;
+  // its full label is the one the patchbay prints.
+  const inBank = (group, short, c) => ({ ...c, group, short, label: `${group} ${short}` });
   const CONTROLS = [
-    { name: 'size', label: 'size', kind: 'knob', min: 0.02, max: 4, warp: 'exp', fmt: (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`) },
-    { name: 'rate', label: 'density', kind: 'knob', min: 0.5, max: 64, warp: 'exp', fmt: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` },
-    { name: 'spray', label: 'spray', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
-    { name: 'drive', label: 'drive', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
-    { name: 'crush', label: 'crush', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
-    { name: 'noise', label: 'noise', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
-    { name: 'wow', label: 'wow', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    amount('size', 'size', 0.02, 4, 'exp', secs),
+    amount('rate', 'density', 0.5, 64, 'exp', (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s`),
+    steps('chord', 'chord', groupChoices(GROUPS.chord)),
+    inBank('scan', 'mode', steps('scanmode', '', [[1, 'speed'], [2, 'place'], [3, 'behind']].map(([m, label]) => ({ label, value: m })))),
+    inBank('scan', 'read', amount('scan', '', 0, 1, 'lin', num(2))),
+    steps('lock', 'freeze', [{ label: 'off', value: 0 }, { label: 'on', value: 1 }]),
+    inBank('figure', 'pattern', steps('figure', '', groupChoices(GROUPS.figure, (v) => !v.pattern))),
+    inBank('figure', 'phase', amount('ephase', '')),
+    amount('sos', 'overdub'),
+    inBank('spray', 'amount', amount('spray', '')),
+    inBank('spray', 'mode', steps('spraymode', '', numbered(3))),
+    amount('drive', 'drive'),
+    inBank('crush', 'amount', amount('crush', '')),
+    inBank('crush', 'mode', steps('crushmode', '', numbered(3))),
+    inBank('reverb', 'amount', amount('rverb', '')),
+    inBank('reverb', 'time', amount('rtime', '')),
+    amount('wow', 'wow'),
+    inBank('noise', 'amount', amount('noise', '')),
+    inBank('noise', 'type', steps('noisetype', '', numbered(3))),
+    inBank('noise', 'decay', amount('noisedecay', '', 0.1, 2, 'exp', secs)),
+    inBank('noise', 'tone', amount('noisetone', '', 200, 4000, 'exp', hz)),
+    inBank('noise', 'follow', amount('noisedyn', '', 0.5, 3, 'lin', num(2))),
+    steps('taps', 'echoes', groupChoices(GROUPS.taps, (v) => v.taptimes.every((t) => t === 0))),
+    inBank('spectral', 'mix', amount('swet', '')),
+    inBank('spectral', 'time', amount('scycle', '', 0.25, 8, 'exp', secs)),
+    inBank('spectral', 'return', amount('sfb', '')),
+    inBank('spectral', 'tilt', amount('stilt', '', -1, 1, 'lin', num(2))),
+    inBank('spectral', 'split', amount('sxover', '', 200, 2000, 'exp', hz)),
+    inBank('spectral', 'blur', amount('sdiffuse', '')),
+    inBank('swarm', 'amount', amount('swarm', '')),
+    inBank('swarm', 'mode', steps('swarmmode', '', numbered(3))),
+    amount('strum', 'strum', 0, 0.5, 'lin', secs),
+    steps('chance', 'chance', groupChoices(GROUPS.chance, (v) => v.every((x) => x === 1), 'all')),
+    steps('contour', 'shape', Array.from({ length: 17 }, (_, i) => ({ label: String(i), value: i }))),
+    amount('tilt', 'tilt', -1, 1, 'lin', num(2)),
+    amount('comp', 'squash'),
+    amount('ingain', 'input', 0, 2, 'lin', num(2)),
+    inBank('window', 'start', amount('winstart', '')),
+    inBank('window', 'end', amount('winend', '')),
   ];
   const NAMES = CONTROLS.map((c) => c.name);
-  // Where each knob's number goes: the two granulators' `m`/`n` pair for the
-  // grain settings, the effect's own command for the rest.
-  const GRAIN = new Set(['size', 'rate', 'spray']);
+  /** A patch's value for each control, groups gathered. */
+  const setOf = (p) => Object.fromEntries(NAMES.map((n) => [n, GROUPS[n] ? GROUPS[n](p) : (p[n] ?? (n === 'winend' ? 1 : 0))]));
 
   // ── Pappus, behind the rig's engine contract ─────────────────────────────
   let eng = null, ctx = null, modulator = null, cur = null, routed = new Set();
@@ -69,6 +128,36 @@
   let ranFor = 0, runFrom = null;
   const engSeconds = () => ranFor + (runFrom != null ? ctx.currentTime - runFrom : 0);
   const both = (name, v) => { setParam(eng, `m${name}`, v); setParam(eng, `n${name}`, v); };
+  const delayMode = () => cur.scanmode >= 3;
+  // How each knob reaches the engine, command for command as radio-gran.mjs's
+  // writeDiscrete and writeContinuous write them.
+  const viaBoth = (n) => (v) => both(n, v), viaOne = (cmd) => (v) => setParam(eng, cmd, v);
+  const WRITE = {
+    size: viaBoth('size'), rate: viaBoth('rate'), spray: viaBoth('spray'), swarm: viaBoth('swarm'),
+    strum: viaBoth('strum'), sos: viaBoth('sos'), tilt: viaBoth('tilt'), contour: viaBoth('contour'),
+    lock: viaBoth('lock'), spraymode: viaBoth('spraymode'), swarmmode: viaBoth('swarmmode'), ephase: viaBoth('ephase'),
+    // In a delay mode the knob is a time behind, in seconds of the ring.
+    scan: (v) => (delayMode() ? both('delay', v * BUF_SECONDS) : both('scan', v)),
+    scanmode: (v) => { both('scanmode', v); WRITE.scan(cur.scan); WRITE.winstart(cur.winstart); WRITE.winend(cur.winend); },
+    // A delay mode reads the whole lap whatever the window says (writeContinuous's rule).
+    winstart: (v) => both('winstart', delayMode() ? 0 : v),
+    winend: (v) => both('winend', delayMode() ? 1 : v),
+    ingain: viaOne('ingain'), comp: viaOne('mcomp'), swet: viaOne('swet'), scycle: viaOne('scycle'),
+    sfb: viaOne('sfb'), stilt: viaOne('stilt'), sxover: viaOne('stiltxover'), sdiffuse: viaOne('sdiffuse'),
+    drive: viaOne('drive'), crush: viaOne('crush'), crushmode: viaOne('crushmode'), noise: viaOne('noise'),
+    noisetype: viaOne('noisetype'), noisedecay: viaOne('noisedecay'), noisetone: viaOne('noisetone'),
+    noisedyn: viaOne('noisedyn'), wow: viaOne('kwow'), rverb: viaOne('rverb'), rtime: viaOne('rtime'),
+    chord: (v) => { setParam(eng, 'gates', v.gates); setParam(eng, 'pitches', v.pitches); },
+    chance: (v) => setParam(eng, 'probs', v),
+    figure: (v) => { both('elen', v.elen); eng.send('/b_setn', GATE0, 0, 16, ...patternOf({ pattern: v.pattern })); },
+    taps: (v) => {
+      setParam(eng, 'taptimes', [...v.taptimes, 0, 0, 0, 0]); setParam(eng, 'tappans', [...v.tappans, 0, 0, 0, 0]);
+      setParam(eng, 'tappitch', [...v.tappitch, 0, 0, 0, 0]);
+    },
+  };
+  // What the patch's movement (pappus-mod.mjs) is allowed to move: its base
+  // follows the knob, and the modulator writes base plus movement.
+  const ROUTABLE = new Set(['rate', 'size', 'scan', 'spray', 'swarm', 'strum', 'sos', 'contour', 'wow', 'drive', 'crush', 'noise', 'winstart', 'winend']);
 
   const engine = {
     label: 'Pappus granulator',
@@ -105,10 +194,13 @@
       if (!(await startPappusSynth(eng))) throw new Error('Pappus did not start');
       runFrom = ctx.currentTime; ranFor = 0;
       applyAudibleDefaults(eng, { live: true, bufSeconds: BUF_SECONDS });
+      // The constants this rung needs, written once; every patch value after
+      // this arrives through a knob.
+      writeDiscrete(eng, PATCHES[0], { bufSeconds: BUF_SECONDS });
       T.startMs = Math.round(performance.now() - t0);
       log(`Pappus up ${T.startMs} ms after Play: ${bufs.allocated} buffers, `
         + `${(T.bufferBytes / 1e6).toFixed(1)} MB of them, the ${(def.bytes / 1024).toFixed(0)} KB definition taken in ${def.ms} ms`);
-      // The modulation: the patches' routes, fed by the source's level and
+      // The movement: the patches' routes, fed by the source's level and
       // colour, at MOD_HZ, as /videoradio/ runs it.
       const tap = ctx.createAnalyser(); tap.fftSize = 2048; tap.smoothingTimeConstant = 0;
       input.connect(tap);
@@ -122,29 +214,22 @@
       setInterval(() => { if (runFrom == null) return; modulator.sense(feats.read()); modulator.tick(); }, 1000 / MOD_HZ);
       return { meter: eng.meter, out: eng.out, timing: T, scsynth: eng };
     },
-    // A patch lands in /videoradio/'s order (radio-gran.mjs's two halves: the
-    // discrete half, every base, the routes, then the continuous half with
-    // the routed ones left to the modulator), EXCEPT the knobs' numbers: those
-    // stay where the knobs are now and glide to the patch over their wires.
+    // What a patch sets that is not a knob: its routes, the movement the
+    // modulator adds. Every value arrives by a knob and its glide.
     land(i, now) {
-      cur = { ...PATCHES[i], ...Object.fromEntries(NAMES.map((n) => [n, now[n]])) };
-      writeDiscrete(eng, cur, { bufSeconds: BUF_SECONDS });
-      for (const [k, v] of Object.entries(basesOf(cur))) modulator.setBase(k, v);
-      const routes = routesOf(cur);
+      cur = { ...cur, ...now };
+      const p = PATCHES[i];
+      for (const [k, v] of Object.entries(basesOf({ ...p, ...now, probs: now.chance }))) modulator.setBase(k, v);
+      const routes = routesOf(p);
       modulator.setRoutes(routes);
       routed = new Set(routes.map((r) => r.dest));
-      writeContinuous(eng, continuousOf(cur), { scanmode: cur.scanmode, bufSeconds: BUF_SECONDS, skip: new Set([...routed, ...NAMES]) });
     },
-    // Pappus's own `size` (a grain's length in seconds) and `rate` (grains a
-    // second), the two numbers that mean the same thing in all twelve patches;
-    // `scan` is a speed, a place or a lag depending on the patch. A routed one
-    // is the modulator's: move its base and it moves around the new number.
     knob(name, v) {
-      if (!cur) return;
-      cur[name] = v;
-      if (routed.has(name)) modulator.setBase(name, v);
-      else if (GRAIN.has(name)) both(name, v);
-      else setParam(eng, MOD_CMD[name] ?? name, v);
+      cur = { ...(cur ?? {}), [name]: v };
+      if (!eng || !modulator) return;
+      const dest = name === 'chance' ? 'probs' : name;
+      if (routed.has(dest) && (ROUTABLE.has(dest) || dest === 'probs')) modulator.setBase(dest, v);
+      else WRITE[name](v);
     },
     run(on) {
       eng.send('/n_run', PAPPUS_NODE, on ? 1 : 0);
@@ -152,7 +237,7 @@
       if (!on && runFrom != null) { ranFor += ctx.currentTime - runFrom; runFrom = null; }
     },
     async read(name) {
-      const c = GRAIN.has(name) ? `m${name}` : (MOD_CMD[name] ?? name);
+      const c = ['size', 'rate', 'spray'].includes(name) ? `m${name}` : (MOD_CMD[name] ?? name);
       const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === c, 3000, '/s_get', PAPPUS_NODE, c);
       return r ? Number(r[3]) : null;
     },
@@ -162,9 +247,8 @@
   };
 
   const rig = createGrainRig({
-    d, engine,
-    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, set: Object.fromEntries(NAMES.map((n) => [n, p[n]])) })),
-    controls: CONTROLS,
+    d, engine, controls: CONTROLS, outputScope: false,
+    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, set: setOf(p) })),
   });
   await rig.ready();
 </script>

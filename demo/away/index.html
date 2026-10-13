@@ -605,7 +605,7 @@
     d.assert('a page in the same room hears this page’s keys and picture', heard.includes(KEYS_OUT) && heard.includes(`${SITE}:screen:audio`), heard.join(', '));
     const yes = await other.request(KEYS_OUT, INSTRUMENT_IN, true, { timeoutMs: 3000 });
     d.assert('asked for its keys to the Circuit, it answers open', yes?.open === true, yes ? `open ${yes.open}: ${yes.why}` : 'no answer');
-    const elsewhere = await other.request(KEYS_OUT, boardPort('yoshimi', 'midi-in'), true, { timeoutMs: 3000 });
+    const elsewhere = await other.request(KEYS_OUT, boardPort('sampler', 'midi-in'), true, { timeoutMs: 3000 });
     d.assert('asked for its keys anywhere else, it refuses and names where they go', elsewhere?.open === false && elsewhere.why.includes(INSTRUMENT_IN),
       elsewhere ? elsewhere.why : 'no answer');
     const close = await other.request(KEYS_OUT, INSTRUMENT_IN, false, { timeoutMs: 3000 });
