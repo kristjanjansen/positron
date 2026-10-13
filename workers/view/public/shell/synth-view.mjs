@@ -859,7 +859,7 @@ export function traceOf(t = {}, fallback = '--dim') {
  */
 /**
  * 🔴 A TRIGGERED SCOPE: ONE HIT, CAPTURED FROM ITS ONSET, HELD STILL UNTIL THE
- * NEXT. Asked 2026-10-12 on `/concepts/rhythm/010/`: *"scopes are very
+ * NEXT. Asked 2026-10-12 on `/rhythm/drum-knobs/`: *"scopes are very
  * "nervous". what to do on 010"*, then *"is ti a scope feature/prop?"*. A
  * free running scope redraws whatever the last 40 ms held, so a drum reads as
  * a flicker: a hit, then its tail, then silence, sixty times a second. A drum
@@ -1003,7 +1003,7 @@ export function createWaveShape({ host, label = '', height = 96, name = '', grou
       // 🔴 IN THE SAME TYPE AS THE DRAWN NAME BELOW, since 2026-10-12. It was
       // 11 px in ink here and 9 px faint once a trace arrived, so a scope's
       // name changed size every time its signal came and went, reported on
-      // /concepts/rhythm/010/ as *"scope labels keep chaning size"*.
+      // /rhythm/drum-knobs/ as *"scope labels keep chaning size"*.
       if (v.reason === null && v.axes && v.name) f.say(v.name, PAD, foot, { room: W - PAD * 2 });
       if (v.axes?.y) f.say(v.axes.y, W - PAD, yTop + 9, { align: 'right', px: 10, colour: C.faint, room: W / 2 });
       if (v.axes?.x) f.say(v.axes.x, W - PAD, yBot - 3, { align: 'right', px: 10, colour: C.faint, room: W / 2 });

@@ -26,7 +26,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createPlaitsVoice, PATCHES, P } from '/concepts/synth/plaits-voice.mjs';
+  import { createPlaitsVoice, PATCHES, P } from '/code/plaits-voice.mjs';
 
   // A basic Plaits concept. Asked 2026-10-12 (BACKLOG, "A basic Plaits
   // concept"): *"do basic plaits concept with patchbay. play button, scope,
@@ -35,7 +35,7 @@
   //
   // THE VOICE IS /muta/'s, NOT A COPY: the same worklet and wasm, Emilie
   // Gillet's Plaits compiled unmodified, through `../plaits-voice.mjs`, which
-  // /concepts/synth/120/ plays too, with the same patches.
+  // /code/plaits-keys/ plays too, with the same patches.
   //
   // THE NOTES ARE ONE SEQUENCE ON A TIMELINE, THE SAME FOR EVERY PATCH.
   // Asked 2026-10-12: *"add timeline to plaits concepts looping. play stop
@@ -126,7 +126,7 @@
   lay(ID('plaits', 'audio-out'), ID('speaker', 'audio-in'));
 
   // ── the voice: /muta/'s worklet and wasm, made on the first play ───────
-  // (`../plaits-voice.mjs`, shared with /concepts/synth/120/).
+  // (`../plaits-voice.mjs`, shared with /code/plaits-keys/).
   const voice = createPlaitsVoice({ log: d.log, voices: 6, onUp: () => route() });
   const send = voice.send;
   const loadPatch = voice.loadPatch;

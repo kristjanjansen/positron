@@ -2726,7 +2726,7 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    three thousand lines down, because that is the rule they have to beat and
    this one came first. See the block there, which carries the measurement.
    🔴 `--pg-lab` IS A FLOOR AND THE WIDEST NAME IS THE WIDTH, SINCE 2026-10-12.
-   Asked for as a 16 by 4 drum grid with its rows named (`/concepts/rhythm/000/`:
+   Asked for as a 16 by 4 drum grid with its rows named (`/rhythm/drum-machine/`:
    kick, snare, open hat, closed hat). At a fixed 22 px every name past two
    letters was clipped, which is the `/tom/` defect above in a new costume.
    `max-content` sizes the column to the widest label, so a grid of numbers
@@ -8031,3 +8031,25 @@ button.pos-linkbtn:active { background: none; }
   }
   .pos-ipanel-plate > .pos-ipanel-name { justify-content: center; order: 1; }
 }
+
+/* ── THE HERO, LARGE (demo/shell/hero.mjs) ───────────────────────────────────
+   One block, two pages: /kit/frontpage/ shows it and the front page opens
+   with it, since 2026-10-13 (*"use http://127.0.0.1:8890/kit/frontpage/ on top
+   THE HERO, LARGE"*). Moved here verbatim from that page's `.fp-big` rules
+   (2026-10-12, *"do bit bigger version of it. yellow dot in positron stuio"*):
+   the headline in the mono at 600, the line under it in Geist, the wordmark's
+   dot and the headline's full stop in the accent. No media query: every size
+   is a clamp, so the block reads its own width and nothing here can lose to a
+   later rule of equal weight. */
+.pos-hero { display: flex; flex-direction: column; min-width: 0; padding: 24px 0 var(--pos-gap); }
+.pos-hero > * { margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.pos-hero-eye { font: 400 13px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.pos-hero-eye b, .pos-hero-h b { color: var(--hi); font-weight: inherit; }
+.pos-hero-h { font: 600 clamp(32px, 7vw, 56px)/1.08 var(--mono); letter-spacing: -.04em; color: var(--fg); margin-top: 18px; }
+.pos-hero-l { font: 400 clamp(18px, 2.3vw, 22px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 24px; max-width: 32em; }
+.pos-hero-s { font: 400 clamp(14px, 1.5vw, 16px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
+/* The imaginary patchbay under it (*"create imaginary parchbay that fits into
+   16:9 size under it"*): drawn at a fixed width by hero.mjs and scaled to the
+   column, so the frame takes the scaled height. */
+.pos-hero-bay { display: flex; justify-content: center; margin-top: 32px; }
+.pos-hero-bay-in { flex: none; }

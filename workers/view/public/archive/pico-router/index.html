@@ -33,7 +33,7 @@
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createToggle } from '/shell/toggle.mjs';
 
-  // /concepts/synth/000/ with a Pico in the middle. The keyboard's notes go into an
+  // /synth/keyboard/ with a Pico in the middle. The keyboard's notes go into an
   // emulated RP2040 as DIN MIDI bytes on UART0 RX, the firmware's C
   // (rig/pico/patch/main.c around rig/route-core/) routes them, and whatever
   // the firmware writes to UART0 TX comes back as events out of pico:midi-out

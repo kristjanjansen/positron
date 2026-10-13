@@ -39,7 +39,7 @@
 // is a number or one of Env's own shape names written as a symbol (`\lin`).
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
-// SINCE 2026-10-13, FOR THE GRAIN RING, /concepts/sampler/060/: `%` (opMod),
+// SINCE 2026-10-13, FOR THE GRAIN RING, /granulator/granulator/: `%` (opMod),
 // `.sqrt`, `.sin` and `.cos` (its equal power wet and dry), a 'quoted' symbol (sclang's other spelling of `\name`, and the only
 // one that can hold a `/`), and the UGens GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames and BufDur, each from its class file
@@ -151,7 +151,7 @@ export const UGENS = {
   Pan2:       { file: 'Pan.sc',     args: [['in', REQUIRED], ['pos', 0], ['level', 1]], outputs: 2, first: 'audio' },
   EnvGen:     { file: 'EnvGen.sc',  args: [['envelope', REQUIRED], ['gate', 1], ['levelScale', 1],
                                              ['levelBias', 0], ['timeScale', 1], ['doneAction', 0]] },
-  // ── added 2026-10-13 for the grain ring, /concepts/sampler/060/. Read in
+  // ── added 2026-10-13 for the grain ring, /granulator/granulator/. Read in
   // supercollider develop 1995490 on 2026-10-13, the same commit as the rows
   // above. Four shapes the rows above do not have, each a field:
   //   `rates`   the methods the class really has; GrainBuf is `*ar` only and
@@ -416,7 +416,7 @@ const RATE_WORD = ['scalar', 'control', 'audio'];
  *
  * @param {string} src
  * @param {{name?: string, bus?: number}} [o]  `bus` is the output bus the last
- *   line goes to, 0 by default. Added 2026-10-12 so `/concepts/rhythm/` can put
+ *   line goes to, 0 by default. Added 2026-10-12 so the `/rhythm/` concept pages can put
  *   each drum on a stereo pair of its own; the engine has to be booted with that
  *   many output channels, or the bus is an input.
  * @returns {{ok: true, bytes: Uint8Array, name: string, params: {name: string, value: number}[],

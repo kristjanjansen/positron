@@ -3,7 +3,7 @@
 // second page can have the same line without a copy of it.
 //
 // Asked 2026-10-13: *"do reel-demo-like patchbay version ... timeline is same"*
-// (/concepts/archives/000/). The line is this file; what plays is the page's.
+// (/history/newsreels/). The line is this file; what plays is the page's.
 //
 // 🔴 THIS FILE OPENS NOTHING AT ERR. It reads `/reel/1965.json`, which is our
 // own catalogue (metadata only, no media), and it draws, picks, steps and

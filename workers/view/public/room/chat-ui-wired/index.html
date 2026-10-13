@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Chat UI wired</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* concepts room/002, THE CHAT UI WIRED TO THE PATCHBAY, 2026-10-11. Asked:
+     *"002: wire in patchbay from 000 and show it"*. room/001's frame and
+     compose box, driven by room/000's bay: two `*` links, a line crossing the
+     room as one `bay.event`. The patchbay picture sits under the frame. */
+
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs. */
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createChatLog, createChatCompose, createChatColumn, createChatWindow } from '/shell/chat-ui.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createBayNode, randomSite, ROOM_RE } from '/shell/bay-node.mjs';
+  import { heldPicture } from '/shell/bay-view.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+
+  const d = mount({ name: 'Chat UI wired', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('room/chat-ui-wired');
+
+  // ── the bay, as room/000 has it ──────────────────────────────────────────
+  // Every tab is a SITE with one `chat` node and two `value` ports shaped
+  // `of: text`, and holds two `*` links: a speaker and a listener. Its own
+  // room, never studio-1. Nothing opens until Join is pressed.
+  const asked = new URLSearchParams(location.search).get('room');
+  const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-1';
+  const SITE = randomSite('web');
+  const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
+  const SELF = {
+    v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser',
+    nodes: [{ id: `${SITE}:chat`, kind: 'person', label: 'chat', place: 'browser' }],
+    ports: [
+      { id: OUT, label: 'chat', dir: 'out', medium: 'value', shape: { of: 'text' } },
+      { id: IN, label: 'chat', dir: 'in', medium: 'value', shape: { of: 'text' } },
+    ],
+  };
+  function bay() {
+    const b = node.registry.fill(createBay());
+    b.addPort({ ...b.port(IN), deliver: heard });
+    b.link(OUT, '*:chat:value-in');
+    b.link('*:chat:value-out', IN);
+    return b;
+  }
+  let pb = null;
+  const node = createBayNode({
+    room: ROOM, graphs: [SELF], bay,
+    log: (line, kind) => d.log(line, kind),
+    onJoin: () => { join.enable('join', false, `in ${ROOM}`); box.enable(true); pb?.refresh(); },
+    onGraph: () => { pb?.refresh(); },
+    onEvent: (m, n) => { if (n < 0) d.log(`refused a line said as ${m.source} by a socket that never announced it`, 'warn'); },
+  });
+
+  // ── the chat UI, as room/001 has it ──────────────────────────────────────
+  const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
+  const short = (site) => site === SITE ? 'you' : site;
+
+  const log = createChatLog();
+  const add = (r) => log.add(r);
+
+  // Called by the bay, only along the listener link.
+  function heard(e, l, m) {
+    pb?.pulse(l.from, l.to);
+    add({ who: short(String(m.from).split(':')[0]), at: Number(m.sent) || Date.now(), text: String(e.text || '') });
+  }
+
+  function say(text) {
+    const r = node.emit(OUT, { text });
+    if (r.sent) pb?.pulse(OUT, '*:chat:value-in');
+    add({ who: 'you', at: Date.now(), text, me: true });
+    if (!r.far.length) d.log('nobody else in the room heard it');
+  }
+
+  const box = createChatCompose({ placeholder: `Message ${ROOM}`, onSend: say });
+  const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
+  const panel = createChatWindow({ columns: [createChatColumn({ body: log, compose: box })], footer: join.el });
+
+  // ── the patchbay: the two `*` links this tab holds, read from bay() ──────
+  // Before Join it is drawn from this tab's own graph, which opens nothing. A
+  // wire pulses when a line leaves or arrives along it.
+  pb = createPatchbay(heldPicture(bay, SITE),
+    { room: ROOM,  detail: (n) => [{ text: n.id.startsWith('*:') ? n.label : 'chat box', sans: true }] });
+
+  d.stack.add(panel.el, pb.el);
+  d.ready();
+</script>

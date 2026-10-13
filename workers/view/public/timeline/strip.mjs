@@ -3176,7 +3176,7 @@ export function createStrip(canvas, deck, opts = {}) {
     show(id, on) { const L = S.lanes.find((l) => l.id === id); if (L) { L.show = on !== false; layout(); invalidate(); } return !!L; },
     /**
      * WHICH LANES ARE ACTIVE RIGHT NOW. Asked 2026-10-12 on
-     * /concepts/typist/040/: *"dim lanes in timeline that are not active
+     * /typist/multi-typer/: *"dim lanes in timeline that are not active
      * (depends num of typist)"*. `setActive(['a', 'b'])` leaves those two at
      * full strength and dims every other lane, its marks AND its gutter, by
      * the theme's `off` (the kit's `--ctl-off`, the same number a switched off

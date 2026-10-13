@@ -62,7 +62,7 @@ const list = (xs) => (xs && xs.length ? xs.join(', ') : '');
 export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () => false, open = false, details = false, room = 'room' } = {}) {
   /* 🔴 THE RELAY IS DRAWN AS A BOX, 2026-10-11. Asked: *"why relay can no be
      another box?"*, *"why it can have standard node naming?"*, then, after a
-     prototype on /concepts/room/000/, *"ok do it and update patcbays"*. Every
+     prototype on /room/chat/, *"ok do it and update patcbays"*. Every
      link the relay carries is drawn as two hops through `cf-relay:<room>`,
      named like any node (as `cf-store:history`), with one in and one out port
      per medium it carries. PICTURE ONLY: the bay still holds and routes the
@@ -83,7 +83,7 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
   // events as the change in `sent` on the SAME object, and treats a new object
   // as a new wire; a hop built afresh on every read was a new wire every time,
   // so no MIDI ever pulsed on a relayed link (found 2026-10-11 on
-  // /concepts/remote/010/ when it was synth/070, *"i do not see midi animation on circuilt patchbay"*).
+  // /remote/circuit-on-pi/ when it was synth/070, *"i do not see midi animation on circuilt patchbay"*).
   const hopCache = new Map();
   const drawn = () => {
     const ports = raw.ports(), links = [], extra = new Map(), hops = new Map();

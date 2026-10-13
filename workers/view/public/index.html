@@ -5,81 +5,155 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<!-- THE TAB SAYS `positron`. The page's heading is the logo since 2026-10-07
-     (*"rm positron: 41 media art experiments"*); the counted name it carried
-     from 2026-09-24 is gone, and `indexTitle()` with it. -->
+<!-- THE FRONT PAGE IS THE CONCEPTS INDEX SINCE 2026-10-13: *"when all is done,
+     move concepts to frontpage. use http://127.0.0.1:8890/kit/frontpage/ on top
+     THE HERO, LARGE. rename all with group/slug, rm numbers"*, then *"keep same
+     boxes style"*. It was demo/concepts/index.html at /concepts/, which now
+     forwards here (workers/view/src/index.js). The old front page, the
+     manifest's groups baked by workers/view/build.mjs into menu.html, is in
+     archive/frontpage/ with a README. -->
 <title>positron</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<link rel="stylesheet" href="/shell/slide.css">
 <link rel="icon" href="/favicon.ico">
-
-<div class="pos-head pos-index">
-  <!-- THE HEADING IS THE ADDRESS, positron.studio with the dot in the accent, 2026-10-07:
-       *"for index title use "positron.studio" with yellow do"*. It was the horizontal logo
-       for an hour, and the counted `positron: N media art experiments` before that. -->
-  <div class="pos-title"><h1 class="pos-name">positron<span class="sl-hi">.</span>studio</h1></div>
-  <!-- no sentence under the title since 2026-10-10: *"rm frontpage slogan"* -->
-</div>
-
-  <h2 class="pos-act-h">TH</h2><div class="pos-cards" style="--card-min:210px"><a class="pos-card" href="/held/" style="min-height:108px"><span class="pos-card-t">held</span><span class="pos-card-d">Held in Human, played back from its own score</span><span class="pos-card-f"><span class="pos-card-g">timeline</span><span class="pos-card-g">uncertainty</span><span class="pos-card-g">canvas</span></span></a></div>
-
-
-
-<script type="module">
-  // The rows above are baked at build time, so anything that needs a live
-  // browser to decide runs here: un-link what this browser cannot do, and say
-  // why in words. demo/index.html calls the same function on rows it rendered
-  // itself, so there is one copy of the rule.
-  import { markIndex } from '/shell/caps.mjs';
-
-  /**
-   * 🔴 THE FRONT PAGE GETS A FEEDBACK BUTTON TOO, AND IT IS NOT THE SHELL'S.
-   * Every demo page has one because `shell.mjs` mounts it; this page does not
-   * mount the shell, so the one page everybody lands on first was the one page
-   * with nowhere to say anything. Asked for in those words, with the label:
-   * *"add feedback button to fronpage too ('general feedback')"*.
-   *
-   * ⚠️ `isTrusted`, THE SAME GATE, FOR THE SAME REASON. `shell.mjs` carries the
-   * long note: a scripted press produces `isTrusted: false`, and a control that
-   * writes to a store a person is going to read may only be worked by a person.
-   * A second copy of that button without a second copy of that gate is how the
-   * gate stops meaning anything.
-   *
-   * ⚠️ AND THE SLUG IS `general`, WHICH IS WHAT THE PANEL TITLES ITSELF FROM.
-   * Notes are stored with it, so a note about the site as a whole can be told
-   * apart from a note about a page when they are read back.
-   */
-  {
-    const fb = document.createElement('button');
-    fb.className = 'pos-fb-btn';
-    fb.type = 'button';
-    // ⚠️ THE BUTTON SAYS `Feedback` ON EVERY PAGE INCLUDING THIS ONE, and only
-    // the PANEL says which feedback it is. Reported in one line: *"'feedback'
-    // is always button name. 'general feedback' is modal title"*. A button
-    // whose label changes per page is a control a reader has to re-find; the
-    // panel's own title is where the scope belongs, and `slug` below is what
-    // writes it.
-    fb.textContent = 'Feedback';
-    fb.dataset.slug = 'general';
-    fb.setAttribute('aria-haspopup', 'dialog');
-    fb.setAttribute('aria-expanded', 'false');
-    fb.title = 'say something about the site as a whole';
-    fb.addEventListener('click', async (e) => {
-      if (!e.isTrusted) return;
-      fb.setAttribute('aria-expanded', 'true');
-      try {
-        const m = await import('/shell/feedback.mjs');
-        m.openFeedback(null, { slug: 'general' });
-      } catch {
-        fb.setAttribute('aria-expanded', 'false');
-      }
-    });
-    document.querySelector('.pos-title')?.append(fb);
+<style>
+  .cc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .cc-card {
+    display: flex; flex-direction: column; gap: 6px;
+    min-height: 115px;   /* three lines of a 100 character description, measured 2026-10-12 */
+    padding: var(--inset, 12px);
+    background: var(--card);
+    border: var(--edge, 1px solid var(--line));
+    border-radius: var(--r, 4px);
+    color: inherit; text-decoration: none;
   }
-  // markIndex also puts the headset offer at the top when there is one —
-  // one copy, in caps.mjs, because both index pages need it.
-  await markIndex(document);
-  // The decks under `slides`, one player each, the same call on both front pages.
-  (await import('/shell/decks.mjs')).mountDecks(document);
+  .cc-card:hover { border-color: var(--fg); }
+  /* No number on a card since 2026-10-13 (*"rm numbers"*): the title is the
+     whole name and the address is /<group>/<slug>/. `.cc-n` survives only as
+     the `demo` word on a demo card in a concept group. */
+  .cc-n { font: 400 12px var(--mono); color: var(--dim); }
+  /* The title names the page, so it is the mono; the line under it is read
+     through, so it is Geist (`--sans`, the body's face). Both balanced, as
+     /kit/frontpage/ sets them. */
+  .cc-t { margin: 0; font-size: 15px; font-family: var(--mono); }
+  .cc-t, .cc-s { text-wrap: balance; }
+  /* The `demo` word before a demo card's title, quieter than the title. */
+  .cc-t .cc-n { color: var(--dim); margin-right: 10px; }
+  .cc-s { margin: 0; color: var(--dim); font-size: 13.5px; }
+  /* Two card colours from the concepts' medium palette (positron-concepts), so
+     a reader tells a concept page from a full demo and a demo from a use case.
+     midi blue for a demo beside the concepts, file orchid for a use case. */
+  :root { --cc-demo: #6fb8e8; --cc-case: #d68fc6; }
+  .cc-card.cc-demo {
+    background: color-mix(in srgb, var(--cc-demo) 7%, var(--card));
+    border-color: color-mix(in srgb, var(--cc-demo) 35%, var(--line));
+  }
+  .cc-card.cc-demo .cc-n { color: var(--cc-demo); }
+  .cc-card.cc-demo:hover { border-color: var(--cc-demo); }
+  /* A demo a concept page now covers: an inverted badge, light ink filled with
+     the page's dark as its text, uppercase like the kit's `.pos-tag`, never red
+     and never the brand `--hi` (asked 2026-10-12, *"make label more visible,
+     ivert badge"*), the covering page's name just left of it. Its line box is
+     the title's, so the card keeps its size. */
+  .cc-demo .cc-off {
+    flex: none; margin-left: 8px; align-self: center;
+    padding: 0 6px; border-radius: 3px;
+    background: var(--fg2); color: var(--bg);
+    font: 600 10px/1.6 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .cc-demo .cc-t:has(.cc-off) { display: flex; align-items: baseline; }
+  .cc-demo .cc-by { margin-left: auto; padding-left: 10px; font: 400 12px var(--mono); color: var(--dim2); white-space: nowrap; }
+  /* A use case card carries more: the front page's group above the title and
+     its address under the line, so it keeps a taller size of its own. */
+  .cc-card.cc-case {
+    min-height: 140px;
+    background: color-mix(in srgb, var(--cc-case) 7%, var(--card));
+    border-color: color-mix(in srgb, var(--cc-case) 35%, var(--line));
+  }
+  .cc-card.cc-case:hover { border-color: var(--cc-case); }
+  .cc-case .cc-g { font: 400 12px var(--mono); color: var(--cc-case); }
+  .cc-case .cc-t { font-size: 17px; }
+  .cc-case .cc-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { createHero } from '/shell/hero.mjs';
+
+  import { CONCEPTS, CONCEPT_GROUPS, CASE_GROUPS, DEMO_CARDS, GROUP_TITLES } from '/shell/concept-list.mjs';
+  import { DEMOS, GROUPS, targetOf } from '/manifest.mjs';
+
+  // `general` because this is where a note about the site as a whole is left,
+  // the slug the old front page's own feedback button wrote (archive/frontpage/).
+  // No back link: this is where every `← concepts` arrives.
+  const d = mount({ name: 'general', what: '', readout: null, index: null, showLog: false });
+  document.title = 'positron';
+  // THE HERO, LARGE on top, the block /kit/frontpage/ shows (demo/shell/hero.mjs),
+  // one copy for both. Its headline is this page's h1, so the shell's own title
+  // goes and the Feedback button keeps the title row to itself.
+  document.querySelector('.pos-head .pos-name')?.remove();
+  d.el.prepend(createHero({ tag: 'h1' }).el);
+
+  // Concept groups first, in CONCEPT_GROUPS order (a group only CONCEPTS uses
+  // is added at the end so nothing vanishes), then the use case groups. Each is
+  // one block under the kit's section heading, built when it first gets a card.
+  const order = [...CONCEPT_GROUPS];
+  for (const c of CONCEPTS) { const g = c.group || c.id.split('/')[0]; if (!order.includes(g)) order.push(g); }
+  order.push(...CASE_GROUPS, 'other');
+  const cards = new Map(order.map((g) => [g, []]));
+
+  CONCEPTS.forEach(({ title, say, id, group: shown }) => {
+    // `id` is `<group>/<slug>`, the page's folder under demo/ and its URL.
+    const [folder] = id.split('/');
+    // A row may show under another heading than its folder (`group` in concept-list.mjs).
+    const group = shown || folder;
+    const a = el('a', 'cc-card', '', { href: `/${id}/` });
+    a.append(el('h3', 'cc-t', title));
+    if (say) a.append(el('p', 'cc-s', say));
+    cards.get(group).push(a);
+  });
+
+  // The front page's demos, listed and built rows only, in the manifest's story
+  // order. A row with no entry in DEMO_CARDS lands under `other` rather than
+  // disappearing, and says so in the console.
+  for (const row of DEMOS) {
+    if (!row.built || row.unlisted) continue;
+    const at = DEMO_CARDS[row.name];
+    if (!at) console.warn(`concepts: ${row.name} has no entry in DEMO_CARDS`);
+    const group = at?.group || 'other';
+    const say = at?.say || row.one || '';
+    const href = targetOf(row);
+    const name = row.title || row.name;
+    if (!cards.has(group)) cards.set(group, []);
+    if (CONCEPT_GROUPS.includes(group)) {
+      const a = el('a', 'cc-card cc-demo', '', { href });
+      const h = el('h3', 'cc-t');
+      h.append(el('span', 'cc-n', 'demo'), document.createTextNode(name));
+      a.append(h, el('p', 'cc-s', say));
+      const by = at?.supersededBy && CONCEPTS.find((c) => c.id === at.supersededBy);
+      if (at?.supersededBy && !by) console.warn(`concepts: ${row.name} is superseded by ${at.supersededBy}, which is not in CONCEPTS`);
+      if (by) {
+        // The covering page's name left of the badge, no line of its own.
+        // Asked 2026-10-12: *"rm covers it line, put the name ledt of not
+        // needed badge"*.
+        h.append(el('span', 'cc-by', by.title), el('span', 'cc-off', 'not needed'));
+        a.title = `not needed\n/${by.id}/ shows the same idea`;
+      }
+      cards.get(group).push(a);
+    } else {
+      const a = el('a', 'cc-card cc-case', '', { href });
+      a.append(el('span', 'cc-g', GROUPS.get(row.group) || row.group || ''),
+        el('h3', 'cc-t', name), el('p', 'cc-s', say), el('span', 'cc-u', `/${row.name}/`));
+      cards.get(group).push(a);
+    }
+  }
+
+  for (const [group, list] of cards) {
+    if (!list.length) continue;
+    const g = el('div', 'cc-cards');
+    g.append(...list);
+    d.stack.titled(GROUP_TITLES[group] || group, g);
+  }
+  // No link to /archive/ from here since 2026-10-12 (*"rm arhive link"*); the
+  // page stays at its URL.
+  d.ready();
 </script>
-</html>

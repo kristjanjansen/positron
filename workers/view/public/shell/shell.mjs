@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '53d14dee-125138-78f4';
+export const BUILD = '3cde38ac-131305-25e1';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -78,7 +78,7 @@ export function mount({
   joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
-  indexLabel = 'demos',  // the word after the arrow; `/concepts/<n>/` says `concepts`
+  indexLabel = 'demos',  // the word after the arrow; a concept page at /<group>/<slug>/ says `concepts`
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();

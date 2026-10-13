@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Dot piano</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Two pictures side by side, each half the content width; one under the other on a phone. */
+  .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
+  .cc-pair > * { flex: 1 1 0; min-width: 0; }
+  @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } .cc-pair > * { flex: none; } }
+  .cc-vis { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+  /* The emulated OLED: the panel's dark ink, the 128x64 canvas at a whole number scale in the middle. */
+  .cc-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: #05070c; cursor: pointer; }
+  .pos-vp[data-full] .cc-oled { aspect-ratio: auto; height: 100%; }
+  .cc-oled canvas { display: block; image-rendering: pixelated; }
+  .cc-pico-say { font-size: 12px; color: var(--dim); }
+  /* record is red, the one control that starts writing (shell.css --rec) */
+  .cc-rec { color: var(--rec, #e5484d); }
+  /* The same medium colours as /concepts/misc/000/. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createTransportBar } from '/shell/transport-bar.mjs';
+  import { createStripView } from '/shell/strip.mjs';
+  import { createGlue } from '/shell/glue.mjs';
+  import { setIcon } from '/shell/icon-button.mjs';
+  import { createDeck } from '/timeline/transport.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
+  import { createPicoRunner, parseUF2, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
+  import { drawOled } from '/shell/oled-view.mjs';
+
+  // /synth/recorder/ with the kit's own transport bar and timeline glued together in
+  // place of the hand-made record buttons and notes table. A take is items on a
+  // DECK; the deck plays them back through an adapter that sends each note out of
+  // rec:midi-out. /synth/keyboard/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
+  // keyboard's notes along a link while armed, `rec:midi-out` plays them back
+  // into the synth along another.
+  const S = 'web';
+  const bay = createBay();
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED'], ['knob-volume', 'person', 'knob']]) {
+    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  }
+
+  // ── the synth: one sine per held note, a short fade in and out ──────────
+  let ctx = null, bus = null;
+  const voices = new Map();
+  // The audio graph follows the links: the synth's bus reaches the speakers only
+  // while synth:audio-out -> speaker:audio-in is held.
+  function audio() {
+    if (!ctx) return;
+    bus ??= ctx.createGain();
+    bus.disconnect();
+    if (bay.links().some((l) => l.from === `${S}:synth:audio-out` && l.to === `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
+  }
+
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  function noteOn(n, vel) {
+    if (!ctx) { ctx = new AudioContext(); audio(); }
+    if (voices.has(n)) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = 'sawtooth';
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
+    o.connect(g).connect(bus);
+    o.start();
+    voices.set(n, { o, g });
+  }
+  function noteOff(n) {
+    const v = voices.get(n);
+    if (!v) return;
+    const t = ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
+    v.o.stop(t + 0.06);
+    voices.delete(n);
+  }
+
+  // ── the shader's picture: rings, one per pitch ───────────────────────
+  // In the manner of dotpiano.com. Every pitch has its own ring, low notes inside.
+  // A pen sits at the top and the whole picture turns clockwise under it, so a
+  // held note draws a continuous arc on its ring for as long as it is held. On
+  // release the arc stops growing, carries on turning and fades. The strokes live
+  // here and reach the shader as numbers every frame: a shader cannot hear a note.
+  const MAXS = 48, LIFE = 3000, LO = 48, HI = 67, SPIN = 0.7;   // SPIN in radians a second
+  const strokes = [];              // { n, on, off, vel }
+  const pens = new Map();          // note -> its stroke while held
+  // ── the midi node: generic MIDI STATE, nothing about pictures ──────────
+  // What is sounding and the last value of every controller, sent out of
+  // midi:value-out ON CHANGE, as a copy, to whatever is linked. CC 7 is volume and
+  // starts at 100. The shader keeps the last copy it was handed.
+  const mstate = { notes: new Map(), cc: new Float32Array(128) };
+  mstate.cc[7] = 100 / 127;
+  function midiIn(e) {
+    if (e.cls === 'note') { if (e.d2) mstate.notes.set(e.d1, { vel: e.d2 }); else mstate.notes.delete(e.d1); }
+    else if (e.cls === 'cc') mstate.cc[e.d1] = e.d2 / 127;
+    sendState();
+  }
+  const sendState = () => bay.send(`${S}:midi:value-out`, { notes: new Map(mstate.notes), cc: Float32Array.from(mstate.cc) });
+  const canvas = el('canvas', 'cc-vis');
+  canvas.width = 1280; canvas.height = 720;
+  const gl = canvas.getContext('webgl2');
+  let prog = null, uB = null, uA = null, uN = null, uS = null, uW = null;
+  if (gl) {
+    const vs = `#version 300 es
+      in vec2 p; out vec2 uv;
+      void main() { uv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }`;
+    const fs = `#version 300 es
+      precision highp float;
+      in vec2 uv; out vec4 o;
+      uniform int uN; uniform vec4 uS[${MAXS}]; uniform vec2 uW[${MAXS}]; uniform float uAspect; uniform float uBright;
+      const float TAU = 6.2831853;
+      void main() {
+        vec2 q = (uv - 0.5) * vec2(uAspect, 1.0);
+        float rho = length(q), th = atan(q.x, q.y);          // 0 at the top, clockwise positive
+        vec3 c = vec3(0.0);
+        for (int i = 0; i < ${MAXS}; i++) {
+          if (i >= uN) break;
+          vec4 s = uS[i];                                    // ring radius, start angle, span, alpha
+          float w = uW[i].x;                                 // half the line width
+          float rel = mod(th - s.y, TAU);
+          float inside = step(rel, s.z);
+          float d = abs(rho - s.x);
+          // round ends: distance to each end of the arc
+          vec2 e0 = s.x * vec2(sin(s.y), cos(s.y));
+          vec2 e1 = s.x * vec2(sin(s.y + s.z), cos(s.y + s.z));
+          float dc = min(length(q - e0), length(q - e1));
+          float dist = mix(dc, min(d, dc), inside);
+          float k = smoothstep(w, w * 0.5, dist) * s.w;
+          vec3 hue = 0.55 + 0.45 * cos(TAU * (uW[i].y + vec3(0.0, 0.33, 0.67)));
+          c = max(c, hue * k);
+        }
+        o = vec4(c * uBright, 1.0);
+      }`;
+    const sh = (t, src) => { const x = gl.createShader(t); gl.shaderSource(x, src); gl.compileShader(x); return x; };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog);
+    // Said in the log once the page is mounted, so a shader that did not compile is visible.
+    var shaderSays = gl.getProgramParameter(prog, gl.LINK_STATUS) ? 'the shader compiled'
+      : `the shader did not compile: ${gl.getProgramInfoLog(prog)}`;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    uB = gl.getUniformLocation(prog, 'uBright'); uA = gl.getUniformLocation(prog, 'uAspect'); uN = gl.getUniformLocation(prog, 'uN'); uS = gl.getUniformLocation(prog, 'uS'); uW = gl.getUniformLocation(prog, 'uW');
+  }
+  // TWO NODES. `midi` keeps generic MIDI state and sends it once a frame out of
+  // midi:value-out when it changes. `shader` keeps whatever arrived last on shader:value-in, keeps its
+  // own strokes from the notes in it, and turns CC 7 into brightness. It never
+  // sees an event. Cut the value link and the picture freezes.
+  let latest = null;               // the last state shader:value-in was handed
+  function frame(now) {
+    if (latest) {
+      for (const [n, v] of latest.notes) if (!pens.has(n)) {
+        const st = { n, on: now, off: null, vel: v.vel };
+        strokes.push(st); pens.set(n, st);
+        if (strokes.length > MAXS) strokes.shift();
+      }
+      for (const [n, st] of pens) if (!latest.notes.has(n)) { st.off = now; pens.delete(n); }
+    }
+    while (strokes.length && strokes[0].off != null && now - strokes[0].off > LIFE) strokes.shift();
+    if (gl && prog && latest) {
+      const sv = new Float32Array(MAXS * 4), wv = new Float32Array(MAXS * 2);
+      const turn = (t) => (t / 1000) * SPIN;                // how far the picture has turned at time t
+      strokes.forEach((st, i) => {
+        const end = st.off ?? now;
+        const span = Math.min(turn(end) - turn(st.on), 2 * Math.PI - 0.05);
+        // The pen is at the top (angle 0). A point drawn at time t sits turn(now) - turn(t)
+        // clockwise of the pen now, so the arc runs from the end of the note back to its start.
+        const start = turn(now) - turn(end);
+        const r = 0.05 + 0.37 * (st.n - LO) / (HI - LO);
+        const alpha = st.off == null ? 1 : Math.max(0, 1 - (now - st.off) / LIFE);
+        sv.set([r, start, Math.max(span, 0.0001), alpha], i * 4);
+        wv.set([0.004 + 0.006 * st.vel / 127, (st.n % 12) / 12], i * 2);
+      });
+      // The backing store follows the box it is shown in, so a ring is round in
+      // whatever shape the panel gives the canvas, and sharp in full screen.
+      const w = Math.round(canvas.clientWidth * devicePixelRatio), h = Math.round(canvas.clientHeight * devicePixelRatio);
+      if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h; }
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(prog);
+      gl.uniform1f(uA, canvas.width / canvas.height); gl.uniform1f(uB, latest.cc[7]);
+      gl.uniform1i(uN, strokes.length); gl.uniform4fv(uS, sv); gl.uniform2fv(uW, wv);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ── the Pico: the same rings drawn by C firmware on an emulated RP2040 ──────
+  // rig/pico/rings/main.c, built to /resources/pico/rings-pico.uf2 and run in
+  // rp2040js in a worker. pico:midi-in turns each event back into MIDI bytes and
+  // feeds them to UART0 RX, which is GP1, the DIN in. The firmware draws on its
+  // SSD1306 and every new screen comes back as 128x64 ones and zeros.
+  // ⚠️ NOTHING IS FETCHED ON A VISIT. The worker and the UF2 wait for the first
+  // key, knob or press of the panel; bytes that arrive meanwhile are kept and
+  // sent once it has booted.
+  const PICO_UF2 = '/resources/pico/rings-pico.uf2';
+  const pico = { state: 'off', runner: null, queue: [], frames: 0, px: null, bytes: 0 };
+  const oledCv = document.createElement('canvas');
+  oledCv.width = OLED_W; oledCv.height = OLED_H;
+  drawOled(oledCv, new Uint8Array(OLED_W * OLED_H));
+  const oledBox = el('div', 'cc-oled');
+  oledBox.title = 'press to start the Pico';
+  oledBox.append(oledCv);
+  // A whole number scale, so every panel pixel is the same size on screen.
+  new ResizeObserver(() => {
+    const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / OLED_W, oledBox.clientHeight / OLED_H)));
+    oledCv.style.width = `${k * OLED_W}px`; oledCv.style.height = `${k * OLED_H}px`;
+  }).observe(oledBox);
+  // The footer's middle says the screen's resolution, and only says otherwise while it loads or if it failed.
+  const picoSays = el('span', 'cc-pico-say', '128\u00d764');
+  const showing = () => bay.links().some((l) => l.from === `${S}:pico:video-out` && l.to === `${S}:oled:video-in`);
+  async function picoStart() {
+    if (pico.state !== 'off') return;
+    pico.state = 'loading'; picoSays.textContent = 'loading';
+    try {
+      const res = await fetch(PICO_UF2);
+      if (!res.ok) throw new Error(`${PICO_UF2} answered ${res.status}`);
+      const image = parseUF2(await res.arrayBuffer());
+      pico.runner = createPicoRunner({ onFrame: (px) => {
+        pico.frames++; pico.px = px;
+        if (showing()) drawOled(oledCv, px);
+      } });
+      pico.runner.boot(image);
+      pico.state = 'running'; picoSays.textContent = '128\u00d764'; oledBox.title = '';
+      d.log(`the Pico booted rings-pico.uf2, ${image.length.toLocaleString('en')} bytes of flash`);
+      if (pico.queue.length) { pico.runner.send(pico.queue); pico.queue = []; }
+    } catch (e) {
+      pico.state = 'failed'; picoSays.textContent = 'failed';
+      d.log(`the Pico did not start: ${e.message}`, 'bad');
+    }
+  }
+  oledBox.addEventListener('pointerdown', () => picoStart());
+  // One bay event to MIDI bytes on channel 1: note on 0x90, note off 0x80, CC 0xB0.
+  function picoIn(e) {
+    const b = e.cls === 'note' ? (e.d2 ? [0x90, e.d1, e.d2] : [0x80, e.d1, 0]) : e.cls === 'cc' ? [0xB0, e.d1, e.d2] : null;
+    if (!b) return;
+    pico.bytes += b.length;
+    if (pico.state === 'running') pico.runner.send(b);
+    else if (pico.state !== 'failed') { pico.queue.push(...b); picoStart(); }
+  }
+
+  let kb = null;
+  const PORTS = [
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
+    // The volume knob is a node of its own, as on /synth/sound-design/: a turn is one CC 7
+    // out of its own port, so its cable is the one that pulses.
+    { id: `${S}:knob-volume:midi-out`, dir: 'out', medium: 'midi', emits: ['cc'] },
+    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
+      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
+    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
+      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
+    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
+    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
+    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
+      deliver: (e) => take(e) },
+    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: `${S}:midi:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
+      deliver: (e) => midiIn(e) },
+    { id: `${S}:midi:value-out`, dir: 'out', medium: 'value' },
+    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value',
+      deliver: (e) => { latest = e; } },
+    { id: `${S}:shader:video-out`, dir: 'out', medium: 'video' },
+    { id: `${S}:screen:video-in`, dir: 'in', medium: 'video' },
+    { id: `${S}:pico:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
+      deliver: (e) => picoIn(e) },
+    { id: `${S}:pico:video-out`, dir: 'out', medium: 'video' },
+    { id: `${S}:oled:video-in`, dir: 'in', medium: 'video' },
+  ];
+  for (const p of PORTS) bay.addPort(p);
+
+  const d = mount({ name: 'Dot piano', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('synth/dot-piano');
+
+  // ── the links, rebuilt whenever an effect changes ─────────────────────
+  function patch() {
+    for (const l of bay.links()) bay.unlink(l.id);
+    // The keys send notes only, since the volume knob has its own node, so the
+    // synth and the recorder take them with no transform on the link.
+    const want = [[`${S}:keys:midi-out`, `${S}:synth:midi-in`, []]];
+    // The recorder hears the keys; it plays back into the synth on a link of its own.
+    want.push([`${S}:keys:midi-out`, `${S}:rec:midi-in`, []], [`${S}:rec:midi-out`, `${S}:synth:midi-in`, []]);
+    want.push([`${S}:synth:audio-out`, `${S}:speaker:audio-in`, []]);
+    // The shader hears the same notes as the synth, from the keys and from the
+    // recorder, and its picture goes to the screen on this page.
+    want.push([`${S}:keys:midi-out`, `${S}:midi:midi-in`, []], [`${S}:rec:midi-out`, `${S}:midi:midi-in`, []],
+      [`${S}:midi:value-out`, `${S}:shader:value-in`, []],
+      [`${S}:shader:video-out`, `${S}:screen:video-in`, []]);
+    // The Pico hears the same notes, and its screen is the panel on the right.
+    want.push([`${S}:keys:midi-out`, `${S}:pico:midi-in`, []], [`${S}:rec:midi-out`, `${S}:pico:midi-in`, []],
+      [`${S}:pico:video-out`, `${S}:oled:video-in`, []]);
+    // The volume knob's CC 7 reaches the midi state (the shader's brightness) and
+    // the Pico, whose firmware reads CC 7 as its brightness too (rig/pico/rings/main.c).
+    want.push([`${S}:knob-volume:midi-out`, `${S}:midi:midi-in`, []], [`${S}:knob-volume:midi-out`, `${S}:pico:midi-in`, []]);
+    for (const [a, b, tr] of want) {
+      const r = bay.link(a, b, tr, { site: S });
+      if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    }
+    for (const n of [...voices.keys()]) noteOff(n);
+    audio();
+    pb.refresh();
+    sendState();                   // a new link hears the current state once, then only changes
+   
+  }
+
+  // ── the recorder: a deck, its bar and its strip ─────────────────────────
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
+  const TAKE_MS = 20000;
+  let armed = false, nid = 0;
+  const notes = [];                // { n, vel, at, len } for the strip
+  const open = new Map();          // note -> its row, until the key comes up
+
+  // Playback: the deck fires each item at its position; the adapter sends it out
+  // of rec:midi-out, where the bay's link takes it to the synth.
+  const adapter = {
+    caps: { rates: [1], continuous: false },
+    actuate(payload) {
+      if (armed) return;           // a note scheduled while recording already sounded from the keys
+      bay.send(`${S}:rec:midi-out`, { cls: 'note', ch: 1, d1: payload.n, d2: payload.vel });
+     
+    },
+    reduce() { return {}; },
+    assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
+  };
+  const deck = createDeck({ items: [], adapters: { note: adapter }, range: [0, TAKE_MS] });
+  const pos = () => deck.transport.position();
+
+  function take(e) {
+    if (!armed) return;
+    const at = pos();
+    deck.sched.schedule({ at, kind: 'note', id: `n${nid++}`, payload: { n: e.d1, vel: e.d2 } });
+    if (e.d2) { const r = { n: e.d1, vel: e.d2, at, len: null }; notes.push(r); open.set(e.d1, r); }
+    else { const r = open.get(e.d1); if (r) { r.len = at - r.at; open.delete(e.d1); } }
+  }
+  function record() {
+    deck.pause();
+    deck.sched.clear();
+    notes.length = 0; open.clear();
+    deck.seek(0);
+    armed = true;
+    deck.play();
+    face();
+  }
+  function stopRecording() {
+    armed = false;
+    deck.pause();
+    face();
+  }
+  function face() {
+    const b = bar.extra?.('rec');
+    if (!b) return;
+    // the bar's extras take a label, and `extra(id)` hands back the button for
+    // a page to re-face, so the icon goes on here and the bar is unchanged
+    setIcon(b, armed ? 'stop' : 'record', armed ? 'stop recording' : 'record');
+    b.classList.toggle('cc-rec', !armed);
+  }
+
+  const glue = el('div');
+  const bar = createTransportBar(glue, deck, {
+    scrub: false, loop: false, live: false,
+    extras: [{ id: 'rec', label: '', aria: 'record', title: 'record', onPress: () => (armed ? stopRecording() : record()) }],
+  });
+  const strip = createStripView(glue, deck, {
+    size: 'auto', follow: true, gutter: 120,
+    lanes: [
+      { id: 'take', kind: 'note', label: 'take', height: 72, width: 2, as: 'ticks', terse: true,
+        rows: () => notes.map((r, i) => ({ at: r.at, id: `t${i}`, kind: 'note', payload: r })),
+        describeRow: (r) => [nameOf(r.payload.n), `vel ${r.payload.vel}`] },
+    ],
+  });
+  const surface = createGlue(bar.el, strip.surface);
+  face();
+
+  // ── the links as a picture, with the links and ports behind its details ──
+  // A MIDI wire pulses once per event its link delivered; an audio wire is lit
+  // while a voice sounds, a video wire always, because both pictures redraw every frame.
+  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voices.size > 0 });
+
+  // A key press is one event leaving keys:midi-out, sent through the bay.
+  const host = el('div');
+  // C3 to G4, 12 white keys: as many as fit inside the instrument panel's inset at 49 px.
+  kb = createKeyboard(host, {
+    ...keyRange(19), base: 48,
+    onDown: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+
+  patch();
+  d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
+  // The knobs, in their own row above the keyboard, as on /synth/sound-design/.
+  // Volume sends CC 7 out of web:knob-volume:midi-out; on this page it brightens
+  // both pictures and sounds nothing.
+  const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100, hand: true,
+    onInput: (v) => { bay.send(`${S}:knob-volume:midi-out`, { cls: 'cc', ch: 1, d1: 7, d2: Math.round(v) }); } });
+  const knobs = createKnobGrid(new Map([['volume', volume]]), { row: true });
+  const instrument = createInstrumentPanel({ keys: host, plate: false });
+  // Each panel names the device that draws it on the left and its resolution in the middle.
+  const glRes = el('span', 'cc-pico-say', '');
+  const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-pico-say', 'Browser GPU'), centre: glRes });
+  const picoPanel = createVideoPanel({ media: oledBox, left: el('span', 'cc-pico-say', 'Pico (emulated)'), centre: picoSays });
+  setInterval(() => { const t = `${canvas.width}\u00d7${canvas.height}`; if (glRes.textContent !== t) glRes.textContent = t; }, 500);
+  const pair = el('div', 'cc-pair');
+  pair.append(panel.el, picoPanel.el);
+  // Blocks in the shell's stack, at the shell's gap. The pair is one block.
+  d.stack.add(pair, surface, knobs.el, instrument.el, pb.el);
+  window.__demo.pico = pico;
+  window.__demo.knobs = knobs;
+  window.__demo.bay = bay;
+  d.ready();
+</script>

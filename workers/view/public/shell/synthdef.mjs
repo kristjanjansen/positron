@@ -255,7 +255,7 @@ export function graph(name) {
   }
   /**
    * The same, to an output bus other than 0. Added 2026-10-12 for
-   * `/concepts/rhythm/`'s four drums, each on a stereo pair of its own so a
+   * the `/rhythm/` concept pages' four drums, each on a stereo pair of its own so a
    * page can split the engine's output into one scope per drum. A bus past the
    * engine's output channels is an INPUT bus (scsynth numbers outputs first),
    * so the caller boots the engine with enough outputs for it.
