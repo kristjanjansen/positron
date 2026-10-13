@@ -42,7 +42,7 @@ export const CONCEPTS = [
   { n: 'remote/020', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
   { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
   { n: 'remote/040', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
-  { n: 'remote/050', title: 'Shader on Pi', say: 'The mirror shader here and on a Pi in another building, each change timed to its first frame.' },
+  { n: 'remote/050', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ is the Filter page since 2026-10-13.
@@ -60,7 +60,7 @@ export const CONCEPTS = [
   { n: 'video/060', title: 'LL-HLS loopback', say: 'Your camera to Cloudflare Stream and back as LL-HLS beside the original, with the delay timed.' },
   { n: 'video/050', title: 'MoQ loopback', say: 'Your camera over MoQ to Cloudflare\'s relay and back beside the original, with the delay timed.' },
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
-  { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ with one knob for its mirrors, and code that recompiles as you edit.' },
+  { n: 'shader/000', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
   { n: 'room/000', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },
