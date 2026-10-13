@@ -1017,6 +1017,11 @@ export const DEMOS = [
   { name: 'kit/frontpage', title: 'frontpage', group: 'kit', act: 0, created: '2026-10-12', built: true, unlisted: true,
     one: 'the two faces this site is set in, JetBrains Mono for what names and Geist for what is read through',
     tags: ['shell', 'no network'] },
+  // The fourteenth part, 2026-10-13: *"Build frontpage og card and apply to all
+  // pages"*, drawn with no browser (*"What headless chrome?!!? See ../eccm etc"*).
+  { name: 'kit/share', title: 'share', group: 'kit', act: 0, created: '2026-10-13', built: true, unlisted: true,
+    one: 'the card every page is shared with, the front page’s hero over its patchbay, as the PNG the build makes and the SVG it is made from',
+    tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
   // title is on footer on 1/2 w it replaces page count and becomes link to
