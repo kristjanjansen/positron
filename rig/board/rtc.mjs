@@ -313,6 +313,14 @@ export function createMainDirect({ PeerConnection = null, signal, handle, frame,
       for (let o = 0; o < int16.length; o += unit) rtc.pcm(int16.subarray(o, o + unit));
     },
     sweep() { rtc?.sweep(); },
+    /**
+     * A listed extra channel a peer has opened (`channels` above), or null.
+     * Since 2026-10-13, for the shader picture's `vid` channel on
+     * /concepts/remote/050/ (board.mjs `video.direct`). `has` says whether the
+     * peer exists at all, so a caller can wait for a channel still opening.
+     */
+    channel: (peer, label) => rtc?.peers.get(peer)?.ch?.[label] ?? null,
+    has: (peer) => !!rtc?.peers.has(peer),
     status: () => (rtc ? rtc.status() : null),
     get size() { return rtc ? rtc.size : 0; },
     close() { rtc?.close(); },

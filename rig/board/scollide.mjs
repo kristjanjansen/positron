@@ -142,7 +142,8 @@ export const STRUCTURAL = Object.freeze(['Control', 'LagControl', 'BinaryOpUGen'
 // they are UnaryOpUGen, already structural.
 export const ALLOWED_CLASSES = Object.freeze(new Set([...STRUCTURAL,
   'SinOsc', 'Saw', 'Pulse', 'LFSaw', 'LFTri', 'LFNoise1', 'WhiteNoise', 'LPF', 'HPF', 'RLPF', 'Pan2', 'EnvGen',
-  'GrainBuf', 'BufWr', 'Phasor', 'SendReply', 'Impulse', 'Dust', 'TRand', 'In', 'BufFrames', 'BufDur']));
+  'GrainBuf', 'BufWr', 'Phasor', 'SendReply', 'Impulse', 'Dust', 'TRand', 'In', 'BufFrames', 'BufDur',
+  'DelayC', 'LocalIn', 'LocalOut']));
 /**
  * 🔴 BufWr WRITES INTO A BUFFER, AND ON THE SAMPLER'S SERVER THE BUFFERS ARE
  * THE PIANO. On `ENGINES.own` nothing allocates a buffer for a page (there is

@@ -29,7 +29,7 @@ import { createCollideService } from './scollide.mjs';
 import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
-import { createCameraRoom } from './camera.mjs';
+import { createCameraRoom, framePieces } from './camera.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
 import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
@@ -340,13 +340,57 @@ function videoConnect() {
  * without parsing NAL types.
  */
 function sendFrame(unit, key) {
-  if (vws?.readyState !== 1) return;
+  // The direct viewers first (`video.direct` below), then the relay room. The
+  // counter rises once per frame whoever it reaches, so a viewer switching
+  // path sees one counter.
+  const at = vseq;
+  if (videoDirects.size) sendVideoDirect(at, unit, key);
+  if (vws?.readyState !== 1) { if (videoDirects.size) vseq++; return; }
   const out = Buffer.allocUnsafe(8 + unit.byteLength);
   out.writeUInt32LE(vseq++, 0);
   out.writeUInt32LE(key ? 1 : 0, 4);
   Buffer.from(unit.buffer, unit.byteOffset, unit.byteLength).copy(out, 8);
   vws.send(out);
   vsent++;
+}
+
+// ── the picture on a direct link, since 2026-10-13 ───────────────────────────
+// Asked: *"add direct option to all remote instruments"*, which includes
+// /concepts/remote/050/ Shader on Pi. The same arrangement as the Pi camera on
+// remote/010 (camera.mjs `attachDirect`, inputs.mjs `camDirect`): a third data
+// channel `vid` on the page's direct link to this main socket, ORDERED and
+// RELIABLE (a decoder fed a frame with a hole is broken to the next keyframe),
+// each frame cut into 16 KB pieces by `framePieces`. Nothing is sent on `vid`
+// until the page asks `video.direct` over `ctl`; `video.relay` or a closed
+// channel stops it. The relay room keeps its frames for every other viewer.
+// ⚠️ NO KEY HERE, UNLIKE THE CAMERA: the shader picture is already open to
+// anybody in `<room>-video`, so the direct link carries nothing the relay
+// would not.
+const videoDirects = new Map();   // peer -> { sink, waitKey, sent, dropped }
+const VIDEO_DIRECT_BACKLOG = 1024 * 1024;
+function sendVideoDirect(at, unit, key) {
+  for (const [peer, x] of videoDirects) {
+    let open = false;
+    try { open = x.dc.isOpen(); } catch { /* closed under us */ }
+    if (!open) { videoDirects.delete(peer); log(`video: ${peer} back on the relay, its channel closed, after ${x.sent} direct frames`); continue; }
+    let backlog = 0;
+    try { backlog = x.dc.bufferedAmount(); } catch { /* */ }
+    if (backlog > VIDEO_DIRECT_BACKLOG) x.waitKey = true;
+    if (x.waitKey) { if (!key) { x.dropped++; continue; } x.waitKey = false; }
+    try { for (const b of framePieces(at, key, unit)) x.dc.sendMessageBinary(b); x.sent++; }
+    catch (e) { videoDirects.delete(peer); log(`video: ${peer} back on the relay, a send failed, ${e.message}`); }
+  }
+}
+/** `video.direct` over `ctl`: attach the peer's `vid` channel, waiting up to 500 ms for it to arrive. */
+function videoDirect(reply, peer, waited = 0) {
+  if (!peer) return reply('video.direct', { ok: false, why: 'the picture goes direct only over a direct link, never through this room' });
+  const dc = mainDirect?.channel(peer, 'vid');
+  if (!dc && waited < 500 && mainDirect?.has(peer)) { setTimeout(() => videoDirect(reply, peer, waited + 25), 25); return undefined; }
+  if (!dc) return reply('video.direct', { ok: false, why: 'open the vid channel first', retry: true });
+  if (!videoDirects.has(peer) && videoDirects.size >= 4) return reply('video.direct', { ok: false, why: '4 direct viewers already, use the relay' });
+  videoDirects.set(peer, { dc, waitKey: true, sent: 0, dropped: 0 });
+  log(`video: frames go direct to ${peer}, ${videoDirects.size} direct`);
+  return reply('video.direct', { ok: true, running: !!video });
 }
 
 /**
@@ -1873,8 +1917,14 @@ mainDirect = createMainDirect({
   handle: (m, reply, peer) => {
     const from = typeof m.from === 'string' ? m.from : `rtc-${peer}`;
     clientSeen.set(from, Date.now());
+    // The shader picture on this peer's `vid` channel (sendFrame above). Over
+    // `ctl` only, because only `ctl` knows which peer asked.
+    if (m.type === 'video.direct') return videoDirect(reply, peer);
+    if (m.type === 'video.relay') { videoDirects.delete(peer); return reply('video.relay', { ok: true }); }
     return handle({ ...m, from }, reply);
   },
+  channels: ['vid'],
+  onChannelClosed: (p, label) => { if (label === 'vid' && videoDirects.delete(p.id)) log(`video: ${p.id} back on the relay, its channel closed`); },
 });
 setCaptureUnit((u) => mainDirect.unit(u));
 const hwInputs = createInputs({
