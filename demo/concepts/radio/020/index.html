@@ -66,9 +66,12 @@
   // two MP3: nothing below reads the extension or the content type, and
   // decodeAudioData sniffs the bytes.
   const STATIONS = [
-    { id: 'raadio2', label: 'Raadio 2', key: 'radio/raadio2/2026-10-11.mp3' },
-    { id: 'raadio4', label: 'Raadio 4', key: 'radio/raadio4/2026-10-11.mp3' },
-    { id: 'ida', label: 'Ida', key: 'radio/ida/2026-10-11.aac' },
+    // Named as recordings, so none is taken for the live station (asked
+    // 2026-10-13, *"when you have radio recordings, suffix patch names with
+    // '... recording'"*). /concepts/radio/030/ plays them live and keeps the plain names.
+    { id: 'raadio2', label: 'Raadio 2 recording', key: 'radio/raadio2/2026-10-11.mp3' },
+    { id: 'raadio4', label: 'Raadio 4 recording', key: 'radio/raadio4/2026-10-11.mp3' },
+    { id: 'ida', label: 'Ida recording', key: 'radio/ida/2026-10-11.aac' },
   ];
   const asked = new URLSearchParams(location.search).get('src');
   const srcOf = (st) => asked || `${MEDIA}${st.key}`;
@@ -88,7 +91,7 @@
   // `audio-out` feeds the wave, the speakers and the detector.
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${CF}:${st.id}`, kind: 'store', label: `${st.label}, recorded`, place: 'cloudflare', net: 'cloudflare' });
+    bay.addNode({ id: `${CF}:${st.id}`, kind: 'store', label: st.label, place: 'cloudflare', net: 'cloudflare' });
     bay.addPort({ id: FILE_OUT(st), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: srcOf(st) });
   }
   bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });

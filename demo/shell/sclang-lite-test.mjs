@@ -71,6 +71,11 @@
 //   the per class rates ignored                              103/105, GrainBuf.kr
 //                                                            and BufFrames.ar
 //
+// Then `.sin` and `.cos` for the ring's wet and dry, 106 ok, and two more:
+//
+//   their opcodes swapped                                    105/106, that check
+//   their folds swapped                                      105/106, that check
+//
 // ⚠️ WHAT NONE OF THEM CAN SEE: whether scsynth agrees. Opcode 0 for `*` is a
 // well formed file that loads and plays, louder; only the page's own meter
 // under a changed `amp` can tell a multiply from an add
@@ -431,6 +436,20 @@ const { KEYED } = M;
   ok('a number % a number folds the way sc_mod does, so -0.25 % 1 is 0.75, and -4.sqrt is -2 as sc_sqrt has it',
     s0 && inp(d, s0.inputs[0]) === 225 && byName(d, 'BinaryOpUGen').some((b) => inp(d, b.inputs[1]) === 2),
     s0 ? `freq ${inp(d, s0.inputs[0])}, ${byName(d, 'BinaryOpUGen').map((b) => ins(d, b).join('*')).join(' ')}` : 'no SinOsc');
+}
+{
+  // `UnaryOpUGens.cpp`'s enum counted from opNeg 0: opSin 28, opCos 29. A
+  // number folds; a signal is a block with that special index.
+  const { d } = def("{ |mix = 0.5| SinOsc.ar(300 * (0.5pi).sin) * (mix * 0.5pi).sin + (WhiteNoise.ar * (mix * 0.5pi).cos) * 0.1 }");
+  const s0 = d && byName(d, 'SinOsc')[0];
+  // Which unary multiplies which: the SinOsc is scaled by the .sin, the noise by the .cos.
+  const scaleOf = (cls) => {
+    const m = d && byName(d, 'BinaryOpUGen').find((b) => ins(d, b)[0] === `${cls}:0` && ins(d, b)[1].startsWith('UnaryOpUGen'));
+    return m ? d.blocks[m.inputs[1].from].special : null;
+  };
+  const un = `${scaleOf('SinOsc')} ${scaleOf('WhiteNoise')}`;
+  ok('NEGATIVE CONTROL: .sin is opSin 28 and .cos opCos 29, and a number folds, so (0.5pi).sin is 1',
+    s0 && inp(d, s0.inputs[0]) === 300 && un === '28 29', `freq ${s0 ? inp(d, s0.inputs[0]) : '?'}, sin then cos ${un}`);
 }
 {
   const { r } = def("{ GrainBuf.ar(2, Impulse.ar(10), 0.1, 0, 1, 0.5) }");

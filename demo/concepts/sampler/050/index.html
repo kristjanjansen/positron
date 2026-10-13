@@ -36,6 +36,31 @@
 
   const sentence = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+  // The knobs: the numbers the twelve patches set that a person can turn and
+  // hear the same way in every patch (asked 2026-10-13, *"expose them"*).
+  // LEFT OUT, and why: `scan` is a speed, a place or a lag depending on the
+  // patch's mode, so one knob would mean three things; the modes, the chord
+  // (`gates`, `pitches`), the figure (`pattern`, `elen`) and `contour` are
+  // choices, not amounts, and a glide between two of them is nothing; `sos`
+  // also decides how much the ring keeps recording; the spectral, tap and
+  // reverb settings are written whole by `writeContinuous` on every landing
+  // and cannot be held back for a knob to glide them (it has no `skip` for
+  // them), so a knob on one would jump and then glide.
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const CONTROLS = [
+    { name: 'size', label: 'size', kind: 'knob', min: 0.02, max: 4, warp: 'exp', fmt: (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`) },
+    { name: 'rate', label: 'density', kind: 'knob', min: 0.5, max: 64, warp: 'exp', fmt: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` },
+    { name: 'spray', label: 'spray', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'drive', label: 'drive', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'crush', label: 'crush', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'noise', label: 'noise', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'wow', label: 'wow', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+  ];
+  const NAMES = CONTROLS.map((c) => c.name);
+  // Where each knob's number goes: the two granulators' `m`/`n` pair for the
+  // grain settings, the effect's own command for the rest.
+  const GRAIN = new Set(['size', 'rate', 'spray']);
+
   // ── Pappus, behind the rig's engine contract ─────────────────────────────
   let eng = null, ctx = null, modulator = null, cur = null, routed = new Set();
   // The write head of Pappus's ring, on the audio clock. `wphase` is a Phasor
@@ -97,25 +122,29 @@
       setInterval(() => { if (runFrom == null) return; modulator.sense(feats.read()); modulator.tick(); }, 1000 / MOD_HZ);
       return { meter: eng.meter, out: eng.out, timing: T, scsynth: eng };
     },
-    // A patch is landed whole (radio-gran.mjs's two halves, in /videoradio/'s
-    // order: the discrete half, every base, the routes, then the continuous
-    // half with the routed ones left to the modulator).
-    land(i) {
-      cur = { ...PATCHES[i] };
+    // A patch lands in /videoradio/'s order (radio-gran.mjs's two halves: the
+    // discrete half, every base, the routes, then the continuous half with
+    // the routed ones left to the modulator), EXCEPT the knobs' numbers: those
+    // stay where the knobs are now and glide to the patch over their wires.
+    land(i, now) {
+      cur = { ...PATCHES[i], ...Object.fromEntries(NAMES.map((n) => [n, now[n]])) };
       writeDiscrete(eng, cur, { bufSeconds: BUF_SECONDS });
       for (const [k, v] of Object.entries(basesOf(cur))) modulator.setBase(k, v);
       const routes = routesOf(cur);
       modulator.setRoutes(routes);
       routed = new Set(routes.map((r) => r.dest));
-      writeContinuous(eng, continuousOf(cur), { scanmode: cur.scanmode, bufSeconds: BUF_SECONDS, skip: routed });
+      writeContinuous(eng, continuousOf(cur), { scanmode: cur.scanmode, bufSeconds: BUF_SECONDS, skip: new Set([...routed, ...NAMES]) });
     },
     // Pappus's own `size` (a grain's length in seconds) and `rate` (grains a
     // second), the two numbers that mean the same thing in all twelve patches;
     // `scan` is a speed, a place or a lag depending on the patch. A routed one
     // is the modulator's: move its base and it moves around the new number.
     knob(name, v) {
+      if (!cur) return;
       cur[name] = v;
-      if (routed.has(name)) modulator.setBase(name, v); else both(name, v);
+      if (routed.has(name)) modulator.setBase(name, v);
+      else if (GRAIN.has(name)) both(name, v);
+      else setParam(eng, MOD_CMD[name] ?? name, v);
     },
     run(on) {
       eng.send('/n_run', PAPPUS_NODE, on ? 1 : 0);
@@ -123,16 +152,19 @@
       if (!on && runFrom != null) { ranFor += ctx.currentTime - runFrom; runFrom = null; }
     },
     async read(name) {
-      const c = `m${name}`;
+      const c = GRAIN.has(name) ? `m${name}` : (MOD_CMD[name] ?? name);
       const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === c, 3000, '/s_get', PAPPUS_NODE, c);
       return r ? Number(r[3]) : null;
     },
+    // The patch's routes move these round the knob's number (pappus-mod.mjs).
+    moving: () => [...routed],
     glitches: () => { try { return eng?.sonic.getMetrics?.()?.glitchCount ?? null; } catch { return null; } },
   };
 
   const rig = createGrainRig({
     d, engine,
-    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, size: p.size, rate: p.rate })),
+    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, set: Object.fromEntries(NAMES.map((n) => [n, p[n]])) })),
+    controls: CONTROLS,
   });
   await rig.ready();
 </script>
