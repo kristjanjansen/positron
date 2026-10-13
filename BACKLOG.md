@@ -1,4 +1,5 @@
 ## Open
+- **Grain landscape: drop the knobs that change nothing you can see** (2026-10-13). Asked: *"do testing on http://127.0.0.1:8890/concepts/shader/020/ params. when no visual impact or absolutely mininak, remove"*. Measure each of the 35 knobs' effect on the picture; remove those with none or almost none (their value stays fixed at the look's own).
 - ~~**Grain landscape: the invisible hand on its knobs**~~ (DONE) (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/shader/020/ - andd inivisible hand for knobs"*. `hand: true` on every knob, as the other concept pages have.
 - ~~**Loopbacks: protocol names in the footers, not over the pictures**~~ (2026-10-13). Asked: *"rm labels on top of videos in loopback demos. move them to videopanel fooers"*. DONE by the session: WebRTC, LL-HLS and MoQ are the first word of each returned picture's footer.
 - ~~**Tuner: no labels on the dial**~~ (2026-10-13). Asked: *"rm labels"* on shots of radio/010's dial (531, 1602, Viker, Ida). DONE by the session: no end numbers, no station names.
