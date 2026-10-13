@@ -74,6 +74,14 @@
   .cc-case .cc-g { font: 400 12px var(--mono); color: var(--cc-case); }
   .cc-case .cc-t { font-size: 17px; }
   .cc-case .cc-u { margin-top: auto; font: 400 12px var(--mono); color: var(--dim2); }
+  /* The wordmark sits on the Feedback row (see the script), so the hero starts
+     at its headline; the space above the row is a little less than a demo
+     page's, asked 2026-10-13 (*"Keep top whitespace, perhaps bit less"*). */
+  .pos-title .pos-hero-eye { margin: 0; flex: 1 1 auto; }
+  .pos-hero.pos-hero-index { padding-top: 8px; }
+  .pos-hero-index .pos-hero-h { margin-top: 0; }
+  .pos-head.pos-index { margin-top: 20px; }
+  @media (min-width: 600px) { .pos-head.pos-index { margin-top: 28px; } }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -90,8 +98,15 @@
   // THE HERO, LARGE on top, the block /kit/frontpage/ shows (demo/shell/hero.mjs),
   // one copy for both. Its headline is this page's h1, so the shell's own title
   // goes and the Feedback button keeps the title row to itself.
-  document.querySelector('.pos-head .pos-name')?.remove();
-  d.el.prepend(createHero({ tag: 'h1' }).el);
+  const hero = createHero({ tag: 'h1' });
+  d.el.prepend(hero.el);
+  // The wordmark takes the title's place, on the Feedback button's row and
+  // centred on it (asked 2026-10-13: *"Feedback same h as sitename, v align.
+  // Keep top whitespace, perhaps bit less"*).
+  const nameEl = document.querySelector('.pos-head .pos-name');
+  const eye = hero.el.querySelector('.pos-hero-eye');
+  if (nameEl && eye) nameEl.replaceWith(eye);
+  hero.el.classList.add('pos-hero-index');
 
   // Concept groups first, in CONCEPT_GROUPS order (a group only CONCEPTS uses
   // is added at the end so nothing vanishes), then the use case groups. Each is
