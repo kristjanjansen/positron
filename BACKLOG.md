@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Front page footer: make it fit the rest, mono labels; the copyright does not fit**~~ (2026-10-13, DONE). Asked: *"it kina does not fit to rest, work on in. mono labels?"*, *"also copyriht stuff does not fit"*. Labels as the group headings, values as card lines, the wordmark and year in mono in place of ©.
+
 - ~~**Front page footer: smaller, no underline, more space before it**~~ (2026-10-13, DONE). Asked: *"too big lower texts. no underline"*, *"add moore space before it"*. 13 px, labels 12, a link lights on hover, 140 px above.
 
 - ~~**Front page footer: no line, Geist, nicer**~~ (2026-10-13, DONE). Asked: *"no line. geist. nicer"*. Three labelled cells (Write, Instagram, positron.studio © year), no rule, underline turns yellow on hover.
