@@ -76,7 +76,7 @@
   const d = mount({
     name: 'Collide here and on the Pi', what: '', index: '/concepts/', indexLabel: 'concepts',
     // The four cells under the title, the log alone at the foot (*"readings on
-    // top"*), as /concepts/sampler/030/ does.
+    // top"*), as /concepts/remote/030/ does.
     joined: false,
     readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms' },
   });
@@ -96,7 +96,7 @@
   // through `/shell/board-collide.mjs`; a key is `note.on {node: 'collide'}`
   // and a knob `sc.set`. The board compiles the TEXT with the same compiler
   // and says `same: true` when its bytes are this tab's. `?path=direct`
-  // offers the direct path, as /concepts/sampler/030/ does.
+  // offers the direct path, as /concepts/remote/030/ does.
   // ⚠️ THE BOARD ON THIS PAGE TODAY IS THE STAND-IN: `?relay=ws://127.0.0.1:8897`
   // with `node demo/fake-board.mjs` running. It answers every verb through the
   // board's own `rig/board/scollide.mjs`, and its sound is a fixed tone, not
