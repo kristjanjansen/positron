@@ -5,10 +5,10 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept sampler 060</title>
+<title>Grain ring</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
+  import { CODE_ROWS } from '/concepts/nav.mjs';
   import { mount } from '/shell/shell.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
@@ -37,33 +37,34 @@
   //
   // The five patches are sets of control values on the one program (`/n_set`),
   // so a patch never swaps the graph; only an edit does. Every one of those
-  // values is a knob (freeze a toggle) bound to its `\name` in the program,
+  // values is a knob (freeze a stepped one) bound to its `\name` in the program,
   // fed from the patch node over a wire and gliding there, and `\mix` is the
   // wet/dry knob, blended in the engine. Each is coloured in the code as its
   // knob is.
   //
   // Everything that is not the engine is `../grain-rig.mjs`, shared with 050.
-  const d = mount({ name: 'concept sampler 060', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('sampler/060');
+  // Archived 2026-10-13 (*"archive https://positron.studio/concepts/sampler/060/"*):
+  // it was concepts sampler/060 and is served here now, still working.
+  const d = mount({ name: 'Grain ring', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
   const NODE = 4000, BUF = 0, DEF = 'gring';
   // Every control a patch sets, each a knob bound to its `\name` in the
   // program (asked 2026-10-13, *"expose them. route patch to knobs"*). Freeze
-  // is on or off, so it is the kit's toggle and not a knob: a knob with two
-  // positions is a switch wearing a dial. The wet/dry is the rig's own.
+  // is a stepped knob with two positions, off and on (asked the same day,
+  // *"convert freeze to 0 1 knob"*). The wet/dry is the rig's own, first.
   const pct = (v) => `${Math.round(v * 100)}%`, secs = (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`);
   const times = (v) => `${v.toFixed(2)}x`;
   const CONTROLS = [
     { name: 'size', label: 'size', kind: 'knob', min: 0.02, max: 4, warp: 'exp', fmt: secs },
     { name: 'density', label: 'density', kind: 'knob', min: 0.5, max: 64, warp: 'exp', fmt: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` },
+    { name: 'pitch', label: 'pitch', kind: 'knob', min: 0.25, max: 4, warp: 'exp', fmt: times },
+    { name: 'freeze', label: 'freeze', kind: 'steps', choices: [{ label: 'off', value: 0 }, { label: 'on', value: 1 }] },
     { name: 'speed', label: 'speed', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: times },
     { name: 'back', label: 'back', kind: 'knob', min: 0, max: 4, warp: 'lin', fmt: secs },
     { name: 'scatter', label: 'scatter', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
     { name: 'jitter', label: 'jitter', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: secs },
-    { name: 'pitch', label: 'pitch', kind: 'knob', min: 0.25, max: 4, warp: 'exp', fmt: times },
     { name: 'detune', label: 'detune', kind: 'knob', min: 0, max: 0.1, warp: 'lin', fmt: (v) => `${(v * 100).toFixed(1)}%` },
     { name: 'pan', label: 'pan', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
-    { name: 'freeze', label: 'freeze', kind: 'toggle' },
   ];
   const NAMES = CONTROLS.map((c) => c.name);
   const setOf = (p) => Object.fromEntries(NAMES.map((n) => [n, valuesOf(p)[n]]));

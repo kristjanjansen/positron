@@ -1,5 +1,5 @@
 // demo/concepts/sampler/grain-ring.mjs: the grain ring's program, and the
-// patches that are sets of its control values. /concepts/sampler/060/ shows
+// patches that are sets of its control values. /archive/grain-ring/ (concepts sampler/060 until it was archived) shows
 // the text in its code box, compiles it with `/shell/sclang-lite.mjs` in the
 // tab, and runs it on the tab's scsynth. Kept apart from the page so
 // `sclang-lite-test.mjs` can compile the same text with no browser.
