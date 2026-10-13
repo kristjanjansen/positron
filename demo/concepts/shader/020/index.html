@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept shader 020</title>
+<title>Scan landscape</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   .cc-pic canvas { display: block; width: 100%; height: 100%; }
@@ -73,26 +73,52 @@
   const PATCH = PATCHES.find((p) => p.name === 'Cloud');
   const NODE = 4000, BUF = 0, DEF = 'gring';
 
-  // ── the knobs: every number that shapes the picture ─────────────────────
+  // ── the knobs: every number that shapes the picture you can see ───────
   // Each look number, the four the baked body types as literals (EXTRA), and
   // how long the grain marks take to fade, which the picture is handed in its
   // data rather than in its body. Most visible first. Ranges cover every look
   // in the archive table with room either side.
+  //
+  // 🔴 29 OF THE 35 THERE WERE, MEASURED 2026-10-13. Asked (BACKLOG): *"do
+  // testing on .../concepts/shader/020/ params. when no visual impact or
+  // absolutely minimal, remove"*. Each knob at its min, open and max, on the
+  // real GPU (ANGLE Metal, M2 Pro), at 960x540, in both states a visitor
+  // sees: standby, and playing on our Raadio 2 recording. Comparable because
+  // the data texture this page feeds its chain was RECORDED once per state
+  // (1500 frames) and REPLAYED byte for byte into a fresh chain per setting,
+  // so only the knob differed; the same setting twice read 0.000.
+  // Measured as mean |difference| of 0..255 and share of pixels moved by
+  // more than 8, worst of min and max, every state that enables the knob.
+  // The cut is where the data has a gap: the five below change at most
+  // 1.71% of pixels and at most 1.28 of 255 in every state, and the next
+  // weakest (blue) changes 7.35% playing and 11.3% standby.
+  //   glow     0.000 and 0% in both states, over 25 s and 1451 grain events:
+  //            it scales a bloom of the flat field, masked by the ridges, and
+  //            on this material that product never reaches a whole level
+  //   facet    standby 0 (needs grains), playing 0.36 of 255, 0.88%
+  //   occlude  standby 0.54, 0.20%; playing 1.05, 1.66%
+  //   fade     standby 0 (needs grains), playing 0.66, 1.71%
+  //   echo     standby 1.28, 1.69% (at 0.9 only); playing 0.58, 0.01%
+  // They stay at the look's own value in their uniform, so the picture at
+  // the opening values is the same bytes as before (testFinal, 4 of 4).
+  //   mirror   0 alone, because the fold sits at `horizon`, which opens at
+  //            1.0, the top edge, so there is nothing above it to fold; and
+  //            horizon read 0 alone because the fold is off. Together they
+  //            are 4.4 to 9.2 of 255 and 18 to 30% of pixels, so one knob
+  //            does it: mirror is held ON and horizon alone moves the fold.
+  //            At 1.0 the fold is off by construction (`sy > 1.0` is never
+  //            true in the frame), the same bytes as mirror off.
   const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3), pct = (v) => `${Math.round(v * 100)}%`;
   const K = [
     { name: 'rows', label: 'rows', min: 8, max: 132, step: 1, fmt: (v) => `${Math.round(v)}` },
     { name: 'ampM', label: 'height', min: 0.5, max: 8, fmt: f2 },
-    { name: 'keep', label: 'echo', min: 0.9, max: 0.999, fmt: f3 },
     { name: 'tunnel', label: 'tunnel', min: 0, max: 4, fmt: (v) => `${v.toFixed(2)}x` },
-    { name: 'glow', label: 'glow', min: 0, max: 1.5, fmt: f2 },
-    { name: 'fade', label: 'fade', min: 0.2, max: 8, fmt: (v) => `${v.toFixed(1)} s` },
     { name: 'travel', label: 'travel', min: 0, max: 5, fmt: f2 },
     { name: 'wide', label: 'wide', min: 0.5, max: 3, fmt: f2 },
     { name: 'cam', label: 'near', min: 0.1, max: 1, fmt: f2 },
     { name: 'baseB', label: 'depth', min: 0.3, max: 1, fmt: f2 },
     { name: 'baseA', label: 'floor', min: 0, max: 0.2, fmt: f3 },
     { name: 'baseE', label: 'spacing', min: 0.5, max: 1.5, fmt: f2 },
-    { name: 'mirror', label: 'mirror', choices: [['off', 0], ['on', 1]] },
     { name: 'mir', label: 'horizon', min: 0.3, max: 1, fmt: f2 },
     { name: 'waves', label: 'waves', choices: [['1', 1], ['3', 3]] },
     { name: 'idle', label: 'idle', min: 0, max: 0.15, fmt: f3 },
@@ -102,12 +128,10 @@
     { name: 'sway', label: 'sway', min: 0, max: 1, fmt: f2 },
     { name: 'heave', label: 'heave', min: 0, max: 1, fmt: f2 },
     { name: 'valley', label: 'valley', min: 0, max: 0.6, fmt: f2 },
-    { name: 'facet', label: 'facet', min: 0, max: 1, fmt: f2 },
     { name: 'bucket', label: 'counts', min: 0, max: 1, fmt: f2 },
     { name: 'ampA', label: 'amp', min: 0, max: 0.3, fmt: f3 },
     { name: 'ampL', label: 'loud', min: 0, max: 0.5, fmt: f3 },
     { name: 'ampB', label: 'bass', min: 0, max: 0.2, fmt: f3 },
-    { name: 'occl', label: 'occlude', min: 0, max: 12, fmt: (v) => v.toFixed(1) },
     { name: 'halo', label: 'halo', min: 0, max: 1, fmt: f2 },
     { name: 'gamma', label: 'gamma', min: 0.6, max: 2, fmt: f2 },
     { name: 'gain', label: 'gain', min: 0.5, max: 3, fmt: f2 },
@@ -116,15 +140,17 @@
     { name: 'scan', label: 'lines', min: 0, max: 0.5, fmt: f2 },
     { name: 'vig', label: 'edges', min: 0, max: 1, fmt: f2 },
   ];
-  // /videoradio/'s trail time constant, `TRAIL_S` there
-  const OPEN = { ...LOOK, ...EXTRA, fade: 1.6 };
+  // The six that left the row, at the values they hold: the look's own, but
+  // mirror, which is held on (above). `fade` is /videoradio/'s `TRAIL_S`.
+  const FIXED = { keep: LOOK.keep, glow: EXTRA.glow, fade: 1.6, facet: LOOK.facet, occl: LOOK.occl, mirror: 1 };
+  const OPEN = { ...LOOK, ...EXTRA, ...FIXED };
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const SOURCES = createSources({ log: (m) => d.log(m) });
   const SRC = SOURCES[0];
   const FILE_OUT = `${SRC.store}:${SRC.id}:file-out`;
   const RADIO_IN = `${S}:radio:file-in`, RADIO_OUT = `${S}:radio:audio-out`;
-  const GRAINS_IN = `${S}:grains:audio-in`, GRAINS_OUT = `${S}:grains:audio-out`, GRAINS_EV = `${S}:grains:value-out`;
+  const GRAINS_IN = `${S}:granulator:audio-in`, GRAINS_OUT = `${S}:granulator:audio-out`, GRAINS_EV = `${S}:granulator:value-out`;
   const SPEAKER = `${S}:speaker:audio-in`;
   const SH_AUDIO = `${S}:shader:audio-in`, SH_VAL = `${S}:shader:value-in`, SH_OUT = `${S}:shader:video-out`;
   const SCREEN = `${S}:screen:video-in`;
@@ -139,10 +165,11 @@
   bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
   bay.addPort({ id: RADIO_IN, label: 'radio', dir: 'in', medium: 'file' });
   bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:grains`, kind: 'engine', label: 'grain ring', place: 'browser' });
-  bay.addPort({ id: GRAINS_IN, label: 'grains', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: GRAINS_OUT, label: 'grains', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: GRAINS_EV, label: 'grains', dir: 'out', medium: 'value' });
+  // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
+  bay.addNode({ id: `${S}:granulator`, kind: 'engine', label: 'granulator', place: 'browser' });
+  bay.addPort({ id: GRAINS_IN, label: 'granulator', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: GRAINS_OUT, label: 'granulator', dir: 'out', medium: 'audio' });
+  bay.addPort({ id: GRAINS_EV, label: 'events', dir: 'out', medium: 'value' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER, label: 'speakers', dir: 'in', medium: 'audio' });
   bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'scan landscape', place: 'browser' });
@@ -183,19 +210,20 @@
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
     name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
-    try { field = createScanField(gl, { look: LOOK, live: true, canvas }); }
+    try {
+      field = createScanField(gl, { look: LOOK, live: true, canvas });
+      field.set('mirror', FIXED.mirror);              // see the knob list: horizon alone moves the fold
+    }
     catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
   } else d.log('this browser has no WebGL2, so there is no picture', 'bad');
 
   // ── what reaches the shader's value inlet ───────────────────────────────
-  const P = { fade: OPEN.fade };
   let knobEvents = 0, grainEvents = 0;
   function valueIn(ev) {
     if (ev?.of === 'grain') { grainEvents++; bucket(ev); return; }
     if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
     knobEvents++;
-    if (ev.name === 'fade') P.fade = ev.v;
-    else field?.set(ev.name, ev.v);
+    field?.set(ev.name, ev.v);
   }
 
   // ── the data texture, filled every frame as /videoradio/ fills it ───────
@@ -244,7 +272,7 @@
       windowRow();
       data[at(6, 3)] = 255;                                    // all grains, the ring's mix at 1
       data[at(7, 3)] = Math.min(255, got);
-      data[at(16, 3)] = u8(Math.exp(-dt / Math.max(0.05, P.fade)));
+      data[at(16, 3)] = u8(Math.exp(-dt / Math.max(0.05, FIXED.fade)));
       pulse = (pulse + got * 0.045) % 1;
       data[at(19, 3)] = u8(0.5 - 0.5 * Math.cos(pulse * Math.PI * 2));
       jolt = Math.max(0, jolt - dt * 1.1);
@@ -324,7 +352,7 @@
       const pull = ctx.createGain(); pull.gain.value = 0; analyser.connect(pull).connect(ctx.destination);
       feats = createFeatures(analyser, ctx.sampleRate);
       follow = Object.fromEntries(FOLLOWER_NAMES.map((k) => [k, createEnvFollower(MOD_FOLLOWERS[k])]));
-      d.log(`the grain ring is up on ${PATCH.name}: ${PATCH.says}`);
+      d.log(`the granulator is up on its ${PATCH.name} patch`);
       eng = e;
       return e;
     })();
@@ -391,7 +419,7 @@
   window.__demo.knobs = grid;
   window.__demo.landscape = {
     field: () => field, playing: () => playing, grains: () => grains, frames: () => frames,
-    events: () => ({ knob: knobEvents, grain: grainEvents }), params: () => ({ ...(field?.params() || {}), fade: P.fade }),
+    events: () => ({ knob: knobEvents, grain: grainEvents }), params: () => ({ ...(field?.params() || {}), fade: FIXED.fade }),
     fetched: () => SOURCES.fetched(), context: () => ctx, knob: (nm) => knobs.get(nm),
   };
 
@@ -405,19 +433,42 @@
       field ? `${Object.keys(field.params()).length} numbers in uK` : 'no picture');
     await wait(400);
     d.assert('the standby field draws before Play, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
+    // The six that left the row hold their values in the uniform, and the
+    // knob row and the patchbay are the 29 that were measured to show.
+    const pr = field.params(), gone = Object.keys(FIXED).filter((k) => k !== 'fade');
+    const holdsFixed = gone.every((k) => Math.abs(pr[k] - FIXED[k]) < 1e-6);
+    const nodes = bay.nodes().filter((n) => n.id.startsWith(`${S}:knob-`)).length;
+    d.assert('29 knobs, one patchbay node each, and the six without a visible effect hold their values',
+      knobs.size === 29 && nodes === 29 && holdsFixed && !gone.some((k) => knobs.has(k)),
+      `${knobs.size} knobs, ${nodes} knob nodes, ${gone.map((k) => `${k} ${+pr[k].toFixed(3)}`).join(', ')}`);
+    // Mirror is held on and is invisible at the opening horizon; horizon
+    // alone moves the fold, by hand, and back draws the same bytes.
+    const still = new Uint8Array(data), hz = knobs.get('mir'), hz0 = hz.value();
+    const m1 = field.testFinal(still);
+    field.set('mirror', 0);
+    const m0 = field.testFinal(still);
+    field.set('mirror', FIXED.mirror);
+    hz.set(0.52, { from: 'hand' });
+    const h52 = field.testFinal(still);
+    hz.set(hz0, { from: 'hand' });
+    const h1 = field.testFinal(still);
+    const eq = (x, y) => x.px.every((v, i) => v === y.px[i]);
+    d.assert('mirror held on draws the same bytes as off at the opening horizon, and horizon alone folds the picture',
+      eq(m1, m0) && diff(m1, h52) > 1 && eq(m1, h1),
+      `on vs off identical ${eq(m1, m0)}, horizon 1 to 0.52 mean change ${diff(m1, h52).toFixed(2)} of 255, back identical ${eq(m1, h1)}`);
     await play();
-    d.assert('Play brought the grain ring up on our recording', !!eng && !!source, `${SRC.url}`);
+    d.assert('Play brought the granulator up on our recording', !!eng && !!source, `${SRC.url}`);
     if (!eng) return;
     await wait(WINDOW_S * 1000 + 1500);
     const g0 = grainEvents;
     await wait(1000);
-    d.assert('the engine reports grains and they reach the shader over their wire', grainEvents - g0 > 5 && grains > 20,
-      `${grainEvents - g0} grain events into the shader in the last second, ${grains} reported`);
+    d.assert('the granulator reports its events and they reach the shader over their wire', grainEvents - g0 > 5 && grains > 20,
+      `${grainEvents - g0} events into the shader in the last second, ${grains} reported`);
     const level = follow ? follow.rms.value() : 0;
-    d.assert('the shader hears the grains: its level follower is above zero', level > 0.01, `rms follower ${level.toFixed(3)}`);
+    d.assert('the shader hears the granulator: its level follower is above zero', level > 0.01, `rms follower ${level.toFixed(3)}`);
     const fp = field.readField();
     let hot = 0; for (let i = 0; i < fp.px.length; i += 4) if (fp.px[i] > 8) hot++;
-    d.assert('the grains land in the picture\'s field', hot > 200, `${hot} lit pixels in the grain layer`);
+    d.assert('the events land in the picture\'s field', hot > 200, `${hot} lit pixels in the field layer`);
     const f1 = field.readFinal(); const fA = frames;
     await wait(500);
     const f2 = field.readFinal();
