@@ -1,4 +1,5 @@
 ## Open
+- ~~**Pi piano is Piano and Rhodes on Pi**~~ (2026-10-13). Asked: *"Pi piano = Piano and Rhodes on Pi"*. DONE in list.mjs.
 - **A follow-up granulator page: Ida, Dub, the tempo detector feeding the granulator** (2026-10-13). Asked: *"make followup demo with ida, dub and add tempo detection and feed it into granulator"*. Next concept after sampler/060: the Ida recording and the Dub patch, radio/tempo.mjs reading the recording, and the tempo (and beat phase) driving the granulator's timing (echo time, grain rate, gate) on a wire in the patchbay.
 - ~~**Granulator opens on Raadio 2 and Tape stop**~~ (2026-10-13). Asked: *"raadio 2 and tape stop default http://127.0.0.1:8890/concepts/sampler/060/"*. DONE: source raadio2, Tape stop first in PATCHES.
 - ~~**Archive Plaits patches; Plaits keys and the Sampler under instruments in code; the Sampler is Piano and Rhodes**~~ (2026-10-13). Asked: *"arhvie plaits patches. move plaits keys, sampler to in code instuments"*, *"smapler = piano and rhodes"*. DONE by the session: /archive/plaits-patches/, groups and title in list.mjs.

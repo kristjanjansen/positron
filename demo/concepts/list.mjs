@@ -42,7 +42,7 @@ export const CONCEPTS = [
   // The gap stays; /concepts/remote/000/ is a 404.
   { n: 'remote/010', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
   { n: 'remote/020', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
-  { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
+  { n: 'remote/030', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
   { n: 'remote/040', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
   { n: 'remote/050', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
