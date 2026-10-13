@@ -77,17 +77,23 @@ export const DEMOS = [
   // `click` was its own page 2026-09-14 and is the CLICK tab of /csound/ since
   // 2026-10-05, no redirect.
 
-  { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /llhls/, listed on /archive/ with the other retired pages.
+  { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true, unlisted: true,
     one: 'the tuned low-latency player against a live input',
     tags: ['LL-HLS', 'Stream', 'container'],
     // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
     // harness asserts against a 204 and calls a working demo broken
     settleMs: 75000, lightSettleMs: 1000 },
-  { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /webrtc/, listed on /archive/ with the other retired pages.
+  { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true, unlisted: true,
     one: 'the same live picture the HLS pages play, delivered over WHEP instead',
     tags: ['WebRTC', 'WHEP', 'Stream'],
     settleMs: 75000, lightSettleMs: 1000 },
-  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, settleMs: 30000, lightSettleMs: 1000,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /moq/, listed on /archive/ with the other retired pages.
+  { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, unlisted: true, settleMs: 30000, lightSettleMs: 1000,
     one: 'the same test picture the other streaming pages play, sent from this browser over MoQ and back',
     tags: ['MoQ', 'WebTransport', 'WebCodecs'] },
   // One press starts every leg: getUserMedia, a WHIP publish through the pub
@@ -95,7 +101,9 @@ export const DEMOS = [
   // the relay session together take seconds, and the checks then wait for 30
   // timed frames on each leg, so the first page asserts land well after the
   // harness's default settle.
-  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, settleMs: 45000, lightSettleMs: 3000,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /cam/, listed on /archive/ with the other retired pages.
+  { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, unlisted: true, settleMs: 45000, lightSettleMs: 3000,
     one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
@@ -116,7 +124,9 @@ export const DEMOS = [
   // rather than demo/verify.mjs — the ordinary harness runs Chrome with
   // --disable-gpu, where getContext('webgl2') returns null and every assert
   // here would be unreachable.
-  { name: 'mirror', group: 'th', act: 0, created: '2026-09-11', built: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /mirror/, listed on /archive/ with the other retired pages.
+  { name: 'mirror', group: 'th', act: 0, created: '2026-09-11', built: true, unlisted: true, gl: true, xr: true, settleMs: 5000, room: 'fixed',
     one: 'the same shader drawn by your browser and by a Raspberry Pi, side by side',
     tags: ['WebGL2', 'WebCodecs', 'H.264', 'WS'] },
 
@@ -323,7 +333,9 @@ export const DEMOS = [
   // TAKES, SEGMENTS, ROUND TRIP, FAR END since 2026-10-04 (plan-demo-structure
   // §3.5). Its checks run before ready, MEASURED about 20 s ordinary and 33 s
   // deep; bootMs is a ceiling and costs a working page nothing.
-  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, bootMs: 70000, lightSettleMs: 2000,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /capture/, listed on /archive/ with the other retired pages.
+  { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, unlisted: true, bootMs: 70000, lightSettleMs: 2000,
     one: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'WHIP', 'WHEP', 'WebRTC', 'timeline'] },
   // the first page where all three legs meet: live over a real WebRTC hop, the
@@ -874,7 +886,9 @@ export const DEMOS = [
    * a browser with no MIDI at all. It has a known stream written into it and
    * every check runs off that, so the page is worth opening on a phone.
    */
-  { name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true,
+  // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+  // deployed at /dump/, listed on /archive/ with the other retired pages.
+  { name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true, unlisted: true,
     one: 'every message a plugged-in instrument sends, as raw bytes beside a reading of them',
     tags: ['WebMIDI', 'CoreMIDI', 'SysEx'] },
 
