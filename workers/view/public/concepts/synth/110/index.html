@@ -253,9 +253,10 @@
     bay.send(ID('patch', 'midi-out'), { cls: 'program', ch: 1, d1: i });
     // The knobs take the patch's values and send them over their own links.
     for (const [name, k] of knobs) {
-      const v = PATCHES[i][name];
-      if (k.value() === v) bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v });
-      else k.set(v, { from: 'patch' });
+      // On screen the knob glides there (`receive` sends nothing); the value
+      // leaves on its own cable here, once.
+      const got = k.receive(PATCHES[i][name], { from: 'patch', force: true });
+      bay.send(ID(`knob-${name}`, 'value-out'), { of: 'param', name, v: got });
     }
   }
   const stepPatch = (by) => pick((at + by + PATCHES.length) % PATCHES.length);

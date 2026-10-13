@@ -19,7 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { snapTo, knobPlaces } from './knob.mjs';
+import { snapTo, knobPlaces, easeOut, RECEIVE_GLIDE_MS } from './knob.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, 'knob.mjs'), 'utf8');
@@ -217,6 +217,29 @@ function driveDrag({ min, max, step = 0, from, pixels, each = 1 }) {
   is('the reserved width is published as a custom property rather than written as one',
     /setProperty\('--knob-num-w'/.test(code) && !/\.style\.minWidth/.test(code),
     '--knob-num-w, read by .pos-knob-v in shell.css, and no inline min-width in the code');
+}
+
+// ── a value from somewhere else (2026-10-13) ─────────────────────────────
+{
+  /* 🔴 THE WHOLE POINT OF `receive` IS THAT IT SENDS NOTHING: a value that came
+     from the instrument must never go back to it. Graded on the function's own
+     body with comments stripped, so the sentence saying so cannot pass it. */
+  const start = code.indexOf('function receive(');
+  let depth = 0, end = start;
+  for (let i = code.indexOf(') {', start) + 2; i < code.length; i++) { if (code[i] === '{') depth++; else if (code[i] === '}' && --depth === 0) { end = i; break; } }
+  const fn = code.slice(start, end + 1);
+  is('receive exists and never calls onInput or onChange, so nothing it draws is sent',
+    start > 0 && fn.length > 200 && !/onInput\(|onChange\(/.test(fn), `${fn.length} characters of body`);
+  is('NEGATIVE: and the same test does find the call in a drag, so it can fail',
+    /onInput\(v, src\)/.test(code), 'set() calls onInput(v, src)');
+  is('receive steps aside while a person is dragging or has just moved it',
+    /if \(!force && \(dragging \|\| now\(\) - userAt < RECEIVE_HOLD_MS\)\)/.test(fn), 'held off and counted as ignored');
+  const pts = [0, 0.25, 0.5, 0.75, 1].map(easeOut);
+  is('the glide eases out, starts at 0, ends at 1 and never goes back',
+    pts[0] === 0 && pts[4] === 1 && pts.every((p, i) => i === 0 || p > pts[i - 1]) && pts[1] > 0.25,
+    pts.map((p) => p.toFixed(3)).join(' '));
+  is('the glide is short enough to read as a turn and not a wait',
+    RECEIVE_GLIDE_MS >= 120 && RECEIVE_GLIDE_MS <= 200, `${RECEIVE_GLIDE_MS} ms`);
 }
 
 console.log(`\n${ok} ok, ${bad} failed`);

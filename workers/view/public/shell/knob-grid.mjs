@@ -39,7 +39,7 @@ function nameOf(item, i) {
  * @param {number} [o.cols]  the most boxes across. Unset, the grid takes the
  *   width it is given and fits as many as that holds.
  * @param {string} [o.cls]   an extra class for a page's own rules
- * @returns {{el, cells, knobs, names, show, on, cellOf}}
+ * @returns {{el, cells, knobs, names, show, on, cellOf, receive}}
  */
 export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {}) {
   const list = knobs instanceof Map
@@ -117,6 +117,18 @@ export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {})
     on: (x) => { const e = find(x); return !!e && !e.cell.dataset.off; },
     /** the box a knob sits in, so a check can measure it */
     cellOf: (x) => find(x)?.cell ?? null,
+    /**
+     * A value from somewhere else for one knob, by name, knob or index: it
+     * glides and is marked, and nothing is sent (`knob.mjs` `receive`). A knob
+     * switched off here takes nothing, so a page cannot draw a turn on a knob
+     * whose cable reaches nothing.
+     */
+    receive(x, value, opts) {
+      const e = find(x);
+      if (!e) throw new Error(`a knob grid has no knob ${JSON.stringify(typeof x === 'object' ? '(object)' : x)}`);
+      if (e.cell.dataset.off) return e.knob.value();
+      return e.knob.receive ? e.knob.receive(value, opts) : e.knob.set(value, { ...opts, quiet: true });
+    },
   };
 }
 

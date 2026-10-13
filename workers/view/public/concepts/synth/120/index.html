@@ -180,9 +180,10 @@
     voice.setGain(p.gain);
     const want = { model: p.engine, harmonics: p.harmonics, timbre: p.timbre, morph: p.morph, decay: p.decay, colour: p.colour };
     for (const [name, v] of Object.entries(want)) {
-      const k = knobs.get(name);
-      if (k.value() === v) bay.send(ID(`knob-${byName.get(name).id}`, 'value-out'), { of: 'param', name, v });
-      else k.set(v, { from: 'patch' });
+      // The knob turns to the patch's value on screen (`receive`, which glides
+      // and sends nothing) and the value leaves on its own cable here, once.
+      const got = knobs.get(name).receive(v, { from: 'patch', force: true });
+      bay.send(ID(`knob-${byName.get(name).id}`, 'value-out'), { of: 'param', name, v: got });
     }
   }
   const stepPatch = (by) => pick((at + by + PATCHES.length) % PATCHES.length);
