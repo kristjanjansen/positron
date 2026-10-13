@@ -29,7 +29,7 @@ import M from './font-metrics.mjs';
 // headline on as many lines as make it biggest, the small line cut to its first
 // sentence (*"Make positron. studio larger and put to bottom. Wrap ig title"*,
 // *"Rm delivered as line"*).
-export const TEMPLATE_V = 4;
+export const TEMPLATE_V = 5;
 export const W = 1200, H = 630;
 export const IG_W = 1080, IG_H = 1350;
 export const SITE = 'https://positron.studio';
@@ -93,9 +93,9 @@ function breaks(text, n) {
 // 1.5 times the hero's 13 px eye in the same units, so it scales with the card
 // and stays well under the headline's 56.
 const MARK = { ...TYPE.eye, size: TYPE.eye.size * 1.5 };
-// 🔴 THE SMALL LINE IS ITS FIRST SENTENCE ON A CARD, asked *"Rm delivered as
-// line"*. HERO and the front page keep the whole of it.
-const SMALL = HERO.small.split(/(?<=\.)\s+/)[0];
+// 🔴 NO SMALL LINE ON A CARD SINCE 2026-10-13: first cut to its first sentence
+// (*"Rm delivered as line"*), then gone (*"Rm poweee by stuff"*). HERO and the
+// front page keep the whole of it.
 
 // The hero block laid out at the front page's sizes in a column `measure`
 // wide, with the headline broken as `head` says: its rows (the headline, the
@@ -104,9 +104,10 @@ function layout(measure, head) {
   const rows = [
     { t: TYPE.head, lines: head, accent: true, gap: 0 },
     { t: TYPE.line, lines: balance(HERO.line, TYPE.line, Math.min(measure, LINE_MAX)), gap: GAPS.line },
-    { t: TYPE.small, lines: balance(SMALL, TYPE.small, measure), gap: GAPS.small },
   ];
-  const mark = { t: MARK, lines: [HERO.eye.toUpperCase()], dot: true, gap: 0 };
+  // Lowercase, `positron` gray and `.studio` yellow: *"No uppercase. Yellow?"*,
+  // *"Try gray and yellow"*, then *".studio in yellow. Go"*.
+  const mark = { t: MARK, lines: [SITE_NAME], studio: true, gap: 0 };
   const w = Math.max(...[...rows, mark].map((r) => blockW(r.lines, r.t)));
   const h = rows.reduce((a, r) => a + r.gap + r.lines.length * r.t.lh * r.t.size, 0);
   return { rows, mark, w, h, markH: MARK.lh * MARK.size };
@@ -122,6 +123,7 @@ function block(r, x, y0, k) {
   r.lines.forEach((l, i) => {
     let inner = xml(l);
     if (r.dot) inner = l.split(' ').map(xml).join(`<tspan fill="${INK.hi}">.</tspan>`);
+    if (r.studio) { const i = l.indexOf('.'); inner = `${xml(l.slice(0, i))}<tspan fill="${INK.hi}">${xml(l.slice(i))}</tspan>`; }
     if (r.accent && i === r.lines.length - 1 && /\.$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">.</tspan>`;
     out.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}"${t.track ? ` letter-spacing="${+(t.track * size).toFixed(2)}"` : ''} fill="${t.fill}">${inner}</text>`);
     y += t.lh * size;
@@ -157,7 +159,7 @@ function heroCard(w, h, pad, kind, lines = [2]) {
   return { svg, alt: ALT, version, path: `/og/${kind}-${version}.png`, width: w, height: h, scale: k,
     headSize: TYPE.head.size * k, markSize: MARK.size * k, head: L.rows[0].lines };
 }
-const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line} ${SMALL}`;
+const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line}`;
 
 /** The site card, the og:image of every page: `{ svg, alt, version, path, width, height }`. */
 export const siteCard = () => heroCard(W, H, 72, 'site');

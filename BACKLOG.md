@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Share cards: the wordmark lowercase, try gray and yellow**~~ (DONE: positron gray, .studio yellow; the Powered by line gone too, *"Rm poweee by stuff"*; TEMPLATE_V 5) (2026-10-13). Asked: *"No uppercase. Yellow?"*, *"Try gray and yellow"*. Three variants rendered and sent (a gray + yellow dot, b gray positron + yellow .studio, c yellow + gray dot); waiting for the pick, then demo/shell/share-card.mjs line 109.
+
 - ~~**Share cards: the site name too big**~~ (2026-10-13, DONE). Asked: *"Toooooo big sitename"*. Wordmark 2.5 to 1.5 times the eye, TEMPLATE_V 4.
 
 - ~~**Share cards: POSITRON.STUDIO larger and at the bottom; the Instagram headline wrapped**~~ (DONE, TEMPLATE_V 3) (2026-10-13). Asked: *"Make positron. studio larger and put to bottom. Wrap ig title"*, then *"Rm delivered as line"* (on the cards; the front page keeps it unless asked). demo/shell/share-card.mjs.
