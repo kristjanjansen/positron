@@ -78,7 +78,7 @@ const { CONCEPTS, CONCEPT_DIRS, DEMO_CARDS } =
 // that turns its SVG into a PNG with no browser (og/render.mjs, resvg wasm).
 const { siteCard, igCard, helloCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
 const { HERO } = await import(new URL('../../demo/shell/hero.mjs', import.meta.url));
-const { renderPng } = await import(new URL('./og/render.mjs', import.meta.url));
+const { renderPng, inkBox } = await import(new URL('./og/render.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -896,6 +896,27 @@ for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['i
   const png = await renderPng(c.svg, c.width);
   await writeFile(join(OUT, c.path.slice(1)), png);
   console.log(`  ${what} ${c.path}: ${c.width}x${c.height}, ${png.length} bytes, ${(performance.now() - t0).toFixed(0)} ms`);
+}
+
+// 🔴 THE INSTAGRAM AVATAR AS A FILE, 2026-10-13: *"deploy. links to ig first
+// post and avatar in positron.studio"*. /kit/logo/'s P.S AVATARS draws it on a
+// canvas for a download; this is the same mark made here, with no browser, so
+// it has a URL: p.s in the mono face at 600, tracked -0.12 em, the dot in the
+// accent, its ink 0.56 of the width and centred on resvg's own ink box, on a
+// full 320 square that Instagram crops to a circle.
+{
+  const S = 320, FILL = 0.56;
+  const mark = (size, dx = 0, dy = 0) => `<text x="${dx.toFixed(2)}" y="${dy.toFixed(2)}" font-family="'Brand JetBrains Mono', 'JetBrains Mono', monospace" font-weight="600" font-size="${size.toFixed(2)}" letter-spacing="${(-0.12 * size).toFixed(2)}" fill="#e6e6e6">p<tspan fill="#ffd400">.</tspan>s</text>`;
+  const wrap = (body, bg) => `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${bg ? `<rect width="${S}" height="${S}" fill="#0b0e14"/>` : ''}${body}</svg>`;
+  const b0 = await inkBox(wrap(mark(100, 0, 200)));
+  const size = 100 * FILL * S / b0.width;
+  const b1 = await inkBox(wrap(mark(size, 0, 200)));
+  const svg = wrap(mark(size, (S - b1.width) / 2 - b1.x, 200 + (S - b1.height) / 2 - b1.y), true);
+  const { fnv } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
+  const path = `/og/avatar-instagram-${fnv(svg)}.png`;
+  const png = await renderPng(svg, S);
+  await writeFile(join(OUT, path.slice(1)), png);
+  console.log(`  instagram avatar ${path}: ${S}x${S}, ${png.length} bytes`);
 }
 
 // ── _headers — the half of the noindex that the Worker cannot reach ──────────

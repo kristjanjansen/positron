@@ -10,6 +10,13 @@
 <link rel="stylesheet" href="/shell/kit-page.css">
 <link rel="stylesheet" href="/shell/slide.css">
 <link rel="stylesheet" href="/shell/brand-slides.css">
+<style>
+  /* p.s trial icons */
+  .ps-grid { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end; }
+  .ps-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .ps-cv { display: block; }
+  .ps-cap { margin: 0; }
+</style>
 <script type="module">
   import { createSlide, stepOf } from '/shell/slide.mjs';
   import { BRAND_SLIDES } from '/shell/brand-slides.mjs';
@@ -50,6 +57,123 @@
       shown.set(name, createSlide(spec, { host: box, full: true }));
     });
   }
+
+  // 🔴 p.s AS A MARK, 2026-10-13: *"for logos icons try also p.s, yellow dot
+  // (play with tracking)"*, then *"-0.12 em, align to center. try icons,
+  // favicons etc"*. The two letters that start positron.studio's two words, the
+  // dot in the accent, the mono face at 600, tracked -0.12 em. Drawn on canvas
+  // and centred on its INK, not its line box: p hangs below the baseline and
+  // s does not, so a line box centred mark sits high. A trial, not the shipped
+  // icon: the favicon and app icon above are unchanged.
+  const PS_TRACK = -0.12;
+  async function drawPs(cv, px, { shape = 'square', fill = 0.62, text = 'p.s', dpr = Math.min(window.devicePixelRatio || 1, 3) } = {}) {
+    await document.fonts.load(`600 100px "Brand JetBrains Mono"`);
+    cv.width = Math.round(px * dpr); cv.height = Math.round(px * dpr);
+    cv.style.width = `${px}px`; cv.style.height = `${px}px`;
+    const c = cv.getContext('2d'), W = cv.width;
+    c.clearRect(0, 0, W, W);
+    c.save();
+    c.beginPath();
+    if (shape === 'circle') c.arc(W / 2, W / 2, W / 2, 0, Math.PI * 2);
+    else if (shape === 'ios') c.roundRect(0, 0, W, W, W * 0.225);
+    else if (shape === 'flat') c.rect(0, 0, W, W);
+    else c.roundRect(0, 0, W, W, W * 0.18);
+    c.fillStyle = '#0b0e14'; c.fill(); c.clip();
+    // measure at 100 px, then scale the ink to `fill` of the tile's width
+    const glyphs = [...text];
+    const measure = (size) => {
+      c.font = `600 ${size}px "Brand JetBrains Mono"`;
+      let x = 0, l = Infinity, r = -Infinity, t = Infinity, b = -Infinity; const at = [];
+      for (const g of glyphs) {
+        const m = c.measureText(g);
+        at.push(x);
+        l = Math.min(l, x - m.actualBoundingBoxLeft); r = Math.max(r, x + m.actualBoundingBoxRight);
+        t = Math.min(t, -m.actualBoundingBoxAscent); b = Math.max(b, m.actualBoundingBoxDescent);
+        // -0.12 em closes p.s around its dot; with no dot it runs p into s, so ps keeps the face's own spacing
+        x += m.width + (text.includes('.') ? PS_TRACK : 0) * size;
+      }
+      return { l, r, t, b, at };
+    };
+    const m100 = measure(100);
+    const size = 100 * (W * fill) / (m100.r - m100.l);
+    const m = measure(size);
+    const ox = (W - (m.r - m.l)) / 2 - m.l, oy = (W - (m.b - m.t)) / 2 - m.t;
+    glyphs.forEach((g, k) => { c.fillStyle = g === '.' ? '#ffd400' : '#e6e6e6'; c.fillText(g, ox + m.at[k], oy); });
+    c.restore();
+  }
+  const PS_ICONS = [
+    // the favicons drop the dot, which is two pixels at 16: *"faficon: do 'ps'"*
+    // 32 and 48 as ps went: *"rm favicon 32 ps, favicon 48 ps"*
+    ['favicon', 16, 'square', 0.86, 'ps'],
+    // and 32 and 48 with the dot as well: *"favicon 32, favicon 48 -- try with dot too"*
+    ['favicon', 32, 'square', 0.86, 'p.s'], ['favicon', 48, 'square', 0.8, 'p.s'],
+    ['apple touch', 180, 'ios', 0.62], ['android', 192, 'circle', 0.56], ['store', 512, 'ios', 0.62],
+  ];
+  // *"try also insta profile image etc"*: the avatars each network crops to a
+  // circle (or GitHub's and LinkedIn's square), at the size the network shows
+  // them in a feed, with the size it asks to be uploaded at in the caption.
+  const PS_AVATARS = [
+    ['instagram', 110, 'circle', 0.56, 320], ['x', 128, 'circle', 0.56, 400],
+    ['bluesky', 128, 'circle', 0.56, 1000], ['youtube', 98, 'circle', 0.56, 800],
+    ['threads', 84, 'circle', 0.56, 320], ['github', 128, 'square', 0.62, 460],
+    ['linkedin', 128, 'flat', 0.62, 400], ['instagram in a feed', 32, 'circle', 0.6, 0],
+  ];
+  section('P.S', 'p.s tracked -0.12 em with the dot in the accent, centred on its ink, as app icons as iOS, Android and a store draw them, and as ps with no dot for the favicons at 16, 32 and 48 px.', null, (box) => {
+    const grid = document.createElement('div');
+    grid.className = 'ps-grid';
+    for (const [name, px, shape, fill, text] of PS_ICONS) {
+      const col = document.createElement('div');
+      col.className = 'ps-col';
+      const cv = document.createElement('canvas');
+      cv.className = 'ps-cv';
+      if (px === 512) cv.dataset.show = '256';
+      drawPs(cv, px, { shape, fill, text }).then(() => { if (px === 512) { cv.style.width = '256px'; cv.style.height = '256px'; } });
+      const cap = document.createElement('p');
+      cap.className = 'kit-n ps-cap';
+      cap.textContent = `${name} ${px}${text ? ` ${text}` : ''}${px === 512 ? ', shown at 256' : ''}`;
+      col.append(cv, cap);
+      grid.append(col);
+    }
+    box.append(grid);
+  });
+
+  section('P.S AVATARS', 'The same mark as a profile picture, cropped as each network crops it and drawn at the size it is seen in a feed.', null, (box) => {
+    const grid = document.createElement('div');
+    grid.className = 'ps-grid';
+    for (const [name, px, shape, fill, upload] of PS_AVATARS) {
+      const col = document.createElement('div');
+      col.className = 'ps-col';
+      const cv = document.createElement('canvas');
+      cv.className = 'ps-cv';
+      drawPs(cv, px, { shape, fill });
+      const cap = document.createElement('p');
+      cap.className = 'kit-n ps-cap';
+      cap.textContent = upload ? name : `${name}, beside a post`;   // no sizes: *"just rm size nrts, keep download links"*
+      col.append(cv, cap);
+      // *"add dl buttons to avatars"*: the PNG at the size the network asks
+      // to be uploaded at, which is already 2.5 to 8 times the size it is
+      // shown at, so no 2x on top. A full square with no circle cut out: the
+      // network crops it, and a circle drawn in would show its corners as a
+      // second ring on a light theme.
+      if (upload) {
+        const btn = document.createElement('button');
+        btn.className = 'pos-linkbtn';
+        btn.textContent = 'download';
+        btn.addEventListener('click', async () => {
+          const out = document.createElement('canvas');
+          await drawPs(out, upload, { shape: 'flat', fill, dpr: 1 });
+          out.toBlob((b) => {
+            const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(b), download: `positron-studio-${name}-${upload}.png` });
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          }, 'image/png');
+        });
+        col.append(btn);
+      }
+      grid.append(col);
+    }
+    box.append(grid);
+  });
 
   // A link to a block lands on it. See `land()` in demo/shell/kit-page.mjs.
   land();

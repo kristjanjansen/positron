@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Logo: try p.s with a yellow dot as a mark, play with tracking**~~ (DEPLOYED as trials on /kit/logo/, the Instagram avatar built to /og/avatar-instagram-<hash>.png; the shipped favicon is still β+) (2026-10-13). Asked: *"for logos icons try also p.s, yellow dot (play with tracking). dev server"*. A P.S block on /kit/logo/ at five trackings (-0.12 to +0.14 em) as app icon, 32 px and 16 px tiles; on the dev server, not deployed. Then *"-0.12 em, align to center. try icons, favicons etc"*: canvas icons centred on the ink, favicons 16/32/48, apple touch 180, android 192 circle, store 512. Then *"try also insta profile image etc"*: a P.S AVATARS block, each network's crop at its feed size. Then *"faficon: do 'ps'"*: the favicons are ps, no dot; then *"favicon 32, favicon 48 -- try with dot too"*; then *"add dl buttons to avatars. should they be 2x?"*: a download per avatar at the network's upload size, a full square; then *"rm favicon 32 ps, favicon 48 ps"*: 16 is ps, 32 and 48 are p.s.
+
 - ~~**Kit back links say kit, not demos**~~ (2026-10-13, DONE). Asked: *"kit backlinks should sa \"kit\" not demos"*. Every /kit/<part>/ reads ← kit to /kit/; /kit/ reads ← positron.
 
 - ~~**Share cards: the site name's tracking a bit tighter**~~ (2026-10-13, DONE). Asked: *"reduce sitename tracking a bit"*. 0.14 to 0.08 em on all three cards, TEMPLATE_V 6.
