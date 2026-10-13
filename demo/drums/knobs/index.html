@@ -16,10 +16,10 @@
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
-  import { voices } from '/rhythm/voices.mjs';
+  import { createDrumMachine } from '/drums/drum-machine.mjs';
+  import { voices } from '/drums/voices.mjs';
 
-  // /rhythm/drums/ plus one knob per drum. Asked 2026-10-12: *"next
+  // /drums/machine/ plus one knob per drum. Asked 2026-10-12: *"next
   // drum, same but each synth a parameter to tweak"*.
   //
   // Each drum's program declares its one number as a named control
@@ -37,7 +37,7 @@
   // scope is a node, `web:scope-<drum>`, fed by that drum's `audio-out` alone,
   // so a scope shows its drum and nothing else (`../drum-machine.mjs`).
   const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('rhythm/knobs');
+  conceptNav('drums/knobs');
   const m = createDrumMachine(d, { voices: voices({ knobs: true }), scopes: true });
   const scopes = el('div', 'cc-scopes');
   scopes.append(...m.scopes);

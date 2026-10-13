@@ -21,10 +21,10 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createDrop } from '/shell/drop.mjs';
   import { createSampleLoader } from '/shell/sample-loader.mjs';
-  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
-  import { sampleRows, rowNames, createSampleBank, MAX_ROWS } from '/rhythm/sample-voices.mjs';
+  import { createDrumMachine } from '/drums/drum-machine.mjs';
+  import { sampleRows, rowNames, createSampleBank, MAX_ROWS } from '/drums/sample-voices.mjs';
 
-  // The drum machine of /rhythm/drums/ with its rows playing SAMPLES,
+  // The drum machine of /drums/machine/ with its rows playing SAMPLES,
   // on the same one SuperCollider engine. The definition, the default kit and
   // the rows are in `../sample-voices.mjs`.
   //
@@ -49,7 +49,7 @@
   // NOTHING OPENS ON A VISIT: the engine and the default kit wait for play, and
   // a dropped file is read in the tab and sent nowhere.
   const d = mount({ name: 'Sample drums', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('rhythm/samples');
+  conceptNav('drums/samples');
 
   const bank = createSampleBank({ log: d.log });
   /** The rows now: the file each one plays and the name it shows. */

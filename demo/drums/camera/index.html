@@ -25,8 +25,8 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
-  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
-  import { voices } from '/rhythm/voices.mjs';
+  import { createDrumMachine } from '/drums/drum-machine.mjs';
+  import { voices } from '/drums/voices.mjs';
 
   // The drum machine played by a picture. Asked 2026-10-12: *"do 050 drums with
   // camera input and that pixelning shader you already have done on tv demos
@@ -74,12 +74,12 @@
   // THE WIRES: camera video-out to the original and to `web:pixelate`, the
   // pixelate node's video-out to the right panel and its value-out (one whole
   // pattern a bar) to `web:sequencer:value-in`, then the sequencer to the four
-  // drums and the drums to the speakers, as on /rhythm/drums/.
+  // drums and the drums to the speakers, as on /drums/machine/.
   //
   // NOTHING OPENS ON A VISIT. The camera is asked for on its own press, the
   // engine on play's, and nothing leaves this machine.
   const d = mount({ name: 'Camera drums', what: '', readout: null, index: '/', indexLabel: 'positron' });
-  conceptNav('rhythm/camera');
+  conceptNav('drums/camera');
 
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;

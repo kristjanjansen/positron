@@ -299,7 +299,7 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     Q_MIN < 1 && Q_MAX >= 10);
 }
 
-// ── the triggered scope's arithmetic (2026-10-12, /rhythm/knobs/) ──
+// ── the triggered scope's arithmetic (2026-10-12, /drums/knobs/) ──
 // A buffer of 1000 samples at 1000 Hz ending at t = 10 s, with a hit (a burst
 // of 1s) starting at sample 700, so at t = 9.7 s. NEGATIVE CONTROLS: a clock
 // that is 3 ms off still lands on sample 700 (the gate finds the edge), an

@@ -1487,7 +1487,7 @@ console.log('\nbeat: the graph on the hello and on every beat');
 {
   const C = await import('./scollide.mjs');
   const { compile: scCompile, UGENS: SC_UGENS } = await import('../../demo/shell/sclang-lite.mjs');
-  const { voices: drumVoices } = await import('../../demo/rhythm/voices.mjs');
+  const { voices: drumVoices } = await import('../../demo/drums/voices.mjs');
   const J = await import('./jacksynth.mjs');
   // The collide program, read out of the page's own module (it imports by
   // absolute URL, so node cannot import it; the text is the template literal).

@@ -25,7 +25,7 @@ import { startBoard } from '../fake-board.mjs';
 import { format, parse, randomId } from './wire.mjs';
 import { createBoardCollide, AHEAD } from './board-collide.mjs';
 import { skewSample } from '../../proto/looper/peer.mjs';
-import { voices } from '../rhythm/voices.mjs';
+import { voices } from '../drums/voices.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {

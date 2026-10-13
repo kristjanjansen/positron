@@ -56,7 +56,6 @@ export const CONCEPTS = [
   { id: 'remote/circuit', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
   { id: 'remote/collide', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
   { id: 'remote/piano', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
-  { id: 'remote/drums', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /synth/sound/ is Sound design since 2026-10-13.
@@ -99,11 +98,13 @@ export const CONCEPTS = [
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
-  { id: 'rhythm/drums', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
-  { id: 'rhythm/knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
-  { id: 'rhythm/samples', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
+  { id: 'drums/machine', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
+  { id: 'drums/knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
+  { id: 'drums/samples', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
   // rhythm/030 moved to remote/040 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
-  { id: 'rhythm/camera', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
+  { id: 'drums/camera', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
+  // remote/drums moved here as drums/remote 2026-10-13 (*"Move drums on pi into remote drums"*), and the rhythm group became drums (*"Renamw rythm group into drums"*); the old URLs 404.
+  { id: 'drums/remote', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
   // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
   // one machine first, then the relay, then two places on one clock. Old 070 Join late merged into Shared clock;
   // old 040 Follow is archived at /archive/clock-follow/. The old numbers 404 (no forwarding).
@@ -132,7 +133,7 @@ export const CONCEPTS = [
 // `room` was the archived /room/ demo until 2026-10-01 (archive/demos/room-index.html);
 // /room/ itself stays a 404, only /room/<slug>/ answers. `archive` is not here:
 // the tutorial slide moved to /archive/tutorial-slide/ with the archived pages.
-export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'rhythm', 'history'];
+export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'drums', 'history'];
 
 // The demos on the front page (asked 2026-10-12, *"inegrate fronpage
 // index and concepts, prefering the latter"*). Every listed, built row of
@@ -147,7 +148,7 @@ export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', '
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
 // room last (asked 2026-10-13, *"move room into last group"*).
-export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'typist', 'sampler', 'rhythm', 'archives', 'room'];
+export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'typist', 'sampler', 'drums', 'archives', 'room'];
 // `archives` is also the first of CASE_GROUPS; as a concept group it keeps the same place on
 // the front page (right after rhythm) and its demo rows would draw as demo cards beside /history/newsreels/.
 // A group's heading on the front page is its key, unless it is named here. `remote`

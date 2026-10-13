@@ -1,5 +1,7 @@
 ## Open
 
+- **Rename the rhythm group to drums; Drums on Pi joins it as remote drums** (2026-10-13). Asked: *"Renamw rythm group into drums"* then *"Move drums on pi into remote drums"*. demo/rhythm becomes demo/drums; rhythm/drums becomes drums/machine (a slug may not be its group's name); remote/drums becomes drums/remote, the same move as shader/remote. Old URLs 404.
+
 - **Beat granulator: the tempo wire into the grains is not visible, and it should always follow** (2026-10-13). Asked, with an iPhone screenshot of https://positron.studio/granulator/beat/: *"Do not see how tempo feeds into grains"* then *"Beat granulator: always follow"*. `demo/granulator/beat/index.html`. On the phone web:tempo value-out reads as going only to web:wave value-in-2; the hold(TEMPO_OUT, GRAINS_VAL) wire exists in code but shares the knob bus into web:grains value-in and cannot be told apart. Always follow: drop the hold under STEADY and the follow tempo switch.
 - ~~**Front page patchbay: gaps twice as wide**~~ (2026-10-13). Asked: *"make frontpage patchbays horz gap 2x wider"*. DONE in demo/shell/hero.mjs: boxes sized as if four in a row (2.2 on a phone), the desk picture drawn at 900 px.
 - ~~**Front page: Feedback on the wordmark's row, a little less space on top**~~ (2026-10-13). Asked: *"Feedback same h as sitename, v align. Keep top whitespace, perahs biit less. Prioritize and deploy first"*. DONE by the session in demo/index.html.
