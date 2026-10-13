@@ -1,6 +1,12 @@
 ## Open
 
-- **Scan landscape: fewer knobs** (2026-10-13). Asked: *"Did you ever reduced lanacape params"* then *"What about lanacape params simplofication?"*. /shader/landscape/ shows 29 knobs (35 less the 6 measured dead on 2026-10-12). Keep the few that change the picture most, fix the rest in the patch like the grain ring. Then *"Cut more"*: 3 to 4 knobs. Card say "every number of its look on a knob" goes stale with it.
+- **Scout positron studio's web presence** (2026-10-13). Asked: *"In bg scout positron studio web presence: gh org name, npm package, skills sh, social media acvounts. Try dot dash etc as separator"*. Research only: which names are free (GitHub org, npm package/scope, skills.sh, Instagram, X, Bluesky, Mastodon, YouTube, TikTok, LinkedIn...) for positron, positronstudio, positron-studio, positron.studio, positron_studio. Nothing registered.
+
+- ~~**Bring the kit card to the front page**~~ (2026-10-13, DONE). Asked: *"Bring kit card to frontpage"*. manifest kit row listed, DEMO_CARDS.kit, under its own heading at the foot.
+
+- **Plan: OG and Instagram images, with the patchbay renderer and the typography working there** (2026-10-13). Asked: *"In bg do plan for og and insta images. We need patchbay renderer and typogtaphy to work there. See ../eccm and ../trip"*. A plan in plans/, not code. Prior art in ~/personal/eccm and ~/personal/trip.
+
+- **Scan landscape: fewer knobs** (2026-10-13). Asked: *"Did you ever reduced lanacape params"* then *"What about lanacape params simplofication?"*. /shader/landscape/ shows 29 knobs (35 less the 6 measured dead on 2026-10-12). Keep the few that change the picture most, fix the rest in the patch like the grain ring. Then *"Cut more"*, then *"3-4 too little. I want it to be ready for granulator"*: about 6 to 8, chosen so the granulator can drive them next, each with a value-in. Card say "every number of its look on a knob" goes stale with it.
 
 - ~~**Move drums before radio; move held to archive**~~ (2026-10-13, DONE). Asked: *"Move drums before radio"*, *"Move held to archive"*. CONCEPT_GROUPS order; held `unlisted: true`, a card on /archive/.
 
