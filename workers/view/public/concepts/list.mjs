@@ -31,7 +31,7 @@ export const CONCEPTS = [
   // shader/010 until then; the old URLs 404 (no forwarding), except synth/060 and 070, which are
   // other pages since 2026-10-13 (the split of synth/040).
   { n: 'remote/000', title: 'Yoshimi', say: 'Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here.' },
-  { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches.' },
+  { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit on the Pi from the keys or a MIDI keyboard, with its eight macro knobs.' },
   { n: 'remote/020', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
   { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes played by the Pi in another building, over the relay or a direct link.' },
   { n: 'remote/040', title: 'Drums on the Pi', say: 'Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade the two.' },
