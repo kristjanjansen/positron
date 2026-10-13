@@ -17,7 +17,7 @@
 //                                      its OWN WebRTC input (CAM_WHIP_URL)
 //   /stage/watch /stage/status         the same four routes on /stage/'s own
 //   /stage/start /stop                 instance: the MIM film on WHIP, nothing else
-//   wss://pub.positron.studio/loop     /concepts/video/030/'s LL-HLS loopback: the
+//   wss://pub.positron.studio/loop     /concepts/video/060/'s LL-HLS loopback: the
 //                                      /cam route on its own instance and its OWN
 //                                      input (LOOP_STREAM_KEY), every take deleted
 //   GET  /loop/status                  recordings on that input, account storage

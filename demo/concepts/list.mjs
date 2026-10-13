@@ -100,7 +100,7 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'remote', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
 // reads as the owner asked for it, *"remote instruments"* (2026-10-13).
 export const GROUP_TITLES = { remote: 'remote instruments' };
@@ -109,16 +109,11 @@ export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   // fau, collide and muta archived 2026-10-13 (*"archve fau collide muta"*): still served, listed on /archive/.
-  mirror: { group: 'shader', say: 'A kaleidoscope drawn by this browser and by a Raspberry Pi side by side, or hung in a headset.', supersededBy: 'remote/050' },
-  llhls: { group: 'streaming', say: 'A live test picture over low latency HLS, counting how far behind it plays, its stalls and switches.' },
-  webrtc: { group: 'streaming', say: 'The same live test picture delivered over WebRTC by WHEP, with the network ping and route shown.', supersededBy: 'video/030' },
-  moq: { group: 'streaming', say: 'A test picture sent to Cloudflare\'s MoQ relay and back, its glass to glass delay read off a clock.' },
-  cam: { group: 'streaming', say: 'Your webcam beside what comes back over WebRTC, MoQ and LL-HLS, each with its glass to glass delay.' },
+  // mirror, dump and the streaming group (llhls, webrtc, moq, cam, capture) archived 2026-10-13
+  // (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still served, listed on /archive/.
   // flipper archived 2026-10-12 (*"archive flipper"*): archive/demos/flipper-index.html.
-  capture: { group: 'streaming', say: 'Four ways of keeping what came over a link, from takes recorded end to end to what a receiver got.' },
   // circuit, evo, twelve and pack archived 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
   // still served at their URLs, listed on /archive/ under devices.
-  dump: { group: 'device', say: 'Every message a MIDI instrument plugged in here sends, as raw bytes beside a plain reading.' },
   // wire and patchbay archived 2026-10-12 (*"archive wire and patchbay"*): still served, listed on /archive/.
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
