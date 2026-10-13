@@ -76,7 +76,7 @@ const { CONCEPTS, CONCEPT_DIRS, DEMO_CARDS } =
   await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
 // The share card and its tags (demo/shell/share-card.mjs), and the rasteriser
 // that turns its SVG into a PNG with no browser (og/render.mjs, resvg wasm).
-const { siteCard, igCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
+const { siteCard, igCard, helloCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
 const { HERO } = await import(new URL('../../demo/shell/hero.mjs', import.meta.url));
 const { renderPng } = await import(new URL('./og/render.mjs', import.meta.url));
 
@@ -891,7 +891,7 @@ await writeFile(join(OUT, 'favicon.ico'), favicon());
 // downloaded from /kit/share/.
 const CARD = siteCard();
 await mkdir(join(OUT, 'og'), { recursive: true });
-for (const [what, c] of [['share card', CARD], ['instagram card', igCard()]]) {
+for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['instagram hello', helloCard()]]) {
   const t0 = performance.now();
   const png = await renderPng(c.svg, c.width);
   await writeFile(join(OUT, c.path.slice(1)), png);

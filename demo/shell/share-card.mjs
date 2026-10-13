@@ -124,7 +124,8 @@ function block(r, x, y0, k) {
     let inner = xml(l);
     if (r.dot) inner = l.split(' ').map(xml).join(`<tspan fill="${INK.hi}">.</tspan>`);
     if (r.studio) { const i = l.indexOf('.'); inner = `${xml(l.slice(0, i))}<tspan fill="${INK.hi}">${xml(l.slice(i))}</tspan>`; }
-    if (r.accent && i === r.lines.length - 1 && /\.$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">.</tspan>`;
+    if (r.punct && /[.?]$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">${l.slice(-1)}</tspan>`;
+    else if (r.accent && i === r.lines.length - 1 && /\.$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">.</tspan>`;
     out.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}"${t.track ? ` letter-spacing="${+(t.track * size).toFixed(2)}"` : ''} fill="${t.fill}">${inner}</text>`);
     y += t.lh * size;
   });
@@ -165,6 +166,27 @@ const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line}`;
 export const siteCard = () => heroCard(W, H, 72, 'site');
 /** The Instagram portrait, 1080 by 1350, tagged on no page: posted by hand. */
 export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig', [2, 3, 4]);
+
+// 🔴 A SECOND INSTAGRAM POST, 2026-10-13: *"To ig add Hello. Is this thing on?
+// plus sitename"*. The owner's four lines as given, each closing mark in --hi
+// as the headline's full stop is, at the largest size the width and height
+// allow, and the wordmark on the bottom margin as on the other cards.
+export const HELLO = ['Hello.', 'Is this', 'thing', 'on?'];
+export function helloCard() {
+  const w = IG_W, h = IG_H, pad = 96;
+  const r = { t: TYPE.head, lines: HELLO, punct: true, gap: 0 };
+  const mark = { t: MARK, lines: [SITE_NAME], studio: true, gap: 0 };
+  const tw = blockW(r.lines, r.t), th = r.lines.length * r.t.lh * r.t.size;
+  // the wordmark keeps the size it has on the hero portrait, so the two posts match
+  const km = igCard().markSize / MARK.size;
+  const markH = MARK.lh * MARK.size * km;
+  const k = Math.min((w - 2 * pad) / tw, (h - 2 * pad - markH - MARK_AIR * km) / th);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${block(r, pad, pad, k)}${block(mark, pad, h - pad - markH, km)}</svg>`;
+  const version = fnv(`${svg}|${TEMPLATE_V}`);
+  return { svg, alt: `${SITE_NAME}: ${HELLO.join(' ')}`, version, path: `/og/hello-${version}.png`, width: w, height: h, scale: k,
+    headSize: TYPE.head.size * k, markSize: MARK.size * km, head: HELLO };
+}
 
 /** FNV-1a, 8 hex, eccm's and trip's cardVersion. */
 export function fnv(str) {
