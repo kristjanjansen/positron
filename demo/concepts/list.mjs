@@ -20,8 +20,8 @@ export const CONCEPTS = [
   { n: 'synth/050', title: 'Filter', say: 'A sawtooth from the keys through a low-pass filter, with knobs for its cutoff and resonance.' },
   { n: 'synth/060', title: 'Envelope', say: 'Play the keys through an envelope and set how slowly each note fades in and how long it rings on.' },
   { n: 'synth/070', title: 'LFO', say: 'An oscillator too slow to hear moves the filter\'s cutoff, so a held note opens and closes by itself.' },
-  { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
-  { n: 'synth/090', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
+  { n: 'synth/080', group: 'code', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
+  { n: 'synth/090', group: 'code', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
   { n: 'synth/110', title: 'Plaits patches', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
   { n: 'synth/120', title: 'Plaits keys', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // Asked 2026-10-13: *"rename synth to instruments"*, *"move sampler to instruments"*,
@@ -119,13 +119,15 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock', 'archives'];
+export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock', 'archives'];
 // `archives` is also the first of CASE_GROUPS; as a concept group it keeps the same place on
 // /concepts/ (right after clock) and its demo rows (reel, floor, tapes) draw as demo cards beside archives/000.
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
 // reads as the owner asked for it, *"remote instruments"* (2026-10-13).
 // performances shows as timelines (asked 2026-10-13, *"performances = timelines"*).
-export const GROUP_TITLES = { synth: 'instruments', remote: 'remote instruments', performances: 'timelines' };
+// Asked 2026-10-13: *"split instruments group into 'building instruments' and
+// 'instruments in code'"*: Faust synth and Collide synth, the two whose code is on the page, show under `code`.
+export const GROUP_TITLES = { synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
