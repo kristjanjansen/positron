@@ -142,8 +142,8 @@ export const DEMO_CARDS = {
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
   partitur: { group: 'performances', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
-  stage: { group: 'performances', say: 'A church scene from MIMproject\'s 2011 MIM goes Sustainable, run live from a control room.' },
-  weight: { group: 'performances', say: 'One sentence, "If these walls could talk", round four walls, each word as big as it is short.' },
+  // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
+  // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // radio archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
   videoradio: { group: 'stations', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
   // knobs archived 2026-10-13 with Yoshimi: archive/demos/knobs-index.html, /knobs/ is a 404.

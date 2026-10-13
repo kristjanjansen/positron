@@ -143,7 +143,9 @@ export const DEMOS = [
   // Six fields are computed in JavaScript at load, measured around 25 ms each
   // on this machine, and the asserts then draw every word off-screen twice to
   // read its size out of the pixels. The first assert sits behind all of it.
-  { name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
+  // `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+  // /weight/, listed on /archive/ with the other retired pages.
+  { name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, unlisted: true, gl: true, xr: true, settleMs: 8000,
     one: 'one sentence broken across four walls, each word as big as it is short and none of them turning to face you, and any word retyped where it stands',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
@@ -776,7 +778,9 @@ export const DEMOS = [
   // ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
   // publisher itself (`waitForWhip`) before it presses, so the wake is paid
   // against the asserts before the press rather than against this number.
-  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000, lightSettleMs: 2000,
+  // `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+  // /stage/, listed on /archive/ with the other retired pages.
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, unlisted: true, settleMs: 75000, lightSettleMs: 2000,
     // \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
     // read *"two presses, one for the picture and one for the show"*, which the
     // 2026-09-25 transport rework made false twice over: the two presses are

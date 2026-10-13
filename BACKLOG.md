@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /weight/ and /stage/**~~ (2026-10-13). Asked: *"archive weight stage"*. DONE by the session: unlisted, still served, cards out, on /archive/. /stage/'s routes and Stream input stay in workers/pub.
 - ~~**Archive /making/**~~ (2026-10-13). Asked: *"archive making"*. DONE by the session: unlisted, still served, card out, on /archive/.
 - **The /videoradio/ picture as a shader concept, with every visual parameter a knob and a patchbay** (2026-10-13). Asked: *"copy the visualiztion videograme from videoradio and add it to shaders concept. add all patameters that adjust its visulaliztion as kobs + add patchbay"*.
 - ~~**No "/mirror/" in card text**~~ (2026-10-13). Asked: *"from /mirror/ is pointless on desc"*. DONE: shader/000 and remote/050 say "a kaleidoscope shader".
