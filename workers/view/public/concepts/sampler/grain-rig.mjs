@@ -21,14 +21,37 @@
 //         grain the ENGINE reports, `g = { pos, ago, dur, voice, half }`:
 //         `pos` 0..1 of the window it reads, `ago` how many seconds ago the
 //         audio under it arrived. Nothing here invents a grain.
-//     land(i)                          load patch i whole
-//     knob(name, v)                    'size' (s) or 'rate' (grains/s)
+//     land(i, now)                     what patch i sets that is NOT a knob
+//                                      (the knobs glide there on their own);
+//                                      `now` is every knob's value right now
+//     knob(name, v)                    one control, by its name in `controls`,
+//                                      and 'mix' (0 dry to 1 wet) when `mixes`
+//     mixes                            true when the engine blends its own
+//                                      input against its grains; otherwise
+//                                      the rig mixes outside it, with the
+//                                      dry source on a wire of its own
 //     run(on)                          pause or resume, keeping the ring
 //     read(name) -> Promise<number>    a knob's value ASKED OF THE SERVER
 //     glitches() -> number|null
+//     moving() -> string[]             optional: controls the engine moves by
+//                                      itself, so their read back value is the
+//                                      patch's plus that movement
 //   }
-// and `patches` is `[{ name, says, size, rate }]`, each name written as it is
-// to be shown (sentence case).
+// `controls` is every number a patch sets that a person may turn,
+// `[{ name, label, kind: 'knob' | 'toggle', min, max, warp: 'lin' | 'exp', fmt }]`,
+// and `patches` is `[{ name, says, set }]`, `set` holding a value for every
+// control and each name written as it is to be shown (sentence case).
+//
+// THE PATCH IS A NODE AND THE KNOBS TAKE INPUT. Asked 2026-10-13: *"expose
+// them. route patch to knobs (should take input)"* and *"patch selection
+// should slowly go to new values"*. `web:patch:value-out` is wired into every
+// knob's `value-in`; a patch change is ONE event carrying the whole set, and
+// each knob takes its own value and glides there over `GLIDE_MS`, eased, its
+// own needle moving. Every knob's `value-out` goes into `web:grains:value-in`,
+// so the knobs are the only thing that drives the grains. A hand on a knob
+// during a glide stops that knob's glide, and what it is turned to holds
+// until the next patch. A toggle (freeze) changes at the START of the glide,
+// so it holds the moment you chose rather than one 1.6 s later.
 //
 // THE SOURCES. A source is an audio node into the granulator's input and that
 // is the whole contract: each entry's `open(ctx)` resolves to `{ node, stop }`.
@@ -52,6 +75,7 @@ import { createButtonGroup } from '/shell/button-group.mjs';
 import { createPicker } from '/shell/picker.mjs';
 import { createKnob } from '/shell/knob.mjs';
 import { createKnobGrid } from '/shell/knob-grid.mjs';
+import { createToggle } from '/shell/toggle.mjs';
 
 /** The window both engines read, in seconds, and the source scope's width. */
 export const WINDOW_S = 8;
@@ -116,9 +140,12 @@ export function createSources({ log = () => {} } = {}) {
     return { id, label, kind: 'recording', store: 'cf-r2', url, open: (ac) => openRecording(ac, id, label, url) };
   };
   const list = [
-    recording('raadio2', 'Raadio 2', 'radio/raadio2/2026-10-11.mp3'),
-    recording('raadio4', 'Raadio 4', 'radio/raadio4/2026-10-11.mp3'),
-    recording('ida', 'Ida', 'radio/ida/2026-10-11.aac'),
+    // A recording is named as one, so it is never taken for the live station
+    // (asked 2026-10-13, *"when you have radio recordings, suffix patch names
+    // with '... recording'"*).
+    recording('raadio2', 'Raadio 2 recording', 'radio/raadio2/2026-10-11.mp3'),
+    recording('raadio4', 'Raadio 4 recording', 'radio/raadio4/2026-10-11.mp3'),
+    recording('ida', 'Ida recording', 'radio/ida/2026-10-11.aac'),
   ];
   list.fetched = () => decoded.size;
   return list;
@@ -131,19 +158,24 @@ const CSS = `
   .cc-wave { position: relative; }
   .cc-births { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
   .cc-top { display: flex; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }`;
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+  .pos-kgrid-cell:has(> .pos-toggle) { display: flex; align-items: center; justify-content: center; }`;
 // The kit's grain scope as a panel's picture, as /concepts/radio/020/ draws
 // it: the panel's stage is the edge and the ground, so the scope gives up its
 // own margin, border and corner, and its always-empty caption takes no room.
 // The grains' start times over the output scope are a canvas laid exactly on
 // the scope's, so it moves nothing. Play sits on its own row, at its own size.
+// A toggle in the knob row (060's freeze) sits in the middle of its cell, as
+// a knob's dial does in its own.
 
 /**
  * @param {object} o
  * @param o.d        the page's `mount()` result
  * @param o.engine   see the contract at the top of this file
- * @param o.patches  `[{ name, says, size, rate }]`
- * @param o.ranges   `{ size: [lo, hi], rate: [lo, hi] }` for the two knobs
+ * @param o.patches  `[{ name, says, set }]`
+ * @param o.controls the knobs and toggles, see the contract above
+ * @param o.roles    which control is a grain's length and which is how many a
+ *                   second, for the self check: `{ size, density }`
  * @param o.hue      `(knob) => number|null`, a knob's hue, so a page that shows
  *                   its program can colour a knob and its control alike
  * @param o.under    elements that go under the knobs (a code box: knobs above
@@ -151,7 +183,7 @@ const CSS = `
  * @param o.check    `async (tools) => {}`, the page's own checks, run inside the
  *                   self check while the sound is still playing
  */
-export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4], rate: [0.5, 64] },
+export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
   hue = () => null, under = [], check: pageCheck = null }) {
   if (!document.getElementById('cc-grain-css')) {
     const st = el('style'); st.id = 'cc-grain-css'; st.textContent = CSS; document.head.append(st);
@@ -164,16 +196,21 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   const FILE_OUT = (s) => `${s.store}:${s.id}:file-out`;
   const RADIO_IN = `${S}:radio:file-in`, RADIO_OUT = `${S}:radio:audio-out`;
   const GRAINS_IN = `${S}:grains:audio-in`, GRAINS_OUT = `${S}:grains:audio-out`;
-  const GRAINS_SIZE = `${S}:grains:value-in`, GRAINS_DENS = `${S}:grains:value-in-2`;
+  const GRAINS_VAL = `${S}:grains:value-in`;
   const GRAINS_EV = `${S}:grains:value-out`;
   const WAVE_IN = `${S}:wave:audio-in`, WAVE_EV = `${S}:wave:value-in`;
   const SCOPE_IN = `${S}:scope:audio-in`, SCOPE_EV = `${S}:scope:value-in`;
   const SPEAKER_IN = `${S}:speaker:audio-in`;
-  const SIZE_OUT = `${S}:knob-size:value-out`, DENS_OUT = `${S}:knob-density:value-out`;
+  const PATCH_OUT = `${S}:patch:value-out`;
+  const KNOB_IN = (n) => `${S}:knob-${n}:value-in`, KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
+  const MIX = { name: 'mix', label: 'wet/dry', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: (v) => `${Math.round(v * 100)}%` };
+  // An engine that does not blend its own dry and wet is mixed here: the dry
+  // source goes to the speakers on a wire of its own, beside the grains.
+  const outside = !engine.mixes;
 
   const bay = createBay();
   for (const s of SOURCES) {
-    bay.addNode({ id: `${s.store}:${s.id}`, kind: 'store', label: `${s.label}, recorded`, place: 'cloudflare', net: 'cloudflare' });
+    bay.addNode({ id: `${s.store}:${s.id}`, kind: 'store', label: s.label, place: 'cloudflare', net: 'cloudflare' });
     bay.addPort({ id: FILE_OUT(s), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: s.url });
   }
   bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
@@ -182,8 +219,9 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   bay.addNode({ id: `${S}:grains`, kind: 'engine', label: engine.label, place: 'browser' });
   bay.addPort({ id: GRAINS_IN, label: 'grains', dir: 'in', medium: 'audio' });
   bay.addPort({ id: GRAINS_OUT, label: 'grains', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: GRAINS_SIZE, label: 'size', dir: 'in', medium: 'value', deliver: (ev) => knobIn('size', ev) });
-  bay.addPort({ id: GRAINS_DENS, label: 'density', dir: 'in', medium: 'value', deliver: (ev) => knobIn('rate', ev) });
+  // Every knob's value comes in here, one port for all of them, as on
+  // /concepts/synth/090/; the event names its control.
+  bay.addPort({ id: GRAINS_VAL, label: 'values', dir: 'in', medium: 'value', deliver: (ev) => valueIn(ev) });
   // Every grain the engine reports leaves here as one event, so anything that
   // wants to follow the grains (the two scopes today, a picture later) holds a
   // link from this port rather than reaching into the engine.
@@ -196,10 +234,14 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   bay.addPort({ id: SCOPE_EV, label: 'grains', dir: 'in', medium: 'value', deliver: (ev) => scopeGrain(ev) });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:knob-size`, kind: 'engine', label: 'size knob', place: 'browser' });
-  bay.addPort({ id: SIZE_OUT, label: 'size', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:knob-density`, kind: 'engine', label: 'density knob', place: 'browser' });
-  bay.addPort({ id: DENS_OUT, label: 'density', dir: 'out', medium: 'value' });
+  bay.addNode({ id: `${S}:patch`, kind: 'engine', label: 'patch', place: 'browser' });
+  bay.addPort({ id: PATCH_OUT, label: 'patch', dir: 'out', medium: 'value' });
+  for (const c of [...controls, MIX]) {
+    bay.addNode({ id: `${S}:knob-${c.name}`, kind: 'person', label: c.label, place: 'browser' });
+    // The wet/dry is no patch's, so it has nothing coming in.
+    if (c !== MIX) bay.addPort({ id: KNOB_IN(c.name), label: c.label, dir: 'in', medium: 'value', deliver: (ev) => patchIn(c.name, ev) });
+    bay.addPort({ id: KNOB_OUT(c.name), label: c.label, dir: 'out', medium: 'value' });
+  }
 
   // The links, held from load so the picture does not change with play.
   const held = new Map();
@@ -213,19 +255,27 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
   for (const s of SOURCES) hold(FILE_OUT(s), RADIO_IN);
   hold(RADIO_OUT, GRAINS_IN);
+  if (outside) hold(RADIO_OUT, SPEAKER_IN);
+  for (const c of controls) hold(PATCH_OUT, KNOB_IN(c.name));
+  for (const c of [...controls, MIX]) hold(KNOB_OUT(c.name), GRAINS_VAL);
   hold(RADIO_OUT, WAVE_IN);
   hold(GRAINS_OUT, SPEAKER_IN);
   hold(GRAINS_OUT, SCOPE_IN);
-  hold(SIZE_OUT, GRAINS_SIZE);
-  hold(DENS_OUT, GRAINS_DENS);
   hold(GRAINS_EV, WAVE_EV);
   hold(GRAINS_EV, SCOPE_EV);
 
   // ── state ────────────────────────────────────────────────────────────────
   let ctx = null, srcBus = null, toGrains = null, srcTap = null, srcBuf = null, outBuf = null;
+  // `dry` is the outside mix's dry path, unused when the engine mixes;
+  // `heard` is an analyser on what the speakers get, wet and dry together.
+  let dry = null, heard = null;
   let eng = null, booting = null, source = null, opening = null, fetchedAt = 0, playing = false;
   let patchAt = 0;
-  const cur = { size: patches[0].size, rate: patches[0].rate };
+  // `mix` is not a patch's: a patch change leaves the wet/dry where it is.
+  const cur = { ...patches[0].set, mix: 1 };
+  // The grain ticks fade with the grains in the sound, and never quite out,
+  // so a dry setting still shows the grains are being made.
+  const tickAlpha = () => 0.15 + 0.85 * cur.mix;
 
   // ── the grains, as data ──────────────────────────────────────────────────
   const EV_KEEP = 400;
@@ -278,7 +328,7 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
     onPick: (i) => choosePatch(i) });
   patchPick.options(patches.map((p) => p.name), 0);
   const scopePanel = createVideoPanel({ media: scopeHost, aspect: 'auto', right: patchPick.el, left: false,
-    values: [{ key: 'gps', label: 'grains/s', reserve: 5 }] });
+  });
 
   const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
   let ink = null;
@@ -302,7 +352,7 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
       const x = Math.round(W - (age / OUT_S) * W);
       if (x < 0 || x > W) continue;
       // Brightest as it starts, fading over the grain's own length.
-      g.globalAlpha = 0.25 + 0.75 * Math.max(0, 1 - age / Math.max(0.05, b.dur || 0.1));
+      g.globalAlpha = tickAlpha() * (0.25 + 0.75 * Math.max(0, 1 - age / Math.max(0.05, b.dur || 0.1)));
       g.fillRect(x - dpr, H * 0.82, dpr, H * 0.18);
     }
     g.globalAlpha = 1;
@@ -316,13 +366,11 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
     for (let i = events.length - 1; i >= 0 && events[i].at > now - 1; i--) n++;
     return n;
   }
-  let gpsShownAt = 0;
   function frame() {
     if (!playing) return;
     if (holds(RADIO_OUT, WAVE_IN)) { srcTap.getFloatTimeDomainData(srcBuf); wave.feed(srcBuf, ctx.sampleRate); }
-    if (eng && holds(GRAINS_OUT, SCOPE_IN)) { eng.meter.getFloatTimeDomainData(outBuf); scope.feed(outBuf, ctx.sampleRate); }
+    if (eng && holds(GRAINS_OUT, SCOPE_IN)) { heard.getFloatTimeDomainData(outBuf); scope.feed(outBuf, ctx.sampleRate); }
     drawBirths();
-    if (performance.now() - gpsShownAt > 250) { gpsShownAt = performance.now(); scopePanel.values.set('gps', String(gps())); }
     requestAnimationFrame(frame);
   }
 
@@ -366,15 +414,20 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   function route() {
     try { srcBus.disconnect(toGrains); } catch { /* not connected */ }
     if (holds(RADIO_OUT, GRAINS_IN)) srcBus.connect(toGrains);
-    if (eng) eng.out.gain.setTargetAtTime(holds(GRAINS_OUT, SPEAKER_IN) && playing ? 0.9 : 0, ctx.currentTime, 0.02);
+    // Equal power, so the middle of the knob does not dip. When the engine
+    // mixes, its output is already the blend and goes out whole.
+    const wet = outside ? Math.sin(cur.mix * Math.PI / 2) : 1;
+    if (eng) eng.out.gain.setTargetAtTime(holds(GRAINS_OUT, SPEAKER_IN) && playing ? 0.9 * wet : 0, ctx.currentTime, 0.02);
+    if (dry) dry.gain.setTargetAtTime(holds(RADIO_OUT, SPEAKER_IN) && playing ? 0.9 * Math.cos(cur.mix * Math.PI / 2) : 0, ctx.currentTime, 0.02);
   }
   function boot() {
     booting ??= (async () => {
       eng = await engine.boot({ ctx, input: toGrains, grain, log: (m, k) => d.log(m, k) });
-      engine.land(patchAt);
-      // a knob turned before the engine was up still counts
-      if (cur.size !== patches[patchAt].size) engine.knob('size', cur.size);
-      if (cur.rate !== patches[patchAt].rate) engine.knob('rate', cur.rate);
+      eng.out.connect(heard);
+      engine.land(patchAt, { ...cur });
+      // Every knob as it stands, which is the patch unless one was turned before Play.
+      for (const c of controls) engine.knob(c.name, cur[c.name]);
+      if (engine.mixes) engine.knob('mix', cur.mix);
       d.log(`${patches[patchAt].name}: ${patches[patchAt].says}`);
       return eng;
     })();
@@ -382,41 +435,79 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
     return booting;
   }
 
-  // ── a patch, and the two knobs on top of it ──────────────────────────────
+  // ── a patch, the knobs it moves, and the glide ───────────────────────────
   function choosePatch(i) {
     const n = (i + patches.length) % patches.length;
     patchAt = n;
     patchPick.show(patches[n].name, n);
-    cur.size = patches[n].size; cur.rate = patches[n].rate;
-    setKnob('size', cur.size);
-    setKnob('rate', cur.rate);
-    if (eng) { engine.land(n); d.log(`${patches[n].name}: ${patches[n].says}`); }
+    if (eng) { engine.land(n, { ...cur }); d.log(`${patches[n].name}: ${patches[n].says}`); }
+    bay.send(PATCH_OUT, { of: 'patch', name: patches[n].name, set: { ...patches[n].set } });
   }
-  /** One of the two numbers, from a knob's event on its value wire. */
-  function knobIn(name, ev) {
-    if (ev?.of !== 'param' || ev.name !== name || !Number.isFinite(ev.v)) return;
-    cur[name] = ev.v;
-    if (eng) engine.knob(name, ev.v);
+  /** A patch arriving at one knob, on its wire from web:patch. */
+  function patchIn(name, ev) {
+    if (ev?.of !== 'patch' || !Number.isFinite(ev.set?.[name])) return;
+    glideTo(name, ev.set[name]);
   }
-  // Each knob travels geometrically, because 20 ms to 4 s and 0.5 to 64 a
-  // second are ranges where the middle of the knob should be the middle of
-  // the octaves.
-  const toV = (name, k) => { const [lo, hi] = ranges[name]; return lo * (hi / lo) ** k; };
-  const toK = (name, v) => { const [lo, hi] = ranges[name]; return Math.log(v / lo) / Math.log(hi / lo); };
-  const OUT_OF = { size: SIZE_OUT, rate: DENS_OUT };
-  const fmt = { size: (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`), rate: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` };
-  const mk = (name, label) => createKnob({
-    label, min: 0, max: 1, step: 0.001, value: toK(name, patches[0][name]),
-    format: (k) => fmt[name](toV(name, k)),
-    onInput: (k) => bay.send(OUT_OF[name], { of: 'param', name, v: +toV(name, k).toFixed(4) }),
-  });
-  const knobs = new Map([['size', mk('size', 'size')], ['rate', mk('rate', 'density')]]);
+  /** A knob's value arriving at the grains, on its wire into web:grains. */
+  function valueIn(ev) {
+    if (ev?.of !== 'param' || !Number.isFinite(ev.v) || !(ev.name in cur)) return;
+    cur[ev.name] = ev.v;
+    if (ev.name === 'mix') {
+      wave.grainAlpha(tickAlpha());
+      if (ctx) route();
+      if (!engine.mixes) return;
+    }
+    if (eng) engine.knob(ev.name, ev.v);
+  }
+  // A knob's travel is 0 to 1 and its warp says what that means: `exp` puts
+  // the middle of the knob at the middle of the octaves (20 ms to 4 s, 0.5 to
+  // 64 a second), `lin` is straight. A glide moves the travel, so an `exp`
+  // knob glides evenly in octaves.
+  const byName = new Map([...controls, MIX].map((c) => [c.name, c]));
+  const toV = (c, k) => (c.warp === 'exp' ? c.min * (c.max / c.min) ** k : c.min + (c.max - c.min) * k);
+  const toK = (c, v) => Math.min(1, Math.max(0, c.warp === 'exp' ? Math.log(v / c.min) / Math.log(c.max / c.min) : (v - c.min) / (c.max - c.min)));
+  const send = (name, v) => bay.send(KNOB_OUT(name), { of: 'param', name, v });
+  const knobs = new Map();
+  for (const c of [...controls, MIX]) {
+    if (c.kind === 'toggle') {
+      const t = createToggle({ label: c.label, checked: !!cur[c.name], onChange: (on) => send(c.name, on ? 1 : 0) });
+      knobs.set(c.name, t);
+      continue;
+    }
+    knobs.set(c.name, createKnob({
+      label: c.label, min: 0, max: 1, value: toK(c, cur[c.name]),
+      format: (k) => c.fmt(toV(c, k)),
+      onInput: (k, from) => { if (from === 'hand') glides.delete(c.name); send(c.name, toV(c, k)); },
+    }));
+  }
   for (const [name, knob] of knobs) {
     const h = hue(name);
     if (h != null) { knob.el.dataset.param = name; knob.el.style.setProperty('--param-hue', String(h)); }
   }
-  function setKnob(name, v) { knobs.get(name).set(toK(name, v), { from: 'self', quiet: true }); }
   const knobRow = createKnobGrid(knobs, { row: true });
+
+  /** How long a patch takes to arrive, eased in and out: long enough to hear it travel. */
+  const GLIDE_MS = 1600, GLIDE_TICK_MS = 40;
+  const glides = new Map();          // knob name -> { k0, k1, t0 }
+  let glideTimer = 0;
+  function glideTo(name, v) {
+    const c = byName.get(name), knob = knobs.get(name);
+    if (c.kind === 'toggle') { knob.set(!!v); return; }
+    const k0 = knob.value(), k1 = toK(c, v);
+    if (Math.abs(k1 - k0) < 1e-6) { send(name, v); return; }
+    glides.set(name, { k0, k1, t0: performance.now() });
+    glideTimer ||= setInterval(glideStep, GLIDE_TICK_MS);
+  }
+  function glideStep() {
+    const now = performance.now();
+    for (const [name, g] of glides) {
+      const t = Math.min(1, (now - g.t0) / GLIDE_MS), e = 0.5 - 0.5 * Math.cos(Math.PI * t);
+      knobs.get(name).set(g.k0 + (g.k1 - g.k0) * e, { from: 'self' });
+      if (t >= 1) glides.delete(name);
+    }
+    if (!glides.size) { clearInterval(glideTimer); glideTimer = 0; }
+  }
+  const glidingNow = () => [...glides.keys()];
 
   // ── play and stop ────────────────────────────────────────────────────────
   async function play() {
@@ -431,6 +522,14 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
       srcBus.connect(srcTap);
       // pulled, or the analyser is never asked to run
       const pull = ctx.createGain(); pull.gain.value = 0; srcTap.connect(pull).connect(ctx.destination);
+      heard = ctx.createAnalyser(); heard.fftSize = 2048; heard.smoothingTimeConstant = 0;
+      heard.connect(pull);
+      if (outside) {
+        dry = ctx.createGain(); dry.gain.value = 0;
+        srcBus.connect(dry);
+        dry.connect(ctx.destination);
+        dry.connect(heard);
+      }
     }
     playing = true;
     face();
@@ -467,7 +566,7 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
   // ── read only, for a check over CDP, and for a picture that wants the grains ─
   const meterRms = (ms = 1000) => new Promise((res) => {
     const buf = new Float32Array(2048); let s = 0, n = 0;
-    const id = setInterval(() => { eng.meter.getFloatTimeDomainData(buf); for (const v of buf) { s += v * v; n++; } }, 50);
+    const id = setInterval(() => { heard.getFloatTimeDomainData(buf); for (const v of buf) { s += v * v; n++; } }, 50);
     setTimeout(() => { clearInterval(id); res(Math.sqrt(s / Math.max(1, n))); }, ms);
   });
   const api = {
@@ -475,7 +574,7 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
     /** Follow every grain as it is reported. Returns a function that stops. */
     on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
     playing: () => playing, source: () => SOURCES[at].id, patch: () => patches[patchAt].name,
-    knob: (name) => cur[name] ?? null, count: () => grainCount, gps, timing: () => ({ ...(eng?.timing || {}) }),
+    knob: (name) => cur[name] ?? null, count: () => grainCount, gps, tickAlpha, timing: () => ({ ...(eng?.timing || {}) }),
     engine: () => eng, level: meterRms, glitches: () => engine.glitches(),
   };
   window.__demo.grains = api;
@@ -498,34 +597,98 @@ export function createGrainRig({ d, engine, patches, ranges = { size: [0.02, 4],
       ev ? JSON.stringify(ev) : 'none');
 
     // Density: grains a second, counted from the engine's own reports.
-    const rate = async (v) => { knobs.get('rate').set(toK('rate', v), { from: 'self' }); await wait(1600); return gps(); };
+    const SZ = byName.get(roles.size), DN = byName.get(roles.density);
+    const rate = async (v) => { knobs.get(DN.name).set(toK(DN, v), { from: 'hand' }); await wait(1600); return gps(); };
     const lo = await rate(4), hi = await rate(40);
     d.assert('the density knob changes how many grains the engine reports', hi > lo * 3, `4/s gave ${lo}, 40/s gave ${hi}`);
     // Size: the length the engine says each grain had.
     const meanDur = (from) => { const xs = events.filter((e) => e.at > from).map((e) => e.dur); return xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length); };
-    const size = async (v) => { knobs.get('size').set(toK('size', v), { from: 'self' }); await wait(300); const t = ctx.currentTime; await wait(1200); return meanDur(t); };
+    const size = async (v) => { knobs.get(SZ.name).set(toK(SZ, v), { from: 'hand' }); await wait(300); const t = ctx.currentTime; await wait(1200); return meanDur(t); };
     const sShort = await size(0.05), sLong = await size(0.6);
     d.assert('the size knob changes the length the engine reports for each grain', sLong > sShort * 4,
       `50 ms gave ${(sShort * 1000).toFixed(0)} ms, 600 ms gave ${(sLong * 1000).toFixed(0)} ms`);
     // A patch change, asked of the server rather than believed: the patch
     // furthest from the current knob values, so both must move.
-    const before = { size: await engine.read('size'), rate: await engine.read('rate') };
+    const before = { size: await engine.read(SZ.name), rate: await engine.read(DN.name) };
     let to = 0, far = -1;
     patches.forEach((p, i) => {
-      const dist = Math.abs(Math.log(p.size / before.size)) + Math.abs(Math.log(p.rate / before.rate));
+      const dist = Math.abs(Math.log(p.set[SZ.name] / before.size)) + Math.abs(Math.log(p.set[DN.name] / before.rate));
       if (i !== patchAt && dist > far) { far = dist; to = i; }
     });
     const n0 = grainCount;
+    const sentBefore = bay.links().filter((l) => l.from === PATCH_OUT).reduce((n, l) => n + (l.sent || 0), 0);
+    const k0 = knobs.get(DN.name).value(), kTo = toK(DN, patches[to].set[DN.name]);
     choosePatch(to);
-    await wait(1500);
-    const after = { size: await engine.read('size'), rate: await engine.read('rate') };
-    const near = (a, b) => Math.abs(a - b) <= Math.abs(b) * 1e-3;
-    d.assert('a patch change reaches the engine', near(after.size, patches[to].size) && near(after.rate, patches[to].rate)
-      && !near(before.rate, after.rate), `${patches[to].name}: before ${JSON.stringify(before)}, after ${JSON.stringify(after)}`);
-    d.assert('and the knobs follow the patch', Math.abs(toV('rate', knobs.get('rate').value()) - patches[to].rate) < patches[to].rate * 0.01,
-      `${toV('rate', knobs.get('rate').value()).toFixed(3)}/s`);
+    await wait(GLIDE_MS * 0.4);
+    const kMid = knobs.get(DN.name).value();
+    const midOver = await engine.read(DN.name);
+    await wait(GLIDE_MS * 0.6 + 600);
+    const after = { size: await engine.read(SZ.name), rate: await engine.read(DN.name) };
+    // A control the engine is moving by itself (050's patches send the
+    // music's level onto some of them) reads its patch value plus that
+    // movement, so it is held to within an octave rather than to the digit.
+    const moving = new Set(engine.moving?.() ?? []);
+    const near = (a, b, name) => (moving.has(name) ? Math.abs(Math.log(a / b)) < Math.LN2 : Math.abs(a - b) <= Math.abs(b) * 1e-3);
+    const sent = bay.links().filter((l) => l.from === PATCH_OUT).reduce((n, l) => n + (l.sent || 0), 0) - sentBefore;
+    d.assert('a patch reaches the knobs over their wires from web:patch, one event on every one', sent === controls.length,
+      `${sent} events on ${controls.length} wires`);
+    d.assert('and the knobs glide there: part way through, the density knob is between where it was and where it goes, and so is the engine',
+      kMid > Math.min(k0, kTo) + 0.02 && kMid < Math.max(k0, kTo) - 0.02 && midOver > Math.min(before.rate, patches[to].set[DN.name]) && midOver < Math.max(before.rate, patches[to].set[DN.name]),
+      `knob ${k0.toFixed(3)} to ${kTo.toFixed(3)}, at ${GLIDE_MS * 0.4} ms ${kMid.toFixed(3)}, engine ${midOver?.toFixed(2)}`);
+    d.assert('a patch change reaches the engine through the knobs', near(after.size, patches[to].set[SZ.name], SZ.name)
+      && near(after.rate, patches[to].set[DN.name], DN.name) && !near(before.rate, after.rate, ''),
+      `${patches[to].name}: before ${JSON.stringify(before)}, after ${JSON.stringify(after)}${moving.size ? `, moved by the patch itself: ${[...moving].join(' ')}` : ''}`);
+    d.assert('and the knobs come to rest on the patch', Math.abs(toV(DN, knobs.get(DN.name).value()) - patches[to].set[DN.name]) < patches[to].set[DN.name] * 0.001,
+      `${toV(DN, knobs.get(DN.name).value()).toFixed(3)}/s`);
+    // A hand on a knob during a glide stops that knob's glide and keeps what it turned to.
+    const back = patchAt === 0 ? 1 : 0;
+    choosePatch(back);
+    await wait(300);
+    const handK = 0.5;
+    knobs.get(SZ.name).set(handK, { from: 'hand' });
+    await wait(GLIDE_MS + 400);
+    d.assert('a hand on a knob during a glide stops that knob there, while the others arrive',
+      Math.abs(knobs.get(SZ.name).value() - handK) < 1e-6 && Math.abs(toV(DN, knobs.get(DN.name).value()) - patches[back].set[DN.name]) < patches[back].set[DN.name] * 0.001,
+      `size knob ${knobs.get(SZ.name).value().toFixed(3)}, density ${toV(DN, knobs.get(DN.name).value()).toFixed(3)}/s, still gliding: ${glidingNow().join(' ') || 'none'}`);
     const lv2 = await meterRms(1500);
     d.assert('the new patch still sounds', lv2 > 0.001, `rms ${lv2.toFixed(4)}, ${grainCount - n0} grains since`);
+    // Wet and dry. What is heard is compared with the source: at 0 it IS the
+    // source (a correlation near 1, at whatever lag the engine adds), at 1
+    // it is grains, which are other moments of it at other pitches and much
+    // less alike. The tick ink is read off both canvases.
+    const corr = () => {
+      const a = new Float32Array(2048), b = new Float32Array(2048);
+      srcTap.getFloatTimeDomainData(a); heard.getFloatTimeDomainData(b);
+      let best = 0;
+      let ea = 0; for (let i = 0; i < 1024; i++) ea += a[i] * a[i];
+      for (let L = 0; L < 1024; L += 1) {
+        let sab = 0, eb = 0;
+        for (let i = 0; i < 1024; i++) { sab += a[i] * b[i + L]; eb += b[i + L] * b[i + L]; }
+        const c = ea > 0 && eb > 0 ? sab / Math.sqrt(ea * eb) : 0;
+        if (c > best) best = c;
+      }
+      return best;
+    };
+    const corrOver = async (n = 8) => { let t = 0; for (let i = 0; i < n; i++) { t += corr(); await wait(120); } return t / n; };
+    const birthInk = () => {
+      const g = birthCanvas.getContext('2d'), px = g.getImageData(0, 0, birthCanvas.width, birthCanvas.height).data;
+      let m = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > m) m = px[i]; return m;
+    };
+    const waveInk = () => {
+      const c = wave.canvas, px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let m = 0; for (let i = 0; i < px.length; i += 4) { const y = px[i + 1] - px[i + 2]; if (y > m) m = y; } return m;
+    };
+    const atMix = async (v) => {
+      knobs.get('mix').set(v, { from: 'hand' });
+      await wait(900);
+      return { mix: v, rms: +(await meterRms(1000)).toFixed(4), corr: +(await corrOver()).toFixed(2), tick: +tickAlpha().toFixed(2), birthInk: birthInk(), waveInk: waveInk() };
+    };
+    const m0 = await atMix(0), mh = await atMix(0.5), m1 = await atMix(1);
+    const say = [m0, mh, m1].map((m) => JSON.stringify(m)).join(' ');
+    d.assert('wet/dry at 0 is the source itself, and at 1 the grains', m0.corr > 0.8 && m1.corr < m0.corr - 0.2 && m0.rms > 0.002 && m1.rms > 0.002, say);
+    d.assert('and halfway is both', mh.corr < m0.corr && mh.corr > m1.corr - 0.05 && mh.rms > 0.002, say);
+    d.assert('the grain ticks fade with the grains: faint when dry, full when wet, on both scopes',
+      m0.tick < 0.2 && m1.tick === 1 && m0.birthInk < m1.birthInk * 0.4 && m0.waveInk < m1.waveInk * 0.6, say);
     if (pageCheck) await pageCheck({ wait, gps, level: meterRms, choosePatch, events: () => events.slice(),
       knob: (name, v) => knobs.get(name).set(toK(name, v), { from: 'self' }), count: () => grainCount });
     d.log(`timing ${JSON.stringify(eng.timing)}, glitches ${engine.glitches()}`);

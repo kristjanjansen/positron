@@ -36,24 +36,45 @@
   // playing.
   //
   // The five patches are sets of control values on the one program (`/n_set`),
-  // so a patch never swaps the graph; only an edit does. The two knobs are the
-  // program's `\size` and `\density`, coloured in the code as the knobs are.
+  // so a patch never swaps the graph; only an edit does. Every one of those
+  // values is a knob (freeze a toggle) bound to its `\name` in the program,
+  // fed from the patch node over a wire and gliding there, and `\mix` is the
+  // wet/dry knob, blended in the engine. Each is coloured in the code as its
+  // knob is.
   //
   // Everything that is not the engine is `../grain-rig.mjs`, shared with 050.
   const d = mount({ name: 'concept sampler 060', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('sampler/060');
 
   const NODE = 4000, BUF = 0, DEF = 'gring';
-  const CONTROL = { size: 'size', rate: 'density' };
+  // Every control a patch sets, each a knob bound to its `\name` in the
+  // program (asked 2026-10-13, *"expose them. route patch to knobs"*). Freeze
+  // is on or off, so it is the kit's toggle and not a knob: a knob with two
+  // positions is a switch wearing a dial. The wet/dry is the rig's own.
+  const pct = (v) => `${Math.round(v * 100)}%`, secs = (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`);
+  const times = (v) => `${v.toFixed(2)}x`;
+  const CONTROLS = [
+    { name: 'size', label: 'size', kind: 'knob', min: 0.02, max: 4, warp: 'exp', fmt: secs },
+    { name: 'density', label: 'density', kind: 'knob', min: 0.5, max: 64, warp: 'exp', fmt: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` },
+    { name: 'speed', label: 'speed', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: times },
+    { name: 'back', label: 'back', kind: 'knob', min: 0, max: 4, warp: 'lin', fmt: secs },
+    { name: 'scatter', label: 'scatter', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'jitter', label: 'jitter', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: secs },
+    { name: 'pitch', label: 'pitch', kind: 'knob', min: 0.25, max: 4, warp: 'exp', fmt: times },
+    { name: 'detune', label: 'detune', kind: 'knob', min: 0, max: 0.1, warp: 'lin', fmt: (v) => `${(v * 100).toFixed(1)}%` },
+    { name: 'pan', label: 'pan', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: pct },
+    { name: 'freeze', label: 'freeze', kind: 'toggle' },
+  ];
+  const NAMES = CONTROLS.map((c) => c.name);
+  const setOf = (p) => Object.fromEntries(NAMES.map((n) => [n, valuesOf(p)[n]]));
 
   // ── the program: compiled as the page opens (no fetch), and on every edit ──
   let good = compile(PROGRAM, { name: DEF });
   if (!good.ok) d.log(`the page's own program did not compile: ${good.message}`, 'bad');
 
   // ── the engine, behind the rig's contract ────────────────────────────────
-  let eng = null, ctx = null, values = valuesOf(PATCHES[0]), swaps = 0;
+  let eng = null, ctx = null, values = valuesOf(PATCHES[0]), mixNow = 1, swaps = 0;
   const T = { bufferBytes: RING_SECONDS * 48000 * 4 };
-  const setAll = () => eng.send('/n_set', NODE, ...Object.entries(values).flat());
   /** The current program into the engine, in place of whatever runs. */
   async function start(bytes) {
     const t = performance.now();
@@ -62,7 +83,7 @@
     T.defMs = Math.round(performance.now() - t); T.defBytes = bytes.length;
     if (swaps) eng.send('/n_free', NODE);
     const go = await eng.sendAndWait((m) => m[0] === '/n_go' || (m[0] === '/fail' && m[1] === '/s_new'), 5000,
-      '/s_new', DEF, NODE, 1, 0, 'buf', BUF, 'inbus', 2, ...Object.entries(values).flat());
+      '/s_new', DEF, NODE, 1, 0, 'buf', BUF, 'inbus', 2, 'mix', mixNow, ...Object.entries(values).flat());
     if (!go || go[0] !== '/n_go') throw new Error('the grain ring did not start');
     // An edit made while stopped is ready for Play and does not run meanwhile.
     if (swaps && !window.__demo.grains?.playing()) eng.send('/n_run', NODE, 0);
@@ -70,6 +91,9 @@
   }
   const engine = {
     label: 'grain ring',
+    // The wet/dry is `\mix` in the program's last line, so the blend happens
+    // in the engine and the dry source never leaves it.
+    mixes: true,
     async boot({ ctx: ac, input, grain, log }) {
       ctx = ac;
       const t0 = performance.now();
@@ -101,18 +125,18 @@
         + `the ${good.bytes.length} B definition taken in ${T.defMs} ms`);
       return { meter: eng.meter, out: eng.out, timing: T, scsynth: eng };
     },
-    land(i) {
-      values = valuesOf(PATCHES[i]);
-      setAll();
+    // What a patch sets that is not a knob: only the read head's restart.
+    // Every value it sets is a knob's, and arrives by gliding.
+    land() {
       // The read head starts again at the write head, so a lag behind it
       // (`back`) means what it says after a stretch has left it anywhere.
       eng.send('/n_set', NODE, 'sync', 1);
       setTimeout(() => eng.send('/n_set', NODE, 'sync', 0), 40);
     },
-    knob(name, v) { values[CONTROL[name]] = v; eng.send('/n_set', NODE, CONTROL[name], v); },
+    knob(name, v) { if (name === 'mix') mixNow = v; else values[name] = v; eng.send('/n_set', NODE, name, v); },
     run(on) { eng.send('/n_run', NODE, on ? 1 : 0); },
     async read(name) {
-      const c = CONTROL[name];
+      const c = name;
       const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === c, 3000, '/s_get', NODE, c);
       return r ? Number(r[3]) : null;
     },
@@ -120,7 +144,10 @@
   };
 
   // ── the code box ─────────────────────────────────────────────────────────
-  const book = createHueBook().assign(['size', 'density']);
+  // Eleven controls and the kit's book holds six hues, so this page brings
+  // eleven, spread round the wheel and kept off the yellow and the green the
+  // site spends on what is chosen and what is live.
+  const book = createHueBook({ hues: [205, 330, 168, 278, 28, 250, 305, 186, 352, 228, 8] }).assign([...NAMES, 'mix']);
   const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM, hues: book,
     ariaLabel: 'the SuperCollider program of this granulator, edit it and it recompiles' });
   let compiles = 0, refused = 0;
@@ -136,7 +163,7 @@
         d.log(`the edit did not compile, the last good program keeps playing: ${out.message}`, 'warn');
         return out;
       }
-      const gone = ['size', 'density'].filter((n) => !out.controls.some((c) => c.name === n));
+      const gone = [...NAMES, 'mix'].filter((n) => !out.controls.some((c) => c.name === n));
       good = out;
       compiles++;
       if (eng) {
@@ -144,22 +171,23 @@
         catch (e) { d.log(`the edit compiled and the engine refused it: ${e.message}`, 'bad'); return { ok: false, error: e.message }; }
       }
       d.log(`the edit compiled in ${ms.toFixed(1)} ms into ${out.bytes.length} B and ${eng ? 'plays now' : 'plays from Play'}`
-        + (gone.length ? `, and has no \\${gone.join(' or \\')}, so that knob drives nothing` : ''), gone.length ? 'warn' : '');
+        + (gone.length ? `, and has no \\${gone.join(' or \\')}, so ${gone.length > 1 ? 'those knobs drive' : 'that knob drives'} nothing` : ''), gone.length ? 'warn' : '');
       return out;
     },
   });
 
   const rig = createGrainRig({
     d, engine,
-    patches: PATCHES.map((p) => ({ name: p.name, says: p.says, size: valuesOf(p).size, rate: valuesOf(p).density })),
-    hue: (knob) => book.hueOf(CONTROL[knob]),
+    patches: PATCHES.map((p) => ({ name: p.name, says: p.says, set: setOf(p) })),
+    controls: CONTROLS, roles: { size: 'size', density: 'density' },
+    hue: (knob) => book.hueOf(knob),
     under: [code.el],
     // The page's own checks: an edit is heard, a broken edit is not.
     check: async ({ wait, gps, level, choosePatch }) => {
       const until = async (fn, ms = 6000) => { for (let i = 0; i < ms / 100 && !fn(); i++) await wait(100); return fn(); };
       const type = (text) => { code.set(text); code.input.dispatchEvent(new Event('input', { bubbles: true })); };
       choosePatch(PATCHES.findIndex((p) => p.name === 'Stutter'));
-      await wait(1600);
+      await wait(2600);
       const before = gps();
       const edited = PROGRAM.replace('Impulse.ar(density * (1 - scatter))', 'Impulse.ar(density * 2 * (1 - scatter))');
       const c0 = compiles, s0 = swaps;

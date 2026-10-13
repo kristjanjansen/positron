@@ -40,7 +40,7 @@
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
 // SINCE 2026-10-13, FOR /concepts/sampler/060/'s GRAIN RING: `%` (opMod),
-// `.sqrt`, a 'quoted' symbol (sclang's other spelling of `\name`, and the only
+// `.sqrt`, `.sin` and `.cos` (its equal power wet and dry), a 'quoted' symbol (sclang's other spelling of `\name`, and the only
 // one that can hold a `/`), and the UGens GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames and BufDur, each from its class file
 // (see `UGENS`). A line that is only a call, like `BufWr.ar(...)` or
@@ -243,14 +243,14 @@ export function specFor(name, value) {
 
 /** `BinaryOpUGens.cpp`: opAdd 0, opSub 1, opMul 2, opIDiv 3, opFDiv 4, opMod 5. */
 export const BINARY = { '+': 0, '-': 1, '*': 2, '/': 4, '%': 5 };
-/** `UnaryOpUGens.cpp`: opNeg 0, opAbs 5, opSquared 12, opSqrt 14, opMIDICPS 17, opTanH 36. */
-export const UNARY = { neg: 0, abs: 5, squared: 12, sqrt: 14, midicps: 17, tanh: 36 };
+/** `UnaryOpUGens.cpp`: opNeg 0, opAbs 5, opSquared 12, opSqrt 14, opMIDICPS 17, opSin 28, opCos 29, opTanH 36. */
+export const UNARY = { neg: 0, abs: 5, squared: 12, sqrt: 14, midicps: 17, sin: 28, cos: 29, tanh: 36 };
 const FOLD1 = {
   neg: (x) => -x, abs: Math.abs, squared: (x) => x * x,
   // `sc_sqrt` in `SC_InlineUnaryOp.h`: the root of a negative number is the
   // negative of the root of its size, not NaN.
   sqrt: (x) => (x < 0 ? -Math.sqrt(-x) : Math.sqrt(x)),
-  midicps: (x) => 440 * 2 ** ((x - 69) / 12), tanh: Math.tanh,
+  midicps: (x) => 440 * 2 ** ((x - 69) / 12), sin: Math.sin, cos: Math.cos, tanh: Math.tanh,
 };
 /** `sc_mod` in `SC_InlineBinaryOp.h`: the result is always on the divisor's side of zero, so -0.25 % 1 is 0.75. */
 const scMod = (a, b) => (b === 0 ? 0 : a - b * Math.floor(a / b));

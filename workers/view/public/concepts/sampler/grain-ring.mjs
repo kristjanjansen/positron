@@ -7,7 +7,9 @@
 // THE PROGRAM. What comes in is written round an eight second mono buffer by
 // BufWr; GrainBuf reads grains out of it; SendReply tells the page about every
 // grain: where it read, how long it is, where the write head was, and its
-// playback rate. Every number a patch moves is a named control, so a patch is
+// playback rate. `\mix` blends the input against the grains on the last line,
+// with equal power so the middle does not dip; it is the page's wet/dry knob
+// and no patch sets it. Every number a patch moves is a named control, so a patch is
 // a set of `/n_set` values and never a different graph. An edit to the text is
 // a different graph, and the page starts it in place of the old one with the
 // same values, on the same buffer.
@@ -18,6 +20,8 @@ export const PROGRAM = `// grains read out of an eight second ring of what comes
   var buf = \\buf.kr(0);
   var frames = BufFrames.kr(buf);
   var secs = BufDur.kr(buf);
+  // what comes in, one channel
+  var input = Mix(In.ar(\\inbus.kr(2), 2)) * 0.5;
   // write what comes in round the ring, until freeze holds it
   var freeze = \\freeze.kr(0);
   var write = Phasor.ar(0, 1 - freeze, 0, frames);
@@ -36,11 +40,12 @@ export const PROGRAM = `// grains read out of an eight second ring of what comes
   var rate = TRand.ar(pitch * (1 - detune), pitch * (1 + detune), trig);
   var pan = \\pan.kr(0.5);
   var grains = GrainBuf.ar(2, trig, size, buf, rate, pos, 2, TRand.ar(pan.neg, pan, trig));
-  BufWr.ar(Mix(In.ar(\\inbus.kr(2), 2)) * 0.5 * (1 - freeze), buf, write);
+  var mix = \\mix.kr(1);
+  BufWr.ar(input * (1 - freeze), buf, write);
   // tell the page about every grain
   SendReply.ar(trig, '/grain', [pos, size, write / frames, rate]);
-  // quieter as more grains overlap
-  grains * \\amp.kr(1.5) / (density * size + 1).sqrt
+  // quieter as more grains overlap, then mix: 0 is only the input, 1 only grains
+  (grains * \\amp.kr(1.5) / (density * size + 1).sqrt * (mix * 0.5pi).sin) + (input * (mix * 0.5pi).cos)
 }`;
 
 /** The ring's length, which the page allocates and the program reads back with BufDur. */
