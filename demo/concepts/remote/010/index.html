@@ -33,6 +33,9 @@
   import { createLease } from '/shell/openers.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
   import { readPatch } from '/shell/circuit-patch.mjs';
+  import { CIRCUIT_CC } from '/shell/circuit-cc.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
 
   // The keyboard and a patch selector playing the Novation Circuit
   // that is plugged into the Raspberry Pi, the way /away/ reaches it: the Pi
@@ -41,8 +44,8 @@
   // and sends the Circuit's sound back down the same socket while a lease is
   // held.
   //
-  // 🔴 NOTHING HERE CAN WRITE THE CIRCUIT'S FLASH. Notes, two synth control
-  // changes and a program change on channel 1, patches 0 to 63, which selects
+  // 🔴 NOTHING HERE CAN WRITE THE CIRCUIT'S FLASH. Notes, the eight macro
+  // control changes (CC 80 to 87) and a program change on channel 1, patches 0 to 63, which selects
   // a synth patch into RAM. One SysEx, the nine byte Current Patch Dump Request,
   // which asks the Circuit for the patch it is holding and changes nothing. No
   // session change on 16. The board's gate refuses everything else whatever
@@ -77,22 +80,64 @@
   const S = 'web';
   const id = (n, p) => `${S}:${n}:${p}`;
   const CIRCUIT_IN = boardPort(INPUT, 'midi-in'), CIRCUIT_AUDIO = boardPort(INPUT, 'audio-out');
+  const CIRCUIT_VALUE = boardPort(INPUT, 'value-in');
   const bay = createBay();
   bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
   bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
   bay.addNode({ id: `${BOARD_SITE}:${INPUT}`, kind: 'device', label: 'Circuit on the Pi', place: ROOM });
+  // ── the eight macro knobs, each a node of its own ──────────────────────
+  // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/ ahve
+  // separate control knobs in patchbay to alter chricuit c1-c8 ? allow cc ?"*.
+  // The Circuit's macro knobs 1 to 8 are CC 80 to 87 on the synth's own
+  // channel, Synth 1 on 1 and Synth 2 on 2 (demo/shell/circuit-cc.mjs, rows
+  // `macro knob N position`; MEASURED off the Circuit's own knobs, a full 0 to
+  // 127 sweep each, research/measured-devices-2026-09-20.md "Circuit macro 7
+  // is CC 86"). This page plays Synth 1, so the knobs move Synth 1's macros.
+  // The board's gate already lets these through (rig/board/inputs.mjs
+  // `SYNTH_CC`, the `1/2` rows of the same table).
+  const MACROS = CIRCUIT_CC.filter((r) => r.ch === '1/2' && r.sec === 'Macro Knob')
+    .map((r, i) => ({ n: i + 1, cc: r.cc, name: `macro ${i + 1}`, pos: `MacroKnob${i + 1}_Position` }));
+  if (MACROS.length !== 8 || MACROS.some((m, i) => m.cc !== 80 + i)) throw new Error('the macro knobs are CC 80 to 87 and the table says otherwise');
+  for (const m of MACROS) bay.addNode({ id: `${S}:knob-macro-${m.n}`, kind: 'person', label: `macro ${m.n}`, place: 'browser' });
   bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
   bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
 
   let board = null, armed = false, lease = null;
   let sent = { note: 0, cc: 0, program: 0 }, refused = 0, lastRefusal = '', lastProgram = null;
   const midi = (bytes) => (armed && board ? board.send({ type: 'midi.send', bytes }) : false);
-  // CCs are thinned to one per controller per 30 ms, and the last one always goes.
-  const pendingCc = new Map();
-  setInterval(() => {
-    for (const [cc, v] of pendingCc) if (midi([0xB0 | (CH - 1), cc, v])) sent.cc++;
-    pendingCc.clear();
-  }, 30);
+  // ── control changes: three bytes, Bn cc vv, and nothing else ─────────────
+  // The board's gate decides what reaches the Circuit whatever a page sends;
+  // this page refuses on its own side too, so a bug here is a log line and
+  // never a byte on the wire. A CC is exactly three bytes, a status of 0xB0 on
+  // this page's channel, and two data bytes of 0 to 127.
+  const isPlainCc = (b) => Array.isArray(b) && b.length === 3 && (b[0] & 0xF0) === 0xB0 && (b[0] & 0x0F) === CH - 1
+    && Number.isInteger(b[1]) && b[1] >= 0 && b[1] <= 127 && Number.isInteger(b[2]) && b[2] >= 0 && b[2] <= 127;
+  let ccRefusedHere = 0;
+  const ccSent = new Map();       // controller -> how many went out, for a driver
+  // At most 30 a second per controller, and the last value always goes: a
+  // value that arrives inside the gap waits for the gap's end, and a newer one
+  // overtakes it rather than queueing behind it.
+  const CC_GAP_MS = Math.ceil(1000 / 30);
+  const ccq = new Map();          // controller -> { v, last, timer }
+  function sendCc(cc) {
+    const q = ccq.get(cc);
+    if (!q || q.v == null) return;
+    const bytes = [0xB0 | (CH - 1), cc, q.v];
+    q.v = null; q.last = performance.now();
+    if (!isPlainCc(bytes)) { ccRefusedHere++; d.log(`not sent: ${bytes.join(' ')} is not a three byte control change`, 'warn'); return; }
+    if (midi(bytes)) { sent.cc++; ccSent.set(cc, (ccSent.get(cc) || 0) + 1); }
+  }
+  function queueCc(cc, v) {
+    if (!armed) return;
+    const q = ccq.get(cc) ?? { v: null, last: -Infinity, timer: null };
+    ccq.set(cc, q);
+    q.v = Math.round(v);
+    if (q.timer) return;
+    const due = q.last + CC_GAP_MS - performance.now();
+    if (due <= 0) sendCc(cc);
+    else q.timer = setTimeout(() => { q.timer = null; sendCc(cc); }, due);
+  }
+  function dropCc() { for (const q of ccq.values()) { clearTimeout(q.timer); q.timer = null; q.v = null; } }
   // What reaches the Circuit's midi-in leaves for the board, and only once armed.
   function toCircuit(ev) {
     if (!armed) return;
@@ -100,7 +145,7 @@
       if (ev.d2 > 0) pressed(ev.d1);
       if (midi(ev.d2 > 0 ? [0x90 | (CH - 1), ev.d1, ev.d2] : [0x80 | (CH - 1), ev.d1, 0])) sent.note++;
     } else if (ev.cls === 'cc') {
-      pendingCc.set(ev.d1, ev.d2);
+      queueCc(ev.d1, ev.d2);
     } else if (ev.cls === 'program') {
       if (ev.d1 < 0 || ev.d1 > 63) return;
       lastProgram = [0xC0 | (CH - 1), ev.d1];
@@ -112,6 +157,15 @@
     { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
     { id: CIRCUIT_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toCircuit },
     { id: CIRCUIT_AUDIO, dir: 'out', medium: 'audio' },
+    ...MACROS.map((m) => ({ id: id(`knob-macro-${m.n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+    // A page side port on the Circuit's node: a knob's value arrives here and
+    // leaves for the Pi as its macro's control change.
+    { id: CIRCUIT_VALUE, dir: 'in', medium: 'value', shape: { of: 'param', names: MACROS.map((m) => m.name) },
+      deliver: (e) => {
+        const m = e?.of === 'param' && MACROS.find((x) => x.name === e.name);
+        if (!m || !Number.isFinite(e.v)) return;
+        queueCc(m.cc, Math.max(0, Math.min(127, e.v)));
+      } },
     { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
     { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
@@ -119,6 +173,7 @@
   const LINKS = [
     [id('keys', 'midi-out'), CIRCUIT_IN],
     [id('patch', 'midi-out'), CIRCUIT_IN],
+    ...MACROS.map((m) => [id(`knob-macro-${m.n}`, 'value-out'), CIRCUIT_VALUE]),
     [CIRCUIT_AUDIO, id('scope', 'audio-in')],
     [CIRCUIT_AUDIO, id('speaker', 'audio-in')],
   ];
@@ -266,6 +321,7 @@
     }
     lastDump = { bytes: [...p.bytes], name: p.name, at: asked };
     nameReads++;
+    if (patchAt === asked) knobsFrom(p);
     if (asked != null) names.set(asked, p.name);
     if (patchAt !== asked) return;
     showName(p.name);
@@ -295,6 +351,31 @@
   patchPick.show('');
   patchPick.disabled(true);
 
+  // ── the macro knobs ─────────────────────────────────────────────────────
+  // 🔴 WHERE A KNOB STARTS. The Circuit sends a CC when one of its own macro
+  // knobs is turned, and nothing when asked, and the board does not pass the
+  // Circuit's own MIDI back to a page anyway. What it does answer is the patch
+  // dump this page already asks for: the patch carries each macro's Position
+  // (circuit-patch.mjs `MacroKnobN_Position`, addresses 204 + 17 per knob), so
+  // on play and after every patch change the knobs move to what the patch
+  // holds, without sending. Before that they sit at 64, switched off.
+  // ⚠️ Whether the dump's Position follows a macro turned on the Circuit by
+  // hand, or only the stored patch, has not been measured.
+  let knobsRead = 0;
+  const knobs = new Map(MACROS.map((m) => [m.name, createKnob({
+    label: `M${m.n}`, title: `macro ${m.n}, CC ${m.cc} on channel ${CH}`, min: 0, max: 127, step: 1, value: 64,
+    disabled: true,
+    onInput: (v) => bay.send(id(`knob-macro-${m.n}`, 'value-out'), { of: 'param', name: m.name, v }),
+  })]));
+  const knobGrid = createKnobGrid(knobs, { row: true });
+  const knobsOn = (yes) => { for (const k of knobs.values()) k.enable(yes); };
+  function knobsFrom(p) {
+    try {
+      for (const m of MACROS) knobs.get(m.name).set(p.value(m.pos), { from: 'patch', quiet: true });
+      knobsRead++;
+    } catch (e) { d.log(`The macro positions did not read out of the patch, ${e.message}`, 'warn'); }
+  }
+
   // ── the keyboard ────────────────────────────────────────────────────────
   const host = el('div');
   const kb = createKeyboard(host, {
@@ -302,6 +383,98 @@
     onDown: (note, how) => { if (how === 'midi') return; bay.send(id('keys', 'midi-out'), { cls: 'note', ch: CH, d1: note, d2: 100 }); },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(id('keys', 'midi-out'), { cls: 'note', ch: CH, d1: note, d2: 0 }); },
   });
+
+  // ── MIDI in: keyboards and controllers plugged into this machine ────────
+  // Asked 2026-10-13: *"add midi in to https://positron.studio/concepts/remote/010"*.
+  // The same shape as /concepts/synth/120/ and 000/ (there is no kit module for
+  // it yet): every input is a node, `web:midi`, `web:midi-2`, ..., with a
+  // midi wire into `pi-1:circuit:midi-in`, the path the on-screen keys take,
+  // so its notes land on Synth 1's channel like theirs.
+  // 🔴 ASKED FOR ON THE PLAY PRESS, NEVER ON LOAD, AND WITH `sysex: false`.
+  // 🔴 WHAT PASSES: note on, note off, and a control change whose number is
+  // one of the Circuit's synth controls (circuit-cc.mjs, the `1/2` rows, the
+  // same table the Pi's gate allows). Everything else a device sends is
+  // dropped here and counted: SysEx (which `sysex: false` never delivers
+  // anyway), program change, pitch bend, aftertouch, clock, and any CC the
+  // Circuit's synth does not take. A CC that is a macro (80 to 87) moves that
+  // macro's knob on screen, quietly, so it is sent once, by the device's wire.
+  const SYNTH_CCS = new Set(CIRCUIT_CC.filter((r) => r.ch === '1/2').map((r) => r.cc));
+  const plugged = new Set();
+  const shown = (pid) => !pid.startsWith(`${S}:midi`) || plugged.has(pid.split(':').slice(0, 2).join(':'));
+  const slots = new Map(), devHeld = new Map(), devLinks = new Map();
+  const slotFor = (p) => {
+    if (!slots.has(p.id)) slots.set(p.id, slots.size ? `${S}:midi-${slots.size + 1}` : `${S}:midi`);
+    return slots.get(p.id);
+  };
+  const wired = new WeakSet();
+  const devIn = { note: 0, cc: 0, dropped: 0 };
+  const droppedSaid = new Set();
+  function drop(what) {
+    devIn.dropped++;
+    if (droppedSaid.has(what)) return;
+    droppedSaid.add(what);
+    d.log(`MIDI in: ${what} is not passed to the Circuit`, 'warn');
+  }
+  function fromDevice(e) {
+    const node = slots.get(e.target.id);
+    if (!node || !plugged.has(node)) return;
+    const data = e.data;
+    const st = data[0] & 0xF0;
+    if (data[0] >= 0xF0) { if (data[0] !== 0xF8 && data[0] !== 0xFE) drop(data[0] === 0xF0 ? 'SysEx' : 'a system message'); return; }
+    if (data.length !== 3) { drop(st === 0xC0 ? 'program change' : st === 0xD0 ? 'channel pressure' : 'a short message'); return; }
+    const [, d1, d2] = data;
+    if (st === 0x90 || st === 0x80) {
+      const on = st === 0x90 && d2 > 0;
+      const h = devHeld.get(node);
+      if (on) h.add(d1); else h.delete(d1);
+      kb.lightNote?.(d1, on);
+      devIn.note++;
+      bay.send(`${node}:midi-out`, { cls: 'note', ch: CH, d1, d2: on ? d2 : 0 });
+      return;
+    }
+    if (st === 0xB0) {
+      if (!SYNTH_CCS.has(d1)) { drop(`CC ${d1}`); return; }
+      const m = MACROS.find((x) => x.cc === d1);
+      if (m) knobs.get(m.name).set(d2, { from: 'hardware', quiet: true });
+      devIn.cc++;
+      bay.send(`${node}:midi-out`, { cls: 'cc', ch: CH, d1, d2 });
+      return;
+    }
+    drop(st === 0xE0 ? 'pitch bend' : st === 0xA0 ? 'aftertouch' : 'that message');
+  }
+  function plug(p) {
+    const node = slotFor(p);
+    bay.addNode({ id: node, kind: 'device', label: p.name || 'MIDI keyboard', place: 'browser' });
+    if (plugged.has(node)) return;
+    bay.addPort({ id: `${node}:midi-out`, label: `${node.split(':')[1]}:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
+    const r = bay.link(`${node}:midi-out`, CIRCUIT_IN, [], { site: S });
+    if (!r.ok) d.log(`${node}:midi-out -> ${CIRCUIT_IN} refused: ${r.why}`, 'warn');
+    plugged.add(node); devHeld.set(node, new Set()); devLinks.set(node, r.ok ? [r.id] : []);
+    if (!wired.has(p)) { p.addEventListener('midimessage', fromDevice); wired.add(p); }
+    d.log(`MIDI in: ${p.name || 'unnamed port'} as ${node}`);
+  }
+  function unplug(node) {
+    for (const n of devHeld.get(node) || []) { kb.lightNote?.(n, false); bay.send(`${node}:midi-out`, { cls: 'note', ch: CH, d1: n, d2: 0 }); }
+    for (const lid of devLinks.get(node) || []) bay.unlink(lid);
+    plugged.delete(node); devHeld.delete(node); devLinks.delete(node);
+    d.log(`MIDI in gone: ${bay.node?.(node)?.label || node}`);
+  }
+  function devices(access) {
+    const now = new Set();
+    for (const p of access.inputs.values()) if (p.state !== 'disconnected') { plug(p); now.add(slotFor(p)); }
+    for (const node of [...plugged]) if (!now.has(node)) unplug(node);
+    pb.refresh?.();
+  }
+  let midiAsked = false;
+  function askMidi() {
+    if (midiAsked || !navigator.requestMIDIAccess) return;
+    midiAsked = true;
+    navigator.requestMIDIAccess({ sysex: false }).then((access) => {
+      devices(access);
+      access.onstatechange = () => devices(access);
+      if (!access.inputs.size) d.log('MIDI in: no keyboard or controller is plugged into this machine');
+    }, (e) => d.log(`MIDI in: the browser did not give access (${e?.message || 'refused'})`, 'warn'));
+  }
 
   // ── play: join the Circuit's room, ask the board, hold the lease ─────────
   let saidLast = '';
@@ -349,6 +522,8 @@
       lease = createLease({ ask: (m, r, t) => board.ask(m, r, t), what: 'the Circuit capture', log: (line, kind) => d.log(line, kind) });
       armed = true;
       patchPick.disabled(false);
+      knobsOn(true);
+      askMidi();
       say('The Circuit on the Raspberry Pi, play the keys');
       transport.setIcon('play', 'stop', 'stop');
       readName();
@@ -359,9 +534,10 @@
     if (armed && board) board.send({ type: 'midi.panic' });
     armed = false;
     lease?.stop(); lease = null;
-    pendingCc.clear();
+    dropCc();
     kb.panic?.();
     patchPick.disabled(true);
+    knobsOn(false);
     transport.setIcon('play', 'play', 'play');
     say('Stopped, every note on the Circuit was released');
   }
@@ -504,20 +680,27 @@
 
   // ── the patchbay ────────────────────────────────────────────────────────
   const sounding = () => armed && level > 0.002;
-  const pb = createPatchbay(bay, { room: ROOM,
+  const pb = createPatchbay({
+    nodes: () => bay.nodes().filter((n) => shown(n.id)),
+    ports: () => bay.ports().filter((p) => shown(p.id)),
+    links: () => bay.links(),
+  }, { room: ROOM,
     flowing: (l) => (l.from === CIRCUIT_AUDIO ? sounding() : l.from === CAM_OUT ? !!cam?.flowing() : armed),
   });
   setInterval(() => pb.refresh?.(), 500);
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, ...(cam ? [cam.el] : []), wave.el, patchPick.el, host, pb.el);
+  d.stack.add(top, ...(cam ? [cam.el] : []), wave.el, patchPick.el, knobGrid.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
     armed, level, span: () => span, clipped: () => clipped, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
     patchAt, patchName, nameReads, nameMisses, lastDump, stale, names: () => Object.fromEntries(names), shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
+    macros: MACROS.map((m) => ({ n: m.n, cc: m.cc, value: knobs.get(m.name).value(), sent: ccSent.get(m.cc) || 0 })),
+    ccRefusedHere, knobsRead, ccGapMs: CC_GAP_MS,
+    midiIn: { asked: midiAsked, plugged: [...plugged], ...devIn },
     cam: cam ? cam.probe() : null,
   });
   d.ready();
