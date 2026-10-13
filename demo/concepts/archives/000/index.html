@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Newsreels</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script src="/proto/remixer/hls.min.js"></script>
+<style>
+  /* THE FRAME: a picture and three controls on it, and nothing under it. Asked
+     2026-10-13: *"custom videoframe with play and mute and fullscreen control
+     ... no footer"*. The controls sit on the picture's lower edge, so the frame
+     is one box with one edge. */
+  .ar-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000;
+              border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .ar-frame video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+  .ar-ctl { position: absolute; left: 10px; right: 10px; bottom: 10px;
+            display: flex; gap: 8px; pointer-events: none; }
+  .ar-ctl > button { pointer-events: auto; }
+  .ar-ctl > .ar-end { margin-left: auto; }
+  /* Full screen by either route sets `.pos-full` (fullscreen.mjs); the picture
+     takes the whole screen and gives up its edge. A class, never `:fullscreen`. */
+  .ar-frame.pos-full { aspect-ratio: auto; width: 100vw; height: 100vh; border: 0; border-radius: 0; }
+</style>
+
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createIconButton } from '/shell/icon-button.mjs';
+  import * as FS from '/shell/fullscreen.mjs';
+  import { ifSelfcheck, SELFCHECK } from '/shell/selfcheck.mjs';
+  import { mediaMaster } from '/timeline/media-master.mjs';
+  import { createReelLine, YEAR_FROM, YEAR_TO, ARHIIV, iso, sentenceCase } from '/shell/reel-line.mjs';
+
+  // /reel/ as a concept page: a day's newsreel and that day's radio are two
+  // boxes in a patchbay, wired into this tab's picture and speakers, on
+  // /reel/'s own line (demo/shell/reel-line.mjs, shared, not copied).
+  //
+  // 🔴 NOTHING OPENS ON A VISIT, AND A CHECK NEVER REACHES ERR. Every URL for
+  // the archive goes through `reachERR` and is counted, a visit asserts zero,
+  // and under `?selfcheck=1` the play press picks a day and opens nothing, as
+  // on /reel/. `?base=` points the page at demo/fake-arhiiv.mjs instead of
+  // arhiiv.err.ee, which is how anything here is ever played by a machine.
+  const BASE = new URLSearchParams(location.search).get('base') || ARHIIV;
+  let errOpens = 0;
+  const reachERR = (url) => { errOpens += 1; return url; };
+  // /reel/'s gate, for /reel/'s measured reason: Chrome answers "maybe" to
+  // canPlayType for HLS and then never joins the separate audio group.
+  const NATIVE_HLS = 'ManagedMediaSource' in window
+    && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+
+  const d = mount({ name: 'concept archives 000', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('archives/000');
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  // Two outside sources, because they are two archives: the film archive's
+  // newsreel and the radio archive's programme. Each is an `external` node, so
+  // a link out of it needs `consent: true`, named here where the patch is
+  // held. Holding a link opens nothing; the press does.
+  const S = 'web';
+  const REEL_OUT = 'err:newsreel:video-out', RADIO_OUT = 'err:radio:audio-out';
+  const SCREEN_IN = `${S}:screen:video-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
+  const bay = createBay();
+  bay.addNode({ id: 'err:newsreel', kind: 'external', label: 'newsreel', place: 'err', net: 'err' });
+  bay.addPort({ id: REEL_OUT, label: 'newsreel', dir: 'out', medium: 'video', transports: ['https'] });
+  bay.addNode({ id: 'err:radio', kind: 'external', label: 'radio', place: 'err', net: 'err' });
+  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio', transports: ['https'] });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture', place: 'browser' });
+  bay.addPort({ id: SCREEN_IN, label: 'picture', dir: 'in', medium: 'video' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+
+  const held = new Map();
+  function hold(a, b, opts) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return true;
+    bay.seen(a); bay.seen(b);
+    const r = bay.link(a, b, [], { site: S, ...opts });
+    if (r.ok) { held.set(k, r.id); return true; }
+    d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+    return false;
+  }
+  hold(REEL_OUT, SCREEN_IN, { consent: true, via: 'https' });
+  hold(RADIO_OUT, SPEAKER_IN, { consent: true, via: 'https' });
+
+  // ── the frame ───────────────────────────────────────────────────────────
+  const film = el('video', '', null, { playsinline: '' });
+  // The radio, hidden and driven: the picture is the player and the sound
+  // follows it. A day with no film plays its radio in the picture's own
+  // element, so the frame's controls are still real controls (as on /reel/).
+  const wireless = el('audio');
+  wireless.hidden = true;
+  const hasSound = () => !!(wireless.getAttribute('src') || aHls);
+  let hls = null, aHls = null, opened = null, muted = false, pb = null;
+  const going = () => !!opened && (!film.paused || (hasSound() && !wireless.paused));
+
+  const frame = el('div', 'ar-frame');
+  const playBtn = createIconButton({ icon: 'play', label: 'play', onPress: () => (going() ? command.pause() : command.play()) });
+  const muteBtn = createIconButton({ icon: 'volume', label: 'mute', onPress: () => setMuted(!muted) });
+  const fullBtn = createIconButton({ icon: 'fullscreen', label: 'fill the screen', onPress: () => FS.toggle(frame).then(face) });
+  fullBtn.el.classList.add('ar-end');
+  const ctl = el('div', 'ar-ctl');
+  ctl.append(playBtn.el, muteBtn.el, fullBtn.el);
+  frame.append(film, ctl, wireless);
+  FS.watch(frame, () => face());
+
+  function setMuted(m) {
+    muted = !!m;
+    film.muted = muted;
+    wireless.muted = muted;
+    face();
+  }
+  function face() {
+    const on = going();
+    playBtn.set(on ? 'pause' : 'play', on ? 'pause' : 'play');
+    muteBtn.set(muted ? 'mute' : 'volume', muted ? 'unmute' : 'mute');
+    const full = FS.isFull(frame);
+    fullBtn.set(full ? 'fullscreen-exit' : 'fullscreen', full ? 'leave full screen' : 'fill the screen');
+    pb?.refresh();
+  }
+
+  // ── the line ────────────────────────────────────────────────────────────
+  // /reel/'s line, the same module: a press on a mark plays it, a scrub that
+  // comes to rest keeps going if something was going and otherwise only picks.
+  const line = createReelLine({
+    onPress: (it) => play(it),
+    onLand: (it) => { if (going()) play(it); else select(it); },
+  });
+  const deck = line.deck;
+  const lineHost = el('div');
+  // No footer under the line (*"no footer"*): the strip's own tooltip says
+  // the same three lines on hover.
+  const view = line.mount(lineHost, { footer: false });
+  // THE PICTURE IS THE MASTER AND THE YEAR FOLLOWS IT, as on /reel/.
+  const master = mediaMaster(deck, film, { anchorMs: () => (line.current ? line.current.at : YEAR_FROM) });
+
+  pb = createPatchbay(bay, {
+    flowing: (l) => {
+      if (!opened) return false;
+      const { picture, sound } = line.halves;
+      if (l.from === REEL_OUT) return !!picture && !film.paused;
+      if (l.from === RADIO_OUT) return !!sound && (picture ? !wireless.paused : !film.paused);
+      return false;
+    },
+  });
+
+  // ── picking a day, and opening one ──────────────────────────────────────
+  // /reel/'s split: picking is free and opens nothing; `play` is the only
+  // thing that reaches for the archive, and only a press calls it.
+  function select(it, { empty = true } = {}) {
+    close(empty);
+    return line.pick(it);
+  }
+  function close(empty = true) {
+    opened = null;
+    film.pause(); wireless.pause();
+    if (hls) { hls.destroy(); hls = null; }
+    if (aHls) { aHls.destroy(); aHls = null; }
+    wireless.removeAttribute('src'); wireless.load();
+    if (empty) { film.removeAttribute('src'); film.load(); }
+    face();
+  }
+  const attach = (media, url, isFilm) => {
+    if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) { media.src = reachERR(url); return true; }
+    const h = new window.Hls({ enableWorker: true });
+    h.loadSource(reachERR(url)); h.attachMedia(media);
+    if (isFilm) hls = h; else aHls = h;
+    return true;
+  };
+
+  // STREAMS, STORES NOTHING, exactly as /reel/: one content GET for the media
+  // url, then the element is given it.
+  async function play(it) {
+    // Bless the element inside the gesture, before anything is awaited.
+    (it.kind === 'audio' ? wireless : film).play().catch(() => {});
+    const { picture, sound } = select(it, { empty: false });
+    const streamOf = async (item, kind) => {
+      try {
+        const r = await fetch(reachERR(`${BASE}/api/v1/content/${kind}/${encodeURIComponent(item.slug)}`));
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const raw = (j?.data?.media || j?.media)?.src?.hls;
+        if (!raw) { d.log(`${item.slug}: no stream offered`, 'bad'); return null; }
+        return raw.startsWith('//') ? `https:${raw}` : raw;
+      } catch (e) {
+        d.log(`could not ask the archive for ${item.slug}: ${e.message}`, 'bad');
+        return null;
+      }
+    };
+    const src = picture ? await streamOf(picture, 'video') : null;
+    if (picture && !src) { close(); return; }
+    const su = sound ? await streamOf(sound, 'audio') : null;
+    if (!picture) {
+      if (!su) { close(); return; }
+      attach(film, su, true);
+      opened = it;
+      film.muted = muted;
+      await film.play().catch(() => {});
+      d.log(`playing the radio of ${sound.date}: ${sentenceCase(sound.title).slice(0, 40)}`, 'hi');
+      face();
+      return;
+    }
+    if (su) { attach(wireless, su, false); wireless.muted = muted; wireless.play().catch(() => {}); }
+    attach(film, src, true);
+    opened = it;
+    film.muted = muted;
+    try { await film.play(); } catch {
+      // A browser may still refuse sound; a muted picture beats none, and the
+      // mute button is then the way to the sound.
+      setMuted(true);
+      await film.play().catch(() => {});
+      d.log('the browser refused sound. Press the speaker to hear it', 'bad');
+    }
+    d.log(`playing the newsreel of ${picture.date}${su ? ' with that day\'s radio' : ', silent: no radio survives from this day'}`, 'hi');
+    face();
+  }
+
+  // THE PICTURE DRIVES THE SOUND, as on /reel/: start and stop together, and a
+  // seek takes the radio to the same offset where it is long enough.
+  const follow = () => {
+    if (hasSound()) { if (film.paused) wireless.pause(); else wireless.play().catch(() => {}); }
+    face();
+  };
+  film.addEventListener('play', () => { if (!deck.playing()) deck.play(); follow(); });
+  film.addEventListener('pause', () => { if (deck.playing()) deck.pause(); follow(); });
+  film.addEventListener('seeked', () => {
+    if (!hasSound()) return;
+    const t = film.currentTime;
+    if (Number.isFinite(wireless.duration) && t <= wireless.duration
+        && Math.abs(wireless.currentTime - t) > 0.25) wireless.currentTime = t;
+  });
+  film.addEventListener('loadedmetadata', () => {
+    const it = line.halves.picture;
+    if (!it || opened == null || !Number.isFinite(film.duration)) return;
+    it.playedMs = Math.round(film.duration * 1000);
+    line.gutters();
+  });
+
+  // The frame's play and pause. Nothing picked: the first mark from the
+  // playhead, and under `?selfcheck=1` only picked, never opened (/reel/'s rule
+  // for a harness press).
+  const command = {
+    play: () => {
+      const current = line.current;
+      if (!current) {
+        const first = line.firstFromPlayhead();
+        if (!first) { d.log('nothing to play yet, the archive list has not arrived'); return; }
+        if (SELFCHECK) {
+          select(first);
+          d.log(`picked the first mark, ${first.date}, and opened nothing: a check never reaches ERR`);
+          return;
+        }
+        play(first);
+        return;
+      }
+      if (opened !== current) { play(current); return; }
+      film.play().catch(() => {});
+      if (hasSound() && wireless.paused) wireless.play().catch(() => {});
+      face();
+    },
+    pause: () => { film.pause(); if (hasSound()) wireless.pause(); deck.pause(); face(); },
+  };
+
+  d.stack.add(frame, lineHost, pb.el);
+  face();
+
+  // ── load the year ───────────────────────────────────────────────────────
+  (async () => {
+    await line.ready;
+    const { items, radio, sharedDays, openOn } = line;
+    d.log(`${items.length} newsreels and ${radio.length} radio programmes, `
+      + `${sharedDays} days with both. Nothing is asked of ERR until you play one`);
+    window.__strip = view.strip;
+
+    d.assert('the line is positioned in 1965', deck.position() >= YEAR_FROM && deck.position() < YEAR_TO, iso(deck.position()));
+    d.assert('the whole year is on it', items.length > 250 && radio.length > 0, `${items.length} newsreels, ${radio.length} radio`);
+    d.assert('the picture is the transport master, so the line follows it', !!master);
+    d.assert('a visit opens nothing at ERR', errOpens === 0, `${errOpens} reaches since the page loaded`);
+    d.assert('the frame has three controls and no footer',
+      frame.querySelectorAll('button').length === 3 && !frame.querySelector('.pos-vp-foot'),
+      [...frame.querySelectorAll('button')].map((b) => b.getAttribute('aria-label')).join(', '));
+    d.assert('the newsreel and the radio are two boxes, each wired to its own end',
+      held.size === 2 && bay.links().length === 2, bay.links().map((l) => `${l.from} -> ${l.to}`).join(', '));
+
+    ifSelfcheck(() => {
+      // PRESSES THE FRAME'S OWN BUTTONS, so it is behind the gate. With nothing
+      // picked, play picks the first mark and opens nothing; mute flips both
+      // elements and opens nothing; then the page goes back to how a visitor
+      // finds it.
+      const before = errOpens;
+      playBtn.el.click();
+      const picked = line.current;
+      muteBtn.el.click();
+      const mutedBoth = film.muted && wireless.muted;
+      muteBtn.el.click();
+      const reaches = errOpens - before;
+      d.assert('play under a check picks the first mark and opens nothing at ERR',
+        !!picked && picked.at >= openOn.at - 86400000 && reaches === 0 && !opened,
+        `${picked?.date}, ${reaches} reaches`);
+      d.assert('mute silences the picture and the radio together, and unmutes them',
+        mutedBoth && !film.muted && !wireless.muted, `${mutedBoth}`);
+      const a = line.nearestOf(items[0].at + 3600000, items), b = line.nearestOf(items[1].at - 3600000, items);
+      d.assert('a scrub lands on the broadcast nearest where it stopped', a === items[0] && b === items[1], `${a?.date} then ${b?.date}`);
+      select(null);
+    });
+    d.ready();
+  })().catch((e) => d.fail(e));
+</script>
+</html>

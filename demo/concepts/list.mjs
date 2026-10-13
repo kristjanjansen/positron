@@ -96,6 +96,9 @@ export const CONCEPTS = [
   // clock/030 Shared clock moved to /archive/ 2026-10-12 (*"Cut it"*): both places were simulated in one tab.
   // clock/040 MIDI clock and clock/050 Clock drift moved to /archive/ 2026-10-12 (*"still too many clock demos, i can not distinguish"*, *"move less relevant to archive"*).
   // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
+  // archives (asked 2026-10-13, *"make archives concept group. do reel-demo-like patchbay version"*):
+  // /reel/ with the newsreel and the radio as two boxes, on /reel/'s line (demo/shell/reel-line.mjs).
+  { n: 'archives/000', title: 'Newsreels', say: 'ERR\'s 1965 newsreels on a line, each silent film and that day\'s surviving radio as two boxes.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
@@ -116,7 +119,9 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock', 'archives'];
+// `archives` is also the first of CASE_GROUPS; as a concept group it keeps the same place on
+// /concepts/ (right after clock) and its demo rows (reel, floor, tapes) draw as demo cards beside archives/000.
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
 // reads as the owner asked for it, *"remote instruments"* (2026-10-13).
 export const GROUP_TITLES = { synth: 'instruments', remote: 'remote instruments' };
