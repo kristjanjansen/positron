@@ -1,4 +1,5 @@
 ## Open
+- **A "remote synths" concept group; archive fau, collide, muta** (2026-10-13). Asked: *"archve fau collide muta"*, then *"make group remote synths and move pi-playing ones there"*. (1) fau, collide, muta: unlisted, still served, DEMO_CARDS out, on /archive/. (2) a new concept group for the synth pages that play on the Raspberry Pi (synth/060 Yoshimi, synth/070 Circuit, synth/100 Collide on Pi), moved out of synth with their files, numbers and links.
 - ~~**rm synth/130**~~ (2026-10-13). Asked: *"rm https://positron.studio/concepts/synth/130/"*. DONE by the session: page and row removed, the dump card no longer points at it.
 - ~~**Frontpage hero: the headline's full stop yellow**~~ (2026-10-12). Asked: *"g. -> yellow dot"*. DONE by the session.
 - ~~**Frontpage desk patchbay: 3 by 3 that makes sense**~~ (2026-10-12). Asked: *"3 x 3 blocks in desktop"*, *"make them make sense"*. DONE by the session: keys, a Pico knob and a camera; Cloudflare relay, the Pi GPU and Stream; the Circuit on the Pi, this screen and every phone watching. Nine wires, each a real use. Then *"Rm one box from desktop center"*: the Pi GPU out, the middle is the relay and Stream.
