@@ -751,6 +751,22 @@ canvas {
    cannot read — a deliberate zoom is somebody asking, an accidental one is the
    page misfiring, and only the second is a bug. */
 html, body { touch-action: manipulation; }
+/* 🔴 AND ON THE CONTROL ITSELF, BECAUSE AN ANCESTOR'S VALUE IS NOT ALWAYS THE
+   ONE SAFARI READS. Reported 2026-10-13 from an iPhone: *"Dbltap should not
+   zoom"*. The effective `touch-action` on an element is the intersection down
+   its ancestors, and a control inside anything that sets its own (`pan-x` on
+   the key row, `pan-y` on a scroller) inherits that value rather than
+   `manipulation`. Stating it on every interactive element closes that.
+   ⚠️ `:where()` SO IT WEIGHS NOTHING. Every rule that already sets a
+   `touch-action` (`none` on a knob, a slider lane or a pad that drags, `pan-x`
+   on the keys) beats this at any position in the file, so this only fills the
+   elements nobody stated. The key row's double tap is handled in keyboard.mjs,
+   because `pan-x` there is load bearing.
+   ⚠️ PINCH STAYS. `manipulation` is pan plus pinch zoom, minus double tap. */
+:where(button, select, input, label, summary, a[href], [role="button"],
+       [role="slider"], [role="switch"], [role="tab"], [tabindex]) {
+  touch-action: manipulation;
+}
 button:active { background: var(--card); }
 button[disabled] { opacity: .4; cursor: default; }
 /* ⚠️ THE GLOW IS A HALO, NOT A BIGGER BUTTON. `box-shadow` costs no layout, so
@@ -2271,7 +2287,7 @@ video[hidden] { display: none; }
    content-sized column between one slider and the next, which is what made the
    gaps look uneven when they were all the same number. */
 /* 🔴 THE COLUMN GAP IS A NUMBER OTHER THINGS HAVE TO AGREE WITH, so it is named
-   rather than typed. `/radio/` puts a picker in the same column as these
+   rather than typed. `/archive/radio/` puts a picker in the same column as these
    sliders and has to start its control at the same x — it set its own gap to 0
    against a grid that has twelve, and the row sat 12 px to the left of every
    lane under it. REPORTED three times, the last one after a component swap had
@@ -2726,7 +2742,7 @@ button.pos-pg-pad:hover { filter: brightness(1.35); }
    three thousand lines down, because that is the rule they have to beat and
    this one came first. See the block there, which carries the measurement.
    🔴 `--pg-lab` IS A FLOOR AND THE WIDEST NAME IS THE WIDTH, SINCE 2026-10-12.
-   Asked for as a 16 by 4 drum grid with its rows named (`/rhythm/drum-machine/`:
+   Asked for as a 16 by 4 drum grid with its rows named (`/rhythm/drums/`:
    kick, snare, open hat, closed hat). At a fixed 22 px every name past two
    letters was clipped, which is the `/tom/` defect above in a new costume.
    `max-content` sizes the column to the widest label, so a grid of numbers
@@ -2880,7 +2896,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
      auto` never shrinks a button below its word, so every pixel of padding
      here is a pixel of a row that has to be dragged. MEASURED at 390 px:
      `/click/`'s three rates still share the row whole at 12 px, with nothing to
-     scroll either way. But `/radio/`'s EIGHT stations go from 97 px of drag to
+     scroll either way. But `/archive/radio/`'s EIGHT stations go from 97 px of drag to
      **161 px**. Eight names cannot fit 390 px at any padding, so this buys air
      on every row that fits and costs 64 px of travel on the one row that never
      did. That is the trade, said out loud; if it ever has to come back, this
@@ -3269,7 +3285,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
 .pos-scope-gut { font: 400 11px/1.5 var(--mono); color: var(--dim2); margin: 6px 0 0; }
 /* 🔴 A GLUED SCOPE DRAWS ONE BORDER, NOT TWO. Reported 2026-09-21 with two
    screenshots, *"rm double bordering"* against `/pack/` and *"rm thick borders
-   round waveform and 'the radio as it arrives'"* against `/radio/`, which are
+   round waveform and 'the radio as it arrives'"* against `/archive/radio/`, which are
    the same fault described from two pages.
    ✅ MEASURED rather than guessed: the canvas computes `1px solid rgb(31, 41,
    55)` and its `.pos-glue` parent computes the same 1 px in the same colour,
@@ -3285,11 +3301,11 @@ button.pos-pg-lab:hover { color: var(--fg); }
    ground, so a part with no background of its own lets that colour through its
    whole area and the caption would sit on the seam. A margin inside a glue is
    the seam becoming a gap. */
-/* ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT. `/radio/` glues the scope straight in
+/* ⚠️ ONE LEVEL DEEP AS WELL AS DIRECT. `/archive/radio/` glues the scope straight in
    and `/pack/` wraps it in the element that paints its part's ground, which is
    what `.pos-glue` requires of every child, so a direct-child selector fixed
    one page and left the other exactly as reported. MEASURED: the canvas read
-   1 px on `/pack/` and 0 on `/radio/` from the same rule. */
+   1 px on `/pack/` and 0 on `/archive/radio/` from the same rule. */
 /* 🔴 AND THE CANVAS BORDER READINGS ABOVE ARE DATED 2026-09-21 AND ARE NO
    LONGER WHAT THIS STYLESHEET DOES. `.pos-scope-c` reads `border: var(--edge)`
    and `.pos-glue.pos-glue > *` sets `--edge: 0`, which INHERITS to any depth,
@@ -3890,7 +3906,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    `grid-template-columns: 1fr`, so every child got a row of its own and the die
    dropped UNDER the segment with `justify-self: start` parking it at the far
    left, a whole row away from the arrows it works with. REPORTED on
-   `/radio/`'s SOUND row and `/mirror/`'s LOOK row. MEASURED at 390 px on
+   `/archive/radio/`'s SOUND row and `/mirror/`'s LOOK row. MEASURED at 390 px on
    `/mirror/` before this: segment at y 216.5, die at y 254.5 and x 16, under
    the LABEL rather than beside anything.
    🔴 A WRAPPING FLEX ROW, NOT `1fr auto`, AND THE GRID WAS TRIED FIRST AND
@@ -4741,7 +4757,7 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
    that brings its own `title` was getting the body's ordinary 22 px rhythm
    instead: two headings over two pictures on two pages at two distances, which
    is the defect CLAUDE.md's vertical spacing rule exists to stop. Photographed
-   against `/radio/`, which uses the standing heading and therefore looked
+   against `/archive/radio/`, which uses the standing heading and therefore looked
    right. 44 in both cases, declared in one place. */
 .pos-body > .pos-dg { margin-top: 44px; }
 /* ⚠️ AND `.pos-how` KEEPS ITS OWN `margin-bottom` FOR EXACTLY THIS PAIR. It is
