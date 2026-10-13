@@ -1,4 +1,5 @@
 ## Open
+- **Granulator: more interesting patches, a Dub patch, Ida recording and Dub as the defaults** (2026-10-13). Asked: *"make more interstin ganulator parches. do dub, put ida rec default and dub degault"*. On /concepts/sampler/060/ (Grain ring): richer patches, one called Dub, the source picker opening on the Ida recording and the patch picker on Dub.
 - ~~**Sampler: rm Copy log**~~ (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/sampler/000/ rm copy log"*. DONE: the button is gone; `await __demo.copyLog()` still copies the journal.
 - ~~**Rename the Plaits pages**~~ (2026-10-13). Asked: *"rename plaits panel / synth"*; chose *"Plaits patches / Plaits keys"*. DONE: synth/110 Plaits patches, synth/120 Plaits keys.
 - **synth/110: the notes timeline** (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/synth/110/ use notes timeline"*. The loop drawn as notes on the kit timeline (as synth/020 Timeline draws a take), in place of its strip.
