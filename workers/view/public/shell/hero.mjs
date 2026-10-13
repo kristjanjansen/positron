@@ -156,10 +156,14 @@ export function createHero({ tag = 'h2' } = {}) {
   const fit = () => { if (drawW) inner.style.zoom = String(Math.min(1, frame.clientWidth / drawW)); };
   function draw() {
     const phone = phoneQ.matches, bay = bayOf(phone ? PHONE : DESK);
-    drawW = phone ? 520 : 760;
+    drawW = phone ? 520 : 900;   // 900 at the desk leaves the wires about twice the room
     inner.style.width = `${drawW}px`;
     // Every column the same width: boxes at a row-of-n width, no stretch.
-    const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false, sizeAs: phone ? 2 : 3 });
+    const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false,
+      // Wider gaps between the columns, about twice the bay's 48 px (asked
+      // 2026-10-13: *"make frontpage patchbays horz gap 2x wider"*): boxes are
+      // sized as if the row held more of them, and the wires take the rest.
+      sizeAs: phone ? 2.2 : 4 });
     inner.replaceChildren(view.el);
     const feed = feeds();
     for (const l of bay.links()) life.add(view, l.id, bay.portMap.get(l.from).medium, feed[l.from]);
