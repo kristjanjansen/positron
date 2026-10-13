@@ -77,6 +77,12 @@
   /* The wordmark sits on the Feedback row (see the script), so the hero starts
      at its headline; the space above the row is a little less than a demo
      page's, asked 2026-10-13 (*"Keep top whitespace, perhaps bit less"*). */
+  /* the footer: one line of three cells at the desk, stacked on a phone */
+  .cc-foot { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 56px; padding: 20px 0 32px; border-top: 1px solid var(--line); font: 400 13px/1.5 var(--mono); }
+  .cc-foot-c { color: var(--dim); text-decoration: none; }
+  a.cc-foot-c:hover { color: var(--fg); }
+  .cc-foot-y { margin-left: auto; color: var(--dim2); }
+  @media (max-width: 599px) { .cc-foot { flex-direction: column; } .cc-foot-y { margin-left: 0; } }
   .pos-title .pos-hero-eye { margin: 0; flex: 1 1 auto; }
   .pos-hero.pos-hero-index { padding-top: 8px; }
   .pos-hero-index .pos-hero-h { margin-top: 0; }
@@ -176,5 +182,17 @@
   }
   // No link to /archive/ from here since 2026-10-12 (*"rm arhive link"*); the
   // page stays at its URL.
+
+  // The front page's footer, this page only: *"add footer with ... and
+  // instagram (positron.studio) plus year etc. for frontpage only"*, the
+  // address the one that already reaches the mail worker (positron@, chosen
+  // over a new info@). Three cells, no glue between them.
+  const foot = el('footer', 'cc-foot');
+  foot.append(
+    el('a', 'cc-foot-c', 'positron@positron.studio', { href: 'mailto:positron@positron.studio' }),
+    el('a', 'cc-foot-c', 'instagram positron.studio', { href: 'https://www.instagram.com/positron.studio/', rel: 'noopener' }),
+    el('span', 'cc-foot-c cc-foot-y', `© ${new Date().getFullYear()} positron.studio`),
+  );
+  d.el.append(foot);
   d.ready();
 </script>

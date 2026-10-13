@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Front page footer: the email, Instagram positron.studio, the year**~~ (2026-10-13, DONE). Asked: *"add footer with info@positron.studio (see we have it?) and instagram (positron.studio) plus year etc. for frontpge only"*. No info@ exists; the owner chose positron@ (the mail worker). demo/index.html only.
+
 - ~~**Logo: try p.s with a yellow dot as a mark, play with tracking**~~ (DEPLOYED as trials on /kit/logo/, the Instagram avatar built to /og/avatar-instagram-<hash>.png; the shipped favicon is still β+) (2026-10-13). Asked: *"for logos icons try also p.s, yellow dot (play with tracking). dev server"*. A P.S block on /kit/logo/ at five trackings (-0.12 to +0.14 em) as app icon, 32 px and 16 px tiles; on the dev server, not deployed. Then *"-0.12 em, align to center. try icons, favicons etc"*: canvas icons centred on the ink, favicons 16/32/48, apple touch 180, android 192 circle, store 512. Then *"try also insta profile image etc"*: a P.S AVATARS block, each network's crop at its feed size. Then *"faficon: do 'ps'"*: the favicons are ps, no dot; then *"favicon 32, favicon 48 -- try with dot too"*; then *"add dl buttons to avatars. should they be 2x?"*: a download per avatar at the network's upload size, a full square; then *"rm favicon 32 ps, favicon 48 ps"*: 16 is ps, 32 and 48 are p.s.
 
 - ~~**Kit back links say kit, not demos**~~ (2026-10-13, DONE). Asked: *"kit backlinks should sa \"kit\" not demos"*. Every /kit/<part>/ reads ← kit to /kit/; /kit/ reads ← positron.
