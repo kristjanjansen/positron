@@ -126,7 +126,8 @@ export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio',
 // performances shows as timelines (asked 2026-10-13, *"performances = timelines"*).
 // Asked 2026-10-13: *"split instruments group into 'building instruments' and
 // 'instruments in code'"*: Faust synth and Collide synth, the two whose code is on the page, show under `code`.
-export const GROUP_TITLES = { synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
+// archives shows as history (asked 2026-10-13, *"archives = hisotry"*).
+export const GROUP_TITLES = { archives: 'history', synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
@@ -149,7 +150,8 @@ export const DEMO_CARDS = {
   // resources archived 2026-10-13 (*"archvie resourves"*): still served, listed on /archive/.
   // tapes archived 2026-10-13 (*"archive tapes and deck"*): still served, listed on /archive/.
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
-  partitur: { group: 'performances', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
+  // partitur under history (asked 2026-10-13, *"bring back nagy visualiation from arhvie there"*).
+  partitur: { group: 'archives', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
   // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
