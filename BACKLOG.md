@@ -1,4 +1,5 @@
 ## Open
+- **A direct option on every remote instrument** (2026-10-13). Asked: *"add direct optpn to all remote isntumetns."*. The relay/direct choice and ?path=direct that remote/010 and 030 have, on 020 Collide on Pi, 040 Drums on the Pi and 050 Shader on Pi too, with the path cell and the fallback.
 - **Granulator: more interesting patches, a Dub patch, Ida recording and Dub as the defaults** (2026-10-13). Asked: *"make more interstin ganulator parches. do dub, put ida rec default and dub degault"*. On /concepts/sampler/060/ (Grain ring): richer patches, one called Dub, the source picker opening on the Ida recording and the patch picker on Dub.
 - ~~**Sampler: rm Copy log**~~ (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/sampler/000/ rm copy log"*. DONE: the button is gone; `await __demo.copyLog()` still copies the journal.
 - ~~**Rename the Plaits pages**~~ (2026-10-13). Asked: *"rename plaits panel / synth"*; chose *"Plaits patches / Plaits keys"*. DONE: synth/110 Plaits patches, synth/120 Plaits keys.
