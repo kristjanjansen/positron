@@ -124,7 +124,8 @@ export const CONCEPT_GROUPS = ['synth', 'granulator', 'remote', 'radio', 'video'
 // /concepts/ (right after clock) and its demo rows (reel, floor, tapes) draw as demo cards beside archives/000.
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
 // reads as the owner asked for it, *"remote instruments"* (2026-10-13).
-export const GROUP_TITLES = { synth: 'instruments', remote: 'remote instruments' };
+// performances shows as timelines (asked 2026-10-13, *"performances = timelines"*).
+export const GROUP_TITLES = { synth: 'instruments', remote: 'remote instruments', performances: 'timelines' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
