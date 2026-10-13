@@ -1,6 +1,6 @@
 ## Open
 
-- **Scout positron studio's web presence** (2026-10-13). Asked: *"In bg scout positron studio web presence: gh org name, npm package, skills sh, social media acvounts. Try dot dash etc as separator"*. Research only: which names are free (GitHub org, npm package/scope, skills.sh, Instagram, X, Bluesky, Mastodon, YouTube, TikTok, LinkedIn...) for positron, positronstudio, positron-studio, positron.studio, positron_studio. Nothing registered.
+- ~~**Scout positron studio's web presence**~~ (DONE: research/web-presence-names-2026-10-13.md; positron-studio where a dash is allowed, positronstudio elsewhere, @positron.studio on Bluesky; nothing registered) (2026-10-13). Asked: *"In bg scout positron studio web presence: gh org name, npm package, skills sh, social media acvounts. Try dot dash etc as separator"*. Research only: which names are free (GitHub org, npm package/scope, skills.sh, Instagram, X, Bluesky, Mastodon, YouTube, TikTok, LinkedIn...) for positron, positronstudio, positron-studio, positron.studio, positron_studio. Nothing registered.
 
 - ~~**Bring the kit card to the front page**~~ (2026-10-13, DONE). Asked: *"Bring kit card to frontpage"*. manifest kit row listed, DEMO_CARDS.kit, under its own heading at the foot.
 
