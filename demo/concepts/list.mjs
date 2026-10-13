@@ -153,7 +153,7 @@ export const DEMO_CARDS = {
   // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // radio archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
-  videoradio: { group: 'stations', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
+  // videoradio archived 2026-10-13 (*"archvie videoradio"*): still served, listed on /archive/; its picture lives on as /concepts/shader/020/.
   // knobs archived 2026-10-13 with Yoshimi: archive/demos/knobs-index.html, /knobs/ is a 404.
   // away archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
   // shape archived 2026-10-12 (*"archiev shape"*): still served, listed on /archive/ under devices.

@@ -417,7 +417,9 @@ export const DEMOS = [
   // ⚠️ `xr` AND THE `WebXR` TAG WENT WITH IT. There is no Run in VR control to
   // scroll under a thumb any more, and a tag naming an API the page no longer
   // calls is a description that has drifted from the thing it describes.
-  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archvie videoradio"*): still built and deployed at
+  // /videoradio/, listed on /archive/ with the other retired pages.
+  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true, unlisted: true,
     gl: true, settleMs: 45000, lightSettleMs: 2000,
     one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
