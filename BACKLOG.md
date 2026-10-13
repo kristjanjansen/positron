@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Front page footer: smaller, no underline, more space before it**~~ (2026-10-13, DONE). Asked: *"too big lower texts. no underline"*, *"add moore space before it"*. 13 px, labels 12, a link lights on hover, 140 px above.
+
 - ~~**Front page footer: no line, Geist, nicer**~~ (2026-10-13, DONE). Asked: *"no line. geist. nicer"*. Three labelled cells (Write, Instagram, positron.studio © year), no rule, underline turns yellow on hover.
 
 - ~~**Front page footer: the email, Instagram positron.studio, the year**~~ (2026-10-13, DONE). Asked: *"add footer with info@positron.studio (see we have it?) and instagram (positron.studio) plus year etc. for frontpge only"*. No info@ exists; the owner chose positron@ (the mail worker). demo/index.html only.
