@@ -29,7 +29,7 @@
   // code box from our granulator"*); every control in it is a named control.
   //
   // The ten patches are sets of control values on the one program (`/n_set`),
-  // so a patch never swaps the graph. It opens on Dub and on the Ida recording
+  // so a patch never swaps the graph. It opens on Tape stop and on the Raadio 2 recording
   // (asked 2026-10-13, *"do dub, put ida rec default and dub default"*). After the rig's wet/dry, seven knobs
   // (asked 2026-10-13, *"our grain can have ~7 params + wet/dry as first"*),
   // most audible first:
@@ -141,7 +141,7 @@
   const rig = createGrainRig({
     d, engine,
     patches: PATCHES.map((p) => ({ name: p.name, says: p.says, set: pick(p, NAMES), fixed: pick(p, FIXED) })),
-    controls: CONTROLS, roles: { size: 'size', density: 'density' }, source: 'ida',
+    controls: CONTROLS, roles: { size: 'size', density: 'density' }, source: 'raadio2',
     // The patch picker on its own row, full width, and no output scope (asked
     // 2026-10-13, *"replace with just a patch selector (no scope/viz/footer)"*
     // and *"patch selector full w"*).
@@ -151,7 +151,7 @@
     check: async ({ wait, choosePatch, events }) => {
       d.assert('the program compiled in this tab as the page opened', good.ok && good.bytes.length > 0,
         good.ok ? `${good.bytes.length} B in ${T.compileMs} ms` : good.message);
-      d.assert('it opened on the Ida recording and on Dub', window.__demo.grains.source() === 'ida' && PATCHES[0].name === 'Dub',
+      d.assert('it opened on the Raadio 2 recording and on Tape stop', window.__demo.grains.source() === 'raadio2' && PATCHES[0].name === 'Tape stop',
         `${window.__demo.grains.source()}, ${PATCHES[0].name}`);
       const to = PATCHES.findIndex((p) => p.name === 'Gate');
       choosePatch(to);

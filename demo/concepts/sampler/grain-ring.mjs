@@ -90,6 +90,10 @@ export const DEFAULTS = { freeze: 0, speed: 1, back: 0.5, density: 20, scatter: 
  * motion. `amp` levels them against each other, measured on the Ida recording.
  */
 export const PATCHES = [
+  // Tape stop first, the default (asked 2026-10-13, *"raadio 2 and tape stop default"*).
+  { name: 'Tape stop', says: 'the tape winds down to a stop every two and a half seconds and springs back',
+    set: { size: 0.15, density: 30, pitch: 1, back: 0.1, speed: 1, scatter: 0, freeze: 0,
+      jitter: 0, detune: 0, pan: 0.2, drop: 0.9, ramp: 0.4, tone: 10000, amp: 0.95 } },
   // A moment half a second back, repeating every 0.43 s and darker each time
   // round, the tape sagging a little over ten seconds.
   { name: 'Dub', says: 'half a second back, low and dark, echoing a long tail',
@@ -113,9 +117,6 @@ export const PATCHES = [
   { name: 'Backwards', says: 'long grains played in reverse, so every sound swells in and stops',
     set: { size: 0.6, density: 6, pitch: 1, back: 1.2, speed: 1, scatter: 0.4, freeze: 0,
       jitter: 0.3, detune: 0.003, pan: 0.7, dir: -1, tone: 9000, echo: 0.35, time: 0.5, dark: 4000, amp: 1.4 } },
-  { name: 'Tape stop', says: 'the tape winds down to a stop every two and a half seconds and springs back',
-    set: { size: 0.15, density: 30, pitch: 1, back: 0.1, speed: 1, scatter: 0, freeze: 0,
-      jitter: 0, detune: 0, pan: 0.2, drop: 0.9, ramp: 0.4, tone: 10000, amp: 0.95 } },
   { name: 'Undertow', says: 'an octave down, slow and smeared, a dark drone under the sound',
     set: { size: 1.5, density: 10, pitch: 0.5, back: 2, speed: 0.5, scatter: 0.8, freeze: 0,
       jitter: 1, detune: 0.006, pan: 0.8, tone: 1200, echo: 0.5, time: 0.9, dark: 800, amp: 1.4 } },
