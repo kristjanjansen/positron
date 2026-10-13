@@ -81,9 +81,10 @@ export const CONCEPTS = [
   { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
-  { id: 'room/chat', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },
+  { id: 'room/chat', title: 'Chat', say: 'A chat window whose every line crosses the room along a patchbay link, drawn underneath.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
-  { id: 'room/window', title: 'Chat UI wired', say: 'The same chat in a proper chat window, with the patchbay still doing the wiring underneath.' },
+  // room/window Chat UI wired moved to room/chat 2026-10-13 (*"Move chat ui wired to chat.
+  // Rm chat ui wired"*): the patchbay-only chat it replaced is gone, /room/window/ is a 404.
   { id: 'room/broadcast', title: 'Broadcast chat', say: 'Whoever joins first is admin and broadcasts in a column of their own while the rest chat beside.' },
   { id: 'room/history', title: 'Chat timeline', say: 'The broadcast chat with a memory: until you join, the room\'s last fifty lines replay at their pace.' },
   // room/010 History and room/020 Admin removed 2026-10-11 (*"rm room 010 020
