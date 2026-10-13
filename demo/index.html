@@ -77,11 +77,16 @@
   /* The wordmark sits on the Feedback row (see the script), so the hero starts
      at its headline; the space above the row is a little less than a demo
      page's, asked 2026-10-13 (*"Keep top whitespace, perhaps bit less"*). */
-  /* the footer: one line of three cells at the desk, stacked on a phone */
-  .cc-foot { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 56px; padding: 20px 0 32px; border-top: 1px solid var(--line); font: 400 13px/1.5 var(--mono); }
-  .cc-foot-c { color: var(--dim); text-decoration: none; }
-  a.cc-foot-c:hover { color: var(--fg); }
-  .cc-foot-y { margin-left: auto; color: var(--dim2); }
+  /* the footer: three cells in Geist, no rule over them (*"no line. geist.
+     nicer"*), each a quiet label over its value, in a row at the desk and a
+     column on a phone */
+  .cc-foot { display: flex; flex-wrap: wrap; gap: 24px 56px; margin-top: 88px; padding-bottom: 48px; font: 400 15px/1.45 var(--sans); }
+  .cc-foot-c { display: flex; flex-direction: column; gap: 4px; color: var(--fg); text-decoration: none; }
+  .cc-foot-k { font-size: 13px; color: var(--dim2); }
+  a.cc-foot-c .cc-foot-v { text-decoration: underline; text-decoration-color: var(--line2, #2b3546); text-underline-offset: 4px; transition: text-decoration-color .15s; }
+  a.cc-foot-c:hover .cc-foot-v { text-decoration-color: var(--hi); }
+  .cc-foot-y { margin-left: auto; }
+  .cc-foot-y .cc-foot-v { color: var(--dim); }
   @media (max-width: 599px) { .cc-foot { flex-direction: column; } .cc-foot-y { margin-left: 0; } }
   .pos-title .pos-hero-eye { margin: 0; flex: 1 1 auto; }
   .pos-hero.pos-hero-index { padding-top: 8px; }
@@ -188,10 +193,15 @@
   // address the one that already reaches the mail worker (positron@, chosen
   // over a new info@). Three cells, no glue between them.
   const foot = el('footer', 'cc-foot');
+  const cell = (tag, key, value, attrs, cls = '') => {
+    const c = el(tag, `cc-foot-c${cls}`, '', attrs);
+    c.append(el('span', 'cc-foot-k', key), el('span', 'cc-foot-v', value));
+    return c;
+  };
   foot.append(
-    el('a', 'cc-foot-c', 'positron@positron.studio', { href: 'mailto:positron@positron.studio' }),
-    el('a', 'cc-foot-c', 'instagram positron.studio', { href: 'https://www.instagram.com/positron.studio/', rel: 'noopener' }),
-    el('span', 'cc-foot-c cc-foot-y', `© ${new Date().getFullYear()} positron.studio`),
+    cell('a', 'Write', 'positron@positron.studio', { href: 'mailto:positron@positron.studio' }),
+    cell('a', 'Instagram', '@positron.studio', { href: 'https://www.instagram.com/positron.studio/', rel: 'noopener' }),
+    cell('span', 'positron.studio', `© ${new Date().getFullYear()}`, {}, ' cc-foot-y'),
   );
   d.el.append(foot);
   d.ready();
