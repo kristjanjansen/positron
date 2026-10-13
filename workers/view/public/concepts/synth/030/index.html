@@ -265,7 +265,7 @@
   let kb = null;
   const PORTS = [
     { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    // The volume knob is a node of its own, as on /concepts/synth/040/: a turn is one CC 7
+    // The volume knob is a node of its own, as on /concepts/synth/050/: a turn is one CC 7
     // out of its own port, so its cable is the one that pulses.
     { id: `${S}:knob-volume:midi-out`, dir: 'out', medium: 'midi', emits: ['cc'] },
     { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
@@ -410,7 +410,7 @@
 
   patch();
   d.log(gl ? (typeof shaderSays === 'string' ? shaderSays : 'no shader') : 'this browser has no WebGL2, so the picture stays dark', gl && /did not/.test(shaderSays || '') ? 'warn' : undefined);
-  // The knobs, in their own row above the keyboard, as on /concepts/synth/040/ and 016.
+  // The knobs, in their own row above the keyboard, as on /concepts/synth/050/.
   // Volume sends CC 7 out of web:knob-volume:midi-out; on this page it brightens
   // both pictures and sounds nothing.
   const volume = createKnob({ label: 'volume', min: 0, max: 127, value: 100, hand: true,

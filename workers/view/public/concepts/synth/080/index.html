@@ -21,7 +21,7 @@
   import { faustCompile, faustNode } from '/shell/faust.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
 
-  // /concepts/synth/040/'s patchbay synth with the sound made by a Faust program,
+  // The patchbay synth of /concepts/synth/patch-synth.mjs (synth/040 until 2026-10-13) with the sound made by a Faust program,
   // and every parameter that program declares a knob node of its own, cabled
   // into the engine's `value-in`, as on /fau/.
   //
@@ -145,7 +145,7 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     if (!ctx) {
       ctx = new AudioContext();
       master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
-      // A silent sink that keeps the analyser pulled, as on /concepts/synth/040/.
+      // A silent sink that keeps the analyser pulled, as in /concepts/synth/patch-synth.mjs.
       pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       an = ctx.createAnalyser(); an.fftSize = 2048; an.connect(pull);
       buf = new Float32Array(an.fftSize);
