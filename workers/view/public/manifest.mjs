@@ -307,7 +307,9 @@ export const DEMOS = [
   // line. ⚠️ THE DEPLOYED `/veil/` DIES WITH THE ROW and no redirect has been
   // written, the same as `radio1965`, `box` and `keys` before it. It was live
   // for less than a day.
-  { name: 'held', group: 'th', act: 6, created: '2026-09-19', built: true,
+  // `unlisted: true` since 2026-10-13 (*"Move held to archive"*): still built and deployed at
+  // /held/, listed on /archive/ with the other retired pages.
+  { name: 'held', group: 'th', act: 6, created: '2026-09-19', built: true, unlisted: true,
     // sizes the wait for the page's first assert, which sits behind one local
     // read of a 99 KB file. Nothing here has a control to press.
     settleMs: 4000,

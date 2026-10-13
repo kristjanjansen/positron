@@ -148,7 +148,7 @@ export const CONCEPT_DIRS = ['synth', 'code', 'granulator', 'remote', 'radio', '
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
 // room last (asked 2026-10-13, *"move room into last group"*).
-export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'radio', 'video', 'shader', 'typist', 'sampler', 'drums', 'archives', 'room'];
+export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'drums', 'radio', 'video', 'shader', 'typist', 'sampler', 'archives', 'room'];
 // `archives` is also the first of CASE_GROUPS; as a concept group it keeps the same place on
 // the front page (right after rhythm) and its demo rows would draw as demo cards beside /history/newsreels/.
 // A group's heading on the front page is its key, unless it is named here. `remote`
@@ -181,6 +181,7 @@ export const DEMO_CARDS = {
   // tapes archived 2026-10-13 (*"archive tapes and deck"*): still served, listed on /archive/.
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
   // partitur archived 2026-10-13 (*"sorry, archvie partitur again"*): still served, listed on /archive/.
+  // held archived 2026-10-13 (*"Move held to archive"*): still served, listed on /archive/.
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
   // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
