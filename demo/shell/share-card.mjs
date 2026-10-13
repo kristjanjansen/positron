@@ -29,7 +29,7 @@ import M from './font-metrics.mjs';
 // headline on as many lines as make it biggest, the small line cut to its first
 // sentence (*"Make positron. studio larger and put to bottom. Wrap ig title"*,
 // *"Rm delivered as line"*).
-export const TEMPLATE_V = 5;
+export const TEMPLATE_V = 6;
 export const W = 1200, H = 630;
 export const IG_W = 1080, IG_H = 1350;
 export const SITE = 'https://positron.studio';
@@ -92,7 +92,8 @@ function breaks(text, n) {
 // larger and put to bottom"*, then at 2.5 times *"Toooooo big sitename"*. It is
 // 1.5 times the hero's 13 px eye in the same units, so it scales with the card
 // and stays well under the headline's 56.
-const MARK = { ...TYPE.eye, size: TYPE.eye.size * 1.5 };
+// tracking 0.14 to 0.08 em: *"reduce sitename tracking a bit"*
+const MARK = { ...TYPE.eye, size: TYPE.eye.size * 1.5, track: 0.08 };
 // 🔴 NO SMALL LINE ON A CARD SINCE 2026-10-13: first cut to its first sentence
 // (*"Rm delivered as line"*), then gone (*"Rm poweee by stuff"*). HERO and the
 // front page keep the whole of it.
