@@ -86,6 +86,7 @@
 // NOTHING OPENS ON A VISIT. No AudioContext, no fetch, no engine, no prefetch
 // hint: Play brings the engine up, fetches the recording and starts both.
 import { el } from '/shell/shell.mjs';
+import { fromFirstFrame } from '/shell/mp3-frames.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
 import { createBay } from '/shell/bay.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';
@@ -144,7 +145,11 @@ export function createSources({ log = () => {} } = {}) {
       if (!r.ok) throw new Error(`${r.status} from ${url}`);
       const ab = await r.arrayBuffer();
       const size = ab.byteLength;
-      b = await ac.decodeAudioData(ab);
+      // From the first frame: Safari answers `Decoding failed` on a recording
+      // cut from a live mount mid frame (`fromFirstFrame` has the measurement).
+      const { buffer: clean, skipped } = fromFirstFrame(ab);
+      if (skipped) log(`${label}: ${skipped} bytes before the first frame, left out`);
+      b = await ac.decodeAudioData(clean);
       const raised = level(b);
       decoded.set(id, b);
       log(`${label}: ${(size / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s, raised ${raised.toFixed(1)} dB on average`);

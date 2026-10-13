@@ -170,3 +170,102 @@ export const release = (owner) => theHub().release(owner);
 export const contexts = () => (hub ? hub.contexts() : 0);
 /** Who holds the context now, or null. */
 export const audioOwner = () => (hub ? hub.owner() : null);
+
+// ── waking a context on a phone ─────────────────────────────────────────────
+//
+// 🔴 AN AUDIOCONTEXT MADE OUTSIDE A GESTURE STAYS SILENT ON AN IPHONE FOR EVER,
+// AND THE KIT KEYBOARD MAKES EVERY PAGE'S CONTEXT OUTSIDE ONE. Reported
+// 2026-10-13 from an iPhone in Safari on /synth/keyboard/: *"Can not play
+// onscreen keyb on mobile (safari)"*. A finger on a key sounds two animation
+// frames after `pointerdown` (the swipe verdict in keyboard.mjs), so a page's
+// `ctx ??= new AudioContext()` runs inside a `requestAnimationFrame` callback,
+// which is no gesture at all. WebKit starts that context `suspended` and
+// nothing on those pages ever calls `resume()`, so every key after it schedules
+// sound into a clock that never moves. Desktop Chrome hides it twice over: a
+// harness passes `--autoplay-policy=no-user-gesture-required`, and Chrome
+// resumes a suspended context by itself when a source starts after the page
+// has had a gesture. WebKit does neither.
+//
+// ✅ `wakeAudioOnGesture()` RESUMES EVERY CONTEXT THE PAGE MADE, FROM INSIDE THE
+// NEXT TRUSTED GESTURE, whoever made it. It wraps the `AudioContext`
+// constructor in a Proxy that only records each instance (the object handed
+// back is the real one, so `instanceof`, `constructor` and every method are
+// untouched), and listens on `window` in the capture phase, so it runs before
+// any page handler on the same event.
+// ⚠️ THE EVENTS ARE ALL OF THEM, ON PURPOSE. WebKit counts `touchend` (and so
+// `pointerup` from a finger) as the gesture that may start audio; `touchstart`
+// and a finger's `pointerdown` are not activation in the HTML spec and were not
+// in WebKit since iOS 9. A mouse's `pointerdown` and a `keydown` are. A
+// `resume()` outside a gesture is harmless and resolves later or never, so
+// calling it on every one costs nothing and covers every engine.
+// ⚠️ IT RESUMES ONLY A CONTEXT THAT HAS NEVER RUN, OR ONE THE SYSTEM
+// INTERRUPTED. A context that has been `running` and is now `suspended` was
+// suspended by somebody on purpose, `release()` above being one, and waking it
+// on the next tap would undo that.
+// ⚠️ THE FIRST TOUCH ON A FRESH IPHONE PAGE IS STILL SILENT, AND THAT IS NOT
+// FIXABLE FROM HERE. The context is made in the verdict frame, after the
+// `touchend` that could have started it has not happened yet; the `touchend`
+// that ends that same touch resumes it, and the page's own note off in the same
+// event cancels the note it was holding. Every touch after the first sounds.
+//
+// 🔴 THE SILENT SWITCH MUTES WEBAUDIO ON AN IPHONE UNLESS THE PAGE SAYS IT IS
+// PLAYBACK. WebKit's default audio session for a page is `ambient`, which
+// obeys the ring/silent switch, so a phone in silent mode plays a working
+// keyboard at zero. `navigator.audioSession.type = 'playback'` (Safari 16.4
+// and up) makes it media, which ignores the switch the way a video does. It is
+// set on the first gesture rather than on import, so a visit that never plays
+// changes nothing about the phone's audio. Where `audioSession` is missing
+// (older iOS, every non-WebKit browser) nothing is set and the switch still
+// mutes on an old iPhone; the silent `<audio>` element trick that covers that
+// case is NOT here.
+//
+// ⚠️ IT CANNOT SEE A CONTEXT MADE BEFORE IT WAS INSTALLED. The kit keyboard
+// installs it when it is built, which on every page is before the first press
+// and so before any page makes a context lazily.
+let woken = null;
+export function wakeAudioOnGesture() {
+  if (woken) return woken;
+  const w = typeof window === 'undefined' ? null : window;
+  if (!w) return (woken = { contexts: () => [] });
+  const live = new Set();
+  const ran = new WeakSet();
+  const track = (c) => {
+    if (!c || live.has(c)) return c;
+    live.add(c);
+    const note = () => {
+      if (c.state === 'running') ran.add(c);
+      if (c.state === 'closed') live.delete(c);
+    };
+    note();
+    c.addEventListener?.('statechange', note);
+    return c;
+  };
+  for (const name of ['AudioContext', 'webkitAudioContext']) {
+    const Orig = w[name];
+    if (typeof Orig !== 'function' || Orig.__posWake) continue;
+    const Wrapped = new Proxy(Orig, {
+      construct(t, args, nt) { return track(Reflect.construct(t, args, nt === Wrapped ? t : nt)); },
+      get(t, k, r) { return k === '__posWake' ? true : Reflect.get(t, k, t); },
+    });
+    try { w[name] = Wrapped; } catch { /* a frozen global; contexts then go unseen */ }
+  }
+  if (hub?.context()) track(hub.context());
+
+  let session = false;
+  const onGesture = (e) => {
+    if (!e.isTrusted) return;
+    if (!session) {
+      session = true;
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* read only here */ }
+    }
+    for (const c of live) {
+      if (c.state === 'running' || c.state === 'closed') continue;
+      if (c.state === 'suspended' && ran.has(c)) continue;
+      Promise.resolve(c.resume?.()).catch(() => {});
+    }
+  };
+  for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click']) {
+    w.addEventListener(type, onGesture, { capture: true, passive: true });
+  }
+  return (woken = { contexts: () => [...live] });
+}

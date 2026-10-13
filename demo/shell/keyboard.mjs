@@ -144,6 +144,13 @@ import { createNumLoop, RATIOS, TEMPO_BAND } from './numloop.mjs';
    typed in this file, which is the same reason `name.mjs` takes its letters out
    of `chords.mjs` instead of writing them again. */
 import { nameChord, RECOGNISED, NOTE_LETTERS } from './name.mjs';
+/* 🔴 A KEY SOUNDS IN A FRAME, NOT IN A GESTURE, SO THE KEYBOARD WAKES THE PAGE'S
+   AUDIO. The whole argument is beside `wakeAudioOnGesture` in `audio.mjs`: a
+   touch sounds two animation frames after it lands, a page's lazy
+   `new AudioContext()` therefore runs outside any gesture, and on an iPhone that
+   context stays suspended for ever. Building a keyboard installs the waker, so
+   every page with these keys gains it without a line of its own. */
+import { wakeAudioOnGesture } from './audio.mjs';
 
 /**
  * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
@@ -434,6 +441,7 @@ export function createKeyboard(host, {
   full = false,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
+  wakeAudioOnGesture();
   /**
    * 🔴 `letters` MAY BE A SET NOW, AND THE RULE IT ENFORCES IS UNCHANGED.
    * The rule below is *a key labelled `a` that does nothing when you press `a`
@@ -767,6 +775,30 @@ export function createKeyboard(host, {
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     keysEl.addEventListener(type, endTouch);
   }
+
+  // 🔴 TWO QUICK TAPS ON A KEY ARE TWO NOTES, NEVER A ZOOM. Reported 2026-10-13
+  // from an iPhone: *"Dbltap should not zoom"*. `html, body` carry
+  // `touch-action: manipulation` in shell.css, and this row carries `pan-x`
+  // because a swipe has to scroll it, and the effective action on a key is
+  // their intersection, which is `pan-x`: a value that says nothing about
+  // double tap, and Safari is free to zoom on one. A repeated note IS a double
+  // tap, so the instrument's commonest gesture was the one that zoomed.
+  // ✅ `preventDefault` ON THE SECOND `touchend` is the one thing every WebKit
+  // honours: it cancels the double tap gesture and the synthesised click, and
+  // the keys never used the click, because they play on pointer events. Pinch
+  // is a two finger gesture and is not touched. The window is 350 ms, just over
+  // Safari's own double tap interval.
+  // ⚠️ AND THE GESTURE THAT WAKES AUDIO IS NOT LOST. `preventDefault` stops the
+  // default action, not the event: the `touchend` is still dispatched as user
+  // activation, and `wakeAudioOnGesture` hears it on `window` in the capture
+  // phase before this listener runs.
+  let lastTouchEnd = 0;
+  const onTouchEnd = (e) => {
+    const now = e.timeStamp;
+    if (now - lastTouchEnd < 350 && e.cancelable) e.preventDefault();
+    lastTouchEnd = now;
+  };
+  keysEl.addEventListener('touchend', onTouchEnd, { passive: false });
 
 
   // ── the pad ──────────────────────────────────────────────────────────────
@@ -2086,6 +2118,7 @@ export function createKeyboard(host, {
         removeEventListener('blur', onBlur);
       }
       keysEl.removeEventListener('touchmove', onTouchMove);
+      keysEl.removeEventListener('touchend', onTouchEnd);
       el.remove();
     },
   };

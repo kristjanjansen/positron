@@ -314,3 +314,42 @@ export function createFrameSplitter({ framing = null } = {}) {
     get framing() { return kind; },
   };
 }
+
+/**
+ * The same bytes from their first confirmed frame on, for `decodeAudioData`.
+ *
+ * 🔴 SAFARI REFUSES A FILE THAT DOES NOT START ON A FRAME, AND A RECORDING CUT
+ * FROM A LIVE MOUNT NEVER DOES. Reported 2026-10-13 from an iPhone on the
+ * granulator: *"Raadio 2 recording did not open: Decoding failed"*. MEASURED
+ * the same day in desktop Safari 27 against our own bucket: Raadio 2 starts
+ * with 127 bytes of the middle of a frame and Raadio 4 with 120, because both
+ * were captured by joining an Icecast mount mid stream; `decodeAudioData`
+ * answered `Decoding failed` on both as fetched and decoded both whole once cut
+ * at the first frame (183.20 s and 183.04 s). Chrome and ffmpeg skip the junk
+ * themselves, which is why nothing here ever saw it. The Ida ADTS file starts
+ * on a frame and is handed back untouched.
+ * ⚠️ THE FRAMING IS READ OFF THE BYTES, NOT THE URL OR THE TYPE, which is the
+ * rule at `framingFor`: whichever reader confirms a frame first wins, and a
+ * buffer neither reader can sync on is returned as it came, so a WAV, an Ogg
+ * or an MP4 still reaches the decoder and gets its own answer.
+ * ⚠️ AN ID3 TAG IS NOT JUNK AND IS KEPT. A file that opens `ID3` is a tagged
+ * MP3 every decoder knows how to skip, and cutting into it would be cutting
+ * into a file that was never broken.
+ *
+ * @param {ArrayBuffer} ab
+ * @param {number} [scan] how far into the file to look for the first frame
+ * @returns {{ buffer: ArrayBuffer, skipped: number, framing: string|null }}
+ */
+export function fromFirstFrame(ab, scan = 65536) {
+  const u = new Uint8Array(ab);
+  if (u[0] === 0x49 && u[1] === 0x44 && u[2] === 0x33) return { buffer: ab, skipped: 0, framing: 'mpeg' };
+  const head = u.subarray(0, Math.min(u.length, scan));
+  let best = null;
+  for (const framing of ['mpeg', 'adts']) {
+    const { frames } = frameStarts(head, 0, { framing });
+    // Two frames in a row, so a lone header-shaped run of payload is not a start.
+    if (frames.length >= 2 && (!best || frames[0].at < best.at)) best = { at: frames[0].at, framing };
+  }
+  if (!best) return { buffer: ab, skipped: 0, framing: null };
+  return { buffer: best.at ? ab.slice(best.at) : ab, skipped: best.at, framing: best.framing };
+}
