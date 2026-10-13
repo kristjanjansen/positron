@@ -43,7 +43,8 @@ export function createKitPage({ part, what, controls = [] }) {
   /* `readout: null` because the subject here is the controls themselves. Every
      readout on these pages is a SPECIMEN rather than the page's own
      instrument (the monolith's mount carries the whole argument). */
-  const d = mount({ name: `kit/${part}`, what, readout: null, controls });
+  // back to the kit, saying so: *"kit backlinks should say kit not demos"*
+  const d = mount({ name: `kit/${part}`, what, readout: null, controls, index: '/kit/', indexLabel: 'kit' });
   /* 🔴 THE HEADING IS THE PART ALONE, ASKED 2026-10-06: *"no need to "kit/..."
      in titles"*. `mount()` takes no display title, so the heading it drew is
      re-worded here; `__demo.name`, `document.title` and the feedback slug keep

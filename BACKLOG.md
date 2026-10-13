@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Kit back links say kit, not demos**~~ (2026-10-13, DONE). Asked: *"kit backlinks should sa \"kit\" not demos"*. Every /kit/<part>/ reads ← kit to /kit/; /kit/ reads ← positron.
+
 - ~~**Share cards: the site name's tracking a bit tighter**~~ (2026-10-13, DONE). Asked: *"reduce sitename tracking a bit"*. 0.14 to 0.08 em on all three cards, TEMPLATE_V 6.
 
 - ~~**Hello post: the green more showy**~~ (2026-10-13, DONE). Asked: *"Make green more showy"*. #3dffa0 with a soft glow under it. (A Geist title was tried and reverted, *"Revert"*.)
