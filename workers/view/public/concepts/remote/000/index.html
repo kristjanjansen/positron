@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept 017</title>
+<title>POSITRON concept remote 000</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The play button alone at the top left. What the board says goes to the log
@@ -36,9 +36,9 @@
   // NOTHING OPENS ON A VISIT. The board (and so the relay socket) is made on the
   // Start press, never at load. A check run sends nothing to the shared board
   // unless ?board=1 is added, the same gate /knobs/ uses.
-  const d = mount({ name: 'concept synth 060', what: '', joined: false,
+  const d = mount({ name: 'concept remote 000', what: '', joined: false,
     readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' }, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('synth/060');
+  conceptNav('remote/000');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';

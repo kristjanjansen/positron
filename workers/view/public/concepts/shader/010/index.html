@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* This tab on the left, the Pi on the right, each half the content width;
-     stacked on a phone, this tab first. As /concepts/synth/100/. */
+     stacked on a phone, this tab first. As /concepts/remote/020/. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
@@ -150,7 +150,7 @@ void main(){
   //             blending if it builds, exactly v3dpipe's arithmetic.
   //   the trip  UP_MS to the board, for a knob turn and for a program: half
   //             the Mac to Pi relay round trip, 64 to 69 ms measured 2026-09-14
-  //             (PROGRESS.md, as /concepts/synth/100/ uses it).
+  //             (PROGRESS.md, as /concepts/remote/020/ uses it).
   //   back      DOWN_MS on the picture: one frame to render and read back,
   //             one frame in the hardware encoder, the relay back (UP_MS) and
   //             one frame to decode. ⚠️ ONLY THE RELAY IS MEASURED; the three
@@ -334,7 +334,7 @@ void main(){
   // ── the real board, when one answers ─────────────────────────────────────
   //
   // Since 2026-10-12. A press of the board button asks the Pi in `studio-1`
-  // for `video.status` and gives it ASK_MS to answer, as /concepts/synth/100/
+  // for `video.status` and gives it ASK_MS to answer, as /concepts/remote/020/
   // does; no answer, a harness run (`createBoard` will not drive the board
   // under a check) or a browser with no WebCodecs keeps the simulation, and the
   // right panel's footer says which. A board that answers but is not drawing

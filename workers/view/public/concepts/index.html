@@ -67,7 +67,7 @@
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
 
-  import { CONCEPTS, CONCEPT_GROUPS, CASE_GROUPS, DEMO_CARDS } from '/concepts/list.mjs';
+  import { CONCEPTS, CONCEPT_GROUPS, CASE_GROUPS, DEMO_CARDS, GROUP_TITLES } from '/concepts/list.mjs';
   import { DEMOS, GROUPS, targetOf } from '/manifest.mjs';
 
   const d = mount({ name: 'concepts', what: 'The ideas behind positron and the projects that use them.', readout: null });
@@ -130,7 +130,7 @@
     if (!list.length) continue;
     const g = el('div', 'cc-cards');
     g.append(...list);
-    d.stack.titled(group, g);
+    d.stack.titled(GROUP_TITLES[group] || group, g);
   }
   // No link to /archive/ from here since 2026-10-12 (*"rm arhive link"*); the
   // page stays at its URL.

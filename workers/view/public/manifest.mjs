@@ -657,11 +657,15 @@ export const DEMOS = [
    * ⚠️ NO `settleMs`. Every control is an async handler, so `verify.mjs` waits
    * for `data-busy` to clear rather than for a number somebody guessed.
    */
-  { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+  // deployed at /fau/, listed on /archive/ with the other retired pages.
+  { name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true, unlisted: true,
     one: 'a synthesiser you type in, compiled to machine code in this tab '
        + 'whenever you stop typing',
     tags: ['Faust', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
-  { name: 'collide', group: 'instruments', act: 4, created: '2026-09-30', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+  // deployed at /collide/, listed on /archive/ with the other retired pages.
+  { name: 'collide', group: 'instruments', act: 4, created: '2026-09-30', built: true, unlisted: true,
     one: 'a synth typed in a small subset of SuperCollider, compiled in this tab '
        + 'whenever you stop typing',
     tags: ['SuperCollider', 'WebAssembly', 'AudioWorklet', 'WebMIDI'] },
@@ -843,7 +847,9 @@ export const DEMOS = [
    * rather than pages that make a sound of their own, and that is the company
    * this one keeps.
    */
-  { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, settleMs: 8000,
+  // `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+  // deployed at /muta/, listed on /archive/ with the other retired pages.
+  { name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true, unlisted: true, settleMs: 8000,
     one: 'eight voices of Emilie Gillet’s Plaits firmware, compiled unmodified from its own C++ to WebAssembly on the audio thread',
     /* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
        keeps this row linked and the page says why rather than the row vanishing,

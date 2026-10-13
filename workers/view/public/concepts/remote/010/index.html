@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept synth 070</title>
+<title>POSITRON concept remote 010</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* Play alone at the top left. No status label: what the board says goes to
@@ -50,9 +50,9 @@
   //
   // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
   // load. A check run sends nothing to the Circuit unless ?board=1 is added.
-  const d = mount({ name: 'concept synth 070', what: '', joined: false,
+  const d = mount({ name: 'concept remote 010', what: '', joined: false,
     readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' }, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('synth/070');
+  conceptNav('remote/010');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';

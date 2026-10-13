@@ -1,5 +1,5 @@
 // demo/concepts/synth/collide-voice.mjs: the voice /concepts/synth/090/ and
-// /concepts/synth/100/ play, a program in /collide/'s small subset of
+// /concepts/remote/020/ play, a program in /collide/'s small subset of
 // SuperCollider, compiled in the tab and run on wasm scsynth.
 //
 // Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"): *"do 090
