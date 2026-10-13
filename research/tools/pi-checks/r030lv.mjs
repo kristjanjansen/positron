@@ -63,7 +63,7 @@ try {
   };
 
   guard('open');
-  await S('Page.navigate', { url: `http://127.0.0.1:8890/remote/drums-on-the-pi/` });
+  await S('Page.navigate', { url: `http://127.0.0.1:8890/remote/drums/` });
   await sleep(2500);
   out.join = await join();
   if (!['relay', 'direct', 'turn'].includes(out.join.mode)) throw new Error(`not on the board: ${out.join.mode}`);

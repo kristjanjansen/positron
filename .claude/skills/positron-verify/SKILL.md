@@ -11,7 +11,7 @@ having broken it on purpose once.
 
 ## External sources, and the stand-ins that replace them
 
-🔴 **DO NOT RE-VERIFY `/radio/` OR PROBE STATION HEALTH. ASKED TWICE.**
+🔴 **DO NOT RE-VERIFY `/archive/radio/` OR PROBE STATION HEALTH. ASKED TWICE.**
 *"stop messing around with live stream assertions, you're wasting everybody's
 time"*, then *"can we please stop assessing the radio, its killing me and my
 budget"*. A run of that page costs minutes and a lot of tokens, it needs a
@@ -23,7 +23,7 @@ demo/<slug>/index.html` parses every module block without opening a browser).
 A red run on that page is not information until somebody asks for it.
 
 ✅ **AND SINCE 2026-09-16 IT CAN BE GRADED WITHOUT COSTING ANYBODY ANYTHING.**
-`node demo/verify.mjs radio` starts `demo/fake-station.mjs` itself and points
+`node demo/verify.mjs archive/radio` (the slug was `radio` until 2026-10-13, when the archived page moved to /archive/radio/ and the measurements below were made under the old one) starts `demo/fake-station.mjs` itself and points
 the page at it with its own `?base=`: real MP3 frames, real ICY headers, a real
 `icy-metaint` text channel and a `/health` route in the relay's shape, paced at
 128 kbit/s. **MEASURED: 48/48 green with zero bytes from anybody's radio.** So
@@ -114,7 +114,7 @@ undone by stopping, only by not adding to it. So the rule is not *"a red run is
 a fact about somebody else's server"* any more, which was an argument about the
 VALUE of the check. It is: **every connection this repo opens to an ERR mount
 appears in a public broadcaster's audience measurement, so open one only when a
-person is going to listen to it.** `/radio/` and `/videoradio/` both rotate
+person is going to listen to it.** `/archive/radio/` and `/videoradio/` both rotate
 four ERR mounts; that covers every harness run, every `verify-gl.mjs videoradio`,
 every reload in a development loop, and every tab left open on a second monitor.
 ⚠️ Two stations were REMOVED over this and ERR was not: `idaidaida.net` and
@@ -340,7 +340,7 @@ matching no measured file, proved by putting the old name back.
 
 🔴 **A PAGE THAT GAINS ITS FIRST CONTROL MOVES EVERY OTHER CONTROL'S HARNESS
 PRESS, AND `settleMs` ONLY EVER LANDS ON CONTROL 0.** MEASURED 2026-09-16 on
-`/radio/`: adding one button made the looper's `→` control 1 instead of control
+`/archive/radio/`: adding one button made the looper's `→` control 1 instead of control
 0, so the single press the harness gives it moved from t+1 s to **t+31 s**,
 landing in the middle of the page's own loop check and taking it red
 intermittently with a face that read `≠`. Nothing about either control changed.
@@ -378,7 +378,7 @@ branch. After any change to `src/low-latency-player.js`, run
 `demo/verify-native.mjs` too. ⚠️ **RETIRED 2026-10-13 FOR NOW:** it and
 `demo/verify-safari.mjs` drive /llhls/, whose input was deleted that day, so
 both refuse with exit 2 rather than read PASS about a player that never starts.
-Until one is re-pointed at /video/ll-hls-loopback/ (in `BACKLOG.md`), the native
+Until one is re-pointed at /video/llhls/ (in `BACKLOG.md`), the native
 branch has no harness, and that is the gap to say out loud after a player change.
 
 **Attribute a run to a build before iterating on it.** Every 06 log opens with
@@ -846,7 +846,7 @@ AND THAT DISTINCTION BLINDED THE SUITE.** The first-assert loop ran
 growth loop can take over. **The moment the SHELL gained two asserts of its own,
 every page in the suite had a non-zero count at t+0**, that phase fell through on
 its first test, and a page was left with 12 tries at 400 ms to produce everything
-it had. **MEASURED the day it landed: `/radio/` makes 34 asserts and the suite
+it had. **MEASURED the day it landed: `/archive/radio/` makes 34 asserts and the suite
 collected 2, then reported 13/13 green.** That is this project's worst failure
 shape, a green suite with no coverage, **and it hit 28 demos at once because 28
 declare `settleMs`.**
@@ -884,7 +884,7 @@ the other end of the same loop.
 ⚠️ **`ready` ALONE WOULD NOT HAVE SAVED IT, WHICH IS WHY BOTH ARE HERE.**
 `/muta/` calls `ifSelfcheck(...)` WITHOUT awaiting it and then `d.ready()` on the
 next line, so `ready` is true a few milliseconds in and stays true through every
-check the page makes. `/radio/` does the same from inside the granulator's boot.
+check the page makes. `/archive/radio/` does the same from inside the granulator's boot.
 **A page's own claim to be finished is worth reading and is not worth trusting
 alone.** ⚠️ And moving `d.ready()` to the END of a page's checks was TRIED: it
 made that page fail the 7.4 s boot wait and be graded not at all, because the
@@ -1188,7 +1188,7 @@ looking at where the loud part landed.** (`demo/fake-station.mjs`, repeated in
 🔴 **PACE AGAINST THE CLOCK, NOT AGAINST THE TIMER, AND THE DIFFERENCE WAS
 MEASURABLE FROM INSIDE THE PAGE.** Sending a fixed chunk per `setInterval` tick
 sends at the rate the timer actually fires, and node's timers run a millisecond or
-two late: **MEASURED through `/radio/`'s own settled-rate readout, 125 kbit/s
+two late: **MEASURED through `/archive/radio/`'s own settled-rate readout, 125 kbit/s
 against the 128 declared, which is 2.3% slow. A listener then loses about 23 ms of
 cushion every second, so the page's 600 ms floor drained to 32 ms over half a
 minute and its `the cushion outlasts the worst gap in it` check went red about a

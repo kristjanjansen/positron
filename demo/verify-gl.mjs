@@ -92,12 +92,12 @@ const targets = DEMOS.filter((d) => d.built !== false && d.gl)
   .filter((d) => !want.length || want.includes(d.name));
 
 // 🔴 `videoradio` ROTATES ERR MOUNTS, SO IT GETS THE STAND-IN `verify.mjs`
-// GIVES `/radio/`, STARTED HERE RATHER THAN REMEMBERED. Every connection this
+// GIVES `/archive/radio/`, STARTED HERE RATHER THAN REMEMBERED. Every connection this
 // repository opens to an ERR mount is counted in a public broadcaster's
 // listener statistics (CLAUDE.md), and until 2026-10-04 `node
 // demo/verify-gl.mjs videoradio` opened four of them. `demo/fake-station.mjs`
 // answers any mount name with real MP3 frames and ICY headers, and the page
-// takes `?base=` exactly as `/radio/` does. ⚠️ `DEMO_QUERY=base=...` still wins
+// takes `?base=` exactly as `/archive/radio/` does. ⚠️ `DEMO_QUERY=base=...` still wins
 // (it is first in the query, and `URLSearchParams.get` returns the first), and
 // a stand-in on 127.0.0.1 cannot be reached from a `DEMO_BASE` deploy, so none
 // is started then.

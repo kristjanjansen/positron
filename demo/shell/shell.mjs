@@ -305,7 +305,7 @@ export function mount({
    * `asserts.length === 0`. These two land at t+0 on EVERY shelled page, so
    * that test became false immediately and the wait never engaged again.
    *
-   * MEASURED the day they landed: `/radio/` makes 34 asserts, the suite
+   * MEASURED the day they landed: `/archive/radio/` makes 34 asserts, the suite
    * collected **2**, and reported **13/13 green**. A green suite with no
    * coverage, across the 28 demos that declare `settleMs`, and nothing about it
    * looked wrong from the outside.
@@ -422,7 +422,7 @@ export function mount({
      * 🔴 IT USED TO SEARCH THE CONTROL ROW ONLY, AND MOVING A BUTTON BROKE IT
      * SILENTLY. Pages move controls on purpose and are told to: `/videoradio/`
      * moved `Run in VR` under its sentence, `/tapes/` moves its own row, and
-     * `/radio/` moved `Automate` into the granulator block on instruction. The
+     * `/archive/radio/` moved `Automate` into the granulator block on instruction. The
      * button still worked; `d.button(id)` returned null, so every check that
      * read its state reported `no button` about a control plainly on the page.
      * MEASURED as three red asserts the moment `Automate` moved.

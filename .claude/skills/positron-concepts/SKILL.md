@@ -24,18 +24,32 @@ group/slug, rm numbers"*, then *"keep same boxes style"*. This supersedes the
 numbered scheme the rest of this file was written in (`/concepts/<group>/<nnn>/`,
 asked 2026-10-11 as *"/concepts/group/0x"*).
 - **The page is `demo/<group>/<slug>/index.html`, served at `/<group>/<slug>/`.**
-  The slug is the title in lowercase words joined by hyphens (Circuit on Pi is
-  `/remote/circuit-on-pi/`), and `demo/shell/concept-list-test.mjs` fails a row
-  whose slug is not its title's. A renamed title is a renamed folder.
+- 🔴 **THE SLUG IS ONE PLAIN LOWERCASE WORD, SINCE 2026-10-13 (NIGHT).**
+  Instructed: *"Resolve clashes. Avoid dashes on names."* No hyphen, no digit,
+  unique in its group, and never the group's own name (`/granulator/granulator/`
+  was the case that made that a rule). The word is CHOSEN from the title, not
+  spelled out of it: Circuit on Pi is `/remote/circuit/`, Camera shader is
+  `/video/shader/`, Live tempo is `/radio/live/`. The title keeps its words; only
+  the address lost the dashes. `demo/shell/concept-list-test.mjs` fails a hyphen
+  or a slug equal to its group. Until that evening the slug was the title in
+  lowercase words joined by hyphens (`/remote/circuit-on-pi/`), and every one of
+  those addresses is a 404, no forwarding. The table is in `positron-history`.
 - **The group is the folder, and the folders are `CONCEPT_DIRS` in
   `demo/shell/concept-list.mjs`.** `workers/view/build.mjs` deploys each one whole
   and REFUSES the build when a folder is also a demo slug, a manifest page path or
-  a site path, because a concept group is a top-level address now. That is why
-  the radio pages are `/stations/` (`/radio/` is the archived radio demo, still
-  served) and the newsreels `/history/` (the heading reads history). A row's
-  `group` sets the HEADING when it is not the folder (`stations` rows show under
-  `radio`). A new group is a new folder in `CONCEPT_DIRS`, checked against
-  `ls demo` and the manifest first.
+  a site path, because a concept group is a top-level address now.
+  🔴 **A CLASH IS RESOLVED, NOT WORKED ROUND.** For one afternoon the radio pages
+  were `/stations/` because the archived radio demo still answered at `/radio/`.
+  Asked *"Resolve clashes"*, the demo moved out of the way to `/archive/radio/`
+  (manifest row `archive/radio`, folder `demo/archive/radio/`, the kit's
+  `kit/<part>` pattern of a name with a slash, so `demo/verify.mjs archive/radio`
+  still grades it against its stand-in) and the group took `radio`. MEASURED that
+  night against every built manifest name, `extraPages()` and the build's fixed
+  list: no other group folder takes a served address. The newsreels are
+  `/history/` and show under the heading archives; a row's `group` sets the
+  HEADING when it is not the folder. A new group is a new folder in
+  `CONCEPT_DIRS`, checked against `ls demo` and the manifest first; when a name
+  you want is taken by something archived, move the archived thing.
 - **No number anywhere a visitor looks**: not on a card, not in `<title>`, not in
   `mount({ name })`, not in the pager. A row is `{ id, title, say, group? }`;
   `id` is `<group>/<slug>`, its position in `CONCEPTS` is its order, and

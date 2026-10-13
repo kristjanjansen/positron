@@ -201,7 +201,7 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
       // vertical spans do not overlap (plans/plan-links-view-phone.md).
       /* 🔴 A TITLE THAT DOES NOT FIT BESIDE ITS PORTS GETS A LINE OF ITS OWN,
          2026-10-11. The first port row shared the title's line on every card,
-         so on /typist/multi-typer/?n=6 at 375 px the gutter took 22 lanes, the
+         so on /typist/score/?n=6 at 375 px the gutter took 22 lanes, the
          cards shrank to 159 px and `web:typewriter-k` was drawn over its own
          `value-in` (40 overlapping labels, MEASURED). Each card now measures
          its title (and the grey field under it) against the port names on the

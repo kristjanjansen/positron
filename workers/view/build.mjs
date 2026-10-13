@@ -329,7 +329,7 @@ const FILES = [
   ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
   ['demo/shell/vendor/LICENSE-pico-bootrom', 'shell/vendor/LICENSE-pico-bootrom'],
   ['demo/resources/pico/router-pico.uf2', 'resources/pico/router-pico.uf2'],
-  // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /synth/dot-piano/ (once /concepts/14/)
+  // rig/pico/rings/build-pico/rings.uf2, byte for byte: the rings of /synth/dots/ (once /concepts/14/)
   // drawn by C on the emulated Pico (rig/pico/rings/build.sh copies it here).
   ['demo/resources/pico/rings-pico.uf2', 'resources/pico/rings-pico.uf2'],
   // rig/pico/patch/build-pico/patch.uf2, byte for byte: concept 070's own firmware,
@@ -654,9 +654,10 @@ function demoFiles() {
  * ⚠️ SAME CONTAINMENT AS demoFiles(): named subtrees, filtered to the same web
  * extensions, so nothing from the repo root can reach public/.
  * 🔴 AND IT REFUSES A FOLDER THAT WOULD TAKE OVER A STILL-SERVED ADDRESS. A
- * concept group is a top-level path now, beside every demo slug, and /radio/ is
- * the archived radio demo, still served: that is why the radio concepts are at
- * /stations/. A demo slug, a manifest page path, or a top-level destination
+ * concept group is a top-level path now, beside every demo slug. For one
+ * afternoon the radio concepts were /stations/ because the archived radio demo
+ * still answered at /radio/; asked *"Resolve clashes"*, the demo moved to
+ * /archive/radio/ (manifest row `archive/radio`) and the group took /radio/. A demo slug, a manifest page path, or a top-level destination
  * of the hand list above, under the same name as a concept folder, stops the
  * build here, as does a row whose folder is not in CONCEPT_DIRS (it would not
  * be copied and its card would 404).
@@ -705,9 +706,14 @@ function archiveFiles() {
   // One level of subdirectories as well, for a retired page kept whole
   // (`demo/archive/clock-follow/`, the old concepts clock/040, moved there
   // 2026-10-12 when the clock pages were renumbered).
+  // A folder a manifest row owns (`archive/radio`, the archived radio demo, since
+  // 2026-10-13) is copied by demoFiles() with its media, so it is skipped here:
+  // copying it twice is a duplicate destination and the build refuses it.
+  const owned = new Set(DEMO_MANIFEST.filter((d) => d.name.startsWith('archive/')).map((d) => d.name.slice(8)));
   const walk = (rel) => {
     for (const e of readdirSync(join(REPO, 'demo/archive', rel), { withFileTypes: true })) {
       const p = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory() && !rel && owned.has(e.name)) continue;
       if (e.isDirectory() && !rel) walk(p);
       else if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name))) out.push([`demo/archive/${p}`, `archive/${p}`]);
     }

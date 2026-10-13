@@ -397,7 +397,7 @@
      * exactly that loss twice, on `/mirror/` and `/blocks/`, where ten and six
      * asserts would have gone silent.
      * ✅ THE CHECKS RUN AT LOAD BEHIND `SELFCHECK` NOW, which is what `/muta/`
-     * and `/radio/` already do, and the per page assert count was diffed either
+     * and `/archive/radio/` already do, and the per page assert count was diffed either
      * side of the change rather than assumed.
      * ⚠️ AND THE PAGE IS BETTER FOR IT. The thing to press was always the
      * keyboard.
@@ -4838,7 +4838,7 @@
    * 🔴 THE CHECKS RUN AT LOAD AND ARE NOT AWAITED, AND THAT IS THE WHOLE COST
    * OF DELETING THE CONTROL ROW. They used to hang off `Play a phrase`, which
    * is how `demo/verify.mjs` drove this page; with no button to press they had
-   * to move or vanish, and vanishing is silent. `/muta/` and `/radio/` already
+   * to move or vanish, and vanishing is silent. `/muta/` and `/archive/radio/` already
    * do exactly this.
    */
   ifSelfcheck(checks, { log: d.log,

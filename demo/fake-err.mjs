@@ -18,7 +18,7 @@
 // with the most machinery in them were the two nobody could run, and the last
 // full suite skipped both in writing.
 //
-// This is the same answer `demo/fake-station.mjs` gave `/radio/` and
+// This is the same answer `demo/fake-station.mjs` gave `/archive/radio/` and
 // `demo/fake-tapes.mjs` gave `/tapes/`. A real master playlist, a real sliding
 // media playlist with a real PROGRAM-DATE-TIME and a real MEDIA-SEQUENCE, real
 // MPEG-TS segments that really decode, real Range replies, and a real schedule

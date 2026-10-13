@@ -1,5 +1,5 @@
 // demo/typist/sampler.mjs: the Hermes Precisa 305 sampler of
-// /typist/typewriter/ and /typist/typewriters/, lifted for /typist/multi-typer/, where
+// /typist/typewriter/ and /typist/machines/, lifted for /typist/score/, where
 // several typewriters share ONE set of decoded buffers. 010 and 020 still carry
 // their own copy and are unchanged.
 //
@@ -10,7 +10,7 @@
 //   - `createVoice(ctx, samples, ...)`: one typewriter. One
 //     AudioBufferSourceNode per key into the voice's own `out` gain, so a press
 //     costs no fetch and no decode; the pitch per key type comes from a
-//     character (`typewriters/fx.mjs`), read when a sample starts.
+//     character (`machines/fx.mjs`), read when a sample starts.
 
 // R2, through the station worker's /media/ door, which answers CORS for any origin.
 export const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/typewriter/hermes-precisa-305/';

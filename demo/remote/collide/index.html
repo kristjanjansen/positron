@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Collide on Pi</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The path choice alone at the top left, as /remote/piano/'s row
+     (that page has its play button beside it; here a key is the start). */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+</style>
+<script type="module">
+  import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createOverlayScope } from '/remote/overlay-scope.mjs';
+  import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/remote/path.mjs';
+  import { createCodeBox } from '/shell/code-box.mjs';
+  import { createSlider } from '/shell/slider.mjs';
+  import { createHueBook } from '/shell/code-lang.mjs';
+  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { createBoard, BOARD_FRAME_MS, BOARD_CHANNELS, BOARD_RATE } from '/shell/board.mjs';
+  import { createBoardCollide } from '/shell/board-collide.mjs';
+  import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/code/collide-voice.mjs';
+
+  // /code/collide/ plus the same voice rendered on the Raspberry Pi as
+  // well. Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"):
+  // *"100 is same but with local and rasperry pi rendering. 1/2 videpanel with
+  // wave on left, pi wave on right. readings on top, 2 local 2 pi ones. pi is
+  // not on lan, backlog its execution, simulate locally until then"*.
+  //
+  // 🔴 THE PI SIDE IS THE REAL BOARD WHEN ONE ANSWERS, AND SIMULATED IN THIS TAB
+  // WHEN NONE DOES, and the page says which on the Pi node's label and in the
+  // `path` cell (`relay`, `direct`, `turn` or `simulated`).
+  // `createPiSide` below is the one place the board goes in (2026-10-12,
+  // plans/plan-pi-supercollider-defs.md steps 3 and 5).
+  //
+  // THE READOUT, every cell measured here and none typed:
+  //   local lag / Pi lag     from the key going down (`performance.now()` in
+  //                          the key's own handler) to the first window of
+  //                          that side's sound above -50 dBFS at its analyser,
+  //                          plus the context's own `baseLatency` and
+  //                          `outputLatency`, which is what is still between
+  //                          the analyser and the speakers. Measured only on a
+  //                          note that starts from silence on that side, so a
+  //                          tail still ringing cannot pass for the new note,
+  //                          and only once that side's engine is up, so the
+  //                          first key's boot is not a lag.
+  //   local spread / Pi spread  the worst minus the best of those lags over
+  //                          every note so far, empty until there are two.
+  //                          Replaced the two level cells 2026-10-12: *"local
+  //                          pi levels have no value"* (both sides play one
+  //                          program, so they read the same number).
+  //
+  // THE CROSSFADER, asked the same day: *"add crossfader to collide on pi"*.
+  // Its own node, `web:xfade`, with the local sound on `audio-in` and the Pi's
+  // on `audio-in-2`, its `audio-out` to the speakers, and the slider a node of
+  // its own, `web:fader:value-out`, cabled into `web:xfade:value-in`. Equal
+  // power, as /radio/blend/. The scopes and the cells read each side
+  // BEFORE the crossfade, so a side faded out still shows its wave.
+  //
+  // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
+  // opens. A pointer over the keys fetches the engine (our origin); the first
+  // key makes the AudioContext and boots both engines.
+  const d = mount({
+    name: 'Collide here and on the Pi', what: '', index: '/', indexLabel: 'concepts',
+    // The four cells under the title, the log alone at the foot (*"readings on
+    // top"*), as /remote/piano/ does.
+    joined: false,
+    // `network` and `path` came 2026-10-13 with the direct option, the two
+    // cells remote/010 shows for its link (an even count, as the shell asks).
+    readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms', network: 'ms', path: '' },
+  });
+  hintCell(d, 'network', NETWORK_HINT);
+  hintCell(d, 'path', PATH_HINT);
+  conceptNav('remote/collide');
+
+  // ── the Pi side: THE ONE PLACE THE REAL BOARD GOES IN ────────────────────
+  //
+  // The page talks to the Pi through five calls and nothing else: `wake(ctx)`,
+  // `noteOn(note, vel)`, `noteOff(note)`, `param(name, v)` and `out()` (its
+  // sound, as an AudioNode in `ctx`).
+  //
+  // THE BOARD, since 2026-10-12. On the first key, `createBoard` with this
+  // page's own 48 kHz context and `toDestination: false`, so the board's sound
+  // is a node HERE that the router puts through the Pi scope and the
+  // crossfader. Then `audio.status` (does a board answer at all, in
+  // `ASK_MS`), `audio.start {source: 'collide'}`, and `sc.load` of PROGRAM
+  // through `/shell/board-collide.mjs`; a key is `note.on {node: 'collide'}`
+  // and a knob `sc.set`. The board compiles the TEXT with the same compiler
+  // and says `same: true` when its bytes are this tab's. `?path=direct`
+  // offers the direct path, as /remote/piano/ does.
+  // ⚠️ THE BOARD ON THIS PAGE TODAY IS THE STAND-IN: `?relay=ws://127.0.0.1:8897`
+  // with `node demo/fake-board.mjs` running. It answers every verb through the
+  // board's own `rig/board/scollide.mjs`, and its sound is a fixed tone, not
+  // the program. The real Pi has not run `scollide.mjs` yet (plan step 4).
+  //
+  // SIMULATED, when nothing answers: a second scsynth in this tab running the
+  // same program, with the trip modelled around it:
+  //
+  //   up     UP_MS before a note or a knob reaches the engine: half the Mac to
+  //          Pi relay round trip, 64 to 69 ms measured 2026-09-14 (PROGRESS.md,
+  //          quoted in research/pi-drum-machines-2026-09-21.md section 2.3).
+  //   back   DOWN_MS of delay on the sound: the board's JACK period (1024 at
+  //          48 kHz on the dummy backend, `rig/board/jacksynth.mjs`, 21.3 ms),
+  //          one board frame (`BOARD_FRAME_MS`, read from board.mjs), the
+  //          relay back (the same 34 ms), and the playout cushion board.mjs
+  //          opens with (`cushionMs = 100`). The sound is folded to
+  //          `BOARD_CHANNELS` (one) on the way, because the board sends mono.
+  //   ⚠️ A MODEL, NOT A MEASUREMENT OF THE BOARD. Its total, about 210 ms,
+  //   sits inside the 160 to 220 ms that research file estimates for press to
+  //   sound through this rig, and that number has never been measured either
+  //   (same file, section 2.3). The `Pi lag` cell measures the MODEL.
+  //
+  const UP_MS = 34;
+  const JACK_MS = 1024 / 48000 * 1000;
+  const CUSHION_MS = 100;
+  const DOWN_MS = JACK_MS + BOARD_FRAME_MS + UP_MS + CUSHION_MS;
+
+  function createSimulatedPi({ log }) {
+    const v = createCollideVoice({ log: (line, kind) => log(`Pi (simulated): ${line}`, kind), who: 'SuperCollider' });
+    let tail = null;
+    const later = (fn) => setTimeout(fn, UP_MS);
+    return {
+      compiled: v.compiled, values: v.values, stat: v.stat, held: v.held, warm: v.warm,
+      async wake(ctx) {
+        await v.wake(ctx);
+        if (!tail) {
+          const fold = ctx.createGain();
+          fold.channelCount = BOARD_CHANNELS; fold.channelCountMode = 'explicit'; fold.channelInterpretation = 'speakers';
+          tail = ctx.createDelay(1);
+          tail.delayTime.value = DOWN_MS / 1000;
+          v.out().connect(fold).connect(tail);
+        }
+      },
+      out: () => tail,
+      noteOn: (note, vel) => later(() => v.noteOn(note, vel)),
+      noteOff: (note) => later(() => v.noteOff(note)),
+      param: (name, x) => { if (!v.values.has(name)) return false; later(() => v.param(name, x)); return true; },
+    };
+  }
+
+  /** How long a board has to answer `audio.status` before the Pi side is simulated. */
+  const ASK_MS = 3000;
+  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
+  // instruments."* The same choice, cell and fall back as remote/010 and 030
+  // (`/remote/path.mjs`): the relay unless `?path=direct`; direct is a
+  // WebRTC link to the board offered once it answers, the relay kept for
+  // presence and as the fall back when no channel opens in 3 s or it drops.
+  // A change of choice makes a new board on the new path (`switchPath`).
+  const path = createPathChoice({ log: d.log, onPick: (m) => switchPath(m) });
+  /**
+   * The board if one answers, the simulation if none does. `mode()` is
+   * `checking` until it is decided, then `relay`, `direct`, `turn` or
+   * `simulated`; `onMode` hears every change.
+   */
+  function createPiSide({ log, onMode = () => {} }) {
+    const sim = createSimulatedPi({ log });
+    let mode = 'idle', board = null, kit = null, waking = null, loaded = null;
+    const say = (m) => { mode = m; onMode(m); };
+    const real = () => mode !== 'idle' && mode !== 'checking' && mode !== 'simulated';
+    async function tryBoard(ctx) {
+      board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
+        direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      // A harness may not drive the board (`createBoard`'s guard), so it is
+      // simulated under a check without a word on the wire.
+      if (!board.driving()) return 'this run may not drive the board';
+      // The socket opens after `createBoard` returns, and a send before it
+      // opens is no send at all, so the question waits for it inside ASK_MS.
+      const t0 = performance.now();
+      while (board.state() !== 1 && performance.now() - t0 < ASK_MS) await new Promise((r) => setTimeout(r, 50));
+      const left = ASK_MS - (performance.now() - t0);
+      if (board.state() !== 1 || !await board.ask({ type: 'audio.status' }, 'audio.started', Math.max(500, left))) {
+        return `no board answered in ${ASK_MS / 1000} s`;
+      }
+      const st = await kit.start();
+      if (!st?.ok) return `the board did not start its collide engine: ${st?.reason ?? 'no answer'}`;
+      if (!await board.startAudio()) return 'the board\'s sound cannot be played in this page\'s audio';
+      let via = 'relay';
+      if (path.mode() === 'direct') {
+        // The direct path before the program and the first note, so a phrase
+        // never starts on the relay and switches. It falls back after 3 s.
+        log('Pi: opening a direct path to the board');
+        path.connecting(true);
+        try { via = await board.goDirect(); } finally { path.connecting(false); }
+        if (via === 'relay' || via === 'refused') path.fellBack();
+      }
+      loaded = await kit.load('collide', PROGRAM);
+      if (!loaded?.ok) return `the board did not take the program: ${loaded?.reason ?? 'no answer'}${loaded?.line ? ` at line ${loaded.line}` : ''}`;
+      log(`the board compiled the program to ${loaded.bytes} bytes in ${loaded.compileMs} ms, ${loaded.same ? 'the same bytes as this tab' : 'DIFFERENT bytes from this tab'}`, loaded.same ? 'hi' : 'bad');
+      kit.keepClock();
+      board.watchRtt(2000);
+      return { via: via === 'refused' ? 'relay' : via };
+    }
+    return {
+      get simulated() { return !real(); },
+      mode: () => mode,
+      board: () => board, kit: () => kit, loaded: () => loaded,
+      compiled: sim.compiled, values: sim.values, stat: sim.stat, held: sim.held, warm: sim.warm,
+      wake(ctx) {
+        waking ??= (async () => {
+          say('checking');
+          const r = await tryBoard(ctx).catch((e) => e.message);
+          if (typeof r === 'object') { say(r.via); return; }
+          log(`Pi side simulated in this tab: ${r}`);
+          board?.close(); board = null; kit = null;
+          await sim.wake(ctx);
+          say('simulated');
+        })();
+        return waking;
+      },
+      out: () => (real() ? board.playout() : sim.out()),
+      /** Leave the board, so the next `wake` makes a new one (a change of path). */
+      reset() {
+        if (!real()) return false;
+        try { kit?.panic?.(); } catch { /* closing */ }
+        try { board.playout()?.disconnect(); } catch { /* not connected */ }
+        board.close(); board = null; kit = null; loaded = null; waking = null; say('idle');
+        return true;
+      },
+      // While it is still being decided a key goes to the simulation, which
+      // holds it until its engine is up and drops it if it never wakes.
+      noteOn: (note, vel) => (real() ? kit.noteOn('collide', note, vel) : sim.noteOn(note, vel)),
+      noteOff: (note) => (real() ? kit.noteOff('collide', note) : sim.noteOff(note)),
+      param: (name, x) => {
+        if (!sim.values.has(name)) return false;
+        if (real()) { sim.values.set(name, x); kit.set('collide', name, x); } else sim.param(name, x);
+        return true;
+      },
+    };
+  }
+
+  // ── the two sides ────────────────────────────────────────────────────────
+  const local = createCollideVoice({ log: d.log, who: 'SuperCollider here' });
+  const pi = createPiSide({ log: d.log, onMode: (m) => showMode(m) });
+  const NAMES = local.compiled.knobs.map((k) => k.name);
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const S = 'web';
+  const ID = (node, port) => `${S}:${node}:${port}`;
+  const PI = (port) => `${BOARD_SITE}:collide:${port}`;
+  const bay = createBay();
+  for (const [n, kind, label] of [
+    ['keys', 'person', 'keyboard'],
+    ...NAMES.map((n) => [`knob-${n}`, 'person', n]),
+    ['collide', 'engine', 'SuperCollider here'],
+    ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'], ['speaker', 'screen', 'speakers'],
+  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  const piNode = bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi', place: 'studio-1' });
+  bay.addNode({ id: `${S}:fader`, kind: 'person', label: 'fader', place: 'browser' });
+  bay.addNode({ id: `${S}:xfade`, kind: 'engine', label: 'crossfader', place: 'browser' });
+  /** 0 is all here, 1 is all Pi. Opens at the middle. */
+  let x = 0.5, fades = 0;
+  let notesIn = 0, piNotesIn = 0, paramSends = 0, piParamSends = 0;
+  const PORTS = [
+    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    ...NAMES.map((n) => ({ id: ID(`knob-${n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
+    { id: ID('collide', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note') return;
+      notesIn++;
+      if (e.d2) local.noteOn(e.d1, e.d2); else local.noteOff(e.d1);
+    } },
+    { id: ID('collide', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
+      if (e?.of === 'param' && local.param(e.name, e.v)) paramSends++;
+    } },
+    { id: ID('collide', 'audio-out'), dir: 'out', medium: 'audio' },
+    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
+      if (e?.cls !== 'note') return;
+      piNotesIn++;
+      if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
+    } },
+    { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
+      if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++;
+    } },
+    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
+    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('scope-pi', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
+    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+      if (e?.of !== 'param' || e.name !== 'x') return;
+      x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
+    } },
+    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
+    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const lay = (from, to, opts) => { const r = bay.link(from, to, [], opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  lay(ID('keys', 'midi-out'), ID('collide', 'midi-in'));
+  lay(ID('keys', 'midi-out'), PI('midi-in'));
+  for (const n of NAMES) { lay(ID(`knob-${n}`, 'value-out'), ID('collide', 'value-in')); lay(ID(`knob-${n}`, 'value-out'), PI('value-in')); }
+  lay(ID('collide', 'audio-out'), ID('scope', 'audio-in'));
+  lay(ID('collide', 'audio-out'), ID('xfade', 'audio-in'));
+  lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
+  // ⚠️ VIA RELAY, BECAUSE THAT IS THE WIRE IT RIDES. Both Pi legs read one
+  // `board.playout()` node fed by the relay socket; without this the bay took
+  // the crossfader for a second internet receiver and gave it a MoQ session
+  // the board never opens, and the picture drew it as a wire of its own, a
+  // column wider than the box (884 px in 688 at 1280, 2026-10-12).
+  lay(PI('audio-out'), ID('xfade', 'audio-in-2'), { via: 'relay' });
+  lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
+  lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
+
+  // ── the sound, made on the first key ─────────────────────────────────────
+  let ctx = null, master = null, mix = null, mixMeter = null, mixBuf = null, on = false;
+  /** Per side: the scope's analyser, the meter's, and the note being timed. */
+  const SIDES = {
+    local: { voice: local, from: ID('collide', 'audio-out'), scope: ID('scope', 'audio-in'), fadeIn: ID('xfade', 'audio-in'), gain: null, an: null, buf: null, meter: null, mbuf: null, timing: null },
+    pi: { voice: pi, from: PI('audio-out'), scope: ID('scope-pi', 'audio-in'), fadeIn: ID('xfade', 'audio-in-2'), gain: null, an: null, buf: null, meter: null, mbuf: null, timing: null },
+  };
+  /** Equal power: cos and sin of a quarter turn, as /radio/blend/. */
+  const fadeGains = () => [Math.cos(x * Math.PI / 2), Math.sin(x * Math.PI / 2)];
+  function applyFade() {
+    if (!ctx) return;
+    const g = fadeGains();
+    [SIDES.local, SIDES.pi].forEach((s, i) => s.gain?.gain.setTargetAtTime(g[i], ctx.currentTime, 0.02));
+  }
+  /** THE ROUTER: each side's sound goes where the bay's audio links say. */
+  function route() {
+    const held = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+    for (const s of Object.values(SIDES)) {
+      const out = s.voice.out();
+      if (!out) continue;
+      try { out.disconnect(); } catch { /* not connected */ }
+      // The meter is always on: the cells measure what the side makes.
+      out.connect(s.meter);
+      if (held(s.from, s.scope)) out.connect(s.an);
+      if (held(s.from, s.fadeIn)) out.connect(s.gain);
+    }
+    try { mix.disconnect(); } catch { /* not connected */ }
+    if (held(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'))) mix.connect(master);
+    mix.connect(mixMeter);
+    applyFade();
+  }
+  async function start() {
+    if (!ctx) {
+      // Made here, synchronously inside the key's gesture.
+      // At the board's rate, so the board's sound can be played in THIS context
+      // (`createBoard({ audioContext })` refuses any other, nothing resamples).
+      ctx = new AudioContext({ sampleRate: BOARD_RATE, latencyHint: 'interactive' });
+      master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+      const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
+      // The crossfader: one gain per side into one sum, metered after.
+      mix = ctx.createGain();
+      mixMeter = ctx.createAnalyser(); mixMeter.fftSize = 2048; mixMeter.connect(pull);
+      mixBuf = new Float32Array(mixMeter.fftSize);
+      for (const s of Object.values(SIDES)) {
+        s.gain = ctx.createGain(); s.gain.gain.value = 0; s.gain.connect(mix);
+        // 32768 samples, 0.68 s: long enough to still hold a note's onset when
+        // the Pi's copy of it arrives a few hundred ms after the key.
+        s.an = ctx.createAnalyser(); s.an.fftSize = 32768; s.an.connect(pull);
+        s.buf = new Float32Array(s.an.fftSize);
+        // 1024 samples, 21 ms at 48 kHz: short, so an onset is seen early.
+        s.meter = ctx.createAnalyser(); s.meter.fftSize = 1024; s.meter.connect(pull);
+        s.mbuf = new Float32Array(s.meter.fftSize);
+      }
+    }
+    ctx.resume();
+    // The Pi side may take seconds to decide (a board that never answers is
+    // waited for `ASK_MS`), so the local side does not wait for it.
+    pi.wake(ctx).then(() => { route(); pb.refresh(); }, () => {});
+    try { await local.wake(ctx); } catch { return false; }
+    route();
+    on = true;
+    pb.refresh();
+    return true;
+  }
+
+  // ── the cells ────────────────────────────────────────────────────────────
+  const SILENT_DB = -50;
+  const KEY = { local: ['local lag', 'local spread'], pi: ['Pi lag', 'Pi spread'] };
+  const measured = { local: { lag: null, lags: [] }, pi: { lag: null, lags: [] } };
+  let poll = 0;
+  /** A key went down at `t`: time each side's onset and hold its loudest window. */
+  function timeNote(t) {
+    for (const [k, s] of Object.entries(SIDES)) {
+      // Timed only when that side is up and quiet at the press.
+      const quiet = !!s.meter && !!s.voice.out() && dbfs(rmsOf(s.meter, s.mbuf)) < SILENT_DB;
+      s.timing = { t, quiet, heard: false };
+    }
+    if (!poll) poll = setInterval(tick, 2);
+  }
+  function tick() {
+    const now = performance.now();
+    let busy = false;
+    for (const [k, s] of Object.entries(SIDES)) {
+      const tm = s.timing;
+      if (!tm || !s.meter) { if (tm && now - tm.t < 4000) busy = true; continue; }
+      if (tm.heard || now - tm.t > 4000) { s.timing = null; continue; }
+      busy = true;
+      const db = dbfs(rmsOf(s.meter, s.mbuf));
+      if (!tm.heard && db >= SILENT_DB) {
+        tm.heard = true; tm.at = now;
+        if (tm.quiet && ctx) {
+          const lag = now - tm.t + ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000;
+          const m = measured[k];
+          m.lag = lag;
+          m.lags.push(lag);
+          d.set(KEY[k][0], lag.toFixed(0));
+          if (m.lags.length > 1) d.set(KEY[k][1], (Math.max(...m.lags) - Math.min(...m.lags)).toFixed(0));
+        }
+      }
+    }
+    if (!busy) { clearInterval(poll); poll = 0; }
+  }
+
+  // ── the keyboard: its notes leave on `keys:midi-out` and nowhere else ────
+  const host = el('div');
+  const kb = createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => {
+      if (how === 'midi') return;
+      timeNote(performance.now());
+      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
+      if (!on) start();
+      hold();
+    },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+  });
+  for (const ev of ['pointerenter', 'focusin', 'touchstart']) host.addEventListener(ev, () => local.warm(), { once: true, passive: true });
+
+  // ── the two knobs, each a node of its own, each cabled into both synths ─
+  const book = createHueBook().assign(NAMES);
+  const knobs = new Map(local.compiled.knobs.map((k) => {
+    const knob = createKnob({
+      label: k.name, min: k.spec.min, max: k.spec.max, value: k.value, hand: true,
+      onInput: (v) => bay.send(ID(`knob-${k.name}`, 'value-out'), { of: 'param', name: k.name, v }),
+    });
+    knob.el.dataset.param = k.name;
+    knob.el.style.setProperty('--param-hue', String(book.hueOf(k.name)));
+    return [k.name, knob];
+  }));
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── one scope, both waves on it, each held from its own note's onset ────
+  // Asked 2026-10-13: *"overlay 2 waves on top of each other, full w"*. The
+  // scope, what was measured before it and how each side's onset is found are
+  // in /remote/overlay-scope.mjs, shared with remote/040 since the
+  // same day. Here a key is the trigger, the window is 1024 samples (21 ms at
+  // 48 kHz, about four cycles of A3) and the Pi's window may slide 20 ms (960
+  // samples, a period of the lowest key) to its best match.
+  const overlay = createOverlayScope({ win: 1024, slide: 960, axis: '21 ms' });
+  const scope = overlay.wave, held = overlay.held, captures = overlay.captures;
+  const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
+  const sideAn = (s) => () => (s.an && s.voice.out() && scoped(s) ? s.an : null);
+  /** A key went down: take each side's window from its own onset, once it has one. */
+  function hold() {
+    if (!ctx) return;
+    overlay.hold({ ctx, at: ctx.currentTime, sides: { local: sideAn(SIDES.local), pi: sideAn(SIDES.pi) } });
+  }
+
+  // ── which Pi, on the Pi node's label and the `path` and `network` cells ─
+  const isPi = (l) => l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+  function pathCells() {
+    const b = pi.board(), via = b && !pi.simulated ? b.stats().via : null;
+    d.set('path', via ?? (pi.mode() === 'simulated' ? 'model' : ''));
+    const rtt = via ? b.stats().rttMs : null;
+    d.set('network', Number.isFinite(rtt) ? Math.round(rtt) : '');
+  }
+  function showMode(m) {
+    // No longer than the real label: the bay's column is as wide as its widest
+    // box, and `SuperCollider on the Pi, simulated` widened the Pi's column
+    // enough to push the patchbay 11 px past its box at 1280 (2026-10-12).
+    piNode.label = m === 'simulated' ? 'SuperCollider, simulated' : 'SuperCollider on the Pi';
+    pathCells();
+    pb.refresh();
+  }
+  // The wire each Pi link rides, and the fall back when direct drops.
+  setInterval(() => {
+    const b = pi.board();
+    if (b && !pi.simulated) {
+      const via = b.stats().via;
+      if (path.rewire(bay, via, isPi, d.log)) pb.refresh();
+      if (path.mode() === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); path.fellBack(); }
+    }
+    pathCells();
+  }, 500);
+  /** A new choice while the board is joined: leave it and join again on the new path. */
+  async function switchPath() {
+    if (!ctx || !pi.reset()) return;   // not joined yet, or simulated: the next wake reads the choice
+    path.reset();
+    await pi.wake(ctx);
+    route(); pb.refresh();
+  }
+
+  // ── the page ─────────────────────────────────────────────────────────────
+  const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
+    flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || local.held().length > 0),
+  });
+  // The crossfader's slider, the kit's, its two ends named inside the lane; a
+  // move leaves on `web:fader:value-out` and reaches the sound only over its link.
+  const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
+    ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
+  const top = el('div', 'cc-top');
+  top.append(path.el);
+  // The program both sides run, read only; a sixth of its height as on 090.
+  const lines = PROGRAM.split('\n').length;
+  const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
+    hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
+  code.input.readOnly = true;
+  // Knobs above the code (*"when there are code and knobs on concepts, move knobs on top of code"*).
+  d.stack.add(top, scope.el, fader.el, grid.el, code.el, host, pb.el);
+
+  const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };
+  window.__demo.knobs = grid;
+  window.__demo.keyboard = kb;
+  window.__demo.collide = {
+    bay, local, pi, knobs, names: NAMES, model: { UP_MS, DOWN_MS, JACK_MS, CUSHION_MS, FRAME_MS: BOARD_FRAME_MS },
+    piMode: () => pi.mode(), piClock: () => pi.kit()?.clock() ?? null, piLoaded: () => pi.loaded(),
+    piStats: () => pi.kit()?.stats() ?? null, piBoard: () => pi.board()?.stats() ?? null,
+    measured, ctx: () => ctx, fader, x: () => x, fades: () => fades,
+    mixLevel: () => (mixMeter ? rmsOf(mixMeter, mixBuf) : 0),
+    notesIn: () => notesIn, piNotesIn: () => piNotesIn, paramSends: () => paramSends, piParamSends: () => piParamSends,
+    samples: samplesOf(SIDES.local), piSamples: samplesOf(SIDES.pi),
+    code: PROGRAM,
+    path: () => path.mode(), scope, held, captures,
+  };
+  d.ready();
+</script>

@@ -250,10 +250,10 @@ const row = page.stack();                // a block that is itself a column`,
     const cut = t.split(/\s+[—–-]\s+|,\s+/)[0];
     return cut.length > 12 ? cut : t;
   };
-  const pick = ['weight', 'tapes', 'kurenniemi', 'able', 'floor', 'radio', 'wire', 'strip'];
+  const pick = ['weight', 'tapes', 'kurenniemi', 'able', 'floor', 'archive/radio', 'wire', 'strip'];
   const rows = pick.map((n) => DEMOS.find((x) => x.name === n)).filter(Boolean);
   const cardsFor = (extra = {}) => rows.map((r) => createCard({
-    title: r.name,
+    title: r.name.split('/').pop(),
     desc: firstClause(r.one),
     tags: (r.tags || []).slice(0, 3),
     href: `/${r.name}/`,

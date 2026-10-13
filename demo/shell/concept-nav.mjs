@@ -17,7 +17,7 @@ export function conceptNav(id) {
   const back = head?.querySelector('.pos-back');
   if (!head || !back) return;
   const i = CONCEPTS.findIndex((c) => c.id === id);
-  // A page that is off the index (/room/patch-from-words/) has no place in the
+  // A page that is off the index (/room/words/) has no place in the
   // order, so no pager: CONCEPTS[-1 + 1] used to offer it the first card as `next`.
   const prev = i < 0 ? null : CONCEPTS[i - 1], next = i < 0 ? null : CONCEPTS[i + 1];
   // The heading is the concept's title from concept-list.mjs, never a number.
@@ -33,8 +33,11 @@ export function conceptNav(id) {
   back.replaceWith(row);
   row.append(back);
   const side = el('span', 'cc-nav-pn');
-  if (prev) side.append(el('a', 'pos-back', `‹ ${prev.title}`, { href: `/${prev.id}/` }));
-  if (next) side.append(el('a', 'pos-back', `${next.title} ›`, { href: `/${next.id}/` }));
+  // Next keeps the right edge and previous the left, whether or not the other
+  // exists. Asked 2026-10-13 on a phone shot of Keyboard, the first page, where
+  // the lone next link sat on the left: *"Next link always to right"*.
+  if (prev) side.append(el('a', 'pos-back cc-prev', `‹ ${prev.title}`, { href: `/${prev.id}/` }));
+  if (next) side.append(el('a', 'pos-back cc-next', `${next.title} ›`, { href: `/${next.id}/` }));
   row.append(side);
   if (!document.getElementById('cc-nav-css')) {
     const st = el('style');
@@ -49,6 +52,7 @@ export function conceptNav(id) {
       + ' .cc-nav { row-gap: 10px; margin-bottom: 20px; }'
       + ' .cc-nav .pos-back { margin-bottom: 0; }'
       + ' .cc-nav-pn .pos-back { font-size: 13px; letter-spacing: 0; text-transform: none; }'
+      + ' .cc-nav-pn .cc-next { margin-left: auto; }'
       + ' @media (min-width: 600px) { .cc-nav { margin-bottom: 30px; } }'
       + ' @media (max-width: 599px) { .cc-nav-pn { flex: 1 1 100%; justify-content: space-between; } }'
       // Code boxes on concept pages: three times the kit field's 7px 9px.

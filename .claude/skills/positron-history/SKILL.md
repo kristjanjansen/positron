@@ -198,3 +198,54 @@ Instructed: *"when all is done, move concepts to frontpage. use http://127.0.0.1
 | `demo/concepts/typist/sampler.mjs` | `demo/typist/sampler.mjs` |
 | `demo/concepts/video/loopback.mjs` | `demo/video/loopback.mjs` |
 | `demo/concepts/index.html` | `demo/index.html` (the front page) |
+
+## One word slugs and the radio group, 2026-10-13 (night): /<group>/<dashed-slug>/ to /<group>/<word>/
+
+Instructed: *"Resolve clashes. Avoid dashes on names."*, then *"Plaits keys (rm keys from name)"*. Every concept slug became one plain lowercase word, never its group's own name, chosen from the title (titles keep their words, except Plaits keys, retitled Plaits). The clash the afternoon had worked round was resolved instead: the archived radio demo moved from `/radio/` (`demo/radio/`, manifest `radio`) to **`/archive/radio/`** (`demo/archive/radio/`, manifest `archive/radio`, graded by `node demo/verify.mjs archive/radio`), and the radio concepts left `/stations/` for `/radio/`. **Every address in the left column is a 404, and `/radio/` itself no longer answers as the demo.** No forwarding, by the concepts rule. The sweep matched the URL forms and the path forms (`/radio/`, `demo/radio/`, `positron.studio/radio/`, the old ids) in `demo/`, `workers/`, `timeline/`, `research/tools/`, the skills, `CLAUDE.md`, `HANDOFF.md`, `LESSONS.md`; never the word radio, never a verbatim quotation, nothing under `archive/`, `plans/` or `research/*.md`, and not the table above, which records the afternoon as it was.
+
+| old address | new address |
+| --- | --- |
+| `/radio/` (the archived radio demo) | `/archive/radio/` |
+| `/synth/sound-design/` | `/synth/sound/` |
+| `/synth/dot-piano/` | `/synth/dots/` |
+| `/code/faust-synth/` | `/code/faust/` |
+| `/code/collide-synth/` | `/code/collide/` |
+| `/code/plaits-keys/` | `/code/plaits/` (title Plaits) |
+| `/code/piano-and-rhodes/` | `/code/piano/` |
+| `/granulator/granulator/` | `/granulator/grains/` |
+| `/granulator/beat-granulator/` | `/granulator/beat/` |
+| `/remote/circuit-on-pi/` | `/remote/circuit/` |
+| `/remote/collide-on-pi/` | `/remote/collide/` |
+| `/remote/piano-and-rhodes-on-pi/` | `/remote/piano/` |
+| `/remote/drums-on-the-pi/` | `/remote/drums/` |
+| `/remote/shader-on-pi/` | `/remote/shader/` |
+| `/stations/radio/` | `/radio/blend/` |
+| `/stations/tuner/` | `/radio/tuner/` |
+| `/stations/tempo/` | `/radio/tempo/` |
+| `/stations/live-tempo/` | `/radio/live/` |
+| `/stations/live-key/` | `/radio/key/` |
+| `/video/camera-shader/` | `/video/shader/` |
+| `/video/camera-recorder/` | `/video/recorder/` |
+| `/video/webrtc-loopback/` | `/video/webrtc/` |
+| `/video/ll-hls-loopback/` | `/video/llhls/` |
+| `/video/moq-loopback/` | `/video/moq/` |
+| `/shader/mirror-shader/` | `/shader/mirror/` |
+| `/shader/scan-landscape/` | `/shader/landscape/` |
+| `/room/chat-ui-wired/` | `/room/window/` |
+| `/room/broadcast-chat/` | `/room/broadcast/` |
+| `/room/chat-timeline/` | `/room/history/` |
+| `/room/patch-from-words/` | `/room/words/` (off the index) |
+| `/typist/typewriters/` | `/typist/machines/` |
+| `/typist/multi-typer/` | `/typist/score/` |
+| `/rhythm/drum-machine/` | `/rhythm/drums/` |
+| `/rhythm/drum-knobs/` | `/rhythm/knobs/` |
+| `/rhythm/sample-drums/` | `/rhythm/samples/` |
+| `/rhythm/camera-drums/` | `/rhythm/camera/` |
+
+Unchanged: `/synth/keyboard/`, `/synth/recorder/`, `/synth/timeline/`, `/video/camera/`, `/room/chat/`, `/typist/paper/`, `/typist/typewriter/`, `/typist/playback/`, `/history/newsreels/`.
+
+| old module | new module |
+| --- | --- |
+| `demo/stations/tempo.mjs` | `demo/radio/tempo.mjs` |
+| `demo/typist/typewriters/fx.mjs` | `demo/typist/machines/fx.mjs` |
+| `demo/radio/index.html` | `demo/archive/radio/index.html` |

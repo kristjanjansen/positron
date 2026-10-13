@@ -500,7 +500,7 @@ export function createStepGrid({
        PADDING. A strip inside `createPanelLayout` carries `--panel-gap` (16 px)
        on the side facing the label column, so pads sized off `clientWidth`
        came out 16 px too wide in total and the sixteenth was cut under the
-       scroller's edge. MEASURED 2026-10-12: `/rhythm/drum-machine/` 580 px of
+       scroller's edge. MEASURED 2026-10-12: `/rhythm/drums/` 580 px of
        client width against 590 of scroll width, `/tom/` 636 against 638. A
        strip with no padding (the kit's) is unchanged. */
     const cs = getComputedStyle(strip);

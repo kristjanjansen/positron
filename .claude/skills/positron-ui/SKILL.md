@@ -511,7 +511,7 @@ USE).
 ## Components, layout and the words on the page
 
 - 🔴 **A COMPONENT SWAP MOVES EVERY SELECTOR THAT NAMED THE OLD ONE.**
-  `/radio/`'s sound row went `createChoice` -> `createPicker` and one of the
+  `/archive/radio/`'s sound row went `createChoice` -> `createPicker` and one of the
   three rules keyed on the old class was updated. `shareLabelColumn()` went on
   setting `--lab` on exactly the right element and **nothing consumed it**, so
   the JavaScript and the comment beside it both read as correct while the row
@@ -1584,7 +1584,7 @@ UNDER THE KNOB. Chrome makes wheel listeners passive by default.**
 **From `demo/shell/choice.mjs`.**
 
 🔴 **A CONTROL WHOSE EFFECT IS SECONDS AWAY LOOKS BROKEN WITHOUT THIS, and
-`/radio/` is where it was reported: a speed button lights the moment it
+`/archive/radio/` is where it was reported: a speed button lights the moment it
 is pressed and the sound takes about a second to get there, 600 ms of
 already-scheduled audio plus the glide, so the first thing a listener does
 is press it again. REPORTED as *"can we track when 0.5 etc happens and

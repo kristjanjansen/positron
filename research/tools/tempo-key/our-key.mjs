@@ -1,4 +1,4 @@
-// Runs the key detector of /stations/live-key/ offline over a mono float32
+// Runs the key detector of /radio/key/ offline over a mono float32
 // file and prints its readings as JSON.
 //
 //   node research/tools/tempo-key/our-key.mjs <in.f32> [--page path] [--opts '{"profiles":"kk"}'] > out.json
@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 const file = args[0];
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const PAGE = opt('--page', new URL('../../../demo/stations/live-key/index.html', import.meta.url).pathname);
+const PAGE = opt('--page', new URL('../../../demo/radio/key/index.html', import.meta.url).pathname);
 const OPTS = JSON.parse(opt('--opts', '{}'));
 const SR = 44100, N = 32768, HOP_S = 0.1, READ_S = 0.5;
 

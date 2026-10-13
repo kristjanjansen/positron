@@ -114,10 +114,10 @@ if (peersAtStart.length) {
  * 🔴 FOUR PAGES ARE GRADED AGAINST STAND-INS, NEVER AGAINST THE REAL THING, AND
  * THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO.
  *
- * Every station `/radio/` offers is an ERR mount, and ERR told us our listeners
+ * Every station `/archive/radio/` offers is an ERR mount, and ERR told us our listeners
  * were corrupting their audience figures: the standing rule is that a connection
  * to one is opened only when a PERSON is going to listen. That made the page's
- * own thirty-four checks unrunnable, so `node demo/verify.mjs radio` either
+ * own thirty-four checks unrunnable, so `node demo/verify.mjs archive/radio` either
  * never happened or happened at somebody else's expense. `demo/fake-station.mjs`
  * serves real MP3 frames with real ICY headers at the page's own `?base=`, so
  * the decode path, the loop and the whole self-check run against a mount that is
@@ -132,7 +132,7 @@ if (peersAtStart.length) {
  * which is the way it happens by accident. `demo/fake-tapes.mjs` serves the same
  * paths at the lengths `corpus.json` measured.
  *
- * 🔴 AND `/now/` AND `/flipper/` ARE THE SAME BROADCASTER AS `/radio/`, WHICH
+ * 🔴 AND `/now/` AND `/flipper/` ARE THE SAME BROADCASTER AS `/archive/radio/`, WHICH
  * IS WHY THE LAST FULL SUITE SKIPPED BOTH IN WRITING. They sweep ERR's live HLS
  * two bytes at a time to find where the rights refusals start, which is thirty
  * probes on one page and eight per channel on the other, plus a ten minute
@@ -153,16 +153,18 @@ const PEER_IN_PAGE = new Set(['capture', 'wire']);
 /** slug -> the `?base=` its page is pointed at, filled in as each one comes up. */
 const standIn = new Map();
 const standIns = [];
-if (all.some((t) => t.name === 'radio')) {
+// The archived radio demo is `archive/radio` since 2026-10-13 (*"Resolve clashes"*):
+// its folder is demo/archive/radio/ and /radio/ is the radio concepts' group.
+if (all.some((t) => t.name === 'archive/radio')) {
   const station = startStation({ port: 0, quiet: true });
   if (!station) {
-    console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `radio` '
+    console.log('⚠️  the stand-in station needs ffmpeg and could not be built, so `archive/radio` '
       + 'will be graded against nothing rather than against ERR.');
   } else {
     await new Promise((r) => station.on('listening', r));
-    standIn.set('radio', `http://127.0.0.1:${station.address().port}`);
+    standIn.set('archive/radio', `http://127.0.0.1:${station.address().port}`);
     standIns.push(station);
-    console.log(`stand-in station ${standIn.get('radio')} (nobody's radio)`);
+    console.log(`stand-in station ${standIn.get('archive/radio')} (nobody's radio)`);
   }
 }
 if (all.some((t) => t.name === 'tapes')) {
@@ -728,7 +730,7 @@ for (const t of targets) {
    * topic means one room may use it — a harness room that reached real phones
    * is exactly how this came up.
    */
-  const own = t.room === 'fixed' ? '' : `room=${t.name}-test-${Math.random().toString(36).slice(2, 8)}`;
+  const own = t.room === 'fixed' ? '' : `room=${t.name.replace(/\//g, '-')}-test-${Math.random().toString(36).slice(2, 8)}`;
   // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A
   // VISIT. `radio` proves a station button works by pressing another station
   // and pressing back, and proves the transport stops by stopping it — on the
@@ -1041,7 +1043,7 @@ for (const t of targets) {
    * fell through on its first test, and a page was left with 12 tries at 400 ms
    * to produce everything it had.
    *
-   * MEASURED the day it landed: `/radio/` makes 34 asserts and the suite
+   * MEASURED the day it landed: `/archive/radio/` makes 34 asserts and the suite
    * collected **2**, then reported **13/13 green**. That is this project's worst
    * failure shape, a green suite with no coverage, and it hit 28 demos at once
    * because 28 declare `settleMs`.
@@ -1060,7 +1062,7 @@ for (const t of targets) {
   // existed, so two asserts from the shell at t+0 handed every page straight to
   // a loop that allows 4.8 s in total. A page is done when it says it is ready
   // AND its count has stopped moving. Both conditions, or a page that calls
-  // `ready()` before driving its own checks (`/radio/` does, from inside
+  // `ready()` before driving its own checks (`/archive/radio/` does, from inside
   // the granulator's boot) is cut off at the moment it starts working.
   // ⚠️ "THE PAGE HAS NOT ASSERTED YET" IS NOT "THE COUNT IS ZERO". The shell
   // makes two of its own at t+0 on every shelled page, so a zero test answered
@@ -1098,7 +1100,7 @@ for (const t of targets) {
    * `/muta/` calls `ifSelfcheck(...)` WITHOUT awaiting it and then `d.ready()`
    * on the next line, so `ready` is true a few milliseconds in and stays true
    * through every check the page makes. The paragraph above already knew
-   * `/radio/` does the same from inside the granulator's boot. A page's own
+   * `/archive/radio/` does the same from inside the granulator's boot. A page's own
    * claim to be finished is worth reading and is not worth trusting alone.
    *
    * ⚠️ AND `__demo.ready` IS A REAL BOOLEAN, WHICH WAS CHECKED AFTER GETTING IT

@@ -27,8 +27,8 @@ import { createHandDrive, HAND_MAX_MS, HAND_YIELD_MS } from './hand-drive.mjs';
 
 /**
  * 🔴 THE TWO CEILINGS MOVED TO `hand-drive.mjs` ON 2026-09-22 AND ARE
- * RE-EXPORTED HERE UNCHANGED. `/radio/`, `/kit/` and `/knobs/` import
- * `HAND_YIELD_MS` from this module, and `/radio/`'s comment says in as many
+ * RE-EXPORTED HERE UNCHANGED. `/archive/radio/`, `/kit/` and `/knobs/` import
+ * `HAND_YIELD_MS` from this module, and `/archive/radio/`'s comment says in as many
  * words that it is imported RATHER THAN TYPED, so a moved export would be three
  * broken pages in exchange for a tidier import list.
  */
@@ -162,7 +162,7 @@ export function createSliderGroup(sliders = [], { pair = false } = {}) {
  * @param [o.warp] `'exp'` for a logarithmic lane. Default linear, unchanged.
  *
  * 🔴 WHY A LINEAR LANE HIDES THE INTERESTING HALF OF A RANGE, MEASURED.
- * `/radio/` granulates a radio station and every setting sounded like the
+ * `/archive/radio/` granulates a radio station and every setting sounded like the
  * same wash. The upstream norns script this engine came from declares grain
  * rate `0.1-100 Hz EXPONENTIAL` and grain length `0.002-8 beats EXPONENTIAL`;
  * this page exposed `0.5-40` and `0.01-1` LINEAR. So the top of the engine was
@@ -535,7 +535,7 @@ export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, va
      * Re-scale this slider in place.
      *
      * 🔴 A CONTROL WHOSE MEANING CHANGES NEEDS ITS UNITS TO CHANGE WITH IT, and
-     * without this the page could only relabel the word. `/radio/`'s read
+     * without this the page could only relabel the word. `/archive/radio/`'s read
      * head is a PLACE in one mode, a SPEED in another and a LAG in a third —
      * `Engine_Pappus.sc:719` selects between them — so one 0..1 lane showed
      * `0.30` for what was actually **-0.10x**, a number that is not wrong so
@@ -562,7 +562,7 @@ export function createSlider({ label, sub = '', aria, min = 0, max = 1, step, va
      * Rename the control.
      *
      * 🔴 FOR A CONTROL WHOSE MEANING A PRESET DECIDES, NOT FOR DECORATION.
-     * `/radio/`'s read-head slider drives `mscan` in one engine mode and
+     * `/archive/radio/`'s read-head slider drives `mscan` in one engine mode and
      * `mdelay` in another, and in a third `mscan` is a SPEED rather than a
      * place — so one fixed word is wrong for two of the three, which is this
      * project's named hazard: a control that looks like it does one thing and

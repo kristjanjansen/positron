@@ -14,7 +14,7 @@
 // `node demo/verify.mjs tapes` was spending somebody else's bandwidth, and
 // `node demo/verify.mjs` with no arguments did it by accident.
 //
-// This is the same answer `demo/fake-station.mjs` gave `/radio/`. Real MP3
+// This is the same answer `demo/fake-station.mjs` gave `/archive/radio/`. Real MP3
 // frames, real `content-length`, real `accept-ranges` and real Range replies, at
 // the exact lengths `corpus.json` records, served from a port on this machine.
 //

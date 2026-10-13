@@ -1482,7 +1482,7 @@
    *
    * 🔴 `live: true`, SO THE CLOCK IS A LIVE CHIP RATHER THAN A DURATION. A show
    * has a length only once it has stopped, and a bar counting toward a nominal
-   * end would be claiming a finish time nobody has set. `/radio/` is the shape
+   * end would be claiming a finish time nobody has set. `/archive/radio/` is the shape
    * rather than `/replay/`, and that distinction is what `transport-bar.mjs`'s
    * own header is about.
    * ⚠️ `scrub: false` AND `loop: false` FOR THE SAME REASON: a live show has no
@@ -2524,7 +2524,7 @@
 
 
   /**
-   * A handle for a probe, like `window.__scope` on `/radio/`. Harmless in a
+   * A handle for a probe, like `window.__scope` on `/archive/radio/`. Harmless in a
    * page and it is how the pipeline is looked at from outside without adding a
    * readout cell for every internal that only matters while building.
    */

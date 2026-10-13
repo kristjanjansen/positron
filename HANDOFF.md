@@ -2,7 +2,8 @@
 
 ## Where it is right now
 
-- **In the tree, NOT committed and NOT deployed (2026-10-13, late): the concepts are the front page.** `demo/index.html` is THE HERO, LARGE (`demo/shell/hero.mjs`, shared with /kit/frontpage/) over the concept cards, no numbers. Every concept page moved from `/concepts/<group>/<nnn>/` to `/<group>/<slug>/` (https://positron.studio/synth/keyboard/ once deployed; the full table is in `positron-history`), the radio ones to `/stations/` because `/radio/` is the archived demo, the newsreels to `/history/`. `/concepts/` answers 302 to `/`; the old page addresses 404. The old front page is `archive/frontpage/`. Until it is deployed, the lines below that name `/concepts/...` are the live addresses.
+- **In the tree, NOT committed and NOT deployed (2026-10-13, night): one word slugs, clashes resolved.** Asked: *"Resolve clashes. Avoid dashes on names."* Every concept slug is one plain lowercase word, never its group's name (`/remote/circuit-on-pi/` is `/remote/circuit/`, `/granulator/granulator/` is `/granulator/grains/`); the radio concepts are `/radio/<slug>/` (the `stations` folder is gone) because the archived radio demo moved to `/archive/radio/` (manifest row `archive/radio`, `demo/archive/radio/`). The dashed addresses and `/stations/...` 404 with no forwarding. Full table in `positron-history`. `demo/shell/concept-list-test.mjs` fails a hyphen or a slug equal to its group.
+- **Committed and deployed as BUILD 3cde38ac (2026-10-13, late): the concepts are the front page.** `demo/index.html` is THE HERO, LARGE (`demo/shell/hero.mjs`, shared with /kit/frontpage/) over the concept cards, no numbers. Every concept page moved from `/concepts/<group>/<nnn>/` to `/<group>/<slug>/` (https://positron.studio/synth/keyboard/ once deployed; the full table is in `positron-history`), the newsreels to `/history/` (the radio ones went to `/stations/` that afternoon and to `/radio/` the same night). `/concepts/` answers 302 to `/`; the old page addresses 404. The old front page is `archive/frontpage/`.
 - **Site: BUILD `3de40367-091104-1cea`**, confirmed on the edge. Deployed from a clean worktree of HEAD every time this session (`git worktree add --detach`, build, deploy, commit `public/` there, fast forward main), so no in-flight file ever shipped.
 - **Workers:** positron-pub and positron-sweep redeployed today (pub's test pattern and RTMPS camera routes answer 410, see the note below this section). Six workers deleted.
 - **The Pi: Yoshimi was retired 2026-10-13** (`archive/yoshimi/README.md`, `plans/plan-retire-yoshimi.md`). The board has no JACK instrument: `audio.start` needs a named source (`sampler`, `collide`, `synth`), and the granulator (`fx.pappus`) refuses for want of one, so `rig/board/insert-test.mjs` and `pappus-live.mjs` refuse (exit 2) and `jack-bay-live.mjs` holds the capture with the sampler.
@@ -63,7 +64,7 @@ to run something, check this list first.
   `node demo/verify-safari.mjs` (they drove /llhls/ and now refuse, exit 2);
   anything holding `wss://pub.positron.studio/watch`; `src/provision-cam.sh`
   (refuses). A WebRTC check with a publisher behind it today:
-  https://positron.studio/concepts/video/030/ (WebRTC loopback; /video/webrtc-loopback/ after the 2026-10-13 move), or
+  https://positron.studio/concepts/video/030/ (WebRTC loopback; /video/webrtc/ after the 2026-10-13 move), or
   `DEMO_DEEP=1 node demo/verify.mjs stage`.
 
 # Handoff, 2026-10-11, session 75: looper accuracy, the Pi on direct, concepts reshuffled
@@ -460,7 +461,7 @@ Verify: `slides/positron slides/synths kit/slides` **124/124** before the last d
 
 - **Slide columns overflow** (BACKLOG, 2026-10-07): which deck, which width and which mode are unknown. Ask, or shoot the synths split slides at 375, 1280 and in the front page halves.
 - **The positron deck's title says 10 and holds 9 things** since the synth slide was cut; a tenth or "9 things" is the owner's call.
-- **Interactive material per slide** was suggested in chat (patchbay, circuit, mirror, sync, draw, tapes, partitur), nothing built. `/radio/` and `/tapes/` open other people's servers, so neither belongs on a slide that loads by itself.
+- **Interactive material per slide** was suggested in chat (patchbay, circuit, mirror, sync, draw, tapes, partitur), nothing built. `/archive/radio/` and `/tapes/` open other people's servers, so neither belongs on a slide that loads by itself.
 - Everything from the sections below still stands.
 
 # Handoff, 2026-10-06 evening, session 67: the synths deck grows a filter and an LFO, the front page frames its decks
@@ -853,10 +854,10 @@ to 50, `/time/` 37 to 42 plus 24 bar drills, `/wire/` 32 to 38 (one page now),
 
 ## Open, from this half
 
-1. **`/radio/` deep collected 4 of its own checks**: its slow ones arrived after
+1. **`/archive/radio/` deep collected 4 of its own checks**: its slow ones arrived after
    `settleMs` 30 s. Raised to 60000, NOT re-run (owner asked to stop re-verifying
    the radio).
-2. **A diagram rule fails on `/radio/` and `/grains/`** in both tiers ("container
+2. **A diagram rule fails on `/archive/radio/` and `/grains/`** in both tiers ("container
    holds at least one box"), present before today.
 3. **`/pack/` 29/31** and **`/kit/`'s slider checks running for visitors** (BACKLOG).
 4. **`/capture/`'s ordinary check pass takes about 19 s** (it records real takes);
@@ -1947,7 +1948,7 @@ than implying a green run covered it.
 ## Eight things found on the way that nobody asked about
 
 - 🔴 **AN ASSERT WRITTEN TO CATCH THE WAVEFORM'S RING COULD NEVER HAVE SEEN
-  IT.** `demo/radio/index.html:5736` reads `getComputedStyle(canvas)
+  IT.** `demo/archive/radio/index.html:5736` reads `getComputedStyle(canvas)
   .borderTopWidth === 0` and was green every run while the ring was on screen.
   Not an assert that never ran: one that ran every time and asked the wrong
   instrument. A corner pixel sample is four lines.

@@ -87,7 +87,7 @@
   // IS a mixed picture that something else can take, so the mixer has a
   // video-out and the dither takes it.
   //
-  // THE DITHER is /video/camera-shader/'s shader, copied: a two tone 4x4 Bayer dither
+  // THE DITHER is /video/shader/'s shader, copied: a two tone 4x4 Bayer dither
   // over the mixed picture's brightness, the page's ground for off and a warm
   // off-white for on, leaning toward --hi only in the brightest cells.
   //
@@ -273,7 +273,7 @@
     const vs = `#version 300 es
       in vec2 p;
       void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
-    // As /video/camera-shader/: brightness per cell of uSize pixels, a little
+    // As /video/shader/: brightness per cell of uSize pixels, a little
     // contrast, then one Bayer threshold. Below it the page's ground, above it
     // warm off-white, which leans toward --hi only in the brightest cells.
     const fs = `#version 300 es
@@ -410,7 +410,7 @@
     if (!playing) render();
   }
 
-  // The sound follows the links the bay holds, as on /stations/radio/: a channel
+  // The sound follows the links the bay holds, as on /radio/blend/: a channel
   // reaches the fader only along its audio link, the fader the speakers only
   // along fader -> speaker.
   function route() {

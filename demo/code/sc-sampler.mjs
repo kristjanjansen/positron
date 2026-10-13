@@ -1,7 +1,7 @@
 // demo/code/sc-sampler.mjs: the sampler pages' ONE SuperCollider
 // sampler, since 2026-10-12. Asked: *"should we go all on supercollider
 // sampler?"*, then *"all in"* (BACKLOG, "All in on the SuperCollider sampler").
-// /code/piano-and-rhodes/ plays through this (010, 020 and 040 were merged into
+// /code/piano/ plays through this (010, 020 and 040 were merged into
 // it 2026-10-12 and forward there); the WebAudio `createSampler` in sampler.mjs
 // stays as it was for anything else.
 //

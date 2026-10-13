@@ -186,7 +186,7 @@ Radio 1965 and were quietly being treated as true of Icecast in general.
 ⚠️ **IT WAS MEASURED, REFUSED, AND THEN ADDED ANYWAY, ON INSTRUCTION.** The
 measurement below has not changed and neither has what it implies: this relay
 adds nothing to these two mounts, and carrying them costs 144 MB per
-listener-hour of the account's egress. What changed is that `/radio/` now
+listener-hour of the account's egress. What changed is that `/archive/radio/` now
 plays six stations, and one code path through the relay for all six is worth
 more to that page than the bytes are worth here. ⚠️ **The two entries are
 `ida-tallinn` and `ida-helsinki` and they are the first thing to drop if egress

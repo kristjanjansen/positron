@@ -33,7 +33,7 @@ import { el } from './shell.mjs';
  * ALREADY TAKEN. Asked for on `/wish/` 2026-09-22: a picker shows `70B` and
  * `Scout`, and what a reader wants on hover is the full model id and what a
  * press costs. The obvious shape is `[name, value, title]` and it would have
- * been a defect the moment it shipped: `/radio/`'s `STATIONS` are already
+ * been a defect the moment it shipped: `/archive/radio/`'s `STATIONS` are already
  * `['Klassika', 'klassikaraadio', 128]`, where the third element is a BITRATE,
  * so every station button on that page would have grown a tooltip reading
  * `128`. FOUND BY READING ALL ELEVEN CALL SITES BEFORE WRITING THIS, NOT AFTER.
@@ -117,7 +117,7 @@ export function createChoice({ label, options, at = 0, onPick, title, orient = '
    * Mark one option as PRESSED BUT NOT YET ARRIVED, or `null` for none.
    *
    * 🔴 A CONTROL WHOSE EFFECT IS SECONDS AWAY LOOKS BROKEN WITHOUT THIS, and
-   * `/radio/` is where it was reported: a speed button lights the moment it
+   * `/archive/radio/` is where it was reported: a speed button lights the moment it
    * is pressed and the sound takes about a second to get there — 600 ms of
    * already-scheduled audio plus the glide — so the first thing a listener does
    * is press it again. REPORTED as *"can we track when 0.5 etc happens and

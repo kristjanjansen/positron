@@ -1,4 +1,4 @@
-// What autoplay on /stations/live-key/ would play over a recording, the old
+// What autoplay on /radio/key/ would play over a recording, the old
 // way and the new, offline, with no browser and no station.
 //
 //   node research/tools/tempo-key/autoplay-chords.mjs <in.f32> [--seq] [--json]
@@ -15,7 +15,7 @@
 // a chord is played when autoplay starts, every 4 s after, and at once when the
 // key changes. Autoplay is ticked at t = 0, before any key exists.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { chooseChord, voiceLead, rootPosition, motion, romanOf, chromaEase } from '../../../demo/stations/live-key/autoplay.mjs';
+import { chooseChord, voiceLead, rootPosition, motion, romanOf, chromaEase } from '../../../demo/radio/key/autoplay.mjs';
 
 const args = process.argv.slice(2);
 const file = args.find((a) => a.endsWith('.f32'));
@@ -28,7 +28,7 @@ const OPTS = (() => { const i = args.indexOf('--opts'); return i >= 0 ? JSON.par
 // it sounds for. Soft truth, not truth (nobody has labelled these recordings,
 // and essentia knows only major and minor triads).
 const REF = (() => { const i = args.indexOf('--ref'); return i >= 0 ? JSON.parse(readFileSync(args[i + 1], 'utf8')) : null; })();
-const PAGE = new URL('../../../demo/stations/live-key/index.html', import.meta.url).pathname;
+const PAGE = new URL('../../../demo/radio/key/index.html', import.meta.url).pathname;
 const html = readFileSync(PAGE, 'utf8');
 const a = html.indexOf('// KEY CORE BEGIN'), b = html.indexOf('// KEY CORE END');
 if (a < 0 || b < 0) throw new Error('KEY CORE not found in ' + PAGE);

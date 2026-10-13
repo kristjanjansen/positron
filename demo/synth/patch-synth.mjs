@@ -5,7 +5,7 @@
 // one page per module (*"can split https://positron.studio/concepts/synth/040/
 // apart to different conecepts, do not dupe with existing ones (so only some
 // last steps?). rm 040 later."*). It sits beside the pages that use it, as
-// radio/tempo.mjs does. /synth/sound-design/ Sound design is its one page since
+// radio/tempo.mjs does. /synth/sound/ Sound design is its one page since
 // 2026-10-13 (*"combine filter+envelope+lfo to single sound design concept"*),
 // when the filter, envelope and LFO pages (050, 060, 070) became that one;
 // module-page.mjs builds it.
@@ -250,7 +250,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
     // A silent sink that keeps every scope's analyser pulled, so a scope reads
     // whatever is patched into it whether or not that reaches the speakers.
-    // /stations/radio/ had to learn this: an analyser nothing pulls reads silence.
+    // /radio/blend/ had to learn this: an analyser nothing pulls reads silence.
     pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
 
     const osc = ctx.createOscillator(), level = ctx.createGain();
@@ -285,7 +285,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
    * module's audio out to the far module's input, which is a node or, for
    * `cutoff-in`, the filter's detune AudioParam. Every out is disconnected
    * first, so an unlinked edge goes silent. Called after every link change.
-   * As `route()` on /stations/radio/, lifted to every module.
+   * As `route()` on /radio/blend/, lifted to every module.
    */
   function route() {
     if (!ctx) return;

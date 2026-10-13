@@ -15,7 +15,7 @@
  * answers one question, "will this parse", and says nothing at all about
  * whether the page works.
  *
- *   node demo/check-html.mjs demo/radio/index.html
+ *   node demo/check-html.mjs demo/archive/radio/index.html
  *   node demo/check-html.mjs demo/ *\/index.html     (every page)
  *
  * ⚠️ `--check` NEEDS A FILE WITH AN EXTENSION IT KNOWS, so each block is

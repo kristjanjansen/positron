@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Patch from words</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The same medium colours as /concepts/misc/000/. */
+  :root {
+    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
+    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
+  }
+  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
+  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
+  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
+  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
+  /* The requests and the ask button: a column of sentences, the button under it. */
+  .cc-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; }
+  .cc-stack > * { flex: none; }
+  .cc-stack > .pos-bgroup { width: auto; }
+  .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
+  /* KIT DEFECT, REPAIRED HERE ONLY BECAUSE shell.css IS NOT THIS PAGE'S TO
+     CHANGE: `.step { height: 34px }` (shell.css 3831) beats the column choice,
+     whose rule never sets the segment's height, so five options were squeezed
+     into one 34 px box at 13 px each. MEASURED 2026-10-10. Belongs in
+     `.pos-choice[data-orient="column"] .pos-seg`. */
+  .cc-stack .pos-choice[data-orient="column"] .pos-seg { height: auto; }
+  .cc-stack .pos-choice[data-orient="column"] .pos-seg > button { text-align: left; }
+  /* A request is a sentence, not a name, so on a phone it wraps rather than
+     dragging the page 104 px sideways. */
+  @media (max-width: 560px) {
+    .cc-stack .pos-choice[data-orient="column"] .pos-seg > button {
+      white-space: normal; height: auto; min-height: 34px; text-align: left; padding-block: 6px;
+    }
+  }
+  .cc-no { color: var(--bad); }
+  .cc-stack.cc-wide { align-items: stretch; }
+</style>
+<script type="module">
+  import { conceptNav } from '/shell/concept-nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { createChoice } from '/shell/choice.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createTable } from '/shell/table.mjs';
+  import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createWaveShape } from '/shell/synth-view.mjs';
+  import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+
+  // Words to links. A small local bay (keys, synth, filter, recorder, scope,
+  // speakers), a fixed list of requests, and a button that sends the chosen
+  // request plus this bay's real port list to the wish agent
+  // (workers/wish/src/wish.mjs, POST /wish). The model PROPOSES; this page
+  // checks every proposed link with the same two walls /wish/ uses,
+  // `checkTransforms` for the shape of each transform and `bay.validate` (inside
+  // `bay.link`) for the ports, and holds only what passes. Refusals are listed
+  // in words beside the lines the model wrote.
+  //
+  // THE MODEL is the first, leftmost, in /wish/'s PATCH row:
+  // @cf/meta/llama-3.3-70b-instruct-fp8-fast, at $0.293 per million input
+  // tokens and $2.253 per million output tokens (Cloudflare's pricing page as
+  // quoted in demo/wish/index.html, 2026-09-22).
+  //
+  // WHAT IT COSTS: every press of Ask is ONE Workers AI call on a paid account.
+  // MEASURED 2026-10-10 on this page, two presses: 781 and 783 prompt tokens,
+  // 109 and 86 completion tokens, $0.00047 and $0.00042, about 3 s each. Nothing opens on a
+  // visit: no fetch, no AudioContext, until somebody presses.
+  const S = 'web';
+  const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+  const PRICE_IN = 0.293 / 1e6, PRICE_OUT = 2.253 / 1e6;
+  const API = new URLSearchParams(location.search).get('api') || 'https://wish.positron.studio';
+
+  // Each request stands on its own, because the agent sees one sentence and
+  // nothing that was asked before it, and each press replaces the whole patch.
+  const REQUESTS = [
+    'play the keys through the synth to the speakers',
+    'play the keys an octave higher through the synth to the speakers',
+    'play the keys through the synth and the filter to the speakers',
+    'record what I play into the synth and show the sound on the scope',
+    'play the keys with a fifth above through the synth to the speakers',
+  ];
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const bay = createBay();
+  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw synth'],
+    ['fx', 'engine', 'low-pass filter'], ['rec', 'store', 'recorder'],
+    ['scope', 'screen', 'scope'], ['speaker', 'screen', 'speakers']]) {
+    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
+  }
+
+  // ── sound: a sawtooth per held note (a low-pass is inaudible on a sine) ──
+  let ctx = null, bus = null, filter = null, scopeIn = null;
+  const voices = new Map();
+  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  function wake() {
+    if (ctx) return;
+    ctx = new AudioContext();
+    bus = ctx.createGain();
+    filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.frequency.value = 700; filter.Q.value = 4;
+    scopeIn = ctx.createAnalyser();
+    scopeIn.fftSize = 2048;
+    audio();
+    requestAnimationFrame(frame);
+  }
+  function noteOn(n, vel) {
+    wake();
+    if (voices.has(n)) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
+    o.type = 'sawtooth';
+    o.frequency.value = hz(n);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
+    o.connect(g).connect(bus);
+    o.start();
+    voices.set(n, { o, g });
+  }
+  function noteOff(n) {
+    const v = voices.get(n);
+    if (!v) return;
+    const t = ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(v.g.gain.value, t);
+    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
+    v.o.stop(t + 0.06);
+    voices.delete(n);
+  }
+  // The WebAudio graph follows the audio links the bay holds, and nothing else.
+  function audio() {
+    if (!ctx) return;
+    bus.disconnect(); filter.disconnect();
+    const outOf = { synth: bus, fx: filter };
+    const inOf = { fx: filter, scope: scopeIn, speaker: ctx.destination };
+    for (const l of bay.links()) {
+      const a = outOf[l.from.split(':')[1]], b = inOf[l.to.split(':')[1]];
+      if (a && b && l.from.endsWith(':audio-out') && l.to.endsWith(':audio-in')) a.connect(b);
+    }
+  }
+
+  // ── the recorder keeps every note it hears and passes it on ─────────────
+  const kept = [];
+  let inRec = false;
+  function record(e) {
+    if (inRec) return;           // a link from rec back into rec must not loop
+    inRec = true;
+    if (e.d2) kept.push(e.d1);
+    bay.send(`${S}:rec:midi-out`, e);
+    inRec = false;
+    pb.refresh();
+  }
+
+  // Every port has a label, because the agent reads it to know what a port is.
+  const PORTS = [
+    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'keyboard, the notes I play' },
+    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'synth, notes in',
+      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
+    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', label: 'synth, sound out' },
+    { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', label: 'low-pass filter, sound in' },
+    { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', label: 'low-pass filter, sound out' },
+    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'recorder, notes to record',
+      deliver: record },
+    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'recorder, the notes it recorded' },
+    { id: `${S}:scope:audio-in`, dir: 'in', medium: 'audio', label: 'scope, shows the sound' },
+    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', label: 'speakers' },
+  ];
+  for (const p of PORTS) bay.addPort(p);
+
+  const d = mount({ name: 'Patch from words', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  conceptNav('room/words');
+  d.log('each Ask is one Workers AI call to llama 3.3 70B, about $0.0005, and nothing is sent until you press it');
+
+  // ── asking ──────────────────────────────────────────────────────────────
+  let chosen = 0;
+  const pick = createChoice({ label: 'say', orient: 'column', at: 0,
+    options: REQUESTS.map((r, i) => [r, i]), onPick: (i) => { chosen = i; } });
+  const ask = createButtonGroup({ buttons: [{ id: 'ask', label: 'Ask the model', primary: true, onPress: () => go(chosen) }] });
+
+  const patchT = createTable({ minRows: 4, empty: '', columns: [
+    { key: 'line', label: 'link', grow: true, hi: true, clip: true, hover: 'line' },
+    { key: 'held', label: 'held', width: 56 },
+    { key: 'why', label: 'why', width: 240, clip: true, hover: 'whyfix' },
+  ] });
+
+  async function go(i) {
+    const text = REQUESTS[i];
+    const ports = PORTS.map((p) => ({ id: p.id, label: p.label, dir: p.dir }));
+    d.log(`asked: ${text}`);
+    let out;
+    try {
+      const r = await fetch(`${API}/wish`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, ports, model: MODEL }) });
+      out = await r.json().catch(() => ({}));
+      if (!r.ok) { d.log(`the agent said: ${out.error || `HTTP ${r.status}`}`, 'warn'); return; }
+    } catch { d.log(`nothing answered at ${API}`, 'warn'); return; }
+
+    const u = out.usage || {};
+    const cost = (u.prompt_tokens || 0) * PRICE_IN + (u.completion_tokens || 0) * PRICE_OUT;
+    d.log(`answered in ${out.ms} ms, ${u.prompt_tokens ?? '?'} tokens in, ${u.completion_tokens ?? '?'} out, $${cost.toFixed(5)}`);
+    for (const f of out.fixed || []) d.log(`the agent repaired what the model wrote: ${JSON.stringify(f)}`, 'warn');
+
+    // Replace the whole patch with what passes both walls.
+    for (const n of [...voices.keys()]) noteOff(n);
+    for (const l of bay.links()) bay.unlink(l.id);
+    const rows = [];
+    for (const l of out.links || []) {
+      const line = printLink({ from: l.from, to: l.to, transforms: l.transforms || [] });
+      const bad = checkTransforms(l.transforms || []);
+      const r = bad ? { ok: false, ...bad } : bay.link(l.from, l.to, l.transforms || [], { site: S });
+      rows.push({ line, held: r.ok ? 'yes' : 'no', why: r.ok ? '' : r.why, whyfix: r.ok ? '' : `${r.why} ${r.fix || ''}`.trim() });
+      if (!r.ok) d.log(`refused ${line}: ${r.why}`, 'warn');
+    }
+    if (!rows.length) d.log('the model proposed no links');
+    patchT.set(rows);
+    for (const c of patchT.el.querySelectorAll('.pos-tbl-body .pos-tbl-c')) if (c.textContent === 'no') c.classList.add('cc-no');
+    d.log(`held ${rows.filter((r) => r.held === 'yes').length} of ${rows.length} links`);
+    audio();
+    pb.refresh();
+  }
+
+  // ── the scope, full width, drawn from whatever reaches scope:audio-in ────
+  const WINDOW = 512, FULL = 0.25;
+  const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
+  const buf = new Float32Array(2048);
+  function frame() {
+    const on = bay.links().some((l) => l.to === `${S}:scope:audio-in`);
+    if (on && voices.size) {
+      scopeIn.getFloatTimeDomainData(buf);
+      let i0 = 0;
+      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
+      const win = buf.subarray(i0, i0 + WINDOW);
+      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    } else wave.set({ points: null, reason: null, name: '' });
+    requestAnimationFrame(frame);
+  }
+
+  // ── the keyboard: a press is one event out of keys:midi-out ─────────────
+  const host = el('div');
+  createKeyboard(host, {
+    ...keyRange(21), base: 48,
+    onDown: (note, how) => { if (how === 'midi') return; wake(); bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 100 }); pb.refresh(); },
+    onUp: (note, how) => { if (how === 'midi') return; bay.send(`${S}:keys:midi-out`, { cls: 'note', ch: 1, d1: note, d2: 0 }); pb.refresh(); },
+  });
+
+  // ── the links as a picture ──────────────────────────────────────────────
+  const pb = createPatchbay(bay, {
+    flowing: () => voices.size > 0,
+    detail: (n) => [{ text: n.id === `${S}:rec` ? `${n.label}, ${kept.length} notes` : n.label || '', sans: true }],
+  });
+
+  const top = el('div', 'cc-stack');
+  top.append(pick.el, ask.el);
+  const patchBlock = el('div', 'cc-stack cc-wide');
+  patchBlock.append(el('h3', 'cc-h', 'what the model proposed'), patchT.el);
+  d.stack.add(top, wave.el, host, patchBlock, pb.el);
+  window.__demo.ask = (i) => { pick.set(i, true); chosen = i; return go(i); };
+  window.__demo.bay = bay;
+  d.ready();
+</script>

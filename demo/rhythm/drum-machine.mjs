@@ -1,5 +1,5 @@
-// demo/rhythm/drum-machine.mjs: the drum machine /rhythm/drum-machine/
-// and /rhythm/drum-knobs/ are built from. A page mounts the shell and calls
+// demo/rhythm/drum-machine.mjs: the drum machine /rhythm/drums/
+// and /rhythm/knobs/ are built from. A page mounts the shell and calls
 // `createDrumMachine(d, { voices })`, and gets the glued transport and grid,
 // the patchbay, and, when the voices carry a parameter (010), one row of knobs,
 // each knob a bay node `web:knob-<name>` with a value wire into its drum.

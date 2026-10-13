@@ -12,9 +12,12 @@
 // skill"*. 100 characters is about three lines on a card at 1280 and at 375.
 // And, since 2026-10-13 when the concepts became the front page at
 // /<group>/<slug>/ (*"rename all with group/slug, rm numbers"*), every row's id:
-// two segments, the folder one of CONCEPT_DIRS, the slug the title in
-// lowercase words joined by hyphens, no number for a segment, no id twice, and a
-// page on disk at demo/<id>/index.html.
+// two segments, the folder one of CONCEPT_DIRS, no number for a segment, no id
+// twice, and a page on disk at demo/<id>/index.html. The slug is ONE plain
+// lowercase word since the same evening (*"Resolve clashes. Avoid dashes on
+// names."*): letters only, no hyphen, never the group's own name
+// (/granulator/granulator/ was the case), unique in its group. It is chosen from
+// the title, not spelled out of it, so the title is not compared.
 import { existsSync } from 'node:fs';
 import { CONCEPTS, DEMO_CARDS, CONCEPT_DIRS } from './concept-list.mjs';
 
@@ -37,7 +40,6 @@ for (const [id, say] of cards) {
   if (why.length) bad.push({ id, why, say });
 }
 
-const slugOf = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const seen = new Set();
 for (const c of CONCEPTS) {
   const why = [];
@@ -45,7 +47,8 @@ for (const c of CONCEPTS) {
   if (!c.id || rest.length || !slug) why.push('id is not <group>/<slug>');
   else {
     if (!CONCEPT_DIRS.includes(dir)) why.push(`folder ${dir} is not in CONCEPT_DIRS`);
-    if (slug !== slugOf(c.title)) why.push(`slug ${slug} is not the title's, ${slugOf(c.title)}`);
+    if (!/^[a-z]+$/.test(slug)) why.push(`slug ${slug} is not one plain lowercase word`);
+    if (slug === dir) why.push(`slug ${slug} repeats its group`);
     if (/^\d+$/.test(slug) || /^\d+$/.test(dir)) why.push('a number for a segment');
     if (!existsSync(new URL(`../${c.id}/index.html`, import.meta.url))) why.push('no page at demo/' + c.id + '/index.html');
   }

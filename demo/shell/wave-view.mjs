@@ -548,7 +548,7 @@ export function createWaveView(host, { height = 120, label = '', normalise = fal
     /**
      * How much of the canvas is not field colour, READ BACK OFF THE PIXELS.
      *
-     * 🔴 A COLUMN COUNT IS NOT A PICTURE. `/radio/` already records this: a
+     * 🔴 A COLUMN COUNT IS NOT A PICTURE. `/archive/radio/` already records this: a
      * check that a wave was drawn has to ask the canvas, because every number
      * in `facts()` would be exactly the same if the fill colour were the field
      * colour, if the scale were zero, or if `paint()` returned early. The field

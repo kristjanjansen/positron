@@ -1,6 +1,6 @@
 // The LL-HLS loopback's input, and everything that keeps it empty.
 //
-// /video/webrtc-loopback/ sends a camera through the `loop` instance onto ONE
+// /video/webrtc/ sends a camera through the `loop` instance onto ONE
 // RTMPS live input that nothing else uses ("positron-hls-loopback",
 // src/provision-loop.sh). Recording cannot be turned off on RTMPS
 // (positron-streaming), so every take is a Stream video counted against the

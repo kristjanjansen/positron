@@ -87,7 +87,7 @@
     // any request overrides it, which is how the new one was driven live
     // before anybody's viewers were moved.
     "PUB_RT": "next",
-    // /video/webrtc-loopback/'s LL-HLS LOOPBACK INPUT, "positron-hls-loopback"
+    // /video/webrtc/'s LL-HLS LOOPBACK INPUT, "positron-hls-loopback"
     // (src/provision-loop.sh), by uid and never by name: every recording on it
     // is deleted (loop.mjs). Public, it is in every HLS play URL. The customer
     // code is the lifecycle URL's host, as in demo/shell/live.mjs.

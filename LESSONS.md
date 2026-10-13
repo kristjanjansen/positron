@@ -2207,7 +2207,7 @@ starts timing out, and the test for "has it produced one yet" was
 the wait never engaged again and each demo got 12 tries at 400 ms to produce
 everything it had.
 
-MEASURED: `/radio/` makes 43 asserts. The suite collected **2** and reported
+MEASURED: `/archive/radio/` makes 43 asserts. The suite collected **2** and reported
 **13/13 green**. Twenty-eight demos declare `settleMs`, so all of them were
 exposed.
 
@@ -2220,14 +2220,14 @@ the PAGE asserted anything yet.
 
 ⚠️ And two wrong fixes were tried first, both plausible. Arming the wait on
 `d.ready()` fails because a page may call it before driving its own checks:
-`/radio/` does, from inside the granulator's boot. Requiring "ready AND the
+`/archive/radio/` does, from inside the granulator's boot. Requiring "ready AND the
 count is stable" fails the same way, and would have shipped looking correct.
 What was needed was not a better heuristic for done, it was the one number that
 makes the question answerable.
 
 ## 96. A page nobody may run is a page nobody can change (session 30)
 
-`/radio/` has thirty-seven checks of its own and a standing rule that it must
+`/archive/radio/` has thirty-seven checks of its own and a standing rule that it must
 not be run: every station it offers is an ERR mount, and ERR reported that our
 listeners were corrupting their audience figures. Both halves are right, and
 together they mean the page's decode path and its looper could be edited and
@@ -2694,7 +2694,7 @@ measured instance in this project and the first in the harness itself.
 🔴 **AND `ready` ALONE WOULD NOT HAVE SAVED IT EITHER.** `/muta/` calls
 `ifSelfcheck(...)` **without awaiting it** and then `d.ready()` on the next
 line, so `ready` is true a few milliseconds in and stays true through every
-check the page makes. `/radio/` does the same from inside the granulator's boot.
+check the page makes. `/archive/radio/` does the same from inside the granulator's boot.
 **A page's own claim to be finished is worth reading and is not worth trusting
 alone.**
 

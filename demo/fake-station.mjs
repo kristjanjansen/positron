@@ -4,10 +4,10 @@
 //   node demo/fake-station.mjs --port 9100
 //
 // Then open the page against it:
-//   http://127.0.0.1:8890/radio/?base=http://127.0.0.1:8899
+//   http://127.0.0.1:8890/archive/radio/?base=http://127.0.0.1:8899
 //
 // 🔴 WHY THIS EXISTS, AND IT IS THE FIRST RULE IN CLAUDE.MD RATHER THAN A
-// CONVENIENCE. Every station `/radio/` offers is an ERR mount, ERR told us our
+// CONVENIENCE. Every station `/archive/radio/` offers is an ERR mount, ERR told us our
 // listeners were corrupting their audience figures, and the standing rule is
 // that a connection to one of their mounts is opened only when a PERSON is
 // going to listen to it. That left the page's decode and loop paths ungradeable:
@@ -90,7 +90,7 @@ const TICK_MS = 50;
  * 🔴 IT BURSTS AT CONNECT, BECAUSE ICECAST DOES, AND A PAGE THAT MEASURES ITS
  * OWN CUSHION CAN TELL. `burst-size` defaults to 65536 bytes on a real mount:
  * four seconds of 128 kbit/s audio arrive at once so a new listener has
- * something in hand before the paced bytes start. `/radio/`'s own settled-rate
+ * something in hand before the paced bytes start. `/archive/radio/`'s own settled-rate
  * check already names it (*"the difference is Icecast's burst"*).
  *
  * MEASURED without it: the page's cushion sat at 199 ms against a 104 ms worst
@@ -182,7 +182,7 @@ export function startStation({ port = 8899, quiet = false } = {}) {
      * 🔴 PACED AGAINST THE CLOCK, NOT AGAINST THE TIMER, AND THE DIFFERENCE WAS
      * MEASURABLE FROM INSIDE THE PAGE. Sending a fixed chunk per `setInterval`
      * tick sends at the rate the timer actually fires, and node's timers run a
-     * millisecond or two late: MEASURED through `/radio/`'s own settled-rate
+     * millisecond or two late: MEASURED through `/archive/radio/`'s own settled-rate
      * readout, **125 kbit/s against the 128 declared**, which is 2.3% slow. A
      * listener then loses about 23 ms of cushion every second, so the page's
      * 600 ms floor drained to 32 ms over half a minute and its `the cushion
@@ -235,6 +235,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
   server.on('listening', () => {
     const p = server.address().port;
     console.log(`stand-in station on http://127.0.0.1:${p}`);
-    console.log(`  http://127.0.0.1:8890/radio/?base=http://127.0.0.1:${p}`);
+    console.log(`  http://127.0.0.1:8890/archive/radio/?base=http://127.0.0.1:${p}`);
   });
 }

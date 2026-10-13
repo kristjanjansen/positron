@@ -1,5 +1,5 @@
 // demo/granulator/grain-ring.mjs: the grain ring's program, and the
-// patches that are sets of its control values. /granulator/granulator/ shows
+// patches that are sets of its control values. /granulator/grains/ shows
 // the text in its code box, compiles it with `/shell/sclang-lite.mjs` in the
 // tab, and runs it on the tab's scsynth. Kept apart from the page so
 // `sclang-lite-test.mjs` can compile the same text with no browser.
@@ -25,7 +25,7 @@
 // Every one of them is neutral at its default (DEFAULTS), so a patch that does
 // not name them sounds as before.
 //
-// AND SINCE 2026-10-13 A BEAT GRID, for /granulator/beat-granulator/ (*"make followup
+// AND SINCE 2026-10-13 A BEAT GRID, for /granulator/beat/ (*"make followup
 // demo with ida, dub and add tempo detection and feed it into granulator"*).
 // `\lock` 1 takes the even grains off `Impulse` and onto a Phasor that goes
 // round `density` times a second (`secs / frames` is one over the sample

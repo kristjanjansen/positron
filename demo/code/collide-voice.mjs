@@ -1,5 +1,5 @@
-// demo/code/collide-voice.mjs: the voice /code/collide-synth/ and
-// /remote/collide-on-pi/ play, a program in /collide/'s small subset of
+// demo/code/collide-voice.mjs: the voice /code/collide/ and
+// /remote/collide/ play, a program in /collide/'s small subset of
 // SuperCollider, compiled in the tab and run on wasm scsynth.
 //
 // Asked 2026-10-12 (BACKLOG, "synth/090 Collide synth and synth/100"): *"do 090

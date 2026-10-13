@@ -1,9 +1,9 @@
-// Runs the tempo detector of /stations/tempo/ and 030/ offline over a mono
+// Runs the tempo detector of /radio/tempo/ and 030/ offline over a mono
 // float32 file, and prints its readings as JSON.
 //
 //   node research/tools/tempo-key/our-tempo.mjs <in.f32> [--level agc030|static020|none] [--det module.mjs | --page page.html] [--set 'NAME=value;...'] > out.json
 //
-// SINCE 2026-10-12 THE DETECTOR IS A MODULE, demo/stations/tempo.mjs,
+// SINCE 2026-10-12 THE DETECTOR IS A MODULE, demo/radio/tempo.mjs,
 // and by default this imports that very file, so what is measured is what the
 // pages run. `--det` points it at another copy of the module. `--page` keeps the
 // old way for a page that still carries the detector inline (radio/030 as of
@@ -35,7 +35,7 @@ const file = args[0];
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const LEVEL = opt('--level', 'agc030');
 const PAGE = opt('--page', null);
-const DET = opt('--det', new URL('../../../demo/stations/tempo.mjs', import.meta.url).pathname);
+const DET = opt('--det', new URL('../../../demo/radio/tempo.mjs', import.meta.url).pathname);
 const SR = 44100;
 
 // --set 'HAT_BETA=0;PH_W=[1, 0.5, 0.25, 0]' rewrites the detector's own

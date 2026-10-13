@@ -59,7 +59,7 @@ const HEAD_PX = 1;
  * `1 - seconds/grainSeconds` of the buffer lands left of x=0 and is skipped by
  * the bounds test.
  *
- * MEASURED on `/radio/`, which asked for a 6 s window over an 8 s buffer:
+ * MEASURED on `/archive/radio/`, which asked for a 6 s window over an 8 s buffer:
  * the oldest QUARTER of the granulator's range could not be drawn at all, so
  * whenever its read head sat there the picture showed no grains and the page's
  * own check read `0 lit`. That was taken for the station being off air more
@@ -84,7 +84,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // overlaying them invites a reading nothing supports.
   //
   // ⚠️ THAT ARGUMENT DOES NOT HOLD WHEN THE MATERIAL IS THE SAME AUDIO. On
-  // `/radio/` the granulator's buffer is filled from the very stream this
+  // `/archive/radio/` the granulator's buffer is filled from the very stream this
   // scope is drawing, on one clock in one process — so a grain that read at
   // fraction `pos` of an N-second buffer read the audio that arrived
   // `(1 - pos) * N` seconds ago, and that lands on this axis exactly. Passing
@@ -96,7 +96,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // inspecting and wrong for a stream: as a loud passage scrolls off the right
   // edge the divisor drops and everything left standing suddenly grows, so a
   // quiet stretch looks identical to a loud one and the whole picture heaves.
-  // Reported from `/radio/` as *"the scale keeps changing"*, which is
+  // Reported from `/archive/radio/` as *"the scale keeps changing"*, which is
   // exactly what it was doing.
   //
   // Set it to an amplitude (1 = full scale) and the height means a level again.
@@ -157,7 +157,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   // ⚠️ `wraps`, NOT `marks`. This object already had `mark(g)` — one grain, at
   // the point in the material it read — and a second `mark()` defined lower in
   // the SAME object literal silently replaced it. Every grain tick on
-  // `/radio/` stopped being drawn, the page's own assert read `0 ticks
+  // `/archive/radio/` stopped being drawn, the page's own assert read `0 ticks
   // alive`, and it was put down to the station being off air, which it also
   // was. Two names, two jobs, and the collision was invisible because a later
   // key in an object literal simply wins.
@@ -206,7 +206,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
   let loopA = null, loopB = null;
   let sourceName = '', counts = { measured: 0, inferred: 0 };
   // 🔴 HOW SOLID THE GRAINS ARE DRAWN, AND IT IS A NUMBER THE PAGE OWNS.
-  // `/radio/` blends a live station against the granulator chewing it, and
+  // `/archive/radio/` blends a live station against the granulator chewing it, and
   // the fader that does that is the one gesture on the page — so the ticks are
   // drawn at exactly the share of what you are HEARING that they are: invisible
   // when the fader is all radio, solid when it is all granulator.
@@ -352,7 +352,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * 🔴 FREEZING IS RIGHT WHERE SOMETHING KEEPS LANDING ON THE FROZEN PICTURE,
      * AND WRONG WHERE NOTHING DOES.
      *
-     * On `/radio/` the wave stops and the GRAINS carry on being drawn
+     * On `/archive/radio/` the wave stops and the GRAINS carry on being drawn
      * across the held span, so a stopped picture is still a live one: the thing
      * that moves is the instrument reading the seconds again and again.
      *
@@ -362,7 +362,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
      * a silence that did not happen, reported as *"visualization just stops on
      * looping tapes"*. That page keeps its lap in a ring now and plays it from
      * there, so the picture is a fixed piece of sound with a line crossing it,
-     * and it freezes like `/radio/` does. No page passes `false` today. The
+     * and it freezes like `/archive/radio/` does. No page passes `false` today. The
      * option stays because the question it answers is real: whether anything is
      * still arriving to draw is a fact about the caller, not about this file.
      */
@@ -570,7 +570,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
         // measurement nobody asked for is a second measurement nobody asked for
         // however well it is reasoned.
         //
-        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/radio/index.html`
+        // ⚠️ AND IT WAS UNFINDABLE FROM THE PAGE. `demo/archive/radio/index.html`
         // contains no colour at all — one `theme-color` meta and nothing else —
         // because the hue lived in this shared kit, switched on merely by the
         // data carrying a `tone` field. Looking at the page that showed it would
@@ -690,7 +690,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
 
     /**
      * 🔴 A LINE SAYING WHAT THIS PICTURE IS, AND IT WAS DEAD CODE UNTIL NOW.
-     * `source(name)` has existed and been called by `/radio/` for weeks and the
+     * `source(name)` has existed and been called by `/archive/radio/` for weeks and the
      * string was assigned and never drawn: a component with a setter and no
      * reader, which is the same shape as a control that looks live and is
      * inert. FOUND 2026-09-16 while answering why `/tapes/` shows an empty box
@@ -778,7 +778,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
        `ctx.strokeRect(0.5, 0.5, W - 1, H - 1)` in `C.line` stood here, and it
        is the ring three separate reports were about: *"rm double bordering"*
        against `/pack/` and *"rm thick borders round waveform"* against
-       `/radio/` on 2026-09-21, *"rm padding and its border around waveform
+       `/archive/radio/` on 2026-09-21, *"rm padding and its border around waveform
        canvas"* against `/pack/` on 2026-09-22, and *"rm border around
        waveform"* against `/pack/`'s SAMPLES tab today.
        🔴 ALL THREE EARLIER REPAIRS WENT TO THE STYLESHEET AND NONE OF THEM
@@ -792,7 +792,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
        colour touching, which is the 2 px edge reported as THICK, and a glued
        scope drew this stroke alone, which is the ring reported today.
        🔴 AND A PAINTED EDGE IS UNREACHABLE BY EVERY CHECK THIS PROJECT HAS.
-       `/radio/` carries an assert reading `getComputedStyle(canvas)
+       `/archive/radio/` carries an assert reading `getComputedStyle(canvas)
        .borderTopWidth === 0` inside a glue, written for the 2026-09-21 report,
        and it has been GREEN the whole time the ring was on screen. A frame in
        the backing store is the inline-style defect in a different costume: no
@@ -804,7 +804,7 @@ export function createGrainScope(host, { seconds = 4, height = 150, fadeMs = 520
        One edge per object, drawn by the outermost thing that owns it.
        ⚠️ NO CHECK ANYWHERE COUNTED THIS INK, WHICH WAS CHECKED RATHER THAN
        ASSUMED. `/pack/`'s `waveInk` counts `r > 40 || g > 45 || b > 55` and
-       #1f2937 is 31/41/55, under all three; `/radio/`'s grain ink wants yellow,
+       #1f2937 is 31/41/55, under all three; `/archive/radio/`'s grain ink wants yellow,
        its head ink wants near white, and its `waveSpan` wants `b >= 62` with a
        comment naming this exact border as the thing the blue channel excludes. */
     ctx.restore();

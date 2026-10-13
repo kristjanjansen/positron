@@ -86,7 +86,7 @@
   import { createScanField, LOOKS, DEFAULT_LOOK, FIELD_W, FIELD_H, DATA_W, DATA_H, at, u8,
            LIT_FLOOR, LIT_RANGE, WET_FLOOR, WET_RANGE } from '/shell/scan-field.mjs';
 
-  // 🔴 WHAT THIS PAGE IS, AND WHY IT IS NOT `/radio/` WITH THE CONTROLS
+  // 🔴 WHAT THIS PAGE IS, AND WHY IT IS NOT `/archive/radio/` WITH THE CONTROLS
   // HIDDEN. The instrument over there is a thing you play: a fader, four
   // settings, a sound picker, a station row and a LOOP row, with a waveform
   // above them. Take the hands off it and nothing moves, because every one of
@@ -98,7 +98,7 @@
   // 🔴 AND THE MACHINE IS IMPORTED, NOT COPIED. `demo/shell/radio-gran.mjs`
   // holds the station list, the twelve sounds, the modulator's lanes, the two
   // halves of a patch write, the loop's grain-clock arithmetic and the six
-  // numbers the instrument listens to. ⚠️ `/radio/` HAS NOT BEEN MOVED ONTO
+  // numbers the instrument listens to. ⚠️ `/archive/radio/` HAS NOT BEEN MOVED ONTO
   // IT YET, so those things exist twice today. Read that module's header before
   // editing either.
 
@@ -268,7 +268,7 @@
   // 🔴 THE PANE HOLDS THE PICTURE AND NOTHING ELSE. The controls used to be
   // moved inside it and faded out after three seconds of no pointer, which is a
   // video player's chrome; the transport bar below is a separate box under the
-  // picture, the way `/radio/` and `/tapes/` have always had it.
+  // picture, the way `/archive/radio/` and `/tapes/` have always had it.
   pane.append(screen);
   d.el.append(pane);
 
@@ -280,7 +280,7 @@
    * moved inside the picture's box, which is the hand-rolled fourth copy
    * CLAUDE.md says to stop making.
    *
-   * ⚠️ THE DECK HOLDS NOTHING AND FOLLOWS THE WALL CLOCK, exactly as `/radio/`'s
+   * ⚠️ THE DECK HOLDS NOTHING AND FOLLOWS THE WALL CLOCK, exactly as `/archive/radio/`'s
    * does, and for the same reason: the sound is not ON this timeline, it is the
    * live thing the timeline is watching. `actuate()` is required by
    * `registerAdapter` and is empty here because there is nothing to actuate.
@@ -306,7 +306,7 @@
    * `live: true` replaces the clock with the LIVE chip, which is what a stream
    * with no end has to say instead of a time. `scrub: false` because there is
    * nowhere to drag to. `loop: false` with a `loopSlot` puts ⛶ exactly where
-   * `/radio/` keeps LOOP: *"just replace looper with fullscreen button (make
+   * `/archive/radio/` keeps LOOP: *"just replace looper with fullscreen button (make
    * component slot-able)"*.
    */
   const bar = createTransportBar(d.el, deck, {
@@ -363,7 +363,7 @@
   //
   // 🔴 DRAW THE INSTRUMENT, NOT THE SOUND. `plans/plan-audio-shader.md §0` argues it
   // and the argument is stronger here than it was there, because over on
-  // `/radio/` this would be a SECOND surface beside a waveform and a
+  // `/archive/radio/` this would be a SECOND surface beside a waveform and a
   // readout, while here it is the only one. A spectrum turned into moving
   // shapes says nothing specific about the sound: the same picture appears for
   // any input, and this project has already answered two of those with *"this
@@ -403,7 +403,7 @@
 
   // 🔴 THE PICTURE IS `/shell/scan-field.mjs` SINCE 2026-10-13: the data
   // texture's layout, the looks, every shader body and the WebGL chain moved
-  // there verbatim, comments and all, so /shader/scan-landscape/ draws the same
+  // there verbatim, comments and all, so /shader/landscape/ draws the same
   // picture with its numbers on knobs. This page compiles it BAKED, which
   // generates the text this page used to carry inline, byte for byte. The
   // layout of the 64 x 4 texture this page fills every frame is in that
@@ -560,7 +560,7 @@
   let loopRing = null, loopTap = null, loopOut = null;
   let stream = null, feats = null, modulator = null, eng = null;
   // ⚠️ THERE IS NO FAVOURITE, AND THE ONE THAT WAS HERE COST TWO RUNS. It
-  // opened on klassikaraadio because /radio/ does, and that page has a
+  // opened on klassikaraadio because /archive/radio/ does, and that page has a
   // reason: it upgrades to the station it is named after. This one changes
   // station on its own every minute, so it has nothing to prefer, and a
   // hard-coded first choice is a mount that can be down all afternoon while the
@@ -1588,7 +1588,7 @@
    *
    * ⚠️ CAPTURE PHASE, AND IT READS THE STATE BEFORE THE PRESS. The bar's own
    * handler flips the deck, so by the time a bubbling listener runs
-   * `deck.playing()` already means the NEXT state. `/radio/` does exactly this
+   * `deck.playing()` already means the NEXT state. `/archive/radio/` does exactly this
    * and for the same reason.
    * ⚠️ AND IT LISTENS FOR `click`, NOT `pointerdown`. `verify.mjs` drives a page
    * with `.tbar-toggle.click()` and sends no pointer events at all, so a
@@ -1751,7 +1751,7 @@
           // SendReply prepends two of its own arguments, so pos is at index
           // 3, and reading it at 2 takes the replyID, which is -1 on every grain
           // there has ever been. This page has that bug's whole history in
-          // /radio/'s comments; it is not going to be repeated here.
+          // /archive/radio/'s comments; it is not going to be repeated here.
           if (m[0] !== '/pgrain') return false;
           grains++;
           bucket(m[3], m[4], m[5]);
@@ -2011,7 +2011,7 @@
 
     // 🔴 THE POSITIONAL PAIR, WITH TWO GRAINS AND NOT ONE. One grain proves a
     // deposit; two prove the AXIS, in the right order and the right distance
-    // apart. /radio/ shipped a wrong answer to exactly this question
+    // apart. /archive/radio/ shipped a wrong answer to exactly this question
     // twice in one line, and the count was right the whole time while the place
     // was not, with nothing able to see it.
     //

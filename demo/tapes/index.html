@@ -55,7 +55,7 @@
 
   /**
    * 🔴 WHERE THE RECORDINGS ARE FETCHED FROM, AND IT IS archive.org UNLESS
-   * SOMEBODY SAYS OTHERWISE. This is the same escape hatch `/radio/` has, in
+   * SOMEBODY SAYS OTHERWISE. This is the same escape hatch `/archive/radio/` has, in
    * the same shape and for the same reason.
    *
    * Every recording here is on somebody else's server, and the standing
@@ -541,7 +541,7 @@
    * can be inaudible, ask nobody for a duration, and still spend a visitor's
    * bandwidth on a 12 MB recording while its transport runs on its own.
    *
-   * `/radio/` and `/crate/` already answer this the same way and for the same
+   * `/archive/radio/` and `/crate/` already answer this the same way and for the same
    * reason: a self-check that works the instrument cannot be scheduled into
    * being harmless, it has to not run. `demo/verify.mjs` appends `selfcheck=1`
    * to every demo it opens, so the suite still grades everything.
@@ -896,7 +896,7 @@
    * how it would get one by accident.
    */
   /**
-   * 🔴 THE LOOPER IS THE ONE `/radio/` HAS, AND IT IS A MODULE NOW. Asked for as
+   * 🔴 THE LOOPER IS THE ONE `/archive/radio/` HAS, AND IT IS A MODULE NOW. Asked for as
    * *"make it use same looping ui as radio (make it global)"*. LOOP keeps the
    * lap you are hearing; the button glued to its right plays that lap forwards,
    * backwards, or there and back. `demo/shell/looper.mjs` owns all of it, so the
@@ -913,7 +913,7 @@
    * RING, which is why nothing is heard to change at the first press. The bar
    * marks the loop, the tape plays it once while the ring fills, and at the wrap
    * the page takes the tape down and puts the kept seconds up in its place. On
-   * `/radio/` the same two moments are `fill` and `set`, because there the sound
+   * `/archive/radio/` the same two moments are `fill` and `set`, because there the sound
    * has not arrived yet.
    *
    * ⚠️ 30 SECONDS, WHICH IS A PROMISE THE PAGE CAN KEEP. Stereo at 48 kHz is
@@ -928,7 +928,7 @@
   // file. Drawing the file means fetching and decoding all of it — 225 MB for
   // the largest thing here — before a single sample is heard, and the picture
   // would then be of something nobody is listening to yet. This is the same
-  // `feed()` path `/radio/` uses, with no grains because there is no
+  // `feed()` path `/archive/radio/` uses, with no grains because there is no
   // granulator on this page.
   // 🔴 IT FREEZES ON A LOOP AGAIN, BECAUSE WHAT A LOOP IS HERE HAS CHANGED.
   // `freezeOnLoop: false` was right for a loop made of seeks: the tape really
@@ -1096,7 +1096,7 @@
      * file, so the file has to stop being heard. Writing to `out` would move the
      * gain the sound gate owns, and the next `setAudible` would put the tape
      * back underneath the loop. Two gains, one job each, which is the same split
-     * `/radio/` draws between its fader and its live path.
+     * `/archive/radio/` draws between its fader and its live path.
      */
     liveIn = ctx.createGain();
     src.connect(liveIn);
@@ -1749,7 +1749,7 @@
      *         down and put the kept seconds up in its place.
      *   off   give the tape back.
      *
-     * ⚠️ `/radio/` USES `fill` AND `set` FOR THE SAME TWO MOMENTS, because there
+     * ⚠️ `/archive/radio/` USES `fill` AND `set` FOR THE SAME TWO MOMENTS, because there
      * the sound the loop will play has not arrived yet and the window is opened
      * AHEAD of the press. Same looper, same button, two honest entry points.
      */
@@ -1770,7 +1770,7 @@
     onLoopPos: (f) => scope.playhead?.(f == null ? null : (looper.headFrac() ?? f)),
     /**
      * 🔴 ONE BUTTON GLUED TO THE RIGHT OF LOOP, CYCLING → ← ⇆, AND IT IS THE
-     * ONE `/radio/` HAS. It is on the bar with no loop running, because a
+     * ONE `/archive/radio/` HAS. It is on the bar with no loop running, because a
      * direction is a choice you can make BEFORE pressing LOOP: it says what the
      * next lap will do.
      *
@@ -1780,7 +1780,7 @@
      * right for every page that has one. A tape that winds down and comes back
      * up is a fact about THIS machine, it has to move the media element as well
      * as the ring, and putting it in `demo/shell/looper.mjs` would give it to
-     * `/radio/`'s transport bar and every other looper page uninvited. So the
+     * `/archive/radio/`'s transport bar and every other looper page uninvited. So the
      * page decides WHEN the looper's own press lands and the looper still owns
      * what the press DOES.
      */

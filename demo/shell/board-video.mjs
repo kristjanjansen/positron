@@ -1,7 +1,7 @@
 // demo/shell/board-video.mjs: the Raspberry Pi's picture, received and decoded.
 //
 // Taken out of /mirror/ on 2026-10-12 (BACKLOG, "shader/010 on the real Pi")
-// so that /remote/shader-on-pi/ can show the board's real picture with the same
+// so that /remote/shader/ can show the board's real picture with the same
 // code /mirror/ has run since 2026-09-11, rather than a second copy of it.
 //
 // WHAT THE BOARD SENDS (rig/board/board.mjs, `sendFrame`). After `video.start`
@@ -66,7 +66,7 @@ export function createBoardVideo({
   let waitingForKey = true, last = -1, lastSeq = null, lastAt = 0;
   // Whether binary frames on the socket are drawn. Off while the same frames
   // arrive another way (`feed`, the Pi camera's direct link on
-  // /remote/circuit-on-pi/, since 2026-10-13); the socket stays open for text.
+  // /remote/circuit/, since 2026-10-13); the socket stays open for text.
   let fromSocket = true;
   let take = null;
   const watching = setInterval(() => {

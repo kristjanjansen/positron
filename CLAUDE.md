@@ -20,6 +20,10 @@ cards of `demo/shell/concept-list.mjs`, and the build copies that file as it is.
 Every concept page is at `/<group>/<slug>/` (https://positron.studio/synth/keyboard/),
 no number anywhere; `/concepts/` answers 302 to `/` and every old
 `/concepts/<group>/<number>/` is a 404. The old table is in `positron-history`.
+The slug is ONE plain lowercase word, never its group's name (*"Resolve clashes.
+Avoid dashes on names."*, 2026-10-13): `/remote/circuit/`, not
+`/remote/circuit-on-pi/`, and a group name taken by an archived page is resolved
+by moving that page (the radio demo is `/archive/radio/`), not by renaming the group.
 The listed manifest rows (today only `held`) draw as use case cards from
 `DEMO_CARDS`, skipping `built: false` and `unlisted` rows. The paragraph below
 describes the manifest-baked front page, which is in `archive/frontpage/`; what
@@ -236,7 +240,7 @@ come from this repository.**
 ```sh
 node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
-node demo/verify.mjs radio tapes         # just these, by slug
+node demo/verify.mjs archive/radio tapes         # just these, by slug
 DEMO_DEEP=1 node demo/verify.mjs stage    # the deep tier: round trips, recordings, live streams
 node demo/verify-native.mjs              # THE IPHONE CODE PATH, RETIRED 2026-10-13: it drove /llhls/, whose input is deleted, and refuses (exit 2)
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
@@ -314,7 +318,7 @@ GONE.** It played the input `whep-rig`, which Stream deleted that day with the
 test pattern feeding it, and pub's `/watch`, `/status` and `/whip` answer 410.
 The script is at `archive/check-whep.mjs` as the record of how the table below
 was measured. **The WebRTC check today is
-https://positron.studio/video/webrtc-loopback/ (WebRTC loopback):** press, allow
+https://positron.studio/video/webrtc/ (WebRTC loopback):** press, allow
 the camera, and the WebRTC panel shows the round trip in ms. ⚠️ It asks for a
 TURN relay as well, so behind a tunnel that drops UDP it may connect through the
 relay where `check-whep.mjs` (no relay) failed; it is not the same instrument
@@ -405,7 +409,7 @@ not adding to it. **So open one only when a person is going to listen to it.**
 mistake. **The rule is about whose server it is, not about which harm has been
 named yet.**
 
-🔴 **DO NOT RE-VERIFY `/radio/` OR PROBE STATION HEALTH. ASKED TWICE**, the
+🔴 **DO NOT RE-VERIFY `/archive/radio/` OR PROBE STATION HEALTH. ASKED TWICE**, the
 second time as *"can we please stop assessing the radio, its killing me and my
 budget"*. Never `curl` a mount, a health route or a live segment to find out
 whether somebody else's server is up. The answer to *is it red because of me or
@@ -592,14 +596,14 @@ bug was a fact true of every part and of no part's author.
   the list is calling it, and it is not finished until the screenshot changes.
 
 - 🔴 **A FINISHED PAGE IS HANDED OVER AS A URL, NOT AS A PATH.**
-  `demo/radio/index.html` is not an answer to *"where is it"* — it is the
+  `demo/archive/radio/index.html` is not an answer to *"where is it"* — it is the
   answer to *"which file did you edit"*, and the reply to a working demo that
   gives one was **"useless to me"**. Say where to OPEN it:
   **a deployed `https://positron.studio/<slug>/` if it is deployed, otherwise a
   live local URL with every query parameter it needs to work** — and the server
   behind it still RUNNING, not one killed three commands ago. ⚠️ A page that
   needs a local worker as well needs BOTH up and both named, in one line that
-  can be clicked: `http://127.0.0.1:8890/radio/?base=http://localhost:8899`.
+  can be clicked: `http://127.0.0.1:8890/archive/radio/?base=http://localhost:8899`.
   If it cannot be reached at all yet, say that in those words and say what is
   missing — an unreachable page reported as done is worse than one reported as
   blocked, because only one of them gets fixed.

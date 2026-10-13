@@ -518,7 +518,7 @@ inline by default and sits on a text baseline, so a BLOCK parent reserves
 descender space under it, and that 1.5 px strip is painted in the seam colour.
 A flex container blockifies its children, which is why `.pos-rows-r` is flex,
 and it reaches one level only. **Every `.pos-glue > X` patch is also written
-`.pos-glue > * > X`**, because `/radio/` glues a scope straight in and `/pack/`
+`.pos-glue > * > X`**, because `/archive/radio/` glues a scope straight in and `/pack/`
 wraps it, and a direct-child selector fixed one page and left the other exactly
 as reported.
 

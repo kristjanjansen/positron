@@ -779,7 +779,7 @@
    * 🔴 IT IS `grain-scope.mjs`, WHICH IS THIS SITE'S WAVEFORM, AND IT WAS
    * `wave-view.mjs`, WHICH WAS THIS PAGE'S. Asked 2026-09-21 as *"use standard
    * wave visualizer (what we had in radio wtc...)"* and then settled three
-   * messages later as *"use same component in pack"*. `/radio/`, `/tapes/` and
+   * messages later as *"use same component in pack"*. `/archive/radio/`, `/tapes/` and
    * `/grains/` all draw with the scope; `wave-view` had exactly one caller,
    * which was this page, so "the standard one" was the one this page was not
    * using.
@@ -820,7 +820,7 @@
    * `<div>` inside the glue and the scope went inside that, which put the scope
    * TWO levels under the surface. `shell.css` zeroes a glued scope's margin with
    * `.pos-glue > .pos-scope, .pos-glue > * > .pos-scope`, and it says in its own
-   * comment why the second half exists: `/radio/` glues the scope straight in and
+   * comment why the second half exists: `/archive/radio/` glues the scope straight in and
    * this page wrapped it. A row between them makes the scope THREE levels down,
    * where neither half of that selector reaches, and `.pos-scope` is
    * `margin: 22px 0 12px`. So keeping the wrapper would have put 22 px of `--card`
@@ -861,7 +861,7 @@
   const whyRow = samplesRows.row(whyEl, { pad: true });
   /**
    * 🔴 THE PAGE HIDES ITS OWN PART, BECAUSE THE SCOPE DOES NOT HIDE ITSELF AND
-   * SHOULD NOT. `/radio/` draws a scrolling picture from `feed()` before any
+   * SHOULD NOT. `/archive/radio/` draws a scrolling picture from `feed()` before any
    * peaks exist, so a component that vanished without a buffer would blank the
    * page it was built for. `wave-view` hid itself and this page relied on it;
    * with the swap the rule moves to where it is true, which is here.
@@ -1976,7 +1976,7 @@
          canvas by `grain-scope.mjs`, and it was saying a third time what the
          marked row and the row's own `name` column already say an inch above
          it.
-         ⚠️ THE COMPONENT IS UNTOUCHED, WHICH IS THE POINT. `/radio/`,
+         ⚠️ THE COMPONENT IS UNTOUCHED, WHICH IS THE POINT. `/archive/radio/`,
          `/tapes/` and `/grains/` all draw with the same module and all three
          pass a name that is worth having: on a live station the corner is the
          only thing that says what the picture IS. A component option would have
@@ -3086,7 +3086,7 @@
         const wv = waveRow.getBoundingClientRect();
         /* ⚠️ AND NOTHING INSIDE DRAWS A SECOND EDGE, which is the reported
            fault rather than an extra: *"rm double bordering"*. MEASURED at the
-           time on `/radio/`: a component's 1 px against the glue's 1 px in the
+           time on `/archive/radio/`: a component's 1 px against the glue's 1 px in the
            same colour reads as one 2 px line. */
         const inner = (x) => parseFloat(getComputedStyle(x).borderTopWidth);
         d.assert('the list and the picture are two rows of one glued panel, in that order, with a 1 px seam',
@@ -3112,7 +3112,7 @@
          * is the check the component's own header demands: every number in
          * `facts()` would read the same if the fill colour were the field
          * colour, if the scale were zero or if `paint()` returned early.
-         * `/radio/` already records that a check a wave was drawn has to ask
+         * `/archive/radio/` already records that a check a wave was drawn has to ask
          * the canvas.
          */
         /**
