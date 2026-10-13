@@ -8,12 +8,6 @@
 <title>Drums on the Pi</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The two waves at half width each, here on the left and the Pi on the
-     right, stacked on a phone, here first: /concepts/remote/020/'s pair. */
-  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
-  .cc-pair canvas { display: block; width: 100%; height: 100%; }
-  .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
   /* The path choice alone at the top left, as /concepts/remote/030/'s row
      (Play is the drum machine's own, on its transport bar). */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -21,9 +15,9 @@
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/concepts/remote/path.mjs';
+  import { createOverlayScope } from '/concepts/remote/overlay-scope.mjs';
   import { BOARD_SITE } from '/shell/graph-registry.mjs';
   import { createBoard, BOARD_RATE, BOARD_CHANNELS } from '/shell/board.mjs';
   import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
@@ -95,6 +89,14 @@
   //   path        relay, direct, model (the Pi simulated in this tab; the word
   //               `simulated` did not fit the cell at 1280), or empty while stopped.
   //
+  // THE SCOPE, asked 2026-10-13 (*"can not see viz improvements"*, on the two
+  // half width panels this page still had): remote/020's one full width
+  // scope, both sides' drums on it, here yellow and the Pi blue, from
+  // /concepts/remote/overlay-scope.mjs. Each bar's first hit is the trigger;
+  // each side's window starts at its own copy of that hit and is held until
+  // the next bar. The Pi's copy is found by its shape ('match' there), since
+  // a pattern is never quiet in the 90 to 300 ms before it arrives.
+  //
   // THE ASSERT THE PLAN NAMES, read by a check through `__demo.drums.check()`:
   // hits handed over to the board equal the hits it started.
   const d = mount({
@@ -123,7 +125,7 @@
   /** Per side: where its sound comes from, the scope, the meter and its fade gain. */
   const SIDES = {
     local: { out: () => localTap, from: 'web:mix:audio-out', scope: 'web:scope:audio-in', fadeIn: 'web:xfade:audio-in' },
-    pi: { out: () => pi.out(), from: `${BOARD_SITE}:drums:audio-out`, scope: 'web:scope-pi:audio-in', fadeIn: 'web:xfade:audio-in-2' },
+    pi: { out: () => pi.out(), from: `${BOARD_SITE}:drums:audio-out`, scope: 'web:scope:audio-in-2', fadeIn: 'web:xfade:audio-in-2' },
   };
   function getCtx() {
     if (ctx) return ctx;
@@ -138,13 +140,13 @@
     mixBuf = new Float32Array(mixMeter.fftSize);
     for (const s of Object.values(SIDES)) {
       s.gain = ctx.createGain(); s.gain.gain.value = 0; s.gain.connect(xmix);
-      s.an = ctx.createAnalyser(); s.an.fftSize = 2048; s.an.connect(pull);
-      s.buf = new Float32Array(s.an.fftSize);
+      // 32768 samples, 0.68 s: long enough to still hold a bar's first hit
+      // here when the Pi's copy of it arrives up to 400 ms later.
+      s.an = ctx.createAnalyser(); s.an.fftSize = 32768; s.an.connect(pull);
       // 512 samples, about 11 ms: short, so an onset is seen early.
       s.meter = ctx.createAnalyser(); s.meter.fftSize = 512; s.meter.connect(pull);
       s.mbuf = new Float32Array(s.meter.fftSize);
     }
-    requestAnimationFrame(frame);
     return ctx;
   }
   const rmsOf = (an, buf) => { an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); };
@@ -300,17 +302,19 @@
     mix: { node: 'mix', label: 'drums mixed' },
     onWake: async () => { m.api.mixOut().connect(localTap); route(); },
     // One press: the drums here and the Pi. The Pi joins before the first hit.
-    onStart: (c) => pi.join(c),
+    onStart: (c) => { lastStep = -1; lastAt = null; return pi.join(c); },
     onStop: () => { if (pi.joined()) pi.leave(); },
     flowing: (l, playing) => playing && (l.from === SEQ_PI.from && l.to === SEQ_PI.to ? pi.joined()
       : l.from.startsWith(`${BOARD_SITE}:`) ? pi.joined() : true),
   });
   const bay = m.api.bay;
 
-  // ── the bay: the Pi node, the scopes, the crossfader, the speakers ──────
+  // ── the bay: the Pi node, the scope, the crossfader, the speakers ───────
   const piNode = bay.addNode({ id: `${BOARD_SITE}:drums`, kind: 'engine', label: 'drums on the Pi', place: 'studio-1' });
   for (const [n, kind, label] of [
-    ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'],
+    // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
+    // crossfader takes them.
+    ['scope', 'screen', 'waveforms'],
     ['fader', 'person', 'fader'], ['xfade', 'engine', 'crossfader'], ['speaker', 'screen', 'speakers'],
   ]) bay.addNode({ id: `web:${n}`, kind, label, place: 'browser' });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
@@ -329,13 +333,14 @@
       const name = NAME_OF.get(e.d1);
       if (!name) return;
       piIn++;
+      trigger(e);
       if (!pending.has(e.at)) pending.set(e.at, []);
       pending.get(e.at).push({ name, perfAt: e.at, ...(name === 'hhc' ? { choke: 'hho' } : {}) });
       if (!flushing) { flushing = true; queueMicrotask(flush); }
     } },
     { id: PI('audio-out'), dir: 'out', medium: 'audio' },
     { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('scope-pi', 'audio-in'), dir: 'in', medium: 'audio' },
+    { id: ID('scope', 'audio-in-2'), dir: 'in', medium: 'audio' },
     { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
     { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;
@@ -351,7 +356,7 @@
   lay(SEQ_PI.from, SEQ_PI.to);
   lay(ID('mix', 'audio-out'), ID('scope', 'audio-in'));
   lay(ID('mix', 'audio-out'), ID('xfade', 'audio-in'));
-  lay(PI('audio-out'), ID('scope-pi', 'audio-in'));
+  lay(PI('audio-out'), ID('scope', 'audio-in-2'));
   lay(PI('audio-out'), ID('xfade', 'audio-in-2'));
   lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
   lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
@@ -422,19 +427,23 @@
   // The simulation's late count, read the same way, every 2 s.
   setInterval(() => { const s = pi.sim(); if (s && pi.mode() === 'simulated') d.set('Pi late', String(s.stat.late)); }, STATS_MS);
 
-  // ── the two waves, each in a video panel at half width ───────────────────
-  const W = 640, H = 360;
-  function wavePanel(name, foot) {
-    const canvas = el('canvas');
-    canvas.width = W; canvas.height = H;
-    const footEl = el('span', 'cc-say', foot);
-    const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-say', name), right: footEl });
-    return { panel, g: canvas.getContext('2d'), foot: footEl };
+  // ── the scope: both sides on one, each from its own copy of the bar's first hit
+  // A window of 4096 samples, 85 ms at 48 kHz: a kick's attack and its first
+  // few cycles. This tab's onset may lie up to 50 ms before the hit's time,
+  // because the time is when it is HEARD and the analyser sees it earlier.
+  const overlay = createOverlayScope({ win: 4096, axis: '85 ms', find: 'match', slackMs: 50 });
+  const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
+  const sideAn = (s) => () => (s.an && s.out() && scoped(s) ? s.an : null);
+  let lastStep = -1, lastAt = null;
+  /** A hit from the sequencer: the first of each bar takes both windows. */
+  function trigger(e) {
+    if (e.at === lastAt) return;
+    const first = lastStep < 0 || e.step <= lastStep;
+    lastStep = e.step; lastAt = e.at;
+    if (!first || !ctx) return;
+    overlay.hold({ ctx, at: ctx.currentTime + (e.at - performance.now()) / 1000, sides: { local: sideAn(SIDES.local), pi: sideAn(SIDES.pi) } });
   }
-  const left = wavePanel('SuperCollider here', 'this tab');
-  const right = wavePanel('SuperCollider on the Pi', 'stopped');
   function showMode(md) {
-    right.foot.textContent = md === 'idle' ? 'stopped' : md;
     piNode.label = md === 'simulated' ? 'drums on the Pi, simulated' : 'drums on the Pi';
     d.set('path', md === 'idle' || md === 'checking' ? '' : md === 'simulated' ? 'model' : md);
     if (md === 'idle' || md === 'checking') { d.set('Pi late', ''); d.set('network', ''); }
@@ -442,38 +451,13 @@
     route();
     m.api.refresh();
   }
-  const css = getComputedStyle(document.documentElement);
-  const colour = (n, f) => css.getPropertyValue(n).trim() || f;
-  const INK = colour('--hi', '#f5c84c'), GROUND = colour('--card2', '#151a24'), LINE = colour('--line', '#2a3140');
-  function draw(g, s) {
-    g.fillStyle = GROUND; g.fillRect(0, 0, W, H);
-    if (!s.an || !s.out() || !bay.links().some((l) => l.from === s.from && l.to === s.scope)) return;
-    s.an.getFloatTimeDomainData(s.buf);
-    const N = s.buf.length, FULL = 0.6;
-    g.fillStyle = LINE; g.fillRect(0, H / 2, W, 1);
-    g.strokeStyle = INK; g.lineWidth = 2; g.beginPath();
-    for (let i = 0; i < N; i++) {
-      const v = Math.max(-1, Math.min(1, s.buf[i] / FULL));
-      const px = i / (N - 1) * W, py = H / 2 - v * (H / 2 - 12);
-      if (i) g.lineTo(px, py); else g.moveTo(px, py);
-    }
-    g.stroke();
-  }
-  function frame() {
-    draw(left.g, SIDES.local);
-    draw(right.g, SIDES.pi);
-    requestAnimationFrame(frame);
-  }
-  draw(left.g, SIDES.local); draw(right.g, SIDES.pi);
 
   // ── the page ─────────────────────────────────────────────────────────────
   const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
     ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
-  const pair = el('div', 'cc-pair');
-  pair.append(left.panel.el, right.panel.el);
   const top = el('div', 'cc-top');
   top.append(path.el);
-  d.stack.add(top, pair, fader.el, m.surface, m.patchbay);
+  d.stack.add(top, overlay.el, fader.el, m.surface, m.patchbay);
   showMode('idle');
   hintCell(d, 'network', NETWORK_HINT);
   hintCell(d, 'path', PATH_HINT);
@@ -501,6 +485,8 @@
   window.__rhythm = m.api;
   window.__demo.drums = {
     m: m.api, bay, pi, fader, lags, AHEAD,
+    /** The scope: each side's held window, how many were taken, and the Pi's lag behind this tab as matched. */
+    scope: overlay,
     /** Each side's meter, for a check that reads the returned sound itself (the choke). */
     sides: SIDES,
     piIn: () => piIn, x: () => x, fades: () => fades, ctx: () => ctx,

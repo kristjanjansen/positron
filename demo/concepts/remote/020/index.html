@@ -20,7 +20,7 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createWaveShape, captureTrace } from '/shell/synth-view.mjs';
+  import { createOverlayScope } from '/concepts/remote/overlay-scope.mjs';
   import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/concepts/remote/path.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
   import { createSlider } from '/shell/slider.mjs';
@@ -442,96 +442,20 @@
   const grid = createKnobGrid(knobs, { row: true });
 
   // ── one scope, both waves on it, each held from its own note's onset ────
-  // Asked 2026-10-13 on a shot of the two half panels (here a clean slow wave,
-  // the Pi a dense jittering band): *"how to make less nervous?"*, then
-  // *"overlay 2 waves on top of each other, full w"*.
-  // MEASURED first, the real board on the relay, held keys on three notes:
-  // both panels drew with the SAME code (512 samples from the first rising
-  // zero crossing, redrawn every frame), so the drawing was not the
-  // difference. The Pi's copy is clean (exact digital zero between notes, no
-  // dither); what it carries more of is energy above 4 kHz, 10 to 20 dB more
-  // relative to its note, which is int16 quantisation (about -101 dBFS) under
-  // a note at -35 to -50 dBFS. And on the relay its playout trimmed or ran dry
-  // 3 to 9 times in a few seconds, each one a splice in the wave. A free
-  // running scope redraws whatever 11 ms the last frame held, so every splice
-  // and every frame boundary moved the Pi's picture.
-  // So the scope is HELD, the kit's triggered idea (/kit/devices/, TRIGGERED
-  // SCOPE): on each key, each side's window is taken from THAT SIDE'S OWN
-  // onset of the note and kept until the next key. The onsets are found
-  // separately because the Pi's arrives 100 to 300 ms after this tab's: from
-  // the press, the first 1 ms block over three times the 30 ms before it (as
-  // remote/030 finds a note), then the first rising zero crossing after it.
-  // A resonant saw crosses zero more than once a cycle, so the Pi's window is
-  // then slid up to 20 ms further to where it matches this tab's best (the
-  // largest correlation), and the two lie on top of each other. One scale for both, the larger peak, so a level
-  // difference still shows. A key whose onset cannot be found (a note played
-  // over a louder tail) keeps the previous picture.
-  const WIN = 1024;                       // 21 ms at 48 kHz, about four cycles of A3
-  const FLAT = Array(512).fill(0);
-  const scope = createWaveShape({ name: 'here', colour: '--hi', height: 160, points: FLAT,
-    over: { name: 'Pi', colour: '--mi-blue', points: FLAT }, axes: { x: '21 ms' } });
-  const held = { local: null, pi: null }, heldGen = { local: 0, pi: 0 };
-  const SLIDE = 960, shifts = [];          // 20 ms, a period of the lowest key
-  /** How far into `buf` from `at` the window best matches `ref`, 0 to SLIDE samples. */
-  function bestShift(ref, buf, at) {
-    let best = 0, bestC = -Infinity;
-    for (let sh = 0; sh <= SLIDE; sh += 2) {
-      let c = 0; for (let i = 0; i < WIN; i += 2) c += ref[i] * buf[at + sh + i];
-      if (c > bestC) { bestC = c; best = sh; }
-    }
-    return best;
-  }
-  const captures = { local: 0, pi: 0, missed: 0 };
-  let holdGen = 0;
-  /** The first rising zero crossing after the first onset at or after `from`, or -1. */
-  function onsetFrom(buf, from) {
-    const blk = 48, n = buf.length, pk = [];
-    for (let i = Math.max(0, from - 30 * blk); i + blk <= n; i += blk) {
-      let m = 0; for (let j = i; j < i + blk; j++) { const a = buf[j] < 0 ? -buf[j] : buf[j]; if (a > m) m = a; }
-      pk.push([i, m]);
-    }
-    for (let k = 0; k < pk.length; k++) {
-      const [i, m] = pk[k];
-      if (i < from) continue;
-      let before = 0; for (let j = Math.max(0, k - 30); j < k; j++) before = Math.max(before, pk[j][1]);
-      if (m > 0.002 && m > before * 3) {
-        for (let z = i + 1; z < n - WIN; z++) if (buf[z - 1] < 0 && buf[z] >= 0) return z;
-        return -1;
-      }
-    }
-    return -1;
-  }
+  // Asked 2026-10-13: *"overlay 2 waves on top of each other, full w"*. The
+  // scope, what was measured before it and how each side's onset is found are
+  // in /concepts/remote/overlay-scope.mjs, shared with remote/040 since the
+  // same day. Here a key is the trigger, the window is 1024 samples (21 ms at
+  // 48 kHz, about four cycles of A3) and the Pi's window may slide 20 ms (960
+  // samples, a period of the lowest key) to its best match.
+  const overlay = createOverlayScope({ win: 1024, slide: 960, axis: '21 ms' });
+  const scope = overlay.wave, held = overlay.held, captures = overlay.captures;
   const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
+  const sideAn = (s) => () => (s.an && s.voice.out() && scoped(s) ? s.an : null);
   /** A key went down: take each side's window from its own onset, once it has one. */
   function hold() {
     if (!ctx) return;
-    const gen = ++holdGen, pressedAt = ctx.currentTime, t0 = performance.now();
-    for (const [k, s] of Object.entries(SIDES)) {
-      const tick = () => {
-        if (gen !== holdGen) return;
-        const late = performance.now() - t0 > 1500;
-        if (!s.an || !s.voice.out() || !scoped(s)) { if (!late) setTimeout(tick, 40); return; }
-        const buf = new Float32Array(s.an.fftSize);
-        s.an.getFloatTimeDomainData(buf);
-        const from = Math.round(buf.length - (ctx.currentTime - pressedAt) * ctx.sampleRate);
-        const at = from >= 0 ? onsetFrom(buf, from) : -1;
-        if (at >= 0 && at + WIN + SLIDE <= buf.length) {
-          // The Pi's window slides to where it best matches this tab's.
-          const sh = k === 'pi' && held.local && heldGen.local === gen ? bestShift(held.local, buf, at) : 0;
-          held[k] = buf.slice(at + sh, at + sh + WIN); heldGen[k] = gen; shifts.push(sh); captures[k]++; paintHeld(); return;
-        }
-        if (from < 0 || late) { captures.missed++; return; }
-        setTimeout(tick, 40);
-      };
-      setTimeout(tick, 40);
-    }
-  }
-  function paintHeld() {
-    let peak = 0;
-    for (const b of [held.local, held.pi]) if (b) for (const v of b) peak = Math.max(peak, Math.abs(v));
-    const full = Math.max(peak * 1.1, 1e-4);
-    const pts = (b) => (b ? Array.from(captureTrace(b, 0, b.length, 512), (v) => Math.max(-1, Math.min(1, v / full))) : FLAT);
-    scope.set({ points: pts(held.local), over: { name: 'Pi', colour: '--mi-blue', points: pts(held.pi) } });
+    overlay.hold({ ctx, at: ctx.currentTime, sides: { local: sideAn(SIDES.local), pi: sideAn(SIDES.pi) } });
   }
 
   // ── which Pi, on the Pi node's label and the `path` and `network` cells ─
