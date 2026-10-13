@@ -68,7 +68,7 @@ export const CONCEPTS = [
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { n: 'rhythm/000', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
   { n: 'rhythm/010', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
-  { n: 'rhythm/020', title: 'Sample drums', say: 'The drum machine playing samples from a default kit, or from a Circuit pack or WAVs you drop on it.' },
+  { n: 'rhythm/020', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
   // rhythm/030 moved to remote/040 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { n: 'rhythm/050', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
   // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
