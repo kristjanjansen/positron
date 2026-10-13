@@ -20,7 +20,7 @@ export const CONCEPTS = [
   { n: 'synth/100', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
-  { n: 'synth/130', title: 'MIDI dump', say: 'MIDI from devices here, the keys and what pages send the Pi, as raw bytes beside a plain reading.' },
+  // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
@@ -110,7 +110,7 @@ export const DEMO_CARDS = {
   capture: { group: 'streaming', say: 'Four ways of keeping what came over a link, from takes recorded end to end to what a receiver got.' },
   // circuit, evo, twelve and pack archived 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
   // still served at their URLs, listed on /archive/ under devices.
-  dump: { group: 'device', say: 'Every message a MIDI instrument plugged in here sends, as raw bytes beside a plain reading.', supersededBy: 'synth/130' },
+  dump: { group: 'device', say: 'Every message a MIDI instrument plugged in here sends, as raw bytes beside a plain reading.' },
   // wire and patchbay archived 2026-10-12 (*"archive wire and patchbay"*): still served, listed on /archive/.
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
   nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
