@@ -1020,7 +1020,7 @@ export const DEMOS = [
   // The fourteenth part, 2026-10-13: *"Build frontpage og card and apply to all
   // pages"*, drawn with no browser (*"What headless chrome?!!? See ../eccm etc"*).
   { name: 'kit/share', title: 'share', group: 'kit', act: 0, created: '2026-10-13', built: true, unlisted: true,
-    one: 'the card every page is shared with, the front page’s hero over its patchbay, as the PNG the build makes and the SVG it is made from',
+    one: 'the card every page is shared with and its Instagram portrait, the front page’s hero type, as the PNGs the build makes and the SVG they are made from',
     tags: ['shell', 'no network'] },
 
   // 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
