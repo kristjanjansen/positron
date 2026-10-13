@@ -13,11 +13,11 @@
 
 <script type="module">
   import { mount, guard, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
-  import { whep, holdPublisher, waitForWhip, watchPresentedFps, fetchIceServers, readIcePath } from '/shell/live.mjs';
+  import { RETIRED_LEG, fetchIceServers, readIcePath } from '/shell/live.mjs';
   import { createPresenceButton, streamSays, STREAM_CAN } from '/shell/presence.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  import { SELFCHECK, DEEP } from '/shell/selfcheck.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
 
   const d = mount({
     name: 'webrtc',
@@ -28,7 +28,7 @@
     // does is the control's own label, and what the round trip means is its
     // footer label's business. This project has cut this rule from four
     // sentences to three to one and broken it every time within a few pages.
-    what: 'The same live picture the HLS pages play, delivered over WHEP instead.',
+    what: 'The test picture over WHEP, a leg retired on 2026-10-13.',
     // 🔴 `rtt` WAS A KEY THAT READ AS A LATENCY CLAIM. Quoting this number
     // beside a glass-to-glass one flattered WHEP by about three times once
     // already (CLAUDE.md, candidate-pair RTT). The words now say what it is,
@@ -202,65 +202,6 @@
     return fetchIceServers({ log: (m) => d.log(m) });
   }
 
-  // A WHEP client is small: offer recvonly, POST the SDP, take the answer.
-  async function whepPlay(url) {
-    pc = new RTCPeerConnection({
-      bundlePolicy: 'max-bundle',
-      ...(ice?.iceServers?.length ? { iceServers: ice.iceServers } : {}),
-    });
-    pc.addTransceiver('video', { direction: 'recvonly' });
-    pc.addTransceiver('audio', { direction: 'recvonly' });
-    // A WEBRTC TRACK ARRIVES MUTED and unmutes only once media actually
-    // flows. Assigning srcObject before that gives iOS a stream with no
-    // frames yet, and it paints black and stays there even though decoding
-    // later succeeds — which is exactly what the phone showed: rtt 16 ms,
-    // 26 fps inbound, and a black rectangle.
-    // ONE stream that we own, and every arriving track gets added to it.
-    //
-    // Adopting e.streams[0] per track loses tracks: Cloudflare delivers audio
-    // and video with different msids, so the second ontrack REPLACED srcObject
-    // and threw the first track away. Whichever unmuted last won, which is a
-    // race — the suite showed "video:live" alone on one run and "audio:live"
-    // alone on the next, while getStats() reported 2125 video frames decoded at
-    // 1280x720 either way. Same bug, opposite faces.
-    const inbound = new MediaStream();
-    pc.ontrack = (e) => {
-      inbound.addTrack(e.track);
-      const attach = async () => {
-        if (video.srcObject !== inbound) video.srcObject = inbound;
-        // play AFTER attaching a live stream, not before
-        try { await video.play(); d.log(`attached on ${e.track.kind} unmute`); }
-        catch (err) { await playOrPrompt(video, d); }
-      };
-      if (e.track.muted) e.track.addEventListener("unmute", attach, { once: true });
-      else attach();
-      // some builds never fire unmute; metadata is a second chance
-      video.addEventListener("loadedmetadata", () => video.play().catch(() => {}), { once: true });
-    };
-    pc.onconnectionstatechange = () => d.log(`pc ${pc.connectionState}`);
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    // wait for ICE gathering so the offer is complete (no trickle to WHEP)
-    if (pc.iceGatheringState !== 'complete') {
-      await new Promise((res) => {
-        const t = setTimeout(res, 3000);
-        pc.addEventListener('icegatheringstatechange', () => {
-          if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); }
-        });
-      });
-    }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/sdp' },
-      body: pc.localDescription.sdp,
-    });
-    if (!res.ok) throw new Error(`WHEP ${res.status}`);
-    const answer = await res.text();
-    await pc.setRemoteDescription({ type: 'answer', sdp: answer });
-    return res.headers.get('location');
-  }
-
   /**
    * 🔴 `stream.state()`, NOT `stream.state`. It is a FUNCTION on the presence api
    * (`state: () => now`) and `createPresenceButton` hands it through a getter,
@@ -301,130 +242,22 @@
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
   }
 
-  /* 🔴 TWO TIERS, asked 2026-10-04: *"make checks way ligher (2 tiers?)"*,
-     *"i mean these long-running ones"*. This press holds the publisher, asks
-     for relay servers, waits out a cold container's WHIP leg and then a WHEP
-     handshake and its first frames: a minute of Stream on a cold day. An
-     ORDINARY harness run (`selfcheck=1`) starts none of it and grades the page
-     at rest; `DEMO_DEEP=1 node demo/verify.mjs webrtc` runs the rest. A visitor
-     is never `LIGHT`, so their press is unchanged. */
-  const LIGHT = SELFCHECK && !DEEP;
+  /* 🔴 RETIRED 2026-10-13, AND SO EVERY TIER IS THE LIGHT ONE. The test
+     pattern's WHIP leg is gone: Stream deleted its input (whep-rig) and pub
+     answers /watch, /status and /whip with 410. Before the retirement a press
+     held the publisher, asked for relay servers, waited up to 90 s for the
+     WHIP leg and then negotiated WHEP; now there is nothing to wait for, so a
+     press says so at once and an ordinary or a deep harness run grades the
+     page at rest. The body that ran it is in git at be7737d. A WebRTC check
+     that still has a publisher behind it is /concepts/video/030/ (WebRTC
+     loopback, a camera through WHIP and back over WHEP). */
+  const LIGHT = true;
 
   async function start() {
     if (pc) return;
-    if (LIGHT) {
-      d.log('left for the deep run: the publisher, the relay servers, the WHIP leg and the WHEP picture (DEMO_DEEP=1)');
-      await d.run('check');
-      return;
-    }
-    pressAt ??= performance.now();
-    const mine = ++gen;
-    abort = new AbortController();
-    stream.set('coming').because('press again to stop it');
-    armVideo(video);          // before any await, or iOS refuses later
-    playing = false;
-    unwatchFps = watchPresentedFps(video, (r) => panel.values.set('fps', r == null ? '' : r.toFixed(1)));
-    /**
-     * 🔴 THE VIEWER COUNT IS REHOMED, NOT DELETED. The badge that went carried
-     * two facts: whether this page is holding the publisher, which the toggle
-     * now says in words, and HOW MANY are holding it, which the toggle cannot
-     * say at all. Deleting a display without rehoming what it said is how a
-     * page quietly stops reporting something.
-     * ⚠️ AND IT IS A LOG LINE RATHER THAN A FOURTH FOOTER CELL, MEASURED
-     * RATHER THAN CHOSEN. At 375 px a four cell row could not fit beside the
-     * panel's own square and scrolled, cutting `H.264 + AAC` in half, and a row
-     * that has to be dragged sideways is a row nobody reads. A count that
-     * changes when somebody arrives or leaves is an EVENT, which is what the
-     * log is for; the other three are properties of the picture above it.
-     */
-    let sawViewers = null;
-    ws = holdPublisher((s) => {
-      held = !!s.held;
-      if (s.viewers != null && s.viewers !== sawViewers) {
-        sawViewers = s.viewers;
-        d.log(`${s.viewers} watching`);
-      }
-    });
-    d.log('holding the publisher open');
-    // Asked now, in parallel with the container waking, and awaited before
-    // the first offer, because WHEP takes no trickle and the offer has to carry
-    // the relay candidates it is ever going to have.
-    const iceAsk = askIce();
-
-    // Wait for the WHIP LEG, not the HLS manifest. They are different inputs.
-    const w = await waitForWhip({
-      signal: abort.signal,
-      onTick: ({ waitedMs, err }) => d.log(`whip leg not up at ${(waitedMs / 1000).toFixed(0)}s${err ? ` (${err})` : ''}`),
-    });
-    if (gen !== mine) return;   // stopped while the container was waking
-    // 🔴 A PAGE THAT CANNOT REACH ITS SUBJECT SAYS SO, IN AN ASSERT, NOT IN A LOG.
-    // This line used to `d.log` and return, which is how this page read 8/8
-    // GREEN on a desk where it had never connected: a log is not graded, so the
-    // suite saw a page that simply stopped having opinions. MEASURED 2026-09-25:
-    // `node demo/verify.mjs webrtc` printed `page asserted something · 2`, and
-    // both of those two are the shell's feedback-button asserts.
-    // ⚠️ `aborted` IS NOT A FAILURE. The page being left is the harness tearing
-    // down, and grading that red would make every clean teardown a defect.
-    if (!w.ok) {
-      stream.set('offline').because('the publisher did not come up');
-      if (w.aborted) { d.log('page left', 'bad'); return; }
-      d.assert('the whip leg came up', false,
-        `no publisher after ${(w.waitedMs / 1000).toFixed(0)}s, so nothing could be played`);
-      await d.run('check');
-      return;
-    }
-    d.log(`whip leg publishing after ${(w.waitedMs / 1000).toFixed(1)}s`, 'hi');
-    ice = await iceAsk;
-    if (gen !== mine) return;
-
-    // ffmpeg reaching DTLS state=10 is not the same as Cloudflare being ready
-    // to answer a WHEP offer, so a 409 here is "not yet" rather than "no".
-    for (let attempt = 1; attempt <= 6; attempt++) {
-      try {
-        started = performance.now();
-        await whepPlay(whep());
-        d.log(`WHEP negotiated in ${Math.round(performance.now() - started)} ms`, 'hi');
-        await playOrPrompt(video, d);
-        // 🔴 `break`, NOT `return`, AND THIS ONE CHARACTER IS WHY THIS PAGE HAS
-        // NEVER GRADED ITSELF. A `return` here leaves `d.run('check')` below
-        // unreachable on the SUCCESS path, and the failure path returns too, so
-        // every route out of this handler skipped the checks. The standing
-        // explanation in this repository was that the checks sat behind a
-        // connection that never happened. That was wrong and it was the more
-        // comforting answer: they sat behind a connection that DID happen, and
-        // were skipped anyway. MEASURED 2026-09-25 with a publisher awake and
-        // WHEP media confirmed reaching this machine at 389 frames and
-        // 3,554,870 bytes: still `page asserted something · 2`.
-        break;
-      } catch (e) {
-        try { pc?.close(); } catch { /* fine */ }
-        pc = null;
-        if (gen !== mine) return;      // stopped between the offer and the answer
-        d.log(`whep attempt ${attempt}: ${e.message}`, 'bad');
-        if (attempt === 6) { stream.set('offline').because('WHEP would not connect'); d.fail(e); return; }
-        await new Promise((r) => setTimeout(r, 4000));
-        if (gen !== mine) return;      // stopped during the wait before the next try
-      }
-    }
-    if (gen !== mine) return;
-    settle();
-    /**
-     * ⚠️ THE CELLS ARE READ ONCE MORE BEFORE THEY ARE GRADED, AND GIVEN UP TO
-     * 4 s TO HAVE SOMETHING TO SAY. The interval below reads `getStats()` once a
-     * second on its own clock, so at this line it may not have run since the
-     * answer came back, and `buffer` needs the receiver to have emitted at
-     * least one frame. Waiting here rather than inside the check keeps the
-     * check synchronous, which is what stops the harness walking off mid-check.
-     */
-    for (let i = 0; i < 8 && gen === mine; i++) {
-      await readStats();
-      if (stat.buffer != null && stat.codec && stat.rtt != null && icePath?.path) break;
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    if (gen !== mine) return;
-    // The checks read what this control just produced, so this is the first
-    // moment they can be true, and a button for them would make them optional.
-    await d.run('check');
+    stream.set('offline').because(RETIRED_LEG);
+    d.log(`${RETIRED_LEG}: its input and the publisher behind it are deleted, so nothing will come`, 'bad');
+    if (SELFCHECK) await d.run('check');
   }
 
   /**
@@ -750,10 +583,11 @@
    * publisher held against a new session for about 45 s.
    */
   const dg = createDiagram(d.el, {
-    caption: 'One POST of an offer and one answer back, and then the frames come straight '
-      + 'from Cloudflare over UDP without touching a worker, or through a relay where UDP is blocked. It stops the same way the '
-      + 'low latency HLS page stops, because both legs are one container counting the '
-      + 'sockets that are holding it open.',
+    caption: 'Retired 2026-10-13: the input and the publisher drawn here are deleted, so a press now says so and stops. '
+      + 'It was one POST of an offer and one answer back, and then the frames came straight '
+      + 'from Cloudflare over UDP without touching a worker, or through a relay where UDP was blocked. It stopped the same way the '
+      + 'low latency HLS page stopped, because both legs were one container counting the '
+      + 'sockets that were holding it open.',
     nodes: [
       { id: 'you', label: 'Browser', sub: 'this page', kind: 'here', tech: 'browser',
         children: [

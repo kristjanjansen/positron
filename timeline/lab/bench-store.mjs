@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `instrument.positron.studio` (workers/instrument) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // timeline/lab/bench-store.mjs — the store bench: rows x backend x (open, cold
 // seek, warm advance, memory). Also owns the synthetic-log fixtures, so
 // prop-store.mjs and the bench measure THE SAME BYTES.

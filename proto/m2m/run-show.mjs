@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // P3C SHOW driver — N=12 vs the DEPLOYED Worker, conducted by score.mjs.
 // Adapted from run-grid.mjs (grid agent's; that file untouched). Differences:
 //   - pages load show.html (P3C copy) and ALWAYS run against the Worker

@@ -13,6 +13,7 @@
 "use strict";
 // ---- constants -------------------------------------------------------------
 // WHIP publish URL is a credential (path segment = stream key) — never hardcode it.
+// The input this published to, whep-rig, was DELETED from Stream on 2026-10-13.
 // Pass ?whip=<url-encoded publish URL>; the driver reads it from rig/whep/live_input.json (gitignored).
 const WHIP_URL = new URLSearchParams(location.search).get("whip");
 if (!WHIP_URL) throw new Error("missing ?whip= publish URL (see rig/whep/live_input.json)");

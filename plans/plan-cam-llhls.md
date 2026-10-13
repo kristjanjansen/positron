@@ -1,5 +1,15 @@
 # Plan: a webcam to the container and back as LL-HLS, for `/cam/`
 
+> **2026-10-13, DATED NOTE: what this plan built is retired.** /cam/'s RTMPS
+> camera leg is gone: the input `positron-cam` (`157863305ec9583187dfbb1c66c031ea`)
+> was deleted from Stream and the `CAM_STREAM_KEY` secret from positron-pub, pub's `wss /cam` and
+> `/cam/status` answer 410, `src/provision-cam.sh` refuses to run, and the
+> archived `/cam/` page's LL-HLS panel says `retired 2026-10-13`. The same
+> publish (`camPublish` in `demo/shell/live.mjs`, MediaRecorder to a container
+> to RTMPS) lives on as /concepts/video/060/ (LL-HLS loopback) on its own input
+> `positron-hls-loopback` through pub's `/loop`. Everything below is the plan
+> and its measurements as written on 2026-09-30, and is not rewritten.
+
 Asked 2026-09-30, verbatim: *"figure out how to to llhls from webcam to
 container and back"*. Context: `BACKLOG.md`, `### Open 2026-09-30: a new demo
 `cam``. The page already exists as a draft in `demo/cam/index.html` and leaves

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: the input this drives, whep-rig, was DELETED from Stream that day (rig/whep/NOTES.md).
 // WHEP rig driver — two SEPARATE chromium instances (publisher, player) so both
 // pages are foreground: background tabs stop buffering AND rVFC with zero errors
 // (plan §4.2). Uses playwright 1.60.0 from the npx cache (chromium-1223 already

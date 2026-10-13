@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `moq.positron.studio` (workers/moq-safari) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // obs-moq plugin drive: switch the OBS stream service between rtmp_custom and
 // moq_service, and verify playback via the deployed self-reporting player
 // (elektron-moq-safari) in headless Chrome, whose ?log= hook posts into our

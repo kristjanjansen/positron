@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // ===========================================================================
 // POSITRON STUDIO — ENGINE (plans/plan-studio.md §5 Session B)
 //

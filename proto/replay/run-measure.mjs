@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // Replay MEASUREMENT driver — runs after run-record.mjs. Three phases:
 //   A  straight-through replay: every cue's error = decoded burned wall-clock
 //      on the glass at the fire moment − fireAt  (content-referenced, so the

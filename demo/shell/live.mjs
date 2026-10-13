@@ -1,43 +1,28 @@
-// demo/shell/live.mjs — the live input Act 1 publishes to and plays back.
+// demo/shell/live.mjs: Cloudflare Stream inputs, WHIP and WHEP, shared by the
+// pages that publish to Stream or play from it.
 //
-// Provisioned 2026-09-04 with preferLowLatency:true and recording.mode
-// "automatic" — BOTH are required or the LL-HLS pipeline is not engaged and you
-// silently get plain HLS. preferLowLatency also means the manifest carries
-// PROGRAM-DATE-TIME, which is what makes latency measurable at all: Cloudflare
-// strips in-band metadata and only emits PDT on low-latency inputs.
+// RETIRED 2026-10-13, AND GONE FROM THIS FILE THE SAME DAY: the test pattern
+// that `/llhls/` and `/webrtc/` played (the inputs positron-demo and whep-rig,
+// pub's /watch, /status, /start, /stop and /whip), and `/cam/`'s RTMPS camera
+// (the input positron-cam, pub's /cam). Stream deleted the three inputs and pub
+// answers those routes 410. What went with them: `LIVE.uid`, `LIVE.pub`,
+// `LIVE.pubStatus`, `llhls()`, `lifecycle()`, `waitForManifest`, `WHEP_UID`,
+// `whep()`, `WHIP_PROXY`, `whipPublish`, `CAM_PROXY`, `CAM_UID`, `camLlhls()`,
+// `camLifecycle()`, and `watchPresentedFps`, which only those two pages called.
+// They are in git at be7737d. The archived pages that
+// used them are still served and answer a press with `RETIRED_LEG` rather than
+// a 90 s wait for a publisher that no longer exists.
 //
-// Nothing publishes to it until a viewer holds pub.positron.studio/watch. The
-// container starts on the first viewer and stops after the last one leaves, so
-// opening one of these demos is what brings the stream up.
+// What is left: /stage/'s own input, the camera's WebRTC input (video/030), the
+// LL-HLS loopback publish (`camPublish`, video/060), the TURN relay, and the
+// WHIP and WHEP helpers they share.
 
 export const LIVE = {
-  uid: '0e390aa48b55d49a57284e6c2c535477',
   customer: 'customer-mwuu1cmlyif6eluy',
-  pub: 'wss://pub.positron.studio/watch',
-  pubStatus: 'https://pub.positron.studio/status',
 };
 
-export const llhls = () =>
-  `https://${LIVE.customer}.cloudflarestream.com/${LIVE.uid}/manifest/video.m3u8?protocol=llhls`;
-
-/**
- * WHEP playback of the same input. Safe to hardcode: it carries only the uid.
- * The WHIP *publish* URL is deliberately absent — that one embeds the stream
- * key, so it lives in a Worker secret and never in this repo.
- */
-/**
- * WHEP plays a DIFFERENT input on purpose. Cloudflare's docs: "WHIP and WHEP
- * must be used together: we do not yet support inputs using RTMP/SRT to be
- * played using WHEP." Asking the RTMPS input for WHEP returns 409. So the
- * container publishes the same burned-in pattern to two inputs, and 09 compares
- * them by that clock.
- *
- * Only the uid appears here; the WHIP publish URL embeds a secret and lives in
- * a Worker secret instead.
- */
-export const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig"
-export const whep = () =>
-  `https://${LIVE.customer}.cloudflarestream.com/${WHEP_UID}/webRTC/play`;
+/** What an archived page says when its retired leg is pressed. */
+export const RETIRED_LEG = 'this leg was retired 2026-10-13';
 
 /**
  * /stage/'s OWN WebRTC input, fed the MIM film by its own container instance
@@ -52,14 +37,13 @@ export const stageWhep = () => (STAGE_UID
   ? `https://${LIVE.customer}.cloudflarestream.com/${STAGE_UID}/webRTC/play`
   : null);
 
-export const lifecycle = () =>
-  `https://${LIVE.customer}.cloudflarestream.com/${LIVE.uid}/lifecycle`;
-
 /**
  * Hold the publisher up for as long as the page is open. The socket IS the
  * reference count: dropping it is how the container learns nobody is watching.
+ * `url` has no default since 2026-10-13: the default was the test pattern's
+ * /watch, which is retired, and /stage/ passes its own `STAGE_PUB`.
  */
-export function holdPublisher(onState, url = LIVE.pub) {
+export function holdPublisher(onState, url) {
   const ws = new WebSocket(url);
   ws.onopen = () => onState?.({ held: true });
   ws.onclose = () => onState?.({ held: false });
@@ -70,61 +54,14 @@ export function holdPublisher(onState, url = LIVE.pub) {
 }
 
 /**
- * How many frames a second this element is actually PUTTING ON SCREEN.
- *
- * 🔴 PRESENTED, NOT DECODED, AND THE DIFFERENCE IS THE ONE BUG BOTH THESE PAGES
- * HAVE ALREADY SHIPPED. `/webrtc/` read `26 fps inbound` beside a black
- * rectangle and its own comment says decoding is not rendering; `/llhls/`
- * measured an iPhone advancing at 0.16x while dropping 3 frames of 507, so
- * every decoder-side counter said the device was fine. `requestVideoFrameCallback`
- * fires once per frame the compositor actually showed, which is the number a
- * person is looking at.
- *
- * 🔴 IT IS HERE BECAUSE BOTH PUB-FED PAGES WANT THE SAME NUMBER AND NEITHER
- * SHOULD TYPE IT. They already share this module for the publisher; a second
- * copy of a frame counter in the other page is how two pages end up reporting
- * two different fps under the same word. If a page with no publisher ever wants
- * it, it belongs in the kit rather than here.
- *
- * ⚠️ AN ABSENT API REPORTS `null`, NEVER `0`. Safari before 15.4 and any engine
- * without `requestVideoFrameCallback` cannot answer, and a zero there reads as
- * a stalled picture rather than as an unasked question. The caller empties its
- * cell on null, which is the kit's own rule about a cell with nothing measured
- * in it.
- * ⚠️ AND IT COUNTS OVER A WHOLE SECOND RATHER THAN DIVIDING TWO TIMESTAMPS. A
- * per-frame interval is a sample of one and swings by several fps between two
- * frames that are both on time.
- *
- * @returns {() => void} stop it.
- */
-export function watchPresentedFps(video, onRate, everyMs = 1000) {
-  if (typeof video?.requestVideoFrameCallback !== 'function') {
-    onRate?.(null);
-    return () => {};
-  }
-  let frames = 0, since = performance.now(), live = true;
-  const tick = () => {
-    if (!live) return;
-    frames++;
-    const now = performance.now();
-    if (now - since >= everyMs) {
-      onRate?.((frames * 1000) / (now - since));
-      frames = 0;
-      since = now;
-    }
-    video.requestVideoFrameCallback(tick);
-  };
-  video.requestVideoFrameCallback(tick);
-  return () => { live = false; };
-}
-
-/**
  * Wait for the WHIP LEG, which is a different input from the HLS one.
  * 07 previously waited on the HLS manifest — a signal about input A while it
  * was about to play input B, so it asked for WHEP before the WHIP handshake had
  * finished and got a 409. The publisher's own status is the right signal.
+ * `statusUrl` has no default since 2026-10-13 (the default was the retired
+ * /status); /stage/ passes `STAGE_PUB_STATUS`.
  */
-export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl = LIVE.pubStatus } = {}) {
+export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const stop = () => ac.abort();
@@ -146,64 +83,6 @@ export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl
       onTick?.({ whip: !!s?.container?.whip?.publishing, err: s?.container?.whip?.error ?? null, waitedMs: Date.now() - t0 });
     } catch {
       if (ac.signal.aborted) return { ok: false, aborted: true, waitedMs: Date.now() - t0 };
-    }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  removeEventListener('pagehide', stop);
-  return { ok: false, aborted: ac.signal.aborted, waitedMs: Date.now() - t0 };
-}
-
-/** Poll the manifest until Cloudflare is actually serving it (204 -> 200). */
-/**
- * Does the media playlist actually carry segments yet?
- *
- * Cloudflare serves the MASTER manifest with HTTP 200 as soon as ingest
- * starts — before the child playlist has a single #EXTINF. Starting the
- * player then makes it request fragments that do not exist: measured on an
- * iPhone as a continuous fragLoadError flood (loaded=0, total=0) with
- * rebuilds every 2-6 s for the best part of a minute, ending in playback
- * once the pipeline finally filled. "A long time with stalls, then finally
- * good playback" was this, not the encoder and not the latency target.
- *
- * Two segments, not one: one is a single GOP with nothing behind it, so the
- * player arrives at the live edge with nothing to decode into.
- */
-async function segmentsReady(signal, want = 2) {
-  const top = await fetch(llhls(), { cache: 'no-store', signal });
-  if (top.status !== 200) return { ok: false, status: top.status };
-  const text = await top.text();
-  const rel = text.split('\n').find((x) => x.trim() && !x.startsWith('#'));
-  if (!rel) return { ok: false, status: 'no variants' };
-  const media = new URL(rel.trim(), top.url || llhls()).toString();
-  const child = await fetch(media, { cache: 'no-store', signal });
-  if (child.status !== 200) return { ok: false, status: `child ${child.status}` };
-  const body = await child.text();
-  const segs = (body.match(/^#EXTINF:/gm) || []).length;
-  return { ok: segs >= want, status: `${segs} segment(s)`, segs };
-}
-
-export async function waitForManifest({ timeoutMs = 90000, onTick, signal } = {}) {
-  const t0 = Date.now();
-  // Tie the poll to the page. Without this the loop kept fetching after
-  // navigation and every in-flight request surfaced as net::ERR_ABORTED —
-  // a leak that read as a page fault.
-  const ac = new AbortController();
-  const stop = () => ac.abort();
-  addEventListener('pagehide', stop, { once: true });
-  // And to the page's own stop. See the note on `waitForWhip` above: a visitor
-  // who presses during the half minute this poll covers has not left.
-  signal?.addEventListener('abort', stop, { once: true });
-  for (let i = 0; Date.now() - t0 < timeoutMs && !ac.signal.aborted; i++) {
-    try {
-      const r = await segmentsReady(ac.signal);
-      if (r.ok) {
-        removeEventListener('pagehide', stop);
-        return { ok: true, waitedMs: Date.now() - t0, segs: r.segs };
-      }
-      onTick?.({ status: r.status, waitedMs: Date.now() - t0 });
-    } catch (e) {
-      if (ac.signal.aborted) return { ok: false, aborted: true, waitedMs: Date.now() - t0 };
-      onTick?.({ status: 'err', waitedMs: Date.now() - t0 });
     }
     await new Promise((r) => setTimeout(r, 2000));
   }
@@ -370,51 +249,6 @@ export async function readIcePath(pc) {
   };
 }
 
-/** Where a browser asks OUR worker to publish for it. The worker holds the key. */
-export const WHIP_PROXY = 'https://pub.positron.studio/whip';
-
-/**
- * Publish a MediaStream to the live input, WITHOUT ever seeing the credential.
- *
- * Cloudflare's WHIP publish URL carries the stream key in its path, so a public
- * page cannot hold it. The worker does, and proxies the handshake: one POST of
- * an offer, one answer. WHIP to Cloudflare is single-shot SDP with no trickle,
- * so that is the whole exchange — media then flows browser to Cloudflare
- * DIRECTLY over ICE/DTLS/SRTP and never touches the worker.
- *
- * Measured 2026-09-08 from a canvas: HTTP 201, connected/connected, 140 frames
- * and 511 KB sent in the first six seconds.
- *
- * `stop()` matters. The worker hands back an opaque id because Cloudflare's own
- * resource URL is ALSO credential-bearing; DELETE goes back through the worker.
- */
-export async function whipPublish(stream, { log = () => {}, iceServers = null } = {}) {
-  const pc = new RTCPeerConnection(rtcConfig(iceServers));
-  for (const t of stream.getTracks()) pc.addTrack(t, stream);
-  pc.onconnectionstatechange = () => log(`publish ${pc.connectionState}`);
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  await gathered(pc, iceServers);
-  const res = await fetch(WHIP_PROXY, {
-    method: 'POST',
-    headers: { 'content-type': 'application/sdp' },
-    body: pc.localDescription.sdp,
-  });
-  const body = await res.text();
-  if (!res.ok) { pc.close(); throw new Error(`publish ${res.status}: ${body.slice(0, 120)}`); }
-  const id = res.headers.get('x-whip-id');
-  await pc.setRemoteDescription({ type: 'answer', sdp: body });
-  log(`publishing · id ${id}`, 'hi');
-  return {
-    pc, id,
-    async stop() {
-      try { pc.close(); } catch { /* already */ }
-      if (id) { try { await fetch(`${WHIP_PROXY}/${id}`, { method: 'DELETE' }); } catch { /* gone */ } }
-    },
-  };
-}
-
 /**
  * Subscribe over WHEP into `video`, and hand back the stream we own.
  *
@@ -504,14 +338,19 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
 }
 
 /**
- * A CAMERA ONTO ITS OWN LL-HLS INPUT, through the Pub Durable Object and the
- * `cam` container instance, with the key never leaving the worker.
+ * A CAMERA ONTO AN LL-HLS INPUT, through the Pub Durable Object and a
+ * container instance, with the key never leaving the worker.
  * plans/plan-cam-llhls.md.
  *
  *   page MediaRecorder (H.264 in WebM, 2 s keyframes, 100 ms slices)
- *     -> wss://pub.positron.studio/cam -> one POST per chunk into the container
- *     -> ffmpeg -c:v copy to RTMPS -> the camera input `camLlhls()` plays
+ *     -> a pub WebSocket (`url`) -> one POST per chunk into the container
+ *     -> ffmpeg -c:v copy to RTMPS -> that instance's own LL-HLS input
  *
+ * 🔴 `url` HAS NO DEFAULT SINCE 2026-10-13. The default was /cam/'s RTMPS camera,
+ * `wss://pub.positron.studio/cam`, whose input (positron-cam) was deleted that
+ * day and whose route answers 410. The one caller left is /concepts/video/060/,
+ * which passes `wss://pub.positron.studio/loop` (its own input,
+ * positron-hls-loopback).
  * 🔴 ITS OWN INPUT, NOT THE TEST PATTERN'S. It borrowed that one by handover
  * until 2026-09-30 and /llhls/ stalled while a camera was tested on it. One
  * camera at a time; a second is refused, and that arrives here as `busy` with
@@ -530,20 +369,14 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
  *   closed    the socket closed with nothing said
  *   unsupported  this browser cannot record H.264
  */
-export const CAM_PROXY = 'wss://pub.positron.studio/cam';
-/** The camera's own RTMPS input ("positron-cam", src/provision-cam.sh). Only the uid. */
-export const CAM_UID = '157863305ec9583187dfbb1c66c031ea';
-export const camLlhls = () =>
-  `https://${LIVE.customer}.cloudflarestream.com/${CAM_UID}/manifest/video.m3u8?protocol=llhls`;
-export const camLifecycle = () =>
-  `https://${LIVE.customer}.cloudflarestream.com/${CAM_UID}/lifecycle`;
 
 /**
- * /cam/'s WebRTC leg on its OWN WebRTC input ("positron-cam-whip",
- * src/provision-cam-whip.sh, recording off), published through
- * `pub.positron.studio/cam/whip` so the key stays in the worker. It borrowed the
- * test pattern's WHIP input until 2026-09-30 and was refused with 409 whenever
- * somebody held /watch. One camera at a time; a second gets 409 in words.
+ * The camera's WebRTC input ("positron-cam-whip", src/provision-cam-whip.sh,
+ * recording off), published through `pub.positron.studio/cam/whip` so the key
+ * stays in the worker. /concepts/video/030/'s WebRTC loopback since 2026-10-13,
+ * and the archived /cam/'s WebRTC leg. It borrowed the test pattern's WHIP
+ * input until 2026-09-30 and was refused with 409 whenever somebody held the
+ * (now retired) /watch. One camera at a time; a second gets 409 in words.
  */
 export const CAM_WHIP_UID = '54791f4c5c73713859c5413eeb06a008';
 export const CAM_WHIP_PROXY = 'https://pub.positron.studio/cam/whip';
@@ -551,8 +384,9 @@ export const camWhep = () =>
   `https://${LIVE.customer}.cloudflarestream.com/${CAM_WHIP_UID}/webRTC/play`;
 
 /**
- * `whipPublish` with the proxy named, for the camera's own input. A copy rather
- * than a parameter, so the function other pages rely on is untouched.
+ * WHIP through our worker, for the camera's own input. It began as a copy of
+ * `whipPublish`, the test pattern's publish, which was retired 2026-10-13 and
+ * is gone from this file.
  * ⚠️ THE DELETE IS `keepalive`, because the worker holds the input for this
  * session until it hears it, and `stop()` also runs from `pagehide`, where an
  * ordinary fetch is cancelled with the page.
@@ -590,7 +424,7 @@ export function camFormat() {
   return null;
 }
 
-export function camPublish(stream, { url = CAM_PROXY, log = () => {}, onState = () => {}, sliceMs = 100, bitrate = 2_500_000 } = {}) {
+export function camPublish(stream, { url, log = () => {}, onState = () => {}, sliceMs = 100, bitrate = 2_500_000 } = {}) {
   const f = camFormat();
   const st = { t: 'opening', sid: null, chunks: 0, bytes: 0, readyAt: null, why: null };
   let rec = null, ws = null, done = false;

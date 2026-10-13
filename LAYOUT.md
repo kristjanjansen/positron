@@ -87,7 +87,7 @@ inside a single task.
 THE MOVE AS A FIX.** The repository is public and the file is in git history, so
 it is fetchable from a clone at its old path forever. It named one credential as
 still unrotated, `positron-demo`'s RTMPS stream key, exposed to a session
-transcript on 2026-09-10 by a bare `GetStreamServiceSettings`. ✅ **THAT KEY IS
+transcript on 2026-09-10 by a bare `GetStreamServiceSettings`. (2026-10-13: the input itself was deleted from Stream, so the key no longer exists.) ✅ **THAT KEY IS
 ROTATED, 2026-09-24T19:08:11Z**, through `POST
 /stream/live_inputs/<uid>/rotate_keys`, which rotates IN PLACE and left the
 input UID alone, so nothing in the repository moved. ⚠️ **THE FILE'S OWN

@@ -29,9 +29,8 @@
 
 <script type="module">
   import { mount, guard, el, armVideo } from '/shell/shell.mjs';
-  import { whepPlay, fetchIceServers, probeUdp, camPublish, camLlhls, camLifecycle, camWhipPublish, camWhep } from '/shell/live.mjs';
+  import { whepPlay, fetchIceServers, probeUdp, camWhipPublish, camWhep, RETIRED_LEG } from '/shell/live.mjs';
   import { createPresenceButton, CAMERA, CAMERA_CAN } from '/shell/presence.mjs';
-  import { createLowLatencyPlayer } from '/src/low-latency-player.js';
   import { startMoq, moqSupport } from '/shell/moq.mjs';
   import { drawCamera, burn, readBurnedFrom, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -41,7 +40,7 @@
   const d = mount({
     name: 'cam',
     // The index's own line, verbatim, because this page has a diagram.
-    what: 'One webcam next to what comes back over WebRTC, MoQ and LL-HLS.',
+    what: 'One webcam next to what comes back over WebRTC and MoQ.',
     // Every latency is a fact about ONE picture and sits in that picture's
     // footer. A row above the grid repeating four of them would be the same
     // facts twice.
@@ -76,95 +75,21 @@
   d.controls.append(camBtn.el);
 
   /**
-   * 🔴 THE LL-HLS LEG. The burned canvas is recorded with MediaRecorder and
-   * sent over `wss://pub.positron.studio/cam`, the worker POSTs each chunk into
-   * a container instance of the camera's own, and ffmpeg rewraps it (no encode)
-   * to RTMPS on the camera's OWN input, which is then played back here through
-   * the tuned player /llhls/ uses. plans/plan-cam-llhls.md.
-   * 🔴 NOT THE TEST PATTERN'S INPUT. It borrowed that by handover until
-   * 2026-09-30 and /llhls/ stalled while a camera was tested on it.
-   * ⚠️ EVERY SESSION IS A STREAM RECORDING. The input is RTMPS, where
-   * recording cannot be turned off, and each session adds its length to the
-   * account's 1000 minute cap. So the harness leaves this leg off unless it
-   * asks with `hls=1`, and a visitor gets it only by pressing the camera button.
+   * 🔴 THE LL-HLS LEG IS RETIRED, 2026-10-13. The burned canvas was recorded
+   * with MediaRecorder, sent over `wss://pub.positron.studio/cam` into a
+   * container of the camera's own, rewrapped by ffmpeg to RTMPS on the input
+   * positron-cam and played back through the tuned player /llhls/ used
+   * (plans/plan-cam-llhls.md). That input is deleted and pub answers /cam with
+   * 410, so the panel stays and its footer says the leg is retired, in every
+   * tier and for a visitor alike. The code that ran it is in git at be7737d;
+   * the same publish lives on in /concepts/video/060/ (LL-HLS loopback), on
+   * that page's own input.
    */
-  const HLS_ON = !SELFCHECK || new URLSearchParams(location.search).get('hls') === '1';
+  const HLS_ON = false;
   const HLS = { pub: null, player: null, st: null, err: null, readyAt: null, liveAt: null, uid: null, firstMs: null, rebuilds: 0, starts: [] };
-  // Said in the panel's own footer, after its name, so no word repeats it.
-  const HLS_SAY = {
-    busy: 'another camera is on it', stopped: 'stopped',
-    closed: 'lost the publisher', unsupported: 'needs Chrome or Edge',
-  };
-  /**
-   * Until Stream says the camera's input is live. A player built before that
-   * meets a 204 manifest and rebuilds through it, which works and puts a rebuild
-   * storm in the log that is not a fault. `/lifecycle` is one small GET on our
-   * own input, asked only after the press.
-   */
-  async function streamLive(mine, capMs = 30000) {
-    const t0 = performance.now();
-    while (gen === mine && HLS.st === 'ready' && performance.now() - t0 < capMs) {
-      try {
-        const j = await (await fetch(camLifecycle(), { cache: 'no-store' })).json();
-        if (j.live && j.videoUID) return j.videoUID;
-      } catch { /* ask again */ }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    return null;
-  }
-  /**
-   * hls.js is a classic script that sets `window.Hls`, which the player reads.
-   * Loaded on the press, not on the visit: 600 KB nobody asked for otherwise.
-   */
-  let hlsLib = null;
-  const loadHlsJs = () => (window.Hls ? Promise.resolve() : (hlsLib ||= new Promise((ok, no) => {
-    const sc = document.createElement('script');
-    sc.src = '/proto/remixer/hls.min.js';
-    sc.onload = ok;
-    sc.onerror = () => { hlsLib = null; no(new Error('hls.js did not load')); };
-    document.head.append(sc);
-  })));
-  function startHls(mine) {
-    if (!HLS_ON) {
-      sayOn(P.hls, 'left off under the harness');
-      d.log('ll-hls: not run under the harness without hls=1, because every session is recorded on Stream');
-      return;
-    }
-    const t0 = HLS.askedAt = performance.now();
-    loadHlsJs().catch((e) => d.log(`ll-hls: ${e.message}`, 'bad'));
-    HLS.pub = camPublish(sendStream, {
-      log: (m) => d.log(`ll-hls ${m}`),
-      onState: ({ t, why }) => {
-        if (gen !== mine) return;
-        HLS.st = t;
-        if (t === 'ready') {
-          HLS.readyAt = performance.now();
-          d.log(`ll-hls: the container publishes the camera, ${((HLS.readyAt - t0) / 1000).toFixed(1)} s after asking`, 'hi');
-          // Only once Stream says the input is live: before that the manifest
-          // is empty and a player built on it would only rebuild through it.
-          Promise.all([loadHlsJs(), streamLive(mine)]).then(([, uid]) => {
-            if (gen !== mine || HLS.st !== 'ready') return;
-            HLS.liveAt = performance.now();
-            HLS.uid = uid;
-            d.log(uid
-              ? `ll-hls: Stream has the camera live (video ${uid.slice(0, 8)}), ${((HLS.liveAt - HLS.readyAt) / 1000).toFixed(1)} s after recording began`
-              : 'll-hls: Stream did not say the input was live within 30 s, playing anyway', uid ? 'hi' : 'bad');
-            HLS.player = createLowLatencyPlayer(hlsV, camLlhls())
-              .on('rebuild', ({ why: w }) => { HLS.rebuilds++; d.log(`ll-hls: player rebuilt (${w})`); })
-              .on('start', () => HLS.starts.push(performance.now()));
-            meters.hls = meter(hlsV);
-          }).catch((e) => { HLS.err = e.message; sayOn(P.hls, 'could not play'); });
-          return;
-        }
-        HLS.err = why || t;
-        d.log(`ll-hls: ${HLS.err}`, 'bad');
-        sayOn(P.hls, HLS_SAY[t] || 'stopped');
-        P.hls.values.set('lat', '');
-        try { HLS.player?.destroy(); } catch { /* gone */ }
-        HLS.player = null;
-        if (meters.hls) meters.hls.live = false;
-      },
-    });
+  function startHls() {
+    sayOn(P.hls, 'retired 2026-10-13');
+    d.log(`ll-hls: ${RETIRED_LEG}. its input and pub's /cam are deleted, so nothing is sent`);
   }
   function stopHls() {
     try { HLS.pub?.stop(); } catch { /* gone */ }
@@ -587,7 +512,7 @@
       ? `local capture to screen ${ms(median(meters.local.samples))} over ${meters.local.samples.length} frame(s)`
       : 'this browser reports no captureTime, so the local cell stays empty');
     if (!HLS_ON) {
-      d.assert('LL-HLS is left off under the harness and says so in its footer', !HLS.pub && /harness/.test(saidOn(P.hls)),
+      d.assert('LL-HLS is retired and says so in its footer', !HLS.pub && /retired/.test(saidOn(P.hls)),
         saidOn(P.hls) || 'nothing said');
     } else if (HLS.err) {
       // Refused because another camera is on the input is a fact about somebody
@@ -707,7 +632,7 @@
     ],
     links: [
       { from: 'canvas', to: 'rec', note: 'The canvas is captured as a stream thirty times a second.' },
-      { from: 'rec', to: 'pub', label: 'WebM', note: 'Binary WebSocket messages to pub.positron.studio/cam.' },
+      { from: 'rec', to: 'pub', label: 'WebM', note: 'Binary WebSocket messages to pub.positron.studio/cam, which answers 410 since the leg was retired on 2026-10-13.' },
       { from: 'stream', to: 'player', label: 'LL-HLS', back: true,
         note: 'Playlists and half second parts over HTTPS, which is why this panel is seconds behind the others.' },
     ],

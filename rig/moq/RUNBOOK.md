@@ -1,5 +1,7 @@
 # MoQ on Cloudflare — Runbook (draft, in progress)
 
+> **2026-10-13:** `moq.positron.studio` (workers/moq-safari) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). Commands below that reach it no longer work; the rest is a dated record.
+
 Status: COMPLETE (session 2, 2026-08-25 evening). Headline: **draft-14 public relay works with
 NO auth — end-to-end publish/subscribe verified, one-way pub→relay→sub p50 17.9 ms** (§3.6/§3.7).
 draft-16 binaries built and auth-rejection verified; blocked only on the human dashboard step (§3).

@@ -1,5 +1,14 @@
 # ffmpeg WHIP → Cloudflare Stream interop (open question 3)
 
+> **2026-10-13: the input this file is about is gone.** `whep-rig`
+> (`224558e8993d5a5efd234d9d3a320f87`) was deleted from Stream that day, with
+> the `WHIP_URL` secret that pointed pub's test pattern at it, and pub's
+> `/watch`, `/status` and `/whip` answer 410. Everything below is a dated record
+> of what was measured on it and stays as written. `run.mjs`, `publish.html`
+> and `play.html` here have no input to run against; a WebRTC round trip with
+> an input behind it today is /concepts/video/030/ (pub's `/cam/whip` onto
+> `positron-cam-whip`).
+
 Question: does ffmpeg 9.0.1's WHIP muxer interoperate with Cloudflare Stream WHIP
 ingest, given the suspected `profile-level-id` mismatch (muxer emits `42001f`/`64001f`,
 CF docs specify `42e01f`)? Playback must be verified, not just SDP acceptance.

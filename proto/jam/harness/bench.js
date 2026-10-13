@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `cues.positron.studio` (workers/cues), `rtc.positron.studio` (workers/rtc) and `selfrec.positron.studio` (workers/selfrec) were deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // proto/jam/harness/bench.js — one page, every transport arm.
 // Role via ?peer=a|b. Driven by run-bench.mjs through the /msg mailboxes.
 // a = sender, b = receiver for all matrix runs (same host, direction moot).

@@ -19,6 +19,19 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { serve } from './server.mjs';
 
+// 🔴 RETIRED 2026-10-13, AND IT WOULD NOW PASS ABOUT NOTHING. This harness
+// drives /llhls/, whose live input (positron-demo) and publisher (pub's /watch)
+// were deleted that day. /llhls/ now answers a press with "this leg was retired
+// 2026-10-13" and builds no player, so the native branch of
+// src/low-latency-player.js never runs and a run here would read PASS with zero
+// coverage. It refuses instead. The player's one live caller left is
+// /concepts/video/060/ (LL-HLS loopback, a camera on its own input), which this
+// file does not drive; re-pointing it there is open in BACKLOG.md.
+if (!process.argv.includes('--anyway')) {
+  console.log('demo/verify-safari.mjs is retired (2026-10-13): /llhls/ has no stream behind it, so nothing would be graded. See the header.');
+  process.exit(2);
+}
+
 /** A port the OS picked, released immediately — lifted from verify-quest.mjs,
  *  where its comment is also the honest one: there is a race between the close
  *  and safaridriver's bind, and it is still better than a constant. */

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // ============================================================================
 // ENGINE-side repackager — answers "what does the repackaging? CF cron has no
 // ffmpeg": THIS runs on the engine machine (node + homebrew ffmpeg), not in a

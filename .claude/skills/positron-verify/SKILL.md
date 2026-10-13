@@ -375,7 +375,11 @@ rule above, and account for every one that moved.
 **A green suite can mean zero coverage.** `verify.mjs` reported 261/261 while a
 demo was fatally broken on iPhone, because desktop Chrome never enters that
 branch. After any change to `src/low-latency-player.js`, run
-`demo/verify-native.mjs` too.
+`demo/verify-native.mjs` too. ⚠️ **RETIRED 2026-10-13 FOR NOW:** it and
+`demo/verify-safari.mjs` drive /llhls/, whose input was deleted that day, so
+both refuse with exit 2 rather than read PASS about a player that never starts.
+Until one is re-pointed at /concepts/video/060/ (in `BACKLOG.md`), the native
+branch has no harness, and that is the gap to say out loud after a player change.
 
 **Attribute a run to a build before iterating on it.** Every 06 log opens with
 `BUILD <sha>-<hhmmss>`, substituted into the deployed `shell.mjs` by
@@ -1115,6 +1119,9 @@ honest about itself: **there is a race between the close and the other process's
 bind, and it is still better than a constant.**
 
 ## The second browser is not always Chrome: `demo/verify-safari.mjs`
+
+⚠️ **RETIRED 2026-10-13: it drives /llhls/, whose input was deleted, and now
+refuses (exit 2) unless run with `--anyway`.** What follows is why it existed.
 
 **WHY IT EXISTS.** `verify.mjs` speaks CDP, which Safari does not, so the whole
 WebKit family was untested. **macOS Safari is the ONE platform with both a plain

@@ -1,5 +1,13 @@
 # Secret rotation checklist (open since session 1 → 2026-08-27)
 
+> **2026-10-13, DATED NOTE.** The workers elektron-selfrec, elektron-cues and
+> elektron-rtc (with instrument, moq-safari and osc) were deleted from
+> Cloudflare that day, so `SELFREC_TOKEN`, `CUES_TOKEN`, `ROOM_TOKEN` and
+> `OPERATOR_TOKEN` on them went with the workers and need no rotation, and the
+> `selfrec.positron.studio` smoke check below no longer answers. positron-pub's
+> `STREAM_KEY`, `WHIP_URL` and `CAM_STREAM_KEY` were deleted the same day with
+> their Stream inputs. The rest is the checklist as written.
+
 Four exposures, ranked by blast radius. All are USER actions (dashboard/GitHub);
 commands below are the exact follow-ups once each new value exists.
 

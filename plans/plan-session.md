@@ -1,5 +1,10 @@
 # plan-session — a show off the wire, laid on one line, kept for six hours
 
+> **2026-10-13, DATED NOTE.** The test pattern inputs `positron-demo` and
+> `whep-rig`, the `STREAM_KEY` and `WHIP_URL` secrets, and pub's `/watch`,
+> `/status`, `/start`, `/stop` and `/whip` were retired that day (410). The text
+> below is the plan as written and is not rewritten.
+
 Status: **not started, and no longer blocked.** **§1b is the build** — a
 Worker proxies the WHIP handshake, a browser publishes, and no container is in
 the path. §1a is the fallback; §1/§3 are the original container variant and are

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // m2m PHASE 3B driver — RECORDING COMPOSITE (no OBS).
 // N=8 grid via the DEPLOYED Worker (2 featured "1","2" + 4 live A..D + 2 wall
 // W,X — all grid.html view=lite) + composite.html (own Chrome, viewport ==

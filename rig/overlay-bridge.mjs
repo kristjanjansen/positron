@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `cues.positron.studio` (workers/cues) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 /**
  * DO cue room -> text file -> ffmpeg drawtext burn-in.
  *

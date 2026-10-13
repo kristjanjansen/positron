@@ -1,4 +1,15 @@
-// demo/check-whep.mjs — can WebRTC media actually reach this machine?
+// archive/check-whep.mjs (was demo/check-whep.mjs): can WebRTC media reach this machine?
+//
+// 🔴 RETIRED 2026-10-13 AND MOVED HERE, NOT DELETED. It played the input
+// whep-rig (224558e8...), which Stream deleted that day along with the test
+// pattern that fed it (pub's /watch, /status, /whip now answer 410). Run now it
+// gets a WHEP POST refusal and prints INCONCLUSIVE, which is honest and useless.
+// It is kept because the VPN measurements in CLAUDE.md came out of it (VPN on:
+// 201, failed, 0 frames; VPN off: 201, connected, 489 frames), and it is the
+// shape to copy if a WHEP check is wanted again: point PLAY at an input that
+// has a publisher. For a WebRTC check today use /concepts/video/030/ (WebRTC
+// loopback: a camera through pub's /cam/whip and back over WHEP), or
+// `DEMO_DEEP=1 node demo/verify.mjs stage` (the MIM film over WHEP).
 //
 // 🔴 WRITTEN AFTER A VPN COST MOST OF A SESSION, 2026-09-25. Every WebRTC page
 // here failed, and the failure looked like code every single time: `/stage/`
@@ -11,7 +22,7 @@
 // prints what actually crossed. No positron page is involved, so nothing in
 // this repository can be the cause of what it reports.
 //
-//   node demo/check-whep.mjs
+//   node archive/check-whep.mjs   (retired: see above)
 //
 // MEASURED the same minute, same machine, one toggle apart:
 //   VPN ON   status 201  connection failed     0 frames        0 bytes

@@ -1,5 +1,12 @@
 # plan-stage-live: a show that starts, is recorded by the room that runs it, and plays back afterwards
 
+> **2026-10-13, DATED NOTE.** The test pattern this plan names as the second
+> leg is gone: the input `whep-rig` (`224558e8993d5a5efd234d9d3a320f87`), the
+> `WHIP_URL` secret and pub's `/watch`, `/status`, `/start`, `/stop` and `/whip`
+> were retired that day (410), with `positron-demo` and `STREAM_KEY` beside
+> them. `/stage/`'s own input `positron-stage` and its `/stage/*` routes are
+> untouched. The text below is the plan as written and is not rewritten.
+
 Status: **research and a plan. Nothing here is built.** Written 2026-09-18 out of
 one dictated block, quoted in full in `BACKLOG.md`. The closing instruction is
 the one that shaped this document: *"make a plan and do a good research how we

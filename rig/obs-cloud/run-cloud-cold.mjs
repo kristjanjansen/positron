@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `moq.positron.studio` (workers/moq-safari) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // Cloud cold-start → pixels, staged timestamps. Assumes the instance is DEAD
 // (/kill'ed). Wakes it with /health, polls obs-websocket readiness through the
 // Worker proxy, runs setup, starts a fresh-ns MoQ stream, then launches the

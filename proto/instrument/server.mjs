@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `instrument.positron.studio` (workers/instrument) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // proto/instrument/server.mjs — remote-instrument rig server on :8899.
 // Plain node ESM, no deps, no build step (ThreatLocker: no bundler binaries).
 //

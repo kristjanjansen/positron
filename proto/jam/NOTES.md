@@ -1,5 +1,7 @@
 # proto/jam — music-jamming latency matrix + duet demos (2026-08-27)
 
+> **2026-10-13:** `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). Commands below that reach it no longer work; the rest is a dated record.
+
 Question: how do co-created MIDI notes travel FASTEST between browsers?
 Arms: DC-P2P (ordered / unordered+maxRetransmits:0), CF Realtime SFU DataChannels,
 DO relays (cues JSON / elektron-jam JSON / elektron-jam binary), legacy

@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `instrument.positron.studio` (workers/instrument) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // proto/instrument/harness/run-instrument.mjs — end-to-end verification of the
 // remote-instrument platform, in ONE headless Chrome with three tabs:
 //

@@ -223,9 +223,9 @@ come from this repository.**
 ```sh
 node demo/server.mjs                     # :8890, serves the repo; / == deployed
 node demo/verify.mjs                     # every built demo (CDP, asserts on window.__demo)
-node demo/verify.mjs llhls ladder        # just these, by slug
-DEMO_DEEP=1 node demo/verify.mjs keep     # the deep tier: round trips, recordings, live streams
-node demo/verify-native.mjs              # THE IPHONE CODE PATH — verify.mjs cannot reach it
+node demo/verify.mjs radio tapes         # just these, by slug
+DEMO_DEEP=1 node demo/verify.mjs stage    # the deep tier: round trips, recordings, live streams
+node demo/verify-native.mjs              # THE IPHONE CODE PATH, RETIRED 2026-10-13: it drove /llhls/, whose input is deleted, and refuses (exit 2)
 node demo/fake-station.mjs               # an Icecast mount that is nobody's radio
 node demo/fake-tapes.mjs                 # an archive that is nobody's archive
 node demo/fake-err.mjs                   # a live edge that is nobody's broadcaster
@@ -234,7 +234,7 @@ node demo/shell/xr-quit-test.mjs         # is there really a way out of every he
 node workers/mail/test.mjs               # what arrives at positron@ is spam or a person
 node demo/resources/measure-durations.mjs   # how long each recording is, asked once
 node demo/resources/build-mimproject-images.mjs --check   # the recovered pictures, prints only
-node demo/verify-safari.mjs              # desktop Safari over WebDriver, both engines
+node demo/verify-safari.mjs              # desktop Safari over WebDriver, RETIRED 2026-10-13 with /llhls/'s input, refuses (exit 2)
 node demo/shot.mjs kit/devices 375 1280  # LOOK at a page on an iPhone mini and at the desk, before saying it is done (the kit is /kit/<part>/ since 2026-10-06)
 node demo/which-rule-won.mjs fau '.fau-src textarea' padding-top   # every declaration for one property, and which won; sees a shorthand beating a longhand
 node demo/ancestry.mjs nola '.panel-plate' padding-top --width 375  # every ancestor's inset and which one makes a containing block, before writing a fourth override
@@ -296,9 +296,18 @@ SESSION ON 2026-09-25 AND IT LOOKED LIKE CODE EVERY SINGLE TIME.** `/stage/` was
 rewritten five different ways, the harness was blamed, then headless Chrome was
 blamed, then the page was declared broken for visitors. None of them were it.
 
-```sh
-node demo/check-whep.mjs      # a real browser, the live input, no positron page
-```
+⚠️ **RETIRED 2026-10-13: `demo/check-whep.mjs` AND THE `/watch` IT NEEDED ARE
+GONE.** It played the input `whep-rig`, which Stream deleted that day with the
+test pattern feeding it, and pub's `/watch`, `/status` and `/whip` answer 410.
+The script is at `archive/check-whep.mjs` as the record of how the table below
+was measured. **The WebRTC check today is
+https://positron.studio/concepts/video/030/ (WebRTC loopback):** press, allow
+the camera, and the WebRTC panel shows the round trip in ms. ⚠️ It asks for a
+TURN relay as well, so behind a tunnel that drops UDP it may connect through the
+relay where `check-whep.mjs` (no relay) failed; it is not the same instrument
+and a pass there does not clear the tunnel. `DEMO_DEEP=1 node demo/verify.mjs
+stage` is the harness form (WHEP from `/stage/`'s own input, which asks for the
+relay too). The tunnel itself is answered by the `route` line above.
 
 **MEASURED the same minute, same machine, one toggle apart:**
 
@@ -316,16 +325,16 @@ at.
 🔴 **AND THE PARAGRAPH BELOW WAS WRONG ABOUT `/webrtc/`, CORRECTED 2026-09-25.
 THE OWNER SAYS THERE IS NO VPN ON THIS MACHINE, AND WHEP WORKS HERE.** Three
 measurements the same afternoon, each one undoing a conclusion above it:
-- 🔴 **`demo/check-whep.mjs` WAS LYING, AND IT IS THE TOOL THIS WHOLE RULE
-  RESTS ON.** Its early return answers a WHEP POST of status >= 300 with
+- 🔴 **`demo/check-whep.mjs` WAS LYING, AND IT WAS THE TOOL THIS WHOLE RULE
+  RESTED ON** (retired 2026-10-13, see above). Its early return answers a WHEP POST of status >= 300 with
   `nothing is publishing to that input`, and its verdict block then printed a
   confident **CHECK THE VPN FIRST** anyway, because it only tested
   `framesDecoded > 0`. So it blamed a VPN that does not exist for an input that
   had no publisher. It has three outcomes now and exits 2 on `INCONCLUSIVE`.
 - ✅ **WITH A PUBLISHER AWAKE, WHEP MEDIA REACHES THIS MACHINE:** `status 201`,
   `connection connected`, **389 frames, 3,554,870 bytes**. No VPN, no code
-  change. Holding a socket to `wss://pub.positron.studio/watch` is what wakes
-  the container, and nothing below is measurable until it is awake.
+  change. Holding a socket to `wss://pub.positron.studio/watch` was what woke
+  the container then; `/watch` was retired on 2026-10-13 and answers 410.
 - 🔴 **AND `/webrtc/`'s TWO ASSERTS WERE NOT THE CONNECTION'S FAULT. THE
   CHECKS WERE UNREACHABLE ON EVERY PATH.** `d.run('check')` sat after a `for`
   loop whose success branch `return`ed and whose failure branch `return`ed, so
@@ -349,13 +358,15 @@ no coverage was **the diagnostic tool itself**. Check that a check can fail.
 between the two runs.
 
 ✅ **MOST WORK IS UNAFFECTED AND DOES NOT NEED THE VPN OFF.** Everything that is
-HTTPS still works: LL-HLS (`llhls` reads 12/12 with the VPN on), the relay and
+HTTPS still works: LL-HLS (`llhls` read 12/12 with the VPN on, before its input
+was retired on 2026-10-13), the relay and
 every Durable Object page, R2 uploads and downloads, Cloudflare deploys,
 `wrangler`, the GitHub push dance, the stand-ins, and every page with no live
 WebRTC leg in it. **Only the UDP media path is lost.** So this is a rule about
 one class of failure, not a reason to work unprotected.
 
-🔴 **AND THE REAL LESSON IS ABOUT THE CONTROL, NOT THE VPN.** `/webrtc/` was
+🔴 **AND THE REAL LESSON IS ABOUT THE CONTROL, NOT THE VPN.** `/webrtc/` (its
+leg retired 2026-10-13, the lesson not) was
 used for hours as proof that WHEP worked, on the strength of a run reading
 **8/8 green**. It contains **two** page asserts and both are the shell's: that
 page's own checks sit behind a connection that never happened, so they have

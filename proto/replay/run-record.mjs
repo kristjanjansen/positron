@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // Replay-test RECORD driver — records the show page to Stream via the proven
 // p3b pipeline (CDP screencast -> ffmpeg wallclock-PTS fps=30 x264+AAC -> RTMPS,
 // recording automatic), while operator.mjs fires 12 cues through the DEPLOYED

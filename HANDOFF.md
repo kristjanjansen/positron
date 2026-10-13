@@ -1,3 +1,31 @@
+# Retired 2026-10-13: the test pattern, /cam/'s RTMPS camera, six workers
+
+A dated note, added by the cleanup asked as *"Clean up those"*. Every section
+below it is a record of its own day and is not rewritten; where one tells you
+to run something, check this list first.
+
+- **Gone from Stream:** the inputs `positron-demo` (`0e390aa4...`, /llhls/'s
+  test pattern), `whep-rig` (`224558e8...`, /webrtc/'s and capture ROUND TRIP's)
+  and `positron-cam` (`15786330...`, /cam/'s LL-HLS leg). Secrets `STREAM_KEY`,
+  `WHIP_URL` and `CAM_STREAM_KEY` deleted from positron-pub.
+- **pub answers 410:** `/watch`, `/status`, `/start`, `/stop`, `/whip`, `wss /cam`,
+  `/cam/status`. Kept: `/cam/whip` (video/030), `/loop*` (video/060), `/stage/*`,
+  `/ice`, `/log`, `/logs`.
+- **Six workers deleted:** cues, instrument, moq-safari, osc, rtc, selfrec
+  (`workers/*/RETIRED.md`), so `cues.`, `instrument.`, `moq.`, `osc.`, `rtc.` and
+  `selfrec.positron.studio` no longer answer.
+- **The archived pages stay served and say so on press:** /llhls/ and /webrtc/
+  answer `this leg was retired 2026-10-13` at once, /cam/'s LL-HLS panel reads
+  `retired 2026-10-13`, capture's ROUND TRIP says the same (a DEEP run reads its
+  leg asserts red with that reason, expected).
+- **Commands in older sections that no longer work:** `node demo/check-whep.mjs`
+  (moved to `archive/check-whep.mjs`, retired); `node demo/verify-native.mjs` and
+  `node demo/verify-safari.mjs` (they drove /llhls/ and now refuse, exit 2);
+  anything holding `wss://pub.positron.studio/watch`; `src/provision-cam.sh`
+  (refuses). A WebRTC check with a publisher behind it today:
+  https://positron.studio/concepts/video/030/ (WebRTC loopback), or
+  `DEMO_DEEP=1 node demo/verify.mjs stage`.
+
 # Handoff, 2026-10-11, session 75: looper accuracy, the Pi on direct, concepts reshuffled
 
 ## Where it is right now
@@ -2881,7 +2909,7 @@ wired to it. Of the eight pages that declare `extras`, only this one passed
 ```sh
 node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"
 node demo/verify.mjs stage           # 47/48 before the last few UI changes
-node demo/check-whep.mjs             # THREE outcomes now, see below
+node demo/check-whep.mjs             # THREE outcomes now, see below (RETIRED 2026-10-13: archive/check-whep.mjs, see the top)
 ```
 
 🔴 **AND `workers/pub` IS NOT DEPLOYED. IT CANNOT BE, FROM THIS MACHINE.** The
@@ -3088,7 +3116,7 @@ is actually true now, then what went wrong, in that order.
 ```sh
 node -e "import('./demo/manifest.mjs').then(m => console.log(m.DEMOS.length))"
 node demo/verify.mjs stage          # 33/47 today, see below
-node demo/check-whep.mjs            # is WebRTC media reaching this machine
+node demo/check-whep.mjs            # is WebRTC media reaching this machine (RETIRED 2026-10-13: archive/check-whep.mjs, see the top)
 ```
 
 ## 🔴 THE VPN. CHECK IT BEFORE DEBUGGING ANY WebRTC FAILURE
@@ -3100,7 +3128,8 @@ MEASURED with no positron page involved, one toggle apart:
     VPN ON    status 201   connection failed      0 frames        0 bytes
     VPN OFF   status 201   connection connected   489 frames  4,428,273 bytes
 
-`node demo/check-whep.mjs` answers it in one command. The rule and the numbers
+`node demo/check-whep.mjs` answered it in one command until it was retired on
+2026-10-13 (see the top of this file). The rule and the numbers
 are in `CLAUDE.md`. **Most work is unaffected**: LL-HLS, the relay, R2, deploys,
 wrangler and the pushes are all HTTPS.
 

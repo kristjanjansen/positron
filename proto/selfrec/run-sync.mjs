@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) and `selfrec.positron.studio` (workers/selfrec) were deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // ============================================================================
 // SYNC-leg regression driver — the v1 grid-archive DoD in one run.
 //

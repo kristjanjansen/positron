@@ -1,5 +1,10 @@
 # Plan: `/stage/` as a receiver, fed by a real publisher, on ONE transport
 
+> **2026-10-13, DATED NOTE.** The test pattern inputs `positron-demo` and
+> `whep-rig`, the `STREAM_KEY` and `WHIP_URL` secrets, and pub's `/watch`,
+> `/status`, `/start`, `/stop` and `/whip` were retired that day (410). The text
+> below is the plan as written and is not rewritten.
+
 Written 2026-09-25, rewritten the same day when the premise changed twice.
 **Read off the running code and off measurements already in this repository.**
 Every number says where it came from; anything inferred is marked as inference.

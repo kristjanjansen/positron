@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // PROTO B driver — central per-participant recording, measured.
 // Spawns: server.mjs (:8893, chunk receiver + collector), N publisher pages
 // (pub.html, groups of <=4 per Chrome context — the m2m co-tenancy rule), and

@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `osc.positron.studio` (workers/osc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // proto/osc/bench-node.mjs — PHASE 3, the arms that need no browser.
 //
 //   node proto/osc/bench-node.mjs [--n 300] [--only do,local]

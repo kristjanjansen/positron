@@ -1,5 +1,7 @@
 # m2m SFU prototype notes
 
+> **2026-10-13:** `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). Commands below that reach it no longer work; the rest is a dated record.
+
 Goal: prove N-way (3-participant) video through the Cloudflare Realtime SFU and
 measure per-directed-pair glass-to-glass latency with the house burned-pixel method
 (rig/whep patterns reused: 56-block binary row, rVFC decode, Playwright driver).

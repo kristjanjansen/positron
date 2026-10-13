@@ -1,5 +1,14 @@
 # WHEP rig notes (open item 6)
 
+> **2026-10-13: the input this file is about is gone.** `whep-rig`
+> (`224558e8993d5a5efd234d9d3a320f87`) was deleted from Stream that day, with
+> the `WHIP_URL` secret that pointed pub's test pattern at it, and pub's
+> `/watch`, `/status` and `/whip` answer 410. Everything below is a dated record
+> of what was measured on it and stays as written. `run.mjs`, `publish.html`
+> and `play.html` here have no input to run against; a WebRTC round trip with
+> an input behind it today is /concepts/video/030/ (pub's `/cam/whip` onto
+> `positron-cam-whip`).
+
 POWER RISK: battery 2% at start — notes appended after every step.
 
 ## Step 1 — live input created ✅ (2026-08-25)

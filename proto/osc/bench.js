@@ -1,3 +1,4 @@
+// RETIRED 2026-10-13: `osc.positron.studio` (workers/osc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // proto/osc/bench.js — PHASE 3 browser arms. Two headless Chromes, peer=a
 // (sender) and peer=b (receiver), driven by run-bench.mjs over CDP.
 //

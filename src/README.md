@@ -1,5 +1,7 @@
 # Low-latency streaming on Cloudflare — working setup
 
+> **2026-10-13:** `cues.positron.studio` (workers/cues) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). Commands below that reach it no longer work; the rest is a dated record.
+
 Measured **2.45 s** glass-to-playhead against a 2.50 s target, playback rate 1.000.
 
 ## Run it

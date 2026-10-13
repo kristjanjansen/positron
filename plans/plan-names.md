@@ -1,5 +1,7 @@
 # plan-names — one write path, tiered by credential, with a name that says what it does
 
+> **2026-10-13, DATED NOTE:** `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). The text below is the plan as written and is not rewritten.
+
 Status: **not started.** Written 2026-09-08 out of "rename ingest selfrec to
 something more understandable", then rewritten after the better question:
 *"can they not share code, be one domain just different creds / quotas?"*

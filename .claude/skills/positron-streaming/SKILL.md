@@ -5,6 +5,20 @@ description: HLS, LL-HLS, MoQ, WHEP, Cloudflare Stream and Workers, the relay an
 
 # Streaming, the relay, and what each provider actually does
 
+⚠️ **RETIRED 2026-10-13, AND THE LESSONS BELOW STAND.** The test pattern
+(Stream inputs `positron-demo` and `whep-rig`, pub's `/watch`, `/status`,
+`/start`, `/stop`, `/whip`) and /cam/'s RTMPS camera (input `positron-cam`,
+pub's `wss /cam`) are gone and those routes answer 410. Six workers were
+deleted from Cloudflare the same day: cues, instrument, moq-safari, osc, rtc
+and selfrec, so `cues.`, `instrument.`, `moq.`, `osc.`, `rtc.` and
+`selfrec.positron.studio` do not answer; their code stays in `workers/` as the
+record the citations below point at (`workers/*/RETIRED.md`). What still runs
+on Stream: `/stage/`'s `positron-stage`, video/030's `positron-cam-whip`
+(`/cam/whip`) and video/060's `positron-hls-loopback` (`/loop`). The archived
+/llhls/, /webrtc/, /cam/ (LL-HLS leg) and capture ROUND TRIP answer a press
+with `this leg was retired 2026-10-13`. A measurement below that names one of
+them is a dated record, not a page to re-run.
+
 Measured on this account and these devices. Prices and limits move, so a claim
 here is worth re-checking before a plan is built on it.
 
@@ -211,7 +225,8 @@ here is worth re-checking before a plan is built on it.
   **8 ms at p50** over an empty one with zero loss (`demo/perf-wire.mjs`).
 - **`ingest.positron.studio` is the only tokenless write path.** Server-minted
   session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
-  with a cron sweep. `selfrec` stays token-gated; keep the two separate.
+  with a cron sweep. `selfrec` was the token-gated one until its worker was
+  deleted on 2026-10-13; if a gated write path returns, keep the two separate.
 - **MediaRecorder output reports `duration: Infinity`**, which leaves a
   transport bar with no range to scrub. Seek far past the end, let the browser
   resolve the duration, then come back.
@@ -385,9 +400,10 @@ From `workers/relay/src/index.js`.
 - 🔴 **WHIP AND WHEP MUST BE USED TOGETHER.** Cloudflare's docs are explicit:
   "WHIP and WHEP must be used together: we do not yet support inputs using
   RTMP/SRT to be played using WHEP". One input cannot serve both an LL-HLS
-  page off RTMPS and a WHEP page, so each leg publishes the SAME burned-in test
-  pattern to its OWN input, which is exactly what makes a cross-transport
-  comparison possible. (`workers/pub/container/server.mjs`.)
+  page off RTMPS and a WHEP page, so each leg published the SAME burned-in test
+  pattern to its OWN input, which is exactly what made a cross-transport
+  comparison possible. (`workers/pub/container/server.mjs`.) Both test pattern
+  inputs were deleted 2026-10-13; the rule holds for any page that wants both.
 - 🔴 **CLOUDFLARE HOLDS A WHIP INPUT AGAINST A STALE PUBLISHER.** A leg that
   died with "Error muxing a packet / Resource temporarily unavailable" (exit
   245) cannot be restarted immediately: measured, it needs roughly 45 s before
@@ -823,7 +839,8 @@ the reason is the one already written in the file or in this skill.
   `latency`, `dimensions`, `rebuild`, `resync`, `stall`, `start`, `level`,
   `advance-capped`, `target-raised`, `audio-lag`, `ms`, `engine`,
   `media-error`, `waiting`. This is what makes a page gradable at all, and
-  `demo/llhls/index.html` asserts on exactly these.
+  `demo/llhls/index.html` asserted on exactly these until its input was
+  retired on 2026-10-13; /concepts/video/060/ is the live caller now.
 
 #### The answer, in one paragraph
 

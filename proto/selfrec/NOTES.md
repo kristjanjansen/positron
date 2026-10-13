@@ -1,5 +1,7 @@
 # proto/selfrec — PROTO A: participant self-recording (MediaRecorder → Worker → R2)
 
+> **2026-10-13:** `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). Commands below that reach it no longer work; the rest is a dated record.
+
 Working notes / checkpoints. Port 8894, process prefix `selfrec`. Sibling
 PROTO B (proto/centralrec, :8893) untouched.
 

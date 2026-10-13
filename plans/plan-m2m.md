@@ -1,5 +1,7 @@
 # Many-to-many video — plan
 
+> **2026-10-13, DATED NOTE:** `moq.positron.studio` (workers/moq-safari) and `rtc.positron.studio` (workers/rtc) were deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md). The text below is the plan as written and is not rewritten.
+
 **Date:** 2026-08-25 · **Status:** designed, phase-1 prototype in flight (`proto/m2m/`, sibling agent) ·
 Companion to `plans/plan.md` (one-to-many ground truth — this file does not restate it)
 

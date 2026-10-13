@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // m2m TIERED GRID driver — N=12: 2 featured ("1","2", view=full — the two
 // performers ARE the measuring probes: they render the full three-tier grid),
 // 6 live (A..F, view=lite: publish + signaling only), 4 wall (W,X,Y,Z,

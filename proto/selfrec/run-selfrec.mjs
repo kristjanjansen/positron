@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `selfrec.positron.studio` (workers/selfrec) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // ============================================================================
 // PROTO A driver — participant self-recording scenarios (plan: two-proto
 // comparison; sibling PROTO B = proto/centralrec, untouched).

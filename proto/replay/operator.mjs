@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
 // Cue operator for the replay test — node WS client to the DEPLOYED elektron-rtc
 // room. Sends 12 cues at known offsets from BASE_MS (the publisher's T0 stamp):
 //   even seq: "now" cues       — sent AT the fire moment, at = Date.now()
