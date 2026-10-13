@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**A second Instagram image: "Hello. Is this thing on?" plus the site name, a green dot in the o**~~ (2026-10-13, DONE). Asked: *"To ig add Hello. Is this thing on? plus sitename"*, *"Inside on's o add our green dot"*. helloCard() in share-card.mjs, the status green --ok, /og/hello-<hash>.png, on /kit/share/.
+
 - ~~**A second Instagram image: "Hello. Is this thing on?" plus the site name**~~ (2026-10-13, DONE). Asked: *"To ig add Hello. Is this thing on? plus sitename"*. helloCard() in share-card.mjs, /og/hello-<hash>.png, on /kit/share/.
 
 - ~~**Share cards: the wordmark lowercase, try gray and yellow**~~ (DONE: positron gray, .studio yellow; the Powered by line gone too, *"Rm poweee by stuff"*; TEMPLATE_V 5) (2026-10-13). Asked: *"No uppercase. Yellow?"*, *"Try gray and yellow"*. Three variants rendered and sent (a gray + yellow dot, b gray positron + yellow .studio, c yellow + gray dot); waiting for the pick, then demo/shell/share-card.mjs line 109.

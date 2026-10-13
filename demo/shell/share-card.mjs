@@ -172,6 +172,21 @@ export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig', [2, 3, 4]);
 // as the headline's full stop is, at the largest size the width and height
 // allow, and the wordmark on the bottom margin as on the other cards.
 export const HELLO = ['Hello.', 'Is this', 'thing', 'on?'];
+// 🔴 AND THE GREEN DOT IN THE O OF `on?`: *"Inside on's o add our green dot"*.
+// It is the status dot's green, `--ok` in shell.css, the one colour on the site
+// that means "it answered". Centred in the o's counter: the o is the line's
+// first glyph, so its middle is half a mono advance (0.6 em) in, and half the
+// x-height (JetBrains Mono's is 0.55 em) above the baseline, the same baseline
+// block() writes.
+const OK = '#8fd6a8';
+function onDot(r, x, y0, k) {
+  const { t } = r, size = t.size * k, cap = M[`${t.face}${t.weight}`].cap;
+  const i = r.lines.findIndex((l) => l.startsWith('o'));
+  if (i < 0) return '';
+  const base = y0 + cap * size + (t.lh - 1) * size / 2 + i * t.lh * size;
+  const cx = x + 0.3 * size, cy = base - 0.275 * size;
+  return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(0.075 * size).toFixed(1)}" fill="${OK}"/>`;
+}
 export function helloCard() {
   const w = IG_W, h = IG_H, pad = 96;
   const r = { t: TYPE.head, lines: HELLO, punct: true, gap: 0 };
@@ -182,7 +197,7 @@ export function helloCard() {
   const markH = MARK.lh * MARK.size * km;
   const k = Math.min((w - 2 * pad) / tw, (h - 2 * pad - markH - MARK_AIR * km) / th);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
-    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${block(r, pad, pad, k)}${block(mark, pad, h - pad - markH, km)}</svg>`;
+    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${block(r, pad, pad, k)}${onDot(r, pad, pad, k)}${block(mark, pad, h - pad - markH, km)}</svg>`;
   const version = fnv(`${svg}|${TEMPLATE_V}`);
   return { svg, alt: `${SITE_NAME}: ${HELLO.join(' ')}`, version, path: `/og/hello-${version}.png`, width: w, height: h, scale: k,
     headSize: TYPE.head.size * k, markSize: MARK.size * km, head: HELLO };
