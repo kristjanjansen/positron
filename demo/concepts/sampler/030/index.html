@@ -8,7 +8,7 @@
 <title>POSITRON concept sampler 030</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The play button alone at the top left, as /concepts/synth/060/. What the
+  /* The play button alone at the top left, as /concepts/remote/000/. What the
      board says goes to the log only. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
@@ -22,11 +22,11 @@
   // piano and Rhodes, played by the Raspberry Pi in studio-1 instead of the tab:
   // `pi-1:sampler` is a SuperCollider server of its own on the board
   // (rig/board/scsampler.mjs), the samples come from R2 onto the SD card once,
-  // and its sound comes back down the relay as synth/060's Yoshimi does.
+  // and its sound comes back down the relay as remote/000's Yoshimi does.
   // Asked: *"do supercollider. rm fluidsynth"*, option b) of
   // plans/plan-sampler-pi-pico.md §2.2: the sampler and Yoshimi sum into the one
   // capture, so this page starting the sampler never stops Yoshimi for somebody
-  // else, and synth/060 starting Yoshimi never stops this.
+  // else, and remote/000 starting Yoshimi never stops this.
   //
   // RELAY OR DIRECT, ONE PAGE SINCE 2026-10-11 (asked: *"can we combiine 030
   // and 035 with radiobutton of direct/notdirect mode?"*). 035 was this page
@@ -41,7 +41,7 @@
   //
   // NOTHING OPENS ON A VISIT. The board (and so the relay socket) is made on the
   // play press, never at load. A check run sends nothing to the shared board
-  // unless ?board=1 is added, the same gate synth/060 and /knobs/ use.
+  // unless ?board=1 is added, the same gate remote/000 and /knobs/ use.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';

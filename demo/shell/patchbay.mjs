@@ -83,7 +83,7 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
   // events as the change in `sent` on the SAME object, and treats a new object
   // as a new wire; a hop built afresh on every read was a new wire every time,
   // so no MIDI ever pulsed on a relayed link (found 2026-10-11 on
-  // /concepts/synth/070/, *"i do not see midi animation on circuilt patchbay"*).
+  // /concepts/remote/010/ when it was synth/070, *"i do not see midi animation on circuilt patchbay"*).
   const hopCache = new Map();
   const drawn = () => {
     const ports = raw.ports(), links = [], extra = new Map(), hops = new Map();

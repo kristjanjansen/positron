@@ -1,4 +1,4 @@
-// synth/100 levels, here against the REAL Pi. One headless Chrome, closed on every path.
+// remote/020 (was synth/100) levels, here against the REAL Pi. One headless Chrome, closed on every path.
 // node s100lv.mjs [tag] [query]
 import { spawn, execSync } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const TAG = process.argv[2] ?? 'before';
 const QUERY = process.argv[3] ?? '';
-const PAGE = process.env.PAGE ?? 'concepts/synth/100/';
+const PAGE = process.env.PAGE ?? 'concepts/remote/020/';
 const OUTF = `/private/tmp/claude-501/-Users-s32863-personal-positron/0f3a0353-ddeb-41fa-a915-9abf8aa2d34d/scratchpad/s100-${TAG}.json`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const routeOk = () => /interface: en0/.test(execSync('route -n get <pi>').toString());

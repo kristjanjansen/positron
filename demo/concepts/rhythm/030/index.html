@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The two waves at half width each, here on the left and the Pi on the
-     right, stacked on a phone, here first: /concepts/synth/100/'s pair. */
+     right, stacked on a phone, here first: /concepts/remote/020/'s pair. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
@@ -29,7 +29,7 @@
   import { VOICES, LIFE } from '/concepts/rhythm/voices.mjs';
 
   // /concepts/rhythm/000/ with the same four drums also played on the
-  // Raspberry Pi, the way /concepts/synth/100/ pairs a voice here with one on
+  // Raspberry Pi, the way /concepts/remote/020/ pairs a voice here with one on
   // the Pi. plans/plan-pi-supercollider-defs.md §3.4 and §4 step 6 (the plan
   // calls it rhythm/020; that number went to the sample drums).
   //
@@ -93,7 +93,7 @@
   // hits handed over to the board equal the hits it started.
   const d = mount({
     name: 'Drums on the Pi', what: '', index: '/concepts/', indexLabel: 'concepts',
-    // The four cells under the title, the log at the foot, as synth/100.
+    // The four cells under the title, the log at the foot, as remote/020.
     joined: false,
     readout: { 'Pi late': '', 'Pi lag': 'ms', 'round trip': 'ms', path: '' },
   });

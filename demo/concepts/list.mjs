@@ -13,17 +13,20 @@ export const CONCEPTS = [
   { n: 'synth/020', title: 'Timeline', say: 'The same recorder drawn on a timeline, so a take shows as notes in time and plays from its start.' },
   { n: 'synth/030', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
   { n: 'synth/040', title: 'Synth', say: 'A synth built one module at a time, from a bare sine to a filter, an envelope and an LFO.' },
-  { n: 'synth/060', title: 'Yoshimi', say: 'Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here.' },
-  { n: 'synth/070', title: 'Circuit', say: 'Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { n: 'synth/090', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
-  { n: 'synth/100', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
+  // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*):
+  // the synth pages that play on the Raspberry Pi. remote/000, 010 and 020 were synth/060, 070
+  // and 100 until then; the old URLs 404 (no forwarding).
+  { n: 'remote/000', title: 'Yoshimi', say: 'Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here.' },
+  { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches.' },
+  { n: 'remote/020', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
-  // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ forwards.
+  // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ 404s (no forwarding).
   // draw/000 XY filter moved to /archive/ 2026-10-12 (*"Revert xy changes, archive cy and draw"*), and the draw group with it.
   { n: 'radio/000', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { n: 'radio/010', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
@@ -93,14 +96,15 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'remote', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+// A group's heading on /concepts/ is its slug, unless it is named here. `remote`
+// reads as the owner asked for it, *"make group remote synths"* (2026-10-13).
+export const GROUP_TITLES = { remote: 'remote synths' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
-  fau: { group: 'synth', say: 'A synth you write in Faust, compiled in this tab whenever you stop typing.', supersededBy: 'synth/080' },
-  collide: { group: 'synth', say: 'A synth you write in a small subset of SuperCollider, compiled in this tab whenever you stop typing.', supersededBy: 'synth/090' },
-  muta: { group: 'synth', say: 'Emilie Gillet\'s Plaits firmware compiled unmodified to WebAssembly, eight voices played over MIDI.', supersededBy: 'synth/120' },
+  // fau, collide and muta archived 2026-10-13 (*"archve fau collide muta"*): still served, listed on /archive/.
   mirror: { group: 'shader', say: 'A kaleidoscope drawn by this browser and by a Raspberry Pi side by side, or hung in a headset.', supersededBy: 'shader/010' },
   llhls: { group: 'streaming', say: 'A live test picture over low latency HLS, counting how far behind it plays, its stalls and switches.' },
   webrtc: { group: 'streaming', say: 'The same live test picture delivered over WebRTC by WHEP, with the network ping and route shown.', supersededBy: 'video/030' },
