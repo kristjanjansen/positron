@@ -1,4 +1,5 @@
 ## Open
+- ~~**Front page: Feedback on the wordmark's row, a little less space on top**~~ (2026-10-13). Asked: *"Feedback same h as sitename, v align. Keep top whitespace, perahs biit less. Prioritize and deploy first"*. DONE by the session in demo/index.html.
 - **iPhone Safari: "Raadio 2 recording did not open: Decoding failed" on the Granulator** (2026-10-13), from an owner screenshot. The 2.9 MB R2 MP3 decodes in Chrome and not in WebKit. With the iOS agent.
 - **Plaits keys is titled Plaits** (2026-10-13). Asked: *"Plaits keys (rm keys from name)"*. The title in concept-list.mjs and the page's own name; its address is /code/plaits/.
 - **Plaits keys is just Plaits; Plaits and Collide silent on iPhone Safari** (2026-10-13). Asked: *"No plaits keys (rm keys grom name) nor collide lically make sound on safari movbile"*. Title to the slug agent; the engines (Plaits worklet, scsynth wasm) to the iOS agent.
