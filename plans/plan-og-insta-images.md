@@ -1,3 +1,5 @@
+> **OVERRULED 2026-10-13.** The owner: *"What headless chrome?!!? See ../eccm etc"*. Built instead the eccm way: our own SVG from font metrics (demo/shell/bay-svg.mjs, share-card.mjs), resvg-wasm at build time (workers/view/og/), no browser. Route B below is what shipped, at build rather than in a Worker.
+
 # Share images: Open Graph and Instagram, as a kit image
 
 Written 2026-10-13. A plan, nothing in positron changed: no code, no build, no

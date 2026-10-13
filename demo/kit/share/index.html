@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON kit/share</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/kit-page.css">
+<style>
+  /* A card is a picture with a ground of its own, so it carries no frame
+     (eccm's /social: "no borders on og / ig cards"), and it is drawn at the
+     column's width, never wider than its own 1200 px. */
+  .share-pic { display: block; inline-size: 100%; max-inline-size: 1200px; block-size: auto; }
+  .share-svg > svg { display: block; inline-size: 100%; max-inline-size: 1200px; block-size: auto; }
+  .share-tags { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 12px/1.6 var(--mono); color: var(--dim); }
+</style>
+<script type="module">
+  import { siteCard, shareTags, TEMPLATE_V } from '/shell/share-card.mjs';
+  import { heroBay } from '/shell/hero.mjs';
+  import { drawBay, textWidth } from '/shell/bay-svg.mjs';
+  import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
+  import { el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createKitPage } from '/shell/kit-page.mjs';
+
+  /**
+   * 🔴 kit/share, THE SHARE CARD, 2026-10-13. Asked: *"Build frontpage og card
+   * and apply to all pages"*, then *"What headless chrome?!!? See ../eccm etc"*.
+   * The card every page names in its og:image: the front page's hero over its
+   * imaginary patchbay, written as SVG by demo/shell/share-card.mjs and
+   * demo/shell/bay-svg.mjs with no DOM, and made a PNG at build by resvg
+   * (workers/view/og/render.mjs). eccm's /social is the model: the images a
+   * page is shared with, shown as they ship.
+   * ⚠️ THE PNG EXISTS ONLY IN A BUILD. The dev server serves the repository,
+   * where there is no og/ directory, so this page asks for the PNG only when
+   * its own head carries the og:image the build writes, and says so otherwise
+   * rather than logging a 404.
+   * ⚠️ A VISIT OPENS NOTHING. The SVG is drawn from data in this tab.
+   */
+  const { d, section, land, checkPage } = createKitPage({
+    part: 'share',
+    what: 'The card every page is shared with, the front page’s hero over its patchbay, drawn as SVG with no browser and made a PNG at build.',
+  });
+
+  const card = siteCard();
+  const shipped = document.querySelector('meta[property="og:image"]')?.content || null;
+  let img = null, inline = null;
+
+  section('SITE CARD', 'The PNG as it ships, 1200 by 630, named by a hash of its SVG so a changed card is a new address.', null, (box) => {
+    if (shipped) {
+      img = Object.assign(el('img', 'share-pic'), { src: new URL(shipped).pathname, alt: card.alt, width: card.width, height: card.height });
+      box.append(img);
+    } else box.append(el('p', 'kit-n', `This copy of the page is not built, so there is no PNG beside it. The build writes ${card.path}.`));
+  });
+
+  section('THE SVG', 'The same picture as the SVG the PNG is made from, written in this tab by the code the build runs, every attribute literal.', null, (box) => {
+    inline = el('div', 'share-svg');
+    inline.innerHTML = card.svg;
+    const svg = inline.firstElementChild;
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', card.alt);
+    box.append(inline);
+  });
+
+  section('THE TAGS', 'What the build writes into the head of every page, this one’s shown, after its robots meta.', null, (box) => {
+    const tags = shipped
+      ? [...document.head.querySelectorAll('meta[property^="og:"], meta[name="twitter:card"]')].map((m) => m.outerHTML)
+      : shareTags({ title: 'share', description: 'The card every page is shared with.', url: '/kit/share/', card });
+    box.append(el('pre', 'share-tags', tags.join('\n')));
+  });
+
+  land();
+
+  if (SELFCHECK) {
+  const frames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+  await document.fonts.ready;
+  await Promise.all(['400 13px "Brand JetBrains Mono"', '400 11px "Brand JetBrains Mono"', '600 58px "Brand JetBrains Mono"', '400 11px "Brand Geist"', '400 24px "Brand Geist"'].map((f) => document.fonts.load(f)));
+  await frames(3);
+  checkPage();
+
+  // 1. the SVG is resvg's kind: no class, no var(), no style element, and it
+  // names the card's own size
+  {
+    const bad = [/\sclass=/, /var\(/, /<style/].filter((r) => r.test(card.svg)).map(String);
+    d.assert('the card is plain SVG with every attribute literal, no class, no var() and no stylesheet',
+      bad.length === 0 && /width="1200" height="630"/.test(card.svg),
+      bad.length ? `found ${bad.join(', ')}` : `${card.svg.length} characters, 1200 by 630, version ${card.version}, template ${TEMPLATE_V}`);
+  }
+
+  // 2. the page's own bay view and the string writer draw the hero's bay in
+  // the same places, box for box, at the width the front page draws it
+  {
+    document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS }));
+    const hb = heroBay(false), host = el('div');
+    host.style.cssText = `position: absolute; left: -10000px; top: 0; width: ${hb.width}px`;
+    document.body.append(host);
+    const view = createBayView(hb.bay, { detail: hb.detail, stretch: hb.stretch, sizeAs: hb.sizeAs });
+    host.append(view.el);
+    view.render();
+    const page = [...view.el.querySelectorAll('.lv-box')].map((g) => {
+      const r = g.querySelector('rect'), t = g.querySelector('.lv-title');
+      return { id: t.textContent, x: +r.getAttribute('x') - 0.5, y: +r.getAttribute('y') - 0.5, w: +r.getAttribute('width') + 1, h: +r.getAttribute('height') + 1 };
+    });
+    const str = drawBay(hb.bay, hb).boxes;
+    const off = str.map((b) => { const p = page.find((q) => q.id === b.id); return p ? Math.max(Math.abs(p.x - b.x), Math.abs(p.y - b.y), Math.abs(p.w - b.w), Math.abs(p.h - b.h)) : Infinity; });
+    const worst = Math.max(...off);
+    host.remove();
+    d.assert('the bay drawn as a string puts every box where the page’s own bay view puts it, within half a pixel',
+      page.length === str.length && str.length > 0 && worst <= 0.5,
+      `${str.length} boxes in the string, ${page.length} in the view, the worst ${worst.toFixed(2)} px apart`);
+  }
+
+  // 3. the SVG drawn in this tab sets its text in the site's faces: the
+  // headline's ink is as wide here as the font metrics said it would be
+  {
+    const t = [...inline.querySelectorAll('text')].find((n) => n.getAttribute('font-weight') === '600');
+    const want = Number(t?.getAttribute('font-size')) || 0;
+    const got = t ? t.getComputedTextLength() : 0;
+    const fam = t ? getComputedStyle(t).fontFamily : '';
+    const ok = t && document.fonts.check(`600 ${want}px "Brand JetBrains Mono"`);
+    const predicted = t ? textWidth(t.textContent, 'mono', want, { weight: 600, tracking: Number(t.getAttribute('letter-spacing')) || 0 }) : 0;
+    d.assert('the headline in the inline SVG is set in the site’s mono at 600, at the width the metrics predicted',
+      !!ok && /Brand JetBrains Mono/.test(fam) && Math.abs(got - predicted) <= 0.01 * predicted,
+      t ? `"${t.textContent}" ${got.toFixed(1)} px wide in ${fam.split(',')[0]}, the metrics said ${predicted.toFixed(1)}` : 'no 600 text in the SVG');
+  }
+
+  // 4. in a build, the og:image this page carries is the card this tab drew,
+  // and the PNG behind it is 1200 by 630
+  if (shipped) {
+    await (img.complete ? Promise.resolve() : new Promise((r) => { img.onload = img.onerror = r; }));
+    d.assert('the og:image in this page’s head is the card this tab computed, and the PNG is 1200 by 630',
+      new URL(shipped).pathname === card.path && img.naturalWidth === 1200 && img.naturalHeight === 630,
+      `${new URL(shipped).pathname} against ${card.path}, ${img.naturalWidth}x${img.naturalHeight}`);
+  } else d.log(`not built: no og:image in this page's head, so the PNG check is the build's (${card.path})`);
+  } // if (SELFCHECK)
+
+  d.ready();
+</script>
+</html>

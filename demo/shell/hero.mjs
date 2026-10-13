@@ -116,6 +116,26 @@ function feeds() {
   };
 }
 
+/**
+ * The imaginary patch as data, for the page and for a picture drawn with no
+ * page (share-card.mjs draws the share card's bay from this with bay-svg.mjs).
+ * `{ bay, width, detail, stretch, sizeAs }`: the width it is drawn at and the
+ * options `createBayView` takes, so the two pictures cannot disagree.
+ */
+export function heroBay(phone = false) {
+  return {
+    bay: bayOf(phone ? PHONE : DESK),
+    width: phone ? 520 : 900,   // 900 at the desk leaves the wires about twice the room
+    detail: (n) => [{ text: n.label }],
+    // Every column the same width: boxes at a row-of-n width, no stretch.
+    stretch: false,
+    // Wider gaps between the columns, about twice the bay's 48 px (asked
+    // 2026-10-13: *"make frontpage patchbays horz gap 2x wider"*): boxes are
+    // sized as if the row held more of them, and the wires take the rest.
+    sizeAs: phone ? 2.2 : 4,
+  };
+}
+
 let styled = false;
 function style() {
   if (styled) return;
@@ -155,15 +175,10 @@ export function createHero({ tag = 'h2' } = {}) {
   // is exactly as tall as the picture it shows.
   const fit = () => { if (drawW) inner.style.zoom = String(Math.min(1, frame.clientWidth / drawW)); };
   function draw() {
-    const phone = phoneQ.matches, bay = bayOf(phone ? PHONE : DESK);
-    drawW = phone ? 520 : 900;   // 900 at the desk leaves the wires about twice the room
+    const phone = phoneQ.matches, { bay, width, ...opts } = heroBay(phone);
+    drawW = width;
     inner.style.width = `${drawW}px`;
-    // Every column the same width: boxes at a row-of-n width, no stretch.
-    const view = createBayView(bay, { detail: (n) => [{ text: n.label }], stretch: false,
-      // Wider gaps between the columns, about twice the bay's 48 px (asked
-      // 2026-10-13: *"make frontpage patchbays horz gap 2x wider"*): boxes are
-      // sized as if the row held more of them, and the wires take the rest.
-      sizeAs: phone ? 2.2 : 4 });
+    const view = createBayView(bay, opts);
     inner.replaceChildren(view.el);
     const feed = feeds();
     for (const l of bay.links()) life.add(view, l.id, bay.portMap.get(l.from).medium, feed[l.from]);

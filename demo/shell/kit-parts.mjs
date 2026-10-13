@@ -101,6 +101,9 @@ export const KIT_PARTS = [
     'the-rule-in-use', 'sharp-test', 'hero', 'titles-and-subtitles', 'pairings-on-a-slide',
     'the-choice', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
   ] },
+  // `share` IS THE FOURTEENTH, 2026-10-13 (*"Build frontpage og card and apply
+  // to all pages"*): the share card, demo/shell/share-card.mjs, as it ships.
+  { part: 'share', label: 'SHARE', ids: ['site-card', 'the-svg', 'the-tags'] },
 ];
 
 export const idFor = (title) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

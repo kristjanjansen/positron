@@ -18,12 +18,15 @@ const s = (tag, attrs = {}, text) => {
 };
 
 const FONT = 11, TITLE = 13, ROW = 20, PAD = 10, GAP = 48, MIN_GAP = 28, STACK_BELOW = 480, TWIN_GAP = 64, TGAP = 10, DROW = 16, PLANE = 8;
+// The geometry, for demo/shell/bay-svg.mjs, which draws the same picture with no
+// DOM (a share card at build time, a Worker). One set of numbers, two writers.
+export const BAY_GEOMETRY = { FONT, TITLE, ROW, PAD, GAP, MIN_GAP, STACK_BELOW, TWIN_GAP, TGAP, DROW, PLANE };
 const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
 const portName = (portId) => portId.split(':').slice(2).join(':');
 
 /** A path through `pts` with every corner rounded at radius `r` (smaller
  *  where a leg is too short for it). Legs may be straight or slanted. */
-function rounded(pts, r = 6) {
+export function rounded(pts, r = 6) {
   let d = `M${pts[0][0]},${pts[0][1]}`;
   for (let i = 1; i < pts.length - 1; i++) {
     const [px, py] = pts[i - 1], [x, y] = pts[i], [nx, ny] = pts[i + 1];
@@ -40,7 +43,7 @@ function rounded(pts, r = 6) {
 /** Column of each node: the longest chain of links that reaches it. A link
  *  that closes a loop (a chat's speaker and listener) is a RETURN link: it is
  *  left out of the ranking and drawn back under the row instead. */
-function ranks(nodes, links) {
+export function ranks(nodes, links) {
   const out = new Map(nodes.map((n) => [n.id, []]));
   for (const l of links) {
     const a = nodeOf(l.from), b = nodeOf(l.to);

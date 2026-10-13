@@ -1,8 +1,10 @@
 ## Open
 
+- **/kit/share/: the SVG patchbay sits up to 3 px from the live bay view** (2026-10-13). `node demo/verify.mjs kit/share` 15/16: "the bay drawn as a string puts every box where the page's own bay view puts it, within half a pixel": 8 boxes each, worst 3.00 px. Also: bay-svg.mjs has no stacked phone layout (throws below 480 px on purpose), and has not run in workerd.
+
 - ~~**Archive the frontpage kit part**~~ (2026-10-13, DONE). Asked: *"Archive frontoage kit"*. Off /kit/'s cards (KIT_PARTS archived: true), a card on /archive/, /kit/frontpage/ still served.
 
-- **Build the front page OG card and apply it to every page, the eccm way** (2026-10-13). Asked: *"Build frontpage og card and apply to all pages"*, then *"What headless chrome?!!? See ../eccm etc"*. NOT Chrome: resvg-wasm as in ~/personal/eccm (src/og/render.mjs, card.mjs, route.mjs, tools/og-fonts.py) and ~/personal/trip. The patchbay drawn as plain SVG from font metrics, no DOM. One site card 1200x630, og: and twitter: tags in every page's head.
+- ~~**Build the front page OG card and apply it to every page, the eccm way**~~ (DONE: demo/shell/bay-svg.mjs + share-card.mjs, resvg-wasm at build, /og/site-<hash>.png, 119 of 119 pages tagged, /kit/share/) (2026-10-13). Asked: *"Build frontpage og card and apply to all pages"*, then *"What headless chrome?!!? See ../eccm etc"*. NOT Chrome: resvg-wasm as in ~/personal/eccm (src/og/render.mjs, card.mjs, route.mjs, tools/og-fonts.py) and ~/personal/trip. The patchbay drawn as plain SVG from font metrics, no DOM. One site card 1200x630, og: and twitter: tags in every page's head.
 
 - ~~**Scout positron studio's web presence**~~ (DONE: research/web-presence-names-2026-10-13.md; positron-studio where a dash is allowed, positronstudio elsewhere, @positron.studio on Bluesky; nothing registered) (2026-10-13). Asked: *"In bg scout positron studio web presence: gh org name, npm package, skills sh, social media acvounts. Try dot dash etc as separator"*. Research only: which names are free (GitHub org, npm package/scope, skills.sh, Instagram, X, Bluesky, Mastodon, YouTube, TikTok, LinkedIn...) for positron, positronstudio, positron-studio, positron.studio, positron_studio. Nothing registered.
 

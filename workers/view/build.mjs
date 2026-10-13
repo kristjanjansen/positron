@@ -72,8 +72,13 @@ const { DEMOS: DEMO_MANIFEST, extraPages } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
 // The concept pages: their rows and the folders they live in. Since 2026-10-13
 // they are the front page and answer at /<group>/<slug>/ (demo/shell/concept-list.mjs).
-const { CONCEPTS, CONCEPT_DIRS } =
+const { CONCEPTS, CONCEPT_DIRS, DEMO_CARDS } =
   await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
+// The share card and its tags (demo/shell/share-card.mjs), and the rasteriser
+// that turns its SVG into a PNG with no browser (og/render.mjs, resvg wasm).
+const { siteCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
+const { HERO } = await import(new URL('../../demo/shell/hero.mjs', import.meta.url));
+const { renderPng } = await import(new URL('./og/render.mjs', import.meta.url));
 
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
@@ -666,7 +671,7 @@ function conceptFiles() {
   const taken = new Set(DEMO_MANIFEST.flatMap((d) => [d.name.split('/')[0],
     ...(d.page ? [d.page.split('/').filter(Boolean)[0]] : [])]));
   for (const [, dst] of extraPages()) taken.add(dst.split('/')[0]);
-  for (const t of ['shell', 'archive', 'kit', 'proto', 'src', 'timeline', 'resources', 'notes', 'concepts', 'frontpage', 'eccm', 'api', 'icy', 'err-img', 'report']) taken.add(t);
+  for (const t of ['shell', 'archive', 'kit', 'proto', 'src', 'timeline', 'resources', 'notes', 'concepts', 'frontpage', 'eccm', 'api', 'icy', 'err-img', 'report', 'og']) taken.add(t);
   const clash = CONCEPT_DIRS.filter((g) => taken.has(g));
   const stray = CONCEPTS.filter((c) => !CONCEPT_DIRS.includes(c.id.split('/')[0])).map((c) => c.id);
   if (clash.length || stray.length) {
@@ -866,6 +871,29 @@ await mkdir(OUT, { recursive: true });
 // a 404 to the console, and "zero console errors" stops being true.
 await writeFile(join(OUT, 'favicon.ico'), favicon());
 
+// ── the share card, og/site-<hash>.png ───────────────────────────────────────
+//
+// 🔴 ONE CARD FOR EVERY PAGE FOR NOW, DRAWN WITH NO BROWSER, 2026-10-13. Asked:
+// *"Build frontpage og card and apply to all pages"*, then *"What headless
+// chrome?!!? See ../eccm etc"*. The SVG is written by share-card.mjs and
+// bay-svg.mjs from HERO and the hero's bay, and resvg (wasm, og/render.mjs)
+// rasterises it with the site's faces as TTFs (og/og-fonts.py). eccm and trip
+// render the same way at the EDGE, on the first fetch, because their cards come
+// from a database; here every input is in the repository at build, so the PNG
+// is a static asset like the favicon and costs no Worker, no R2 and no wasm in
+// the deployed bundle.
+// ⚠️ THE NAME CARRIES A HASH OF THE SVG AND TEMPLATE_V, because scrapers cache
+// a preview by URL: a changed card is a new URL, and an old one is a 404 after
+// the next deploy, which is fine for a scraper that already holds its bytes.
+const CARD = siteCard();
+{
+  const t0 = performance.now();
+  const png = await renderPng(CARD.svg, CARD.width);
+  await mkdir(join(OUT, 'og'), { recursive: true });
+  await writeFile(join(OUT, CARD.path.slice(1)), png);
+  console.log(`  share card ${CARD.path}: ${CARD.width}x${CARD.height}, ${png.length} bytes, ${(performance.now() - t0).toFixed(0)} ms`);
+}
+
 // ── _headers — the half of the noindex that the Worker cannot reach ──────────
 //
 // 🔴 STATIC ASSETS ARE SERVED BY THE EDGE BEFORE THE WORKER RUNS. `src/index.js`
@@ -885,8 +913,10 @@ await writeFile(join(OUT, 'favicon.ico'), favicon());
 // the copy loop below. Nothing else knows about any of it.
 // The second block serves archiveFiles()'s markdown notes as plain text, so a
 // browser shows them rather than offering a download.
+// The third serves the share card for a year: its name changes when it does.
 await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n'
-  + '/archive/*.md\n  Content-Type: text/plain; charset=utf-8\n');
+  + '/archive/*.md\n  Content-Type: text/plain; charset=utf-8\n'
+  + '/og/*\n  Cache-Control: public, max-age=31536000, immutable\n');
 
 // ── the noindex meta, on every page, whoever wrote the page ─────────────────
 //
@@ -917,6 +947,47 @@ function withRobotsMeta(src, text) {
     : `${ROBOTS_META}\n${text}`;
 }
 
+// ── the share tags, on every page ───────────────────────────────────────────
+//
+// Open Graph and the X card, written into the deployed copy of every page next
+// to the robots meta, because a link preview bot reads the HTML the edge serves
+// and runs no script (so `mount()` cannot be where they come from). The tag set
+// is eccm's and trip's. Title and description per page, from what already
+// names it: a concept page's CONCEPTS row (`title`, `say`), a demo's manifest
+// row (`title` or its name, the card's `say` or the row's `one`), the front page
+// from HERO, and anything else from its own <title>. The image is the one site
+// card for every page. A page that carries its own og:image keeps it, and the
+// count is printed, as for the robots meta.
+const SHARE = new Map();
+for (const c of CONCEPTS) SHARE.set(`${c.id}/index.html`, { title: c.title, description: c.say });
+for (const d of DEMO_MANIFEST) {
+  const dst = `${(d.page || `/${d.name}/`).slice(1)}index.html`;
+  if (SHARE.has(dst)) continue;
+  const card = DEMO_CARDS[d.name];
+  // the name the page's own heading shows (mount() draws `name`), since most
+  // demos' <title> is a bare `positron` that the shell rewrites in script
+  SHARE.set(dst, { title: card?.title || d.title || d.name, description: card?.say || d.one || null });
+}
+SHARE.set('index.html', { title: SITE_NAME, description: HERO.line });
+const shared = [], ownShare = [];
+const sentence = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+function withShareMeta(src, dst, text) {
+  if (/<meta[^>]*property="og:image"/.test(text)) { ownShare.push(src); return text; }
+  const known = SHARE.get(dst) || {};
+  // a <title> as a reader of a preview should see it: no POSITRON prefix, and
+  // only what comes before a dash or a middot (two protos and two pages join a
+  // subtitle with one, and a share title is not the place for either)
+  const own = (text.match(/<title>([^<]*)<\/title>/) || [])[1]?.replace(/^POSITRON\s+/i, '').replace(/^[·\s]+/, '').split(/\s+[—·]\s+/)[0].trim();
+  const desc = (text.match(/<meta name="description" content="([^"]*)"/) || [])[1];
+  const url = `/${dst.replace(/(^|\/)index\.html$/, '$1')}`;
+  const tags = shareTags({ title: known.title || own || 'positron', description: sentence(known.description || desc || ''), url, card: CARD });
+  shared.push(dst);
+  const block = tags.join('\n');
+  return text.includes(ROBOTS_META) ? text.replace(ROBOTS_META, `${ROBOTS_META}\n${block}`)
+    : text.includes(CHARSET) ? text.replace(CHARSET, `${CHARSET}\n${block}`)
+      : `${block}\n${text}`;
+}
+
 for (const [src, dst] of FILES) {
   const to = join(OUT, dst);
   await mkdir(dirname(to), { recursive: true });
@@ -930,7 +1001,7 @@ for (const [src, dst] of FILES) {
       text = text.split(from).join(into);
     }
     if (append) text += '\n' + append + '\n';
-    if (isPage) text = withRobotsMeta(src, text);
+    if (isPage) text = withShareMeta(src, dst, withRobotsMeta(src, text));
     await writeFile(to, text);
     if (rewrites || append) {
       console.log(`  ${rewrites ? `rewrote ${dst} (${rewrites.length} substitution(s))` : `copied ${dst}`}${append ? ' + back link' : ''}`);
@@ -942,6 +1013,8 @@ for (const [src, dst] of FILES) {
 console.log(patched.length
   ? `  noindex meta added to ${patched.length} page(s) that lacked it: ${patched.join(', ')}`
   : '  noindex meta: every page carried it already');
+console.log(`  share tags written into ${shared.length} page(s), every one naming ${CARD.path}`
+  + (ownShare.length ? `; ${ownShare.length} carried their own og:image and were left alone: ${ownShare.join(', ')}` : ''));
 {
   // Stripping the demo/ prefix on deploy made it possible for two sources to
   // land on one destination (demo/index.html and the generated menu both wanted
