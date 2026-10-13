@@ -25,7 +25,11 @@ import M from './font-metrics.mjs';
 // bump on a change the SVG cannot show (a face, resvg): it is in every hash.
 // 2 since 2026-10-13: the patchbay came off both cards (*"No patchbay. Do like
 // frontpage. Do also ig image"*).
-export const TEMPLATE_V = 2;
+// 3 the same evening: the wordmark larger and at the foot, the Instagram
+// headline on as many lines as make it biggest, the small line cut to its first
+// sentence (*"Make positron. studio larger and put to bottom. Wrap ig title"*,
+// *"Rm delivered as line"*).
+export const TEMPLATE_V = 3;
 export const W = 1200, H = 630;
 export const IG_W = 1080, IG_H = 1350;
 export const SITE = 'https://positron.studio';
@@ -68,31 +72,43 @@ function balance(text, t, maxW) {
   for (let i = 0; i < 16; i++) { const mid = (lo + hi) / 2; if (wrap(text, t, mid).length > n) lo = mid; else hi = mid; }
   return wrap(text, t, hi);
 }
-// the headline on exactly two lines, broken where the two come out most even
-function twoLines(text, t) {
-  const words = text.split(/\s+/);
-  let best = null;
-  for (let i = 1; i < words.length; i++) {
-    const ls = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
-    const wd = Math.max(...ls.map((l) => width(l, t)));
-    if (!best || wd < best.wd) best = { ls, wd };
-  }
-  return best ? best.ls : [text];
-}
 const blockW = (lines, t) => Math.max(...lines.map((l) => width(l, t)));
 
 // The hero block laid out at the front page's sizes in a column `measure` wide:
 // its lines, and its width and height in those units.
-function layout(measure) {
+// Every way to break the headline at its spaces into `n` lines, never inside a
+// word and never with a hyphen.
+function breaks(text, n) {
+  const words = text.split(/\s+/), out = [];
+  const go = (i, left, acc) => {
+    if (left === 1) { out.push([...acc, words.slice(i).join(' ')]); return; }
+    for (let j = i + 1; j <= words.length - left + 1; j++) go(j, left - 1, [...acc, words.slice(i, j).join(' ')]);
+  };
+  if (n <= words.length) go(0, n, []);
+  return out;
+}
+
+// 🔴 THE WORDMARK AT THE FOOT, LARGER, 2026-10-13: *"Make positron. studio
+// larger and put to bottom"*. It is 2.5 times the hero's 13 px eye in the same
+// units, so it scales with the card and stays well under the headline's 56.
+const MARK = { ...TYPE.eye, size: TYPE.eye.size * 2.5 };
+// 🔴 THE SMALL LINE IS ITS FIRST SENTENCE ON A CARD, asked *"Rm delivered as
+// line"*. HERO and the front page keep the whole of it.
+const SMALL = HERO.small.split(/(?<=\.)\s+/)[0];
+
+// The hero block laid out at the front page's sizes in a column `measure`
+// wide, with the headline broken as `head` says: its rows (the headline, the
+// line, the small line), the wordmark, and the size of each in those units.
+function layout(measure, head) {
   const rows = [
-    { t: TYPE.eye, lines: [HERO.eye.toUpperCase()], dot: true, gap: 0 },
-    { t: TYPE.head, lines: twoLines(HERO.head, TYPE.head), accent: true, gap: GAPS.head },
+    { t: TYPE.head, lines: head, accent: true, gap: 0 },
     { t: TYPE.line, lines: balance(HERO.line, TYPE.line, Math.min(measure, LINE_MAX)), gap: GAPS.line },
-    { t: TYPE.small, lines: balance(HERO.small, TYPE.small, measure), gap: GAPS.small },
+    { t: TYPE.small, lines: balance(SMALL, TYPE.small, measure), gap: GAPS.small },
   ];
-  const w = Math.max(...rows.map((r) => blockW(r.lines, r.t)));
+  const mark = { t: MARK, lines: [HERO.eye.toUpperCase()], dot: true, gap: 0 };
+  const w = Math.max(...[...rows, mark].map((r) => blockW(r.lines, r.t)));
   const h = rows.reduce((a, r) => a + r.gap + r.lines.length * r.t.lh * r.t.size, 0);
-  return { rows, w, h };
+  return { rows, mark, w, h, markH: MARK.lh * MARK.size };
 }
 
 // One block of text at scale k. `accent` puts a closing full stop in --hi,
@@ -113,50 +129,39 @@ function block(r, x, y0, k) {
 }
 
 /**
- * The hero alone in a `w` by `h` frame with `pad` on every side: the column
- * measure that lets the block grow largest is searched for (a wide frame keeps
- * the line on two lines, a tall one lets it run to more), the block is scaled
- * by that factor and centred in the frame.
+ * The hero in a `w` by `h` frame with `pad` on every side: the headline, the
+ * line and the small line from the top margin, the wordmark on the bottom
+ * margin, at least MARK_AIR between them. `lines` is how many lines the
+ * headline may take: [2] as the front page sets it, or several, and then every
+ * break at a space is tried. The column measure and the break that let the
+ * whole grow largest win, scaled by one factor so the front page's
+ * proportions hold, and the type is left aligned on the pad.
  */
-function heroCard(w, h, pad, kind) {
+const MARK_AIR = 40;
+function heroCard(w, h, pad, kind, lines = [2]) {
   let best = null;
-  for (let m = 360; m <= 1000; m += 8) {
-    const L = layout(m);
-    const k = Math.min((w - 2 * pad) / L.w, (h - 2 * pad) / L.h);
-    if (!best || k > best.k + 1e-6) best = { L, k, m };
+  for (const n of lines) for (const head of breaks(HERO.head, n)) for (let m = 360; m <= 1000; m += 8) {
+    const L = layout(m, head);
+    const k = Math.min((w - 2 * pad) / L.w, (h - 2 * pad) / (L.h + MARK_AIR + L.markH));
+    if (!best || k > best.k + 1e-6) best = { L, k };
   }
   const { L, k } = best;
   const x = pad, parts = [];
-  const tall = (r) => r.lines.length * r.t.lh * r.t.size * k;
-  const slack = h - 2 * pad - L.h * k;
-  if (slack < 0.2 * h) {
-    // a wide frame: the block as the front page stacks it, centred
-    let y = (h - L.h * k) / 2;
-    for (const r of L.rows) { y += r.gap * k; parts.push(block(r, x, y, k)); y += tall(r); }
-  } else {
-    // a tall frame, which the two line headline fills across long before it
-    // fills down: the wordmark on the top margin, the small line on the bottom
-    // one, and the headline and the line centred between them, so the frame
-    // is filled by the same type at the same size rather than by two empty bands
-    const [eye, head, line, small] = L.rows;
-    parts.push(block(eye, x, pad, k));
-    parts.push(block(small, x, h - pad - tall(small), k));
-    const midH = tall(head) + line.gap * k + tall(line);
-    let y = (h - midH) / 2;
-    parts.push(block(head, x, y, k)); y += tall(head) + line.gap * k;
-    parts.push(block(line, x, y, k));
-  }
+  let y = pad;
+  for (const r of L.rows) { y += r.gap * k; parts.push(block(r, x, y, k)); y += r.lines.length * r.t.lh * r.t.size * k; }
+  parts.push(block(L.mark, x, h - pad - L.markH * k, k));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
     + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${parts.join('')}</svg>`;
   const version = fnv(`${svg}|${TEMPLATE_V}`);
-  return { svg, alt: ALT, version, path: `/og/${kind}-${version}.png`, width: w, height: h, scale: k, headSize: TYPE.head.size * k };
+  return { svg, alt: ALT, version, path: `/og/${kind}-${version}.png`, width: w, height: h, scale: k,
+    headSize: TYPE.head.size * k, markSize: MARK.size * k, head: L.rows[0].lines };
 }
-const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line} ${HERO.small}`;
+const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line} ${SMALL}`;
 
 /** The site card, the og:image of every page: `{ svg, alt, version, path, width, height }`. */
 export const siteCard = () => heroCard(W, H, 72, 'site');
 /** The Instagram portrait, 1080 by 1350, tagged on no page: posted by hand. */
-export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig');
+export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig', [2, 3, 4]);
 
 /** FNV-1a, 8 hex, eccm's and trip's cardVersion. */
 export function fnv(str) {

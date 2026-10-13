@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Share cards: POSITRON.STUDIO larger and at the bottom; the Instagram headline wrapped**~~ (DONE, TEMPLATE_V 3) (2026-10-13). Asked: *"Make positron. studio larger and put to bottom. Wrap ig title"*, then *"Rm delivered as line"* (on the cards; the front page keeps it unless asked). demo/shell/share-card.mjs.
+
 - ~~**Share card: no patchbay, set like the front page; and an Instagram image**~~ (DONE: TEMPLATE_V 2, /og/site-*.png and /og/ig-*.png, kit/share 15/15) (2026-10-13). Asked: *"No patchbay. Do like frontpage. Do also ig image"*. The OG card loses the bay and sets the hero type as the front page does (headline on two lines, large); an Instagram image (1080x1350) in the same style, on /kit/share/ to download, not deployed as a tag.
 
 - ~~**/kit/share/: the SVG patchbay sits up to 3 px from the live bay view**~~ (moot for now: the cards draw no bay and the assert went with it; bay-svg.mjs kept, the 3 px stands if it is used again) (2026-10-13). `node demo/verify.mjs kit/share` 15/16: "the bay drawn as a string puts every box where the page's own bay view puts it, within half a pixel": 8 boxes each, worst 3.00 px. Also: bay-svg.mjs has no stacked phone layout (throws below 480 px on purpose), and has not run in workerd.
