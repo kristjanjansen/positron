@@ -1,6 +1,6 @@
 // demo/shell/concept-nav.mjs: previous and next links in a concept page's header,
-// on the same line as `← concepts`, walking the order in concept-list.mjs.
-// `← concepts` goes to the front page, which is the concepts index since
+// on the same line as `← positron`, walking the order in concept-list.mjs.
+// `← positron` goes to the front page, which is the concepts index since
 // 2026-10-13 (*"move concepts to frontpage"*), and every link here is a
 // /<group>/<slug>/ address, never a number.
 import { el } from '/shell/shell.mjs';

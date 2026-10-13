@@ -57,7 +57,6 @@ export const CONCEPTS = [
   { id: 'remote/collide', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
   { id: 'remote/piano', title: 'Piano and Rhodes on Pi', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
   { id: 'remote/drums', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
-  { id: 'remote/shader', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /synth/sound/ is Sound design since 2026-10-13.
@@ -79,6 +78,8 @@ export const CONCEPTS = [
   { id: 'shader/mirror', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
   // shader/020 and not 010: 010's old address 404s on purpose, so it is not reused for a different page.
   { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape, with every number of its look on a knob.' },
+  // remote/shader moved here as shader/remote 2026-10-13 (*"Move pi shader to remote shaders under shaders"*); the old URL 404s.
+  { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
   { id: 'room/chat', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },
