@@ -604,6 +604,20 @@ export function createBoard({
     });
   }
 
+  /**
+   * 🔴 ASK ON THE DIRECT LINK OR NOT AT ALL. For a message that must never
+   * reach the relay room, which is tokenless and heard by everybody in it: the
+   * Pi camera's key (/concepts/remote/010/, 2026-10-13). `ask` falls back to the
+   * relay when `ctl` is not open, which is right for a note and wrong for a
+   * secret, so this answers null instead.
+   */
+  async function askDirect(msg, type, ms = 3000) {
+    if (!driving || via === 'relay' || dx?.ctl?.readyState !== 'open') return null;
+    const id = randomId();
+    try { dx.ctl.send(JSON.stringify({ ...msg, id })); } catch { return null; }
+    return waitFor(type, ms, id);
+  }
+
   async function ask(msg, type, ms = 8000) {
     // The id first, so the wait is for THIS answer rather than for the next
     // message of the same shape. On a shared board that can be somebody else's
@@ -618,6 +632,11 @@ export function createBoard({
   // selected pair runs through a TURN server. Read from getStats, because a lag
   // measured over a TURN hop is not comparable with one measured direct.
   let via = 'relay', boardDirect = null, dx = null, dxN = 0, rttMs = null, rttTimer = null;
+  // The board's wall clock against this one, from `rtc.pong`'s `at` (since
+  // 2026-10-13): board minus here, in ms, at the round trip's middle. A
+  // property of the two clocks, not of the path, so a figure measured while
+  // direct still holds after a fall back to the relay. Null until measured.
+  let clockOffsetMs = null;
 
   function useRelay(why) {
     if (via !== 'relay') log(`direct path closed, ${why}. Back on the relay`, 'warn');
@@ -686,7 +705,13 @@ export function createBoard({
         playout?.port.postMessage({ cmd: 'inChannels', n: chIn });
         return;
       }
-      if (m.type === 'rtc.pong') { if (Number.isFinite(m.t)) rttMs = performance.now() - m.t; return; }
+      if (m.type === 'rtc.pong') {
+        if (Number.isFinite(m.t)) {
+          rttMs = performance.now() - m.t;
+          if (Number.isFinite(m.at)) clockOffsetMs = m.at - (Date.now() - rttMs / 2);
+        }
+        return;
+      }
       heard(m);
     };
     d.ctl.onclose = () => { if (dx === d) useRelay('the board closed it'); };
@@ -744,12 +769,23 @@ export function createBoard({
     driving: () => driving,
     refusedToBoard: () => refused,
     ask,
+    askDirect,
     waitFor,
     startAudio,
     ping: (ms) => wire.ping(ms),
     state: () => wire.state(),
     /** Offer the direct path; see `direct` above. */
     goDirect,
+    /**
+     * Another data channel on the open direct link, or null while there is
+     * none. Since 2026-10-13, for the Pi camera's `cam` channel on
+     * /concepts/remote/010/: the board holds a listed label and sends nothing
+     * on it until it is asked over `ctl` (rig/board/rtc.mjs `channels`).
+     */
+    channel(label, opts = {}) {
+      if (via === 'relay' || !dx?.pc) return null;
+      try { const dc = dx.pc.createDataChannel(label, opts); dc.binaryType = 'arraybuffer'; return dc; } catch { return null; }
+    },
     /** Keep `stats().rttMs` fresh on whichever path is in use. */
     watchRtt,
     /** which socket in the room is the board, or null if it has not spoken. */
@@ -767,7 +803,7 @@ export function createBoard({
       framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
       channels: chIn, shapeChecked, shapeWrong, shapeSaid,
       /** 'relay', 'direct' or 'turn', and the board's own answer time on it. */
-      via, rttMs, boardDirect,
+      via, rttMs, boardDirect, clockOffsetMs,
       told,
       /** Who else is driving the instrument: 'page', 'tool', or null. */
       driver: pres.driver,

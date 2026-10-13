@@ -26,6 +26,7 @@
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createChoice } from '/shell/choice.mjs';
   import { createPicker } from '/shell/picker.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -53,11 +54,16 @@
   //
   // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
   // load. A check run sends nothing to the Circuit unless ?board=1 is added.
-  // The camera's two cells exist only when the URL carries the camera key, so
+  // The camera's three cells exist only when the URL carries the camera key, so
   // a page without it shows nothing of the camera, not even an empty cell.
   const CAM_KEY = new URLSearchParams(location.search).get('cam') || '';
   const d = mount({ name: 'concept remote 010', what: '', joined: false,
-    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms',
+    // ⚠️ AN EVEN NUMBER OF CELLS (shell.mjs `createReport` throws on odd).
+    // `path` came in 2026-10-13 with the direct link, so `key to sound` became
+    // the MEDIAN of the last twenty presses and the separate `median` cell went
+    // (the last press alone is `__demo.probe().lags`). The camera's path is a
+    // word in `path` (`direct, camera relay`) rather than a third camera cell.
+    readout: { 'key to sound': 'ms', 'round trip': 'ms', cushion: 'ms', path: '',
       ...(CAM_KEY ? { 'cam fps': '', 'cam lag': 'ms' } : {}) }, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('remote/010');
 
@@ -66,24 +72,47 @@
   const INPUT = 'circuit';
   const INPUT_ROOM = `${ROOM}-${INPUT}`;
   const MAY_PLAY = !SELFCHECK || q.get('board') === '1';
+  // ── relay or direct ─────────────────────────────────────────────────────
+  // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/?cam= go
+  // direct too?"*, then *"can we go direct with circuit?"*. As on
+  // /concepts/remote/030/: the relay unless `?path=direct`, and the choice at
+  // the top. Direct is two WebRTC data channels to the Circuit's input on the
+  // Pi (rig/board/rtc.mjs, inputs.mjs), signalled in `studio-1-circuit`:
+  // notes, CC, the patch questions and the lease on `ctl`, the Circuit's
+  // sound on `pcm`, the macros turned by hand back on `ctl`, and with the
+  // camera key the camera's frames on a third channel `cam` (below). No
+  // channel within 3 s, or one that drops, and the relay carries everything.
+  let mode = q.get('path') === 'direct' ? 'direct' : 'relay';
+  // 10 ms frames on the direct path, as 030 (plan-away-webrtc.md section 9 P3).
+  const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
   // Synth 1 is channel 1 (plans/plan-circuit-model12.md §3.1). The gate allows
   // program change on 1 and 2 only, patches 0 to 63.
   const CH = 1;
-  // The list is numbers, because only the patch a synth is HOLDING can be read
-  // (a dump request answers for the current patch, never for a slot). The cell
-  // shows the name the Circuit sends back, as it stores it.
-  const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
+  // Only the patch a synth is HOLDING can be read (a dump request answers for
+  // the current patch, never for a slot), so the cell shows the name the
+  // Circuit sends back, as it stores it, once a patch has been picked.
+  // The names the Circuit sent back for each slot, READ OFF THIS DESK'S CIRCUIT
+  // 2026-10-13 with `__demo.scanNames()` (slot 1 answered with no name). A label
+  // until the patch is picked; the name read back then replaces it, so a slot
+  // renamed on the Circuit shows its new name the first time it is played.
+  const SCANNED = ['Aciiid', '', 'LFO disko', 'Meeelow', 'Not FM', 'Filth Sense', 'Filthres', 'Flamed', 'Good Lead',
+    'Filtered Lead', 'Saw Striker', 'Alive', 'Aggie', 'Frosted Glass', 'Gaston', 'K-plunk', 'Smooth Pad', 'Twins',
+    'Weird Pad', 'Vel FilterFun', 'Movt4', 'Frog Steps', 'Organ-to-ring', 'Ringy Patch', 'Wobber Blobber', 'Sick Lead',
+    'Shimmer Atmo', 'noiseFX', 'Sine Pop', 'StarScreamer', 'Wobble Chord', 'Yaw', 'Grime Square', 'SyncBass',
+    'BlogHouse Bass', 'Bubble Bass', 'Smoov Bass', 'WigBaz', 'Yo!', 'Bass Grease', 'Sub Dub', 'Phone Lead',
+    'Funkth Lead', 'Game Over Arp', "Dev's Pad", 'Noisey Lead', 'Harsh Wiggle', 'STB Dance', 'PWR Pad', 'ResKey',
+    'SpooKey', 'Unstable Pad', 'Talk to Me', 'Eskimo', 'Betanmoan', 'Siney Tinez', 'Woo-z', 'SpaceRadio', 'Kick!',
+    'Space Perc', 'Sawdet', 'Breathe', 'Fading Pulse', 'Alien X Talk'];
+  const PATCHES = Array.from({ length: 64 }, (_, i) => SCANNED[i] || `Patch ${i + 1}`);
   // 🔴 THE STARTING PATCH IS GASTON, BY NUMBER. Asked 2026-10-13: *"gaston as
   // std patch"*. A name can only be read back for the patch Synth 1 is
   // holding, so the page does not look it up at play time: the slot is written
   // here and the name is its label, and on play Synth 1 is sent there.
-  // ⚠️ THE SLOT IS NOT KNOWN YET. No file in this repository records which of
-  // the owner's 64 slots holds Gaston (the pack is private). While `at` is
-  // null the page starts wherever the Circuit already is, as before. To learn
-  // it: play with ?board=1, then `await __demo.scanNames()` in the console,
-  // which steps Synth 1 through program changes 0 to 63 (RAM only, the gate
-  // allows nothing else) and returns every slot's name; put Gaston's here.
-  const START_PATCH = { at: null, name: 'Gaston' };
+  // Slot 14 (0 based, "Patch 15" on the Circuit), READ 2026-10-13 by the
+  // session with `await __demo.scanNames()` against this desk's Circuit, which
+  // steps Synth 1 through program changes 0 to 63 (RAM only) and returns every
+  // slot's name. If the owner moves Gaston, scan again and change the number.
+  const START_PATCH = { at: 14, name: 'Gaston' };
   if (START_PATCH.at != null) PATCHES[START_PATCH.at] = START_PATCH.name;
 
   // ── the bay ─────────────────────────────────────────────────────────────
@@ -281,8 +310,7 @@
   function lagCells() {
     const st = board?.stats();
     const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
-    cell('key to sound', lastLag == null ? '' : Math.round(lastLag));
-    cell('median', med == null ? '' : Math.round(med));
+    cell('key to sound', med == null ? '' : Math.round(med));
     cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
     cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
   }
@@ -506,7 +534,7 @@
   // ── the Circuit's own macro knobs, turned by hand on the desk ───────────
   // Only Synth 1's (this page plays channel 1) and only while armed: a turn
   // before play, or from a page that is not listening, is not this page's.
-  const circuitIn = { n: 0, ignored: 0, said: new Set() };
+  const circuitIn = { n: 0, ignored: 0, said: new Set(), relayCopies: 0, direct: 0 };
   function fromCircuit(m) {
     if (!armed || m.input !== INPUT || m.ch !== CH) return;
     const mac = MACROS.find((x) => x.cc === m.cc);
@@ -516,6 +544,7 @@
     k.receive(m.v, { from: 'device' });
     if (k.received().ignored > before) { circuitIn.ignored++; return; }
     circuitIn.n++;
+    if (m.path === 'direct') circuitIn.direct++;
     if (!circuitIn.said.has(mac.n)) { circuitIn.said.add(mac.n); d.log(`Macro ${mac.n} was turned on the Circuit itself, and its knob here follows it`); }
   }
 
@@ -544,12 +573,19 @@
   function makeBoard() {
     let open;
     opened = new Promise((r) => { open = r; });
+    const direct = mode === 'direct' ? { direct: true, directCushionMs: Number(q.get('cushion')) || 40 } : {};
     board = createBoard({
-      room: INPUT_ROOM, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250,
+      room: INPUT_ROOM, of: 'Raspberry Pi', showName: false, cushionMs: 80, maxCushionMs: 250, ...direct,
       log: (line, kind) => d.log(line, kind),
       onOpen: () => open(true),
       onMessage: (m) => {
-        if (m.type === 'midi.cc') return fromCircuit(m);
+        // On the direct path the board sends a hand turn on `ctl` marked
+        // `path: 'direct'` AND into the relay room for pages on the relay; the
+        // relay's copy is the late one, so it is dropped here.
+        if (m.type === 'midi.cc') {
+          if (m.path !== 'direct' && board?.stats().via !== 'relay') { circuitIn.relayCopies++; return; }
+          return fromCircuit(m);
+        }
         if (m.type === 'midi.refused') { refused++; lastRefusal = m.why || ''; d.log(`the Pi refused a message for the Circuit: ${m.why}`, 'warn'); }
       },
     });
@@ -579,8 +615,23 @@
       if (!MAY_PLAY) { say('A check is running, so nothing was sent to the Circuit. Add ?board=1 to let it through', 'warn'); return; }
       const st = await board.ask({ type: 'audio.status' }, 'audio.started', 6000);
       if (!st) { say(`The Raspberry Pi is not answering in ${INPUT_ROOM}, so the keys go nowhere`, 'warn'); return; }
+      if (mode === 'direct') {
+        // Direct before the lease and the first note, so the sound starts on
+        // the path it stays on. Falls back to the relay after 3 s.
+        say('Opening a direct path to the Pi');
+        pathChoice.pending(1);
+        let path;
+        try { path = await board.goDirect({ frameMs: DIRECT_FRAME_MS }); } finally { pathChoice.pending(null); }
+        rewire(path);
+        if (path === 'relay') fellBack();
+        say(path === 'direct' ? 'Direct to the Pi, the relay only carries presence now'
+          : path === 'turn' ? 'Direct to the Pi through a TURN server, so not on one network'
+          : 'No direct path, so the relay carries everything', path === 'relay' ? 'warn' : undefined);
+      } else rewire('relay');
       lease = createLease({ ask: (m, r, t) => board.ask(m, r, t), what: 'the Circuit capture', log: (line, kind) => d.log(line, kind) });
       armed = true;
+      board.watchRtt(2000);
+      cam?.tryDirect();
       patchPick.disabled(false);
       knobsOn(true);
       askMidi();
@@ -595,6 +646,7 @@
     cam?.stop();
     if (armed && board) board.send({ type: 'midi.panic' });
     armed = false;
+    board?.watchRtt(0);
     lease?.stop(); lease = null;
     dropCc();
     kb.panic?.();
@@ -608,6 +660,57 @@
   const transport = createButtonGroup({ buttons: [
     { id: 'play', icon: 'play', label: 'play', onPress: () => (armed || cam?.on() ? stop() : start()) },
   ] });
+
+  // Relay or direct. A change while playing stops, makes a new board for the
+  // new mode (its own socket, cushion and playout) and plays again, as 030.
+  async function setMode(m) {
+    if (m === mode) return;
+    mode = m;
+    const u = new URL(location.href);
+    if (m === 'direct') u.searchParams.set('path', 'direct'); else u.searchParams.delete('path');
+    history.replaceState(null, '', u);
+    const was = armed;
+    if (armed || cam?.on()) stop();
+    if (board) { board.close(); board = null; analyser = null; buf = null; }
+    d.log(`mode: ${m}`);
+    if (was) await start();
+  }
+  // The choice shows the path in use, not only the one asked for.
+  function fellBack() {
+    mode = 'relay';
+    pathChoice.set(0, true);
+    const u = new URL(location.href);
+    u.searchParams.delete('path');
+    history.replaceState(null, '', u);
+  }
+  const pathChoice = createChoice({ label: 'path', options: [['relay', 'relay'], ['direct', 'direct']],
+    at: mode === 'direct' ? 1 : 0, onPick: (v) => setMode(v) });
+  // 🔴 THE LINKS SAY WHICH WIRE CARRIES THEM, as on 030: every link between
+  // this page and the Pi is made again with `via` when the path changes,
+  // `datachannel` while direct (or through TURN), `relay` otherwise. The
+  // camera's link follows the camera's own path (`cam path`), which can stay
+  // on the relay while the sound is direct.
+  const wiredVia = new Map();
+  function rewire(path, which = (l) => l.from !== CAM_OUT) {
+    const via = path === 'direct' || path === 'turn' ? 'datachannel' : 'relay';
+    for (const l of bay.links()) {
+      const pi = l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+      if (!pi || !which(l) || wiredVia.get(`${l.from}>${l.to}`) === via) continue;
+      bay.unlink(l.id);
+      const r = bay.link(l.from, l.to, l.transforms || [], { via });
+      if (!r.ok) { d.log(`${l.from} -> ${l.to} via ${via} refused: ${r.why}`, 'warn'); bay.link(l.from, l.to, l.transforms || []); }
+      wiredVia.set(`${l.from}>${l.to}`, via);
+    }
+    pb?.refresh?.();
+  }
+  setInterval(() => {
+    if (!board || !armed) return;
+    const via = board.stats().via;
+    rewire(via);
+    if (mode === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); fellBack(); }
+    const cp = cam?.path();
+    d.set('path', cp && cp !== (via === 'relay' ? 'relay' : 'direct') ? `${via}, camera ${cp}` : via);
+  }, 500);
 
   // ── the Pi's camera, for holders of the key only ────────────────────────
   // Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
@@ -650,13 +753,34 @@
     // arrives. Pi to this screen through the relay, against two NTP set clocks,
     // so it is worth what their agreement is worth; the camera's own exposure
     // and encode time is not in it.
-    const ticks = new Map(), lags = [];
+    // ⚠️ THE TICK AND ITS FRAME CAN ARRIVE IN EITHER ORDER. On the relay they
+    // share one socket and the tick comes first; on the direct link a frame can
+    // beat a tick that went through the relay, so both sides are kept and the
+    // lag is taken when the second of the two arrives. Since 2026-10-13 the
+    // board also sends the tick on the `cam` channel.
+    // The board's clock is corrected by the offset `rtc.pong` measures on a
+    // direct link (board.mjs `clockOffsetMs`), once there has been one; before
+    // that the lag is against two NTP set clocks, as it always was.
+    const ticks = new Map(), arrived = new Map(), lags = [], raw = [];
+    const lagOf = (wall, at) => {
+      const off = board?.stats().clockOffsetMs;
+      raw.push(wall - at); if (raw.length > 20) raw.shift();
+      lags.push(wall - (at - (Number.isFinite(off) ? off : 0))); if (lags.length > 20) lags.shift();
+    };
+    const tickAt = (seq, at) => {
+      const wall = arrived.get(seq);
+      if (wall != null) { arrived.delete(seq); lagOf(wall, at); return; }
+      ticks.set(seq, at);
+      if (ticks.size > 10) ticks.delete(ticks.keys().next().value);
+    };
     const video = createBoardVideo({
       canvas,
       onSeq: (seq) => {
         lastFrameAt = performance.now();
         const at = ticks.get(seq);
-        if (at != null) { ticks.delete(seq); lags.push(Date.now() - at); if (lags.length > 20) lags.shift(); }
+        if (at != null) { ticks.delete(seq); lagOf(Date.now(), at); return; }
+        arrived.set(seq, Date.now());
+        if (arrived.size > 90) arrived.delete(arrived.keys().next().value);
       },
       onKey: () => { say('online'); d.log('A keyframe from the Pi camera arrived, the picture starts here'); },
       onLost: (n) => d.log(`The relay has dropped ${n} frame${n === 1 ? '' : 's'} of the camera picture`, 'warn'),
@@ -667,6 +791,7 @@
           watching();
           clearInterval(beat);
           beat = setInterval(watching, WATCHING_MS);
+          tryDirect();
         } else if (m.type === 'cam.started') {
           if (!shape) d.log(`The Pi camera is up, ${m.camera}, ${m.w}x${m.h} at ${m.fps} fps`);
           shape = m;
@@ -678,13 +803,13 @@
           if (on) d.log(`The Pi camera stopped: ${m.why}`, 'warn');
           shape = null;
         } else if (m.type === 'cam.tick') {
-          ticks.set(m.seq, m.at);
-          if (ticks.size > 10) ticks.delete(ticks.keys().next().value);
+          if (camPath !== 'direct') tickAt(m.seq, m.at);
         }
       },
       onClose: (e) => {
         if (!on) return;
         on = false; keyed = false; clearInterval(beat);
+        toRelay(null);
         say('offline', 'the camera room closed');
         d.log(e?.code === 4003 ? 'The relay closed the camera room: it did not take the key' : `The camera room closed (${e?.code ?? '?'})`, 'warn');
       },
@@ -715,9 +840,93 @@
       say('coming');
       d.log(`Asking the Pi for its camera in ${CAM_ROOM}`);
     }
+    // ── the camera on the direct link ─────────────────────────────────────
+    // 🔴 THE SAME TWO GATES AS THE RELAY, AND ONE MORE. The relay's key check
+    // first (`POST .../key` answered 204 and the keyed room said `cam.key.ok`),
+    // then the board's: `cam.direct` carries the key and this page's viewer
+    // name over `ctl` ONLY (board.askDirect, never the tokenless relay room),
+    // and the board attaches the `cam` channel only when the key is its own
+    // AND that viewer is one the relay let into the keyed room
+    // (rig/board/camera.mjs `attachDirect`). A direct link alone opens nothing.
+    // WHY A THIRD CHANNEL ON THE CIRCUIT'S LINK, NOT A LINK OF ITS OWN: the
+    // link is already open, so the camera costs no second ICE and DTLS
+    // handshake and falls back with the sound; and not on `ctl` or `pcm`,
+    // because a picture wants ORDERED and RELIABLE delivery (a decoder fed a
+    // frame with a hole is broken to the next keyframe), which `pcm` (no
+    // retransmits) and `ctl` (unordered) are not. The board cuts a frame into
+    // 16 KB pieces, so a keyframe cannot hold a note on `ctl` behind it for
+    // longer than one piece.
+    let dcam = null, camPath = 'relay', tries = 0, nextTry = 0, pieces = [], pieceSeq = -1, directFrames = 0;
+    const camSaid = new Set();
+    function onDirect(data) {
+      if (typeof data === 'string') {
+        let m = null; try { m = JSON.parse(data); } catch { return; }
+        if (m?.type === 'cam.tick') tickAt(m.seq, m.at);
+        else if (m?.type === 'cam.stopped' && on) d.log(`The Pi camera stopped: ${m.why}`, 'warn');
+        return;
+      }
+      if (!(data instanceof ArrayBuffer) || data.byteLength < 8) return;
+      const dv = new DataView(data);
+      const seq = dv.getUint32(0, true), flags = dv.getUint32(4, true);
+      if (seq !== pieceSeq) { pieces = []; pieceSeq = seq; }
+      pieces.push(new Uint8Array(data, 8));
+      if (flags & 2) return;
+      const n = pieces.reduce((a, p) => a + p.byteLength, 0);
+      const out = new Uint8Array(8 + n);
+      const ov = new DataView(out.buffer);
+      ov.setUint32(0, seq, true); ov.setUint32(4, flags & 1, true);
+      let o = 8; for (const p of pieces) { out.set(p, o); o += p.byteLength; }
+      pieces = []; pieceSeq = -1;
+      directFrames++;
+      video.feed(out.buffer);
+    }
+    async function tryDirect() {
+      if (!on || !keyed || dcam || !board || camPath === 'direct') return;
+      const via = board.stats().via;
+      if (via === 'relay' || tries >= 5 || performance.now() < nextTry) return;
+      tries++;
+      const dc = board.channel('cam', { ordered: true });
+      if (!dc) return;
+      dcam = dc;
+      dc.onmessage = (e) => { if (dcam === dc) onDirect(e.data); };
+      dc.onclose = () => { if (dcam === dc) toRelay('its channel closed'); };
+      if (dc.readyState !== 'open') await new Promise((r) => { dc.onopen = r; setTimeout(r, 3000); });
+      if (dcam !== dc) return;
+      if (dc.readyState !== 'open') { dcam = null; try { dc.close(); } catch { /* */ } nextTry = performance.now() + 2000; return; }
+      const r = await board.askDirect({ type: 'cam.direct', key: CAM_KEY, viewer: ME }, 'cam.direct', 3000);
+      if (dcam !== dc) return;
+      if (!r?.ok) {
+        dcam = null; try { dc.close(); } catch { /* */ }
+        nextTry = performance.now() + (r?.retry || !r ? 1500 : 1e12);
+        const why = r ? r.why : 'the Pi did not answer on the direct link';
+        if (!camSaid.has(why)) { camSaid.add(why); d.log(`The camera stays on the relay for now: ${why}`, r?.retry || !r ? 'dim' : 'warn'); }
+        return;
+      }
+      camPath = 'direct';
+      video.socketFrames(false);
+      video.expectKey();
+      rewire('direct', (l) => l.from === CAM_OUT);
+      d.log('The camera\'s frames come on the direct link now, the relay carries only its key and its heartbeat', 'hi');
+    }
+    // Back to the relay: the channel closed, the direct link dropped, or the
+    // page stopped. `cam.relay` in the keyed room tells the board at once,
+    // rather than when it notices a dead link.
+    function toRelay(why) {
+      const dc = dcam; dcam = null;
+      try { dc?.close(); } catch { /* */ }
+      pieces = []; pieceSeq = -1;
+      if (camPath !== 'direct') return;
+      camPath = 'relay';
+      video.socketFrames(true);
+      video.expectKey();
+      rewire('relay', (l) => l.from === CAM_OUT);
+      if (why && on) { video.say({ type: 'cam.relay', from: ME }); d.log(`The camera is back on the relay, ${why}`, 'warn'); }
+    }
     function stop() {
       if (!on) return;
       on = false;
+      toRelay(null);
+      tries = 0; nextTry = 0;
       clearInterval(beat);
       if (keyed) video.say({ type: 'cam.bye', from: ME });
       keyed = false; shape = null;
@@ -726,6 +935,8 @@
       say('unknown');
     }
     setInterval(() => {
+      if (camPath === 'direct' && board?.stats().via === 'relay') toRelay('the direct link dropped');
+      else if (on && keyed && camPath === 'relay') tryDirect();
       const fresh = on && performance.now() - lastFrameAt < 2000;
       d.set('cam fps', fresh ? Math.round(video.fps()) : '');
       const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
@@ -733,10 +944,13 @@
     }, 500);
 
     return {
-      el: panel.el, start, stop, on: () => on,
+      el: panel.el, start, stop, on: () => on, tryDirect,
+      /** The camera's own path while it is on and keyed, else null. */
+      path: () => (on && keyed ? camPath : null),
       flowing: () => on && performance.now() - lastFrameAt < 2000,
       probe: () => ({ on, keyed, shape, decoded: video.decoded(), lost: video.lost(), fps: video.fps(), kbit: video.kbit(),
-        lags: [...lags], size: [canvas.width, canvas.height], lastSeq: video.lastSeq() }),
+        lags: [...lags], raw: [...raw], size: [canvas.width, canvas.height], lastSeq: video.lastSeq(),
+        path: camPath, directFrames, tries }),
     };
   }
 
@@ -752,7 +966,7 @@
   setInterval(() => pb.refresh?.(), 500);
 
   const top = el('div', 'cc-top');
-  top.append(transport.el);
+  top.append(transport.el, pathChoice.el);
   d.stack.add(top, ...(cam ? [cam.el] : []), wave.el, patchPick.el, knobGrid.el, host, pb.el);
   window.__demo.bay = bay;
   window.__demo.scanNames = scanNames;
@@ -763,7 +977,8 @@
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
     macros: MACROS.map((m) => ({ n: m.n, cc: m.cc, value: knobs.get(m.name).value(), sent: ccSent.get(m.cc) || 0 })),
     ccRefusedHere, knobsRead, ccGapMs: CC_GAP_MS,
-    fromCircuit: { n: circuitIn.n, ignored: circuitIn.ignored },
+    fromCircuit: { n: circuitIn.n, ignored: circuitIn.ignored, direct: circuitIn.direct, relayCopies: circuitIn.relayCopies },
+    mode, path: board ? board.stats().via : null, lags: [...lags],
     received: MACROS.map((m) => ({ n: m.n, ...knobs.get(m.name).received() })),
     startPatch: { ...START_PATCH },
     midiIn: { asked: midiAsked, plugged: [...plugged], ...devIn },
