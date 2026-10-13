@@ -51,8 +51,9 @@
   //
   // A kit deck (`createDeck`) holds the note ons and offs and plays them
   // through `web:sequence:midi-out`; the kit transport bar is play, stop and
-  // LOOP, glued to a strip that draws each note from its start to its note
-  // off. LOOP is on from the start, over the whole 8 s.
+  // LOOP, glued to the notes timeline: a row per pitch, each note a bar from
+  // its start to its note off, the sounding notes lit. LOOP is on from the
+  // start, over the whole 8 s.
   //
   // A SEEK STARTS WHAT IS SOUNDING THERE, IT DOES NOT SKIP IT. The deck folds
   // the score up to the new position (`reduce`) and the page asserts that
@@ -147,11 +148,13 @@
   /** The pitches held at `pos` inside one lap, the wrapped tail included. */
   const heldAt = (pos) => NOTES.filter((x) => (x.at <= pos && pos < x.end) || (x.end > LAP && pos < x.end - LAP)).map((x) => x.n);
   const sounding = new Set();   // pitches the sequence has on right now
+  let litRows = () => {};       // the notes timeline lights what sounds (set below)
   let quiet = true;             // true unless the deck is rolling with the voice up
   let ons = 0, offs = 0, chased = 0;
   function emit(n, on) {
     if (on === sounding.has(n)) return;
     if (on) { sounding.add(n); ons++; } else { sounding.delete(n); offs++; }
+    litRows();
     bay.send(ID('sequence', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: on ? 100 : 0 });
   }
   /** THE CHASE: make what sounds equal what is held, touching nothing else. */
@@ -196,20 +199,38 @@
   let arming = false;
   const bar = createTransportBar(glue, deck, { scrub: false, command: { play, pause: stop } });
 
-  // ── the strip: two rows, so the overlapping notes sit side by side ──────
+  // ── the notes timeline: one row per pitch, highest on top ───────────────
+  // Asked 2026-10-13: *"use notes timeline"*. The loop is drawn as notes in
+  // time on the kit strip: a row per pitch (named in the gutter), each note a
+  // bar from its start to its note off, so pitch is the row and length is the
+  // width. G's tail past the loop point is drawn at the start of the lap,
+  // where the second lap onward hears it. The playhead moves as it plays, and
+  // the notes the voice is sounding now are lit: their rows through the
+  // strip's own `setActive` (the rest dim, gutter included), their bars
+  // through `currentOf` (full weight and a ring, the rest at half).
+  // The bars carry no text (`labels: false`): the gutter names the pitch and
+  // a hover names the note and its length.
   const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
-  const ROWS = Math.ceil(HOLD / STEP);
-  const lanes = Array.from({ length: ROWS }, (_, k) => ({
-    id: `voice-${k + 1}`, kind: 'note', label: `voice ${k + 1}`, height: 30, as: 'spans', stack: false, terse: true,
-    rows: () => NOTES.flatMap((x, i) => (i % ROWS !== k ? [] : [
-      { at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: Math.min(x.end, LAP) - x.at } },
-      ...(x.end > LAP ? [{ at: 0, id: `t${i}`, kind: 'note', payload: { n: x.n, durMs: x.end - LAP } }] : []),
-    ])),
+  const PITCHES = [...new Set(SEQ)].sort((a, b) => b - a);
+  const laneId = (n) => `pitch-${n}`;
+  const spanRows = NOTES.flatMap((x, i) => [
+    { at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: Math.min(x.end, LAP) - x.at } },
+    ...(x.end > LAP ? [{ at: 0, id: `t${i}`, kind: 'note', payload: { n: x.n, durMs: x.end - LAP } }] : []),
+  ]);
+  const lanes = PITCHES.map((n) => ({
+    id: laneId(n), kind: 'note', label: nameOf(n), height: 24, as: 'spans', stack: false, terse: true, barGap: 2, labels: false,
+    rows: () => spanRows.filter((r) => r.payload.n === n),
     describeRow: (r) => [nameOf(r.payload.n), `${(r.payload.durMs / 1000).toFixed(1)} s`],
-    labelOf: (sp) => nameOf(sp.row.payload.n),
+    currentOf: (sp) => {
+      if (!sounding.has(n)) return false;
+      const p = deck.position();
+      return sp.from <= p && p < sp.to;
+    },
   }));
-  const strip = createStripView(glue, deck, { size: 'auto', follow: false, gutter: 96, lanes });
+  const strip = createStripView(glue, deck, { size: 'auto', follow: false, gutter: 64, lanes });
+  /** What is lit: the rows of the pitches sounding now, or every row when none is. */
+  litRows = () => strip.strip.setActive(sounding.size ? [...sounding].map(laneId) : null);
   const surface = createGlue(bar.el, strip.surface);
   // The whole lap in view once the strip has a width (typist/040's reason).
   let fitW = 0;
@@ -274,7 +295,7 @@
 
   window.__demo.knobs = grid;
   window.__demo.plaits = {
-    bay, deck, bar, patches: PATCHES, knobs, pick, play, stop, features: voice.features, heldAt, notes: NOTES, lap: LAP,
+    bay, deck, bar, strip, patches: PATCHES, knobs, pick, play, stop, features: voice.features, heldAt, notes: NOTES, lap: LAP,
     at: () => at, playing: () => deck.playing(), ready: voice.ready,
     ctx: voice.ctx, wasmAsked: voice.asked, sounding: () => [...sounding].sort(),
     counts: () => ({ notesIn, programsIn, paramsIn, ons, offs, chased }),
