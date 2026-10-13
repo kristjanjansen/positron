@@ -5,8 +5,10 @@
 // one page per module (*"can split https://positron.studio/concepts/synth/040/
 // apart to different conecepts, do not dupe with existing ones (so only some
 // last steps?). rm 040 later."*). It sits beside the pages that use it, as
-// radio/tempo.mjs does: /concepts/synth/050/ (filter), 060 (envelope) and 070
-// (LFO). module-page.mjs builds those pages around it.
+// radio/tempo.mjs does. /concepts/synth/050/ Sound design is its one page since
+// 2026-10-13 (*"combine filter+envelope+lfo to single sound design concept"*),
+// when the filter, envelope and LFO pages (050, 060, 070) became that one;
+// module-page.mjs builds it.
 //
 // A module is a node with ports. An audio link is a `connect()` made by
 // `route()`, a MIDI link carries notes through `bay.send`, and a value link
@@ -32,7 +34,7 @@ const expo = (lo, hi) => ({
   to: (raw) => lo * (hi / lo) ** (raw / 127),
   from: (v) => (127 * Math.log(v / lo)) / Math.log(hi / lo),
 });
-const F = expo(55, 880), C = expo(80, 8000), A = expo(0.003, 2), R = expo(0.02, 3), L = expo(0.05, 12);
+const F = expo(55, 880), C = expo(80, 8000), A = expo(0.003, 2), D = expo(0.02, 3), R = expo(0.02, 3), L = expo(0.05, 12);
 const hzText = (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`);
 const sText = (v) => (v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms`);
 
@@ -47,6 +49,8 @@ export const KNOBS = [
   { name: 'cutoff', owner: 'filter', min: 0, max: 127, raw: C.from(1100), value: C.to, format: (r) => hzText(C.to(r)) },
   { name: 'q', owner: 'filter', min: 0.7, max: 15, raw: 5, value: (r) => r, format: (r) => r.toFixed(1) },
   { name: 'attack', owner: 'amp', min: 0, max: 127, raw: A.from(0.008), value: A.to, format: (r) => sText(A.to(r)) },
+  { name: 'decay', owner: 'amp', min: 0, max: 127, raw: D.from(0.35), value: D.to, format: (r) => sText(D.to(r)) },
+  { name: 'sustain', owner: 'amp', min: 0, max: 1, step: 0.01, raw: 0.55, value: (r) => r, format: (r) => `${Math.round(r * 100)}%` },
   { name: 'release', owner: 'amp', min: 0, max: 127, raw: R.from(0.45), value: R.to, format: (r) => sText(R.to(r)) },
   { name: 'rate', owner: 'lfo', min: 0, max: 127, raw: L.from(0.35), value: L.to, format: (r) => `${L.to(r).toFixed(2)} Hz` },
   // Depth is in octaves and travels as cents, because the LFO moves the
@@ -61,6 +65,7 @@ export const knobRaw = (name, v) => {
   if (name === 'freq') return F.from(v);
   if (name === 'cutoff') return C.from(v);
   if (name === 'attack') return A.from(v);
+  if (name === 'decay') return D.from(v);
   if (name === 'release') return R.from(v);
   if (name === 'rate') return L.from(v);
   if (name === 'depth') return v / 1200;

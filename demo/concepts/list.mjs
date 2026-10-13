@@ -14,11 +14,11 @@ export const CONCEPTS = [
   // synth/040 Synth removed 2026-10-13 (*"can split https://positron.studio/concepts/synth/040/ apart to
   // different conecepts, do not dupe with existing ones (so only some last steps?). rm 040 later."*). Its
   // sine and freq knob are synth/000's, and its wave knob is the oscillator's own setting rather than a
-  // module; its filter, envelope and LFO are 050, 060 and 070. The old URL 404s (no forwarding).
+  // module; its filter, envelope and LFO are 050. The old URL 404s (no forwarding).
   // 050, 060 and 070 were used before (draw/000, remote/000 and remote/010); those old pages are gone.
-  { n: 'synth/050', title: 'Filter', say: 'A sawtooth from the keys through a low-pass filter, with knobs for its cutoff and resonance.' },
-  { n: 'synth/060', title: 'Envelope', say: 'Play the keys through an envelope and set how slowly each note fades in and how long it rings on.' },
-  { n: 'synth/070', title: 'LFO', say: 'An oscillator too slow to hear moves the filter\'s cutoff, so a held note opens and closes by itself.' },
+  { n: 'synth/050', title: 'Sound design', say: 'One voice from the keys through a filter, an envelope and an LFO, every knob on a wire of its own.' },
+  // synth/060 Envelope and synth/070 LFO removed 2026-10-13 into synth/050 Sound design (*"combine
+  // filter+envelope+lfo to single sound design concept"*). Their URLs 404 (no forwarding).
   { n: 'synth/080', group: 'code', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { n: 'synth/090', group: 'code', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
   // synth/110 Plaits patches moved to /archive/plaits-patches/ 2026-10-13 (*"arhvie plaits patches"*).
@@ -36,8 +36,8 @@ export const CONCEPTS = [
   // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,
   // then *"yea, move them all to remote instruments or stm"*): every concept page that plays on the
   // Raspberry Pi. remote/000 to 050 were synth/060, synth/070, synth/100, sampler/030, rhythm/030 and
-  // shader/010 until then; the old URLs 404 (no forwarding), except synth/060 and 070, which are
-  // other pages since 2026-10-13 (the split of synth/040).
+  // shader/010 until then; the old URLs 404 (no forwarding). synth/060 and 070 were briefly
+  // the Envelope and LFO pages of the synth/040 split, folded into synth/050 the same day.
   // remote/000 Yoshimi archived 2026-10-13 with Yoshimi (*"discard yoshimi"*): archive/concepts/remote-000.md.
   // The gap stays; /concepts/remote/000/ is a 404.
   { n: 'remote/010', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
@@ -47,7 +47,7 @@ export const CONCEPTS = [
   { n: 'remote/050', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
-  // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ is the Filter page since 2026-10-13.
+  // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ is Sound design since 2026-10-13.
   // draw/000 XY filter moved to /archive/ 2026-10-12 (*"Revert xy changes, archive cy and draw"*), and the draw group with it.
   { n: 'radio/000', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { n: 'radio/010', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
