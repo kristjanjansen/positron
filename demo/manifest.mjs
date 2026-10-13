@@ -267,7 +267,8 @@ export const DEMOS = [
   // mark per record, as wide as its date is vague, and the twenty-six a browser
   // can open are pressable. Named for the thing you can hear, because that is
   // the reason it exists rather than the table.
-  { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+  { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true, unlisted: true,
     one: 'every Erkki Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
   // The other archive, and it is the opposite kind of thing from the two rows
@@ -317,7 +318,8 @@ export const DEMOS = [
     tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
-  { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
+  // `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+  { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, unlisted: true, page: '/proto/deck/',
     one: "Erkki Kurenniemi's corpus on one deck, media from archive.org",
     tags: ['timeline', 'not shelled'] },
   // ⚠️ `megatimeline` IS OFF THE MENU AND STILL ON THE EDGE. The row is gone;

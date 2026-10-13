@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /tapes/ and deck**~~ (2026-10-13). Asked: *"archive tapes and deck"*. DONE by the session: both unlisted (deck is the /proto/deck/ row), listed on /archive/; tapes still served.
 - **An archives concept group; a reel-like concept page** (2026-10-13). Asked: *"make archives concept group. do reel-demo-like patchbay version. custom videoframe with play and mute and fullscreen control. timeline is same. no loop. no footer. newsreel radio are seprate box"*. A concept page like /reel/ (a day's newsreel with that day's radio) in a new `archives` group: the newsreel and the radio as two boxes in a patchbay, a custom video frame with play, mute and full screen, /reel/'s timeline, no loop, no footer.
 - ~~**Archive /resources/**~~ (2026-10-13). Asked: *"archvie resourves"*. DONE by the session: unlisted, still served, card out, on /archive/.
 - ~~**Archive /weight/ and /stage/**~~ (2026-10-13). Asked: *"archive weight stage"*. DONE by the session: unlisted, still served, cards out, on /archive/. /stage/'s routes and Stream input stay in workers/pub.
