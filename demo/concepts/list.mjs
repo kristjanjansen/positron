@@ -96,7 +96,7 @@ export const CONCEPTS = [
   // clock/060 Play together and clock/070 Replay moved to /archive/ 2026-10-12 (*"arvhice http://127.0.0.1:8890/concepts/clock/060/ http://127.0.0.1:8890/concepts/clock/070/"*).
   // archives (asked 2026-10-13, *"make archives concept group. do reel-demo-like patchbay version"*):
   // /reel/ with the newsreel and the radio as two boxes, on /reel/'s line (demo/shell/reel-line.mjs).
-  { n: 'archives/000', title: 'Newsreels', say: 'ERR\'s 1965 newsreels on a line, each silent film and that day\'s surviving radio as two boxes.' },
+  { n: 'archives/000', title: 'Newsreels', say: 'ERR\'s 1965 newsreels on a line, each silent film played with that day\'s surviving radio.' },
   // misc, last (asked 2026-10-11, *"move bay and tutorial to last misc group"*):
   // bay/000, bay/010 and tutorial/000 until then, those URLs now 404.
   // misc/000 Announce and misc/010 Mirror archived 2026-10-12 (*"archve/md misc 000 and 010"*): archive/concepts/misc-000.md, misc-010.md.
