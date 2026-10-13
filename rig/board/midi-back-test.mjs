@@ -131,6 +131,43 @@ const is = (name, got, want) => {
   hw.close();
 }
 
+// ── on a direct link too, 2026-10-13 (remote/010 direct) ────────────────────
+// A page on the direct path hears a hand turned macro on its own `ctl`, marked
+// `path: 'direct'`, so it need not wait for the relay's copy and can drop it.
+{
+  const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
+  let t = 0; const timers = [], inbox = [];
+  const EAGAIN = () => { const e = new Error('EAGAIN'); e.code = 'EAGAIN'; return e; };
+  const fs = { readlinkSync: () => 'card7', openSync: (pth, fl) => (fl === (FS_C.O_RDONLY | FS_C.O_NONBLOCK) ? 77 : 42),
+    readSync: (fd, buf) => { const c = inbox.shift(); if (!c) throw EAGAIN(); buf.set(c); return c.length; },
+    writeSync: (fd, b) => b.length, closeSync: () => {} };
+  const sock = [];
+  class WS { constructor() { this.readyState = 1; this.sent = []; sock.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
+  class DC { constructor(l) { this.l = l; this.out = []; } getLabel() { return this.l; } isOpen() { return true; } bufferedAmount() { return 0; }
+    sendMessage(x) { this.out.push(JSON.parse(x)); } sendMessageBinary() {} onMessage(f) { this.recv = f; } close() {} onClosed() {} }
+  let pc = null;
+  class PC { constructor() { pc = this; } onLocalDescription(f) { this.ld = f; } onLocalCandidate() {} onStateChange() {} onDataChannel(f) { this.dcf = f; }
+    setRemoteDescription() { this.ld('v=0', 'answer'); } addRemoteCandidate() {} close() {} }
+  const hw = createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 4, rate: 200, name: 'pi', id: 'pi',
+    spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); return p; },
+    WebSocket: WS, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
+    randomId: () => 'x', now: () => t, fs, leaseMs: 60_000, beatMs: 5_000, PeerConnection: PC,
+    setTimer: (fn, ms) => { const h = { at: t + ms, fn }; timers.push(h); return h; } });
+  const run = (ms) => { const until = t + ms; for (;;) { timers.sort((a, b) => a.at - b.at); if (!timers.length || timers[0].at > until) break; const h = timers.shift(); t = h.at; h.fn(); } t = until; };
+  const c = hw.get('circuit'); c.connect();
+  sock[0].onmessage({ data: JSON.stringify({ type: 'rtc.offer', peer: 'page1', sdp: 'v=0', from: 'p' }) });
+  const pcm = new DC('pcm'), ctl = new DC('ctl'); pc.dcf(pcm); pc.dcf(ctl);
+  ctl.recv(JSON.stringify({ type: 'input.want', id: 'w' }));
+  inbox.push(Uint8Array.from([0xB0, 82, 64]));
+  run(100);
+  const direct = ctl.out.filter((m) => m.type === 'midi.cc');
+  const relay = sock[0].sent.filter((x) => typeof x === 'string').map((x) => JSON.parse(x)).filter((m) => m.type === 'midi.cc');
+  is('a hand turned macro reaches the direct peer on ctl, marked direct', direct.map(({ cc, v, path }) => ({ cc, v, path })), [{ cc: 82, v: 64, path: 'direct' }]);
+  is('NEGATIVE: and the relay room still hears it, unmarked, for a page on the relay', relay.map(({ cc, path }) => ({ cc, path })), [{ cc: 82, path: undefined }]);
+  is('the status counts the direct copies', c.status().midi.back.direct, 1);
+  hw.close();
+}
+
 {
   // NEGATIVE CONTROL: a busy input is said, not thrown, and the page still plays.
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1]}}}');

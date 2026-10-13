@@ -64,6 +64,11 @@ export function createBoardVideo({
   const ctx = canvas.getContext('2d');
   let ws = null, decoder = null, decoded = 0, lost = 0, bytes = 0, fps = 0, kbit = null;
   let waitingForKey = true, last = -1, lastSeq = null, lastAt = 0;
+  // Whether binary frames on the socket are drawn. Off while the same frames
+  // arrive another way (`feed`, the Pi camera's direct link on
+  // /concepts/remote/010/, since 2026-10-13); the socket stays open for text.
+  let fromSocket = true;
+  let take = null;
   const watching = setInterval(() => {
     if (ws && send && !document.hidden) send({ type: 'video.watching' });
   }, WATCHING_MS);
@@ -117,14 +122,18 @@ export function createBoardVideo({
         if (m) onText(m);
         return;
       }
-      const f = parseBoardFrame(e.data);
-      if (!f || ws !== sock) return;
+      if (ws !== sock || !fromSocket) return;
+      take(e.data);
+    };
+    take = (data) => {
+      const f = parseBoardFrame(data);
+      if (!f || !decoder || decoder !== dec) return;
       if (last >= 0 && f.seq > last + 1) { lost += f.seq - last - 1; onLost(lost); }
       last = f.seq;
       const first = lastSeq === null;
       lastSeq = f.seq; lastAt = performance.now();
       onSeq(f.seq, f.key, first);
-      bytes += e.data.byteLength;
+      bytes += data.byteLength;
       if (waitingForKey) { if (!f.key) return; waitingForKey = false; onKey(); }
       try {
         dec.decode(new EncodedVideoChunk({ type: f.key ? 'key' : 'delta', timestamp: f.seq * 1e6 / rate, data: f.data }));
@@ -145,6 +154,12 @@ export function createBoardVideo({
   return {
     open, close,
     isOpen: () => !!ws,
+    /** One frame from elsewhere, in the board's frame format. Drawn whether or not the socket's are. */
+    feed(buf) { take?.(buf); },
+    /** Draw the socket's binary frames, or not. */
+    socketFrames(yes) { fromSocket = !!yes; },
+    /** After a change of path: start again on the next keyframe, and do not count the gap as loss. */
+    expectKey() { waitingForKey = true; last = -1; },
     /** Text on the video socket itself, for a room where the board listens there. False when it is not open. */
     say(msg) {
       if (ws?.readyState !== 1) return false;

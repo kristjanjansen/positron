@@ -360,6 +360,11 @@ export function createInputs({
   // `{ ensure(), wire(doc, what) }` from `jacksynth.mjs`, or null on a board
   // with no JACK. Only an input configured `via: "jack"` uses it.
   jack = null, setTimer = setTimeout,
+  // The Pi camera's keyed room (camera.mjs `createCameraRoom`), or null. Since
+  // 2026-10-13 a page holding the camera key may have the camera's frames on
+  // its direct link to an input, on a third data channel `cam`, instead of
+  // through the relay. camera.mjs decides; this only hands it the channel.
+  camera = null,
 }) {
   const live = new Map();
   // The capture's unit: half a frame when a frame halves, so the direct path
@@ -372,7 +377,7 @@ export function createInputs({
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
       bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null, onCard: false,
-      back: null, backSaid: '', backSent: 0,
+      back: null, backSaid: '', backSent: 0, backDirect: 0,
     };
     // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
     // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
@@ -416,7 +421,7 @@ export function createInputs({
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device, via: onJack ? 'jack' : 'arecord',
                             ...(onJack ? { jack: { port: jackPort, bridge: s.onCard || !!s.bridge, by: s.onCard ? 'jackd' : s.bridge ? 'alsa_in' : null, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
                             frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused,
-                              back: { open: !!s.back, sent: s.backSent, ...(s.back ? s.back.limiter.counts() : {}) } } : null,
+                              back: { open: !!s.back, sent: s.backSent, direct: s.backDirect, ...(s.back ? s.back.limiter.counts() : {}) } } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             direct: s.rtc ? s.rtc.status() : null,
                             ...(s.proc ? {} : { reason: 'nothing playing' }) });
@@ -695,7 +700,12 @@ export function createInputs({
       }
       s.backSaid = '';
       const limiter = createBackLimiter({ gapMs: GAP_MS, now, setTimer,
-        emit: ({ ch, cc, v }) => { if (send({ type: 'midi.cc', input: cfg.name, ch, cc, v })) s.backSent++; } });
+        emit: ({ ch, cc, v }) => {
+          if (send({ type: 'midi.cc', input: cfg.name, ch, cc, v })) s.backSent++;
+          // And on every direct link, marked, so a page on one does not wait
+          // for the relay's copy and can drop it (remote/010, 2026-10-13).
+          if (s.rtc?.broadcast({ type: 'midi.cc', input: cfg.name, ch, cc, v, path: 'direct' })) s.backDirect++;
+        } });
       s.back = { fd, parser: createMidiParser(), limiter, timer: null };
       log(`${cfg.name}: reading the instrument's macro knobs (CC 80 to 87) off /dev/snd/midiC${midiDev()}D0`);
       const b = s.back;
@@ -799,10 +809,45 @@ export function createInputs({
       return n;
     }
 
+    // ── the Pi camera on a direct link ──────────────────────────────────────
+    // 🔴 ONLY OVER `ctl`, AND camera.mjs DECIDES. `cam.direct` carries the
+    // camera key and the page's viewer name in the keyed camera room. Over the
+    // relay it is refused without a look, because this room is tokenless and a
+    // key sent here would be a key told to everybody in it. Over `ctl` the
+    // camera checks the key against BOARD_CAM_KEY AND that the viewer is one
+    // the relay let into `<room>-cam` (so the relay's own key check passed
+    // first); only then are frames sent on the peer's `cam` channel.
+    const camId = (peerId) => `${cfg.name}:${peerId}`;
+    // ⚠️ THE ASK CAN OVERTAKE ITS CHANNEL. MEASURED 2026-10-13 against the Pi:
+    // the page's `cam` channel was open on its side and `cam.direct` on `ctl`
+    // still reached this handler before node-datachannel had told rtc.mjs
+    // about the new channel, so the first ask was refused and the camera went
+    // direct only on the retry 1.5 s later. So a missing channel is waited for,
+    // 25 ms at a time for half a second, before it is refused.
+    function camDirect(msg, reply, peerId, waited = 0) {
+      if (!peerId) return reply('cam.direct', { ok: false, why: 'the camera goes direct only over a direct link, never through this room' });
+      if (!camera?.attachDirect) return reply('cam.direct', { ok: false, why: 'this board has no camera room' });
+      const dc = s.rtc?.peers.get(peerId)?.ch?.cam;
+      if (!dc && waited < 500 && s.rtc?.peers.has(peerId)) { setTimer(() => camDirect(msg, reply, peerId, waited + 25), 25); return undefined; }
+      if (!dc) return reply('cam.direct', { ok: false, why: 'open the cam channel first', retry: true });
+      const r = camera.attachDirect({
+        id: camId(peerId), viewer: msg.viewer, key: msg.key,
+        sink: {
+          open: () => { try { return dc.isOpen(); } catch { return false; } },
+          backlog: () => { try { return dc.bufferedAmount(); } catch { return 0; } },
+          send: (buf) => dc.sendMessageBinary(buf),
+          text: (m) => dc.sendMessage(JSON.stringify(m)),
+        },
+      });
+      return reply('cam.direct', r);
+    }
+
     // `answer` is how a reply leaves: the relay room by default, the peer's own
-    // `ctl` channel when the message came over one.
-    function handle(msg, answer = null) {
+    // `ctl` channel when the message came over one, and then `peerId` says which.
+    function handle(msg, answer = null, peerId = null) {
       const reply = answer || ((type, body) => send({ type, re: msg.id, ...body }));
+      if (msg.type === 'cam.direct') return camDirect(msg, reply, answer ? peerId : null);
+      if (msg.type === 'cam.relay') { if (answer && peerId) camera?.detachDirect?.(camId(peerId), 'the page asked for the relay'); return reply('cam.relay', { ok: true }); }
       if (msg.type === 'input.want') {
         s.lease = now() + leaseMs;
         const was = !!s.proc;
@@ -884,9 +929,12 @@ export function createInputs({
       s.rtc = createRtc({
         PeerConnection, signal: send, handle, now, rate, unitMs: 1000 * UNIT / rate,
         log: (...a) => log(`${cfg.name}:`, ...a),
+        channels: ['cam'],
+        onChannelClosed: (p, label) => { if (label === 'cam') camera?.detachDirect?.(camId(p.id), 'its cam channel closed'); },
         // A direct listener that goes away lets go of the notes IT started.
         // Everybody else's stay, which is why this is not `midiPanic`.
         onGone: (p) => {
+          camera?.detachDirect?.(camId(p.id), 'its direct link closed');
           if (!cfg.midi || !fs) return;
           for (const k of p.held) {
             if (!s.held.has(k)) continue;

@@ -35,7 +35,7 @@
 // says so at length), so each refuses while the other runs.
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 
 /** No `cam.watching` from anybody for this long, and the camera stops. */
 export const CAM_IDLE_MS = 25_000;
@@ -43,6 +43,51 @@ export const CAM_IDLE_MS = 25_000;
 export const CAM_CODEC = 'avc1.42E01F';
 /** Over this many bytes queued on the socket, delta frames are dropped until the next keyframe. */
 const BACKLOG_BYTES = 2 << 20;
+
+// ── the direct path, since 2026-10-13 ───────────────────────────────────────
+// Asked: *"can https://positron.studio/concepts/remote/010/?cam= go direct
+// too?"*. The frames can leave on a page's direct WebRTC link to the Circuit's
+// input (rtc.mjs, inputs.mjs), on a third data channel `cam` beside `pcm` and
+// `ctl`, instead of through the relay. The keyed room stays the control: the
+// key check, `cam.watching`, `cam.bye` and the start and stop all still happen
+// there, and only the frames and the clock ticks move.
+// 🔴 TWO GATES, BOTH REQUIRED. `attachDirect` takes the key (compared with this
+// board's BOARD_CAM_KEY) AND the page's viewer name, which must be one this
+// room heard `cam.watching` from, which the relay delivers only from a socket
+// whose key it took. So a direct link alone opens nothing, and neither does a
+// key alone.
+// ⚠️ IN PIECES OF 16 KB, ORDERED AND RELIABLE. A keyframe is tens of KB and
+// 16 KB is the message size every SCTP stack takes; in order and reliable,
+// because a decoder fed a frame with a hole in it is broken until the next
+// keyframe, and the relay was a TCP stream too. Piece header: uint32 counter,
+// uint32 flags (bit 0 keyframe, bit 1 more pieces follow), then the bytes.
+/** Bytes of picture per piece on the `cam` channel. */
+export const DIRECT_PIECE = 16 * 1024 - 8;
+/** At most this many direct viewers; past it a page stays on the relay. */
+export const MAX_DIRECT = 4;
+
+/** One frame as the pieces the `cam` channel carries. Pure. */
+export function framePieces(seq, key, unit, piece = DIRECT_PIECE) {
+  const out = [];
+  for (let o = 0; o < unit.byteLength || (o === 0 && !out.length); o += piece) {
+    const n = Math.min(piece, unit.byteLength - o);
+    const more = o + n < unit.byteLength;
+    const b = Buffer.allocUnsafe(8 + n);
+    b.writeUInt32LE(seq >>> 0, 0);
+    b.writeUInt32LE((key ? 1 : 0) | (more ? 2 : 0), 4);
+    Buffer.from(unit.buffer, unit.byteOffset + o, n).copy(b, 8);
+    out.push(b);
+    if (!more) break;
+  }
+  return out;
+}
+
+/** Key equality that does not leak where two keys first differ. */
+export function sameKey(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+  const h = (x) => createHash('sha256').update(x).digest();
+  return timingSafeEqual(h(a), h(b));
+}
 
 const run = (cmd, args, timeout = 6000) => {
   try {
@@ -285,7 +330,16 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
   }
   const FROM = `board-cam-${randomBytes(3).toString('hex')}`;
   const viewers = new Map();       // from -> last cam.watching
-  let ws = null, authed = false, cam = null, shape = null, seq = 0, sent = 0, skipping = false;
+  let ws = null, authed = false, cam = null, shape = null, seq = 0, sent = 0, skipping = false, relaySkipped = 0;
+  const directs = new Map();       // id -> { viewer, sink, waitKey, sent, dropped }
+  // The relay carries the frames only while some keyed viewer is not on a
+  // direct link: a frame nobody reads through the relay is relay time for nothing.
+  const relayNeeded = () => {
+    if (!directs.size) return true;
+    const direct = new Set([...directs.values()].map((x) => x.viewer));
+    for (const v of viewers.keys()) if (!direct.has(v)) return true;
+    return false;
+  };
   let backoff = 1000, closed = false, refusedKey = false, tick = null;
   // A refusal is remembered for half a minute, so a viewer's heartbeat every
   // ten seconds does not ask the machine for its cameras every ten seconds.
@@ -293,7 +347,20 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
 
   const say = (m) => { if (ws?.readyState === 1 && authed) ws.send(JSON.stringify({ ...m, from: FROM })); };
 
+  function sendDirect(at, unit, key) {
+    for (const [id, x] of directs) {
+      if (!x.sink.open()) { detachDirect(id, 'its channel is not open'); continue; }
+      if (x.sink.backlog() > BACKLOG_BYTES) x.waitKey = true;
+      if (x.waitKey) { if (!key) { x.dropped++; continue; } x.waitKey = false; }
+      try { for (const b of framePieces(at, key, unit)) x.sink.send(b); x.sent++; }
+      catch (e) { detachDirect(id, `a send failed, ${e.message}`); }
+    }
+  }
+
   function sendFrame(unit, key) {
+    const at = seq;
+    if (directs.size) sendDirect(at, unit, key);
+    if (!relayNeeded()) { seq++; relaySkipped++; skipping = true; return; }
     if (ws?.readyState !== 1 || !authed) return;
     // A slow link backs up in the socket; dropping deltas until the next
     // keyframe keeps the picture current rather than ever later.
@@ -314,6 +381,31 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
     clearInterval(tick); tick = null;
     log(`camera: stopped, ${why}, after ${st.frames} frames`);
     say({ type: 'cam.stopped', why, ...st });
+    sayDirect({ type: 'cam.stopped', why, ...st });
+  }
+
+  function sayDirect(m) {
+    for (const x of directs.values()) { try { x.sink.text({ ...m, from: FROM }); } catch { /* closing */ } }
+  }
+
+  function attachDirect({ id, viewer, key: k, sink } = {}) {
+    if (!id || !sink) return { ok: false, why: 'no channel' };
+    if (!sameKey(k, key)) { log(`camera: a direct link offered a key that is not this board's (${id})`); return { ok: false, why: 'the key does not match this board' }; }
+    if (!authed) return { ok: false, why: 'the board is not in the camera room yet', retry: true };
+    if (typeof viewer !== 'string' || !viewers.has(viewer)) return { ok: false, why: 'no keyed viewer of that name in the camera room yet', retry: true };
+    if (!directs.has(id) && directs.size >= MAX_DIRECT) return { ok: false, why: `${MAX_DIRECT} direct viewers already, use the relay` };
+    directs.set(id, { viewer, sink, waitKey: true, sent: 0, dropped: 0, at: now() });
+    log(`camera: frames go direct to ${viewer} (${id}), ${directs.size} direct`);
+    if (cam && shape) { try { sink.text({ type: 'cam.started', ok: true, ...shape, from: FROM }); } catch { /* */ } }
+    return { ok: true, running: !!cam };
+  }
+
+  function detachDirect(id, why) {
+    const x = directs.get(id);
+    if (!x) return false;
+    directs.delete(id);
+    log(`camera: ${x.viewer} back on the relay, ${why}, after ${x.sent} direct frames`);
+    return true;
   }
 
   function begin() {
@@ -340,7 +432,7 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
     // The counter and this clock once a second, so a viewer can estimate the
     // delay against its own clock. Both clocks are NTP set; the estimate is
     // worth what their agreement is worth, and the page says so.
-    tick = setInterval(() => say({ type: 'cam.tick', seq, at: now() }), 1000);
+    tick = setInterval(() => { const m = { type: 'cam.tick', seq, at: now() }; say(m); sayDirect(m); }, 1000);
     tick.unref?.();
   }
 
@@ -351,8 +443,13 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
       viewers.set(m.from, now());
       if (!cam) begin();
       else if (isNew) say({ type: 'cam.started', ok: true, ...shape });
+    } else if (m.type === 'cam.relay') {
+      // A page that lost its direct link says so here, so the relay carries
+      // its frames again at once rather than when the dead link is noticed.
+      for (const [id, x] of directs) if (x.viewer === m.from) detachDirect(id, 'it asked for the relay');
     } else if (m.type === 'cam.bye') {
       viewers.delete(m.from);
+      for (const [id, x] of directs) if (x.viewer === m.from) detachDirect(id, 'it left');
       if (!viewers.size) end('the last viewer left');
     } else if (m.type === 'cam.ping') {
       say({ type: 'cam.pong', t: m.t, to: m.from, at: now() });
@@ -362,6 +459,7 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
   const prune = setInterval(() => {
     const cut = now() - idleMs;
     for (const [k, t] of viewers) if (t < cut) viewers.delete(k);
+    for (const [id, x] of directs) if (!viewers.has(x.viewer)) detachDirect(id, 'it stopped saying it is watching');
     if (cam && !viewers.size) end(`no keyed viewer has said it is watching for ${Math.round(idleMs / 1000)} s`);
   }, 5000);
   prune.unref?.();
@@ -387,6 +485,7 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
       const was = authed;
       authed = false; ws = null;
       viewers.clear();
+      for (const id of [...directs.keys()]) detachDirect(id, 'the board lost the camera room');
       end('the board lost the camera room');
       if (closed) return;
       if (e?.code === 4003) {
@@ -405,7 +504,9 @@ export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy
   return {
     enabled: true,
     running: () => !!cam,
-    status: () => ({ enabled: true, joined: authed, running: !!cam, viewers: viewers.size, sent, shape }),
+    status: () => ({ enabled: true, joined: authed, running: !!cam, viewers: viewers.size, sent, relaySkipped, shape,
+      direct: [...directs.values()].map((x) => ({ viewer: x.viewer, sent: x.sent, dropped: x.dropped })) }),
+    attachDirect, detachDirect,
     stop() { closed = true; clearInterval(prune); end('the board is stopping'); try { ws?.close(); } catch { /* gone */ } },
   };
 }

@@ -1880,6 +1880,9 @@ setCaptureUnit((u) => mainDirect.unit(u));
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
   spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a), PeerConnection,
+  // The camera's frames may ride a page's direct link to an input, behind the
+  // camera's own two gates (camera.mjs `attachDirect`), since 2026-10-13.
+  camera,
   // Only an input configured `via: "jack"` touches this (inputs.mjs).
   jack: { ensure: () => ensureJackd({ onLog: (l) => log('input', l) }),
           wire: (doc, what) => jackWire(doc, { onLog: (l) => log('input', l), what }) },

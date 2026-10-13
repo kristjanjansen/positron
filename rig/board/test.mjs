@@ -921,7 +921,7 @@ console.log('\nrtc: the direct path, against a fake peer');
     constructor(label) { this.label = label; this.out = []; this.open = true; this.backlog = 0; }
     getLabel() { return this.label; } isOpen() { return this.open; } bufferedAmount() { return this.backlog; }
     sendMessage(x) { this.out.push(JSON.parse(x)); } sendMessageBinary(b) { this.out.push(b); }
-    onMessage(f) { this.recv = f; } close() { this.open = false; }
+    onMessage(f) { this.recv = f; } close() { this.open = false; } onClosed(f) { this.closedCb = f; }
   }
   class FakePC {
     constructor(name, cfg) { this.name = name; this.cfg = cfg; this.cands = []; this.closed = false; pcs.push(this); }
@@ -939,7 +939,11 @@ console.log('\nrtc: the direct path, against a fake peer');
   const sock = [];
   class WS { constructor() { this.readyState = 1; this.sent = []; sock.push(this); } send(x) { this.sent.push(x); } close() { this.readyState = 3; } }
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
-  const mk = (PeerConnection) => createInputs({ inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 4, rate: 200, name: 'pi', id: 'pi',
+  // A camera room that records what it is asked, for the cam channel below.
+  const camAsked = [], camGone = [];
+  const fakeCamera = { attachDirect: (a) => { camAsked.push(a); return a.key === 'K' ? { ok: true } : { ok: false, why: 'no' }; },
+    detachDirect: (id, why) => { camGone.push([id, why]); return true; } };
+  const mk = (PeerConnection) => createInputs({ camera: fakeCamera, inputs: cfg.inputs, room: 'r', relay: 'wss://x', frame: 4, rate: 200, name: 'pi', id: 'pi',
     spawn: () => { const p = new EventEmitter(); p.stdout = new EventEmitter(); p.stderr = new EventEmitter(); p.kill = () => p.emit('exit'); spawned.push(p); return p; },
     WebSocket: WS, format: (m, e) => JSON.stringify({ ...m, ...e }), parse: (x) => ({ kind: 'json', msg: JSON.parse(x) }),
     randomId: () => 'x', now: () => t, fs: fakeFs, leaseMs: 60_000, beatMs: 5_000, PeerConnection });
@@ -985,6 +989,37 @@ console.log('\nrtc: the direct path, against a fake peer');
   is('input.want over ctl starts the capture', spawned.length, 1);
   is('and answers on ctl', ctl.out.at(-1).type, 'input.wanted');
 
+  // ── the Pi camera on the same link, 2026-10-13 (camera.mjs attachDirect) ──
+  ctl.recv(JSON.stringify({ type: 'rtc.ping', id: 'pp', t: 5 }));
+  is('a pong carries the board\'s wall clock, for the page\'s clock offset', [ctl.out.at(-1).type, typeof ctl.out.at(-1).at], ['rtc.pong', 'number']);
+  const relayBefore = relayOut(ws).length;
+  ws.onmessage({ data: JSON.stringify({ type: 'cam.direct', id: 'cr', key: 'K', viewer: 'v1', from: 'p' }) });
+  is('NEGATIVE CONTROL: cam.direct through the relay room is refused without asking the camera', [camAsked.length, relayOut(ws).at(-1)?.type, relayOut(ws).at(-1)?.ok], [0, 'cam.direct', false]);
+  ctl.recv(JSON.stringify({ type: 'cam.direct', id: 'c0', key: 'K', viewer: 'v1' }));
+  is('cam.direct with no cam channel is not refused at once (the ask can overtake its channel)', ctl.out.at(-1).type === 'cam.direct', false);
+  await new Promise((r) => setTimeout(r, 650));
+  is('but after half a second with none it says so, and to try again', [camAsked.length, ctl.out.at(-1).type, ctl.out.at(-1).ok, ctl.out.at(-1).retry], [0, 'cam.direct', false, true]);
+  const cam = new FakeDC('cam');
+  pcs[0].dcf(cam);
+  is('a cam channel is held, not closed', cam.open, true);
+  const stray = new FakeDC('junk'); pcs[0].dcf(stray);
+  is('NEGATIVE CONTROL: a channel nobody listed is still closed', stray.open, false);
+  ctl.recv(JSON.stringify({ type: 'cam.direct', id: 'c1', key: 'K', viewer: 'v1' }));
+  is('cam.direct over ctl asks the camera, with the key, the viewer and this peer', [camAsked[0]?.id, camAsked[0]?.viewer, camAsked[0]?.key], ['circuit:page1', 'v1', 'K']);
+  is('and its answer goes back on ctl', [ctl.out.at(-1).type, ctl.out.at(-1).ok, ctl.out.at(-1).re], ['cam.direct', true, 'c1']);
+  camAsked[0].sink.send(Buffer.from([1, 2]));
+  is('the sink the camera gets writes on the cam channel', cam.out.length, 1);
+  cam.closedCb();
+  is('the cam channel closing detaches it', camGone.at(-1)?.[0], 'circuit:page1');
+  // MEASURED 2026-10-13 on the Pi: the ask arrived before the channel did.
+  ctl.recv(JSON.stringify({ type: 'cam.direct', id: 'c2', key: 'K', viewer: 'v1' }));
+  const cam2 = new FakeDC('cam');
+  setTimeout(() => pcs[0].dcf(cam2), 60);
+  await new Promise((r) => setTimeout(r, 150));
+  is('an ask that overtook its channel waits for it and attaches', [camAsked.length, ctl.out.at(-1).re, ctl.out.at(-1).ok], [2, 'c2', true]);
+  cam2.closedCb();
+  is('nothing about the camera reached the relay room but the one refusal', relayOut(ws).length, relayBefore + 1);
+
   // frame 4 at 200 Hz: 20 ms a frame and a 10 ms unit, as on the board
   const frame = (a) => spawned[0].stdout.emit('data', Buffer.from(new Int16Array(a.flatMap((x) => [x, 7])).buffer));
   frame([1, 2]);
@@ -1018,6 +1053,7 @@ console.log('\nrtc: the direct path, against a fake peer');
   c.handle({ type: 'input.want', id: 'w2' });
   c.beat();
   is('a peer silent for a minute is closed', pcs[0].closed, true);
+  is('and its camera link, if any, is detached', camGone.some(([id, why]) => id === 'circuit:page1' && /direct link/.test(why)), true);
   is('the peer that kept talking stays', pcs[1].closed, false);
   is('the quiet peer\'s held note is released', writes.some((w) => w[0] === 0x81 && w[1] === 67), true);
   is('and nobody else\'s is', writes.some((w) => w[0] === 0x82 && w[1] === 70), false);

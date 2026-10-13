@@ -100,6 +100,17 @@ export function createRtc({
   PeerConnection, signal, handle, log = () => {}, now = () => Date.now(),
   iceServers = ['stun:stun.cloudflare.com:3478'], maxPeers = MAX_PEERS, idleMs = PEER_IDLE_MS,
   unitMs, rate, onGone = () => {},
+  // Labels a page may open beside `pcm` and `ctl`. Since 2026-10-13: `cam`,
+  // the Pi camera's frames on /concepts/remote/010/ (camera.mjs
+  // `attachDirect`). A channel listed here is only HELD: nothing is sent on it
+  // until its owner is asked over `ctl` and says yes. Anything not listed is
+  // closed, as before.
+  channels = [], onChannelClosed = () => {},
+  // The board's wall clock, for `rtc.pong`'s `at`: with the round trip it
+  // gives the page the offset between the two clocks, which a camera lag
+  // measured against the board's clock needs (it is otherwise worth what NTP
+  // on both machines is worth).
+  wall = () => Date.now(),
 }) {
   const peers = new Map();
 
@@ -126,7 +137,7 @@ export function createRtc({
     const want = msg.frameMs === 20 ? 20 : 10;
     const frameMs = want % unitMs === 0 ? want : unitMs;
     const p = { id, pc: null, pcm: null, ctl: null, heard: now(), frameMs, parts: frameMs / unitMs,
-                pending: [], seq: 0, held: new Set(), notes: new Map(), last: new Map(), sent: 0, dropped: 0 };
+                pending: [], seq: 0, held: new Set(), notes: new Map(), last: new Map(), sent: 0, dropped: 0, ch: {} };
     let pc;
     try { pc = new PeerConnection(`away-${id}`, { iceServers }); }
     catch (e) { signal({ type: 'rtc.refused', peer: id, why: `no peer connection here: ${e.message}` }); return; }
@@ -141,7 +152,18 @@ export function createRtc({
     pc.onDataChannel((dc) => {
       const label = dc.getLabel();
       if (label === 'pcm') { p.pcm = dc; return; }
-      if (label !== 'ctl') { try { dc.close(); } catch {} return; }
+      if (label !== 'ctl') {
+        if (!channels.includes(label)) { try { dc.close(); } catch {} return; }
+        p.ch[label] = dc;
+        try {
+          dc.onClosed?.(() => {
+            if (p.ch[label] !== dc) return;
+            delete p.ch[label];
+            onChannelClosed(p, label);
+          });
+        } catch { /* a fake without onClosed */ }
+        return;
+      }
       p.ctl = dc;
       const reply = (type, body) => { try { dc.sendMessage(JSON.stringify({ type, ...body })); } catch { /* closing */ } };
       reply('rtc.hello', { frameMs: p.frameMs, audioChannels: 1, rate });
@@ -150,7 +172,7 @@ export function createRtc({
         let m;
         try { m = JSON.parse(typeof data === 'string' ? data : data.toString()); } catch { return; }
         if (!m || typeof m !== 'object') return;
-        if (m.type === 'rtc.ping') return reply('rtc.pong', { re: m.id, t: m.t });
+        if (m.type === 'rtc.ping') return reply('rtc.pong', { re: m.id, t: m.t, at: wall() });
         if (m.type === 'midi.send') {
           if (!fresher(p.last, m.bytes, m.n)) return;   // overtaken; see the top of this file
           const [st, a, b] = Array.isArray(m.bytes) ? m.bytes : [];
@@ -211,8 +233,21 @@ export function createRtc({
     for (const p of [...peers.values()]) if (now() - p.heard > idleMs) close(p.id, 'nothing on ctl for a minute');
   }
 
+  /** One JSON message on every open `ctl`, for what the board says unasked (a macro turned by hand). */
+  function broadcast(msg) {
+    let n = 0;
+    const line = JSON.stringify(msg);
+    for (const p of peers.values()) {
+      let open = false;
+      try { open = !!p.ctl && p.ctl.isOpen(); } catch { /* closed under us */ }
+      if (!open) continue;
+      try { p.ctl.sendMessage(line); n++; } catch { /* closing */ }
+    }
+    return n;
+  }
+
   return {
-    offer, candidate, pcm, sweep, peers,
+    offer, candidate, pcm, sweep, peers, broadcast,
     get size() { return peers.size; },
     status: () => [...peers.values()].map((p) => ({ peer: p.id, frameMs: p.frameMs, sent: p.sent, dropped: p.dropped, open: !!p.pcm && !!p.ctl })),
     close() { for (const id of [...peers.keys()]) close(id, 'shutting down'); },

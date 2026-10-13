@@ -18,7 +18,7 @@
 // gate check, not here).
 import { spawnSync } from 'node:child_process';
 import { parseRpicamList, parseV4l2Devices, pickCaptureDevice, findCamera, cameraCommand,
-  createAccessUnitSplitter, createCameraRoom } from './camera.mjs';
+  createAccessUnitSplitter, createCameraRoom, framePieces, sameKey, DIRECT_PIECE } from './camera.mjs';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else fail++; console.log(`${c ? 'ok  ' : 'BAD '} ${m}`); };
@@ -169,6 +169,70 @@ ws.hear({ type: 'cam.watching', from: 'page-4' });
 ws.close();
 ok(!room.running(), 'room: losing the room stops the camera');
 room.stop();
+
+// ── the direct path, 2026-10-13 ─────────────────────────────────────────
+// NEGATIVE CONTROLS: a gate that checked only the key would attach a page the
+// relay never let into the room; one that checked only the viewer would attach
+// whoever learned a viewer's name; a board that kept sending through the relay
+// to a viewer it serves direct would pay the relay for frames nobody reads.
+{
+  const big = new Uint8Array(DIRECT_PIECE * 2 + 5).map((_, i) => i & 255);
+  const ps = framePieces(7, true, big);
+  ok(ps.length === 3 && ps.every((b) => b.readUInt32LE(0) === 7) && ps.map((b) => b.readUInt32LE(4)).join() === '3,3,1',
+    'direct: a frame over one piece is cut, every piece says more but the last, all say keyframe');
+  ok(Buffer.concat(ps.map((b) => b.subarray(8))).equals(Buffer.from(big)), 'direct: and the pieces put back together are the frame');
+  const one = framePieces(8, false, new Uint8Array([1, 2, 3]));
+  ok(one.length === 1 && one[0].readUInt32LE(4) === 0 && one[0].length === 11, 'direct: a small delta frame is one piece with no flags');
+  ok(sameKey('a'.repeat(64), 'a'.repeat(64)) && !sameKey('a'.repeat(64), 'b'.repeat(64)) && !sameKey('', '') && !sameKey(undefined, 'x'),
+    'direct: keys compare, and an empty key never matches');
+
+  const K = 'k'.repeat(64);
+  const r2 = createCameraRoom({ relay: 'wss://x', room: 'studio-1-cam', key: K, WS: FakeWS,
+    find: () => ({ ok: true, kind: 'test', name: 'test' }), start: fakeStart, now: () => clock, log: () => {} });
+  await new Promise((r) => setTimeout(r, 0));
+  const w2 = FakeWS.last;
+  const sinkOf = () => { const s = { out: [], texts: [], isOpen: true, back: 0 };
+    s.sink = { open: () => s.isOpen, backlog: () => s.back, send: (b) => s.out.push(b), text: (m) => s.texts.push(m) }; return s; };
+  const a = sinkOf();
+  ok(r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: K, sink: a.sink }).ok === false, 'direct: refused before the board is in the keyed room');
+  w2.hear({ type: 'cam.key.ok' });
+  const noViewer = r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: K, sink: a.sink });
+  ok(noViewer.ok === false && noViewer.retry === true, 'NEGATIVE CONTROL direct: the right key with no keyed viewer of that name is refused');
+  w2.hear({ type: 'cam.watching', from: 'page-1' });
+  const n0 = started.length;
+  ok(r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: 'x'.repeat(64), sink: a.sink }).ok === false, 'NEGATIVE CONTROL direct: a keyed viewer with the wrong key is refused');
+  ok(r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: K, sink: a.sink }).ok === true, 'direct: the key and a keyed viewer, both, attach');
+  ok(a.texts.some((m) => m.type === 'cam.started'), 'direct: a running camera says cam.started on the channel');
+  const cam2 = started[n0 - 1 + 1] || started.at(-1);
+  const relayBins = () => w2.sent.filter((d) => typeof d !== 'string').length;
+  const rb0 = relayBins();
+  cam2.frame(false);
+  ok(a.out.length === 0, 'direct: a delta before the first keyframe is not sent on the channel');
+  cam2.frame(true); cam2.frame(false);
+  ok(a.out.length === 2 && a.out[0].readUInt32LE(4) === 1, 'direct: from the keyframe on, every frame goes direct');
+  ok(relayBins() === rb0, 'NEGATIVE CONTROL direct: and none through the relay while the only viewer is direct');
+  w2.hear({ type: 'cam.watching', from: 'page-2' });
+  cam2.frame(true);
+  ok(relayBins() === rb0 + 1 && a.out.length === 3, 'direct: a second viewer on the relay brings the relay frames back, and the direct one keeps its own');
+  w2.hear({ type: 'cam.bye', from: 'page-2' });
+  a.back = 4 << 20; cam2.frame(false);
+  ok(a.out.length === 3, 'direct: a channel that is not draining drops deltas');
+  a.back = 0; cam2.frame(false);
+  ok(a.out.length === 3, 'direct: and waits for the next keyframe');
+  cam2.frame(true);
+  ok(a.out.length === 4, 'direct: which it then sends');
+  w2.hear({ type: 'cam.relay', from: 'page-1' });
+  const rb1 = relayBins();
+  cam2.frame(true);
+  ok(r2.status().direct.length === 0 && relayBins() === rb1 + 1 && a.out.length === 4, 'direct: cam.relay from the page puts it back on the relay at once');
+  ok(r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: K, sink: a.sink }).ok, 'direct: and it can attach again');
+  a.isOpen = false; cam2.frame(true);
+  ok(r2.status().direct.length === 0, 'direct: a closed channel is detached on the next frame');
+  r2.attachDirect({ id: 'circuit:p1', viewer: 'page-1', key: K, sink: (a.isOpen = true, a.sink) });
+  w2.hear({ type: 'cam.bye', from: 'page-1' });
+  ok(r2.status().direct.length === 0, 'direct: a bye detaches it');
+  r2.stop();
+}
 const off = createCameraRoom({ relay: 'wss://x', room: 'r-cam', key: '', WS: FakeWS, log: () => {} });
 ok(off.enabled === false && !off.running(), 'room: no key set, nothing joined and nothing started');
 
