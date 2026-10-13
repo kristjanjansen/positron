@@ -21,7 +21,7 @@
   .cc-pair canvas { display: block; width: 100%; height: 100%; }
   .cc-say { font-size: 12px; color: var(--dim); }
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  .pos-vp-tag > .cc-proto { color: var(--fg); }
+  .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -111,13 +111,16 @@
   const panel = createVideoPanel({ media: L, left: name });
   panel.el.querySelector('.pos-vp-r').prepend(size);
   const state = el('span', 'cc-say', '');
-  const moqPanel = createVideoPanel({ media: R, left: state, values: [
+  const leftM = el('span', 'cc-left'); leftM.append(el('span', 'cc-say cc-proto', 'MoQ '), state);
+  const moqPanel = createVideoPanel({ media: R, left: leftM, values: [
     { key: 'delay', label: '', reserve: 6 },
     { key: 'fps', label: 'fps', reserve: 2 },
     { key: 'codec', label: '', reserve: 3 },
   ] });
   const V = moqPanel.values;
-  moqPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'MoQ'));
+  // The protocol's name is the footer's first word, not a plate over the picture
+  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
+  // to videopanel fooers"*).
   const pair = el('div', 'cc-pair');
   pair.append(panel.el, moqPanel.el);
 
@@ -289,7 +292,7 @@
   // ?selfcheck=2, as on /moq/. The ordinary tier opens nothing.
   if (SELFCHECK) {
     d.assert('a visit opened nothing', !cam && !leg, cam ? 'a camera is open' : leg ? 'a session is open' : 'nothing open');
-    d.assert('the returned picture is tagged MoQ', moqPanel.slots.tag.textContent.includes('MoQ'));
+    d.assert('the returned picture is tagged MoQ', moqPanel.el.textContent.includes('MoQ'));
     if (DEEP && support.ok) {
       await start();
       const t0 = performance.now();
