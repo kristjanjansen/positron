@@ -16,7 +16,6 @@
   .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
 </style>
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -27,7 +26,7 @@
   import { createGlue } from '/shell/glue.mjs';
   import { createDeck } from '/timeline/transport.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createPlaitsVoice, PATCHES, P } from '../plaits-voice.mjs';
+  import { createPlaitsVoice, PATCHES, P } from '/concepts/synth/plaits-voice.mjs';
 
   // A basic Plaits concept. Asked 2026-10-12 (BACKLOG, "A basic Plaits
   // concept"): *"do basic plaits concept with patchbay. play button, scope,
@@ -77,8 +76,7 @@
   // NOTHING OPENS ON A VISIT. A pointer over (or focus on) the transport bar
   // fetches the wasm from this origin; the first play makes the AudioContext
   // and boots. A seek before that moves the playhead and sounds nothing.
-  const d = mount({ name: 'Plaits patches', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('synth/110');
+  const d = mount({ name: 'Plaits patches', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
   // The one sequence, for every patch: the notes, a note every STEP ms, each
   // held HOLD ms. LAP is the loop.

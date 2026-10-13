@@ -21,12 +21,13 @@ export const CONCEPTS = [
   { n: 'synth/070', title: 'LFO', say: 'An oscillator too slow to hear moves the filter\'s cutoff, so a held note opens and closes by itself.' },
   { n: 'synth/080', group: 'code', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { n: 'synth/090', group: 'code', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
-  { n: 'synth/110', title: 'Plaits patches', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
-  { n: 'synth/120', title: 'Plaits keys', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
+  // synth/110 Plaits patches moved to /archive/plaits-patches/ 2026-10-13 (*"arhvie plaits patches"*).
+  // Plaits keys and Piano and Rhodes under instruments in code (asked 2026-10-13, *"move plaits keys, sampler to in code instuments"*).
+  { n: 'synth/120', group: 'code', title: 'Plaits keys', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // Asked 2026-10-13: *"rename synth to instruments"*, *"move sampler to instruments"*,
   // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
   // its folder and URL stay where they are, so no address changed.
-  { n: 'sampler/000', group: 'synth', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
+  { n: 'sampler/000', group: 'code', title: 'Piano and Rhodes', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
   // Dot piano last in its group (asked 2026-10-13, *"dot piano is last in group"*).
   { n: 'synth/030', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
   { n: 'sampler/060', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
