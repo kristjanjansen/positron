@@ -171,7 +171,7 @@ export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig', [2, 3, 4]);
 // plus sitename"*. The owner's four lines as given, at the largest size the
 // width and height allow, and the wordmark on the bottom margin as on the
 // other cards.
-export const HELLO = ['Hello,', 'is thing', 'on?'];   // *"Hello, is thing on?"*, as given
+export const HELLO = ['Hello,', 'is this', 'thing', 'on?'];   // as given, 2026-10-13
 // 🔴 AND THE QUESTION MARK'S OWN DOT IS GREEN: first a dot inside the o of
 // `on?` (*"Inside on's o add our green dot"*), then *"No inside o. Questionmark
 // is white but dot is green. Hello's dot is gray"*. The green is the status
