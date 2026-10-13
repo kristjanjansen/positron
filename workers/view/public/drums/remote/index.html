@@ -23,10 +23,10 @@
   import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
-  import { createDrumMachine } from '/rhythm/drum-machine.mjs';
-  import { VOICES, LIFE } from '/rhythm/voices.mjs';
+  import { createDrumMachine } from '/drums/drum-machine.mjs';
+  import { VOICES, LIFE } from '/drums/voices.mjs';
 
-  // /rhythm/drums/ with the same four drums also played on the
+  // /drums/machine/ with the same four drums also played on the
   // Raspberry Pi, the way /remote/collide/ pairs a voice here with one on
   // the Pi. plans/plan-pi-supercollider-defs.md §3.4 and §4 step 6 (the plan
   // calls it rhythm/020; that number went to the sample drums).
@@ -105,7 +105,7 @@
     joined: false,
     readout: { 'Pi late': '', 'Pi lag': 'ms', network: 'ms', path: '' },
   });
-  conceptNav('remote/drums');
+  conceptNav('drums/remote');
 
   const q = new URLSearchParams(location.search);
   // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote

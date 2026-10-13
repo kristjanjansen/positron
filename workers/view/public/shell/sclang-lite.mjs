@@ -416,7 +416,7 @@ const RATE_WORD = ['scalar', 'control', 'audio'];
  *
  * @param {string} src
  * @param {{name?: string, bus?: number}} [o]  `bus` is the output bus the last
- *   line goes to, 0 by default. Added 2026-10-12 so the `/rhythm/` concept pages can put
+ *   line goes to, 0 by default. Added 2026-10-12 so the `/drums/` concept pages can put
  *   each drum on a stereo pair of its own; the engine has to be booted with that
  *   many output channels, or the bus is an input.
  * @returns {{ok: true, bytes: Uint8Array, name: string, params: {name: string, value: number}[],

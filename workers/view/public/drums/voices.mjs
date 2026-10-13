@@ -1,5 +1,5 @@
-// demo/rhythm/voices.mjs: the four drum voices /rhythm/drums/ and
-// /rhythm/knobs/ play, each a small program in /collide/'s subset of
+// demo/drums/voices.mjs: the four drum voices /drums/machine/ and
+// /drums/knobs/ play, each a small program in /collide/'s subset of
 // SuperCollider, compiled in the tab and run on scsynth compiled to WebAssembly.
 //
 // Asked 2026-10-12 (BACKLOG, "A rhythm concept group"): *"make new grpup
@@ -141,7 +141,7 @@ const ROWS = [
 ];
 
 
-// ── FOUR MORE, FOR /rhythm/camera/ ONLY ───────────────────────────────
+// ── FOUR MORE, FOR /drums/camera/ ONLY ───────────────────────────────
 // Asked 2026-10-12: *"add 4 more drum isntrumets to 050"*. Chosen to read as
 // different from the four above and from each other, by ear and on a scope:
 //   clap     three quick noise bursts and a tail, the 808's clap. The one
@@ -223,7 +223,7 @@ const EXTRAS = [
   { key: 'rim', label: 'rim shot', make: rim },
 ];
 
-// ── NINE MORE, FOR /rhythm/camera/'s 2x ONLY ──────────────────────────
+// ── NINE MORE, FOR /drums/camera/'s 2x ONLY ──────────────────────────
 // Asked 2026-10-12: *"can we deliver 2x more res button and drum instruments as
 // toggle?"*. At 2x the picture is 32 by 18 squares, so eighteen rows. Each of
 // these is a sound the first nine do not make:

@@ -1,6 +1,6 @@
 // ONE SCOPE, BOTH WAVES ON IT, EACH HELD FROM ITS OWN ONSET.
 // Lifted 2026-10-13 out of /remote/collide/ (Collide on Pi) so
-// /remote/drums/ (Drums on the Pi) draws the same picture; asked that
+// /drums/remote/ (Drums on the Pi) draws the same picture; asked that
 // day on 040 as *"can not see viz improvements"*.
 //
 // What it was built for, on 020: asked on a shot of two half panels (here a

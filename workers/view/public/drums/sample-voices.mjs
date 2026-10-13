@@ -1,6 +1,6 @@
-// demo/rhythm/sample-voices.mjs: the rows of /rhythm/samples/, one per sample,
+// demo/drums/sample-voices.mjs: the rows of /drums/samples/, one per sample,
 // which play SAMPLES on the same one SuperCollider engine the synth drums run
-// on. Asked 2026-10-12 (BACKLOG, "rhythm/020"): /rhythm/knobs/ with the
+// on. Asked 2026-10-12 (BACKLOG, "drums/020"): /drums/knobs/ with the
 // voices playing samples, a default kit on R2, any pack or zip of WAVs dropped
 // on the page replacing it.
 //
@@ -28,7 +28,7 @@
 import { graph, RATE, OP } from '/shell/synthdef.mjs';
 import { toMono } from '/shell/circuit-sample.mjs';
 
-/** The default kit: the four /rhythm/drums/ drums, one hit each,
+/** The default kit: the four /drums/machine/ drums, one hit each,
  *  rendered in this tab off each drum's own output pair (2026-10-12) and put
  *  on R2 under `rhythm/default-kit/`. */
 export const KIT_BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/rhythm/default-kit/';
