@@ -1,4 +1,6 @@
 ## Open
+- **iPhone Safari: "Raadio 2 recording did not open: Decoding failed" on the Granulator** (2026-10-13), from an owner screenshot. The 2.9 MB R2 MP3 decodes in Chrome and not in WebKit. With the iOS agent.
+- **Plaits keys is titled Plaits** (2026-10-13). Asked: *"Plaits keys (rm keys from name)"*. The title in concept-list.mjs and the page's own name; its address is /code/plaits/.
 - **Plaits keys is just Plaits; Plaits and Collide silent on iPhone Safari** (2026-10-13). Asked: *"No plaits keys (rm keys grom name) nor collide lically make sound on safari movbile"*. Title to the slug agent; the engines (Plaits worklet, scsynth wasm) to the iOS agent.
 - **Code boxes just above the patchbay** (2026-10-13). Asked: *"All syth etc code boxes on top of patchbay"*. On every page with a code box (Faust, Collide, Collide on Pi, Shader on Pi, Mirror shader and any other), the code box sits immediately above the patchbay. Queued until the slug move lands (it moves those folders).
 - **Concept pager: next always on the right** (2026-10-13). Asked on a phone shot of Keyboard, the first concept page, where the next link "Recorder ›" sat on the LEFT under "← CONCEPTS": *"Next link always to right"*. demo/shell/concept-nav.mjs: next at the right edge of its row and previous at the left whether or not the other exists, phone and desktop.
