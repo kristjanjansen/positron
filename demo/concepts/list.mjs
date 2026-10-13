@@ -22,8 +22,8 @@ export const CONCEPTS = [
   { n: 'synth/070', title: 'LFO', say: 'An oscillator too slow to hear moves the filter\'s cutoff, so a held note opens and closes by itself.' },
   { n: 'synth/080', title: 'Faust synth', say: 'A Faust synth voice compiled in this tab on your first key, with a knob for each of its parameters.' },
   { n: 'synth/090', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
-  { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
-  { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
+  { n: 'synth/110', title: 'Plaits patches', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
+  { n: 'synth/120', title: 'Plaits keys', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // Asked 2026-10-13: *"rename synth to instruments"*, *"move sampler to instruments"*,
   // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
   // its folder and URL stay where they are, so no address changed.
