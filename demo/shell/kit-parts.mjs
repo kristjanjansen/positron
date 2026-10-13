@@ -95,7 +95,9 @@ export const KIT_PARTS = [
   // `frontpage` IS THE THIRTEENTH, 2026-10-12 (*"add new kit card / page. name
   // it fronpage. lets work on it. first do typograpy sampler"*): the faces the
   // site is set in today, and the sans faces measured against the brand mono.
-  { part: 'frontpage', label: 'FRONTPAGE', ids: [
+  // Archived 2026-10-13 (*"Archive frontoage kit"*): still served and its
+  // blocks still resolve, off /kit/'s cards, listed on /archive/.
+  { part: 'frontpage', label: 'FRONTPAGE', archived: true, ids: [
     'the-rule-in-use', 'sharp-test', 'hero', 'titles-and-subtitles', 'pairings-on-a-slide',
     'the-choice', 'measured-against-the-brand-mono', 'matching-sans', 'typography-sampler',
   ] },

@@ -59,6 +59,7 @@
   const one = (part) => DEMOS.find((x) => x.name === `kit/${part}`)?.one || '';
   const cards = el('div', 'kit-cards');
   for (const p of KIT_PARTS) {
+    if (p.archived) continue;   // listed on /archive/ instead
     const a = el('a', 'kit-card', '', { href: `/kit/${p.part}/` });
     a.append(el('h3', 'kit-card-t', p.part));
     const say = one(p.part);
