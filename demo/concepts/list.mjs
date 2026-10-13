@@ -137,7 +137,7 @@ export const DEMO_CARDS = {
   // use cases: actual content, played with the wiring in view
   reel: { group: 'archives', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },
   floor: { group: 'archives', say: 'ERR\'s 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset.' },
-  resources: { group: 'archives', say: 'Every source for Erkki Kurenniemi\'s work that could be reached, with its date, holder and licence.' },
+  // resources archived 2026-10-13 (*"archvie resourves"*): still served, listed on /archive/.
   tapes: { group: 'archives', say: 'Every Erkki Kurenniemi recording that still plays, end to end, each block as long as its recording.' },
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
   partitur: { group: 'performances', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },

@@ -258,7 +258,9 @@ export const DEMOS = [
   // Refs only — nothing is copied here. `demo/resources/build-corpus.mjs`
   // gathers it and folds in the shorter list `aikajana` plays from, and the
   // page re-checks that fold from the other end so the two cannot disagree.
-  { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archvie resourves"*): still built and deployed at
+  // /resources/, listed on /archive/ with the other retired pages.
+  { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true, unlisted: true,
     one: 'every reachable source for Erkki Kurenniemi\'s work, one row each',
     tags: ['archive', 'provenance'] },
   // The same corpus as the row above, on an axis instead of in a table: one

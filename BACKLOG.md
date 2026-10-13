@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /resources/**~~ (2026-10-13). Asked: *"archvie resourves"*. DONE by the session: unlisted, still served, card out, on /archive/.
 - ~~**Archive /weight/ and /stage/**~~ (2026-10-13). Asked: *"archive weight stage"*. DONE by the session: unlisted, still served, cards out, on /archive/. /stage/'s routes and Stream input stay in workers/pub.
 - ~~**Archive /making/**~~ (2026-10-13). Asked: *"archive making"*. DONE by the session: unlisted, still served, card out, on /archive/.
 - **The /videoradio/ picture as a shader concept, with every visual parameter a knob and a patchbay** (2026-10-13). Asked: *"copy the visualiztion videograme from videoradio and add it to shaders concept. add all patameters that adjust its visulaliztion as kobs + add patchbay"*.
