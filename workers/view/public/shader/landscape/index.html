@@ -73,77 +73,81 @@
   const PATCH = PATCHES.find((p) => p.name === 'Cloud');
   const NODE = 4000, BUF = 0, DEF = 'gring';
 
-  // ── the knobs: every number that shapes the picture you can see ───────
-  // Each look number, the four the baked body types as literals (EXTRA), and
-  // how long the grain marks take to fade, which the picture is handed in its
-  // data rather than in its body. Most visible first. Ranges cover every look
-  // in the archive table with room either side.
+  // ── the knobs: six, the rest fixed at the look's own ───────────────────
+  // Asked 2026-10-13: *"What about lanacape params simplofication?"*, then
+  // *"Cut more"*, then *"3-4 too little. I want it to be ready for
+  // granulator"*. So the row is the few numbers that change the picture most
+  // and most differently, weighted to the ones the sound already moves,
+  // because the granulator's values are going to drive them next. Each is a
+  // node with a value-out (a turn, into the shader) and a value-in (where a
+  // granulator wire can land: it turns the dial and the picture, sends
+  // nothing back). Every other number holds `quartz`'s own value (FIXED), so
+  // at the opening values this is /videoradio/'s picture, number for number.
   //
-  // 🔴 29 OF THE 35 THERE WERE, MEASURED 2026-10-13. Asked (BACKLOG): *"do
-  // testing on .../concepts/shader/020/ params. when no visual impact or
-  // absolutely minimal, remove"*. Each knob at its min, open and max, on the
-  // real GPU (ANGLE Metal, M2 Pro), at 960x540, in both states a visitor
-  // sees: standby, and playing on our Raadio 2 recording. Comparable because
-  // the data texture this page feeds its chain was RECORDED once per state
-  // (1500 frames) and REPLAYED byte for byte into a fresh chain per setting,
-  // so only the knob differed; the same setting twice read 0.000.
-  // Measured as mean |difference| of 0..255 and share of pixels moved by
-  // more than 8, worst of min and max, every state that enables the knob.
-  // The cut is where the data has a gap: the five below change at most
-  // 1.71% of pixels and at most 1.28 of 255 in every state, and the next
-  // weakest (blue) changes 7.35% playing and 11.3% standby.
-  //   glow     0.000 and 0% in both states, over 25 s and 1451 grain events:
-  //            it scales a bloom of the flat field, masked by the ridges, and
-  //            on this material that product never reaches a whole level
-  //   facet    standby 0 (needs grains), playing 0.36 of 255, 0.88%
-  //   occlude  standby 0.54, 0.20%; playing 1.05, 1.66%
-  //   fade     standby 0 (needs grains), playing 0.66, 1.71%
-  //   echo     standby 1.28, 1.69% (at 0.9 only); playing 0.58, 0.01%
-  // They stay at the look's own value in their uniform, so the picture at
-  // the opening values is the same bytes as before (testFinal, 4 of 4).
-  //   mirror   0 alone, because the fold sits at `horizon`, which opens at
-  //            1.0, the top edge, so there is nothing above it to fold; and
-  //            horizon read 0 alone because the fold is off. Together they
-  //            are 4.4 to 9.2 of 255 and 18 to 30% of pixels, so one knob
-  //            does it: mirror is held ON and horizon alone moves the fold.
-  //            At 1.0 the fold is off by construction (`sy > 1.0` is never
-  //            true in the frame), the same bytes as mirror off.
-  const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3), pct = (v) => `${Math.round(v * 100)}%`;
+  // 🔴 CHOSEN BY MEASUREMENT, 2026-10-13, on the real GPU (ANGLE Metal, M2
+  // Pro), 960x540. The data texture this page feeds the chain was RECORDED,
+  // 300 frames standby and 300 playing our Raadio 2 recording through the
+  // granulator, and REPLAYED byte for byte into a fresh chain per setting
+  // (the same setting twice read 0.000), each knob alone at its min and its
+  // max. Three numbers per setting, worst of min and max, against the
+  // opening picture, read at frames 200, 250 and 300:
+  //   pixel  mean |change| of 0..255, and the share moved by more than 8
+  //   block  mean |luminance change| over 32 px blocks, which is what the
+  //          eye sees at a glance. A thin line moved by one width moves
+  //          every one of its pixels, so the pixel number saturates near 20
+  //          for any knob that shifts geometry at all and cannot rank them;
+  //          the block number can.
+  //   alike  the correlation of two knobs' block changes (centred), to keep
+  //          two that do the same thing from both getting a knob.
+  // Block, standby / playing, highest first (the full table is in the
+  // report to the session, 2026-10-13):
+  //   halo 40.5/29.2  rows 26.3/18.7  valley 14.5/19.3  gamma 17.8/13.0
+  //   gain 16.3/11.3  amp 14.6/8.8  height 12.5/13.7  floor 13.6/9.0
+  //   depth 12.8/12.2  lines 11.9/7.1  loud 0/10.1  travel 9.0/10.4
+  //   spacing 9.4/7.6  edges 8.7/5.4  horizon 6.5/7.5  white 6.6/4.8
+  //   swell 5.5/3.4  idle 4.5/2.8  heave 3.4/1.3  tunnel 3.3/0.9
+  //   counts 0/3.3  near 3.1/3.3  waves 2.9/1.4  wide 2.6/2.7  blue 2.1/1.6
+  //   sway 0.7/1.3  stretch 0/1.1  breath 1.1/0.6  bass 0/0.9
+  // What the six are, and why each and not its neighbour:
+  //   rows    the strongest that changes the STRUCTURE. halo, gain, gamma
+  //           and lines correlate 0.91 to 0.98 with it: all of them mostly
+  //           make the same lines brighter, so one knob stands for the five.
+  //   height  the master on every sound-driven height (`ampM` multiplies
+  //           amp, loud and bass). valley, floor, depth and amp correlate
+  //           0.80 to 0.89 with it: one knob for the terrain's relief.
+  //   loud    the strongest of the ones the SOUND drives: 0 standby, 10.1
+  //           playing. How far the level follower lifts the ridges. bass
+  //           correlates 0.69 with it and moves a tenth as much.
+  //   swell   the wave walking through the rows; alike nothing above 0.61,
+  //           and in standby it doubles the picture's motion (1.3 to 3.2).
+  //   counts  how much the grain events themselves make the height: 0
+  //           standby, 3.3 playing, and alike nothing above 0.24. The one
+  //           knob that is about the granulator's own events.
+  //   heave   the terrain breathing on the grain clock (`pulse`, advanced by
+  //           the grains reported): the largest gain in playing motion of the
+  //           sound-driven ones (block motion 3.6 to 5.6), alike nothing
+  //           above 0.46.
+  // Left at the look's value although they measure: halo (open 0, which is
+  // the look; at 1 it is the rows/gain family again), travel (0 is why
+  // quartz holds still, see LOOKS), stretch, sway, breath, bass (each under
+  // 1.3 by block, playing). The six removed on 2026-10-12 (echo, glow,
+  // fade, occlude, facet, mirror) measured under 1.3 of 255 by pixel then.
+  // ⚠️ mirror is now the look's own 0, not held at 1: with horizon fixed at
+  // 1.0 the fold is off by construction, so both draw the same bytes.
+  const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3);
   const K = [
     { name: 'rows', label: 'rows', min: 8, max: 132, step: 1, fmt: (v) => `${Math.round(v)}` },
     { name: 'ampM', label: 'height', min: 0.5, max: 8, fmt: f2 },
-    { name: 'tunnel', label: 'tunnel', min: 0, max: 4, fmt: (v) => `${v.toFixed(2)}x` },
-    { name: 'travel', label: 'travel', min: 0, max: 5, fmt: f2 },
-    { name: 'wide', label: 'wide', min: 0.5, max: 3, fmt: f2 },
-    { name: 'cam', label: 'near', min: 0.1, max: 1, fmt: f2 },
-    { name: 'baseB', label: 'depth', min: 0.3, max: 1, fmt: f2 },
-    { name: 'baseA', label: 'floor', min: 0, max: 0.2, fmt: f3 },
-    { name: 'baseE', label: 'spacing', min: 0.5, max: 1.5, fmt: f2 },
-    { name: 'mir', label: 'horizon', min: 0.3, max: 1, fmt: f2 },
-    { name: 'waves', label: 'waves', choices: [['1', 1], ['3', 3]] },
-    { name: 'idle', label: 'idle', min: 0, max: 0.15, fmt: f3 },
-    { name: 'swellY', label: 'swell', min: 0, max: 0.05, fmt: f3 },
-    { name: 'stretch', label: 'stretch', min: 0, max: 3, fmt: f2 },
-    { name: 'xbreath', label: 'breath', min: 0, max: 1, fmt: f2 },
-    { name: 'sway', label: 'sway', min: 0, max: 1, fmt: f2 },
-    { name: 'heave', label: 'heave', min: 0, max: 1, fmt: f2 },
-    { name: 'valley', label: 'valley', min: 0, max: 0.6, fmt: f2 },
-    { name: 'bucket', label: 'counts', min: 0, max: 1, fmt: f2 },
-    { name: 'ampA', label: 'amp', min: 0, max: 0.3, fmt: f3 },
     { name: 'ampL', label: 'loud', min: 0, max: 0.5, fmt: f3 },
-    { name: 'ampB', label: 'bass', min: 0, max: 0.2, fmt: f3 },
-    { name: 'halo', label: 'halo', min: 0, max: 1, fmt: f2 },
-    { name: 'gamma', label: 'gamma', min: 0.6, max: 2, fmt: f2 },
-    { name: 'gain', label: 'gain', min: 0.5, max: 3, fmt: f2 },
-    { name: 'mono', label: 'white', min: 0, max: 1, fmt: pct },
-    { name: 'chroma', label: 'blue', min: 0, max: 1, fmt: pct },
-    { name: 'scan', label: 'lines', min: 0, max: 0.5, fmt: f2 },
-    { name: 'vig', label: 'edges', min: 0, max: 1, fmt: f2 },
+    { name: 'swellY', label: 'swell', min: 0, max: 0.05, fmt: f3 },
+    { name: 'bucket', label: 'counts', min: 0, max: 1, fmt: f2 },
+    { name: 'heave', label: 'heave', min: 0, max: 1, fmt: f2 },
   ];
-  // The six that left the row, at the values they hold: the look's own, but
-  // mirror, which is held on (above). `fade` is /videoradio/'s `TRAIL_S`.
-  const FIXED = { keep: LOOK.keep, glow: EXTRA.glow, fade: 1.6, facet: LOOK.facet, occl: LOOK.occl, mirror: 1 };
-  const OPEN = { ...LOOK, ...EXTRA, ...FIXED };
+  // Every number without a knob, at the look's own value. `fade` is
+  // /videoradio/'s `TRAIL_S` and reaches the picture in its data, not uK.
+  const OPEN = { ...LOOK, ...EXTRA, fade: 1.6 };
+  const KNOBBED = new Set(K.map((c) => c.name));
+  const FIXED = Object.fromEntries(Object.entries(OPEN).filter(([n]) => !KNOBBED.has(n)));
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const SOURCES = createSources({ log: (m) => d.log(m) });
@@ -158,6 +162,7 @@
   // never by the shader's own name for the number (`ampM` is `height`).
   const LABEL = new Map();
   const KNOB_OUT = (n) => `${S}:knob-${LABEL.get(n)}:value-out`;
+  const KNOB_IN = (n) => `${S}:knob-${LABEL.get(n)}:value-in`;
 
   const bay = createBay();
   bay.addNode({ id: `${SRC.store}:${SRC.id}`, kind: 'store', label: SRC.label, place: 'cloudflare', net: 'cloudflare' });
@@ -182,6 +187,8 @@
     LABEL.set(c.name, c.label);
     bay.addNode({ id: `${S}:knob-${c.label}`, kind: 'person', label: c.label, place: 'browser' });
     bay.addPort({ id: KNOB_OUT(c.name), label: c.label, dir: 'out', medium: 'value' });
+    // where a granulator's value can land later: unlinked today
+    bay.addPort({ id: KNOB_IN(c.name), label: c.label, dir: 'in', medium: 'value', deliver: (ev) => knobIn(c.name, ev) });
   }
   function hold(a, b) {
     const r = bay.link(a, b, [], { site: S });
@@ -210,10 +217,7 @@
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
     name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
-    try {
-      field = createScanField(gl, { look: LOOK, live: true, canvas });
-      field.set('mirror', FIXED.mirror);              // see the knob list: horizon alone moves the fold
-    }
+    try { field = createScanField(gl, { look: LOOK, live: true, canvas }); }
     catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
   } else d.log('this browser has no WebGL2, so there is no picture', 'bad');
 
@@ -224,6 +228,15 @@
     if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
     knobEvents++;
     field?.set(ev.name, ev.v);
+  }
+  // A value on a knob's own inlet: the dial glides to it (the invisible hand's
+  // `receive`, which sends nothing) and the picture takes it directly.
+  let knobInEvents = 0;
+  function knobIn(nm, ev) {
+    if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
+    knobInEvents++;
+    knobs.get(nm)?.receive(ev.v, { from: 'wire' });
+    field?.set(nm, ev.v);
   }
 
   // ── the data texture, filled every frame as /videoradio/ fills it ───────
@@ -298,13 +311,7 @@
   const knobs = new Map();
   const send = (nm, v) => bay.send(KNOB_OUT(nm), { of: 'param', name: nm, v });
   for (const c of K) {
-    if (c.choices) {
-      const at0 = Math.max(0, c.choices.findIndex(([, v]) => v === OPEN[c.name]));
-      // The invisible hand on every knob (asked 2026-10-13, *"andd inivisible hand for knobs"*).
-      knobs.set(c.name, createKnob({ label: c.label, min: 0, max: c.choices.length - 1, step: 1, value: at0, hand: true,
-        format: (i) => c.choices[Math.round(i)]?.[0] ?? '', onInput: (i) => send(c.name, c.choices[Math.round(i)][1]) }));
-      continue;
-    }
+    // The invisible hand on every knob (asked 2026-10-13, *"andd inivisible hand for knobs"*).
     knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name], hand: true,
       ...(c.step ? { step: c.step } : {}), format: c.fmt, onInput: (v) => send(c.name, v) }));
   }
@@ -419,7 +426,7 @@
   window.__demo.knobs = grid;
   window.__demo.landscape = {
     field: () => field, playing: () => playing, grains: () => grains, frames: () => frames,
-    events: () => ({ knob: knobEvents, grain: grainEvents }), params: () => ({ ...(field?.params() || {}), fade: FIXED.fade }),
+    events: () => ({ knob: knobEvents, knobIn: knobInEvents, grain: grainEvents }), params: () => ({ ...(field?.params() || {}), fade: FIXED.fade }),
     fetched: () => SOURCES.fetched(), context: () => ctx, knob: (nm) => knobs.get(nm),
   };
 
@@ -433,29 +440,29 @@
       field ? `${Object.keys(field.params()).length} numbers in uK` : 'no picture');
     await wait(400);
     d.assert('the standby field draws before Play, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
-    // The six that left the row hold their values in the uniform, and the
-    // knob row and the patchbay are the 29 that were measured to show.
-    const pr = field.params(), gone = Object.keys(FIXED).filter((k) => k !== 'fade');
-    const holdsFixed = gone.every((k) => Math.abs(pr[k] - FIXED[k]) < 1e-6);
-    const nodes = bay.nodes().filter((n) => n.id.startsWith(`${S}:knob-`)).length;
-    d.assert('29 knobs, one patchbay node each, and the six without a visible effect hold their values',
-      knobs.size === 29 && nodes === 29 && holdsFixed && !gone.some((k) => knobs.has(k)),
-      `${knobs.size} knobs, ${nodes} knob nodes, ${gone.map((k) => `${k} ${+pr[k].toFixed(3)}`).join(', ')}`);
-    // Mirror is held on and is invisible at the opening horizon; horizon
-    // alone moves the fold, by hand, and back draws the same bytes.
-    const still = new Uint8Array(data), hz = knobs.get('mir'), hz0 = hz.value();
-    const m1 = field.testFinal(still);
-    field.set('mirror', 0);
-    const m0 = field.testFinal(still);
-    field.set('mirror', FIXED.mirror);
-    hz.set(0.52, { from: 'hand' });
-    const h52 = field.testFinal(still);
-    hz.set(hz0, { from: 'hand' });
-    const h1 = field.testFinal(still);
+    // Six knobs, each a node with an outlet and an inlet, and every other
+    // number at the look's own value in the uniform.
+    const pr = field.params(), kept = Object.keys(FIXED).filter((k) => k in pr);
+    const off = kept.filter((k) => Math.abs(pr[k] - FIXED[k]) > 1e-6);
+    const knobNodes = bay.nodes().filter((n) => n.id.startsWith(`${S}:knob-`)).length;
+    const inlets = K.filter((c) => bay.port(KNOB_IN(c.name))?.dir === 'in').length;
+    d.assert('six knobs, one patchbay node each with a value inlet, and every other number holds the look\'s own value',
+      knobs.size === 6 && knobNodes === 6 && inlets === 6 && kept.length === 28 && off.length === 0,
+      `${knobs.size} knobs, ${knobNodes} knob nodes, ${inlets} inlets, ${kept.length} fixed, ${off.length ? `off: ${off.join(', ')}` : 'none off'}`);
+    // A value on a knob's inlet (where a granulator wire will land) turns the
+    // dial and the picture, sends nothing on the knob's outlet, and back draws
+    // the same bytes.
+    const still = new Uint8Array(data), hv = knobs.get('ampM'), h0 = hv.value();
+    const sent0 = knobEvents;
+    const p0 = field.testFinal(still);
+    bay.port(KNOB_IN('ampM')).deliver({ of: 'param', name: 'ampM', v: 1.2 });
+    const p1 = field.testFinal(still), dial = hv.value();
+    bay.port(KNOB_IN('ampM')).deliver({ of: 'param', name: 'ampM', v: h0 });
+    const p2 = field.testFinal(still);
     const eq = (x, y) => x.px.every((v, i) => v === y.px[i]);
-    d.assert('mirror held on draws the same bytes as off at the opening horizon, and horizon alone folds the picture',
-      eq(m1, m0) && diff(m1, h52) > 1 && eq(m1, h1),
-      `on vs off identical ${eq(m1, m0)}, horizon 1 to 0.52 mean change ${diff(m1, h52).toFixed(2)} of 255, back identical ${eq(m1, h1)}`);
+    d.assert('a value on the height knob\'s inlet turns its dial and the picture, sends nothing back, and back draws the same bytes',
+      Math.abs(dial - 1.2) < 1e-6 && diff(p0, p1) > 0.2 && eq(p0, p2) && knobEvents === sent0 && knobInEvents === 2,
+      `dial ${dial.toFixed(2)}, mean change ${diff(p0, p1).toFixed(2)} of 255, back identical ${eq(p0, p2)}, ${knobEvents - sent0} sent on the outlet`);
     await play();
     d.assert('Play brought the granulator up on our recording', !!eng && !!source, `${SRC.url}`);
     if (!eng) return;

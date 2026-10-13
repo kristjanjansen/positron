@@ -76,7 +76,7 @@ export const CONCEPTS = [
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
   { id: 'shader/mirror', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
   // shader/020 and not 010: 010's old address 404s on purpose, so it is not reused for a different page.
-  { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape, with every number of its look on a knob.' },
+  { id: 'shader/landscape', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape. Six knobs shape the ridges.' },
   // remote/shader moved here as shader/remote 2026-10-13 (*"Move pi shader to remote shaders under shaders"*); the old URL 404s.
   { id: 'shader/remote', title: 'Shader on Pi', say: 'A kaleidoscope shader here and on a Pi in another building, each change timed to its first frame.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
