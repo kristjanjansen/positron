@@ -29,7 +29,7 @@ import M from './font-metrics.mjs';
 // headline on as many lines as make it biggest, the small line cut to its first
 // sentence (*"Make positron. studio larger and put to bottom. Wrap ig title"*,
 // *"Rm delivered as line"*).
-export const TEMPLATE_V = 3;
+export const TEMPLATE_V = 4;
 export const W = 1200, H = 630;
 export const IG_W = 1080, IG_H = 1350;
 export const SITE = 'https://positron.studio';
@@ -89,9 +89,10 @@ function breaks(text, n) {
 }
 
 // 🔴 THE WORDMARK AT THE FOOT, LARGER, 2026-10-13: *"Make positron. studio
-// larger and put to bottom"*. It is 2.5 times the hero's 13 px eye in the same
-// units, so it scales with the card and stays well under the headline's 56.
-const MARK = { ...TYPE.eye, size: TYPE.eye.size * 2.5 };
+// larger and put to bottom"*, then at 2.5 times *"Toooooo big sitename"*. It is
+// 1.5 times the hero's 13 px eye in the same units, so it scales with the card
+// and stays well under the headline's 56.
+const MARK = { ...TYPE.eye, size: TYPE.eye.size * 1.5 };
 // 🔴 THE SMALL LINE IS ITS FIRST SENTENCE ON A CARD, asked *"Rm delivered as
 // line"*. HERO and the front page keep the whole of it.
 const SMALL = HERO.small.split(/(?<=\.)\s+/)[0];
