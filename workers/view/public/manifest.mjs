@@ -80,17 +80,20 @@ export const DEMOS = [
   // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
   // deployed at /llhls/, listed on /archive/ with the other retired pages.
   { name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true, unlisted: true,
-    one: 'the tuned low-latency player against a live input',
+    one: 'the tuned low-latency player, whose live input was retired on 2026-10-13',
     tags: ['LL-HLS', 'Stream', 'container'],
-    // a cold container + ffmpeg + Stream ingest is ~30 s; without this the
-    // harness asserts against a 204 and calls a working demo broken
-    settleMs: 75000, lightSettleMs: 1000 },
+    // settleMs 75000 covered a cold container, ffmpeg and Stream ingest. The
+    // input and pub's /watch were retired 2026-10-13 and a press now answers at
+    // once, in every tier, so the wait went with them.
+    lightSettleMs: 1000 },
   // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
   // deployed at /webrtc/, listed on /archive/ with the other retired pages.
   { name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true, unlisted: true,
-    one: 'the same live picture the HLS pages play, delivered over WHEP instead',
+    one: 'the test picture over WHEP, a leg retired on 2026-10-13',
     tags: ['WebRTC', 'WHEP', 'Stream'],
-    settleMs: 75000, lightSettleMs: 1000 },
+    // settleMs 75000 went with the input whep-rig and pub's /watch, retired
+    // 2026-10-13: a press answers at once in every tier.
+    lightSettleMs: 1000 },
   // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
   // deployed at /moq/, listed on /archive/ with the other retired pages.
   { name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, unlisted: true, settleMs: 30000, lightSettleMs: 1000,
@@ -104,7 +107,9 @@ export const DEMOS = [
   // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
   // deployed at /cam/, listed on /archive/ with the other retired pages.
   { name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, unlisted: true, settleMs: 45000, lightSettleMs: 3000,
-    one: 'one webcam next to what comes back over WebRTC, MoQ and LL-HLS',
+    // Its LL-HLS leg (the input positron-cam, pub's /cam) was retired
+    // 2026-10-13; the panel stays and its footer says so.
+    one: 'one webcam next to what comes back over WebRTC and MoQ',
     tags: ['getUserMedia', 'WebRTC', 'WHIP', 'MoQ'] },
 
   // `room` was a demo (open this page twice and each window shows the other,
@@ -335,6 +340,10 @@ export const DEMOS = [
   // deep; bootMs is a ceiling and costs a working page nothing.
   // `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
   // deployed at /capture/, listed on /archive/ with the other retired pages.
+  // ⚠️ ROUND TRIP's leg (pub's /whip, the input whep-rig) was retired
+  // 2026-10-13, so a DEEP run reads that tab's leg asserts red with the reason
+  // `this leg was retired 2026-10-13`. Those reds are expected; an ordinary run
+  // never reaches them.
   { name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true, unlisted: true, bootMs: 70000, lightSettleMs: 2000,
     one: 'Recording what came over a link, from a take on this machine to the far end of a live connection.',
     tags: ['getUserMedia', 'MediaRecorder', 'R2', 'WHIP', 'WHEP', 'WebRTC', 'timeline'] },

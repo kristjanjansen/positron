@@ -1,5 +1,15 @@
 // ROUND TRIP, from the retired `/keep/` (2026-10-04, `plans/plan-demo-structure.md`
-// §3.5). The picture you send goes out to Cloudflare over WHIP and comes back
+// §3.5).
+//
+// 🔴 RETIRED 2026-10-13. Its WHIP leg went out through pub's /whip onto the
+// input whep-rig and came back over WHEP from it; that input is deleted and
+// /whip answers 410. Send and receive now asks for the relay servers (the one
+// check that needs no leg) and then says the leg is retired, at once, rather
+// than failing a publish. A deep run (`DEMO_DEEP=1`) therefore reads the two
+// leg asserts red with that reason, and `roundTripChecks()` with them: those
+// reds are EXPECTED and say so in their detail. The leg's code is in git at
+// be7737d. A round trip that still has an input behind it is
+// /concepts/video/030/ (WebRTC loopback). The picture you send goes out to Cloudflare over WHIP and comes back
 // over WHEP, and what you record is the copy that came back. Every frame
 // carries a clock written into the pixels before it left, so dragging the line
 // and watching that clock move by the same amount proves the seek landed.
@@ -23,7 +33,7 @@
 import { el, armVideo, recorderMime } from '/shell/shell.mjs';
 import { setIcon } from '/shell/icon-button.mjs';
 import { putWhole, fetchBack } from '/shell/ingest.mjs';
-import { whipPublish, whepPlay, whep, fetchIceServers, readIcePath } from '/shell/live.mjs';
+import { RETIRED_LEG, fetchIceServers, readIcePath } from '/shell/live.mjs';
 import { createPanelValues } from '/shell/video-panel.mjs';
 import { readBurnedFrom, videoHue } from '/shell/pattern.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -39,7 +49,7 @@ const FPS = 25, FRAME_MS = 1000 / FPS;
 
 // No readout: see the header.
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
-export const about = 'The clock goes out to Cloudflare and comes back, and what you record is the copy that came back. Press Send and receive, then record with the red button.';
+export const about = 'The clock went out to Cloudflare and came back, and what you recorded was the copy that came back. The leg was retired on 2026-10-13, so Send and receive now says so and stops.';
 
 export const readout = null;
 
@@ -188,36 +198,9 @@ export function build({ panel, assert, log }) {
       // with the network
       if (SELFCHECK) await roundTripChecks();
     };
-    try {
-      pub = await whipPublish(source.canvas.captureStream(FPS), { iceServers: ice.iceServers, log });
-    } catch (e) { log(`send failed: ${e.message}`, 'bad'); await noLegs(`send failed: ${e.message}`); return; }
-    try {
-      sub = await whepPlay(whep(), live, { iceServers: ice.iceServers, log });
-    } catch (e) { log(`receive failed: ${e.message}`, 'bad'); await noLegs(`receive failed: ${e.message}`); return; }
-    armVideo(live);
-    // a WHEP track exists before it carries anything, so wait for a frame
-    for (let i = 0; i < 120 && !live.videoWidth; i++) await wait(250);
-    log(live.videoWidth ? `receiving ${live.videoWidth}x${live.videoHeight}` : 'no picture arrived', live.videoWidth ? 'hi' : 'bad');
-    legSampler();
-    for (let i = 0; i < 8 && !routeOf(); i++) {
-      await readPaths();
-      if (!routeOf()) await wait(500);
-    }
-    setInterval(readPaths, 2000);
-    const conf = [pub, sub].map((x) => (x.pc.getConfiguration().iceServers || []).flatMap((s) => [].concat(s.urls)));
-    assert('both legs hold what the ask returned',
-      conf.every((c) => c.length > 0 && (!ice.relay || c.some((u) => /^turns?:/.test(u)))),
-      conf.map((c, i) => `${i ? 'back' : 'out'} ${c.length} url(s), ${c.filter((u) => /^turns?:/.test(u)).length} TURN`).join(', '));
-    const shownPath = legVals.cell('path').textContent.trim();
-    const route = routeOf();
-    assert('the path the media took is named beside the round trip',
-      (route === 'direct' || route === 'relay') && shownPath === route,
-      route
-        ? `${route}: out ${paths.out.local} over ${paths.out.protocol}, back ${paths.back.local} over ${paths.back.protocol}, cell ${JSON.stringify(shownPath)}`
-        : 'the selected candidate pairs could not be read');
-    // THE REST RUN FROM HERE, INSIDE THE PRESS, AND ONLY UNDER A HARNESS: the
-    // button stays busy while they run, and the tab's check awaits the press.
-    if (SELFCHECK) await roundTripChecks();
+    // RETIRED 2026-10-13 (see the header): no leg to open, so say so and stop.
+    log(`${RETIRED_LEG}: its input and pub's /whip are deleted, so nothing is sent`, 'bad');
+    await noLegs(RETIRED_LEG);
   });
 
   /**
