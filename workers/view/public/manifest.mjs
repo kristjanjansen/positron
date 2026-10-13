@@ -377,7 +377,9 @@ export const DEMOS = [
   // not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
   // definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
   // samples and a 1.2 s deafness control before the page says anything at all.
-  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, settleMs: 60000, lightSettleMs: 15000,
+  // `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
+  // /radio/, listed on /archive/ with the other retired pages.
+  { name: 'radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', built: true, unlisted: true, settleMs: 60000, lightSettleMs: 15000,
     one: 'six live radio stations from Tallinn and Helsinki, granulated in the tab by hand, or by sliders that sweep themselves back and forth',
     tags: ['Icecast', 'Workers', 'WebAudio', 'live'] },
   // The same machine as the row above with the instrument panel taken off: it
@@ -485,7 +487,9 @@ export const DEMOS = [
    * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
    * the harness.
    */
-  { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
+  // /wish/, listed on /archive/ with the other retired pages.
+  { name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true, unlisted: true,
     one: 'say which instrument should play which, and a language model makes the connection on the desk',
     tags: ['WebMIDI', 'Workers AI', 'getUserMedia'] },
   // `wall` was its own unlisted page 2026-10-04 and is the WALL tab of
@@ -781,7 +785,9 @@ export const DEMOS = [
 
   // Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
   // captured by `rig/board/board.mjs` and streamed into the Pi's own room.
-  { name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true, room: 'fixed',
+  // `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
+  // /away/, listed on /archive/ with the other retired pages.
+  { name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true, unlisted: true, room: 'fixed',
     one: 'play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives',
     tags: ['WS', 'relay', 'PCM', 'MIDI', 'canvas', 'live board'] },
 

@@ -76,13 +76,15 @@
   // is added at the end so nothing vanishes), then the use case groups. Each is
   // one block under the kit's section heading, built when it first gets a card.
   const order = [...CONCEPT_GROUPS];
-  for (const c of CONCEPTS) { const g = c.n.split('/')[0]; if (!order.includes(g)) order.push(g); }
+  for (const c of CONCEPTS) { const g = c.group || c.n.split('/')[0]; if (!order.includes(g)) order.push(g); }
   order.push(...CASE_GROUPS, 'other');
   const cards = new Map(order.map((g) => [g, []]));
 
-  CONCEPTS.forEach(({ title, say, n }) => {
+  CONCEPTS.forEach(({ title, say, n, group: shown }) => {
     // `n` is `<group>/<number>`, the page's folder and URL.
-    const [group, num] = n.split('/');
+    const [folder, num] = n.split('/');
+    // A row may show under another heading than its folder (`group` in list.mjs).
+    const group = shown || folder;
     const a = el('a', 'cc-card', '', { href: `/concepts/${n}/` });
     const h = el('h3', 'cc-t');
     h.append(el('span', 'cc-n', String(num)), document.createTextNode(title));

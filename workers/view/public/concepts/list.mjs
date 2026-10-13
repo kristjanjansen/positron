@@ -24,6 +24,11 @@ export const CONCEPTS = [
   { n: 'synth/090', title: 'Collide synth', say: 'Play a small SuperCollider program from the keys and edit its code, recompiled when you stop typing.' },
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
+  // Asked 2026-10-13: *"rename synth to instruments"*, *"move sampler to instruments"*,
+  // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
+  // its folder and URL stay where they are, so no address changed.
+  { n: 'sampler/000', group: 'synth', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
+  { n: 'sampler/050', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated by Pappus in this tab, each grain marked where it read the sound.' },
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
   // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,
   // then *"yea, move them all to remote instruments or stm"*): every concept page that plays on the
@@ -71,8 +76,6 @@ export const CONCEPTS = [
   { n: 'typist/020', title: 'Typewriters', say: 'The typewriter through an effects box where every number gives a different machine.' },
   { n: 'typist/030', title: 'Playback', say: 'Everything you type, deletions included, is kept and played back as the page writes itself again.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
-  { n: 'sampler/000', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
-  { n: 'sampler/050', title: 'Granulator', say: 'Our radio recordings granulated by Pappus in this tab, each grain marked where it read the sound.' },
   // sampler/060 Grain ring moved to /archive/ 2026-10-13 (*"archive https://positron.studio/concepts/sampler/060/"*): /archive/grain-ring/, still working.
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
@@ -111,10 +114,10 @@ export const CONCEPTS = [
 // "no needed" on conceptlike demo boxes that are superceded by simular/newer
 // concept"*): its card reads `not needed` and names that page. Delete the field
 // to take the label off.
-export const CONCEPT_GROUPS = ['synth', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
+export const CONCEPT_GROUPS = ['synth', 'granulator', 'remote', 'radio', 'video', 'shader', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
 // reads as the owner asked for it, *"remote instruments"* (2026-10-13).
-export const GROUP_TITLES = { remote: 'remote instruments' };
+export const GROUP_TITLES = { synth: 'instruments', remote: 'remote instruments' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
@@ -141,10 +144,10 @@ export const DEMO_CARDS = {
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
   stage: { group: 'performances', say: 'A church scene from MIMproject\'s 2011 MIM goes Sustainable, run live from a control room.' },
   weight: { group: 'performances', say: 'One sentence, "If these walls could talk", round four walls, each word as big as it is short.' },
-  radio: { group: 'stations', say: 'Eight live radio stations from Tallinn and Helsinki, broken into grains by hand or by sliders.' },
+  // radio archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
   videoradio: { group: 'stations', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
   // knobs archived 2026-10-13 with Yoshimi: archive/demos/knobs-index.html, /knobs/ is a 404.
-  away: { group: 'instruments', say: 'A Novation Circuit on a desk in another building, played from this page and heard back through a Pi.' },
+  // away archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
   // shape archived 2026-10-12 (*"archiev shape"*): still served, listed on /archive/ under devices.
-  wish: { group: 'instruments', say: 'Say or type which instrument plays which, and a language model on Cloudflare makes the connection.' },
+  // wish archived 2026-10-13 (*"archive wish, away, radio."*): still served, listed on /archive/.
 };
