@@ -272,11 +272,12 @@
   for (const c of K) {
     if (c.choices) {
       const at0 = Math.max(0, c.choices.findIndex(([, v]) => v === OPEN[c.name]));
-      knobs.set(c.name, createKnob({ label: c.label, min: 0, max: c.choices.length - 1, step: 1, value: at0,
+      // The invisible hand on every knob (asked 2026-10-13, *"andd inivisible hand for knobs"*).
+      knobs.set(c.name, createKnob({ label: c.label, min: 0, max: c.choices.length - 1, step: 1, value: at0, hand: true,
         format: (i) => c.choices[Math.round(i)]?.[0] ?? '', onInput: (i) => send(c.name, c.choices[Math.round(i)][1]) }));
       continue;
     }
-    knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name],
+    knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name], hand: true,
       ...(c.step ? { step: c.step } : {}), format: c.fmt, onInput: (v) => send(c.name, v) }));
   }
   const grid = createKnobGrid(knobs, { row: true });
