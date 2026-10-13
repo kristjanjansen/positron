@@ -1,7 +1,12 @@
-// demo/concepts/synth/040/modules.mjs: a mono WebAudio synth whose modules are bay
+// demo/concepts/synth/patch-synth.mjs: a mono WebAudio synth whose modules are bay
 // nodes, and the router that wires the WebAudio graph from the links the bay
-// holds. plans/plan-synth-patch.md §1 to §4. Page-local on purpose: the owner
-// decided it lives inside /concepts/synth/040/ ("yes 40 this way"), not in the shell.
+// holds. plans/plan-synth-patch.md §1 to §4. It was
+// demo/concepts/synth/040/modules.mjs until 2026-10-13, when 040 was split into
+// one page per module (*"can split https://positron.studio/concepts/synth/040/
+// apart to different conecepts, do not dupe with existing ones (so only some
+// last steps?). rm 040 later."*). It sits beside the pages that use it, as
+// radio/tempo.mjs does: /concepts/synth/050/ (filter), 060 (envelope) and 070
+// (LFO). module-page.mjs builds those pages around it.
 //
 // A module is a node with ports. An audio link is a `connect()` made by
 // `route()`, a MIDI link carries notes through `bay.send`, and a value link
@@ -10,7 +15,7 @@
 //
 // NOTHING OPENS ON IMPORT. The modules keep their parameters as plain state
 // until `start(ctx)` is handed an AudioContext, which the page makes on the
-// first key or play press.
+// first key press.
 
 import { createBay, parsePatch } from '/shell/bay.mjs';
 
@@ -32,9 +37,9 @@ const hzText = (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.roun
 const sText = (v) => (v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms`);
 
 /**
- * The knob row. `owner` is the module whose `value-in` takes the name; `raw`
- * is what the dial shows (0 to 127 for an exponential one) and `value(raw)` is
- * what travels along the link.
+ * Every knob a module has. `owner` is the module whose `value-in` takes the
+ * name; `raw` is what the dial shows (0 to 127 for an exponential one) and
+ * `value(raw)` is what travels along the link. A page offers some of them.
  */
 export const KNOBS = [
   { name: 'freq', owner: 'osc', min: 0, max: 127, raw: F.from(220), value: F.to, format: (r) => hzText(F.to(r)) },
@@ -70,43 +75,11 @@ const NAMES = {
   lfo: ['rate', 'depth'],
 };
 
-/**
- * The six steps of §4, each a patch text. Choosing one unlinks everything and
- * links what `parsePatch` reads from it. `knobs` is which dials the step
- * offers; `preset` is the sound the step starts from, so step 1 is a sine
- * however the page was left.
- */
-const L1 = `web:osc:audio-out -> web:speaker:audio-in
-web:osc:audio-out -> web:scope:audio-in`;
-const L2 = L1;
-const L4 = `web:osc:audio-out -> web:filter:audio-in
-web:filter:audio-out -> web:speaker:audio-in
-web:filter:audio-out -> web:scope:audio-in`;
-const L5 = `web:tone:midi-out -> web:osc:midi-in
-web:tone:midi-out -> web:amp:midi-in
-web:osc:audio-out -> web:filter:audio-in
-web:filter:audio-out -> web:amp:audio-in
-web:amp:audio-out -> web:speaker:audio-in
-web:amp:audio-out -> web:scope:audio-in`;
-const L6 = `${L5}
-web:lfo:audio-out -> web:filter:cutoff-in`;
-
 // One node per knob, eurorack style (*"Per knob. Lets go eurorack :)"*): each
-// knob a step offers is a box of its own, `web:knob-<name>`, with a cable into
+// knob a page offers is a box of its own, `web:knob-<name>`, with a cable into
 // the module it moves.
-const withKnobs = (patch, names) => [patch,
+export const withKnobs = (patch, names) => [patch,
   ...names.map((k) => `web:knob-${k}:value-out -> web:${KNOBS.find((x) => x.name === k).owner}:value-in`)].join('\n');
-const STEP_LIST = [
-  { name: 'sine', patch: L1, knobs: [], preset: { wave: 'sine', freq: 220 } },
-  { name: 'knob', patch: L2, knobs: ['freq'], preset: { wave: 'sine' } },
-  { name: 'wave', patch: L2, knobs: ['freq', 'wave'], preset: { wave: 'sawtooth' } },
-  { name: 'filter', patch: L4, knobs: ['freq', 'wave', 'cutoff', 'q'], preset: { wave: 'sawtooth' } },
-  // No keyboard since 2026-10-10 (*"from 40 rm keys and detune"*): play is a
-  // test tone, one held note out of web:tone into the osc and the amp.
-  { name: 'amp', patch: L5, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release'], preset: { wave: 'sawtooth' } },
-  { name: 'lfo', patch: L6, knobs: ['freq', 'wave', 'cutoff', 'q', 'attack', 'release', 'rate', 'depth'], preset: { wave: 'sawtooth', cutoff: 1000, depth: 1800 } },
-];
-export const STEPS = STEP_LIST.map((st) => ({ ...st, patch: withKnobs(st.patch, st.knobs) }));
 
 /**
  * @param {object} o
@@ -157,12 +130,24 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   // The osc is mono and plays the last key still held.
   const oscNotes = [];
   const keyed = () => bay.links().some((l) => l.to === id('osc', 'midi-in'));
+  // With an amp taking the keys and the osc's sound, the amp shapes the note.
+  // Without one, the osc opens and closes its own level on the keys, at once,
+  // so a page with no envelope still plays notes rather than one held drone.
+  const ampGated = () => bay.links().some((l) => l.to === id('amp', 'midi-in'))
+    && bay.links().some((l) => l.to === id('amp', 'audio-in'));
+  const OSC_LEVEL = 0.22;
+  function oscGate() {
+    if (!ctx) return;
+    const open = ampGated() || !keyed() || oscNotes.length > 0;
+    N.osc.out.gain.setTargetAtTime(open ? OSC_LEVEL : 0, at(), open ? 0.004 : 0.02);
+  }
   function oscNote(e) {
     const i = oscNotes.indexOf(e.d1);
     if (i >= 0) oscNotes.splice(i, 1);
     if (e.d2) oscNotes.push(e.d1);
     const n = oscNotes[oscNotes.length - 1];
     if (n !== undefined && ctx) glide(N.osc.osc.frequency, hz(n), 0.004);
+    oscGate();
   }
 
   // The amp opens on the first key down and closes when the last one is up.
@@ -188,7 +173,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const NODES = [
-    ['tone', 'person', 'test tone'],
+    ['keys', 'person', 'keyboard'],
     ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
     ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
     ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
@@ -198,7 +183,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
     shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
   const PORTS = [
-    { id: id('tone', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
+    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
     // No `names` on a knob: the bay's shape check wants names to be equal, and
     // one knob names one of a module's several. The module ignores and logs a
     // name it does not have.
@@ -265,7 +250,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
 
     const osc = ctx.createOscillator(), level = ctx.createGain();
     osc.type = P.osc.wave; osc.frequency.value = P.osc.freq; osc.detune.value = P.osc.detune;
-    level.gain.value = 0.22;
+    level.gain.value = 0;
     osc.connect(level); osc.start();
     N.osc = { osc, out: level, input: () => null };
 
@@ -307,6 +292,7 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     }
     // With no key on the osc, it plays the freq knob's pitch.
     if (!keyed()) N.osc.osc.frequency.setTargetAtTime(P.osc.freq, at(), 0.01);
+    oscGate();
   }
 
   let on = false;
@@ -316,12 +302,11 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
     if (master) master.gain.setTargetAtTime(v ? 0.7 : 0, at(), 0.03);
   }
 
-  const has = (from, to) => bay.links().some((l) => l.from === from && l.to === to);
-  /** Is a voice audible: sound on, and either no amp in the chain or a key held or releasing. */
+  /** Is a voice audible: sound on, and a key held or the amp still releasing. */
   function sounding() {
     if (!ctx || !on) return false;
-    const gated = has(id('tone', 'midi-out'), id('amp', 'midi-in')) && bay.links().some((l) => l.to === id('amp', 'audio-in'));
-    return !gated || ampHeld.size > 0 || at() < releaseEnd;
+    if (ampGated()) return ampHeld.size > 0 || at() < releaseEnd;
+    return !keyed() || oscNotes.length > 0;
   }
 
   /** A scope's latest samples, or null when nothing is patched into it. */

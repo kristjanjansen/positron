@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept synth 070</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount } from '/shell/shell.mjs';
+  import { modulePage } from '/concepts/synth/module-page.mjs';
+
+  // One module, an LFO, a slow oscillator that is never heard itself: its
+  // output moves the filter's cutoff, so the sound opens and closes on its
+  // own while a key is held. The filter is 050's at a fixed cutoff, and rate
+  // and depth are the only knobs. Split out of synth/040 on 2026-10-13, where it
+  // was step 6; the voice is ../patch-synth.mjs and the page is
+  // ../module-page.mjs.
+  const d = mount({ name: 'concept synth 070', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('synth/070');
+  modulePage(d, {
+    patch: `web:keys:midi-out -> web:osc:midi-in
+web:osc:audio-out -> web:filter:audio-in
+web:filter:audio-out -> web:speaker:audio-in
+web:filter:audio-out -> web:scope:audio-in
+web:lfo:audio-out -> web:filter:cutoff-in`,
+    knobs: ['rate', 'depth'],
+    preset: { wave: 'sawtooth', cutoff: 1000, rate: 0.8, depth: 1800 },
+  });
+  d.ready();
+</script>

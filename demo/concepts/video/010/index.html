@@ -84,7 +84,7 @@
     shape: { of: 'param', names: KNOBS.map((k) => k.name) }, deliver: setParam });
   bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
   bay.addPort({ id: FX, label: 'dithered', dir: 'in', medium: 'video' });
-  // No `names` on a knob, as on /concepts/synth/040/: one knob names one of the
+  // No `names` on a knob, as in /concepts/synth/patch-synth.mjs: one knob names one of the
   // shader's several, and the shader logs a name it does not have.
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
   for (const k of KNOBS) bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
