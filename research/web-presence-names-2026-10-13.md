@@ -122,3 +122,21 @@ skills away from a bare `positron-` prefix, or relying on the
 What a reading cannot settle: a 404 does not prove a name is registrable
 (GitHub holds recently deleted names, YouTube and LinkedIn reserve some), and
 Instagram, Threads and TikTok need a logged-in look.
+
+## Instagram, checked again 2026-10-13 (asked: *"Just see what Insta username gives you"*)
+
+A profile page fetched anonymously with an iPhone user agent carries the
+profile's name in `<title>` when the account exists, and a bare `Instagram`
+title when it does not. A made-up name (`positronstudiozzq9`) gives the bare
+title at 618,924 bytes, the control.
+
+| name | title | reading |
+| --- | --- | --- |
+| positronstudio | Positron Studio (@positronstudio) | TAKEN |
+| positron | Francesco Positron (@positron) | TAKEN |
+| positron.studio | Instagram (618,935 bytes, same as the control) | FREE, as far as an anonymous page can say |
+| positron_studio | Instagram | FREE, the same reading |
+
+So the dashless set breaks on Instagram: `positronstudio` is somebody's.
+`positron.studio` is free and is the domain itself, which makes it the best
+Instagram handle, and Threads follows Instagram's name.
