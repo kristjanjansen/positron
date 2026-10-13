@@ -30,6 +30,7 @@ import { createCollideService } from './scollide.mjs';
 import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
+import { createCameraRoom } from './camera.mjs';
 import { parseInputs, createInputs } from './inputs.mjs';
 import { createMainDirect } from './rtc.mjs';
 import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
@@ -1320,6 +1321,9 @@ async function handle(msg, replyVia = null) {
     // ── the picture ──────────────────────────────────────────────────────
     case 'video.start': {
       if (video) return reply('video.started', { ok: true, already: true, room: VIDEO_ROOM, ...videoShape() });
+      // The Pi camera (camera.mjs) encodes on the same exclusive device, and a
+      // second user of it blocks rather than failing.
+      if (camera?.running()) return reply('video.started', { ok: false, reason: 'the Pi camera is using the hardware encoder for /concepts/remote/010/, so the shader picture waits' });
       videoConnect();
       const r = startVideo({
         w: Math.min(msg.w ?? 1280, 1920), h: Math.min(msg.h ?? 720, 1080),
@@ -1836,6 +1840,21 @@ if (backend() === 'alsa') sweepOrphans();
 // device and makes the picture permanently unavailable.
 sweepStrayEncoders((l) => log('video:', l));
 
+// ── the Pi camera, for holders of a key only ─────────────────────────────────
+// camera.mjs has the why. It joins `<room>-cam` with BOARD_CAM_KEY and starts
+// the camera only for a viewer the relay let into that room, never for a verb in
+// this board's own tokenless room. With no key set it joins nothing.
+const camera = (DRY || ONCE) ? null : createCameraRoom({
+  relay: RELAY, room: `${ROOM}-cam`, key: process.env.BOARD_CAM_KEY || '',
+  log: (l) => log(l), encoderBusy: () => !!video,
+  size: {
+    w: Math.min(Number(process.env.BOARD_CAM_W) || 1280, 1920),
+    h: Math.min(Number(process.env.BOARD_CAM_H) || 720, 1080),
+    fps: Math.min(Number(process.env.BOARD_CAM_FPS) || 30, 30),
+    bitrate: Math.min(Number(process.env.BOARD_CAM_BITRATE) || 1_500_000, 4_000_000),
+  },
+});
+
 // ── hardware inputs, each in a room of its own ───────────────────────────────
 // inputs.mjs has the why. Configured in /etc/default/positron-board as
 // BOARD_INPUTS, and a bad entry is reported here and skipped rather than
@@ -1885,5 +1904,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { stopAudio(); collide.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); stopAudio(); collide.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

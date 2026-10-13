@@ -97,9 +97,45 @@ const STRIKES = 50;                       // overruns tolerated before the socke
 // cover the agents, which do not ping but do send constantly.
 const IDLE_MS = 10 * 60 * 1000;           // silent this long, and only if the room is full
 
+// 🔴 ONE KIND OF ROOM HERE IS NOT TOKENLESS: A ROOM WHOSE NAME ENDS `-cam`.
+// Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
+// url secret parameter to enable (key in cf secrets)"*. `studio-1-cam` carries
+// the picture from the Raspberry Pi's own camera, and the Pi starts that camera
+// for whoever speaks in the room (rig/board/camera.mjs), so who may speak there
+// is who may turn a camera on in somebody's room.
+// ⚠️ THE KEY ARRIVES IN THE FIRST MESSAGE, NOT IN THE URL OR A HEADER. Workers
+// Logs records every request's URL and headers (observability is on, below in
+// wrangler.jsonc), so a key in either would be written into a log on every
+// join. A message body is not. Until a socket's first message is
+// `{"type":"cam.key","key":...}` with the key that matches the secret
+// `PI_CAM_KEY`, it hears nothing and what it sends is dropped; a wrong key is
+// closed with 4003.
+// ⚠️ AND THE 403 A PERSON CAN SEE IS `POST /room/<name>-cam/key`, with the key
+// as the body: 204 when it matches, 403 when it does not. The page asks it
+// before it opens the room, because a browser cannot read why a WebSocket closed
+// before it opened.
+// ⚠️ NO SECRET SET MEANS NOBODY GETS IN, never everybody: the comparison is
+// against the secret, and a missing one matches nothing.
+const CAM_ROOM = /-cam$/;
+const CAM_AUTH_MS = 10_000;               // a socket that has not proved the key by then is closed
+
+/** SHA-256 both sides, then compare every byte, so the time taken says nothing about how much matched. */
+async function keyMatches(given, secret) {
+  if (typeof given !== 'string' || !given || typeof secret !== 'string' || !secret || given.length > 512) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([given, secret].map((x) => crypto.subtle.digest('SHA-256', enc.encode(x))));
+  const x = new Uint8Array(a), y = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
 export class Relay {
-  constructor(state) {
+  constructor(state, env) {
     this.state = state;
+    this.env = env;
+    /** per socket, in memory: `{ gated, ok }` once read, so a frame does not deserialize an attachment per receiver. Rebuilt from the attachment after hibernation. */
+    this.cam = new WeakMap();
     // pure network RTT: answered by the runtime, no DO wake
     this.state.setWebSocketAutoResponse(
       new WebSocketRequestResponsePair('ping', 'pong'),
@@ -119,6 +155,18 @@ export class Relay {
 
   async fetch(request) {
     const url = new URL(request.url);
+
+    const name = url.pathname.split('/')[2] || '';
+    if (url.pathname.endsWith('/key')) {
+      // Only reached for a keyed room (the router refuses the rest).
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+      if (request.method !== 'POST') return new Response('POST the key', { status: 405, headers: CORS });
+      const body = (await request.text()).trim();
+      const ok = await keyMatches(body, this.env?.PI_CAM_KEY);
+      return new Response(ok ? null : 'wrong key', { status: ok ? 204 : 403, headers: CORS });
+    }
+    // A keyed room says nothing about itself to somebody without the key.
+    if (url.pathname.endsWith('/stats') && CAM_ROOM.test(name)) return new Response('keyed room', { status: 403, headers: CORS });
 
     if (url.pathname.endsWith('/stats')) {
       // HIBERNATION IS KEPT ON PURPOSE (it is what makes an idle room free, and
@@ -160,7 +208,24 @@ export class Relay {
     // makes it permanently un-evictable: every restart resets its apparent age,
     // so a room full of dead sockets stays full forever — measured, that is
     // exactly what `studio-1` did. ONE write per connection, never per message.
-    try { pair[1].serializeAttachment({ at: Date.now() }); } catch { /* nothing to lose */ }
+    const gated = CAM_ROOM.test(url.pathname.split('/')[2] || '');
+    try { pair[1].serializeAttachment(gated ? { at: Date.now(), gated: true, ok: false } : { at: Date.now() }); } catch { /* nothing to lose */ }
+    if (gated) {
+      this.cam.set(pair[1], { gated: true, ok: false });
+      // A socket that never proves the key is not left holding a place. Two
+      // ways, because neither is enough alone: a timer, which a hibernating
+      // object drops (MEASURED 2026-10-13, a silent socket was still open at
+      // 11 s), and a sweep on every join, which needs no timer at all.
+      const ws = pair[1];
+      setTimeout(() => { if (!this.#camOf(ws).ok) { try { ws.close(4003, 'no key'); } catch { /* gone */ } } }, CAM_AUTH_MS);
+      const now = Date.now();
+      for (const s of this.state.getWebSockets()) {
+        if (s === ws || this.#camOf(s).ok) continue;
+        let at = 0;
+        try { at = s.deserializeAttachment()?.at || 0; } catch { /* old */ }
+        if (now - at > CAM_AUTH_MS) { try { s.close(4003, 'no key'); } catch { /* gone */ } }
+      }
+    }
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -222,6 +287,18 @@ export class Relay {
     return true;
   }
 
+  /** Is this socket in a keyed room, and has it proved the key. Old sockets with no attachment are ungated. */
+  #camOf(ws) {
+    let c = this.cam.get(ws);
+    if (!c) {
+      let a = null;
+      try { a = ws.deserializeAttachment(); } catch { /* old socket */ }
+      c = { gated: !!a?.gated, ok: !!a?.ok };
+      this.cam.set(ws, c);
+    }
+    return c;
+  }
+
   async webSocketMessage(ws, msg) {
     // ⚠️ Before any cap or bucket check — a socket that is being rate-limited is
     // very much alive, and marking liveness only on ACCEPTED messages would
@@ -238,6 +315,22 @@ export class Relay {
       : msg.byteLength;
     if (size > MAX_BYTES) { this.dropped++; return; }
 
+    // A keyed room: nothing from a socket that has not proved the key, except
+    // the message that proves it.
+    const me = this.#camOf(ws);
+    if (me.gated && !me.ok) {
+      let m = null;
+      if (typeof msg === 'string' && msg.length < 2048) { try { m = JSON.parse(msg); } catch { /* not the key */ } }
+      if (m?.type === 'cam.key' && await keyMatches(m.key, this.env?.PI_CAM_KEY)) {
+        me.ok = true;
+        try { ws.serializeAttachment({ ...(ws.deserializeAttachment() || {}), gated: true, ok: true }); } catch { /* memory still holds it */ }
+        try { ws.send(JSON.stringify({ type: 'cam.key.ok' })); } catch { /* gone */ }
+      } else {
+        try { ws.close(4003, 'wrong key'); } catch { /* gone */ }
+      }
+      return;
+    }
+
     const verdict = this.#allow(ws, size);
     if (verdict === 'close') {
       this.closed++;
@@ -247,6 +340,20 @@ export class Relay {
     if (!verdict) { this.dropped++; return; }
 
     // VERBATIM, to everyone, sender included. Never parsed, never re-stamped.
+    // ⚠️ IN A KEYED ROOM, only to sockets that proved the key, and a BINARY
+    // frame is not echoed to its sender: the Pi sends the camera there at about
+    // 1.5 Mbit/s and has no use for its own picture coming back down a link in
+    // another building.
+    if (me.gated) {
+      const binary = typeof msg !== 'string';
+      for (const s of this.state.getWebSockets()) {
+        if (binary && s === ws) continue;
+        if (!this.#camOf(s).ok) continue;
+        try { s.send(msg); } catch { /* peer vanished mid-send */ }
+      }
+      this.relayed++;
+      return;
+    }
     for (const s of this.state.getWebSockets()) {
       try { s.send(msg); } catch { /* peer vanished mid-send */ }
     }
@@ -256,6 +363,8 @@ export class Relay {
   async webSocketClose() {}
   async webSocketError() {}
 }
+
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type' };
 
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), {
@@ -278,8 +387,9 @@ export default {
     }
 
     // constrained so the DO namespace cannot be sprayed with arbitrary junk
-    const m = url.pathname.match(/^\/room\/([a-zA-Z0-9_-]{1,64})\/(ws|stats)$/);
+    const m = url.pathname.match(/^\/room\/([a-zA-Z0-9_-]{1,64})\/(ws|stats|key)$/);
     if (!m) return new Response('use /room/<name>/ws or /room/<name>/stats', { status: 404 });
+    if (m[2] === 'key' && !CAM_ROOM.test(m[1])) return new Response('only a keyed room has a key', { status: 404 });
 
     const id = env.ROOMS.idFromName(m[1]);
     return env.ROOMS.get(id).fetch(request);
