@@ -38,11 +38,11 @@ export const CONCEPTS = [
   // other pages since 2026-10-13 (the split of synth/040).
   // remote/000 Yoshimi archived 2026-10-13 with Yoshimi (*"discard yoshimi"*): archive/concepts/remote-000.md.
   // The gap stays; /concepts/remote/000/ is a 404.
-  { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit on the Pi from the keys or a MIDI keyboard, with its eight macro knobs.' },
-  { n: 'remote/020', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
-  { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes played by the Pi in another building, over the relay or a direct link.' },
-  { n: 'remote/040', title: 'Drums on the Pi', say: 'Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade the two.' },
-  { n: 'remote/050', title: 'Shader on Pi', say: 'The mirror shader in this tab and on the Raspberry Pi, each change timed to its first frame.' },
+  { n: 'remote/010', title: 'Circuit on Pi', say: 'A Novation Circuit in another building, played from here through its Pi. Keys, MIDI and 8 macros.' },
+  { n: 'remote/020', title: 'Collide on Pi', say: 'SuperCollider here and on a Pi in another building at once. Crossfade between the two.' },
+  { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes on a Pi in another building, played from here over the relay or direct.' },
+  { n: 'remote/040', title: 'Drums on the Pi', say: 'One drum pattern here and on a Pi in another building at the same moment. Crossfade the two.' },
+  { n: 'remote/050', title: 'Shader on Pi', say: 'The mirror shader here and on a Pi in another building, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ is the Filter page since 2026-10-13.
