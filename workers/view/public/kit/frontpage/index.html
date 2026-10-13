@@ -339,18 +339,16 @@
       // copy's three places in three columns. Left what you hold (keys, a knob
       // on a Pico, a camera), middle what Cloudflare and the Pi do with it,
       // right where it ends up. The keys and the knob reach the Circuit on the
-      // Pi through the relay; the knob also bends the Pi's shader, which draws
-      // on your camera for this screen; the camera also goes out on Stream to
-      // every phone watching.
+      // Pi through the relay; the camera goes out on Stream to this screen and
+      // to every phone watching. Then *"Rm one box from desktop center"*: the
+      // Pi's GPU went, so the middle is the two Cloudflare services.
       const DESK = [
         ['web:keys:midi-out', 'cf-relay:room:midi-in'],
         ['pico-1:knob:value-out', 'cf-relay:room:value-in'],
         ['cf-relay:room:midi-out', 'pi-1:circuit:midi-in'],
         ['cf-relay:room:value-out', 'pi-1:circuit:value-in'],
-        ['pico-1:knob:value-out', 'pi-1:gpu:value-in'],
-        ['web:camera:video-out', 'pi-1:gpu:video-in'],
         ['web:camera:video-out', 'cf-stream:live:video-in'],
-        ['pi-1:gpu:video-out', 'web:screen:video-in'],
+        ['cf-stream:live:video-out', 'web:screen:video-in'],
         ['cf-stream:live:video-out', 'phone:screen:video-in'],
       ];
       // The PHONE picture is its own patch, about the phone in your hand (asked:
