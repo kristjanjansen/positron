@@ -101,10 +101,27 @@ import { LIFE } from './voices.mjs';
  * @param {(shape: {rows: number, steps: number}) => void} [o.onShape]  called as
  *   a new shape lands, before its first step is read, so a page that writes the
  *   pattern can write it for the new shape first
+ * @param {boolean} [o.start]  false: the grid starts empty rather than with the
+ *   house four on the floor (rhythm/020, whose rows are whatever was loaded)
+ * @param {(rows: number) => number} [o.gain]  the mix's level for this many
+ *   rows, read at the first play and at every new shape; left out, it follows
+ *   how many drums there are in all, as it always has
+ * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]
+ *   above `over` rows the patchbay draws the rows as ONE box, `web:<node>`,
+ *   with one MIDI wire in and one audio wire out (rhythm/020 with a 64 sample
+ *   pack). It is the picture only: the bay still holds one filtered wire per
+ *   row, and every hit still crosses its own.
+ *
+ * A voice's `label` and `title` are read every time they are drawn, so a voice
+ * whose label is a getter renames its row and its box (rhythm/020's sample
+ * names); `opens` and `closes`, when a voice has them, say which rows are an
+ * open hat and the closed hat that chokes it (by default the `hho` and `hhc`
+ * keys, as on 000).
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
-  onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null }) {
+  onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null,
+  start: startPattern = true, gain = null, group = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -224,7 +241,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       // Eight drums at once (050) sum about 3 dB hotter than four, and the
       // loudest bar measured -1.5 dBFS RMS, so the mix comes down to 0.7 there.
       // Eighteen (050 at 2x) come down to 0.5.
-      junction.gain.value = ALL.length > 9 ? 0.5 : ALL.length > 4 ? 0.7 : 1;
+      junction.gain.value = levelFor();
       if (!mix) junction.connect(ctx.destination);
       an = ctx.createAnalyser(); an.fftSize = 1024; buf = new Float32Array(an.fftSize);
       junction.connect(an);
@@ -267,6 +284,12 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     }
   }
 
+  /** The mix's level: the page's, for the rows there are now, or by how many drums there are in all. */
+  const levelFor = () => (gain ? gain(VOICES.length) : ALL.length > 9 ? 0.5 : ALL.length > 4 ? 0.7 : 1);
+  /** Which rows are an open hat and the closed hat that chokes it. */
+  const opens = (v) => (v.opens ?? v.key === 'hho');
+  const closes = (v) => (v.closes ?? v.key === 'hhc');
+
   /** One hit, at `at` on performance.now()'s clock, as a timestamped bundle. */
   /** Whether a drum's sound has a wire to the speakers (read at the hit when the outputs are not split). */
   const wired = (key) => bay.links().some((l) => l.from === ID(key, 'audio-out') && l.to === SPK);
@@ -275,7 +298,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     if (!eng) return;
     if (!SPLIT && !wired(v.key)) return;
     const id = nextId++;
-    if (v.key === 'hhc' && openHat && at < openHat.until) {
+    if (closes(v) && openHat && at < openHat.until) {
       // The choke, in the same bundle time as the closed hat itself.
       eng.sendAt(at, '/n_set', openHat.id, 'gate', 0);
       stat.chokes++;
@@ -295,7 +318,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     eng.sendAt(at, '/s_new', v.name, id, 0, 0, ...args);
     nodeVoice.set(id, v.key);
     stat.started[v.key]++;
-    if (v.key === 'hho') openHat = { id, until: at + life * 1000 };
+    if (opens(v)) openHat = { id, until: at + life * 1000 };
   }
 
   // ── the bay ──────────────────────────────────────────────────────────────
@@ -355,7 +378,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const makeGrid = () => createStepGrid({
     fixed: panel.fixed, strip: panel.strip, rows: VOICES.length, steps: STEPS,
     label: (r) => VOICES[r].label,
-    title: (r) => `${VOICES[r].label}, note ${VOICES[r].note}`,
+    title: (r) => VOICES[r].title ?? `${VOICES[r].label}, note ${VOICES[r].note}`,
     padTitle: (r, s) => `${VOICES[r].label}, step ${s + 1}`,
     ticks: true, readOnly: patternIn,
     onToggle: (r, s, lit, why) => { if (why !== 'quiet') d.log(`${VOICES[r].label} step ${s + 1} ${lit ? 'on' : 'off'}`); },
@@ -370,6 +393,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     panel.strip.textContent = '';
     grid = makeGrid();
     if (playing) grid.live(true);
+    if (junction) junction.gain.value = levelFor();
     api.grid = grid;
     onShape?.({ rows: sh.rows, steps: sh.steps });
     pb.refresh();
@@ -383,7 +407,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     hho: [2, 6, 10, 14],
     hhc: [0, 3, 4, 7, 8, 11, 12, 15],
   };
-  if (!patternIn) VOICES.forEach((v, r) => { for (const s of START[v.key]) grid.set(r, s, true, 'quiet'); });
+  if (!patternIn && startPattern) VOICES.forEach((v, r) => { for (const s of START[v.key] ?? []) grid.set(r, s, true, 'quiet'); });
   /** A whole pattern from a wire: every pad set to what the rows say. */
   let patternsIn = 0;
   function setPattern(rows) {
@@ -538,11 +562,51 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   // A page that adds wires of its own (050's camera) says when those flow.
   // The patchbay shows the drums that are rows now; the others stay loaded and leave the picture.
   const offRow = (id) => { const k = id.split(':')[1]; return ALL.some((v) => v.key === k) && !VOICES.some((v) => v.key === k); };
-  const view = SPLIT && !shapeOpt ? bay : {
+  const filtered = {
     nodes: () => bay.nodes().filter((n) => !offRow(n.id)),
     ports: () => bay.ports().filter((p) => !offRow(p.id)),
     links: () => bay.links().filter((l) => !offRow(l.from) && !offRow(l.to)),
   };
+  // With `group`: each row's box is named by its voice's label as it is now,
+  // and above `over` rows the rows are drawn as one box. A row's own node and
+  // ports are `web:<key>` and `web:<key>:<port>`; the scopes' are not.
+  const rowOf = (id) => { const k = id.split(':')[1]; return VOICES.find((v) => v.key === k) ?? null; };
+  const GID = `${S}:${group?.node ?? 'samples'}`;
+  const many = () => !!group && VOICES.length > group.over;
+  const toGroup = (id) => (rowOf(id) ? `${GID}:${id.split(':')[2]}` : id);
+  const groupedView = {
+    nodes() {
+      const ns = filtered.nodes().map((n) => { const v = rowOf(n.id); return v ? { ...n, label: `${v.label}, SuperCollider` } : n; });
+      if (!many()) return ns;
+      const at = ns.findIndex((n) => rowOf(n.id));
+      const out = ns.filter((n) => !rowOf(n.id));
+      out.splice(Math.max(0, at), 0, { id: GID, kind: 'engine', label: group.label(VOICES.length), place: 'browser' });
+      return out;
+    },
+    ports() {
+      const ps = filtered.ports();
+      if (!many()) return ps;
+      const g = group.node;
+      return [...ps.filter((p) => !rowOf(p.id)),
+        { id: `${GID}:midi-in`, label: `${g}:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'] },
+        { id: `${GID}:audio-out`, label: `${g}:audio-out`, dir: 'out', medium: 'audio' }];
+    },
+    links() {
+      const ls = filtered.links();
+      if (!many()) return ls;
+      // One wire per pair of ends, carrying the rows' traffic summed.
+      const by = new Map();
+      for (const l of ls) {
+        const from = toGroup(l.from), to = toGroup(l.to);
+        if (from === l.from && to === l.to) { by.set(l.id, l); continue; }
+        const k = `${from}>${to}`, was = by.get(k);
+        if (was) { was.sent += l.sent || 0; continue; }
+        by.set(k, { ...l, id: `g-${k}`, from, to, transforms: [], sent: l.sent || 0 });
+      }
+      return [...by.values()];
+    },
+  };
+  const view = group ? groupedView : SPLIT && !shapeOpt ? bay : filtered;
   const pb = createPatchbay(view, { flowing: (l) => (flowing ? flowing(l, playing) : playing) });
 
   // ── the knobs, one row, each sending on its own wire ─────────────────────
@@ -639,8 +703,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     start, stop,
     /** The shape now, and a new one: at once when stopped, at the top of the next loop when playing. */
     shape: () => ({ rows: VOICES.length, steps: STEPS }),
-    setShape(sh) {
-      if (sh.rows === VOICES.length && sh.steps === STEPS) { pendingShape = null; return; }
+    /** `fresh`: build the grid again, empty, even when the shape is the same (a new kit). */
+    setShape(sh, { fresh = false } = {}) {
+      if (!fresh && sh.rows === VOICES.length && sh.steps === STEPS) { pendingShape = null; return; }
       if (playing) pendingShape = sh; else reshape(sh);
     },
     pendingShape: () => pendingShape,

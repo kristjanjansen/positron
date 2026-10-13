@@ -1,4 +1,4 @@
-// demo/concepts/rhythm/sample-voices.mjs: the four rows of /concepts/rhythm/020/,
+// demo/concepts/rhythm/sample-voices.mjs: the rows of /concepts/rhythm/020/, one per sample,
 // which play SAMPLES on the same one SuperCollider engine the synth drums run
 // on. Asked 2026-10-12 (BACKLOG, "rhythm/020"): /concepts/rhythm/010/ with the
 // voices playing samples, a default kit on R2, any pack or zip of WAVs dropped
@@ -19,13 +19,14 @@
 // Samples are mixed to mono (`toMono`, the mean of the channels) and handed to
 // scsynth as 16 bit WAVs by `sonic.loadSample`, as sc-sampler.mjs does.
 //
-// THE KNOBS, PER ROW: pitch in semitones, -12 to +12 (the rate is 2^(st/12),
-// so it is the sample played faster or slower, length and all, as a sampler
-// does), and length, 0.03 to 2 s, the most of the sample a hit plays.
+// EVERY SAMPLE IS A ROW since 2026-10-13 (*"show all samples with their
+// names. no preatterns"*): `sampleRows` makes 64 rows, a Circuit pack's slot
+// count, and the page shows as many as are loaded. No knobs: every hit plays
+// at its own pitch, to its own end (the default kit keeps the lengths its four
+// rows had).
 
 import { graph, RATE, OP } from '/shell/synthdef.mjs';
 import { toMono } from '/shell/circuit-sample.mjs';
-import { NOTE } from './voices.mjs';
 
 /** The default kit: the four /concepts/rhythm/000/ drums, one hit each,
  *  rendered in this tab off each drum's own output pair (2026-10-12) and put
@@ -68,41 +69,65 @@ export function wavBytes(samples, rate) {
   return buf;
 }
 
-/** Which loaded sample a row takes by default: the first whose name says so,
- *  else the row's own position among the first four. */
-export function defaultPick(names, rowKey, rowIndex) {
-  const want = { kick: /kick|bd|bass ?drum/i, snare: /snare|sd|clap/i, hho: /open|oh|hat|hh/i, hhc: /closed|ch|hat|hh/i }[rowKey];
-  const taken = names.map((n) => n.toLowerCase());
-  let i = -1;
-  if (rowKey === 'hhc') i = taken.findIndex((n) => /closed/.test(n) || (/\bch\b|_ch|ch_/.test(n)));
-  if (rowKey === 'hho') i = taken.findIndex((n) => /open/.test(n) || (/\boh\b|_oh|oh_/.test(n)));
-  if (i < 0 && want && rowKey !== 'hho' && rowKey !== 'hhc') i = taken.findIndex((n) => want.test(n));
-  if (i < 0 && (rowKey === 'hho' || rowKey === 'hhc')) i = taken.findIndex((n) => /hat|hh/.test(n));
-  if (i < 0) i = Math.min(rowIndex, names.length - 1);
-  return i;
-}
+/** The most rows a kit becomes: a Circuit pack's 64 sample slots, which is
+ *  also how many rows /tom/ draws. A zip or a set of WAVs past it keeps its
+ *  first 64, in the order they were read. */
+export const MAX_ROWS = 64;
 
 /**
- * The four rows: `voices()`'s shape for `createDrumMachine`, each with the
- * `drumsample` definition, two knobs, and `args()` that names the row's
- * buffer (null while nothing is loaded, so a hit is skipped rather than
- * playing buffer 0).
- * @param {{ bufOf: (key: string) => number|null }} o
+ * What each row is called: the file's own name, without the folder and the
+ * `.wav`, and without a run of leading words every name shares. A pack whose
+ * files are all `NOVHTG Hit - Drumstation - 808 ...` reads `808 Crash D1T1`,
+ * because the shared part names the pack and not the row. The whole name stays
+ * in the row's hover.
+ * @param {string[]} files
+ * @returns {string[]}
  */
-export function sampleVoices({ bufOf }) {
+export function rowNames(files) {
+  const bare = files.map((f) => String(f).split('/').pop().replace(/\.wav$/i, ''));
+  if (bare.length < 2) return bare;
+  const first = bare[0];
+  const cuts = [];
+  for (let i = 0; i < first.length; i++) {
+    if (!bare.every((b) => b[i] === first[i])) break;
+    // Only ever at a word's end, so a shared `Kick` is not cut to `ick`.
+    if (/[\s_\-]/.test(first[i])) cuts.push(i + 1);
+  }
+  // The longest cut that still leaves every name a word, so `Tone 00` to
+  // `Tone 63` stay as they are rather than becoming bare numbers.
+  const cut = cuts.reverse().find((c) => bare.every((b) => /\p{L}/u.test(b.slice(c)))) ?? 0;
+  return cut ? bare.map((b) => b.slice(cut).trim()) : bare;
+}
+
+/** How long a hit of a default kit row may ring, as the four rows had it before
+ *  every sample became a row; anything else plays to its own end. */
+const KIT_LEN = { kick: 0.5, snare: 0.5, 'open-hat': 0.5, 'closed-hat': 0.1 };
+
+/**
+ * One row per sample slot, `MAX_ROWS` of them: `voices()`'s shape for
+ * `createDrumMachine`, all on the one `drumsample` definition. A row's label
+ * is read live (`nameOf(r)`), so a new kit renames the rows without a new
+ * machine. A row is an open hat or a closed hat by its name, and the closed
+ * one chokes the open one as on 000. `args()` names the row's buffer, or
+ * answers null while it has none, so a hit is skipped rather than playing
+ * buffer 0.
+ * @param {{ nameOf: (r: number) => string|null, fileOf: (r: number) => string|null,
+ *   bufOf: (r: number) => number|null }} o
+ */
+export function sampleRows({ nameOf, fileOf, bufOf }) {
   const def = drumSampleDef();
-  // The last word is the knob's second line, kept to one line: `closed hat`
-  // wrapped to two and made its knob taller than its neighbours.
-  const ROWS = [['kick', 'kick', 'kick'], ['snare', 'snare', 'snare'], ['hho', 'open hat', 'open'], ['hhc', 'closed hat', 'closed']];
-  return ROWS.map(([key, label, sub]) => ({
-    key, label, name: 'drumsample', note: NOTE[key], def,
-    params: [
-      { name: `${key}-pitch`, control: 'rate', label: 'pitch', sub, value: 0, min: -12, max: 12, step: 1,
-        unit: 'semitones', toArg: (st) => 2 ** (st / 12) },
-      { name: `${key}-length`, control: 'len', label: 'length', sub, value: key === 'hhc' ? 0.1 : key === 'hho' ? 0.5 : 0.5,
-        min: 0.03, max: 2, unit: 's', life: key === 'hho' },
-    ],
-    args: () => { const b = bufOf(key); return b == null ? null : ['buf', b]; },
+  return Array.from({ length: MAX_ROWS }, (_, r) => ({
+    key: `s${r}`, name: 'drumsample', note: 36 + r, def,
+    get label() { return nameOf(r) ?? `slot ${r + 1}`; },
+    get title() { const f = fileOf(r); return f ? `${f}, row ${r + 1}` : `row ${r + 1}, nothing loaded`; },
+    get opens() { return /open|\bo?hh?o\b|\boh\b/i.test(nameOf(r) ?? ''); },
+    get closes() { return /closed|\bhhc\b|\bch\b/i.test(nameOf(r) ?? ''); },
+    args: () => {
+      const b = bufOf(r);
+      if (b == null) return null;
+      const f = String(fileOf(r) ?? '').replace(/\.wav$/i, '');
+      return ['buf', b, 'rate', 1, 'len', KIT_LEN[f] ?? 10];
+    },
   }));
 }
 
