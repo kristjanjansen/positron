@@ -11,7 +11,6 @@ export const CONCEPTS = [
   { n: 'synth/000', title: 'Keyboard', say: 'Play a sine synthesizer from the on-screen keys or a MIDI keyboard plugged into this computer.' },
   { n: 'synth/010', title: 'Recorder', say: 'Record what you play and play it back, every note in a table with its time, velocity and length.' },
   { n: 'synth/020', title: 'Timeline', say: 'The same recorder drawn on a timeline, so a take shows as notes in time and plays from its start.' },
-  { n: 'synth/030', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
   // synth/040 Synth removed 2026-10-13 (*"can split https://positron.studio/concepts/synth/040/ apart to
   // different conecepts, do not dupe with existing ones (so only some last steps?). rm 040 later."*). Its
   // sine and freq knob are synth/000's, and its wave knob is the oscillator's own setting rather than a
@@ -28,6 +27,8 @@ export const CONCEPTS = [
   // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
   // its folder and URL stay where they are, so no address changed.
   { n: 'sampler/000', group: 'synth', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
+  // Dot piano last in its group (asked 2026-10-13, *"dot piano is last in group"*).
+  { n: 'synth/030', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
   { n: 'sampler/060', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
   // sampler/050, the Pappus granulator, moved to /archive/ 2026-10-13 when the owner chose the light one (*"but we got rid of pappus?!? 060 ???"*): /archive/pappus/, still working.
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
