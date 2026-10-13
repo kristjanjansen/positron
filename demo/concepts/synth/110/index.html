@@ -214,10 +214,13 @@
   const nameOf = (n) => `${NAMES[n % 12]}${Math.floor(n / 12) - 1}`;
   const PITCHES = [...new Set(SEQ)].sort((a, b) => b - a);
   const laneId = (n) => `pitch-${n}`;
-  const spanRows = NOTES.flatMap((x, i) => [
+  const lapRows = NOTES.flatMap((x, i) => [
     { at: x.at, id: `n${i}`, kind: 'note', payload: { n: x.n, durMs: Math.min(x.end, LAP) - x.at } },
     ...(x.end > LAP ? [{ at: 0, id: `t${i}`, kind: 'note', payload: { n: x.n, durMs: x.end - LAP } }] : []),
   ]);
+  // Two laps on the line, zoomed out 2x (asked 2026-10-13, *"zoom out 2x"*):
+  // the second is the next time round, drawn so the view is never half empty.
+  const spanRows = [...lapRows, ...lapRows.map((r) => ({ ...r, at: r.at + LAP, id: `${r.id}b` }))];
   const lanes = PITCHES.map((n) => ({
     id: laneId(n), kind: 'note', label: nameOf(n), height: 24, as: 'spans', stack: false, terse: true, barGap: 2, labels: false,
     rows: () => spanRows.filter((r) => r.payload.n === n),
@@ -236,7 +239,7 @@
   let fitW = 0;
   new ResizeObserver(() => {
     const w = strip.el.clientWidth;
-    if (w && w !== fitW) { fitW = w; strip.strip.fit(0, LAP); }
+    if (w && w !== fitW) { fitW = w; strip.strip.fit(0, 2 * LAP); }
   }).observe(strip.el);
   // LOOP ON FROM THE START, through the bar's own button: a mark at 0 and a mark
   // at the end. The bar starts the deck on the first mark, so `arming`

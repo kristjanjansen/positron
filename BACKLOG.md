@@ -1,4 +1,5 @@
 ## Open
+- ~~**Plaits patches: the timeline zoomed out 2x**~~ (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/synth/110/ zoom out 2x"*. DONE: the view spans two laps, the second drawn as the next time round.
 - ~~**Dot piano last in its group**~~ (2026-10-13). Asked: *"dot piano is last in group"*. DONE: its row after Sampler.
 - **Filter, Envelope and LFO as one Sound design concept** (2026-10-13). Asked: *"combine filter+envelope+lfo to single sound design concept"*. One page with the oscillator, the filter, the envelope and the LFO, each module's knobs, one patchbay; synth/060 and 070 removed.
 - **archives shows as history; the Moholy-Nagy picture there** (2026-10-13). Asked: *"archives = hisotry. bring back nagy visualiation from arhvie there"*. DONE by the session: the heading reads history; the /partitur/ card (Moholy-Nagy's 1924 score) moved under it. No archived Moholy-Nagy page was found: if a concept page of the score's picture alone was meant, it is not built.
