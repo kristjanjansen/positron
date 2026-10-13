@@ -62,7 +62,7 @@ export const CONCEPTS = [
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
   { n: 'shader/000', title: 'Mirror shader', say: 'A kaleidoscope shader with one knob for its mirrors, and code that recompiles as you edit.' },
   // shader/020 and not 010: 010's old address 404s on purpose, so it is not reused for a different page.
-  { n: 'shader/020', title: 'Grain landscape', say: 'Grains from a radio recording drawn as a scan landscape, with every number of its look on a knob.' },
+  { n: 'shader/020', title: 'Scan landscape', say: 'A radio recording drawn as a scan landscape, with every number of its look on a knob.' },
   // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
   { n: 'room/000', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },

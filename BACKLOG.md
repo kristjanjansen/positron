@@ -1,4 +1,5 @@
 ## Open
+- ~~**shader/020 without "grains" in its name and line**~~ (2026-10-13). Asked: *"Grain landscape ... - no grains metions"*. DONE: "Scan landscape", "A radio recording drawn as a scan landscape, with every number of its look on a knob."
 - ~~**Instruments split: building instruments and instruments in code**~~ (2026-10-13). Asked: *"split oinstumets group intoto 'building instuments' and 'instuments in code'"*. DONE by the session as headings: synth/080 Faust synth and synth/090 Collide synth (their code on the page) under "instruments in code"; the rest, Sampler included, under "building instruments". No address changed.
 - ~~**Archive /reel/ and /floor/**~~ (2026-10-13). Asked: *"archive reel and floor"*. DONE: unlisted, still served, cards out, on /archive/; /reel/ lives on as archives/000 Newsreels.
 - ~~**Archive /videoradio/**~~ (2026-10-13). Asked: *"archvie videoradio"*. DONE: unlisted, still served, card out, on /archive/; its picture is shader/020 Grain landscape.
