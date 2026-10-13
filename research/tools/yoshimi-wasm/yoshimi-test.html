@@ -1,0 +1,25 @@
+<script src="libs/audioworklet.js"></script>
+<script>
+(async () => {
+  const r = window.__r = { stage: 'start' };
+  try {
+    const ctx = new AudioContext({ sampleRate: 48000 }); await ctx.resume();
+    await AWPF.polyfill(ctx);
+    const load = (u) => new Promise((s, j) => { const e = document.createElement('script'); e.src = u; e.onload = s; e.onerror = j; document.head.appendChild(e); });
+    let t = performance.now();
+    await load('libs/wam-controller.js'); await load('yoshimi.js');
+    AWPF.origin = location.origin + '/y/';
+    await WAM.YOSHIMI.importScripts(ctx, AWPF.origin);
+    const y = new WAM.YOSHIMI(ctx);
+    r.bootMs = Math.round(performance.now() - t);
+    const an = ctx.createAnalyser(); an.fftSize = 2048; y.connect(an); an.connect(ctx.destination);
+    y.sendMessage('set', 'patch', await (await fetch('../morph.xml')).text());
+    await new Promise((s) => setTimeout(s, 300));
+    y.onMidi([0x90, 57, 100]);
+    await new Promise((s) => setTimeout(s, 1000));
+    const buf = new Float32Array(2048); an.getFloatTimeDomainData(buf);
+    r.rms = Math.sqrt(buf.reduce((a, x) => a + x * x, 0) / buf.length);
+    r.stage = 'done';
+  } catch (e) { r.stage = 'error'; r.error = String(e && e.stack || e); }
+})();
+</script>

@@ -1,0 +1,19 @@
+<script type="module">
+import { ZynStrudelOutput } from './z/web/strudel-output.js';
+const r = window.__r = { stage: 'start' };
+try {
+  const ctx = new AudioContext({ sampleRate: 48000 }); await ctx.resume();
+  let t = performance.now();
+  const z = await new ZynStrudelOutput(ctx).init('./z/zyn_wasm.wasm', './z/web/zyn-worklet.js', { connectToDestination: false });
+  r.bootMs = Math.round(performance.now() - t);
+  const an = ctx.createAnalyser(); an.fftSize = 2048; z.node.connect(an); an.connect(ctx.destination);
+  const xml = await (await fetch('./morph.xml')).text();
+  z.node.loadPatch(xml, 0);
+  await new Promise((s) => setTimeout(s, 300));
+  z.node.sendMidi(0x90, 57, 100);
+  await new Promise((s) => setTimeout(s, 1000));
+  const buf = new Float32Array(2048); an.getFloatTimeDomainData(buf);
+  r.rms = Math.sqrt(buf.reduce((a, x) => a + x * x, 0) / buf.length);
+  r.stage = 'done';
+} catch (e) { r.stage = 'error'; r.error = String(e); }
+</script>
