@@ -36,7 +36,7 @@
   // on top of 010"*. Each drum plays on an output pair of its own and each
   // scope is a node, `web:scope-<drum>`, fed by that drum's `audio-out` alone,
   // so a scope shows its drum and nothing else (`../drum-machine.mjs`).
-  const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('rhythm/knobs');
   const m = createDrumMachine(d, { voices: voices({ knobs: true }), scopes: true });
   const scopes = el('div', 'cc-scopes');

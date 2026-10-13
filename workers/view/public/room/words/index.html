@@ -168,7 +168,7 @@
   ];
   for (const p of PORTS) bay.addPort(p);
 
-  const d = mount({ name: 'Patch from words', what: '', readout: null, index: '/', indexLabel: 'concepts' });
+  const d = mount({ name: 'Patch from words', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('room/words');
   d.log('each Ask is one Workers AI call to llama 3.3 70B, about $0.0005, and nothing is sent until you press it');
 

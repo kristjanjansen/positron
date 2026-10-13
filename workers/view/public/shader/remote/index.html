@@ -68,13 +68,13 @@
   //
   // NOTHING OPENS ON A VISIT: no camera, no fetch, no room.
   const d = mount({
-    name: 'Mirror shader here and on the Pi', what: '', index: '/', indexLabel: 'concepts',
+    name: 'Mirror shader here and on the Pi', what: '', index: '/', indexLabel: 'positron',
     joined: false,
     // `network` and `path` came 2026-10-13 with the direct option, the two
     // cells remote/010 shows for its link (an even count, as the shell asks).
     readout: { 'local fps': 'fps', 'local lag': 'ms', 'Pi fps': 'fps', 'Pi lag': 'ms', network: 'ms', path: '' },
   });
-  conceptNav('remote/shader');
+  conceptNav('shader/remote');
   hintCell(d, 'network', NETWORK_HINT);
   hintCell(d, 'path', PATH_HINT);
 
