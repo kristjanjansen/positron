@@ -658,7 +658,9 @@ export const DEMOS = [
    * browser at all, on one claim the whole thing rests on: at a margin of 1.0 it
    * is never wrong.
    */
-  { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true,
+  // `unlisted: true` since 2026-10-13 (*"arvhice nola"*): still built and deployed at
+  // /nola/, listed on /archive/ with the other retired pages.
+  { name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true, unlisted: true,
     one: 'a piano and a 1977 Rhodes you play from one MIDI keyboard, over a roll '
        + 'of chords you type in or teach it by playing',
     tags: ['WebMIDI', 'WebAudio', 'sampler', 'chords'] },

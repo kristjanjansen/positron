@@ -127,7 +127,7 @@ export const DEMO_CARDS = {
   // still served at their URLs, listed on /archive/ under devices.
   // wire and patchbay archived 2026-10-12 (*"archive wire and patchbay"*): still served, listed on /archive/.
   // typist, the front page demo, archived 2026-10-12 (*"archive/mdfy typist"*): archive/typist.md.
-  nola: { group: 'sampler', say: 'A piano and a 1977 Rhodes from one keyboard, over chords you type in or teach it by playing.', supersededBy: 'sampler/000' },
+  // nola archived 2026-10-13 (*"arvhice nola"*): still served, listed on /archive/.
   tom: { group: 'rhythm', say: 'Drop a Circuit pack or a set of samples and its sounds become the rows of a 16 step grid.' },
   // time and sync archived 2026-10-12 (*"archive time and sync demos"*): still served, listed on /archive/.
   // draw archived 2026-10-12 with XY filter: still served, listed on /archive/.
