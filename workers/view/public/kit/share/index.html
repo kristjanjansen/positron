@@ -34,7 +34,7 @@
   .share-tags { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 12px/1.6 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
-  import { siteCard, igCard, shareTags, TEMPLATE_V } from '/shell/share-card.mjs';
+  import { siteCard, igCard, helloCard, shareTags, TEMPLATE_V } from '/shell/share-card.mjs';
   import { textWidth } from '/shell/bay-svg.mjs';
   import { el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -59,7 +59,7 @@
     what: 'The card every page is shared with and its Instagram portrait, the front page’s hero type, drawn as SVG with no browser and made PNGs at build.',
   });
 
-  const card = siteCard(), ig = igCard();
+  const card = siteCard(), ig = igCard(), hello = helloCard();
   const shipped = document.querySelector('meta[property="og:image"]')?.content || null;
   const imgs = [];
   let inline = null;
@@ -70,9 +70,9 @@
   };
 
   section('SITE CARD', 'The two PNGs as they ship: the 1200 by 630 card every page names, and the 1080 by 1350 Instagram portrait no page names, each named by a hash of its SVG.', null, (box) => {
-    if (!shipped) { box.append(el('p', 'kit-n', `This copy of the page is not built, so there are no PNGs beside it. The build writes ${card.path} and ${ig.path}.`)); return; }
+    if (!shipped) { box.append(el('p', 'kit-n', `This copy of the page is not built, so there are no PNGs beside it. The build writes ${card.path}, ${ig.path} and ${hello.path}.`)); return; }
     const row = el('div', 'share-row');
-    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram']]) {
+    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram'], [hello, 'instagram hello']]) {
       const img = Object.assign(el('img', 'share-pic'), { src: c.path, alt: c.alt, width: c.width, height: c.height });
       const a = Object.assign(el('a', 'pos-linkbtn', `download ${c.path.split('/').pop()}`), { href: c.path, download: c.path.split('/').pop() });
       const f = figure(c, name, img);
@@ -85,7 +85,7 @@
 
   section('THE SVG', 'The same two pictures as the SVG each PNG is made from, written in this tab by the code the build runs, every attribute literal.', null, (box) => {
     const row = el('div', 'share-row');
-    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram']]) {
+    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram'], [hello, 'instagram hello']]) {
       const holder = el('div', 'share-svg');
       holder.innerHTML = c.svg;
       const svg = holder.firstElementChild;
