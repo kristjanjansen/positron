@@ -179,7 +179,9 @@ export const HELLO = ['Hello,', 'is this', 'thing', 'on?'];   // as given, 2026-
 // answered". The ? is drawn white, then drawn again in green clipped to the
 // band its dot sits in, so the dot is the glyph's own and not a circle
 // guessed on top of it.
-const OK = '#8fd6a8';
+// *"Make green more showy"*: brighter than the status dot's #8fd6a8, and lit,
+// a blurred copy of itself under it.
+const OK = '#3dffa0';
 // Each dot drawn again in its own colour, clipped to the band it sits in, so
 // the dot is the glyph's own: the ?'s dot in green (below 0.2 em over the
 // baseline) and every i's tittle in gray (above JetBrains Mono's 0.55 em
@@ -190,8 +192,10 @@ function dots(r, x, y0, k) {
   const out = [];
   const again = (ch, gx, base, top, hgt, fill) => {
     const id = `dot${++clips}`;
+    const glyph = `<text x="${gx.toFixed(1)}" y="${base.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}" fill="${fill}" clip-path="url(#${id})">${xml(ch)}</text>`;
     out.push(`<clipPath id="${id}"><rect x="${(gx - size).toFixed(1)}" y="${top.toFixed(1)}" width="${(3 * size).toFixed(1)}" height="${hgt.toFixed(1)}"/></clipPath>`
-      + `<text x="${gx.toFixed(1)}" y="${base.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}" fill="${fill}" clip-path="url(#${id})">${xml(ch)}</text>`);
+      + (fill === OK ? `<filter id="glow${id}" x="-1" y="-1" width="3" height="3"><feGaussianBlur stdDeviation="${(0.14 * size).toFixed(1)}"/></filter><g filter="url(#glow${id})">${glyph}${glyph}${glyph}</g>` : '')
+      + glyph);
   };
   r.lines.forEach((l, i) => {
     const base = y0 + cap * size + (t.lh - 1) * size / 2 + i * t.lh * size;
