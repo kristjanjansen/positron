@@ -39,6 +39,13 @@
 // is a number or one of Env's own shape names written as a symbol (`\lin`).
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
+// SINCE 2026-10-13, FOR /concepts/sampler/060/'s GRAIN RING: `%` (opMod),
+// `.sqrt`, a 'quoted' symbol (sclang's other spelling of `\name`, and the only
+// one that can hold a `/`), and the UGens GrainBuf, BufWr, Phasor, SendReply,
+// Impulse, Dust, TRand, In, BufFrames and BufDur, each from its class file
+// (see `UGENS`). A line that is only a call, like `BufWr.ar(...)` or
+// `SendReply.ar(...)`, stays in the graph, as it does in sclang.
+//
 // 🔴 NAMED CONTROLS, `\name.kr(value, lag, spec: ...)`, ADDED 2026-09-30 so a
 // program can say which of its numbers a knob under the text may turn. The
 // signature is sclang's own, `Symbol.kr { | val, lag, fixedLag = false, spec | }`
@@ -81,8 +88,8 @@
 // unknown keyword (sclang only WARNS about that one; here a misspelled `mull:`
 // is an error, because a warning nobody reads is how a sound silently loses
 // its level). A positional argument after a keyword one. Strings, symbols
-// anywhere but an Env curve, `~environment` variables, nested functions,
-// `if`, `.play`, `SynthDef`, `Out`, `#[...]`, every operator but the five, a
+// anywhere but an Env curve or SendReply's cmdName, `~environment` variables, nested functions,
+// `if`, `.play`, `SynthDef`, `Out`, `#[...]`, every operator but the six, a
 // variable used before it has a value, a default that is not a number. A named
 // control that is `.ar`, `.ir` or `.tr`, whose value or lag is not a number,
 // that is given `fixedLag`, that shares a name with an argument, or whose spec
@@ -142,6 +149,39 @@ export const UGENS = {
   Pan2:       { file: 'Pan.sc',     args: [['in', REQUIRED], ['pos', 0], ['level', 1]], outputs: 2, first: 'audio' },
   EnvGen:     { file: 'EnvGen.sc',  args: [['envelope', REQUIRED], ['gate', 1], ['levelScale', 1],
                                              ['levelBias', 0], ['timeScale', 1], ['doneAction', 0]] },
+  // ── added 2026-10-13 for /concepts/sampler/060/, a grain ring. Read in
+  // supercollider develop 1995490 on 2026-10-13, the same commit as the rows
+  // above. Four shapes the rows above do not have, each a field:
+  //   `rates`   the methods the class really has; GrainBuf is `*ar` only and
+  //             the buffer info UGens `*kr` (and `*ir`, not in this subset).
+  //   `chans`   the argument that is the NUMBER OF OUTPUTS and not an input:
+  //             `In.init` and `GrainBuf.init` take it off the front and call
+  //             `initOutputs`. A whole number from 1 to MAX_CHANNELS here.
+  //   `inline`  the argument whose array is spliced into the inputs rather
+  //             than expanded: BufWr's `inputArray` (`multiNewList([... loop]
+  //             ++ inputArray.asArray)`) and SendReply's `values` (bubbled,
+  //             then `addAll(values)`).
+  //   `order`   the inputs in the order the server reads them, where it is
+  //             not the argument order. SendReply's `new1` is `[trig, replyID,
+  //             ascii.size] ++ ascii ++ values`, so `#cmdName` is the symbol
+  //             written as its length and then its characters.
+  // `outputs: 0` is `SendTrig`'s `numOutputs { ^0 }`; the call answers 0.0 as
+  // sclang's does. `noAlias` is `DefineDtorCantAliasUnit(GrainBuf)` in
+  // `server/plugins/GrainUGens.cpp`, which changes the wire count (`wirePeak`).
+  Impulse:    { file: 'Osc.sc',     args: [['freq', 440], ['phase', 0]], madd: true },
+  Dust:       { file: 'Noise.sc',   args: [['density', 0]], madd: true },
+  TRand:      { file: 'Noise.sc',   args: [['lo', 0], ['hi', 1], ['trig', 0]] },
+  Phasor:     { file: 'Trig.sc',    args: [['trig', 0], ['rate', 1], ['start', 0], ['end', 1], ['resetPos', 0]] },
+  BufFrames:  { file: 'InfoUGens.sc', args: [['bufnum', REQUIRED]], rates: ['kr'] },
+  BufDur:     { file: 'InfoUGens.sc', args: [['bufnum', REQUIRED]], rates: ['kr'] },
+  In:         { file: 'InOut.sc',   args: [['bus', 0], ['numChannels', 1]], chans: 'numChannels' },
+  BufWr:      { file: 'BufIO.sc',   args: [['inputArray', REQUIRED], ['bufnum', 0], ['phase', 0], ['loop', 1]],
+                inline: 'inputArray', order: ['bufnum', 'phase', 'loop', 'inputArray'] },
+  GrainBuf:   { file: 'GrainUGens.sc', args: [['numChannels', 1], ['trigger', 0], ['dur', 1], ['sndbuf', REQUIRED],
+                ['rate', 1], ['pos', 0], ['interp', 2], ['pan', 0], ['envbufnum', -1], ['maxGrains', 512]],
+                madd: true, chans: 'numChannels', rates: ['ar'], noAlias: true },
+  SendReply:  { file: 'Trig.sc',    args: [['trig', 0], ['cmdName', '/reply'], ['values', REQUIRED], ['replyID', -1]],
+                inline: 'values', order: ['trig', 'replyID', '#cmdName', 'values'], outputs: 0, first: 'same' },
 };
 
 /** `Env`'s class methods, from `Env.sc`, arguments and defaults verbatim. */
@@ -201,14 +241,19 @@ export function specFor(name, value) {
     : { min: -m, max: m, warp: 'lin', step: 0, guessed: true };
 }
 
-/** `BinaryOpUGens.cpp`: opAdd 0, opSub 1, opMul 2, opIDiv 3, opFDiv 4. */
-export const BINARY = { '+': 0, '-': 1, '*': 2, '/': 4 };
-/** `UnaryOpUGens.cpp`: opNeg 0, opAbs 5, opSquared 12, opMIDICPS 17, opTanH 36. */
-export const UNARY = { neg: 0, abs: 5, squared: 12, midicps: 17, tanh: 36 };
+/** `BinaryOpUGens.cpp`: opAdd 0, opSub 1, opMul 2, opIDiv 3, opFDiv 4, opMod 5. */
+export const BINARY = { '+': 0, '-': 1, '*': 2, '/': 4, '%': 5 };
+/** `UnaryOpUGens.cpp`: opNeg 0, opAbs 5, opSquared 12, opSqrt 14, opMIDICPS 17, opTanH 36. */
+export const UNARY = { neg: 0, abs: 5, squared: 12, sqrt: 14, midicps: 17, tanh: 36 };
 const FOLD1 = {
   neg: (x) => -x, abs: Math.abs, squared: (x) => x * x,
+  // `sc_sqrt` in `SC_InlineUnaryOp.h`: the root of a negative number is the
+  // negative of the root of its size, not NaN.
+  sqrt: (x) => (x < 0 ? -Math.sqrt(-x) : Math.sqrt(x)),
   midicps: (x) => 440 * 2 ** ((x - 69) / 12), tanh: Math.tanh,
 };
+/** `sc_mod` in `SC_InlineBinaryOp.h`: the result is always on the divisor's side of zero, so -0.25 % 1 is 0.75. */
+const scMod = (a, b) => (b === 0 ? 0 : a - b * Math.floor(a / b));
 
 /**
  * 🔴 64 AUDIO WIRES ALIVE AT ONCE, AND OVER IT THE ENGINE SAYS NOTHING.
@@ -301,26 +346,35 @@ export function lex(src) {
       continue;
     }
     if (c === '"') throw new SclError('strings are not in this subset', pos);
-    if (c === "'") throw new SclError("'quoted' symbols are not in this subset, write \\lin instead", pos);
+    if (c === "'") {
+      // A quoted symbol, which sclang reads as a Symbol exactly like `\name`
+      // and which is the only way to write one with a `/` in it: SendReply's
+      // cmdName is `'/reply'` in its own class file.
+      const m = /^'((?:[^'\\\n])*)'/.exec(src.slice(i));
+      if (!m) throw new SclError("a 'quoted symbol' has to close on the same line", pos);
+      step(m[0].length);
+      push('sym', m[1], pos);
+      continue;
+    }
     if (c === '~') throw new SclError('~environment variables are not in this subset, use var', pos);
     if (c === '#') throw new SclError('#[literal arrays] are not in this subset, use [ ]', pos);
     if (c === '|' ) { step(); push('punc', '|', pos); continue; }
     if (c === '=' && src[i + 1] !== '=') { step(); push('punc', '=', pos); continue; }
-    if (c === '-' || c === '+' || c === '*' || c === '/' || c === '!') {
+    if (c === '-' || c === '+' || c === '*' || c === '/' || c === '!' || c === '%') {
       // A run of operator characters is one operator in sclang, so `**` and
       // `!=` are read whole and refused whole rather than as two things.
       let j = i;
       while (j < src.length && OPCHARS.includes(src[j]) && !(src[j] === '/' && (src[j + 1] === '/' || src[j + 1] === '*'))) j++;
       const op = src.slice(i, j);
       step(op.length);
-      if (!['+', '-', '*', '/', '!'].includes(op)) throw new SclError(`the operator ${op} is not in this subset, only + - * / and !`, pos);
+      if (!['+', '-', '*', '/', '%', '!'].includes(op)) throw new SclError(`the operator ${op} is not in this subset, only + - * / % and !`, pos);
       push('op', op, pos);
       continue;
     }
     if (OPCHARS.includes(c)) {
       let j = i;
       while (j < src.length && OPCHARS.includes(src[j])) j++;
-      throw new SclError(`the operator ${src.slice(i, j)} is not in this subset, only + - * / and !`, pos);
+      throw new SclError(`the operator ${src.slice(i, j)} is not in this subset, only + - * / % and !`, pos);
     }
     if (PUNCT.has(c)) { step(); push('punc', c, pos); continue; }
     throw new SclError(`${JSON.stringify(c)} is not something this reads`, pos);
@@ -408,6 +462,7 @@ function compileOrThrow(src, name, bus = 0) {
       if (op === '+') return num(a.v + b.v);
       if (op === '-') return num(a.v - b.v);
       if (op === '*') return num(a.v * b.v);
+      if (op === '%') return num(scMod(a.v, b.v));
       return num(a.v / b.v);
     }
     // `BinaryOpUGen.new1`'s degenerate cases, in its order.
@@ -500,7 +555,36 @@ function compileOrThrow(src, name, bus = 0) {
     const rate = method === 'ar' ? RATE.sample : RATE.slow;
     const own = vals.slice(0, spec.args.length);
     const [mul, addv] = spec.madd ? vals.slice(spec.args.length) : [num(1), num(0)];
-    const made = expand(own, (items) => one(cls, spec, rate, items, at), at, cls === 'EnvGen');
+    // The arguments that are not inputs to expand over: the output count, a
+    // spliced array and a symbol. Each is checked here and passed through whole.
+    const names = spec.args.map(([k]) => k);
+    const fixed = new Map();
+    if (spec.chans) {
+      const c = own[names.indexOf(spec.chans)];
+      if (!isNum(c) || !Number.isInteger(c.v) || c.v < 1 || c.v > MAX_CHANNELS) {
+        throw new SclError(`${cls}'s ${spec.chans} is how many outputs it has, a whole number from 1 to ${MAX_CHANNELS} here, not ${describe(c)}`, at);
+      }
+      fixed.set(spec.chans, c);
+    }
+    if (spec.inline) {
+      const v = own[names.indexOf(spec.inline)];
+      const items = v.k === 'arr' ? v.items : [v];
+      for (const x of items) {
+        if (x.k === 'arr') throw new SclError(`${cls}'s ${spec.inline} is one array, and an array of arrays is not in this subset`, at);
+        if (x.k !== 'num' && x.k !== 'sig') throw new SclError(`${describe(x)} cannot go into ${cls}'s ${spec.inline}`, at);
+      }
+      fixed.set(spec.inline, { k: 'arr', items });
+    }
+    for (const k of ['cmdName']) {
+      if (!names.includes(k)) continue;
+      const v = own[names.indexOf(k)];
+      if (v.k !== 'sym') throw new SclError(`${cls}'s ${k} is a symbol like '/reply', not ${describe(v)}`, at);
+      if (!/^[\x20-\x7e]+$/.test(v.v)) throw new SclError(`${cls}'s ${k} is written in plain ASCII here, and '${v.v}' is not`, at);
+      fixed.set(k, v);
+    }
+    const plain = names.map((k, i) => (fixed.has(k) ? num(0) : own[i]));
+    const made = expand(plain, (items) => one(cls, spec, rate,
+      items.map((x, i) => (fixed.has(names[i]) ? fixed.get(names[i]) : x)), at), at, cls === 'EnvGen');
     return spec.madd ? madd(made, mul, addv, at) : made;
   }
 
@@ -522,6 +606,23 @@ function compileOrThrow(src, name, bus = 0) {
       ins = [...rest, ...envArray(env, at)];
       // doneAction is the fifth input: gate, levelScale, levelBias, timeScale, doneAction.
       meta = { doneAction: isNum(rest[4]) ? rest[4].v : null };
+    } else if (spec.order || spec.chans) {
+      const by = new Map(spec.args.map(([k], i) => [k, vals[i]]));
+      ins = [];
+      for (const k of spec.order ?? spec.args.map(([n]) => n)) {
+        if (k === spec.chans) continue;
+        if (k === '#cmdName') {
+          const codes = [...by.get('cmdName').v].map((ch) => num(ch.charCodeAt(0)));
+          ins.push(num(codes.length), ...codes);
+        } else if (k === spec.inline) ins.push(...by.get(k).items);
+        else ins.push(by.get(k));
+      }
+      // BufWr's own `checkInputs`: at audio rate its phase and everything it
+      // writes have to be audio rate too.
+      if (cls === 'BufWr' && rate === RATE.sample) {
+        if (rateOf(by.get('phase')) !== RATE.sample) throw new SclError(`BufWr.ar: its phase is ${RATE_WORD[rateOf(by.get('phase'))]} rate and has to be audio rate`, at);
+        if (by.get('inputArray').items.some((x) => rateOf(x) !== RATE.sample)) throw new SclError('BufWr.ar: what it writes has to be audio rate', at);
+      }
     } else {
       ins = vals;
     }
@@ -535,8 +636,10 @@ function compileOrThrow(src, name, bus = 0) {
       }
     }
     const refs = ins.map((x) => input(x, at));
-    const outs = spec.outputs ?? 1;
+    const outs = spec.chans ? vals[spec.args.findIndex(([k]) => k === spec.chans)].v : (spec.outputs ?? 1);
     const ref = add(cls, rate, refs, outs, 0, meta);
+    // SendReply answers 0.0, sclang's own `^0.0`: it has no output to read.
+    if (outs === 0) return num(0);
     if (outs === 1) return { k: 'sig', rate, ref };
     return { k: 'arr', items: Array.from({ length: outs }, (_, i) => ({ k: 'sig', rate, ref: { from: ref.from, out: i } })) };
   }
@@ -770,6 +873,8 @@ function compileOrThrow(src, name, bus = 0) {
       if (!UGENS[t.v]) throw new SclError(`${t.v} is not in this subset, which knows ${Object.keys(UGENS).join(', ')}, Env and Mix`, t);
       if (method === 'new') throw new SclError(`${t.v}(...) needs a rate: ${t.v}.ar(...) or ${t.v}.kr(...)`, t);
       if (method !== 'ar' && method !== 'kr') throw new SclError(`${t.v}.${method} is not in this subset, only ${t.v}.ar and ${t.v}.kr`, t);
+      const rates = UGENS[t.v].rates;
+      if (rates && !rates.includes(method)) throw new SclError(`${t.v}.${method} does not exist in SuperCollider either; ${t.v} has ${rates.map((r) => `.${r}`).join(' and ')}`, t);
     }
     const got = callArgs();
     if (t.v === 'Env') return envCall(method, got, t);
@@ -995,6 +1100,15 @@ export function wirePeak(blocks) {
   let live = 0, peak = 0;
   const left = new Map(readers);
   blocks.forEach((b, j) => {
+    // A block that cannot alias its inputs to its outputs takes its outputs
+    // FIRST (`DoBufferColoring`, the `kUnitDef_CantAliasInputsToOutputs`
+    // branch), so for a moment its inputs and outputs are all alive.
+    const first = UGENS[b.cls]?.noAlias;
+    const take = () => {
+      if (b.rate !== RATE.sample) return;
+      for (let o = 0; o < b.outs; o++) { live++; peak = Math.max(peak, live); }
+    };
+    if (first) take();
     for (const i of b.inputs) {
       if (i.from < 0 || blocks[i.from].rate !== RATE.sample) continue;
       const key = `${i.from}:${i.out}`;
@@ -1002,12 +1116,7 @@ export function wirePeak(blocks) {
       left.set(key, n);
       if (n === 0) live--;
     }
-    if (b.rate === RATE.sample) {
-      for (let o = 0; o < b.outs; o++) {
-        live++;
-        peak = Math.max(peak, live);
-      }
-    }
+    if (!first) take();
   });
   return peak;
 }

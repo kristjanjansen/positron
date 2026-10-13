@@ -56,6 +56,21 @@
 //   freq, amp and gate not left out of the knobs             81/84, three
 //   a lag of 0 kept as a lag                                 83/84, the 0 is nil
 //
+// ⚠️ 2026-10-13, THE GRAIN RING'S UGENS (GrainBuf, BufWr, Phasor, SendReply,
+// Impulse, Dust, TRand, In, BufFrames, BufDur), `%`, `.sqrt` and 'quoted'
+// symbols, for /concepts/sampler/060/. MEASURED, 105 ok on the real module
+// (84 before), then six sabotaged copies:
+//
+//   SendReply's replyID written after its cmdName           103/105, its layout
+//                                                            and the probe bytes
+//   GrainBuf's noAlias dropped                               104/105, the wire count
+//   numChannels written as an input                          102/105, GrainBuf, In
+//                                                            and the probe bytes
+//   % folded as JavaScript's %, so -0.25 % 1 is -0.25        104/105, the fold
+//   BufWr's phase rule removed                               104/105, that refusal
+//   the per class rates ignored                              103/105, GrainBuf.kr
+//                                                            and BufFrames.ar
+//
 // ⚠️ WHAT NONE OF THEM CAN SEE: whether scsynth agrees. Opcode 0 for `*` is a
 // well formed file that loads and plays, louder; only the page's own meter
 // under a changed `amp` can tell a multiply from an add
@@ -338,6 +353,99 @@ const { KEYED } = M;
     `rate ${rate?.spec.min}..${rate?.spec.max} ${rate?.spec.warp}, cut ${cut?.spec.min}..${cut?.spec.max}${cut?.spec.guessed ? ' guessed' : ''}`);
 }
 
+// ── the grain ring's UGens, added 2026-10-13 ─────────────────────────────────
+//
+// For /concepts/sampler/060/. Every expected number below is read off the
+// class files of supercollider develop 1995490 (GrainUGens.sc, BufIO.sc,
+// Trig.sc, Osc.sc, Noise.sc, InOut.sc, InfoUGens.sc), not off this compiler.
+
+{
+  const { PROGRAM } = await import('../concepts/sampler/grain-ring.mjs');
+  const r = compile(PROGRAM, { name: 'gring' });
+  ok('the grain ring program compiles', r.ok, r.ok ? `${r.bytes.length} B, ${r.blocks} blocks, ${r.wires} wires` : r.message);
+  const d = r.ok ? readSynthDef(r.bytes).defs[0] : null;
+  const gb = d && byName(d, 'GrainBuf')[0];
+  ok('NEGATIVE CONTROL: GrainBuf\'s numChannels is its output count and not an input, so it has 2 outputs and 9 inputs',
+    gb && gb.outputs.length === 2 && gb.inputs.length === 9 && inp(d, gb.inputs[5]) === 2 && inp(d, gb.inputs[7]) === -1 && inp(d, gb.inputs[8]) === 512,
+    gb ? `${gb.outputs.length} outputs, inputs ${ins(d, gb).join(', ')}` : 'no GrainBuf');
+  const sr = d && byName(d, 'SendReply')[0];
+  const name = '/grain';
+  const want = [-1, name.length, ...[...name].map((c) => c.charCodeAt(0))];
+  ok('NEGATIVE CONTROL: SendReply is trig, replyID -1, the length of its cmdName, its characters, then the values, with no output',
+    sr && sr.outputs.length === 0 && sr.inputs.length === 1 + want.length + 4 && ins(d, sr).slice(1, 1 + want.length).join() === want.join(),
+    sr ? ins(d, sr).join(' ') : 'no SendReply');
+  const bw = d && byName(d, 'BufWr')[0];
+  ok('BufWr\'s inputs are bufnum, phase and loop, then what it writes',
+    bw && bw.inputs.length === 4 && ins(d, bw)[1] === 'Phasor:0' && inp(d, bw.inputs[2]) === 1 && ins(d, bw)[3].startsWith('BinaryOpUGen'),
+    bw ? ins(d, bw).join(' ') : 'no BufWr');
+  const inn = d && byName(d, 'In')[0];
+  ok('In.ar(bus, 2) is one block with two outputs reading the bus control',
+    inn && inn.outputs.length === 2 && inn.inputs.length === 1 && ins(d, inn)[0].startsWith('Control'),
+    inn ? `${inn.outputs.length} outputs, ${ins(d, inn).join(' ')}` : 'no In');
+  ok('% is opMod 5 and .sqrt is opSqrt 14',
+    d && byName(d, 'BinaryOpUGen').some((b) => b.special === 5) && byName(d, 'UnaryOpUGen').some((b) => b.special === 14));
+  ok('size and density are named controls a knob can be drawn from',
+    r.ok && ['size', 'density'].every((n) => r.knobs.some((k) => k.name === n && k.spec.warp === 'exp')),
+    r.ok ? r.knobs.map((k) => k.name).join(' ') : '');
+}
+{
+  // The probe's graph, built block by block with synthdef.mjs on 2026-10-13
+  // and measured on the tab's scsynth (20.0 replies a second at dens 20),
+  // against the same graph written as text. Byte for byte.
+  const { graph, RATE, OP } = await import('./synthdef.mjs');
+  const FR = 8 * 48000;
+  const g = graph('gbuf');
+  const k = g.value;
+  const [buf, dens, size, amp] = g.params([['buf', 900], ['dens', 20], ['size', 0.1], ['amp', 0.5]]);
+  const inp1 = g.block('In', RATE.sample, [k(2)], 1);
+  const ph = g.block('Phasor', RATE.sample, [k(0), k(1), k(0), k(FR), k(0)]);
+  g.block('BufWr', RATE.sample, [buf, ph, k(1), inp1], 1);
+  const trig = g.block('Impulse', RATE.sample, [dens, k(0)]);
+  const frac = g.block('BinaryOpUGen', RATE.sample, [ph, k(1 / FR)], 1, OP.mul);
+  const pos = g.block('BinaryOpUGen', RATE.sample, [frac, k(0.25)], 1, OP.sub);
+  const gb = g.block('GrainBuf', RATE.sample, [trig, size, buf, k(1), pos, k(2), k(0), k(-1), k(512)], 2);
+  const nm = '/gbuf';
+  g.block('SendReply', RATE.sample, [trig, k(-1), k(nm.length), ...[...nm].map((c) => k(c.charCodeAt(0))), pos, size], 0);
+  const l = g.block('BinaryOpUGen', RATE.sample, [{ from: gb.from, out: 0 }, amp], 1, OP.mul);
+  const rr = g.block('BinaryOpUGen', RATE.sample, [{ from: gb.from, out: 1 }, amp], 1, OP.mul);
+  g.out(l, rr);
+  const byHand = g.bytes();
+  const text = `{ |buf = 900, dens = 20, size = 0.1, amp = 0.5|
+  var inp = In.ar(2, 1);
+  var ph = Phasor.ar(0, 1, 0, ${FR}, 0);
+  var trig, pos, g;
+  BufWr.ar(inp, buf, ph, 1);
+  trig = Impulse.ar(dens, 0);
+  pos = ph * (1 / ${FR}) - 0.25;
+  g = GrainBuf.ar(2, trig, size, buf, 1, pos, 2, 0, -1, 512);
+  SendReply.ar(trig, '/gbuf', [pos, size]);
+  g * amp
+}`;
+  const r = compile(text, { name: 'gbuf' });
+  ok('NEGATIVE CONTROL: the probe\'s hand built GrainBuf graph and the same graph as text are the same file, byte for byte',
+    r.ok && sameBytes(r.bytes, byHand), r.ok ? `${r.bytes.length} B against ${byHand.length} B` : r.message);
+}
+{
+  const { d } = def("{ SinOsc.ar(300 * (-0.25 % 1)) * (-4).sqrt.neg * 0.01 }");
+  const s0 = d && byName(d, 'SinOsc')[0];
+  ok('a number % a number folds the way sc_mod does, so -0.25 % 1 is 0.75, and -4.sqrt is -2 as sc_sqrt has it',
+    s0 && inp(d, s0.inputs[0]) === 225 && byName(d, 'BinaryOpUGen').some((b) => inp(d, b.inputs[1]) === 2),
+    s0 ? `freq ${inp(d, s0.inputs[0])}, ${byName(d, 'BinaryOpUGen').map((b) => ins(d, b).join('*')).join(' ')}` : 'no SinOsc');
+}
+{
+  const { r } = def("{ GrainBuf.ar(2, Impulse.ar(10), 0.1, 0, 1, 0.5) }");
+  // One input and two outputs alive at the same moment is three, where an
+  // ordinary block would give its input back first and peak at two.
+  ok('NEGATIVE CONTROL: GrainBuf cannot alias its inputs to its outputs, so the wire count holds both at once',
+    r.ok && r.wires === 3, r.ok ? `${r.wires} wires` : r.message);
+}
+{
+  const { r, d } = def("{ SendReply.kr(Impulse.kr(4), '/tick', [1, 2]); SinOsc.ar * 0.1 }");
+  const sr = d && byName(d, 'SendReply')[0];
+  ok('SendReply.kr is a control rate block, and the line after it still plays',
+    r.ok && sr && sr.rate === 1 && byName(d, 'SinOsc').length === 1, r.ok ? `rate ${sr?.rate}` : r.message);
+}
+
 // ── refusals, each with a line and a column ───────────────────────────────────
 
 const REFUSE = [
@@ -379,6 +487,17 @@ const REFUSE = [
   ['a lag that is a signal', String.raw`{ SinOsc.ar(\x.kr(300, LFNoise1.kr(1))) }`, 1, 24, /lag of \\x has to be a number/],
   ['a named control with an argument\'s name', String.raw`{ |x = 1| SinOsc.ar(\x.kr(300)) }`, 1, 21, /already an argument/],
   ['NEGATIVE CONTROL: one name with two values, which is sclang\'s own error', String.raw`{ SinOsc.ar(\x.kr(300) + \x.kr(400)) }`, 1, 26, /more than one set of default values/],
+  // the grain ring's UGens
+  ['NEGATIVE CONTROL: GrainBuf at control rate, which SuperCollider does not have either', '{ GrainBuf.kr(1, 0, 0.1, 0) }', 1, 3, /GrainBuf\.kr does not exist/],
+  ['GrainBuf with no buffer', '{ GrainBuf.ar(2, Impulse.ar(10)) }', 1, 3, /needs its sndbuf argument/],
+  ['NEGATIVE CONTROL: a channel count that is a signal', '{ GrainBuf.ar(SinOsc.kr(1), Impulse.ar(10), 0.1, 0) }', 1, 3, /how many outputs it has/],
+  ['three channels of In', '{ Mix(In.ar(2, 3)) }', 1, 7, /from 1 to 2/],
+  ['a SendReply cmdName that is a number', '{ SendReply.ar(Impulse.ar(4), 3, [1]); SinOsc.ar }', 1, 3, /is a symbol like/],
+  ['a SendReply with no values', "{ SendReply.ar(Impulse.ar(4), '/x'); SinOsc.ar }", 1, 3, /needs its values argument/],
+  ['NEGATIVE CONTROL: a SendReply.ar on a control rate trigger, SendTrig\'s checkSameRateAsFirstInput', "{ SendReply.ar(Impulse.kr(4), '/x', [1]); SinOsc.ar }", 1, 3, /first input is control rate/],
+  ['NEGATIVE CONTROL: BufWr.ar with a control rate phase, its own checkInputs', '{ BufWr.ar(SinOsc.ar, 0, LFSaw.kr(1)); SinOsc.ar }', 1, 3, /phase is control rate/],
+  ['BufFrames at audio rate', '{ SinOsc.ar(BufFrames.ar(0)) }', 1, 13, /BufFrames\.ar does not exist/],
+  ["a 'quoted symbol' left open", "{ SendReply.ar(Impulse.ar(4), '/x, [1]); SinOsc.ar }", 1, 31, /has to close on the same line/],
   ['a keyword a named control does not take', String.raw`{ SinOsc.ar(\x.kr(300, 0.1, spec: [20, 600], mull: 2)) }`, 1, 46, /no argument called mull/],
 ];
 for (const [name, src, line, col, re] of REFUSE) {

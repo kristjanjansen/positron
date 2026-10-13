@@ -71,6 +71,8 @@ export const CONCEPTS = [
   { n: 'typist/030', title: 'Playback', say: 'Everything you type, deletions included, is kept and played back as the page writes itself again.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
   { n: 'sampler/000', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
+  { n: 'sampler/050', title: 'Granulator', say: 'Our radio recordings granulated by Pappus in this tab, each grain marked where it read the sound.' },
+  { n: 'sampler/060', title: 'Grain ring', say: 'The same radio grains from a small SuperCollider program you can read and edit while it plays.' },
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
