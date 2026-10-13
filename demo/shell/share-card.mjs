@@ -171,7 +171,7 @@ export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig', [2, 3, 4]);
 // plus sitename"*. The owner's four lines as given, at the largest size the
 // width and height allow, and the wordmark on the bottom margin as on the
 // other cards.
-export const HELLO = ['Hello.', 'Is this', 'thing', 'on?'];
+export const HELLO = ['Hello,', 'is thing', 'on?'];   // *"Hello, is thing on?"*, as given
 // 🔴 AND THE QUESTION MARK'S OWN DOT IS GREEN: first a dot inside the o of
 // `on?` (*"Inside on's o add our green dot"*), then *"No inside o. Questionmark
 // is white but dot is green. Hello's dot is gray"*. The green is the status
@@ -180,16 +180,29 @@ export const HELLO = ['Hello.', 'Is this', 'thing', 'on?'];
 // band its dot sits in, so the dot is the glyph's own and not a circle
 // guessed on top of it.
 const OK = '#8fd6a8';
-function qDot(r, x, y0, k) {
+// Each dot drawn again in its own colour, clipped to the band it sits in, so
+// the dot is the glyph's own: the ?'s dot in green (below 0.2 em over the
+// baseline) and every i's tittle in gray (above JetBrains Mono's 0.55 em
+// x-height). *"Hello, is thing on? 2 i dots gray, ? Dot green"*, 2026-10-13.
+let clips = 0;
+function dots(r, x, y0, k) {
   const { t } = r, size = t.size * k, cap = M[`${t.face}${t.weight}`].cap, fam = FAMILY[t.face];
-  const i = r.lines.findIndex((l) => l.endsWith('?'));
-  if (i < 0) return '';
-  const l = r.lines[i];
-  const base = y0 + cap * size + (t.lh - 1) * size / 2 + i * t.lh * size;
-  const qx = x + width(l.slice(0, -1), { ...t, size });
-  const top = base - 0.2 * size;
-  return `<clipPath id="qdot"><rect x="${(qx - size).toFixed(1)}" y="${top.toFixed(1)}" width="${(3 * size).toFixed(1)}" height="${(0.5 * size).toFixed(1)}"/></clipPath>`
-    + `<text x="${qx.toFixed(1)}" y="${base.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}" fill="${OK}" clip-path="url(#qdot)">?</text>`;
+  const out = [];
+  const again = (ch, gx, base, top, hgt, fill) => {
+    const id = `dot${++clips}`;
+    out.push(`<clipPath id="${id}"><rect x="${(gx - size).toFixed(1)}" y="${top.toFixed(1)}" width="${(3 * size).toFixed(1)}" height="${hgt.toFixed(1)}"/></clipPath>`
+      + `<text x="${gx.toFixed(1)}" y="${base.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}" fill="${fill}" clip-path="url(#${id})">${xml(ch)}</text>`);
+  };
+  r.lines.forEach((l, i) => {
+    const base = y0 + cap * size + (t.lh - 1) * size / 2 + i * t.lh * size;
+    [...l].forEach((ch, c) => {
+      if (ch !== '?' && ch !== 'i') return;
+      const gx = x + (c ? width(l.slice(0, c), { ...t, size }) : 0);
+      if (ch === '?') again(ch, gx, base, base - 0.2 * size, 0.5 * size, OK);
+      else again(ch, gx, base, base - 1.2 * size, 0.6 * size, INK.dim);
+    });
+  });
+  return out.join('');
 }
 export function helloCard() {
   const w = IG_W, h = IG_H, pad = 96;
@@ -201,8 +214,9 @@ export function helloCard() {
   const markH = MARK.lh * MARK.size * km;
   // three quarters of the largest that fits: *"Smaller title"*
   const k = 0.75 * Math.min((w - 2 * pad) / tw, (h - 2 * pad - markH - MARK_AIR * km) / th);
+  clips = 0;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
-    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${block(r, pad, pad, k)}${qDot(r, pad, pad, k)}${block(mark, pad, h - pad - markH, km)}</svg>`;
+    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${block(r, pad, pad, k)}${dots(r, pad, pad, k)}${block(mark, pad, h - pad - markH, km)}</svg>`;
   const version = fnv(`${svg}|${TEMPLATE_V}`);
   return { svg, alt: `${SITE_NAME}: ${HELLO.join(' ')}`, version, path: `/og/hello-${version}.png`, width: w, height: h, scale: k,
     headSize: TYPE.head.size * k, markSize: MARK.size * km, head: HELLO };

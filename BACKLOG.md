@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Hello post: "Hello, / is thing / on?", the two i dots gray, the ? dot green**~~ (2026-10-13, DONE). Asked as given, text verbatim.
+
 - ~~**A second Instagram image: "Hello. Is this thing on?" plus the site name, a green dot in the o**~~ (2026-10-13, DONE). Asked: *"To ig add Hello. Is this thing on? plus sitename"*, *"Inside on's o add our green dot"*, then *"No inside o. Uestionmaeks ark is white but dot is green. Hello,s dot is gray"*, *"Smaller title"*. helloCard() in share-card.mjs, the status green --ok, /og/hello-<hash>.png, on /kit/share/.
 
 - ~~**A second Instagram image: "Hello. Is this thing on?" plus the site name**~~ (2026-10-13, DONE). Asked: *"To ig add Hello. Is this thing on? plus sitename"*. helloCard() in share-card.mjs, /og/hello-<hash>.png, on /kit/share/.
