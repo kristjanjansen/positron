@@ -377,7 +377,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const panel = createPanelLayout({ side: 'left', flow: false, strip: { role: 'group', label: 'steps' } });
   const makeGrid = () => createStepGrid({
     fixed: panel.fixed, strip: panel.strip, rows: VOICES.length, steps: STEPS,
-    label: (r) => VOICES[r].label,
+    // A voice may carry a `short` grid label (rhythm/020's row numbers); the
+    // full name stays in the row's hover and everywhere else.
+    label: (r) => VOICES[r].short ?? VOICES[r].label,
     title: (r) => VOICES[r].title ?? `${VOICES[r].label}, note ${VOICES[r].note}`,
     padTitle: (r, s) => `${VOICES[r].label}, step ${s + 1}`,
     ticks: true, readOnly: patternIn,
