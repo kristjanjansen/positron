@@ -1,4 +1,5 @@
 ## Open
+- ~~**Sampler: rm Copy log**~~ (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/sampler/000/ rm copy log"*. DONE: the button is gone; `await __demo.copyLog()` still copies the journal.
 - ~~**Rename the Plaits pages**~~ (2026-10-13). Asked: *"rename plaits panel / synth"*; chose *"Plaits patches / Plaits keys"*. DONE: synth/110 Plaits patches, synth/120 Plaits keys.
 - **synth/110: the notes timeline** (2026-10-13). Asked: *"http://127.0.0.1:8890/concepts/synth/110/ use notes timeline"*. The loop drawn as notes on the kit timeline (as synth/020 Timeline draws a take), in place of its strip.
 - ~~**Code boxes a third lower**~~ (2026-10-13). Asked: *"make code boxes 1/3 less h"*. DONE by the session: CODE_ROWS 14 to 9 in concepts/nav.mjs (synth/080, 090, shader/000, remote/020, 050).

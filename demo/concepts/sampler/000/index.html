@@ -78,7 +78,6 @@
   // or the first MIDI message boots the engine.
   import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -693,9 +692,11 @@
     }
     d.log(`copied ${J.inputs.length} inputs, ${J.decisions.length} decisions and ${L.events.length} loop events`);
   }
-  const copyBtn = createButtonGroup({ buttons: [{ id: 'copy', label: 'Copy log', onPress: copy }] });
+  // No Copy log button since 2026-10-13 (*"rm copy log"*); the journal is still
+  // kept and `await __demo.copyLog()` copies it from the console.
+  window.__demo.copyLog = copy;
 
-  d.stack.add(surface, patchPick.el, host, copyBtn.el, pb.el);
+  d.stack.add(surface, patchPick.el, host, pb.el);
   // The strip fits itself to its first width; this window is the empty take's.
   requestAnimationFrame(() => strip.strip.fit(0, VIEW_MS));
   window.__demo.bay = bay;
