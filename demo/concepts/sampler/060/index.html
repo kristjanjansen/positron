@@ -28,8 +28,9 @@
   // run on the tab's scsynth. The text is not shown (asked 2026-10-13, *"rm
   // code box from our granulator"*); every control in it is a named control.
   //
-  // The five patches are sets of control values on the one program (`/n_set`),
-  // so a patch never swaps the graph. After the rig's wet/dry, seven knobs
+  // The ten patches are sets of control values on the one program (`/n_set`),
+  // so a patch never swaps the graph. It opens on Dub and on the Ida recording
+  // (asked 2026-10-13, *"do dub, put ida rec default and dub default"*). After the rig's wet/dry, seven knobs
   // (asked 2026-10-13, *"our grain can have ~7 params + wet/dry as first"*),
   // most audible first:
   //   size     how long each grain is
@@ -39,9 +40,10 @@
   //   speed    how fast the read head moves: 1 follows, below 1 stretches
   //   scatter  even grains at 0, grains at random at 1
   //   freeze   the ring stops recording and holds what it has (off or on)
-  // What is left, jitter, detune and pan, is the texture that makes a patch
-  // that patch; the patch alone sets it, on its own wire from web:patch into
-  // web:grains, with `/n_set` at once and no glide.
+  // What is left (FIXED below: the texture, the tone, the echo, the tape and
+  // its direction, the level) is what makes a patch that patch; the patch
+  // alone sets it, on its own wire from web:patch into web:grains, with
+  // `/n_set` at once and no glide.
   //
   // Everything that is not the engine is `../grain-rig.mjs`, shared with the
   // archived Pappus page.
@@ -63,7 +65,9 @@
     { name: 'freeze', label: 'freeze', kind: 'steps', choices: [{ label: 'off', value: 0 }, { label: 'on', value: 1 }] },
   ];
   const NAMES = CONTROLS.map((c) => c.name);
-  const FIXED = ['jitter', 'detune', 'pan'];
+  // What a patch sets that no knob turns: the texture (jitter, detune, pan),
+  // the tone, the echo, the tape and its direction, and the level.
+  const FIXED = ['jitter', 'detune', 'pan', 'tone', 'echo', 'time', 'dark', 'drop', 'ramp', 'dir', 'amp'];
   const pick = (p, names) => Object.fromEntries(names.map((n) => [n, valuesOf(p)[n]]));
 
   // ── the program: compiled as the page opens, pure JavaScript, no fetch ───
@@ -137,22 +141,32 @@
   const rig = createGrainRig({
     d, engine,
     patches: PATCHES.map((p) => ({ name: p.name, says: p.says, set: pick(p, NAMES), fixed: pick(p, FIXED) })),
-    controls: CONTROLS, roles: { size: 'size', density: 'density' },
+    controls: CONTROLS, roles: { size: 'size', density: 'density' }, source: 'ida',
     // The patch picker on its own row, full width, and no output scope (asked
     // 2026-10-13, *"replace with just a patch selector (no scope/viz/footer)"*
     // and *"patch selector full w"*).
     outputScope: false,
     // The page's own checks: the program compiled here, and a fixed value is
     // in the engine without a knob for it.
-    check: async ({ wait, choosePatch }) => {
+    check: async ({ wait, choosePatch, events }) => {
       d.assert('the program compiled in this tab as the page opened', good.ok && good.bytes.length > 0,
         good.ok ? `${good.bytes.length} B in ${T.compileMs} ms` : good.message);
-      const to = PATCHES.findIndex((p) => p.name === 'Stutter');
+      d.assert('it opened on the Ida recording and on Dub', window.__demo.grains.source() === 'ida' && PATCHES[0].name === 'Dub',
+        `${window.__demo.grains.source()}, ${PATCHES[0].name}`);
+      const to = PATCHES.findIndex((p) => p.name === 'Gate');
       choosePatch(to);
       await wait(2600);
-      const panNow = await engine.read('pan');
+      const panNow = await engine.read('pan'), echoNow = await engine.read('echo');
       d.assert('a patch sets its fixed values in the engine, with no knob for them',
-        Math.abs(panNow - valuesOf(PATCHES[to]).pan) < 1e-4, `pan ${panNow} against Stutter's ${valuesOf(PATCHES[to]).pan}`);
+        Math.abs(panNow - valuesOf(PATCHES[to]).pan) < 1e-4 && Math.abs(echoNow - valuesOf(PATCHES[to]).echo) < 1e-4,
+        `pan ${panNow} and echo ${echoNow} against Gate's ${valuesOf(PATCHES[to]).pan} and ${valuesOf(PATCHES[to]).echo}`);
+      // Backwards is the one patch whose grains play in reverse, and the engine says so.
+      const bw = PATCHES.findIndex((p) => p.name === 'Backwards');
+      choosePatch(bw);
+      await wait(3000);
+      const rates = events().filter((e) => e.patch === 'Backwards').slice(-8).map((e) => e.rate);
+      d.assert('Backwards plays its grains in reverse: the engine reports a negative rate for each',
+        rates.length > 0 && rates.every((r) => r < 0), `${rates.length} grains, rates ${rates.map((r) => r.toFixed(2)).join(' ')}`);
     },
   });
   window.__demo.ring = { good: () => good, compileMs: () => T.compileMs };

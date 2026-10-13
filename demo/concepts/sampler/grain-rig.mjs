@@ -205,14 +205,17 @@ const CSS = `
  * @param o.outputScope false for no output scope: the patch picker then stands
  *                   alone where the scope's panel was (050, asked 2026-10-13,
  *                   *"replace with just a patch selector (no scope/viz/footer)"*)
+ * @param o.source   the id of the source the picker opens on (060 opens on
+ *                   `ida`, asked 2026-10-13, *"put ida rec default"*); the
+ *                   first one when it is not given or names none
  */
 export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
-  hue = () => null, under = [], check: pageCheck = null, outputScope = true }) {
+  hue = () => null, under = [], check: pageCheck = null, outputScope = true, source: firstSource = null }) {
   if (!document.getElementById('cc-grain-css')) {
     const st = el('style'); st.id = 'cc-grain-css'; st.textContent = CSS; document.head.append(st);
   }
   const SOURCES = createSources({ log: (m) => d.log(m) });
-  let at = 0;
+  let at = Math.max(0, SOURCES.findIndex((s) => s.id === firstSource));
 
   // ── the bay ──────────────────────────────────────────────────────────────
   const S = 'web';
@@ -334,7 +337,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     wave.mark({ pos: 1 - ev.ago / WINDOW_S, dur: ev.dur, voice: ev.voice, half: ev.half });
   }
   const pick = createPicker({ what: 'source', prev: () => choose(at - 1), next: () => choose(at + 1), onPick: (i) => choose(i) });
-  pick.options(SOURCES.map((s) => s.label), 0);
+  pick.options(SOURCES.map((s) => s.label), at);
   const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', right: false, left: pick.el });
 
   // The OUTPUT scope: what the granulator sends to the speakers, with each
