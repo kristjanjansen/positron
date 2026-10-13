@@ -1,7 +1,8 @@
 {
   "name": "positron-pub",
-  // pub.positron.studio — the ffmpeg publisher for the Act 1 demos, alive
-  // exactly as long as somebody holds /watch.
+  // pub.positron.studio: /stage/'s film publisher, the two loopbacks under
+  // /concepts/video/, /ice and the device log. The test pattern (/watch) and
+  // /cam/'s RTMPS camera were retired 2026-10-13 (worker.mjs header).
   //
   // instance_type "standard", not the obs-cloud rig's "standard-4": that image
   // exists to compose SCENES (OBS + browser source + llvmpipe fixes, ~190% of a
@@ -15,8 +16,9 @@
     {
       "class_name": "Pub",
       "image": "./container/Dockerfile",
-      // THREE: the test pattern instance (`p1`), /stage/'s film (`stage`) and
-      // /cam/'s camera rewrap (`cam`), each on its own input.
+      // THREE: once the test pattern instance (`p1`), /stage/'s film (`stage`)
+      // and /cam/'s camera rewrap (`cam`). Since 2026-10-13 only `stage` starts
+      // a container here; `p1` and `cam` answer without one.
       "max_instances": 3,
       // CUSTOM, not a predefined type, because the predefined ones are wrong in
       // both directions here.
@@ -65,10 +67,9 @@
     { "tag": "v2", "new_sqlite_classes": ["PubNext"] }
   ],
   "vars": {
-    // Both legs encode at once on ONE instance, so this is the real budget.
-    // Tunable without rebuilding the image, which is how the stall got
-    // diagnosed: half a vCPU could not hold two 720p30 encodes.
-    "PUB_W": "1280", "PUB_H": "720", "PUB_FPS": "30",
+    // PUB_W, PUB_H and PUB_FPS went 2026-10-13 with the test pattern, the
+    // only publish that sent a size (/stage/'s film is a copy, the loopback a
+    // rewrap). PUB_SOURCE and PUB_BURN stay: they reach the container's env.
     // TESTSRC2, NOT THE FILM. `testsrc2` (or empty) means testsrc2 in
     // container/server.mjs; the word, because an empty env value was never
     // measured surviving the container runtime.

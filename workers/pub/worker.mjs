@@ -1,27 +1,26 @@
-// positron-pub — the publisher for the Act 1 demos, alive exactly as long as
-// somebody is watching.
+// positron-pub: /stage/'s film publisher, the two loopbacks under
+// /concepts/video/, TURN credentials and the device log.
 //
-//   wss://pub.positron.studio/watch    a viewer. First one in starts the
-//                                      publish; last one out stops it.
-//   GET  /status                       viewers + container + ffmpeg state
 //   GET  /ice                          short lived TURN servers, 503 with no key
-//   POST /start /stop                  manual override (debugging)
 //   POST /log                          a device reports what it saw
 //   GET  /logs[?format=text]           read those reports back
 //   POST /logs/clear                   drop them
-//   wss://pub.positron.studio/cam      a camera: MediaRecorder chunks in, its
-//                                      OWN input (CAM_STREAM_KEY) out as LL-HLS
-//   GET  /cam                          is a camera on it, 409 when busy
-//   GET  /cam/status                   the camera instance's own state
-//   POST /cam/whip, DELETE /cam/whip/<id>  the camera's WebRTC publish, onto
-//                                      its OWN WebRTC input (CAM_WHIP_URL)
-//   /stage/watch /stage/status         the same four routes on /stage/'s own
-//   /stage/start /stop                 instance: the MIM film on WHIP, nothing else
+//   POST /cam/whip, DELETE /cam/whip/<id>  /concepts/video/030/'s WebRTC
+//                                      loopback publish, onto its OWN WebRTC
+//                                      input (CAM_WHIP_URL, "positron-cam-whip")
+//   /stage/watch /stage/status         /stage/'s own instance: the MIM film on
+//   /stage/start /stop                 WHIP while a viewer holds /stage/watch
 //   wss://pub.positron.studio/loop     /concepts/video/060/'s LL-HLS loopback: the
-//                                      /cam route on its own instance and its OWN
-//                                      input (LOOP_STREAM_KEY), every take deleted
+//                                      camera rewrap on its own instance and its
+//                                      OWN input (LOOP_STREAM_KEY), every take deleted
 //   GET  /loop/status                  recordings on that input, account storage
 //   POST /loop/sweep                   the cron's clean, now (once a minute)
+//
+// RETIRED 2026-10-13, answering 410: /watch, /status, /start, /stop, /whip
+// (the test pattern on the inputs positron-demo and whep-rig, which fed the
+// archived /llhls/ and /webrtc/), and /cam, /cam/status (/cam/'s RTMPS camera
+// on the input positron-cam). All three inputs were deleted from Stream the
+// same day, with the secrets STREAM_KEY, WHIP_URL and CAM_STREAM_KEY.
 //
 // WHY REFERENCE COUNTING AND NOT sleepAfter ALONE: the Container base class
 // sleeps on REQUEST idleness, and ffmpeg publishing generates no incoming
@@ -39,18 +38,20 @@ const ICE_PER_HOUR = 120;        // relay credentials minted per hour, overall
 const ICE_PER_ADDRESS_HOUR = 20; // and per address, so one caller cannot spend the hour
 const ICE_TTL_S = 4 * 3600;      // longer than a camera is left on; a credential cannot be refreshed mid-call here
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
+// The main instance. Since 2026-10-13 it publishes nothing: it holds the
+// device log and the /ice rate limits, and keeps its name so the log survives.
 const NAME = 'p1';
 // /stage/'S OWN INSTANCE of the same class: the MIM film on its own WebRTC
 // input (STAGE_WHIP_URL), WHIP only, no clocks, no RTMPS. Routed by the /stage
 // prefix, so the test pattern instance above is untouched.
 const STAGE = 'stage';
 const STAGE_PATHS = new Set(['/watch', '/status', '/start', '/stop']);
-// /cam/'S OWN INSTANCE, and its own RTMPS input (CAM_STREAM_KEY, provisioned by
-// src/provision-cam.sh). 🔴 IT WAS A HANDOVER ON THE TEST PATTERN'S INPUT UNTIL
-// 2026-09-30, and /llhls/ stalled in the owner's screenshot while a camera was
-// being tested on it: every hand back is a new Stream video UID and a player
-// rebuild for whoever is watching. So the main instance and its pattern do not
-// know a camera exists, and a camera never waits on or refuses for a viewer.
+// The main instance's routes since 2026-10-13, and the ones retired that day.
+const MAIN_PATHS = new Set(['/ice', '/log', '/logs', '/logs/clear']);
+const RETIRED = new Set(['/watch', '/status', '/start', '/stop', '/whip', '/cam', '/cam/status']);
+// THE CAMERA INSTANCE, which since 2026-10-13 only proxies the WebRTC publish
+// (/cam/whip) onto "positron-cam-whip". Its RTMPS camera route, /cam, and that
+// input (positron-cam) are gone; the rewrap path it used lives on in `loop`.
 const CAM = 'cam';
 // NEXT (PubNext, the durable_object runtime). The instance is pub's custom
 // size from wrangler.jsonc, spelled the new API's way (camelCase, in code):
@@ -64,18 +65,15 @@ const NEXT_READY_MS = 60_000;
 const NEXT_WHIP_SNDBUF = 4 * 1024 * 1024;
 const LOG_KEEP = 400;          // ring buffer of device reports
 const LOG_MAX_BODY = 2000;     // one report cannot flood the rest out
-const CAM_PER_HOUR = 20;       // camera sessions per hour, DO-counted like /whip
-// 🔴 EVERY CAMERA SESSION IS A STREAM RECORDING. The LL-HLS input is RTMPS, and
-// recording cannot be turned off there, so each session adds its length to the
-// account's 1000 minute storage cap, which blocks new live streams when full.
+// How long a WebRTC camera session may hold "positron-cam-whip" before the
+// next publish replaces it (a tab that left without its DELETE).
 const CAM_MAX_MS = 300_000;
-const CAM_IDLE_MS = 5_000;     // no chunk this long and the DO ends the session
-const CAM_TICK_MS = 5_000;     // the alarm's cadence while a camera is live
+const CAM_IDLE_MS = 5_000;     // no chunk this long and the DO ends a loopback take
+const CAM_TICK_MS = 5_000;     // the alarm's cadence while a loopback take is live
 // /cam/'S WebRTC LEG HAS ITS OWN WebRTC INPUT TOO (CAM_WHIP_URL, "positron-cam-whip",
 // provisioned by src/provision-cam-whip.sh, recording off). It borrowed the test
-// pattern's WHIP_URL until 2026-09-30 and was refused with 409 whenever somebody
-// held /watch, so /cam/'s WebRTC panel went red while anybody watched /llhls/.
-// One camera at a time. ⚠️ A SESSION HELD BY A TAB THAT DIED WITHOUT ITS DELETE
+// pattern's WHIP input until 2026-09-30 and was refused with 409 whenever
+// somebody watched that pattern. One camera at a time. ⚠️ A SESSION HELD BY A TAB THAT DIED WITHOUT ITS DELETE
 // cannot be told apart from a live one: MEASURED 2026-09-30, `/lifecycle` on a
 // WebRTC input answers `live: true` with nothing publishing to it, so it is no
 // signal here. Such a session blocks the next camera for at most CAM_MAX_MS and
@@ -316,7 +314,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       try { await this.ctx.storage.put('role', told); } catch { /* re-told on the next request */ }
     }
 
-    // ── a viewer ──────────────────────────────────────────────────────────
+    // ── a viewer (/stage/watch only since 2026-10-13) ───────────────────────
     if (url.pathname === '/watch') {
       if (request.headers.get('Upgrade') !== 'websocket') {
         return new Response('expected websocket', { status: 426 });
@@ -338,12 +336,14 @@ const pubOn = (Base, NEXT) => class extends Base {
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
-    // ── a camera, onto its own LL-HLS input, on its own instance ────────────
+    // ── the LL-HLS loopback's camera, onto its own input, on its own instance ─
     //
-    // `/cam/` records its burned canvas with MediaRecorder and sends each chunk
-    // here; this object POSTs them, in order, into its container's camera leg,
-    // which rewraps them to RTMPS on the camera's OWN input (CAM_STREAM_KEY).
-    // Only the `cam` instance answers this; see CAM. plans/plan-cam-llhls.md.
+    // /concepts/video/060/ records its canvas with MediaRecorder and sends each
+    // chunk to /loop, which arrives here as /cam; this object POSTs them, in
+    // order, into its container's camera leg, which rewraps them to RTMPS on the
+    // loopback's OWN input (LOOP_STREAM_KEY). Only the `loop` instance answers
+    // this since 2026-10-13, when /cam/'s own RTMPS route was retired.
+    // plans/plan-cam-llhls.md is the design.
     //
     // 🔴 REFUSED IN BAND, NOT WITH A STATUS. A browser cannot read the HTTP
     // status of a refused WebSocket upgrade, so a 409 there reaches the page as
@@ -351,8 +351,7 @@ const pubOn = (Base, NEXT) => class extends Base {
     // `{t:'busy', status: 409, error}` and closed with 4409, and the page can
     // say why in words. A plain GET answers the same question with a real 409.
     const role = await this.#getRole();
-    if (url.pathname === '/cam' && (role === CAM || role === LOOP)) {
-      const loop = role === LOOP;
+    if (url.pathname === '/cam' && role === LOOP) {
       const busy = this.#camBusy();
       if (request.headers.get('Upgrade') !== 'websocket') {
         return json(busy || { free: true }, busy ? 409 : 200);
@@ -360,11 +359,10 @@ const pubOn = (Base, NEXT) => class extends Base {
       const pair = new WebSocketPair();
       const now = Date.now();
       this.#camHits = this.#camHits.filter((t) => now - t < 3600_000);
-      const perHour = loop ? LOOP_PER_HOUR : CAM_PER_HOUR;
       const refuse = busy
-        || (this.#camHits.length >= perHour ? { error: 'too many camera sessions this hour', limit: perHour, status: 429 } : null)
+        || (this.#camHits.length >= LOOP_PER_HOUR ? { error: 'too many camera sessions this hour', limit: LOOP_PER_HOUR, status: 429 } : null)
         || (!this.#camKey() ? { error: 'no camera stream key on this worker', status: 503 } : null)
-        || (loop ? await this.#loopGuard() : null);
+        || await this.#loopGuard();
       if (refuse) {
         this.ctx.acceptWebSocket(pair[1], ['cam-refused']);
         pair[1].serializeAttachment({ role: 'refused' });
@@ -379,7 +377,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       this.ctx.acceptWebSocket(pair[1], ['cam']);
       pair[1].serializeAttachment({ role: 'cam', sid, at: now });
       this.#cam = { sid, at: now, lastAt: now, bytes: 0, chunks: 0, open: false, chain: Promise.resolve(), ws: pair[1] };
-      if (loop) await this.#loopPut('loopTake', { sid, at: now, uid: null });
+      await this.#loopPut('loopTake', { sid, at: now, uid: null });
       await this.ctx.storage.setAlarm(now + CAM_TICK_MS);
       try { pair[1].send(JSON.stringify({ t: 'hello', sid, maxS: this.#camMax() / 1000 })); } catch { /* raced */ }
       return new Response(null, { status: 101, webSocket: pair[0] });
@@ -569,12 +567,13 @@ const pubOn = (Base, NEXT) => class extends Base {
     // Media then flows browser <-> Cloudflare directly over ICE/DTLS/SRTP and
     // NEVER crosses this worker. A worker cannot carry media and does not have
     // to; it carries thirty lines of signalling.
+    //
+    // ONLY THE CAMERA INSTANCE SINCE 2026-10-13. The test pattern's /whip (on
+    // WHIP_URL, the input whep-rig) is retired with that input.
     if (url.pathname === '/whip' && request.method === 'POST') {
-      // The camera instance publishes to ITS OWN input and knows nothing about
-      // /watch; every other instance keeps the test pattern's rules below.
-      const camRole = (await this.#getRole()) === CAM;
-      const whip = camRole ? this.env.CAM_WHIP_URL : this.env.WHIP_URL;
-      if (!whip) return json({ error: camRole ? CAM_WHIP_MISSING : 'no WHIP_URL configured' }, 503);
+      if ((await this.#getRole()) !== CAM) return json({ error: 'retired 2026-10-13' }, 410);
+      const whip = this.env.CAM_WHIP_URL;
+      if (!whip) return json({ error: CAM_WHIP_MISSING }, 503);
 
       // A tokenless publish proxy is an open door to our live input, so it gets
       // the same discipline `ingest` has: a small per-hour cap, counted here
@@ -585,40 +584,16 @@ const pubOn = (Base, NEXT) => class extends Base {
         return json({ error: 'too many publishes this hour', limit: WHIP_PER_HOUR }, 429);
       }
 
-      // The container publishes to the SAME input. Two publishers is one
-      // publisher and a fight, so hand the input over rather than race for it.
-      //
-      // 🔴 AND WHILE SOMEBODY IS WATCHING, THE CONTAINER KEEPS IT. Until
-      // 2026-09-30 this line only handed the input over when nobody held
-      // /watch, and with a viewer present it went on to POST anyway, which is
-      // exactly the race the sentence above says not to run: a browser
-      // publish (/cam/, /keep/, /stage/) and the container's own WHIP leg on
-      // one input, and a /webrtc/ viewer's picture swapped for somebody's
-      // camera mid-play. A 409 with the count says why in words, and the page
-      // asking can say so rather than fight.
-      // ⚠️ THE OTHER DIRECTION IS UNCHANGED ON PURPOSE: a viewer arriving while
-      // a browser holds the input starts the container's leg as before, and the
-      // browser publish loses the input. The container has priority because the
-      // pages that watch it have no other source; a camera page can say so.
-      if (camRole) {
-        // One camera at a time, and nothing to do with viewers.
-        const held = await this.#camWhipHeld();
-        if (held) {
-          if (now - held.at < CAM_MAX_MS) {
-            return json({ error: 'input busy: another camera is on the camera WebRTC input', sinceS: Math.round((now - held.at) / 1000) }, 409);
-          }
-          // Older than any session may be: a tab that left without its DELETE.
-          if (held.url) { try { await fetch(held.url, { method: 'DELETE' }); } catch { /* gone */ } }
-          await this.#camWhipSet(null);
+      // One camera at a time. Two publishers on one input is one publisher
+      // and a fight, so a second is told 409 in words rather than racing.
+      const held = await this.#camWhipHeld();
+      if (held) {
+        if (now - held.at < CAM_MAX_MS) {
+          return json({ error: 'input busy: another camera is on the camera WebRTC input', sinceS: Math.round((now - held.at) / 1000) }, 409);
         }
-      } else {
-        if (this.viewers() > 0) {
-          return json({
-            error: 'input busy: the container is publishing to it for viewers',
-            viewers: this.viewers(),
-          }, 409);
-        }
-        await this.#stopPublish();
+        // Older than any session may be: a tab that left without its DELETE.
+        if (held.url) { try { await fetch(held.url, { method: 'DELETE' }); } catch { /* gone */ } }
+        await this.#camWhipSet(null);
       }
 
       const offer = await request.text();
@@ -644,7 +619,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       this.#whipRes.set(id, { url: loc ? new URL(loc, whip).toString() : null, at: now });
       this.#whipHits.push(now);
       for (const [k, v] of this.#whipRes) if (now - v.at > 6 * 3600_000) this.#whipRes.delete(k);
-      if (camRole) await this.#camWhipSet({ id, url: this.#whipRes.get(id).url, at: now });
+      await this.#camWhipSet({ id, url: this.#whipRes.get(id).url, at: now });
 
       return new Response(await up.text(), {
         status: 201,
@@ -695,7 +670,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       } });
     }
 
-    return json({ error: 'use /watch /status /start /stop' }, 404);
+    return json({ error: 'not a route on this instance' }, 404);
   }
 
   /**
@@ -706,9 +681,9 @@ const pubOn = (Base, NEXT) => class extends Base {
    * because a viewer socket accepted before tags existed is restored untagged
    * after a deploy, and it is still somebody watching.
    */
-  /** Which input a camera session goes to, by role. */
-  #camKey() { return this.#role === LOOP ? this.env.LOOP_STREAM_KEY : this.env.CAM_STREAM_KEY; }
-  #camMax() { return this.#role === LOOP ? LOOP_MAX_MS : CAM_MAX_MS; }
+  /** A camera session's input: the loopback's, the only role that takes one. */
+  #camKey() { return this.#role === LOOP ? this.env.LOOP_STREAM_KEY : null; }
+  #camMax() { return LOOP_MAX_MS; }
 
   async #loopPut(k, v) { try { await this.ctx.storage.put(k, v); } catch { /* the cron is the floor */ } }
   async #loopGet(k, d) { try { return (await this.ctx.storage.get(k)) ?? d; } catch { return d; } }
@@ -845,7 +820,7 @@ const pubOn = (Base, NEXT) => class extends Base {
 
   /** Why a camera cannot have its input right now, or null. One at a time. */
   #camBusy() {
-    return this.#camLive() ? { error: 'another camera is already on the LL-HLS camera input', status: 409 } : null;
+    return this.#camLive() ? { error: 'another take is already on the LL-HLS loopback input', status: 409 } : null;
   }
 
   #camLive() {
@@ -886,17 +861,6 @@ const pubOn = (Base, NEXT) => class extends Base {
     await this.#camRetireLater();
   }
 
-  /**
-   * Source settings, tunable without a redeploy of the IMAGE.
-   *
-   */
-  #size() {
-    const n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
-    return {
-      w: n(this.env.PUB_W, 1280), h: n(this.env.PUB_H, 720), fps: n(this.env.PUB_FPS, 30),
-    };
-  }
-
   async #ensureAlarm() {
     const at = await this.ctx.storage.getAlarm();
     if (at === null) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
@@ -916,28 +880,11 @@ const pubOn = (Base, NEXT) => class extends Base {
       } catch { /* container still waking; the sweep retries */ }
       return;
     }
-    const key = this.env.STREAM_KEY;
-    const whip = this.env.WHIP_URL;
-    // Both legs, same refcount. Cloudflare cannot serve WHEP from an RTMPS
-    // input, so 06 and 07 need separate inputs fed the same pattern.
-    if (key) {
-      try {
-        await this.#c(new Request('http://c/start', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ key, ...this.#size(), ...(extra || {}) }),
-        }));
-      } catch { /* container still waking; the sweep retries */ }
-    }
-    if (whip) {
-      try {
-        await this.#c(new Request('http://c/start-whip', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ url: whip, ...this.#size() }),
-        }));
-      } catch { /* same */ }
-    }
+    // THE TEST PATTERN IS RETIRED (2026-10-13). The main instance used to
+    // publish it on two legs, RTMPS (STREAM_KEY, positron-demo) and WHIP
+    // (WHIP_URL, whep-rig); both inputs and both secrets are gone, so any
+    // other role publishes nothing.
+    void extra;
   }
 
   async #stopPublish() {
@@ -955,17 +902,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     // checked every CAM_TICK_MS while a camera is live. It never runs the
     // viewer sweep below, which is about the test pattern.
     if ((await this.#getRole()) === LOOP) return this.#loopAlarm();
-    if ((await this.#getRole()) === CAM) {
-      const c = this.#camLive() ? this.#camState() : null;
-      // NEXT: no camera left, so the box goes (see #retire). The alarm that
-      // lands here is the one the session's end set CAM_TICK_MS out.
-      if (!c) { await this.#retire(); return; }
-      const now = Date.now();
-      if (c.open && now - c.lastAt > CAM_IDLE_MS) await this.#endCam('stopped', `no video from the camera for ${Math.round((now - c.lastAt) / 1000)} s`);
-      else if (now - c.at > CAM_MAX_MS) await this.#endCam('stopped', `a camera session is capped at ${CAM_MAX_MS / 60000} minutes, because every one is recorded on Stream`);
-      else await this.ctx.storage.setAlarm(now + CAM_TICK_MS);
-      return;
-    }
+    // The camera instance holds no sockets since /cam was retired, so an
+    // alarm left over from then only retires a container that is still up.
+    if ((await this.#getRole()) === CAM) { await this.#retire(); return; }
     const n = this.viewers();
     if (n > 0) {
       this.#idleTicks = 0;
@@ -981,11 +920,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       try {
         const r = await this.#c(new Request('http://c/status'));
         const s = await r.json();
-        // either leg dying under a live viewer gets restarted
-        const down = (await this.#getRole()) === STAGE
-          ? !s.whip?.publishing
-          : !s.publishing || !s.whip?.publishing;
-        if (down) await this.#startPublish();
+        // the film's leg dying under a live viewer gets restarted (stage only;
+        // the main instance has had no viewers since /watch was retired)
+        if ((await this.#getRole()) === STAGE && !s.whip?.publishing) await this.#startPublish();
       } catch { /* waking */ }
       await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
       return;
@@ -1186,9 +1123,8 @@ export default {
     if (url.pathname === '/' || url.pathname === '') {
       return json({
         worker: 'positron-pub',
-        watch: 'wss://pub.positron.studio/watch',
-        status: 'GET /status',
-        note: 'publishes while at least one viewer holds /watch',
+        routes: ['/stage/watch', '/stage/status', '/cam/whip', '/loop', '/loop/status', '/loop/sweep', '/ice', '/log', '/logs'],
+        retired: { at: '2026-10-13', routes: [...RETIRED] },
         runtime: ns(env, url) === env.PUB_NEXT ? 'next' : 'legacy',
       });
     }
@@ -1225,13 +1161,13 @@ export default {
       // instances and all three are taken (wrangler.jsonc).
       return getContainer(env.PUB_NEXT || env.PUB, LOOP).fetch(req);
     }
-    // /cam and /cam/status are the camera instance, and nothing else reaches it.
-    if (url.pathname === '/cam' || url.pathname === '/cam/status') {
-      if (url.pathname === '/cam/status') url.pathname = '/status';
-      const req = new Request(url, request);
-      req.headers.set('x-pub-role', CAM);
-      return getContainer(ns(env, url), CAM).fetch(req);
+    // The test pattern (/watch and its routes) and /cam/'s RTMPS camera are
+    // gone, and say so rather than 404, because an archived page still asks.
+    if (RETIRED.has(url.pathname) || url.pathname.startsWith('/whip/')) {
+      return json({ error: 'retired 2026-10-13: the test pattern and /cam/\'s RTMPS camera no longer publish' }, 410);
     }
+    // What is left on the main instance: the device log and the TURN relay.
+    if (!MAIN_PATHS.has(url.pathname)) return json({ error: 'not a route', routes: '/ /stage/* /cam/whip /loop /loop/status /loop/sweep /ice /log /logs /logs/clear' }, 404);
     const req = new Request(request);
     req.headers.delete('x-pub-role');
     return getContainer(ns(env, url), NAME).fetch(req);

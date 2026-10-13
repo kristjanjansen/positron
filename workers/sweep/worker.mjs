@@ -6,8 +6,9 @@
 // not sweeping is an outage. `deleteRecordingAfterDays` has a minimum of 30,
 // which is too coarse.
 //
-// WHAT. Recordings whose `liveInput` is one of `INPUTS` (the uids of
-// `positron-demo` and `positron-cam`, by uid and never by name, because a name
+// WHAT. Recordings whose `liveInput` is one of `INPUTS` (the uids of the rig
+// inputs `low-latency-demo` and `latency-rig-llhls` since 2026-10-13, when
+// `positron-demo` and `positron-cam` were deleted; by uid and never by name, because a name
 // is a label somebody can change), `created` more than `MAX_AGE_H` hours ago,
 // and in state `ready`. Never `live-inprogress`, and nothing still processing.
 //

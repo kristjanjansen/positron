@@ -249,9 +249,9 @@
     } catch (e) {
       if (gen !== mine) return;
       const busy = /\b409\b/.test(e.message);
-      d.log(busy ? 'webrtc publish 409: another camera is on /cam/\'s input (/cam/ is on air), so nothing was sent'
+      d.log(busy ? 'webrtc publish 409: the input is busy, somebody else is using this WebRTC loopback, so nothing was sent'
         : `the WebRTC publish did not start: ${e.message}`, 'bad');
-      state.textContent = busy ? 'another camera is on air' : 'did not publish';
+      state.textContent = busy ? 'somebody else is using it' : 'did not publish';
       RTC.live = false; V.set('warmup', '');
       stat.pub = 'refused';
       return;

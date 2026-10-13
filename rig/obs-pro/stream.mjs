@@ -19,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { ObsClient } from '../obs-docker/control.mjs';
 
+// Both inputs were DELETED from Stream on 2026-10-13, so the hls and whip modes have no input to publish to.
 const HLS_UID  = '0e390aa48b55d49a57284e6c2c535477';   // "positron-demo"
 const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig"
 const RELAY    = 'https://draft-14.cloudflare.mediaoverquic.com';
