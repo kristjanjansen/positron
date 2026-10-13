@@ -28,7 +28,8 @@ export const CONCEPTS = [
   // *"make granulator its own group"*. A row's `group` sets the heading it shows under;
   // its folder and URL stay where they are, so no address changed.
   { n: 'sampler/000', group: 'synth', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
-  { n: 'sampler/050', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated by Pappus in this tab, each grain marked where it read the sound.' },
+  { n: 'sampler/060', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
+  // sampler/050, the Pappus granulator, moved to /archive/ 2026-10-13 when the owner chose the light one (*"but we got rid of pappus?!? 060 ???"*): /archive/pappus/, still working.
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
   // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,
   // then *"yea, move them all to remote instruments or stm"*): every concept page that plays on the
@@ -76,7 +77,6 @@ export const CONCEPTS = [
   { n: 'typist/020', title: 'Typewriters', say: 'The typewriter through an effects box where every number gives a different machine.' },
   { n: 'typist/030', title: 'Playback', say: 'Everything you type, deletions included, is kept and played back as the page writes itself again.' },
   { n: 'typist/040', title: 'Multi typer', say: 'Up to six papers typed at once from a written score, each through a typewriter of its own.' },
-  // sampler/060 Grain ring moved to /archive/ 2026-10-13 (*"archive https://positron.studio/concepts/sampler/060/"*): /archive/grain-ring/, still working.
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).

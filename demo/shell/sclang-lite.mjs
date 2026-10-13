@@ -39,7 +39,7 @@
 // is a number or one of Env's own shape names written as a symbol (`\lin`).
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
-// SINCE 2026-10-13, FOR THE GRAIN RING (/archive/grain-ring/, concepts sampler/060 when it was written): `%` (opMod),
+// SINCE 2026-10-13, FOR THE GRAIN RING, /concepts/sampler/060/: `%` (opMod),
 // `.sqrt`, `.sin` and `.cos` (its equal power wet and dry), a 'quoted' symbol (sclang's other spelling of `\name`, and the only
 // one that can hold a `/`), and the UGens GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames and BufDur, each from its class file
@@ -149,7 +149,7 @@ export const UGENS = {
   Pan2:       { file: 'Pan.sc',     args: [['in', REQUIRED], ['pos', 0], ['level', 1]], outputs: 2, first: 'audio' },
   EnvGen:     { file: 'EnvGen.sc',  args: [['envelope', REQUIRED], ['gate', 1], ['levelScale', 1],
                                              ['levelBias', 0], ['timeScale', 1], ['doneAction', 0]] },
-  // ── added 2026-10-13 for the grain ring, /archive/grain-ring/. Read in
+  // ── added 2026-10-13 for the grain ring, /concepts/sampler/060/. Read in
   // supercollider develop 1995490 on 2026-10-13, the same commit as the rows
   // above. Four shapes the rows above do not have, each a field:
   //   `rates`   the methods the class really has; GrainBuf is `*ar` only and

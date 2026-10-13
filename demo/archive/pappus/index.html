@@ -5,15 +5,14 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept sampler 050</title>
+<title>Pappus granulator</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount } from '/shell/shell.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { allocBuffers, bufferPlan, startPappusSynth, applyAudibleDefaults, setParam, RING_SECONDS, PAPPUS_NODE, GATE0 } from '/shell/pappus.mjs';
   import { createModulator } from '/shell/pappus-mod.mjs';
-  import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ, SCAN_RANGE,
+  import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ,
     writeDiscrete, basesOf, routesOf, patternOf, createFeatures } from '/shell/radio-gran.mjs';
   import { createGrainRig } from '/concepts/sampler/grain-rig.mjs';
 
@@ -29,96 +28,57 @@
   //
   // Everything that is not Pappus (the sources, the scope, the grain events,
   // the knobs and their glide, the patchbay, Play and the self check) is
-  // `../grain-rig.mjs`, which /archive/grain-ring/ shares. This page is the
+  // `/concepts/sampler/grain-rig.mjs`, which /concepts/sampler/060/ shares. This page is the
   // engine and its controls. No output scope since 2026-10-13: the patch
   // picker stands alone (*"replace with just a patch selector (no
   // scope/viz/footer)"*).
-  const d = mount({ name: 'concept sampler 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
-  conceptNav('sampler/050');
+  // Archived 2026-10-13: the owner chose the light Grain ring as the
+  // granulator (*"but we got rid of pappus?!? 060 ???"*), which is
+  // /concepts/sampler/060/ again. This was concepts sampler/050 and still works
+  // here, on the board's own Pappus definitions at /grains/defs/.
+  const d = mount({ name: 'Pappus granulator', what: '', readout: null, index: '/archive/', indexLabel: 'archive' });
 
   const sentence = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  // ── the controls: everything the twelve patches set, as knobs ────────────
-  // Asked 2026-10-13: *"move wet/dry to first and add all knobs"*. An amount
-  // is a plain knob over the range the patches use and a little past it. A
-  // choice is a stepped knob over the choices the patches make: the scan
-  // mode, the envelope shape, the modes, freeze, and four groups the engine
-  // reads as one thing: the chord (`gates` and `pitches`), the chances
-  // (`probs`), the figure (`pattern` and `elen`) and the echo taps
-  // (`taptimes`, `tappans`, `tappitch`). A group's choices are numbered in
-  // the order the patches first use them, and `none` (or `all`) where that is
-  // what one means: a patch name was too long to sit inside a knob. `scan` is labelled plainly and left to
-  // mean what its mode says: a speed, a place or a time behind.
-  // Most audible first, after the wet/dry the rig puts at the front.
-  const pct = (v) => `${Math.round(v * 100)}%`, num = (n) => (v) => v.toFixed(n);
-  const secs = (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`);
-  const hz = (v) => (v < 1000 ? `${Math.round(v)} Hz` : `${(v / 1000).toFixed(1)} kHz`);
+  // ── the controls: four knobs, everything else fixed by the patch ─────────
+  // Asked 2026-10-13: *"reduce granulator knobs a lot. fix values. patch only
+  // changes those"*. After the wet/dry, four knobs that mean the same thing
+  // in all twelve patches and that you hear at once:
+  //   size     how long each grain is
+  //   density  how many grains a second
+  //   spray    how far each grain strays from where the read head is
+  //   reverb   how much of the sound goes into the room
+  // Left out of the knobs on purpose: `scan` (a speed, a place or a time
+  // behind, by the patch's mode), the modes, the chord and the figure
+  // (choices, not amounts), `sos` (it also decides how much the ring keeps
+  // recording), and the colour stages (drive, crush, noise, spectral, echoes),
+  // which are what makes one patch that patch. All of those are FIXED: the
+  // patch sets them and nothing else does.
+  const pct = (v) => `${Math.round(v * 100)}%`;
   const amount = (name, label, min = 0, max = 1, warp = 'lin', fmt = pct) => ({ name, label, kind: 'knob', min, max, warp, fmt });
-  const steps = (name, label, choices) => ({ name, label, kind: 'steps', choices });
-  /** The distinct values the patches give a field or a group, numbered in the order the patches first use them. */
-  const groupChoices = (pick, none = null, noneLabel = 'none') => {
-    const seen = new Map();
-    let n = 0;
-    for (const p of PATCHES) {
-      const v = pick(p), k = JSON.stringify(v);
-      if (!seen.has(k)) seen.set(k, { label: none && none(v) ? noneLabel : String(++n), value: v });
-    }
-    return [...seen.values()];
-  };
-  const numbered = (n) => Array.from({ length: n }, (_, i) => ({ label: String(i + 1), value: i + 1 }));
+  const CONTROLS = [
+    amount('size', 'size', 0.02, 4, 'exp', (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`)),
+    amount('rate', 'density', 0.5, 64, 'exp', (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s`),
+    amount('spray', 'spray'),
+    amount('rverb', 'reverb'),
+  ];
+  const NAMES = CONTROLS.map((c) => c.name);
+  // The fixed values, in the order they are written: the scan mode before
+  // the scan and the window, because those mean what the mode says. The
+  // chord (`gates` and `pitches`), the chances (`probs`), the figure
+  // (`pattern` and `elen`) and the echoes (taps) travel as one value each.
+  const FIXED = ['scanmode', 'scan', 'winstart', 'winend', 'lock', 'chord', 'chance', 'figure', 'ephase', 'contour',
+    'sos', 'tilt', 'ingain', 'comp', 'spraymode', 'swarm', 'swarmmode', 'strum',
+    'swet', 'scycle', 'sfb', 'stilt', 'sxover', 'sdiffuse', 'taps',
+    'drive', 'crush', 'crushmode', 'noise', 'noisetype', 'noisedecay', 'noisetone', 'noisedyn', 'wow', 'rtime'];
   const GROUPS = {
     chord: (p) => ({ gates: p.gates, pitches: p.pitches }),
     chance: (p) => p.probs,
     figure: (p) => ({ pattern: p.pattern, elen: p.elen }),
     taps: (p) => ({ taptimes: p.taptimes, tappans: p.tappans, tappitch: p.tappitch }),
   };
-  // In a bank (a heading over its knobs), a control shows its short label;
-  // its full label is the one the patchbay prints.
-  const inBank = (group, short, c) => ({ ...c, group, short, label: `${group} ${short}` });
-  const CONTROLS = [
-    amount('size', 'size', 0.02, 4, 'exp', secs),
-    amount('rate', 'density', 0.5, 64, 'exp', (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s`),
-    steps('chord', 'chord', groupChoices(GROUPS.chord)),
-    inBank('scan', 'mode', steps('scanmode', '', [[1, 'speed'], [2, 'place'], [3, 'behind']].map(([m, label]) => ({ label, value: m })))),
-    inBank('scan', 'read', amount('scan', '', 0, 1, 'lin', num(2))),
-    steps('lock', 'freeze', [{ label: 'off', value: 0 }, { label: 'on', value: 1 }]),
-    inBank('figure', 'pattern', steps('figure', '', groupChoices(GROUPS.figure, (v) => !v.pattern))),
-    inBank('figure', 'phase', amount('ephase', '')),
-    amount('sos', 'overdub'),
-    inBank('spray', 'amount', amount('spray', '')),
-    inBank('spray', 'mode', steps('spraymode', '', numbered(3))),
-    amount('drive', 'drive'),
-    inBank('crush', 'amount', amount('crush', '')),
-    inBank('crush', 'mode', steps('crushmode', '', numbered(3))),
-    inBank('reverb', 'amount', amount('rverb', '')),
-    inBank('reverb', 'time', amount('rtime', '')),
-    amount('wow', 'wow'),
-    inBank('noise', 'amount', amount('noise', '')),
-    inBank('noise', 'type', steps('noisetype', '', numbered(3))),
-    inBank('noise', 'decay', amount('noisedecay', '', 0.1, 2, 'exp', secs)),
-    inBank('noise', 'tone', amount('noisetone', '', 200, 4000, 'exp', hz)),
-    inBank('noise', 'follow', amount('noisedyn', '', 0.5, 3, 'lin', num(2))),
-    steps('taps', 'echoes', groupChoices(GROUPS.taps, (v) => v.taptimes.every((t) => t === 0))),
-    inBank('spectral', 'mix', amount('swet', '')),
-    inBank('spectral', 'time', amount('scycle', '', 0.25, 8, 'exp', secs)),
-    inBank('spectral', 'return', amount('sfb', '')),
-    inBank('spectral', 'tilt', amount('stilt', '', -1, 1, 'lin', num(2))),
-    inBank('spectral', 'split', amount('sxover', '', 200, 2000, 'exp', hz)),
-    inBank('spectral', 'blur', amount('sdiffuse', '')),
-    inBank('swarm', 'amount', amount('swarm', '')),
-    inBank('swarm', 'mode', steps('swarmmode', '', numbered(3))),
-    amount('strum', 'strum', 0, 0.5, 'lin', secs),
-    steps('chance', 'chance', groupChoices(GROUPS.chance, (v) => v.every((x) => x === 1), 'all')),
-    steps('contour', 'shape', Array.from({ length: 17 }, (_, i) => ({ label: String(i), value: i }))),
-    amount('tilt', 'tilt', -1, 1, 'lin', num(2)),
-    amount('comp', 'squash'),
-    amount('ingain', 'input', 0, 2, 'lin', num(2)),
-    inBank('window', 'start', amount('winstart', '')),
-    inBank('window', 'end', amount('winend', '')),
-  ];
-  const NAMES = CONTROLS.map((c) => c.name);
-  /** A patch's value for each control, groups gathered. */
-  const setOf = (p) => Object.fromEntries(NAMES.map((n) => [n, GROUPS[n] ? GROUPS[n](p) : (p[n] ?? (n === 'winend' ? 1 : 0))]));
+  const valueOf = (p, n) => (GROUPS[n] ? GROUPS[n](p) : (p[n] ?? (n === 'winend' ? 1 : 0)));
+  const pick = (p, names) => Object.fromEntries(names.map((n) => [n, valueOf(p, n)]));
 
   // ── Pappus, behind the rig's engine contract ─────────────────────────────
   let eng = null, ctx = null, modulator = null, cur = null, routed = new Set();
@@ -158,6 +118,14 @@
   // What the patch's movement (pappus-mod.mjs) is allowed to move: its base
   // follows the knob, and the modulator writes base plus movement.
   const ROUTABLE = new Set(['rate', 'size', 'scan', 'spray', 'swarm', 'strum', 'sos', 'contour', 'wow', 'drive', 'crush', 'noise', 'winstart', 'winend']);
+
+  /** One value into the engine: a moving one's base, or its own command. */
+  function write(name, v) {
+    if (!eng || !modulator) return;
+    const dest = name === 'chance' ? 'probs' : name;
+    if (routed.has(dest) && (ROUTABLE.has(dest) || dest === 'probs')) modulator.setBase(dest, v);
+    else WRITE[name](v);
+  }
 
   const engine = {
     label: 'Pappus granulator',
@@ -217,19 +185,23 @@
     // What a patch sets that is not a knob: its routes, the movement the
     // modulator adds. Every value arrives by a knob and its glide.
     land(i, now) {
-      cur = { ...cur, ...now };
       const p = PATCHES[i];
-      for (const [k, v] of Object.entries(basesOf({ ...p, ...now, probs: now.chance }))) modulator.setBase(k, v);
+      cur = { ...cur, ...pick(p, FIXED), ...now };
+      for (const [k, v] of Object.entries(basesOf({ ...p, ...now }))) modulator.setBase(k, v);
       const routes = routesOf(p);
       modulator.setRoutes(routes);
       routed = new Set(routes.map((r) => r.dest));
     },
     knob(name, v) {
       cur = { ...(cur ?? {}), [name]: v };
-      if (!eng || !modulator) return;
-      const dest = name === 'chance' ? 'probs' : name;
-      if (routed.has(dest) && (ROUTABLE.has(dest) || dest === 'probs')) modulator.setBase(dest, v);
-      else WRITE[name](v);
+      write(name, v);
+    },
+    // Written at once, with no glide: Pappus's own 20 ms `Lag.kr` on every
+    // amount (Engine_Pappus.sc, `lagt`) already takes the step off a jump, and
+    // the modes, the chord and the figure are choices that only ever step.
+    fixed(set) {
+      cur = { ...(cur ?? {}), ...set };
+      for (const n of FIXED) if (n in set) write(n, set[n]);
     },
     run(on) {
       eng.send('/n_run', PAPPUS_NODE, on ? 1 : 0);
@@ -248,7 +220,7 @@
 
   const rig = createGrainRig({
     d, engine, controls: CONTROLS, outputScope: false,
-    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, set: setOf(p) })),
+    patches: PATCHES.map((p) => ({ name: sentence(p.name), says: p.says, set: pick(p, NAMES), fixed: pick(p, FIXED) })),
   });
   await rig.ready();
 </script>

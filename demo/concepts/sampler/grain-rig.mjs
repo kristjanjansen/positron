@@ -1,6 +1,6 @@
 // demo/concepts/sampler/grain-rig.mjs: everything a granulator concept page has
-// that is not its engine. Lifted out of sampler/050 on 2026-10-13 when its
-// lighter twin sampler/060 (now /archive/grain-ring/) arrived (BACKLOG, *"the plain GrainBuf ring is the
+// that is not its engine. Lifted out of sampler/050 (now /archive/pappus/) on 2026-10-13 when its
+// lighter twin sampler/060 arrived (BACKLOG, *"the plain GrainBuf ring is the
 // real lighter twin of Pappus - do"*), so the two pages share one copy:
 // the sources, the patchbay, the two scopes with their grain ticks, the grain
 // events, the two knobs, Play, `window.__demo.grains` and the self check.
@@ -24,6 +24,7 @@
 //     land(i, now)                     what patch i sets that is NOT a knob
 //                                      (the knobs glide there on their own);
 //                                      `now` is every knob's value right now
+//     fixed(set)                       a patch's fixed values, written at once
 //     knob(name, v)                    one control, by its name in `controls`,
 //                                      and 'mix' (0 dry to 1 wet) when `mixes`
 //     mixes                            true when the engine blends its own
@@ -41,13 +42,18 @@
 // `{ name, label, kind: 'knob', min, max, warp: 'lin' | 'exp', fmt }` for an
 // amount, `{ name, label, kind: 'steps', choices: [{ label, value }] }` for a
 // choice (the kit's stepped knob, `step: 1`; a value may be an array, a chord
-// or a figure, and is matched whole). A control with a `group` sits in a
-// bank of that name (the kit's knob bank: a heading over a row of knobs)
-// and shows its `short` label there, so `spectral` over `time`, `return`
-// and `blur` reads whole where `spectral feedback` under one knob was cut
-// to `SPECTR…`. Consecutive controls of one group share one bank,
-// and `patches` is `[{ name, says, set }]`, `set` holding a value for every
-// control and each name written as it is to be shown (sentence case).
+// or a figure, and is matched whole). Each knob is a cell of its own in
+// one row (asked 2026-10-13, *"no grouped buttons"*), its label short enough
+// to fit the cell,
+// and `patches` is `[{ name, says, set, fixed }]`: `set` a value for every
+// knob, `fixed` everything else the patch sets, and each name written as it
+// is to be shown (sentence case).
+//
+// FEW KNOBS, THE REST FIXED. Asked 2026-10-13: *"reduce granulator knobs a
+// lot. fix values. patch only changes those"*. What is not a knob is set by
+// the patch alone: `web:patch:value-out-2` carries it, one `{ of: 'fixed',
+// set }` event per patch change, straight into `web:grains:value-in`, and the
+// engine writes it at once with no glide (`engine.fixed(set)`).
 //
 // THE PATCH IS A NODE AND THE KNOBS TAKE INPUT. Asked 2026-10-13: *"expose
 // them. route patch to knobs (should take input)"* and *"patch selection
@@ -83,7 +89,7 @@ import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createGrainScope } from '/shell/grain-scope.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
 import { createPicker } from '/shell/picker.mjs';
-import { createKnob, createKnobBank } from '/shell/knob.mjs';
+import { createKnob } from '/shell/knob.mjs';
 import { createKnobGrid } from '/shell/knob-grid.mjs';
 
 /** The window both engines read, in seconds, and the source scope's width. */
@@ -168,17 +174,19 @@ const CSS = `
   .cc-births { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
   .cc-top { display: flex; }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .pos-kgrid-cell[data-span="2"] { grid-column: span 2; }
-  .pos-kgrid-cell[data-span="3"] { grid-column: span 3; }
-  .pos-kgrid-cell[data-span="4"] { grid-column: span 4; }
-  .pos-kgrid-cell[data-span="5"] { grid-column: span 5; }
-  .pos-kgrid-cell[data-span="6"] { grid-column: span 6; }
+  .cc-patch { display: flex; }
+  .cc-patch > .pos-pick { display: flex; width: 100%; height: auto; }
+  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
+  .cc-patch .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
 `;
 // The kit's grain scope as a panel's picture, as /concepts/radio/020/ draws
 // it: the panel's stage is the edge and the ground, so the scope gives up its
 // own margin, border and corner, and its always-empty caption takes no room.
 // The grains' start times over the output scope are a canvas laid exactly on
 // the scope's, so it moves nothing. Play sits on its own row, at its own size.
+// A patch picker standing alone (`outputScope: false`) spans its row, with
+// the kit's own phone arrangement of `.pos-pick` (shell.css) at every width
+// (asked 2026-10-13, *"patch selector full w"*).
 
 /**
  * @param {object} o
@@ -216,7 +224,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   const WAVE_IN = `${S}:wave:audio-in`, WAVE_EV = `${S}:wave:value-in`;
   const SCOPE_IN = `${S}:scope:audio-in`, SCOPE_EV = `${S}:scope:value-in`;
   const SPEAKER_IN = `${S}:speaker:audio-in`;
-  const PATCH_OUT = `${S}:patch:value-out`;
+  const PATCH_OUT = `${S}:patch:value-out`, PATCH_FIXED = `${S}:patch:value-out-2`;
   const KNOB_IN = (n) => `${S}:knob-${n}:value-in`, KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
   const MIX = { name: 'mix', label: 'wet/dry', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: (v) => `${Math.round(v * 100)}%` };
   // An engine that does not blend its own dry and wet is mixed here: the dry
@@ -253,6 +261,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
   bay.addNode({ id: `${S}:patch`, kind: 'engine', label: 'patch', place: 'browser' });
   bay.addPort({ id: PATCH_OUT, label: 'patch', dir: 'out', medium: 'value' });
+  bay.addPort({ id: PATCH_FIXED, label: 'fixed', dir: 'out', medium: 'value' });
   for (const c of [MIX, ...controls]) {
     bay.addNode({ id: `${S}:knob-${c.name}`, kind: 'person', label: c.label, place: 'browser' });
     // The wet/dry is no patch's, so it has nothing coming in.
@@ -274,6 +283,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   hold(RADIO_OUT, GRAINS_IN);
   if (outside) hold(RADIO_OUT, SPEAKER_IN);
   for (const c of controls) hold(PATCH_OUT, KNOB_IN(c.name));
+  hold(PATCH_FIXED, GRAINS_VAL);
   for (const c of [MIX, ...controls]) hold(KNOB_OUT(c.name), GRAINS_VAL);
   hold(RADIO_OUT, WAVE_IN);
   hold(GRAINS_OUT, SPEAKER_IN);
@@ -345,7 +355,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     onPick: (i) => choosePatch(i) });
   patchPick.options(patches.map((p) => p.name), 0);
   const scopePanel = outputScope ? createVideoPanel({ media: scopeHost, aspect: 'auto', right: patchPick.el, left: false })
-    : { el: (() => { const row = el('div', 'cc-top'); row.append(patchPick.el); return row; })() };
+    : { el: (() => { const row = el('div', 'cc-patch'); row.append(patchPick.el); return row; })() };
 
   const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
   let ink = null;
@@ -442,6 +452,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
       eng = await engine.boot({ ctx, input: toGrains, grain, log: (m, k) => d.log(m, k) });
       eng.out.connect(heard);
       engine.land(patchAt, { ...cur });
+      engine.fixed(patches[patchAt].fixed);
       // Every knob as it stands, which is the patch unless one was turned before Play.
       for (const c of controls) engine.knob(c.name, cur[c.name]);
       if (engine.mixes) engine.knob('mix', cur.mix);
@@ -459,6 +470,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     patchPick.show(patches[n].name, n);
     if (eng) { engine.land(n, { ...cur }); d.log(`${patches[n].name}: ${patches[n].says}`); }
     bay.send(PATCH_OUT, { of: 'patch', name: patches[n].name, set: { ...patches[n].set } });
+    bay.send(PATCH_FIXED, { of: 'fixed', name: patches[n].name, set: { ...patches[n].fixed } });
   }
   /** A patch arriving at one knob, on its wire from web:patch. */
   function patchIn(name, ev) {
@@ -467,6 +479,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   }
   /** A knob's value arriving at the grains, on its wire into web:grains. */
   function valueIn(ev) {
+    if (ev?.of === 'fixed') { if (eng && ev.set) engine.fixed(ev.set); return; }
     if (ev?.of !== 'param' || ev.v === undefined || !(ev.name in cur)) return;
     if (ev.name === 'mix' && !Number.isFinite(ev.v)) return;
     cur[ev.name] = ev.v;
@@ -492,14 +505,14 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     if (c.kind === 'steps') {
       // The kit's stepped knob, as /kit/devices/ shows it: `step: 1` over the choices.
       knobs.set(c.name, createKnob({
-        label: c.short ?? c.label, min: 0, max: c.choices.length - 1, step: 1, value: stepOf(c, cur[c.name]),
+        label: c.label, min: 0, max: c.choices.length - 1, step: 1, value: stepOf(c, cur[c.name]),
         format: (i) => c.choices[Math.round(i)]?.label ?? '',
         onInput: (i) => send(c.name, c.choices[Math.round(i)].value),
       }));
       continue;
     }
     knobs.set(c.name, createKnob({
-      label: c.short ?? c.label, min: 0, max: 1, value: toK(c, cur[c.name]),
+      label: c.label, min: 0, max: 1, value: toK(c, cur[c.name]),
       format: (k) => c.fmt(toV(c, k)),
       onInput: (k, from) => { if (from === 'hand') glides.delete(c.name); send(c.name, toV(c, k)); },
     }));
@@ -508,19 +521,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     const h = hue(name);
     if (h != null) { knob.el.dataset.param = name; knob.el.style.setProperty('--param-hue', String(h)); }
   }
-  // The row: a knob on its own, or a bank of a group's knobs together.
-  const cells = [];
-  for (const c of [MIX, ...controls]) {
-    const last = cells[cells.length - 1];
-    if (c.group && last?.group === c.group) last.items.push(knobs.get(c.name));
-    else cells.push({ name: c.group ? `bank-${c.group}` : c.name, group: c.group, items: [knobs.get(c.name)] });
-  }
-  const knobRow = createKnobGrid(cells.map((x) => ({
-    name: x.name, knob: x.group ? createKnobBank(x.items, { label: x.group }) : x.items[0],
-  })), { row: true });
-  // A bank spans as many of the row's columns as it has knobs, so each knob
-  // in it has the room a knob on its own has.
-  for (const x of cells) if (x.group) knobRow.cellOf(x.name).dataset.span = String(Math.min(6, x.items.length));
+  const knobRow = createKnobGrid(knobs, { row: true });
 
   /** How long a patch takes to arrive, eased in and out: long enough to hear it travel. */
   const GLIDE_MS = 1600, GLIDE_TICK_MS = 40;
@@ -652,7 +653,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
       if (i !== patchAt && dist > far) { far = dist; to = i; }
     });
     const n0 = grainCount;
-    const sentBefore = bay.links().filter((l) => l.from === PATCH_OUT).reduce((n, l) => n + (l.sent || 0), 0);
+    const sentBefore = bay.links().filter((l) => l.from === PATCH_OUT || l.from === PATCH_FIXED).reduce((n, l) => n + (l.sent || 0), 0);
     const k0 = knobs.get(DN.name).value(), kTo = toK(DN, patches[to].set[DN.name]);
     choosePatch(to);
     await wait(GLIDE_MS * 0.4);
@@ -665,9 +666,9 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     // movement, so it is held to within an octave rather than to the digit.
     const moving = new Set(engine.moving?.() ?? []);
     const near = (a, b, name) => (moving.has(name) ? Math.abs(Math.log(a / b)) < Math.LN2 : Math.abs(a - b) <= Math.abs(b) * 1e-3);
-    const sent = bay.links().filter((l) => l.from === PATCH_OUT).reduce((n, l) => n + (l.sent || 0), 0) - sentBefore;
-    d.assert('a patch reaches the knobs over their wires from web:patch, one event on every one', sent === controls.length,
-      `${sent} events on ${controls.length} wires`);
+    const sent = bay.links().filter((l) => l.from === PATCH_OUT || l.from === PATCH_FIXED).reduce((n, l) => n + (l.sent || 0), 0) - sentBefore;
+    d.assert('a patch reaches the knobs over their wires from web:patch, one event on every one, and its fixed values on one wire of their own',
+      sent === controls.length + 1, `${sent} events on ${controls.length} knob wires and the fixed one`);
     d.assert('and the knobs glide there: part way through, the density knob is between where it was and where it goes, and so is the engine',
       kMid > Math.min(k0, kTo) + 0.02 && kMid < Math.max(k0, kTo) - 0.02 && midOver > Math.min(before.rate, patches[to].set[DN.name]) && midOver < Math.max(before.rate, patches[to].set[DN.name]),
       `knob ${k0.toFixed(3)} to ${kTo.toFixed(3)}, at ${GLIDE_MS * 0.4} ms ${kMid.toFixed(3)}, engine ${midOver?.toFixed(2)}`);
