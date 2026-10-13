@@ -1,8 +1,10 @@
-// demo/concepts/synth/module-page.mjs: one synth module on a page of its own,
-// played from the kit's keys. /concepts/synth/050/ (filter), 060 (envelope) and
-// 070 (LFO) are each this with a different patch and knob list, so the delta
-// between them is the lesson and no page carries a copy of another
-// (2026-10-13, the split of synth/040, *"do not dupe with existing ones"*).
+// demo/concepts/synth/module-page.mjs: a patch of synth modules on a page,
+// played from the kit's keys, a knob per parameter. It was written for three
+// pages, one module each (050 filter, 060 envelope, 070 LFO, the split of
+// synth/040), and since 2026-10-13 builds the one that replaced them,
+// /concepts/synth/050/ Sound design (*"combine filter+envelope+lfo to single
+// sound design concept"*). It stays a module because the page is a patch and a
+// knob list handed to it.
 //
 // The page, top to bottom, as positron-concepts lays out a synth: the
 // waveform at full width, the knob row, the keys, the patchbay. The sound is
@@ -70,14 +72,12 @@ export function modulePage(d, { patch, knobs: names, preset = {} }) {
 
   // ── the keys: what they play leaves on keys:midi-out and nowhere else ──
   const host = el('div');
+  const down = (note) => { wake(); bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 }); };
+  const up = (note) => bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 });
   const kb = createKeyboard(host, {
     ...keyRange(21), base: 48,
-    onDown: (note, how) => {
-      if (how === 'midi') return;
-      wake();
-      bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
-    },
-    onUp: (note, how) => { if (how === 'midi') return; bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
+    onDown: (note, how) => { if (how !== 'midi') down(note); },
+    onUp: (note, how) => { if (how !== 'midi') up(note); },
   });
 
   // ── the patch, and the patchbay drawing only what it links ──────────────
@@ -95,12 +95,15 @@ export function modulePage(d, { patch, knobs: names, preset = {} }) {
   window.__demo.knobs = grid;
   window.__demo.keyboard = kb;
   /** RMS of what reaches the scope now, 0 before the first key. */
-  window.__demo.level = () => {
+  const level = () => {
     const buf = synth.read('scope');
     if (!buf) return 0;
     let s = 0;
     for (const v of buf) s += v * v;
     return Math.sqrt(s / buf.length);
   };
-  return { synth, knobs, grid, kb, pb };
+  window.__demo.level = level;
+  /** Turn a knob as a hand would, so the value travels its own wire. */
+  const turn = (name, v) => knobs.get(name).set(knobRaw(name, v));
+  return { synth, knobs, grid, kb, pb, down, up, turn, level };
 }

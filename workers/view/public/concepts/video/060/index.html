@@ -23,7 +23,7 @@
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
   /* The word on the picture's plate is read against a picture, so full ink. */
-  .pos-vp-tag > .cc-proto { color: var(--fg); }
+  .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -150,7 +150,8 @@
   // row 334 px wide at 1280 scroll its last cell out of sight.
   const H = createPicture();
   const hstate = el('span', 'cc-say', '');
-  const hlsPanel = createVideoPanel({ media: H.c, left: hstate, values: [
+  const leftH = el('span', 'cc-left'); leftH.append(el('span', 'cc-say cc-proto', 'LL-HLS '), hstate);
+  const hlsPanel = createVideoPanel({ media: H.c, left: leftH, values: [
     { key: 'warmup', label: 'warmup', reserve: 5 },
     { key: 'delay', label: 'delay', reserve: 6 },
     { key: 'rec', label: 'rec', reserve: 1 },
@@ -160,7 +161,9 @@
   const hoverHls = () => { HV.el.title = [hover.size, hover.storage].filter(Boolean).join('\n'); };
   // The picture says LL-HLS on its tag plate, always, even stopped (reported
   // 2026-10-12 of the WebRTC one: *"not clear that this is webrtc"*).
-  hlsPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'LL-HLS'));
+  // The protocol's name is the footer's first word, not a plate over the picture
+  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
+  // to videopanel fooers"*).
 
   const pair = el('div', 'cc-pair');
   pair.append(camera.panel.el, hlsPanel.el);

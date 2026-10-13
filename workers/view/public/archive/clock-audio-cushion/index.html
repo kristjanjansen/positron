@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 020</title>
+<title>POSITRON Audio cushion</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/020, CUSHION, 2026-10-12. One idea: sound that crosses a
@@ -31,7 +31,6 @@
   // Changing the cushion re-arms the worklet's floor and starts the counts again.
   //
   // Nothing opens on a visit. Play joins the room and starts the tone.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createBayNode, ROOM_RE } from '/shell/bay-node.mjs';
@@ -56,11 +55,10 @@
   const G_THERE = graphOf(THERE, 'there', [{ id: `${THERE}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' }],
     [{ id: IN, label: 'speakers', dir: 'in', medium: 'audio', transports: ['relay'] }]);
 
-  const d = mount({ name: 'concept clock 020', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Audio cushion', what: '', index: '/archive/', indexLabel: 'archive',
     // Readouts on top, the log at the foot (positron-concepts).
     joined: false,
     readout: { cushion: 'ms', lag: 'ms', dropouts: '', 'late frames': '' } });
-  conceptNav('clock/020');
 
   const S = soundCard({ sampleRate: RATE });
 

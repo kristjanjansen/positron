@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 070</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The detector's beats over the source scope, on the scope's own eight
+     seconds: a canvas laid exactly on the scope's, so it moves nothing. */
+  .cc-beats { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  /* The tempo beside the switch that follows it, on Play's row. */
+  .cc-top { align-items: center; flex-wrap: wrap; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { compile } from '/shell/sclang-lite.mjs';
+  import { createToggle } from '/shell/toggle.mjs';
+  import { createPanelValues } from '/shell/video-panel.mjs';
+  import { createGrainRig, WINDOW_S } from '/concepts/sampler/grain-rig.mjs';
+  import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/concepts/sampler/grain-ring.mjs';
+  import { createTempoDetector, STEADY, steady } from '/concepts/radio/tempo.mjs';
+
+  // concepts sampler/070, BEAT GRANULATOR, 2026-10-13. Asked (BACKLOG): *"make
+  // followup demo with ida, dub and add tempo detection and feed it into
+  // granulator"*. sampler/060's Granulator (the grain ring, `../grain-ring.mjs`,
+  // and everything else `../grain-rig.mjs`) on the Ida recording and the Dub
+  // patch, plus /concepts/radio/020/'s tempo detector (`/concepts/radio/tempo.mjs`)
+  // hearing the same recording. Its readings travel on a wire of their own,
+  // web:tempo:value-out into web:grains:value-in, and the grains take the
+  // timing from them:
+  //   time     the echo: Dub's is three quarters of a beat, every other
+  //            patch's the nearest of BEAT_FRACTIONS to its own time
+  //   density  a whole number of grains a beat, the nearest to the knob
+  //   back     a whole number of quarter beats, the nearest to the knob
+  //   lock     the program's beat grid on (`\lock`, `../grain-ring.mjs`), and
+  //            `\beat` raised on every beat, so the even grains start on it
+  // The knobs keep what a person or a patch set; only what reaches the engine
+  // is put on the beat. A reading under the detector's STEADY is not a tempo,
+  // so the grains hold the last one that was. The echo time glides there by
+  // the program's own lag on `\time` (0.3 s); density and back step.
+  // `follow tempo` (on) takes all of it off, so the difference can be heard.
+  const d = mount({ name: 'concept sampler 070', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('sampler/070');
+
+  const NODE = 4000, BUF = 0, DEF = 'gring';
+  const secs = (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`);
+  const times = (v) => `${v.toFixed(2)}x`;
+  // sampler/060's seven knobs, as they are there.
+  const CONTROLS = [
+    { name: 'size', label: 'size', kind: 'knob', min: 0.02, max: 4, warp: 'exp', fmt: secs },
+    { name: 'density', label: 'density', kind: 'knob', min: 0.5, max: 64, warp: 'exp', fmt: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` },
+    { name: 'pitch', label: 'pitch', kind: 'knob', min: 0.25, max: 4, warp: 'exp', fmt: times },
+    { name: 'back', label: 'back', kind: 'knob', min: 0, max: 4, warp: 'lin', fmt: secs },
+    { name: 'speed', label: 'speed', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: times },
+    { name: 'scatter', label: 'scatter', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: (v) => `${Math.round(v * 100)}%` },
+    { name: 'freeze', label: 'freeze', kind: 'steps', choices: [{ label: 'off', value: 0 }, { label: 'on', value: 1 }] },
+  ];
+  const NAMES = CONTROLS.map((c) => c.name);
+  const FIXED = ['jitter', 'detune', 'pan', 'tone', 'echo', 'time', 'dark', 'drop', 'ramp', 'dir', 'amp'];
+  const pick = (p, names) => Object.fromEntries(names.map((n) => [n, valuesOf(p)[n]]));
+  // Dub first: the page opens on it.
+  const LIST = [PATCHES.find((p) => p.name === 'Dub'), ...PATCHES.filter((p) => p.name !== 'Dub')];
+
+  // ── the beat ─────────────────────────────────────────────────────────────
+  // An echo on the beat: a quarter, a dotted eighth, an eighth, a dotted
+  // quarter's half, a beat, one and a half, two. Dub's is a dotted eighth,
+  // three quarters of a beat, the classic dub delay.
+  const BEAT_FRACTIONS = [1 / 4, 3 / 8, 1 / 2, 3 / 4, 1, 3 / 2, 2];
+  const OWN_BEATS = { Dub: 3 / 4 };
+  const MAX_TIME = 1.5;              // the program's DelayC holds 1.5 s
+  const TIMED = ['time', 'density', 'back'];
+  const want = { ...valuesOf(LIST[0]) };   // what the knobs and the patch set, before the beat
+  let follow = true, rig = null;
+  let grid = null;                   // the tempo the grains hold: { bpm, beatAt, confidence }
+  let lastReading = null, readingsIn = 0;
+  const locked = () => follow && !!grid;
+  const timeBeats = (beat) => {
+    const own = OWN_BEATS[rig?.api.patch()];
+    if (own) return own;
+    const r = want.time / beat;
+    return BEAT_FRACTIONS.filter((f) => f * beat <= MAX_TIME).reduce((a, f) => (Math.abs(Math.log(f / r)) < Math.abs(Math.log(a / r)) ? f : a), 1 / 4);
+  };
+  /** What a control is sent to the engine as: on the beat while following. */
+  function onBeat(name) {
+    const v = want[name];
+    if (!locked() || !TIMED.includes(name)) return v;
+    const beat = 60 / grid.bpm;
+    if (name === 'time') return Math.min(MAX_TIME, beat * timeBeats(beat));
+    if (name === 'density') return Math.max(1, Math.round(v * beat)) / beat;
+    return Math.max(1, Math.round(v / (beat / 4))) * (beat / 4);   // back
+  }
+
+  // ── the program: compiled as the page opens, pure JavaScript, no fetch ───
+  const t0 = performance.now();
+  const good = compile(PROGRAM, { name: DEF });
+  const compileMs = performance.now() - t0;
+  if (!good.ok) d.log(`the granulator's program did not compile: ${good.message}`, 'bad');
+
+  // ── the engine, behind the rig's contract (as sampler/060's) ─────────────
+  let eng = null, ctx = null, mixNow = 1;
+  const T = { bufferBytes: RING_SECONDS * 48000 * 4, compileMs: +compileMs.toFixed(1) };
+  const timedNow = () => [...TIMED.flatMap((n) => [n, onBeat(n)]), 'lock', locked() ? 1 : 0];
+  function sendTimed() { if (eng) eng.send('/n_set', NODE, ...timedNow()); }
+  const engine = {
+    label: 'grain ring',
+    mixes: true,
+    async boot({ ctx: ac, input, grain, log }) {
+      ctx = ac;
+      const t1 = performance.now();
+      if (!good.ok) throw new Error('the program did not compile');
+      eng = await bootScsynth({
+        audioContext: ctx, input, log,
+        onReply: (m) => {
+          if (m[0] !== '/grain') return false;
+          const pos = m[3], head = m[5];
+          grain({ pos, ago: ((((head - pos) % 1) + 1) % 1) * RING_SECONDS, dur: m[4], voice: 0, rate: m[6] });
+          return true;
+        },
+      });
+      eng.out.gain.value = 0;
+      T.moduleMs = Math.round(eng.moduleMs); T.bootMs = Math.round(eng.bootMs);
+      const alloc = await eng.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && (m[1] === '/b_alloc' || m[1] === '/b_allocPtr'),
+        5000, '/b_alloc', BUF, RING_SECONDS * ctx.sampleRate, 1);
+      if (!alloc || alloc[0] !== '/done') throw new Error('the ring buffer was not allocated');
+      const done = await eng.sendAndWait((m) => m[0] === '/done' && m[1] === '/d_recv', 5000, '/d_recv', good.bytes);
+      if (!done) throw new Error('the engine never said it had the definition');
+      const vals = Object.fromEntries(Object.keys(want).map((n) => [n, onBeat(n)]));
+      const go = await eng.sendAndWait((m) => m[0] === '/n_go' || (m[0] === '/fail' && m[1] === '/s_new'), 5000,
+        '/s_new', DEF, NODE, 1, 0, 'buf', BUF, 'inbus', 2, 'mix', mixNow, ...Object.entries(vals).flat(), 'lock', locked() ? 1 : 0);
+      if (!go || go[0] !== '/n_go') throw new Error('the granulator did not start');
+      T.startMs = Math.round(performance.now() - t1);
+      log(`the granulator up ${T.startMs} ms after Play, the ${good.bytes.length} B definition compiled in ${T.compileMs} ms`);
+      return { meter: eng.meter, out: eng.out, timing: T, scsynth: eng };
+    },
+    land() {
+      eng.send('/n_set', NODE, 'sync', 1);
+      setTimeout(() => eng.send('/n_set', NODE, 'sync', 0), 40);
+      // A patch's own echo on the beat (Dub's three quarters) is the patch's.
+      sendTimed();
+    },
+    knob(name, v) {
+      if (name === 'mix') { mixNow = v; eng.send('/n_set', NODE, 'mix', v); return; }
+      want[name] = v;
+      eng.send('/n_set', NODE, name, onBeat(name));
+    },
+    fixed(set) {
+      Object.assign(want, set);
+      eng.send('/n_set', NODE, ...Object.keys(set).flatMap((n) => [n, onBeat(n)]));
+    },
+    run(on) { eng.send('/n_run', NODE, on ? 1 : 0); },
+    async read(name) {
+      const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', NODE, name);
+      return r ? Number(r[3]) : null;
+    },
+    glitches: () => { try { return eng?.sonic.getMetrics?.()?.glitchCount ?? null; } catch { return null; } },
+    // While following, density and back read back on the beat, not at the
+    // knob: the rig's own patch check holds them to within an octave.
+    moving: () => (locked() ? ['density', 'back'] : []),
+    // The tempo and the follow switch, on web:grains:value-in.
+    value(ev) {
+      if (ev?.of !== 'param') return false;
+      if (ev.name === 'bpm') {
+        readingsIn++;
+        lastReading = ev;
+        // Under STEADY the reading is not a tempo: hold the one we have.
+        if (steady(ev) && Number.isFinite(ev.beatAt)) {
+          const moved = !grid || grid.bpm !== ev.v;
+          grid = { bpm: ev.v, beatAt: ev.beatAt, confidence: ev.confidence };
+          if (moved) sendTimed();
+        }
+        showTempo();
+        return true;
+      }
+      if (ev.name === 'follow') {
+        follow = !!ev.v;
+        sendTimed();
+        showTempo();
+        return true;
+      }
+      return false;
+    },
+  };
+
+  // ── the beat on the engine: `\beat` raised on every beat of the grid ─────
+  // A 10 ms timer on this tab's audio clock: when the next beat of the held
+  // grid is due, `\beat` goes to 1 and back to 0 15 ms later (the Phasor in
+  // the program resets on the rise). So a beat lands within a timer tick and
+  // an audio block of the grid, a few ms, which the self check measures.
+  let nextBeat = null, pulseGrid = null, pulses = 0, pulser = 0;
+  function pulse() {
+    if (!eng || !ctx || !rig.api.playing() || !locked()) { nextBeat = null; return; }
+    const per = 60 / grid.bpm, now = ctx.currentTime;
+    // A new reading moves the grid: the next beat is the first of it after now.
+    if (nextBeat == null || pulseGrid !== grid || nextBeat < now - per) {
+      pulseGrid = grid;
+      nextBeat = grid.beatAt + Math.ceil((now - 0.004 - grid.beatAt) / per) * per;
+    }
+    if (now >= nextBeat - 0.004) {
+      eng.send('/n_set', NODE, 'beat', 1);
+      setTimeout(() => eng?.send('/n_set', NODE, 'beat', 0), 15);
+      pulses++;
+      nextBeat += per;
+    }
+  }
+
+  // ── the tempo detector, on the same sound the granulator records ─────────
+  let bay = null, det = null, TEMPO_OUT = '', TEMPO_IN = '', RADIO_OUT = '', FOLLOW_OUT = '';
+  const beats = [];                  // { at, c }: a beat instant on this tab's audio clock, and the reading's confidence
+  function beatsIn(ev) {
+    if (ev?.of !== 'param' || ev.name !== 'bpm' || !Array.isArray(ev.beats) || !steady(ev)) return;
+    for (const b of ev.beats) if (Number.isFinite(b)) beats.push({ at: b, c: ev.confidence ?? 1 });
+  }
+  function wire({ bay: b, hold, ports }) {
+    bay = b;
+    const S = 'web';
+    RADIO_OUT = ports.RADIO_OUT;
+    TEMPO_IN = `${S}:tempo:audio-in`; TEMPO_OUT = `${S}:tempo:value-out`;
+    const WAVE_BEATS = `${S}:wave:value-in-2`;
+    FOLLOW_OUT = `${S}:follow:value-out`;
+    bay.addNode({ id: `${S}:tempo`, kind: 'engine', label: 'tempo detector', place: 'browser' });
+    bay.addPort({ id: TEMPO_IN, label: 'tempo detector', dir: 'in', medium: 'audio' });
+    bay.addPort({ id: TEMPO_OUT, label: 'tempo', dir: 'out', medium: 'value' });
+    bay.addPort({ id: WAVE_BEATS, label: 'beats', dir: 'in', medium: 'value', deliver: (ev) => beatsIn(ev) });
+    bay.addNode({ id: `${S}:follow`, kind: 'person', label: 'follow tempo', place: 'browser' });
+    bay.addPort({ id: FOLLOW_OUT, label: 'follow tempo', dir: 'out', medium: 'value' });
+    hold(RADIO_OUT, TEMPO_IN);
+    hold(TEMPO_OUT, ports.GRAINS_VAL);
+    hold(TEMPO_OUT, WAVE_BEATS);
+    hold(FOLLOW_OUT, ports.GRAINS_VAL);
+  }
+  const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+  function audio({ ctx: ac, bus }) {
+    const pull = ac.createGain(); pull.gain.value = 0; pull.connect(ac.destination);
+    det = createTempoDetector(ac, { pull, playing: () => rig.api.playing(), onReading: (ev) => bay.send(TEMPO_OUT, ev) });
+    if (holds(RADIO_OUT, TEMPO_IN)) bus.connect(det.in);
+    pulser ||= setInterval(pulse, 10);
+  }
+
+  // The tempo the grains hold and how sure the last reading was, beside the
+  // switch, in the kit's panel values. A reading under STEADY leaves the held
+  // tempo standing and says so once in the log.
+  const tempoVals = createPanelValues([{ key: 'bpm', reserve: 9 }, { key: 'conf', label: 'confidence', reserve: 4 }]);
+  let holding = false;
+  function showTempo() {
+    const r = lastReading;
+    tempoVals.set('bpm', grid ? `${grid.bpm.toFixed(1)} bpm` : r ? 'no steady beat' : '');
+    tempoVals.set('conf', r ? r.confidence.toFixed(2) : '');
+    const h = !!grid && !!r && !steady(r);
+    if (h !== holding) { holding = h; d.log(h ? `no steady beat: the grains hold ${grid.bpm.toFixed(1)} bpm` : `a steady beat again: ${grid.bpm.toFixed(1)} bpm`); }
+  }
+
+  const followSwitch = createToggle({ label: 'follow tempo', checked: true,
+    onChange: (on) => bay.send(FOLLOW_OUT, { of: 'param', name: 'follow', v: on ? 1 : 0 }) });
+
+  // ── the self check's own part, run inside the rig's while the sound plays ─
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  /** How tightly the grains of the last `ms` sit on the beat grid: 1 all on one
+   *  phase of it, 0 spread evenly. Each grain's time (when its report reached
+   *  this tab) against the grid of `n` grains a beat. */
+  const onGrid = (evs, bpm, beatAt, n) => {
+    const per = 60 / bpm / n;
+    let c = 0, s = 0;
+    for (const e of evs) { const a = 2 * Math.PI * ((e.at - beatAt) / per); c += Math.cos(a); s += Math.sin(a); }
+    return evs.length ? Math.hypot(c, s) / evs.length : 0;
+  };
+  async function check({ events }) {
+    d.assert('it opened on the Ida recording and on Dub', rig.api.source() === 'ida' && LIST[0].name === 'Dub',
+      `${rig.api.source()}, ${LIST[0].name}, now ${rig.api.patch()}`);
+    for (let i = 0; i < 40 && !grid; i++) await wait(500);
+    d.assert('the tempo detector finds a steady beat in the Ida recording', !!grid,
+      grid ? `${grid.bpm} bpm at confidence ${grid.confidence}` : `last reading ${JSON.stringify(lastReading && { v: lastReading.v, c: lastReading.confidence })}`);
+    if (!grid) return;
+    const sent = bay.links().filter((l) => l.from === TEMPO_OUT && l.to.endsWith(':grains:value-in')).reduce((n, l) => n + (l.sent || 0), 0);
+    d.assert('the tempo reaches the granulator as events on its wire from web:tempo', sent > 0 && readingsIn > 0 && sent >= readingsIn,
+      `${sent} sent on the wire, ${readingsIn} taken by the grains, holding ${grid.bpm} bpm`);
+    const g0 = { ...grid };
+    const tOn = await engine.read('time');
+    const g1 = { ...grid };
+    const fit = (g) => Math.abs(tOn - 0.75 * 60 / g.bpm);
+    const miss = Math.min(fit(g0), fit(g1));
+    d.assert('the echo time in the engine is three quarters of the detected beat, within 3 ms', miss < 0.003,
+      `engine ${(tOn * 1000).toFixed(1)} ms, 3/4 of a beat at ${g1.bpm} bpm is ${(0.75 * 60000 / g1.bpm).toFixed(1)} ms, off by ${(miss * 1000).toFixed(2)} ms; Dub's own is ${want.time * 1000} ms`);
+    const dens = await engine.read('density'), back = await engine.read('back');
+    const beat = 60 / grid.bpm, nPer = dens * beat, qBack = back / (beat / 4);
+    d.assert('density is a whole number of grains a beat and back a whole number of quarter beats',
+      Math.abs(nPer - Math.round(nPer)) < 0.01 && Math.abs(qBack - Math.round(qBack)) < 0.01,
+      `${dens.toFixed(3)}/s is ${nPer.toFixed(3)} a beat (knob ${want.density.toFixed(2)}/s), back ${back.toFixed(4)} s is ${qBack.toFixed(3)} quarter beats (knob ${want.back.toFixed(3)} s)`);
+    const lockOn = await engine.read('lock');
+    d.assert('the beat grid is on in the engine and raised on every beat', lockOn === 1 && pulses > 0, `lock ${lockOn}, ${pulses} beats raised`);
+    // The grains on the grid, then with following off.
+    let t = ctx.currentTime; await wait(3000);
+    const n = Math.max(1, Math.round(dens * beat));
+    const rOn = onGrid(events().filter((e) => e.at > t), grid.bpm, grid.beatAt, n);
+    followSwitch.set(false);
+    await wait(300);
+    const tOff = await engine.read('time'), dOff = await engine.read('density'), lockOff = await engine.read('lock');
+    d.assert('following off, the engine takes the patch\'s own echo time and the knob\'s density, and the grid is off',
+      Math.abs(tOff - want.time) < 1e-4 && Math.abs(dOff - want.density) < 1e-3 * want.density && lockOff === 0 && Math.abs(tOff - tOn) > 0.005,
+      `time ${(tOn * 1000).toFixed(1)} ms on, ${(tOff * 1000).toFixed(1)} ms off; density ${dens.toFixed(2)} on, ${dOff.toFixed(2)} off; lock ${lockOff}`);
+    t = ctx.currentTime; await wait(3000);
+    const rOff = onGrid(events().filter((e) => e.at > t), grid.bpm, grid.beatAt, n);
+    d.assert('the grains sit on the beat grid while following and spread off it when not', rOn > 0.5 && rOn > rOff + 0.2,
+      `on ${rOn.toFixed(2)}, off ${rOff.toFixed(2)} (1 all on one phase of a ${n} a beat grid, 0 spread evenly)`);
+    followSwitch.set(true);
+    await wait(300);
+    const tBack = await engine.read('time');
+    d.assert('following on again, the echo is back on the beat', Math.abs(tBack - 0.75 * 60 / grid.bpm) < 0.003,
+      `${(tBack * 1000).toFixed(1)} ms at ${grid.bpm} bpm`);
+    // A reading under STEADY changes nothing in the engine: sent on the real
+    // wire, as the detector would, 30% fast and unsure.
+    const held = grid.bpm;
+    bay.send(TEMPO_OUT, { of: 'param', name: 'bpm', v: Math.round(held * 13) / 10, confidence: STEADY / 5, beatAt: ctx.currentTime, beats: [], candidates: [] });
+    const tHeld = await engine.read('time');
+    d.assert('a reading under the steady threshold is held, not followed', grid.bpm === held && Math.abs(tHeld - 0.75 * 60 / held) < 0.003,
+      `sent ${Math.round(held * 13) / 10} bpm at ${STEADY / 5}, the engine still ${(tHeld * 1000).toFixed(1)} ms for ${held} bpm`);
+    const foot = tempoVals.cell('bpm').textContent;
+    const ink = (() => { const px = beatCanvas.getContext('2d').getImageData(0, 0, beatCanvas.width, beatCanvas.height).data; let m = 0; for (let i = 3; i < px.length; i += 4) if (px[i] > m) m = px[i]; return m; })();
+    d.assert('the source scope carries the beats, and the tempo row the held tempo and the reading\'s confidence', beats.length > 0 && ink > 0 && foot === `${held.toFixed(1)} bpm` && tempoVals.cell('conf').textContent === (STEADY / 5).toFixed(2),
+      `${beats.length} beats, ink ${ink}, "${foot}", confidence ${tempoVals.cell('conf').textContent}`);
+    window.__demo.beat.measured = { bpm: g1.bpm, confidence: g1.confidence, timeOn: tOn, timeOff: tOff, densOn: dens, densOff: dOff, back, rOn, rOff, pulses };
+  }
+
+  rig = createGrainRig({
+    d, engine,
+    patches: LIST.map((p) => ({ name: p.name, says: p.says, set: pick(p, NAMES), fixed: pick(p, FIXED) })),
+    controls: CONTROLS, roles: { size: 'size', density: 'density' }, source: 'ida',
+    outputScope: false,
+    wire, audio, top: [followSwitch.el, tempoVals.el],
+    check,
+  });
+
+  // The beats, one accent line each, as bright as the reading that placed them was sure.
+  const beatCanvas = el('canvas', 'cc-beats');
+  rig.waveHost.append(beatCanvas);
+  let ink = null;
+  function drawBeats() {
+    requestAnimationFrame(drawBeats);
+    if (!ctx || !rig.api.playing()) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(beatCanvas.clientWidth * dpr), H = Math.round(beatCanvas.clientHeight * dpr);
+    if (!W || !H) return;
+    if (beatCanvas.width !== W || beatCanvas.height !== H) { beatCanvas.width = W; beatCanvas.height = H; }
+    const g = beatCanvas.getContext('2d');
+    g.clearRect(0, 0, W, H);
+    const now = ctx.currentTime;
+    while (beats.length && beats[0].at < now - WINDOW_S - 0.5) beats.shift();
+    g.fillStyle = (ink ??= getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400');
+    for (const b of beats) {
+      const x = Math.round(W - ((now - b.at) / WINDOW_S) * W);
+      if (x < 0 || x > W) continue;
+      g.globalAlpha = 0.2 + 0.8 * Math.max(0, Math.min(1, b.c));
+      g.fillRect(x - dpr, 0, dpr, H);
+    }
+    g.globalAlpha = 1;
+  }
+  requestAnimationFrame(drawBeats);
+
+  window.__demo.beat = { grid: () => grid && { ...grid }, follow: () => follow, last: () => lastReading, pulses: () => pulses,
+    beats: () => beats.slice(), want: () => ({ ...want }), read: (n) => engine.read(n), measured: null };
+  await rig.ready();
+</script>

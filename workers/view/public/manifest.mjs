@@ -143,7 +143,9 @@ export const DEMOS = [
   // Six fields are computed in JavaScript at load, measured around 25 ms each
   // on this machine, and the asserts then draw every word off-screen twice to
   // read its size out of the pixels. The first assert sits behind all of it.
-  { name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, gl: true, xr: true, settleMs: 8000,
+  // `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+  // /weight/, listed on /archive/ with the other retired pages.
+  { name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, unlisted: true, gl: true, xr: true, settleMs: 8000,
     one: 'one sentence broken across four walls, each word as big as it is short and none of them turning to face you, and any word retyped where it stands',
     tags: ['WebXR', 'WebGL2', 'fonts'] },
 
@@ -230,7 +232,9 @@ export const DEMOS = [
   // The archival horizon and the timeline library, meeting for the first time:
   // a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
   // committed; the media streams from ERR and nothing is stored here.
-  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+  // /reel/, listed on /archive/ with the other retired pages.
+  { name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true, unlisted: true,
     one: 'every 1965 newsreel in ERR\'s archive is a mark on one line at the day it was broadcast',
     tags: ['archive', 'timeline'] },
   // `now` (one ERR television channel on a line whose right-hand end is the
@@ -241,7 +245,9 @@ export const DEMOS = [
   // `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
   // a GPU page graded there reports a defect that belongs to the harness.
   // `node demo/verify-gl.mjs` is the grader.
-  { name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, gl: true, xr: true,
+  // `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+  // /floor/, listed on /archive/ with the other retired pages.
+  { name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, unlisted: true, gl: true, xr: true,
     one: 'every 1965 newsreel face up on a floor you walk over, and any of them plays where it lies',
     tags: ['WebGL2', 'WebXR', 'archive', 'HLS'],
     // 298 thumbnails arrive as you look at them; a cold floor is a few seconds
@@ -256,14 +262,17 @@ export const DEMOS = [
   // Refs only — nothing is copied here. `demo/resources/build-corpus.mjs`
   // gathers it and folds in the shorter list `aikajana` plays from, and the
   // page re-checks that fold from the other end so the two cannot disagree.
-  { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archvie resourves"*): still built and deployed at
+  // /resources/, listed on /archive/ with the other retired pages.
+  { name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: true, unlisted: true,
     one: 'every reachable source for Erkki Kurenniemi\'s work, one row each',
     tags: ['archive', 'provenance'] },
   // The same corpus as the row above, on an axis instead of in a table: one
   // mark per record, as wide as its date is vague, and the twenty-six a browser
   // can open are pressable. Named for the thing you can hear, because that is
   // the reason it exists rather than the table.
-  { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+  { name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true, unlisted: true,
     one: 'every Erkki Kurenniemi recording that plays, laid end to end as one long tape',
     tags: ['timeline', 'uncertainty', 'archive'] },
   // The other archive, and it is the opposite kind of thing from the two rows
@@ -271,7 +280,9 @@ export const DEMOS = [
   // files WE hold, because mimproject.org has been down long enough that two
   // video sites were the last copies anybody could reach. Its corpus is a
   // separate file for exactly that reason — see `build-mimproject.mjs`.
-  { name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive making"*): still built and deployed at
+  // /making/, listed on /archive/ with the other retired pages.
+  { name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true, unlisted: true,
     one: 'the recordings and the pictures that outlived MIMproject\'s own website, shown from the table under whichever one you are looking at',
     tags: ['archive', 'provenance', 'R2'] },
   // 🔴 THE FIRST ROW IN ACT 6, `composition`, AND IT SITS HERE IN THE ARRAY
@@ -311,7 +322,8 @@ export const DEMOS = [
     tags: ['timeline', 'uncertainty', 'canvas'] },
   // The deck that gathered it, under its own name since 2026-09-14 — it was
   // called `kurenniemi` until the row above took that slug.
-  { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, page: '/proto/deck/',
+  // `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+  { name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false, unlisted: true, page: '/proto/deck/',
     one: "Erkki Kurenniemi's corpus on one deck, media from archive.org",
     tags: ['timeline', 'not shelled'] },
   // ⚠️ `megatimeline` IS OFF THE MENU AND STILL ON THE EDGE. The row is gone;
@@ -409,7 +421,9 @@ export const DEMOS = [
   // ⚠️ `xr` AND THE `WebXR` TAG WENT WITH IT. There is no Run in VR control to
   // scroll under a thumb any more, and a tag naming an API the page no longer
   // calls is a description that has drifted from the thing it describes.
-  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archvie videoradio"*): still built and deployed at
+  // /videoradio/, listed on /archive/ with the other retired pages.
+  { name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true, unlisted: true,
     gl: true, settleMs: 45000, lightSettleMs: 2000,
     one: 'a radio station fed through a granulator, playing itself',
     tags: ['WebGL2', 'Icecast', 'WebAudio', 'live'] },
@@ -499,7 +513,9 @@ export const DEMOS = [
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',
     tags: ['WebCodecs'] },
-  { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true,
+  // `unlisted: true` since 2026-10-13 (*"sorry, archvie partitur again"*): still built and deployed at
+  // /partitur/, listed on /archive/ with the other retired pages.
+  { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline whose light any other screen can show as a projection wall.',
     tags: [] },
   // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
@@ -774,7 +790,9 @@ export const DEMOS = [
   // ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
   // publisher itself (`waitForWhip`) before it presses, so the wake is paid
   // against the asserts before the press rather than against this number.
-  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, settleMs: 75000, lightSettleMs: 2000,
+  // `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+  // /stage/, listed on /archive/ with the other retired pages.
+  { name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, unlisted: true, settleMs: 75000, lightSettleMs: 2000,
     // \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
     // read *"two presses, one for the picture and one for the show"*, which the
     // 2026-09-25 transport rework made false twice over: the two presses are

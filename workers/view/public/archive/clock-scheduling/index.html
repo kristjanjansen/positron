@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 000</title>
+<title>POSITRON Scheduling</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/000, SCHEDULING, 2026-10-12. One idea: one pattern played two
@@ -30,7 +30,6 @@
   //
   // Nothing opens on a visit: the AudioContext, the ears and the pattern all
   // start on the first press of play.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
@@ -45,12 +44,11 @@
   const TIMER_IN = `${S}:timer:midi-in`, CARD_IN = `${S}:soundcard:midi-in`;
   const TIMER_OUT = `${S}:timer:audio-out`, CARD_OUT = `${S}:soundcard:audio-out`, SPK = `${S}:speaker:audio-in`;
 
-  const d = mount({ name: 'concept clock 000', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Scheduling', what: '', index: '/archive/', indexLabel: 'archive',
     // The cells under the title and the log alone at the foot, asked 2026-10-12:
     // *"move readouts to top"*.
     joined: false,
     readout: { 'timer median': 'ms', 'timer worst': 'ms', 'sound card median': 'ms', 'sound card worst': 'ms' } });
-  conceptNav('clock/000');
 
   // ── the pattern: one bar of eight steps, played eight times ─────────────
   const STEP = 250, BAR = 8 * STEP, LAPS = 8, LENGTH = BAR * LAPS;

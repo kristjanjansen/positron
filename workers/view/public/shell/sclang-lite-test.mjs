@@ -58,7 +58,7 @@
 //
 // ⚠️ 2026-10-13, THE GRAIN RING'S UGENS (GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames, BufDur), `%`, `.sqrt` and 'quoted'
-// symbols, for the grain ring (/archive/grain-ring/). MEASURED, 105 ok on the real module
+// symbols, for the grain ring (/concepts/sampler/060/). MEASURED, 105 ok on the real module
 // (84 before), then six sabotaged copies:
 //
 //   SendReply's replyID written after its cmdName           103/105, its layout
@@ -75,6 +75,14 @@
 //
 //   their opcodes swapped                                    105/106, that check
 //   their folds swapped                                      105/106, that check
+//
+// Then DelayC, LocalIn and LocalOut for the ring's echo (its Dub patch),
+// 114 ok, and four more sabotaged copies:
+//
+//   LocalIn's default not wrapped to its channel count       112/114, both LocalIn
+//   LocalIn's default written as an ordinary input           112/114, both LocalIn
+//   LocalOut's audio rate rule removed                       112/114, both refusals
+//   DelayC's first input rate rule removed                   113/114, that refusal
 //
 // ⚠️ WHAT NONE OF THEM CAN SEE: whether scsynth agrees. Opcode 0 for `*` is a
 // well formed file that loads and plays, louder; only the page's own meter
@@ -360,7 +368,7 @@ const { KEYED } = M;
 
 // ── the grain ring's UGens, added 2026-10-13 ─────────────────────────────────
 //
-// For the grain ring, /archive/grain-ring/. Every expected number below is read off the
+// For the grain ring, /concepts/sampler/060/. Every expected number below is read off the
 // class files of supercollider develop 1995490 (GrainUGens.sc, BufIO.sc,
 // Trig.sc, Osc.sc, Noise.sc, InOut.sc, InfoUGens.sc), not off this compiler.
 
@@ -465,6 +473,31 @@ const { KEYED } = M;
     r.ok && sr && sr.rate === 1 && byName(d, 'SinOsc').length === 1, r.ok ? `rate ${sr?.rate}` : r.message);
 }
 
+{
+  // The ring's echo, 2026-10-13: Delay.sc and InOut.sc at develop 1995490.
+  // LocalIn.ar(2) is one block, two outputs, and `argDefault.wrapExtend(2)`
+  // as its inputs, so two zeros; LocalOut is one block with no output whose
+  // inputs are the channels; DelayC is in, maxdelaytime, delaytime.
+  const { r, d } = def("{ var x = SinOsc.ar([300, 400]) * 0.1; var fb = LocalIn.ar(2); var t = DelayC.ar(x + fb * 0.5, 1.5, 0.375); LocalOut.ar(t); x + t }");
+  const li = d && byName(d, 'LocalIn'), lo = d && byName(d, 'LocalOut'), dc = d && byName(d, 'DelayC');
+  ok('NEGATIVE CONTROL: LocalIn.ar(2) is one block with two outputs and one default per channel as its inputs',
+    r.ok && li.length === 1 && li[0].outputs.length === 2 && li[0].inputs.length === 2 && ins(d, li[0]).join() === '0,0',
+    r.ok ? `${li.length} LocalIn, ${li[0]?.outputs.length} outputs, inputs ${li[0] ? ins(d, li[0]).join(' ') : ''}` : r.message);
+  ok('LocalOut.ar(two channels) is one block, no output, the two channels as its inputs',
+    r.ok && lo.length === 1 && lo[0].outputs.length === 0 && lo[0].inputs.length === 2 && ins(d, lo[0]).every((x) => x.startsWith('DelayC')),
+    r.ok ? `${lo.length} LocalOut, inputs ${lo[0] ? ins(d, lo[0]).join(' ') : ''}` : r.message);
+  ok('DelayC expands over two channels, each in, maxdelaytime 1.5, delaytime 0.375',
+    r.ok && dc.length === 2 && dc.every((b) => b.inputs.length === 3 && close(inp(d, b.inputs[1]), 1.5) && close(inp(d, b.inputs[2]), 0.375)),
+    r.ok ? dc.map((b) => ins(d, b).join(' ')).join(' | ') : r.message);
+  // Channels are at most 2 here, so wrapExtend is shown both ways: a default
+  // shorter than the count repeats, one longer is cut.
+  const { d: d2 } = def('{ var fb = LocalIn.ar(2, [0.25]); LocalOut.ar(fb); fb }');
+  const { d: d1 } = def('{ var fb = LocalIn.ar(1, [0.25, 0.5]); LocalOut.ar(fb); fb }');
+  const w = (dd) => { const b = dd && byName(dd, 'LocalIn')[0]; return b ? ins(dd, b).join(',') : 'did not compile'; };
+  ok('NEGATIVE CONTROL: LocalIn wraps its default to its channel count, as wrapExtend does',
+    w(d2) === '0.25,0.25' && w(d1) === '0.25', `2 channels of [0.25]: ${w(d2)}; 1 channel of [0.25, 0.5]: ${w(d1)}`);
+}
+
 // ── refusals, each with a line and a column ───────────────────────────────────
 
 const REFUSE = [
@@ -517,6 +550,11 @@ const REFUSE = [
   ['NEGATIVE CONTROL: BufWr.ar with a control rate phase, its own checkInputs', '{ BufWr.ar(SinOsc.ar, 0, LFSaw.kr(1)); SinOsc.ar }', 1, 3, /phase is control rate/],
   ['BufFrames at audio rate', '{ SinOsc.ar(BufFrames.ar(0)) }', 1, 13, /BufFrames\.ar does not exist/],
   ["a 'quoted symbol' left open", "{ SendReply.ar(Impulse.ar(4), '/x, [1]); SinOsc.ar }", 1, 31, /has to close on the same line/],
+  // the ring's echo
+  ['NEGATIVE CONTROL: LocalOut.ar of a number, which AbstractOut.checkInputs refuses at audio rate', '{ LocalOut.ar(0.5); SinOsc.ar }', 1, 3, /every channel it writes has to be audio rate/],
+  ['LocalOut.ar of a control rate signal', '{ LocalOut.ar(LFNoise1.kr(1)); SinOsc.ar }', 1, 3, /every channel it writes has to be audio rate/],
+  ['DelayC.ar of a control rate signal', '{ DelayC.ar(LFNoise1.kr(1), 0.2, 0.1) }', 1, 3, /first input is control rate/],
+  ['a LocalIn channel count that is a signal', '{ Mix(LocalIn.ar(SinOsc.kr(1))) }', 1, 7, /how many outputs it has/],
   ['a keyword a named control does not take', String.raw`{ SinOsc.ar(\x.kr(300, 0.1, spec: [20, 600], mull: 2)) }`, 1, 46, /no argument called mull/],
 ];
 for (const [name, src, line, col, re] of REFUSE) {

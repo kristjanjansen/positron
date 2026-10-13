@@ -39,12 +39,14 @@
 // is a number or one of Env's own shape names written as a symbol (`\lin`).
 // `//` and `/* */` comments, nested the way sclang nests them.
 //
-// SINCE 2026-10-13, FOR THE GRAIN RING (/archive/grain-ring/, concepts sampler/060 when it was written): `%` (opMod),
+// SINCE 2026-10-13, FOR THE GRAIN RING, /concepts/sampler/060/: `%` (opMod),
 // `.sqrt`, `.sin` and `.cos` (its equal power wet and dry), a 'quoted' symbol (sclang's other spelling of `\name`, and the only
 // one that can hold a `/`), and the UGens GrainBuf, BufWr, Phasor, SendReply,
 // Impulse, Dust, TRand, In, BufFrames and BufDur, each from its class file
-// (see `UGENS`). A line that is only a call, like `BufWr.ar(...)` or
-// `SendReply.ar(...)`, stays in the graph, as it does in sclang.
+// (see `UGENS`). Then, the same day, DelayC, LocalIn and LocalOut for the
+// ring's echo: a delay whose output comes back into its own input. A line
+// that is only a call, like `BufWr.ar(...)`, `SendReply.ar(...)` or
+// `LocalOut.ar(...)`, stays in the graph, as it does in sclang.
 //
 // 🔴 NAMED CONTROLS, `\name.kr(value, lag, spec: ...)`, ADDED 2026-09-30 so a
 // program can say which of its numbers a knob under the text may turn. The
@@ -149,7 +151,7 @@ export const UGENS = {
   Pan2:       { file: 'Pan.sc',     args: [['in', REQUIRED], ['pos', 0], ['level', 1]], outputs: 2, first: 'audio' },
   EnvGen:     { file: 'EnvGen.sc',  args: [['envelope', REQUIRED], ['gate', 1], ['levelScale', 1],
                                              ['levelBias', 0], ['timeScale', 1], ['doneAction', 0]] },
-  // ── added 2026-10-13 for the grain ring, /archive/grain-ring/. Read in
+  // ── added 2026-10-13 for the grain ring, /concepts/sampler/060/. Read in
   // supercollider develop 1995490 on 2026-10-13, the same commit as the rows
   // above. Four shapes the rows above do not have, each a field:
   //   `rates`   the methods the class really has; GrainBuf is `*ar` only and
@@ -182,6 +184,22 @@ export const UGENS = {
                 madd: true, chans: 'numChannels', rates: ['ar'], noAlias: true },
   SendReply:  { file: 'Trig.sc',    args: [['trig', 0], ['cmdName', '/reply'], ['values', REQUIRED], ['replyID', -1]],
                 inline: 'values', order: ['trig', 'replyID', '#cmdName', 'values'], outputs: 0, first: 'same' },
+  // ── added 2026-10-13 for the grain ring's echo (its Dub patch), read in
+  // supercollider develop 1995490 the same day. DelayC is `DelayN`'s
+  // `*ar { arg in = 0.0, maxdelaytime = 0.2, delaytime = 0.2, mul, add }`
+  // (Delay.sc; DelayC inherits it), whose `in.asAudioRateInput` is tighter
+  // here: an `.ar` delay of a control rate signal is refused, as a filter's is.
+  // LocalIn is `*ar { arg numChannels = 1, default = 0.0 }` whose `init` takes
+  // the count off the front and `inputs = argDefault.wrapExtend(numChannels)`
+  // (InOut.sc): `wrap` is that, one default per channel. LocalOut is
+  // `*ar { arg channelsArray }`, `multiNewList(['audio'] ++ channelsArray)`
+  // and `^0.0`, no output (InOut.sc); `AbstractOut.checkInputs` wants every
+  // channel at audio rate on `.ar`, which is `allAudio`. Its
+  // `replaceZeroesWithSilence` is not copied: a number into it is refused.
+  DelayC:     { file: 'Delay.sc',   args: [['in', 0], ['maxdelaytime', 0.2], ['delaytime', 0.2]], madd: true, first: 'same' },
+  LocalIn:    { file: 'InOut.sc',   args: [['numChannels', 1], ['default', 0]], chans: 'numChannels', inline: 'default', wrap: true },
+  LocalOut:   { file: 'InOut.sc',   args: [['channelsArray', REQUIRED]], inline: 'channelsArray', order: ['channelsArray'],
+                outputs: 0, allAudio: true },
 };
 
 /** `Env`'s class methods, from `Env.sc`, arguments and defaults verbatim. */
@@ -573,7 +591,9 @@ function compileOrThrow(src, name, bus = 0) {
         if (x.k === 'arr') throw new SclError(`${cls}'s ${spec.inline} is one array, and an array of arrays is not in this subset`, at);
         if (x.k !== 'num' && x.k !== 'sig') throw new SclError(`${describe(x)} cannot go into ${cls}'s ${spec.inline}`, at);
       }
-      fixed.set(spec.inline, { k: 'arr', items });
+      // LocalIn's `argDefault.wrapExtend(numChannels)`: one default per channel.
+      const n = spec.wrap ? fixed.get(spec.chans).v : items.length;
+      fixed.set(spec.inline, { k: 'arr', items: Array.from({ length: n }, (_, i) => items[i % items.length]) });
     }
     for (const k of ['cmdName']) {
       if (!names.includes(k)) continue;
@@ -622,6 +642,10 @@ function compileOrThrow(src, name, bus = 0) {
       if (cls === 'BufWr' && rate === RATE.sample) {
         if (rateOf(by.get('phase')) !== RATE.sample) throw new SclError(`BufWr.ar: its phase is ${RATE_WORD[rateOf(by.get('phase'))]} rate and has to be audio rate`, at);
         if (by.get('inputArray').items.some((x) => rateOf(x) !== RATE.sample)) throw new SclError('BufWr.ar: what it writes has to be audio rate', at);
+      }
+      // LocalOut's `AbstractOut.checkInputs`: at audio rate every channel is audio rate.
+      if (spec.allAudio && rate === RATE.sample && ins.some((x) => rateOf(x) !== RATE.sample)) {
+        throw new SclError(`${cls}.ar: every channel it writes has to be audio rate`, at);
       }
     } else {
       ins = vals;

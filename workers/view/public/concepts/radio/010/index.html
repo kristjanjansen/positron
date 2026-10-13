@@ -314,7 +314,7 @@
 
   // ── the dial: a slider whose every move is one event out of dial:value-out
   const dial = createSlider({ label: '', aria: 'tune', min: 0, max: 1, step: 0.001, value: tune,
-    ends: ['531', '1602'], onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
+    onInput: (v) => bay.send(DIAL_OUT, { of: 'param', name: 'tune', v }) });
   const scale = el('div', 'cc-scale');
   const marks = STATIONS.map((st) => {
     const m = el('span', 'cc-mark', st.short);
@@ -326,8 +326,10 @@
     const m = mix(tune);
     marks.forEach((el, i) => el.classList.toggle('on', m.st[i].clear > 0.5));
   }
+  // No labels on the dial since 2026-10-13 (*"rm labels"*): no 531 / 1602 ends
+  // and no station names under it; the marks still exist for paintScale, unshown.
   const fade = el('div', 'cc-dial');
-  fade.append(dial.el, scale);
+  fade.append(dial.el);
   paintScale();
 
   const tunerBlock = el('div', 'cc-tuner');

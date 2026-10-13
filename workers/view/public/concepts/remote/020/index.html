@@ -8,14 +8,9 @@
 <title>Collide here and on the Pi</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The two waves at half width each, here on the left and the Pi on the
-     right (asked 2026-10-12, *"1/2 videpanel with wave on left, pi wave on
-     right"*). Side by side on a desk, never stacked there; stacked on a phone,
-     here first. The same pair rule as /concepts/shader/000/. */
-  .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-  @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
-  .cc-pair canvas { display: block; width: 100%; height: 100%; }
-  .cc-say { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; }
+  /* The path choice alone at the top left, as /concepts/remote/030/'s row
+     (that page has its play button beside it; here a key is the start). */
+  .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 </style>
 <script type="module">
   import { conceptNav, CODE_ROWS } from '/concepts/nav.mjs';
@@ -25,7 +20,8 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
-  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createOverlayScope } from '/concepts/remote/overlay-scope.mjs';
+  import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/concepts/remote/path.mjs';
   import { createCodeBox } from '/shell/code-box.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
@@ -42,7 +38,7 @@
   //
   // 🔴 THE PI SIDE IS THE REAL BOARD WHEN ONE ANSWERS, AND SIMULATED IN THIS TAB
   // WHEN NONE DOES, and the page says which on the Pi node's label and in the
-  // right panel's footer (`checking`, `relay`, `direct` or `simulated`).
+  // `path` cell (`relay`, `direct`, `turn` or `simulated`).
   // `createPiSide` below is the one place the board goes in (2026-10-12,
   // plans/plan-pi-supercollider-defs.md steps 3 and 5).
   //
@@ -78,8 +74,12 @@
     // The four cells under the title, the log alone at the foot (*"readings on
     // top"*), as /concepts/remote/030/ does.
     joined: false,
-    readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms' },
+    // `network` and `path` came 2026-10-13 with the direct option, the two
+    // cells remote/010 shows for its link (an even count, as the shell asks).
+    readout: { 'local lag': 'ms', 'local spread': 'ms', 'Pi lag': 'ms', 'Pi spread': 'ms', network: 'ms', path: '' },
   });
+  hintCell(d, 'network', NETWORK_HINT);
+  hintCell(d, 'path', PATH_HINT);
   conceptNav('remote/020');
 
   // ── the Pi side: THE ONE PLACE THE REAL BOARD GOES IN ────────────────────
@@ -149,7 +149,13 @@
 
   /** How long a board has to answer `audio.status` before the Pi side is simulated. */
   const ASK_MS = 3000;
-  const PATH = new URLSearchParams(location.search).get('path') === 'direct' ? 'direct' : 'relay';
+  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
+  // instruments."* The same choice, cell and fall back as remote/010 and 030
+  // (`/concepts/remote/path.mjs`): the relay unless `?path=direct`; direct is a
+  // WebRTC link to the board offered once it answers, the relay kept for
+  // presence and as the fall back when no channel opens in 3 s or it drops.
+  // A change of choice makes a new board on the new path (`switchPath`).
+  const path = createPathChoice({ log: d.log, onPick: (m) => switchPath(m) });
   /**
    * The board if one answers, the simulation if none does. `mode()` is
    * `checking` until it is decided, then `relay`, `direct`, `turn` or
@@ -162,7 +168,7 @@
     const real = () => mode !== 'idle' && mode !== 'checking' && mode !== 'simulated';
     async function tryBoard(ctx) {
       board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
-        direct: PATH === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+        direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
       kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
       // A harness may not drive the board (`createBoard`'s guard), so it is
       // simulated under a check without a word on the wire.
@@ -178,7 +184,15 @@
       const st = await kit.start();
       if (!st?.ok) return `the board did not start its collide engine: ${st?.reason ?? 'no answer'}`;
       if (!await board.startAudio()) return 'the board\'s sound cannot be played in this page\'s audio';
-      const via = PATH === 'direct' ? await board.goDirect() : 'relay';
+      let via = 'relay';
+      if (path.mode() === 'direct') {
+        // The direct path before the program and the first note, so a phrase
+        // never starts on the relay and switches. It falls back after 3 s.
+        log('Pi: opening a direct path to the board');
+        path.connecting(true);
+        try { via = await board.goDirect(); } finally { path.connecting(false); }
+        if (via === 'relay' || via === 'refused') path.fellBack();
+      }
       loaded = await kit.load('collide', PROGRAM);
       if (!loaded?.ok) return `the board did not take the program: ${loaded?.reason ?? 'no answer'}${loaded?.line ? ` at line ${loaded.line}` : ''}`;
       log(`the board compiled the program to ${loaded.bytes} bytes in ${loaded.compileMs} ms, ${loaded.same ? 'the same bytes as this tab' : 'DIFFERENT bytes from this tab'}`, loaded.same ? 'hi' : 'bad');
@@ -204,6 +218,14 @@
         return waking;
       },
       out: () => (real() ? board.playout() : sim.out()),
+      /** Leave the board, so the next `wake` makes a new one (a change of path). */
+      reset() {
+        if (!real()) return false;
+        try { kit?.panic?.(); } catch { /* closing */ }
+        try { board.playout()?.disconnect(); } catch { /* not connected */ }
+        board.close(); board = null; kit = null; loaded = null; waking = null; say('idle');
+        return true;
+      },
       // While it is still being decided a key goes to the simulation, which
       // holds it until its engine is up and drops it if it never wakes.
       noteOn: (note, vel) => (real() ? kit.noteOn('collide', note, vel) : sim.noteOn(note, vel)),
@@ -333,13 +355,14 @@
       mixBuf = new Float32Array(mixMeter.fftSize);
       for (const s of Object.values(SIDES)) {
         s.gain = ctx.createGain(); s.gain.gain.value = 0; s.gain.connect(mix);
-        s.an = ctx.createAnalyser(); s.an.fftSize = 2048; s.an.connect(pull);
+        // 32768 samples, 0.68 s: long enough to still hold a note's onset when
+        // the Pi's copy of it arrives a few hundred ms after the key.
+        s.an = ctx.createAnalyser(); s.an.fftSize = 32768; s.an.connect(pull);
         s.buf = new Float32Array(s.an.fftSize);
         // 1024 samples, 21 ms at 48 kHz: short, so an onset is seen early.
         s.meter = ctx.createAnalyser(); s.meter.fftSize = 1024; s.meter.connect(pull);
         s.mbuf = new Float32Array(s.meter.fftSize);
       }
-      requestAnimationFrame(frame);
     }
     ctx.resume();
     // The Pi side may take seconds to decide (a board that never answers is
@@ -399,6 +422,7 @@
       timeNote(performance.now());
       bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 100 });
       if (!on) start();
+      hold();
     },
     onUp: (note, how) => { if (how === 'midi') return; bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: note, d2: 0 }); },
   });
@@ -417,54 +441,56 @@
   }));
   const grid = createKnobGrid(knobs, { row: true });
 
-  // ── the two waves, each in a video panel at half width ───────────────────
-  const W = 640, H = 360;
-  function wavePanel(name, foot) {
-    const canvas = el('canvas');
-    canvas.width = W; canvas.height = H;
-    const footEl = el('span', 'cc-say', foot);
-    const panel = createVideoPanel({ media: canvas, left: el('span', 'cc-say', name), right: footEl });
-    return { panel, g: canvas.getContext('2d'), foot: footEl };
+  // ── one scope, both waves on it, each held from its own note's onset ────
+  // Asked 2026-10-13: *"overlay 2 waves on top of each other, full w"*. The
+  // scope, what was measured before it and how each side's onset is found are
+  // in /concepts/remote/overlay-scope.mjs, shared with remote/040 since the
+  // same day. Here a key is the trigger, the window is 1024 samples (21 ms at
+  // 48 kHz, about four cycles of A3) and the Pi's window may slide 20 ms (960
+  // samples, a period of the lowest key) to its best match.
+  const overlay = createOverlayScope({ win: 1024, slide: 960, axis: '21 ms' });
+  const scope = overlay.wave, held = overlay.held, captures = overlay.captures;
+  const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
+  const sideAn = (s) => () => (s.an && s.voice.out() && scoped(s) ? s.an : null);
+  /** A key went down: take each side's window from its own onset, once it has one. */
+  function hold() {
+    if (!ctx) return;
+    overlay.hold({ ctx, at: ctx.currentTime, sides: { local: sideAn(SIDES.local), pi: sideAn(SIDES.pi) } });
   }
-  const left = wavePanel('SuperCollider here', 'this tab');
-  const right = wavePanel('SuperCollider on the Pi', 'not asked yet');
-  /** Which Pi is live, on the right panel's footer and the Pi node's label. */
+
+  // ── which Pi, on the Pi node's label and the `path` and `network` cells ─
+  const isPi = (l) => l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`);
+  function pathCells() {
+    const b = pi.board(), via = b && !pi.simulated ? b.stats().via : null;
+    d.set('path', via ?? (pi.mode() === 'simulated' ? 'model' : ''));
+    const rtt = via ? b.stats().rttMs : null;
+    d.set('network', Number.isFinite(rtt) ? Math.round(rtt) : '');
+  }
   function showMode(m) {
-    const word = m === 'simulated' ? 'simulated' : m === 'checking' ? 'checking' : m;
-    if (right.foot) right.foot.textContent = word;
     // No longer than the real label: the bay's column is as wide as its widest
     // box, and `SuperCollider on the Pi, simulated` widened the Pi's column
-    // enough to push the patchbay 11 px past its box at 1280 (2026-10-12). The
-    // title already says `pi-1`.
+    // enough to push the patchbay 11 px past its box at 1280 (2026-10-12).
     piNode.label = m === 'simulated' ? 'SuperCollider, simulated' : 'SuperCollider on the Pi';
+    pathCells();
     pb.refresh();
   }
-  const css = getComputedStyle(document.documentElement);
-  const colour = (n, f) => css.getPropertyValue(n).trim() || f;
-  const INK = colour('--hi', '#f5c84c'), GROUND = colour('--card2', '#151a24'), LINE = colour('--line', '#2a3140');
-  function draw(g, s) {
-    g.fillStyle = GROUND; g.fillRect(0, 0, W, H);
-    const scoped = on && bay.links().some((l) => l.from === s.from && l.to === s.scope);
-    if (!scoped) return;
-    s.an.getFloatTimeDomainData(s.buf);
-    const WINDOW = 512, FULL = 0.5;
-    let i0 = 0;
-    for (let i = 1; i < s.buf.length - WINDOW; i++) if (s.buf[i - 1] < 0 && s.buf[i] >= 0) { i0 = i; break; }
-    g.fillStyle = LINE; g.fillRect(0, H / 2, W, 1);
-    g.strokeStyle = INK; g.lineWidth = 2; g.beginPath();
-    for (let i = 0; i < WINDOW; i++) {
-      const v = Math.max(-1, Math.min(1, s.buf[i0 + i] / FULL));
-      const x = i / (WINDOW - 1) * W, y = H / 2 - v * (H / 2 - 12);
-      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+  // The wire each Pi link rides, and the fall back when direct drops.
+  setInterval(() => {
+    const b = pi.board();
+    if (b && !pi.simulated) {
+      const via = b.stats().via;
+      if (path.rewire(bay, via, isPi, d.log)) pb.refresh();
+      if (path.mode() === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); path.fellBack(); }
     }
-    g.stroke();
+    pathCells();
+  }, 500);
+  /** A new choice while the board is joined: leave it and join again on the new path. */
+  async function switchPath() {
+    if (!ctx || !pi.reset()) return;   // not joined yet, or simulated: the next wake reads the choice
+    path.reset();
+    await pi.wake(ctx);
+    route(); pb.refresh();
   }
-  function frame() {
-    draw(left.g, SIDES.local);
-    draw(right.g, SIDES.pi);
-    requestAnimationFrame(frame);
-  }
-  draw(left.g, SIDES.local); draw(right.g, SIDES.pi);
 
   // ── the page ─────────────────────────────────────────────────────────────
   const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
@@ -474,15 +500,15 @@
   // move leaves on `web:fader:value-out` and reaches the sound only over its link.
   const fader = createSlider({ label: '', aria: 'crossfade between here and the Pi', min: 0, max: 1, step: 0.01, value: x,
     ends: ['here', 'Pi'], onInput: (v) => bay.send(ID('fader', 'value-out'), { of: 'param', name: 'x', v }) });
-  const pair = el('div', 'cc-pair');
-  pair.append(left.panel.el, right.panel.el);
+  const top = el('div', 'cc-top');
+  top.append(path.el);
   // The program both sides run, read only; a sixth of its height as on 090.
   const lines = PROGRAM.split('\n').length;
   const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program both synths play, read only' });
   code.input.readOnly = true;
   // Knobs above the code (*"when there are code and knobs on concepts, move knobs on top of code"*).
-  d.stack.add(pair, fader.el, grid.el, code.el, host, pb.el);
+  d.stack.add(top, scope.el, fader.el, grid.el, code.el, host, pb.el);
 
   const samplesOf = (s) => () => { if (!s.an) return []; s.an.getFloatTimeDomainData(s.buf); return Array.from(s.buf); };
   window.__demo.knobs = grid;
@@ -496,6 +522,7 @@
     notesIn: () => notesIn, piNotesIn: () => piNotesIn, paramSends: () => paramSends, piParamSends: () => piParamSends,
     samples: samplesOf(SIDES.local), piSamples: samplesOf(SIDES.pi),
     code: PROGRAM,
+    path: () => path.mode(), scope, held, captures,
   };
   d.ready();
 </script>

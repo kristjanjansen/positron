@@ -23,7 +23,7 @@
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
   /* The word on the picture's plate is read against a picture, so full ink. */
-  .pos-vp-tag > .cc-proto { color: var(--fg); }
+  .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -128,7 +128,8 @@
   // are in the row's hover beside the codec and the decoded and dropped counts.
   const R = createPicture();
   const state = el('span', 'cc-say', '');
-  const loopPanel = createVideoPanel({ media: R.c, left: state, values: [
+  const leftW = el('span', 'cc-left'); leftW.append(el('span', 'cc-say cc-proto', 'WebRTC '), state);
+  const loopPanel = createVideoPanel({ media: R.c, left: leftW, values: [
     { key: 'warmup', label: 'warmup', reserve: 5 },
     { key: 'delay', label: 'delay', reserve: 5 },   // `90 ms`, `1.2 s`: 6 scrolled the row 2 px at 1280
     { key: 'rate', label: 'kbit/s', reserve: 4 },
@@ -137,7 +138,9 @@
   // 🔴 THE PICTURE SAYS WEBRTC, ALWAYS, EVEN STOPPED. Reported 2026-10-12:
   // *"not clear that this is webrtc"*. On the panel's own tag plate, top left
   // of the picture, where it stays in full screen.
-  loopPanel.slots.tag.append(el('span', 'cc-say cc-proto', 'WebRTC'));
+  // The protocol's name is the footer's first word, not a plate over the picture
+  // (asked 2026-10-13: *"rm labels on top of videos in loopback demos. move them
+  // to videopanel fooers"*).
 
   const pair = el('div', 'cc-pair');
   pair.append(camera.panel.el, loopPanel.el);

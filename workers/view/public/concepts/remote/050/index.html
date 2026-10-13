@@ -33,6 +33,7 @@
   import { createBoard } from '/shell/board.mjs';
   import { createBoardVideo, BOARD_VIDEO_ASK } from '/shell/board-video.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT, viaOf } from '/concepts/remote/path.mjs';
 
   // /concepts/shader/000/ plus the Raspberry Pi drawing the same shader.
   // Asked 2026-10-12 (BACKLOG, "shader/010"): *"can you do mirror shader
@@ -69,9 +70,27 @@
   const d = mount({
     name: 'Mirror shader here and on the Pi', what: '', index: '/concepts/', indexLabel: 'concepts',
     joined: false,
-    readout: { 'local fps': 'fps', 'local lag': 'ms', 'Pi fps': 'fps', 'Pi lag': 'ms' },
+    // `network` and `path` came 2026-10-13 with the direct option, the two
+    // cells remote/010 shows for its link (an even count, as the shell asks).
+    readout: { 'local fps': 'fps', 'local lag': 'ms', 'Pi fps': 'fps', 'Pi lag': 'ms', network: 'ms', path: '' },
   });
   conceptNav('remote/050');
+  hintCell(d, 'network', NETWORK_HINT);
+  hintCell(d, 'path', PATH_HINT);
+
+  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
+  // instruments."* The same choice, cell and fall back as remote/010 and 030
+  // (`/concepts/remote/path.mjs`): the relay unless `?path=direct`. Direct is a
+  // WebRTC link to the board's main socket, offered once the board answers;
+  // the knob and the program then leave on its `ctl` channel, and the PICTURE
+  // comes on a third channel `vid`, ordered and reliable, as remote/010's
+  // camera does on `cam` (a decoder fed a frame with a hole is broken to the
+  // next keyframe, so not `pcm`, which never retransmits, and not `ctl`, which
+  // is unordered). The board cuts each frame into 16 KB pieces
+  // (rig/board/board.mjs `video.direct`, camera.mjs `framePieces`). The relay
+  // room stays open for the board's own messages and is where the picture
+  // falls back to when the link drops or no channel opens in 3 s.
+  const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
 
   // ── the program, as on 000 ───────────────────────────────────────────────
   const VS = `#version 300 es
@@ -371,7 +390,7 @@ void main(){
     const sim = createSimulatedPi({ onReply, onShown });
     let mode = 'simulated', board = null, started = false, renderer = '', reason = null;
     const say = (m) => { mode = m; onMode(m); };
-    const real = () => mode === 'relay';
+    const real = () => mode === 'relay' || mode === 'direct' || mode === 'turn';
     const probe = document.createElement('canvas');
     probe.width = PROBE_W; probe.height = PROBE_H;
     const pctx = probe.getContext('2d', { willReadFrequently: true });
@@ -420,8 +439,64 @@ void main(){
     /** A change made here; the earliest one not yet seen in the picture is the one timed. */
     const mark = (what, at) => { if (!pending) pending = { what, at }; };
 
+    // ── the picture on the direct link ──────────────────────────────────
+    // `picPath` is where the frames come from: `relay` (the video room) or
+    // `direct` (the `vid` channel). Pieces of one frame are joined back into
+    // the board's frame format and fed to the same decoder.
+    let vid = null, picPath = 'relay', pieces = [], pieceSeq = -1, directFrames = 0;
+    function onVid(data) {
+      if (!(data instanceof ArrayBuffer) || data.byteLength < 8) return;
+      const dv = new DataView(data);
+      const seq = dv.getUint32(0, true), flags = dv.getUint32(4, true);
+      if (seq !== pieceSeq) { pieces = []; pieceSeq = seq; }
+      pieces.push(new Uint8Array(data, 8));
+      if (flags & 2) return;
+      const n = pieces.reduce((a, p) => a + p.byteLength, 0);
+      const out = new Uint8Array(8 + n);
+      const ov = new DataView(out.buffer);
+      ov.setUint32(0, seq, true); ov.setUint32(4, flags & 1, true);
+      let o = 8; for (const p of pieces) { out.set(p, o); o += p.byteLength; }
+      pieces = []; pieceSeq = -1;
+      directFrames++;
+      video.feed(out.buffer);
+    }
+    /** Ask the board for the picture on the direct link. True when it comes there. */
+    async function pictureDirect() {
+      const dc = board?.channel('vid', { ordered: true });
+      if (!dc) return false;
+      vid = dc;
+      dc.onmessage = (e) => { if (vid === dc) onVid(e.data); };
+      dc.onclose = () => { if (vid === dc) pictureRelay('its channel closed'); };
+      if (dc.readyState !== 'open') await new Promise((r) => { dc.onopen = r; setTimeout(r, 3000); });
+      if (vid !== dc || dc.readyState !== 'open') { if (vid === dc) vid = null; try { dc.close(); } catch { /* */ } return false; }
+      const r = await board.askDirect({ type: 'video.direct' }, 'video.direct', 3000);
+      if (vid !== dc) return false;
+      if (!r?.ok) {
+        vid = null; try { dc.close(); } catch { /* */ }
+        log(`Pi: the picture stays on the relay: ${r ? r.why : 'the board did not answer on the direct link'}`, 'warn');
+        return false;
+      }
+      picPath = 'direct';
+      video.socketFrames(false);
+      video.expectKey();
+      log('Pi: the picture comes on the direct link now, the relay carries only the board\u2019s messages', 'hi');
+      return true;
+    }
+    /** Back to the relay for the picture: the channel closed, the link dropped, or the page left. */
+    function pictureRelay(why) {
+      const dc = vid; vid = null;
+      try { dc?.close(); } catch { /* */ }
+      pieces = []; pieceSeq = -1;
+      if (picPath !== 'direct') return;
+      picPath = 'relay';
+      video.socketFrames(true);
+      video.expectKey();
+      if (why) log(`Pi: the picture is back on the relay, ${why}`, 'warn');
+    }
+
     async function tryBoard() {
       board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, log: (line, kind) => log(`Pi: ${line}`, kind),
+        direct: path.mode() === 'direct',
         onMessage: (m) => {
           if (!real()) return;
           if (m.type === 'video.params' || m.type === 'video.shader.applied') onReply(m);
@@ -445,7 +520,17 @@ void main(){
       const r = video.open(st.room, st);
       if (!r.ok) return r.reason;
       log(`Pi: the board is drawing ${st.w}x${st.h} at ${st.fps} a second${started ? ', started by this page' : ''}`, 'hi');
-      return { st };
+      let via = 'relay';
+      if (path.mode() === 'direct') {
+        // The direct link, then the picture on it. It falls back to the relay
+        // after 3 s with no channel, and the picture stays on the relay if the
+        // board will not put it on the link.
+        log('Pi: opening a direct path to the board');
+        path.connecting(true);
+        try { via = await board.goDirect(); } finally { path.connecting(false); }
+        if (via === 'relay' || via === 'refused') { via = 'relay'; path.fellBack(); } else await pictureDirect();
+      }
+      return { st, via };
     }
     async function join(segments, body) {
       if (mode !== 'simulated') return mode;
@@ -459,7 +544,8 @@ void main(){
         return mode;
       }
       reason = null; prev = null; calm = []; pending = null; lags.length = 0;
-      say('relay');
+      board.watchRtt(2000);
+      say(r.via);
       // What this page shows goes to the board at once, so the two pictures
       // start from one program and one segment count, as /mirror/ does on start.
       board.send({ type: 'video.params', mirrors: segments });
@@ -474,19 +560,36 @@ void main(){
     }
     function leave(stop = true) {
       if (mode === 'simulated') return;
+      pictureRelay(null);
       const was = video.close();
       if (stop && started) board?.send({ type: 'video.stop' });
       log(`Pi: left after ${was.decoded} frames decoded, ${was.lost} lost${started && stop ? ', and the picture this page started was stopped' : ''}`);
       started = false; pending = null;
       clearTimeout(heldTimer); heldTimer = null; held = null; drawing = false;
-      setTimeout(() => { board?.close(); board = null; }, 300);
+      // This board, not whichever one `board` names in 300 ms: a change of
+      // path joins a new one straight away.
+      const b = board; board = null;
+      b?.watchRtt(0);
+      setTimeout(() => b?.close(), 300);
       say('simulated');
+    }
+    /** Leave and join again on the path now chosen, keeping whether this page started the picture. */
+    async function rejoin(segments, body) {
+      if (!real()) return;
+      const was = started;
+      leave(false);
+      await join(segments, body);
+      started ||= was;
     }
     return {
       view: sim.view,
       get simulated() { return !real(); },
       get ok() { return real() || sim.ok; },
-      mode: () => mode, reason: () => reason, join, leave, lags: () => lags.slice(),
+      mode: () => mode, reason: () => reason, join, leave, rejoin, lags: () => lags.slice(),
+      /** Where the picture comes from now, and how many frames came on the direct link. */
+      picture: () => (real() ? picPath : null), directFrames: () => directFrames,
+      /** The direct link dropped (board.mjs fell back): the picture follows it. */
+      dropped() { pictureRelay('the direct link dropped'); },
       board: () => board, video,
       renderer: () => (real() ? renderer : sim.renderer()),
       seg: sim.seg,
@@ -590,11 +693,12 @@ void main(){
   });
   /** The right panel's footer and the Pi node's label say which Pi this is. */
   function showMode(m) {
-    if (m === 'relay') piName.textContent = `${shortName(pi.renderer()) || 'v3dpipe'}, Raspberry Pi`;
+    const isReal = m === 'relay' || m === 'direct' || m === 'turn';
+    if (isReal) piName.textContent = `${shortName(pi.renderer()) || 'v3dpipe'}, Raspberry Pi`;
     else if (m === 'checking') piName.textContent = 'asking the Pi';
     else piName.textContent = pi.ok ? `${shortName(pi.renderer())}, simulated Pi` : 'simulated Pi, no WebGL2';
-    if (piNode) { piNode.label = m === 'relay' ? 'v3dpipe on the Pi' : 'v3dpipe on the Pi, simulated'; pb?.refresh(); }
-    join?.setIcon('pi', m === 'relay' ? 'stop' : 'board', m === 'relay' ? 'leave the Pi, back to the simulation' : 'show the real Pi\u2019s picture');
+    if (piNode) { piNode.label = isReal ? 'v3dpipe on the Pi' : 'v3dpipe on the Pi, simulated'; pb?.refresh(); }
+    join?.setIcon('pi', isReal ? 'stop' : 'board', isReal ? 'leave the Pi, back to the simulation' : 'show the real Pi\u2019s picture');
     d.set('Pi lag', '');
   }
   let piNode = null, pb = null, join = null;
@@ -644,7 +748,8 @@ void main(){
     { id: PI('program-in'), dir: 'in', medium: 'program', shape: PROG_SHAPE, deliver: (e) => {
       pi.send({ type: 'video.shader', body: bodyOf(e.source) }, e.at);
     } },
-    { id: PI('video-out'), dir: 'out', medium: 'video', transports: ['relay-h264'] },
+    // The relay's H.264 room, or the `vid` data channel on the direct link.
+    { id: PI('video-out'), dir: 'out', medium: 'video', transports: ['relay-h264', 'datachannel'] },
     { id: ID('screen-pi', 'video-in'), dir: 'in', medium: 'video' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
@@ -756,8 +861,50 @@ void main(){
   ] });
   showMode(pi.mode());
   const top = el('div', 'cc-top');
-  top.append(join.el);
+  top.append(join.el, path.el);
   d.stack.add(top, pair, grid.el, code.el, pb.el);
+
+  // ── the path: the wire each Pi link rides, the two cells, the fall back ──
+  // The knob and the program ride `datachannel` while the link is direct; the
+  // picture rides `datachannel` only while its own frames come on `vid`, else
+  // the relay's H.264 room. The `path` cell names the picture's path when it
+  // differs from the link's (`direct, picture relay`), as remote/010 does for
+  // its camera.
+  const PIC_LINK = (l) => l.from === PI('video-out');
+  let picVia = null;
+  function wirePicture(p) {
+    const via = p === 'direct' ? 'datachannel' : 'relay-h264';
+    if (via === picVia) return;
+    picVia = via;
+    for (const l of bay.links()) {
+      if (!PIC_LINK(l)) continue;
+      bay.unlink(l.id);
+      const r = bay.link(l.from, l.to, [], { via });
+      if (!r.ok) d.log(`${l.from} -> ${l.to} via ${via} refused: ${r.why}`, 'warn');
+    }
+    pb.refresh();
+  }
+  const isPiControl = (l) => !PIC_LINK(l) && (l.from.startsWith(`${BOARD_SITE}:`) || l.to.startsWith(`${BOARD_SITE}:`));
+  setInterval(() => {
+    const b = pi.board();
+    if (pi.simulated || !b) { d.set('network', ''); d.set('path', pi.mode() === 'simulated' && pi.reason() ? 'model' : ''); wirePicture('relay'); return; }
+    const via = b.stats().via;
+    if (via === 'relay' && pi.picture() === 'direct') pi.dropped();
+    if (path.mode() === 'direct' && via === 'relay') { d.log('the direct path dropped, the relay carries everything now', 'warn'); path.fellBack(); }
+    if (path.rewire(bay, via, isPiControl, d.log)) pb.refresh();
+    wirePicture(pi.picture());
+    const word = viaOf(via) === 'relay' ? 'relay' : via;
+    const pic = pi.picture();
+    d.set('path', pic && (pic === 'direct') !== (word !== 'relay') ? `${word}, picture ${pic}` : word);
+    const rtt = b.stats().rttMs;
+    d.set('network', Number.isFinite(rtt) ? Math.round(rtt) : '');
+  }, 500);
+  /** A new choice while the real Pi is shown: leave it and join again on the new path. */
+  async function switchPath() {
+    if (pi.simulated) return;          // the next press of the board button reads the choice
+    path.reset();
+    await pi.rejoin(Math.round(knob.value()), lastGood && bodyOf(lastGood));
+  }
 
   // The knob's starting value goes over both wires, so the first N either
   // side sees came along a link.
@@ -766,7 +913,7 @@ void main(){
 
   window.__demo.knobs = grid;
   window.__demo.shader = {
-    knob, code, idle, pi, bay, replies, lags, join,
+    knob, code, idle, pi, bay, replies, lags, join, path: () => path.mode(),
     model: { UP_MS, DOWN_MS, PI_FPS, PI_W, PI_H },
     size: [W, H],
     source: () => (fsShader ? gl.getShaderSource(fsShader) : null),

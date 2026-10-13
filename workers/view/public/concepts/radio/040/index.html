@@ -28,8 +28,10 @@
   .cc-kb-host .k.ai .kd::after { box-shadow: inset 0 0 0 1px #4a5568; }
   /* Asked: *"only circles that autoplay plays are yellow-bordered. when on
      autoplay keep thay hellow. others grayer"*. The rest of the key's notes
-     stay grey rings; the notes of the chord autoplay is holding, in every
-     octave, are yellow rings for as long as the chord lasts. */
+     stay grey rings; the notes of the chord autoplay is holding are yellow
+     rings for as long as the chord lasts. Since 2026-10-13 the chord is
+     voiced to move least, so the rings are the exact notes the pad plays, not
+     the chord's letters in every octave. */
   .cc-kb-host .k.ai.cc-auto .kd::after { box-shadow: inset 0 0 0 1px var(--hi); }
   /* The footer's labels in the kit's form label style, `.pos-field-l`'s
      declarations (asked: *"use std form label styling"*). */
@@ -56,6 +58,7 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { chooseChord, voiceLead, chromaEase } from './autoplay.mjs';
 
   // concepts radio/040, KEY, 2026-10-11. /concepts/radio/030/ with the tempo
   // detector swapped for a key detector. Asked: *"010 key dertect, live
@@ -434,11 +437,28 @@
   }
 
   // ── autoplay ────────────────────────────────────────────────────────────
-  // While ticked, the pad plays chords in the key the footer names, four
-  // seconds each: the home chord, then the ones built on the sixth, fourth and
-  // fifth notes of the scale, round again. It follows the key when it changes,
-  // and waits silently while there is no key yet.
-  const AUTO_STEPS = [0, 5, 3, 4], AUTO_S = 4, AUTO_CH = 2;
+  // While ticked, the pad plays a chord of the key the footer names every
+  // AUTO_S seconds, and at once when the key changes; it waits silently while
+  // there is no key yet. Until 2026-10-13 that was a fixed I vi IV V loop in
+  // root position, restarting on I at every key change, and the owner's word
+  // for it was *"it feels repeating same chords all the time"*. Now (both
+  // halves are pure functions in ./autoplay.mjs, graded by autoplay-test.mjs):
+  // 1. The chord follows the radio: of the key's seven triads, the one whose
+  //    notes hold most of what the station sounded over the last CHORD_TAU_S
+  //    seconds, with a small lean to I, IV, V and vi and a small cost for
+  //    repeating the chord sounding. That chroma is the detector's half second
+  //    picture, arriving on autoplay's value-in with the key, eased here; the
+  //    detector's 30 s sum is for the key and is not used for the chord. When
+  //    the key's confidence is low or the chroma is flat, it walks I IV V vi.
+  // 2. Each chord is voiced as the inversion inside PAD_LO..PAD_HI that moves
+  //    the three voices least from the chord before, so shared notes hold.
+  //    The bass keeps the chord's root, as before.
+  // Bar lines from a tempo detector are a later step; AUTO_S stays.
+  const AUTO_S = 4, AUTO_CH = 2, CHORD_TAU_S = 3;
+  // The pad's three voices stay inside the drawn keyboard (C3 to B4) with room
+  // under them for the bass; a first chord sits in root position nearest C4.
+  const PAD_LO = 52, PAD_HI = 71, PAD_HOME = 60;
+  const PAD_RANGE = { lo: PAD_LO, hi: PAD_HI, home: PAD_HOME };
   // Asked: *"cinfidence level -> note volime?"*, then *"do steeper but have
   // ineria not to be annoying"*. Autoplay's loudness is CC 11 on its own
   // channel, a level and not a velocity, so a chord already sounding swells
@@ -455,7 +475,11 @@
     const v = Math.round(autoExpr * 127);
     if (v !== autoExprSent) { autoExprSent = v; for (const port of [AUTO_OUT, AUTO_BASS]) bay.send(port, { cls: 'cc', ch: AUTO_CH, d1: 11, d2: v }); }
   }
-  let autoTimer = null, autoAt = 0, autoHeld = [], autoBassNote = null;
+  let autoTimer = null, autoHeld = [], autoBassNote = null;
+  // The step and the voiced notes sounding now (or last), what the next
+  // choice and the next voicing are made against, and the station's last few
+  // seconds of pitch classes.
+  let autoStep = null, autoVoiced = null, autoHow = null, autoChroma = new Array(12).fill(0), autoChromaAt = null;
   // Which drawn key is which note: read once off the names the keys print
   // (`C3`, `C♯3`), because the keyboard publishes no element per note.
   const PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -466,30 +490,37 @@
   }
   function autoMark(notes) {
     for (const k of keyEls.values()) k.classList.remove('cc-auto');
-    for (const n of notes) for (const o of [-12, 0, 12]) keyEls.get(n + o)?.classList.add('cc-auto');
+    for (const n of notes) keyEls.get(n)?.classList.add('cc-auto');
   }
   // The last key reading that arrived on autoplay's value-in. A new key
   // restarts the chord cycle, or moves the preview.
   let autoReading = null;
   function autoKey(ev) {
     if (ev?.of !== 'param' || ev.name !== 'key') return;
+    // The chroma comes with every reading, about ten a second, and is eased
+    // over CHORD_TAU_S on the clock it arrives by.
+    if (Array.isArray(ev.chroma) && ev.chroma.length === 12) {
+      const now = performance.now() / 1000;
+      chromaEase(autoChroma, ev.chroma, autoChromaAt == null ? 0.1 : Math.min(1, now - autoChromaAt), CHORD_TAU_S);
+      autoChromaAt = now;
+    }
     const moved = autoReading?.v !== ev.v;
     autoReading = ev;
     if (!moved) return;
-    if (autoTimer) { autoAt = 0; autoChord(); } else autoPreview();
+    // A step of the old key means nothing in the new one; the voicing still
+    // moves least from the notes that were sounding.
+    autoStep = null;
+    if (autoTimer) autoChord(); else autoPreview();
   }
-  // The three notes of the chord on scale step `step` of the reading's key.
-  function chordOf(r, step) {
-    const sc = KEY_SCALE[r.mode], root = KB_BASE + r.tonic;
-    return [step, step + 2, step + 4].map((k) => root + sc[k % 7] + 12 * Math.floor(k / 7));
-  }
-  // With Autoplay off, the chord it would open on, the home chord, is shown
-  // as yellow rings (asked: *"when autoplay is off, color the would-play
-  // notes border yellow"*). With it on, the chord it is holding is.
+  const keyOk = (r) => r && r.tonic != null && KEY_SCALE[r.mode];
+  // With Autoplay off, the chord it would open on is shown as yellow rings
+  // (asked: *"when autoplay is off, color the would-play notes border
+  // yellow"*): the home chord, in root position. With it on, the chord it is
+  // holding is.
   function autoPreview() {
     if (autoTimer) return;
     const r = autoReading;
-    autoSay(r && r.tonic != null && KEY_SCALE[r.mode] ? chordOf(r, AUTO_STEPS[0]) : []);
+    autoSay(keyOk(r) ? voiceLead(null, [0, 2, 4].map((k) => (r.tonic + KEY_SCALE[r.mode][k]) % 12), PAD_RANGE).notes : []);
   }
   // The chord autoplay holds, or would open on, leaves on its value-out.
   const autoSay = (notes) => bay.send(AUTO_CHORD, { of: 'param', name: 'chord', notes: [...notes] });
@@ -500,18 +531,28 @@
     autoSay([]);
     autoPreview();
   }
+  // A held note is HELD: a note the new chord shares with the one sounding
+  // gets no note off and no new note on, so the pad does not breathe out and
+  // in again on it, and a chord that repeats simply goes on sounding. Only
+  // the voices that move are released and struck.
   function autoChord() {
-    autoRelease();
     const r = autoReading;
-    if (!r || r.tonic == null || !KEY_SCALE[r.mode]) return;
-    const step = AUTO_STEPS[autoAt++ % AUTO_STEPS.length];
-    const chord = chordOf(r, step);
-    for (const n of chord) {
-      bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 100 });
-      autoHeld.push(n);
+    if (!keyOk(r)) { autoRelease(); return; }
+    const c = chooseChord(autoChroma, r, autoStep);
+    const { notes } = voiceLead(autoVoiced, c.pcs, PAD_RANGE);
+    if (c.how !== autoHow) d.log(c.how === 'walk' ? 'autoplay walks I IV V vi, the radio is not clear enough to follow' : 'autoplay follows the radio\'s chords');
+    autoStep = c.step; autoVoiced = notes; autoHow = c.how;
+    for (const n of autoHeld) if (!notes.includes(n)) bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 0 });
+    for (const n of notes) if (!autoHeld.includes(n)) bay.send(AUTO_OUT, { cls: 'note', ch: AUTO_CH, d1: n, d2: 100 });
+    autoHeld = [...notes];
+    // The bass is the chord's root where the old root position put it: an
+    // octave under KB_BASE + tonic + the step's interval. The same root holds.
+    const bass = KB_BASE - 12 + r.tonic + KEY_SCALE[r.mode][c.step];
+    if (bass !== autoBassNote) {
+      if (autoBassNote != null) bay.send(AUTO_BASS, { cls: 'note', ch: AUTO_CH, d1: autoBassNote, d2: 0 });
+      autoBassNote = bass;
+      bay.send(AUTO_BASS, { cls: 'note', ch: AUTO_CH, d1: bass, d2: 110 });
     }
-    autoBassNote = chord[0] - 12;
-    bay.send(AUTO_BASS, { cls: 'note', ch: AUTO_CH, d1: autoBassNote, d2: 110 });
     autoSay(autoHeld);
   }
   function autoSet(on) {
@@ -523,7 +564,7 @@
     // starts silent and comes in at the key's confidence
     autoExpr = 0; autoExprSent = -1; autoExprTick();
     autoExprTimer = setInterval(autoExprTick, AUTO_EXPR_MS);
-    autoAt = 0;
+    autoStep = null; autoVoiced = null; autoHow = null;
     autoChord();
     autoTimer = setInterval(autoChord, AUTO_S * 1000);
     d.log(autoReading?.v ? `autoplay in ${autoReading.v}` : 'autoplay waits for a key');
@@ -931,6 +972,6 @@
     live: () => !!leg?.live, stream: () => leg?.stream.stats() ?? null, gain: () => (lv ? +lv.g.toFixed(3) : null),
     levels: () => Object.fromEntries(levels), reading: () => reading, playing: () => playing,
     links: () => bay.links().map((l) => `${l.from} -> ${l.to}${l.transforms?.length ? ' ' + JSON.stringify(l.transforms) : ''}`),
-    voices: () => [...voices.keys()].map((k) => +k.split('/')[1]), expr: () => autoExprSent, marked: () => [...keyEls].filter(([, k]) => k.classList.contains('cc-auto')).map(([n]) => n), keyEls: () => keyEls.size, mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
+    voices: () => [...voices.keys()].map((k) => +k.split('/')[1]), expr: () => autoExprSent, autoStep: () => autoStep, autoHow: () => autoHow, marked: () => [...keyEls].filter(([, k]) => k.classList.contains('cc-auto')).map(([n]) => n), keyEls: () => keyEls.size, mix: () => mix, energy: () => energy, auto: () => !!autoTimer, autoHeld: () => [...autoHeld] };
   d.ready();
 </script>

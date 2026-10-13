@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept clock 010</title>
+<title>POSITRON Message lag</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <script type="module">
   // concepts clock/010, LAG, 2026-10-12. Asked: *"start building"* on BACKLOG.md
@@ -19,7 +19,6 @@
   // clock: no clock agreement is needed to trust it. That is clock/030's subject.
   //
   // Nothing opens on a visit. The first press (Join, or a key) opens both sockets.
-  import { conceptNav } from '/concepts/nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
@@ -49,12 +48,11 @@
     { id: SPK, label: 'speakers', dir: 'in', medium: 'audio' },
   ]);
 
-  const d = mount({ name: 'concept clock 010', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'Message lag', what: '', index: '/archive/', indexLabel: 'archive',
     // The cells under the title and the log alone at the foot, asked 2026-10-12:
     // *"move readouts to top"*.
     joined: false,
     readout: { median: 'ms', worst: 'ms', last: 'ms', spread: 'ms' } });
-  conceptNav('clock/010');
 
   // ── the synth, on the `there` site: one sine per held note ──────────────
   let ctx = null;

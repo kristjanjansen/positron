@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>Scan landscape</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cc-pic canvas { display: block; width: 100%; height: 100%; }
+  .cc-say { font-size: 12px; color: var(--dim); }
+  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
+  .cc-top { display: flex; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { compile } from '/shell/sclang-lite.mjs';
+  import { createEnvFollower } from '/shell/pappus-mod.mjs';
+  import { LANES, LAYOUT_VERSION, MOD_FOLLOWERS, FOLLOWER_NAMES, createFeatures } from '/shell/radio-gran.mjs';
+  import { createScanField, LOOKS, DEFAULT_LOOK, EXTRA, FIELD_W, FIELD_H, DATA_W, DATA_H, at, u8 } from '/shell/scan-field.mjs';
+  import { createSources, WINDOW_S } from '/concepts/sampler/grain-rig.mjs';
+  import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/concepts/sampler/grain-ring.mjs';
+
+  // concepts shader/020, GRAIN LANDSCAPE, 2026-10-13. Asked (BACKLOG): *"copy
+  // the visualization from videoradio and add it to shaders concept. add all
+  // parameters that adjust its visualization as knobs + add patchbay"*.
+  //
+  // THE PICTURE IS /videoradio/'s, NOT A COPY OF IT. Both pages import
+  // `/shell/scan-field.mjs`; that page builds it baked (its look's numbers
+  // typed into the body), this one live, with every one of those numbers read
+  // from a uniform array the knobs write. At the knobs' opening values the
+  // two bodies draw the same `quartz` look.
+  //
+  // Not 010: shader/010 moved to remote/050 the same day and its old address
+  // 404s on purpose (no forwarding), so a different page there would answer
+  // an old link to the Pi shader with something else. 020 is the next free.
+  //
+  // THE GRAINS ARE REAL. Play brings up the grain ring of
+  // /concepts/sampler/060/ (`../../sampler/grain-ring.mjs`'s program, compiled
+  // in this tab, on the tab's scsynth) on our own Raadio 2 recording from R2,
+  // on its `Cloud` patch. Every grain the engine reports leaves
+  // `web:grains:value-out` as one event and lands in the picture's 64
+  // buckets: across is how long ago the audio under it came in (newest on the
+  // right, over the ring's eight seconds), up is the grain's length on the
+  // 2 ms to 4 s lane /videoradio/ uses. The six audio followers that light it
+  // read the granulator's own output, on `web:grains:audio-out` into the
+  // shader's audio inlet.
+  //
+  // ⚠️ THE ENGINE BOOT IS 060's, written again here in its smallest form (no
+  // knobs on the grains, one patch). Lifting 060's `engine` object into
+  // grain-ring.mjs would let both import it; that touches 060 and is left for
+  // the session to decide.
+  //
+  // NOTHING OPENS ON A VISIT: no audio context, no fetch, no engine. The
+  // picture draws its standby field (scanlines over the slow drift) from the
+  // first frame, which is what /videoradio/ does before Play too.
+  const S = 'web';
+  const d = mount({ name: 'concept shader 020', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('shader/020');
+
+  const LOOK = LOOKS[DEFAULT_LOOK];
+  const PATCH = PATCHES.find((p) => p.name === 'Cloud');
+  const NODE = 4000, BUF = 0, DEF = 'gring';
+
+  // ── the knobs: every number that shapes the picture you can see ───────
+  // Each look number, the four the baked body types as literals (EXTRA), and
+  // how long the grain marks take to fade, which the picture is handed in its
+  // data rather than in its body. Most visible first. Ranges cover every look
+  // in the archive table with room either side.
+  //
+  // 🔴 29 OF THE 35 THERE WERE, MEASURED 2026-10-13. Asked (BACKLOG): *"do
+  // testing on .../concepts/shader/020/ params. when no visual impact or
+  // absolutely minimal, remove"*. Each knob at its min, open and max, on the
+  // real GPU (ANGLE Metal, M2 Pro), at 960x540, in both states a visitor
+  // sees: standby, and playing on our Raadio 2 recording. Comparable because
+  // the data texture this page feeds its chain was RECORDED once per state
+  // (1500 frames) and REPLAYED byte for byte into a fresh chain per setting,
+  // so only the knob differed; the same setting twice read 0.000.
+  // Measured as mean |difference| of 0..255 and share of pixels moved by
+  // more than 8, worst of min and max, every state that enables the knob.
+  // The cut is where the data has a gap: the five below change at most
+  // 1.71% of pixels and at most 1.28 of 255 in every state, and the next
+  // weakest (blue) changes 7.35% playing and 11.3% standby.
+  //   glow     0.000 and 0% in both states, over 25 s and 1451 grain events:
+  //            it scales a bloom of the flat field, masked by the ridges, and
+  //            on this material that product never reaches a whole level
+  //   facet    standby 0 (needs grains), playing 0.36 of 255, 0.88%
+  //   occlude  standby 0.54, 0.20%; playing 1.05, 1.66%
+  //   fade     standby 0 (needs grains), playing 0.66, 1.71%
+  //   echo     standby 1.28, 1.69% (at 0.9 only); playing 0.58, 0.01%
+  // They stay at the look's own value in their uniform, so the picture at
+  // the opening values is the same bytes as before (testFinal, 4 of 4).
+  //   mirror   0 alone, because the fold sits at `horizon`, which opens at
+  //            1.0, the top edge, so there is nothing above it to fold; and
+  //            horizon read 0 alone because the fold is off. Together they
+  //            are 4.4 to 9.2 of 255 and 18 to 30% of pixels, so one knob
+  //            does it: mirror is held ON and horizon alone moves the fold.
+  //            At 1.0 the fold is off by construction (`sy > 1.0` is never
+  //            true in the frame), the same bytes as mirror off.
+  const f2 = (v) => v.toFixed(2), f3 = (v) => v.toFixed(3), pct = (v) => `${Math.round(v * 100)}%`;
+  const K = [
+    { name: 'rows', label: 'rows', min: 8, max: 132, step: 1, fmt: (v) => `${Math.round(v)}` },
+    { name: 'ampM', label: 'height', min: 0.5, max: 8, fmt: f2 },
+    { name: 'tunnel', label: 'tunnel', min: 0, max: 4, fmt: (v) => `${v.toFixed(2)}x` },
+    { name: 'travel', label: 'travel', min: 0, max: 5, fmt: f2 },
+    { name: 'wide', label: 'wide', min: 0.5, max: 3, fmt: f2 },
+    { name: 'cam', label: 'near', min: 0.1, max: 1, fmt: f2 },
+    { name: 'baseB', label: 'depth', min: 0.3, max: 1, fmt: f2 },
+    { name: 'baseA', label: 'floor', min: 0, max: 0.2, fmt: f3 },
+    { name: 'baseE', label: 'spacing', min: 0.5, max: 1.5, fmt: f2 },
+    { name: 'mir', label: 'horizon', min: 0.3, max: 1, fmt: f2 },
+    { name: 'waves', label: 'waves', choices: [['1', 1], ['3', 3]] },
+    { name: 'idle', label: 'idle', min: 0, max: 0.15, fmt: f3 },
+    { name: 'swellY', label: 'swell', min: 0, max: 0.05, fmt: f3 },
+    { name: 'stretch', label: 'stretch', min: 0, max: 3, fmt: f2 },
+    { name: 'xbreath', label: 'breath', min: 0, max: 1, fmt: f2 },
+    { name: 'sway', label: 'sway', min: 0, max: 1, fmt: f2 },
+    { name: 'heave', label: 'heave', min: 0, max: 1, fmt: f2 },
+    { name: 'valley', label: 'valley', min: 0, max: 0.6, fmt: f2 },
+    { name: 'bucket', label: 'counts', min: 0, max: 1, fmt: f2 },
+    { name: 'ampA', label: 'amp', min: 0, max: 0.3, fmt: f3 },
+    { name: 'ampL', label: 'loud', min: 0, max: 0.5, fmt: f3 },
+    { name: 'ampB', label: 'bass', min: 0, max: 0.2, fmt: f3 },
+    { name: 'halo', label: 'halo', min: 0, max: 1, fmt: f2 },
+    { name: 'gamma', label: 'gamma', min: 0.6, max: 2, fmt: f2 },
+    { name: 'gain', label: 'gain', min: 0.5, max: 3, fmt: f2 },
+    { name: 'mono', label: 'white', min: 0, max: 1, fmt: pct },
+    { name: 'chroma', label: 'blue', min: 0, max: 1, fmt: pct },
+    { name: 'scan', label: 'lines', min: 0, max: 0.5, fmt: f2 },
+    { name: 'vig', label: 'edges', min: 0, max: 1, fmt: f2 },
+  ];
+  // The six that left the row, at the values they hold: the look's own, but
+  // mirror, which is held on (above). `fade` is /videoradio/'s `TRAIL_S`.
+  const FIXED = { keep: LOOK.keep, glow: EXTRA.glow, fade: 1.6, facet: LOOK.facet, occl: LOOK.occl, mirror: 1 };
+  const OPEN = { ...LOOK, ...EXTRA, ...FIXED };
+
+  // ── the bay ─────────────────────────────────────────────────────────────
+  const SOURCES = createSources({ log: (m) => d.log(m) });
+  const SRC = SOURCES[0];
+  const FILE_OUT = `${SRC.store}:${SRC.id}:file-out`;
+  const RADIO_IN = `${S}:radio:file-in`, RADIO_OUT = `${S}:radio:audio-out`;
+  const GRAINS_IN = `${S}:granulator:audio-in`, GRAINS_OUT = `${S}:granulator:audio-out`, GRAINS_EV = `${S}:granulator:value-out`;
+  const SPEAKER = `${S}:speaker:audio-in`;
+  const SH_AUDIO = `${S}:shader:audio-in`, SH_VAL = `${S}:shader:value-in`, SH_OUT = `${S}:shader:video-out`;
+  const SCREEN = `${S}:screen:video-in`;
+  // A knob's node is named by its label, the word a visitor reads under it,
+  // never by the shader's own name for the number (`ampM` is `height`).
+  const LABEL = new Map();
+  const KNOB_OUT = (n) => `${S}:knob-${LABEL.get(n)}:value-out`;
+
+  const bay = createBay();
+  bay.addNode({ id: `${SRC.store}:${SRC.id}`, kind: 'store', label: SRC.label, place: 'cloudflare', net: 'cloudflare' });
+  bay.addPort({ id: FILE_OUT, label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: SRC.url });
+  bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
+  bay.addPort({ id: RADIO_IN, label: 'radio', dir: 'in', medium: 'file' });
+  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio' });
+  // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
+  bay.addNode({ id: `${S}:granulator`, kind: 'engine', label: 'granulator', place: 'browser' });
+  bay.addPort({ id: GRAINS_IN, label: 'granulator', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: GRAINS_OUT, label: 'granulator', dir: 'out', medium: 'audio' });
+  bay.addPort({ id: GRAINS_EV, label: 'events', dir: 'out', medium: 'value' });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: SPEAKER, label: 'speakers', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'scan landscape', place: 'browser' });
+  bay.addPort({ id: SH_AUDIO, label: 'level', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: SH_VAL, label: 'values', dir: 'in', medium: 'value', deliver: (ev) => valueIn(ev) });
+  bay.addPort({ id: SH_OUT, label: 'picture', dir: 'out', medium: 'video', transports: ['page'] });
+  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'screen', place: 'browser' });
+  bay.addPort({ id: SCREEN, label: 'screen', dir: 'in', medium: 'video' });
+  for (const c of K) {
+    LABEL.set(c.name, c.label);
+    bay.addNode({ id: `${S}:knob-${c.label}`, kind: 'person', label: c.label, place: 'browser' });
+    bay.addPort({ id: KNOB_OUT(c.name), label: c.label, dir: 'out', medium: 'value' });
+  }
+  function hold(a, b) {
+    const r = bay.link(a, b, [], { site: S });
+    if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+  hold(FILE_OUT, RADIO_IN);
+  hold(RADIO_OUT, GRAINS_IN);
+  hold(GRAINS_OUT, SPEAKER);
+  hold(GRAINS_OUT, SH_AUDIO);
+  hold(GRAINS_EV, SH_VAL);
+  for (const c of K) hold(KNOB_OUT(c.name), SH_VAL);
+  hold(SH_OUT, SCREEN);
+
+  // ── the picture ─────────────────────────────────────────────────────────
+  const canvas = el('canvas');
+  canvas.width = FIELD_W; canvas.height = FIELD_H;
+  const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: false });
+  const name = el('span', 'cc-say', '');
+  const count = el('span', 'cc-say', '');
+  const panel = createVideoPanel({ media: canvas, left: name });
+  panel.el.classList.add('cc-pic');
+  panel.el.querySelector('.pos-vp-r')?.prepend(count);
+  let field = null, glErr = 0, frames = 0;
+  if (gl) {
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const r = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    name.textContent = (r.match(/Renderer:\s*([^,)]+)/)?.[1] ?? r.replace(/^ANGLE \(|\)$/g, '')).trim().slice(0, 24);
+    try {
+      field = createScanField(gl, { look: LOOK, live: true, canvas });
+      field.set('mirror', FIXED.mirror);              // see the knob list: horizon alone moves the fold
+    }
+    catch (e) { d.log(`the picture did not compile: ${e.message}`, 'bad'); }
+  } else d.log('this browser has no WebGL2, so there is no picture', 'bad');
+
+  // ── what reaches the shader's value inlet ───────────────────────────────
+  let knobEvents = 0, grainEvents = 0;
+  function valueIn(ev) {
+    if (ev?.of === 'grain') { grainEvents++; bucket(ev); return; }
+    if (ev?.of !== 'param' || !Number.isFinite(ev.v)) return;
+    knobEvents++;
+    field?.set(ev.name, ev.v);
+  }
+
+  // ── the data texture, filled every frame as /videoradio/ fills it ───────
+  const data = new Uint8Array(DATA_W * DATA_H * 4);
+  const buckets = Array.from({ length: DATA_W }, () => ({ n: 0, dsum: 0 }));
+  const sizeLane = LANES.size;
+  function bucket(ev) {
+    const x = Math.min(DATA_W - 1, Math.max(0, Math.floor((1 - ev.ago / WINDOW_S) * DATA_W)));
+    const b = buckets[x];
+    if (b.n >= 255) return;
+    b.n++;
+    b.dsum += sizeLane.unmap(Math.max(0, Number(ev.dur) || 0));
+  }
+  // Where the grains read: `back` seconds behind the newest, give or take
+  // `jitter`. Knowable here, because the read head follows the write head at
+  // speed 1, so it is drawn as the window's bright half.
+  function windowRow() {
+    const v = valuesOf(PATCH);
+    const centre = 1 - v.back / WINDOW_S, half = Math.max(1 / DATA_W, v.jitter / WINDOW_S);
+    for (let x = 0; x < DATA_W; x++) {
+      const f = (x + 0.5) / DATA_W, u = Math.abs(f - centre) / half;
+      const i = at(x, 2);
+      data[i] = u8(u >= 1 ? 0 : 1 - u * u); data[i + 1] = 255; data[i + 2] = 0; data[i + 3] = 255;
+    }
+    data[at(18, 3)] = 255;
+  }
+  let feats = null, follow = null, analyser = null;
+  let pulse = 0, drift = 0, jolt = 0, last = 0, playing = false;
+  function tick(now) {
+    if (!field) return;
+    const dt = last ? Math.min(0.25, (now - last) / 1000) : 1 / 60;
+    last = now;
+    drift = (drift + dt * 0.06) % 1;
+    if (!playing || !feats) {
+      // the standby field, as /videoradio/ draws it before Play
+      data.fill(0);
+    } else {
+      let got = 0;
+      for (let x = 0; x < DATA_W; x++) {
+        const b = buckets[x], i = at(x, 0);
+        data[i] = Math.min(255, b.n); data[i + 1] = b.n ? u8(b.dsum / b.n) : 0; data[i + 2] = 0; data[i + 3] = 0;
+        got += b.n; b.n = 0; b.dsum = 0;
+      }
+      const f = feats.read();
+      FOLLOWER_NAMES.forEach((n, i) => { follow[n].push(f[n] ?? 0, dt); data[at(i, 3)] = u8(follow[n].value()); });
+      windowRow();
+      data[at(6, 3)] = 255;                                    // all grains, the ring's mix at 1
+      data[at(7, 3)] = Math.min(255, got);
+      data[at(16, 3)] = u8(Math.exp(-dt / Math.max(0.05, FIXED.fade)));
+      pulse = (pulse + got * 0.045) % 1;
+      data[at(19, 3)] = u8(0.5 - 0.5 * Math.cos(pulse * Math.PI * 2));
+      jolt = Math.max(0, jolt - dt * 1.1);
+      data[at(20, 3)] = u8(jolt);
+    }
+    data[at(21, 3)] = u8(drift);
+    data[at(63, 3)] = LAYOUT_VERSION;
+    // the screen shows the picture only while the shader holds its wire to it
+    if (holds(SH_OUT, SCREEN)) { field.step(data); frames++; }
+    if (!glErr) glErr = gl.getError();
+  }
+  let n = 0, since = 0;
+  function frame(t) {
+    tick(t);
+    n++;
+    if (!since) since = t;
+    else if (t - since >= 1000) { count.textContent = `${(n * 1000 / (t - since)).toFixed(1)} fps`; n = 0; since = t; }
+    requestAnimationFrame(frame);
+  }
+  if (field) requestAnimationFrame(frame);
+
+  // ── the knobs, each its own node, a turn is one event on its wire ───────
+  const knobs = new Map();
+  const send = (nm, v) => bay.send(KNOB_OUT(nm), { of: 'param', name: nm, v });
+  for (const c of K) {
+    if (c.choices) {
+      const at0 = Math.max(0, c.choices.findIndex(([, v]) => v === OPEN[c.name]));
+      // The invisible hand on every knob (asked 2026-10-13, *"andd inivisible hand for knobs"*).
+      knobs.set(c.name, createKnob({ label: c.label, min: 0, max: c.choices.length - 1, step: 1, value: at0, hand: true,
+        format: (i) => c.choices[Math.round(i)]?.[0] ?? '', onInput: (i) => send(c.name, c.choices[Math.round(i)][1]) }));
+      continue;
+    }
+    knobs.set(c.name, createKnob({ label: c.label, min: c.min, max: c.max, value: OPEN[c.name], hand: true,
+      ...(c.step ? { step: c.step } : {}), format: c.fmt, onInput: (v) => send(c.name, v) }));
+  }
+  const grid = createKnobGrid(knobs, { row: true });
+
+  // ── the engine: 060's grain ring, booted on Play ────────────────────────
+  const good = compile(PROGRAM, { name: DEF });
+  if (!good.ok) d.log(`the granulator's program did not compile: ${good.message}`, 'bad');
+  let ctx = null, eng = null, booting = null, source = null, opening = null, fetchedAt = 0, grains = 0;
+  let srcBus = null, toGrains = null;
+  function route() {
+    if (!ctx) return;
+    try { srcBus.disconnect(toGrains); } catch { /* not connected */ }
+    if (holds(RADIO_OUT, GRAINS_IN)) srcBus.connect(toGrains);
+    if (eng) eng.out.gain.setTargetAtTime(holds(GRAINS_OUT, SPEAKER) && playing ? 0.9 : 0, ctx.currentTime, 0.02);
+  }
+  function boot() {
+    booting ??= (async () => {
+      if (!good.ok) throw new Error('the program did not compile');
+      const e = await bootScsynth({
+        audioContext: ctx, input: toGrains, log: (m, k) => d.log(m, k),
+        // ['/grain', nodeID, replyID, pos, size, write head, rate], as on 060
+        onReply: (m) => {
+          if (m[0] !== '/grain') return false;
+          if (!playing) return true;
+          const pos = m[3], head = m[5];
+          grains++;
+          bay.send(GRAINS_EV, { of: 'grain', at: +ctx.currentTime.toFixed(4), pos,
+            ago: +(((((head - pos) % 1) + 1) % 1) * RING_SECONDS).toFixed(3), dur: m[4], voice: 0, rate: m[6] });
+          return true;
+        },
+      });
+      e.out.gain.value = 0;
+      const alloc = await e.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && (m[1] === '/b_alloc' || m[1] === '/b_allocPtr'),
+        5000, '/b_alloc', BUF, RING_SECONDS * ctx.sampleRate, 1);
+      if (!alloc || alloc[0] !== '/done') throw new Error('the ring buffer was not allocated');
+      const done = await e.sendAndWait((m) => m[0] === '/done' && m[1] === '/d_recv', 5000, '/d_recv', good.bytes);
+      if (!done) throw new Error('the engine never said it had the definition');
+      const go = await e.sendAndWait((m) => m[0] === '/n_go' || (m[0] === '/fail' && m[1] === '/s_new'), 5000,
+        '/s_new', DEF, NODE, 1, 0, 'buf', BUF, 'inbus', 2, 'mix', 1, ...Object.entries(valuesOf(PATCH)).flat());
+      if (!go || go[0] !== '/n_go') throw new Error('the granulator did not start');
+      // the shader's audio inlet: an analyser on what the grains send out
+      analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.5;
+      e.out.connect(analyser);
+      const pull = ctx.createGain(); pull.gain.value = 0; analyser.connect(pull).connect(ctx.destination);
+      feats = createFeatures(analyser, ctx.sampleRate);
+      follow = Object.fromEntries(FOLLOWER_NAMES.map((k) => [k, createEnvFollower(MOD_FOLLOWERS[k])]));
+      d.log(`the granulator is up on its ${PATCH.name} patch`);
+      eng = e;
+      return e;
+    })();
+    booting.catch(() => { booting = null; eng = null; });
+    return booting;
+  }
+  async function plug() {
+    const job = opening = SRC.open(ctx);
+    pb.refresh();
+    let got;
+    try { got = await job; }
+    catch (e) { d.log(`${SRC.label} did not open: ${e?.message || e}`, 'warn'); return false; }
+    finally { if (opening === job) { opening = null; fetchedAt = performance.now(); pb.refresh(); } }
+    if (!playing) { got.stop(); return false; }
+    source?.stop();
+    source = got;
+    source.node.connect(srcBus);
+    return true;
+  }
+  async function play() {
+    ctx ??= new AudioContext({ sampleRate: 48000 });
+    ctx.resume();
+    if (!srcBus) { srcBus = ctx.createGain(); toGrains = ctx.createGain(); }
+    playing = true; jolt = 1;
+    face(); route();
+    const wasUp = !!eng;
+    try { await boot(); } catch (e) { d.log(`the granulator did not come up: ${e?.message || e}`, 'bad'); playing = false; face(); return; }
+    if (!playing) return;
+    if (wasUp) eng.send('/n_run', NODE, 1);
+    route();
+    await plug();
+    pb.refresh();
+  }
+  function stop() {
+    playing = false;
+    source?.stop(); source = null;
+    if (eng) eng.send('/n_run', NODE, 0);
+    route(); pb.refresh(); face();
+  }
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
+  ] });
+  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
+  face();
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+
+  // ── the patchbay ────────────────────────────────────────────────────────
+  // The file wire is lit while the recording comes down, the audio wires
+  // while it plays, the video wire while the shader draws; value wires pulse
+  // once per event, a grain or a turn.
+  const pb = createPatchbay(bay, {
+    flowing: (l, medium) => {
+      if (medium === 'file') return !!opening || (fetchedAt && performance.now() - fetchedAt < 600);
+      if (medium === 'audio') return playing && !!source;
+      if (medium === 'video') return !!field;
+      return false;
+    },
+  });
+
+  d.stack.add(top, panel.el, grid.el, pb.el);
+
+  // ── read only, for a check over CDP ─────────────────────────────────────
+  window.__demo.knobs = grid;
+  window.__demo.landscape = {
+    field: () => field, playing: () => playing, grains: () => grains, frames: () => frames,
+    events: () => ({ knob: knobEvents, grain: grainEvents }), params: () => ({ ...(field?.params() || {}), fade: FIXED.fade }),
+    fetched: () => SOURCES.fetched(), context: () => ctx, knob: (nm) => knobs.get(nm),
+  };
+
+  // ── the self check, only under ?selfcheck=1 ─────────────────────────────
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const diff = (a, b) => { let s = 0; for (let i = 0; i < a.px.length; i += 4) s += Math.abs(a.px[i] - b.px[i]) + Math.abs(a.px[i + 1] - b.px[i + 1]) + Math.abs(a.px[i + 2] - b.px[i + 2]); return s / (a.px.length / 4) / 3; };
+  const spread = (r) => { const lo = [255, 255, 255], hi = [0, 0, 0]; for (let i = 0; i < r.px.length; i += 4) for (let c = 0; c < 3; c++) { lo[c] = Math.min(lo[c], r.px[i + c]); hi[c] = Math.max(hi[c], r.px[i + c]); } return Math.max(...hi.map((h, c) => h - lo[c])); };
+  async function check() {
+    d.assert('a visit opened no audio context and fetched nothing', ctx === null && SOURCES.fetched() === 0);
+    d.assert('the picture compiled live, with every look number on a uniform', !!field && /uniform float uK\[\d+\]/.test(field.shaders.OUT_FS),
+      field ? `${Object.keys(field.params()).length} numbers in uK` : 'no picture');
+    await wait(400);
+    d.assert('the standby field draws before Play, with no GL error', frames > 10 && glErr === 0, `${frames} frames, gl.getError ${glErr}`);
+    // The six that left the row hold their values in the uniform, and the
+    // knob row and the patchbay are the 29 that were measured to show.
+    const pr = field.params(), gone = Object.keys(FIXED).filter((k) => k !== 'fade');
+    const holdsFixed = gone.every((k) => Math.abs(pr[k] - FIXED[k]) < 1e-6);
+    const nodes = bay.nodes().filter((n) => n.id.startsWith(`${S}:knob-`)).length;
+    d.assert('29 knobs, one patchbay node each, and the six without a visible effect hold their values',
+      knobs.size === 29 && nodes === 29 && holdsFixed && !gone.some((k) => knobs.has(k)),
+      `${knobs.size} knobs, ${nodes} knob nodes, ${gone.map((k) => `${k} ${+pr[k].toFixed(3)}`).join(', ')}`);
+    // Mirror is held on and is invisible at the opening horizon; horizon
+    // alone moves the fold, by hand, and back draws the same bytes.
+    const still = new Uint8Array(data), hz = knobs.get('mir'), hz0 = hz.value();
+    const m1 = field.testFinal(still);
+    field.set('mirror', 0);
+    const m0 = field.testFinal(still);
+    field.set('mirror', FIXED.mirror);
+    hz.set(0.52, { from: 'hand' });
+    const h52 = field.testFinal(still);
+    hz.set(hz0, { from: 'hand' });
+    const h1 = field.testFinal(still);
+    const eq = (x, y) => x.px.every((v, i) => v === y.px[i]);
+    d.assert('mirror held on draws the same bytes as off at the opening horizon, and horizon alone folds the picture',
+      eq(m1, m0) && diff(m1, h52) > 1 && eq(m1, h1),
+      `on vs off identical ${eq(m1, m0)}, horizon 1 to 0.52 mean change ${diff(m1, h52).toFixed(2)} of 255, back identical ${eq(m1, h1)}`);
+    await play();
+    d.assert('Play brought the granulator up on our recording', !!eng && !!source, `${SRC.url}`);
+    if (!eng) return;
+    await wait(WINDOW_S * 1000 + 1500);
+    const g0 = grainEvents;
+    await wait(1000);
+    d.assert('the granulator reports its events and they reach the shader over their wire', grainEvents - g0 > 5 && grains > 20,
+      `${grainEvents - g0} events into the shader in the last second, ${grains} reported`);
+    const level = follow ? follow.rms.value() : 0;
+    d.assert('the shader hears the granulator: its level follower is above zero', level > 0.01, `rms follower ${level.toFixed(3)}`);
+    const fp = field.readField();
+    let hot = 0; for (let i = 0; i < fp.px.length; i += 4) if (fp.px[i] > 8) hot++;
+    d.assert('the events land in the picture\'s field', hot > 200, `${hot} lit pixels in the field layer`);
+    const f1 = field.readFinal(); const fA = frames;
+    await wait(500);
+    const f2 = field.readFinal();
+    d.assert('frames keep being drawn and the picture moves with the sound', frames > fA + 10 && spread(f2) > 40 && diff(f1, f2) > 0.2,
+      `${frames - fA} frames in 500 ms, channel spread ${spread(f2)}, mean change ${diff(f1, f2).toFixed(2)} of 255`);
+    // A knob changes the picture: the whole chain once over one held frame of
+    // data, before and after a turn made by hand on the rows knob, and back.
+    const held = new Uint8Array(data);
+    const rowsK = knobs.get('rows'), was = rowsK.value();
+    const sentBefore = knobEvents;
+    const a = field.testFinal(held);
+    rowsK.set(12, { from: 'hand' });
+    const b = field.testFinal(held);
+    rowsK.set(was, { from: 'hand' });
+    const c = field.testFinal(held);
+    const same = a.px.every((v, i) => v === c.px[i]);
+    d.assert('a knob changes the picture, through its wire: rows 46 to 12 moves the pixels, and back draws the same bytes',
+      knobEvents - sentBefore === 2 && diff(a, b) > 1 && same,
+      `${knobEvents - sentBefore} events on the wire, mean change ${diff(a, b).toFixed(2)} of 255, back identical ${same}`);
+    stop();
+  }
+  if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
+  d.ready();
+</script>

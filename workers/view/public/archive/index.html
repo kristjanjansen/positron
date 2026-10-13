@@ -43,6 +43,16 @@
 
   // Still deployed, off /concepts/ and off the front page.
   const RETIRED = [
+    { kind: 'demo', title: 'Partitur', href: '/partitur/', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
+    { kind: 'demo', title: 'Reel', href: '/reel/', say: 'A year of ERR\'s AK filmikroonika, each silent film played with that day\'s radio where it survives.' },
+    { kind: 'demo', title: 'Floor', href: '/floor/', say: 'ERR\'s 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset.' },
+    { kind: 'demo', title: 'Videoradio', href: '/videoradio/', say: 'A live radio station playing itself through a granulator, looping a few seconds of what is on air.' },
+    { kind: 'demo', title: 'Tapes', href: '/tapes/', say: 'Every Erkki Kurenniemi recording that still plays, end to end, each block as long as its recording.' },
+    { kind: 'demo', title: 'Deck', href: '/proto/deck/', say: 'Erkki Kurenniemi\'s corpus on one deck, with media from archive.org.' },
+    { kind: 'demo', title: 'Resources', href: '/resources/', say: 'Every source for Erkki Kurenniemi\'s work that could be reached, with its date, holder and licence.' },
+    { kind: 'demo', title: 'Weight', href: '/weight/', say: 'One sentence, "If these walls could talk", round four walls, each word as big as it is short.' },
+    { kind: 'demo', title: 'Stage', href: '/stage/', say: 'A church scene from MIMproject\'s 2011 MIM goes Sustainable, run live from a control room.' },
+    { kind: 'demo', title: 'Making', href: '/making/', say: 'What survives of MIMproject without its website: 26 videos from 2008 to 2018 and recovered pictures.' },
     { kind: 'demo', title: 'Radio', href: '/radio/', say: 'Eight live radio stations from Tallinn and Helsinki, broken into grains by hand or by sliders.' },
     { kind: 'demo', title: 'Wish', href: '/wish/', say: 'Say or type which instrument plays which, and a language model on Cloudflare makes the connection.' },
     { kind: 'demo', title: 'Away', href: '/away/', say: 'A Novation Circuit on a desk in another building, played from this page and heard back through a Pi.' },
@@ -60,11 +70,15 @@
     { kind: 'clock 050', title: 'Clock drift', href: '/archive/clock-drift/', say: 'Two clocks a few parts per million apart drift off the beat until they agree the time again.' },
     { kind: 'draw 000', title: 'XY filter', href: '/archive/draw-xy/', say: 'Drag the pad over a held note. Left to right opens the filter, bottom to top raises its resonance.' },
     { kind: 'clock 030', title: 'Shared clock', href: '/archive/clock-shared/', say: 'Two places in this tab, one clock set wrong on purpose, agree the time once and then share one beat.' },
+    { kind: 'clock 000', title: 'Scheduling', href: '/archive/clock-scheduling/', say: 'A JavaScript timer and the sound card play one rhythm. Make the page busy and the timer lands late.' },
+    { kind: 'clock 010', title: 'Message lag', href: '/archive/clock-message-lag/', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' },
+    { kind: 'clock 020', title: 'Audio cushion', href: '/archive/clock-audio-cushion/', say: 'A test tone over the relay waits in a cushion you set from 20 to 300 ms, trading delay for dropouts.' },
+    { kind: 'synth 110', title: 'Plaits patches', href: '/archive/plaits-patches/', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
     { kind: 'clock 060', title: 'Play together', href: '/archive/clock-play-together/', say: 'A link carrying the shared clock lands one note in two places together, but both places are in one tab with a simulated second clock.' },
     { kind: 'clock 070', title: 'Replay', href: '/archive/clock-replay/', say: 'Keys and a picture recorded, then played back with the recording as the clock.' },
     { kind: 'clock 040', title: 'Follow', href: '/archive/clock-follow/', say: 'A cue waits for its own late picture, but the picture is modelled in the tab, so a real LL-HLS stream would have to replace it.' },
-    // Asked 2026-10-13: *"archive https://positron.studio/concepts/sampler/060/"*.
-    { kind: 'sampler 060', title: 'Grain ring', href: '/archive/grain-ring/', say: 'The same radio grains from a small SuperCollider program you can read and edit while it plays.' },
+    // Moved here 2026-10-13 when the owner chose the light granulator (*"but we got rid of pappus?!? 060 ???"*).
+    { kind: 'sampler 050', title: 'Pappus granulator', href: '/archive/pappus/', say: 'Our radio recordings granulated by Pappus, the Raspberry Pi\'s granulator, running in this tab.' },
     { kind: 'misc 020', title: 'Tutorial slide', href: '/concepts/misc/020/', say: 'A tutorial step as one 16:9 slide frame holding its words, its build area and its patchbay.' },
     // Asked 2026-10-12: *"archive wire and patchbay"*. Still served, unlisted in the manifest.
     { kind: 'demo', title: 'Wire', href: '/wire/', say: 'A message as the exact bytes it becomes, and notes played into a second tab, each timed on landing.' },
