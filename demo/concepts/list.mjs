@@ -152,8 +152,7 @@ export const DEMO_CARDS = {
   // resources archived 2026-10-13 (*"archvie resourves"*): still served, listed on /archive/.
   // tapes archived 2026-10-13 (*"archive tapes and deck"*): still served, listed on /archive/.
   // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
-  // partitur under history (asked 2026-10-13, *"bring back nagy visualiation from arhvie there"*).
-  partitur: { group: 'archives', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
+  // partitur archived 2026-10-13 (*"sorry, archvie partitur again"*): still served, listed on /archive/.
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
   // stage archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.
   // weight archived 2026-10-13 (*"archive weight stage"*): still served, listed on /archive/.

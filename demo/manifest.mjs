@@ -513,7 +513,9 @@ export const DEMOS = [
   { name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'A universal patchbay that links notes, sound, video and code between this browser and the studio\u2019s Raspberry Pi, checking every link before it opens.',
     tags: ['WebCodecs'] },
-  { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true,
+  // `unlisted: true` since 2026-10-13 (*"sorry, archvie partitur again"*): still built and deployed at
+  // /partitur/, listed on /archive/ with the other retired pages.
+  { name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true, unlisted: true,
     one: 'Moholy-Nagy\u2019s 1924 score for a mechanical variety act, played as a timeline whose light any other screen can show as a projection wall.',
     tags: [] },
   // /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
