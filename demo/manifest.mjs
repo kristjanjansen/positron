@@ -271,7 +271,9 @@ export const DEMOS = [
   // files WE hold, because mimproject.org has been down long enough that two
   // video sites were the last copies anybody could reach. Its corpus is a
   // separate file for exactly that reason — see `build-mimproject.mjs`.
-  { name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true,
+  // `unlisted: true` since 2026-10-13 (*"archive making"*): still built and deployed at
+  // /making/, listed on /archive/ with the other retired pages.
+  { name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true, unlisted: true,
     one: 'the recordings and the pictures that outlived MIMproject\'s own website, shown from the table under whichever one you are looking at',
     tags: ['archive', 'provenance', 'R2'] },
   // 🔴 THE FIRST ROW IN ACT 6, `composition`, AND IT SITS HERE IN THE ARRAY

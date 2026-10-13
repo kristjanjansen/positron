@@ -139,7 +139,7 @@ export const DEMO_CARDS = {
   floor: { group: 'archives', say: 'ERR\'s 1965 newsreels face up as a floor with no edge, to walk over in the browser or in a headset.' },
   resources: { group: 'archives', say: 'Every source for Erkki Kurenniemi\'s work that could be reached, with its date, holder and licence.' },
   tapes: { group: 'archives', say: 'Every Erkki Kurenniemi recording that still plays, end to end, each block as long as its recording.' },
-  making: { group: 'archives', say: 'What survives of MIMproject without its website: 26 videos from 2008 to 2018 and recovered pictures.' },
+  // making archived 2026-10-13 (*"archive making"*): still served, listed on /archive/.
   partitur: { group: 'performances', say: 'László Moholy-Nagy\'s 1924 score sketch for a mechanical variety act, played as a timeline.' },
   held: { group: 'performances', say: 'Held in Human, a 2024 mixed reality piece, played back from its own score across its eight scenes.' },
   stage: { group: 'performances', say: 'A church scene from MIMproject\'s 2011 MIM goes Sustainable, run live from a control room.' },

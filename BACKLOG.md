@@ -1,4 +1,5 @@
 ## Open
+- ~~**Archive /making/**~~ (2026-10-13). Asked: *"archive making"*. DONE by the session: unlisted, still served, card out, on /archive/.
 - **The /videoradio/ picture as a shader concept, with every visual parameter a knob and a patchbay** (2026-10-13). Asked: *"copy the visualiztion videograme from videoradio and add it to shaders concept. add all patameters that adjust its visulaliztion as kobs + add patchbay"*.
 - ~~**No "/mirror/" in card text**~~ (2026-10-13). Asked: *"from /mirror/ is pointless on desc"*. DONE: shader/000 and remote/050 say "a kaleidoscope shader".
 - ~~**Remote instruments say they are remote; remote/010 is "Circuit on Pi"**~~ (2026-10-13). Asked: *"Circuit in Pi is thtile. on all remote instruments put a note on remotedness to desc"*. DONE by the session: every remote card names "a Pi in another building"; the title reads "Circuit on Pi", matching its neighbours.
