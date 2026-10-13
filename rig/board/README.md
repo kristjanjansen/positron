@@ -80,9 +80,30 @@ three readings went wrong in 2026-09.
 
 ## One instrument, and why
 
-`jacksynth.mjs` raises **Yoshimi** and nothing else, since 2026-09-16.
+🔴 **NO JACK INSTRUMENT SINCE 2026-10-13: YOSHIMI WAS RETIRED FROM THE BOARD
+THAT DAY.** Packages purged, its board code in `archive/yoshimi/`, its state in
+R2; `archive/yoshimi/README.md` has what was removed and how to bring it back
+(alone, or as a pair with a browser build). `JACK_SYNTHS` in `jacksynth.mjs` is
+empty and left in place, so a JACK synth is one entry again. What sounds now is
+named every time, because there is no default:
 
-    node ask.mjs --room studio-1 audio.start   '{"source":"yoshimi"}'
+    node ask.mjs --room studio-1 audio.start   '{"source":"sampler"}'   # SuperCollider sampler, piano and Rhodes
+    node ask.mjs --room studio-1 audio.start   '{"source":"collide"}'   # page programs on their own scsynth
+    node ask.mjs --room studio-1 audio.start   '{"source":"synth"}'     # the arithmetic FM synth, no JACK, reachable by name only
+
+A bare `audio.start` is refused in words, and a `note.on` to an idle board is
+dropped with a reason. Both used to raise Yoshimi.
+⚠️ **THE GRANULATOR HAS NOTHING TO WRAP.** `fx.pappus` inserts it around the
+instrument slot only (`inst.jack`), and the sampler and the Circuit, both on
+JACK, are not that slot. So `fx.pappus {on: true}` answers `nothing is playing
+for an insert to wrap`, and `insert-test.mjs` and `pappus-live.mjs` refuse
+(exit 2) unless given `--instrument <source>` on a board that has one.
+`jack-bay-live.mjs` holds the capture with the sampler instead.
+
+The rest of this section is the record from when Yoshimi was the one
+instrument (2026-09-16 to 2026-10-13), kept because the reasons still hold:
+
+    node ask.mjs --room studio-1 audio.start   '{"source":"yoshimi"}'          # answers `unknown source` now
     node ask.mjs --room studio-1 voice.select  '{"channel":0,"bank":95,"program":6}'
 
 🔴 **FluidSynth and hexter were here and are at `archive/box-fluidsynth-hexter/`.**
@@ -101,7 +122,7 @@ files. **Bank select is CC 32 here, read out of Yoshimi's own config, not CC 0**
 CC 0 is its root directory, and sending a bank on it points Yoshimi at a root
 that does not exist, after which every program change lands nowhere.
 
-`yoshimi-test.mjs` checks the claim that matters: the same note under two
+`yoshimi-test.mjs` (now `archive/yoshimi/yoshimi-test.mjs`) checks the claim that matters: the same note under two
 patches must sound *different*. A patch test that never compares two patches is
 testing a config file.
 

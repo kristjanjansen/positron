@@ -20,7 +20,7 @@ import { openSync, writeSync, closeSync, existsSync, mkdirSync, readFileSync } f
 // strings here, each run blind with its output thrown away. Each re-patch is
 // now a small document (`links` that must be there, `own` inputs whose whole
 // feed it decides), planned against the graph, applied, and READ BACK.
-import { ensureBoardInstance, sourcesOf as alsaSourcesOf } from './yoshimi.mjs';
+import { sourcesOf as alsaSourcesOf } from './alsa.mjs';
 import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff, setPortNames } from './jack.mjs';
 export { parseJackLsp };
 
@@ -321,31 +321,12 @@ export async function ensureJackd({ onLog } = {}) {
  * below, which inserts it between whatever is playing and the capture, and can
  * be switched on and off under a running instrument.
  */
-/**
- * Yoshimi's command line. `-a` with no device: the device list only matters on
- * `Fixed`, and the instance says `External` (yoshimi.mjs `externalMidi`), so
- * the board's `aconnect` is the one connection. No `-K`, which would turn the
- * JACK auto connect back on, and no `-k`, which would start a second jackd.
- */
-export const YOSHIMI_ARGS = Object.freeze(['-i', '-a', '-J', '-b=256']);
-
 export const JACK_SYNTHS = {
-  yoshimi: {
-    needs: ['yoshimi', 'jackd', 'ffmpeg'],
-    // -i no GUI, -a ALSA MIDI (so virmidi can reach it), -J JACK audio
-    // `ensureBoardInstance` first: see yoshimi.mjs. Without it Yoshimi exits 1
-    // on a jackd that owns a card capture only, since there is no playback,
-    // and subscribes itself to every MIDI source on the box, the Circuit too.
-    spawn: () => { try { ensureBoardInstance(); } catch { /* yoshimi says why if it matters */ }
-                   return spawn('yoshimi', YOSHIMI_ARGS, { stdio: ['ignore','pipe','pipe'] }); },
-    portMatch: /^yoshimi:left/i,
-    portMatch2: /^yoshimi:right/i,
-    // It appears on the graph well before it has read 911 instruments off the
-    // disk, so this is waited AFTER the port is there rather than instead of it.
-    settle: 6000,
-    alsaMatch: /yoshimi/i,
-    osc: false,
-  },
+  // 🔴 EMPTY OF YOSHIMI SINCE 2026-10-13, AND LEFT IN PLACE ON PURPOSE. Asked:
+  // *"discard yoshimi. with possiblity to do dual setup in future"*. Its entry
+  // and `YOSHIMI_ARGS` are verbatim in archive/yoshimi/jacksynth-entry.mjs, and
+  // archive/yoshimi/README.md says how to put them back. `startJackSynth` and
+  // this table stay, so a JACK synth is one entry again.
 
   // 🔴 AN `archive` SOURCE STOOD HERE AND LEFT ON 2026-09-16. It played ERR's
   // 1965 radio archive into the JACK graph: ffmpeg into `snd-aloop`, `alsa_in`
@@ -974,7 +955,7 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   // `settle` is for an instrument that registers its port before it can play —
   // yoshimi loads 911 instruments across 24 banks after it appears on the graph
   // — and it is waited only after the port is actually there.
-  const ceiling = def.warmup ?? (name === 'yoshimi' ? 13000 : 6000);
+  const ceiling = def.warmup ?? 6000;   // Yoshimi's 13 s is `warmup` on its archived entry
   const t0port = Date.now();
   let ready = false;
   while (!ready && Date.now() - t0port < ceiling) {

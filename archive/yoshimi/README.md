@@ -190,3 +190,14 @@ What the owner asked to keep possible. Not built; this is the route.
   `push.sh` unpacks and never deletes. Nothing imports them.
 - HANDOFF.md, `rig/board/README.md` and the `positron-hardware` skill still
   describe Yoshimi as on the board (the plan's step 5).
+
+Later the same day (*"fix postyoshmi stuff"*): the step 5 docs carry a dated
+line (`rig/board/README.md`, the `positron-hardware` skill, HANDOFF.md), and the
+three harnesses no longer stop at `unknown source`. `jack-bay-live.mjs` holds
+the capture with the sampler and reads its two standing rows where it read
+Yoshimi's; its `--pappus` arm, `insert-test.mjs` and a live `pappus-live.mjs`
+refuse with exit 2 before sending anything, because `fx.pappus` wraps only the
+instrument slot (`inst.jack`) and nothing fills it. `insert-test.mjs` and
+`pappus-live.mjs` take `--instrument <source>` and run as before on a board
+that has a JACK instrument again; `jack-bay-live.mjs --pappus` has no such
+option and its granulator arm was removed, to be written back if one returns.

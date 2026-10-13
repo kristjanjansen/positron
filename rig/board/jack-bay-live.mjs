@@ -2,7 +2,7 @@
 // real board, graded on the far side of the wire.
 //
 //   node rig/board/jack-bay-live.mjs                 the Circuit into the capture, and back out
-//   node rig/board/jack-bay-live.mjs --pappus        and the Circuit into the granulator
+//   node rig/board/jack-bay-live.mjs --pappus        REFUSED since 2026-10-13 (exit 2), see below
 //   node rig/board/jack-bay-live.mjs --sabotage      never make the link; the level asserts must go red
 //
 // Written 2026-10-11 (plans/plan-nodes-revisited.md §3 item 3). What it asserts
@@ -16,10 +16,30 @@
 // 🔴 IT PLAYS THE CIRCUIT. Note on and note off on channel 1 through the input's
 // own gate (`midi.send`, inputs.mjs `midiVerdict`), 400 ms each, and CC 123 at
 // the end. No SysEx, no program change, nothing that writes the instrument.
-// ⚠️ IT CHANGES THE ONE JACK GRAPH ON THE BOARD for about a minute, and
-// `--pappus` switches the granulator on and back off. Whoever is listening to
-// `studio-1` hears the Circuit in it while the link is up. It restores what it
-// found: the link is unlinked, the granulator left as it was.
+// ⚠️ IT CHANGES THE ONE JACK GRAPH ON THE BOARD for about a minute. Whoever is
+// listening to `studio-1` hears the Circuit in it while the link is up. It
+// restores what it found: the link is unlinked, and a sampler it had to start
+// is stopped again.
+//
+// 🔴 THE SAMPLER HOLDS THE CAPTURE, SINCE 2026-10-13. Until then this raised
+// Yoshimi so that `posboard` existed, and Yoshimi left the board that day
+// (archive/yoshimi/README.md). The sampler is the swap because it is the one
+// engine left that raises the shared capture and stands in it (its standing
+// rows, `possampler:out_1/2 -> posboard:input_1`, jacksynth.mjs
+// `setStandingRows`), so every READ BACK below asks the same question it asked
+// of Yoshimi's two ports: does a bay link sit beside the board's own rows and
+// leave them alone. It plays no note on the sampler, so the main room's floor
+// is the sampler idle and the Circuit is the only thing that can lift it.
+// It stops the sampler at the end if it started it.
+// ⚠️ WHAT THE SWAP COSTS. The board's own CHAIN is an instrument's (`inst`),
+// and the sampler is not one, so with only the sampler up `jack.graph` reads
+// `chain.intact: false` by construction and `jack.rebuild` refuses (`nothing is
+// playing on the JACK graph`). The chain checks therefore read the diff
+// (`missing` and `extra` empty, the capture present) rather than `intact`, and
+// §5 item 6 (a re-patch keeps the link) is asserted as the refusal it is now:
+// nothing moved, the link still on the graph. `--pappus` REFUSES (exit 2):
+// `fx.pappus` raises the granulator only around a JACK instrument
+// (`inst.jack`), and the board has none since Yoshimi left.
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);
@@ -28,6 +48,14 @@ const SABOTAGE = argv.includes('--sabotage');
 const MAIN = 'studio-1', INPUT = 'studio-1-circuit';
 const CIRCUIT = 'pi-1:circuit:audio-out', CAPTURE = 'pi-1:capture:audio-in';
 const GRAN_IN = 'pi-1:pappus:audio-in';
+const SAMPLER = 'pi-1:sampler:audio-out', SAMPLER_JACK = ['possampler:out_1', 'possampler:out_2'];
+
+if (PAPPUS) {
+  console.log('\nREFUSED: --pappus needs the granulator, and `fx.pappus` raises it only around a JACK instrument');
+  console.log('(board.mjs `inst.jack`). The board has none since Yoshimi left on 2026-10-13 (archive/yoshimi/README.md),');
+  console.log('so the arm would stop at "nothing is playing for an insert to wrap". Nothing was sent to the board.\n');
+  process.exit(2);
+}
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -85,18 +113,27 @@ async function noteLevel(note = 60) {
   return { floor, peak, rise: 20 * Math.log10(peak / floor), frames: main.frames.length - k };
 }
 const linkLine = (a, b) => `${a} -> ${b}`;
+/** The board's own rows agree with the graph: the capture is there, nothing missing, nothing stray. */
+const settled = (c) => c?.capture?.present === true && c.missing?.length === 0 && c.extra?.length === 0;
 
 console.log('\n== the board, before anything moves ==');
-let st = await main.ask({ type: 'audio.status' }, 'audio.started', 5000);
-if (!st?.ok || st.source !== 'yoshimi') {
-  console.log('  starting yoshimi, so the capture exists (about 15 s)');
-  st = await main.ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 30000);
+const st0 = await main.ask({ type: 'audio.status' }, 'audio.started', 5000);
+if (!st0) { console.log('  no board answered in this room, nothing to test'); main.close(); input.close(); process.exit(1); }
+const startedSampler = st0.sampler?.ok !== true;
+let samp = st0.sampler;
+if (startedSampler) {
+  console.log('  starting the sampler, so the capture exists (it plays nothing until a note is sent)');
+  samp = await main.ask({ type: 'audio.start', source: 'sampler' }, 'audio.started', 60000);
 }
-ok('yoshimi is the board\'s instrument, so the capture is on the graph', st?.ok && st.source === 'yoshimi', st ? `${st.source} ${st.reason ?? ''}` : 'no answer');
+ok('the sampler is up, so the capture is on the graph', samp?.ok === true && samp.source === 'sampler',
+  samp ? `${samp.source ?? ''} ${samp.reason ?? ''}${startedSampler ? ' (started by this run)' : ' (already running)'}` : 'no answer');
 await wait(1500);
 ok('the main room is streaming the capture', main.frames.length > 20, `${main.frames.length} frames`);
 const before = await main.ask({ type: 'jack.graph' }, 'jack.graph', 5000);
-ok('the board\'s own chain is intact before the test', before?.chain?.intact === true, JSON.stringify(before?.chain?.extra ?? before));
+ok('the board\'s own rows agree with the graph before the test', settled(before?.chain),
+  JSON.stringify({ missing: before?.chain?.missing, extra: before?.chain?.extra, capture: before?.chain?.capture }));
+ok('READ BACK: the sampler feeds the capture on both channels before anything moves',
+  SAMPLER_JACK.every((p) => before?.chain?.capture?.sources?.includes(p)), JSON.stringify(before?.chain?.capture?.sources));
 const links0 = await main.ask({ type: 'jack.links' }, 'jack.links', 5000);
 ok('the board holds no bay link to begin with', links0?.links?.length === 0, JSON.stringify(links0?.links));
 
@@ -112,61 +149,45 @@ let lk = null;
 if (!SABOTAGE) lk = await main.ask({ type: 'jack.link', link: linkLine(CIRCUIT, CAPTURE) }, 'jack.linked', 8000);
 ok('the link is one JACK row, the taken channel into the capture',
   lk?.rows?.length === 1 && lk.rows[0].from === 'circuit:capture_1' && lk.rows[0].to === 'posboard:input_1', JSON.stringify(lk?.rows));
-ok('READ BACK: posboard:input_1 is fed by the Circuit and still by both Yoshimi channels',
-  ['circuit:capture_1', 'yoshimi:left', 'yoshimi:right'].every((p) => lk?.feeding?.['posboard:input_1']?.includes(p)), JSON.stringify(lk?.feeding));
+ok('READ BACK: posboard:input_1 is fed by the Circuit and still by both sampler channels',
+  ['circuit:capture_1', ...SAMPLER_JACK].every((p) => lk?.feeding?.['posboard:input_1']?.includes(p)), JSON.stringify(lk?.feeding));
 const on1 = await noteLevel(62);
 ok('FAR SIDE: a Circuit note now arrives in the main room', on1.rise > 20, `rise ${on1.rise.toFixed(1)} dB, peak ${db(on1.peak)} dBFS over ${on1.frames} frames`);
 
 console.log('\n== the board\'s own re-patch keeps the link (§5 item 6) ==');
 const rb = await main.ask({ type: 'jack.rebuild' }, 'jack.rebuild', 8000);
-ok('jack.rebuild moves nothing and reads the chain intact with the link in it', rb?.ok === true && rb.changed === 0, `changed ${rb?.changed}, ${rb?.reason ?? ''}`);
+// With no instrument the board refuses a rebuild in words. What can still be
+// graded is that the refusal moved nothing: the link has to be on the graph after.
+ok('jack.rebuild with no instrument refuses in words and moves nothing',
+  rb?.ok === false && rb.changed === 0 && /nothing is playing on the JACK graph/.test(rb.reason ?? ''), `changed ${rb?.changed}, ${rb?.reason ?? ''}`);
 const links1 = await main.ask({ type: 'jack.links' }, 'jack.links', 5000);
 ok('jack.links lists the link, intact on the graph', links1?.links?.length === 1 && links1.links[0].intact === true, JSON.stringify(links1?.links?.map((l) => [l.link, l.intact])));
 
-if (PAPPUS) {
-  console.log('\n== the Circuit into the granulator ==');
-  const fx = await main.ask({ type: 'fx.pappus', on: true }, 'fx.pappus', 90000);
-  ok('the granulator is up', fx?.ok && fx.on === true, fx ? `${fx.reason ?? ''} ready ${fx.ready}` : 'no answer in 90 s');
-  const gl = await main.ask({ type: 'jack.link', link: linkLine(CIRCUIT, GRAN_IN) }, 'jack.linked', 8000);
-  ok('one bay link is two JACK rows, the mono Circuit into both granulator inputs',
-    gl?.rows?.map((r) => r.to).join() === 'SuperCollider:in_1,SuperCollider:in_2', JSON.stringify(gl?.rows ?? gl?.problems));
-  ok('READ BACK: both granulator inputs are fed by the Circuit, beside Yoshimi',
-    gl?.feeding?.['SuperCollider:in_1']?.includes('circuit:capture_1') && gl?.feeding?.['SuperCollider:in_2']?.includes('circuit:capture_1'), JSON.stringify(gl?.feeding));
-  // Take the direct Circuit row out, so what arrives is only what came THROUGH the granulator.
-  const un = await main.ask({ type: 'jack.unlink', link: linkLine(CIRCUIT, CAPTURE) }, 'jack.unlinked', 8000);
-  ok('the direct link comes out again', un?.ok && un.cut?.length === 1, JSON.stringify(un?.cut));
-  const g1 = await noteLevel(64);
-  ok('FAR SIDE: a Circuit note arrives in the main room through the granulator', g1.rise > 10, `rise ${g1.rise.toFixed(1)} dB, peak ${db(g1.peak)} dBFS`);
-  const fxOff = await main.ask({ type: 'fx.pappus', on: false }, 'fx.pappus', 10000);
-  const fxOn2 = await main.ask({ type: 'fx.pappus', on: true }, 'fx.pappus', 30000);
-  const links2 = await main.ask({ type: 'jack.links' }, 'jack.links', 5000);
-  ok('fx.pappus off and on again keep the granulator link, rather than owning it away',
-    fxOff?.ok && fxOn2?.ok && links2?.links?.find((l) => l.link === linkLine(CIRCUIT, GRAN_IN))?.intact === true, JSON.stringify(links2?.links?.map((l) => [l.link, l.intact])));
-  const ug = await main.ask({ type: 'jack.unlink', link: linkLine(CIRCUIT, GRAN_IN) }, 'jack.unlinked', 8000);
-  ok('READ BACK: unlinked, the granulator is fed by Yoshimi only',
-    ug?.ok && !ug.feeding?.['SuperCollider:in_1']?.includes('circuit:capture_1') && ug.feeding?.['SuperCollider:in_1']?.includes('yoshimi:left'), JSON.stringify(ug?.feeding));
-  const fxEnd = await main.ask({ type: 'fx.pappus', on: false }, 'fx.pappus', 10000);
-  ok('and the granulator goes back out of the chain, as it was found', fxEnd?.ok && fxEnd.on === false);
-} else {
+{
   console.log('\n== unlinked ==');
   const un = await main.ask({ type: 'jack.unlink', link: linkLine(CIRCUIT, CAPTURE) }, 'jack.unlinked', 8000);
-  ok('READ BACK: the Circuit row is cut and both Yoshimi rows stay',
+  ok('READ BACK: the Circuit row is cut and both sampler rows stay',
     un?.ok && un.cut?.length === 1 && !un.feeding?.['posboard:input_1']?.includes('circuit:capture_1')
-    && ['yoshimi:left', 'yoshimi:right'].every((p) => un.feeding?.['posboard:input_1']?.includes(p)), JSON.stringify(un?.feeding));
+    && SAMPLER_JACK.every((p) => un.feeding?.['posboard:input_1']?.includes(p)), JSON.stringify(un?.feeding));
 }
 
 console.log('\n== a link that repeats the board\'s own chain, unlinked, leaves the room sounding ==');
-const yl = await main.ask({ type: 'jack.link', link: linkLine('pi-1:yoshimi:audio-out', CAPTURE) }, 'jack.linked', 8000);
-const yu = await main.ask({ type: 'jack.unlink', link: linkLine('pi-1:yoshimi:audio-out', CAPTURE) }, 'jack.unlinked', 8000);
-ok('NEGATIVE CONTROL: unlinking it cuts nothing, because the chain still wants both rows',
+const yl = await main.ask({ type: 'jack.link', link: linkLine(SAMPLER, CAPTURE) }, 'jack.linked', 8000);
+const yu = await main.ask({ type: 'jack.unlink', link: linkLine(SAMPLER, CAPTURE) }, 'jack.unlinked', 8000);
+ok('NEGATIVE CONTROL: unlinking it cuts nothing, because the sampler\'s standing rows still want both',
   yl?.ok && yu?.ok && yu.cut?.length === 0 && yu.kept?.length === 2, `cut ${yu?.cut?.length} kept ${yu?.kept?.length}`);
 const off2 = await noteLevel(60);
 ok('NEGATIVE CONTROL: with every link gone, a Circuit note is out of the main room again', off2.rise < 10, `rise ${off2.rise.toFixed(1)} dB`);
 const after = await main.ask({ type: 'jack.graph' }, 'jack.graph', 5000);
-ok('the board\'s own chain is intact afterwards, as it was found', after?.chain?.intact === true, JSON.stringify(after?.chain?.missing));
+ok('the board\'s own rows agree with the graph afterwards, as it was found', settled(after?.chain),
+  JSON.stringify({ missing: after?.chain?.missing, extra: after?.chain?.extra }));
 
 input.send({ type: 'midi.send', bytes: [0xB0, 123, 0] });
 await wait(300);
+if (startedSampler) {
+  const sp = await main.ask({ type: 'audio.stop', source: 'sampler' }, 'audio.stopped', 8000);
+  console.log(`  the sampler stopped again, as it was found: ${sp?.ok ? 'yes' : `no (${sp?.reason ?? 'no answer'})`}`);
+}
 main.close(); input.close();
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

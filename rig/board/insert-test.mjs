@@ -17,7 +17,7 @@
 // no `__demo` and `demo/verify.mjs` cannot see it. A guard nothing can grade is
 // a guard that will rot, so this is the harness.
 //
-//   node rig/board/insert-test.mjs --room studio-1
+//   node rig/board/insert-test.mjs --room studio-1 --instrument <a JACK instrument>
 //
 // ⚠️ IT TOUCHES A SHARED INSTRUMENT and it says so: it switches the insert on
 // and off a few times and puts it back the way it found it. It needs an
@@ -47,12 +47,35 @@
 //   6  a new instrument does not come up granulated afterwards.
 //   7  a plain `fx.pappus {on:false}` is still obeyed, which is what keeps it a
 //      thing a person can type at a wedged board.
+//
+// 🔴 IT REFUSES BY DEFAULT SINCE 2026-10-13 (exit 2), BECAUSE THE BOARD HAS NO
+// INSTRUMENT FOR THE INSERT TO WRAP. It raised Yoshimi, and Yoshimi left the
+// board that day (archive/yoshimi/README.md). `fx.pappus` raises the granulator
+// only around a JACK INSTRUMENT (board.mjs `inst.jack`, set by `JACK_SYNTHS`,
+// which is empty now). The sampler and the Circuit are both on JACK, and
+// neither is one: the sampler is `samp`, beside the instrument slot, and the
+// Circuit is a hardware input in its own room. So `fx.pappus {on: true}` answers
+// `nothing is playing for an insert to wrap` whatever else is playing, and
+// every case below would stop at case 1 for a reason that is not the sweep.
+// Retargeting to the sampler would not be a swap: it needs the board to let the
+// insert wrap the sampler's standing rows, which is board code and a push.
+//   node rig/board/insert-test.mjs --room studio-1 --instrument yoshimi
+// runs it as it was, for a board that has a JACK instrument again (the README
+// says how to bring Yoshimi back).
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
 const ROOM = arg('room', 'studio-1');
 const RELAY = arg('relay', RELAY_BASE);
+const INSTRUMENT = arg('instrument', null);
+if (!INSTRUMENT) {
+  console.log('\nREFUSED: the insert wraps only a JACK instrument (board.mjs `inst.jack`), and this board has none');
+  console.log('since Yoshimi left on 2026-10-13 (archive/yoshimi/README.md). The sampler and the Circuit are on JACK');
+  console.log('but are not the instrument slot, so fx.pappus would refuse every case here for the wrong reason.');
+  console.log('Name one with --instrument <source> on a board that has it. Nothing was sent to the board.\n');
+  process.exit(2);
+}
 // 📄 `INSERT_HELD_MS` in board.mjs. Read from there in words rather than shared as
 // a constant, because this process cannot import the board's copy — so the test
 // waits a margin past it and SAYS the number, which is how a disagreement shows
@@ -137,8 +160,8 @@ const wasPlaying = status.ok ? status.source : null;
 const wasInsert = status.fx === 'pappus';
 console.log(`  the board was playing ${wasPlaying ?? 'nothing'}, insert ${wasInsert ? 'in' : 'out'}`);
 if (!status.ok || !status.jack) {
-  console.log('  starting yoshimi, because the insert can only wrap what is on the JACK graph');
-  status = await grainsTab.ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 90000);
+  console.log(`  starting ${INSTRUMENT}, because the insert can only wrap a JACK instrument`);
+  status = await grainsTab.ask({ type: 'audio.start', source: INSTRUMENT }, 'audio.started', 90000);
   if (!status?.ok) { console.log(`  could not start an instrument: ${status?.reason}`); process.exit(1); }
 }
 
@@ -227,7 +250,7 @@ ok('and the board says WHO asked for it, which nothing could see before',
 //
 // `startAudio` re-patches a switched-on insert onto whatever comes up, which is
 // right for the page holding it and is how a closed tab's granulator used to
-// end up wrapping the next person's yoshimi. The board sweeps at the top of
+// end up wrapping the next person's instrument. The board sweeps at the top of
 // that call too, so the five seconds between the drop and the next heartbeat
 // are not audible either.
 //
@@ -235,7 +258,7 @@ ok('and the board says WHO asked for it, which nothing could see before',
 // outside the board is not something this can time reliably, so what is checked
 // is the thing that matters: the instrument comes up with no insert on it.
 {
-  const started = await boardTab.ask({ type: 'audio.start', source: 'yoshimi' }, 'audio.started', 120000);
+  const started = await boardTab.ask({ type: 'audio.start', source: INSTRUMENT }, 'audio.started', 120000);
   ok('an instrument started afterwards comes up with no insert on it',
     started?.ok === true && started?.fx === null,
     `source=${started?.source} fx=${started?.fx} fxBy=${started?.fxBy}`);

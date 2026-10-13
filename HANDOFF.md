@@ -4,6 +4,7 @@
 
 - **Site: BUILD `3de40367-091104-1cea`**, confirmed on the edge. Deployed from a clean worktree of HEAD every time this session (`git worktree add --detach`, build, deploy, commit `public/` there, fast forward main), so no in-flight file ever shipped.
 - **Workers:** positron-pub and positron-sweep redeployed today (pub's test pattern and RTMPS camera routes answer 410, see the note below this section). Six workers deleted.
+- **The Pi: Yoshimi was retired 2026-10-13** (`archive/yoshimi/README.md`, `plans/plan-retire-yoshimi.md`). The board has no JACK instrument: `audio.start` needs a named source (`sampler`, `collide`, `synth`), and the granulator (`fx.pappus`) refuses for want of one, so `rig/board/insert-test.mjs` and `pappus-live.mjs` refuse (exit 2) and `jack-bay-live.mjs` holds the capture with the sampler.
 - **GitHub:** pushed once at `7564a0b6`; **50 commits since are NOT pushed**. Push needs the account switch in CLAUDE.md, and switching back.
 - Counted: **57 demo rows, 56 built, 40 unlisted**; **44 concept pages** in synth, remote, radio, video, shader, room, typist, sampler, rhythm, clock; **114 plans**. Working tree clean. No agent running. Dev server up on :8890.
 - A power cut killed three agents mid work at the start (fonts, tempo, LL-HLS loopback); all three were resumed from their transcripts and finished.
@@ -15,7 +16,7 @@
 | site wide | **Two faces only:** JetBrains Mono names (titles, headings, controls, readouts, keys), Geist reads (lines, body, cards). 39 font files and 403 KB gone, Bravura with them; keys read `C#3`. Canvas pictures wait for the face. Rule in positron-ui |
 | https://positron.studio/frontpage | redirects (302) to /kit/frontpage/: THE HERO, LARGE on top (`POSITRON.STUDIO` and the headline's full stop in the accent) over a working imaginary patchbay: desk 3 columns (keys, Pico knob, camera; relay, Stream; Circuit on the Pi, this screen, every phone), phone 2 columns of its own (touch, tilt, camera, mic into the Circuit, the Pi GPU, Stream), equal box widths, one stand-in player driving every wire |
 | every concept page | the card `say` under the title (nav.mjs); prev and next bigger, as written, close under the back link, spread on a phone |
-| /concepts/ | **REMOTE INSTRUMENTS** (`remote/000` to `050`: Yoshimi, Circuit, Collide on Pi, Pi piano, Drums on the Pi, Shader on Pi); old synth/060, 070, 100, sampler/030, rhythm/030, shader/010 URLs 404. No archive link. draw, streaming and device groups gone |
+| /concepts/ | **REMOTE INSTRUMENTS** (`remote/000` to `050`: Yoshimi (archived 2026-10-13, see the Pi line above), Circuit, Collide on Pi, Pi piano, Drums on the Pi, Shader on Pi); old synth/060, 070, 100, sampler/030, rhythm/030, shader/010 URLs 404. No archive link. draw, streaming and device groups gone |
 | video/030 WebRTC loopback, video/060 LL-HLS loopback, video/050 MoQ loopback | the camera loopback split in two (shared `video/loopback.mjs`): WebRTC 87 ms; LL-HLS 5.3 s settled, 30 s cap from when Stream says live, every take deleted about 90 s after (worker alarm plus a 10 min cron, a 600 storage minute guard); MoQ 29 to 32 ms through Cloudflare's public relay |
 | radio/020 Tempo | beats on the kick 77.2 to 81.3 %, shown wrong 6.3 to 5.0 %. beat_this in the tab measured and refused (27.6 % of a core, no better tempo): research/tempo-key-eval-2026-10-12.md section 8 |
 | rhythm/020 Sample drums | samples box first, no scopes, no knobs, no per row pickers |
@@ -27,7 +28,7 @@
 
 ## Open, waiting on the owner
 
-- **knobs and away** repeat remote/000 Yoshimi and remote/010 Circuit: mark them not needed? Asked, not answered.
+- **knobs and away** repeat remote/000 Yoshimi and remote/010 Circuit: mark them not needed? Asked, not answered. ⚠️ 2026-10-13: knobs and remote/000 are archived with Yoshimi, so only `away` is left to decide.
 - **remote/020 Collide on Pi scopes** "very nervous visualization. think what to do": nothing proposed yet.
 - **clock/010 Message lag autoplay** (*"use autoplay stuff here no keyboard"*): its agent launch was cancelled by the owner, not built.
 - **capture concepts**: three proposed (Take, Pieces, What arrived), no go yet.
@@ -136,8 +137,8 @@ to run something, check this list first.
 - **JACK runs on the Fast Track Pro itself** (`jackd -d alsa -C hw:CARD=Pro -p 512 -n 3`, capture only); the Circuit is on JACK and clean (floor about -80 dBFS, same as arecord). The arecord config is saved on the Pi. A power cycle of the Fast Track Pro cured 8 bit samples once; do it again if they return.
 - `rig/board/jack.mjs`: plan/apply JACK links, bay links between Pi audio ports become JACK connections.
 - **SysEx**: the gate allows exactly the Circuit Current Patch Dump Request and the Device Inquiry; the board reads before writing (snd-usb-audio drops replies otherwise). /concepts/synth/070/ shows the Circuit's patch name.
-- **Yoshimi** takes MIDI only from the board's virmidi (`alsa_midi_type` External), so it no longer grabs the Circuit.
-- **SuperCollider sampler** (`rig/board/scsampler.mjs`, its own scsynth on 57130) beside Yoshimi, both summed into the capture (option b). Piano and Rhodes FLACs on the card. FluidSynth removed from the Pi.
+- **Yoshimi** takes MIDI only from the board's virmidi (`alsa_midi_type` External), so it no longer grabs the Circuit. ⚠️ 2026-10-13: Yoshimi is off the board (`archive/yoshimi/README.md`).
+- **SuperCollider sampler** (`rig/board/scsampler.mjs`, its own scsynth on 57130) beside Yoshimi, both summed into the capture (option b). ⚠️ 2026-10-13: the sampler alone now. Piano and Rhodes FLACs on the card. FluidSynth removed from the Pi.
 - Board tests 445/445. Unused on the Pi, not removed, owner to decide: `/opt/positron-box` + its service, hexter, dssi-host-jack, qjackctl, supercollider-ide and Qt WebEngine, mkvtoolnix, flite, pocketsphinx, the Pi 5 kernel, ModemManager, bluetooth.
 
 ## New concepts and kit

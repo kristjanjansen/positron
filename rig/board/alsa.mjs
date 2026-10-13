@@ -247,3 +247,29 @@ export function clearAll({ dry = false } = {}) {
   try { execFileSync('aconnect', ['-x'], { stdio: 'pipe' }); return { ok: true, result: 'cleared' }; }
   catch (e) { return { ok: false, result: 'failed', error: String(e.stderr ?? e.message).trim() }; }
 }
+
+// `sourcesOf` moved here from yoshimi.mjs on 2026-10-13, when Yoshimi left the
+// board (archive/yoshimi/README.md): it reads any client's sources off
+// `aconnect -l`, and `jacksynth.mjs` `strayMidiSources` uses it for every JACK synth.
+/**
+ * Who feeds a sequencer client, out of `aconnect -l`, as `{ id, name }` per
+ * source port. `match` is a RegExp on the client's name or `(id, name) => bool`. The board's check that Yoshimi hears the virmidi port and
+ * nothing else: an instance edited by hand, or a Yoshimi that ignores the
+ * setting, would show the Circuit here.
+ *
+ *   client 128: 'yoshimi' [type=user,pid=4321]
+ *       0 'input           '
+ *           Connected From: 16:0, 44:0[real:0]
+ */
+export function sourcesOf(listing, match) {
+  const names = new Map();
+  let cur = null, inside = false;
+  const from = [];
+  for (const line of String(listing).split('\n')) {
+    const c = line.match(/^client (\d+): '([^']*)'/);
+    if (c) { cur = c[1]; names.set(cur, c[2]); inside = typeof match === 'function' ? match(c[1], c[2]) : match.test(c[2]); continue; }
+    const f = line.match(/^\s+Connected From:\s*(.*)$/);
+    if (f && inside) for (const id of f[1].match(/\d+:\d+/g) ?? []) from.push(id);
+  }
+  return from.map((id) => ({ id, name: names.get(id.split(':')[0]) ?? null }));
+}

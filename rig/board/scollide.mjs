@@ -135,8 +135,23 @@ export const CPU_REFUSE = 70;
  * `test.mjs` goes red until it is.
  */
 export const STRUCTURAL = Object.freeze(['Control', 'LagControl', 'BinaryOpUGen', 'UnaryOpUGen', 'Out']);
+// ⚠️ THE SECOND ROW ARRIVED 2026-10-13, when the compiler learned them for the
+// grain ring (now /archive/grain-ring/). Every one is a core scsynth plugin
+// class (GrainBuf in GrainUGens, the rest in BufIO, Trig, InOut, Noise and
+// Osc), so the board's real scsynth loads them. `.sin` and `.cos` need no row:
+// they are UnaryOpUGen, already structural.
 export const ALLOWED_CLASSES = Object.freeze(new Set([...STRUCTURAL,
-  'SinOsc', 'Saw', 'Pulse', 'LFSaw', 'LFTri', 'LFNoise1', 'WhiteNoise', 'LPF', 'HPF', 'RLPF', 'Pan2', 'EnvGen']));
+  'SinOsc', 'Saw', 'Pulse', 'LFSaw', 'LFTri', 'LFNoise1', 'WhiteNoise', 'LPF', 'HPF', 'RLPF', 'Pan2', 'EnvGen',
+  'GrainBuf', 'BufWr', 'Phasor', 'SendReply', 'Impulse', 'Dust', 'TRand', 'In', 'BufFrames', 'BufDur']));
+/**
+ * 🔴 BufWr WRITES INTO A BUFFER, AND ON THE SAMPLER'S SERVER THE BUFFERS ARE
+ * THE PIANO. On `ENGINES.own` nothing allocates a buffer for a page (there is
+ * no verb for it), so a BufWr there writes into nothing and is inert. On
+ * `ENGINES.shared` the same program could overwrite the sampler's recordings
+ * for everybody in the room, so that engine refuses the class by name.
+ */
+export const SHARED_REFUSED = Object.freeze(['BufWr']);
+export const ALLOWED_SHARED = Object.freeze(new Set([...ALLOWED_CLASSES].filter((c) => !SHARED_REFUSED.includes(c))));
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export const nameOk = (n) => typeof n === 'string' && NAME_RE.test(n);
@@ -482,7 +497,8 @@ export function createCollideService({ engine = ENGINE, start = startScCollide, 
 
   function attach(s) {
     server = s;
-    core = createCollideCore({ send: (p) => server?.send(encodePacket(p)), now, bus: s.bus ?? PAGE_BUS, log });
+    core = createCollideCore({ send: (p) => server?.send(encodePacket(p)), now, bus: s.bus ?? PAGE_BUS, log,
+      allowed: s.mode === 'shared' ? ALLOWED_SHARED : ALLOWED_CLASSES });
     offReply = s.onReply((m) => {
       if (m.addr === '/n_end') core?.ended(m.args[0]);
       else if (m.addr === '/fail') core?.failed(m.args);

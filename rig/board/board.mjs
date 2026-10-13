@@ -24,7 +24,6 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
          jackGraph, jackChain, jackRebuild, ensureJackd, setJackCard, wire as jackWire, setBayRows, getBayRows,
          setCaptureUnit,
        } from './jacksynth.mjs';
-import { yoshimiPatches, YOSHIMI_DIR } from './yoshimi.mjs';
 import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
 import { createCollideService } from './scollide.mjs';
 import { captureHolders } from './jacksynth.mjs';
@@ -37,7 +36,6 @@ import { helloMsg, aliveMsg, graphOf } from './beat.mjs';
 import { jackRows } from '../../demo/shell/graph-registry.mjs';
 import { listJack, plan as jackPlan, apply as jackApply, canonical as jackCanonical, diff as jackDiff } from './jack.mjs';
 import { spawn, execFileSync } from 'node:child_process';
-import { statSync } from 'node:fs';
 import * as fsMod from 'node:fs';
 
 const arg = (k, dflt) => {
@@ -420,28 +418,12 @@ function watchVideoViewers() {
 function stopVideoWatch() { if (videoWatch) { clearInterval(videoWatch); videoWatch = null; videoAloneSince = null; } }
 
 /**
- * Yoshimi's bank map, read once and re-read when Yoshimi rewrites it.
- *
- * The file is 660 KB of gzipped XML and a patch step asks for the bank number
- * every time, so re-reading it per keystroke would be silly — but caching it
- * forever would make an instrument added on the board invisible until a restart.
- * The mtime is the cheap way to have both.
+ * Which controller selects a bank. 32 is the MIDI standard (bank select LSB).
+ * Until 2026-10-13 Yoshimi's was read from its own bank map here (`yoshimiList`,
+ * now in archive/yoshimi/board-half.mjs); no instrument left on the board
+ * reads it from anywhere else.
  */
-let yoshimiMemo = null, yoshimiMemoAt = 0;
-function yoshimiList() {
-  let mtime = 0;
-  try { mtime = statSync(`${YOSHIMI_DIR}/yoshimi.banks`).mtimeMs; } catch { /* answered below */ }
-  if (!yoshimiMemo || mtime !== yoshimiMemoAt) { yoshimiMemo = yoshimiPatches(); yoshimiMemoAt = mtime; }
-  return yoshimiMemo;
-}
-/**
- * Which controller selects a bank, for the instrument that is running.
- *
- * 32 is the MIDI standard (bank select LSB) and is the right answer for any
- * synth that has banks at all; Yoshimi's is read from Yoshimi rather than
- * assumed, because it is settable there and a page cannot see the setting.
- */
-const bankCC = (source) => (source === 'yoshimi' ? yoshimiList().bankCC ?? 32 : 32);
+const bankCC = () => 32;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -655,7 +637,7 @@ async function startAudio(source = 'synth', msg = null) {
   // is the right answer: `known` lists what this board actually has.
   if (source !== 'capture') {
     return { ok: false, reason: `unknown source ${JSON.stringify(source)}`,
-             known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture'] };
+             known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture', 'sampler', 'collide'] };
   }
   if (backend() !== 'alsa') return { ok: false, reason: 'no arecord here — capture needs the board' };
   if (!(AUDIO_TAKE >= 1 && AUDIO_TAKE <= AUDIO_CH)) {
@@ -860,7 +842,11 @@ async function handle(msg, replyVia = null) {
       log('clearing every subscription');
       return reply('patch.cleared', clearAll({ dry: DRY }));
     case 'audio.start':
-      startAudio(msg.source ?? 'yoshimi', msg).then((r) => reply('audio.started', r));
+      // 🔴 NO DEFAULT SINCE 2026-10-13. A bare `audio.start` meant Yoshimi, and
+      // Yoshimi left the board (archive/yoshimi/README.md), so it is refused in
+      // words rather than quietly turned into another instrument.
+      if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "sampler"}, "collide" or "synth"; there is no default since Yoshimi left this board on 2026-10-13' });
+      startAudio(msg.source, msg).then((r) => reply('audio.started', r));
       return true;
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The board does
     // not care which, and does not need one to exist.
@@ -876,7 +862,10 @@ async function handle(msg, replyVia = null) {
       // If something is mid-start, do NOT start a second instrument — drop the
       // note. One missed note is nothing; two instruments is a broken stream.
       if (starting) return reply('note.ack', { note: msg.note, dropped: true, starting });
-      if (!synth && !inst) await startAudio('yoshimi', {});
+      // 🔴 A NOTE TO AN IDLE BOARD STARTS NOTHING, SINCE 2026-10-13. It used to
+      // raise Yoshimi, 300 MB for 13 to 40 s, on any stray note; now it is
+      // dropped and said, as the sampler branch above already did.
+      if (!synth && !inst) return reply('note.ack', { note: msg.note, dropped: true, reason: 'nothing is playing on this board, send audio.start {source: ...} first' });
       if (inst) inst.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
       // ⚠️ A KEY NO LONGER PITCHES A GRAIN VOICE, AND THAT WENT WITH THE
@@ -910,16 +899,8 @@ async function handle(msg, replyVia = null) {
     // pretend to — so the board enumerates and the page renders what it is told.
     case 'voices.list': {
       const src = msg.source ?? inst?.source ?? null;
-      if (src === 'yoshimi') {
-        const list = yoshimiList();
-        log(`voices.list: ${list.count} patches in ${list.bankCount} banks, root ${list.root}${list.stale ? ' (STALE — the bank map disagrees with the disk)' : ''}`);
-        // ⚠️ `source` names the INSTRUMENT and must survive the spread. The
-        // list carried its own `source` (the file it was read from) for one
-        // revision, the spread overwrote this one with a path, and every
-        // client waiting for "the yoshimi list" waited forever — with the
-        // reply sitting right there. The file is `file`.
-        return reply('voices.listed', { ...list, source: 'yoshimi' });
-      }
+      // The Yoshimi branch (its bank map as `voices.listed`) left on 2026-10-13
+      // and is in archive/yoshimi/board-half.mjs.
       // ⚠️ THIS BRANCH IS NOT DEAD, THOUGH YOSHIMI IS THE ONLY INSTRUMENT.
       // `nothing is playing` is the ordinary answer on a cold board, and it has
       // to be told apart from a library that failed to read. `fixed` is that
@@ -1607,7 +1588,7 @@ async function handle(msg, replyVia = null) {
           // Say which verb raises a missing end, rather than only that it is missing.
           const hint = planned.problems.some((p) => /SuperCollider/.test(p)) ? ' The granulator is not running: fx.pappus on raises it.'
             : planned.problems.some((p) => /posboard/.test(p)) ? ' The capture is not running: audio.start raises it.'
-            : planned.problems.some((p) => /yoshimi/.test(p)) ? ' Yoshimi is not running: audio.start raises it.' : '';
+            : '';
           return answer({ ok: false, applied: false, rows: jr.rows, problems: planned.problems, hint: hint.trim() || null });
         }
         if (!DRY) { bayLinks.set(key, jr.rows); setBayRows(flat()); }
@@ -1676,9 +1657,10 @@ function connect() {
                           ...Object.fromEntries(Object.keys(JACK_SYNTHS).map((k) => [k, jackSynthAvailable(k)])),
                           sampler: samplerAvailable() };
     // `jack`: this board has a JACK graph, so its JACK ends are announced
-    // (graph-registry.mjs `boardGraph`). Yoshimi installed or an input on JACK
-    // is the same question `startJackSynth` and `inputs.mjs` ask.
-    const jack = jackSynthAvailable('yoshimi') || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
+    // (graph-registry.mjs `boardGraph`). The sampler installed (it plays into the
+    // JACK capture) or an input on JACK; it read `jackSynthAvailable('yoshimi')`
+    // until Yoshimi left on 2026-10-13.
+    const jack = samplerAvailable() || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
     graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable() };

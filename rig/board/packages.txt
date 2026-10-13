@@ -28,10 +28,13 @@
 # installing them costs 141 MB of soundfont and a plugin host for something
 # that cannot be reached. `archive/box-fluidsynth-hexter/` has the code and the
 # reason.
+#
+# 🔴 AND `yoshimi` AND `yoshimi-data` LEFT ON 2026-10-13 (*"discard yoshimi"*),
+# with `yoshimi-doc` and the libraries only they used (`libfltk1.3t64`,
+# `libfltk-images1.3t64`, `libmxml1`, `libxft2`) purged off the Pi the same day.
+# archive/yoshimi/README.md says how to put them back (2.3.3.3-1 from trixie).
 
 jackd2	1.9.22~dfsg-4	apt	the audio graph every instrument is patched into; the insert lives on it
-yoshimi	2.3.3.3-1	apt	911 instruments in 24 banks, as its own JACK client
-yoshimi-data	-	apt	those banks; without it yoshimi starts and has nothing to play
 supercollider	1:3.13.0+repack-3	apt	scsynth and sclang, what pappus the granular engine runs in
 sc3-plugins	-	apt	the extra UGens pappus uses; core SuperCollider is not enough for it
 csound	1:6.18.1+dfsg-4	apt	the reverb insert (rig/board/csd/space.csd)

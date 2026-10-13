@@ -1,6 +1,6 @@
 ---
 name: positron-hardware
-description: The Raspberry Pi board, the Ableton rig, Yoshimi, the Novation Circuit, MIDI and audio capture on this desk. Load before touching anything under rig/, before a page that plays or records real hardware, and before any claim about what an instrument does.
+description: The Raspberry Pi board, the Ableton rig, Yoshimi (retired from the board 2026-10-13), the Novation Circuit, MIDI and audio capture on this desk. Load before touching anything under rig/, before a page that plays or records real hardware, and before any claim about what an instrument does.
 ---
 
 # The machines on and off this desk
@@ -92,6 +92,20 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
   that was `ffmpeg -f avfoundation`, whose TCC subject is the terminal;
   `audiotap` disclaims responsibility and is its own subject, measured working
   from an ssh-started process.
+- 🔴 **YOSHIMI IS NOT ON THE BOARD SINCE 2026-10-13.** Retired that day on
+  *"discard yoshimi. with possiblity to do dual setup in future"*: packages
+  purged on the Pi, `rig/board/yoshimi.mjs` and the four measuring tests
+  (`yoshimi-test`, `cc-test`, `wobble-test`, `note-test`) moved to
+  `archive/yoshimi/`, `/knobs/` and `/grains/` to `archive/demos/`.
+  `archive/yoshimi/README.md` says what went where and how to bring it back,
+  alone or as a Pi and browser pair. The board has NO JACK instrument now:
+  `audio.start` needs a named source (`sampler`, `collide`, `synth`), and the
+  granulator (`fx.pappus`) refuses because it wraps only the instrument slot,
+  which the sampler and the Circuit are not. The entry below is the record of
+  the instrument while it was here, and its controller map is what a returning
+  Yoshimi (or the browser build in `research/yoshimi-wasm-2026-10-13.md`) still
+  answers. The tests it names are in `archive/yoshimi/` and import
+  `./measure.mjs`, so they run only once moved back to `rig/board/`.
 - 🔴 **YOSHIMI DOES NOT USE THE GENERAL MIDI CONTROLLER MAP, AND ASKING IT FOR A
   VIBRATO GETS A SLIDER THAT DOES NOTHING.** In General MIDI, 76 and 77 are
   vibrato rate and depth. In the ZynAddSubFX family they are **FM amplitude** and

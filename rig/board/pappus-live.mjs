@@ -165,6 +165,19 @@
 // change was scoped to one file. They belong next to `measure()`, and
 // `summarise`/`separated` there are what they replace — nothing else imports
 // those two.
+//
+// 🔴 A LIVE RUN REFUSES BY DEFAULT SINCE 2026-10-13 (exit 2), BECAUSE THE BOARD
+// HAS NO INSTRUMENT FOR THE INSERT TO WRAP. It raised Yoshimi, and Yoshimi left
+// the board that day (archive/yoshimi/README.md). `fx.pappus` raises the
+// granulator only around a JACK INSTRUMENT (board.mjs `inst.jack`, set by
+// `JACK_SYNTHS`, which is empty now). The sampler and the Circuit are on JACK
+// and neither is the instrument slot, so `fx.pappus {on: true}` answers
+// `nothing is playing for an insert to wrap`, and the priming notes below go to
+// `note.on` with no `node`, which only an instrument takes. Retargeting to the
+// sampler needs the board to let the insert wrap the sampler's standing rows,
+// which is board code and a push, not a swap here.
+// `--instrument <source>` runs it as it was on a board that has one again.
+// `--self-test` needs no board and still runs.
 import { measure } from './measure.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i >= 0 ? process.argv[i + 1] : d; };
@@ -194,6 +207,14 @@ const only = arg('only', null);
 const RUN = new Set(only ? only.split(',').map((s) => s.trim()) : SECTIONS);
 for (const s of RUN) if (!SECTIONS.includes(s)) { console.error(`unknown section "${s}" — pick from ${SECTIONS.join(' | ')}`); process.exit(2); }
 const ROOM = arg('room', 'studio-1');
+const INSTRUMENT = arg('instrument', null);
+if (!SELF && !INSTRUMENT) {
+  console.log('\nREFUSED: the granulator wraps only a JACK instrument (board.mjs `inst.jack`), and this board has none');
+  console.log('since Yoshimi left on 2026-10-13 (archive/yoshimi/README.md). The sampler and the Circuit are on JACK');
+  console.log('but are not the instrument slot, so fx.pappus would refuse and nothing here could be graded.');
+  console.log('Name one with --instrument <source> on a board that has it, or run --self-test. Nothing was sent.\n');
+  process.exit(2);
+}
 /** Repeats a condition. See "why five" above; `--takes` is for experiments, not for making a run pass. */
 const TAKES = Math.max(1, Number(arg('takes', QUICK ? 2 : 5)));
 const TAKES_DRIFT = QUICK ? TAKES : Math.max(TAKES, 7);
@@ -660,10 +681,9 @@ const sounded = (c) => c.all.filter((t) => t.peak > SILENCE).length;
 
 try {
   // ── raise the chain ───────────────────────────────────────────────────────
-  // Yoshimi is what the insert wraps: an insert can only reach what is on the
-  // JACK graph, and it is the only instrument this board has since 2026-09-16.
-  console.log('  raising yoshimi (a JACK chain takes ~13 s) ...');
-  const s = await answer(send({ type: 'audio.start', source: 'yoshimi' }), 'audio.started', 60000);
+  // The insert wraps a JACK instrument and nothing else (see the header).
+  console.log(`  raising ${INSTRUMENT} (a JACK chain took ~13 s for Yoshimi) ...`);
+  const s = await answer(send({ type: 'audio.start', source: INSTRUMENT }), 'audio.started', 60000);
   okOnce('a JACK instrument is up for the insert to wrap', s.ok !== false, s.source ?? '');
 
   console.log('  switching pappus on (first time compiles 2,030 lines, ~40 s) ...');
