@@ -25,6 +25,18 @@
 // Every one of them is neutral at its default (DEFAULTS), so a patch that does
 // not name them sounds as before.
 //
+// AND SINCE 2026-10-13 A BEAT GRID, for /concepts/sampler/070/ (*"make followup
+// demo with ida, dub and add tempo detection and feed it into granulator"*).
+// `\lock` 1 takes the even grains off `Impulse` and onto a Phasor that goes
+// round `density` times a second (`secs / frames` is one over the sample
+// rate, as the buffer was allocated) and that `\beat` sets back to 0 when the
+// page raises it on a beat. GrainBuf, TRand and SendReply all fire when their
+// trigger goes from 0 or below to above 0, so the ramp shifted down by half
+// fires once a turn, at the top. With `density` a whole number of grains a
+// beat the grains land on the beat. Scattered grains (Dust) still come at
+// random and count only on the low half of a turn. `\lock` 0 is the old
+// graph's sound exactly: the Impulse at its old rate and the ramp times 0.
+//
 // The comments in it are for a visitor reading the box: short and plain.
 export const PROGRAM = `// grains read out of an eight second ring of what comes in
 {
@@ -43,7 +55,11 @@ export const PROGRAM = `// grains read out of an eight second ring of what comes
   // grains a second, evenly or at random
   var density = \\density.kr(20, spec: [0.5, 64, \\exp]);
   var scatter = \\scatter.kr(0);
-  var trig = Impulse.ar(density * (1 - scatter)) + Dust.ar(density * scatter);
+  // lock 1 puts the even grains on the beat: a ramp round density times a
+  // second, set back to its start on every beat (beat 0 to 1)
+  var lock = \\lock.kr(0);
+  var grid = Phasor.ar(\\beat.kr(0), density * secs / frames, 0, 1);
+  var trig = Impulse.ar(density * (1 - scatter) * (1 - lock)) + Dust.ar(density * scatter) + ((((grid + 0.5) % 1) - 0.5) * lock * (1 - scatter));
   // each grain's length, place, pitch and side; dir -1 plays every grain backwards
   var size = \\size.kr(0.1, spec: [0.02, 4, \\exp]);
   var jitter = \\jitter.kr(0);
@@ -77,7 +93,7 @@ export const RING_SECONDS = 8;
  * nothing round the echo, `drop` 0 never slows the tape, `dir` 1 plays forwards.
  */
 export const DEFAULTS = { freeze: 0, speed: 1, back: 0.5, density: 20, scatter: 0, size: 0.1, jitter: 0,
-  pitch: 1, detune: 0, pan: 0.5, amp: 1.5, tone: 20000, echo: 0, time: 0.375, dark: 20000, drop: 0, ramp: 0.5, dir: 1 };
+  pitch: 1, detune: 0, pan: 0.5, amp: 1.5, tone: 20000, echo: 0, time: 0.375, dark: 20000, drop: 0, ramp: 0.5, dir: 1, lock: 0 };
 
 /**
  * Ten sounds, each a set of control values on the one program, each one

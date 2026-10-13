@@ -31,6 +31,8 @@ export const CONCEPTS = [
   // Dot piano last in its group (asked 2026-10-13, *"dot piano is last in group"*).
   { n: 'synth/030', title: 'Dot piano', say: 'Each note draws an arc on a ring, by a shader in this tab and by C firmware on an emulated Pico.' },
   { n: 'sampler/060', group: 'granulator', title: 'Granulator', say: 'Our radio recordings granulated in this tab, each grain marked on the wave where it read the sound.' },
+  // sampler/070 (asked 2026-10-13, *"make followup demo with ida, dub and add tempo detection and feed it into granulator"*).
+  { n: 'sampler/070', group: 'granulator', title: 'Beat granulator', say: 'The Ida recording granulated on Dub, its echo and grains put on the beat a tempo detector hears.' },
   // sampler/050, the Pappus granulator, moved to /archive/ 2026-10-13 when the owner chose the light one (*"but we got rid of pappus?!? 060 ???"*): /archive/pappus/, still working.
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
   // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,

@@ -37,6 +37,10 @@
 //     moving() -> string[]             optional: controls the engine moves by
 //                                      itself, so their read back value is the
 //                                      patch's plus that movement
+//     value(ev) -> boolean             optional: an event on web:grains:value-in
+//                                      that is not a knob's or a patch's (070's
+//                                      tempo, its follow switch); true when the
+//                                      engine took it
 //   }
 // `controls` is everything a patch sets, each a knob a person may turn:
 // `{ name, label, kind: 'knob', min, max, warp: 'lin' | 'exp', fmt }` for an
@@ -172,7 +176,7 @@ const CSS = `
   .cc-wave .pos-scope-gut { display: none; }
   .cc-wave { position: relative; }
   .cc-births { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
-  .cc-top { display: flex; }
+  .cc-top { display: flex; gap: var(--ctl-gap); }
   .cc-top > .pos-bgroup { flex: none; width: auto; }
   .cc-patch { display: flex; }
   .cc-patch > .pos-pick { display: flex; width: 100%; height: auto; }
@@ -208,9 +212,21 @@ const CSS = `
  * @param o.source   the id of the source the picker opens on (060 opens on
  *                   `ida`, asked 2026-10-13, *"put ida rec default"*); the
  *                   first one when it is not given or names none
+ * @param o.wire     `({ bay, hold, holds, ports }) => {}`, called once the rig's own
+ *                   nodes and links are in the bay and before the patchbay is
+ *                   drawn, so a page can add nodes and links of its own (070's
+ *                   tempo detector). `ports` names the rig's ports.
+ * @param o.audio    `({ ctx, bus }) => {}`, called once when Play first builds
+ *                   the audio graph: `bus` is the chosen source, the same node
+ *                   the granulator and the source scope hear
+ * @param o.top      elements after Play on its row (070's follow switch)
+ *
+ * Added 2026-10-13 for /concepts/sampler/070/; a page that passes none of
+ * wire, audio, top or `engine.value` gets what it got before.
  */
 export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
-  hue = () => null, under = [], check: pageCheck = null, outputScope = true, source: firstSource = null }) {
+  hue = () => null, under = [], check: pageCheck = null, outputScope = true, source: firstSource = null,
+  wire = null, audio = null, top: topExtra = [] }) {
   if (!document.getElementById('cc-grain-css')) {
     const st = el('style'); st.id = 'cc-grain-css'; st.textContent = CSS; document.head.append(st);
   }
@@ -293,6 +309,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   if (outputScope) hold(GRAINS_OUT, SCOPE_IN);
   hold(GRAINS_EV, WAVE_EV);
   if (outputScope) hold(GRAINS_EV, SCOPE_EV);
+  wire?.({ bay, hold, holds, ports: { RADIO_OUT, GRAINS_IN, GRAINS_OUT, GRAINS_VAL, GRAINS_EV, WAVE_IN, WAVE_EV, SPEAKER_IN, PATCH_OUT, PATCH_FIXED } });
 
   // ── state ────────────────────────────────────────────────────────────────
   let ctx = null, srcBus = null, toGrains = null, srcTap = null, srcBuf = null, outBuf = null;
@@ -482,6 +499,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   }
   /** A knob's value arriving at the grains, on its wire into web:grains. */
   function valueIn(ev) {
+    if (engine.value?.(ev)) return;
     if (ev?.of === 'fixed') { if (eng && ev.set) engine.fixed(ev.set); return; }
     if (ev?.of !== 'param' || ev.v === undefined || !(ev.name in cur)) return;
     if (ev.name === 'mix' && !Number.isFinite(ev.v)) return;
@@ -570,6 +588,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
         dry.connect(ctx.destination);
         dry.connect(heard);
       }
+      audio?.({ ctx, bus: srcBus });
     }
     playing = true;
     face();
@@ -600,7 +619,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   face();
 
   const top = el('div', 'cc-top');
-  top.append(transport.el);
+  top.append(transport.el, ...topExtra);
   d.stack.add(top, wavePanel.el, scopePanel.el, knobRow.el, ...under, pb.el);
 
   // ── read only, for a check over CDP, and for a picture that wants the grains ─
@@ -736,7 +755,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   }
 
   return {
-    bay, api, play, stop,
+    bay, api, play, stop, waveHost,
     /** Run the self check when `?selfcheck=1` asked for one, then say ready. */
     async ready() {
       if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
