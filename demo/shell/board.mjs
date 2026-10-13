@@ -279,6 +279,9 @@ export function createBoard({
   // ── audio ─────────────────────────────────────────────────────────────────
   let ctx = null, playout = null, meterNode = null, meterBuf = null;
   let bufferedMs = 0, starved = 0, trimmed = 0, breaks = -1;
+  // The floor the worklet is holding now (it ratchets 1.5x on each starve), and
+  // the silence those starves cost. Read by remote/010 to split key to sound.
+  let floorMs = null, starvedMs = 0;
   let frames = 0, lost = 0, lastSeq = -1, firstFrameAt = 0, peak = 0;
   let told = null;                    // what `board.hello` announced, if we heard it
   let chIn = channels, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
@@ -406,7 +409,7 @@ export function createBoard({
      */
     playout.port.onmessage = (e) => {
       const st = e.data?.stats; if (!st) return;
-      bufferedMs = st.bufferedMs;
+      bufferedMs = st.bufferedMs; floorMs = st.floorMs ?? null; starvedMs = st.underrunMs ?? 0;
       starved = st.underruns; trimmed = st.trimEvents;
       const b = starved + trimmed;
       if (b !== breaks) {
@@ -799,7 +802,7 @@ export function createBoard({
       /** `running`, `suspended` or null before there is a context at all. A page
        *  that wants to assert it is playing has to ask this, not the counters. */
       audioState: ctx ? ctx.state : null,
-      bufferedMs, starved, trimmed, breaks,
+      bufferedMs, floorMs, starved, starvedMs, trimmed, breaks,
       framesPerSec: firstFrameAt ? frames / Math.max(0.001, (performance.now() - firstFrameAt) / 1000) : 0,
       channels: chIn, shapeChecked, shapeWrong, shapeSaid,
       /** 'relay', 'direct' or 'turn', and the board's own answer time on it. */

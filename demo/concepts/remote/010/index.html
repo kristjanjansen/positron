@@ -63,7 +63,12 @@
     // the MEDIAN of the last twenty presses and the separate `median` cell went
     // (the last press alone is `__demo.probe().lags`). The camera's path is a
     // word in `path` (`direct, camera relay`) rather than a third camera cell.
-    readout: { 'key to sound': 'ms', 'round trip': 'ms', cushion: 'ms', path: '',
+    // 🔴 `round trip` IS `network` SINCE 2026-10-13. The owner read `KEY TO SOUND
+    // 141` beside `ROUND TRIP 3` and asked *"i dnot not undestand difference on
+    // there readings"*: two cells in ms side by side read as two answers to one
+    // question. `network` is a message there and back with no sound in it; `key to
+    // sound` is the whole trip, and its hover adds up the parts (`partsLine`).
+    readout: { 'key to sound': 'ms', network: 'ms', cushion: 'ms', path: '',
       ...(CAM_KEY ? { 'cam fps': '', 'cam lag': 'ms' } : {}) }, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('remote/010');
 
@@ -259,8 +264,9 @@
   // per press: the first 1 ms block after the press that is over ONSET and
   // three times what the 30 ms before it held, on the speaker's clock
   // (`getOutputTimestamp`, so the browser's own output latency is inside it).
-  // The other cells are the parts this page can name: the Pi's round trip, the
-  // playout cushion, the browser's output latency, and the path. What is left
+  // The other cells are the parts this page can name: the network round trip
+  // to the Pi, the playout cushion, and the path; the browser's output latency
+  // is read off the context and shown in the hover. What is left
   // over is the Pi's capture block and frame (JACK 512 x 3 at 48 kHz, 20 ms
   // frames), which the page cannot see on its own.
   const KEEP_MS = 200, ONSET = 0.02, WAIT_MS = 1500;
@@ -311,9 +317,29 @@
     const st = board?.stats();
     const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
     cell('key to sound', med == null ? '' : Math.round(med));
-    cell('round trip', st?.rttMs == null ? '' : Math.round(st.rttMs));
+    cell('network', st?.rttMs == null ? '' : Math.round(st.rttMs));
     cell('cushion', st?.bufferedMs == null ? '' : Math.round(st.bufferedMs));
+    hint('key to sound', `key down to sound out of the speaker\nmedian of the last 20 presses\n${partsLine(med, st)}`);
   }
+  // What each cell measures, on hover: two or three short lines (positron-ui).
+  // `key to sound` adds up its parts from the other cells. The Pi's part is what
+  // is left over: one way out and back is about `network`, the cushion and the
+  // speaker are this browser's own, so the rest is the Pi hearing the note (MIDI
+  // to the Circuit, its sound, the card, JACK's period, a 10 ms frame).
+  function partsLine(med, st) {
+    const c = board?.ctx();
+    const out = c ? ((c.outputLatency || 0) + (c.baseLatency || 0)) * 1000 : null;
+    if (med == null || st?.rttMs == null || st?.bufferedMs == null || out == null) return 'network, the Pi, cushion and speaker';
+    const pi = med - st.rttMs - st.bufferedMs - out;
+    return `network ${Math.round(st.rttMs)}, Pi ${Math.round(pi)}, cushion ${Math.round(st.bufferedMs)}, speaker ${Math.round(out)}`;
+  }
+  function hint(k, text) {
+    for (const c of d.readoutEl?.querySelectorAll('.pos-cell') || []) if (c.querySelector('.pos-k')?.textContent === k) c.title = text;
+  }
+  hint('key to sound', 'key down to sound out of the speaker\nmedian of the last 20 presses');
+  hint('network', 'a message to the Pi and back, no sound in it\nabout this much of key to sound is the network');
+  hint('cushion', 'sound held in this browser\nso a late frame does not leave a gap');
+  hint('path', 'direct is a WebRTC link to the Pi\nrelay is the Cloudflare room');
   function lagFrame() {
     listen();
     requestAnimationFrame(lagFrame);
