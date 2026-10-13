@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON concept sampler 050</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The kit's grain scope as a panel's picture, as /concepts/radio/020/ draws
+     it: the panel's stage is the edge and the ground, so the scope gives up its
+     own margin, border and corner, and its always-empty caption takes no room. */
+  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
+  .cc-wave .pos-scope-gut { display: none; }
+  /* The grains' start times over the output scope: a canvas laid exactly on
+     the scope's, so it moves nothing. */
+  .cc-wave { position: relative; }
+  .cc-births { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+  /* Play on its own row: the button's own size, at the left. */
+  .cc-top { display: flex; }
+  .cc-top > .pos-bgroup { flex: none; width: auto; }
+</style>
+<script type="module">
+  import { conceptNav } from '/concepts/nav.mjs';
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { createVideoPanel } from '/shell/video-panel.mjs';
+  import { createGrainScope } from '/shell/grain-scope.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+  import { createPicker } from '/shell/picker.mjs';
+  import { createKnob } from '/shell/knob.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { bootScsynth } from '/shell/scsynth.mjs';
+  import { allocBuffers, bufferPlan, startPappusSynth, applyAudibleDefaults, setParam, RING_SECONDS, PAPPUS_NODE } from '/shell/pappus.mjs';
+  import { createModulator } from '/shell/pappus-mod.mjs';
+  import { PATCHES, BUF_SECONDS, MOD_SPECS, MOD_FOLLOWERS, MOD_CMD, MOD_HZ,
+    writeDiscrete, writeContinuous, continuousOf, basesOf, routesOf, createFeatures } from '/shell/radio-gran.mjs';
+
+  // concepts sampler/050, GRANULATOR, 2026-10-13. Asked (BACKLOG, first line under
+  // ## Open): *"what is good source? perhaps our recorded radios for start? witch
+  // patch selector. do we get events for scope? do 2 knobs. what pappus gives us?"*
+  //
+  // A sampler because a granulator is one: it RECORDS what comes in and plays
+  // pieces of it back. Pappus (rig/board/norns/Engine_Pappus.sc, the board's
+  // granulator, compiled on the Pi as the TINY rung) runs in this tab's wasm
+  // SuperCollider and records its INPUT into a ring, so the source is any audio
+  // node plugged into that input. Today that is one of our three R2 radio
+  // recordings (the ones /concepts/radio/020/ plays). The patches are
+  // radio-gran.mjs's twelve, the same ones /videoradio/ tours.
+  //
+  // NOTHING OPENS ON A VISIT. No AudioContext, no fetch, no engine and no
+  // prefetch hint: Play brings SuperCollider up, fetches the recording from our
+  // bucket and starts both. Never an outside station: the recordings were
+  // captured once and are kept in our own bucket.
+  const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
+  const asked = new URLSearchParams(location.search).get('src');
+
+  // ── the sources ──────────────────────────────────────────────────────────
+  // 🔴 A SOURCE IS AN AUDIO NODE INTO THE GRANULATOR'S INPUT, AND THAT IS THE
+  // WHOLE CONTRACT. Each entry's `open(ctx)` resolves to `{ node, stop }`: a
+  // node that makes sound into `srcBus`, and a way to stop it. A recording
+  // decodes a file from the bucket and loops it. The next ones (a microphone by
+  // getUserMedia, a tab's audio by getDisplayMedia, the Pi's audio over the
+  // relay, our own stage stream) are one more entry each with their own `open`,
+  // and nothing below the list changes: Pappus records whatever reaches its
+  // input bus, it never sees a file. `store` says where the bytes come from,
+  // for the patchbay; a live source would have none.
+  const recording = (id, label, key) => ({
+    id, label, kind: 'recording', store: 'cf-r2', url: asked || `${MEDIA}${key}`,
+    open: (ctx) => openRecording(ctx, id, label, asked || `${MEDIA}${key}`),
+  });
+  const SOURCES = [
+    recording('raadio2', 'Raadio 2', 'radio/raadio2/2026-10-11.mp3'),
+    recording('raadio4', 'Raadio 4', 'radio/raadio4/2026-10-11.mp3'),
+    recording('ida', 'Ida', 'radio/ida/2026-10-11.aac'),
+  ];
+  let at = 0;
+
+  // ── the bay ──────────────────────────────────────────────────────────────
+  const S = 'web';
+  const FILE_OUT = (s) => `${s.store}:${s.id}:file-out`;
+  const RADIO_IN = `${S}:radio:file-in`, RADIO_OUT = `${S}:radio:audio-out`;
+  const GRAINS_IN = `${S}:grains:audio-in`, GRAINS_OUT = `${S}:grains:audio-out`;
+  const GRAINS_SIZE = `${S}:grains:value-in`, GRAINS_DENS = `${S}:grains:value-in-2`;
+  const GRAINS_EV = `${S}:grains:value-out`;
+  const WAVE_IN = `${S}:wave:audio-in`, WAVE_EV = `${S}:wave:value-in`;
+  const SCOPE_IN = `${S}:scope:audio-in`, SCOPE_EV = `${S}:scope:value-in`;
+  const SPEAKER_IN = `${S}:speaker:audio-in`;
+  const SIZE_OUT = `${S}:knob-size:value-out`, DENS_OUT = `${S}:knob-density:value-out`;
+
+  const bay = createBay();
+  for (const s of SOURCES) {
+    bay.addNode({ id: `${s.store}:${s.id}`, kind: 'store', label: `${s.label}, recorded`, place: 'cloudflare', net: 'cloudflare' });
+    bay.addPort({ id: FILE_OUT(s), label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: s.url });
+  }
+  bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
+  bay.addPort({ id: RADIO_IN, label: 'radio', dir: 'in', medium: 'file' });
+  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio' });
+  bay.addNode({ id: `${S}:grains`, kind: 'engine', label: 'Pappus granulator', place: 'browser' });
+  bay.addPort({ id: GRAINS_IN, label: 'grains', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: GRAINS_OUT, label: 'grains', dir: 'out', medium: 'audio' });
+  bay.addPort({ id: GRAINS_SIZE, label: 'size', dir: 'in', medium: 'value', deliver: (ev) => knobIn('size', ev) });
+  bay.addPort({ id: GRAINS_DENS, label: 'density', dir: 'in', medium: 'value', deliver: (ev) => knobIn('rate', ev) });
+  // Every grain the engine reports leaves here as one event, so anything that
+  // wants to follow the grains (the two scopes today, a picture later) holds a
+  // link from this port rather than reaching into the engine.
+  bay.addPort({ id: GRAINS_EV, label: 'grains', dir: 'out', medium: 'value' });
+  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'source scope', place: 'browser' });
+  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: WAVE_EV, label: 'grains', dir: 'in', medium: 'value', deliver: (ev) => waveGrain(ev) });
+  bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'output scope', place: 'browser' });
+  bay.addPort({ id: SCOPE_IN, label: 'scope', dir: 'in', medium: 'audio' });
+  bay.addPort({ id: SCOPE_EV, label: 'grains', dir: 'in', medium: 'value', deliver: (ev) => scopeGrain(ev) });
+  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  bay.addNode({ id: `${S}:knob-size`, kind: 'engine', label: 'size knob', place: 'browser' });
+  bay.addPort({ id: SIZE_OUT, label: 'size', dir: 'out', medium: 'value' });
+  bay.addNode({ id: `${S}:knob-density`, kind: 'engine', label: 'density knob', place: 'browser' });
+  bay.addPort({ id: DENS_OUT, label: 'density', dir: 'out', medium: 'value' });
+
+  const d = mount({ name: 'concept sampler 050', what: '', readout: null, index: '/concepts/', indexLabel: 'concepts' });
+  conceptNav('sampler/050');
+
+  // ── the links, held from load so the picture does not change with play ─────
+  const held = new Map();
+  function hold(a, b) {
+    const k = `${a} ${b}`;
+    if (held.has(k)) return;
+    const r = bay.link(a, b, [], { site: S });
+    if (r.ok) held.set(k, r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
+  }
+  // The sound follows the links the bay holds, read off `bay.links()`.
+  const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);
+  for (const s of SOURCES) hold(FILE_OUT(s), RADIO_IN);
+  hold(RADIO_OUT, GRAINS_IN);
+  hold(RADIO_OUT, WAVE_IN);
+  hold(GRAINS_OUT, SPEAKER_IN);
+  hold(GRAINS_OUT, SCOPE_IN);
+  hold(SIZE_OUT, GRAINS_SIZE);
+  hold(DENS_OUT, GRAINS_DENS);
+  hold(GRAINS_EV, WAVE_EV);
+  hold(GRAINS_EV, SCOPE_EV);
+
+  // ── state ────────────────────────────────────────────────────────────────
+  let ctx = null, srcBus = null, toGrains = null, srcTap = null, srcBuf = null, outBuf = null;
+  let eng = null, booting = null, modulator = null, feats = null, ticker = 0;
+  let source = null, opening = null, fetchedAt = 0, playing = false;
+  let cur = { ...PATCHES[0] }, patchAt = 0, routed = new Set();
+  const decoded = new Map();          // source id -> AudioBuffer, decoded once
+  const T = { moduleMs: null, bootMs: null, allocMs: null, defMs: null, defBytes: null, startMs: null,
+    bufferBytes: bufferPlan().reduce((n, [, f, c]) => n + f * c * 4, 0) };
+
+  // The write head of Pappus's ring, on the audio clock. `wphase` is a Phasor
+  // from 0 at /s_new over `mbuflen` seconds (Engine_Pappus.sc:652), and /n_run 0
+  // stops it, so it is the engine's running seconds, kept here across pauses.
+  let ranFor = 0, runFrom = null;
+  const engSeconds = () => ranFor + (runFrom != null ? ctx.currentTime - runFrom : 0);
+
+  // ── the grains, as data ──────────────────────────────────────────────────
+  // 🔴 EVERY GRAIN IS AN EVENT FROM THE ENGINE, NOT A GUESS FROM SETTINGS.
+  // Pappus's `SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half])`
+  // (Engine_Pappus.sc:849) reaches this tab through bootScsynth's `onReply`, as
+  // `['/pgrain', nodeID, replyID, pos, dur, voice, half]`; `pos` is at index 3
+  // (the off by one /grains/ and /radio/ both record). `pos` is a fraction of
+  // the SIXTY second ring and the engine reads only its first BUF_SECONDS, so
+  // it is rescaled to the window, and the window's write head says how many
+  // seconds ago the audio under that grain arrived.
+  const EV_KEEP = 400;
+  const events = [];
+  const listeners = new Set();
+  let grainCount = 0;
+  function onGrain(m) {
+    if (!playing) return;
+    const t = ctx.currentTime;
+    const win = Math.min(1, Math.max(0, m[3] * RING_SECONDS / BUF_SECONDS));
+    const head = (engSeconds() / BUF_SECONDS) % 1;
+    const ago = (((head - win) % 1) + 1) % 1 * BUF_SECONDS;
+    const ev = { of: 'grain', at: +t.toFixed(4), pos: win, ago: +ago.toFixed(3), dur: m[4], voice: m[5], half: m[6],
+      patch: cur?.name ?? null };
+    grainCount++;
+    events.push(ev);
+    if (events.length > EV_KEEP) events.shift();
+    for (const fn of listeners) { try { fn(ev); } catch { /* a listener's fault is its own */ } }
+    bay.send(GRAINS_EV, ev);
+  }
+
+  // ── the pictures ────────────────────────────────────────────────────────
+  // The SOURCE scope: the last eight seconds of what went into the granulator,
+  // which is exactly what its ring holds, with every grain a tick at the place
+  // in that sound it read. The kit's `grainSeconds` puts a mark of position p
+  // at `(1 - p) * 8` seconds ago, so each grain is handed `1 - ago / 8`.
+  const waveHost = el('div', 'cc-wave');
+  const wave = createGrainScope(waveHost, { seconds: BUF_SECONDS, height: 120, fullScale: 1, grainSeconds: BUF_SECONDS });
+  function waveGrain(ev) {
+    if (ev?.of !== 'grain') return;
+    wave.mark({ pos: 1 - ev.ago / BUF_SECONDS, dur: ev.dur, voice: ev.voice, half: ev.half });
+  }
+  const pick = createPicker({ what: 'source', prev: () => choose(at - 1), next: () => choose(at + 1), onPick: (i) => choose(i) });
+  pick.options(SOURCES.map((s) => s.label), 0);
+  const wavePanel = createVideoPanel({ media: waveHost, aspect: 'auto', right: false, left: pick.el });
+
+  // The OUTPUT scope: what the granulator sends to the speakers, with each
+  // grain's start drawn as a hairline at the moment the engine reported it, so
+  // the marks scroll left with the sound they started.
+  const OUT_S = 4;
+  const scopeHost = el('div', 'cc-wave');
+  const scope = createGrainScope(scopeHost, { seconds: OUT_S, height: 120, fullScale: 1 });
+  const birthCanvas = el('canvas', 'cc-births');
+  scopeHost.append(birthCanvas);
+  const births = [];
+  function scopeGrain(ev) {
+    if (ev?.of !== 'grain') return;
+    births.push({ at: ev.at, dur: ev.dur });
+    if (births.length > 2000) births.shift();
+  }
+  const sentence = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const patchPick = createPicker({ what: 'patch', prev: () => choosePatch(patchAt - 1), next: () => choosePatch(patchAt + 1),
+    onPick: (i) => choosePatch(i) });
+  patchPick.options(PATCHES.map((p) => sentence(p.name)), 0);
+  const scopePanel = createVideoPanel({ media: scopeHost, aspect: 'auto', right: patchPick.el, left: false,
+    values: [{ key: 'gps', label: 'grains/s', reserve: 5 }] });
+
+  const tok = (k) => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+  let ink = null;
+  const inks = () => (ink ??= { hi: tok('--hi') || '#ffd400' });
+  function fit(c) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(c.clientWidth * dpr), H = Math.round(c.clientHeight * dpr);
+    if (W && H && (c.width !== W || c.height !== H)) { c.width = W; c.height = H; }
+    return { W, H, dpr };
+  }
+  function drawBirths() {
+    const { W, H, dpr } = fit(birthCanvas);
+    if (!W || !H) return;
+    const g = birthCanvas.getContext('2d');
+    g.clearRect(0, 0, W, H);
+    const now = ctx.currentTime;
+    while (births.length && births[0].at < now - OUT_S - 0.5) births.shift();
+    g.fillStyle = inks().hi;
+    for (const b of births) {
+      const age = now - b.at;
+      const x = Math.round(W - (age / OUT_S) * W);
+      if (x < 0 || x > W) continue;
+      // Brightest as it starts, fading over the grain's own length.
+      g.globalAlpha = 0.25 + 0.75 * Math.max(0, 1 - age / Math.max(0.05, b.dur || 0.1));
+      g.fillRect(x - dpr, H * 0.82, dpr, H * 0.18);
+    }
+    g.globalAlpha = 1;
+  }
+
+  // grains per second, over the last second of events
+  function gps() {
+    if (!ctx) return 0;
+    const now = ctx.currentTime;
+    let n = 0;
+    for (let i = events.length - 1; i >= 0 && events[i].at > now - 1; i--) n++;
+    return n;
+  }
+  let gpsShownAt = 0;
+  function frame() {
+    if (!playing) return;
+    if (holds(RADIO_OUT, WAVE_IN)) { srcTap.getFloatTimeDomainData(srcBuf); wave.feed(srcBuf, ctx.sampleRate); }
+    if (eng && holds(GRAINS_OUT, SCOPE_IN)) { eng.meter.getFloatTimeDomainData(outBuf); scope.feed(outBuf, ctx.sampleRate); }
+    drawBirths();
+    if (performance.now() - gpsShownAt > 250) { gpsShownAt = performance.now(); scopePanel.values.set('gps', String(gps())); }
+    requestAnimationFrame(frame);
+  }
+
+  // ── the patchbay ─────────────────────────────────────────────────────────
+  // The file wire is lit while the recording comes down and for 600 ms after;
+  // the audio wires while it plays. Value wires pulse once per event.
+  const pb = createPatchbay(bay, {
+    flowing: (l, medium) => {
+      if (medium === 'file') return l.from === FILE_OUT(SOURCES[at]) && (!!opening || (fetchedAt && performance.now() - fetchedAt < 600));
+      if (medium === 'audio') return playing && !!source;
+      return false;
+    },
+  });
+
+  // ── the recording: fetched once, decoded once, levelled once, looped ──────
+  // One gain per second of the file, raised (never lowered) toward -16 dB RMS
+  // by at most 36 dB and eased across seconds, then a soft knee over 0.8. It is
+  // /concepts/radio/020/'s levelling made shorter: MEASURED there, the Ida
+  // capture is -44 dB RMS under one loud stretch, so one gain for the whole
+  // file would leave it inaudible.
+  const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_MAX_DB = 36, KNEE = 0.8;
+  function level(b) {
+    const sr = b.sampleRate, n = b.length, blk = Math.round(sr), nb = Math.ceil(n / blk);
+    const chs = Array.from({ length: b.numberOfChannels }, (_, c) => b.getChannelData(c));
+    const gdb = new Float32Array(nb);
+    for (let k = 0; k < nb; k++) {
+      let sum = 0, m = 0;
+      for (const x of chs) for (let i = k * blk; i < Math.min(n, (k + 1) * blk); i += 2) { sum += x[i] * x[i]; m++; }
+      const rms = Math.sqrt(sum / Math.max(1, m));
+      gdb[k] = rms > 1e-6 ? Math.max(0, Math.min(LEVEL_MAX_DB, 20 * Math.log10(LEVEL_RMS / rms))) : 0;
+    }
+    const lo = gdb.map((g, k) => Math.min(g, gdb[k - 1] ?? g, gdb[k + 1] ?? g));
+    const eased = lo.map((g, k) => ((lo[k - 1] ?? g) + g + (lo[k + 1] ?? g)) / 3);
+    const room = 1 - KNEE;
+    for (let i = 0; i < n; i++) {
+      const pos = i / blk - 0.5, k0 = Math.max(0, Math.min(nb - 1, Math.floor(pos))), k1 = Math.min(nb - 1, k0 + 1);
+      const f = Math.max(0, Math.min(1, pos - k0));
+      const g = 10 ** ((eased[k0] * (1 - f) + eased[k1] * f) / 20);
+      for (const x of chs) {
+        const v = x[i] * g, a = v < 0 ? -v : v;
+        x[i] = a <= KNEE ? v : Math.sign(v) * (KNEE + room * Math.tanh((a - KNEE) / room));
+      }
+    }
+    return eased.reduce((s, g) => s + g, 0) / nb;
+  }
+  async function openRecording(ac, id, label, url) {
+    let b = decoded.get(id);
+    if (!b) {
+      d.log(`fetching ${url}`);
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status} from ${url}`);
+      const ab = await r.arrayBuffer();
+      const size = ab.byteLength;
+      b = await ac.decodeAudioData(ab);
+      const raised = level(b);
+      decoded.set(id, b);
+      d.log(`${label}: ${(size / 1e6).toFixed(2)} MB, ${b.duration.toFixed(1)} s, raised ${raised.toFixed(1)} dB on average`);
+    }
+    const node = ac.createBufferSource();
+    node.buffer = b; node.loop = true;
+    node.start();
+    return { node, stop: () => { try { node.stop(); node.disconnect(); } catch { /* already stopped */ } } };
+  }
+
+  function choose(i) {
+    const n = (i + SOURCES.length) % SOURCES.length;
+    if (n === at) return;
+    at = n;
+    pick.show(SOURCES[at].label, at);
+    pb.refresh();
+    if (playing) plug();
+  }
+  /** The chosen source into the bus the granulator records. */
+  async function plug() {
+    const s = SOURCES[at];
+    const job = opening = s.open(ctx);
+    pb.refresh();
+    let got;
+    try { got = await job; }
+    catch (e) { d.log(`${s.label} did not open: ${e?.message || e}`, 'warn'); return false; }
+    finally { if (opening === job) { opening = null; fetchedAt = performance.now(); pb.refresh(); } }
+    if (!playing || SOURCES[at] !== s) { got.stop(); return false; }
+    source?.stop();
+    source = got;
+    source.node.connect(srcBus);
+    pb.refresh();
+    return true;
+  }
+
+  // ── the engine ───────────────────────────────────────────────────────────
+  function route() {
+    try { srcBus.disconnect(toGrains); } catch { /* not connected */ }
+    if (holds(RADIO_OUT, GRAINS_IN)) srcBus.connect(toGrains);
+    if (eng) eng.out.gain.setTargetAtTime(holds(GRAINS_OUT, SPEAKER_IN) && playing ? 0.9 : 0, ctx.currentTime, 0.02);
+  }
+  function boot() {
+    booting ??= (async () => {
+      const t0 = performance.now();
+      eng = await bootScsynth({
+        audioContext: ctx, input: toGrains, log: (m) => d.log(m),
+        onReply: (m) => { if (m[0] !== '/pgrain') return false; onGrain(m); return true; },
+      });
+      eng.out.gain.value = 0;
+      T.moduleMs = Math.round(eng.moduleMs); T.bootMs = Math.round(eng.bootMs);
+      const ta = performance.now();
+      const bufs = await allocBuffers(eng, { log: (m) => d.log(m) });
+      T.allocMs = Math.round(performance.now() - ta);
+      const def = await eng.recvDef('/grains/defs/pappus-tiny.scsyndef');
+      T.defMs = def.ms; T.defBytes = def.bytes;
+      if (!def.ok) throw new Error(`Pappus was not taken: ${def.why}`);
+      if (!(await startPappusSynth(eng))) throw new Error('Pappus did not start');
+      runFrom = ctx.currentTime; ranFor = 0;
+      applyAudibleDefaults(eng, { live: true, bufSeconds: BUF_SECONDS });
+      T.startMs = Math.round(performance.now() - t0);
+      d.log(`Pappus up ${T.startMs} ms after Play: ${bufs.allocated} buffers, `
+        + `${(T.bufferBytes / 1e6).toFixed(1)} MB of them, the ${(def.bytes / 1024).toFixed(0)} KB definition taken in ${def.ms} ms`);
+      modulator = createModulator({
+        now: () => ctx.currentTime,
+        send: (name, v) => setParam(eng, MOD_CMD[name] ?? `m${name}`, v),
+        specs: MOD_SPECS, followers: MOD_FOLLOWERS,
+        warn: (m) => d.log(`modulation refused: ${m}`, 'warn'),
+      });
+      land(cur);
+      ticker = setInterval(() => {
+        if (!playing || !modulator) return;
+        modulator.sense(feats.read());
+        modulator.tick();
+      }, 1000 / MOD_HZ);
+      return eng;
+    })();
+    booting.catch(() => { booting = null; });
+    return booting;
+  }
+
+  // ── a patch, and the two knobs on top of it ──────────────────────────────
+  // A patch is landed whole (radio-gran.mjs's two halves, in /videoradio/'s
+  // order: the discrete half, every base, the routes, then the continuous half
+  // with the routed ones left to the modulator). The knobs then move two of its
+  // numbers, and a patch change puts them back where that patch has them.
+  function land(p) {
+    cur = { ...p };
+    if (!eng) return;
+    writeDiscrete(eng, cur, { bufSeconds: BUF_SECONDS });
+    for (const [k, v] of Object.entries(basesOf(cur))) modulator.setBase(k, v);
+    const routes = routesOf(cur);
+    modulator.setRoutes(routes);
+    routed = new Set(routes.map((r) => r.dest));
+    writeContinuous(eng, continuousOf(cur), { scanmode: cur.scanmode, bufSeconds: BUF_SECONDS, skip: routed });
+    d.log(`${sentence(cur.name)}: ${cur.says}`);
+  }
+  function choosePatch(i) {
+    const n = (i + PATCHES.length) % PATCHES.length;
+    patchAt = n;
+    patchPick.show(sentence(PATCHES[n].name), n);
+    land(PATCHES[n]);
+    setKnob('size', PATCHES[n].size);
+    setKnob('rate', PATCHES[n].rate);
+  }
+  /** One of the two numbers, from a knob's event on its value wire. */
+  function knobIn(name, ev) {
+    if (ev?.of !== 'param' || ev.name !== name || !Number.isFinite(ev.v) || !cur) return;
+    cur[name] = ev.v;
+    if (!eng) return;
+    // A routed control is the modulator's: move its base and it moves around
+    // the new number. Anything else is written straight to both granulators.
+    if (routed.has(name)) modulator.setBase(name, ev.v);
+    else { setParam(eng, `m${name}`, ev.v); setParam(eng, `n${name}`, ev.v); }
+  }
+
+  // The two knobs, size and density. Both are Pappus's own `size` (a grain's
+  // length in seconds) and `rate` (grains a second), the two numbers that mean
+  // the same thing in all twelve patches; `scan` means a speed, a place or a lag
+  // depending on the patch (radio-gran.mjs SCAN_RANGE), so it is left to them.
+  // Each travels geometrically, because 50 ms to 4 s and 0.5 to 64 a second are
+  // ranges where the middle of the knob should be the middle of the octaves.
+  const RANGE = { size: [0.02, 4], rate: [0.5, 64] };
+  const toV = (name, k) => { const [lo, hi] = RANGE[name]; return lo * (hi / lo) ** k; };
+  const toK = (name, v) => { const [lo, hi] = RANGE[name]; return Math.log(v / lo) / Math.log(hi / lo); };
+  const OUT_OF = { size: SIZE_OUT, rate: DENS_OUT };
+  const fmt = { size: (v) => (v < 1 ? `${Math.round(v * 1000)} ms` : `${v.toFixed(2)} s`), rate: (v) => `${v < 10 ? v.toFixed(1) : Math.round(v)}/s` };
+  const mk = (name, label) => createKnob({
+    label, min: 0, max: 1, step: 0.001, value: toK(name, PATCHES[0][name]),
+    format: (k) => fmt[name](toV(name, k)),
+    onInput: (k) => bay.send(OUT_OF[name], { of: 'param', name, v: +toV(name, k).toFixed(4) }),
+  });
+  const knobs = new Map([['size', mk('size', 'size')], ['rate', mk('rate', 'density')]]);
+  function setKnob(name, v) { knobs.get(name).set(toK(name, v), { from: 'self', quiet: true }); }
+  const knobRow = createKnobGrid(knobs, { row: true });
+
+  // ── play and stop ────────────────────────────────────────────────────────
+  async function play() {
+    ctx ??= new AudioContext({ sampleRate: 48000 });
+    ctx.resume();
+    if (!srcBus) {
+      srcBus = ctx.createGain();
+      toGrains = ctx.createGain();
+      srcTap = ctx.createAnalyser(); srcTap.fftSize = 2048; srcTap.smoothingTimeConstant = 0;
+      srcBuf = new Float32Array(srcTap.fftSize);
+      outBuf = new Float32Array(2048);
+      srcBus.connect(srcTap);
+      // pulled, or the analyser is never asked to run
+      const pull = ctx.createGain(); pull.gain.value = 0; srcTap.connect(pull).connect(ctx.destination);
+      feats = createFeatures(srcTap, ctx.sampleRate);
+    }
+    playing = true;
+    face();
+    route();
+    try { await boot(); } catch (e) { d.log(`SuperCollider did not come up: ${e?.message || e}`, 'bad'); playing = false; face(); return; }
+    if (!playing) return;
+    if (runFrom == null) { eng.send('/n_run', PAPPUS_NODE, 1); runFrom = ctx.currentTime; }
+    route();
+    await plug();
+    pb.refresh();
+    requestAnimationFrame(frame);
+  }
+  function stop() {
+    playing = false;
+    source?.stop(); source = null;
+    // Paused, not freed: the ring keeps what it held and the next Play goes on from it.
+    if (eng && runFrom != null) { eng.send('/n_run', PAPPUS_NODE, 0); ranFor += ctx.currentTime - runFrom; runFrom = null; }
+    route();
+    pb.refresh();
+    face();
+  }
+
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (playing ? stop() : play()) },
+  ] });
+  function face() { transport.setIcon('play', playing ? 'stop' : 'play', playing ? 'stop' : 'play'); }
+  face();
+
+  const top = el('div', 'cc-top');
+  top.append(transport.el);
+  d.stack.add(top, wavePanel.el, scopePanel.el, knobRow.el, pb.el);
+
+  // ── read only, for a check over CDP, and for a picture that wants the grains ─
+  const meterRms = (ms = 1000) => new Promise((res) => {
+    const buf = new Float32Array(2048); let s = 0, n = 0;
+    const id = setInterval(() => { eng.meter.getFloatTimeDomainData(buf); for (const v of buf) { s += v * v; n++; } }, 50);
+    setTimeout(() => { clearInterval(id); res(Math.sqrt(s / Math.max(1, n))); }, ms);
+  });
+  window.__demo.grains = {
+    events: () => events.slice(),
+    /** Follow every grain as it is reported. Returns a function that stops. */
+    on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    playing: () => playing, source: () => SOURCES[at].id, patch: () => cur?.name ?? null,
+    knob: (name) => (cur ? cur[name] : null), count: () => grainCount, gps, timing: () => ({ ...T }),
+    engine: () => eng, level: meterRms,
+    glitches: () => { try { return eng?.sonic.getMetrics?.()?.glitchCount ?? null; } catch { return null; } },
+  };
+
+  // ── the self check, only under ?selfcheck=1, never for a visitor ─────────
+  async function check() {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const G = window.__demo.grains;
+    d.assert('a visit opened no audio context and fetched nothing', ctx === null && decoded.size === 0);
+    await play();
+    d.assert('Play brought Pappus up in this tab', !!eng && T.defBytes > 0, `${T.startMs} ms, definition ${T.defBytes} B`);
+    // the ring has to hold something before a grain can sound like the source
+    for (let i = 0; i < 120 && engSeconds() < BUF_SECONDS; i++) await wait(100);
+    const lv = await meterRms(1500);
+    d.assert('Play makes sound: the output level is above zero', lv > 0.002, `rms ${lv.toFixed(4)}`);
+    d.assert('the engine reports its grains as events', grainCount > 0, `${grainCount} grains, ${gps()} in the last second`);
+    const ev = events[events.length - 1];
+    d.assert('a grain event carries its time, its place and its length',
+      ev && Number.isFinite(ev.at) && ev.pos >= 0 && ev.pos <= 1 && ev.ago >= 0 && ev.ago <= BUF_SECONDS && ev.dur > 0,
+      ev ? JSON.stringify(ev) : 'none');
+
+    // Density: grains a second, counted from the engine's own reports.
+    const rate = async (v) => { knobs.get('rate').set(toK('rate', v), { from: 'self' }); await wait(1600); return gps(); };
+    const lo = await rate(4), hi = await rate(40);
+    d.assert('the density knob changes how many grains the engine reports', hi > lo * 3, `4/s gave ${lo}, 40/s gave ${hi}`);
+    // Size: the length the engine says each grain had.
+    const meanDur = (from) => { const xs = events.filter((e) => e.at > from).map((e) => e.dur); return xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length); };
+    const size = async (v) => { knobs.get('size').set(toK('size', v), { from: 'self' }); await wait(300); const t = ctx.currentTime; await wait(1200); return meanDur(t); };
+    const sShort = await size(0.05), sLong = await size(0.6);
+    d.assert('the size knob changes the length the engine reports for each grain', sLong > sShort * 4,
+      `50 ms gave ${(sShort * 1000).toFixed(0)} ms, 600 ms gave ${(sLong * 1000).toFixed(0)} ms`);
+    // A patch: asked of the server with /s_get, not believed.
+    const sGet = async (name) => { const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', PAPPUS_NODE, name); return r ? Number(r[3]) : null; };
+    const before = { scanmode: await sGet('mscanmode'), rate: await sGet('mrate') };
+    const n0 = grainCount;
+    choosePatch(PATCHES.findIndex((p) => p.name === 'ground'));
+    await wait(1500);
+    const after = { scanmode: await sGet('mscanmode'), rate: await sGet('mrate'), size: await sGet('msize') };
+    d.assert('a patch change reaches the engine', after.rate === 0.5 && after.size === 4 && before.rate !== after.rate,
+      `before ${JSON.stringify(before)}, after ${JSON.stringify(after)}`);
+    d.assert('and the knobs follow the patch', Math.abs(toV('rate', knobs.get('rate').value()) - 0.5) < 0.01,
+      `${toV('rate', knobs.get('rate').value()).toFixed(3)}/s`);
+    const lv2 = await meterRms(1500);
+    d.assert('the new patch still sounds', lv2 > 0.001, `rms ${lv2.toFixed(4)}, ${grainCount - n0} grains since`);
+    const glitch = G.glitches();
+    d.log(`timing ${JSON.stringify(T)}, glitches ${glitch}`);
+    stop();
+  }
+  if (SELFCHECK) { try { await check(); } catch (e) { d.assert('the self check ran to the end', false, String(e?.stack || e)); } }
+  d.ready();
+</script>

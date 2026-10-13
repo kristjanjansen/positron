@@ -22,7 +22,7 @@
   import { createDrop } from '/shell/drop.mjs';
   import { createSampleLoader } from '/shell/sample-loader.mjs';
   import { createDrumMachine } from '/concepts/rhythm/drum-machine.mjs';
-  import { sampleRows, rowNames, createSampleBank, DEFAULT_KIT, MAX_ROWS } from '/concepts/rhythm/sample-voices.mjs';
+  import { sampleRows, rowNames, createSampleBank, MAX_ROWS } from '/concepts/rhythm/sample-voices.mjs';
 
   // The drum machine of /concepts/rhythm/000/ with its rows playing SAMPLES,
   // on the same one SuperCollider engine. The definition, the default kit and
@@ -72,11 +72,13 @@
   }
 
   // The default kit's names are known before anything is fetched.
-  offer(DEFAULT_KIT.map((name) => ({ name })));
+  // No default kit since 2026-10-13 (asked: *"no default grid / player /
+  // patchbay, do all on load"*): the page opens on the SAMPLES box alone, and
+  // the grid, its transport and the patchbay appear when a kit is loaded.
 
   m = createDrumMachine(d, {
     voices: VOICES,
-    shape: { rows: files.length, steps: 16 },
+    shape: { rows: 1, steps: 16 },
     start: false,
     // The level the four drums had, kept for four; more rows sum hotter.
     gain: (rows) => (rows > 9 ? 0.5 : rows > 4 ? 0.7 : 1),
@@ -101,6 +103,7 @@
       const ok = got.filter((g) => g.wave?.ok !== false && g.wave?.frames !== 0);
       if (ok.length < got.length) d.log(`${got.length - ok.length} sample(s) did not read and are not rows`, 'warn');
       offer(ok, { fresh: true });
+      if (!shown) { d.stack.add(m.surface, m.patchbay); shown = true; }
       const on = await bank.use(ok.slice(0, MAX_ROWS));
       // A sample the engine could not take is not a row either.
       if (on && bank.loaded().length !== files.length) offer(bank.loaded(), { fresh: true });
@@ -108,10 +111,10 @@
       return true;
     },
   });
-  let dropped = 0;
+  let dropped = 0, shown = false;
 
   // The way in first, then the grid and the patchbay.
-  d.stack.add(drop.el, m.surface, m.patchbay);
+  d.stack.add(drop.el);
   window.__rhythm = m.api;
   window.__samples = { bank, names: () => names, files: () => files, dropped: () => dropped, open: (f) => drop.open(f) };
   d.ready();
