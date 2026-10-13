@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Move drums before radio; move held to archive**~~ (2026-10-13, DONE). Asked: *"Move drums before radio"*, *"Move held to archive"*. CONCEPT_GROUPS order; held `unlisted: true`, a card on /archive/.
+
 - **Chat: move Chat UI wired into Chat, remove Chat UI wired** (2026-10-13). Asked: *"Move chat ui wired to chat. Rm chat ui wired"*. /room/chat/ becomes the chat window page (demo/room/window), /room/window/ 404s, its card goes.
 - **Join button broken on the broadcast chat on iPhone** (2026-10-13). Asked: *"Join button broken"*, screenshot: the transport row reads `JOIN (` clipped beside CLEAR, at phone width. demo/room/broadcast (or room/history, both have admin).
 
