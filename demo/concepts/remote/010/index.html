@@ -73,6 +73,18 @@
   // (a dump request answers for the current patch, never for a slot). The cell
   // shows the name the Circuit sends back, as it stores it.
   const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
+  // 🔴 THE STARTING PATCH IS GASTON, BY NUMBER. Asked 2026-10-13: *"gaston as
+  // std patch"*. A name can only be read back for the patch Synth 1 is
+  // holding, so the page does not look it up at play time: the slot is written
+  // here and the name is its label, and on play Synth 1 is sent there.
+  // ⚠️ THE SLOT IS NOT KNOWN YET. No file in this repository records which of
+  // the owner's 64 slots holds Gaston (the pack is private). While `at` is
+  // null the page starts wherever the Circuit already is, as before. To learn
+  // it: play with ?board=1, then `await __demo.scanNames()` in the console,
+  // which steps Synth 1 through program changes 0 to 63 (RAM only, the gate
+  // allows nothing else) and returns every slot's name; put Gaston's here.
+  const START_PATCH = { at: null, name: 'Gaston' };
+  if (START_PATCH.at != null) PATCHES[START_PATCH.at] = START_PATCH.name;
 
   // ── the bay ─────────────────────────────────────────────────────────────
   // The Pi's ids are boardGraph's: `pi-1:circuit:midi-in` (announced while the
@@ -347,31 +359,45 @@
   }
   const step = (by) => pickPatch(patchAt == null ? (by > 0 ? 0 : PATCHES.length - 1) : (patchAt + by + PATCHES.length) % PATCHES.length);
   const patchPick = createPicker({ what: 'patch', cls: 'cc-patch', prev: () => step(-1), next: () => step(+1), onPick: (i) => pickPatch(i) });
-  patchPick.options(PATCHES, 0);
-  patchPick.show('');
+  patchPick.options(PATCHES, START_PATCH.at ?? 0);
+  if (START_PATCH.at != null) patchAt = START_PATCH.at;
+  patchPick.show(START_PATCH.at != null ? START_PATCH.name : '', START_PATCH.at ?? undefined);
   patchPick.disabled(true);
 
   // ── the macro knobs ─────────────────────────────────────────────────────
-  // 🔴 WHERE A KNOB STARTS. The Circuit sends a CC when one of its own macro
-  // knobs is turned, and nothing when asked, and the board does not pass the
-  // Circuit's own MIDI back to a page anyway. What it does answer is the patch
-  // dump this page already asks for: the patch carries each macro's Position
-  // (circuit-patch.mjs `MacroKnobN_Position`, addresses 204 + 17 per knob), so
-  // on play and after every patch change the knobs move to what the patch
-  // holds, without sending. Before that they sit at 64, switched off.
+  // 🔴 A KNOB TURNS ON SCREEN WHEREVER ITS VALUE CAME FROM, AND ONLY A DRAG
+  // SENDS. Asked 2026-10-13: *"make all concept knobs \"invisible-handed\"
+  // start from remote 010"*. Three sources reach these knobs with
+  // `knob.receive()`, which glides the dial, marks it, and never calls
+  // `onInput`, so none of them is ever sent back to the Circuit:
+  //   device  a macro turned BY HAND on the Circuit on the desk. The Circuit
+  //           sends it as CC 80 to 87 on channel 1 (MEASURED,
+  //           research/measured-devices-2026-09-20.md), and the board reads its
+  //           MIDI out while this page holds the lease and tells the room
+  //           `midi.cc` (rig/board/midi-back.mjs), at most 30 a second a knob.
+  //   patch   the patch dump this page asks for after play and after every
+  //           patch change carries each macro's Position (circuit-patch.mjs
+  //           `MacroKnobN_Position`, addresses 204 + 17 per knob).
+  //   midi    a controller plugged into this machine sending CC 80 to 87; its
+  //           own wire sends it to the Circuit, once.
   // ⚠️ Whether the dump's Position follows a macro turned on the Circuit by
   // hand, or only the stored patch, has not been measured.
+  // ⚠️ Whether the Pi's raw MIDI input carries those hand turns as the Mac's
+  // USB did is not measured either; `__demo.probe().fromCircuit` counts them.
+  // And every knob has the kit's invisible hand (`hand: true`, the button on
+  // the ring, as every other concept knob has), which turns it from HERE and
+  // sends, through the same 30 a second queue a drag uses.
   let knobsRead = 0;
   const knobs = new Map(MACROS.map((m) => [m.name, createKnob({
     label: `M${m.n}`, title: `macro ${m.n}, CC ${m.cc} on channel ${CH}`, min: 0, max: 127, step: 1, value: 64,
-    disabled: true,
+    disabled: true, hand: true,
     onInput: (v) => bay.send(id(`knob-macro-${m.n}`, 'value-out'), { of: 'param', name: m.name, v }),
   })]));
   const knobGrid = createKnobGrid(knobs, { row: true });
   const knobsOn = (yes) => { for (const k of knobs.values()) k.enable(yes); };
   function knobsFrom(p) {
     try {
-      for (const m of MACROS) knobs.get(m.name).set(p.value(m.pos), { from: 'patch', quiet: true });
+      for (const m of MACROS) knobs.get(m.name).receive(p.value(m.pos), { from: 'patch', force: true });
       knobsRead++;
     } catch (e) { d.log(`The macro positions did not read out of the patch, ${e.message}`, 'warn'); }
   }
@@ -396,8 +422,9 @@
   // same table the Pi's gate allows). Everything else a device sends is
   // dropped here and counted: SysEx (which `sysex: false` never delivers
   // anyway), program change, pitch bend, aftertouch, clock, and any CC the
-  // Circuit's synth does not take. A CC that is a macro (80 to 87) moves that
-  // macro's knob on screen, quietly, so it is sent once, by the device's wire.
+  // Circuit's synth does not take. A CC that is a macro (80 to 87) turns that
+  // macro's knob on screen (`receive`, which sends nothing), so it is sent
+  // once, by the device's wire.
   const SYNTH_CCS = new Set(CIRCUIT_CC.filter((r) => r.ch === '1/2').map((r) => r.cc));
   const plugged = new Set();
   const shown = (pid) => !pid.startsWith(`${S}:midi`) || plugged.has(pid.split(':').slice(0, 2).join(':'));
@@ -435,7 +462,7 @@
     if (st === 0xB0) {
       if (!SYNTH_CCS.has(d1)) { drop(`CC ${d1}`); return; }
       const m = MACROS.find((x) => x.cc === d1);
-      if (m) knobs.get(m.name).set(d2, { from: 'hardware', quiet: true });
+      if (m) knobs.get(m.name).receive(d2, { from: 'midi' });
       devIn.cc++;
       bay.send(`${node}:midi-out`, { cls: 'cc', ch: CH, d1, d2 });
       return;
@@ -476,6 +503,38 @@
     }, (e) => d.log(`MIDI in: the browser did not give access (${e?.message || 'refused'})`, 'warn'));
   }
 
+  // ── the Circuit's own macro knobs, turned by hand on the desk ───────────
+  // Only Synth 1's (this page plays channel 1) and only while armed: a turn
+  // before play, or from a page that is not listening, is not this page's.
+  const circuitIn = { n: 0, ignored: 0, said: new Set() };
+  function fromCircuit(m) {
+    if (!armed || m.input !== INPUT || m.ch !== CH) return;
+    const mac = MACROS.find((x) => x.cc === m.cc);
+    if (!mac || !Number.isInteger(m.v) || m.v < 0 || m.v > 127) return;
+    const k = knobs.get(mac.name);
+    const before = k.received().ignored;
+    k.receive(m.v, { from: 'device' });
+    if (k.received().ignored > before) { circuitIn.ignored++; return; }
+    circuitIn.n++;
+    if (!circuitIn.said.has(mac.n)) { circuitIn.said.add(mac.n); d.log(`Macro ${mac.n} was turned on the Circuit itself, and its knob here follows it`); }
+  }
+
+  // Asked for the patch number of a name (see START_PATCH). Steps Synth 1
+  // through every patch, reading each name, and returns them. Program change
+  // only: it changes the patch Synth 1 holds in RAM and writes nothing. Run by
+  // a person from the console, never by a check.
+  async function scanNames({ from = 0, to = 63 } = {}) {
+    if (!armed) throw new Error('press play with ?board=1 first');
+    const out = {};
+    for (let i = from; i <= to; i++) {
+      pickPatch(i);
+      await wait(400);
+      while (nameBusy) await wait(50);
+      out[i] = names.get(i) ?? null;
+    }
+    return out;
+  }
+
   // ── play: join the Circuit's room, ask the board, hold the lease ─────────
   let saidLast = '';
   const say = (text, kind) => { saidLast = text; d.log(text, kind); };
@@ -490,6 +549,7 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: () => open(true),
       onMessage: (m) => {
+        if (m.type === 'midi.cc') return fromCircuit(m);
         if (m.type === 'midi.refused') { refused++; lastRefusal = m.why || ''; d.log(`the Pi refused a message for the Circuit: ${m.why}`, 'warn'); }
       },
     });
@@ -526,7 +586,9 @@
       askMidi();
       say('The Circuit on the Raspberry Pi, play the keys');
       transport.setIcon('play', 'stop', 'stop');
-      readName();
+      // The starting patch, by number (START_PATCH), and its name read back.
+      if (START_PATCH.at != null && patchAt === START_PATCH.at && lastProgram == null) pickPatch(START_PATCH.at);
+      else readName();
     } finally { starting = false; }
   }
   function stop() {
@@ -693,6 +755,7 @@
   top.append(transport.el);
   d.stack.add(top, ...(cam ? [cam.el] : []), wave.el, patchPick.el, knobGrid.el, host, pb.el);
   window.__demo.bay = bay;
+  window.__demo.scanNames = scanNames;
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
     armed, level, span: () => span, clipped: () => clipped, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
@@ -700,6 +763,9 @@
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
     macros: MACROS.map((m) => ({ n: m.n, cc: m.cc, value: knobs.get(m.name).value(), sent: ccSent.get(m.cc) || 0 })),
     ccRefusedHere, knobsRead, ccGapMs: CC_GAP_MS,
+    fromCircuit: { n: circuitIn.n, ignored: circuitIn.ignored },
+    received: MACROS.map((m) => ({ n: m.n, ...knobs.get(m.name).received() })),
+    startPatch: { ...START_PATCH },
     midiIn: { asked: midiAsked, plugged: [...plugged], ...devIn },
     cam: cam ? cam.probe() : null,
   });

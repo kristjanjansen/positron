@@ -247,7 +247,48 @@
 
 
   /**
-   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. The
+   * 🔴 THE NEWEST BLOCK, AND THEREFORE THE FIRST CALL TO `section()`. A knob
+   * turned from somewhere else, 2026-10-13, asked as *"make all concept knobs
+   * \"invisible-handed\" start from remote 010"*. `knob.receive(v, { from })`
+   * glides the dial to a value that arrived from outside (the instrument's own
+   * knob, a MIDI controller, a patch, another tab), lights it for a moment and
+   * calls nothing, so it is never sent back. A drag still sends.
+   * ⚠️ THE STAND-IN HAND IS A TIMER AND OPENS NOTHING: every 2.2 s one of the
+   * four knobs receives a value, cycling through the four sources, so the
+   * glide and the mark can be seen without any instrument. It stops while the
+   * page is hidden. Not in a `.pos-controls` row, for the reason every block
+   * below gives.
+   */
+  let rxSpec = null;          // { knobs, sent }  the received knobs
+  section('KNOB TURNED FROM ELSEWHERE',
+    'A knob whose value arrives from somewhere else turns on its own, glides there and lights for a moment, and sends nothing.',
+    `k.receive(v, { from: 'device' })   // glide 160 ms, mark, no onInput
+k.set(v, { quiet: true })          // a jump, nothing called
+// a drag or a key calls onInput, which is what sends
+k.received()   // { n, ignored, last, from, gliding }`,
+    (box) => {
+      const o = out('a stand-in hand turns one knob every 2.2 s');
+      const sent = { n: 0 };
+      const FROM = ['device', 'midi', 'patch', 'relay'];
+      const knobs = ['M1', 'M2', 'M3', 'M4'].map((label, i) => createKnob({
+        label, sub: FROM[i], min: 0, max: 127, value: 64,
+        onInput: (v) => { sent.n++; o.textContent = `${label} sent ${v}, by a person`; },
+      }));
+      const grid = createKnobGrid(knobs, { row: true });
+      rxSpec = { knobs, sent };
+      let at = 0;
+      setInterval(() => {
+        if (document.hidden) return;
+        const i = at++ % knobs.length;
+        const v = 8 + Math.floor(Math.random() * 112);
+        knobs[i].receive(v, { from: FROM[i] });
+        o.textContent = `${knobs[i].el.querySelector('.pos-knob-lab').textContent} received ${v} from ${FROM[i]}, nothing sent`;
+      }, 2200);
+      box.append(grid.el, o);
+    });
+
+  /**
+   * 🔴 ONCE THE NEWEST BLOCK, NOW SECOND. The
    * scope's TRIGGERED mode, 2026-10-12, asked on `/concepts/rhythm/010/` as
    * *"scopes are very "nervous""* and then *"is ti a scope feature/prop?"*.
    * A hit's window is captured from its onset and held until the next hit, the
@@ -1983,6 +2024,35 @@ lane.append(knob.el, padGrid.el, halfPad.el, fader.el)
   if (SELFCHECK) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   checkPage();
+
+  /* ── a knob turned from elsewhere ──────────────────────────────────────── */
+  if (rxSpec) {
+    const k = rxSpec.knobs[3];
+    const sentBefore = rxSpec.sent.n;
+    const was = k.value();
+    const to = was > 64 ? 10 : 120;
+    k.receive(to, { from: 'relay' });
+    const numAt0 = Number(k.el.querySelector('.pos-knob-v').textContent);
+    const valueAt0 = k.value(), marked = k.el.getAttribute('data-remote');
+    await new Promise((r) => setTimeout(r, 60));
+    const numMid = Number(k.el.querySelector('.pos-knob-v').textContent);
+    await new Promise((r) => setTimeout(r, 900));
+    const numEnd = Number(k.el.querySelector('.pos-knob-v').textContent);
+    d.assert('a received value is the knob\'s value at once and the dial glides to it',
+      valueAt0 === to && numMid !== to && numEnd === to,
+      `value ${valueAt0} at once, drawn ${numAt0} then ${numMid} at 60 ms then ${numEnd}`);
+    d.assert('a received value marks the knob and the mark goes out again',
+      marked === 'relay' && !k.el.hasAttribute('data-remote'), `marked ${marked}, after ${k.el.getAttribute('data-remote')}`);
+    d.assert('NEGATIVE: a received value calls nothing, so nothing is sent',
+      rxSpec.sent.n === sentBefore, `${rxSpec.sent.n - sentBefore} sends`);
+    const dial = k.el.querySelector('.pos-knob-dial');
+    dial.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    const afterKey = k.value();
+    k.receive(afterKey > 64 ? 5 : 125, { from: 'relay' });
+    d.assert('a key press still sends, and a value arriving under it is held off',
+      rxSpec.sent.n === sentBefore + 1 && k.value() === afterKey && k.received().ignored >= 1,
+      `sends ${rxSpec.sent.n - sentBefore}, value ${k.value()} against ${afterKey}, ignored ${k.received().ignored}`);
+  }
 
   /* ── the knob grid ─────────────────────────────────────────────────────── */
   if (kgSpec) {

@@ -28,6 +28,7 @@
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { kindOf } from '../../demo/shell/midi-kinds.mjs';
 import { createRtc } from './rtc.mjs';
+import { createMidiParser, backVerdict, createBackLimiter, GAP_MS } from './midi-back.mjs';
 import { constants as FS } from 'node:fs';
 
 export const LEASE_MS = 60_000;
@@ -371,6 +372,7 @@ export function createInputs({
       ws: null, seq: 0, aseq: 0, proc: null, lease: 0, frames: 0, startedAt: null, lastHeard: now(),
       backoff: 500, closed: false, midiFd: null, held: new Set(), notesOut: 0, refused: 0, rtc: null,
       bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null, onCard: false,
+      back: null, backSaid: '', backSent: 0,
     };
     // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
     // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
@@ -413,7 +415,8 @@ export function createInputs({
                            leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0 });
     const status = () => ({ ok: !!s.proc, source: cfg.name, room: s.room, device: cfg.device, via: onJack ? 'jack' : 'arecord',
                             ...(onJack ? { jack: { port: jackPort, bridge: s.onCard || !!s.bridge, by: s.onCard ? 'jackd' : s.bridge ? 'alsa_in' : null, bridgeStarts: s.bridgeStarts, reader: `${reader}:input_1`, fed: s.fed } } : {}),
-                            frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused } : null,
+                            frames: s.frames, midi: cfg.midi ? { port: cfg.midi.port, channels: cfg.midi.channels, out: s.notesOut, held: s.held.size, refused: s.refused,
+                              back: { open: !!s.back, sent: s.backSent, ...(s.back ? s.back.limiter.counts() : {}) } } : null,
                             leaseLeftMs: s.proc ? Math.max(0, s.lease - now()) : 0,
                             direct: s.rtc ? s.rtc.status() : null,
                             ...(s.proc ? {} : { reason: 'nothing playing' }) });
@@ -621,33 +624,46 @@ export function createInputs({
     function finishDump(d, body) {
       if (s.dump !== d) return;
       s.dump = null;
-      try { fs.closeSync(d.fd); } catch { /* gone */ }
+      if (d.fd !== null) { try { fs.closeSync(d.fd); } catch { /* gone */ } }
       d.reply(d.type, { ...d.extra, ...body });
+    }
+    // What one chunk off the instrument's input means to an open question.
+    // True when the question is answered and closed.
+    function feedDump(d, buf) {
+      if (s.dump !== d) return true;
+      d.seen += buf.length;
+      for (const b of buf) {
+        if (b >= 0xF8) d.realtime++;
+        else if (d.head.length < 24) d.head.push(b.toString(16).padStart(2, '0'));
+      }
+      for (const m of d.catcher.feed(buf)) {
+        if (d.match(m)) {
+          log(`${cfg.name}: ${d.what} read back, ${now() - d.at} ms, ${m.length} bytes${d.type === 'midi.identity' ? `: ${m.map((b) => b.toString(16).padStart(2, '0')).join(' ')}` : ''}`);
+          finishDump(d, { ok: true, bytes: m });
+          return true;
+        }
+        d.other++;
+        if (d.others.length < 3) d.others.push(m.slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join(' '));
+      }
+      return false;
     }
     function pollDump(d) {
       if (s.dump !== d) return;
-      const chunk = Buffer.alloc(1024);
-      for (;;) {
-        let n = 0;
-        try { n = fs.readSync(d.fd, chunk, 0, chunk.length, null); }
-        catch (e) {
-          if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') break;
-          log(`${cfg.name}: reading the patch failed, ${e.message}`);
-          return finishDump(d, { ok: false, why: `the instrument input could not be read, ${e.code || e.message}` });
-        }
-        if (!n) break;
-        d.seen += n;
-        for (const b of chunk.subarray(0, n)) {
-          if (b >= 0xF8) d.realtime++;
-          else if (d.head.length < 24) d.head.push(b.toString(16).padStart(2, '0'));
-        }
-        for (const m of d.catcher.feed(chunk.subarray(0, n))) {
-          if (d.match(m)) {
-            log(`${cfg.name}: ${d.what} read back, ${now() - d.at} ms, ${m.length} bytes${d.type === 'midi.identity' ? `: ${m.map((b) => b.toString(16).padStart(2, '0')).join(' ')}` : ''}`);
-            return finishDump(d, { ok: true, bytes: m });
+      // ⚠️ WHILE THE MACRO LISTENER HOLDS THE INPUT, IT READS AND HANDS EVERY
+      // CHUNK TO `feedDump`, because a raw MIDI input opens once: a second open
+      // for the question would be EBUSY. This only keeps the clock.
+      if (d.fd !== null) {
+        const chunk = Buffer.alloc(1024);
+        for (;;) {
+          let n = 0;
+          try { n = fs.readSync(d.fd, chunk, 0, chunk.length, null); }
+          catch (e) {
+            if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') break;
+            log(`${cfg.name}: reading the patch failed, ${e.message}`);
+            return finishDump(d, { ok: false, why: `the instrument input could not be read, ${e.code || e.message}` });
           }
-          d.other++;
-          if (d.others.length < 3) d.others.push(m.slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join(' '));
+          if (!n) break;
+          if (feedDump(d, chunk.subarray(0, n))) return;
         }
       }
       if (now() >= d.until) {
@@ -656,6 +672,70 @@ export function createInputs({
       }
       setTimer(() => pollDump(d), 10);
     }
+
+    // ── the macro knobs, turned by hand on the instrument, told to the room ──
+    // 🔴 midi-back.mjs has the why and the allowlist. Open only while a page
+    // holds the lease, like the capture: nobody listening, nothing read.
+    // ⚠️ NON-BLOCKING AND POLLED, for the reason the dump's reader is: a
+    // blocking read with nothing to read never returns. Every 20 ms, which is
+    // under the 33 ms the limiter lets out per controller.
+    // ⚠️ A BUSY INPUT IS SAID ONCE AND RETRIED ON THE BEAT, never thrown: an
+    // ALSA sequencer subscription to the instrument holds it, and a page that
+    // cannot see hand turns still plays.
+    const BACK_POLL_MS = 20;
+    function backOpen() {
+      if (s.back || !cfg.midi || !fs?.readSync) return;
+      let fd;
+      try { fd = fs.openSync(`/dev/snd/midiC${midiDev()}D0`, FS.O_RDONLY | FS.O_NONBLOCK); }
+      catch (e) {
+        const why = e.code || e.message;
+        if (s.backSaid !== why) log(`${cfg.name}: the instrument input could not be opened for its macro knobs, ${why}`);
+        s.backSaid = why;
+        return;
+      }
+      s.backSaid = '';
+      const limiter = createBackLimiter({ gapMs: GAP_MS, now, setTimer,
+        emit: ({ ch, cc, v }) => { if (send({ type: 'midi.cc', input: cfg.name, ch, cc, v })) s.backSent++; } });
+      s.back = { fd, parser: createMidiParser(), limiter, timer: null };
+      log(`${cfg.name}: reading the instrument's macro knobs (CC 80 to 87) off /dev/snd/midiC${midiDev()}D0`);
+      const b = s.back;
+      const tick = () => {
+        if (s.back !== b) return;
+        pollBack(b);
+        if (s.back === b) b.timer = setTimer(tick, BACK_POLL_MS);
+      };
+      tick();
+    }
+    function pollBack(b) {
+      const chunk = Buffer.alloc(1024);
+      for (let i = 0; i < 64; i++) {
+        let n = 0;
+        try { n = fs.readSync(b.fd, chunk, 0, chunk.length, null); }
+        catch (e) {
+          if (e.code === 'EAGAIN' || e.code === 'EWOULDBLOCK') return;
+          log(`${cfg.name}: reading the instrument's macro knobs failed, ${e.code || e.message}`);
+          backClose('the input failed');
+          return;
+        }
+        if (!n) return;
+        const buf = chunk.subarray(0, n);
+        if (s.dump && s.dump.fd === null) feedDump(s.dump, buf);
+        for (const m of b.parser.feed(buf)) {
+          const v = backVerdict(m);
+          if (v) b.limiter.push(v);
+        }
+      }
+    }
+    function backClose(why) {
+      const b = s.back;
+      if (!b) return;
+      s.back = null;
+      if (b.timer) clearTimeout(b.timer);
+      b.limiter.close();
+      try { fs.closeSync(b.fd); } catch { /* gone */ }
+      log(`${cfg.name}: stopped reading the macro knobs, ${why}`);
+    }
+
     // `want` names what is listened for: the reply type, how to recognise it,
     // and the words a log line uses. One question open at a time, of either kind.
     const wantPatch = (loc) => ({ type: 'midi.patch', extra: { synth: loc + 1 }, what: `patch for synth ${loc + 1}`, short: 'patch', match: (m) => isPatchReply(m, loc) });
@@ -663,6 +743,15 @@ export function createInputs({
     function askBack(bytes, want, reply) {
       const { type, extra } = want;
       if (s.dump) return reply(type, { ok: false, ...extra, why: `the ${s.dump.what} is already being read, one question at a time` });
+      // The macro listener already holds the input open and triggered, so the
+      // question rides on its reads (see `pollDump`) and needs no read first.
+      if (s.back) {
+        const d = { ...want, fd: null, reply, others: [], at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
+        s.dump = d;
+        if (!midiWrite(bytes)) return finishDump(d, { ok: false, why: 'the instrument port could not be written' });
+        setTimer(() => pollDump(d), 10);
+        return undefined;
+      }
       let fd;
       try { fd = fs.openSync(`/dev/snd/midiC${midiDev()}D0`, FS.O_RDONLY | FS.O_NONBLOCK); }
       catch (e) {
@@ -718,10 +807,12 @@ export function createInputs({
         s.lease = now() + leaseMs;
         const was = !!s.proc;
         startCapture();
+        backOpen();
         return reply('input.wanted', { ...status(), started: !was });
       }
       if (msg.type === 'input.stop') {
         s.lease = 0;
+        backClose('asked');
         return reply('input.stopped', { ok: stopCapture('asked'), source: cfg.name });
       }
       if (msg.type === 'audio.status') return reply('audio.started', status());
@@ -778,6 +869,8 @@ export function createInputs({
     // always close.
     function beat() {
       if (s.proc && leaseExpired(s.lease, now())) { stopCapture('nobody renewed the lease'); midiPanic('the lease ran out'); }
+      if (s.back && leaseExpired(s.lease, now())) backClose('nobody renewed the lease');
+      else if (!s.back && !leaseExpired(s.lease, now())) backOpen();
       s.rtc?.sweep();
       if (s.ws?.readyState === 1 && now() - s.lastHeard > 3 * beatMs + 1000) {
         log(`${cfg.name}: no echo, reconnecting`);
@@ -807,9 +900,9 @@ export function createInputs({
     return {
       s, connect, beat, handle, status, stopCapture, startBridge, onJack, jackPort,
       close() {
-        s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); s.rtc?.close();
+        s.closed = true; midiPanic('shutting down'); stopCapture('shutting down'); backClose('shutting down'); s.rtc?.close();
         if (s.bridge) { try { s.bridge.kill('SIGTERM'); } catch { /* gone */ } s.bridge = null; }
-        if (s.dump) { try { fs.closeSync(s.dump.fd); } catch {} s.dump = null; }
+        if (s.dump) { if (s.dump.fd !== null) { try { fs.closeSync(s.dump.fd); } catch {} } s.dump = null; }
         if (s.midiFd !== null) { try { fs.closeSync(s.midiFd); } catch {} s.midiFd = null; }
         try { s.ws?.close(); } catch {}
       },

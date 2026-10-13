@@ -63,6 +63,34 @@ import { createHandDrive } from './hand-drive.mjs';
 const ARC = 270;
 
 /**
+ * 🔴 A VALUE FROM SOMEWHERE ELSE TURNS THE KNOB ON SCREEN, VISIBLY, AND SENDS
+ * NOTHING. Asked 2026-10-13: *"make all concept knobs \"invisible-handed\"
+ * start from remote 010"*. A knob already had two ways to move: `set` (a jump,
+ * and with `quiet` nothing is called) and a drag (which calls `onInput`, so it
+ * SENDS). Neither says "a hand somewhere else turned this": the real
+ * instrument's own knob on the desk, a MIDI controller plugged in, a patch
+ * change, another tab over the relay. `receive(v, { from })` is that third way:
+ * the dial GLIDES to the value over `RECEIVE_GLIDE_MS`, eased, the knob is
+ * marked as moved from outside for `RECEIVE_MARK_MS`, and `onInput` and
+ * `onChange` are NEVER called, so a value that came from the instrument can
+ * never be sent back to it as an echo.
+ * ⚠️ `value()` IS THE NEW VALUE AT ONCE; only the drawing glides. A check, a
+ * drag and a send read the value, and the glide is for the eye.
+ * ⚠️ A PERSON WINS, AND SO DOES THE INVISIBLE HAND. While the visitor is
+ * dragging, or within `RECEIVE_HOLD_MS` of their last move or of the
+ * invisible hand's (`hand: true`, `hand-drive.mjs`), a received value is not
+ * drawn and is counted as `ignored`: it is most likely the instrument echoing
+ * what the page itself just sent, and drawing it would pull the dial back
+ * under the hand. A knob can carry both: the invisible hand turns it from
+ * HERE and sends, `receive` shows a turn made THERE and sends nothing.
+ */
+export const RECEIVE_GLIDE_MS = 160;
+export const RECEIVE_MARK_MS = 700;
+export const RECEIVE_HOLD_MS = 300;
+/** The ease of a received glide: fast out of the start, settling at the end. */
+export const easeOut = (x) => 1 - (1 - x) ** 3;
+
+/**
  * 🔴 THE WORD "HAND" MEANS TWO DIFFERENT THINGS ON THIS COMPONENT AND BOTH ARE
  * OLDER THAN THE OTHER FILE'S. `set(v, { from: 'hand' })` has meant A PERSON
  * since this knob was written, and `handMoves()` counts those. The INVISIBLE
@@ -429,8 +457,8 @@ export function createKnob({
   };
   root.style.setProperty('--knob-num-w', `${widestValue()}ch`);
 
-  function paint() {
-    const frac = (v - min) / span;
+  function paint(at = v) {
+    const frac = (at - min) / span;
     const len = arc.getTotalLength ? arc.getTotalLength() : 0;
     if (len) {
       arc.style.strokeDasharray = String(len);
@@ -456,7 +484,7 @@ export function createKnob({
     // went missing. Same rule as a readout cell.
     // 🔴 AND THE PLACES ARE FIXED, so the string cannot gain and lose a decimal
     // point sixty times a second under a hand. See `dp` and `show` above.
-    num.textContent = show(v);
+    num.textContent = show(at === v ? v : clamp(at));
     svg.setAttribute('aria-valuenow', String(Math.round(v)));
     if (from) root.setAttribute('data-from', from); else root.removeAttribute('data-from');
   }
@@ -472,9 +500,56 @@ export function createKnob({
     const was = v;
     v = clamp(Number(next));
     from = src;
-    if (src === 'hardware') hw++; else if (src === 'hand') hand++;
+    if (src === 'hardware') hw++; else if (src === 'hand') { hand++; userAt = now(); }
+    stopGlide();
     paint();
     if (!quiet && v !== was) { onInput(v, src); onChange(v, src); }
+    return v;
+  }
+
+  // ── a value from somewhere else: glide, mark, send nothing ──────────────
+  // See `RECEIVE_GLIDE_MS` at the top of this file for the why.
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(() => fn(now()), 16);
+  const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let userAt = -Infinity, glide = null, markTimer = null;
+  const got = { n: 0, ignored: 0, last: null, from: '' };
+  function stopGlide() { if (glide) { clearTimeout(glide.end); glide = null; } }
+  // `force` is for a value the visitor ASKED for elsewhere on the page (a
+  // patch they picked), which must land even if they touched this knob a
+  // moment ago; it still waits for nothing and still sends nothing.
+  function receive(next, { from: src = 'remote', glideMs = RECEIVE_GLIDE_MS, force = false } = {}) {
+    const target = clamp(Number(next));
+    if (!Number.isFinite(target)) return v;
+    if (!force && (dragging || now() - userAt < RECEIVE_HOLD_MS)) { got.ignored++; return v; }
+    if (dragging) dragging = false;
+    got.n++; got.last = target; got.from = src;
+    from = src;
+    if (src === 'hardware') hw++;
+    if (target === v && !glide) { paint(); return v; }
+    // A glide already running starts again from where the DIAL is, not from
+    // where it was going, so two values in a row never jump.
+    const fromAt = glide ? glide.drawn : v;
+    stopGlide();
+    v = target;
+    root.setAttribute('data-remote', src);
+    clearTimeout(markTimer);
+    markTimer = setTimeout(() => root.removeAttribute('data-remote'), RECEIVE_MARK_MS);
+    const ms = still() ? 0 : glideMs;
+    if (!(ms > 0)) { paint(); return v; }
+    const g = { t0: now(), drawn: fromAt, end: null };
+    glide = g;
+    const step = () => {
+      if (glide !== g) return;
+      const k = Math.min(1, (now() - g.t0) / ms);
+      g.drawn = fromAt + (v - fromAt) * easeOut(k);
+      paint(g.drawn);
+      if (k < 1) raf(step); else glide = null;
+    };
+    // ⚠️ A HIDDEN TAB RUNS NO FRAMES, so the end is also a timer: the dial
+    // always lands on the value even when nobody watched it get there.
+    g.end = setTimeout(() => { if (glide === g) { glide = null; paint(); } }, ms + 50);
+    raf(step);
     return v;
   }
 
@@ -494,6 +569,7 @@ export function createKnob({
     // names, and nothing pressed the button. `hand-drive.mjs` picks the
     // movement up again from wherever the dial was left.
     handApi?.yield();
+    stopGlide();
     dragging = true;
     acc = 0;
     svg.setPointerCapture(e.pointerId);
@@ -528,6 +604,7 @@ export function createKnob({
   const stop = (e) => {
     if (!dragging) return;
     dragging = false;
+    userAt = now();
     try { svg.releasePointerCapture(e.pointerId); } catch { /* already gone */ }
     // A lift resumes it at once. Only a `set()` with no lift has to wait out
     // `HAND_YIELD_MS`, which is the arrow-key case below.
@@ -619,6 +696,11 @@ export function createKnob({
         const nv = clamp(min + share * span);
         if (nv === v) return;
         v = nv; from = SELF; selfMoves++;
+        // The invisible hand holds a received value off exactly as a person
+        // does, so an instrument echoing what the hand just sent cannot pull
+        // the dial back under it.
+        userAt = now();
+        stopGlide();
         paint();
         onInput(v, SELF);
       },
@@ -655,6 +737,11 @@ export function createKnob({
   return {
     el: root,
     set,
+    /** A value from somewhere else: glides, marks, never calls back. */
+    receive,
+    /** How many values were received and drawn, how many were held off by a
+     *  person's hand, the last one and where it came from. */
+    received: () => ({ ...got, gliding: !!glide }),
     value: () => v,
     /** '' until something has moved it, then 'hand', 'hardware' or 'self'. */
     source: () => from,

@@ -4,10 +4,10 @@
 //   node demo/fake-board.mjs --relay ws://127.0.0.1:9101      # join one already running
 //   node demo/fake-board.mjs --listening                      # as if somebody else held the Circuit's lease
 //   node demo/fake-board.mjs --skew 250                       # its clock 250 ms ahead of this machine's
+//   node demo/fake-board.mjs --hand                           # a hand turns the Circuit's macro knobs, one every 3 s
 //
 // Then open a board page against it:
 //   http://127.0.0.1:8890/away/?relay=ws://127.0.0.1:8897&board=1
-//   http://127.0.0.1:8890/knobs/?relay=ws://127.0.0.1:8897&board=1
 //
 // 🔴 WHY THIS EXISTS. plans/plan-routing-migration.md §3.8: every page that
 // plays the board talks to one Raspberry Pi in another building, with one JACK
@@ -53,8 +53,9 @@
 // has something to read, and nothing about it follows the program.
 //
 // ⚠️ WHAT IT IS NOT: H.264 (no GPU node is announced, so no page is offered a
-// picture that cannot come), Yoshimi (the tone is fixed and a note changes
-// nothing in it), and the direct WebRTC path (`direct: false`, so a page never
+// picture that cannot come), an instrument (the tone is fixed and a note
+// changes nothing in it; it announces `synth`, since Yoshimi left the board on
+// 2026-10-13), and the direct WebRTC path (`direct: false`, so a page never
 // fetches ICE for a board that cannot answer). A stand-in grades OUR code; a
 // page green here can still meet a board that is off.
 //
@@ -158,13 +159,29 @@ function fakeSpawn(opts) {
   };
 }
 
-/** A fake ALSA raw MIDI port: every write is kept, so the count is the far side's. */
-function fakeFs(written) {
+/**
+ * A fake ALSA raw MIDI port: every write is kept, so the count is the far side's.
+ * And since 2026-10-13 it has an input too, the Circuit's MIDI out: `inbox`
+ * holds byte chunks the instrument "sent", read back non-blocking exactly as
+ * `inputs.mjs` reads `/dev/snd/midiC<n>D0`, EAGAIN when there is nothing.
+ * One read open at a time, EBUSY on a second, as a raw MIDI input is.
+ */
+function fakeFs(written, inbox) {
+  let reading = false;
   return {
     readlinkSync: () => 'card9',
-    openSync: () => 9,
-    closeSync: () => {},
+    openSync: (pth, fl) => {
+      if ((fl & 3) !== 0) return 9;                        // write
+      if (reading) { const e = new Error('EBUSY: the stand-in input is open'); e.code = 'EBUSY'; throw e; }
+      reading = true; return 10;
+    },
+    closeSync: (fd) => { if (fd === 10) { reading = false; inbox.length = 0; } },
     writeSync: (fd, buf) => { written.push([...buf]); return buf.length; },
+    readSync: (fd, buf) => {
+      const c = fd === 10 ? inbox.shift() : null;
+      if (!c) { const e = new Error('EAGAIN'); e.code = 'EAGAIN'; throw e; }
+      buf.set(c); return c.length;
+    },
   };
 }
 
@@ -229,11 +246,16 @@ export function fakeScsynth({ now }) {
  * @param {number} [o.beatMs]
  * @param {number} [o.skewMs]    this board's clock is the machine's plus this,
  *                               for `clock.ping` and every `at` it is sent
+ * @param {boolean} [o.hand]     a hand on the Circuit: every 3 s one macro knob
+ *                               (M1 to M8 in turn) is swept to a new value, as
+ *                               CC 80 to 87 on channel 1 with clock between, the
+ *                               way the real one sends a turn. Only while a
+ *                               lease is held, because only then is it read.
  * Returns `{ relay, room, ready, stats(), close() }`; `ready` resolves when
  * both rooms are joined and the hellos are out.
  */
 export function startBoard({ relay = null, port = 8897, room = 'studio-1', listening = false,
-  silent = false, portGone = false, quiet = false, beatMs = 5000, skewMs = 0 } = {}) {
+  silent = false, portGone = false, quiet = false, beatMs = 5000, skewMs = 0, hand = false } = {}) {
   const say = (...a) => { if (!quiet) console.log('[fake-board]', ...a); };
   let ownRelay = null;
   let resolveUrl;
@@ -255,7 +277,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     circuit: { device: 'hw:CARD=Fake,DEV=0', channels: 2, take: 1, midi: { port: 'Circuit', channels: [1, 2, 10] } },
   }));
   const graphFacts = {
-    room, instruments: { yoshimi: true }, inputs: INPUTS.inputs, ports: [],
+    room, instruments: { synth: true }, inputs: INPUTS.inputs, ports: [],
     frameMs: FRAME_MS, gpu: false, midiPresent: () => true,
   };
 
@@ -310,8 +332,10 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
         return reply('audio.started', source ? { ok: true, source, jack: false, fx: false, standIn: true, inputs: inputs.status() }
           : { ok: false, reason: 'nothing playing', fx: false, standIn: true, inputs: inputs.status() });
       case 'audio.start': {
-        const want = msg.source ?? 'yoshimi';
-        if (want !== 'yoshimi' && want !== 'synth') return reply('audio.started', { ok: false, reason: `${want} is not installed on this board`, standIn: true });
+        // As the board since 2026-10-13: no source is refused in words, there is no default.
+        if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "synth"}', standIn: true });
+        const want = msg.source;
+        if (want !== 'synth') return reply('audio.started', { ok: false, reason: `${want} is not installed on this board`, standIn: true });
         const already = source === want;
         source = want; counts.audioStarts++;
         startTone();
@@ -319,7 +343,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
       }
       case 'audio.stop': return reply('audio.stopped', stopAudio());
       case 'note.on':
-        if (!source) { source = 'yoshimi'; startTone(); }
+        // As the board since 2026-10-13: a note to an idle board starts nothing.
+        if (!source) return reply('note.ack', { note: msg.note, dropped: true, reason: 'nothing is playing on this board, send audio.start {source: "synth"} first' });
         counts.notesOn++;
         return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0, on: source });
       case 'note.off': counts.notesOff++; return reply('note.ack', { note: msg.note });
@@ -384,7 +409,28 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
 
   // ── the input room, through the board's own code ──────────────────────────
   const opened = {};
-  const fs = fakeFs(written);
+  const inbox = [];                        // what the stand-in Circuit "sends", read by the board's own code
+  const fs = fakeFs(written, inbox);
+  const macroAt = new Map();
+  /** Turn a macro knob on the stand-in Circuit, as a hand does: one CC per
+   *  step from where it was to `v`, clock bytes between. Returns the steps. */
+  function turnMacro(cc, v, { ch = 1, steps = 8 } = {}) {
+    const from = macroAt.get(`${ch}:${cc}`) ?? 64;
+    const bytes = [];
+    for (let i = 1; i <= steps; i++) bytes.push(0xF8, 0xB0 | (ch - 1), cc, Math.round(from + (v - from) * i / steps));
+    macroAt.set(`${ch}:${cc}`, v);
+    inbox.push(Uint8Array.from(bytes));
+    return steps;
+  }
+  let handTimer = null, handAt = 0;
+  if (hand) {
+    handTimer = setInterval(() => {
+      const cc = 80 + (handAt % 8);
+      turnMacro(cc, 16 + Math.floor(Math.random() * 96));
+      handAt++;
+    }, 3000);
+    handTimer.unref?.();
+  }
   const countingFs = portGone ? { ...fs, writeSync: () => { throw new Error('EBUSY: the stand-in port is gone'); } } : fs;
   let inputs = null;
   let listener = null;
@@ -419,13 +465,14 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
     get relay() { return ownRelay?.listening ? `ws://127.0.0.1:${ownRelay.address().port}` : relay; },
     relayServer: ownRelay,
     /** What the far side did, for a test. `midiWritten` is every message the gate let through. */
+    turnMacro,
     stats: () => ({ ...counts, midiWritten: written.length, midi: written.slice(-16),
       collide: { ...(collide.core()?.stats() ?? {}), scsynth: scsynth ? scsynth.counts() : null, skewMs },
       inputs: inputs ? inputs.status() : null, relay: ownRelay?.stats?.() ?? null }),
     close() {
       closed = true;
       collide.stop();
-      clearInterval(beat); clearInterval(listener);
+      clearInterval(beat); clearInterval(listener); clearInterval(handTimer);
       stopAudio();
       try { ws?.close(); } catch { /* gone */ }
       inputs?.close();
@@ -437,7 +484,7 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
 if (resolve(process.argv[1] || '') === fileURLToPath(import.meta.url)) {
   const arg = (k) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : null; };
   const b = startBoard({ relay: arg('relay'), port: Number(arg('port')) || 8897, listening: process.argv.includes('--listening'),
-    skewMs: Number(arg('skew')) || 0 });
+    skewMs: Number(arg('skew')) || 0, hand: process.argv.includes('--hand') });
   b.ready.then((url) => {
     console.log(`[fake-board] ready in ${url}/room/studio-1 and studio-1-circuit (nobody's board)`);
     console.log(`[fake-board] open http://127.0.0.1:8890/away/?relay=${url}&board=1`);

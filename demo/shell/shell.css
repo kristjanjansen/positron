@@ -6201,6 +6201,23 @@ button.pos-linkbtn:active { background: none; }
    lights in `--hi` on every other knob; on a knob with a hue the yellow
    would be the one thing on it that is not its colour. Unset, it is `--hi`. */
 .pos-knob[data-param] .pos-knob-hand[data-on="1"] { color: var(--param-ink, var(--hi)); }
+/* 🔴 A KNOB TURNED FROM SOMEWHERE ELSE SAYS SO FOR A MOMENT, SINCE 2026-10-13.
+   Asked: *"make all concept knobs \"invisible-handed\""*. `knob.receive()` glides
+   the dial and sets `data-remote` (the source: `device`, `midi`, `patch`,
+   `relay`) for `RECEIVE_MARK_MS`. While it is set the ring is `--ok`, the
+   colour a hardware-bound knob already wears, and a small dot lights in the
+   top right of the column. Both are paint only: the dot is absolutely placed
+   and only its opacity moves, so nothing beside the knob shifts.
+   ⚠️ AFTER THE `data-param` RULES AT THE SAME WEIGHT, so a knob with a hue
+   still shows the moment it was moved from outside, and BEFORE the
+   `data-off` rule further down, so a switched off knob stays grey. */
+.pos-knob::after {
+  content: ''; position: absolute; top: calc(var(--knob-num-h) + 1px); right: 2px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--ok);
+  opacity: 0; transition: opacity .45s ease-out; pointer-events: none;
+}
+.pos-knob[data-remote]::after { opacity: 1; transition: opacity .06s linear; }
+.pos-knob[data-remote] .pos-knob-arc { stroke: var(--ok); }
 /* 🔴 A PARAMETER'S CHOICE WEARS THE PARAMETER'S HUE THE WAY ITS KNOB DOES,
    since 2026-10-06 (*"how to make it a radio (sawtooth?)"*): a Faust
    `nentry` with `[style:radio{...}]` is drawn as `choice.mjs` beside the
