@@ -161,6 +161,8 @@ export const CONCEPT_GROUPS = ['synth', 'code', 'granulator', 'remote', 'drums',
 export const GROUP_TITLES = { archives: 'history', synth: 'building instruments', code: 'instruments in code', remote: 'remote instruments', performances: 'timelines' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
+  // kit listed 2026-10-13 (*"Bring kit card to frontpage"*): its own heading, last.
+  kit: { group: 'kit', plain: true, title: 'Kit', say: 'Every part these pages are built from, one page per part.' },
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   // fau, collide and muta archived 2026-10-13 (*"archve fau collide muta"*): still served, listed on /archive/.

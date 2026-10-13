@@ -936,7 +936,8 @@ export const DEMOS = [
   // plans/plan-kit-split.md). `/kit/` is the forwarder now: an old `#block`
   // address goes to the part page holding the block, and anything else reads
   // a list of the parts. The monolith moved with `git mv` to `/kit/slides/`.
-  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', unlisted: true, // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+  // Listed again 2026-10-13 (*"Bring kit card to frontpage"*): a card at the foot of the front page.
+  { name: 'kit', group: 'kit', act: 0, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
     // double duty: hide this from the index, and skip it in `verify.mjs`, which
     // filters on the same field. So the one page whose entire job is to make
     // component drift visible was the one page the suite could not look at, and

@@ -139,7 +139,13 @@
     const href = targetOf(row);
     const name = row.title || row.name;
     if (!cards.has(group)) cards.set(group, []);
-    if (CONCEPT_GROUPS.includes(group)) {
+    if (at?.plain) {
+      // A plain card like the concept cards, no badge and no path: the kit
+      // under its own heading (*"Bring kit card to frontpage"*, 2026-10-13).
+      const a = el('a', 'cc-card', '', { href });
+      a.append(el('h3', 'cc-t', at.title || name), el('p', 'cc-s', say));
+      cards.get(group).push(a);
+    } else if (CONCEPT_GROUPS.includes(group)) {
       const a = el('a', 'cc-card cc-demo', '', { href });
       const h = el('h3', 'cc-t');
       h.append(el('span', 'cc-n', 'demo'), document.createTextNode(name));
