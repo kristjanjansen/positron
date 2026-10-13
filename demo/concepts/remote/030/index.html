@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
-<title>POSITRON concept sampler 030</title>
+<title>POSITRON concept remote 030</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The play button alone at the top left, as /concepts/remote/000/. What the
@@ -18,7 +18,7 @@
   .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
 </style>
 <script type="module">
-  // concepts sampler/030, THE PIANO ON THE PI, 2026-10-11. /concepts/sampler/010/'s
+  // concepts remote/030 (sampler/030 until 2026-10-13), THE PIANO ON THE PI, 2026-10-11. /concepts/sampler/010/'s
   // piano and Rhodes, played by the Raspberry Pi in studio-1 instead of the tab:
   // `pi-1:sampler` is a SuperCollider server of its own on the board
   // (rig/board/scsampler.mjs), the samples come from R2 onto the SD card once,
@@ -56,12 +56,12 @@
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
-  const d = mount({ name: 'concept sampler 030', what: '', index: '/concepts/', indexLabel: 'concepts',
+  const d = mount({ name: 'concept remote 030', what: '', index: '/concepts/', indexLabel: 'concepts',
     // The lag cells under the title and the log alone at the foot, asked
     // 2026-10-11: *"move readout to top of page below title in 030 and 035"*.
     joined: false,
     readout: { 'key to sound': 'ms', 'round trip': 'ms', cushion: 'ms', path: '' } });
-  conceptNav('sampler/030');
+  conceptNav('remote/030');
 
   const q = new URLSearchParams(location.search);
   const ROOM = q.get('room') || 'studio-1';

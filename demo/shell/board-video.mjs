@@ -1,7 +1,7 @@
 // demo/shell/board-video.mjs: the Raspberry Pi's picture, received and decoded.
 //
 // Taken out of /mirror/ on 2026-10-12 (BACKLOG, "shader/010 on the real Pi")
-// so that /concepts/shader/010/ can show the board's real picture with the same
+// so that /concepts/remote/050/ can show the board's real picture with the same
 // code /mirror/ has run since 2026-09-11, rather than a second copy of it.
 //
 // WHAT THE BOARD SENDS (rig/board/board.mjs, `sendFrame`). After `video.start`

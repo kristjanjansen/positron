@@ -8,9 +8,6 @@
 <title>Sample drums</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* As /concepts/rhythm/010/: four scopes a quarter each, two by two on a phone. */
-  .cc-scopes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-  @media (max-width: 560px) { .cc-scopes { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>
 <script type="module">
   import { conceptNav } from '/concepts/nav.mjs';
@@ -43,7 +40,13 @@
   /** row key -> index into the bank's loaded samples */
   const pick = new Map();
   const bufOf = (key) => { const s = bank.loaded()[pick.get(key) ?? -1]; return s ? s.buf : null; };
-  const VOICES = sampleVoices({ bufOf });
+  // No knobs since 2026-10-13 (*"sample drums: rm scopes, move upload to
+  // top, no knobs."*): each row's pitch and length are fixed at the values its
+  // knob started at, sent with every hit instead of wired from a knob.
+  const VOICES = sampleVoices({ bufOf }).map((v) => {
+    const fixed = (v.params || []).flatMap((p) => [p.control, p.toArg ? p.toArg(p.value) : p.value]);
+    return { ...v, params: undefined, args: () => { const a = v.args(); return a && [...a, ...fixed]; } };
+  });
 
   // No picker per row since 2026-10-12 (asked: *"rm"* on a shot of the four
   // row pickers): each row plays its default, by name or by order, from
@@ -62,7 +65,7 @@
   offer(DEFAULT_KIT.map((name) => ({ name })));
 
   const m = createDrumMachine(d, {
-    voices: VOICES, scopes: true,
+    voices: VOICES,
     onWake: async (e) => { offer(await bank.wake(e)); },
   });
 
@@ -89,11 +92,9 @@
   });
   let dropped = 0;
 
-  const scopes = el('div', 'cc-scopes');
-  scopes.append(...m.scopes);
-  d.stack.add(scopes, m.surface, m.knobs, drop.el, m.patchbay);
+  // The way in first, then the grid and the patchbay; no scopes, no knobs.
+  d.stack.add(drop.el, m.surface, m.patchbay);
   window.__rhythm = m.api;
   window.__samples = { bank, pick, names: () => names, dropped: () => dropped, open: (files) => drop.open(files) };
-  window.__demo.knobs = m.api.knobGrid;
   d.ready();
 </script>

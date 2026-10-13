@@ -78,20 +78,20 @@ import { LIFE } from './voices.mjs';
  *   or null to skip the hit); see `paramsOf` and `hit`.
  * @param {(ctx: AudioContext) => Promise<void>} [o.onStart]  awaited on every
  *   press of Play, after the engine is up and before the first hit, while the
- *   bar shows it is busy (rhythm/030 joins the Pi here, so the lead is the
+ *   bar shows it is busy (remote/040 joins the Pi here, so the lead is the
  *   Pi's path from the first hit)
- * @param {() => void} [o.onStop]  called on every stop (rhythm/030 leaves the Pi)
+ * @param {() => void} [o.onStop]  called on every stop (remote/040 leaves the Pi)
  * @param {boolean} [o.scopes]  one scope per drum, each a node `web:scope-<drum>`
  *   fed by that drum's own `audio-out` (rhythm/010)
  * @param {number | (() => number)} [o.ahead]  how far ahead each hit is handed
- *   over, ms, read on every tick; 150 by default. rhythm/030 hands over on the
+ *   over, ms, read on every tick; 150 by default. remote/040 hands over on the
  *   Pi's path, 250 on the relay and 150 direct (plans/plan-pi-supercollider-defs.md §2.4)
  * @param {() => AudioContext} [o.context]  the page's own context, made on the
- *   first press; left out, the machine makes one (rhythm/030 needs 48 kHz)
+ *   first press; left out, the machine makes one (remote/040 needs 48 kHz)
  * @param {{ node: string, label: string }} [o.mix]  the drums go into a node
  *   of this name (`web:<node>:audio-in`) with an `audio-out` of its own, and
  *   the mix is NOT connected to the speakers: the page routes `api.mixOut()`
- *   where its own wires say (rhythm/030's crossfader). Left out, the node is
+ *   where its own wires say (remote/040's crossfader). Left out, the node is
  *   `web:speaker` and the mix goes to the speakers.
  * @param {{ rows: number, steps: number }} [o.shape]  how many of `voices` are
  *   rows (the first n) and how many steps a loop has, 16 by default. Changed
@@ -463,7 +463,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     delete bar.el.dataset.busy;
     playing = true;
     // The first step is handed over at once, so it gets the lead the rest get:
-    // 80 ms at the 150 default, and 100 more at 250 (rhythm/030 on the relay,
+    // 80 ms at the 150 default, and 100 more at 250 (remote/040 on the relay,
     // where a first hit 80 ms ahead would reach the Pi after its time).
     t0 = performance.now() + 80 + Math.max(0, aheadMs() - 150);
     anchor = { k: 0, t: t0, ms: stepMsAt(bpm) };

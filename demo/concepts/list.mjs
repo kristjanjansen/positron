@@ -18,12 +18,16 @@ export const CONCEPTS = [
   { n: 'synth/110', title: 'Plaits synth', say: 'Emilie Gillet\'s Plaits plays one looping four note line, and a patch picker changes only the sound.' },
   { n: 'synth/120', title: 'Plaits panel', say: 'The same Plaits voice played from the keys or a MIDI keyboard, with all ten controls as knobs.' },
   // synth/130 MIDI dump removed 2026-10-13 (*"rm https://positron.studio/concepts/synth/130/"*); /dump/ is not marked not needed any more.
-  // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*):
-  // the synth pages that play on the Raspberry Pi. remote/000, 010 and 020 were synth/060, 070
-  // and 100 until then; the old URLs 404 (no forwarding).
+  // remote, after synth (asked 2026-10-13, *"make group remote synths and move pi-playing ones there"*,
+  // then *"yea, move them all to remote instruments or stm"*): every concept page that plays on the
+  // Raspberry Pi. remote/000 to 050 were synth/060, synth/070, synth/100, sampler/030, rhythm/030 and
+  // shader/010 until then; the old URLs 404 (no forwarding).
   { n: 'remote/000', title: 'Yoshimi', say: 'Play Yoshimi on a Raspberry Pi in another building and see how long each key takes to sound here.' },
   { n: 'remote/010', title: 'Circuit', say: 'Play the Novation Circuit plugged into the Raspberry Pi and pick any of its 64 synth patches.' },
   { n: 'remote/020', title: 'Collide on Pi', say: 'Play one SuperCollider program in this tab and on the Raspberry Pi at once, crossfading the two.' },
+  { n: 'remote/030', title: 'Pi piano', say: 'A piano and a Rhodes played by the Pi in another building, over the relay or a direct link.' },
+  { n: 'remote/040', title: 'Drums on the Pi', say: 'Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade the two.' },
+  { n: 'remote/050', title: 'Shader on Pi', say: 'The mirror shader in this tab and on the Raspberry Pi, each change timed to its first frame.' },
   // draw, after synth because its first page is the synth/040 voice under a pad
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /concepts/synth/050/ 404s (no forwarding).
@@ -42,7 +46,7 @@ export const CONCEPTS = [
   { n: 'video/050', title: 'MoQ loopback', say: 'Your camera over MoQ to Cloudflare\'s relay and back beside the original, with the delay timed.' },
   // video/040 TV moved to /archive/ 2026-10-12 (*"arhice https://positron.studio/concepts/video/040/"*).
   { n: 'shader/000', title: 'Mirror shader', say: 'The kaleidoscope from /mirror/ with one knob for its mirrors, and code that recompiles as you edit.' },
-  { n: 'shader/010', title: 'Shader on Pi', say: 'The same kaleidoscope in this tab and on the Raspberry Pi, each change timed to its first frame.' },
+  // shader/010 moved to remote/050 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   // device/000 Pico router moved to /archive/ 2026-10-12 (*"archive https://positron.studio/concepts/device/000/"*).
   { n: 'room/000', title: 'Chat', say: 'A chat built from nothing but patchbay links, every line crossing the room along a link you can see.' },
   // room/001 Chat UI removed 2026-10-12 (*"001room rm it"*); room/002 keeps the frame.
@@ -61,11 +65,11 @@ export const CONCEPTS = [
   { n: 'sampler/000', title: 'Sampler', say: 'A grand piano and a Rhodes on SuperCollider, looped by the sustain pedal with no tempo and no grid.' },
   // sampler/010, 020 and 040 merged into 000 2026-10-12 (*"merge 000 and 010 with sc piano (and put it looper too)"*); their URLs 404 (no forwarding).
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
-  { n: 'sampler/030', title: 'Pi piano', say: 'The same piano and Rhodes played by the Pi in another building, over the relay or a direct link.' },
+  // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { n: 'rhythm/000', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
   { n: 'rhythm/010', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
   { n: 'rhythm/020', title: 'Sample drums', say: 'The drum machine playing samples from a default kit, or from a Circuit pack or WAVs you drop on it.' },
-  { n: 'rhythm/030', title: 'Drums on the Pi', say: 'Play one drum pattern in this tab and on the Raspberry Pi at the same moment, and crossfade the two.' },
+  // rhythm/030 moved to remote/040 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { n: 'rhythm/050', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },
   // clock, renumbered 2026-10-12 (*"do a cricical read on clock concepts. order it in a way it makes sense (simper -> complex, local -> remote) etc. reduce number if needed. clearer titles and descs"*):
   // one machine first, then the relay, then two places on one clock. Old 070 Join late merged into Shared clock;
@@ -98,14 +102,14 @@ export const CONCEPTS = [
 // to take the label off.
 export const CONCEPT_GROUPS = ['synth', 'remote', 'radio', 'video', 'shader', 'streaming', 'device', 'room', 'typist', 'sampler', 'rhythm', 'clock'];
 // A group's heading on /concepts/ is its slug, unless it is named here. `remote`
-// reads as the owner asked for it, *"make group remote synths"* (2026-10-13).
-export const GROUP_TITLES = { remote: 'remote synths' };
+// reads as the owner asked for it, *"remote instruments"* (2026-10-13).
+export const GROUP_TITLES = { remote: 'remote instruments' };
 export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments'];
 export const DEMO_CARDS = {
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   // fau, collide and muta archived 2026-10-13 (*"archve fau collide muta"*): still served, listed on /archive/.
-  mirror: { group: 'shader', say: 'A kaleidoscope drawn by this browser and by a Raspberry Pi side by side, or hung in a headset.', supersededBy: 'shader/010' },
+  mirror: { group: 'shader', say: 'A kaleidoscope drawn by this browser and by a Raspberry Pi side by side, or hung in a headset.', supersededBy: 'remote/050' },
   llhls: { group: 'streaming', say: 'A live test picture over low latency HLS, counting how far behind it plays, its stalls and switches.' },
   webrtc: { group: 'streaming', say: 'The same live test picture delivered over WebRTC by WHEP, with the network ping and route shown.', supersededBy: 'video/030' },
   moq: { group: 'streaming', say: 'A test picture sent to Cloudflare\'s MoQ relay and back, its glass to glass delay read off a clock.' },

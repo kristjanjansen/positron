@@ -1,4 +1,4 @@
-// rhythm/030 against the REAL Pi (studio-1), via the dev server on :8890. One headless Chrome, closed on every path.
+// remote/040 (was rhythm/030) against the REAL Pi (studio-1), via the dev server on :8890. One headless Chrome, closed on every path.
 // node pi030.mjs relay|direct
 import { spawn, execSync } from 'node:child_process';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -63,7 +63,7 @@ try {
   };
 
   guard('open');
-  await S('Page.navigate', { url: `http://127.0.0.1:8890/concepts/rhythm/030/` });
+  await S('Page.navigate', { url: `http://127.0.0.1:8890/concepts/remote/040/` });
   await sleep(2500);
   out.join = await join();
   if (!['relay', 'direct', 'turn'].includes(out.join.mode)) throw new Error(`not on the board: ${out.join.mode}`);
