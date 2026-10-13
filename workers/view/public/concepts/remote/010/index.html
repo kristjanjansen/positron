@@ -50,8 +50,12 @@
   //
   // NOTHING OPENS ON A VISIT. The board is made on the play press, never at
   // load. A check run sends nothing to the Circuit unless ?board=1 is added.
+  // The camera's two cells exist only when the URL carries the camera key, so
+  // a page without it shows nothing of the camera, not even an empty cell.
+  const CAM_KEY = new URLSearchParams(location.search).get('cam') || '';
   const d = mount({ name: 'concept remote 010', what: '', joined: false,
-    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms' }, index: '/concepts/', indexLabel: 'concepts' });
+    readout: { 'key to sound': 'ms', median: 'ms', 'round trip': 'ms', cushion: 'ms',
+      ...(CAM_KEY ? { 'cam fps': '', 'cam lag': 'ms' } : {}) }, index: '/concepts/', indexLabel: 'concepts' });
   conceptNav('remote/010');
 
   const q = new URLSearchParams(location.search);
@@ -321,6 +325,9 @@
   async function start() {
     if (starting) return;
     starting = true;
+    // The camera does not wait for the Circuit: a picture of the desk is worth
+    // having while the sound is still coming up, or when it does not.
+    if (cam) { cam.start(); transport.setIcon('play', 'stop', 'stop'); }
     try {
       if (!board) makeBoard();
       say(`Reaching ${INPUT_ROOM}`);
@@ -348,6 +355,7 @@
     } finally { starting = false; }
   }
   function stop() {
+    cam?.stop();
     if (armed && board) board.send({ type: 'midi.panic' });
     armed = false;
     lease?.stop(); lease = null;
@@ -357,28 +365,160 @@
     transport.setIcon('play', 'play', 'play');
     say('Stopped, every note on the Circuit was released');
   }
-  addEventListener('pagehide', () => { if (armed && board) board.send({ type: 'midi.panic' }); });
+  addEventListener('pagehide', () => { cam?.stop(); if (armed && board) board.send({ type: 'midi.panic' }); });
 
   const transport = createButtonGroup({ buttons: [
-    { id: 'play', icon: 'play', label: 'play', onPress: () => (armed ? stop() : start()) },
+    { id: 'play', icon: 'play', label: 'play', onPress: () => (armed || cam?.on() ? stop() : start()) },
   ] });
+
+  // ── the Pi's camera, for holders of the key only ────────────────────────
+  // Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
+  // url secret parameter to enable (key in cf secrets)"*.
+  // 🔴 WITHOUT `?cam=` NOTHING BELOW EXISTS: no panel, no module loaded, no
+  // request, no cell. With it, nothing opens on a visit either; the press of
+  // play opens it, as it opens the Circuit.
+  // 🔴 THE KEY IS NEVER COMPARED HERE. The page hands it to the relay, which
+  // compares it with the Cloudflare secret PI_CAM_KEY (workers/relay/src/index.js
+  // `CAM_ROOM`): `POST /room/<room>-cam/key` answers 204 or 403, and only after
+  // a 204 is the keyed room opened, with the key as its first message (in the
+  // message and not the URL, so it is not in the relay's request log). The Pi
+  // joins the same room with its own copy and starts its camera only for a
+  // viewer there (rig/board/camera.mjs), so only a holder of the key can turn
+  // it on. It stops on this page's `cam.bye`, or 25 s after the last
+  // `cam.watching`, which this page sends every 10 s while it is visible.
+  const CAM_ROOM = `${ROOM}-cam`;
+  const CAM_OUT = `${BOARD_SITE}:camera:video-out`, SCREEN_IN = id('screen', 'video-in');
+  const cam = CAM_KEY ? await buildCamera() : null;
+
+  async function buildCamera() {
+    const [{ createVideoPanel }, { createBoardVideo, WATCHING_MS }, { HTTP_BASE }] = await Promise.all([
+      import('/shell/video-panel.mjs'), import('/shell/board-video.mjs'), import('/shell/wire.mjs')]);
+    bay.addNode({ id: `${BOARD_SITE}:camera`, kind: 'device', label: 'camera on the Pi', place: ROOM });
+    bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture', place: 'browser' });
+    bay.addPort({ id: CAM_OUT, label: 'camera:video-out', dir: 'out', medium: 'video' });
+    bay.addPort({ id: SCREEN_IN, label: 'screen:video-in', dir: 'in', medium: 'video' });
+    const linked = bay.link(CAM_OUT, SCREEN_IN);
+    if (!linked.ok) d.log(`${CAM_OUT} -> ${SCREEN_IN} refused: ${linked.why}`, 'warn');
+
+    const ME = `cam-${Math.random().toString(36).slice(2, 8)}`;
+    const canvas = el('canvas', 'cc-cam');
+    canvas.width = 1280; canvas.height = 720;
+    const panel = createVideoPanel({ media: canvas, of: 'the Pi camera' });
+    const say = (state, why) => panel.presence?.set(state, why);
+    let on = false, keyed = false, beat = null, shape = null, lastFrameAt = 0;
+    const said = { refused: '', stopped: '' };
+    // The lag: the board stamps its clock once a second with the counter of the
+    // next frame it will send (`cam.tick`), and this page notes when that frame
+    // arrives. Pi to this screen through the relay, against two NTP set clocks,
+    // so it is worth what their agreement is worth; the camera's own exposure
+    // and encode time is not in it.
+    const ticks = new Map(), lags = [];
+    const video = createBoardVideo({
+      canvas,
+      onSeq: (seq) => {
+        lastFrameAt = performance.now();
+        const at = ticks.get(seq);
+        if (at != null) { ticks.delete(seq); lags.push(Date.now() - at); if (lags.length > 20) lags.shift(); }
+      },
+      onKey: () => { say('online'); d.log('A keyframe from the Pi camera arrived, the picture starts here'); },
+      onLost: (n) => d.log(`The relay has dropped ${n} frame${n === 1 ? '' : 's'} of the camera picture`, 'warn'),
+      onError: (line) => d.log(`Pi camera: ${line}`, 'bad'),
+      onText: (m) => {
+        if (m.type === 'cam.key.ok') {
+          keyed = true;
+          watching();
+          clearInterval(beat);
+          beat = setInterval(watching, WATCHING_MS);
+        } else if (m.type === 'cam.started') {
+          if (!shape) d.log(`The Pi camera is up, ${m.camera}, ${m.w}x${m.h} at ${m.fps} fps`);
+          shape = m;
+        } else if (m.type === 'cam.refused') {
+          if (said.refused !== m.why) d.log(`The Pi did not start its camera: ${m.why}`, 'warn');
+          said.refused = m.why;
+          say('offline', m.why);
+        } else if (m.type === 'cam.stopped') {
+          if (on) d.log(`The Pi camera stopped: ${m.why}`, 'warn');
+          shape = null;
+        } else if (m.type === 'cam.tick') {
+          ticks.set(m.seq, m.at);
+          if (ticks.size > 10) ticks.delete(ticks.keys().next().value);
+        }
+      },
+      onClose: (e) => {
+        if (!on) return;
+        on = false; keyed = false; clearInterval(beat);
+        say('offline', 'the camera room closed');
+        d.log(e?.code === 4003 ? 'The relay closed the camera room: it did not take the key' : `The camera room closed (${e?.code ?? '?'})`, 'warn');
+      },
+    });
+    function watching() { if (keyed && !document.hidden) video.say({ type: 'cam.watching', from: ME }); }
+    addEventListener('visibilitychange', watching);
+
+    async function start() {
+      if (on) return;
+      on = true; said.refused = '';
+      say('checking');
+      let r = null;
+      try { r = await fetch(`${HTTP_BASE}/room/${CAM_ROOM}/key`, { method: 'POST', body: CAM_KEY }); }
+      catch { /* r stays null */ }
+      if (!on) return;
+      if (!r || (r.status !== 204 && r.status !== 403)) {
+        on = false; say('offline', 'the relay did not answer');
+        d.log(`The relay did not answer the camera key check${r ? ` (${r.status})` : ''}, so no picture is asked for`, 'warn');
+        return;
+      }
+      if (r.status === 403) {
+        on = false; say('offline', 'the key was refused');
+        d.log('The relay refused the camera key in this URL, so no picture is asked for', 'warn');
+        return;
+      }
+      const o = video.open(CAM_ROOM, { codec: 'avc1.42E01F', fps: 30 }, { hello: { type: 'cam.key', key: CAM_KEY, from: ME } });
+      if (!o.ok) { on = false; say('offline', o.reason); d.log(o.reason, 'warn'); return; }
+      say('coming');
+      d.log(`Asking the Pi for its camera in ${CAM_ROOM}`);
+    }
+    function stop() {
+      if (!on) return;
+      on = false;
+      clearInterval(beat);
+      if (keyed) video.say({ type: 'cam.bye', from: ME });
+      keyed = false; shape = null;
+      // The bye has to leave before the socket does.
+      setTimeout(() => video.close(), 50);
+      say('unknown');
+    }
+    setInterval(() => {
+      const fresh = on && performance.now() - lastFrameAt < 2000;
+      d.set('cam fps', fresh ? Math.round(video.fps()) : '');
+      const med = lags.length ? [...lags].sort((x, y) => x - y)[lags.length >> 1] : null;
+      d.set('cam lag', fresh && med != null ? Math.round(med) : '');
+    }, 500);
+
+    return {
+      el: panel.el, start, stop, on: () => on,
+      flowing: () => on && performance.now() - lastFrameAt < 2000,
+      probe: () => ({ on, keyed, shape, decoded: video.decoded(), lost: video.lost(), fps: video.fps(), kbit: video.kbit(),
+        lags: [...lags], size: [canvas.width, canvas.height], lastSeq: video.lastSeq() }),
+    };
+  }
 
   // ── the patchbay ────────────────────────────────────────────────────────
   const sounding = () => armed && level > 0.002;
   const pb = createPatchbay(bay, { room: ROOM,
-    flowing: (l) => (l.from === CIRCUIT_AUDIO ? sounding() : armed),
+    flowing: (l) => (l.from === CIRCUIT_AUDIO ? sounding() : l.from === CAM_OUT ? !!cam?.flowing() : armed),
   });
   setInterval(() => pb.refresh?.(), 500);
 
   const top = el('div', 'cc-top');
   top.append(transport.el);
-  d.stack.add(top, wave.el, patchPick.el, host, pb.el);
+  d.stack.add(top, ...(cam ? [cam.el] : []), wave.el, patchPick.el, host, pb.el);
   window.__demo.bay = bay;
   // What this page hears from the Pi, for a driver. Reads only.
   window.__demo.probe = () => ({
     armed, level, span: () => span, clipped: () => clipped, said: saidLast, sent: { ...sent }, refused, lastRefusal, lastProgram,
     patchAt, patchName, nameReads, nameMisses, lastDump, stale, names: () => Object.fromEntries(names), shown: patchPick.el.querySelector('.pos-pick-cell')?.title ?? null,
     lease: lease ? lease.last() : null, stats: board ? board.stats() : null,
+    cam: cam ? cam.probe() : null,
   });
   d.ready();
 </script>

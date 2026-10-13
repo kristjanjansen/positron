@@ -51,11 +51,15 @@ export function parseBoardFrame(buf) {
  * @param {function} [onRate]         `(kbit, fps)` once a second while frames arrive.
  * @param {function} [onClose]        the video socket closed, including by `close()`.
  * @param {function} [onError]        `(text)` a decode error or a refused chunk.
+ * @param {function} [onText]         `(msg)` a text frame on the video socket, parsed as JSON. Since
+ *                                    2026-10-13 for the Pi camera's keyed room (rig/board/camera.mjs),
+ *                                    whose board speaks there; the shader picture's room is binary only.
+ * @param {function} [onOpen]         the video socket opened.
  */
 export function createBoardVideo({
   canvas, send = null, relay = RELAY_BASE,
   onFrame = () => {}, onSeq = () => {}, onKey = () => {}, onLost = () => {}, onRate = () => {},
-  onClose = () => {}, onError = () => {},
+  onClose = () => {}, onError = () => {}, onText = () => {}, onOpen = () => {},
 } = {}) {
   const ctx = canvas.getContext('2d');
   let ws = null, decoder = null, decoded = 0, lost = 0, bytes = 0, fps = 0, kbit = null;
@@ -77,7 +81,7 @@ export function createBoardVideo({
    * Open the picture the board's `video.started` reply describes. Answers
    * `{ ok: true }`, or `{ ok: false, reason }` when this browser cannot decode.
    */
-  function open(room, info = {}) {
+  function open(room, info = {}, { hello = null } = {}) {
     close();
     if (typeof VideoDecoder !== 'function') return { ok: false, reason: 'this browser has no WebCodecs, so the board’s picture cannot be decoded here' };
     waitingForKey = true; decoded = 0; lost = 0; bytes = 0; fps = 0; kbit = null; last = -1; lastSeq = null;
@@ -96,7 +100,23 @@ export function createBoardVideo({
     const sock = ws = new WebSocket(`${relay}/room/${room}/ws`);
     sock.binaryType = 'arraybuffer';
     let tick = 0, at = performance.now();
+    // ⚠️ `hello` IS THE FIRST MESSAGE ON THE SOCKET, and the Pi camera's room
+    // needs it: the relay lets a socket in a keyed room hear nothing until its
+    // first message carries the key (workers/relay/src/index.js `CAM_ROOM`).
+    // In the message, not the URL, so the key is not in a request log.
+    sock.onopen = () => {
+      if (ws !== sock) return;
+      if (hello) { try { sock.send(JSON.stringify(hello)); } catch { /* closing */ } }
+      onOpen();
+    };
     sock.onmessage = (e) => {
+      if (typeof e.data === 'string') {
+        if (ws !== sock) return;
+        let m = null;
+        try { m = JSON.parse(e.data); } catch { /* not ours */ }
+        if (m) onText(m);
+        return;
+      }
       const f = parseBoardFrame(e.data);
       if (!f || ws !== sock) return;
       if (last >= 0 && f.seq > last + 1) { lost += f.seq - last - 1; onLost(lost); }
@@ -118,13 +138,18 @@ export function createBoardVideo({
         tick = 0; at = now; bytes = 0;
       }
     };
-    sock.onclose = () => onClose();
+    sock.onclose = (e) => onClose(e);
     return { ok: true };
   }
 
   return {
     open, close,
     isOpen: () => !!ws,
+    /** Text on the video socket itself, for a room where the board listens there. False when it is not open. */
+    say(msg) {
+      if (ws?.readyState !== 1) return false;
+      try { ws.send(JSON.stringify(msg)); return true; } catch { return false; }
+    },
     decoded: () => decoded,
     lost: () => lost,
     fps: () => fps,
