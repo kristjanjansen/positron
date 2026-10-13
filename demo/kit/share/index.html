@@ -12,15 +12,19 @@
   /* A card is a picture with a ground of its own, so it carries no frame
      (eccm's /social: "no borders on og / ig cards"), and it is drawn at the
      column's width, never wider than its own 1200 px. */
-  .share-pic { display: block; inline-size: 100%; max-inline-size: 1200px; block-size: auto; }
-  .share-svg > svg { display: block; inline-size: 100%; max-inline-size: 1200px; block-size: auto; }
+  .share-pic { display: block; inline-size: 100%; block-size: auto; }
+  .share-svg > svg { display: block; inline-size: 100%; block-size: auto; }
+  /* the two side by side on a desk, the wide one taking the room its shape
+     asks for, so both are the same height; one under the other on a phone */
+  .share-row { display: grid; grid-template-columns: minmax(0, 1200fr) minmax(0, 504fr); gap: 16px; align-items: start; }
+  .share-row figure { margin: 0; min-width: 0; }
+  .share-row figcaption { margin-top: 8px; font: 400 12px/1.5 var(--mono); color: var(--dim); }
+  @media (max-width: 560px) { .share-row { grid-template-columns: minmax(0, 1fr); } }
   .share-tags { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 12px/1.6 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
-  import { siteCard, shareTags, TEMPLATE_V } from '/shell/share-card.mjs';
-  import { heroBay } from '/shell/hero.mjs';
-  import { drawBay, textWidth } from '/shell/bay-svg.mjs';
-  import { createBayView, BAY_VIEW_CSS } from '/shell/bay-view.mjs';
+  import { siteCard, igCard, shareTags, TEMPLATE_V } from '/shell/share-card.mjs';
+  import { textWidth } from '/shell/bay-svg.mjs';
   import { el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createKitPage } from '/shell/kit-page.mjs';
@@ -28,11 +32,11 @@
   /**
    * 🔴 kit/share, THE SHARE CARD, 2026-10-13. Asked: *"Build frontpage og card
    * and apply to all pages"*, then *"What headless chrome?!!? See ../eccm etc"*.
-   * The card every page names in its og:image: the front page's hero over its
-   * imaginary patchbay, written as SVG by demo/shell/share-card.mjs and
-   * demo/shell/bay-svg.mjs with no DOM, and made a PNG at build by resvg
-   * (workers/view/og/render.mjs). eccm's /social is the model: the images a
-   * page is shared with, shown as they ship.
+   * The card every page names in its og:image and the Instagram portrait
+   * beside it, both the front page's hero type alone (*"No patchbay. Do like
+   * frontpage. Do also ig image"*), written as SVG by demo/shell/share-card.mjs
+   * with no DOM and made PNGs at build by resvg (workers/view/og/render.mjs).
+   * eccm's /social is the model: the images a page is shared with, as they ship.
    * ⚠️ THE PNG EXISTS ONLY IN A BUILD. The dev server serves the repository,
    * where there is no og/ directory, so this page asks for the PNG only when
    * its own head carries the og:image the build writes, and says so otherwise
@@ -41,27 +45,45 @@
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'share',
-    what: 'The card every page is shared with, the front page’s hero over its patchbay, drawn as SVG with no browser and made a PNG at build.',
+    what: 'The card every page is shared with and its Instagram portrait, the front page’s hero type, drawn as SVG with no browser and made PNGs at build.',
   });
 
-  const card = siteCard();
+  const card = siteCard(), ig = igCard();
   const shipped = document.querySelector('meta[property="og:image"]')?.content || null;
-  let img = null, inline = null;
+  const imgs = [];
+  let inline = null;
+  const figure = (c, name, child) => {
+    const f = el('figure');
+    f.append(child, el('figcaption', '', `${name}, ${c.width} by ${c.height}`));
+    return f;
+  };
 
-  section('SITE CARD', 'The PNG as it ships, 1200 by 630, named by a hash of its SVG so a changed card is a new address.', null, (box) => {
-    if (shipped) {
-      img = Object.assign(el('img', 'share-pic'), { src: new URL(shipped).pathname, alt: card.alt, width: card.width, height: card.height });
-      box.append(img);
-    } else box.append(el('p', 'kit-n', `This copy of the page is not built, so there is no PNG beside it. The build writes ${card.path}.`));
+  section('SITE CARD', 'The two PNGs as they ship: the 1200 by 630 card every page names, and the 1080 by 1350 Instagram portrait no page names, each named by a hash of its SVG.', null, (box) => {
+    if (!shipped) { box.append(el('p', 'kit-n', `This copy of the page is not built, so there are no PNGs beside it. The build writes ${card.path} and ${ig.path}.`)); return; }
+    const row = el('div', 'share-row');
+    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram']]) {
+      const img = Object.assign(el('img', 'share-pic'), { src: c.path, alt: c.alt, width: c.width, height: c.height });
+      const a = Object.assign(el('a', 'pos-linkbtn', `download ${c.path.split('/').pop()}`), { href: c.path, download: c.path.split('/').pop() });
+      const f = figure(c, name, img);
+      f.querySelector('figcaption').append(' ', a);
+      imgs.push([c, img]);
+      row.append(f);
+    }
+    box.append(row);
   });
 
-  section('THE SVG', 'The same picture as the SVG the PNG is made from, written in this tab by the code the build runs, every attribute literal.', null, (box) => {
-    inline = el('div', 'share-svg');
-    inline.innerHTML = card.svg;
-    const svg = inline.firstElementChild;
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', card.alt);
-    box.append(inline);
+  section('THE SVG', 'The same two pictures as the SVG each PNG is made from, written in this tab by the code the build runs, every attribute literal.', null, (box) => {
+    const row = el('div', 'share-row');
+    for (const [c, name] of [[card, 'og:image'], [ig, 'instagram']]) {
+      const holder = el('div', 'share-svg');
+      holder.innerHTML = c.svg;
+      const svg = holder.firstElementChild;
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', c.alt);
+      if (!inline) inline = holder;
+      row.append(figure(c, name, holder));
+    }
+    box.append(row);
   });
 
   section('THE TAGS', 'What the build writes into the head of every page, this one’s shown, after its robots meta.', null, (box) => {
@@ -83,36 +105,13 @@
   // 1. the SVG is resvg's kind: no class, no var(), no style element, and it
   // names the card's own size
   {
-    const bad = [/\sclass=/, /var\(/, /<style/].filter((r) => r.test(card.svg)).map(String);
-    d.assert('the card is plain SVG with every attribute literal, no class, no var() and no stylesheet',
-      bad.length === 0 && /width="1200" height="630"/.test(card.svg),
-      bad.length ? `found ${bad.join(', ')}` : `${card.svg.length} characters, 1200 by 630, version ${card.version}, template ${TEMPLATE_V}`);
+    const bad = [/\sclass=/, /var\(/, /<style/, /<path/].filter((r) => r.test(card.svg + ig.svg)).map(String);
+    d.assert('both cards are plain SVG text with every attribute literal, no class, no var(), no stylesheet and no patchbay wire',
+      bad.length === 0 && /width="1200" height="630"/.test(card.svg) && /width="1080" height="1350"/.test(ig.svg),
+      bad.length ? `found ${bad.join(', ')}` : `${card.svg.length} and ${ig.svg.length} characters, 1200 by 630 and 1080 by 1350, template ${TEMPLATE_V}`);
   }
 
-  // 2. the page's own bay view and the string writer draw the hero's bay in
-  // the same places, box for box, at the width the front page draws it
-  {
-    document.head.append(Object.assign(document.createElement('style'), { textContent: BAY_VIEW_CSS }));
-    const hb = heroBay(false), host = el('div');
-    host.style.cssText = `position: absolute; left: -10000px; top: 0; width: ${hb.width}px`;
-    document.body.append(host);
-    const view = createBayView(hb.bay, { detail: hb.detail, stretch: hb.stretch, sizeAs: hb.sizeAs });
-    host.append(view.el);
-    view.render();
-    const page = [...view.el.querySelectorAll('.lv-box')].map((g) => {
-      const r = g.querySelector('rect'), t = g.querySelector('.lv-title');
-      return { id: t.textContent, x: +r.getAttribute('x') - 0.5, y: +r.getAttribute('y') - 0.5, w: +r.getAttribute('width') + 1, h: +r.getAttribute('height') + 1 };
-    });
-    const str = drawBay(hb.bay, hb).boxes;
-    const off = str.map((b) => { const p = page.find((q) => q.id === b.id); return p ? Math.max(Math.abs(p.x - b.x), Math.abs(p.y - b.y), Math.abs(p.w - b.w), Math.abs(p.h - b.h)) : Infinity; });
-    const worst = Math.max(...off);
-    host.remove();
-    d.assert('the bay drawn as a string puts every box where the page’s own bay view puts it, within half a pixel',
-      page.length === str.length && str.length > 0 && worst <= 0.5,
-      `${str.length} boxes in the string, ${page.length} in the view, the worst ${worst.toFixed(2)} px apart`);
-  }
-
-  // 3. the SVG drawn in this tab sets its text in the site's faces: the
+  // 2. the SVG drawn in this tab sets its text in the site's faces: the
   // headline's ink is as wide here as the font metrics said it would be
   {
     const t = [...inline.querySelectorAll('text')].find((n) => n.getAttribute('font-weight') === '600');
@@ -126,14 +125,15 @@
       t ? `"${t.textContent}" ${got.toFixed(1)} px wide in ${fam.split(',')[0]}, the metrics said ${predicted.toFixed(1)}` : 'no 600 text in the SVG');
   }
 
-  // 4. in a build, the og:image this page carries is the card this tab drew,
-  // and the PNG behind it is 1200 by 630
+  // 3. in a build, the og:image this page carries is the card this tab drew,
+  // and both PNGs load at their own sizes
   if (shipped) {
-    await (img.complete ? Promise.resolve() : new Promise((r) => { img.onload = img.onerror = r; }));
-    d.assert('the og:image in this page’s head is the card this tab computed, and the PNG is 1200 by 630',
-      new URL(shipped).pathname === card.path && img.naturalWidth === 1200 && img.naturalHeight === 630,
-      `${new URL(shipped).pathname} against ${card.path}, ${img.naturalWidth}x${img.naturalHeight}`);
-  } else d.log(`not built: no og:image in this page's head, so the PNG check is the build's (${card.path})`);
+    await Promise.all(imgs.map(([, img]) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; }))));
+    const sizes = imgs.map(([c, img]) => `${c.path.split('/').pop()} ${img.naturalWidth}x${img.naturalHeight}`);
+    d.assert('the og:image in this page’s head is the card this tab computed, and both PNGs load at their own sizes',
+      new URL(shipped).pathname === card.path && imgs.length === 2 && imgs.every(([c, img]) => img.naturalWidth === c.width && img.naturalHeight === c.height),
+      `${new URL(shipped).pathname} against ${card.path}, ${sizes.join(', ')}`);
+  } else d.log(`not built: no og:image in this page's head, so the PNG check is the build's (${card.path}, ${ig.path})`);
   } // if (SELFCHECK)
 
   d.ready();

@@ -1,10 +1,11 @@
-// demo/shell/share-card.mjs: the site's share card, 1200 by 630, as an SVG
-// string written with no DOM: the front page's hero (the wordmark with its
-// dot in the accent, the headline with its full stop in the accent, the line
-// and the small line, all read from HERO in hero.mjs) over its imaginary
-// patchbay (heroBay() drawn by bay-svg.mjs). Asked 2026-10-13: *"Build
-// frontpage og card and apply to all pages"*, then *"What headless chrome?!!?
-// See ../eccm etc"*.
+// demo/shell/share-card.mjs: the site's share images as SVG strings written
+// with no DOM: the front page's hero type alone (the wordmark with its dot in
+// the accent, the headline on two lines with its full stop in the accent, the
+// line and the small line, all read from HERO in hero.mjs). The 1200 by 630
+// card is every page's og:image; the 1080 by 1350 portrait is for Instagram,
+// posted by hand and tagged on no page. Asked 2026-10-13: *"Build frontpage og
+// card and apply to all pages"*, *"What headless chrome?!!? See ../eccm etc"*,
+// then *"No patchbay. Do like frontpage. Do also ig image"*.
 //
 // eccm's src/og/card.mjs and trip's og-card.ts are the model: text laid out
 // from the font's own advance widths (font-metrics.mjs), a greedy wrap with a
@@ -14,34 +15,41 @@
 // /kit/share/ shows the SVG beside the PNG made from it.
 //
 // ⚠️ THE NAME IS A HASH OF THE SVG ITSELF PLUS TEMPLATE_V. The SVG is the whole
-// input to the rasteriser, so it changes whenever anything visible does (a
-// word in HERO, a wire in the hero's bay, a colour, a size). What it cannot see
-// is the TTFs and resvg's own version: bump TEMPLATE_V when either changes.
-import { HERO, heroBay } from './hero.mjs';
-import { drawBay, textWidth, xml, INK, FAMILY } from './bay-svg.mjs';
+// input to the rasteriser, so it changes whenever anything visible does. What
+// it cannot see is the TTFs and resvg's own version: bump TEMPLATE_V when
+// either changes.
+import { HERO } from './hero.mjs';
+import { textWidth, xml, INK, FAMILY } from './bay-svg.mjs';
 import M from './font-metrics.mjs';
 
-// bump on a change the SVG cannot show (a face, resvg): it is in every hash
-export const TEMPLATE_V = 1;
+// bump on a change the SVG cannot show (a face, resvg): it is in every hash.
+// 2 since 2026-10-13: the patchbay came off both cards (*"No patchbay. Do like
+// frontpage. Do also ig image"*).
+export const TEMPLATE_V = 2;
 export const W = 1200, H = 630;
+export const IG_W = 1080, IG_H = 1350;
 export const SITE = 'https://positron.studio';
 export const SITE_NAME = 'positron.studio';
 
-// The frame. 64 on the left and the top, the bay given whatever is left above
-// the bottom margin, centred as the front page centres it in its column.
-const PAD = 64;
-// The type, the hero's own rules (shell.css .pos-hero*) at a card's size: the
-// eye mono 400 tracked .14em in --dim, the headline mono 600 at -.04em in
-// --fg, the line Geist 400 in --fg, the small line Geist 400 in --dim2. The
-// gaps between them are the hero's (18, 24, 18, 32) times the same factor.
-const K = 1.2;
+// 🔴 THE HERO'S TYPE AND NOTHING ELSE, 2026-10-13. The first card set the hero
+// small over the imaginary patchbay and the owner said *"No patchbay. Do like
+// frontpage. Do also ig image"*. So a card is the front page's hero block alone:
+// the wordmark, the headline on two lines, the line and the small line, at the
+// front page's own sizes and gaps (shell.css .pos-hero* at the desk, where the
+// clamps sit at their maxima: 13, 56, 22, 16 px, gaps 18, 24, 18), scaled up
+// as one block until it fills the frame. bay-svg.mjs stays for a card that
+// wants a patch later.
 const TYPE = {
-  eye: { face: 'mono', weight: 400, size: 16, track: 0.14, lh: 1.2, fill: INK.dim },
-  head: { face: 'mono', weight: 600, size: 58, track: -0.04, lh: 1.08, fill: INK.fg },
-  line: { face: 'sans', weight: 400, size: 24, track: -0.01, lh: 1.45, fill: INK.fg },
-  small: { face: 'sans', weight: 400, size: 18, track: 0, lh: 1.5, fill: INK.dim2 },
+  eye: { face: 'mono', weight: 400, size: 13, track: 0.14, lh: 1.2, fill: INK.dim },
+  head: { face: 'mono', weight: 600, size: 56, track: -0.04, lh: 1.08, fill: INK.fg },
+  line: { face: 'sans', weight: 400, size: 22, track: -0.01, lh: 1.45, fill: INK.fg },
+  small: { face: 'sans', weight: 400, size: 16, track: 0, lh: 1.5, fill: INK.dim2 },
 };
-const GAPS = { head: 18 * K, line: 20 * K, small: 12 * K, bay: 28 * K };
+const GAPS = { head: 18, line: 24, small: 18 };
+// .pos-hero-l carries max-width: 32em, which is what wraps the line onto two
+// at the desk; the headline wraps in the column (Connect anything / to
+// everything.), and on a card it is always those two lines.
+const LINE_MAX = 32 * TYPE.line.size;
 
 const width = (s, t) => textWidth(s, t.face, t.size, { weight: t.weight, tracking: t.track * t.size });
 function wrap(text, t, maxW) {
@@ -60,62 +68,95 @@ function balance(text, t, maxW) {
   for (let i = 0; i < 16; i++) { const mid = (lo + hi) / 2; if (wrap(text, t, mid).length > n) lo = mid; else hi = mid; }
   return wrap(text, t, hi);
 }
-// One block of text. `accent` puts the last character of the last line in
-// --hi (the full stop), `dot` replaces a space with an accent dot (the eye).
-function block(lines, t, x, y0, { accent = false, dot = false } = {}) {
-  const fam = FAMILY[t.face];
-  const asc = M[`${t.face}${t.weight}`].cap;
-  let y = y0 + asc * t.size + (t.lh - 1) * t.size / 2;
+// the headline on exactly two lines, broken where the two come out most even
+function twoLines(text, t) {
+  const words = text.split(/\s+/);
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const ls = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+    const wd = Math.max(...ls.map((l) => width(l, t)));
+    if (!best || wd < best.wd) best = { ls, wd };
+  }
+  return best ? best.ls : [text];
+}
+const blockW = (lines, t) => Math.max(...lines.map((l) => width(l, t)));
+
+// The hero block laid out at the front page's sizes in a column `measure` wide:
+// its lines, and its width and height in those units.
+function layout(measure) {
+  const rows = [
+    { t: TYPE.eye, lines: [HERO.eye.toUpperCase()], dot: true, gap: 0 },
+    { t: TYPE.head, lines: twoLines(HERO.head, TYPE.head), accent: true, gap: GAPS.head },
+    { t: TYPE.line, lines: balance(HERO.line, TYPE.line, Math.min(measure, LINE_MAX)), gap: GAPS.line },
+    { t: TYPE.small, lines: balance(HERO.small, TYPE.small, measure), gap: GAPS.small },
+  ];
+  const w = Math.max(...rows.map((r) => blockW(r.lines, r.t)));
+  const h = rows.reduce((a, r) => a + r.gap + r.lines.length * r.t.lh * r.t.size, 0);
+  return { rows, w, h };
+}
+
+// One block of text at scale k. `accent` puts a closing full stop in --hi,
+// `dot` replaces a space with an accent dot (the wordmark).
+function block(r, x, y0, k) {
+  const { t } = r, size = t.size * k, fam = FAMILY[t.face];
+  const cap = M[`${t.face}${t.weight}`].cap;
+  let y = y0 + cap * size + (t.lh - 1) * size / 2;
   const out = [];
-  lines.forEach((l, i) => {
+  r.lines.forEach((l, i) => {
     let inner = xml(l);
-    if (dot) inner = l.split(' ').map(xml).join(`<tspan fill="${INK.hi}">.</tspan>`);
-    if (accent && i === lines.length - 1 && /\.$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">.</tspan>`;
-    out.push(`<text x="${x}" y="${y.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${t.size}"${t.track ? ` letter-spacing="${+(t.track * t.size).toFixed(2)}"` : ''} fill="${t.fill}">${inner}</text>`);
-    y += t.lh * t.size;
+    if (r.dot) inner = l.split(' ').map(xml).join(`<tspan fill="${INK.hi}">.</tspan>`);
+    if (r.accent && i === r.lines.length - 1 && /\.$/.test(l)) inner = `${xml(l.slice(0, -1))}<tspan fill="${INK.hi}">.</tspan>`;
+    out.push(`<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-family="${xml(fam)}" font-weight="${t.weight}" font-size="${+size.toFixed(2)}"${t.track ? ` letter-spacing="${+(t.track * size).toFixed(2)}"` : ''} fill="${t.fill}">${inner}</text>`);
+    y += t.lh * size;
   });
-  return { svg: out.join(''), bottom: y0 + lines.length * t.lh * t.size };
+  return out.join('');
 }
 
-/** The site card: `{ svg, alt, version, path, width, height }`. */
-export function siteCard() {
-  const measure = W - 2 * PAD;
-  const parts = [];
-  let y = PAD - 6;   // the eye's line box carries its own half leading above the caps
-  const eye = block([HERO.eye.toUpperCase()], TYPE.eye, PAD, y, { dot: true });
-  parts.push(eye.svg); y = eye.bottom + GAPS.head;
-  const head = block(balance(HERO.head, TYPE.head, measure), TYPE.head, PAD, y, { accent: true });
-  parts.push(head.svg); y = head.bottom + GAPS.line;
-  const line = block(balance(HERO.line, TYPE.line, measure), TYPE.line, PAD, y);
-  parts.push(line.svg); y = line.bottom + GAPS.small;
-  const small = block(balance(HERO.small, TYPE.small, measure), TYPE.small, PAD, y);
-  parts.push(small.svg); y = small.bottom + GAPS.bay;
-
-  // The bay at the width the front page draws it (900), then scaled into what
-  // is left, as the hero scales it to its column with `zoom`.
-  const hb = heroBay(false);
-  const bay = drawBay(hb.bay, hb);
-  const k = Math.min(1.25, measure / bay.width, (H - PAD + 16 - y) / bay.height);
-  const bx = (W - bay.width * k) / 2;
-  parts.push(`<g transform="translate(${bx.toFixed(2)} ${y.toFixed(2)}) scale(${k.toFixed(4)})">${bay.body}</g>`);
-
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-    + `<rect width="${W}" height="${H}" fill="${INK.bg}"/>${parts.join('')}</svg>`;
+/**
+ * The hero alone in a `w` by `h` frame with `pad` on every side: the column
+ * measure that lets the block grow largest is searched for (a wide frame keeps
+ * the line on two lines, a tall one lets it run to more), the block is scaled
+ * by that factor and centred in the frame.
+ */
+function heroCard(w, h, pad, kind) {
+  let best = null;
+  for (let m = 360; m <= 1000; m += 8) {
+    const L = layout(m);
+    const k = Math.min((w - 2 * pad) / L.w, (h - 2 * pad) / L.h);
+    if (!best || k > best.k + 1e-6) best = { L, k, m };
+  }
+  const { L, k } = best;
+  const x = pad, parts = [];
+  const tall = (r) => r.lines.length * r.t.lh * r.t.size * k;
+  const slack = h - 2 * pad - L.h * k;
+  if (slack < 0.2 * h) {
+    // a wide frame: the block as the front page stacks it, centred
+    let y = (h - L.h * k) / 2;
+    for (const r of L.rows) { y += r.gap * k; parts.push(block(r, x, y, k)); y += tall(r); }
+  } else {
+    // a tall frame, which the two line headline fills across long before it
+    // fills down: the wordmark on the top margin, the small line on the bottom
+    // one, and the headline and the line centred between them, so the frame
+    // is filled by the same type at the same size rather than by two empty bands
+    const [eye, head, line, small] = L.rows;
+    parts.push(block(eye, x, pad, k));
+    parts.push(block(small, x, h - pad - tall(small), k));
+    const midH = tall(head) + line.gap * k + tall(line);
+    let y = (h - midH) / 2;
+    parts.push(block(head, x, y, k)); y += tall(head) + line.gap * k;
+    parts.push(block(line, x, y, k));
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+    + `<rect width="${w}" height="${h}" fill="${INK.bg}"/>${parts.join('')}</svg>`;
   const version = fnv(`${svg}|${TEMPLATE_V}`);
-  return { svg, alt: siteAlt(hb.bay), version, path: `/og/site-${version}.png`, width: W, height: H, bayScale: k };
+  return { svg, alt: ALT, version, path: `/og/${kind}-${version}.png`, width: w, height: h, scale: k, headSize: TYPE.head.size * k };
 }
+const ALT = `${SITE_NAME}: ${HERO.head} ${HERO.line} ${HERO.small}`;
 
-// What the picture shows, in words, from the same data: the wordmark, the
-// headline, and the bay's three columns by their labels.
-function siteAlt(bay) {
-  const nodes = bay.nodes(), links = bay.links();
-  const into = new Set(links.map((l) => l.to.split(':').slice(0, 2).join(':')));
-  const outOf = new Set(links.map((l) => l.from.split(':').slice(0, 2).join(':')));
-  const names = (f) => nodes.filter(f).map((n) => n.label || n.id);
-  const list = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-  const first = names((n) => !into.has(n.id)), mid = names((n) => into.has(n.id) && outOf.has(n.id)), last = names((n) => !outOf.has(n.id));
-  return `${SITE_NAME}: ${HERO.head} A patchbay wiring ${list(first)} through ${list(mid)} to ${list(last)}.`;
-}
+/** The site card, the og:image of every page: `{ svg, alt, version, path, width, height }`. */
+export const siteCard = () => heroCard(W, H, 72, 'site');
+/** The Instagram portrait, 1080 by 1350, tagged on no page: posted by hand. */
+export const igCard = () => heroCard(IG_W, IG_H, 96, 'ig');
 
 /** FNV-1a, 8 hex, eccm's and trip's cardVersion. */
 export function fnv(str) {

@@ -76,7 +76,7 @@ const { CONCEPTS, CONCEPT_DIRS, DEMO_CARDS } =
   await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
 // The share card and its tags (demo/shell/share-card.mjs), and the rasteriser
 // that turns its SVG into a PNG with no browser (og/render.mjs, resvg wasm).
-const { siteCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
+const { siteCard, igCard, shareTags, SITE_NAME } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
 const { HERO } = await import(new URL('../../demo/shell/hero.mjs', import.meta.url));
 const { renderPng } = await import(new URL('./og/render.mjs', import.meta.url));
 
@@ -875,8 +875,9 @@ await writeFile(join(OUT, 'favicon.ico'), favicon());
 //
 // 🔴 ONE CARD FOR EVERY PAGE FOR NOW, DRAWN WITH NO BROWSER, 2026-10-13. Asked:
 // *"Build frontpage og card and apply to all pages"*, then *"What headless
-// chrome?!!? See ../eccm etc"*. The SVG is written by share-card.mjs and
-// bay-svg.mjs from HERO and the hero's bay, and resvg (wasm, og/render.mjs)
+// chrome?!!? See ../eccm etc"*, and since the same evening the hero's type
+// alone (*"No patchbay. Do like frontpage"*). The SVG is written by
+// share-card.mjs from HERO and the font metrics, and resvg (wasm, og/render.mjs)
 // rasterises it with the site's faces as TTFs (og/og-fonts.py). eccm and trip
 // render the same way at the EDGE, on the first fetch, because their cards come
 // from a database; here every input is in the repository at build, so the PNG
@@ -885,13 +886,16 @@ await writeFile(join(OUT, 'favicon.ico'), favicon());
 // ⚠️ THE NAME CARRIES A HASH OF THE SVG AND TEMPLATE_V, because scrapers cache
 // a preview by URL: a changed card is a new URL, and an old one is a 404 after
 // the next deploy, which is fine for a scraper that already holds its bytes.
+// ⚠️ AND THE INSTAGRAM PORTRAIT BESIDE IT, 1080 BY 1350 (*"Do also ig image"*),
+// which no page names: Instagram reads no Open Graph, it is posted by hand and
+// downloaded from /kit/share/.
 const CARD = siteCard();
-{
+await mkdir(join(OUT, 'og'), { recursive: true });
+for (const [what, c] of [['share card', CARD], ['instagram card', igCard()]]) {
   const t0 = performance.now();
-  const png = await renderPng(CARD.svg, CARD.width);
-  await mkdir(join(OUT, 'og'), { recursive: true });
-  await writeFile(join(OUT, CARD.path.slice(1)), png);
-  console.log(`  share card ${CARD.path}: ${CARD.width}x${CARD.height}, ${png.length} bytes, ${(performance.now() - t0).toFixed(0)} ms`);
+  const png = await renderPng(c.svg, c.width);
+  await writeFile(join(OUT, c.path.slice(1)), png);
+  console.log(`  ${what} ${c.path}: ${c.width}x${c.height}, ${png.length} bytes, ${(performance.now() - t0).toFixed(0)} ms`);
 }
 
 // ── _headers — the half of the noindex that the Worker cannot reach ──────────
