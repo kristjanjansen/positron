@@ -8,7 +8,7 @@
 
 - **Review phase 5: consolidate repeated code into the kit, and bay-traffic remove()** (2026-10-14, agent). Asked: *"do review"*.
 
-- **reel.mjs: the typist page's frame, recording and download as a kit library** (2026-10-14, agent). Asked: *"do reel.mjs"*.
+- ~~**reel.mjs: the typist page's frame, recording and download as a kit library**~~ (2026-10-14, DONE: demo/shell/reel.mjs, typist 297 to 139 lines). Asked: *"do reel.mjs"*.
 
 - **Comment cut, second wave after the above lands** (2026-10-14). Asked: *"do comment cut"*.
 
