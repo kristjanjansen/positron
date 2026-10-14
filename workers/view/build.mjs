@@ -28,6 +28,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { SYNTH_STEPS } from '../../demo/shell/synth-steps.mjs';
+import { takeBuildLock, writeBuildRecord } from './deploy.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -522,12 +523,6 @@ const FILES = [
  * demo/<nn>-<name>/ and filtered to web extensions, so there is no path by
  * which a secret enters public/.
  */
-/**
- * Every web file in demo/shell, deployed flat at /shell/.
- *
- * Same containment argument as demoFiles(): a single known subdirectory,
- * filtered to web extensions, so no secret can reach public/.
- */
 function routeVectorFiles() {
   let names = [];
   try { names = readdirSync(join(REPO, 'demo/shell/route-vectors')); } catch { return []; }
@@ -535,17 +530,32 @@ function routeVectorFiles() {
     .map((n) => [`demo/shell/route-vectors/${n}`, `shell/route-vectors/${n}`]);
 }
 
+// A unit test and its runner are not page assets: they stay out of every
+// enumerated folder, and checkImports() refuses a deployed module importing one.
+function isTest(name) { return name.endsWith('-test.mjs') || name === 'run-tests.mjs'; }
+
+/**
+ * Every web file in demo/shell that git tracks, deployed flat at /shell/. An
+ * untracked scratch file cannot ship; a page that needs one fails checkImports().
+ * Without git it falls back to the directory listing and says so on stderr.
+ */
 function shellFiles() {
-  const out = [];
   const OK = new Set(['.mjs', '.js', '.css']);
-  let entries = [];
-  try { entries = readdirSync(join(REPO, 'demo/shell'), { withFileTypes: true }); }
-  catch { return out; }
-  for (const e of entries) {
-    if (!e.isFile() || !OK.has(extname(e.name))) continue;
-    out.push([`demo/shell/${e.name}`, `shell/${e.name}`]);
+  let names;
+  try {
+    names = execSync('git ls-files -z -- demo/shell', { cwd: REPO, stdio: ['ignore', 'pipe', 'pipe'] })
+      .toString().split('\0').filter(Boolean)
+      .map((f) => f.slice('demo/shell/'.length))
+      .filter((n) => !n.includes('/'));
+  } catch (e) {
+    console.error(`\n⚠️  git ls-files failed (${String(e.message).split('\n')[0]}).`);
+    console.error('   /shell/ is enumerated from the WORKING TREE instead, so an untracked file in demo/shell will ship.\n');
+    try { names = readdirSync(join(REPO, 'demo/shell'), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name); }
+    catch { return []; }
   }
-  return out;
+  // tracked AND on disk: a file deleted in the working tree is not shipped
+  return names.filter((n) => OK.has(extname(n)) && !isTest(n) && existsSync(join(REPO, 'demo/shell', n))).sort()
+    .map((n) => [`demo/shell/${n}`, `shell/${n}`]);
 }
 
 /**
@@ -585,6 +595,7 @@ function checkImports(copied) {
     // follows `from`, which is the second alternative.
     for (const m of text.matchAll(/(?:import[^'"\n]*?|from\s*)['"](\.\/[^'"]+|\/[^'"]+)['"]/g)) {
       const spec = m[1];
+      if (isTest(spec.split('?')[0])) { missing.push(`${dst} imports ${spec}, a unit test, which is never deployed`); continue; }
       if (spec.startsWith('./')) {
         const rel = (dir === '.' ? '' : dir + '/') + spec.slice(2);
         if (!have.has(rel)) missing.push(`${dst} imports ${spec} -> ${rel}`);
@@ -592,7 +603,10 @@ function checkImports(copied) {
         const rel = spec.replace(/^\//, '').split('?')[0];
         // /src/… and /proto/… are carried by the explicit list above; only
         // flag it when nothing in the copy set provides it.
-        if (!have.has(rel)) missing.push(`${dst} imports ${spec} -> ${rel}`);
+        if (!have.has(rel)) {
+          const untracked = rel.startsWith('shell/') && existsSync(join(REPO, 'demo', rel));
+          missing.push(`${dst} imports ${spec} -> ${rel}${untracked ? `  (demo/${rel} is on disk but not tracked by git: git add it)` : ''}`);
+        }
       }
     }
   }
@@ -635,7 +649,7 @@ function demoFiles() {
     try { entries = readdirSync(join(REPO, dir), { withFileTypes: true }); } catch { continue; }
     for (const e of entries) {
       if (!e.isFile()) continue;
-      if (!OK.has(extname(e.name))) continue;
+      if (!OK.has(extname(e.name)) || isTest(e.name)) continue;
       // deployed WITHOUT the demo/ prefix: the public URL is /<nn>-<name>/
       out.push([`${dir}/${e.name}`, `${dir.replace(/^demo\//, '')}/${e.name}`]);
     }
@@ -689,7 +703,7 @@ function conceptFiles() {
     for (const e of entries) {
       const src = `${rel}/${e.name}`;
       if (e.isDirectory()) out.push(...walk(src));
-      else if (e.isFile() && OK.has(extname(e.name))) out.push([src, src.replace(/^demo\//, '')]);
+      else if (e.isFile() && OK.has(extname(e.name)) && !isTest(e.name)) out.push([src, src.replace(/^demo\//, '')]);
     }
     return out;
   };
@@ -720,7 +734,7 @@ function archiveFiles() {
       const p = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory() && !rel && owned.has(e.name)) continue;
       if (e.isDirectory() && !rel) walk(p);
-      else if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name))) out.push([`demo/archive/${p}`, `archive/${p}`]);
+      else if (e.isFile() && ['.html', '.mjs', '.css'].includes(extname(e.name)) && !isTest(e.name)) out.push([`demo/archive/${p}`, `archive/${p}`]);
     }
   };
   walk('');
@@ -857,6 +871,8 @@ checkOut(OUT);
 console.log(SCRATCH ? `SCRATCH BUILD -> ${OUT} (public/ untouched)` : `build -> ${OUT}`);
 console.log(`stamp ${BUILD_STAMP}`);
 
+// public/ is what deploy.mjs uploads, so one build at a time writes it.
+if (!SCRATCH) takeBuildLock('BUILD');
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
@@ -904,8 +920,10 @@ for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['i
 // it has a URL: p.s in the mono face at 600, tracked -0.12 em, the dot in the
 // accent, its ink 0.56 of the width and centred on resvg's own ink box, on a
 // full 320 square that Instagram crops to a circle.
-{
-  const S = 320, FILL = 0.56;
+// GitHub (460, square, ink 0.62) and YouTube (800, cropped to a circle, ink
+// 0.56) joined it 2026-10-14 (*"do profile images for gh and yt"*), at
+// /kit/logo/'s upload sizes and fills.
+for (const [NET, S, FILL] of [['instagram', 320, 0.56], ['github', 460, 0.62], ['youtube', 800, 0.56]]) {
   const mark = (size, dx = 0, dy = 0) => `<text x="${dx.toFixed(2)}" y="${dy.toFixed(2)}" font-family="'Brand JetBrains Mono', 'JetBrains Mono', monospace" font-weight="600" font-size="${size.toFixed(2)}" letter-spacing="${(-0.12 * size).toFixed(2)}" fill="#e6e6e6">p<tspan fill="#ffd400">.</tspan>s</text>`;
   const wrap = (body, bg) => `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${bg ? `<rect width="${S}" height="${S}" fill="#0b0e14"/>` : ''}${body}</svg>`;
   const b0 = await inkBox(wrap(mark(100, 0, 200)));
@@ -913,10 +931,10 @@ for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['i
   const b1 = await inkBox(wrap(mark(size, 0, 200)));
   const svg = wrap(mark(size, (S - b1.width) / 2 - b1.x, 200 + (S - b1.height) / 2 - b1.y), true);
   const { fnv } = await import(new URL('../../demo/shell/share-card.mjs', import.meta.url));
-  const path = `/og/avatar-instagram-${fnv(svg)}.png`;
+  const path = `/og/avatar-${NET}-${fnv(svg)}.png`;
   const png = await renderPng(svg, S);
   await writeFile(join(OUT, path.slice(1)), png);
-  console.log(`  instagram avatar ${path}: ${S}x${S}, ${png.length} bytes`);
+  console.log(`  ${NET} avatar ${path}: ${S}x${S}, ${png.length} bytes`);
 }
 
 // ── _headers — the half of the noindex that the Worker cannot reach ──────────
@@ -1305,6 +1323,8 @@ async function explode(jsonl, key2path) {
 // page now in `archive/`. `explode()` and `queryHash()` are left in this file —
 // they are the mechanism, and the next proto with a committed cache wants them.
 console.log('cache: nothing to explode — megatimeline is archived');
+// deploy.mjs uploads public/ only if it still matches this record, byte for byte.
+if (!SCRATCH) await writeBuildRecord(BUILD_STAMP);
 console.log(SCRATCH
   ? `\nSCRATCH BUILD OK — ${OUT}. Nothing in public/ changed and nothing is deployed from here.`
   : `\nbuild ok — ${OUT}, stamp ${BUILD_STAMP}. Deploy with: node workers/view/deploy.mjs`);

@@ -57,9 +57,27 @@ const MIME = {
 /** Pages the deploy copies in from outside demo/, by their served path. */
 const EXTRA = new Map((await import('./manifest.mjs')).extraPages().map(([src, dst]) => [dst, src]));
 
+// A browser sends a cross-site POST without asking first, so the Origin header
+// is the only thing that keeps another website from writing into .tap/.
+const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+const localOnly = (req, res) => {
+  const o = req.headers.origin;
+  if (o === undefined || LOCAL_ORIGIN.test(o)) return { 'access-control-allow-origin': o || '*' };
+  res.writeHead(403, { 'content-type': 'text/plain' }).end('local origins only');
+  return null;
+};
+
 export function serve(port = PORT) {
-  const s = createServer(async (req, res) => {
-    let rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^([/\\])+/, '');
+  const s = createServer((req, res) => handle(req, res).catch((e) => {
+    // an async handler that throws would be an unhandled rejection, which ends the process
+    if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
+    res.end(`500 ${e.message}`);
+  }));
+  async function handle(req, res) {
+    let rel;
+    try { rel = decodeURIComponent(req.url.split('?')[0]); }
+    catch { res.writeHead(400, { 'content-type': 'text/plain' }).end('malformed URL'); return; }
+    rel = normalize(rel).replace(/^([/\\])+/, '');
     if (rel.includes('..')) { res.writeHead(400).end('no'); return; }
     // ── /err-img — the same route the deployed Worker serves ───────────────
     //
@@ -117,6 +135,8 @@ export function serve(port = PORT) {
      * of this project and one interleaved file would be unreadable.
      */
     if (rel === '_log' && req.method === 'POST') {
+      const cors = localOnly(req, res);
+      if (!cors) return;
       const chunks = [];
       let n = 0;
       for await (const c of req) {
@@ -128,11 +148,13 @@ export function serve(port = PORT) {
       const dir = new URL('../.tap/', import.meta.url);
       try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
       appendFileSync(new URL('log.jsonl', dir), Buffer.concat(chunks) + '\n');
-      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      res.writeHead(204, cors).end();
       return;
     }
 
     if (rel === '_tap' && req.method === 'POST') {
+      const cors = localOnly(req, res);
+      if (!cors) return;
       const chunks = [];
       // A cap, because a keyboard can put 733 messages on the wire in eight
       // seconds and nothing here needs to accept an unbounded body.
@@ -146,15 +168,17 @@ export function serve(port = PORT) {
       const dir = new URL('../.tap/', import.meta.url);
       try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
       appendFileSync(new URL('midi.jsonl', dir), Buffer.concat(chunks) + '\n');
-      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      res.writeHead(204, cors).end();
       return;
     }
     if (rel === '_tap' && req.method === 'DELETE') {
+      const cors = localOnly(req, res);
+      if (!cors) return;
       const { writeFileSync, mkdirSync } = await import('node:fs');
       const dir = new URL('../.tap/', import.meta.url);
       try { mkdirSync(dir, { recursive: true }); } catch { /* already there */ }
       writeFileSync(new URL('midi.jsonl', dir), '');
-      res.writeHead(204, { 'access-control-allow-origin': '*' }).end();
+      res.writeHead(204, cors).end();
       return;
     }
     if (rel === 'err-img') {
@@ -226,7 +250,7 @@ export function serve(port = PORT) {
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain' }).end(`404 ${rel}`);
     }
-  });
+  }
   return new Promise((ok, bad) => {
     let tries = 0;
     s.on('error', (e) => {

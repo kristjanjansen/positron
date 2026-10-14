@@ -18,9 +18,9 @@
 // One of those sabotages leaves the round trip GREEN, which is the honest answer
 // to what it can and cannot prove, and it is reported rather than hidden.
 //
-// 🔴 AND IT READS `New Pack.circuitpack`, SOMEBODY'S ONLY BACKUP OF A DEVICE
-// WITH NO FACTORY RESET. Reading is free and nothing here writes, sends or
-// touches a port.
+// 🔴 AND IT READS THE OWNER'S CIRCUIT PACK (CIRCUIT_PACK=<path>, from
+// <private-pack-repo>), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
+// and nothing here writes, sends or touches a port.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
@@ -28,7 +28,7 @@ import * as S from './circuit-session.mjs';
 import * as C from './circuit-patch.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
+const PACK = process.env.CIRCUIT_PACK || path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
 const BOUGHT = path.join(HERE, '../../tmp/purchages/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
 
 let pass = 0, fail = 0, skip = 0;
@@ -44,8 +44,10 @@ const printable = (s) => [...s].every((c) => c >= ' ' && c <= '~');
 console.log('\n== the Circuit session container ==');
 
 if (!fs.existsSync(PACK)) {
-  console.log('  New Pack.circuitpack is not here, so there is nothing to read.');
-  process.exit(0);
+  // exit 77 is SKIP to demo/shell/run-tests.mjs: nothing was measured, so it must not read as a pass
+  console.log('  SKIP: no pack. It is circuit/2026-09-20-circuit.circuitpack in the private repository');
+  console.log('  <private-pack-repo>; run with CIRCUIT_PACK=<that file> to measure it.');
+  process.exit(77);
 }
 
 const list = readZip(fs.readFileSync(PACK));

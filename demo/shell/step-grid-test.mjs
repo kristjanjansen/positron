@@ -208,8 +208,9 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
     && !/data-now="\$\{i\}"\] \$\{at\}\{background/.test(src),
     'hilite should not kill my 1st col beat bg color');
 
+  // the rule sits outside the step grid block, after `.panel-fixed`, so it wins on order
   ok('the label column has no divider down it',
-    /\.pos-pg-labs \{[^}]*border-right: 0/.test(block),
+    /\.pos-pg-labs \{[^}]*border-(right|inline): 0/.test(css.replace(/\/\*[\s\S]*?\*\//g, '')),
     'rm divider vert line next to pads');
 }
 

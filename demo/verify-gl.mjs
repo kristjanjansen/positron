@@ -42,30 +42,14 @@
 // noise. So "the picture is right" is asserted STRUCTURALLY by the page (it
 // drew, it moved, it is not a flat field), never by comparing pixels across
 // machines.
-import { spawn } from 'node:child_process';
-import { rm, readFile } from 'node:fs/promises';
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
-import { claimProfile } from './harness-profile.mjs';
+import { launchChrome, connectCdp } from './chrome.mjs';
 import { startStation } from './fake-station.mjs';
 
-const CHROME = process.env.CHROME
-  || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-// ⚠️ A FIXED CDP PORT MEANS YOU MAY BE TALKING TO THE PREVIOUS BROWSER.
-// Proving this file's own guard worked took two attempts: the first run of the
-// SwiftShader test reported ANGLE Metal, because a Chrome from the run before
-// was still alive on the fixed port — so the new flags never applied and the
-// harness attached to the old browser. The numbers were about a process that
-// had been started with different flags entirely. That is the same shape as the
-// contaminated governor A/B in plan-visuals §3.4, and the fix is to let Chrome
-// choose the port and read back which one it took.
+// Chrome's port and per-run profile come from demo/chrome.mjs. A fixed port once
+// attached this file to the previous run's Chrome and reported its flags.
 const HTTP_PORT = 8892;                     // not verify.mjs's 8890: both may run
-// 🔴 AND THE PROFILE IS PER-PROCESS, FOR THE SAME REASON AS THE PORT ABOVE.
-// A fixed one was the last shared mutable global in this file: two agents
-// running this harness in one checkout got one profile, one lock — and one of
-// them got killed by the other's `pkill`, mid-run, reading as "chrome did not
-// come up". The port lesson and the profile are the same lesson.
-const { dir: PROFILE } = claimProfile('positron-verify-gl');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
@@ -115,68 +99,16 @@ if (!process.env.DEMO_BASE && targets.some((t) => t.name === 'videoradio')) {
   }
 }
 
-await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() => {});
-// ⚠️ BEFORE the spawn, not after: Chrome writes this file as it starts, and
-// removing it afterwards deletes the very thing being waited for.
-await rm(`${PROFILE}/DevToolsActivePort`, { force: true }).catch(() => {});
-// ⚠️ THERE USED TO BE A `pkill` HERE AND IT IS GONE ON PURPOSE. Chrome refuses
-// to start on a LOCKED profile and simply exits, so a leftover browser from the
-// previous run made this harness sit out its whole poll and report "chrome did
-// not come up" — a Chrome problem in appearance, a stale process in fact. The
-// kill fixed that and introduced a worse one: matched on a path that was the
-// same for everybody, it reached the OTHER AGENT'S run as readily as the
-// previous one. A per-process profile cannot be locked by anything but this
-// process, so the problem the kill solved no longer exists and the collision it
-// caused goes with it. A recovery action is not free (CLAUDE.md).
-
 // ⚠️ NO `--disable-gpu`, AND NO SWIFTSHADER FLAG. The point of this file is the
 // real device. `--headless=new` does use the GPU where one is available, which
 // is why the renderer is asserted rather than assumed.
-const chrome = spawn(CHROME, [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
-  '--no-first-run', '--no-default-browser-check',
-  '--autoplay-policy=no-user-gesture-required', '--mute-audio',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-chrome.stderr.on('data', () => {});
-
-// Port 0 means "pick one", and Chrome writes it into the profile. Reading it
-// back is what guarantees this is OUR browser and not one left running.
-let wsUrl = null, cdpPort = null;
-for (let i = 0; i < 60 && !wsUrl; i++) {
-  await sleep(250);
-  try {
-    cdpPort = (await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0].trim();
-    if (!cdpPort) continue;
-    wsUrl = (await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()).webSocketDebuggerUrl;
-  } catch { /* not up yet */ }
-}
-if (!wsUrl) { chrome.kill(); server?.close(); throw new Error('chrome did not come up'); }
-
-const ws = new WebSocket(wsUrl);
-await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-let msgId = 0;
-const pending = new Map();
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { resolve, reject } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? reject(new Error(JSON.stringify(m.error))) : resolve(m.result);
-  }
-};
-// ⚠️ THE BROWSER ENDPOINT HAS NO `Page` DOMAIN. `/json/version`'s socket talks
-// to the BROWSER; `Page.navigate` and `Runtime.evaluate` live on a page target,
-// so one has to be created and attached to first. Without it the very first
-// call comes back `'Page.enable' wasn't found`, which reads like a Chrome
-// version problem and is not one. verify.mjs does the same two lines.
-const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-  const id = ++msgId;
-  pending.set(id, { resolve, reject });
-  ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-});
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-const S = (method, params = {}) => send(method, params, sessionId);
+const browser = await launchChrome({
+  prefix: 'positron-verify-gl', clearCache: true,
+  args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
+}).catch((e) => { server?.close(); throw e; });
+const cdp = await connectCdp(browser.wsUrl);
+const { ws } = cdp;
+const { S } = await cdp.page();
 const evalIn = async (expr) => {
   const r = await S('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'threw');
@@ -230,7 +162,7 @@ if (!RENDER.webgl2 || isSoft) {
   console.log(`    ${isSoft ? 'This is a software rasteriser. Its numbers describe no real device:' : 'There is no GPU context here.'}`);
   if (isSoft) console.log('    it is ~3.4x faster than a real Raspberry Pi GPU and ~8.2x slower than a real laptop GPU.');
   console.log('    Run this on a machine with a GPU, or fix the flags — never add --enable-unsafe-swiftshader.\n');
-  ws.close(); chrome.kill(); server?.close();
+  ws.close(); await browser.close(); server?.close();
   process.exit(1);
 }
 
@@ -240,7 +172,7 @@ if (!targets.length) {
     ? `no demo named ${want.join(', ')} declares gl: true in manifest.mjs`
     : 'no demo declares gl: true yet — but this machine can grade one when there is'}`);
   console.log(`renderer: ${RENDER.vendor} · ${RENDER.renderer}\n`);
-  ws.close(); chrome.kill(); server?.close();
+  ws.close(); await browser.close(); server?.close();
   process.exit(fail ? 1 : 0);
 }
 
@@ -320,5 +252,5 @@ for (const t of targets) {
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);
 console.log(`renderer: ${RENDER.vendor} · ${RENDER.renderer}\n`);
-ws.close(); chrome.kill(); server?.close();
+ws.close(); await browser.close(); server?.close();
 process.exit(fail ? 1 : 0);

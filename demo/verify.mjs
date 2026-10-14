@@ -7,41 +7,18 @@
 // window.__demo, never on DOM ids, so it does not care how any page is built.
 // Raw CDP over node's global WebSocket, no deps — house harness style.
 
-import { spawn, execFileSync } from 'node:child_process';
-import { rm, readFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
-import { claimProfile } from './harness-profile.mjs';
+import { launchChrome, connectCdp } from './chrome.mjs';
 import { startStation } from './fake-station.mjs';
 import { startTapes } from './fake-tapes.mjs';
 import { startErr } from './fake-err.mjs';
 import { startBoard } from './fake-board.mjs';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-// 🔴 A FIXED PORT IS A SHARED MUTABLE GLOBAL, and this file still had two of
-// them. CLAUDE.md records the same bug in `verify-gl.mjs` — it attached to a
-// Chrome left over from a previous run and reported THAT run's flags, which is
-// how a SwiftShader test reported ANGLE Metal — and the fix ("let the OS choose
-// and read back what you got") was applied to the HTTP port here and never to
-// these two. So two harnesses started at once did not collide loudly: the
-// second found 9333 already answering, attached to the FIRST's browser, and
-// drove someone else's tabs while reporting its own slugs. With agents running
-// in parallel that is not a rare race, it is the normal case — and it is the
-// likeliest explanation for a `cdp timeout` that took a full suite out today on
-// a demo that is 16/16 when run alone.
-//
-// ⚠️ The profile has to become per-run IN THE SAME CHANGE, not as tidiness.
-// Chrome writes the port it actually got into `DevToolsActivePort` inside the
-// profile, so reading it back from a SHARED directory would find whichever
-// browser wrote there last — a per-run port with a shared profile still lands
-// on somebody else's browser. A shared profile is also a shared HTTP cache,
-// which is the opaque-response bug this file already deletes `Default/Cache`
-// to avoid.
-const CDP_PORT = 0;                       // 0 = let the OS pick; read back below
-// The profile is claimed rather than named: `claimProfile` removes it when this
-// run ends however it ends, and SWEEPS the ones left by runs that were killed.
-// See demo/harness-profile.mjs — 229 of these had accumulated to ~20 GB.
-const { dir: PROFILE, swept: SWEPT } = claimProfile('demo-verify-udd');
+// Chrome, its port and its per-run profile come from demo/chrome.mjs, which
+// kills it and removes the profile on every path out.
+// why: .claude/skills/positron-verify "A fixed port is a shared mutable global"
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));   // `--deep` is a tier, not a slug
@@ -252,67 +229,31 @@ const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}
 // checks need. A page that declares no `lightSettleMs` has not been split yet
 // and gets its full wait either way.
 const DEEP = process.env.DEMO_DEEP === '1' || process.argv.includes('--deep');
-const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
+// A row with only `lightSettleMs` keeps it in the deep tier: deep never waits less.
+const settleOf = (t) => (DEEP ? (t.settleMs ?? t.lightSettleMs) : (t.lightSettleMs ?? t.settleMs));
 console.log(`base ${BASE}`);
 console.log(DEEP ? 'tier: DEEP, the long-running checks included'
   : 'tier: ordinary (DEMO_DEEP=1 node demo/verify.mjs ... adds the long-running checks)');
-if (SWEPT) console.log(`(swept ${SWEPT} profile dir(s) left by killed runs)`);
+// The cache is emptied every run: a media element's opaque entry for an m3u8
+// is served to hls.js's later XHR for the same URL and rejected as CORS.
+// why: .claude/skills/positron-verify "An engine switch invalidates the harness's HTTP cache"
+const browser = await launchChrome({
+  prefix: 'demo-verify-udd', clearCache: true,
+  args: [
+    '--disable-gpu', '--autoplay-policy=no-user-gesture-required', '--mute-audio',
+    // OPT IN: Chrome's generated camera, for a page whose subject is a camera
+    // (`/cam/`). Off by default, because with it every camera page in a run
+    // publishes, and some of those publishes are Stream recordings.
+    ...(process.env.DEMO_FAKE_CAMERA === '1'
+      ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : []),
+  ],
+}).catch((e) => { server?.close(); throw e; });
+if (browser.swept) console.log(`(swept ${browser.swept} profile dir(s) left by killed runs)`);
+const cdpPort = browser.port;
 
-// EMPTY CACHE EVERY RUN. A media element loading `video.src = <m3u8>` stores a
-// no-cors (opaque) entry for that URL; when a demo later switches to hls.js,
-// its XHR for the SAME url is served from that entry and rejected as a CORS
-// failure — on a URL that answers 200 with `access-control-allow-origin: *`.
-// Two demos read red for exactly that reason and nothing in the page was wrong.
-await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() => {});
-
-const chrome = spawn(CHROME, [
-  '--headless=new', `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${PROFILE}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu',
-  '--autoplay-policy=no-user-gesture-required', '--mute-audio',
-  // OPT IN: Chrome's generated camera, for a page whose subject is a camera
-  // (`/cam/`). Off by default, because with it every camera page in a run
-  // publishes, and some of those publishes are Stream recordings.
-  ...(process.env.DEMO_FAKE_CAMERA === '1'
-    ? ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] : []),
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-chrome.stderr.on('data', () => {});
-
-let wsUrl = null, cdpPort = null;
-for (let i = 0; i < 60 && !wsUrl; i++) {
-  await sleep(250);
-  try {
-    // the port we ACTUALLY got, from our own profile — never guessed
-    if (!cdpPort) cdpPort = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
-    if (!Number.isFinite(cdpPort) || !cdpPort) { cdpPort = null; continue; }
-    wsUrl = (await (await fetch(`http://127.0.0.1:${cdpPort}/json/version`)).json()).webSocketDebuggerUrl;
-  } catch {}
-}
-if (!wsUrl) { chrome.kill(); server?.close(); throw new Error('chrome did not come up'); }
-
-const ws = new WebSocket(wsUrl);
-await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-let msgId = 0;
-const pending = new Map();
-const listeners = [];
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { resolve, reject } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? reject(new Error(JSON.stringify(m.error))) : resolve(m.result);
-  } else if (m.method) for (const fn of listeners) fn(m);
-};
-const send = (method, params = {}, sessionId) =>
-  new Promise((resolve, reject) => {
-    const id = ++msgId;
-    pending.set(id, { resolve, reject });
-    ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
-    setTimeout(() => { if (pending.delete(id)) reject(new Error('cdp timeout: ' + method)); }, 30000);
-  });
-
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-const S = (m, p) => send(m, p, sessionId);
+const cdp = await connectCdp(browser.wsUrl, { timeout: 30000 });
+const { ws, send } = cdp;
+const { sessionId, S } = await cdp.page();
 await S('Page.enable'); await S('Runtime.enable'); await S('Log.enable'); await S('Network.enable');
 
 let errors = [];
@@ -370,7 +311,7 @@ let hostHits = new Map();
 const errRefusal = (s) => /live\.err\.ee/.test(s)
   || (errAt && s.includes(errAt)
       && /\/live\/[a-z0-9]+\/seg-\d+\.(?:ts|m4s)/.test(s));
-listeners.push((m) => {
+cdp.on((m) => {
   if (m.sessionId !== sessionId) return;
   if (m.method === 'Network.requestWillBeSent') {
     const u = m.params.request?.url || '';
@@ -1201,18 +1142,9 @@ if (fail) {
   }
 }
 ws.close(); server?.close();
-// 🔴 WAIT FOR CHROME TO ACTUALLY BE GONE BEFORE THE PROFILE IS REMOVED.
-// `kill()` asks; it does not stop. MEASURED: with a plain `kill()` the exit
-// handler deleted the directory and a still-shutting-down Chrome recreated it
-// on the way out, so a run that cleaned up correctly still left 250 MB behind
-// — a cleanup that runs, reports nothing, and does nothing. SIGKILL and await
-// the process's own `exit`, capped so a wedged browser cannot hang the suite
-// (the startup sweep collects it next time either way).
-chrome.kill('SIGKILL');
-await Promise.race([
-  new Promise((r) => chrome.once('exit', r)),
-  new Promise((r) => setTimeout(r, 3000)),
-]);
+// SIGKILL and wait for Chrome's own exit before the profile goes, or a Chrome
+// still shutting down recreates it. why: positron-verify "kill() ASKS"
+await browser.close();
 // The stand-ins go with the run. A server left listening on a port is the small
 // version of the thing this harness exists to avoid.
 for (const s of standIns) s.close();

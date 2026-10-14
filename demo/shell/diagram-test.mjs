@@ -704,17 +704,19 @@ console.log('\n== a box inside a box ==');
   const note = findLink(L, 'you', 'synth');
   const pts = pathPoints(note.d);
   const end = pts.at(-1);
+  // The lane is the RIGHT padding: the left is where return paths run (diagram.mjs placeColumn).
+  const right = Math.max(...pi.kids.map((k) => k.x + k.w));
   ok('in one column the arrow reaches the box it names, not the machine round it',
-     L.mode === 'column' && end[0] < synth.x && end[0] >= synth.x - 6
+     L.mode === 'column' && end[0] > synth.x + synth.w && end[0] <= synth.x + synth.w + 6
        && end[1] >= synth.y && end[1] <= synth.y + synth.h,
      `it ends at (${end[0]}, ${end[1]}); the box is x ${synth.x} y ${synth.y}`
      + ` to ${synth.y + synth.h}, the machine's edge is ${pi.x}`);
   const within = pts.filter((p) => p[1] >= pi.y && p[1] <= pi.y + pi.h);
-  ok('and every corner of it inside the machine is in the padding, left of the boxes',
-     within.length >= 2 && within.every((p) => p[0] >= pi.x && p[0] < synth.x)
+  ok('and every corner of it inside the machine is in the padding, right of the boxes',
+     within.length >= 2 && within.every((p) => p[0] > right && p[0] <= pi.x + pi.w)
        && synth.y > pi.labY[0],
      `${within.length} points between x ${Math.min(...within.map((p) => p[0]))} and `
-     + `${Math.max(...within.map((p) => p[0]))}, the boxes start at ${synth.x}`);
+     + `${Math.max(...within.map((p) => p[0]))}, the boxes end at ${right}, the machine at ${pi.x + pi.w}`);
 }
 
 {
@@ -980,11 +982,11 @@ for (const width of [1000, 390]) {
     const cf = L.nodes.find((n) => n.id === 'cf');
     const inCf = pathPoints(findLink(L, 'draw', 'out').d)
       .filter((p) => p[1] >= cf.y && p[1] <= cf.y + cf.h);
-    ok('column: the run inside a machine is in its padding, left of its name and its boxes',
-       inCf.length >= 2 && inCf.every((p) => p[0] >= cf.x && p[0] < cf.kids[0].x)
-         && cf.kids[0].x > cf.x,
+    const cfRight = Math.max(...cf.kids.map((k) => k.x + k.w));
+    ok('column: the run inside a machine is in its padding, right of its boxes',
+       inCf.length >= 2 && inCf.every((p) => p[0] > cfRight && p[0] <= cf.x + cf.w),
        `${inCf.length} points between x ${Math.min(...inCf.map((p) => p[0]))} and `
-       + `${Math.max(...inCf.map((p) => p[0]))}, boxes start at ${cf.kids[0].x}`);
+       + `${Math.max(...inCf.map((p) => p[0]))}, boxes end at ${cfRight}, the machine at ${cf.x + cf.w}`);
   }
 }
 

@@ -99,10 +99,10 @@
 // verify.mjs.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
+import { launchChrome } from './chrome.mjs';
 
 const ADB = process.env.ADB || 'adb';
 // ⚠️ NOT verify.mjs's 8890 and not verify-gl.mjs's 8892: all three may be
@@ -258,34 +258,11 @@ const ok = (label, cond, detail) => {
 // how these three cases came to exist in this shape.
 // ─────────────────────────────────────────────────────────────────────────────
 if (SELF_TEST) {
-  const CHROME = process.env.CHROME
-    || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  const PROFILE = '/private/tmp/claude-501/verify-quest-selftest-udd';
   const server = await serve(HTTP_PORT);
   const base = `http://127.0.0.1:${server.address().port}`;
-
-  // Chrome writes DevToolsActivePort as it starts, so clear it BEFORE the spawn
-  // — removing it afterwards deletes the thing being waited for.
-  await rm(`${PROFILE}/DevToolsActivePort`, { force: true }).catch(() => {});
-  // Port 0 means "pick one", read back from the profile. A FIXED CDP PORT MEANS
-  // YOU MAY BE TALKING TO THE PREVIOUS BROWSER — verify-gl.mjs's SwiftShader
-  // test reported ANGLE Metal for exactly that reason.
-  const chrome = spawn(CHROME, [
-    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
-    '--no-first-run', '--no-default-browser-check', '--mute-audio',
-  ], { stdio: ['ignore', 'pipe', 'pipe'] });
-  chrome.stderr.on('data', () => {});
-
-  let wsUrl = null;
-  for (let i = 0; i < 60 && !wsUrl; i++) {
-    await sleep(250);
-    try {
-      const port = (await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0].trim();
-      if (!port) continue;
-      wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl;
-    } catch { /* not up yet */ }
-  }
-  if (!wsUrl) { chrome.kill(); server.close(); throw new Error('chrome did not come up'); }
+  const browser = await launchChrome({ prefix: 'verify-quest-selftest-udd', args: ['--mute-audio'] })
+    .catch((e) => { server.close(); throw e; });
+  const wsUrl = browser.wsUrl;
 
   const cdp = await connect(wsUrl);
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -333,7 +310,7 @@ if (SELF_TEST) {
 
   console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);
   console.log('(this proves the guard discriminates; it says nothing about any headset)\n');
-  cdp.close(); chrome.kill(); server.close();
+  cdp.close(); await browser.close(); server.close();
   process.exit(fail ? 1 : 0);
 }
 

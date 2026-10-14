@@ -17,17 +17,55 @@
 // it did change, to the wrong thing. There is no output anywhere that looks
 // wrong, which is the worst shape there is.
 //
-// So: build, fingerprint the output, and refuse to upload if one byte of it
-// moved in between. The fingerprint is over CONTENT, not mtimes — a second
-// build of the same tree is not a problem and must not read as one.
+// So: hold a lock across build and upload, have build.mjs record a fingerprint
+// of what it wrote and its stamp, and refuse to upload a public/ that differs
+// from that record by one byte. The fingerprint is over CONTENT, not mtimes.
 import { spawnSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, 'public');
+// The wrangler `npx wrangler --version` resolved to on 2026-10-14. Raise it on purpose.
+export const WRANGLER = '4.75.0';
+// Beside public/, never in it: public/ is uploaded verbatim. `.wrangler/` is gitignored.
+export const LOCK = join(HERE, '.wrangler', 'positron-build.lock');
+export const RECORD = join(HERE, '.wrangler', 'positron-build.json');
+
+/**
+ * Hold the lock on building into public/ until this process exits. A build
+ * spawned by a deploy that already holds it is told so through
+ * POSITRON_BUILD_LOCK=<holder pid>. Refuses (exit 1) while a live process holds it.
+ */
+export function takeBuildLock(what) {
+  let holder = null;
+  try { holder = Number(readFileSync(LOCK, 'utf8')); } catch { /* free */ }
+  if (holder && String(holder) === process.env.POSITRON_BUILD_LOCK) return;
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+  if (holder && holder !== process.pid && alive(holder)) {
+    console.error(`\n${what} REFUSED: process ${holder} is building into or deploying from public/ (${LOCK}).`);
+    console.error('  Wait for it, or build somewhere else with --out.');
+    process.exit(1);
+  }
+  mkdirSync(dirname(LOCK), { recursive: true });
+  writeFileSync(LOCK, String(process.pid));
+  process.on('exit', () => {
+    try { if (readFileSync(LOCK, 'utf8') === String(process.pid)) unlinkSync(LOCK); } catch { /* gone */ }
+  });
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    if (!process.listenerCount(sig)) process.on(sig, () => process.exit(130));
+  }
+}
+
+/** What build.mjs wrote into public/, recorded by build.mjs as its last step. */
+export async function writeBuildRecord(stamp) {
+  const files = Object.fromEntries(await fingerprint(PUBLIC));
+  mkdirSync(dirname(RECORD), { recursive: true });
+  writeFileSync(RECORD, JSON.stringify({ stamp, nonce: process.env.POSITRON_BUILD_NONCE || null, files }));
+}
 
 /** Every file under `dir`, by repo-relative path, with a hash of its bytes. */
 export async function fingerprint(dir) {
@@ -64,7 +102,7 @@ export function drift(before, after) {
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
-// (guarded, so the two functions above can be imported and tested without
+// (guarded, so the functions above can be imported and tested without
 // building or deploying anything — which is how their refusal was proved)
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const DRY = process.argv.includes('--dry-run');
@@ -125,15 +163,27 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
 
 
-  const build = spawnSync(process.execPath, [join(HERE, 'build.mjs')], { stdio: 'inherit' });
+  // The lock is held from before the build to after the upload, so no other
+  // build can write into public/ in between; the record is build.mjs's own
+  // fingerprint of what it wrote, tagged with this deploy's nonce.
+  takeBuildLock('DEPLOY');
+  const nonce = randomUUID();
+  const build = spawnSync(process.execPath, [join(HERE, 'build.mjs')], {
+    stdio: 'inherit', env: { ...process.env, POSITRON_BUILD_LOCK: String(process.pid), POSITRON_BUILD_NONCE: nonce },
+  });
   if (build.status !== 0) {
     console.error('\nDEPLOY REFUSED — the build did not pass. Nothing was uploaded.');
     process.exit(1);
   }
 
-  // The stamp that was just built, read back out of the artefact rather than
-  // recomputed — a stamp derived twice can disagree with itself, and then the
-  // number quoted to a phone is not the number on the edge.
+  let record = null;
+  try { record = JSON.parse(readFileSync(RECORD, 'utf8')); } catch { /* reported below */ }
+  if (!record || record.nonce !== nonce) {
+    console.error(`\nDEPLOY REFUSED: ${RECORD} is ${record ? 'from another build' : 'missing'}, so nothing says what this build wrote.`);
+    process.exit(1);
+  }
+
+  // The stamp read back out of the artefact, and it has to be the one the build recorded.
   const shell = await readFile(join(PUBLIC, 'shell', 'shell.mjs'), 'utf8');
   const stamp = (shell.match(/export const BUILD = '([^']+)'/) || [])[1];
   if (!stamp || stamp === 'dev') {
@@ -141,20 +191,22 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.error('  Every device log opens with this line; shipping `dev` makes every report unattributable.');
     process.exit(1);
   }
+  if (stamp !== record.stamp) {
+    console.error(`\nDEPLOY REFUSED: public/ carries BUILD '${stamp}' and the build recorded '${record.stamp}'.`);
+    process.exit(1);
+  }
 
-  const built = await fingerprint(PUBLIC);
-  console.log(`\nfingerprinted ${built.size} files · stamp ${stamp}`);
+  const built = new Map(Object.entries(record.files));
+  console.log(`\nthe build recorded ${built.size} files, stamp ${stamp}`);
 
-  // ⚠️ THE CHECK IS HERE, AS LATE AS IT CAN BE. Between the build finishing and
-  // wrangler opening the first file is the entire window another `node
-  // build.mjs` has to land in, and it is seconds wide in practice.
+  // As late as it can be: the tree about to be uploaded against the build's record.
   const beforeUpload = await fingerprint(PUBLIC);
   const moved = drift(built, beforeUpload);
   if (moved.length) {
-    console.error('\nDEPLOY REFUSED — public/ changed between the build and the upload:');
+    console.error('\nDEPLOY REFUSED: public/ is not what the build wrote:');
     for (const m of moved.slice(0, 10)) console.error('  ' + m);
     if (moved.length > 10) console.error(`  … and ${moved.length - 10} more`);
-    console.error('\n  Another build landed on top of this one. Re-run this command;');
+    console.error('\n  Something wrote into public/ after the build. Re-run this command;');
     console.error('  and if somebody is building in this checkout, they want --out.');
     process.exit(1);
   }
@@ -170,7 +222,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const env = { ...process.env };
   delete env.CF_API_TOKEN;
   delete env.CLOUDFLARE_API_TOKEN;
-  const up = spawnSync('npx', ['wrangler', 'deploy'], { cwd: HERE, stdio: 'inherit', env });
+  const up = spawnSync('npx', ['--yes', `wrangler@${WRANGLER}`, 'deploy'], { cwd: HERE, stdio: 'inherit', env });
 
   // Whether or not wrangler succeeded, say if the thing it was reading moved
   // under it. A deploy that raced a build shipped an unknown mixture, and that

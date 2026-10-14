@@ -45,12 +45,10 @@
 // `127.0.0.1` or on `positron.studio`, and read the rules in CLAUDE.md before
 // pointing anything at an external source.
 
-import { spawn } from 'node:child_process';
-import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { launchChrome, connectCdp } from './chrome.mjs';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -96,57 +94,12 @@ if (!slug) {
   process.exit(2);
 }
 
-const PROFILE = await mkdtemp(join(tmpdir(), 'positron-shot-'));
-const chrome = spawn(CHROME, [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu',
-  // ⚠️ MUTED AND WITHOUT AN AUTOPLAY GESTURE, because a shot must not start a
-  // sound on somebody's desk and must not be a page that has begun playing.
-  '--mute-audio',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-chrome.stderr.on('data', () => {});
-// ⚠️ CHROME DIES WITH THIS PROCESS, WHATEVER KILLED IT. A run that threw
-// after launch left a headless Chrome alive, and the next verify run marked
-// itself as not evidence because of it. `exit` fires on a normal end, an
-// uncaught throw and a SIGTERM; SIGINT is turned into an exit so it fires too.
-process.on('exit', () => { try { chrome.kill(); } catch { /* already gone */ } });
-process.on('SIGINT', () => process.exit(130));
-
-let wsUrl = null, port = null;
-for (let i = 0; i < 60 && !wsUrl; i++) {
-  await sleep(250);
-  try {
-    // ⚠️ THE PORT WE ACTUALLY GOT, READ FROM OUR OWN PROFILE, NEVER GUESSED.
-    // `verify.mjs` pays for this lesson at length: a guessed port can attach to
-    // somebody else's browser.
-    if (!port) port = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
-    if (!Number.isFinite(port) || !port) { port = null; continue; }
-    wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl;
-  } catch { /* not up yet */ }
-}
-if (!wsUrl) { chrome.kill(); throw new Error('chrome did not come up'); }
-
-const ws = new WebSocket(wsUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let msgId = 0;
-const pending = new Map();
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { resolve, reject } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? reject(new Error(JSON.stringify(m.error))) : resolve(m.result);
-  }
-};
-const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-  const id = ++msgId;
-  pending.set(id, { resolve, reject });
-  ws.send(JSON.stringify({ id, method, params, sessionId }));
-});
-
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-const S = (m, p) => send(m, p, sessionId);
+// ⚠️ MUTED AND WITHOUT AN AUTOPLAY GESTURE, because a shot must not start a
+// sound on somebody's desk and must not be a page that has begun playing.
+const browser = await launchChrome({ prefix: 'positron-shot', args: ['--disable-gpu', '--mute-audio'] });
+const cdp = await connectCdp(browser.wsUrl);
+const { ws } = cdp;
+const { S } = await cdp.page();
 await S('Page.enable');
 await S('Runtime.enable');
 
@@ -240,9 +193,7 @@ for (const w of (widths.length ? widths : WIDTHS)) {
 
 await S('Emulation.clearDeviceMetricsOverride').catch(() => {});
 ws.close();
-chrome.kill();
-await sleep(200);
-await rm(PROFILE, { recursive: true, force: true }).catch(() => {});
+await browser.close();
 
 const bad = shots.filter((s) => s.page.overflow > 0);
 console.log(`\n${shots.length} shot(s) of /${slug}/${bad.length ? `, ${bad.length} with sideways overflow` : ', none dragging the page sideways'}`);

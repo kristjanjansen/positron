@@ -51,12 +51,8 @@
 // shadow tree-scope distance, and a value winning because a transition is
 // running (that is `CSS.getAnimatedStylesForNode`, experimental).
 
-import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { launchChrome, connectCdp } from './chrome.mjs';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const argv = process.argv.slice(2);
@@ -92,53 +88,12 @@ function specOf(rm) {
   return best;
 }
 
-const PROFILE = await mkdtemp(join(tmpdir(), 'positron-won-'));
-const chrome = spawn(CHROME, [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--mute-audio',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-chrome.stderr.on('data', () => {});
-// ⚠️ CHROME DIES WITH THIS PROCESS, WHATEVER KILLED IT. A run that threw
-// after launch left a headless Chrome alive, and the next verify run marked
-// itself as not evidence because of it. `exit` fires on a normal end, an
-// uncaught throw and a SIGTERM; SIGINT is turned into an exit so it fires too.
-process.on('exit', () => { try { chrome.kill(); } catch { /* already gone */ } });
-process.on('SIGINT', () => process.exit(130));
-
-let wsUrl = null, port = null;
-for (let i = 0; i < 60 && !wsUrl; i++) {
-  await sleep(250);
-  try {
-    if (!port) port = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
-    if (!Number.isFinite(port) || !port) { port = null; continue; }
-    wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl;
-  } catch { /* not up yet */ }
-}
-if (!wsUrl) { chrome.kill(); throw new Error('chrome did not come up'); }
-
-const ws = new WebSocket(wsUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let msgId = 0;
-const pending = new Map();
+const browser = await launchChrome({ prefix: 'positron-won', args: ['--disable-gpu', '--mute-audio'] });
+const cdp = await connectCdp(browser.wsUrl);
+const { ws } = cdp;
 const sheets = new Map();               // styleSheetId -> header, for a source URL and line
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data);
-  if (m.method === 'CSS.styleSheetAdded') sheets.set(m.params.header.styleSheetId, m.params.header);
-  if (m.id && pending.has(m.id)) {
-    const { resolve, reject } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? reject(new Error(JSON.stringify(m.error))) : resolve(m.result);
-  }
-};
-const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-  const id = ++msgId;
-  pending.set(id, { resolve, reject });
-  ws.send(JSON.stringify({ id, method, params, sessionId }));
-});
-
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-const S = (m, p) => send(m, p, sessionId);
+cdp.on((m) => { if (m.method === 'CSS.styleSheetAdded') sheets.set(m.params.header.styleSheetId, m.params.header); });
+const { S } = await cdp.page();
 await S('Page.enable');
 await S('DOM.enable');
 // ⚠️ `CSS.enable` BEFORE NAVIGATING, or `styleSheetAdded` is missed for every
@@ -156,7 +111,7 @@ await sleep(WAIT);
 
 const { root } = await S('DOM.getDocument', { depth: -1 });
 const { nodeId } = await S('DOM.querySelector', { nodeId: root.nodeId, selector: SELECTOR });
-if (!nodeId) { ws.close(); chrome.kill(); throw new Error(`no element matches ${SELECTOR} on /${slug}/`); }
+if (!nodeId) { ws.close(); await browser.close(); throw new Error(`no element matches ${SELECTOR} on /${slug}/`); }
 
 const ms = await S('CSS.getMatchedStylesForNode', { nodeId });
 const layerTree = await S('CSS.getLayersForNode', { nodeId }).catch(() => null);
@@ -266,6 +221,4 @@ const got = cs.computedStyle.find((p) => p.name === PROPERTY);
 console.log(`\ncomputed ${PROPERTY} = ${got && got.value}${winner ? `   (the winner said ${winner.prop.value})` : ''}`);
 
 ws.close();
-chrome.kill();
-await sleep(200);
-await rm(PROFILE, { recursive: true, force: true }).catch(() => {});
+await browser.close();

@@ -33,12 +33,8 @@
 // `verify.mjs` records: a fixed port and `/json/list` attach to whatever Chrome
 // is already there. The draft this was adopted from did exactly that.
 
-import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { launchChrome, connectCdp } from './chrome.mjs';
 
-const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const argv = process.argv.slice(2);
@@ -54,51 +50,10 @@ if (!slug || !SELECTOR) {
   process.exit(2);
 }
 
-const PROFILE = await mkdtemp(join(tmpdir(), 'positron-anc-'));
-const chrome = spawn(CHROME, [
-  '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--mute-audio',
-], { stdio: ['ignore', 'pipe', 'pipe'] });
-chrome.stderr.on('data', () => {});
-// ⚠️ CHROME DIES WITH THIS PROCESS, WHATEVER KILLED IT. A run that threw
-// after launch left a headless Chrome alive, and the next verify run marked
-// itself as not evidence because of it. `exit` fires on a normal end, an
-// uncaught throw and a SIGTERM; SIGINT is turned into an exit so it fires too.
-process.on('exit', () => { try { chrome.kill(); } catch { /* already gone */ } });
-process.on('SIGINT', () => process.exit(130));
-
-let wsUrl = null, port = null;
-for (let i = 0; i < 60 && !wsUrl; i++) {
-  await sleep(250);
-  try {
-    if (!port) port = Number((await readFile(`${PROFILE}/DevToolsActivePort`, 'utf8')).split('\n')[0]);
-    if (!Number.isFinite(port) || !port) { port = null; continue; }
-    wsUrl = (await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl;
-  } catch { /* not up yet */ }
-}
-if (!wsUrl) { chrome.kill(); throw new Error('chrome did not come up'); }
-
-const ws = new WebSocket(wsUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let msgId = 0;
-const pending = new Map();
-ws.onmessage = (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && pending.has(m.id)) {
-    const { resolve, reject } = pending.get(m.id);
-    pending.delete(m.id);
-    m.error ? reject(new Error(JSON.stringify(m.error))) : resolve(m.result);
-  }
-};
-const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-  const id = ++msgId;
-  pending.set(id, { resolve, reject });
-  ws.send(JSON.stringify({ id, method, params, sessionId }));
-});
-
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
-const S = (m, p) => send(m, p, sessionId);
+const browser = await launchChrome({ prefix: 'positron-anc', args: ['--disable-gpu', '--mute-audio'] });
+const cdp = await connectCdp(browser.wsUrl);
+const { ws } = cdp;
+const { S } = await cdp.page();
 await S('Page.enable');
 await S('Runtime.enable');
 if (WIDTH) {
@@ -178,7 +133,7 @@ const FN = `(() => {
 
 const { result } = await S('Runtime.evaluate', { expression: FN, returnByValue: true });
 const o = JSON.parse(result.value);
-if (o.missing) { ws.close(); chrome.kill(); throw new Error(`no element matches ${SELECTOR} on /${slug}/`); }
+if (o.missing) { ws.close(); await browser.close(); throw new Error(`no element matches ${SELECTOR} on /${slug}/`); }
 
 const f = (n) => (Number.isFinite(n) ? String(n) : '?');
 console.log(`\n/${slug}/  ${SELECTOR}  walking to the root, reading ${PROP}${WIDTH ? `, at ${WIDTH} px` : ''}`);
@@ -217,6 +172,4 @@ const insetting = o.rows.slice(1).filter((r) => r.pad[3] > 0 || r.border[3] > 0)
 console.log(`\n${insetting.length} ancestor(s) inset the left edge: ${insetting.map((r) => `${r.el} ${r.pad[3]}+${r.border[3]}`).join(', ') || '(none)'}`);
 
 ws.close();
-chrome.kill();
-await sleep(200);
-await rm(PROFILE, { recursive: true, force: true }).catch(() => {});
+await browser.close();
