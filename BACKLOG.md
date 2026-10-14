@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/social/typist/: lower line as far from the bottom as the site name from the top, bottom aligned; bigger main type; columns flipped with more gap**~~ (2026-10-14, DONE). Asked: *"lower text same y padding as sitename, align to bottom. make main font size bigger"*, *"flip cols, add more gap between"*.
+
 - ~~**/social/typist/: icon buttons, its own textarea for the lower line, transport at the top**~~ (2026-10-14, DONE). Asked: *"use icon buttons. lower posittron studio makes no sense, haev a separate textartea. put transport bar to top"*.
 
 - ~~**/social/typewriter/ becomes /social/typist/, and /social/ is the index of every social piece**~~ (2026-10-14, DONE). Asked: *"/social/typist/index.html -- there gonna be more socials. make also index for them"*.
