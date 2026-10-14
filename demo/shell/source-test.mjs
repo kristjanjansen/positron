@@ -1,15 +1,7 @@
-// demo/shell/source-test.mjs — the shared source description, with no audio.
-//
+// demo/shell/source-test.mjs: the shared source description, with no audio.
 //   node demo/shell/source-test.mjs
-//
-// `partialsOf` is pure, which is the reason the design is what it is: the board
-// and the page both expand the same spec with the same function, so a
-// disagreement between the two ends is a disagreement about SYNTHESIS rather
-// than about arithmetic. That is only true if the arithmetic is checked here.
-//
-// Three of these are NEGATIVE CONTROLS. A table that silently aliased, a level
-// that was not the level, or a `count` that changed nothing would all look
-// perfectly fine from the outside.
+// Three are negative controls: aliasing, a wrong level, a `count` that changes nothing.
+// why: lessons/kit-source.md#test-header
 import { partialsOf, compareSource, SHAPES, DEFAULT } from './source.mjs';
 
 let pass = 0, fail = 0;
@@ -45,10 +37,8 @@ console.log('\n== the shared source ==');
      sq.partials.map((p) => p.partial).join(','));
 }
 
-// 3. 🔴 NEGATIVE CONTROL: nothing above Nyquist, ever. A partial past half the
-//    sample rate does not fold over politely — it aliases to a frequency in
-//    neither engine's table, and the input check would then be comparing two
-//    different mistakes rather than two renderings of one spec.
+// 3. NEGATIVE CONTROL: nothing above Nyquist, ever; it would alias in neither table.
+// why: lessons/kit-source.md#test-nyquist
 {
   const r = partialsOf({ hz: 4000, count: 16, chord: [0], shape: 'saw' }, 48000);
   const over = r.partials.filter((p) => p.hz >= 24000);
@@ -108,9 +98,8 @@ console.log('\n== comparing two renderings of one spec ==');
      c.worstDb < 1e-6 && c.missing === 0, `worst ${c.worstDb.toFixed(9)} dB`);
 }
 
-// 8. 🔴 THE ONE THE INPUT CHECK WILL LEAN ON: a difference is found, and it is
-//    ATTRIBUTED. "the input differs by 6 dB" and "it differs by 6 dB at partial
-//    6 of 6" are different findings, and only the second one is actionable.
+// 8. A difference is found and attributed to its partial, which is what makes it actionable.
+// why: lessons/kit-source.md#test-attributed
 {
   const plan = partialsOf({ count: 6, chord: [0] });
   const bent = plan.partials.map((p) => ({ hz: p.hz, amp: p.partial === 6 ? p.amp / 2 : p.amp }));
@@ -120,10 +109,8 @@ console.log('\n== comparing two renderings of one spec ==');
      `${c.worstDb.toFixed(2)} dB at ${c.worstAt}, median ${c.medianDb.toFixed(3)} dB`);
 }
 
-// 9. NEGATIVE CONTROL: a partial that is not there at all must not read as a
-//    small error. A missing top partial is the exact failure two different
-//    band-limiting schemes produce, and averaging it away is how it would be
-//    missed.
+// 9. NEGATIVE CONTROL: a missing partial must not average away into a small error.
+// why: lessons/kit-source.md#test-missing-partial
 {
   const plan = partialsOf({ count: 6, chord: [0] });
   const short = plan.partials.filter((p) => p.partial < 6).map((p) => ({ hz: p.hz, amp: p.amp }));

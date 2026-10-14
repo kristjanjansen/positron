@@ -1,8 +1,6 @@
-// demo/shell/rt-drum.mjs: the runtime of a `drum` node on /connect/
-// (node-runtime.mjs): /drums/machine/'s four SuperCollider voices (kick,
-// snare, open and closed hat, General MIDI notes 36, 38, 46, 42 on any
-// channel), played by what arrives on drum:midi-in and heard on drum:audio-out.
-// No face of its own; the engine boots on the page's first sound press.
+// demo/shell/rt-drum.mjs: the runtime of a drum node on /connect/: /drums/machine/'s four voices
+// (GM notes 36, 38, 46, 42), from drum:midi-in to drum:audio-out. No face; boots on the first sound press.
+// why: lessons/kit-rt-drum.md#header
 
 import { machineFor } from './rt-drums.mjs';
 

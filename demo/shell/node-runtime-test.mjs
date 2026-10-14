@@ -1,14 +1,7 @@
-// demo/shell/node-runtime-test.mjs: the pure half of node-runtime.mjs and the
-// router it uses, with no browser. `node demo/shell/node-runtime-test.mjs`.
-//
-// MOST OF THESE ARE NEGATIVE CONTROLS. A reconcile that never closes, a router
-// that never disconnects and a route filter that lets a relay link through all
-// look fine on a happy path, so every claim below is also run against a
-// sabotaged copy of the function it grades, and each sabotage must turn at
-// least one claim red. A sabotage the claims cannot see fails this file.
-//
-// NOT GRADED HERE: createRuntimes() and the rt-*.mjs factories, which need a
-// document and an AudioContext. /connect/'s self-check grades those.
+// demo/shell/node-runtime-test.mjs: the pure half of node-runtime.mjs and its router, no browser.
+// Each claim is also run against a sabotaged copy that must turn it red. createRuntimes() and the
+// rt-*.mjs factories need a document; /connect/'s self-check grades those.
+// why: lessons/kit-node-runtime.md#test-header
 
 import { NODES } from './nodes.mjs';
 import { createBay } from './bay.mjs';

@@ -1,7 +1,6 @@
-// node demo/shell/reel-test.mjs: the pure half of reel.mjs, with no browser.
-// Not graded here: the canvas, the deck, the bar and MediaRecorder itself,
-// which need a document and are graded by /social/typist/ and a real take.
-// Six of the asserts are NEGATIVE CONTROLS, marked (neg).
+// node demo/shell/reel-test.mjs: the pure half of reel.mjs. Canvas, deck and MediaRecorder are
+// graded on /social/typist/. Six asserts are NEGATIVE CONTROLS, marked (neg).
+// why: lessons/kit-reel.md#test-header
 import { W, H, SAFE_TOP, SAFE_BOTTOM, X, TEXT_W, TYPES, pickType, extOf, atRest, waitsForSound } from './reel.mjs';
 
 let ok = 0, bad = 0;

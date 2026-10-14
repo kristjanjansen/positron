@@ -1,47 +1,7 @@
-// demo/shell/xr-quit-test.mjs — is there really a way out of every headset page.
-//
-//   node demo/shell/xr-quit-test.mjs
-//
-// 🔴 WHY THIS EXISTS. REPORTED 2026-09-19: *"i was not able to get out"*. The
-// cause was `/blocks/` calling `createXRQuit` and `draw` on every frame and
-// never once calling `update`, so the hold could not advance, the ring could not
-// fill and the session could not end. There was no way out of that page at all.
-//
-// ⚠️ IT LOOKED CORRECT FROM EVERY ANGLE THAT CAN BE LOOKED FROM. The object was
-// built, its shader compiled, the badge was drawn at both hands every frame, and
-// the page reported a way out as present. `/weight/`, `/floor/` and
-// `xr-panel.mjs` all had the missing line, so no shared code was wrong and
-// nothing in the repo could disagree with anything.
-//
-// 🔴 THE DESIGN CHANGED, SO THIS CHECK CHANGED WITH IT. The old build was a
-// grep: a file that DRAWS a way out must also ADVANCE it, matched on the
-// argument (`inputSources`) rather than on the method name, because `/blocks/`
-// updates its room, its hands and its document and a name match stayed green
-// with the quit's own call deleted. That check now grades a shape nobody can
-// write: `mountXRQuit` takes the SESSION and advances the hold from the
-// session's own frame loop, and the object it hands back HAS NO `update`. A
-// check about a line that cannot be forgotten is a check that cannot fail, and
-// CLAUDE.md is clear that this is worse than no check.
-//
-// So it grades two things instead, and the first one is new in kind:
-//
-//   · **THE SHARED PATH, BY RUNNING IT.** The hold is pure arithmetic over a
-//     list of gamepads and a frame clock, so a fake session drives the real
-//     `mountXRQuit` here on a laptop with no browser, no GL and no headset: a
-//     button held long enough ends the session, a button released early does
-//     not, and the page contributes NOTHING to either. Every assert below is
-//     reached without a single call to `update` or `draw`, which is the whole
-//     claim of the design stated as a test that would go red if it stopped
-//     being true.
-//   · **THE PAIRING, IN THE SOURCE.** A file that enters an immersive session
-//     must mount the way out on it. That is still static, and it still has to
-//     be: no harness can enter a session, and a file that never mounts one is a
-//     line that is NOT there.
-//
-// ⚠️ A STATIC CHECK IS A WEAK CHECK AND IT IS SAID HERE RATHER THAN DISCOVERED
-// LATER. The second half proves the call exists, not that the page reached it.
-// The first half is the one that proves behaviour, and it proves it about this
-// module rather than about any page.
+// demo/shell/xr-quit-test.mjs (node demo/shell/xr-quit-test.mjs): is there a way out of every headset page.
+// Drives the real mountXRQuit with a fake session (no update, no draw, no page), then checks
+// statically that every file entering a session mounts the way out on it.
+// why: lessons/kit-xr-quit.md#test-header
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -61,19 +21,10 @@ const ok = (name, cond, detail = '') => {
 
 console.log('\n== the way out of a headset ==');
 
-// ─────────────────────────────────────────────────────────────────────────
-// 1. THE SHARED PATH, DRIVEN
-// ─────────────────────────────────────────────────────────────────────────
 /**
- * A session that is nobody's session: a list of buttons, a frame loop and an
- * `end()` that counts. It is deliberately the MINIMUM `mountXRQuit` touches, so
- * a mount that started reaching for anything else would fail here rather than
- * in a headset.
- *
- * ⚠️ THE FRAME STEP IS 11 ms, which is a 90 Hz headset. It matters: the first
- * frame carries no elapsed time at all, so a hold is always one frame behind
- * the wall clock, and a test that drove exactly `HOLD_MS` of frames would sit
- * 11 ms short and read as a hold that does not fire.
+ * 1. THE SHARED PATH, DRIVEN. A session that is nobody's: the minimum mountXRQuit touches.
+ * Frames step 11 ms (90 Hz); the first carries no time, so a hold is one frame behind.
+ * why: lessons/kit-xr-quit.md#test-fake-session
  */
 function fakeSession({ buttons = 2 } = {}) {
   const pad = { buttons: Array.from({ length: buttons }, () => ({ pressed: false })) };
@@ -125,8 +76,8 @@ function mounted(opts = {}) {
 }
 
 {
-  // 🔴 THE ONE THAT MATTERS. No `update`, no `draw`, no page: hold a button and
-  // the session ends.
+  // No update, no draw, no page: hold a button and the session ends.
+  // why: lessons/kit-xr-quit.md#test-hold-ends
   const { s, q, seen } = mounted();
   s.run(110).press().run(3300);
   ok('a button held long enough ends the session, with no page line at all',
@@ -138,8 +89,8 @@ function mounted(opts = {}) {
 }
 
 {
-  // 🔴 NEGATIVE CONTROL. Without this the assert above is satisfied by a mount
-  // that ends the session on any press, or on none.
+  // Negative control: an early release must not end it.
+  // why: lessons/kit-xr-quit.md#test-negative
   const { s, q, seen } = mounted();
   s.run(110).press().run(2500);
   ok('a button released early does NOT end the session',
@@ -154,8 +105,8 @@ function mounted(opts = {}) {
 }
 
 {
-  // 🔴 THE PRESS THAT OPENED THE PAGE IS NOT A PRESS TO LEAVE IT. Every page
-  // used to need its own guard for this and only `xr-panel.mjs` had one.
+  // The press that opened the page is not a press to leave it.
+  // why: lessons/kit-xr-quit.md#test-opening-press
   const s = fakeSession();
   s.press();
   const q = mountXRQuit(null, s, {});
@@ -173,9 +124,8 @@ function mounted(opts = {}) {
 }
 
 {
-  // 🔴 `onQuit` IS TEARDOWN, NOT THE EXIT. This is the exact line that went
-  // missing from `/blocks/`: a page that does not end the session must not be
-  // able to leave somebody in a room.
+  // `onQuit` is teardown, not the exit: the session ends regardless of the page.
+  // why: lessons/kit-xr-quit.md#test-on-quit
   const { s, seen } = mounted();
   s.run(110).press().run(3300);
   ok('the module ends the session even though the page never calls end()',
@@ -221,8 +171,8 @@ function mounted(opts = {}) {
     `progress ${h.progress.toFixed(2)} on button ${h.pressed}`);
   for (let i = 0; i < 12; i++) h.update(src, 0.05);
   ok('and it fires once at the top', fired === 1 && h.progress === 1, `fired ${fired}`);
-  // ⚠️ A STALLED FRAME MUST NOT ADVANCE A HOLD BY A SECOND. The hold measures a
-  // deliberate press and a stall is not one.
+  // A stalled frame must not advance a hold by a second.
+  // why: lessons/kit-xr-quit.md#test-stall
   let fired2 = 0;
   const h2 = createQuitHold({ holdMs: 1000, onQuit: () => { fired2++; } });
   h2.update([], 0.05);
@@ -244,13 +194,10 @@ function mounted(opts = {}) {
     `exports: ${Object.keys(QUIT).sort().join(', ')}`);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// 3. EVERY FILE THAT ENTERS A SESSION MOUNTS THE WAY OUT ON IT
-// ─────────────────────────────────────────────────────────────────────────
 /**
- * Every file under `demo/`. `archive/` is deliberately not walked: a retired
- * page is a record of what was there, and holding it to a rule written after it
- * was retired would make the archive lie.
+ * 3. EVERY FILE THAT ENTERS A SESSION MOUNTS THE WAY OUT ON IT.
+ * Every file under demo/; archive/ is not walked.
+ * why: lessons/kit-xr-quit.md#test-sources
  */
 function sources(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -263,19 +210,9 @@ function sources(dir, out = []) {
 }
 
 /**
- * 🔴 COMMENTS ARE NOT CODE, AND THIS CHECK READ THEM FOR ONE RUN.
- *
- * FOUND BY SABOTAGE, 2026-09-19: with `xr-panel.mjs`'s actual `mountXRQuit`
- * call broken on purpose, its line stayed GREEN, because the sentence three
- * hundred lines above it explaining what `mountXRQuit(gl, session)` does
- * matches the regex perfectly. A file that only TALKS about the way out would
- * have passed, which is the `s.includes(<substring>)` trap CLAUDE.md names
- * three bugs from, met for the second time in this one file.
- *
- * ⚠️ IT IS DELIBERATELY BLUNT. Block comments, HTML comments, and `//` to the
- * end of a line unless a `:` is in front of it, which is what keeps a URL in a
- * string from eating the rest of its line. It is not a parser and does not need
- * to be: what it has to do is stop prose being read as a call.
+ * Comments are not code: strip them so a sentence about mountXRQuit cannot pass a file.
+ * Deliberately blunt; a `//` after a `:` is kept so URLs survive.
+ * why: lessons/kit-xr-quit.md#test-code
  */
 const code = (src) => src
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -283,21 +220,14 @@ const code = (src) => src
   .split('\n').map((l) => l.replace(/(^|[^:])\/\/.*$/, '$1')).join('\n');
 
 /**
- * 🔴 WHAT MAKES A FILE ONE OF THESE: IT ASKS FOR A SESSION. Not that it imports
- * the module, not that it mentions a headset. `navigator.xr.requestSession` is
- * the one call that puts a person somewhere they cannot get out of by looking
- * away, so it is the call that has to be paired.
- * ⚠️ IT IS MATCHED WITH THE `navigator.xr` IN FRONT OF IT. `requestSession`
- * alone appears in comments all over this repo and as a method on the stub
- * inside `demo/verify-quest.mjs`, and a check that fails a harness for owning a
- * fake is a check people learn to ignore.
+ * A file is one of these if it calls `navigator.xr.requestSession(` (matched with the prefix,
+ * so verify-quest.mjs's stub does not count).
+ * why: lessons/kit-xr-quit.md#test-enters
  */
 const ENTERS = /navigator\s*\.\s*xr\s*\.\s*requestSession\s*\(/;
 /**
- * ⚠️ THE IMPORT DOES NOT COUNT, THE CALL DOES. A file that imports the module
- * and never mounts one has no way out to get wrong, and matching on the import
- * alone would pass the exact page that was reported. This is the
- * `s.includes(<substring>)` trap CLAUDE.md names: guard on the call.
+ * The call counts, not the import.
+ * why: lessons/kit-xr-quit.md#test-mounts
  */
 const MOUNTS = /mountXRQuit\s*\(/;
 const IMPORT_LINE = /import\s*\{[^}]*mountXRQuit[^}]*\}[^\n]*/g;
@@ -306,10 +236,8 @@ const enters = (src) => ENTERS.test(code(src));
 const mounts = (src) => MOUNTS.test(code(src).replace(IMPORT_LINE, ''));
 
 /**
- * ⚠️ THE MODULE THAT DEFINES IT IS NOT A CALLER, and neither is this file. Both
- * match every regex above perfectly. That is the substring trap in its own
- * costume, and the first build of the old check failed `xr-quit.mjs` for not
- * calling the methods it declares.
+ * The defining module and this file are not callers.
+ * why: lessons/kit-xr-quit.md#test-files
  */
 const files = sources(join(ROOT, 'demo'))
   .filter((p) => !p.endsWith('xr-quit-test.mjs') && !p.endsWith('shell/xr-quit.mjs'));
@@ -329,10 +257,8 @@ for (const p of enter) {
 }
 
 /**
- * 🔴 THE NEGATIVE CONTROLS, AND WITHOUT THEM THE LOOP ABOVE IS WORTH NOTHING. A
- * check that reports every file as fine is indistinguishable from a check that
- * cannot fail, so the same two regexes are run against sources written to be
- * wrong.
+ * Negative controls: the same regexes run against sources written to be wrong.
+ * why: lessons/kit-xr-quit.md#test-controls
  */
 const NO_WAY_OUT = `
   import { mountXRQuit } from '/shell/xr-quit.mjs';
@@ -343,9 +269,8 @@ ok('the check FAILS a file that imports the way out and never mounts it',
   enters(NO_WAY_OUT) && !mounts(NO_WAY_OUT), 'imports it, enters, no mount');
 
 /**
- * 🔴 AND IT FAILS A FILE THAT ONLY TALKS ABOUT MOUNTING ONE. This control was
- * added after the sabotage above found the check passing a file whose real call
- * had been broken, on the strength of a sentence in a comment.
+ * And it fails a file that only talks about mounting one.
+ * why: lessons/kit-xr-quit.md#test-only-prose
  */
 const ONLY_PROSE = `
   // The way out is mountXRQuit(gl, session), which puts the hold on the
@@ -373,34 +298,24 @@ const GOOD = `
 ok('and it PASSES one that mounts, so it is not simply failing everything',
   enters(GOOD) && mounts(GOOD), 'enters and mounts');
 
-// ─────────────────────────────────────────────────────────────────────────
-// 4. WHAT THE RING IS
-// ─────────────────────────────────────────────────────────────────────────
 /**
- * 🔴 NO WORDS ON THE BADGE. INSTRUCTED 2026-09-19: *"circular coundown (no
- * labels)"*. The module used to draw its `label` into the texture, and a
- * sentence in a comment saying it no longer does is exactly the kind of claim
- * this project keeps finding stale. `fillText` is the one call that can put a
- * word there.
+ * 4. WHAT THE RING IS. No words on the badge: `fillText` is the one call that could put one there.
+ * why: lessons/kit-xr-quit.md#test-no-words
  */
 const quitSrc = readFileSync(join(HERE, 'xr-quit.mjs'), 'utf8');
 ok('the badge draws no text at all', !/fillText\s*\(/.test(quitSrc),
   'no fillText in xr-quit.mjs');
 
 /**
- * ⚠️ AND THE HOLD IS LONG ENOUGH TO BE DELIBERATE. A number this small is not
- * worth a test on its own; what it is worth is a floor, because the value was
- * 900 ms while the exit was one named button and every button is live now. A
- * brush is under 300 ms and a deliberate press about 500.
+ * Every button is live, so the hold has a floor: a brush is under 300 ms, a press about 500.
+ * why: lessons/kit-xr-quit.md#test-hold-floor
  */
 const hold = Number((quitSrc.match(/const HOLD_MS = (\d+)/) || [])[1]);
 ok('the hold cannot be reached by accident', hold >= 1500, `${hold} ms`);
 
 /**
- * 🔴 AND THE RING IS NOT INSIDE WHAT SOMEBODY IS HOLDING. DIRECTED 2026-09-19:
- * it sits in front of the viewer rather than at the controllers, and the one
- * thing that can go wrong with a head locked thing is putting it where a hand
- * already is. An arm is about 0.7 m.
+ * The ring sits in front of the viewer, beyond an arm (about 0.7 m).
+ * why: lessons/kit-xr-quit.md#test-ring-distance
  */
 ok('the ring sits beyond arm\'s reach', DIST_M >= 1.0, `${DIST_M} m`);
 ok('and it is a few degrees across rather than a wall',

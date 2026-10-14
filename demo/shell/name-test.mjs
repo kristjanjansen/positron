@@ -1,24 +1,7 @@
-// demo/shell/name-test.mjs. The chord recogniser, with no browser at all.
-//
-//   node demo/shell/name-test.mjs
-//
-// 🔴 ONE OF THESE DECIDES WHETHER THE WHOLE LEARNING MODE IS WORTH BUILDING:
-// **at a margin of 1.0 the recogniser is never wrong**. If that goes red the
-// idea is dead and the honest thing is to say so, because a page that names a
-// chord wrongly with confidence is worse than one that says nothing, and this
-// page has a particularly bad version of that failure available to it. The
-// roll's `setHeld` lights a row when the player's notes match it, so a wrong
-// name written into a row is confirmed back to the player the moment they play
-// it. The page would have taught somebody its own mistake.
-//
-// The rest are here because `research/chord-learning-2026-09-23.md` measured
-// them and a number in a document goes stale in silence. These run.
-//
-// ⚠️ TEN OF THESE ARE NEGATIVE CONTROLS, written so that the mistake they
-// name would fail them rather than so that today's code passes. The four the
-// research calls for by name are the collisions: `Caug` must come back unsure,
-// `Csus2` must come back unsure, `C E G B` must come back `Cmaj7` confidently,
-// and `C E G A` must come back `Amin7`.
+// demo/shell/name-test.mjs: the chord recogniser, no browser. node demo/shell/name-test.mjs
+// The deciding check: at a margin of 1.0 the recogniser is never wrong. Ten are negative controls
+// (Caug and Csus2 unsure, C E G B is Cmaj7, C E G A is Amin7).
+// why: lessons/kit-name.md#test-header
 
 import { nameChord, RECOGNISED, MARGIN, createSettler, createTally, chordKey, notesOf }
   from './name.mjs';
@@ -36,10 +19,8 @@ console.log('\n== naming ==');
 
 // ── the four collisions the research names, each as its own control ─────────
 
-// 1. NEGATIVE CONTROL. `C E G#` really is `Caug` and `Eaug` and `G#aug`,
-//    because an augmented triad divides the octave into three equal major
-//    thirds and is its own inversion three times over. A recogniser that names
-//    one of them with confidence is guessing and calling it a fact.
+// 1. NEGATIVE CONTROL. C E G# is Caug, Eaug and G#aug alike, so a confident name is a guess.
+// why: lessons/kit-name.md#test-aug
 {
   const r = nameChord([60, 64, 68]);
   ok('an augmented triad is three chords at once, so the page says it is unsure',
@@ -81,34 +62,18 @@ ok('NEGATIVE CONTROL: no sixth and no diminished seventh is in the vocabulary at
 
 // ── the one real bug the research found, and it is one line ─────────────────
 
-// 5. NEGATIVE CONTROL, AND IT IS THE REASON THIS FILE HAS ITS OWN TABLE.
-//    `Cm7` with the fifth left out is `C Eb Bb`. Against `Cmin7` it matches 3
-//    and misses 1; against `Cmin7b5` it matches 3 and misses 1. A dead tie,
-//    broken by whichever comes first, and `min7b5` sits above `min7` in
-//    `chords.mjs`'s `QUALITIES` because that table is ordered longest name
-//    first for the PARSER's benefit. That is a fact about strings. This one is
-//    ordered by how likely a chord is, which is a fact about music.
+// 5. NEGATIVE CONTROL. C Eb Bb ties Cmin7 and Cmin7b5; this file orders by likelihood, not by
+// chords.mjs's longest-name-first parser order.
+// why: lessons/kit-name.md#test-min7-no-fifth
 {
   const r = nameChord([60, 63, 70]);
   const qs = RECOGNISED.map(([q]) => q);
   ok('a minor seventh with no fifth reads as min7 rather than min7b5',
     r.name === 'Cmin7' && qs.indexOf('min7') < qs.indexOf('min7b5'),
     `${r.name}, with min7 at ${qs.indexOf('min7')} and min7b5 at ${qs.indexOf('min7b5')}`);
-  /* 🔴 AND SINCE 2026-09-23 IT IS SURE OF IT, WHICH REVERSES WHAT THIS CHECK
-     USED TO ASSERT. It read `still a tie, so the page does not claim to be sure`
-     and that was the honest answer while the only way to break the tie was the
-     order of a table. MEASURED on 63 seconds of real playing recorded off the
-     keyboard on this desk: 108 of 236 readings came back unnameable and **51 of
-     them were this exact shape**, `Emin7` against `Emin7b5` thirty times over,
-     where the B and the B flat that separate the two were never played.
-     ✅ A RIVAL THAT DIFFERS ONLY IN NOTES NOBODY PLAYED IS NOT A RIVAL. You
-     cannot hear a flat five that is not there, and going quiet about it is not
-     honesty, it is a page refusing to name something perfectly ordinary.
-     ⚠️ THE TWO GUARDS THAT KEEP THIS FROM BECOMING A LIE ARE BOTH IN
-     `name.mjs` AND BOTH WERE FOUND BY THIS FILE GOING RED: the rival must be
-     the SAME SIZE, or two notes read as a confident bare fifth, and three of
-     the winner's own tones must be held, or `C E` reads as a confident `Cmaj`
-     when it is equally `Cmaj7`, `C6`, `Caug` or `Amin`. */
+  // A rival differing only in notes nobody played is not a rival. Guards in name.mjs: the rival is the
+  // same size, and three of the winner's tones are held.
+  // why: lessons/kit-name.md#test-unplayed-rival
   ok('and it is sure of it now, because nothing that was played tells the two apart',
     r.sure === true && r.margin > 0,
     `margin ${r.margin.toFixed(1)}, alts ${r.alts.map((a) => a.name).join(' or ')}`);
@@ -125,11 +90,9 @@ ok('NEGATIVE CONTROL: no sixth and no diminished seventh is in the vocabulary at
 
 // ── the margin walks a rolled chord, which the research measured note by note ─
 
-// 6. MEASURED in the research at every prefix of a rolled `Cmaj7`, and
-//    reproduced here independently. The row that matters is the third: `C` is
-//    genuinely the best reading of `C E G` at a margin of 1.0, it is CORRECT,
-//    and it is about to be replaced. That is why the settling window is a
-//    separate mechanism from the margin and not a substitute for it.
+// 6. Every prefix of a rolled Cmaj7: C is correct for C E G at margin 1.0 and about to be replaced,
+// so the settling window is separate from the margin.
+// why: lessons/kit-name.md#test-prefixes
 {
   const steps = [[60], [60, 64], [60, 64, 67], [60, 64, 67, 71]];
   const got = steps.map((s) => nameChord(s)).map((r) => `${r.name} ${r.margin.toFixed(1)}`);
@@ -176,12 +139,9 @@ const stepsOf = (mask) => {
 };
 
 /**
- * Every root position, every inversion, a doubled root, and a fifth omitted
- * where there is one, across 11 qualities and 12 roots.
- *
- * ⚠️ IT IS GENERATED RATHER THAN LISTED, because a list of a few hundred
- * voicings is a list somebody curated, and the one thing a curated list cannot
- * do is contain the case nobody thought of. The research graded 1,704 of these.
+ * Every root position, inversion, doubled root and omitted fifth over 11 qualities and 12 roots,
+ * generated rather than listed so it contains cases nobody thought of.
+ * why: lessons/kit-name.md#test-cases
  */
 const cases = [];
 for (const [quality, mask] of RECOGNISED) {
@@ -202,11 +162,8 @@ for (const [quality, mask] of RECOGNISED) {
   }
 }
 
-// 10. 🔴 THE ONE THAT DECIDES EVERYTHING. Every case the recogniser is SURE
-//     about must be right. Not most of them. The whole point of a margin is
-//     that it is a promise, and a promise kept 99 per cent of the time is a
-//     page that will one day confirm its own mistake back to somebody who
-//     trusted it.
+// 10. Every case the recogniser is sure about must be right: the margin is a promise.
+// why: lessons/kit-name.md#test-never-wrong
 {
   const spoke = [], wrong = [];
   for (const c of cases) {
@@ -224,10 +181,8 @@ for (const [quality, mask] of RECOGNISED) {
         + 'and every one of them right');
 }
 
-// 11. And the coverage beside it, because a recogniser that never speaks is
-//     also never wrong. MEASURED in the research at 72.0 per cent over its own
-//     600 case set; this set is generated differently so the number differs and
-//     the FLOOR is what is asserted.
+// 11. Coverage beside it (72.0 per cent in the research, on its own set); the floor is asserted.
+// why: lessons/kit-name.md#test-coverage
 {
   const spoke = cases.filter((c) => nameChord(c.notes).sure).length;
   const pct = 100 * spoke / cases.length;
@@ -251,11 +206,8 @@ for (const [quality, mask] of RECOGNISED) {
     + `wrong is ${Object.entries(byQuality).map(([q, n]) => `${q} x${n}`).join(' ') || 'nothing'}`);
 }
 
-// 13. NEGATIVE CONTROL FOR THE WHOLE APPROACH. The obvious recogniser, the
-//     lowest sounding note is the root, scores 100 per cent on root position
-//     and MEASURED **exactly zero on every inversion**. It is written out here
-//     rather than described, because a number in a comment is not evidence, and
-//     because this is the build somebody will reach for next time.
+// 13. NEGATIVE CONTROL. Lowest-note-is-root scores 100 per cent on root position and zero on inversions.
+// why: lessons/kit-name.md#test-lowest-root
 {
   const lowest = (notes) => {
     const low = ((Math.min(...notes) % 12) + 12) % 12;
@@ -302,11 +254,8 @@ ok('a tally key turns back into the notes of the chord it names',
 
 console.log('\n== settling ==');
 
-// 16. 🔴 THE WALK DOWN. Lifting three fingers unevenly hands the recogniser
-//     `C E G`, then `C E`, then `C`, and every one of those is a legitimate
-//     reading of what is held. Settling on the set held when the timer fires
-//     names the fragment. Settling on the LARGEST set held during the window
-//     names the chord.
+// 16. Lifting fingers unevenly gives C E G, C E, C: settle on the largest set held in the window.
+// why: lessons/kit-name.md#test-walk-down
 {
   const s = createSettler({ windowMs: 200 });
   s.held([60], 0);
@@ -353,16 +302,9 @@ console.log('\n== settling ==');
 console.log('\n== which chords somebody keeps returning to ==');
 
 /**
- * 🔴 THE SESSION THAT SEPARATES THE TWO SCORINGS, AND IT IS BUILT SO THAT RAW
- * COUNT GETS IT WRONG. Four loop chords held 1,400 ms each and two passing
- * chords held 150 ms each, and the passing ones are played TWICE as often. That
- * is the research's own finding in a smaller shape: on its 100 event session the
- * raw tally read `Fmaj7 x19  Em x17  C x16`, so the two passing chords WON on
- * count and any policy built on event count picks them.
- * ⚠️ THE GAP IS THERE BY CONSTRUCTION AND THAT IS THE HONEST LIMIT. Nobody has
- * measured what a real player's hold times look like. If the real gap is a
- * factor of two rather than ten, this gate is a much harder choice and might
- * not exist at all.
+ * Four loop chords held 1,400 ms and two passing chords held 150 ms played twice as often, so raw count
+ * picks the passing ones. The gap is there by construction; real hold times are unmeasured.
+ * why: lessons/kit-name.md#test-session
  */
 const session = (() => {
   const evts = [];
@@ -394,13 +336,9 @@ const session = (() => {
     `by count ${byCount.join(' ')}, by time held ${byTime.join(' ')}`);
 }
 
-// 21. 🔴 A TOTAL ON ITS OWN ADMITS EVERYTHING EVENTUALLY, AND THE RESEARCH DID
-//     NOT MEASURE THIS BECAUSE IT SCORED A TOP FOUR RATHER THAN A THRESHOLD.
-//     Run here with the hold gate switched off, which is the build the research
-//     describes, the two passing chords bank 4.8 s each against the loop
-//     chords' 11.2 and a 2,000 ms threshold lets all six in. Ranked, the top
-//     four are right; admitted, everything arrives. This is the control that
-//     says the gate below is doing something.
+// 21. With the hold gate off, passing chords bank 4.8 s against 11.2 and a 2,000 ms threshold admits all six.
+// This is the control that says the gate does something.
+// why: lessons/kit-name.md#test-no-gate
 {
   const t = createTally({ admitMs: 2000, minHoldMs: 0, slots: 6 });
   for (const e of session) { t.hold(e.key, e.at); t.check(e.at + e.ms); t.release(e.at + e.ms); }
@@ -413,9 +351,8 @@ const session = (() => {
     + `, and all ${t.rows().length} were admitted`);
 }
 
-// 22. ✅ AND THE REPAIR IS THE OTHER SCORING THE RESEARCH ALREADY MEASURED AT
-//     4 OF 4: a hold shorter than the gate banks nothing at all, so a chord you
-//     only ever pass through never accrues however often you arrive at it.
+// 22. A hold shorter than the gate banks nothing, so a chord only passed through never accrues.
+// why: lessons/kit-name.md#test-gate
 {
   const t = createTally({ admitMs: 2000, slots: 6 });
   for (const e of session) { t.hold(e.key, e.at); t.check(e.at + e.ms); t.release(e.at + e.ms); }
@@ -438,13 +375,9 @@ const session = (() => {
     `${t.rows().length} rows, where the longest hold in this session is 1400 ms`);
 }
 
-// 24. 🔴 ADMIT AND PIN. MEASURED in the research at **4 list changes against
-//     29, and 0 pure re-sorts against 22**. A pure re-sort is the same four
-//     chords in a different order: nothing new happened, the reader learned
-//     nothing, and every row they were looking at moved. This asserts the
-//     invariant rather than the count, which is the stronger claim: every
-//     snapshot of the list is a PREFIX of the one after it, so no row can have
-//     moved and none can have gone.
+// 24. Admit and pin: every snapshot of the list is a prefix of the next, so no row moves or goes
+// (the research measured 4 list changes against 29).
+// why: lessons/kit-name.md#test-admit-pin
 {
   const t = createTally({ admitMs: 2000, slots: 6 });
   const shots = [];
@@ -485,18 +418,14 @@ const session = (() => {
 {
   const t = createTally({ times: 2, minHoldMs: 400 });
   t.hold('0:maj', 1000);
-  /* ⚠️ READ BEFORE THE NEXT HOLD, not inside the assert. The first version of
-     this check called `dueAt` from the assert expression, which runs after
-     every line above it, so both readings came from the SECOND hold and the
-     numbers agreed for the wrong reason. */
+  // Read before the next hold, not inside the assert, which runs after the second hold.
+  // why: lessons/kit-name.md#test-due-at
   const first = t.dueAt(1000), mid = t.dueAt(2500);
   t.release(3100);
   t.hold('0:maj', 4000);
   const second = t.dueAt(4000);
-  /* 🔴 THE FIRST ARRIVAL HAS NO DUE TIME AT ALL, and that is the change from a
-     total to a count said as a number. No amount of holding admits a chord you
-     have only arrived at once: you have to let go and come back. The second
-     arrival is due the moment it passes the floor. */
+  // A first arrival has no due time: let go and come back. The second is due at the floor.
+  // why: lessons/kit-name.md#test-first-arrival
   ok('a first arrival never falls due however long it is held, and the second does at the floor',
     first === null && mid === null && second === 4400,
     `a first hold from 1000 is due at ${first} and still ${mid} at 2500, and a second `

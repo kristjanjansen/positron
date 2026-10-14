@@ -1,30 +1,7 @@
-// demo/shell/segment-test.mjs — the segment display's arithmetic, with no
-// browser and no picture at all.
-//
-//   node demo/shell/segment-test.mjs
-//
-// `GLYPHS`, `segmentsFor` and `layout` are pure, and they are where every
-// decision this component makes lives: which bars a character lights, what a
-// value too wide for the field does, and what a field shows when nothing has
-// been measured. None of that needs a DOM.
-//
-// 🔴 A SEGMENT MAP IS THE SHAPE OF CODE THAT PASSES A NAIVE TEST BY ACCIDENT.
-// A table returning "every bar on" for every character draws a field full of
-// `8`s and satisfies any check that only asks whether something lit up. So the
-// asserts below name the EXACT bars, and the ones marked NEGATIVE CONTROL are
-// written so that a specific wrong implementation fails them:
-//
-//   NC1  an all-on table                  fails 2, 3, 5 and 7
-//   NC2  blank treated as zero            fails 10 and 11
-//   NC3  overflow printing the low digits fails 15
-//   NC4  the two schemes given the same palette fails 30 and 32
-//
-// All three were run before this file was committed and the counts are in the
-// report.
-//
-// ⚠️ NO MIDDOT IN THE OUTPUT, unlike its older siblings in this directory. The
-// separator rule in CLAUDE.md covers a log line, a middot is what the em dash
-// sweep changed costume into, and a file born after the rule starts without it.
+// The segment display's arithmetic with no browser: node demo/shell/segment-test.mjs
+// The asserts name exact bars; each NEGATIVE CONTROL fails a specific wrong
+// implementation (all-on table, blank as zero, low digits on overflow, one palette).
+// why: lessons/kit-segment.md#test-header
 
 import { SEGMENTS, GLYPHS, DRAWABLE, COLLISIONS, BLANK_CHAR, OVER_CHAR,
   segmentsFor, layout, GEO, advance, fieldW, SCHEMES, schemeFor } from './segment.mjs';
@@ -323,19 +300,14 @@ ok('the drawable list is printable and holds every character in the table',
   && DRAWABLE.includes(BLANK_CHAR),
   `${DRAWABLE.length} characters`);
 
-// ── the two kinds of display ──────────────────────────────────────────────
-//
-// 🔴 THE CLAIM IS NOT THAT THE PALETTES DIFFER, IT IS THAT ONE IS THE OTHER
-// INVERTED. Two tables of different hex would satisfy "they are not the same"
-// while both being light on dark, which is the defect worth catching: a
-// reflective display drawn light on dark is not a reflective display, it is a
-// backlit one in an odd colour. So the assert computes LUMINANCE and compares
-// the ink against its own field.
+// The claim is that one scheme is the other inverted, checked by luminance of ink against field.
+// why: lessons/kit-segment.md#test-schemes
 
-/** Relative luminance of `#rrggbb`, 0 for black and 1 for white.
- *  ⚠️ COMPUTED HERE RATHER THAN IMPORTED, so the test cannot agree with the
- *  module by sharing its arithmetic. That is the two-independent-sources rule:
- *  a check derived from the thing it is checking passes while being wrong. */
+/**
+ * Relative luminance of #rrggbb, 0 black to 1 white; computed here, not imported,
+ * so the test cannot agree with the module by sharing its arithmetic.
+ * why: lessons/kit-segment.md#test-lum
+ */
 const lum = (hex) => {
   const h = hex.replace('#', '');
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);

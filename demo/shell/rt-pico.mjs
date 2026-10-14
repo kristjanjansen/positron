@@ -1,9 +1,7 @@
-// demo/shell/rt-pico.mjs: the runtime of a `pico` node on /connect/
-// (node-runtime.mjs): /synth/dots/'s emulated Pico (pico.mjs
-// `createPicoDevice`), the rings firmware on an RP2040 in a worker. Notes in on
-// pico:midi-in; every screen it draws leaves on pico:video-out, handed only to
-// the runtimes that link reaches (an OLED). Its face says what it is doing and
-// starts it; nothing is fetched before that press or the first note.
+// demo/shell/rt-pico.mjs: a `pico` node on /connect/, the emulated Pico of /synth/dots/ in a worker.
+// Notes in on pico:midi-in; screens out on pico:video-out to linked runtimes (an OLED).
+// Nothing is fetched before its face is pressed or the first note arrives.
+// why: lessons/kit-rt-pico.md#header
 
 import { createPicoDevice } from './pico.mjs';
 import { createButtonGroup } from './button-group.mjs';

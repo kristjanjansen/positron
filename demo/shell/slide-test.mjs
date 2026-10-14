@@ -1,28 +1,7 @@
-// demo/shell/slide-test.mjs, the slide component graded with no browser.
-//
+// demo/shell/slide-test.mjs: the pure half of slide.mjs, with no browser.
 //   node demo/shell/slide-test.mjs
-//
-// What is pure in `slide.mjs` is graded here: the scale and the custom
-// properties written from it, a step's caption, the headline rule, the marks,
-// the padded table, the spec checker, and two claims about the source (the
-// player's keys are not window-wide, the face files exist and ship).
-//
-// 🔴 NEGATIVE CONTROLS, per positron-verify's convention for this directory:
-// 22 of the checks below, named NEGATIVE, are written so that the bug they name fails them
-// (a scale that is too flat, a headline with each banned mark, a full stop
-// inside a number that must NOT be flagged, a hue typo, a bad layout, a split
-// with no side, the key detector pointed at a file known to listen on
-// `document`, a table frame nobody declared, a cell wider than its column, a
-// title slide carrying a headline, a speaker with no title, a date that is not
-// a day, and a tap in the middle or on a box with no width), because a checker that passes everything and one that refuses
-// everything both look green against valid input alone.
-//
-// NOT GRADED HERE, and graded on `/kit/`'s SLIDES tab instead: anything that
-// needs a document. `createSlide`, `createSlidePlayer`, `createSlideLog`,
-// `fitBox` and `slideDiagram` are never called; the computed size, line height and
-// tracking of every step, the 16:9 box, the caption corner, the split sides,
-// spills, the components responding at slide scale and the player's keys are
-// all measured there.
+// Checks named NEGATIVE must fail on the bug they name; anything needing a document is on /kit/.
+// why: lessons/kit-slide.md#test-header
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -139,7 +118,8 @@ ok('the one frame is none, and a table may have it or not',
 ok('NEGATIVE: the rounded box is gone and throws now', throws(() => normalise({ rows: { body: [['a']], frame: 'box' } })));
 ok('NEGATIVE: a frame nobody declared throws', throws(() => normalise({ rows: { body: [['a']], frame: 'rounded' } })));
 {
-  // a split's columns and where its words sit, 2026-10-06 (*"use 1:2 cols layout"*, *"align text to bottom of slide"*)
+  // a split's columns and where its words sit
+  // why: lessons/kit-slide.md#test-split
   const sp = { layout: 'split', side: 'right', slot: () => null, say: 'x' };
   ok('a split takes cols 1:1 or 1:2 and bottom true',
     !throws(() => normalise({ ...sp, cols: '1:2', bottom: true })) && !throws(() => normalise({ ...sp, cols: '1:1' })));
@@ -202,11 +182,9 @@ const C = code(SRC);
 /** A keydown listener on window or document (or bare, which is window), in code. */
 const globalKeys = (c) => [...c.matchAll(/([\w.]*?)\.?addEventListener\(\s*'keydown'/g)]
   .some((m) => m[1] === '' || /^(window|document)$/.test(m[1].split('.').pop()));
-// ⚠️ ONE DOCUMENT LISTENER IS ALLOWED SINCE 2026-10-06, AND ONLY IN FULL
-// SCREEN (*"add keyboard control to slides in fullscreen"*): entering full
-// screen hides the focused ⛶, so the focus falls to the body. It must open by
-// returning unless this player is full, which is when nothing else on the page
-// is on screen to want the keys.
+// One document key listener is allowed, only in full screen, where focus falls to the body;
+// it must return first unless this player is full.
+// why: lessons/kit-slide.md#test-full-only
 const FULL_ONLY = /document\.addEventListener\('keydown', \(e\) => \{\s*if \(!panel\.isFull\(\)/;
 ok('the player\'s keys are heard on its panel and stopped there, never on window or document outside full screen',
   /panel\.el\.addEventListener\('keydown'/.test(C) && FULL_ONLY.test(C) && !globalKeys(C.replace(FULL_ONLY, ''))

@@ -1,8 +1,7 @@
-// demo/shell/rt-shader-dither.mjs: the runtime of a `shader-dither` node on
-// /connect/ (node-runtime.mjs): /video/shader/'s ordered dither
-// (dither-shader.mjs). A screen at the far end of its video-out pulls a
-// frame; it pulls one from whatever is linked into its video-in, dithers it at
-// the `size` arriving on value-in, and hands its canvas on.
+// demo/shell/rt-shader-dither.mjs: a `shader-dither` node on /connect/ (dither-shader.mjs).
+// A screen on video-out pulls a frame; it pulls one from video-in, dithers it at the
+// `size` on value-in, and hands its canvas on.
+// why: lessons/kit-rt-shader-dither.md#header
 
 import { createDitherShader } from './dither-shader.mjs';
 

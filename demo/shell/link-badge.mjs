@@ -1,26 +1,7 @@
-// demo/shell/link-badge.mjs: is anything arriving on this link, in three words.
-//
-// 🔴 THE OWNER'S ANSWER, MADE A KIT PIECE, 2026-10-06 (plans/plan-routing-migration.md
-// §3.7). Asked whether `/stage/` should move onto the patchbay, the owner said
-// *"i do not about patchbay, perhaps just visual indication of picture
-// happening"*, and what shipped there is a tag on the picture: STARTING,
-// RECEIVING, STALLED. That is the UI a page that moves onto the patchbay gets,
-// not a patch view. `/patchbay/` stays the one place links are drawn and made.
-//
-// 🔴 OUTCOME, NEVER INTENT, AND THE COUNT IS TAKEN ON THE FAR SIDE. A press only
-// makes it `starting`. `receiving` needs a number that GREW, read from an
-// opener's `count()`: frames decoded here, PCM frames that reached this page,
-// pieces ingest acknowledged. CLAUDE.md: *a count is only evidence on the far
-// side of the boundary*. An opener whose only count is what it sent has no
-// `count()`, and gets no badge rather than a badge that says `receiving` about
-// its own queue.
-//
-// ⚠️ THE RULE IS `presenceOf`, THE STAGE'S OWN, NOT A SECOND ONE TYPED HERE: a
-// count that grew is a heartbeat, `stallMs` is the stall window, one miss is
-// gone. `linkStateOf` is that rule as a pure function, so a page can feed it
-// fixtures in its own check pass.
-// ⚠️ HIDDEN WHILE `unknown`, which is before a start and after a stop, as the
-// stage hides its tag when there is nothing to receive.
+// demo/shell/link-badge.mjs: is anything arriving on this link: STARTING, RECEIVING, STALLED.
+// Outcome, never intent: receiving needs an opener's count() that grew on the far side;
+// the rule is presence.mjs's presenceOf. Hidden while unknown.
+// why: lessons/kit-link-badge.md#header
 
 import { createPresence, presenceOf } from './presence.mjs';
 
@@ -62,8 +43,8 @@ export function createLinkBadge({ count, stallMs = LINK_STALL_MS, startMs = LINK
     throw new Error('link-badge: count is a function answering what arrived on the far side. '
       + 'An opener with no such count gets no badge.');
   }
-  // ⚠️ `let` AND A NULL CHECK: `createPresence` calls `onChange` once while it
-  // is still being built, before `pres` holds anything.
+  // `let` and a null check: createPresence calls onChange while still being built.
+  // why: lessons/kit-link-badge.md#pres-null
   let pres = null;
   pres = createPresence({ mode: 'badge', state: 'unknown', says: LINK_SAYS, can: LINK_CAN,
     onChange: (st) => { if (pres) pres.el.hidden = st === 'unknown'; onChange?.(st, LINK_SAYS[st]); } });

@@ -1,0 +1,399 @@
+# Kit lessons: roll.mjs
+
+The long comments cut from `demo/shell/roll.mjs`, moved here verbatim. Each heading names the file and the block, and the code points at it with `// why: lessons/kit-roll.md#<anchor>`.
+
+<a id="header"></a>
+
+## roll.mjs, file header
+
+demo/shell/roll.mjs. A vertical piano roll, drawn above the keys it names.
+
+🔴 ASKED FOR 2026-09-23: *"add component that can be glued top of it that is
+vertical piano roll that supports dots (simular to dots on active keyboard
+keys) and vertical (auto)scrolling like piano rythm games. keep it simple and
+Cmaj/6 etc labels next to dots. intially no autoscroll, just allow multiple
+dot rows"*, and then *"rm these keyboards"* about the row of chord charts it
+replaces on `/nola/`.
+
+── THE ONE THING THIS COMPONENT HAS TO GET RIGHT ──────────────────────────
+
+🔴 A ROLL THAT DOES NOT LINE UP WITH THE KEYS UNDER IT IS NOT A ROLL. That
+is not a nicety, it is the whole function: you read a dot, your eye drops
+down the column, and your finger is on the key. `/nola/` shipped chord charts
+that were the same width and the same key size as the instrument and STILL
+did not line up, because they had a different base, and the report was that a
+shape could not be carried down the page.
+✅ SO THE GEOMETRY IS NOT COPIED. `placeKey` and `SHARP_OFF` are imported
+from `keyboard.mjs`, which is the drawing this one has to agree with, and the
+grid template is the same `--k-cols` and `--k-min`/`--k-max` pair the keys
+use. Two drawings, one arithmetic. ⚠️ AND THE PAGE STILL ASSERTS IT, as a
+COLUMN POSITION IN PIXELS rather than as a base number, which is how that
+defect was caught the first time.
+
+── WHAT IT IS NOT ────────────────────────────────────────────────────────
+
+⚠️ IT IS NOT `note-grid.mjs`, which draws a Circuit pattern: sixteen steps
+across, one row per pattern, pitch on the y axis, and its own header says in
+capitals that it is deliberately NOT a piano roll of a session. This is the
+other axis and another subject: pitch across, time down, one row per chord.
+⚠️ AND IT DOES NOT PARSE ANYTHING. `demo/shell/chords.mjs` turns `Cmaj`,
+`C9`, `F/C` and `Fm6/C` into notes and numerals, and `chords-test.mjs`
+grades that with no browser in it. ⚠️ THE COUNT IS NOT WRITTEN HERE ON
+PURPOSE: three comments in two files carried three different counts for that
+one command on 2026-09-23, 36 and 27 and 49, and all three were true when
+they were written. Run it. A caller hands over rows of notes and a label; this file
+decides where a dot goes and nothing else.
+⚠️ NO AUTOSCROLL YET, WHICH IS WHAT WAS ASKED FOR AND IS THE RIGHT SIZE.
+A static stack of rows is gradable with no clock in it at all. When it does
+arrive, `positron-ui`'s rule is that nothing redrawing while somebody is
+looking may change how much room it takes, so the rows will move inside a
+window whose height does not.
+
+<a id="lines"></a>
+
+## roll.mjs, createRoll, the white key rules
+
+🔴 FAINT RULES WHERE THE WHITE KEYS DIVIDE, AND THE HISTORY IS THE LESSON.
+Asked for with a doubt attached: *"add faint vertical lines to indicate
+white key separatoes to piano roll. make this rollbackablge (not sure how
+good idea)"*. Then *"make vertical lines on pianoroll continuous"*, which
+was done by closing the row gap. Then *"no continous vertical bars on
+pianoroll!"*, WHICH WAS READ HERE AS `remove them` AND MEANT `they are
+still not continuous`, so they were deleted. Then, four words: *"you lost
+vertical lines on piano roll"*.
+⚠️ THE MISTAKE IS WORTH MORE THAN THE FEATURE. A report with no verb is
+ambiguous, and the reading that DESTROYS work is the one to check before
+acting on it. Asking would have cost one line.
+✅ AND THE ROLLBACK SWITCH STAYS, because it is what made the round trip
+cost one attribute both ways. `lines: false` turns them off.
+
+🔴 FIFTH, 2026-09-25, AND THIS ONE CARRIES ITS VERB: *"rm gap in piano roll
+vert lines"*, with a screenshot of `/nola/`. So the lines stay, the gap
+goes, and the switch above stays. Nothing in this file changed.
+🔴 AND THE REASON FOUR REPORTS COULD EACH LOOK LIKE THE LAST ONE COMING
+BACK IS THAT THE GAP WAS NEVER WHERE ANY OF THEM SAID. MEASURED at 1280 px
+before anything was touched, cell bottom to the next cell's top all the way
+down: **6.5, 0, 0, 0, 0, 0, 0**. One gap, under the FIRST row, and every
+other join already exact. `shell.css` carries the cause and the repair: the
+first row is half a row taller so the top dot is not crowded against the
+box, the room was meant to go inside the first CELL, and the lane it sits
+in kept a flat 26 px height, so `height: 100%` resolved against the lane
+rather than the row and the rules stopped 6.5 px short at each end.
+⚠️ WHICH IS THIS PROJECT'S OWN RULE ARRIVING AGAIN, one component along:
+*"the reported thing is not necessarily the thing to change, and the cause
+is usually one layer under it"*. Four sessions read a stylesheet and
+argued; one pair of rects ended it.
+
+<a id="seam"></a>
+
+## roll.mjs, createRoll, seam declaration
+
+The seam a glued roll draws between itself and the keys.
+
+🔴 DECLARED HERE AND NOT WHERE IT IS BUILT, BECAUSE `draw()` READS IT AND
+`draw()` RUNS FIRST. Written below the first call it was in its temporal
+dead zone, so the page threw before `ready` and `demo/verify.mjs` reported
+`0/1` with nothing else to say. `positron-ui` records the same shape taking
+seven asserts silent on `/twelve/`: a declaration shadows its whole block
+from the top, and the symptom is never near the cause.
+
+<a id="empty-roll"></a>
+
+## roll.mjs, draw, empty roll and minRows
+
+🔴 AN EMPTY ROLL DRAWS NOTHING AT ALL, NOT AN EMPTY BOX. `.roll` carries
+      its own gap and a page puts it in a stack, so a childless one would paint
+      a band nobody wrote. That is `an empty box is a line`, which this project
+      has already paid for on `/typist/` and in `.pos-controls`.
+      🔴 UNLESS THE CALLER ASKED FOR A FIXED HEIGHT, WHICH IS THE OPPOSITE CASE
+      AND ARRIVED 2026-09-23 AS *"make piano roll h fixed to 5 items even when
+      no data"*. A roll that LEARNS opens empty on purpose and fills one row at
+      a time, so with no floor the page jumps when the first chord lands and
+      again on every row after it. `positron-diagram` already carries this rule
+      for a picture that repaints on a press, and it is the same rule: reserve
+      the room before anything is in it.
+      ⚠️ AND THE TWO CASES ARE BOTH RIGHT. A typed line is a function of what
+      somebody typed, so nothing is coming and an empty box really is a band
+      nobody wrote. `minRows` is opt in for that reason and defaults to 0.
+
+<a id="row-button"></a>
+
+## roll.mjs, draw, a row is a button
+
+🔴 A ROW IS A `button`, WHICH IS THE WHOLE OF MAKING IT SELECTABLE.
+Asked 2026-09-23: *"make pianoroll rows selectable. selecting puttign
+gray dots on the keyboard"*. A div with a click handler would need a
+role, a tabindex, and Enter and Space bound by hand, which is three
+things to get wrong and one of them silently: a control only a mouse
+can reach.
+⚠️ AND N ROWS ARE N TAB STOPS, which `table.mjs` refuses for a
+sixty-three row list and solves with a roving tabindex. A line of
+chords is four or five rows, so the simple thing is the right thing
+here, and the moment somebody rolls a whole song through this it is not.
+
+<a id="row-kind"></a>
+
+## roll.mjs, draw, data-kind
+
+⚠️ A ROW MAY SAY WHAT KIND OF ROW IT IS, AND THIS FILE DOES NOT KNOW
+        WHAT THE KINDS ARE. `/nola/` has a chord it learned off the keys and a
+        chord it is proposing, and those must not look the same; what they look
+        like is that page's business and lives in that page's stylesheet.
+        ⚠️ SET ONLY WHEN THERE IS ONE, because `[data-kind]` matches an EMPTY
+        attribute and a row that was once a guess would keep matching for the
+        rest of the page's life. That is already recorded in `positron-ui`
+        about `video-panel.mjs`, measured.
+
+<a id="roving-tabindex"></a>
+
+## roll.mjs, draw, roving tabindex
+
+🔴 ONE TAB STOP FOR THE WHOLE ROLL, NOT ONE PER ROW. `table.mjs`
+        already refuses the alternative for a sixty-three row list, where
+        tabbing past it costs sixty-three presses, and a line of chords is only
+        short today. The roving tabindex is the standard answer: exactly one
+        row is reachable by Tab and the arrows move between them.
+
+<a id="black-dot"></a>
+
+## roll.mjs, draw, black key dots
+
+🔴 A BLACK DOT SITS ON THE JOIN, WHERE THE KEY BELOW IT DOES NOT.
+          Asked 2026-09-23 as *"move piano roll dots to cross the divider from
+          the middle"*, and then, when asked which of the two readings:
+"lines stay. black key dots move"*.
+          ⚠️ `placeKey` gives a sharp the piano's own offset, scaled by
+          `SHARP_NUDGE`, because a real black key is NOT centred between its
+          neighbours and the KEYBOARD should look like a keyboard. A roll is not
+          a keyboard: it is a grid of marks read downward, and a mark that sits
+          slightly off the rule under it reads as a mistake rather than as
+          lutherie. MEASURED when the nudge landed: a black key centre is 2.27 px
+          off its join at 0.5 and 1.00 px off at 0, on a 42.7 px white key.
+          ✅ SO THE CELL KEEPS ITS COLUMN AND LOSES ITS NUDGE, which puts the dot
+          on the line the eye is already following down to the key.
+
+<a id="label-over-lane"></a>
+
+## roll.mjs, draw, label
+
+⚠️ THE LABEL IS DRAWN OVER THE LANE RATHER THAN BESIDE IT, AND THAT IS
+        THE ALIGNMENT RULE ARRIVING AS A LAYOUT DECISION. A label in its own
+        column would take width off the key columns, and then every dot in the
+        picture would sit a few pixels left of the key it names, which is the
+        exact defect this component exists to avoid. It is absolute, so it
+        costs the grid nothing.
+
+<a id="on-pick"></a>
+
+## roll.mjs, draw, onclick
+
+🔴 THE COMPONENT REPORTS THE PICK AND PAINTS ITSELF, AND NOTHING ELSE.
+        What a picked chord DOES belongs to the page: on `/nola/` it lights the
+        keys, which is a keyboard this file does not own and must not reach
+        into. Same division the sustain toggle keeps.
+
+<a id="rest-rows"></a>
+
+## roll.mjs, draw, placeholder rows
+
+🔴 THE ROWS THAT HOLD THE ROOM OPEN, AND THEY ARE NOT ROWS. They carry
+      the same lane so the height and the columns are identical to a real row
+      rather than approximately it, and an approximate reservation is the
+      `min-height` that never applied wearing different clothes.
+      ⚠️ THEY ARE OUT OF EVERY READER'S WAY: no `button`, so nothing to press
+      and nothing in the tab order, and `aria-hidden` so a screen reader is not
+      told about five chords that do not exist. `rows`, `picked` and the arrow
+      keys all count `current`, which does not include these.
+
+<a id="roll-rest"></a>
+
+## roll.mjs, draw, roll-rest class
+
+⚠️ NOT `.roll-row`, AND THAT IS THE WHOLE POINT. Every check on
+        `/nola/` and `/kit/` counts rows by querying `.roll-row`, so a
+        placeholder wearing that class is a row as far as nine asserts are
+        concerned. MEASURED the moment it was tried: nine red, each reporting
+        5 rows where the page had 4 chords. It takes the height from the same
+        custom property and nothing else.
+
+<a id="paint-picked"></a>
+
+## roll.mjs, paintPicked
+
+⚠️ `aria-pressed` AS WELL AS THE ATTRIBUTE THE STYLE READS, because a row
+that looks selected and does not say so is selected for one reader only.
+
+<a id="real-rows-only"></a>
+
+## roll.mjs, paintPicked, real rows only
+
+⚠️ REAL ROWS ONLY. The children may end with placeholders holding the
+      roll's height open, and those are not selectable, so telling one it is
+      `aria-pressed="false"` announces a chord that is not there. `current` is
+      the list of rows that exist.
+
+<a id="prepend"></a>
+
+## roll.mjs, createRoll, prepend inside the keyboard box
+
+🔴 IT GOES INSIDE THE KEYBOARD'S OWN BOX, AND THAT IS WHAT MAKES IT LINE
+UP RATHER THAN NEARLY LINE UP. Drawn as a sibling it inherits neither the
+keyboard's content width nor its `--k-min`, and MEASURED on `/nola/` the
+first time: columns at `0,29,52,91,104` px against `0,26,46,80,92` on the
+instrument, because the box's 9 px padding and 1 px edge were not in the
+roll's geometry and the floor fell back to the component default of 49.
+Reported in the same minute as *"roll needs to line up with keys"*.
+✅ INSIDE, THE TWO GRIDS ARE THE SAME WIDTH BY CONSTRUCTION and the custom
+properties inherit, so there is nothing left to keep in step. That is also
+exactly what *"can be glued top of it"* asked for: one surface, the roll
+above the keys it names.
+🔴 A GLUED ROLL BRINGS ITS OWN SEAM, WHICH IS THE LOOK THIS PROJECT
+ALREADY HAS A NAME FOR. Reported with a picture: *"leave space above
+keyboard and add separator line edge to edge"*, then *"its 'glue' thing"*.
+`glue.mjs` describes it exactly: one border round the lot, a 1 px seam of
+`--line` between the parts, and the children giving up their own edges.
+⚠️ IT IS A SEPARATE ELEMENT AND NOT A `border-bottom` ON THE ROLL, because
+the roll is a SCROLLER: a negative margin to reach the box's edges would
+widen its scroll content by the padding, the lane would be sized against
+that wider box, and every column would miss the keys. An element with
+nothing in it can full-bleed for free.
+⚠️ AND THE BLEED IS READ OFF THE BOX RATHER THAN TYPED. `--kbd-pad` is
+declared beside the padding it names, so a keyboard that changes its own
+padding cannot leave a seam ending nine pixels short.
+
+<a id="follow-scroll"></a>
+
+## roll.mjs, createRoll, scroll follow and arrow keys
+
+🔴 THE DOTS MOVE WITH THE KEYS, AND WITHOUT THIS THEY LIE. Reported with a
+screenshot: *"dots should move along keyboard"*. A key row wider than the
+page is a scroller, which is how a two octave instrument fits a phone, and
+a roll that stayed still while it moved would point every dot at the wrong
+note the moment somebody dragged the keys. **Lining up at rest and lying
+under a finger is worse than never lining up**, because the first one is
+believed.
+⚠️ ONE DIRECTION ONLY. The keys own the gesture and this follows; making
+the roll draggable too would be two scrollers fighting over one position,
+and a reader would have no way to know which one was right.
+⚠️ `passive`, because this never calls `preventDefault` and a listener that
+might would put itself in the way of the platform's own scrolling.
+🔴 THE ARROWS MOVE AND ENTER PICKS, WHICH IS NOT THE SAME KEY DOING BOTH.
+Asked 2026-09-23: *"make pianoroll naigatable with keyboard"*. `table.mjs`
+learned this the expensive way on `/making/`: an arrow that moved the
+SELECTION called `onPick` per row, and that page's `onPick` fetches a
+picture off a bucket, so a held-down arrow pulled sixty-three files nobody
+asked to see. Moving focus is free; picking is a decision and gets its own
+key. A row is a `button`, so Enter and Space already pick it and nothing
+here has to handle them.
+⚠️ AND IT IS ON THE ROLL RATHER THAN ON EACH ROW, so the listener count
+does not grow with the music.
+
+<a id="roll-w"></a>
+
+## roll.mjs, follow, --roll-w
+
+⚠️ AND THE PICKED ROW'S GROUND IS AS WIDE AS THE KEYS' OWN CONTENT.
+      `shell.css` reads this; the alternative was a row sized to its content,
+      which lets the grid take its ceiling width and misses every column. One
+      measurement, written once, rather than two that agree today.
+
+<a id="add-row"></a>
+
+## roll.mjs, addRow
+
+Add a row at the bottom, KEEPING the selection and the landing row.
+
+🔴 `setRows` CANNOT DO THIS AND IT IS RIGHT NOT TO. It resets `picked` to
+-1 and `focused` to 0 because in the typed-chords mode the rows really
+are new rows and a remembered index would point at a chord nobody typed.
+⚠️ IN A LEARNING MODE THE ROWS ARE THE OLD ROWS PLUS ONE, so the same
+call would throw away the player's selection every time they held a new
+chord long enough, which is the moment they are least expecting anything
+to move. `research/chord-learning-2026-09-23.md` found this by reading
+this file before anything was built.
+⚠️ AND AN APPEND IS THE ONLY CHANGE THAT MOVES NOTHING ALREADY ON SCREEN,
+which is the other half of the same finding: MEASURED over 100 chords, a
+list re-sorted on every chord changed 29 times with 22 of those being
+pure re-sorts of the same four rows, and a list admitted and pinned
+changed 4 times, every one of them an append.
+
+@returns {number} the new row's index
+
+<a id="trim-drop"></a>
+
+## roll.mjs, trimRows and dropRow
+
+Keep the first `n` rows and drop the rest.
+
+⚠️ IT IS FOR A TAIL THE PAGE OWNS RATHER THAN FOR EDITING HISTORY.
+`/nola/` keeps what it has learned at the top and two chords it is
+proposing underneath, and the proposals are replaced whenever the line
+grows. The kept rows do not move, so a selection inside them survives;
+a selection inside the part being dropped cannot, and is cleared rather
+than left pointing at a row that is gone.
+Drop one row, keeping every other row where it is.
+
+🔴 `trimRows` CANNOT DO THIS AND THE DIFFERENCE IS THE WHOLE POINT. It
+keeps a PREFIX, which is right when a page owns a tail it rebuilds; it is
+useless when the row to remove is in the middle of a list that is a LOG.
+`/nola/` reads its roll downward as time, so a proposal sits at the moment
+it was offered and chords played afterwards land below it, and replacing
+that proposal must not move anything under it.
+⚠️ THE SELECTION FOLLOWS THE ROWS RATHER THAN THE INDEX. A pick below the
+dropped row is one row higher afterwards, and a pick ON it is gone, which
+is the only honest answer: the row it named does not exist any more.
+
+<a id="pick"></a>
+
+## roll.mjs, pick
+
+Pick a row from the page, or -1 for none.
+
+🔴 IT TOGGLES, BECAUSE A PRESS TOGGLES. The first version set the index
+and a page's own check went red calling it twice: `4 keys still lit`,
+where a finger pressing the same row twice would have cleared them. **An
+API that does not do what the gesture does is a second path nobody
+grades**, and this project has already paid for a check that drove one.
+
+<a id="set-held"></a>
+
+## roll.mjs, setHeld
+
+Say what is being held, and any row that IS that chord lights up.
+
+🔴 THE OTHER DIRECTION, ASKED FOR 2026-09-23: *"when i hit keys with
+correct dots hilite the chord in piano roll"*. Picking a row puts a chord
+on the keys; this is playing the keys and having the roll answer, which
+is the same relationship read backwards and is the half that tells a
+player they got it.
+⚠️ IT IS AN EXACT SET, NOT A SUBSET. Holding one note of a triad is not
+playing the triad, and a row that lit on the first note would light three
+rows at once on a shared root. Extra notes count too: `Cmaj` plus a
+wrong D is not `Cmaj`.
+⚠️ AND IT IS A THIRD STATE, NOT A SECOND PICK. What you chose and what
+you are playing are different facts and a row can be both, so they are
+two attributes and the style shows both at once.
+
+🔴 AND A CHORD YOU ARE HALF WAY INTO MARKS ITS OWN DOTS, ASKED FOR
+2026-09-23: *"when partial match with piano roll chord use faint yellow
+on dots"*. The exact-set rule above is right about the ROW and leaves the
+roll silent at the one moment somebody is reaching for a chord, which is
+the least useful time for it to say nothing.
+⚠️ THE FLOOR IS TWO NOTES AND EVERY NOTE YOU HOLD BEING IN THAT CHORD,
+and both halves are load bearing. One note in common is not reaching for
+a chord, it is the note happening to be in it, and a root would light
+every row that shares it. Allowing a note that is NOT in the chord would
+light rows you are audibly not playing: holding a full `Cmaj` would part
+match `Cmaj7` and `Amin7` and anything else containing a C, so a cluster
+would light the whole roll. Inside the chord and at least two of it is
+the smallest rule that means *on the way to this one*.
+⚠️ AND A FULL MATCH MARKS NO DOTS, because the row itself has lit and two
+signals for one fact is the middot rule wearing a colour.
+
+<a id="delete-part"></a>
+
+## roll.mjs, setHeld, delete data-part
+
+⚠️ `delete`, NEVER `= ''`: `[data-part]` matches an EMPTY attribute,
+            so a dot that was once half held would stay half held for the rest
+            of the page's life. Measured once already in `video-panel.mjs`.

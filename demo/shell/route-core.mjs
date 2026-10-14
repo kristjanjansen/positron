@@ -1,32 +1,7 @@
-// demo/shell/route-core.mjs: the routing core, L0 of `plans/plan-route-core.md`.
-//
-// A table of ports and links, a closed list of ops, and a gate at the
-// destination. It knows nothing about any instrument, any input method or any
-// computer, and it is written so that a C port can be a line by line copy:
-// integers only, no strings on the hot path beyond the op name lookup, no
-// clock of its own, and no feedback of what it writes back into its inputs.
-//
-// 🔴 THE CONTRACT IS `demo/shell/route-vectors/*.json`, NOT THIS FILE. Every
-// expected output in there was derived by hand, and `route-core-test.mjs` runs
-// them. A behaviour that is not in a vector is not a promise, and a second
-// implementation that passes the vectors and disagrees with this file on
-// something else has found a missing vector, not a bug in itself.
-//
-// ⚠️ `bay.mjs` STAYS THE VALIDATOR IN FRONT OF THIS. It refuses with a reason
-// and a fix in words; this refuses with a short code, because a microcontroller
-// has no room for the words. The op names and arguments are bay's where the two
-// overlap (`channel`, `transpose`, `velocity`, `only`, `drop`, `range`,
-// `vrange`, `fixed`, `cc`), so a bay link's transforms are this core's ops
-// without translation. `scale`, `toggle`, `thin`, `curve`, `velcurve` and
-// `notecc` are the plan's §4 ops that bay does not have yet.
-//
-// ⚠️ TWO OPS CARRY STATE (`toggle`, `thin`) AND ONE READS TIME (`thin`), so the
-// core is a pure function of the event, the link AND that link's state. The
-// plan says "a pure function of the event and the link", which was true of
-// every op except the two it listed itself.
-//
-// Imports only `midi-kinds.mjs`, which imports nothing, so `rig/board/push.sh`
-// can ship the pair by following direct imports.
+// demo/shell/route-core.mjs: the routing core, L0 of plans/plan-route-core.md. Ports, links,
+// closed ops and a gate, integers only so a C port can copy it line by line. The contract is
+// route-vectors/*.json; bay.mjs stays the validator in front. Imports only midi-kinds.mjs.
+// why: lessons/kit-route-core.md#header
 
 import { KINDS, canonKind, kindOf } from './midi-kinds.mjs';
 
@@ -37,8 +12,8 @@ export const VERBS = ['allow', 'confirm', 'deny'];
 export const REFUSALS = ['duplicate', 'unknown-port', 'direction', 'unknown-op', 'bad-args', 'cycle'];
 
 /**
- * ⚠️ THE DEFAULT FOR A PORT WITH NO PROFILE, from the plan's §6: allow for
- * everything except SysEx, which is confirm. A precaution, not a wall.
+ * A port with no profile allows everything except SysEx, which is confirm (plan section 6).
+ * why: lessons/kit-route-core.md#default-verb
  */
 const DEFAULT_VERB = (kind) => (kind === 'sysex' ? 'confirm' : 'allow');
 
@@ -58,7 +33,10 @@ export function toHex(bytes) {
 }
 
 const isNote = (b) => (b[0] & 0xF0) === 0x80 || (b[0] & 0xF0) === 0x90;
-/** ⚠️ A NOTE ON AT VELOCITY 0 IS A RELEASE, here and everywhere below. */
+/**
+ * A note on at velocity 0 is a release, here and everywhere below.
+ * why: lessons/kit-route-core.md#is-note-on
+ */
 const isNoteOn = (b) => (b[0] & 0xF0) === 0x90 && b[2] > 0;
 const isChannel = (b) => b[0] >= 0x80 && b[0] < 0xF0;
 const chOf = (b) => b[0] & 0x0F;                     // 0..15 on the wire
@@ -85,10 +63,9 @@ const pointsOk = (p) => Array.isArray(p) && p.length >= 2 && p.length <= CURVE_P
     && (i === 0 || q[0] > p[i - 1][0]));
 
 /**
- * A 7 bit point as a 14 bit bend value: p * 128, except 127, which is 16383.
- * ⚠️ SO 64 IS THE BEND'S CENTRE 8192 AND 127 ITS TOP, and an identity table
- * leaves every bend exactly as it was (vector 24). Read as a plain p * 128, a
- * table's top would be 16256 and a bend at full could never get there.
+ * A 7 bit point as a 14 bit bend: p * 128, except 127, which is 16383, so an identity table
+ * leaves every bend unchanged (vector 24).
+ * why: lessons/kit-route-core.md#wide
  */
 const wide = (p) => (p === 127 ? 16383 : p << 7);
 const narrow = (p) => p;
@@ -136,14 +113,9 @@ const OPS = {
     },
   },
   /**
-   * Scale note on velocity. ⚠️ ONLY A NOTE ON: bay tests `d2 === 0`, so it
-   * would scale an 8n note off's release velocity. Harmless, and different.
-   * 🔴 IN EXACT INTEGER THOUSANDTHS, NOT A FLOAT, as `route_core.c` does it.
-   * `Math.round(45 * 0.7)` is 31, because the product is 31.499999999999996 in
-   * a double, and the tie 31.5 rounds to 32. MEASURED 2026-10-03: 28 scales
-   * from 0.001 to 4.000 disagreed with the C on a float tie, every one rounded
-   * down here. Vector 20 holds two of them. A scale that is under half a
-   * thousandth rounds to 0 and is refused, as the C refuses it.
+   * Scale note on velocity, only on a note on, in exact integer thousandths as route_core.c does:
+   * a double ties wrong (45 * 0.7 is 31.499999999999996). Under half a thousandth is refused.
+   * why: lessons/kit-route-core.md#op-velocity
    */
   velocity: {
     ok: (a) => typeof a.scale === 'number' && int(Math.round(a.scale * 1000), 1, 65535),
@@ -194,12 +166,9 @@ const OPS = {
     },
   },
   /**
-   * A CC value from lo..hi onto lo2..hi2, clamped first, ties away from zero.
-   * 🔴 LO2 ABOVE HI2 INVERTS, AND THAT IS THE WHOLE REASON THERE ARE FOUR
-   * ARGUMENTS. Only CC `cc` when it is given, every CC when it is not.
-   * ⚠️ NAMED `scale` AND NOT THE PLAN'S `range`, because `range` in bay is
-   * already the note number filter, and one word meaning two ops in two files
-   * is the vocabulary problem `midi-kinds.mjs` was written to end.
+   * A CC value from lo..hi onto lo2..hi2, clamped first, ties away from zero; lo2 above hi2 inverts.
+   * Only CC `cc` when given. Not named `range`, which is bay's note filter.
+   * why: lessons/kit-route-core.md#op-scale
    */
   scale: {
     ok: (a) => int(a.lo, 0, 127) && int(a.hi, 0, 127) && a.lo < a.hi
@@ -227,18 +196,10 @@ const OPS = {
     },
   },
   /**
-   * At most `hz` continuous values a second, one budget per link.
-   * ⚠️ MEASURED FROM THE LAST ONE KEPT, and in integers: `(t - kept) * hz >= 1000`.
-   * ⚠️ IT DROPS THE LAST VALUE OF A FAST SWEEP, which leaves the destination
-   * short of where the knob stopped. A trailing send needs a tick, and the core
-   * has no clock; that is an open question in the plan, not settled here.
-   * 🔴 A t EARLIER THAN THE LAST KEPT IS KEPT, AND THE BUDGET RESTARTS FROM IT
-   * (vector 22). Until 2026-10-03 this file dropped it and the C kept it. Read
-   * as "no time has passed" instead, a clock that restarts at 0 under a core
-   * that does not would silence every knob on the link until the new clock
-   * passed the old one, which could be hours. Kept, the worst case is one value
-   * too many. The C's unsigned difference, there for its 49 day wrap, already
-   * read it this way.
+   * At most `hz` continuous values a second, measured from the last kept: `(t - kept) * hz >= 1000`.
+   * It drops a fast sweep's last value (no clock for a trailing send). A t earlier than the last
+   * kept is kept and restarts the budget (vector 22), as the C does.
+   * why: lessons/kit-route-core.md#op-thin
    */
   thin: {
     ok: (a) => int(a.hz, 1, 1000),
@@ -250,15 +211,10 @@ const OPS = {
     },
   },
   /**
-   * A CC, touch or bend value through `points`, a table of up to 16 `[in, out]`
-   * pairs (vectors 23 and 24). `cls` narrows it to one of the three kinds and
-   * `cc` to one CC number; with neither it curves all three.
-   * ⚠️ A BEND IS CURVED IN ITS OWN 14 BITS, with each point read through `wide`,
-   * so a table drawn once in 0..127 serves a knob and a wheel alike.
-   * ⚠️ A CHANNEL TOUCH (Dn) CARRIES ITS PRESSURE IN THE SECOND BYTE, a poly touch
-   * (An) in the third.
-   * ⚠️ THE TABLE IS COPIED WHEN THE LINK IS MADE, as `route_core.c` copies it
-   * into its table store, so changing the authored array later changes nothing.
+   * A CC, touch or bend value through up to 16 `[in, out]` points (vectors 23, 24); `cls` and `cc`
+   * narrow it. A bend curves in 14 bits through `wide`. Channel touch pressure is byte 2, poly
+   * touch byte 3. The table is copied when the link is made.
+   * why: lessons/kit-route-core.md#op-curve
    */
   curve: {
     ok: (a) => pointsOk(a.points) && opt(a.cc, 0, 127)
@@ -277,9 +233,9 @@ const OPS = {
     },
   },
   /**
-   * A note on's velocity through `points`, the same table and arithmetic as
-   * `curve` (vector 25). 🔴 CLAMPED TO 1..127 AFTER, so a table that reaches 0
-   * cannot turn a note on into a release. A release is left alone.
+   * A note on's velocity through `points`, as `curve` (vector 25), clamped to 1..127 after so it
+   * cannot become a release. A release is left alone.
+   * why: lessons/kit-route-core.md#op-velcurve
    */
   velcurve: {
     ok: (a) => pointsOk(a.points),
@@ -312,12 +268,11 @@ export const OP_NAMES = Object.keys(OPS);
 
 /**
  * A port: `{ id, dir: 'in'|'out'|'both', accepts?: [kind], policy?: {kind: verb},
- * rules?: [{ match: [byte|null], do: verb }] }`. A rule's match is a byte
- * prefix and `null` in it matches any byte. The first rule that matches wins
- * over the per kind policy, and only the first chunk of a SysEx is read.
- *
+ * rules?: [{ match: [byte|null], do: verb }] }`. A rule's match is a byte prefix, `null` any byte;
+ * the first matching rule beats the per kind policy, and only a SysEx's first chunk is read.
  * A link: `{ id, from, to, ops: [{ op, ...args }] }`.
  * An event: `{ port, t, bytes }`. What comes out is `{ port, t, bytes, link }`.
+ * why: lessons/kit-route-core.md#create-core
  */
 export function createCore() {
   const ports = new Map();
@@ -327,9 +282,8 @@ export function createCore() {
   function addPort(p) {
     const accepts = p.accepts ? new Set(p.accepts.map(canonKind)) : null;
     if (accepts?.has(null)) throw new Error(`route-core: ${p.id} accepts a kind that is not one of ${KINDS.join(', ')}`);
-    // ⚠️ A POLICY KEY GOES THROUGH `canonKind` TOO, so `{ pitchbend: 'deny' }`
-    // denies bend (vector 21). It was read verbatim until 2026-10-03, and the
-    // older spelling was silently ignored, which reads as a gate that works.
+    // A policy key goes through `canonKind` too, so `{ pitchbend: 'deny' }` denies bend (vector 21).
+    // why: lessons/kit-route-core.md#policy-canon
     const policy = {};
     for (const [k, verb] of Object.entries(p.policy || {})) {
       const ck = canonKind(k);
@@ -369,8 +323,8 @@ export function createCore() {
       if (!op) return { ok: false, reason: 'unknown-op' };
       if (!op.ok(o)) return { ok: false, reason: 'bad-args' };
     }
-    // 🔴 A LINK THAT CLOSES A LOOP IS REFUSED NOW, NOT FOUND LATER. A self
-    // link is the smallest loop and `reaches(x, x)` says so at once.
+    // A link that closes a loop is refused at link time; a self link is the smallest loop.
+    // why: lessons/kit-route-core.md#link-cycle
     if (reaches(l.to, l.from)) return { ok: false, reason: 'cycle' };
     links.push({
       id: l.id, from: l.from, to: l.to,
@@ -387,9 +341,8 @@ export function createCore() {
   function verbFor(port, kind, bytes) {
     if (kind === 'sysex' && bytes[0] === 0xF0) {
       for (const r of port.rules) {
-        // ⚠️ A FIRST CHUNK SHORTER THAN THE RULE IS JUDGED ON WHAT IT HAS. A
-        // head too short to read byte 6 matches the confirm rule rather than
-        // slipping past it.
+        // A first chunk shorter than the rule is judged on what it has, so it hits the confirm rule.
+        // why: lessons/kit-route-core.md#rule-short
         const n = Math.min(r.match.length, bytes.length);
         let hit = true;
         for (let i = 0; i < n; i++) if (r.match[i] !== null && r.match[i] !== bytes[i]) { hit = false; break; }
@@ -411,11 +364,9 @@ export function createCore() {
     const t = ev.t ?? 0;
     let kind = kindOf(bytes);
     let cont = false;
-    // 🔴 A CHUNK THAT IS ONLY F7, OR STARTS WITH ONE, IS THE OPEN STREAM'S LAST
-    // CHUNK (vector 19). F7 is a status byte, so it reads as kind 'other', and
-    // until 2026-10-03 such a chunk was dropped and left the stream open: the
-    // terminator never reached anyone and the next stray data bytes were taken
-    // as more of that stream. With no stream open it is still dropped.
+    // A chunk that is or starts with F7 ends the open SysEx stream (vector 19); with none open it
+    // is dropped.
+    // why: lessons/kit-route-core.md#f7-chunk
     if (bytes[0] < 0x80 || bytes[0] === 0xF7) {
       if (!openSx.get(ev.port)) return [];  // data with no status and no open SysEx
       kind = 'sysex'; cont = true;
@@ -457,10 +408,9 @@ export function createCore() {
   }
 
   /**
-   * Remove a link and release what it left sounding: a note off per held note
-   * (channel then note ascending), then CC 123 on every channel it ever
-   * delivered a note on. ⚠️ THE RELEASE SKIPS THE GATE ON PURPOSE. It is the
-   * safety message, and a port that took the notes takes their release.
+   * Remove a link and release what it left sounding: note offs (channel, then note ascending),
+   * then CC 123 on every channel it delivered a note on. The release skips the gate on purpose.
+   * why: lessons/kit-route-core.md#unlink
    */
   function unlink(id, t = 0) {
     const i = links.findIndex((l) => l.id === id);

@@ -1,34 +1,7 @@
-// demo/shell/suggest-test.mjs. The chord suggester, with no browser at all.
-//
+// demo/shell/suggest-test.mjs: the chord suggester on the real chord-tables.json, through `suggest()`.
 //   node demo/shell/suggest-test.mjs
-//
-// 🔴 A PACKED TABLE IS UNREADABLE BY EYE, so the only thing between a decoding
-// bug and a page proposing the wrong chord confidently is this file. It reads
-// the real `demo/resources/chord-tables.json` off the disk, decodes it through
-// the same `useTables` a page calls, and asks it the named jazz devices that
-// `research/chord-suggester-benchmark-2026-09-23.md` graded.
-//
-// ⚠️ AND IT ASKS THEM THROUGH `suggest()` RATHER THAN THROUGH THE DECODER. The
-// build script already round trips its own packing. What is untested until here
-// is everything between a chord somebody played and a chord on a roll: the
-// tonic, the two slots, the spelling, and whether the name that comes out can
-// be turned back into notes at all.
-//
-// ⚠️ SIXTEEN OF THESE ARE NEGATIVE CONTROLS, including a truncated table, a
-// sabotaged unigram, a style that does not exist, a sampler held at the argmax,
-// a way home to a chord nothing reaches, a beam narrowed until it is an argmax
-// again, a take of somebody else's chords and a take fed nothing but the page's
-// own suggestions. Two more since 2026-09-30: the two named places the build's
-// own classifier is wrong, and a passing chord that must stay in the table while
-// slot B stops offering it alone.
-//
-// 🔴 AND THE SAMPLER'S CHECK IS TWO HALVES OR IT IS NOTHING. `suggest.mjs` draws
-// slot A rather than taking the maximum since 2026-09-25, so every number in
-// `plans/plan-better-chords-2026-09-25.md` rests on a generator that can be made
-// to repeat itself. A check that only asserted *the same seed gives the same
-// line* passes on a sampler that always returns the same thing, and a check that
-// only asserted *two seeds differ* passes on one nothing can reproduce. Both are
-// below, next to each other, for that reason.
+// Includes negative controls; the sampler is checked both ways (same seed repeats, seeds differ).
+// why: lessons/kit-suggest.md#test-header
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -59,8 +32,8 @@ ok('the plain rule answers with no table loaded at all',
     { style: 'plain' }).source === 'plain',
   suggest({ chords: [C(0, 'maj'), C(7, 'maj')] }, { style: 'plain' }).says);
 
-// 2. 🔴 A MINOR KEY TABLE IS NOT OPTIONAL, and this was a live gap: `Am then F`
-//    reads as `i then VI` and a major-only rule returns nothing at all.
+// 2. A minor key table is required: `Am then F` reads as `i then VI`.
+// why: lessons/kit-suggest.md#test-minor-key
 {
   const r = suggest({ chords: [C(9, 'min'), C(5, 'maj')] }, { style: 'plain' });
   ok('the plain rule answers in a minor key, which a major-only one could not',
@@ -68,24 +41,17 @@ ok('the plain rule answers with no table loaded at all',
     `${r.from} then ${names(r)}`);
 }
 
-// 3. NEGATIVE CONTROL, AND IT IS NOT AN EDGE CASE. `Dm then G` fits C major and
-//    A minor and neither is rooted on D, so the fiat cannot be applied and the
-//    page must say the key is a guess. A ii V is one of the commonest openings
-//    there is.
+// 3. NEGATIVE CONTROL: `Dm then G` fits C major and A minor, so the key is a guess.
+// why: lessons/kit-suggest.md#test-ii-v-guess
 {
   const r = suggest({ chords: [C(2, 'min'), C(7, 'maj')] }, { style: 'plain' });
   ok('a ii V cannot take its own first chord as the key, and says so',
     r.guessed === true && r.keyName === 'C major' && r.says.includes('a guess'), r.says);
 }
 
-// 4. NEGATIVE CONTROL: two chords from no key at all fall back to something
-//    that always exists, and say that is what happened.
-//    ⚠️ THE RESEARCH'S OWN EXAMPLE FOR THIS WAS `C then Eb` AND IT NO LONGER
-//    FITS NOTHING, which is the harmonic minor's `V` row earning its keep
-//    rather than a regression: in F minor those two are `V` and `III`, and a
-//    player going C to Eb really might be in F minor. A tritone pair is the
-//    honest replacement, because a major triad a tritone from another major
-//    triad is in no key of either mode.
+// 4. NEGATIVE CONTROL: two chords from no key fall back and say so. A tritone pair of major
+//    triads is in no key of either mode.
+// why: lessons/kit-suggest.md#test-no-key
 {
   const r = suggest({ chords: [C(0, 'maj'), C(6, 'maj')] }, { style: 'plain' });
   ok('two chords in no key at all get a fifth either side and a sentence saying so',
@@ -98,21 +64,16 @@ ok('the plain rule answers with no table loaded at all',
     + `${numeralIn(3, 'maj', pickKey([C(0, 'maj'), C(3, 'maj')]).key)} in F minor`);
 }
 
-// 5. Fewer than two chords is refused rather than guessed at, which is the
-//    owner's own condition: *"when have at least 2, suggest 3rd and 4th"*.
+// 5. Fewer than two chords is refused rather than guessed at.
+// why: lessons/kit-suggest.md#test-one-chord
 ok('nothing is suggested from one chord',
   suggest({ chords: [C(0, 'maj')] }).ok === false && suggest({ chords: [] }).ok === false,
   suggest({ chords: [C(0, 'maj')] }).says);
 
 console.log('\n== the key, which is a fiat and cannot be deduced ==');
 
-// 6. MEASURED: two chords fit 3.33 keys of 24 on average and never fewer than
-//    2, and three chords never fit exactly 1, because a major key and its
-//    relative minor hold the same seven chords.
-//    ⚠️ THE NUMBERS MOVED WHEN THE HARMONIC MINOR'S OWN `V` AND `vii` WERE
-//    ADDED, which is honest: a minor key with a major dominant fits MORE
-//    progressions, so the average rises from 3.33 to 3.38. The floor of 2 is what the argument
-//    rests on and it does not move.
+// 6. Two chords fit 3.38 keys of 24 on average and never fewer than 2; three never fit exactly 1.
+// why: lessons/kit-suggest.md#test-keys-fit
 {
   const tri = [[0, 'maj'], [2, 'min'], [4, 'min'], [5, 'maj'], [7, 'maj'], [9, 'min'], [11, 'dim']];
   const counts = [];
@@ -127,9 +88,8 @@ console.log('\n== the key, which is a fiat and cannot be deduced ==');
     + `average and never fewer than ${Math.min(...counts)}`);
 }
 
-// 7. 🔴 THE MINOR ii V IS WHY THE HARMONIC MINOR'S MAJOR `V` IS IN THE DEGREE
-//    TABLE. `Dm7b5 G7` has a MAJOR dominant, a natural minor has a minor one,
-//    and without that row no key fits the commonest opening in jazz at all.
+// 7. The minor ii V needs the harmonic minor's major `V` row.
+// why: lessons/kit-suggest.md#test-minor-ii-v
 {
   const k = pickKey([C(2, 'min7b5'), C(7, '7')]);
   ok('a minor ii V finds its key, which a natural minor alone could not',
@@ -152,11 +112,9 @@ ok('the shipped table decodes into two styles through the page-facing call',
   + `${STYLES.jazz.bi.size} bigram, out of ${readFileSync(TABLE_PATH).length} bytes`);
 
 /**
- * 🔴 THE NAMED DEVICES, ASKED THROUGH THE WHOLE PATH. Each row is two chords
- * somebody could really play and the chord the benchmark says the table knows
- * follows them. MEASURED there at 12 of 16 named devices in the top 2; these
- * seven are the ones this page's own recogniser can reach, since it has no
- * `dim7` in its vocabulary by design.
+ * Named devices, asked through the whole path: two played chords and the chord that follows.
+ * Seven the recogniser can reach (no `dim7` in its vocabulary).
+ * why: lessons/kit-suggest.md#test-devices
  */
 const DEVICES = [
   ['a ii V in C', [C(2, 'min7'), C(7, '7')], 0, 'the major ii V I'],
@@ -168,20 +126,11 @@ const DEVICES = [
   ['vi then ii', [C(9, 'min7'), C(2, 'min7')], 7, 'the dominant it sets up'],
 ];
 
-// 9. 🔴 THE MEASUREMENT THE WHOLE TABLE IS FOR. Not *does it decode* but *does
-//    a chord somebody played come back with the chord that really follows it*.
+// 9. Does a played chord come back with the chord that really follows it.
+// why: lessons/kit-suggest.md#test-measurement
 {
-  /* 🔴 THIS CHECK WAS ONE ASSERT AND IS THREE SINCE 2026-09-26, BECAUSE RAISING
-     `KEEP` TO 5 TOOK THE OLD ONE RED FOR A REASON THAT IS NOT A DEFECT. Slot B
-     is the pointwise mutual information pick over a pool of four, and the pool
-     could not be filled while the table kept three rows. With five rows,
-     `A7 Dm7` offers `Bmin7b5` where it used to offer `G7`: a rarer and more
-     specific chord, which is what slot B is FOR and which is exactly why it
-     names the real next chord only 9.9 per cent of the time by design.
-     ⚠️ SO THE CLAIM IS SPLIT INTO THE THREE THINGS IT WAS CONFLATING: what the
-     table KNOWS, what the drawn page OFFERS, and what the argmax pair alone
-     happens to show. Losing one of seven at the third is recorded rather than
-     tuned away. */
+  // Three claims: what the table knows, what the drawn page offers, what the argmax pair shows.
+  // why: lessons/kit-suggest.md#test-three-claims
   const CLS = { maj: 'maj', maj7: 'maj', min: 'min', min7: 'min', 7: 'dom',
     dim: 'dim', min7b5: 'hdim', sus4: 'sus', sus2: 'sus', aug: 'aug' };
   const held = [], drawn = [], atArgmax = [];
@@ -216,22 +165,16 @@ const DEVICES = [
     + `${DEVICES.filter(([l]) => !atArgmax.includes(l)).map(([l]) => l).join(', ') || 'none'}`);
 }
 
-// 10. 🔴 AND EVERY ONE OF THEM READ THE TABLE RATHER THAN FALLING THROUGH TO
-//     THE RULE, which is the half that says the number above is about the
-//     table. A suggester silently backing off would score the same and mean
-//     something else entirely.
+// 10. Every one came out of the table, not the fallback rule.
+// why: lessons/kit-suggest.md#test-from-table
 ok('and every one of them came out of the counted table, not out of the fallback',
   DEVICES.every(([, chords]) => suggest({ chords }, { style: 'jazz', temp: 0 }).source === 'corpus'),
   DEVICES.map(([l, ch]) => `${l} ${suggest({ chords: ch }, { style: 'jazz', temp: 0 }).source}`)
     .join(', '));
 
-// 11. 🔴 TWO SLOTS, TWO JOBS, AND SLOT B IS NOT SLOT A'S RUNNER UP BY
-//     PROBABILITY. It is the continuation most SPECIFIC to this context, which
-//     is what separates an idiom from a cliche and is a quantity rather than a
-//     taste. MEASURED in the benchmark: slot A names the real next chord 48.7
-//     per cent of the time and is the globally commonest chord 16.2 per cent of
-//     the time; slot B names it 9.9 per cent and is the global maximum 1.0 per
-//     cent, with 90.7 per cent of what it offers still attested.
+// 11. Slot B is the continuation most specific to the context, not slot A's runner up.
+//     Benchmark: A names the real next chord 48.7 per cent, B 9.9 per cent.
+// why: lessons/kit-suggest.md#test-two-slots
 {
   const rs = DEVICES.map(([, chords]) =>
     suggest({ chords }, { style: 'jazz', rnd: mkRandom(11) }));
@@ -244,15 +187,11 @@ ok('and every one of them came out of the counted table, not out of the fallback
     two.map((r) => `${r.picks[0].name} then ${r.picks[1].name}`).join(', '));
 }
 
-// 12. NEGATIVE CONTROL for slot B's ranking. It is chosen by pointwise mutual
-//     information against the unigram, so a unigram forced flat must be able to
-//     change it. A slot B that never moved would be the second most probable
-//     row wearing a different name.
+// 12. NEGATIVE CONTROL: a flat unigram must be able to change slot B.
+// why: lessons/kit-suggest.md#test-slot-b-pmi
 {
-  /* ⚠️ AT THE ARGMAX ON BOTH SIDES, WHICH IS WHAT MAKES THIS A TEST OF THE PMI
-     AND NOT OF THE DRAW. Slot B is chosen from the rows slot A did not take, so
-     a sampled A moving would move B for a reason that has nothing to do with
-     what is common everywhere. Hold A still and only the unigram can move it. */
+  // At the argmax on both sides, so only the unigram can move slot B.
+  // why: lessons/kit-suggest.md#test-argmax-both
   const before = DEVICES.map(([, ch]) =>
     suggest({ chords: ch }, { style: 'jazz', temp: 0 }).picks[1]?.name);
   const real = STYLES.jazz.uni;
@@ -267,12 +206,9 @@ ok('and every one of them came out of the counted table, not out of the fallback
     + 'against how common a chord is rather than by probability alone');
 }
 
-// 13. 🔴 THE STYLE DIAL IS A CONTROL THAT DOES SOMETHING, AND HALF OF IT IS THE
-//     SPELLING. MEASURED in the benchmark: the two tables disagree on the first
-//     suggestion for 71.2 per cent of shared bigram contexts, AND 59 of 75
-//     shared symbols are written differently, jazz writing `min7` and `maj7`
-//     where pop writes `min` and `maj`. A dial that swapped the table and kept
-//     one spelling would be half a dial.
+// 13. The style dial swaps table and spelling: first suggestions differ in 71.2 per cent of
+//     shared contexts and 59 of 75 shared symbols are spelled differently.
+// why: lessons/kit-suggest.md#test-style-dial
 {
   const ctxs = [[C(2, 'min7'), C(7, '7')], [C(0, 'maj7'), C(5, 'maj7')],
     [C(9, 'min7'), C(2, 'min7')], [C(0, 'maj'), C(7, 'maj')], [C(5, 'maj'), C(0, 'maj')]];
@@ -284,17 +220,12 @@ ok('and every one of them came out of the counted table, not out of the fallback
     ctxs.map((_, i) => `${j[i]} against ${p[i]}`).join(' | '));
 }
 
-// 14. 🔴 A NAME THE PAGE CANNOT VOICE IS A LABEL THAT LIES ABOUT ITS OWN DOTS.
-//     Every suggestion has to go back through `parseChord`, because the roll
-//     draws the notes and the label side by side and they must be the same
-//     chord. `aug(b7,9)` is a real spelling in that table and nothing here can
-//     play it, so it falls back to its class rather than being drawn over notes
-//     that are not it.
+// 14. Every suggestion must parse back through `parseChord`; unplayable names fall back to class.
+// why: lessons/kit-suggest.md#test-voiceable
 {
   const bad = [];
-  /* ⚠️ SEEDED, AND ONE STREAM ACROSS ALL 1,080, so the sweep covers the second
-     and third rows of every context it touches rather than only the first. The
-     argmax version of this check could never have reached them. */
+  // Seeded, one stream across all 1,080, so the sweep reaches second and third rows.
+  // why: lessons/kit-suggest.md#test-seeded-sweep
   const roundTrip = mkRandom(4242);
   for (const style of ['jazz', 'pop']) {
     for (let root = 0; root < 12; root++) {
@@ -328,19 +259,15 @@ console.log('\n== the draw, which is what stopped it being the argmax ==');
 
 const symOf = (r) => r.picks.map((p) => p.name).join('/');
 
-// 16. 🔴 THE TEMPERATURE IS A STYLE FACT AND IT TRAVELS IN THE TABLE. MEASURED
-//     by `demo/resources/chord-e4-generators.mjs` against this exact shape:
-//     jazz at 3.5 walks ten steps with 53.1 per cent of walks cycling and 7.13
-//     distinct chords, against the real songs' 52.7 and 7.42, and pop at 1.4
-//     reads 87.3 and 4.67 against 89.0 and 4.65. **The same dial that makes jazz
-//     right makes pop wrong**, so a single constant in the module would be the
-//     defect rather than the fix.
+// 16. The temperature travels in the table: jazz 3.5 and pop 1.4 each match real songs, and
+//     one constant would make one of them wrong.
+// why: lessons/kit-suggest.md#test-temperature
 ok('each style carries its own temperature, and they are not the same number',
   STYLES.jazz.temp > 0 && STYLES.pop.temp > 0 && STYLES.jazz.temp !== STYLES.pop.temp,
   `jazz draws at ${STYLES.jazz.temp} and pop at ${STYLES.pop.temp}`);
 
-// 17. 🔴 THE HALF THAT MAKES EVERY OTHER NUMBER REPEATABLE. Two runs on one
-//     seed have to be the same line.
+// 17. Two runs on one seed are the same line.
+// why: lessons/kit-suggest.md#test-repeatable
 {
   const line = (seed) => {
     const rnd = mkRandom(seed);
@@ -356,9 +283,8 @@ ok('each style carries its own temperature, and they are not the same number',
     a !== c, `seed 1 gives ${a.slice(0, 40)}… and seed 2 gives ${c.slice(0, 40)}…`);
 }
 
-// 19. 🔴 AND THE ARGMAX IS STILL REACHABLE, WHICH IS THE CONTROL THE WHOLE PLAN
-//     IS SCORED AGAINST. `temp: 0` is what this file did before 2026-09-25: one
-//     context, one answer, two hundred draws.
+// 19. `temp: 0` is still the argmax: one context, one answer, two hundred draws.
+// why: lessons/kit-suggest.md#test-argmax
 {
   const ctx = [C(2, 'min7'), C(7, '7')];
   const hot = new Set(), cold = new Set();
@@ -373,12 +299,9 @@ ok('each style carries its own temperature, and they are not the same number',
     + `${[...hot].join(', ')}`);
 }
 
-// 20. 🔴 WHAT THE PAGE ACTUALLY DRAWS IS SLOT B, SO THE FIX HAS TO REACH IT.
-//     `/nola/` shows the pointwise-mutual-information pick and not the likeliest
-//     chord, and slot B is chosen from the rows slot A did not take, so a drawn
-//     A moves it. MEASURED over every trigram context in the shipped jazz table:
-//     slot B answers 1.69 different chords a context and moves at all in 68.7
-//     per cent of them, where before it was one chord, always.
+// 20. The page draws slot B, so a drawn A must move it: 1.69 chords a context, moving in
+//     68.7 per cent of trigram contexts.
+// why: lessons/kit-suggest.md#test-slot-b-moves
 {
   const ctx = [C(0, 'maj7'), C(5, 'maj7')];
   const seen = new Set();
@@ -391,11 +314,9 @@ ok('each style carries its own temperature, and they are not the same number',
     seen.size > 1, `after Cmaj7 Fmaj7 the second slot offers ${[...seen].join(', ')}`);
 }
 
-// 21. 🔴 THE COUNT FLOOR IS WHAT HOLDS ATTESTATION AT 96.6 PER CENT AND IT IS IN
-//     THE TABLE RATHER THAN IN THE SAMPLER. `build-chord-tables.mjs` prunes at
-//     `row>=3` and keeps three rows, so there is no tail here to draw from.
-//     MEASURED in the plan: sampling without a floor costs 9.5 points of
-//     attestation for 1.8 bits, which is the same trade pure PMI was refused for.
+// 21. The count floor (`row>=3` in build-chord-tables.mjs) holds attestation at 96.6 per cent;
+//     sampling without it costs 9.5 points for 1.8 bits.
+// why: lessons/kit-suggest.md#test-count-floor
 {
   let widest = 0, n = 0, short = 0;
   for (const st of [STYLES.jazz, STYLES.pop]) {
@@ -408,11 +329,8 @@ ok('each style carries its own temperature, and they are not the same number',
     widest === json.keep && json.keep === 5 && n > 1000,
     `${n} contexts across both styles, the table declares keep ${json.keep} and the `
     + `widest holds ${widest} rows`);
-  /* 🔴 AND THE FLOOR IS STILL DOING THE CUTTING, WHICH IS THE HALF THAT RAISING
-     `KEEP` COULD HAVE QUIETLY UNDONE. `MIN_ROW = 3` means a context with no
-     fourth row seen three times keeps three however high the ceiling goes. If the
-     floor had been dropped instead of the ceiling raised, nearly every context
-     would fill all five slots and this number would collapse. */
+  // `MIN_ROW = 3` must still leave most contexts below the `KEEP` ceiling.
+  // why: lessons/kit-suggest.md#test-floor-cuts
   ok('NEGATIVE CONTROL: most contexts still hold FEWER rows than the ceiling, so the '
     + 'count floor was not what moved',
     short > n * 0.5,
@@ -422,11 +340,9 @@ ok('each style carries its own temperature, and they are not the same number',
 
 console.log('\n== a four chord way home ==');
 
-// 22. 🔴 THE THIRD WORD OF THE COMPLAINT WAS *"not moving anywhere"*, AND THIS
-//     IS THE ONLY PART OF THE ANSWER THAT CHANGES WHAT IS OFFERED RATHER THAN
-//     HOW IT RANKS. MEASURED over 4,000 held-out jazz contexts against this
-//     table's shape: a route exists on 92.7 per cent of them and its transitions
-//     are attested in held-out songs 98.3 per cent of the time.
+// 22. The route changes what is offered: one exists on 92.7 per cent of held-out contexts,
+//     attested 98.3 per cent of the time.
+// why: lessons/kit-suggest.md#test-route
 {
   const r = routeTo({ chords: [C(2, 'min7'), C(7, '7')] }, { style: 'jazz', rnd: mkRandom(3) });
   const last = r.steps[r.steps.length - 1];
@@ -435,9 +351,8 @@ console.log('\n== a four chord way home ==');
     && r.target === '0maj' && r.targetName === last.name,
     `${r.steps.map((c) => c.name).join(' ')} in ${r.keyName}, home to ${r.targetName}`);
 
-  // 23. 🔴 AND EVERY STEP OF IT IS A ROW THE TABLE HOLDS, which is the half that
-  //     says the route is read rather than invented. A beam search over a table
-  //     it did not actually consult would look identical from outside.
+  // 23. Every step of the route is a row the table holds.
+  // why: lessons/kit-suggest.md#test-route-rows
   {
     const st = STYLES.jazz;
     const deg = (root) => (((root - r.tonic) % 12) + 12) % 12;
@@ -457,11 +372,9 @@ console.log('\n== a four chord way home ==');
   }
 }
 
-// 24. 🔴 THE ARGMAX PROBLEM RETURNS ONE LEVEL UP, WHICH IS THE PROOF THE LESSON
-//     IS GENERAL RATHER THAN A PATCH. MEASURED on the shipped shape: the best
-//     path alone puts **72.6 per cent** of its six commonest routes into ii V I
-//     and finds 76 distinct routes, and sampling the path per step drops that to
-//     **18.5 per cent** over 151 routes with attestation unmoved at 98.3.
+// 24. The best path alone sends 72.6 per cent of top routes into ii V I; sampling per step gives
+//     18.5 per cent over 151 routes, attestation unmoved at 98.3.
+// why: lessons/kit-suggest.md#test-route-sampled
 {
   const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
   const many = new Set(), one = new Set();
@@ -496,10 +409,8 @@ console.log('\n== a four chord way home ==');
     `${a.says} / ${b.says}`);
 }
 
-// 27. 🔴 THE SABOTAGE, BECAUSE A DECODER THAT READ GARBAGE WOULD STILL ANSWER.
-//     A table truncated to one record must take the device check red. If it
-//     does not, this whole file is decoration, which is the finding this
-//     repository has recorded four times about its own instruments.
+// 27. NEGATIVE CONTROL: a table truncated to one record must take the device check red.
+// why: lessons/kit-suggest.md#test-sabotage
 {
   const keep = { jazz: STYLES.jazz, pop: STYLES.pop };
   useTables({ ...json,
@@ -522,12 +433,8 @@ ok('and the real table is back in place after the sabotage',
 
 console.log('\n== slot B is drawn too, which is what a player is actually shown ==');
 
-// 🔴 THE FINDING THAT PAID FOR THIS SECTION. `chord-e6-keep.mjs` swept the prune
-//    at 3, 4, 5, 6 and 8 rows and slot B answered EXACTLY 2.00 distinct chords a
-//    context at every one of them, because B is the highest pointwise mutual
-//    information row that A did not take: the PMI top unless A collided with it,
-//    the PMI second when it did. Two values, for any width of table. The plan's
-//    whole lesson had been applied to slot A and slot B is the one on screen.
+// Slot B answered exactly 2.00 chords a context at every prune width, so it is drawn too.
+// why: lessons/kit-suggest.md#test-slot-b-two
 {
   const ctx = [C(0, 'maj7'), C(5, 'maj7')];
   const drawn = new Set(), argmax = new Set();
@@ -548,11 +455,8 @@ console.log('\n== slot B is drawn too, which is what a player is actually shown 
     `${argmax.size} at the argmax against ${drawn.size} drawn, over 200 draws of one context`);
 }
 
-// 🔴 THE BEAM IS A CEILING AND NOT A FILTER, AND RAISING `KEEP` IS WHAT MADE
-//    THAT WORTH ASSERTING. It read 64 while the table kept three rows, where
-//    `3^3` is 27; at five rows the live set is 125, so the old constant would
-//    have thrown the lower half away by probability before the draw saw it and
-//    turned the route quietly back into an argmax.
+// The beam is a ceiling, not a filter: at five rows the live set is 125, above the old 64.
+// why: lessons/kit-suggest.md#test-beam
 {
   const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
   const wide = new Set();
@@ -564,21 +468,15 @@ console.log('\n== slot B is drawn too, which is what a player is actually shown 
 
 console.log('\n== a take, which adapts to what is being played now and forgets ==');
 
-/* 🔴 A TAKE THAT MEETS THE CONTEXT BEING ASKED ABOUT, AND THE FIRST ONE DID NOT.
-   A line in a different corner of the key changes nothing, correctly, and a check
-   written on one reads as the adaptation never having been wired up at all. This
-   is somebody vamping a ii V and going somewhere the table does not expect, three
-   times over, which is the whole case the adaptation exists for. */
+// A take that meets the context being asked about: a ii V going somewhere unexpected, three times.
+// why: lessons/kit-suggest.md#test-take-line
 const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
   C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
   C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
   C(9, 'min7'), C(2, '7'), C(7, 'maj7')];
 
-// 🔴 THE LARGEST SINGLE GAIN IN `plans/plan-better-chords-2026-09-25.md`, section
-//    6.2, MEASURED at +7.44 points of top 1 on full counts and re-measured at
-//    **+6.32 through this table's shape** by `demo/resources/chord-e7-take.mjs`,
-//    against a whole bigram-to-trigram step worth 4.5. It has to actually move
-//    what comes back or none of that reached the page.
+// The take adaptation (+6.32 points of top 1 through this table) must move what comes back.
+// why: lessons/kit-suggest.md#test-take
 {
   const ctx = [C(2, 'min7'), C(7, '7')];
   const before = suggest({ chords: ctx }, { style: 'jazz', temp: 0 });
@@ -590,11 +488,9 @@ const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
     `${names(before)} without it and ${names(after)} after ${take.counted} chords`);
 }
 
-// 🔴 THE RULE THIS PAGE ALREADY PAID FOR, AS A COUNTER RATHER THAN AS A CLAIM.
-//    Reported on `/nola/`: *"you recorded a suggestion. why>"*. A suggester that
-//    learns from its own suggestions writes its own line and calls it yours, so
-//    every chord that can reach the adaptation goes through ONE function that
-//    takes a source and counts what it refused.
+// Every chord that can reach the adaptation goes through one function that takes a source and
+// counts what it refused, so the page's own suggestions are never learned.
+// why: lessons/kit-suggest.md#test-take-source
 {
   const take = mkTake();
   const ctx = [C(2, 'min7'), C(7, '7')];
@@ -614,9 +510,8 @@ const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
     'heard(chord) is refused and heard(chord, \'played\') is counted');
 }
 
-// NEGATIVE CONTROL: the mixing itself, asked directly. A take that never matches
-// the context must hand back exactly the rows it was given, or the adaptation is
-// adding chords nobody played.
+// NEGATIVE CONTROL: a take that never matches hands back exactly the rows it was given.
+// why: lessons/kit-suggest.md#test-mix-none
 {
   const rows = [['0maj', 0.5], ['7dom', 0.3], ['2min', 0.2]];
   const same = adaptRows(rows, ['9aug', '9aug', '9aug', '9aug'], ['0maj', '5maj'], { weight: 0.3 });
@@ -627,24 +522,17 @@ const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
     same.length === rows.length && same.every(([sy], i) => sy === rows[i][0])
     && off.length === rows.length && off.every(([sy], i) => sy === rows[i][0]),
     `${same.length} rows back unchanged, and weight 0 is unchanged too`);
-  /* ⚠️ IT ENTERS AND CLIMBS, IT DOES NOT TAKE OVER, WHICH IS WHAT A WEIGHT OF
-     0.25 MEANS AND WAS WRITTEN OUT WRONG THE FIRST TIME. At 0.3 against a world
-     row holding 0.5 the take's chord cannot reach the top, and asserting that it
-     would have been doing the machine's arithmetic a second time and getting it
-     wrong. What is promised is that a chord the table never offered here is now
-     on the list and above rows it was not in. */
+  // At weight 0.25 the take's chord enters the list and climbs; it does not take the top.
+  // why: lessons/kit-suggest.md#test-mix-climbs
   ok('and a take that HAS met it puts what followed onto the list and above the rest',
     moved.length === rows.length + 1 && moved[1][0] === '11dom'
     && Math.abs(moved.find(([sy]) => sy === '11dom')[1] - 0.3) < 1e-9,
     `${moved.map(([sy, p]) => `${sy} ${(100 * p).toFixed(0)}%`).join('  ')}`);
 }
 
-// 🔴 NOTHING IS STORED, AND SECTION 6.1 REFUSED A PERSISTENT PROFILE ON A
-//    MEASUREMENT: a composer's ENTIRE body of work is worth +0.60 points, and a
-//    stranger's at the same weight reads 0.76 BELOW the baseline. This is
-//    asserted over the module's own source with its comments stripped, because
-//    an absence asserted over raw source grades the prose, which this repository
-//    has already been caught doing twice.
+// Nothing is stored. Asserted over suggest.mjs with its comments stripped, so the prose is
+// not what is graded.
+// why: lessons/kit-suggest.md#test-nothing-stored
 {
   const src = readFileSync(join(HERE, 'suggest.mjs'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
@@ -664,11 +552,8 @@ const TAKE_LINE = [C(2, 'min7'), C(7, '7'), C(3, 'maj7'),
     `${TAKE_LINE.length} chords in, ${kept.length} kept, 0 after clear()`);
 }
 
-// 🔴 THE MIX IS A STYLE FACT AND TRAVELS IN THE TABLE, WHICH IS THE THIRD TIME
-//    THIS PROJECT HAS FOUND THAT. MEASURED: jazz wants 0.25 and pop 0.1, and pop
-//    at 0.25 scores hugely better on top 1 while moving every one of the four
-//    measures AWAY from real pop, which is the plan's own caveat that part of the
-//    gain is music repeating itself rather than anything about a person.
+// The mix weight travels in the table: jazz 0.25, pop 0.1.
+// why: lessons/kit-suggest.md#test-mix-style
 ok('each style carries its own mixing weight, and they are not the same number',
   STYLES.jazz.mix === 0.25 && STYLES.pop.mix === 0.1,
   `jazz mixes a take in at ${STYLES.jazz.mix} and pop at ${STYLES.pop.mix}`);
@@ -677,11 +562,8 @@ ok('each style carries its own mixing weight, and they are not the same number',
 {
   const ctx = { chords: [C(2, 'min7'), C(7, '7')] };
   const take = mkTake();
-  /* ⚠️ THIS TAKE OVERLAPS THE ROUTE'S OWN CONTEXT ON PURPOSE, AND THE FIRST ONE
-     DID NOT. A take of chords the route never passes through changes nothing,
-     correctly, and a check written on one would have read as the adaptation
-     never reaching `routeOver` at all. `Dm7 G7 Em7` round and round makes the
-     trigram the route starts on one the take has met twice. */
+  // This take overlaps the route's own context on purpose, so it can reach `routeOver`.
+  // why: lessons/kit-suggest.md#test-take-route
   for (const c of [C(2, 'min7'), C(7, '7'), C(4, 'min7'),
     C(2, 'min7'), C(7, '7'), C(4, 'min7'),
     C(2, 'min7'), C(7, '7'), C(4, 'min7')]) take.heard(c, 'played');
@@ -695,18 +577,13 @@ ok('each style carries its own mixing weight, and they are not the same number',
 
 console.log('\n== what a chord is counted as, and what slot B may offer alone ==');
 
-// 🔴 REPORTED 2026-09-30 AS *"still not a good sounding suggestion"*, over the
-//    lanes `Fmaj`, `Cmaj7` and a proposal of `C#dim7`. Three defects were found
-//    under it and every check below was run against the code before the repair
-//    and went red there, except the two marked as controls that must stay green
-//    on both sides. The counts are in `BACKLOG.md` under the entry that asked.
+// Three defects behind one report; every check below went red before the repair, except the
+// two controls. Counts in BACKLOG.md.
+// why: lessons/kit-suggest.md#test-report-0930
 
-// 29. 🔴 EVERY QUALITY IS COUNTED UNDER THE CLASS THE TABLE WAS BUILT WITH, AND
-//     THE SOURCE IT IS GRADED AGAINST IS THE BUILD'S OWN `classOf`, NOT
-//     `suggest.mjs`'s MAP. That map held eleven rows for the twenty six qualities
-//     `parseChord` returns, and the other fifteen fell through to major. Read off
-//     `suggest().from`, which is the symbol the table was actually asked about,
-//     so it grades the path a played or typed chord takes rather than a lookup.
+// 29. Every quality is counted under the class the table was built with, graded against the
+//     build's own `classOf`, read off `suggest().from`.
+// why: lessons/kit-suggest.md#test-classes
 {
   const QS = [...new Set([...QUALITIES.map(([n]) => parseChord(`C${n}`)),
     ...RECOGNISED.map(([n]) => parseChord(`C${n}`))].filter((c) => c.ok).map((c) => c.quality))];
@@ -730,31 +607,24 @@ console.log('\n== what a chord is counted as, and what slot B may offer alone ==
     wrong.join(', ') || `${QS.length} qualities, all agreeing with the build's classOf`);
 }
 
-// 30. NEGATIVE CONTROL for the exceptions above: they are exceptions because the
-//     build's classifier really does get them wrong, not because a row is missing
-//     here. `2` starts with a digit and that regex calls every such quality a
-//     dominant; `add9` it cannot class at all. And this file reads them as the
-//     chords they are.
+// 30. NEGATIVE CONTROL: `2` and `add9` are where the build's classifier is wrong, not this file.
+// why: lessons/kit-suggest.md#test-class-exceptions
 ok('NEGATIVE CONTROL: `2` and `add9` are the two places the build classifier is wrong, and this is not',
   classOf('2') === 'dom' && classOf('add9') === null
   && String(suggest({ chords: [C(0, 'maj'), C(2, '2')] }, { style: 'jazz', temp: 0 }).from) === '2sus'
   && String(suggest({ chords: [C(0, 'maj'), C(2, 'add9')] }, { style: 'jazz', temp: 0 }).from) === '2maj',
   `classOf says ${classOf('2')} and ${classOf('add9')}`);
 
-// 31. And the device the build's own round trip asks about by name reaches the
-//     table as that device. `C#dim7` after `Cmaj7` is the passing chord to Dm7,
-//     91 per cent of the time in the jazz table, and it was asked about as a
-//     second major chord a semitone up.
+// 31. `C#dim7` after `Cmaj7` reaches the table as the passing chord to Dm7.
+// why: lessons/kit-suggest.md#test-passing-dim
 {
   const r = suggest({ chords: [C(0, 'maj7'), C(1, 'dim7')] }, { style: 'jazz', temp: 0, bTemp: 0 });
   ok('Cmaj7 C#dim7 is read as a passing chord, so the table answers Dm7',
     r.from === '1dim' && r.picks[0]?.name === 'Dmin7', `${r.from}, then ${names(r)}`);
 }
 
-// 32. 🔴 NO CHORD THE TABLE COUNTED HAS A FREQUENCY OF ZERO. Slot B divides by
-//     it. The linear column stores 46 jazz and 57 pop symbols as exactly 0, every
-//     diminished chord among them, and a zero read as a millionth gave each of
-//     them about 17 bits of specificity.
+// 32. No counted chord has a frequency of zero: slot B divides by it.
+// why: lessons/kit-suggest.md#test-zero-freq
 {
   const zero = [];
   for (const st of ['jazz', 'pop']) {
@@ -767,9 +637,8 @@ ok('NEGATIVE CONTROL: `2` and `add9` are the two places the build classifier is 
     zero.length === 0, zero.length ? `${zero.length}: ${zero.slice(0, 6).join(', ')}` : 'every offered symbol has one');
 }
 
-// 33. And the frequency it has is the counted one, which a floor would not give.
-//     `8dim` is 70 of 52,924 jazz chords, MEASURED 2026-09-30 off the cached iRb
-//     corpus; the log column holds it to a fifth of a bit.
+// 33. The frequency is the counted one: `8dim` is 70 of 52,924 jazz chords.
+// why: lessons/kit-suggest.md#test-counted-freq
 {
   const u = STYLES.jazz.uni.get('8dim');
   const want = 70 / 52924;
@@ -777,9 +646,8 @@ ok('NEGATIVE CONTROL: `2` and `add9` are the two places the build classifier is 
     Math.abs(u / want - 1) < 0.08, `8dim ${u.toExponential(3)} against ${want.toExponential(3)} counted`);
 }
 
-// 34. 🔴 THE REPORT ITSELF. After `Fmaj Cmaj7` the page shows slot B, and it was
-//     `C#dim7` in 75 of 100 draws: a passing chord offered alone, which is the
-//     middle of a move and sounds like a question with no answer.
+// 34. After `Fmaj Cmaj7` slot B must not offer a passing chord alone.
+// why: lessons/kit-suggest.md#test-the-report
 {
   const ctx = [C(5, 'maj'), C(0, 'maj7')];
   const rnd = mkRandom(42);
@@ -811,10 +679,8 @@ ok('NEGATIVE CONTROL: `2` and `add9` are the two places the build classifier is 
     n > 1000 && dim === 0, `${dim} of ${n}`);
 }
 
-// 36. NEGATIVE CONTROL, AND IT IS WHAT KEEPS THE FIX NARROW. The chord is still
-//     in the table and slot A still draws it, so a walk and a way home can pass
-//     through it with the chord after it. A repair that deleted diminished rows
-//     would pass 34 and 35 and fail this.
+// 36. NEGATIVE CONTROL: the passing chord stays in the table and slot A still draws it.
+// why: lessons/kit-suggest.md#test-narrow
 {
   const ctx = [C(5, 'maj'), C(0, 'maj7')];
   const rows = rowsFor(STYLES.jazz, ['0maj', '7maj']).rows.map(([s]) => s);

@@ -1,25 +1,7 @@
-// demo/shell/link-options-test.mjs: a video link's size and rate, with no
-// browser, no socket and no board.
-//
+// demo/shell/link-options-test.mjs: a video link's size and rate, no browser, socket or board.
 //   node demo/shell/link-options-test.mjs
-//
-// What is graded: the option table, the refusals in words, the text form
-// round trip through `bay.mjs`'s `parseLink`/`printLink`, that the bay stores
-// and refuses options per medium, and that a link with no options asks the
-// board for exactly the message `openers.mjs` hard coded before.
-// What is NOT graded here: `openers.mjs`'s `video()` itself, which needs a
-// document, a WebSocket and a board. Its one claim gradable from source (no
-// literal size left in it) is asserted over code with the comments stripped.
-//
-// NEGATIVE CONTROLS: 13 of them, each a value or a line that must be refused,
-// and each asserts the REASON, because a checker that refuses everything for
-// one reason is the same bug from the other side.
-// MEASURED 2026-10-09 against 34 green, one fault at a time on a scratch copy:
-//   range check removed in checkOptions            6 of 34 red
-//   even check removed                             1 of 34 red
-//   bay.mjs validate ignores checkOptions          4 of 34 red
-//   checkOptions ignores the medium                2 of 34 red
-//   default width changed to 1920                  2 of 34 red
+// 13 negative controls, each asserting the refusal's reason; openers.mjs `video()` is not graded.
+// why: lessons/kit-link-options.md#test-header
 
 import { readFileSync } from 'node:fs';
 import { LINK_OPTIONS, OPTION_NAMES, isOption, checkOptions, resolveOptions, videoStart }

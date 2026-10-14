@@ -1,22 +1,7 @@
-// demo/shell/param-knobs-test.mjs: the knob row's arithmetic, with no browser.
-//
-//   node demo/shell/param-knobs-test.mjs
-//
-// 🔴 WHAT THIS CAN AND CANNOT GRADE. `createParamKnobs` needs a `document`, so
-// the row, the rebuild and the value kept across a recompile are graded on
-// `/kit/`, `/collide/` and `/fau/`. What is graded here is `mapSpec`,
-// `unmapSpec` and `placesFor`, against numbers worked out by hand from
-// `ControlSpec` and its warps in SuperCollider's `Spec.sc` (read at 19954900),
-// which is a different source from this file's own arithmetic.
-//
-// 🔴 NEGATIVE CONTROLS, per this directory's convention: a linear map passes
-// every check at the ends of an exponential range, because both warps agree
-// there, so the middle is what separates them. MEASURED 2026-09-30, 14 ok,
-// then three sabotaged copies of the module (`PK_MODULE=<path>`):
-//
-//   `exp` mapped as `lin`                      2 red, the middle and the round trip
-//   the step never applied                     1 red, the step check
-//   places from the linear rule on `exp`       1 red, the release's 0.05
+// The knob row's arithmetic with no browser: node demo/shell/param-knobs-test.mjs
+// mapSpec, unmapSpec and placesFor against hand-worked Spec.sc numbers; the row itself is
+// graded on /kit/, /collide/ and /fau/. Sabotage with PK_MODULE=<path>.
+// why: lessons/kit-param-knobs.md#test-header
 
 const M = await import(process.env.PK_MODULE || './param-knobs.mjs');
 const { mapSpec, unmapSpec, placesFor } = M;

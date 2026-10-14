@@ -1,31 +1,6 @@
-// demo/shell/numloop-test.mjs. The ten slot looper's arithmetic, no browser.
-//
-// 🔴 WHY THIS EXISTS BEFORE THE PAGE DOES. Asked 2026-09-23: *"can make a
-// separate tmp demo too get it right 'num'"*, and the part worth getting right
-// first is not the drawing, it is a four state machine with ten instances and a
-// timing window in it. `looper.mjs` and `name.mjs` are both graded this way for
-// the same reason: everything that can be wrong here is wrong with no pixels
-// involved.
-//
-// 🔴 THE SABOTAGE COUNTS ARE MEASURED RATHER THAN CLAIMED, 2026-09-25, WHICH IS
-// THE ONLY REASON TO BELIEVE ANY OF THE TEMPO AND ALIGNMENT SECTION GRADES
-// ANYTHING. Baseline **36 ok, 0 failed**. Five deliberate breakages:
-//   `snapRatio` never snapping, always keeping the raw lap ....... **6 red**
-//   `detectBpm` answering 120 whatever it was shown ............... **4 red**
-//   the unit released with the slot that set it ................... **1 red**
-//   `1/3` and `3` added to `RATIOS` ............................... **2 red**
-//   `quantiseTimes` defaulting to full strength ................... **1 red**
-// ⚠️ THE ONES THAT TAKE ONLY ONE RED ARE REPORTED RATHER THAN TUNED AWAY. Each
-// is a single decision with a single check behind it, and adding a second check
-// that says the same thing twice would raise the number without raising the
-// coverage. `circuit-sample-test.mjs` reports the same shape for the same reason.
-//
-// 🔴 AND THE FIRST RUN OF SECTION 19 WENT RED ON A REAL DEFECT RATHER THAN ON A
-// BAD EXPECTATION. `enter` returns early when a state is not changing, so a slot
-// already reading `empty` that still held a lap kept it and the unit outlived
-// every loop in the bank. `clear` forgets the lap unconditionally now. The check
-// was written to drive the module the way no page does, and that is what found
-// it: a contract that holds only while one caller is careful is not a contract.
+// demo/shell/numloop-test.mjs: the ten slot looper's arithmetic, no browser.
+// Sabotage measured: five deliberate breakages each turn this red (6, 4, 1, 2 and 1 reds).
+// why: lessons/kit-numloop.md#test-header
 
 import {
   createNumLoop, NEXT, STATES,
@@ -51,13 +26,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   n.destroy();
 }
 
-// 2. and it goes on toggling for ever rather than cycling back to empty
-//    ⚠️ THE CLAIM IS THE SET, NOT THE PARTICULAR STATE, and the first version of
-//    this check asserted `looping` at nine presses and went red. It walks
-//    recording, looping, stopped and then alternates, so an odd press after the
-//    first two is a STOP. Writing the expected state out by hand is doing the
-//    machine's arithmetic a second time and getting it wrong; what is actually
-//    promised is that it never falls out of the pair.
+// 2. and it goes on toggling for ever rather than cycling back to empty.
+// The claim is the set {looping, stopped}, not a particular state per press.
+// why: lessons/kit-numloop.md#test-2-toggle
 {
   const n = createNumLoop();
   const after = [];
@@ -90,14 +61,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   n.destroy();
 }
 
-// 5. 🔴 THE TRAP. A double press must not WALK the machine on the way, which is
-//    what a naive wiring to `click` does: the browser fires click twice before
-//    dblclick, so an unheld press would record and then stop into a loop first.
-//    ⚠️ AND THIS CHECK REVERSED ON 2026-09-23. It read `a double press on an
-//    empty slot clears it and never records`, and a double press on an empty
-//    slot now RECORDS, because *"when doubleclick on empty slot, it stops others
-//    possible loops playing and starts rec"*. What it still has to prove is that
-//    it reaches recording in ONE step rather than by walking the whole cycle.
+// 5. A double press must not walk the machine: click fires twice before dblclick. On an empty slot it
+// reaches recording in one step.
+// why: lessons/kit-numloop.md#test-5-double
 {
   const seen = [];
   const n = createNumLoop({ doubleMs: 40, onEnter: (i, s) => seen.push(s) });
@@ -150,8 +116,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   n.destroy();
 }
 
-// 8. 🔴 THE COST, ASSERTED RATHER THAN DESCRIBED. Every single press is late by
-//    the window, and a page that hid that would feel broken.
+// 8. The cost, asserted: every single press is late by the window.
+// why: lessons/kit-numloop.md#test-8-cost
 {
   const seen = [];
   const n = createNumLoop({ doubleMs: 50, onEnter: (i, s) => seen.push(s), onTouch: () => seen.push('touch') });
@@ -164,11 +130,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   n.destroy();
 }
 
-// 8b. 🔴 AND `pending` IS ALREADY TRUE INSIDE `onTouch`, which is what a page
-//     paints its lamp from. The first version called `onTouch` before booking
-//     the press, so a page reading `pending()` there saw false and the key never
-//     lit. `/num/` found it on its first run; this is the check that keeps it
-//     found.
+// 8b. pending() is already true inside onTouch, which a page paints its lamp from.
+// why: lessons/kit-numloop.md#test-8b-pending
 {
   let sawPending = null;
   const n = createNumLoop({ doubleMs: 40, onTouch: (i) => { sawPending = n2.pending(i); } });
@@ -220,17 +183,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('a looper with no numbers refuses to be built', threw, threw ? 'threw' : 'built one');
 }
 
-// ── THE TEMPO AND THE ALIGNMENT, 2026-09-25 ───────────────────────────────
-//
-// 🔴 THE ASSERTS BELOW ASK WHAT HAS HAPPENED, COUNTED, AND THAT IS NOT A STYLE
-// CHOICE. `/loops/` shipped *"quietly not looping"*: the page never called
-// `servo()`, so a wrap *"was neither committed nor polled: it simply never
-// happened"*, and **"the assert that should have caught it was tolerant of 'not
-// reached yet' and passed vacuously every run"**. On this subject, twice.
-// ✅ SO TWO LOOPS ARE ALIGNED WHEN THEIR WRAPS COINCIDE, COUNTED OVER A SPAN.
-// `wrapsIn` is deliberately NOT the snapping arithmetic written out again: it
-// knows nothing about ratios, units or tempo, it multiplies a lap and counts.
-// A test that recomputed `snapRatio` would prove only that it is deterministic.
+// Tempo and alignment: two loops are aligned when their wraps coincide, counted over a span.
+// wrapsIn only multiplies a lap and counts; it does not repeat the snapping arithmetic.
+// why: lessons/kit-numloop.md#test-tempo-section
 
 /** every moment a loop of this lap comes round inside a span, t=0 excluded */
 const wrapsIn = (spanMs, lapMs) => {
@@ -253,7 +208,8 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
   n.destroy();
 }
 
-// 14. 🔴 AND THE HONEST ANSWER TO A TAKE WITH NO RHYTHM IN IT IS NOT 120.
+// 14. The answer to a take with no rhythm in it is not 120.
+// why: lessons/kit-numloop.md#test-14-no-rhythm
 {
   const one = createNumLoop();
   one.fitLap(0, 1500, { onsets: [0] });
@@ -267,10 +223,9 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
   one.destroy(); silence.destroy();
 }
 
-// 15. 🔴 THE CHANCE FLOOR UNDER `fit`, MEASURED RATHER THAN ASSERTED IN A
-//     COMMENT. `TOL` covers `2 * TOL` of the space between two beats, so a take
-//     with no rhythm in it scores about `CHANCE` by luck. If random takes passed
-//     `MIN_FIT` often, every claim of a detected tempo would be worth nothing.
+// 15. The chance floor under fit, measured: TOL covers 2 * TOL of a beat, so random takes score about
+// CHANCE and must rarely pass MIN_FIT.
+// why: lessons/kit-numloop.md#test-15-chance
 {
   let seed = 0x9e3779b9;
   const rnd = () => { seed |= 0; seed = seed + 0x6d2b79f5 | 0;
@@ -292,9 +247,8 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
     + `mean fit ${meanFit.toFixed(2)} against a chance floor of ${CHANCE.toFixed(2)} and a threshold of ${MIN_FIT}`);
 }
 
-// 16. 🔴 THE HEART OF THE ASK, AND IT IS COUNTED WRAPS RATHER THAN A RATIO
-//     COMPARED TO ITSELF. Two aligned loops come round together for ever; two
-//     unaligned ones meet at their common multiple and nowhere else.
+// 16. Aligned loops come round together for ever; unaligned ones meet only at their common multiple.
+// why: lessons/kit-numloop.md#test-16-wraps
 {
   const n = createNumLoop();
   const first = n.fitLap(0, 2000, { onsets: [0, 500, 1000, 1500] });
@@ -332,9 +286,8 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
   n.destroy();
 }
 
-// 17. 🔴 A TAKE TOO FAR FROM ANY ALLOWED RATIO IS REFUSED, NOT CRUSHED, AND IT
-//     SAYS WHY. Both refusals matter: one outside the span and one in the gap
-//     between two ratios, which is what `MAX_STRETCH` exists to reach.
+// 17. A take too far from any allowed ratio is refused with a reason: outside the span, and in a gap.
+// why: lessons/kit-numloop.md#test-17-refused
 {
   const n = createNumLoop();
   n.fitLap(0, 2000, { onsets: [0, 500, 1000, 1500] });
@@ -349,9 +302,8 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
   n.destroy();
 }
 
-// 18. 🔴 THE RATIO SET IS THE DECISION, AND A TRIPLET LENGTH IS REFUSED RATHER
-//     THAN QUIETLY BECOMING A QUARTER. This is what choosing powers of two COSTS,
-//     asserted so nobody has to take the header's word for it.
+// 18. Powers of two only, so a triplet length is refused rather than becoming a quarter.
+// why: lessons/kit-numloop.md#test-18-triplet
 {
   ok('NEGATIVE CONTROL: every allowed ratio is a power of two, so nothing here can snap to a third',
     RATIOS.length === 5 && RATIOS.every((x) => Number.isInteger(Math.log2(x.r))),
@@ -362,9 +314,8 @@ const together = (a, b) => { const s = new Set(b); return a.filter((t) => s.has(
     `a third of the unit came back ${third.snapped ? `snapped to ${third.lap}` : `refused at ${third.lap} ms`}`);
 }
 
-// 19. 🔴 WHAT HAPPENS TO THE UNIT WHEN THE FIRST LOOP IS CLEARED, WHICH IS THE
-//     DECISION THE BACKLOG ENTRY ASKED TO BE MADE OUT LOUD. It survives, and the
-//     proof is a later take still snapping to it, counted as a ratio.
+// 19. The unit survives clearing the first loop; a later take still snaps to it.
+// why: lessons/kit-numloop.md#test-19-unit
 {
   const n = createNumLoop();
   n.fitLap(0, 2000, { onsets: [0, 500, 1000, 1500] });

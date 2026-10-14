@@ -1,29 +1,7 @@
-// demo/shell/step-grid-test.mjs
-// The pad grid's arithmetic and its refusals, with no browser.
-//
-//   node demo/shell/step-grid-test.mjs
-//
-// 🔴 FIVE PURE FUNCTIONS AND ONE REFUSAL, AND THE REFUSAL IS THE ONE WORTH
-// RUNNING. A grid that plays is claiming a tempo, and `/pack/` has none to
-// claim because nothing in a Circuit session names one. `createStepGrid` throws
-// on a rate with no owner, and that is the only thing in this file that needs
-// a document to be absent rather than present.
-//
-// ⚠️ WHAT IS NOT GRADED HERE, SAID PLAINLY BECAUSE A GREEN SUITE CAN MEAN ZERO
-// COVERAGE. Nothing below draws a pad. `/tom/` grades the real thing against a
-// real pack, and `/kit/` grades the two shapes side by side:
-//   - that the label column and the steps really share one pitch, top and
-//     bottom, which `/tom/` asserts over 64 rows
-//   - that a stroke paints every pad it crosses with one value, which `/tom/`
-//     drives with real pointer events including the negative half
-//   - that an arrow moves focus and does NOT reach the transport
-//   - that a read only grid has no tab stop, no hover lift and no focus ring
-//   - that the parked head lifts a pad's field and the playing one replaces it
-//
-// 🔴 AND THE FIVE SETTLED EDGES ARE CHECKED AS TEXT, WHICH IS THE ONLY CHEAP
-// WAY. Each one is an absence somebody asked for and reported separately, and
-// an absence is exactly what a rewrite puts back. Reading the stylesheet for a
-// border that should not be there costs one command.
+// demo/shell/step-grid-test.mjs: the pad grid's arithmetic and its refusals, no browser
+// (node demo/shell/step-grid-test.mjs). Nothing here draws a pad: /tom/ and /kit/ grade that.
+// The refusal of a rate with no owner is the check that matters; the settled edges are read as CSS text.
+// why: lessons/kit-step-grid.md#test-header
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,14 +16,8 @@ const src = fs.readFileSync(path.join(HERE, 'step-grid.mjs'), 'utf8');
 const css = fs.readFileSync(path.join(HERE, 'shell.css'), 'utf8');
 
 /**
- * The module with its prose taken out.
- *
- * ⚠️ IT EXISTS BECAUSE TWO OF THE CHECKS BELOW WENT RED ON THE MODULE'S OWN
- * HEADER. `step-grid.mjs` explains at length that it has no `AudioContext` and
- * that `setPointerCapture` is the obvious thing and is wrong here, so a search
- * for either string over the whole file finds the explanation and calls it the
- * defect. A guard on a substring is this project's named hazard and this is it
- * in its cheapest form, twice in one afternoon.
+ * The module with its comments taken out, so a search for a string does not find its explanation.
+ * why: lessons/kit-step-grid.md#test-code
  */
 const code = src
   .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -66,10 +38,8 @@ ok('the gutters are taken off before dividing, not after',
   cellSize(658, 16) === Math.floor((658 - 15 * PAD_GAP) / 16),
   `${PAD_GAP} px between, 15 of them`);
 
-/* 🔴 THE FLOOR IS THE WHOLE REASON THIS IS A FUNCTION. Without it a narrow box
-   gives a pad of zero or a negative width, which draws nothing at all and looks
-   like a grid that failed to build rather than one that needs scrolling.
-   MEASURED: 64 steps at a phone's 360 px is 3 px a pad before the floor. */
+// The floor: 64 steps at a phone's 360 px is 3 px a pad before it, which looks like a failed build.
+// why: lessons/kit-step-grid.md#test-cell-floor
 ok('a box too narrow for the steps gives the floor rather than a pad of nothing',
   cellSize(360, 64) === PAD_MIN && cellSize(0, 16) === PAD_MIN
   && cellSize(-50, 16) === PAD_MIN,
@@ -89,9 +59,8 @@ ok('a position lands in the step that holds it',
   stepAt(0, 125, 16) === 0 && stepAt(124, 125, 16) === 0
   && stepAt(125, 125, 16) === 1 && stepAt(1999, 125, 16) === 15);
 
-/* 🔴 CLAMPED AT BOTH ENDS. A position past the last step indexing to step `n`
-   would run off the pads and quietly stop drawing a head at the one moment a
-   reader is watching for it. */
+// Clamped at both ends, or the head stops drawing past the last step.
+// why: lessons/kit-step-grid.md#test-step-clamp
 ok('a position off either end is the nearest step and never off the grid',
   stepAt(-1000, 125, 16) === 0 && stepAt(8000, 125, 16) === 15
   && stepAt(2000, 125, 16) === 15);
@@ -118,19 +87,16 @@ ok('Home and End go to the ends of this row, not of the grid',
   rovingNext('Home', 2, 9, 8, 16).join() === '2,0'
   && rovingNext('End', 2, 9, 8, 16).join() === '2,15');
 
-/* 🔴 IT CLAMPS AND NEVER WRAPS, which is a decision. An arrow that wrapped from
-   the last step of a row to the first of the next reads as the focus jumping,
-   and on a 64 row grid it means holding a key walks the whole instrument. */
+// It clamps and never wraps: wrapping reads as focus jumping.
+// why: lessons/kit-step-grid.md#test-roving-clamp
 ok('an arrow at an edge stays where it is rather than wrapping to the next row',
   rovingNext('ArrowRight', 0, 15, 8, 16).join() === '0,15'
   && rovingNext('ArrowLeft', 0, 0, 8, 16).join() === '0,0'
   && rovingNext('ArrowUp', 0, 5, 8, 16).join() === '0,5'
   && rovingNext('ArrowDown', 7, 5, 8, 16).join() === '7,5');
 
-/* 🔴 EVERY OTHER KEY HAS TO COME BACK `null`, because the handler lets anything
-   it does not answer BUBBLE to the transport bar's own keyboard table. A
-   function that answered a position for an unknown key would swallow the space
-   that plays. */
+// Every other key comes back null and bubbles to the transport bar, or the space that plays is swallowed.
+// why: lessons/kit-step-grid.md#test-roving-null
 ok('NEGATIVE CONTROL: any other key is not this function\'s business',
   rovingNext(' ', 0, 0, 8, 16) === null
   && rovingNext('Enter', 0, 0, 8, 16) === null
@@ -142,10 +108,8 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
   const over = Array.from({ length: 64 }, (_, s) => marksAt(s));
   const beats = over.filter((m) => m.beat).length;
   const bars = over.filter((m) => m.bar).length;
-  /* ⚠️ THE MARKS SURVIVE A CHANGE OF STEP COUNT, which is the thing that would
-     quietly stop meaning anything. A beat every 4 and a bar every 16 describe
-     four bars over 64 and ONE bar over 16, and both are true statements about
-     the grid rather than decoration that happens to land. */
+  // The marks hold at any step count: a beat every 4, a bar every 16.
+  // why: lessons/kit-step-grid.md#test-marks
   ok('every fourth step is a beat and every sixteenth is a bar',
     beats === 16 && bars === 4 && over[0].beat && over[0].bar && !over[1].beat,
     `over 64 steps: ${beats} beats and ${bars} bars`);
@@ -154,14 +118,9 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
     short.filter((m) => m.beat).length === 4 && short.filter((m) => m.bar).length === 1);
 }
 
-// ── the refusal ────────────────────────────────────────────────────────────
-//
-// 🔴 THIS IS THE ONE THAT MATTERS AND IT IS WHY A COMPONENT WITH A DOCUMENT IN
-// IT IS BEING CALLED FROM NODE AT ALL. A grid that plays is claiming a tempo,
-// and the day before this component existed `/pack/` shipped with no play
-// button precisely because NOTHING IN A CIRCUIT SESSION NAMES ONE. So a rate
-// arrives with an owner or it does not arrive, and the check runs before any
-// DOM is touched, which is what makes it reachable here.
+// The refusal: a grid that plays claims a tempo, and nothing in a Circuit session names one. A rate arrives
+// with an owner or not at all, checked before any DOM is touched.
+// why: lessons/kit-step-grid.md#test-refusal
 {
   let threw = null;
   try { createStepGrid({ strip: {}, rows: 4, steps: 16, rate: { bpm: 120 } }); }
@@ -176,11 +135,8 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
     !!noStrip && /strip/.test(noStrip), noStrip || 'it did not throw');
 }
 
-// ── the five settled edges, read off the stylesheet ────────────────────────
-//
-// 🔴 EACH ONE IS AN ABSENCE SOMEBODY ASKED FOR AND REPORTED SEPARATELY, AND AN
-// ABSENCE IS EXACTLY WHAT A REWRITE PUTS BACK. The reports are in the module
-// header; these read the rules for the shapes that must not be there.
+// The five settled edges, read off the stylesheet: each is an absence a rewrite would put back.
+// why: lessons/kit-step-grid.md#test-settled-edges
 {
   const block = css.slice(css.indexOf('/* ── step grid'), css.indexOf('/* The set, and its name'));
 
@@ -242,29 +198,23 @@ ok('NEGATIVE CONTROL: any other key is not this function\'s business',
   ok('the live attribute is deleted rather than set empty, because [data-live] matches on presence',
     /delete rowsEl\.dataset\.live/.test(src));
 
-  /* 🔴 THE STEP AXIS IS NUMBERED IN BEATS AND NOT IN STEPS, AND IT IS A
-     DECISION RATHER THAN A DETAIL. A number under every one of 64 steps in a
-     26 px cell is this project's wrapping table heading in a new costume, and
-     `positron-ui` is explicit that a heading which does not fit is the AUTHOR's
-     problem rather than something to shrink at the reader. */
+  // The step axis is numbered in beats: a number under each of 64 steps in a 26 px cell does not fit.
+  // why: lessons/kit-step-grid.md#test-ruler-beats
   ok('the ruler numbers the beats, and only when a caller asks for numbers at all',
     /if \(!ticks\) return '';/.test(code)
     && /m\.beat && beat > 0 \? String\(Math\.floor\(s \/ beat\) \+ 1\)/.test(code),
     'ticks off is the empty string, ticks on is one number a beat');
 
-  /* 🔴 THE LAMP'S TWO HALVES ARE DECLARED IN THIS FILE ONCE EACH, and the fall
-     reaches `shell.css` as a custom property rather than as a second copy of
-     the number. `shell.css` has repaired that shape twice, as `--sld-col` and
-     as `--ctl-gap`. */
+  // Rise and fall are declared once here; the fall reaches shell.css as --pg-fall, not a second copy.
+  // why: lessons/kit-step-grid.md#test-lamp
   ok('the fall is longer than the rise, and both numbers live only here',
     FALL_MS > RISE_MS && /setProperty\('--pg-fall'/.test(code)
     && /transition:box-shadow \$\{RISE_MS\}ms/.test(code)
     && /var\(--pg-fall, 320ms\)/.test(css) && !/box-shadow 320ms/.test(css),
     `${RISE_MS} ms up and ${FALL_MS} ms down, the fall published as --pg-fall`);
 
-  /* ⚠️ THE NUMBER ONLY MEANS ANYTHING AS A FRACTION OF A STEP. At 120 beats a
-     minute with four to a beat a step is 125 ms, so 320 ms was 2.6 steps of
-     tail and the third column behind the head was still visibly lit. */
+  // A step is 125 ms at 120 bpm with four to a beat, so 320 ms was 2.6 steps of tail.
+  // why: lessons/kit-step-grid.md#test-fall-fraction
   ok('the fall is under a step and a half at the tempo the kit runs at',
     FALL_MS / stepMsFor(120, 4) < 1.6 && 320 / stepMsFor(120, 4) > 2.5,
     `${FALL_MS} ms is ${(FALL_MS / stepMsFor(120, 4)).toFixed(2)} steps of a `

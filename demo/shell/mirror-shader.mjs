@@ -1,11 +1,7 @@
-// demo/shell/mirror-shader.mjs: /shader/mirror/'s kaleidoscope with its
-// feedback tap, as an engine: a WebGL2 canvas, a program built from text, and
-// one frame drawn per `render(segments)`. Lifted 2026-10-14 from that page for
-// /connect/ (plans/plan-connect-ui.md, the convergence rule). /shader/remote/
-// still carries its own copy.
-//
-// The text is /mirror/'s, and why it is what it is is written on
-// /shader/mirror/ beside the knob that turns it.
+// demo/shell/mirror-shader.mjs: /shader/mirror/'s kaleidoscope with its feedback tap, as an engine:
+// a WebGL2 canvas, a program built from text, one frame per `render(segments)`. /shader/remote/
+// still has its own copy; why the text is what it is lives on /shader/mirror/.
+// why: lessons/kit-mirror-shader.md#header
 
 export const MIRROR_VS = `#version 300 es
 void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);

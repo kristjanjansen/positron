@@ -1,11 +1,7 @@
-// demo/shell/synth-params.mjs: the parameters a synth voice takes, as knobs.
-// Split 2026-10-14 out of demo/synth/patch-synth.mjs (plans/plan-connect-ui.md
-// slice 2): only what the /connect/ synth's five parameters need, the pitch
-// arithmetic, the exponential knob travel and the readings. patch-synth.mjs
-// still holds its own copy until it moves onto this file (the page-move list
-// at the end of the plan).
-//
+// demo/shell/synth-params.mjs: the parameters a synth voice takes, as knobs: pitch
+// arithmetic, exponential knob travel and readings for the /connect/ synth.
 // Pure and import free, so node-runtime.mjs and its test can read the names.
+// why: lessons/kit-synth-params.md#header
 
 export const WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
 export const hz = (n) => 440 * 2 ** ((n - 69) / 12);

@@ -1,18 +1,7 @@
-// demo/shell/xr-glb-test.mjs — the controller models, read with no browser.
-//
-//   node demo/shell/xr-glb-test.mjs
-//
-// 🔴 THE READER IS THE HALF A HEADSET CANNOT GRADE. A model that parses into
-// the wrong triangles draws a shape, and a shape in a headset looks like a
-// shape — this is `mirror`'s "ask the picture the right question" one level
-// earlier. Here the question is asked of the bytes, against the real vendored
-// files, with the answers checked for things a wrong parse cannot produce: a
-// bounding box the size of a real controller, a surface that is actually
-// closed, normals that are unit length, and texture coordinates inside 0..1.
-//
-// ⚠️ AND FIVE OF THESE ARE NEGATIVE CONTROLS built by CORRUPTING the real file,
-// because `readGLB` exists to REFUSE what it cannot read and a refusal nobody
-// has seen refuse is a hope. Each one breaks a different clause.
+// The controller models read with no browser: node demo/shell/xr-glb-test.mjs
+// Checks what a wrong parse cannot produce (controller size, closed surface, unit normals,
+// uvs in 0..1); five negative controls corrupt the real file.
+// why: lessons/kit-xr-glb.md#test-header
 
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -48,10 +37,8 @@ for (const hand of ['left', 'right']) {
      `${s.bytes} bytes · ${s.nodes} nodes · ${s.meshes} meshes drawn · ${s.primitives} primitives`
      + ` · ${m.count} vertices · parsed in ${ms.toFixed(1)} ms`);
 
-  // 🔴 IS IT THE SIZE OF A CONTROLLER? A parse that reads the right number of
-  // floats out of the wrong offsets still produces a cloud of points; what it
-  // cannot produce is a cloud 10-25 cm across. This is the assert that would
-  // catch a stride or endianness mistake, and nothing else here would.
+  // A cloud 10 to 25 cm across is what catches a stride or endianness mistake.
+  // why: lessons/kit-xr-glb.md#test-size
   let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < m.positions.length; i += 3) {
     for (let k = 0; k < 3; k++) {
@@ -99,9 +86,8 @@ for (const hand of ['left', 'right']) {
      `${m.count} vertices · ${m.normals.length / 3} normals · ${m.uvs.length / 2} uvs`);
 }
 
-// 🔴 THE TWO HANDS ARE DIFFERENT MODELS, and it is worth one line: a loader
-// that keyed both hands to one file would look completely correct in a headset
-// held in one hand, and be a mirror-image controller in the other.
+// The two hands are different models; one file for both is a mirror image in one hand.
+// why: lessons/kit-xr-glb.md#test-two-hands
 {
   const l = readGLB(raw.left), r = readGLB(raw.right);
   ok('the left and right models are genuinely different files',
@@ -150,13 +136,8 @@ for (const hand of ['left', 'right']) {
   refused('an eight-byte file is refused', bad, '8 bytes');
 }
 {
-  // 🔴 THE BUG three.js FOUND, PROVED. This reader used to round each chunk
-  // length up to the next multiple of four before advancing — a SECOND padding,
-  // on top of the one the spec already requires — which would have walked past
-  // the binary chunk of any file whose JSON chunk was not 4-aligned. Both
-  // vendored files happen to be aligned at 10,768 bytes, so every other case
-  // here passed while it was wrong. It now advances by exactly the length and
-  // refuses an unaligned one, and this is the case that says so.
+  // An unaligned chunk length is refused, not rounded up; both vendored files are aligned.
+  // why: lessons/kit-xr-glb.md#test-chunk-length
   const bad = raw.left.slice(0);
   new DataView(bad).setUint32(12, new DataView(raw.left).getUint32(12, true) + 1, true);
   refused('a chunk length that is not a multiple of four is refused, not silently padded',

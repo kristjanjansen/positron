@@ -1,10 +1,7 @@
-// demo/shell/shell-test.mjs: the DOM log's cap and the device-log shipper,
-// with a fake document and no browser.
-//
+// demo/shell/shell-test.mjs: the DOM log's cap and the device-log shipper, with a fake document.
 //   node demo/shell/shell-test.mjs
-//
-// FOUR OF THE 6 ARE NEGATIVE CONTROLS, written so the bug they name fails them.
-// What `mount()` draws is graded by every page's harness run, not here.
+// Four of the 6 are negative controls; what `mount()` draws is graded by the page harnesses.
+// why: lessons/kit-shell.md#test-header
 
 let pass = 0, fail = 0, neg = 0;
 const ok = (name, cond, detail = '') => {

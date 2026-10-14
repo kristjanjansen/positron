@@ -1,18 +1,7 @@
-// demo/shell/live-test.mjs — the WHEP retry, with a stubbed fetch and no browser.
-//
-//   node demo/shell/live-test.mjs
-//
-// It exists for one reason: `offerSdp` retries a 409, and a retry nobody has
-// watched fire is a retry nobody knows they have. Three of the six checks below
-// are NEGATIVE CONTROLS — they require the guard to NOT fire — because a retry
-// that fires on everything would turn a permanent 404 into a seven-second hang
-// and a page that reads as slow rather than as wrong.
-//
-// The second section fakes RTCPeerConnection and grades the failure path of
-// `whepPlay` and `camWhipPublish`: four NEGATIVE CONTROLS, so seven of 12.
-//
-// `sleep` is injected, so this runs in milliseconds rather than in the ~7 s the
-// real backoff takes. The delays are asserted as VALUES instead.
+// demo/shell/live-test.mjs: the WHEP 409 retry with a stubbed fetch, and the failure paths of whepPlay
+// and camWhipPublish with a faked RTCPeerConnection. node demo/shell/live-test.mjs
+// Seven of 12 are negative controls; `sleep` is injected, so delays are asserted as values.
+// why: lessons/kit-live.md#test-header
 import { offerSdp, WHEP_RETRY, whepPlay, camWhipPublish } from './live.mjs';
 
 let pass = 0, fail = 0;
@@ -51,7 +40,8 @@ console.log('\n== the WHEP 409 retry ==');
      `${calls.length} request(s), ${napped.length} waits`);
 }
 
-// 2. 🔴 THE ONE THIS EXISTS FOR. A 409 that clears is not an error.
+// 2. A 409 that clears is not an error.
+// why: lessons/kit-live.md#test-409
 {
   const calls = stub([409, 409, 201]);
   napped.length = 0;

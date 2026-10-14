@@ -1,25 +1,7 @@
-// demo/shell/xr-pick-test.mjs — the tablet's arithmetic, with no headset.
-//
+// demo/shell/xr-pick-test.mjs: the tablet's arithmetic, with no headset.
 //   node demo/shell/xr-pick-test.mjs
-//
-// `plan-xr-hands` §6.5 puts this FIRST, before any device work, and the reason
-// is worth restating: four coordinate spaces stand between a controller's ray
-// and a slider moving — the quad, the tablet's canvas, the control's row, the
-// control's value — and every one of them is pure arithmetic on two
-// `Float32Array(16)`s. A press that lands in the wrong place is the defect this
-// design is most likely to ship, and it is the one a laptop grades EXACTLY
-// while a headset can only grade it by eye.
-//
-// ⚠️ THE CORNER CASE IS THE ONE THAT EARNS ITS PLACE, and it has to be a corner
-// rather than the centre. The centre hits at 0.5, 0.5 under EVERY mirror,
-// transpose and axis swap you could make — a statistic that is constant by
-// construction over the defects it is meant to catch, which is this project's
-// definition of a blind measurement. The top-left is what distinguishes `0,0`
-// from `1,1`, `1,0` and `0,1` — the four ways `vUv = (aPos.x + 0.5,
-// 0.5 - aPos.y)` can be re-derived wrong.
-//
-// FOUR of the cases below are NEGATIVE CONTROLS: a check that cannot fail is
-// decoration, the convention `diagram-test.mjs` already set here.
+// The corner case matters: the centre reads 0.5, 0.5 under every mirror. Four negative controls.
+// why: lessons/kit-xr-pick.md#test-header
 
 import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -33,27 +15,19 @@ import { holdM, GRIP_PARTS, FACE_TILT, BODY_PROFILE, boundaryOf, wallYaw } from 
 import { dedupe, SAME_THING_M } from './xr-hands.mjs';
 
 /**
- * 🔴 A COPY OF `xr-tablet.mjs` WITH EXTRA CONTROLS IN ITS ARRAY, LOADED FOR
- * REAL. Every layout number in that module is derived at load from
- * `DEFAULT_CONTROLS`, so pushing onto the array afterwards changes the list and
- * not the canvas — the rows would be laid out for a shorter tablet and the hit
- * test would answer about a row that is off the bottom. Rewriting the source
- * and importing it is the only way to ask the real arithmetic a question about
- * a different list. The "one line" test at the bottom of this file already did
- * exactly this; it is a function now because the button needs it too.
- *
+ * A copy of `xr-tablet.mjs` with extra controls in its array, imported for real: layout
+ * is derived at load from `DEFAULT_CONTROLS`, so pushing onto it later changes nothing.
  * @param {string} lines  control literals, inserted at the TOP of the array
  * @param {string} tail   control literals, inserted at the BOTTOM of it
+ * why: lessons/kit-xr-pick.md#test-module-with
  */
 async function moduleWith(lines = '', tail = '') {
   const src = readFileSync(new URL('./xr-tablet.mjs', import.meta.url), 'utf8');
   const head = 'export const DEFAULT_CONTROLS = [\n';
   let marked = src.replace(head, `${head}${lines}`);
   if (tail) {
-    // ⚠️ THE ARRAY'S OWN CLOSING BRACKET, FOUND FROM ITS OPENING ONE. A plain
-    // `replace('\n];\n')` matches the first such line in the FILE, which is
-    // whatever happens to be declared above — and the insert would land in
-    // somebody else's literal while still producing a module that loads.
+    // The array's own closing bracket, found from its opening one, not the file's first `];`.
+    // why: lessons/kit-xr-pick.md#test-closing-bracket
     const at = marked.indexOf(head);
     const close = marked.indexOf('\n];\n', at);
     marked = `${marked.slice(0, close + 1)}${tail}${marked.slice(close + 1)}`;
@@ -67,14 +41,9 @@ async function moduleWith(lines = '', tail = '') {
 }
 
 /**
- * 🔴 THE TABLET WITH ITS BUTTON BACK, WHICH IS THE ONLY PLACE THE BUTTON KIND
- * STILL EXISTS. `QUIT_CONTROL` came off `DEFAULT_CONTROLS` on 2026-09-17 — one
- * way out of a session, and it is a hold on any controller button, not a slab
- * in your other hand. The KIND it is the only instance of costs a branch in the
- * layout, the hit test, the input and the state, so it is graded against a copy
- * of the module that still ships it rather than left as four untested branches.
- * ⚠️ This is what the module looks like if somebody appends the control again,
- * which is the documented way to put it back in a scene.
+ * The tablet with `QUIT_CONTROL` appended, the only place the button kind still exists,
+ * so its branches in layout, hit test, input and state stay graded.
+ * why: lessons/kit-xr-pick.md#test-with-quit
  */
 const WITH_QUIT = await moduleWith('', '  QUIT_CONTROL,\n');
 
@@ -118,9 +87,8 @@ const at = (target) => {
 }
 
 {
-  // 🔴 CATCHES AN R/U SWAP, which the centre case cannot see. Same quad turned
-  // 90 degrees in yaw and stood off to the side; its centre must still read
-  // 0.5, 0.5 and its own top-left must still read 0, 0.
+  // Catches an R/U swap the centre case cannot: a quad turned 90 degrees in yaw.
+  // why: lessons/kit-xr-pick.md#test-yaw
   const YAW = new Float32Array([
     0, 0, W, 0,          // local +X now runs along world +Z
     0, H, 0, 0,
@@ -176,11 +144,8 @@ const at = (target) => {
 
 // ── the tablet, held on a grip pose ───────────────────────────────────────
 {
-  // 🔴 THE POSE, AFTER THE HEADSET SAID IT WAS WRONG. Reported from a Quest 3:
-  // *"tablet works but looks to sky not to me (x rot 90 missing)"*. Identity
-  // grip — the hand at the origin, its -Z (the thumb, and the top plate) along
-  // world -Z, so the plate faces the way a plate faces and nothing is rotated
-  // into a pose that flatters the answer.
+  // Identity grip: the hand at the origin, its -Z along world -Z, nothing pre-rotated.
+  // why: lessons/kit-xr-pick.md#test-pose
   const I = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1]);
   const M = holdM(I);
   const n = [M[8], M[9], M[10]];
@@ -190,9 +155,8 @@ const at = (target) => {
   const hM = Math.hypot(M[4], M[5], M[6]);
   const up = [M[4] / hM, M[5] / hM, M[6] / hM];
 
-  // 🔴 THE REGRESSION, NAMED BY ITS OWN NUMBER. The bug read EXACTLY 1.0000
-  // here — the face pointing straight along the controller, i.e. at the
-  // ceiling. It must now be sin(FACE_TILT), which is the lean and nothing more.
+  // The regression read exactly 1.0 here (facing the ceiling); now sin(FACE_TILT).
+  // why: lessons/kit-xr-pick.md#test-face-regression
   ok('the tablet does not face along the controller (the bug that did read exactly 1.0)',
      Math.abs(dot(n, gnZ)) < 0.5 && near(dot(n, gnZ), Math.sin(FACE_TILT), 1e-6),
      `its face against the controller's own axis: ${dot(n, gnZ).toFixed(4)} (the lean, sin ${(FACE_TILT * 180 / Math.PI).toFixed(0)}°), and it was 1.0000`);
@@ -204,12 +168,8 @@ const at = (target) => {
   ok('...and its own top edge points up the controller, so it reads the right way up',
      dot(up, gnZ) > 0.9, `up against the thumb's direction: ${dot(up, gnZ).toFixed(4)}`);
 
-  // 🔴 RIGHT-HANDED, OR BACKFACE CULLING EATS IT. Three columns with a negative
-  // determinant flip the winding, and the room draws with CULL_FACE on — so a
-  // mirrored basis is an invisible tablet, which reads as "the tablet was never
-  // built" rather than as a sign error. A ROTATION cannot break this; a column
-  // negated by hand to make the picture look right can, which is the whole
-  // reason the fix above was a rotation.
+  // Right-handed, or CULL_FACE hides the tablet: a negated column flips the winding.
+  // why: lessons/kit-xr-pick.md#test-right-handed
   const det =
     M[0] * (M[5] * M[10] - M[6] * M[9])
     - M[4] * (M[1] * M[10] - M[2] * M[9])
@@ -223,9 +183,9 @@ const at = (target) => {
      near(wOut, TABLET.w, 1e-6) && near(hOut, TABLET.h, 1e-6),
      `${wOut.toFixed(3)} x ${hOut.toFixed(3)} m at ${TABLET.px}x${TABLET.py} px`);
 
-  // An eye out along the tablet's own normal, looking back at it — which is
-  // where a face is once the wrist is turned. The centre must read 0.5, 0.5 and
-  // the distance must be the one that was asked for.
+  // An eye out along the tablet's own normal, looking back at it. The centre must read
+  // 0.5, 0.5 and the distance must be the one asked for.
+  // why: lessons/kit-xr-pick.md#test-eye
   const C = [M[12], M[13], M[14]];
   const eye = [C[0] + n[0] * 0.35, C[1] + n[1] * 0.35, C[2] + n[2] * 0.35];
   const back = [-n[0], -n[1], -n[2]];
@@ -240,9 +200,8 @@ const at = (target) => {
   ok('...and the same ray from behind it is refused, so the screen has a front',
      pickQuad(M, behind, n) === null);
 
-  // ⚠️ AND IT CLEARS THE CONTROLLER IT IS ON. The tablet grew by two thirds; a
-  // slab whose bottom edge is inside the head of the stand-in reads as a
-  // modelling fault, and the lift is the number that would be wrong.
+  // The tablet's bottom edge must clear the stand-in controller's head.
+  // why: lessons/kit-xr-pick.md#test-clears-controller
   const topOfHead = Math.max(...BODY_PROFILE.map(([z]) => -z));
   const bottomEdge = Math.hypot(C[0], C[1] - 1, C[2]) - (TABLET.h / 2) * Math.cos(FACE_TILT);
   const gap = bottomEdge - topOfHead;
@@ -254,11 +213,8 @@ const at = (target) => {
 
 // ── one physical thing, one stand-in ──────────────────────────────────────
 {
-  // 🔴 THE DOUBLE CONTROLLER, EXACTLY AS THE DEVICE REPORTED IT. Taken from the
-  // log of 2026-09-13: one input source and two tracked ones, with the SAME
-  // hand appearing twice under the same profile. This is the shape that drew
-  // two stand-ins for one hand, and it is pure arithmetic, so it is graded here
-  // rather than on a head.
+  // The double controller as a Quest reported it: one hand twice under the same profile.
+  // why: lessons/kit-xr-pick.md#test-double-controller
   const at = (where, handedness, profile, x, hasHand = false) => ({
     where, handedness, profile, hasHand,
     m: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0.8, -0.2, 1]),
@@ -272,9 +228,8 @@ const at = (target) => {
      twice.kept.length === 1 && twice.kept[0].where === 'I0' && twice.dropped.length === 1,
      twice.dropped[0] || `kept ${twice.kept.length}`);
 
-  // ⚠️ AND A HAND OVER A CONTROLLER ON THE SAME WRIST: the controller wins,
-  // because it is the object that is physically there and it is the one with
-  // buttons on it.
+  // A hand over a controller on the same wrist: the controller wins.
+  // why: lessons/kit-xr-pick.md#test-hand-over-controller
   const both = dedupe([
     at('I0', 'right', 'oculus-hand', 0.13, true),
     at('T1', 'right', 'meta-quest-touch-plus', 0.13),
@@ -283,11 +238,8 @@ const at = (target) => {
      both.kept.length === 1 && both.kept[0].profile === 'meta-quest-touch-plus',
      `kept ${both.kept.map((k) => k.where + ':' + k.profile).join(', ')}`);
 
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THAT MATTERS. A rule that collapses
-  // everything would also pass both cases above. Two REAL controllers, one per
-  // hand, must both survive — that is the case a distance-only test breaks if
-  // the threshold grows, and the case a handedness-only test breaks when a
-  // runtime reports `none`.
+  // Negative control: two real controllers, one per hand, both survive.
+  // why: lessons/kit-xr-pick.md#test-two-controllers
   const two = dedupe([
     at('I0', 'right', 'meta-quest-touch-plus', 0.13),
     at('I1', 'left', 'meta-quest-touch-plus', -0.26),
@@ -316,38 +268,27 @@ const at = (target) => {
   const first = controlAt(0.5, 0.25);
   ok('the top row of the tablet is the first control',
      first?.i === 0 && first.control.key === c[0].key, first ? first.control.key : 'none');
-  // NEGATIVE CONTROLS: the footer is not a control, and neither is the margin
-  // above the first row. A hit test that answered "row 0" for the whole face
-  // would pass every case above and turn the line that says the shape is a
-  // stand-in into a slider.
+  // why: lessons/kit-xr-pick.md#test-margins
   ok('the margins are not controls',
      controlAt(0.5, 0.99) === null && controlAt(0.5, 0.005) === null);
 
-  // 🔴 THE SLIDER'S ENDS, AND THEY ARE NOT AT u 0 AND u 1. The track is inset
-  // by the tablet's own margin, so a value read straight off `u` would be short
-  // at both ends by exactly that inset — a slider that cannot reach its own
-  // maximum, with every number in the readout still green.
+  // The track is inset by the tablet margin, so the ends are not at u 0 and u 1.
+  // why: lessons/kit-xr-pick.md#test-slider-ends
   const L = TABLET.lane, W = TABLET.designW;
   const lo = valueFromU(0, c[0]), hi = valueFromU(1, c[0]);
   ok('dragging to either end of the track reaches the control\'s own ends',
      near(lo, c[0].min) && near(hi, c[0].max),
      `${lo} .. ${hi} against a declared ${c[0].min} .. ${c[0].max}`);
 
-  // 🔴 A SHARE OF THE TRAVEL, NOT OF THE LANE AND NOT OF THE TABLET — which is
-  // `slider.mjs`'s rule and the one that makes both ends land flush. The three
-  // readings differ, so the test has to name which it wants: the midpoint of
-  // the RANGE sits where the knob's own centre reaches the middle of its
-  // travel, which is NOT the middle of the lane and is nowhere near the middle
-  // of the tablet.
+  // A share of the travel, not of the lane or the tablet (`slider.mjs`'s rule).
+  // why: lessons/kit-xr-pick.md#test-share-of-travel
   const midU = (L.x + L.knobW / 2 + L.travel / 2) / W;
   ok('...and the middle of the TRAVEL is the middle of the range',
      near(valueFromU(midU, c[0]), (c[0].min + c[0].max) / 2),
      `${valueFromU(midU, c[0])} at u ${midU.toFixed(3)} · the middle of the TABLET (u 0.5) would read ${valueFromU(0.5, c[0])}`);
 
-  // NEGATIVE CONTROL, and it is the one that catches the mistake this rule
-  // exists for: if the value were a share of the LANE rather than of the
-  // travel, the knob's left edge at the maximum would hang `knobW` past the
-  // lane's right edge. The two ends must land flush INSIDE it.
+  // Negative control: a share of the lane would hang the knob `knobW` past the lane.
+  // why: lessons/kit-xr-pick.md#test-ends-flush
   const endsFlush = Math.abs((L.x + L.travel) + L.knobW - (L.x + L.w)) < 1e-9;
   ok('the knob\'s two ends land flush inside the lane, neither short nor over',
      endsFlush && L.travel > 0 && L.travel < L.w,
@@ -357,23 +298,15 @@ const at = (target) => {
   ok('a drag that runs off the end is clamped rather than extrapolated',
      valueFromU(-3, c[0]) === c[0].min && valueFromU(4, c[0]) === c[0].max);
 
-  // 🔴 THE LANE HAS TO LOOK LIKE THE SHIPPED ONE, AND THAT IS A NUMBER.
-  // `shell.css` gives `.sld-lane` 96x34 and `--sld-knob` 20 — so the shipped
-  // control is 2.82:1 with a knob 0.588 of its height. A table of constants
-  // copied out of a stylesheet is exactly the kind of thing that drifts, so the
-  // proportions are asserted rather than trusted.
+  // The lane matches the shipped `.sld-lane` (96x34, knob 20), asserted rather than trusted.
+  // why: lessons/kit-xr-pick.md#test-lane-proportions
   ok('the tablet\'s lane has the shipped control\'s proportions',
      Math.abs(L.w / L.h - 96 / 34) < 0.15 && near(L.knobW / L.h, 20 / 34, 1e-9),
      `${(L.w / L.h).toFixed(2)}:1 against 2.82:1 · knob ${(L.knobW / L.h).toFixed(3)} of the lane against 0.588`);
 
-  // ⚠️ AND THE HEAD COLUMN HAS TO FIT ITS OWN LABEL. `HEAD_W` is arithmetic on
-  // a character count — the one place a monospace advance is assumed — so the
-  // assumption is checked against the widest label the list can hold. The PAGE
-  // measures the drawn text too; this is the half a laptop can do with no font.
-  // ⚠️ SLIDERS ONLY, and that is not a convenience. A button's label lives
-  // INSIDE the button, so folding it into this maximum widens a column it will
-  // never be drawn in — which took the lane from 2.75:1 to 2.16:1 and was
-  // caught by the proportion assert above rather than by this one.
+  // `HEAD_W` assumes a mono advance, so it is checked against the widest slider label.
+  // Sliders only: a button's label is drawn inside the button.
+  // why: lessons/kit-xr-pick.md#test-head-column
   const widest = Math.max(...c.filter((x) => !isButton(x)).map((x) => x.label.length));
   ok('the head column is wide enough for the longest label on it',
      TABLET.headW >= widest * TABLET.kit.labelPx * (MONO_ADV + TABLET.kit.labelTrack) - 1e-6,
@@ -381,18 +314,9 @@ const at = (target) => {
 }
 
 // ── the way out, which is a button and not a slider ───────────────────────
-//
-// 🔴 THE CONTROL THIS FILE EXISTS FOR MOST. A slider that lands in the wrong
-// place moves a number you can move back. A way out that fires when nobody
-// asked ends the session somebody was in the middle of, and a way out that
-// cannot be made to fire is a way out that is not there — both of them are
-// arithmetic on a clock and a rectangle, and both are graded here rather than
-// on a head.
-// ⚠️ THE CONTROL AND THE MODULE IT LIVES IN ARE BOTH THE COPY'S. Reading
-// `QUIT_CONTROL` from the shipped module and hit-testing it against the
-// shipped `controlAt` would ask a tablet laid out for one row about a second
-// row, and the honest answer to that is `null` — which is what it said before
-// this line existed.
+// A way out must never fire unasked and must be able to fire; both are graded on the
+// copy's module (`WITH_QUIT`), since the shipped one has no such row.
+// why: lessons/kit-xr-pick.md#test-way-out
 const QT = WITH_QUIT.mod;
 const QCONTROLS = QT?.DEFAULT_CONTROLS ?? [];
 const BTN_C = QCONTROLS.find(isButton) ?? null;
@@ -417,12 +341,8 @@ const btnUV = () => {
      !!at && at.control === BTN_C && isButton(at.control) && at.i === QCONTROLS.length - 1,
      at ? `${at.control.key} · "${at.control.label}" · held ${at.control.hold} ms` : 'nothing there');
 
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THE WHOLE DESIGN RESTS ON. A slider
-  // owns its whole row on purpose — pressing left of its knob drives it to its
-  // minimum — and a way out that inherited that rule would fire from the band
-  // of air its focus ring sits in, from the gap below it, and from the margins
-  // either side. Four places you never meant to press, on the one control whose
-  // press cannot be taken back.
+  // Negative control: unlike a slider, the button does not own its whole row.
+  // why: lessons/kit-xr-pick.md#test-button-row
   const i = QCONTROLS.indexOf(BTN_C);
   const top = QT.TABLET.rowsTop + i * QT.TABLET.rowH + (QT.TABLET.rowContent - QT.TABLET.btn.h) / 2;
   const vAt = (py) => py / QT.TABLET.designH;
@@ -443,24 +363,17 @@ const btnUV = () => {
 }
 
 // ── the hold, with no clock to wait for ───────────────────────────────────
-//
-// ⚠️ A STUB DOCUMENT, AND WHAT IT DOES NOT PROVE. `createXRTablet` asks for a
-// canvas at construction, so two stubs stand in for one. Nothing below calls
-// `draw()` — the PICTURE is graded by `demo/scene`'s own asserts, against a
-// real 2-D context, on a real font. What is graded here is the half a browser
-// adds nothing to: which control a press took, what a clock does to it, and
-// what fires. Every call takes its timestamp, so none of this waits.
+// Two stub canvases; nothing calls `draw()`. Graded: which control a press took, what a
+// clock does to it, what fires. Every call takes its timestamp, so nothing waits.
+// why: lessons/kit-xr-pick.md#test-hold-stub
 globalThis.document = {
   documentElement: {},
   createElement: () => ({ width: 0, height: 0, getContext: () => ({}) }),
 };
 globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
 
-// ⚠️ EVERY TABLET BELOW IS THE COPY'S, NOT THE SHIPPED MODULE'S. The hold, the
-// abort and the `applyAll` guard are all properties of the BUTTON KIND, and the
-// shipped list has no button on it since 2026-09-17 — driving the shipped
-// `createXRTablet` at the button's coordinates would press empty canvas and
-// every one of these checks would pass vacuously.
+// Every tablet below is the copy's: the shipped list has no button, so it would pass vacuously.
+// why: lessons/kit-xr-pick.md#test-copy-tablets
 {
   const hit = (uv) => ({ t: 0.3, u: uv.u, v: uv.v, front: true });
   const mid = btnUV();
@@ -471,8 +384,8 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
     return { t, fired: () => t.fired(), leftCount: () => left };
   };
 
-  // 🔴 A PRESS IS NOT A PRESS-AND-HOLD. The first thing to prove is that the
-  // obvious way to do it by accident does nothing at all.
+  // A press is not a press-and-hold.
+  // why: lessons/kit-xr-pick.md#test-press-not-hold
   {
     const { t, fired, leftCount } = build();
     t.press(hit(mid), 0);
@@ -506,11 +419,8 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
        'released at 90% and five spans later it still has not fired');
   }
 
-  // 🔴 NEGATIVE CONTROL, AND THE ONE A NAIVE IMPLEMENTATION FAILS. Running the
-  // ray off the button must RESET the hold, not pause it: a hold that resumes
-  // where it stopped can be completed by two passes that neither of them meant
-  // to, and nothing on the face would say so. The grip is kept, so coming back
-  // on starts it again from zero.
+  // Negative control: running off the button resets the hold, it does not pause it.
+  // why: lessons/kit-xr-pick.md#test-hold-resets
   {
     const { t, fired, leftCount } = build();
     t.press(hit(mid), 0);
@@ -525,12 +435,8 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
        `off it: ${(reset.p * 100).toFixed(0)}% · back on, ${SPAN} ms after the press, it reads ${(back.p * 100).toFixed(0)}% and not 100`);
   }
 
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE WORST DEFECT THIS CHANGE COULD HAVE
-  // SHIPPED. `applyAll` runs once as a session opens, pushing every slider's
-  // value through its `apply`. A loop that did not know a button when it saw
-  // one would have fired the way out on the first frame of every session —
-  // which presents as a headset that refuses to enter, not as a loop with one
-  // too many things in it.
+  // Negative control: `applyAll` at session start must skip buttons, or every session quits.
+  // why: lessons/kit-xr-pick.md#test-apply-all
   {
     let dots = null, left = 0;
     const t = QT.createXRTablet({ ctx: { room: { setGrid: ({ alpha }) => { dots = alpha; } }, left: () => { left++; } } });
@@ -540,10 +446,8 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
        `the dots went to ${dots} and the way out fired ${left} times`);
   }
 
-  // ⚠️ AND IT HAS TO SAY WHICH OF THE THREE HAPPENED. "I held it and nothing
-  // happened" has three causes — let go early, ray off it, press never landed —
-  // and the owner gets one headset run to tell them apart. The tablet writes a
-  // different line for each; `xr-hands.mjs` carries them to the beacon.
+  // A failed hold logs which of three happened: let go early, ray off it, press never landed.
+  // why: lessons/kit-xr-pick.md#test-three-causes
   {
     const { t } = build();
     t.press(hit(mid), 0);
@@ -560,22 +464,15 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
 
 // ── and the claim this file is here to check ──────────────────────────────
 {
-  // 🔴 "A SECOND CONTROL IS ONE LINE" — TESTED BY WRITING THE LINE. The claim
-  // in `xr-tablet.mjs`'s header was made about a second control and turned out
-  // to hold only for a second control OF A KIND THAT ALREADY EXISTS: the button
-  // above cost a branch in the layout, the hit test, the input and the state.
-  // So the surviving half is proved rather than asserted in prose — a copy of
-  // the module with ONE line added to its array, imported and measured. The
-  // canvas grows by exactly one row, the new row hit-tests, and the fingerprint
-  // counts three.
+  // A second control of an existing kind is one line: a copy with one line added grows
+  // by exactly one row, the row hit-tests, and the fingerprint counts three.
+  // why: lessons/kit-xr-pick.md#test-one-line
   const line = "  { key: 'probe', label: 'probe', unit: 'x', min: 0, max: 10, value: 5, apply: () => {} },\n";
   const { mod: two, why } = await moduleWith(line);
 
   const grew = two && two.TABLET.designH === TABLET.designH + TABLET.rowH;
-  // The SECOND row of the copy, which is the control that was already there.
-  // ⚠️ The line is inserted at the TOP, so the new control is row 0 and the
-  // shipped one moves down — which is the half of "one line" worth checking,
-  // because a layout that only ever appends never has to move anything.
+  // The second row of the copy: inserted at the top, so the shipped control moves down.
+  // why: lessons/kit-xr-pick.md#test-row-moves
   const rowMid = two
     ? two.controlAt(0.5, (TABLET.rowsTop + TABLET.rowH + TABLET.rowContent / 2) / two.TABLET.designH)
     : null;
@@ -592,15 +489,9 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
 }
 
 // ── which of your room's surfaces get dots ────────────────────────────────
-//
-// 🔴 THE DOUBLED FLOOR, GRADED WITHOUT A HEADSET. Reported 2026-09-17 as
-// *"window seems to have doubled dots somehow when having moving panels"*. The
-// grid writes no depth and nothing opaque stands between its quads, so every
-// surface handed to it is superimposed on every other one in the same look — a
-// bed at 0.5 m over a floor at 0 is two parallel dot fields in one place. The
-// list below is the eleven surfaces a Quest 3 reported in this repo on
-// 2026-09-13, by name, so this is the real shape of the problem rather than an
-// invented one.
+// The grid writes no depth, so every surface handed to it superimposes. The list is
+// the eleven surfaces a Quest 3 reported.
+// why: lessons/kit-xr-pick.md#test-surfaces
 {
   const q = (label, y, vertical) => ({ label, y, vertical });
   const room = [
@@ -617,18 +508,15 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
      && !shell.some((x) => ['bed', 'shelf'].includes(x.label)),
      `${room.length} surfaces in, ${shell.length} dotted: [${shell.map((x) => x.label).join(', ')}]`);
 
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THIS RULE COULD EASILY GET WRONG.
-  // Exactly ONE horizontal surface may be the ground. A rule that kept every
-  // horizontal plane below head height would keep the bed and draw the bug it
-  // was written to remove.
+  // Negative control: exactly one horizontal surface may be the ground.
+  // why: lessons/kit-xr-pick.md#test-one-ground
   const twoLow = boundaryOf([q('other', 0.00, false), q('other', 0.45, false)]);
   ok('...and only ONE surface is ever the ground, even with nothing labelled',
      twoLow.length === 1 && twoLow[0].y === 0,
      `two unlabelled horizontals at 0.00 and 0.45 m · kept the one at ${twoLow[0].y.toFixed(2)}`);
 
-  // 🔴 NEGATIVE CONTROL: a runtime that classifies nothing must not end up with
-  // an empty room. An empty shell reads as "your room has no surfaces", which
-  // is a claim about somebody's room made out of our own failure to sort one.
+  // Negative control: a runtime that classifies nothing still gets its surfaces drawn.
+  // why: lessons/kit-xr-pick.md#test-blind-runtime
   const blind = [{ label: 'unlabelled', y: 0, vertical: false }];
   ok('...and a runtime that says nothing useful still gets its surfaces drawn',
      boundaryOf(blind).length === 1 && boundaryOf([]).length === 0,
@@ -636,11 +524,9 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
 }
 
 // ── which way round your room is ──────────────────────────────────────────
-//
-// 🔴 THE ANGLE A BRICK HAS TO BE TURNED BY TO MEET A REAL WALL SQUARELY.
-// Reported 2026-09-17 about `/blocks/`: *"in xr blocks are angled against wall,
-// rotated a bit, not fully against wall"*. Nothing rotated the bricks; the
-// bricks are square to the REFERENCE SPACE and the room is not.
+// The angle a brick turns to meet a real wall: bricks are square to the reference
+// space, and the room is not.
+// why: lessons/kit-xr-pick.md#test-wall-yaw
 {
   const DEG = Math.PI / 180;
   /** A wall whose normal points at `deg`, `area` square metres of it. */
@@ -654,23 +540,20 @@ globalThis.getComputedStyle = () => ({ getPropertyValue: () => '' });
      Math.abs(got / DEG - 17) < 0.01,
      `${(got / DEG).toFixed(3)}° from four normals 90° apart`);
 
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE ONE A PLAIN MEAN FAILS. Four directions
-  // ninety degrees apart average to NOTHING — north and east average to
-  // north-east, and all four cancel — so an implementation that did not fold by
-  // four would read 45° here, or 0, or whatever the rounding gave it.
+  // Negative control: four walls 90 degrees apart cancel in a plain mean; fold by four.
+  // why: lessons/kit-xr-pick.md#test-fold-by-four
   const square = wallYaw(four(0));
   ok('...and a room square to the headset asks for no turn at all',
      Math.abs(square) < 1e-9, `${(square / DEG).toFixed(6)}°`);
 
-  // 🔴 NEGATIVE CONTROL: no walls is 0, and 0 is what every page did before
-  // this function existed. A room nobody measured must not turn anything.
+  // Negative control: no walls measured means no turn.
+  // why: lessons/kit-xr-pick.md#test-no-walls
   ok('...and with nothing measured it asks for no turn either',
      wallYaw([]) === 0 && wallYaw([{ vertical: false, n: [0, 1, 0], size: [4, 4] }]) === 0,
      'an empty list and a floor both read 0');
 
-  // 🔴 AREA IS THE WEIGHT, AND THIS IS WHAT SAYS SO. One 8 m² wall at 20°
-  // against a 0.2 m² sliver at 40°: the answer has to sit next to the wall, not
-  // half way between them. An unweighted mean would read 30°.
+  // Area is the weight: an 8 m2 wall at 20 degrees outvotes a 0.2 m2 sliver at 40.
+  // why: lessons/kit-xr-pick.md#test-area-weight
   const mixed = wallYaw([{ ...wall(20), size: [4, 2] }, { ...wall(40), size: [0.1, 2] }]);
   ok('...and a big wall outvotes a sliver beside a door',
      Math.abs(mixed / DEG - 20) < 1.2 && Math.abs(mixed / DEG - 30) > 8,

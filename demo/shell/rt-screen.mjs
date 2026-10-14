@@ -1,8 +1,6 @@
-// demo/shell/rt-screen.mjs: the runtime of a `screen` node on /connect/
-// (node-runtime.mjs). Its face is the kit's video panel; each frame it pulls a
-// picture from the runtime linked into screen:video-in (a camera, a shader)
-// and draws it contained, as /video/camera/ does. Unlinked, or with nothing
-// arriving, it shows the page's ground and counts nothing.
+// demo/shell/rt-screen.mjs: a `screen` node on /connect/, drawing what arrives on screen:video-in
+// contained in the kit's video panel. With nothing arriving it shows the ground and counts nothing.
+// why: lessons/kit-rt-screen.md#header
 
 import { createVideoPanel } from './video-panel.mjs';
 import { drawCamera, FRAME_W, FRAME_H } from './pattern.mjs';

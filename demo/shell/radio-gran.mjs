@@ -1,103 +1,25 @@
-// demo/shell/radio-gran.mjs — the radio-into-Pappus machine, with no page on it.
-//
-// 🔴 WHY THIS EXISTS, AND IT IS THE SECOND COPY BECOMING A COMPONENT.
-// `/archive/radio/` is a station list, an audio graph, a wasm SuperCollider, twelve
-// finished sounds, a modulator spec and a grain clock that locks to a loop, all
-// inside one 4,985-line page. `/videoradio/` is the same machine with the
-// instrument panel taken off and a shader in its place. Building a second copy
-// of any of that inside a new page is the failure `/kit/` exists to catch, and
-// `research/vr-sound-visual-2026-09.md §6` already left the feature extractor
-// open in exactly these terms: *"add `demo/shell/features.mjs` as a kit
-// component, or lift what `radio` already has? Both are defensible;
-// building a third copy inside a new page is not."*
-//
-// ⚠️ 🔴 `/archive/radio/` HAS NOT BEEN MOVED ONTO THIS YET, AND UNTIL IT IS THERE
-// ARE TWO IMPLEMENTATIONS. This header is the reason to finish the job rather
-// than a record that it was done. `field.mjs` carries the same warning about
-// `wire` and it is the same situation: the table below and the one at
-// `demo/archive/radio/index.html:2820` are the same twelve sounds typed twice, and
-// a drift between them is SILENT because both pages go on working. What to do,
-// in order: delete `PATCHES`, `SCAN_RANGE`, `patternOf`, `liveSteps`,
-// `predictedRate`, `STATIONS`, `srcOf`, `nominalKbps`, the modulator `specs`
-// and `followers` blocks, `writePatch`, the band arithmetic inside `meterTick`
-// and the arithmetic half of `lockGrainsToLoop` from that page, and import them
-// from here. Nothing in this file touches the DOM, so nothing in that page's
-// layout has to move.
-//
-// ⚠️ WHAT IS DELIBERATELY NOT HERE: the audio graph, the loop's ring, the
-// transport, the fader, the pickers, the scope and every assert. Those are a
-// PAGE's, and the two pages want different ones. What is here is what is true
-// of the ENGINE and of the RELAY whoever is asking.
-//
-// 🔴 AND ONE THING HERE IS NEW RATHER THAN LIFTED, WHICH IS WHY IT IS A MODULE
-// AND NOT A FILE OF CONSTANTS. `writePatch` on `/archive/radio/` writes a whole
-// patch in one shot, which is right for pressing a button and useless for a
-// page that has to travel from one sound to another over eight seconds. The
-// split into `writeDiscrete` and `writeContinuous` is what makes a morph
-// expressible, and the line between them is an argument about the engine:
-// `Select.kr` indices, gate figures and chords cannot be interpolated, and
-// pretending otherwise plays a chord nobody wrote.
-//
-// 🔴 AND SO IS THE TOUR CLOCK AT THE BOTTOM, ADDED 2026-09-16 WHEN `/archive/radio/`
-// WAS ASKED FOR THE SAME MOVEMENT. `/videoradio/` still carries its own inline
-// copy of that arithmetic and should be moved onto this one; the numbers are
-// the same numbers and two of them are already in two files. That is the same
-// warning as the one above about the twelve sounds, and it is here rather than
-// in a commit message because nothing type-checks a duplicate.
-//
-// 🔴 AND NOBODY IMPORTS THAT CLOCK TODAY, WHICH IS A FACT TO KNOW BEFORE
-// DELETING IT. `/archive/radio/`'s tour was removed on instruction the same day it was
-// built (*"rm 'automate' button from radio demo (and functionaitu)"*, see
-// `archive/radio-automate/`), and it was the only caller of `tourAt`, `breathe`,
-// `SLOT_MS`, `DWELL_MS` and `MORPH_MS`, and of `morphOf`, `basesOf` and
-// `writeContinuous` besides. They are kept rather than deleted because the
-// paragraph above is still the job: `/videoradio/` has that arithmetic inline
-// and moving it onto these needs them to exist. ⚠️ SO THE COVERAGE IS WORSE
-// THAN IT LOOKS. Everything named here is exported, unreferenced and ungraded
-// by any page or harness; a change to one of them breaks nothing today and
-// breaks `/videoradio/` the day it moves across.
+// demo/shell/radio-gran.mjs: the radio-into-Pappus machine (relay, twelve sounds, modulator,
+// patch writing, tempo lock, tour clock), no DOM. /archive/radio/ still carries its own copy.
+// The tour clock exports have no caller today; /videoradio/ is meant to move onto them.
+// why: lessons/kit-radio-gran.md#header
 
 import { spec } from './pappus-mod.mjs';
 import { setParam, GATE0 } from './pappus.mjs';
 
 /**
- * The seconds Pappus holds. `mbuflen`, and every page that draws a grain
- * position has to rescale by `RING_SECONDS / BUF_SECONDS` (see `pappus.mjs`).
- *
- * ⚠️ IT IS EIGHT AND NOT SIXTY, and the argument is written out at
- * `demo/archive/radio/index.html:2654`: the ring has to be FILLED before the
- * granulator sounds like itself, and at sixty that wait is a minute, which puts
- * every assert outside the harness's budget and a visitor in front of silence.
+ * The seconds Pappus holds (`mbuflen`); rescale grain positions by RING_SECONDS / BUF_SECONDS.
+ * Eight, not sixty: the ring must fill before the granulator sounds like itself.
+ * why: lessons/kit-radio-gran.md#buf-seconds
  */
 export const BUF_SECONDS = 8;
 
-// ── the relay, and which stations are on it ────────────────────────────────
-//
-// 🔴 THE THIRD COLUMN IS THE STATION'S NOMINAL BITRATE AND IT IS NOT A SHARED
-// CONSTANT. `NOMINAL_KBPS = 128` was true of every mount here until IDA Radio
-// arrived at 320, and a check that compares a measured rate against one shared
-// number fails on every run for a station that is behaving perfectly.
-//
-// ⚠️ TWO OF THESE ARE AAC, NOT MP3. `mp3-stream.mjs` picks its frame scanner off
-// the response's `content-type`, so no page has to know which is which, and no
-// URL here claims a container.
-// 🔴 IDA IS BACK, 2026-09-16, ON INSTRUCTION: *"bring ida's back to radio (if
-// single listener)"* and *"bring ida to videoradio too"*. The condition in the
-// first message is the whole argument. It was removed because their operator
-// counted roughly 100 concurrent clients against their limit and traced them
-// here; the relay now holds ONE upstream connection per mount and fans it out,
-// so the number they count is one however many people are listening.
-// `workers/shout/worker.mjs` carries the measurement and the caveat that the
-// operator has not been re-asked.
-//
-// 🔴 AND THEY ARE LAST IN THIS ARRAY, WHICH IS NOT A PREFERENCE. What made the
-// original mistake expensive was not carrying these mounts, it was one line
-// that moved them to the FRONT: every page opens the first entry it finds, so
-// reordering an array pointed every visitor and every harness run at their
-// server at once. At 320 kbit/s they are 2.5x the weight of anything else here.
-// Do not move them up.
+// The relay's stations. The third column is each station's nominal kbit/s, not a shared constant.
+// Two are AAC; mp3-stream.mjs picks the scanner from content-type. Pages open the first entry,
+// so the 320 kbit/s IDA mounts stay last.
+// why: lessons/kit-radio-gran.md#stations
 export const STATIONS = [
-  // Radio 1965 removed 2026-09-15 at the uuu.ee operator's request.
+  // Radio 1965 removed at the uuu.ee operator's request.
+  // why: lessons/kit-radio-gran.md#stations-radio1965
   ['Klassika', 'klassikaraadio', 128],
   ['Viker', 'vikerraadio', 128],
   ['R2', 'raadio2', 128],
@@ -105,9 +27,8 @@ export const STATIONS = [
   ['Tallinn', 'raadiotallinn', 128],
   ['Ida TLL', 'ida-tallinn', 320],
   ['Ida HEL', 'ida-helsinki', 320],
-  // Back, last, 2026-09-16. See the note in `workers/shout/worker.mjs`: the
-  // relay holds one upstream per mount now, so this is one listener at their
-  // server however many people are on this site.
+  // The relay holds one upstream per mount, so this is one listener at their server.
+  // why: lessons/kit-radio-gran.md#stations-ida
   ['Radio 1965', 'radio1965', 128],
 ];
 
@@ -118,25 +39,10 @@ export const nominalKbps = (id) => STATIONS.find(([, s]) => s === id)?.[2] ?? 12
 export const indexOfId = (id) => STATIONS.findIndex(([, s]) => s === id);
 
 /**
- * Which mounts are up, asked of the relay rather than of the mounts.
- *
- * 🔴 ONE REQUEST THAT ALWAYS ANSWERS 200, AND THAT IS THE ENTIRE POINT. Fetching
- * a dead mount directly answers 502, **and the browser logs that to the console
- * with no way to suppress it**, so a page that probes mounts trips its own
- * console check and shows a visitor a red line about somebody else's server.
- * `/health` moves the question to the thing that knows and reports "down" as
- * data.
- *
- * 🔴 AND IT ASKS ABOUT NAMED STATIONS, NEVER ALL OF THEM BY DEFAULT. `/health`
- * opens one upstream connection per station it is asked about, so an unnarrowed
- * probe makes every page load cost the broadcaster six. That is how three ERR
- * mounts came to answer this relay 502 in 9 ms while serving a laptop normally.
- *
- * ⚠️ A STATION MISSING FROM THE ANSWER IS `undefined`, NEVER `false`. "We did
- * not get an answer about it" and "it is down" have opposite consequences, and
- * `caps.mjs` already states the rule: an unknown never blocks.
- *
+ * Which mounts are up, asked of the relay's /health (always 200, so no console 502s).
+ * Asks only named stations: each one costs an upstream connection. Missing means undefined, never false.
  * @returns {Promise<Map<string, boolean|undefined>>}
+ * why: lessons/kit-radio-gran.md#ask-health
  */
 export async function askHealth(base, ids = STATIONS.map(([, id]) => id), { timeoutMs = 6000 } = {}) {
   const out = new Map();
@@ -158,34 +64,10 @@ export async function askHealth(base, ids = STATIONS.map(([, id]) => id), { time
   return out;
 }
 
-// ── the twelve sounds ──────────────────────────────────────────────────────
-//
-// 🔴 EIGHT SOUNDS THAT DIFFER IN KIND, NOT TWELVE SETS OF NUMBERS, and the
-// distinction is what the previous two sets got wrong. REPORTED three times as
-// *"radio granulator patches heard almost same"*, after a round of widening the
-// ranges and a round of adding movement, neither of which could have helped:
-// seven of the old seven used `scanmode 1`, five of them sat between -0.10x and
-// +0.25x read speed, and six had the sixteen-step gate switched off. Seven
-// variations on one architecture. So this set is laid out along the axes the
-// engine actually has, one patch pushed to each end:
-//
-//   mode        DELAY, POSITION and STRETCH, all three
-//   read speed  -1.00 · +0.08 · +0.25 · +0.50 · +1.00 · +2.00 · frozen
-//   overlap     2 (four-second grains) up to 26 (a cloud)
-//   rhythm      three patches on a real gate figure
-//   space       one bone dry, one drowned
-//   blend       `burnt` at `sos 0.45`, which is the radio with the granulator as
-//               an effect rather than the other way round
-//
-// ⚠️ `sos` BELOW 0.6 IS NOT A FLAVOUR, IT IS THE GRANULATOR TURNED OFF.
-// `sxf = (msos.max(mlock)/0.6).clip(0,1)` crossfades grains against the LIVE
-// INPUT, so 0.6 is the first value that is all grains. `burnt`'s 0.45 is the one
-// deliberate exception and it is a different thing to hear, not a quieter one.
-//
-// ⚠️ `mod` IS PART OF THE SOUND. A patch is a PLACE and a MOTION: two patches
-// with the same numbers and different routes are two different instruments,
-// which is the whole answer to "they all sound the same". See `pappus-mod.mjs`
-// for why none of this is in the SynthDef.
+// Sounds laid out along the engine's axes (mode, read speed, overlap, rhythm, space, blend).
+// `sos` below 0.6 crossfades to the live input; only `burnt` (0.45) does that on purpose.
+// `mod` is part of the sound: same numbers with different routes is a different instrument.
+// why: lessons/kit-radio-gran.md#patches
 export const PATCHES = [
   // DELAY mode: the read point sits a fixed distance behind the write head
   // rather than crawling through a window, so what comes out is the station
@@ -256,10 +138,8 @@ export const PATCHES = [
     noise: 0, noisetype: 1, noisedecay: 0.5, noisetone: 700, noisedyn: 1,
     wow: 0, rverb: 0, rtime: 0.3 },
 
-  // ⚠️ `lock 1` HOLDS WHATEVER THE RING CONTAINS AT THE INSTANT IT LANDS,
-  // including the dead air between two programmes. A page that freezes has to
-  // read its own meter afterwards and say which it caught, or a caught silence
-  // is indistinguishable from a broken engine.
+  // `lock 1` holds whatever the ring holds, silence included; a page must read its meter after.
+  // why: lessons/kit-radio-gran.md#patches-lock
   { name: 'one note held',
     says: 'one instant of the broadcast, frozen and stacked into a chord',
     mod: [
@@ -300,10 +180,8 @@ export const PATCHES = [
     noise: 0, noisetype: 1, noisedecay: 0.5, noisetone: 700, noisedyn: 1,
     wow: 0, rverb: 0.05, rtime: 0.25 },
 
-  // 🔴 A ROUTING ONTO `rate` IS THE ONE THING THAT UNPICKS A RHYTHM. The grain
-  // clock is the only timing this instrument has, so the patches whose point is
-  // a figure have NO route onto `rate`: this one moves `size` instead, which
-  // changes how long a grain is and not when it happens.
+  // No route onto `rate` here: the grain clock is the rhythm. This one moves `size` instead.
+  // why: lessons/kit-radio-gran.md#patches-sixteenth
   { name: 'the sixteenth',
     says: 'a sixteen-step figure, four voices playing it four steps apart',
     mod: [
@@ -454,14 +332,9 @@ export const PATCHES = [
 ];
 
 /**
- * 🔴 THE READ HEAD IS THREE DIFFERENT QUANTITIES AND ONE CONTROL.
- * `Engine_Pappus.sc:719` selects between a SPEED (mode 1), a PLACE (mode 2) and
- * a LAG (modes 3 and 4), so a page that shows one lane for all three is telling
- * the truth about one patch in three. In STRETCH the lane IS the speed, in the
- * engine's own terms: `speed = winspan x (3*mscan - 1)`.
- *
- * ⚠️ AND IT IS WHY A MORPH MAY NOT INTERPOLATE `scan` ACROSS A MODE CHANGE. See
- * `morphOf` below: halfway between a speed and a lag is neither.
+ * The read head is a speed (mode 1), a place (mode 2) or a lag (modes 3, 4): Engine_Pappus.sc:719.
+ * So a morph may not interpolate `scan` across a mode change (see morphOf).
+ * why: lessons/kit-radio-gran.md#scan-range
  */
 export const SCAN_RANGE = {
   1: { label: 'read speed', min: -1, max: 2, unit: '×', digits: 2,
@@ -476,16 +349,9 @@ const ALL_ONES = new Array(16).fill(1);
 export const PATTERN_SLOTS = 16;
 
 /**
- * The sixteen steps this patch wants in the gate buffer.
- *
- * 🔴 IT IS NOT A CONVENIENCE. An eight-element `pattern` produces an OSC message
- * that SAYS sixteen values and carries eight, which scsynth discards without a
- * word: the patch then plays on whatever the buffer already held and the page
- * goes on reporting the figure it asked for.
- *
- * ⚠️ IT REPEATS RATHER THAN ZERO-FILLING, because with `elen 16` a repeat plays
- * an eight-step figure twice, which is what writing eight steps means, and a
- * zero-fill would silently give half a bar of silence.
+ * The sixteen steps this patch wants in the gate buffer. Fewer values are silently dropped
+ * by scsynth; an eight-step figure repeats rather than zero-fills.
+ * why: lessons/kit-radio-gran.md#pattern-of
  */
 export const patternOf = (p) => {
   const src = p.pattern ?? ALL_ONES;
@@ -513,12 +379,9 @@ export const predictedRate = (p, rate = p.rate) => rate
 /** How many of the eight voices this patch opens. */
 export const voicesOf = (p) => p.gates.reduce((n, g) => n + (g > 0.001 ? 1 : 0), 0);
 
-// ── the modulator's lanes ──────────────────────────────────────────────────
-//
-// 🔴 EVERY ONE OF THESE IS THE ENGINE'S OWN RANGE, AND THEY DECIDE WHAT A
-// ROUTING MEANS. A modulation is applied in the control's WARPED space, so an
-// LFO on grain length multiplies and divides rather than adding and
-// subtracting: get one of these wrong and a musical amount becomes a slam.
+// The engine's own ranges. Modulation applies in the warped space, so a wrong range turns
+// a musical amount into a slam.
+// why: lessons/kit-radio-gran.md#mod-specs
 export const MOD_SPECS = {
   rate: { min: 0.1, max: 100, warp: 'exp' },     // grains per second
   size: { min: 0.002, max: 4, warp: 'exp' },     // grain length; the engine clips at 8
@@ -526,16 +389,15 @@ export const MOD_SPECS = {
   spray: { min: 0, max: 1 },                     // read-point jitter
   swarm: { min: 0, max: 1 },                     // detuned duplicates
   strum: { min: 0, max: 0.125 },                 // grain-period subdivision
-  // 🔴 THE FLOOR IS 0.62, NOT 0. `sxf = (msos.max(mlock)/0.6).clip(0,1)`
-  // crossfades the grains against the LIVE INPUT, so a lane reaching zero would
-  // make a slow sine switch the instrument off twice a minute.
+  // Floor 0.62: below 0.6 `sxf` crossfades to the live input and a lane would switch it off.
+  // why: lessons/kit-radio-gran.md#mod-specs-sos
   sos: { min: 0.62, max: 1 },
   // A `Select.kr` index over seventeen windows, read per grain, so it wants a
   // stepped source and a fractional index is not a value that can be read back.
   contour: { min: 0, max: 16, quant: 1 },
   wow: { min: 0, max: 1 },
-  // ⚠️ THESE THREE ARE GLOBAL CONTROLS with no `m` prefix, which `MOD_CMD`
-  // below knows and a spec table that only listed lane ends did not.
+  // These three are global controls with no `m` prefix (see MOD_CMD).
+  // why: lessons/kit-radio-gran.md#mod-specs-global
   drive: { min: 0, max: 1 },
   crush: { min: 0, max: 1 },
   noise: { min: 0, max: 1 },
@@ -546,11 +408,9 @@ export const MOD_SPECS = {
 };
 
 /**
- * 🔴 THE DESTINATION ORDER IS FROZEN, THE WAY `pattern.mjs`'s `ROW` IS FROZEN.
- * A page that packs these into a data texture and a shader compiled against a
- * different order do not fail; they draw a plausible wrong picture. Anything
- * reading this as a layout must also read `LAYOUT_VERSION` and refuse a
- * mismatch.
+ * Frozen order: a data texture packed in another order draws a plausible wrong picture.
+ * Readers using it as a layout check LAYOUT_VERSION.
+ * why: lessons/kit-radio-gran.md#mod-dests
  */
 export const MOD_DESTS = ['rate', 'size', 'scan', 'spray', 'swarm', 'strum', 'sos',
   'contour', 'wow', 'drive', 'crush', 'noise', 'winstart', 'winend', 'probs'];
@@ -561,15 +421,9 @@ export const LANES = Object.fromEntries(
   Object.entries(MOD_SPECS).map(([k, v]) => [k, { ...spec(v), n: v.n || 0, quant: v.quant || 0 }]));
 
 /**
- * 🔴 SIX FOLLOWERS OFF ONE ANALYSER READ, AND THE POINT IS THAT THEY ARE ALL THE
- * STATION. Loudness alone is one gesture: everything it drives moves together.
- * Split the same audio into bands and the sources stop agreeing. On speech `mid`
- * moves while `low` sits still, `high` follows sibilance, `tone` says where the
- * energy is rather than how much of it there is, and `flux` is near zero on a
- * sustained chord and high on an announcer.
- *
- * ⚠️ SENSITIVITY IS PER SOURCE AND HAS TO BE. `tone` is already 0..1, so
- * upstream's sens 6 pins it at the ceiling where it stops following anything.
+ * Six followers off one analyser read, so the sources disagree (bands, tone, flux).
+ * Sensitivity is per source: `tone` is already 0..1.
+ * why: lessons/kit-radio-gran.md#mod-followers
  */
 export const MOD_FOLLOWERS = {
   rms: { attack: 0.01, release: 0.35, sens: 6 },
@@ -582,13 +436,9 @@ export const MOD_FOLLOWERS = {
 export const FOLLOWER_NAMES = Object.keys(MOD_FOLLOWERS);
 
 /**
- * Where a modulated control is actually written.
- *
- * ⚠️ NOT EVERY CONTROL WEARS THE `m`. `kwow`, `drive`, `crush`, `noise` and the
- * eight-element arrays are global, one stage for both granulators, so the prefix
- * would name a control this definition does not have. scsynth discards an
- * unknown control IN SILENCE, which is a routing that runs, reports, and never
- * reaches a sample.
+ * Where a modulated control is written. Global controls have no `m` prefix, and scsynth
+ * drops an unknown control silently.
+ * why: lessons/kit-radio-gran.md#mod-cmd
  */
 export const MOD_CMD = { wow: 'kwow', drive: 'drive', crush: 'crush', noise: 'noise',
                          probs: 'probs', gates: 'gates' };
@@ -604,50 +454,22 @@ export const basesOf = (p) => ({
 });
 
 /**
- * This patch's routes, with the ones a delay mode cannot carry removed.
- *
- * ⚠️ `winstart`/`winend` ARE REFUSED IN A DELAY MODE. `delaypos` is a position in
- * the WHOLE lap while `BufWr` writes at the un-windowed phase, so a narrowed
- * window puts the read head nowhere near the write head and "four seconds
- * behind" quietly becomes something else, with nothing on screen saying so.
+ * This patch's routes, minus `winstart`/`winend` in a delay mode, where a narrowed window
+ * moves the read head away from the write head.
+ * why: lessons/kit-radio-gran.md#routes-of
  */
 export const routesOf = (p) => (p.mod || []).filter((r) =>
   !(p.scanmode >= 3 && (r.dest === 'winstart' || r.dest === 'winend')));
 
-// ── writing a patch, in two halves ─────────────────────────────────────────
-//
-// 🔴 THE SPLIT IS THE ARGUMENT, AND THE LINE BETWEEN THEM IS THE ENGINE'S.
-// `/archive/radio/` writes a whole patch on a button press and that is right there.
-// A page that TRAVELS from one sound to another needs to know which fields can
-// be a value in between and which cannot, and the answer is not a matter of
-// taste:
-//
-//   · `scanmode`, `spraymode`, `swarmmode`, `crushmode` and `noisetype` are
-//     `Select.kr` and `Select.ar` INDICES. 2.5 is not a mode.
-//   · `contour` is a `Select.kr` over seventeen envelope windows, read per
-//     grain, and a fractional index is a value that cannot be read back the way
-//     it was sent.
-//   · `gates`, `pitches` and `tappitch` are a CHORD in semitones. Half of
-//     `[0, 3, 7]` and `[-12, -7, 0]` is a chord nobody wrote.
-//   · `elen`, `ephase` and `pattern` are a gate FIGURE, read at audio rate by a
-//     `Stepper` on the grain trigger. A figure has no halfway.
-//   · `lock` is a freeze. It is on or it is off.
-//
-// Everything else is a continuous control behind a 20 ms `Lag.kr`, which is
-// exactly what stepping at 25 Hz is built to receive.
+// Discrete fields (Select indices, contour, chords, gate figures, lock) cannot be interpolated;
+// everything else is continuous behind a 20 ms Lag.kr.
+// why: lessons/kit-radio-gran.md#write-split
 const setBoth = (eng, name, v) => { setParam(eng, `m${name}`, v); setParam(eng, `n${name}`, v); };
 
 /**
- * The half that cannot be interpolated, plus every constant this rung needs.
- *
- * 🔴 IT WRITES EVERY FIELD, EVERY TIME. Each message is fire-and-forget, so a
- * write that only sets what changed inherits whatever the last one left behind,
- * silently. This repo has paid for that three times (`msrc 1`, `src`/`lock`,
- * `notes.gate`).
- *
- * ⚠️ THE SECOND GRANULATOR IS WRITTEN AND DOES NOT EXIST ON THIS RUNG
- * (`graw2 = DC.ar([0,0])` on LITE, and TINY implies LITE). It is two messages
- * and it keeps one function for a board that may be on a different rung.
+ * The half that cannot be interpolated, plus the rung's constants. Writes every field every
+ * time: messages are fire-and-forget. The second granulator is written even where it is absent.
+ * why: lessons/kit-radio-gran.md#write-discrete
  */
 export function writeDiscrete(eng, p, { bufSeconds = BUF_SECONDS } = {}) {
   setBoth(eng, 'scanmode', p.scanmode);
@@ -665,9 +487,8 @@ export function writeDiscrete(eng, p, { bufSeconds = BUF_SECONDS } = {}) {
   setParam(eng, 'tappitch', [...p.tappitch, 0, 0, 0, 0]);
   setParam(eng, 'crushmode', p.crushmode);
   setParam(eng, 'noisetype', p.noisetype);
-  // 🔴 THE SIXTEEN-STEP PATTERN IS A BUFFER, NOT A CONTROL, and one that does
-  // not want a rhythm has to write the ones BACK or it inherits the last
-  // patch's figure silently.
+  // The pattern is a buffer: write the ones back or the last patch's figure stays.
+  // why: lessons/kit-radio-gran.md#write-discrete-pattern
   eng.send('/b_setn', GATE0, 0, 16, ...patternOf(p));
 
   // the stages this rung compiles out, and the constants, written every time
@@ -708,33 +529,18 @@ export function continuousOf(p) {
 }
 
 /**
- * 🔴 THESE ONES TRAVEL AS A RATIO, THE REST AS A DIFFERENCE. `pappus-mod.mjs`
- * makes the argument for modulation and it is the same argument for a morph: a
- * grain length halfway between 50 ms and 4 s is 450 ms if you go geometrically
- * and 2.02 s if you go linearly, and only the first spends any time in the part
- * of the lane where a granulator stops being a delay and becomes a texture.
- * Delay times, cycle lengths and filter frequencies are pitches or rhythms and
- * behave the same way.
- *
- * ⚠️ A ZERO ENDPOINT FALLS BACK TO LINEAR, because a ratio to zero has no
- * meaning and `slowed` really does hold every tap time at 0.
+ * These travel as a ratio, the rest as a difference (lengths, times, frequencies).
+ * A zero endpoint falls back to linear.
+ * why: lessons/kit-radio-gran.md#geometric
  */
 const GEOMETRIC = new Set(['rate', 'size', 'scycle', 'sxover', 'noisetone', 'taptimes']);
 const blend = (a, b, k, geo) =>
   (geo && a > 0 && b > 0 ? a * ((b / a) ** k) : a + (b - a) * k);
 
 /**
- * One sound on the way to another.
- *
- * `k` is 0 at `a` and 1 at `b`. What comes back is a whole set of continuous
- * values plus the discrete patch that should be LOADED at this instant, so a
- * caller never has to decide which side of the crossover it is on twice.
- *
- * 🔴 `scan` IS INTERPOLATED ONLY WHEN BOTH ENDS AGREE ABOUT WHAT IT MEANS. In
- * STRETCH it is a speed, in POSITION a place, in DELAY a lag: halfway between
- * a speed and a lag is neither, and writing it would move the read head
- * somewhere neither patch asks for while the page reports a morph going
- * smoothly. When the modes differ it steps with the mode.
+ * One sound on the way to another: `k` 0 at `a`, 1 at `b`; returns continuous values and
+ * the discrete patch to load now. `scan` interpolates only when both modes agree.
+ * why: lessons/kit-radio-gran.md#morph-of
  */
 export function morphOf(a, b, k) {
   const t = Math.min(1, Math.max(0, k));
@@ -754,17 +560,9 @@ export function morphOf(a, b, k) {
 }
 
 /**
- * The half that can be a value in between, written to the engine.
- *
- * ⚠️ `skip` IS NOT AN OPTIMISATION, IT IS WHAT STOPS TWO WRITERS FIGHTING. A
- * modulated destination is written 25 times a second by `createModulator` from
- * `base + modulation`; a morph writing the same control at the same rate makes
- * the two alternate, which is a 25 Hz square wave on a control that is supposed
- * to be gliding. A morph moves the BASE of a routed destination and writes
- * everything else itself.
- *
- * 🔴 IN A DELAY MODE THE WINDOW MUST BE THE WHOLE LAP, AND IT IS ENFORCED HERE
- * RATHER THAN TRUSTED TO A TABLE. Only STRETCH and POSITION may carry a window.
+ * The interpolable half. `skip` leaves routed destinations to the modulator, or the two
+ * writers alternate at 25 Hz. A delay mode forces the window to the whole lap.
+ * why: lessons/kit-radio-gran.md#write-continuous
  */
 export function writeContinuous(eng, v, { scanmode, bufSeconds = BUF_SECONDS, skip = null } = {}) {
   const delayMode = scanmode >= 3;
@@ -776,16 +574,15 @@ export function writeContinuous(eng, v, { scanmode, bufSeconds = BUF_SECONDS, sk
   if (!no('swarm')) setBoth(eng, 'swarm', v.swarm);
   if (!no('strum')) setBoth(eng, 'strum', v.strum);
   setBoth(eng, 'tilt', v.tilt);
-  // ⚠️ A DELAY MODE IS FORCED TO THE WHOLE LAP AND NOT SKIPPABLE. `routesOf`
-  // has already refused a routing onto these there, so `skip` cannot hold them
-  // and there is nothing to fight with.
+  // A delay mode is forced to the whole lap; routesOf already refuses routes onto it.
+  // why: lessons/kit-radio-gran.md#write-continuous-window
   if (delayMode) { setBoth(eng, 'winstart', 0); setBoth(eng, 'winend', 1); }
   else {
     if (!no('winstart')) setBoth(eng, 'winstart', v.winstart);
     if (!no('winend')) setBoth(eng, 'winend', v.winend);
   }
-  // ⚠️ THE READ HEAD IS WRITTEN LAST OF THE GRANULATOR'S SETTINGS, because which
-  // command it is depends on the mode, and the mode has to be the one in force.
+  // Read head last: its command depends on the mode in force.
+  // why: lessons/kit-radio-gran.md#write-continuous-scan
   if (!no('scan')) {
     if (delayMode) setBoth(eng, 'delay', v.scan * bufSeconds);
     else setBoth(eng, 'scan', v.scan);
@@ -820,31 +617,10 @@ export function writePatch(eng, p, opts = {}) {
 // ── the grain clock, tuned to a loop ───────────────────────────────────────
 
 /**
- * 🔴 THE WHOLE TEMPO QUESTION, ANSWERED IN ARITHMETIC.
- *
- * A loop is an `AudioBuffer` of an exact number of samples played with
- * `loop = true`, so its period is exactly that many samples: MEASURED by looping
- * 384000 samples of noise and finding the lag at which the recording repeats,
- * 384000 at speed 1 and 768000 at 0.5, BIT IDENTICAL, residual exactly 0. The
- * grain clock is `Phasor.ar(t_sync, mrate x SampleDur)` in the same context, so
- * its period is exactly `SampleRate / mrate` samples: MEASURED from the engine's
- * own output over 24 grains, **24000.0 +/- 0.2 samples against 24000 asked
- * for**, twice. Two exact periods can be made to divide each other, and then
- * they never drift.
- *
- * A figure of `elen` steps at `rate` grains a second has a bar of `elen / rate`
- * seconds, and this is the nearest rate that fits a WHOLE NUMBER of those bars
- * into the loop. The nudge is at most half a bar's worth.
- *
- * ⚠️ IT LOCKS TO THE LOOP'S LENGTH AT SPEED 1. Every loop speed offered here is
- * a power of two, so a loop that is `k` bars long at speed 1 is `k x 2^m` bars
- * long at any of them: still whole, still locked, nothing to recompute.
- *
- * ⚠️ FEWER THAN TWO BARS IN THE LOOP IS REFUSED RATHER THAN FUDGED. Halving a
- * grain rate to make one bar fit would be a page changing the sound to satisfy
- * its own arithmetic, and the refusal has to be said in words.
- *
- * @returns {{rate: number|null, laps: number, bars: number, why: string}}
+ * Nearest grain rate that fits a whole number of `elen / rate` bars into the loop. Both periods
+ * are sample exact (measured 24000.0 +/- 0.2 samples), so they never drift. Fewer than two bars
+ * is refused, not fudged. @returns {{rate: number|null, laps: number, bars: number, why: string}}
+ * why: lessons/kit-radio-gran.md#lock-rate
  */
 export function lockRate(seconds, { rate, elen = 1, name = 'this sound', subdivide = false } = {}) {
   if (!(seconds > 0) || !(rate > 0)) return { rate: null, laps: 0, bars: 0, why: 'there is no loop' };
@@ -852,16 +628,9 @@ export function lockRate(seconds, { rate, elen = 1, name = 'this sound', subdivi
   const bars = seconds * rate / n;
   const laps = Math.round(bars);
   if (laps < 2) {
-    // 🔴 THE OTHER WAY THE TWO PERIODS CAN DIVIDE EACH OTHER, AND WITHOUT IT
-    // SHORT LOOPS NEVER LOCK AT ALL. A figure longer than half the loop cannot
-    // fit into it twice, and the refusal above is right about that. It is not
-    // the only lock available: if the LOOP fits a whole number of times into
-    // the BAR, the two periods still divide each other exactly and the figure
-    // simply takes `m` laps to finish. MEASURED on `/videoradio/` before this
-    // existed: with laps of two and three seconds most of the twelve sounds
-    // refused every time, which reads in the log as the page failing rather
-    // than as arithmetic declining. Off by default, because a page that plays
-    // one long loop has no such problem and should hear the refusal.
+    // The other lock: the loop fits a whole number of times into the bar, and the figure takes
+    // `m` laps. Off by default; short loops otherwise never lock.
+    // why: lessons/kit-radio-gran.md#lock-rate-subdivide
     if (subdivide) {
       const m = Math.max(1, Math.min(64, Math.round(1 / Math.max(1e-6, bars))));
       return { rate: n / (seconds * m), laps: 1 / m, bars,
@@ -881,20 +650,9 @@ export function lockRate(seconds, { rate, elen = 1, name = 'this sound', subdivi
 // ── the six numbers the instrument listens to ──────────────────────────────
 
 /**
- * 🔴 LIFTED, NOT REWRITTEN, AND THE TWO GUARDS ARE WHY.
- * `plans/plan-audio-shader.md §8 step 2` says it in as many words: `meterTick` is
- * already written, already tuned, and already carries the two things a second
- * author would miss. An empty FFT bin reports `-Infinity`, and one NaN in the
- * sum poisons every follower at once; and the flux is POSITIVE ONLY, because a
- * decay is not an event.
- *
- * ⚠️ THE ANALYSER MUST HAVE `smoothingTimeConstant = 0`. `getFloatFrequencyData`
- * applies it PER CALL, so a flux follower on a smoothed analyser measures the
- * blend rather than the programme, and the same page reads differently at 60,
- * 72, 90 and 120 Hz.
- *
- * ⚠️ THE BUFFERS ARE HOISTED. Three typed arrays a frame at 60 Hz is 1.4 MB a
- * second of garbage for numbers that are overwritten immediately.
+ * Lifted from meterTick with its guards: -Infinity bins must not reach the sum, flux is positive only.
+ * The analyser needs smoothingTimeConstant = 0; buffers are hoisted (1.4 MB/s of garbage otherwise).
+ * why: lessons/kit-radio-gran.md#create-features
  */
 export function createFeatures(analyser, sampleRate) {
   const bins = analyser.frequencyBinCount;
@@ -950,31 +708,15 @@ export function createFeatures(analyser, sampleRate) {
 }
 
 /**
- * A reported grain position, moved onto the axis a page draws.
- *
- * Pappus records into a sixty-second ring and reads grains out of a window
- * `mbuflen` seconds long, and `/pgrain`'s `pos` is a fraction of the RING. A
- * page drawing on a picture of the live window has to rescale, or every mark
- * lands in the left 13% of it. `RING_SECONDS` is exported by `pappus.mjs` for
- * the same reason this is exported here: a number typed twice can disagree with
- * the buffer it describes.
+ * A `/pgrain` pos (fraction of the ring) moved onto the live window's axis.
+ * why: lessons/kit-radio-gran.md#win-pos
  */
 export const winPos = (p, ringSeconds, bufSeconds = BUF_SECONDS) =>
   Math.min(1, Math.max(0, (p ?? 0) * ringSeconds / bufSeconds));
 
-// ── the tour: a page working its own instrument ────────────────────────────
-//
-// 🔴 EVERY PHASE IS A FUNCTION OF THE CLOCK AND NOTHING IS AN ACCUMULATOR.
-// `pappus-mod.mjs` makes the argument and it applies to anything left running
-// for hours: a late tick, a dropped tick or a backgrounded tab costs
-// RESOLUTION and never POSITION, because the next tick still reads the tour
-// exactly where it should be. A counter incremented per tick comes back from a
-// minimised window playing a sound it should have left twenty minutes ago.
-//
-// ⚠️ THE ARITHMETIC IS PURE AND TAKES NO ENGINE, so a page can grade it with
-// nothing running. `tourAt` is total: every real `elapsedMs` and every `n >= 1`
-// answers, including a negative elapsed, which is what a page that seeds the
-// clock BACKWARDS to open on the sound already loaded hands it.
+// Every phase is a function of the clock, never an accumulator, so a late tick costs
+// resolution, not position. Pure and total, negative elapsed included.
+// why: lessons/kit-radio-gran.md#tour
 export const DWELL_MS = 22000;          // how long one sound is held
 export const MORPH_MS = 9000;           // how long the slide into the next takes
 export const SLOT_MS = DWELL_MS + MORPH_MS;
@@ -1003,17 +745,9 @@ export function tourAt(elapsedMs, n, { dwellMs = DWELL_MS, morphMs = MORPH_MS } 
 }
 
 /**
- * 🔴 THE BLEND IS A FUNCTION OF WHERE THE TOUR IS, NOT A FREE-RUNNING SHAPE,
- * and the difference is legible rather than cosmetic. It opens from the station
- * toward the granulator over the first half of a sound and comes back over the
- * second, so the handover between two sounds always happens while the station
- * is still audible. A sine on a clock of its own eventually puts the deepest
- * part of the granulator exactly on a crossover, which is the one moment the
- * instrument has least to say.
- *
- * ⚠️ NEITHER END IS 0 OR 1. At 0 the granulator is inaudible and any picture of
- * it is drawing something nobody is hearing; at 1 the station is gone and what
- * is left is an instrument with no material.
+ * Blend follows the tour position: out toward the granulator and back within one sound, so
+ * handovers happen while the station is audible. Neither end is 0 or 1.
+ * why: lessons/kit-radio-gran.md#breathe
  */
 export const breathe = (within, lo, hi) =>
   lo + (hi - lo) * (0.5 - 0.5 * Math.cos(2 * Math.PI * within));

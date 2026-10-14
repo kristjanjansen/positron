@@ -1,28 +1,7 @@
-// demo/shell/presence-test.mjs — the presence rule, with no browser at all.
-//
+// demo/shell/presence-test.mjs: the presence rule, with no browser at all.
 //   node demo/shell/presence-test.mjs
-//
-// `presenceOf` and `wirePresence` are pure: no clock, no socket, no element. So
-// the whole of the policy is gradable here, which matters more than usual for
-// this subject, because THE PAGE THAT SHOWS IT CANNOT BE GRADED BY WATCHING.
-// The thing on the far end is a Raspberry Pi in another building; the failure
-// this component exists to stop is a badge that says `offline` about a board
-// that is fine, in the two seconds before the first heartbeat lands, and you
-// only ever see it if you happen to be looking at the right two seconds.
-//
-// SIX OF THESE ARE NEGATIVE CONTROLS: they are written so the bug they name
-// would fail them, rather than so today's code passes. Two of them were proved
-// by breaking the module on purpose:
-//
-//   1  the `coming` check moved above the `online` check, which is the
-//      plausible ordering bug: a board answering normally would pulse as
-//      "coming online" for as long as a page forgot to clear its own flag.
-//      MEASURED 28/28 -> 27/28, and the one that went red is the one written
-//      for it.
-//   2  the "never heard, nobody listening" case answering `offline` instead of
-//      `unknown`, which is the exact defect the fourth state exists to prevent.
-//      MEASURED 28/28 -> 25/28, and the third failure is the good one: the
-//      walk at the bottom stops reaching all four states at all.
+// Six negative controls; two were proved by breaking the module on purpose.
+// why: lessons/kit-presence.md#test-header
 
 import { presenceOf, wirePresence, PRESENCE_STATES, SAYS, WIRED, MISSES } from './presence.mjs';
 
@@ -87,9 +66,7 @@ ok('and `misses` widens it too',
 console.log('\n== what has not been measured ==');
 
 // ── 6. NEGATIVE CONTROL: silence at the start is not absence ────────────────
-// 🔴 THIS IS THE STATE THE COMPONENT EXISTS FOR. A page that opens on
-// `offline` is asserting a measurement of hardware in another building that it
-// has not taken. CLAUDE.md: "we did not look" must not read as "it is missing".
+// why: lessons/kit-presence.md#test-silence-at-start
 ok('NEGATIVE CONTROL: nothing heard and no time passed is unknown, not offline',
   board({ now: at(1_200), since: at(0) }) === 'unknown',
   '1.2 s after joining the room, nothing has answered');
@@ -108,10 +85,8 @@ ok('NEGATIVE CONTROL: with nobody listening it stays unknown, however long',
   'a day later, still unknown');
 
 // ── 9. NEGATIVE CONTROL: a stamp from the future is not a measurement ───────
-// Every envelope on this relay carries `at`, written by the SENDER's own clock.
-// A board running three minutes fast would read as freshly heard from forever
-// after it died, which is the worst shape a presence badge has: confidently
-// green about something that is gone.
+// `at` is the sender's clock; a fast clock must not read as freshly heard.
+// why: lessons/kit-presence.md#test-future-stamp
 ok('NEGATIVE CONTROL: heard from the future reads unknown, not online',
   board({ now: at(10_000), lastSeenAt: at(190_000) }) === 'unknown',
   'a stamp 3 minutes ahead of this clock');
@@ -119,9 +94,8 @@ ok('NEGATIVE CONTROL: heard from the future reads unknown, not online',
 console.log('\n== coming online ==');
 
 // ── 10. it beats both greys ─────────────────────────────────────────────────
-// Yoshimi takes ten to forty seconds to come up on a cold board. For all of it
-// the honest answer is that something is happening, and `offline` there reads
-// as a dead button.
+// A cold synth takes 10 to 40 s to come up, and offline there reads as a dead button.
+// why: lessons/kit-presence.md#test-beats-greys
 ok('a deliberate start beats an empty room',
   board({ now: at(30_000), since: at(0), comingSince: at(28_000) }) === 'coming',
   'nothing has ever answered, and a start is 2 s old');
@@ -131,9 +105,8 @@ ok('and it beats a board that has gone quiet',
   '39 s of silence, but something is being started');
 
 // ── 11. NEGATIVE CONTROL: and it loses to a beat ────────────────────────────
-// The ordering bug. With the `coming` check above the `online` one, a board
-// that is answering normally shows a pulsing badge for as long as a page forgot
-// to clear its flag, which reads as "still starting" about a thing that started.
+// The ordering bug: `coming` checked above `online`.
+// why: lessons/kit-presence.md#test-loses-to-beat
 ok('NEGATIVE CONTROL: a live beat outranks a start that is still flagged',
   board({ now: at(30_000), lastSeenAt: at(29_000), comingSince: at(28_000) }) === 'online',
   'beat 1 s ago, start flagged 2 s ago');
@@ -162,9 +135,8 @@ ok('a start that has not begun yet is not coming',
 console.log('\n== the rule refuses what it cannot answer ==');
 
 // ── 15. no default for the interval ─────────────────────────────────────────
-// 🔴 A DEFAULT HERE WOULD BE A BADGE THAT FLICKERS GREY ON WORKING HARDWARE.
-// One second against a five-second beat calls the board gone between every
-// beat, and the person who goes to look at the board finds nothing wrong.
+// A 1 s default against a 5 s beat flickers working hardware grey.
+// why: lessons/kit-presence.md#test-no-default
 {
   let threw = null;
   try { presenceOf({ now: at(0), lastSeenAt: at(0) }); } catch (e) { threw = e.message; }
@@ -204,12 +176,8 @@ ok('NEGATIVE CONTROL: a page with no socket reads unknown, not offline',
   wirePresence({}).why);
 
 // ── 19. the reason survives, because the reason is the useful part ──────────
-// `openWire` asks `/room/<name>/stats` when an upgrade fails and can say "the
-// room is full at 16 of 16". A badge that drops that is a badge that sends
-// somebody to debug a Pi over a relay that refused the socket.
-// ⚠️ THE FIXTURE IS `wire.mjs`'s OWN SENTENCE and was copied from it, so it
-// changed when that sentence lost its middot on 2026-09-19. A fixture that
-// drifts from the string it stands for is a test about nothing.
+// The fixture is `wire.mjs`'s own refusal sentence; keep it in step with that string.
+// why: lessons/kit-presence.md#test-reason-survives
 {
   const full = 'the room is full at 16 of 16 sockets';
   const r = wirePresence({ ready: 3, refusal: full });
@@ -232,10 +200,8 @@ ok('and a reconnect says so rather than looking like a first attempt',
 console.log('\n== the words ==');
 
 // ── 21. every DERIVED state is reachable ────────────────────────────────────
-// A state no input can produce is dead code wearing a colour.
-// ⚠️ `checking` IS NOT ONE OF THEM AND MUST NOT BE. It is not a fact about the
-// far end: it is this page saying a question is out, so no arrangement of
-// heartbeats may produce it. The control at the bottom is that half.
+// `checking` is not derived: it is the page's question, so no heartbeat may produce it.
+// why: lessons/kit-presence.md#test-reachable
 {
   const walk = [
     board({ now: at(1_000), since: at(0) }),
@@ -260,23 +226,15 @@ console.log('\n== the words ==');
 }
 
 // ── 23. nothing a visitor reads carries an em dash ──────────────────────────
-// CLAUDE.md, checked in code rather than swept by hand, for the same reason
-// `looper-test.mjs` checks it: a formatter can put one back on every string at
-// once and a sweep cannot see that coming.
+// why: lessons/kit-presence.md#test-no-em-dash
 ok('no em dash in anything the badge says',
   [...Object.values(SAYS), ...Object.values(WIRED)].every((s) => !s.includes('—')),
   `${Object.values(SAYS).length + Object.values(WIRED).length} words`);
 
 // ── 23b. `WIRED` covers every state, and collides on purpose ────────────────
-// 🔴 IT BREAKS THE RULE CHECK 22 MAKES, AND THAT IS THE POINT OF WRITING IT
-// DOWN. Five states map onto THREE words: `checking` and `coming` both read
-// `connecting`, because a cable has no difference between *we are asking* and
-// *it is starting up*; `unknown` and `offline` both read `not connected`, which
-// was asked for directly (*"unknown: not connected"*, 2026-09-21).
-// ⚠️ SO THE DOT CARRIES THE WHOLE DISTINCTION between the collided pairs, and
-// `unknown` is drawn as a hollow ring for exactly that reason. A future reader
-// who "fixes" this to satisfy check 22 has undone an instruction, which is why
-// the collision is asserted rather than merely tolerated.
+// Five states, three words, unlike check 22: the hollow dot carries the difference.
+// The collision is asserted so nobody fixes it.
+// why: lessons/kit-presence.md#test-wired-collides
 {
   const missing = PRESENCE_STATES.filter((s) => typeof WIRED[s] !== 'string' || !WIRED[s]);
   ok('WIRED has a word for every state, and it is three words for five',
@@ -302,10 +260,7 @@ ok('no em dash in anything the badge says',
 }
 
 // ── NEGATIVE CONTROL: a heartbeat never invents `checking` ────────────────
-// The state means "we asked and nobody has answered yet", which is a fact about
-// the PAGE and not about the board. If a derivation could produce it, the grey
-// axis would stop meaning what it says: a reader could not tell a question that
-// is out from a thing that is genuinely unmeasured.
+// why: lessons/kit-presence.md#test-never-invents-checking
 {
   const cases = [
     { now: at(1_000) },

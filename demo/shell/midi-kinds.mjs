@@ -1,22 +1,11 @@
-// demo/shell/midi-kinds.mjs — the one list of MIDI message kinds.
-//
-// 🔴 THREE LISTS DISAGREED UNTIL 2026-10-03, AND THIS IS STEP 0 OF BOTH
-// `plans/plan-route-core.md` AND `plans/plan-universal-routing.md`.
-// `bay.mjs` said `bend` and `touch` and had no `transport`; `rig/board/alsa.mjs`
-// said `pitchbend` and `aftertouch` and had one; `rig/board/inputs.mjs` named
-// its refusals in neither. A patch written against one was refused by another
-// for a spelling, which reads as a broken link rather than a vocabulary.
-//
-// ⚠️ PURE AND IMPORT FREE ON PURPOSE. `rig/board/push.sh` ships only the
-// `../../demo/shell/` files a `rig/board/*.mjs` imports DIRECTLY, and does not
-// follow imports of imports, so this file must never import anything.
+// demo/shell/midi-kinds.mjs: the one list of MIDI message kinds for bay.mjs and rig/board.
+// Imports nothing: rig/board/push.sh ships only files a board module imports directly.
+// why: lessons/kit-midi-kinds.md#header
 
 /**
- * Every kind a port may accept or refuse, and a link may carry.
- * ⚠️ `sysex` IS HERE SO THAT IT CAN BE REFUSED BY NAME.
- * ⚠️ `clock` AND `transport` ARE TWO KINDS. A port that wants tempo and not
- * somebody else's start and stop is an ordinary request, and one kind could
- * not say it.
+ * Every kind a port may accept or refuse, and a link may carry. `sysex` is here to be refused
+ * by name; `clock` and `transport` are two kinds so a port can want tempo without start/stop.
+ * why: lessons/kit-midi-kinds.md#kinds
  */
 export const KINDS = ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'transport', 'sysex'];
 
@@ -30,9 +19,9 @@ export function canonKind(name) {
 }
 
 /**
- * The kind of a raw message, from its status byte, or 'other'.
- * Running status is not handled: a message here always carries its status.
- * ⚠️ NOTE OFF IS A NOTE, and so is a note on at velocity 0.
+ * The kind of a raw message from its status byte, or 'other'. No running status.
+ * Note off is a note, and so is a note on at velocity 0.
+ * why: lessons/kit-midi-kinds.md#kind-of
  */
 export function kindOf(bytes) {
   const st = bytes?.[0];

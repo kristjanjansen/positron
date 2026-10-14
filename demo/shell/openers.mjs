@@ -1,36 +1,7 @@
-// demo/shell/openers.mjs: what opens a described link for real, chosen by the
-// transport its session names.
-//
-// 🔴 STEP 2 OF `plans/plan-routing-migration.md`, 2026-10-06. Eight openers and
-// `holdSource` lived in `/patchbay/` and nowhere else (plan §3.2), each tied to
-// a `web:` end, so a page that wanted to open a link had to copy them. They are
-// lifted here VERBATIM IN WHAT THEY SEND: the same board verbs (`input.want` and
-// its lease, `audio.start`, `video.start` and `video.watching`, `midi.send`,
-// `note.on`), the same ingest protocol, the same fetch back from R2. What
-// changed is how one is chosen, and who owns the page's ends.
-//
-// 🔴 DISPATCH IS ON `session.transport`, NOT ON THE MEDIUM (stage plan F2). The
-// page's own `kindOf` sent ANY video link into its screen to the Pi's
-// `video.start`, whatever the bay had said the link rides. Here a link's
-// session names a transport and only an opener for THAT transport may take it:
-// `relay-h264` is the board's picture, `relay` and `datachannel` its sound,
-// `ingest` a recording, `https` a playback, and a light link (no session) is
-// `bytes`. A link whose transport has no opener is refused in words, `nothing
-// here opens whep yet`, rather than handed to the nearest opener of its medium.
-// ⚠️ THAT ONLY WORKS BECAUSE THE BOARD'S PORTS SAY HOW THEY TRAVEL
-// (`graph-registry.mjs` `BOARD_TRANSPORTS`), so the bay picks `relay-h264` from
-// the WHEP cell for the board's video. Without it the board's picture would be
-// `whep` and nothing here would open it, which is the honest answer to a port
-// that does not say.
-//
-// 🔴 A LINK OUT OF ANOTHER PAGE'S PORT IS OPENED BY THAT PAGE (`remote`), before
-// any transport is looked at: `/partitur/` owns its lanes, so the asker sends
-// `link.request` and believes the `link.state` that comes back.
-//
-// ⚠️ NO GUARD FOR THE HARNESS IS IN HERE, ON PURPOSE. Whether a press may open
-// anything is the page's policy (`/patchbay/`'s `openLink` refuses under
-// `?selfcheck=1`), and a page grades that guard by handing it counting openers
-// in place of these. Every opener here reaches real hardware or a real bucket.
+// demo/shell/openers.mjs: what opens a described link for real, chosen by the transport
+// its session names (`relay-h264`, `relay`, `ingest`, `https`, `bytes`, ...), never by
+// medium. Another page's port is opened by that page. Harness guards are the page's.
+// why: lessons/kit-openers.md#header
 
 import { el } from './shell.mjs';
 import { createBoard } from './board.mjs';
@@ -47,8 +18,9 @@ export const RENEW_MS = 20_000;
 export const SEG_MS = 4000;
 
 /**
- * 🔴 WHICH OPENERS MAY TAKE A LINK, BY THE TRANSPORT ITS SESSION NAMES. A
- * transport missing here is one nothing in this file opens yet, and says so.
+ * Which openers may take a link, by its session's transport. A transport missing here
+ * is one nothing in this file opens yet, and says so.
+ * why: lessons/kit-openers.md#by-transport
  */
 export const BY_TRANSPORT = {
   bytes: ['keys', 'notes'],
@@ -57,24 +29,21 @@ export const BY_TRANSPORT = {
   'relay-h264': ['video'],
   ingest: ['record'],
   https: ['play'],
-  // A link inside one board's JACK graph, 2026-10-11: the board applies it.
+  // A link inside one board's JACK graph: the board applies it.
+  // why: lessons/kit-openers.md#jack-transport
   jack: ['jack'],
 };
 
 /**
- * 🔴 ONE LEASE HELPER, plan §4 step 2. A board capture is a lease: asked for,
- * renewed every `everyMs`, and dropped by the board when nobody renews it. The
- * page had this inline in `holdSource`, `/away/` has its own; this is the one.
- * ⚠️ ASK ONLY ONCE THE SOCKET IS OPEN. Measured 2026-10-04: an `input.want` sent
- * the moment the board was created went nowhere, the page logged `nothing
- * answered`, and the stream stood open at 0 frames. `createLease` is called
- * after the board's socket has opened, and asks at once.
+ * A board capture lease: asked for, renewed every `everyMs`, dropped by the board when
+ * nobody renews. Ask only once the socket is open; an earlier ask goes nowhere.
  * @param {object} o
  * @param {Function} o.ask     `board.ask`: `(msg, replyType, timeoutMs) => Promise<reply|null>`
  * @param {string} [o.type]    the verb, `input.want`
  * @param {string} [o.reply]   its answer, `input.wanted`
  * @param {string} [o.what]    what a log line calls the thing leased
  * @returns {{ stop(): void, renewals(): number, last(): object|null }}
+ * why: lessons/kit-openers.md#create-lease
  */
 export function createLease({ ask, type = 'input.want', reply = 'input.wanted', everyMs = RENEW_MS, timeoutMs = 6000,
   what = 'the capture', log = () => {} } = {}) {
@@ -156,14 +125,9 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   }
 
   /**
-   * 🔴 ONE BOARD PER SOUND, HOWEVER MANY LINKS USE IT. Listening and recording
-   * the same input are two links and one capture: a second lease on the same
-   * room would be a second socket asking the Pi for what it already sends. So
-   * the source is held by count, and the last link to let go closes it.
-   * ⚠️ IT IS SILENT UNTIL A LINK SAYS OTHERWISE. The board's playout goes to
-   * the speakers by default, and a record link alone must not play a sound
-   * nobody linked to this screen, so the speaker edge is taken off here and the
-   * listen link puts it back.
+   * One board per sound, held by count; the last link to let go closes it. Silent until
+   * a listen link puts the speaker edge back, so a record link alone plays nothing.
+   * why: lessons/kit-openers.md#hold-source
    */
   const sources = new Map();          // room -> { users, ready, board, ctx, out, lease }
   function holdSource(room) {
@@ -239,26 +203,21 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   }
 
   async function video(l, b) {
-    // 🔴 THE ROOM IS THE BOARD NODE'S PLACE, NOT THE PORT'S SITE. They were the
-    // same string until 2026-10-10, when the Pi's site became `pi-1` and its
-    // room stayed `studio-1` (plans/plan-site-names.md §0); asking the site
-    // would send `video.start` to a room nobody is in.
+    // The room is the board node's place, not the port's site (pi-1 lives in studio-1).
+    // why: lessons/kit-openers.md#room-is-place
     const room = b?.node(nodeOf(l.from))?.place ?? l.from.split(':')[0];
     if (typeof VideoDecoder !== 'function') throw new Error('this browser has no WebCodecs, so the board’s video cannot be decoded here');
-    // 🔴 SIZE AND RATE ARE THE LINK'S, `{ w 640, h 360, fps 15 }` (link-options.mjs).
-    // A link with none asks 1280x720 at 30, the message this sent before. The
-    // bay has checked them already; checked again here because a link object
-    // can be built without the bay, and the board clamps rather than refusing.
+    // Size and rate are the link's (link-options.mjs), default 1280x720 at 30. Checked
+    // again here because a link can be built without the bay, and the board clamps.
+    // why: lessons/kit-openers.md#video-options
     const bad = checkOptions('video', l.options);
     if (bad) throw new Error(bad.why);
     const ask = videoStart(l.options);
     const board = await boardOn(room);
     const r = await board.ask(ask, 'video.started', 20000);
     if (!r || !r.ok) { board.close(); throw new Error(r ? (r.reason || 'the board refused') : 'the board did not answer within 20 s'); }
-    // ⚠️ ONE ENCODER, SO THE FIRST VIEWER'S SIZE WINS. A board already drawing
-    // answers `already: true` with the shape it is drawing, and this link gets
-    // that shape, said in the log rather than pretended away (§4e: two viewers
-    // asking different sizes is the lease's question, not answered here).
+    // One encoder, so the first viewer's size wins; this link logs the shape it got.
+    // why: lessons/kit-openers.md#first-viewer-wins
     if (r.w && (r.w !== ask.w || r.h !== ask.h || r.fps !== ask.fps)) {
       log(`asked for ${ask.w}x${ask.h} at ${ask.fps}, and the board is ${r.already ? 'already ' : ''}drawing ${r.w}x${r.h} at ${r.fps}, so that is what this link shows`, 'warn');
     }
@@ -313,17 +272,9 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   }
 
   // ── recording into the store, and playing it back ──────────────────────
-  //
-  // 🔴 PLAN-UNIVERSAL-ROUTING §10 ITEM 5, *"record is a link to R2 or the store
-  // object"*, 2026-10-04. A link into a store is opened by the page that hears
-  // the sound: it holds the source the way listening does, taps the decoded
-  // sound into a MediaRecorder, and ships four second pieces through ingest's
-  // tokenless protocol (`POST /open`, `PUT /seg/<session>/<n>?fmt=webm`, `POST
-  // /close`). Closing stops the recorder, waits for the last piece and closes
-  // the session, which writes `manifest.json`.
-  // ⚠️ WEBM HAS NO HLS. The worker writes a playlist only for MPEG-TS, so the
-  // playback fetches every piece and joins them into one Blob, which plays
-  // because only the first piece carries the WebM header.
+  // Records the held source to WebM and ships 4 s pieces through ingest (open, seg, close).
+  // WebM gets no HLS playlist, so playback joins every piece into one Blob.
+  // why: lessons/kit-openers.md#record
   const kb = (n) => `${Math.round(n / 1024)} KB`;
   async function record(l, b) {
     const room = b.port(l.from).address;
@@ -403,14 +354,9 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   }
 
   /**
-   * 🔴 THE NOTES RUN THROUGH THE ROUTING CORE, WHICH IS WHAT MAKES THE PATCHBAY
-   * ONE PATCHBAY RATHER THAN TWO DEMOS. Each open MIDI link gets its own core:
-   * the keys are its input, the instrument its output, the link's transforms are
-   * its ops, and the instrument's `never` list is its gate. What comes out is
-   * what goes to the board, so a transform on the link really changes the note.
-   * ⚠️ NO `count()`: the board does not acknowledge a note, so the only number
-   * here is what this page SENT, and a badge reading `receiving` off it would be
-   * the queued-not-delivered count CLAUDE.md warns about.
+   * Notes run through a routing core per MIDI link (keys in, instrument out, transforms
+   * as ops, the instrument's `never` as gate). No `count()`: the board acks no note.
+   * why: lessons/kit-openers.md#keys
    */
   function keys(l, b, notes = false) {
     const to = b.port(l.to);
@@ -458,14 +404,9 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
   }
 
   /**
-   * 🔴 A LINK INSIDE THE BOARD'S JACK GRAPH, 2026-10-11. Nothing crosses a wire
-   * but the request: the page asks the board's room for `jack.link`, the board
-   * resolves the two ids from its OWN announcement, applies the rows and
-   * answers the graph read back. `count()` is the rows the board read back as
-   * connected, which is the far side; a page that wants to know whether they
-   * are still there asks `jack.links`.
-   * ⚠️ CLOSING UNLINKS, AND THE BOARD CUTS ONLY WHAT NOTHING ELSE WANTS: a link
-   * that repeats the board's own chain leaves the room sounding when it closes.
+   * A link inside the board's JACK graph: the page asks `jack.link`, the board resolves
+   * and applies it; `count()` is the rows read back. Closing cuts only what nothing else wants.
+   * why: lessons/kit-openers.md#jack
    */
   async function jack(l, b) {
     const room = l.session.address;

@@ -1,9 +1,7 @@
-// demo/shell/rt-typewriter.mjs: the runtime of a `typewriter` node on /connect/
-// (node-runtime.mjs): /typist/'s Hermes Precisa 305 (typist/sampler.mjs),
-// sounding what arrives on typewriter:value-in into typewriter:audio-out.
-// 🔴 THE SAMPLES ARE READ ON THE FIRST KEY, from the store linked into
-// typewriter:file-in (our own R2), never on a visit or a link. With no store
-// linked there is nothing to play, and it says so once.
+// demo/shell/rt-typewriter.mjs: a `typewriter` node on /connect/ (node-runtime.mjs), /typist/'s sampler
+// playing typewriter:value-in into typewriter:audio-out. Samples are read on the first key, from the store
+// linked into typewriter:file-in, never on a visit; with none linked it says so once.
+// why: lessons/kit-rt-typewriter.md#header
 
 import { createSamples, createVoice } from '/typist/sampler.mjs';
 

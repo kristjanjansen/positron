@@ -1,52 +1,25 @@
-// demo/shell/transport-bar.mjs — the ONE transport control.
-//
-// Factory is the primitive; <positron-transport> is a thin wrapper over it that
-// exists only for disconnectedCallback. No shadow DOM: shell.css cascades in,
-// and document.querySelector keeps working for CDP.
-//
-// Rules it enforces so no page has to remember them:
-//   · playhead from observePosition() — never a page-local rAF loop
-//   · scrub holds deck.range and re-derives when deck.rangeGen() moves
-//   · rates rendered FROM caps.rates, intersected across kinds; no lattice
-//     declared -> a static 1x label, never a slider
-//   · seek always via deck.seek() (two-phase: reduce + assertState)
-//   · any {degraded, reason} lands in the badge, never swallowed
-//   · a LIVE deck loops over a window that fills at the live edge — the bar
-//     owns the two numbers and the page owns the sound (see `liveWindowMs`)
+// demo/shell/transport-bar.mjs: the one transport control. The factory is the primitive;
+// <positron-transport> wraps it only for disconnectedCallback. No shadow DOM, so shell.css
+// cascades in and CDP can query it.
+// why: lessons/kit-transport-bar.md#header
 
 import { observePosition } from '/timeline/transport.mjs';
 import { el } from './shell.mjs';
 import { createChoice } from './choice.mjs';
-// 🔴 THE TOGGLE'S FACE IS AN ICON FROM THE KIT'S SET, NOT A FONT GLYPH IN
-// `::before`. Asked 2026-10-12: *"global: change transport buttons to proper
-// icon buttons"*. See `FACES` below.
+// The toggle's faces are icons from the kit's set, not font glyphs. See FACES.
+// why: lessons/kit-transport-bar.md#toggle-icons
 import { icon } from './icons.mjs';
-// 🔴 THE `LIVE` CHIP IS A PRESENCE BADGE NOW, AND IT IS THE PROJECT'S ONE
-// ONLINE INDICATOR. See `ON_AIR` below for why a hand-rolled span was the
-// defect rather than the style.
+// The live chip is a presence badge, the project's one online indicator. See ON_AIR.
+// why: lessons/kit-transport-bar.md#live-chip-import
 import { createPresence } from './presence.mjs';
-// 🔴 ONE TABLE FOR WHICH WAY A LOOP RUNS, AND IT ALREADY EXISTS. `looper.mjs`
-// owns the vocabulary because it owns the audio version of this control; a
-// second copy of the three glyphs here is how two pages end up disagreeing
-// about what the middle one means. `looper.mjs` imports nothing, so this is a
-// leaf dependency and not a cycle.
+// looper.mjs owns the loop-direction vocabulary; it imports nothing, so no cycle.
+// why: lessons/kit-transport-bar.md#loop-ways-import
 import { WAY_GLYPH, WAY_SAYS, LOOP_TURN, LOOP_WAYS } from './looper.mjs';
 
 /**
- * 🔴 WHAT A LIVE SOURCE'S BADGE SAYS, AND IT IS THE STANDARD INDICATOR WEARING
- * THIS PAGE'S WORDS. `presence.mjs` takes a `says` override precisely so that
- * `on air` costs a word rather than a component.
- *
- * ⚠️ THE FIVE WORDS ARE ABOUT THE SOURCE, NOT ABOUT THE PLAYER. `off air` is a
- * claim that nothing is arriving any more, which is what a listener wants to
- * know and what `LIVE` could never say. A page that has stopped listening on
- * purpose has no measurement to report and goes back to `unknown` rather than
- * accusing the station of dying.
- * ⚠️ AND THE SET DECIDES THE WIDTH. `presence.mjs` reserves the widest phrase
- * the badge can ever say, in characters, so `tuning in` at nine is what this
- * badge is as wide as. `checking` is kept as a WORD because the component
- * requires one for every state, and left out of `ON_AIR_CAN` because a
- * transport bar asks nobody a question: it hears sound or it does not.
+ * What a live source's badge says: presence.mjs words about the source, not the player.
+ * The widest word sets the badge width; `checking` is left out of ON_AIR_CAN.
+ * why: lessons/kit-transport-bar.md#on-air
  */
 export const ON_AIR = {
   online: 'on air',
@@ -59,42 +32,14 @@ export const ON_AIR = {
 export const ON_AIR_CAN = ['online', 'coming', 'offline', 'unknown'];
 
 /**
- * `scrub: false` — ONE POSITION SURFACE PER PAGE.
- *
- * A page that also mounts a strip has two horizontal time axes stacked on each
- * other, at different scales, with different left origins, and no way for a
- * reader to know they are the same axis. The strip is strictly the better of
- * the two: it carries the content as well as the position, and it has always
- * seeked on press AND on drag, which this bar did not. So where there is a
- * strip, the bar keeps what only it has — play/pause, the clock, the rates, the
- * degraded badge — and gives up the slider.
+ * `scrub: false`: one position surface per page. Where a strip is mounted, the bar keeps
+ * play/pause, the clock, the rates and the badge, and gives up the slider.
+ * why: lessons/kit-transport-bar.md#scrub-false
  */
 
 /**
- * 🔴 A BUTTON FOR THE BAR, BUILT BY THE BAR, BECAUSE `right` AND `left` TAKE
- * ELEMENTS AND A PAGE WAS THEREFORE TYPING THE CLASSES ITSELF.
- *
- * Asked for 2026-09-25 against `/stage/`: *"when I look at the transport uh,
- * play recording is has this huge font size and it's kind of off to the right
- * so please make it as a standard button"*.
- * 🔴 THE CAUSE, MEASURED RATHER THAN GUESSED: that page builds its button as
- * `el('button', 'tbar-x', 'PLAY RECORDING')` and hands it to `right`. `.tbar-x`
- * on its own is a GLYPH box in `shell.css`: `--tbar-btn` square, `display:
- * grid`, `place-items: center`, `font-size: 15px`. That is right for ▶ and ●
- * and wrong for a word. 15 px is the huge font, and a two-word label in a
- * fixed square is what pushed it about. The word treatment has existed the
- * whole time and is `tbar-x tbar-word`: width from the text, `--pad-bar` of
- * air, 11 px sans, `--dim`. It is the same class `extras: [{ word: true }]`
- * already applies, so nothing here is new styling.
- * ⚠️ `.tbar-x` IS NOT REPURPOSED AND MUST NOT BE. The glyph box is what the
- * loop's ways, `/take/`'s record and `/pack/`'s ‹ › all want, and it is the
- * selector `demo/verify.mjs` presses on every page. This only stops a caller
- * having to know the second class name.
- * ⚠️ AND IT IS `.tbar-x`, SO THE HARNESS PRESSES IT. That is deliberate and is
- * the difference from `loopSlot`, which uses `.tbar-slot` precisely so the
- * suite leaves it alone. A page whose bar button must not be pressed by the
- * suite should be in `loopSlot`, not here.
- *
+ * A button for `right` and `left`, built by the bar so a page never types its classes.
+ * It is `.tbar-x`, which the harness presses; a button the suite must not press goes in `loopSlot`.
  * @param {object} o
  * @param {string} o.label      the word, or the glyph when `word` is false.
  * @param {boolean} [o.word]    true for a word, which is the standard button.
@@ -103,6 +48,7 @@ export const ON_AIR_CAN = ['online', 'coming', 'offline', 'unknown'];
  * @param {boolean} [o.primary] the record treatment. Rarely what you want.
  * @param {(btn: HTMLButtonElement) => void} [o.onPress]
  * @returns {HTMLButtonElement} ready for `right: [...]` or `left: [...]`.
+ * why: lessons/kit-transport-bar.md#bar-button
  */
 export function barButton({
   label = '', word = false, aria, title, primary = false, onPress,
@@ -123,191 +69,69 @@ export function createTransportBar(host, deck, {
   // 'play' (the default), 'record', or TWO WORDS as an array: what the toggle
   // says it does. See the note on the toggle itself.
   verb = 'play',
-  // 🔴 `false` LEAVES THE LOOP BUTTON OFF, the way `scrub: false` already
-  // leaves the slider off. A loop is a claim that hearing a passage twice is
-  // worth a control, and that is true of a tape and of a live window and false
-  // of a page whose subject is whether a file arrived intact. `/crate/` plays
-  // an upload once to prove it came back whole, and LOOP there was a button
-  // nobody had a reason to press.
+  // `false` leaves the loop button off, for a page with no passage worth hearing twice.
+  // why: lessons/kit-transport-bar.md#loop-false
   loop: wantLoop = true,
   /**
-   * 🔴 `false` LEAVES THE PLAY BUTTON OFF, AND IT IS THE THIRD OF THIS FAMILY
-   * AFTER `scrub: false` AND `loop: false`. Asked for 2026-09-16: *"bring
-   * transport bar to keys but no play button, just online badge"*.
-   *
-   * WHY A BAR MAY HAVE NO TOGGLE. Play, pause and seek are all claims about a
-   * POSITION inside a sound: somewhere it has got to, somewhere it could be
-   * put instead. `/keys/` has none. A note sounds while a key is held, there is
-   * nothing to start, nothing to resume, and stopping is not a state the page
-   * can be in. A toggle there would be a control whose only honest behaviour is
-   * to do nothing, which is the shape of control this project calls a lie. What
-   * the bar still carries is the thing that IS true of the source: whether the
-   * instrument in the other building is answering. That is the chip.
-   *
-   * ⚠️ IT DISARMS EVERY OTHER CLAIM THAT DEPENDED ON PLAYING, rather than
-   * leaving them to read false by luck. `api.toggles` says so in one boolean so
-   * a check can ask; `api.playing` is FORCED false rather than derived, because
-   * a deck nobody starts can still be playing if a page started it another way
-   * and the bar has no business reporting that as its own state; the space bar
-   * stops being a play/pause key, because a key that toggles an absent button
-   * is worse than a missing shortcut; and the end-stop never arms, since there
-   * is no end to arrive at.
-   * ⚠️ AND `demo/verify.mjs` READS `api.toggles` BEFORE ITS PLAY DRILL. That
-   * drill clicks `.tbar-toggle` and asserts the position advanced, so without
-   * the flag a bar with no toggle would take the harness red on a page where
-   * nothing is wrong. There is no such page in the suite today, since `/keys/`
-   * is `built: false`, and the guard is here because the next one will be.
-   *
-   * 🔴 THE GUARD WAS PROVED BY BREAKING IT, AND THE BREAK FOUND A SECOND THING.
-   * MEASURED 2026-09-16: forcing this getter false took `/knobs/` from 34/34 to
-   * **11/11, still green** — the skip line printed, the two drill asserts went,
-   * and TWENTY-ONE MORE went with them. That drill's click is what starts the
-   * page: `/knobs/` declares `controls: []`, so the toggle is the only control
-   * a harness presses, and every check it has sits behind `startNote()`.
-   * ⚠️ SO A PAGE THAT PASSES `toggle: false` MUST NOT PUT ITS CHECKS BEHIND A
-   * PRESS. There is no press. Nothing is wrong on `/keys/`, which declares no
-   * asserts at all, and this is written down because the next page to take this
-   * option will not be so lucky, and 23 asserts vanishing while the run stays
-   * green is the worst shape a loss takes.
+   * `false` leaves the play button off. `api.toggles` says so, `api.playing` is forced false,
+   * space stops toggling and the end-stop never arms. A page using it must not put its checks
+   * behind a press: verify.mjs skips the play drill and nothing else presses.
+   * why: lessons/kit-transport-bar.md#toggle-false
    */
   toggle: wantToggle = true,
   /**
-   * 🔴 THE CLOCK IS OPTIONAL, AND A PAGE WITH A STRIP IS WHY. Asked 2026-09-18:
-   * *"rm times from transport bar"*, on a page whose strip already carries the
-   * position — the second half of the same report that took the slider off it
-   * (*"no need for slider / times in transport lane"*).
-   *
-   * This is the standing "one position surface per page" rule reaching the one
-   * control it had not reached. `scrub: false` already takes off the bar's
-   * SLIDER where a strip is present, on the reasoning that two horizontal time
-   * axes at different scales, stacked, is a contradiction rather than a
-   * redundancy. The clock is the same quantity a third time, in digits: the
-   * strip has a playhead, a ruler with numbers on it, and a gutter, so
-   * `0:04.120 / 3:00.000` beside it is a number nobody reads off the bar.
-   *
-   * ⚠️ IT DEFAULTS ON, because a bar with NO strip is the common case and there
-   * the clock is the only thing that can say where you are.
-   * ⚠️ AND IT DOES NOT TOUCH THE LIVE CHIP OR A PAGE'S OWN `chip`, which sit in
-   * the same slot and carry a different fact. Those are already exclusive of
-   * each other and of the clock; this only says the clock's own case is off.
+   * `false` drops the clock, for a page whose strip already shows the position.
+   * Defaults on; it does not touch the live chip or a page's own `chip`.
+   * why: lessons/kit-transport-bar.md#time-false
    */
   time: wantTime = true,
   /**
-   * 🔴 WHAT TAKES THE LOOP BUTTON'S PLACE ON A BAR THAT HAS NO LOOP. Asked for
-   * in those words, 2026-09-16: *"just replace looper with fullscreen button
-   * (make component slot-able)"*, for `/videoradio/`, whose bar wants a ⛶ where
-   * `/archive/radio/` has LOOP.
-   *
-   * ⚠️ IT IS A SEPARATE OPTION FROM `loopExtras` BECAUSE THOSE TWO MEAN
-   * DIFFERENT THINGS, and reusing one for the other would be a name that lies.
-   * A `loopExtras` button acts ON a loop and is hidden until there is one; a
-   * `loopSlot` button has nothing to do with looping and is simply what this bar
-   * keeps in that position. `/videoradio/`'s ⛶ is not a loop control that
-   * happens to be visible, it is the only thing in that slot.
-   *
-   * Same declaration shape as `extras`: `{ id, label, aria, title, word, onPress }`.
-   * `word: true` for a label rather than a glyph, exactly as `extras` takes it.
-   * Reachable afterwards as `bar.slot(id)`, so a check can press the real
-   * control and a page can relabel one.
+   * What takes the loop button's place on a bar with no loop. Same shape as `extras`
+   * (`{ id, label, aria, title, word, onPress }`), reachable as `bar.slot(id)`.
+   * why: lessons/kit-transport-bar.md#loop-slot
    */
   loopSlot = [],
   /**
-   * 🔴 BUTTONS THAT BELONG TO THE LOOP, SHOWN ONLY WHILE ONE IS RUNNING.
-   * `extras` sit by the play toggle and are always there, which is right for a
-   * transport verb like record and wrong for a thing that can only act on a
-   * loop: a control that is visible and inert is this project's named failure.
-   * These sit immediately RIGHT of the LOOP button, because that is the thing
-   * they modify, and they appear and vanish with it. ⚠️ THEY WERE ON THE LEFT
-   * AND WERE MOVED, ASKED FOR IN THOSE WORDS: *"move loop mode to right not
-   * left"*. LOOP is the verb and the extra is what it does; reading `[LOOP|→]`
-   * left to right gives the action and then its adverb, where `[→|LOOP]` gave
-   * a glyph with nothing yet to modify.
-   * `[{ id, label, aria, title, always, onPress(btn) }]`. `onPress` gets the
-   * button, so a page can read and set `aria-pressed` and keep the state where
-   * the DOM already holds it rather than in a second variable beside it.
-   *
-   * 🔴 `always: true` KEEPS ONE ON THE BAR WITH NO LOOP RUNNING, AND IT IS NOT
-   * AN EXCEPTION TO THE RULE ABOVE. That rule is about a control that can do
-   * nothing until there is a loop. A button that says WHICH WAY the next loop
-   * will play can be pressed before there is one and changes what the next
-   * press of LOOP does, so it is neither inert nor hidden: it is the same
-   * distinction `caps.mjs` draws between a thing you cannot do and a thing you
-   * have not done yet. `/archive/radio/` uses it for the direction button glued to
-   * LOOP, which is why the group below exists.
+   * Buttons that act on a loop, right of LOOP, shown only while one runs.
+   * `[{ id, label, aria, title, always, onPress(btn) }]`; `always: true` keeps one that
+   * sets what the next loop does (the direction) on the bar with no loop running.
+   * why: lessons/kit-transport-bar.md#loop-extras
    */
   loopExtras = [],
   /**
-   * 🔴 THE THREE DIRECTIONS, FOR A LOOP THE DECK ITSELF PLAYS. Asked for
-   * 2026-09-16: *"in draw allow < > <> loop mode"*.
-   *
-   * A page with an `AudioContext` gets this from `looper.mjs`, which mirrors a
-   * kept buffer and plays the copy. A page whose loop is a DECK has no buffer
-   * to mirror, and the deck cannot help: `transport.setRate` throws on a
-   * negative rate in as many words, `negative rate unsupported in v0`. So the
-   * bar drives a reversed lap itself, from its own clock, seeking the deck
-   * frame by frame while it is paused. See `startLap` below.
-   *
-   * ⚠️ NOT FOR A MEDIA-BACKED PAGE. `/replay/` refused these on the argument
-   * that a picture only runs forwards, and that argument still holds wherever
-   * the deck is a FOLLOWER of an element: seeking it backwards fights whatever
-   * is mastering it. This is for a deck that IS the thing being played, which
-   * on this site means a drawn record rather than a recording.
+   * The three loop directions for a loop the deck plays; the bar drives a reversed lap
+   * itself (transport.setRate refuses negative rates). Not for a media-backed deck.
+   * why: lessons/kit-transport-bar.md#loop-ways
    */
   loopWays = false,
   /**
-   * 🔴 AN ELEMENT IN THE LIVE CHIP'S PLACE. `/knobs/` asked for it in those
-   * words: *"on knobs: replace live"*. That position holds the one fact about
-   * the source that is not a number, and on a page playing an instrument in
-   * another building the fact worth having there is whether the instrument is
-   * answering at all. A `LIVE` chip and a presence badge are two claims about
-   * one source in one slot, so the bar takes either and refuses both.
+   * An element in the live chip's place; the bar takes a chip or `live`, never both.
+   * why: lessons/kit-transport-bar.md#chip
    */
   chip = null,
-  // A LIVE DECK HAS NO END. The bar arms a one-shot at range[1] and, when it
-  // fires, pauses the deck and parks the playhead there — right for a
-  // recording, wrong for a window whose right-hand end is the present moment,
-  // where that instant arrives a few seconds after play. Default unchanged.
+  // `false` for a live deck, whose end is the present moment and arrives seconds after play.
+  // why: lessons/kit-transport-bar.md#end-stop
   endStop = true,
-  // WHO OWNS POSITION. On a deck driven by a media element the deck is a
-  // FOLLOWER: a control that writes to the follower is undone by the master's
-  // next tick, silently and within a few hundred milliseconds. Such a page
-  // passes { play, pause, seek } that drive the element instead, and the deck
-  // follows as it always does. Defaults to the deck's own methods, so every
-  // existing caller behaves exactly as before.
+  // Who owns position: a media-driven deck is a follower, so such a page passes
+  // { play, pause, seek } that drive the element. Defaults to the deck's own methods.
+  // why: lessons/kit-transport-bar.md#command
   command = null,
   /**
-   * Called with the new rate the instant a rate button is pressed.
-   *
-   * 🔴 IT REPLACES A POLL, AND THE POLL WAS A THIRD OF A REPORTED DELAY.
-   * `/archive/radio/` owns the thing the rate actually acts on (an Icecast playout,
-   * not this deck's playhead), and the only way it could learn about a press
-   * was to read `deck.targetRate()` on a timer. That timer was 1 Hz — *"why
-   * rate change is so slooooooooow"* — then 120 ms, which is better and is
-   * still up to 120 ms of a control doing nothing before anything is even TOLD.
-   * `applyRate` is the single funnel for every rate change in this bar (the
-   * keyboard table has no rate keys), so a callback here is complete.
+   * Called with the new rate the instant a rate button is pressed, so a page need not poll
+   * `deck.targetRate()`. `applyRate` is the one funnel for rate changes.
+   * why: lessons/kit-transport-bar.md#on-rate
    */
   onRate = null,
   /**
-   * `() => boolean` — is the armed rate not yet audible?
-   *
-   * ⚠️ THE BAR CANNOT KNOW THIS AND MUST NOT GUESS. Whether a speed has
-   * arrived is a fact about whatever is making the sound: a media element is
-   * there the same frame, and a stream with 600 ms of audio already scheduled
-   * is not. A deck that says nothing gets no pulse, which is the honest
-   * default — a bar that animated on a timer would be inventing a wait.
+   * `() => boolean`: is the armed rate not yet audible? Only the sound source knows;
+   * a deck that gives nothing gets no pulse.
+   * why: lessons/kit-transport-bar.md#settling
    */
   settling = null,
   /**
-   * Called when the loop changes or comes round:
-   * `('fill'|'set'|'wrap'|'off', a, b)`.
-   * ⚠️ A WRAP IS AN EVENT AND THE BAR IS THE ONLY THING THAT KNOWS IT HAPPENED —
-   * the deck is told to seek and has no idea why. A page that draws the audio
-   * can put the moment on its own picture; `/tapes/` marks it on the wave.
-   *
-   * `fill` is the live case and it is the one a page must act on: the window
-   * has opened at `a` and will close at `b`, so whatever is holding the sound
-   * starts keeping it NOW. The bar holds no audio of its own.
+   * Called when the loop changes or comes round: `('fill'|'set'|'wrap'|'off', a, b)`.
+   * On `fill` the page starts keeping sound for the window `a` to `b`; the bar holds no audio.
+   * why: lessons/kit-transport-bar.md#on-loop
    */
   onLoop = null,
   /** `(way)` — 'round' | 'back' | 'pingpong', when the direction button is
@@ -315,29 +139,15 @@ export function createTransportBar(host, deck, {
    *  the button's own face already carries the state. */
   onWay = null,
   /**
-   * How much live sound one loop may hold, in milliseconds.
-   *
-   * 🔴 A LIVE LOOP NEEDS A CEILING OR IT IS A RECORDING WITH NO END. The first
-   * press opens the window and the live edge fills it at one second per second;
-   * without a limit the only way it ever closes is a second press, which is a
-   * control you can leave running.
-   *
-   * 20 s is long enough for a phrase of music or a spoken sentence and short
-   * enough to sit through while it fills, and it is far inside the three minute
-   * window the one live deck in this repo declares. ⚠️ IT IS A DEFAULT, NOT A
-   * MEASUREMENT: the bar cannot know how many seconds a page can really keep.
-   * A page that holds a ring of its own passes that ring's length here, and
-   * then the button promises exactly what the page can deliver.
+   * How much live sound one loop may hold, in ms. 20 s is a default, not a measurement;
+   * a page holding its own ring passes that ring's length.
+   * why: lessons/kit-transport-bar.md#live-window
    */
   liveWindowMs = 20000,
   /**
-   * Where the playhead is INSIDE a running loop, 0..1, and `null` once when
-   * there is no loop. A page that draws the sound can run its own playhead
-   * across a frozen picture from this; `grain-scope.mjs` takes exactly that.
-   *
-   * ⚠️ PUSHED FROM THIS BAR'S PAINT, NOT POLLED BY THE PAGE. `observePosition`
-   * is already running at 60 Hz here, and a second rAF loop in a page is the
-   * thing this file exists to stop.
+   * Where the playhead is inside a running loop, 0..1, and `null` once when there is none.
+   * Pushed from this bar's paint, so a page needs no rAF loop of its own.
+   * why: lessons/kit-transport-bar.md#on-loop-pos
    */
   onLoopPos = null,
 } = {}) {
@@ -349,31 +159,10 @@ export function createTransportBar(host, deck, {
   const bar = el('div', 'tbar');
 
   /**
-   * 🔴 `verb: 'record'` MAKES THE TOGGLE A RECORD BUTTON. Asked 2026-09-18 for
-   * `/stage/`: *"replace play with record button in controlroom"*. A control
-   * room's one press does not start playback of anything, it puts a show on air
-   * and writes it down, and a ▶ on it was describing the wrong verb.
-   * ⚠️ IT IS A CLASS AND A LABEL, NOT A SECOND BUTTON. The element, its
-   * `.tbar-toggle` class, its `data-state` and everything that presses it are
-   * untouched, so `demo/verify.mjs`'s play drill and every page holding the bar
-   * keep working. Only the face and what a screen reader hears change.
-   */
-  /**
-   * 🔴 `verb: ['start', 'stop']` MAKES THE TOGGLE TWO WORDS INSTEAD OF A GLYPH.
-   * Asked 2026-09-19 for `/stage/`: *"replace timeline-glued transport record
-   * button with start | stop text labels (same w)"*. A red dot says WRITING,
-   * and that bar's press also puts a show on air, so the dot described half of
-   * it. A word can say the whole thing.
-   *
-   * 🔴 BOTH WORDS ARE IN THE BUTTON AT ONCE AND THE HIDDEN ONE STILL TAKES ITS
-   * SPACE, which is what makes the two states the same width without anybody
-   * measuring anything. `shell.css` puts them in one grid cell and hides the
-   * inactive one with `visibility`, so the button is always as wide as the
-   * longer word, in any font. The alternative, swapping `textContent`, is a
-   * control that changes size under the pointer that just pressed it.
-   * ⚠️ REFUSED AT CONSTRUCTION, WHERE THE STACK STILL SAYS WHO ASKED. One word,
-   * three words, or a number would each fail in a different quiet way: one word
-   * gives a toggle that never changes, and three render on top of each other.
+   * `verb: 'record'` or `verb: ['start', 'stop']` changes the toggle's face and label only;
+   * the `.tbar-toggle` element and its `data-state` stay, so the play drill still works.
+   * Both words sit in one grid cell so the button keeps one width; anything but two words throws.
+   * why: lessons/kit-transport-bar.md#verb
    */
   const WORDS = Array.isArray(verb) ? verb : null;
   if (WORDS && (WORDS.length !== 2 || WORDS.some((w) => typeof w !== 'string' || !w.trim()))) {
@@ -382,19 +171,9 @@ export function createTransportBar(host, deck, {
   }
   const RECORD = verb === 'record';
   /**
-   * 🔴 `verb: 'stop'` IS THE THIRD FACE AND IT SAYS WHAT THE SECOND PRESS DOES.
-   * Asked for on `/tom/` 2026-09-21: *"replace pause icon with stop icon"*,
-   * after that page's second press was made to STOP and rewind rather than
-   * pause. A `❚❚` over a control that returns the playhead to the top is the
-   * shape this project calls a lie: a face describing a verb the button does
-   * not perform.
-   * ⚠️ IT IS A CLASS AND AN ARIA LABEL, NOTHING ELSE. The element, its
-   * `.tbar-toggle` class, its `data-state` and everything that presses it are
-   * untouched, so `verify.mjs`'s play drill and every page holding a bar keep
-   * working. That is the same argument `verb: 'record'` already makes above.
-   * ⚠️ AND THE FACE IS THE KIT'S `stop` ICON, a drawn square, since
-   * 2026-10-12. It was `■` U+25A0 in `::before`, chosen because `⏹` defaults to
-   * emoji presentation; an icon has no presentation to get wrong.
+   * `verb: 'stop'` shows the kit's stop icon for a second press that stops and rewinds.
+   * A class and an aria label only, like `verb: 'record'`.
+   * why: lessons/kit-transport-bar.md#verb-stop
    */
   const STOPS = verb === 'stop';
   const toggle = el('button',
@@ -402,27 +181,14 @@ export function createTransportBar(host, deck, {
     { type: 'button',
       'aria-label': WORDS ? `${WORDS[0]}/${WORDS[1]}`
         : RECORD ? 'record/stop' : STOPS ? 'play/stop' : 'play/pause' });
-  // ⚠️ TWO SPANS, NOT ONE THAT GETS REWRITTEN. The stylesheet decides which one
-  // is visible from `data-state`, which the bar already maintains, so there is
-  // no second place that has to remember which word is showing.
+  // Two spans, not one rewritten: the stylesheet shows one from `data-state`.
+  // why: lessons/kit-transport-bar.md#two-spans
   if (WORDS) toggle.append(el('span', 'tbar-w0', WORDS[0]), el('span', 'tbar-w1', WORDS[1]));
   /**
-   * 🔴 THE GLYPH TOGGLE WEARS ICONS FROM `icons.mjs`, ONE PER STATE, AND THE
-   * STYLESHEET PICKS THE ONE ON SHOW FROM `data-state`. Asked 2026-10-12:
-   * *"global: change transport buttons to proper icon buttons"*. It was ▶, ❚❚,
-   * ■, ●, ◌ and ↺ typed into `::before`, each a font glyph with its own
-   * advance, baseline and size override; an icon is a drawn picture on a 24
-   * unit grid in `currentColor`, so the square's `place-items: center` centres
-   * its ink with nothing measured.
-   * ⚠️ ALL THE FACES ARE IN THE BUTTON AT ONCE, NOT ONE SWAPPED BY `setIcon`.
-   * That is the two-span arrangement `tbar-word` already uses one rule up: the
-   * bar writes `data-state` and nothing else, so there is no second place that
-   * has to remember which face is showing, and a check that sets `data-state`
-   * by hand (`/tom/` does) sees the face it set. `pos-icobtn` and `data-glyph`
-   * are what `setIcon` stamps, so the toggle is the kit's icon button in every
-   * rule that matters, at the bar's own `--tbar-btn` square.
-   * ⚠️ `buffering` IS NOT WRITTEN BY THIS BAR TODAY; the face exists because
-   * `shell.css` drew one for it, and a state with no face is an empty square.
+   * Every icon face is in the toggle at once and shell.css shows one from `data-state`,
+   * so a check that sets `data-state` by hand sees the face it set. `buffering` is not
+   * written by this bar today; its face exists so that state is not an empty square.
+   * why: lessons/kit-transport-bar.md#faces
    */
   const FACES = RECORD ? { rest: 'record', playing: 'stop', ended: 'record', buffering: 'clock' }
     : { rest: 'play', playing: STOPS ? 'stop' : 'pause', ended: 'refresh', buffering: 'clock' };
@@ -444,11 +210,9 @@ export function createTransportBar(host, deck, {
   const loopSpan = el('div', 'tbar-loopspan');
   loopSpan.hidden = true;
   scrub.append(loopSpan, fill, headDot);
-  // `extras` — page buttons that belong to the TRANSPORT rather than beside it.
-  // Recording is the case that earned this: on `take` it is a transport verb,
-  // not a side control, and putting it in `.pos-controls` would have said it was
-  // something you do to the page rather than to the playhead. They sit next to
-  // the toggle and are returned by id so a page can relabel or disable one.
+  // `extras`: page buttons that belong to the transport (record on `take`), by the toggle,
+  // returned by id so a page can relabel or disable one.
+  // why: lessons/kit-transport-bar.md#extras
   let wayAt = 0;                                  // an index into LOOP_TURN
   const wayName = () => LOOP_WAYS[LOOP_TURN[wayAt]][1];
   const wayEntry = {
@@ -469,11 +233,8 @@ export function createTransportBar(host, deck, {
   }
 
   /**
-   * 🔴 A BAR MAY NOT DECLARE BOTH A LOOP AND SOMETHING IN THE LOOP'S PLACE.
-   * They render into one position, so the two together are an author asking for
-   * a layout that does not exist, and the failure without this would be silent:
-   * whichever came last in the append would win and the other would simply not
-   * be on screen. Refuse at construction, where the stack still says who asked.
+   * A loop and a loop slot share one position, so both together throw at construction.
+   * why: lessons/kit-transport-bar.md#loop-slot-refused
    */
   if (loopSlot.length && wantLoop) {
     throw new Error('createTransportBar: loopSlot needs loop: false'
@@ -482,91 +243,47 @@ export function createTransportBar(host, deck, {
   const loopSlotEls = new Map();
   for (const x of loopSlot) {
     /**
-     * 🔴 `tbar-slot`, NOT `tbar-x`, AND THE REASON IS THE HARNESS. `verify.mjs`
-     * presses `.pos-controls button, .tbar-x` on every page, because `.tbar-x`
-     * means "a button the PAGE put in the transport" and those are worth
-     * exercising. This slot is not that: `/videoradio/` keeps a ⛶ in it, and a
-     * suite that presses it leaves the page full screen for every check after
-     * it, including the page's own full screen check, which would then find
-     * somebody already full screen and decline to grade. The loop button is
-     * kept out of that selector for exactly the same reason and says so in
-     * `shell.css`.
-     * ⚠️ IT LOOKS IDENTICAL. `shell.css` gives `.tbar-slot` the same rule as
-     * `.tbar-x`; what differs is who presses it, not what it is.
-     */
-    /**
-     * 🔴 `word: true` MAKES IT A LABEL RATHER THAN A GLYPH, AND IT WAS MISSING
-     * WHILE `extras` HAD IT. MEASURED 2026-09-21 on `/pack/`: a slot button
-     * carrying the word `loop` drew a 30 px square with the text spilling out
-     * of it and over the bar's own right edge. `.tbar-slot` is a GLYPH box,
-     * `--tbar-btn` wide, and the only thing that has ever gone in one is
-     * `/videoradio/`'s ⛶, which is why nobody met this.
-     * ⚠️ AND THE SLOT'S WHOLE PURPOSE IS TO TAKE THE LOOP BUTTON'S PLACE, which
-     * is `tbar-loop tbar-word` reading `Loop`. A slot that could not wear a
-     * word could not replace the thing it is named after.
+     * `tbar-slot`, not `tbar-x`, so verify.mjs never presses it (a full screen slot would
+     * spoil every later check). `word: true` makes it a label, as the loop button it replaces.
+     * why: lessons/kit-transport-bar.md#tbar-slot
      */
     const b = el('button', `tbar-slot${x.word ? ' tbar-word' : ''}`, x.label,
       { type: 'button', 'aria-label': x.aria || x.id });
     b.dataset.id = x.id;
     if (x.title) b.title = x.title;
-    // ⚠️ NEVER HIDDEN. That is the whole difference from `loopExtras`, which
-    // wait for a loop to act on.
+    // Never hidden, unlike `loopExtras`.
+    // why: lessons/kit-transport-bar.md#slot-never-hidden
     b.addEventListener('click', () => x.onPress?.(b));
     loopSlotEls.set(x.id, b);
   }
 
   const extraEls = new Map();
   /**
-   * 🔴 `end: true` PUTS AN EXTRA AT THE START OF THE RIGHT GROUP, JUST LEFT OF
-   * LOOP. Asked 2026-10-05 on `/flipper/`: *"we have unmute buttons, look them
-   * up. left from loop"*. Sound is a state of the playing thing, like the loop
-   * and the rate beside it, not a verb by the play toggle. Same declaration,
-   * same `extra(id)`, only the position differs, and it takes the `data-end`
-   * marker so the gap in the middle of the bar opens to its left.
+   * `end: true` puts an extra at the start of the right group, just left of LOOP,
+   * with the `data-end` marker.
+   * why: lessons/kit-transport-bar.md#end-extras
    */
   const endExtraEls = [];
   for (const x of extras) {
-    // `word: true` says the label is a WORD, not a glyph — it gets width from
-    // its text instead of the 38px square, and the uppercase treatment the
-    // rest of the furniture uses. A square sized for one glyph either clips a
-    // word or is padded around it, and both read as a mistake.
+    // `word: true`: the label is a word, sized by its text rather than the 38px square.
+    // why: lessons/kit-transport-bar.md#extra-word
     const b = el('button', `tbar-x${x.primary ? ' pos-pri' : ''}${x.word ? ' tbar-word' : ''}`,
       x.label, { type: 'button' });
     // The label is a GLYPH, so it is not a name. `aria` is what a screen reader
     // reads and what a test looks for; without it the control is "●".
     b.setAttribute('aria-label', x.aria ?? x.label);
     if (x.title) b.title = x.title;
-    // 🔴 BOTH SPELLINGS, AND `onPress` FIRST, BECAUSE THIS ONE LINE COST A DAY.
-    // `barButton`, `loopSlot` and `loopExtras` all bind `onPress`, this module's
-    // own docs say `onPress` twice (one of them reading "Same declaration shape
-    // as `extras`", which was simply false), and ONLY `extras` bound `onClick`.
-    // MEASURED 2026-09-25: `/stage/` passed `onPress` and its two main controls
-    // were DEAD. `START HLS` and `START WEBRTC` did nothing for a visitor and
-    // nothing for the harness, so its check pressed a button that could not
-    // start anything and then polled 45 s for a show nobody had asked for.
-    // Fourteen asserts followed it red and were read as a timing problem for a
-    // day: the wait was widened to 28 s, 45 s and 80 s, `settleMs` was tripled,
-    // and the page was rewritten five times. Nothing was wrong with the timing.
-    // ⚠️ A SILENT NO-OP IS THE WORST SHAPE A DEFECT TAKES, and `?.` is what made
-    // it silent: a misspelled handler is indistinguishable from a button with
-    // nothing wired to it, so nothing threw, nothing logged, and the page
-    // looked finished. Seven of the eight pages that declare `extras` happened
-    // to pass `onClick` and worked, which is why it survived: the majority were
-    // accidentally right and the documentation was wrong about all of them.
-    // ⚠️ AND ACCEPTING BOTH IS THE FIX RATHER THAN PICKING ONE. Renaming to
-    // `onPress` alone would break those seven pages at once, and renaming the
-    // docs to `onClick` would leave this module disagreeing with its three
-    // siblings. Both names work here now and `onPress` is the one to write.
+    // Both spellings, `onPress` first: a misspelled handler is a silent dead button, and
+    // seven pages pass `onClick`. Write `onPress`.
+    // why: lessons/kit-transport-bar.md#on-press-on-click
     b.addEventListener('click', () => (x.onPress ?? x.onClick)?.(b));
     extraEls.set(x.id, b);
     if (x.end) endExtraEls.push(b);
   }
 
-  // ⚠️ TWO LINES, NOT ONE. `0:00.902 / 3:55.076` is thirteen mono characters of
-  // which one is a slash, and it was the widest fixed thing on the bar —
-  // enough, with a LOOP button beside it, to push the rate group onto a second
-  // row. Stacked it is half the width and the two numbers stop being one long
-  // number with punctuation in the middle: where you are, and how long it is.
+  // Two lines, not one: `0:00.902 / 3:55.076` was the widest fixed thing on the bar and
+  // pushed the rates onto a second row.
+  // why: lessons/kit-transport-bar.md#two-line-clock
   const time = el('output', 'tbar-time');
   const timeNow = el('span', 'tbar-now', '0:00.000');
   const timeAll = el('span', 'tbar-all', '');
@@ -574,59 +291,17 @@ export function createTransportBar(host, deck, {
   const rates = el('div', 'tbar-rates');
   const badge = el('span', 'tbar-badge');
   /**
-   * 🔴 A LIVE SOURCE HAS NO CLOCK WORTH PRINTING. On an Icecast mount the left
-   * half of `19:33:46.098 / 3:00.000` is the wall clock, which the machine
-   * already shows, and the right half is a duration a live stream does not
-   * have. REPORTED as *"transport timers are pointless here. what about LIVE
-   * label"*, and they were: two numbers, neither of which anybody can act on.
-   *
-   * ⚠️ IT CARRIES ONE FACT. It briefly read `SLOWED` at any armed rate other
-   * than 1, and that is a second channel saying what the rate radio group
-   * already says an inch to its right — the armed button IS the statement that
-   * you are not at 1x. How far behind is a number and belongs in a readout
-   * cell, which is the page's BEHIND.
-   *
-   * 🔴 AND THAT ONE FACT IS NOW MEASURED RATHER THAN DECLARED. Asked
-   * 2026-09-20: *"For videoradio use std online insicator with 'on air'. In
-   * other 'live' labesl too tim other demos"*. It was
-   * `el('span', 'tbar-live', 'LIVE')` — a word drawn because the page passed
-   * `live: true` at BUILD TIME, so it said LIVE whether or not a byte was
-   * arriving. That is two of this project's named hazards in one span: every
-   * readout cell must be able to change, and a control that looks live and is
-   * inert. A station that went off the air left the word standing.
-   * ⚠️ SO THE SWAP IS NOT A RENAME, AND A PAGE HAS TO FEED IT. `api.live` is
-   * the badge; a page calls `follow()` once and `seen()` whenever sound
-   * actually arrives. A page that feeds it nothing shows `unknown`, which is
-   * the honest state and never blocks anything. A badge wired to a constant
-   * would be the same lie in a better font.
+   * A live source shows an `on air` badge instead of a clock. It is measured, not declared:
+   * the page calls `api.live.follow()` once and `seen()` whenever sound arrives, and a page
+   * that feeds it nothing shows `unknown`.
+   * why: lessons/kit-transport-bar.md#live-chip
    */
   const liveChip = live
     ? createPresence({ mode: 'badge', says: ON_AIR, can: ON_AIR_CAN, state: 'unknown' })
     : null;
-  /**
-   * 🔴 LOOP IS ON EVERY BAR, AND IT IS THREE PRESSES OF ONE BUTTON.
-   *
-   * Set the start, set the end, and the third press takes the loop off again.
-   * One control rather than two, because two controls for the two ends of one
-   * interval is a pair you can leave half-set — a start with no end is a
-   * button that looks armed and does nothing, and there is no state in this
-   * shape that isn't visible on the button's own face.
-   *
-   * ⚠️ IT IS NOT HIDDEN ON A DECK THAT CANNOT LOOP. A source with no end has
-   * nothing to come back to, and the honest answer there is the button SAYING
-   * so when it is pressed — the same rule `caps.mjs` follows for a demo a
-   * browser cannot run. A control that vanishes says the feature does not
-   * exist, which is a different and false statement.
-   *
-   * ⚠️ AND A LIVE SOURCE IS NO LONGER ONE OF THOSE. It used to answer *a live
-   * station has no past to come back to*, which is true of the station and
-   * false of the page: what a live loop plays is a window this bar opens and
-   * the page fills. See the live-window block further down.
-   */
-  /* 🔴 `Loop`, NOT `LOOP`, ASKED 2026-09-23: *"rename LOOP in transport to
-     Loop"*. Every other word on this bar is a name rather than a shout, and the
-     keyboard's own `Loop` toggle landed the same day, so two controls doing
-     related things would otherwise have been spelled two ways on one page. */
+  // Loop is one button pressed three times: start, end, off. It is disabled, not hidden, on a
+  // deck that cannot loop; a live deck loops over a window it fills (see the live window).
+  // why: lessons/kit-transport-bar.md#loop-button
   const loopBtn = el('button', 'tbar-loop tbar-word', 'Loop',
     { type: 'button', 'aria-label': 'loop' });
   loopBtn.dataset.loop = 'off';
@@ -634,15 +309,9 @@ export function createTransportBar(host, deck, {
     ? 'press to hold the live sound from here. it closes and plays when the window is full, or press again to end it sooner'
     : 'press to mark where a loop starts, again to mark the end, again to take it off';
   /**
-   * 🔴 THE EXTRAS AND LOOP ARE ONE SEGMENTED CONTROL, NOT TWO BUTTONS WITH A
-   * GAP. ASKED FOR IN THOSE WORDS: *"[→|LOOP] - two different buttons visually
-   * together"*. They are two buttons and they stay two buttons — separate hit
-   * areas, separate labels, separate aria — and what joins them is one shared
-   * edge, because what the left one sets is a property OF the right one. At the
-   * bar's ordinary 8 px gap the direction glyph read as another piece of
-   * furniture that happened to be next to LOOP.
-   * ⚠️ NO GROUP WHEN THERE IS NOTHING TO GROUP: a lone LOOP button goes
-   * straight on the bar, so every page that declares no extras is untouched.
+   * The loop extras and LOOP are one segmented control: two buttons sharing an edge.
+   * No group when there are no extras.
+   * why: lessons/kit-transport-bar.md#loop-group
    */
   const loopPair = loopExtraEls.size && wantLoop ? el('div', 'tbar-loopgrp pos-seg') : null;
   if (loopPair) loopPair.append(loopBtn, ...loopExtraEls.values());
@@ -655,51 +324,10 @@ export function createTransportBar(host, deck, {
   const endSide = loopSlotEls.size ? [...loopSlotEls.values()]
     : loopPair ? [loopPair] : [...(wantLoop ? [loopBtn] : []), ...loopExtraEls.values()];
   /**
-   * 🔴 THE ROW HAS ONE BOUNDARY AND THE FREE SPACE OPENS AT IT: EVERYTHING FROM
-   * THE LOOP RIGHTWARDS SITS AT THE RIGHT END OF THE BAR. Asked 2026-09-19 as
-   * *"reel: move loop to the right of transport"*, and it is a rule about this
-   * row rather than a nudge on that page.
-   *
-   * The bar is two groups with a gap in the middle: the transport on the left
-   * (play, a page's own verbs, the slider) and the loop, the rates and the
-   * badge on the right. That was already true and was carried by whichever
-   * member happened to be in the middle: the scrub grows (`flex: 1 1 56px`),
-   * and `shell.css` gives the clock and the LIVE chip a `margin-right: auto`
-   * with no slider present. Three members, three copies of one intention, and
-   * a bar with NONE of them left had nobody holding the boundary: `/reel/`
-   * passes `scrub: false` (it has a strip) and `time: false` (its position is a
-   * date), so LOOP packed left against the ‹ › it used to sit a clock away
-   * from. MEASURED at 1280: LOOP's left edge at 57 px with 375 px of empty bar
-   * to the right of the rates.
-   *
-   * ⚠️ IT IS THE PROJECT'S EXISTING SPELLING FOR THIS, NOT A SECOND MECHANISM:
-   * `data-end="1"` is what `.pos-controls` stamps for `end: true` in
-   * `shell.mjs`, and it means the same thing here. `shell.css` says why the bar
-   * needs its own selector for it.
-   * ⚠️ AND IT IS UNCONDITIONAL, WHICH IS THE WHOLE POINT. Where something to the
-   * left is already flexible the margin gets nothing and nothing moves: a
-   * growing scrub eats the free space before auto margins are resolved, and the
-   * clock's `margin-right: auto` shares the SAME gap, so half each lands the
-   * group in exactly the same place. MEASURED both ways, unchanged to the
-   * tenth of a pixel at 1280 and at 390.
-   */
-  /**
-   * 🔴 `right` IS A CALLER'S OWN CONTROL IN THE RIGHT GROUP, WHERE THE RATES
-   * SIT. Asked for on `/tom/` 2026-09-21: *"bpm in on the transport, right
-   * slot"*, after that page dropped the rate lattice for a `- bpm +` stepper.
-   * ⚠️ IT IS AN OPTION RATHER THAN A PAGE REACHING INTO `.tbar-rates`, which is
-   * what this project calls hand-rolling a control that exists: a page that
-   * queries a component's insides is a page that breaks the day the component
-   * renames a class, silently, with the source still reading as correct.
-   * ⚠️ AND `extras` IS NOT THE SAME SLOT. Those are a page's VERBS and sit by
-   * the play toggle on the left, because they are things you press to make
-   * something happen. The right group is what the transport IS doing: its loop,
-   * its rate, its badge. A tempo belongs with the rate it replaces.
-   * ⚠️ THE `data-end` MARKER FALLS THROUGH TO WHICHEVER MEMBER IS FIRST. It is
-   * what holds the gap in the middle of the bar, and a bar with no loop and no
-   * lattice would otherwise have nobody holding it and pack everything left,
-   * which is the `/reel/` measurement recorded above: LOOP at 57 px with 375 px
-   * of empty bar to its right.
+   * `right` is a caller's own control in the right group, beside the rates. The first member
+   * from the loop rightwards takes `data-end`, which holds the gap in the middle of the bar;
+   * without it a bar with no scrub and no clock packs left (LOOP at 57 px, 375 px empty, at 1280).
+   * why: lessons/kit-transport-bar.md#data-end
    */
   const endRow = [...endExtraEls, ...endSide];
   if (endRow[0]) endRow[0].dataset.end = '1';
@@ -711,33 +339,18 @@ export function createTransportBar(host, deck, {
   host.append(bar);
 
   // ── rates: intersect every declared caps.rates lattice ──────────────────
-  // Rebuilt whenever the adapter registry moves. A nest registers its adapter
-  // on the parent AFTER this bar is constructed, and a page that swaps one
-  // arrangement for another changes the answer again — so a lattice computed
-  // once describes a deck that has not been assembled yet.
+  // Rebuilt whenever the adapter registry moves: a nest registers its adapter after this bar
+  // is built, so a lattice computed once describes an unassembled deck.
+  // why: lessons/kit-transport-bar.md#rates
   let lattice = null, agen = -1;
   /**
-   * 🔴 THE RATES ARE A RADIO GROUP, FROM `choice.mjs`, LIKE EVERY OTHER SET OF
-   * MUTUALLY EXCLUSIVE OPTIONS IN THIS REPO. This built its own loose buttons
-   * with its own `aria-pressed` bookkeeping and its own CSS block, which is the
-   * fourth hand-rolled copy of a control that has been a component since
-   * `choice.mjs` landed — and CLAUDE.md says to build from the kit and to stop
-   * and ask rather than make another one. REPORTED as *"rate controls should be
-   * radiobuttons everywhere. you keep breaking the rule"*, which is fair: this
-   * page's own speed picker WAS a `createChoice` before it moved in here, and
-   * moving it into the bar is where it lost its component.
-   *
-   * ⚠️ SEGMENTED, NOT SPACED, is part of what the component carries — gaps make
-   * four options look like four unrelated controls. The old `.tbar-rates` block
-   * set `gap: 4px` and did exactly that.
+   * The rates are a segmented radio group from `choice.mjs`, not hand-rolled buttons.
+   * why: lessons/kit-transport-bar.md#rate-choice
    */
   let rateChoice = null;
-  // ⚠️ DECLARED UP HERE BECAUSE `buildRates()` RUNS AT CONSTRUCTION. It calls
-  // `syncRates()`, which clears this — and a `let` further down the file is in
-  // its temporal dead zone at that moment, so the constructor would throw
-  // `Cannot access 'wasSettling' before initialization` and take the whole page
-  // with it. That is exactly the failure HANDOFF records for the first attempt
-  // at a rate lattice here: `__demo.ready — failed` and nothing else to go on.
+  // Declared before `buildRates()`, which runs at construction and clears it; a later `let`
+  // would be in its temporal dead zone and throw.
+  // why: lessons/kit-transport-bar.md#was-settling
   let wasSettling = null;
   function buildRates() {
     agen = deck.adapterGen?.() ?? 0;
@@ -745,31 +358,13 @@ export function createTransportBar(host, deck, {
     rates.replaceChildren();
     rateChoice = null;
     /**
-     * 🔴 `> 1`, NOT `length`. A LATTICE OF ONE IS NOT A CHOICE AND MUST DRAW
-     * NOTHING. Found on `/replay/` 2026-09-16 and reported as *"what this
-     * disconnected 1 does here?"* with a screenshot: its cue lane declared
-     * `caps: { rates: [1] }`, the intersection came out as `[1]`, and
-     * `createChoice` rendered a radio group with a single member, which is one
-     * armed yellow button beside LOOP with nothing to choose it against.
-     *
-     * ⚠️ THE RULE WAS ALREADY WRITTEN AND WAS HONOURED FOR THE WRONG CASE. The
-     * note on `latticeFor` says a deck with no rate lattice shows nothing
-     * rather than a lone 1, and this guard enforced it only for an ABSENT
-     * lattice. A lattice that exists and holds one value reaches the reader as
-     * exactly the thing that note forbids.
-     * ⚠️ CHECKED BEFORE CHANGING IT: `demo/jam/` and `demo/kit/` are the only
-     * other places declaring a single rate, and neither asserts on the row, so
-     * both simply stop drawing a button nobody could press meaningfully.
+     * `> 1`, not `length`: a lattice of one value is not a choice and draws nothing.
+     * why: lessons/kit-transport-bar.md#lattice-of-one
      */
     if (lattice && lattice.length > 1) {
       rateChoice = createChoice({
-        // 🔴 NO `x`. Five buttons reading `0.25x 0.5x 1x 1.5x 2x` spend a fifth
-        // of their width on a letter that is the same on every one of them —
-        // and a row of numbers under a transport is already unambiguously a
-        // speed. The suffix was also what pushed the group onto a second line
-        // at ordinary widths, which is a bar that changes height for a unit
-        // nobody was reading. The armed one is marked by colour and fill; the
-        // page's own words say what it is.
+        // No `x` suffix: it is the same on every button and pushed the group onto a second line.
+        // why: lessons/kit-transport-bar.md#no-x
         options: lattice.map((r) => [String(r), r]),
         at: Math.max(0, lattice.indexOf(deck.targetRate?.() ?? 1)),
         onPick: (r) => applyRate(r),
@@ -779,13 +374,8 @@ export function createTransportBar(host, deck, {
       rateChoice.buttons.forEach((b, i) => { b.dataset.rate = String(lattice[i]); });
       rates.append(rateChoice.el);
     }
-    // 🔴 A DECK WITH NO RATE LATTICE SHOWS NOTHING, NOT A LONE "1".
-    // This printed a grey 1 to be honest that there was no choice, and honesty
-    // was not the problem: a control that can only ever read 1 is a structural
-    // constant wearing a measurement's clothes, which is the thing CLAUDE.md
-    // throws a readout out for. It taught a reader to look at a spot where
-    // nothing will ever happen. The absence of a rate group already says there
-    // is no choice, and says it without occupying anything.
+    // A deck with no rate lattice shows nothing, not a lone 1 that can never change.
+    // why: lessons/kit-transport-bar.md#no-lone-one
     syncRates();
   }
   buildRates();
@@ -806,23 +396,16 @@ export function createTransportBar(host, deck, {
     const res = deck.setRate(r);
     if (res && res.degraded) note(res.reason);
     else clearNote();
-    // ⚠️ BEFORE `syncRates`, so the page has already armed whatever it owns by
-    // the time the pulse is decided. The other order asks `settling()` about a
-    // rate the page has not been told about yet, which reads as "arrived" for
-    // one frame and then starts pulsing — a flicker on every press.
+    // Before `syncRates`, so the page has armed its rate before the pulse is decided;
+    // the other order flickers on every press.
+    // why: lessons/kit-transport-bar.md#on-rate-order
     onRate?.(r);
     syncRates();
   }
 
-  // `targetRate`, which is the library's own answer and was here all along:
-  // "the rate play() would resume at — WHAT A PAUSED UI DISPLAYS"
-  // (transport.mjs, beside setRate). `deck.rate()` is 0 while paused, because a
-  // paused transport genuinely advances at zero, so comparing buttons against
-  // it selected none of them exactly when someone is reading the row deciding
-  // what to press — and worse, pressing one changed nothing visible, since
-  // setRate on a paused deck arms the rate and stays paused. An earlier fix
-  // here tracked its own "last real rate", which reinvented targetRate and got
-  // it wrong: it only ever updated while rolling.
+  // Compared against `targetRate`, the rate play() would resume at. `deck.rate()` is 0
+  // while paused, which would select no button.
+  // why: lessons/kit-transport-bar.md#target-rate
   function syncRates() {
     const armed = deck.targetRate?.() ?? (typeof deck.rate === 'function' ? deck.rate() : deck.rate);
     // ⚠️ `set(i, quiet)` — QUIET, or syncing the picture would fire the handler
@@ -859,14 +442,9 @@ export function createTransportBar(host, deck, {
       fill.style.width = `${f * 100}%`;
       headDot.style.left = `${f * 100}%`;
     }
-    // `fmt` — a page may say how a position READS. `0:03.910` is the right
-    // answer for a deck of seconds and a meaningless one for a deck of 1965,
-    // where the position is a date. Default unchanged; a page that needs
-    // calendar time supplies a formatter rather than the bar guessing.
-    // ⚠️ `fmt` STILL GETS THE WHOLE LINE. A page that supplies a formatter is
-    // saying how a position READS — `/tapes/` prints a date — and splitting its
-    // answer on a slash it did not put there would be this bar editing a page's
-    // own words.
+    // `fmt`: a page may say how a position reads (a date on /tapes/). It gets the whole line,
+    // not split on a slash it did not write.
+    // why: lessons/kit-transport-bar.md#fmt
     if (fmt) { timeNow.textContent = fmt(pos, range); timeAll.textContent = ''; }
     else {
       timeNow.textContent = clock(pos, absolute);
@@ -880,16 +458,9 @@ export function createTransportBar(host, deck, {
     // a bar built without one. Painting a detached button is not an error, it is
     // silence, so it is skipped rather than written into nothing.
     if (wantToggle) toggle.dataset.state = playing ? 'playing' : atEnd ? 'ended' : 'paused';
-    // 🔴 THE WRAP, RATE-LIMITED, AND THE LIMIT IS NOT A SAFETY MARGIN — IT IS
-    // THE FIX. A seek is not instant on every kind of deck, so the frame after
-    // one is asked for can still report a position past the end, which asks
-    // for another, which is a seek storm that reads as a stuck playhead. This
-    // repo has the general form already written down: *a recovery action is
-    // not free — rate-limit it.*
-    // ⚠️ AND ONLY WHILE ROLLING. Wrapping a paused deck would drag the playhead
-    // back under somebody who is scrubbing inside their own loop.
-    // ⚠️ NOT WHILE THE LAP DRIVER HAS IT. That loop owns both edges and wraps
-    // on its own clock; this one would wrap it a second time at the far end.
+    // The wrap is rate-limited: a seek is not instant, so the next frame can still read past
+    // the end and ask again, a seek storm. Only while rolling, and not while the lap driver owns it.
+    // why: lessons/kit-transport-bar.md#wrap
     if (!lapRaf && loopA != null && loopB != null && playing && pos >= loopB) {
       const t = performance.now();
       if (t - lastWrap > 150) { lastWrap = t; doSeek(loopA); onLoop?.('wrap', loopA, loopB); }
@@ -898,26 +469,15 @@ export function createTransportBar(host, deck, {
     // and for a deck whose end arrives without the timer: a start with no end,
     // rolling, that reaches the end of the source closes there and engages.
     if (playing && loopA != null && loopB == null && !filling && pos >= range[1]) closeAtEnd();
-    // A loop is a claim about a range, so it cannot outlive one. A live deck's
-    // range walks forward and will eventually leave the marks behind it; saying
-    // so is better than looping over ground that is no longer there.
-    //
-    // 🔴 ONLY THE LEFT EDGE ON A LIVE DECK, AND THIS WOULD HAVE THROWN EVERY
-    // LIVE LOOP AWAY THE INSTANT IT WAS MADE. A live range's right edge is the
-    // present moment as the PAGE last published it, and the station page
-    // publishes it once a second — while the deck's own position runs
-    // continuously. So a window that ends exactly at the live edge reads as up
-    // to a second PAST `range[1]`, and the test below would have cleared it,
-    // with a badge blaming a range nobody can see. A live range can only be
-    // outrun at the back.
+    // A loop cannot outlive its range. On a live deck only the left edge counts: the right edge
+    // is published once a second, so a window ending at the live edge reads up to 1 s past it.
+    // why: lessons/kit-transport-bar.md#outrun
     const outrunsEnd = !live && (loopB ?? loopA) > range[1];
     if (loopA != null && (loopA < range[0] || outrunsEnd)) {
       clearLoop('the loop ran off the back of what is still held');
     }
-    // THE WARNING, WHICH IS A BLINK AND NOT A NUMBER — see setBlink. The last
-    // quarter of the window is when the button starts saying it is about to
-    // close itself, measured against the window that was actually opened rather
-    // than against the option, so the two can never disagree.
+    // The last quarter of the opened window blinks the button (see setBlink).
+    // why: lessons/kit-transport-bar.md#warn-blink
     setBlink(filling && fillEnds != null && loopA != null
       && pos >= fillEnds - (fillEnds - loopA) * LIVE_WARN_FRAC);
     reportLoopPos(pos);
@@ -925,12 +485,9 @@ export function createTransportBar(host, deck, {
   }
 
   /**
-   * The armed rate button pulses until the speed is actually audible.
-   *
-   * ⚠️ ON THE PAINT LOOP, AND THE DOM IS TOUCHED ONLY WHEN THE ANSWER CHANGES.
-   * `observePosition` already runs this at 60 Hz; writing a dataset attribute
-   * sixty times a second would restart the CSS animation on every frame, which
-   * is an animation that renders as a still.
+   * The armed rate button pulses until the speed is audible. Runs on the 60 Hz paint, so the
+   * DOM is touched only on a change, or the CSS animation restarts every frame.
+   * why: lessons/kit-transport-bar.md#sync-pending
    */
   function syncPending() {
     if (!rateChoice) return;
@@ -941,34 +498,16 @@ export function createTransportBar(host, deck, {
   }
 
   // ── the end of a bounded piece ──────────────────────────────────────────
-  // A BOUNDARY IS A COMMITTED ONE-SHOT, NEVER A POLL. This used to live inside
-  // paint(), which observePosition drives off requestAnimationFrame — so in a
-  // hidden tab it never ran: measured, a 20 s deck reached 91,001 ms and was
-  // still reporting `playing: true`, while the bar's clock sat frozen at
-  // 0:00.000. The deck's own scheduler was keeping perfect time throughout;
-  // the only broken thing was asking the renderer to enforce a rule.
-  //
-  // CAVEAT, because it should not be discovered later: this timer is a plain
-  // setTimeout on the main thread, so a hidden tab clamps it to ~1 Hz and the
-  // stop can be up to a second late. That is a bounded error instead of an
-  // unbounded one. The exact fix is to arm it on the scheduler's own worker
-  // host, which createDeck does not currently expose.
+  // A committed one-shot timer, never a check in paint(): rAF does not run in a hidden tab.
+  // A hidden tab clamps setTimeout to ~1 Hz, so the stop can be up to 1 s late.
+  // why: lessons/kit-transport-bar.md#end-one-shot
   let endTimer = null, atEnd = false;
   const clearEnd = () => { if (endTimer) { clearTimeout(endTimer); endTimer = null; } };
 
   /**
-   * 🔴 ONE PRESS IS ENOUGH: THE END IS THE SECOND MARK. ASKED FOR 2026-09-16:
-   * *"if not pressing loop again and playback reaches the end, mark loop right
-   * mark as end and consider the state 'loop engaged'"*.
-   *
-   * So a start with no end is not a half-set control waiting for a hand any
-   * more. Press once and let it run, and what you get is a loop from there to
-   * the end of the source, running, with the button on. Press a second time on
-   * the way and you get the shorter loop you marked, which is what it always
-   * did. ⚠️ A ZERO LENGTH ONE IS STILL REFUSED: a mark on the last frame has no
-   * room in front of it, and the end behaves normally there.
-   * ⚠️ AND NOT ON A LIVE DECK, where a start with no end is a window being
-   * FILLED and already has its own way of closing. `filling` says which.
+   * One press is enough: a start mark with no end closes at the end of the source and plays.
+   * A zero-length loop is refused, and a live deck (filling) has its own way of closing.
+   * why: lessons/kit-transport-bar.md#close-at-end
    */
   function closeAtEnd() {
     if (!seekable || filling || loopA == null || loopB != null) return false;
@@ -1012,13 +551,9 @@ export function createTransportBar(host, deck, {
     : null;
 
   // ── interaction ─────────────────────────────────────────────────────────
-  // Parked at the end, the play button REPLAYS. This is what a sequencer does:
-  // stop at the end and leave the playhead there — the final state is worth
-  // looking at, and here it is literally the fold of every event — then send
-  // the transport back to the start when you ask for play again. Restarting is
-  // well defined in this library in a way it is not for a media element: a
-  // backward seek replays each event exactly once.
+  // Parked at the end, the play button replays from the start, as a sequencer does.
   // Space goes through this too, so a key never skips `stopLap()` or `leaveEnd()`.
+  // why: lessons/kit-transport-bar.md#replay-at-end
   function pressToggle() {
     // A reversed lap is playing even though the deck is not, so pausing one is
     // stopping the driver rather than pausing a transport that is already
@@ -1039,14 +574,9 @@ export function createTransportBar(host, deck, {
     headDot.style.left = `${f * 100}%`;
     return fracToPos(f);
   }
-  // SCRUB LIVE, NOT ON RELEASE. seekFromEvent() only repaints this bar's own
-  // fill; until pointerup the deck never moved, so the strip's playhead, the
-  // readout and every lane sat still while the handle slid — the bar looked
-  // like the only thing on the page connected to anything.
-  //
-  // Coalesced to one seek per frame: a pointermove stream can arrive faster
-  // than a frame, and deck.seek() is two-phase (reduce + assertState), so
-  // seeking per event asks a lane to re-fold work nobody will ever see.
+  // Scrub seeks while dragging, not on release, coalesced to one seek per frame because
+  // deck.seek() is two-phase and a pointermove stream outpaces frames.
+  // why: lessons/kit-transport-bar.md#scrub-live
   let pendingSeek = null, seekRaf = 0;
   function liveSeek(pos) {
     pendingSeek = pos;
@@ -1084,21 +614,9 @@ export function createTransportBar(host, deck, {
   let loopA = null, loopB = null, lastWrap = 0;
 
   /**
-   * 🔴 A LIVE SOURCE GETS A LOOP TOO, AND WHAT IT LOOPS OVER IS A WINDOW THAT
-   * FILLS IN REAL TIME.
-   *
-   * This used to refuse at the press: *a live station has no past to come back
-   * to*. That is true of the station and false of the page, which can keep the
-   * last few seconds of what arrived. So the first press marks the start and
-   * OPENS a window, the live edge fills it at one second per second, and when
-   * it is full the loop is finished and starts playing. A second press before
-   * that ends it early; a press after it takes it off.
-   *
-   * ⚠️ THE BAR HOLDS NO AUDIO, AND CANNOT. It owns the window in the deck's own
-   * time and says when it opened, closed and came round; the page owns the
-   * sound and hears those through `onLoop`. A page that does not listen gets a
-   * playhead that loops over silence, which is why `fill` is an event and not
-   * an internal state change.
+   * A live loop is a window filled in real time: the first press opens it, it plays when full.
+   * The bar holds no audio; the page keeps the sound on `onLoop('fill')`.
+   * why: lessons/kit-transport-bar.md#live-loop
    */
   let filling = false, fillEnds = null, fillTimer = null;
   // The blink's own state, so the DOM is touched only when the answer changes.
@@ -1115,23 +633,9 @@ export function createTransportBar(host, deck, {
     ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 
   /**
-   * 🔴 A WARNING, NOT A COUNTDOWN. A number ticking down is a readout: it asks
-   * to be read, and there is nothing a reader can do with the digits. The blink
-   * says the one thing there is to say, which is that the window is about to
-   * close itself.
-   *
-   * ⚠️ IT ANIMATES OPACITY AND NOTHING ELSE. The word on the face never
-   * changes, the padding never changes, and neither does the border — so the
-   * rate picker and the clock beside it stay exactly where they are. That is
-   * the rule this button already carries for its three states, and a blink that
-   * grew a glow or a letter would break it in a new way.
-   *
-   * ⚠️ REDUCED MOTION GETS A STEADY DIM RATHER THAN NOTHING. Somebody who asked
-   * for less movement still has to be told the window is closing. `shell.css`
-   * already does exactly this for a busy button. It is built here rather than
-   * in the stylesheet because the animation belongs to this control and to no
-   * other, and because the global reduced-motion rule in `shell.css` switches
-   * CSS animations off outright — which for a warning would be silence.
+   * A warning, not a countdown. It animates opacity only, so nothing beside it moves;
+   * reduced motion gets a steady dim, built here because shell.css switches animations off.
+   * why: lessons/kit-transport-bar.md#set-blink
    */
   function setBlink(on) {
     if (on === blinking) return;
@@ -1164,14 +668,8 @@ export function createTransportBar(host, deck, {
   const clearFill = () => { if (fillTimer) { clearTimeout(fillTimer); fillTimer = null; } };
 
   /**
-   * ⚠️ A COMMITTED ONE-SHOT, NOT A CHECK ON THE PAINT LOOP, for the same reason
-   * `armEnd` is one: `observePosition` runs off requestAnimationFrame, so in a
-   * hidden tab the window would go on filling forever and the loop would never
-   * close. Re-armed from `onState` beside `armEnd`, because a play, a pause, a
-   * rate or a seek each move the instant at which the window is full.
-   *
-   * A paused deck gets no timer at all, and that is right: nothing is arriving,
-   * so nothing is filling.
+   * A committed one-shot like `armEnd`, re-armed from `onState`; a paused deck gets no timer.
+   * why: lessons/kit-transport-bar.md#arm-fill
    */
   function armFill() {
     clearFill();
@@ -1192,20 +690,9 @@ export function createTransportBar(host, deck, {
   }
 
   /**
-   * 🔴 A LAP THE BAR DRIVES ITSELF, BECAUSE THE DECK WILL NOT RUN BACKWARDS.
-   * `transport.setRate` throws `negative rate unsupported in v0`, so `←` and
-   * `⇆` cannot be a rate. What they are instead: the deck is PAUSED and this
-   * seeks it once a frame from the bar's own clock, which is the same
-   * arithmetic `looper.mjs` does to a buffer and is the only place in this file
-   * that owns a frame loop.
-   *
-   * ⚠️ `observePosition` KEEPS TICKING WHILE THE DECK IS PAUSED (it is a plain
-   * rAF, checked rather than assumed), so the clock, the fill and the head in
-   * this bar follow a reversed lap without a second painter.
-   * ⚠️ AND THE TOGGLE HAS TO KNOW. `deck.playing()` is false for the whole of a
-   * reversed lap, so `rolling()` below is what everything in this file asks
-   * instead: a bar showing PAUSE over a moving playhead is a control lying
-   * about the state it is in.
+   * The bar drives backward laps itself: the deck is paused and seeked once a frame, since
+   * setRate refuses negative rates. `rolling()` counts a lap as playing, for the toggle's face.
+   * why: lessons/kit-transport-bar.md#lap
    */
   let lapRaf = 0, lapAt = 0, lapPrev = 0;
   const rolling = () => (deck.playing?.() ?? false) || !!lapRaf;
@@ -1285,25 +772,12 @@ export function createTransportBar(host, deck, {
 
   function drawLoop() {
     const on = loopA != null && loopB != null;
-    // 🔴 THE WORD NEVER CHANGES, BECAUSE A CONTROL THAT RESIZES ITSELF MOVES
-    // EVERY CONTROL BESIDE IT. It said LOOP, then END, then LOOP again, and
-    // three characters against four is enough to shove the rate picker and the
-    // clock sideways every time somebody pressed it. That is the same defect as
-    // a live sentence reflowing under a picture: nothing that changes while you
-    // are looking at it may change how much room it takes. State is carried by
-    // `data-loop`, which paints, and by the label a screen reader is given,
-    // which has no width.
-    //
-    // ⚠️ A FILLING WINDOW IS THE `armed` STATE AND KEEPS ITS PAINT. It is a
-    // start with no end yet, which is what `armed` already means, so the live
-    // case needs no fourth colour and no stylesheet of its own. What the live
-    // case adds is the blink, which is opacity and takes no room.
+    // The word never changes, so the button never resizes; state is in `data-loop` and the aria
+    // label. A filling window is the `armed` state plus the blink.
+    // why: lessons/kit-transport-bar.md#loop-word
     loopBtn.dataset.loop = on ? 'on' : loopA != null ? 'armed' : 'off';
-    // 🔴 AND THE PICTURE IS TOLD. The bar owns the loop and keeps two numbers;
-    // a strip drawing the same deck had no way to learn about them, so every
-    // page with both drew a picture of time with the loop missing from it.
-    // `deck.setLoopView` is the one object the two share. The state published
-    // is the same word this button is wearing.
+    // `deck.setLoopView` tells a strip on the same deck about the loop, in this button's word.
+    // why: lessons/kit-transport-bar.md#set-loop-view
     deck.setLoopView?.(loopA == null ? null
       : { a: loopA, b: loopB, state: on ? 'on' : 'armed', filling });
     // they act on a loop, so they exist while there is one and not before —
@@ -1330,66 +804,32 @@ export function createTransportBar(host, deck, {
     drawLoop();
     reportLoopPos(null);
     onLoop?.('off', null, null);
-    // A LIVE SOURCE HAS ONE POSITION THAT MEANS ANYTHING ONCE THE LOOP IS OFF,
-    // and it is now. Leaving the playhead where the loop was would park it in a
-    // past the station has stopped sending, with a LIVE chip above it saying
-    // otherwise.
+    // A live source goes back to now when its loop ends.
+    // why: lessons/kit-transport-bar.md#live-loop-off
     if (wasLive) doSeek(deck.range[1]);
     /**
-     * 🔴 THE BADGE SAYS NOTHING ABOUT A LOOP ENDING. ASKED FOR, MORE THAN ONCE.
-     *
-     * `why` is still passed and is still the reason, because a caller reading
-     * this code needs to know which of four paths cleared the loop. What it no
-     * longer does is put that reason on screen. Every one of those sentences is
-     * longer than the 60 characters the badge shows, so what a person actually
-     * saw was `THE LOOP RAN OFF THE BACK OF WHAT IS ST…` sitting in the
-     * transport, and CLAUDE.md is explicit that anything truncating with an
-     * ellipsis is in the wrong place rather than in need of a wider box.
-     *
-     * It is also not news. The loop ending is visible: the LOOP button goes
-     * dark, the band leaves the slider, the sound changes. A line of prose
-     * saying so is a third channel repeating what two already carried.
-     * ⚠️ THE BADGE ITSELF STAYS for the things it is right for, which are
-     * states a page cannot see any other way: a degraded source, a refused
-     * rate. Those are reported by their own callers and are not this.
+     * `why` names which path cleared the loop, for the reader; the badge says nothing about it.
+     * why: lessons/kit-transport-bar.md#no-loop-note
      */
     clearNote();
   }
 
   /**
-   * 🔴 THE LOOP SAYS NOTHING IN WORDS. ASKED FOR IN THOSE WORDS, 2026-09-16,
-   * WITH A PHOTOGRAPH OF THE BADGE: *"rm all loop messages."*.
-   *
-   * Two sentences used to appear in the transport when a press was refused:
-   * `this source has no end to come back to` and `the two marks are in the same
-   * place`. Both were true and neither was worth a line of prose in a bar six
-   * controls wide. A deck with no end gets a DISABLED button instead, which
-   * says the same thing before you press rather than after; two marks in one
-   * place is now almost unreachable, because a press on a stopped transport
-   * starts it rather than leaving the playhead where the next press will land.
-   * ⚠️ THE BADGE ITSELF STAYS for what it is right for, which is a degraded
-   * source and a refused rate. Neither of those is about a loop.
+   * The loop says nothing in words: a deck with no end gets a disabled button instead.
+   * why: lessons/kit-transport-bar.md#no-loop-words
    */
   loopBtn.disabled = !seekable;
   if (!seekable) loopBtn.title = 'this source has no end to come back to';
 
   loopBtn.addEventListener('click', () => {
-    // ⚠️ ASKED OF THE DECK, NOT OF THE BAR. `seekable` is the one fact that
-    // decides whether a loop can exist at all, and it is the same flag the
-    // scrub and the harness read, so the three cannot disagree.
+    // Asked of the deck: `seekable` is the flag the scrub and the harness also read.
+    // why: lessons/kit-transport-bar.md#seekable
     if (!seekable) return;
     const pos = deck.position();
     if (loopA == null) {
       /**
-       * 🔴 A PRESS ON A STOPPED TRANSPORT STARTS IT. ASKED FOR 2026-09-16:
-       * *"when not playing and prssing loop, playback should start"*.
-       *
-       * The old shape needed the transport to be rolling already, and pressing
-       * LOOP twice on a stopped deck put both marks in the same place, because
-       * nothing moved between them. That is the state the badge was reporting.
-       * ⚠️ PARKED AT THE END, A PRESS MEANS FROM THE TOP. Marking the start of
-       * a loop at the last frame is a loop of nothing, and the play button
-       * already treats a press at the end as a restart, so the two agree.
+       * A press on a stopped transport starts it; parked at the end, it means from the top.
+       * why: lessons/kit-transport-bar.md#press-starts
        */
       let at = pos;
       const rolling = deck.playing?.() ?? false;
@@ -1398,12 +838,8 @@ export function createTransportBar(host, deck, {
         at = range[0];
       }
       loopA = at; loopB = null;
-      // 🔴 A LIVE DECK HAS NOTHING BEHIND THIS PRESS, SO THE WINDOW IS AHEAD OF
-      // IT. On a recording both marks are behind you and the second press picks
-      // the end; on a station the sound the loop will play has not arrived yet,
-      // so the press opens a window instead and the live edge fills it. The
-      // page is told at once, because it is the thing that has to start keeping
-      // the audio — the bar keeps only the two numbers.
+      // On a live deck the press opens a window ahead of it and the page is told at once.
+      // why: lessons/kit-transport-bar.md#live-window-ahead
       filling = live;
       fillEnds = live ? loopA + liveWindowMs : null;
       drawLoop();
@@ -1412,16 +848,11 @@ export function createTransportBar(host, deck, {
       return;
     }
     if (loopB == null) {
-      // 🔴 A LOOP MARKED BACKWARDS IS STILL A LOOP SOMEBODY MEANT. Pressing
-      // the second time after seeking BACK gives an end before the start, and
-      // refusing it is a control punishing somebody for the order they worked
-      // in. Swapped; only a zero-length one is refused, because that is the
-      // press that landed on the same frame as the first and means nothing.
+      // A loop marked backwards is swapped; only a zero-length one is refused.
+      // why: lessons/kit-transport-bar.md#backwards-loop
       const a = Math.min(loopA, pos), b = Math.max(loopA, pos);
-      // Silently, and it stays armed. The press landed on the same frame as the
-      // first one and means nothing; a sentence in the transport saying so was
-      // removed on instruction, and with a press now starting the transport
-      // this is a hand that pressed twice rather than a state anybody is in.
+      // Silently, and it stays armed: a second press on the same frame means nothing.
+      // why: lessons/kit-transport-bar.md#zero-length
       if (b - a < 1) return;
       startLoop(a, b);
       return;
@@ -1442,20 +873,9 @@ export function createTransportBar(host, deck, {
     if (tg instanceof HTMLElement &&
         (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
     /**
-     * 🔴 A KEY AIMED AT ANOTHER BAR IS THAT BAR'S, AND A BAR IN A CLOSED TAB
-     * HEARS NOTHING. 2026-10-04, for the tabbed pages (`/time/` will carry five
-     * bars, `plans/plan-demo-structure.md` §3.2). This table listens on
-     * `window`, so before this every bar on a page took every key: a space
-     * with the focus on one bar's toggle started all of them, and on a tabbed
-     * page that is decks running and sounding in tabs nobody is looking at.
-     * ⚠️ BOTH HALVES ARE NARROW ON PURPOSE. A key from the body still reaches
-     * every bar, which is what the harness sends and what every page before
-     * this was built against. The closed-tab half only applies inside a panel
-     * marked `data-own-keys`, which `tab-page.mjs` sets; `/kit/`, `/stage/`,
-     * `/making/` and `/pack/` hold bars in plain tabs and keep their behaviour,
-     * because `/kit/`'s published bar sits in a closed tab and the harness's
-     * seek would otherwise land on nothing. `bar-drill.mjs` sends its key at
-     * the bar's own element so it moves one bar and no other.
+     * A key aimed at another bar is that bar's, and a bar inside a hidden `data-own-keys` panel
+     * (tab-page.mjs) hears nothing. A key from the body still reaches every bar.
+     * why: lessons/kit-transport-bar.md#own-keys
      */
     if (tg instanceof Element) { const owner = tg.closest('.tbar'); if (owner && owner !== bar) return; }
     if (bar.closest('[data-own-keys][hidden]')) return;
@@ -1463,9 +883,8 @@ export function createTransportBar(host, deck, {
     const span = b - a;
     const cur = deck.position();
     const step = e.shiftKey ? span * 0.1 : span * 0.02;
-    // ⚠️ NOT ON A BAR WITH NO TOGGLE. The space bar is the keyboard's name for
-    // the play button, so on a page that has none it would be a shortcut to a
-    // control nobody can see, and on `/keys/` the space bar is over a piano.
+    // No space key on a bar with no toggle.
+    // why: lessons/kit-transport-bar.md#no-space
     if (e.key === ' ') { if (!wantToggle) return; e.preventDefault(); pressToggle(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); doSeek(Math.min(b, cur + step)); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); doSeek(Math.max(a, cur - step)); }
@@ -1474,56 +893,28 @@ export function createTransportBar(host, deck, {
   }
   addEventListener('keydown', onKey);
 
-  // ── published for CDP; the plan's whole point ───────────────────────────
   /**
-   * 🔴 THIS OBJECT IS WHAT `window.__demo.transport` HOLDS. THE RETURN VALUE OF
-   * `createTransportBar` IS A DIFFERENT AND LARGER OBJECT, AND THE TWO ARE NOT
-   * INTERCHANGEABLE. The line at the bottom of this file publishes `api`
-   * itself; the thing handed back to the page is `{ el, api, extra, loopExtra,
-   * slot, note, destroy, … }`, which CARRIES `api` as a property rather than
-   * being it.
-   * ⚠️ SO A PAGE MUST NEVER ASSIGN THE RETURN VALUE TO `__demo.transport`. It
-   * cost another session real time today: doing that replaces a published
-   * object that has `position` with a wrapper that has none, and
-   * `demo/verify.mjs` dies on `t0.pos.toFixed` while the page itself looks
-   * perfectly well. The bar publishes itself and needs no help; a page with two
-   * bars says which one with `publish: false` on the other, and that option is
-   * the ONLY supported way to decide this.
-   * ⚠️ AND THE TWO DRIFT SILENTLY, because nothing type-checks either of them.
-   * `extra(id)` is on the return value and not here, which by the rule written
-   * on `loopExtra` below is a control a CDP check cannot reach on a page with
-   * more than one bar. Left as it is and written down rather than fixed
-   * quietly: adding a member changes what every harness can see, and that is a
-   * change somebody should ask for.
+   * ── published for CDP ───────────────────────────────────────────────────
+   * This is `window.__demo.transport`. The return value of `createTransportBar` carries it as
+   * `.api`; never assign the return value there, it has no `position`.
+   * why: lessons/kit-transport-bar.md#api
    */
   const api = {
     /**
-     * 🔴 THE BAR'S OWN ELEMENT, SO A CHECK CAN PRESS THIS BAR RATHER THAN THE
-     * FIRST ONE IN THE DOCUMENT. It was on the RETURN VALUE only, and the note
-     * further down this object states the principle it broke: a control
-     * reachable from one and not the other is a control the harness cannot
-     * press. With one bar per page `document.querySelector` happened to agree;
-     * `/stage/` has two and they are different elements.
+     * The bar's own element, so a check presses this bar and not the first in the document.
+     * why: lessons/kit-transport-bar.md#api-el
      */
     el: bar,
     /**
-     * 🔴 THE `on air` BADGE, OR null ON A BAR THAT IS NOT LIVE. This is the
-     * whole of the page's side of the swap: `bar.api.live.follow({ everyMs })`
-     * once, and `.seen()` whenever sound ACTUALLY ARRIVES: a block decoded, a
-     * segment fetched, an ICY title. Never on a press, never on a timer, never
-     * on `deck.playing()`: all three are the page declaring the thing it was
-     * supposed to measure.
-     * ⚠️ IT IS ON THIS OBJECT AS WELL AS ON THE RETURN VALUE, by the rule
-     * written on `loopExtra` below: what `__demo.transport` cannot reach, a CDP
-     * check cannot grade, and the state of this badge is exactly the kind of
-     * claim a check should be reading rather than a class name.
+     * The `on air` badge, or null. `seen()` only when sound arrives, never on a press or timer.
+     * why: lessons/kit-transport-bar.md#api-live
      */
     live: liveChip,
     get position() { return deck.position(); },
-    /** ⚠️ FORCED FALSE ON A BAR WITH NO TOGGLE rather than derived. Nothing on
-     *  such a bar can start the deck, so "is the transport playing" is a
-     *  question about this bar with one answer; reporting a deck a page happened
-     *  to start elsewhere would be the bar claiming a state it does not own. */
+    /**
+     * Forced false on a bar with no toggle: it does not own a deck started elsewhere.
+     * why: lessons/kit-transport-bar.md#api-playing
+     */
     get playing() { return wantToggle ? (deck.playing?.() ?? false) : false; },
     /** whether this bar has a play button at all. `demo/verify.mjs` reads it
      *  before pressing one. */
@@ -1548,12 +939,8 @@ export function createTransportBar(host, deck, {
     /** how much live sound one loop may hold, in ms */
     get loopWindowMs() { return liveWindowMs; },
     /**
-     * The warning is running.
-     *
-     * ⚠️ GRADED FROM HERE AND NOT FROM A CLASS OR A COMPUTED STYLE. The blink
-     * is built in JavaScript (see setBlink), so there is no class to look for,
-     * and sampling opacity would be sampling whichever half of the cycle the
-     * check happened to land in — a measurement that is right half the time.
+     * The warning is running. Graded here, since the blink is JavaScript with no class.
+     * why: lessons/kit-transport-bar.md#api-loop-blinking
      */
     get loopBlinking() { return blinking; },
     /** 0..1 through a running loop, or null. The same number `onLoopPos` pushes. */
@@ -1561,34 +948,18 @@ export function createTransportBar(host, deck, {
     /** press it the way a finger does, so a check drives the real handler */
     pressLoop() { loopBtn.click(); },
     /**
-     * A `loopExtras` button by id, so a check can press the real control and
-     * read the real face.
-     *
-     * ⚠️ IT IS ON THIS OBJECT AS WELL AS ON THE RETURN VALUE, and that is not a
-     * duplicate. This is what `window.__demo.transport` points at, which is the
-     * only handle a CDP check has; the return value is what the PAGE holds. A
-     * control reachable from one and not the other is a control the harness
-     * cannot press, which is how `/archive/radio/`'s ways went ungraded.
+     * A `loopExtras` button by id. On `api` as well as the return value, because `api` is the
+     * only handle a CDP check has.
+     * why: lessons/kit-transport-bar.md#api-loop-extra
      */
     loopExtra: (id) => loopExtraEls.get(id) || null,
     /** a `loopSlot` button by id. Always on the bar; see the option. */
     slot: (id) => loopSlotEls.get(id) || null,
   };
   /**
-   * 🔴 A PAGE WITH TWO BARS HAS TO SAY WHICH ONE IS ITS TRANSPORT, AND UNTIL
-   * 2026-09-18 IT COULD NOT. This line ran unconditionally, so `__demo.transport`
-   * was simply whichever bar was BUILT LAST, which is an ordering fact about
-   * the source rather than a statement about the page. `/stage/` gained a
-   * second bar (a live show in the control room beside a recording in the
-   * archive) and the wrong one won by being further down the file.
-   * ⚠️ IT IS THE ONLY HANDLE A CDP CHECK HAS, so getting it wrong does not show
-   * up as a missing feature: the suite presses one bar and asserts about
-   * another, which fails where nothing is wrong and can pass for the wrong
-   * reason just as easily.
-   * ⚠️ `publish: false` IS OPT-OUT RATHER THAN OPT-IN, because every page that
-   * predates this has exactly one bar and must keep publishing it without being
-   * edited. A new option that silently switched a check off on forty pages is a
-   * loss this suite has already taken once.
+   * A page with two bars says which is its transport with `publish: false` on the other;
+   * opt-out, so every one-bar page keeps publishing.
+   * why: lessons/kit-transport-bar.md#publish
    */
   if (window.__demo && publish !== false) window.__demo.transport = api;
 
@@ -1597,9 +968,8 @@ export function createTransportBar(host, deck, {
   drawLoop();
   paint({ pos: deck.position() });
 
-  // ⚠️ WHAT THE PAGE HOLDS, AND IT IS NOT WHAT THE HARNESS READS. See the note
-  // over `api` above: `__demo.transport` is `api`, this is a wrapper around it,
-  // and assigning this object there takes `position` away from every check.
+  // What the page holds, not what the harness reads (see `api`).
+  // why: lessons/kit-transport-bar.md#return-value
   return {
     el: bar,
     api,
@@ -1635,16 +1005,9 @@ export function createTransportBar(host, deck, {
 
 /**
  * Intersection of every declared caps.rates lattice. null = none declared.
- *
- * READ THE LIVE REGISTRY, not `deck.adapters`. That property is the object
- * handed to `createDeck` and it never holds an adapter registered afterwards —
- * which is every adapter a NEST installs on its parent. So a nest parent's
- * lattice read as "none declared" and the bar showed its honest static 1x for
- * a deck that could in fact be played at four rates. `transport.mjs` says as
- * much beside `deck.adapter()`; the bar was the one client not listening.
- *
- * `deck.caps()` with no kind returns `{kind: caps}` over everything currently
- * registered, which is the question actually being asked.
+ * Reads the live registry via `deck.caps()`, not `deck.adapters`, which misses adapters a
+ * nest registers later.
+ * why: lessons/kit-transport-bar.md#lattice-for
  */
 function latticeFor(deck) {
   let capsByKind = null;

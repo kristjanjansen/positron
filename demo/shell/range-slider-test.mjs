@@ -1,24 +1,7 @@
-// demo/shell/range-slider-test.mjs
-// The two handle arithmetic, no browser.
-//
-//   node demo/shell/range-slider-test.mjs
-//
-// 🔴 FOUR PURE FUNCTIONS, AND EVERY BUG A RANGE CONTROL HAS EVER HAD LIVES IN
-// ONE OF THEM: a start that walks past its end, a handle that pushes its
-// neighbour along and loses the value nobody touched, a screen reader told a
-// handle can reach a number it cannot, and a pair collapsed onto one number
-// that can never be opened again because every press grabs the same handle.
-//
-// ⚠️ WHAT IS NOT GRADED HERE, SAID PLAINLY BECAUSE A GREEN SUITE CAN MEAN ZERO
-// COVERAGE. Nothing below opens a document. `createRangeSlider` is never
-// called. Every claim about PIXELS needs a browser and is asserted on `/kit/`
-// instead:
-//   - that the band really runs between the two handles' centres, which is the
-//     `calc()` that `spanPixels` only states in arithmetic
-//   - that the control contributes exactly two grid items, so a group's shared
-//     columns still line up
-//   - that there are two tab stops and the lane is not one of them
-//   - that the lane and the handles are the single slider's own lane and handle
+// demo/shell/range-slider-test.mjs: the two handle arithmetic, no browser (node demo/shell/range-slider-test.mjs).
+// `createRangeSlider` is never called here: band pixels, the two grid items, the two tab stops
+// and the reused lane are asserted on /kit/.
+// why: lessons/kit-range-slider.md#test-header
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,13 +22,8 @@ ok('a press nearer the start takes the start, and nearer the end takes the end',
   nearestHandle(0.1, 0.2, 0.8) === 'from' && nearestHandle(0.9, 0.2, 0.8) === 'to'
   && nearestHandle(0.3, 0.2, 0.8) === 'from' && nearestHandle(0.7, 0.2, 0.8) === 'to');
 
-/* 🔴 THIS ONE WENT RED FIRST AND THE COMPONENT WAS WRONG, NOT THE CHECK.
-   `Math.abs(0.5 - 0.2)` is 0.3 and `Math.abs(0.5 - 0.8)` is 0.30000000000000004,
-   so an exact tie test made a press halfway between 0.2 and 0.8 take the START
-   while the same press halfway between 0.4 and 0.6 tied exactly and took the
-   END. Two identical gestures answering differently because of where the
-   handles happen to sit, and no reading of the source shows it. `TIE` is why
-   this passes now. */
+// |0.5 - 0.8| is 0.30000000000000004, so an exact tie answered differently by position; `TIE` fixes it.
+// why: lessons/kit-range-slider.md#test-tie
 ok('a press halfway between the two answers the same way wherever they are standing',
   nearestHandle(0.5, 0.2, 0.8) === nearestHandle(0.5, 0.4, 0.6)
   && nearestHandle(0.5, 0.2, 0.8) === 'to',
@@ -57,11 +35,8 @@ ok('NEGATIVE CONTROL: an exact tie test is what those two distances break',
   && Math.abs(0.5 - 0.4) === Math.abs(0.5 - 0.6),
   `${Math.abs(0.5 - 0.2)} against ${Math.abs(0.5 - 0.8)}`);
 
-/* 🔴 THE CASE THE WHOLE TIE RULE EXISTS FOR. With both handles on one number
-   every press is equally near to both, so a rule that answers the same handle
-   every time makes a collapsed range openable in one direction only, which
-   reads as a control that has stopped working. Pressing to the left has to come
-   away with the start and pressing to the right with the end. */
+// A collapsed pair must open in both directions: left press takes the start, right the end.
+// why: lessons/kit-range-slider.md#test-collapsed
 ok('a collapsed pair opens in BOTH directions, which is what the tie rule is for',
   nearestHandle(0.1, 0.5, 0.5) === 'from' && nearestHandle(0.9, 0.5, 0.5) === 'to',
   'left of a stacked pair grabs the start, right of it grabs the end');
@@ -81,11 +56,8 @@ ok('a press on top of one handle takes that one',
     a.lo === 0 && a.hi === 90, `${a.lo} to ${a.hi}`);
   ok('the end may go from wherever the start is standing up to the ceiling',
     b.lo === 30 && b.hi === 127, `${b.lo} to ${b.hi}`);
-  /* 🔴 THIS IS THE CLAIM THAT MATTERS FOR ANYBODY USING A SCREEN READER, and it
-     is the one a naive range control gets wrong. Reporting the full scale on
-     both handles says the start can reach 127 while the end sits at 90, and the
-     only way to find out otherwise is to press the key and hear nothing
-     change. */
+  // Each handle's reported limits stop at its neighbour, or a screen reader is told a lie.
+  // why: lessons/kit-range-slider.md#test-aria-limits
   ok('neither handle is ever told it can reach the other side of its neighbour',
     a.hi <= base.to && b.lo >= base.from);
 
@@ -178,29 +150,20 @@ ok('the default gap lets them touch, because a leg with no travel is a real sett
 {
   const src = fs.readFileSync(path.join(HERE, 'range-slider.mjs'), 'utf8');
 
-  /* 🔴 REUSE IS THE WHOLE ARGUMENT FOR THIS BEING A NEW MODULE RATHER THAN A
-     COPY, so it is checked rather than asserted in a comment. The classes below
-     are declared once in `shell.css` for the single slider, and a range that
-     invented its own would be the second slider stack this project has already
-     paid for. */
+  // The single slider's classes from shell.css are reused, checked rather than claimed.
+  // why: lessons/kit-range-slider.md#test-reuse
   const reused = ['sld', 'sld-head', 'sld-l', 'sld-lane', 'sld-knob', 'sld-v'];
   const missing = reused.filter((c) => !src.includes(`'${c}`) && !src.includes(`${c} `));
   ok('it wears the single slider\'s own classes rather than inventing a second set',
     missing.length === 0, missing.length ? `missing ${missing.join(', ')}` : reused.join(', '));
 
-  /* Two children of the root, a head and a lane, because `.sld-group .sld
-     { display: contents }` is what aligns a stack of sliders and a third child
-     would take a column of its own. The page measures the real thing; this
-     catches the append that would break it. */
+  // Two children, a head and a lane: `.sld-group .sld { display: contents }` aligns a stack.
+  // why: lessons/kit-range-slider.md#test-two-children
   ok('the root is appended exactly one head and one lane',
     /wrap\.append\(head, lane\)/.test(src));
 
-  /* 🔴 ONE WRITER, WHICH IS WHAT KEEPS THE POINTER, THE KEYBOARD AND A PAGE
-     CALLING `set()` FROM DISAGREEING ABOUT THE INVARIANT. Everything that moves
-     a value goes through `write`, and `write` is the only caller of
-     `clampPair` inside the component. A second assignment path would be the
-     hole this file cannot otherwise see, because each of the three looks
-     perfectly correct on its own. */
+  // One writer: `write` is the only caller of `clampPair`, so pointer, keys and `set()` agree.
+  // why: lessons/kit-range-slider.md#test-one-writer
   const body = src.slice(src.indexOf('export function createRangeSlider'));
   const clamps = (body.match(/clampPair\(/g) || []).length;
   const setsA = (body.match(/a = pair\.from/g) || []).length;

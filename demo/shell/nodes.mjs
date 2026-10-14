@@ -1,30 +1,9 @@
-// demo/shell/nodes.mjs: the one catalogue of the node TYPES the site's own
-// pages build in a browser tab, read off every concept page's addNode and
-// addPort on 2026-10-14 (plans/plan-node-catalogue.md, step 1). Pure and import
-// free, so a test and the build can read it.
-//
-// Left out on purpose: the Pi side (`boardGraph()` in graph-registry.mjs), and
-// cf-relay, which patchbay.mjs draws from a link's transport. The other hops
-// (cf-shout, cf-stream, cf-moq) are entries, each on its fixed site.
-//
-// An entry's key is the catalogue NAME. `node` is the id's second segment when
-// it is not the name (three different things are called `shader` on three
-// pages), and `site` is the id's first segment when it is not the page's.
-// No name may look like an instance another entry matches (`knob-mix` would
-// be a knob called mix), so the test refuses one and typeOf will not guess.
-// A port's key is its name; `dir` and `medium` come from it (`value-in-2` is
-// value, in) unless the port says otherwise (`cutoff-in` is audio).
-// `optional` ports are added only when a page passes a deliver or an override
-// for them. `variants` are port fields a page asks for by name
-// (`{ name: 'keys', variant: 'cc' }`). `pages` are the pages that build the
-// type today, `labels` the pages that label it something other than `label`.
-// `match` names a per-instance id a page may pass as a plain string
-// (`knob-cutoff`), and `instance` says in words how an instance is named.
-//
-// THE ORDER RULE (decided 2026-10-14): a node's ports come together with the
-// node, in the entry's port order, so bay.ports() lists node by node and the
-// details table's rows and the SVG's elements follow. A port added later to a
-// node that already exists (addPorts) lands after every port added before it.
+// demo/shell/nodes.mjs: the one catalogue of node types a browser tab builds. Pure and import free.
+// Key = catalogue name; `node`/`site` are the id's segments when they differ. A port's dir and
+// medium come from its name unless it says otherwise. `optional`, `variants`, `pages`, `labels`,
+// `match` and `instance` are described in the lesson. Order: a node's ports come with it, in
+// entry order; addPorts lands after every port added before.
+// why: lessons/kit-nodes.md#header
 
 const P = (o = {}) => o;
 const NOTE = { emits: ['note'] }, TAKES_NOTE = { accepts: ['note'] };
@@ -237,7 +216,8 @@ export const NODES = {
       'value-in': P({ shape: { of: 'param', names: ['invert', 'scale'] } }) },
     pages: ['drums/camera'],
   },
-  // `radio` until 2026-10-14: the grain pages and landscape ask `{ name: 'player', as: 'radio' }`.
+  // Formerly `radio`: the grain pages and landscape ask `{ name: 'player', as: 'radio' }`.
+  // why: lessons/kit-nodes.md#player-was-radio
   player: {
     kind: 'engine', label: 'player',
     ports: { 'file-in': P(), 'audio-out': P() },
@@ -254,8 +234,8 @@ export const NODES = {
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-out': P({ optional: true }) },
     pages: ['radio/live', 'radio/key'],
   },
-  // `granulator` until 2026-10-14: landscape asks `{ name: 'grains', as: 'granulator' }` and
-  // keeps the word granulator (asked 2026-10-13: *"no grains mentions"*).
+  // Formerly `granulator`: landscape asks `{ name: 'grains', as: 'granulator' }`.
+  // why: lessons/kit-nodes.md#grains-was-granulator
   grains: {
     kind: 'engine', label: 'grain ring',
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ optional: true }), 'value-out': P(),
@@ -268,7 +248,8 @@ export const NODES = {
     ports: { 'value-out': P(), 'value-out-2': P() },
     pages: ['granulator/grains', 'granulator/beat'],
   },
-  // `bpm` until 2026-10-14: radio/rig.mjs asks `{ name: 'tempo', as: 'bpm' }`.
+  // Formerly `bpm`: radio/rig.mjs asks `{ name: 'tempo', as: 'bpm' }`.
+  // why: lessons/kit-nodes.md#tempo-was-bpm
   tempo: {
     kind: 'engine', label: 'tempo detector',
     ports: { 'audio-in': P(), 'value-out': P() },

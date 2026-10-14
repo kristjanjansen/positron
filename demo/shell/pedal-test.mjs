@@ -1,32 +1,7 @@
-// demo/shell/pedal-test.mjs. The sustain pedal's arithmetic, with no audio.
-//
-//   node demo/shell/pedal-test.mjs
-//
-// `createPedal` is two sets, a threshold and a change filter, and every bug a
-// sustain pedal has ever had lives in one of them: a lift that steals a note
-// still under a finger, a test for 127 that works on a cheap pedal and fails on
-// an expensive one, a repeat that stutters under a foot that is not moving, and
-// a foot remembered across a switch off. None of those needs a browser, and
-// `plans/plan-nola.md` §5.1 names all four before any of them was written.
-//
-// NINETEEN OF THESE ARE NEGATIVE CONTROLS: they are written so that the bug they
-// describe would fail them, rather than so that today's code passes. The bug is
-// named in the comment above each one.
-//
-// 🔴 AND SEVEN DELIBERATE SABOTAGES TAKE BETWEEN 1 AND 4 OF THEM RED, MEASURED
-// 2026-09-22 rather than claimed: a threshold of `=== 127` costs 2, a `keyDown`
-// that does not take a note off the foot costs 3, no change filter costs 1, a
-// panic that keeps the foot costs 2, a `keyUp` reading only `was` costs 2, a
-// constant damper time costs 4, and a `forgetKeys` that leaves the keys alone
-// costs 1. That list is the only reason to believe any of this grades anything.
-//
-// 🔴 ONE OF THOSE SABOTAGES CAME BACK GREEN THE FIRST TIME AND FOUND A REAL
-// DEFECT. `if (!keysDown.has(n))` at the pedal lift, copied over from
-// `/muta/`, was UNREACHABLE: the two sets are disjoint by construction, so the
-// test could never be false. Removing it changed nothing, which is this
-// project's own signal for a dead guard. What the hunt for a reachable path
-// then turned up is test 19, a duplicate note off releasing a note twice, which
-// was a live bug in `/muta/` and is fixed in both.
+// demo/shell/pedal-test.mjs: the sustain pedal's arithmetic, with no audio (node demo/shell/pedal-test.mjs).
+// Nineteen tests are negative controls, each named for the bug that would fail it; seven
+// deliberate sabotages each take 1 to 4 of them red.
+// why: lessons/kit-pedal.md#test-header
 
 import { createPedal, damperSec, PEDAL_SAYS, SUSTAIN_CC, PEDAL_ON, DAMP_MIN, DAMP_MAX }
   from './pedal.mjs';
@@ -249,10 +224,9 @@ ok('a value outside 0 to 127 is clamped',
 
 // ── a pedal whose polarity was sensed wrong at power up ─────────────────────
 
-// 21. MEASURED on the keyboard in this building 2026-09-23: two press and
-//     release gestures both arrived as `B1 40 00` then `B1 40 7F` 0.40 s later,
-//     so pressing sends 0 and releasing sends 127. `flip` reads it the right
-//     way up without touching the instrument.
+// 21. Measured on the keyboard in this building: pressing sends 0 and releasing 127
+//     (`B1 40 00` then `B1 40 7F`). `flip` reads it the right way up.
+// why: lessons/kit-pedal.md#test-flip
 {
   const { p, notes } = rig({ flip: true });
   p.control(64, 0);
@@ -339,11 +313,9 @@ ok('a value outside 0 to 127 is clamped',
     moved.length === 2 && p.moves() === 2, `${p.moves()} moves from four calls`);
 }
 
-// 29. NEGATIVE CONTROL. A panic must leave the raw value meaning UP on THIS
-//     instrument, not the literal 0. On a flipped pedal 0 means down, so a
-//     panic used to leave the reading contradicting `down`, and the damper time
-//     is read off the reading: every release after a panic took 0.9 s instead
-//     of 0.12.
+// 29. NEGATIVE CONTROL. A panic leaves the raw value meaning up on this instrument, not a
+//     literal 0, or every later release takes 0.9 s instead of 0.12.
+// why: lessons/kit-pedal.md#test-panic-flip
 {
   for (const flip of [false, true]) {
     const { p, let_go } = rig({ flip });
@@ -362,10 +334,8 @@ ok('a value outside 0 to 127 is clamped',
 
 // ── the words ───────────────────────────────────────────────────────────────
 
-// 18. Nothing a visitor reads carries an em dash or a middot. CLAUDE.md, and
-//     the reason this is code rather than a sweep is that two formatters in
-//     `shell.mjs` were stamping middots in under a comment calling one "already
-//     this project's separator".
+// 18. Nothing a visitor reads carries an em dash or a middot.
+// why: lessons/kit-pedal.md#test-no-dashes
 {
   const strings = [PEDAL_SAYS.down, PEDAL_SAYS.up, PEDAL_SAYS.switchy, PEDAL_SAYS.continuous,
     PEDAL_SAYS.freed(1), PEDAL_SAYS.freed(3), PEDAL_SAYS.raw(64, 127, true)];
@@ -376,12 +346,9 @@ ok('a value outside 0 to 127 is clamped',
     PEDAL_SAYS.freed(1));
 }
 
-// 19. NEGATIVE CONTROL, AND IT IS THE ONE THAT FOUND A REAL BUG. A keyboard
-//     sending two releases for one key is ordinary: a note on at velocity 0
-//     followed by a real 0x80 is the commonest shape of it. Reading only
-//     "was this key down" sends the second one past the pedal to the
-//     instrument, so the note stops under a foot that is still down and the
-//     lift releases it a second time afterwards.
+// 19. NEGATIVE CONTROL. Two releases for one key (velocity 0 then 0x80) must not pass the
+//     pedal and release the note twice.
+// why: lessons/kit-pedal.md#test-double-release
 {
   const { p, let_go, notes } = rig();
   p.keyDown(60);

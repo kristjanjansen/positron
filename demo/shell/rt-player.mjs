@@ -1,9 +1,7 @@
-// demo/shell/rt-player.mjs: the runtime of a `player` node on /connect/
-// (node-runtime.mjs): /granulator/'s recordings (grain-rig.mjs
-// `createSources`), decoded and looped into player:audio-out. Its face is
-// Play and the recording picker.
-// 🔴 A RECORDING IS FETCHED ONLY ON PLAY, from our own bucket, and only from the
-// store linked into player:file-in; with none linked it says so and plays nothing.
+// demo/shell/rt-player.mjs: a `player` node on /connect/: /granulator/'s recordings, looped into
+// player:audio-out, behind Play and a picker. A recording is fetched only on Play, from our own
+// bucket, and only from the store linked into player:file-in.
+// why: lessons/kit-rt-player.md#header
 
 import { createButtonGroup } from './button-group.mjs';
 import { createPicker } from './picker.mjs';

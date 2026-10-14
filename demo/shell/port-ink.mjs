@@ -1,9 +1,7 @@
-// demo/shell/port-ink.mjs: colours the port part of every port id on the
-// page (`web:keys:midi-out`) in its medium's colour, read from the bay's own
-// port, without touching the text. The CSS Custom Highlight API paints ranges
-// over the existing text nodes, so a cell still holds plain ASCII that copies,
-// clips and sorts as it did; no spans are added. A browser without
-// `CSS.highlights` shows the text uncoloured.
+// demo/shell/port-ink.mjs: colours the port part of every port id on the page in its medium's
+// colour with the CSS Custom Highlight API, so the text stays plain ASCII.
+// No CSS.highlights, no colour.
+// why: lessons/kit-port-ink.md#header
 
 const ID = /[\w.*-]+:[\w.-]+:[\w.-]+/g;
 

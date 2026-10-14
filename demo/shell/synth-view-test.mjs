@@ -1,32 +1,7 @@
-// demo/shell/synth-view-test.mjs
-// The arithmetic behind the three synth figures, with no browser.
-//
-//   node demo/shell/synth-view-test.mjs
-//
-// 🔴 THE CLAIM THIS FILE EXISTS FOR IS THAT EACH FIGURE DRAWS WHAT ITS INPUTS
-// SAY AND REFUSES WHAT THEY DO NOT. A picture is the easiest thing in the world
-// to write green: any curve that goes down looks like a low pass, any line with
-// a peak in it looks like an envelope, and a sine looks like a sine whatever
-// produced it. So the checks below are COMPARISONS rather than shapes: a low
-// pass and a high pass have to disagree at both ends, four poles have to fall
-// faster than two, raising the resonance has to lift the corner and nothing
-// else, and a wave name that is not a shape's name has to come back empty.
-//
-// ⚠️ WHAT IS NOT GRADED HERE, SAID PLAINLY BECAUSE A GREEN SUITE CAN MEAN ZERO
-// COVERAGE. Nothing below opens a canvas. None of the three constructors is
-// called. Every claim about PIXELS or about what is PAINTED is on `/kit/`:
-//   - that the word `schematic` really reaches the filter's canvas, and
-//     `proportions, not seconds` the envelope's
-//   - that a refused wave draws its name and its reason and no curve
-//   - that the ResizeObserver rebuilds at a new width
-//   - that the three figures paint once each and never ask for a frame
-//   - that `--sv-h` is a custom property a page can still override
-//
-// 🔴 AND THE HONESTY OF THE FILTER IS NOT A NUMBER, SO IT IS CHECKED AS TEXT.
-// The one thing that makes a drawn response curve acceptable in this project is
-// that it says out loud it is not a measurement, and the only cheap way to
-// grade a promise like that is to read the source for it. The page grades the
-// pixels.
+// demo/shell/synth-view-test.mjs: the arithmetic behind the three synth figures, no browser.
+// Checks are comparisons, not shapes. No canvas is opened and no constructor called: pixels are graded
+// on /kit/. The filter's not-a-measurement promise is checked as source text.
+// why: lessons/kit-synth-view.md#test-header
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,10 +26,8 @@ ok('the four textbook names map to the four shapes',
   shapeFor('sine') === 'sine' && shapeFor('triangle') === 'triangle'
   && shapeFor('sawtooth') === 'saw' && shapeFor('square') === 'square');
 
-/* 🔴 THE ONE THAT KEEPS THIS COMPONENT HONEST. `saw 9:1 PW` shares three
-   letters with `sawtooth` and is not a sawtooth, and a substring test would
-   draw a plain ramp for nine different blends under the instrument's own labels
-   for them. Nine plausible wrong pictures from one careless comparison. */
+// `saw 9:1 PW` contains saw and is not a sawtooth; a substring test would draw nine wrong ramps.
+// why: lessons/kit-synth-view.md#test-substring
 ok('NEGATIVE CONTROL: a name that merely contains a shape word is refused',
   shapeFor('saw 9:1 PW') === null && shapeFor('saw 5:5 PW') === null
   && shapeFor('sine table') === null && shapeFor('triangle-saw blend') === null,
@@ -66,21 +39,16 @@ ok('a pulse is never derived from a name, because no name carries a duty cycle',
 ok('nothing at all still answers nothing',
   shapeFor('') === null && shapeFor(null) === null && shapeFor(undefined) === null);
 
-/* 🔴 THE REAL COUNT, AGAINST THE REAL TABLE, so the number in the component's
-   header and the number a page prints cannot drift apart. It is asserted as an
-   exact figure rather than as *some*, so the day somebody works out what a
-   blend looks like this goes red and a reader is told why. */
+// The exact drawable count against the real table, so the header and the page cannot drift apart.
+// why: lessons/kit-synth-view.md#test-real-count
 {
   const drawn = OSC_WAVES.filter((n) => shapeFor(n));
   const tables = OSC_WAVES.slice(FIRST_WAVETABLE);
   ok('4 of the Circuit\'s 30 oscillator waves have a shape this can derive',
     OSC_WAVES.length === 30 && drawn.length === 4,
     `${drawn.join(', ')}`);
-  /* 🔴 SIXTEEN, AND THE BRIEF THIS WAS BUILT FROM SAID FOURTEEN. `FIRST_WAVETABLE`
-     is 14, which is the count of PLAIN waveforms, and `slice(14)` is 16 rows
-     long. Two halves of one split, written down the wrong way round, and the
-     check is here in the form that would have caught it. The conclusion is
-     unchanged: 26 of the 30 have no shape this file may honestly draw. */
+  // FIRST_WAVETABLE is 14 plain waveforms, so slice(14) is 16 wavetables. 26 of 30 have no drawable shape.
+  // why: lessons/kit-synth-view.md#test-sixteen
   ok('16 of the 30 are wavetables, which have no single shape by definition',
     tables.length === 16 && tables.every((n) => shapeFor(n) === null)
     && OSC_WAVES.length - drawn.length === 26,
@@ -121,9 +89,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
 
 {
   const p = wavePoints('sine', 200, { cycles: 2 });
-  /* 🔴 TWO CYCLES, NOT ONE, AND IT IS GRADED BECAUSE ONE CYCLE OF A SQUARE AND
-     ONE CYCLE OF A HALF DUTY PULSE ARE THE SAME PICTURE. The reader has to be
-     able to see that the thing repeats. */
+  // Two cycles: one cycle of a square and of a half duty pulse are the same picture.
+  // why: lessons/kit-synth-view.md#test-two-cycles
   let zeros = 0;
   for (let i = 1; i < p.length; i++) if (p[i - 1] < 0 && p[i] >= 0) zeros++;
   ok('two cycles really are two, counted as upward crossings',
@@ -137,10 +104,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
 // ── two traces in one picture ──────────────────────────────────────────────
 {
   /**
-   * 🔴 SAMPLES OUTRANK A DERIVED SHAPE, AND THAT IS NOT A HOLE IN THE REFUSAL.
-   * The refusal is about GUESSING: a wavetable has no single shape and a blend's
-   * ratio is not published, so a name is refused rather than invented. A caller
-   * handing over samples read the signal, and a reading beats a textbook shape.
+   * Samples outrank a derived shape: the refusal is about guessing, and a reading beats a textbook shape.
+   * why: lessons/kit-synth-view.md#test-samples
    */
   const measured = traceOf({ name: 'digital nasty 1', points: [0, 0.5, -0.5, 0] });
   ok('a trace with real samples is drawn even where its NAME would be refused',
@@ -151,9 +116,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     traceOf({ name: 'sawtooth' }).pts.length === 512
     && traceOf({ name: 'sawtooth' }).shape === 'saw');
 
-  /* 🔴 THE NEGATIVE CONTROL: neither samples nor a derivable name is still a
-     refusal. Without this, the two asserts above would pass on a version that
-     drew a straight line for everything it did not understand. */
+  // NEGATIVE CONTROL: no samples and no derivable name is still a refusal.
+  // why: lessons/kit-synth-view.md#test-no-samples
   ok('NEGATIVE CONTROL: no samples and no derivable name is still nothing to draw',
     traceOf({ name: 'digital nasty 1' }).pts === null
     && traceOf({ name: 'saw 5:5 PW', points: [] }).pts === null,
@@ -187,10 +151,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     && Math.abs(e.stages.attack + e.stages.decay + e.stages.release + e.stages.delay
       - (1 - HOLD_SHARE)) < 1e-12);
 
-  /* 🔴 THE COMPARISON THAT KILLS A DRAWER IGNORING ONE OF ITS INPUTS. Four
-     stages read from one object is four chances to read the same field twice,
-     and a picture drawn that way looks completely ordinary. Each one is moved
-     alone and only its own stage may change. */
+  // Each stage is moved alone and only its own stage may change, catching a field read twice.
+  // why: lessons/kit-synth-view.md#test-stages
   const base = { attack: 20, decay: 20, sustain: 64, release: 20, max: 127 };
   const longA = envelopePath({ ...base, attack: 100 });
   const longR = envelopePath({ ...base, release: 100 });
@@ -203,11 +165,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     && longA.stages.release < longR.stages.release);
 
   const flat = envelopePath({ attack: 0, decay: 0, sustain: 100, release: 0, max: 127 });
-  /* 🔴 EVERY STAGE AT ZERO IS A REAL SETTING AND IT STILL FILLS THE BOX.
-     Dividing the width in proportion to four zeros is a divide by zero wearing
-     a picture, and leaving three quarters of the box empty beside a correct
-     drawing reads as a component that failed rather than as an envelope with no
-     times in it. */
+  // Every stage at zero is a real setting and must still fill the box (no divide by zero).
+  // why: lessons/kit-synth-view.md#test-all-zero
   ok('an envelope with no lengths at all still fills the picture and says so',
     flat.silent === true && Math.abs(flat.end - 1) < 1e-12 && flat.stages.hold === 1,
     `hold ${flat.stages.hold}, ends at ${flat.end}`);
@@ -252,10 +211,8 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     at(lp, 0.05) > at(lp, 0.95) && at(lp, 0.05) > 0.5);
   ok('a high pass is the other way round',
     at(hp, 0.95) > at(hp, 0.05) && at(hp, 0.95) > 0.5);
-  /* 🔴 THE CHECK A DRAWER THAT IGNORED THE TYPE COULD NOT PASS. Both of the two
-     lines above are satisfied by any curve that slopes, as long as it slopes;
-     this one needs the two to disagree at BOTH ends, which only happens if the
-     kind is really being read. */
+  // The two kinds must disagree at both ends, which only happens if the type is read.
+  // why: lessons/kit-synth-view.md#test-type-read
   ok('NEGATIVE CONTROL: the two disagree at both ends, so the type is really read',
     at(lp, 0.05) > at(hp, 0.05) && at(hp, 0.95) > at(lp, 0.95),
     `at the bottom ${at(lp, 0.05).toFixed(3)} against ${at(hp, 0.05).toFixed(3)}, `
@@ -299,12 +256,9 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     Q_MIN < 1 && Q_MAX >= 10);
 }
 
-// ── the triggered scope's arithmetic (2026-10-12, /drums/knobs/) ──
-// A buffer of 1000 samples at 1000 Hz ending at t = 10 s, with a hit (a burst
-// of 1s) starting at sample 700, so at t = 9.7 s. NEGATIVE CONTROLS: a clock
-// that is 3 ms off still lands on sample 700 (the gate finds the edge), an
-// onset whose window would run past the end is refused (-1), and the capture
-// keeps a one sample spike that a plain decimation would step over.
+// Triggered scope: 1000 samples at 1000 Hz ending at 10 s, a hit at sample 700. Controls: a 3 ms
+// clock error still finds sample 700, a window past the end is -1, and a one sample spike survives.
+// why: lessons/kit-synth-view.md#test-scope
 {
   const buf = new Float32Array(1000);
   for (let i = 700; i < 760; i++) buf[i] = i % 2 ? 0.8 : -0.8;
@@ -327,27 +281,14 @@ ok('a shape this file cannot derive answers NaN rather than a number',
 {
   const src = fs.readFileSync(path.join(HERE, 'synth-view.mjs'), 'utf8');
   /**
-   * The same file with every comment taken out.
-   *
-   * 🔴 **AN ABSENCE ASSERTED OVER THE WHOLE FILE GRADES THE PROSE, AND THIS
-   * FILE WAS THE THIRD TO BE CAUGHT BY IT IN ONE DAY**, after
-   * `instrument-test.mjs`, where two asserts had been green for a day matching
-   * comment text, and `knob-test.mjs`, where one went red on its first run for
-   * finding the sentence that FORBIDS the thing it was looking for. Here both
-   * `nothing here asks for an animation frame` and `nothing in here sends
-   * anything anywhere` went red the moment a comment explained that the second
-   * trace takes its samples from a caller and runs no frame loop and opens no
-   * `AudioContext`. The claims were true and the instrument was reading the
-   * wrong text.
-   * ⚠️ **A PRESENCE MAY BE ASSERTED OVER EITHER AND AN ABSENCE OVER `code`
-   * ONLY.** The two checks below that read `src` on purpose are about what the
-   * file SAYS, which is the one thing the comments are.
+   * synth-view.mjs with comments removed. Assert an absence over `code` only, a presence over either:
+   * an absence over the whole file grades the prose.
+   * why: lessons/kit-synth-view.md#test-code-only
    */
   const code = src.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
 
-  /* 🔴 THE PROMISE THAT MAKES A DRAWN RESPONSE CURVE ACCEPTABLE AT ALL, and the
-     only cheap way to grade a promise is to read it. The pixels are graded on
-     `/kit/`; this catches the edit that deletes the word. */
+  // The promise that makes a drawn response curve acceptable, read as text; /kit/ grades the pixels.
+  // why: lessons/kit-synth-view.md#test-schematic
   ok('the filter paints the word schematic into its own picture',
     /f\.say\('schematic'/.test(src) && src.includes('THE FILTER CURVE IS A SCHEMATIC'));
   ok('the envelope paints what its axis is not',
@@ -367,19 +308,15 @@ ok('a shape this file cannot derive answers NaN rather than a number',
     !code.includes('fetch(') && !code.includes('WebSocket')
     && !code.includes('AudioContext') && !code.includes('midi'));
 
-  /* 🔴 `not drawn` CAME OFF THE PICTURE 2026-09-22, ASKED AS *"no \"not
-     drawn\""*, AND STAYED IN THE ANNOUNCEMENT. The card was carrying the
-     refusal twice: the reason says why nothing is drawn and `not drawn` said
-     that nothing is drawn, which the empty picture has already said. A reader
-     with no picture has no empty canvas to infer from, so the words are the
-     only channel they have, and `/kit/` reads them off the aria-label. */
+  // `not drawn` is in the aria-label only: the empty picture already says it, and a reader with
+  // no picture needs the words.
+  // why: lessons/kit-synth-view.md#test-not-drawn
   ok('the refusal is announced and no longer painted',
     !/f\.say\('not drawn'/.test(code) && /not drawn: \$\{v\.reason/.test(code),
     'off the canvas, still in the aria-label');
 
-  /* ⚠️ ONE CONSTANT MEANING THE GAP AT THE BOTTOM, NOT TWO. `shell.css` has
-     paid for this twice, as `--sld-col` and as `--ctl-gap`. Both the refusal's
-     lines and the drawn case's name line are laid against `PAD` and `foot`. */
+  // One constant for the bottom gap: the refusal and the drawn name both sit on PAD and foot.
+  // why: lessons/kit-synth-view.md#test-one-pad
   ok('the refusal sits on the same baseline the drawn name does, off the card\'s one padding',
     /f\.say\(v\.reason \|\| NO_SHAPE, PAD, foot,/.test(code)
     && /f\.say\(v\.name \|\| 'no wave', PAD, foot - 13,/.test(code),

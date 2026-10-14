@@ -1,17 +1,7 @@
-// demo/shell/looper-test.mjs — the looper's arithmetic, with no audio at all.
-//
-//   node demo/shell/looper-test.mjs
-//
-// `ringOrder`, `planVoice` and `headOf` are pure, and every bug this looper has
-// ever had lived in one of them: a ring copied from index 0 after it wrapped
-// (an edit nobody made, in the middle of the loop), a voice that always began
-// at the top (pressing ← jumped the sound to the far end of the picture), a
-// pingpong head that was a ramp and sat at the right edge for the whole return
-// half. None of those needs a browser to catch, and the page that carried them
-// is one no harness may open.
-//
-// SIX OF THESE ARE NEGATIVE CONTROLS: they are written so that the bug they
-// describe would fail them, rather than so that today's code passes.
+// demo/shell/looper-test.mjs: the looper's pure arithmetic (ringOrder, planVoice, headOf),
+// with no audio. Six are negative controls, written so the bug they describe fails them.
+// Run: node demo/shell/looper-test.mjs
+// why: lessons/kit-looper.md#test-header
 
 import { createLooper, ringOrder, planVoice, headOf, LOOP_WAYS, LOOP_TURN, WAY_GLYPH, LOOP_SAYS,
   CHOP_DIV, CHOP_MIN_S } from './looper.mjs';

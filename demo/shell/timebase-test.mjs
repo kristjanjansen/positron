@@ -1,47 +1,7 @@
-// demo/shell/timebase-test.mjs: when a light event lands against a heavy link, with no browser.
-//
-//   node demo/shell/timebase-test.mjs
-//
-// `timebase.mjs` takes every time it uses as an argument, so the whole policy
-// is gradable here. Every expected value below is worked out by hand in the
-// comment above it, from the module's stated rule and not from its code,
-// because a test that recomputes the module's formula catches a typo and never
-// a misreading (the `timeline/csound.mjs` lesson).
-//
-// FOURTEEN OF THE 43 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and
-// counted at the end. They are written so the bug they name fails them.
-//
-// TWELVE SABOTAGES, each run on a copy of the module (and of `wire.mjs`) in a
-// scratch directory with this file beside it, 43/43 before every one. S1 to S7
-// were first measured 2026-10-04 against the 39 of the `due` shape and were
-// RE-RUN the same day after `due` folded into `at`; S8 to S12 are the shape's
-// own and the wire's:
-//
-//   S1  the median replaced by the last observation         2 red
-//   S2  the peer offset's sign flipped                      9 red (8 before the wire round trip)
-//   S3  a step never confirmed, so the line never moves     2 red
-//   S4  an unknown stamp clock read as 0 when following     1 red
-//   S5  the rate ignored when anchoring a recording         1 red
-//   S6  `decide` firing now when it cannot tell             1 red
-//   S7  deviants pushed into the median window as well      1 red (the first
-//       run's 3 was a different way of writing the same bug, not kept)
-//   S8  `follow` ignored, scheduled on the peer clock       4 red
-//   S9  any `on` read as a link id, `on: true` included     1 red
-//   S10 `parse()` not normalising an old envelope           1 red
-//   S11 an event still carrying `due` not refused           1 red
-//   S12 normalising sets `sent` and keeps the old `at`      1 red
-//
-// ⚠️ S2 HAS A SURVIVOR AND IT IS RIGHT TO SURVIVE. `following the video,
-// shared 60000 fires at local 59929.5` stays green with the sign flipped,
-// because when the light event and the video are stamped on the same shared
-// clock, follow is `S - d` and the receiver's own offset cancels out. A
-// receiver that follows a shared-stamped link does not need to have agreed a
-// clock itself; only the senders do. Kept, not tuned away (plan §3.3).
-//
-// WHAT IS NOT GRADED HERE: whether any real transport's observations look
-// like the ones fed in. The jitter, the step sizes and the latencies are
-// positron's measured figures (plan §3), but they are typed in, not observed.
-// Grading against a real stream is plan step 3 and later.
+// demo/shell/timebase-test.mjs (node demo/shell/timebase-test.mjs): when a light event lands against
+// a heavy link, no browser. Expected values are worked by hand from the stated rule, not the code.
+// 14 of 43 are negative controls; twelve sabotages each turned it red. Inputs are typed, not observed.
+// why: lessons/kit-timebase.md#test-header
 
 import { createTimebase, beatToShared, nextBeat } from './timebase.mjs';
 import { format, parse } from './wire.mjs';
@@ -246,8 +206,9 @@ console.log('\n== malformed input from the wire ==');
 
 console.log('\n== the shape on the wire: `at` is when it happens, `sent` is when it left ==');
 {
-  // The decision of 2026-10-04: an event carries `at` (shared ms) flat, and the
-  // envelope's send stamp is `sent`. Offset 137.5, so shared 60000 is local 59862.5.
+  // An event carries `at` (shared ms) flat and the envelope's send stamp is `sent`.
+  // Offset 137.5, so shared 60000 is local 59862.5.
+  // why: lessons/kit-timebase.md#test-flat-at
   const tb = createTimebase({ offsetMs: 137.5 });
 
   // A light's payload may say `on: true`. With no `at`, `beat` or `stamp` it is

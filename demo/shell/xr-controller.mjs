@@ -1,46 +1,16 @@
-// demo/shell/xr-controller.mjs — your actual controllers, drawn from their own
-// models, for a page that does NOT stand in `xr-room.mjs`'s room.
-//
-//   const cons = createXRControllers(gl, { log, say });
-//   cons.want(profile, handedness);          // once, when a source appears
-//   cons.draw({ vp, grip, profile, handedness });   // per hand, per eye
-//
-// 🔴 WHY THIS IS NOT JUST A CALL INTO `xr-room.mjs`. That module already loads
-// and draws these models, and it is where they were written — but it draws them
-// as one step inside a whole renderer: it owns the sky, the walls, the dotted
-// grid, the tablet and its own box program, and a page gets all of that or none
-// of it. `floor` is a page with its own instanced tile shader and its own frame
-// loop; standing it in a room to borrow a controller would mean adopting a
-// second renderer to draw two hands.
-//
-// So the MODEL LOADING is the shared thing and it is shared properly: the
-// vendored `.glb` files, `readGLB`, and the profile naming all come from where
-// they already are. What is new here is ~90 lines of program and draw call.
-//
-// ⚠️ IT DRAWS ONLY WHAT THE RUNTIME ANSWERED FOR. There is no stand-in here and
-// that is deliberate rather than missing: `xr-room.mjs`'s lathe exists because
-// that page puts a tablet on the controller and needs something to hang it off.
-// A page that just wants to see its hands should show the real thing or show
-// nothing, because a shape that is nearly a controller is worse than no shape —
-// it is a confident picture of the wrong object.
+// demo/shell/xr-controller.mjs: your real controllers, drawn from their own models, for
+// a page not in `xr-room.mjs`'s room. Model loading is shared; no stand-in shape:
+//   const cons = createXRControllers(gl, { log, say }); cons.want(...); cons.draw(...)
+// why: lessons/kit-xr-controller.md#header
 
 import { readGLB } from './xr-glb.mjs';
 import { MODEL_BASE, MODEL_PROFILES } from './xr-room.mjs';
 
-/** Greyed, and OPAQUE.
- *  ⚠️ MONOCHROME BECAUSE THE PAGE IS. `floor` is 1965 newsreel and everything
- *  on it goes through one luma; a controller arriving in its vendor's plastic
- *  grey-blue would be the only coloured object in the archive. The model's
- *  texture is kept — it is where the buttons and the seams are — and collapsed
- *  to luminance rather than thrown away.
- *  🔴 AND IT WAS SEE-THROUGH FOR ONE VERSION, WHICH WAS WRONG. The idea was
- *  that your hands should not hide the archive. What it actually does is stop
- *  them being objects: a translucent controller shows its own far side through
- *  its near side, so the shape reads as a smear rather than as a thing you are
- *  holding — and it cannot write depth without punching a hand-shaped hole in
- *  what is behind it, so it has no honest way to sit in front of the floor. A
- *  real object in your hand is the one thing in a headset that does not need
- *  softening. */
+/**
+ * Greyed and opaque: the page is monochrome, so the texture collapses to luma, and a
+ * see-through controller reads as a smear and cannot write depth honestly.
+ * why: lessons/kit-xr-controller.md#ctrl-tint
+ */
 export const CTRL_TINT = 0.82;
 
 const VS = `#version 300 es
@@ -114,13 +84,9 @@ export function createXRControllers(gl, { log = () => {}, say = () => {} } = {})
   }
 
   /**
-   * Ask for a hand's model. Safe to call every frame — the first call starts
-   * the fetch and every later one is a Map lookup.
-   *
-   * ⚠️ NOTHING IS AWAITED ANYWHERE NEAR A SESSION'S ENTRY PATH. The model
-   * arrives in whatever frame it arrives in and is drawn from the next one; a
-   * page that waited for 218 KiB before its first frame would be a black
-   * headset for as long as the network felt like taking.
+   * Ask for a hand's model. Safe every frame: the first call fetches, later ones look up.
+   * Nothing is awaited on a session's entry path; the model draws from the frame after.
+   * why: lessons/kit-xr-controller.md#want
    */
   async function want(profile, handedness) {
     if (!prog || !MODEL_PROFILES[profile]) return false;
@@ -168,10 +134,8 @@ export function createXRControllers(gl, { log = () => {}, say = () => {} } = {})
     /**
      * @param vp     the view-projection for THIS eye
      * @param grip   the gripSpace pose, in the same space as `vp`
-     *
-     * ⚠️ GRIP, NOT TARGET RAY. The ray is where you are POINTING and the grip
-     * is where your HAND is; they differ by the controller's forward tilt, and
-     * a model drawn at the ray sits visibly wrong in the fist.
+     * Grip, not target ray: the ray tilts forward and the model would sit wrong in the fist.
+     * why: lessons/kit-xr-controller.md#draw
      */
     draw({ vp, grip, profile, handedness }) {
       if (!prog || !grip) return false;

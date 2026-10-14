@@ -1,93 +1,7 @@
-// demo/shell/sclang-lite-test.mjs: the SuperCollider subset, with no browser.
-//
-//   node demo/shell/sclang-lite-test.mjs
-//
-// 🔴 WHAT THIS CAN AND CANNOT GRADE. It reads every compile back through
-// `readSynthDef`, which is a SEPARATE pass over the bytes, and compares the
-// graph it finds against numbers written out by hand from SuperCollider's own
-// class files. That grades the structure: which block, which input, which
-// constant, which operator index. It CANNOT say the bytes play. There is no
-// scsynth on this machine and SuperSonic needs an AudioWorklet, so the engine
-// half is graded on `/collide/` under `?selfcheck=1`: `/d_recv` answered
-// `/done` and a non-silent output, beside a meter reading zero with nothing
-// playing. A green run here with a red page means the file is well formed and
-// wrong, which is exactly the case this file cannot see.
-//
-// 🔴 A NAMED PROPORTION OF THESE ARE NEGATIVE CONTROLS, per the convention in
-// this directory: each is written so the defect it names would fail it. They
-// are marked `NEGATIVE CONTROL` and they were PROVED by sabotaging the module,
-// not argued. `SCL_MODULE=<path>` runs this file against another copy of the
-// compiler, which is how the sabotaged copies were graded without touching the
-// real one. MEASURED 2026-09-30, 50 ok on the real module, then eight
-// sabotaged copies:
-//
-//   operators read right to left (so 1 + 2 * 3 is 7)       49/50, precedence
-//   keywords bound by position                              42/50, eight red
-//   `*` written as opcode 0, which ADDS                     48/50, both mul checks
-//   Env.adsr without its release node                       49/50, the adsr array
-//   one channel sent to the left speaker only              49/50, the Out check
-//   the filter rate rule removed                            48/50, both filter refusals
-//   the wire ceiling not checked                            49/50, the 65 refusal
-//   an unknown keyword dropped instead of refused           49/50, `mull:`
-//
-// ⚠️ 2026-09-30, THE WIRE COUNT WAS WRONG AND FOUR CHECKS WERE ADDED FOR IT.
-// An output nobody reads was counted as given straight back; scsynth keeps it.
-// MEASURED, 63 ok on the real module, then three sabotaged copies:
-//
-//   the old line back, an unread output given straight back  60/63, the unread
-//                                                            oscillator, Pan2
-//                                                            and the 63 and 64
-//   inputs never given back                                  59/63, and the
-//                                                            forty deep chain
-//   outputs taken BEFORE the inputs are given back           60/63, the chain
-//                                                            reads 2 and both
-//                                                            ceilings move
-//
-// ⚠️ 2026-09-30, NAMED CONTROLS (`\rel.kr(1.5, spec: [0.05, 6, \exp])`), AND
-// BELL, GLASS AND BREATH LEFT THE PRESETS (*"keep pad growl wah"*), which took
-// six preset checks with them. MEASURED, 84 ok on the real module, then six
-// sabotaged copies (both files copied, since `control()` is in synthdef.mjs):
-//
-//   a lag written as a plain Control                        83/84, the LagControl
-//   every named control given special index 0               82/84, rel's wiring
-//                                                            and the slot check
-//   the spec's default ignored when no value is given        83/84, the defaults
-//   \exp across zero not refused                            83/84, that refusal
-//   freq, amp and gate not left out of the knobs             81/84, three
-//   a lag of 0 kept as a lag                                 83/84, the 0 is nil
-//
-// ⚠️ 2026-10-13, THE GRAIN RING'S UGENS (GrainBuf, BufWr, Phasor, SendReply,
-// Impulse, Dust, TRand, In, BufFrames, BufDur), `%`, `.sqrt` and 'quoted'
-// symbols, for the grain ring (/granulator/grains/). MEASURED, 105 ok on the real module
-// (84 before), then six sabotaged copies:
-//
-//   SendReply's replyID written after its cmdName           103/105, its layout
-//                                                            and the probe bytes
-//   GrainBuf's noAlias dropped                               104/105, the wire count
-//   numChannels written as an input                          102/105, GrainBuf, In
-//                                                            and the probe bytes
-//   % folded as JavaScript's %, so -0.25 % 1 is -0.25        104/105, the fold
-//   BufWr's phase rule removed                               104/105, that refusal
-//   the per class rates ignored                              103/105, GrainBuf.kr
-//                                                            and BufFrames.ar
-//
-// Then `.sin` and `.cos` for the ring's wet and dry, 106 ok, and two more:
-//
-//   their opcodes swapped                                    105/106, that check
-//   their folds swapped                                      105/106, that check
-//
-// Then DelayC, LocalIn and LocalOut for the ring's echo (its Dub patch),
-// 114 ok, and four more sabotaged copies:
-//
-//   LocalIn's default not wrapped to its channel count       112/114, both LocalIn
-//   LocalIn's default written as an ordinary input           112/114, both LocalIn
-//   LocalOut's audio rate rule removed                       112/114, both refusals
-//   DelayC's first input rate rule removed                   113/114, that refusal
-//
-// ⚠️ WHAT NONE OF THEM CAN SEE: whether scsynth agrees. Opcode 0 for `*` is a
-// well formed file that loads and plays, louder; only the page's own meter
-// under a changed `amp` can tell a multiply from an add
-// (`research/supercollider-browser-2026-09.md` §9.3b measured exactly that).
+// demo/shell/sclang-lite-test.mjs: the SuperCollider subset, read back through `readSynthDef`.
+//   node demo/shell/sclang-lite-test.mjs   (SCL_MODULE=<path> runs it against another copy)
+// Grades structure, not sound: scsynth's half is graded on /collide/. Controls proved by sabotage.
+// why: lessons/kit-sclang-lite.md#test-header
 
 import { readSynthDef, sameBytes } from './synthdef.mjs';
 import { PRESETS } from '../collide/presets.mjs';
@@ -128,8 +42,8 @@ for (const p of PRESETS) {
   ok('the Pad is two channels because its freq is multiplied by a two element array',
     pad.r.ok && byName(pad.d, 'Saw').length === 2 && byName(pad.d, 'LPF').length === 2 && pad.r.channels === 2,
     `${byName(pad.d, 'Saw').length} Saw, ${byName(pad.d, 'LPF').length} LPF`);
-  // No preset pans since the Hat went (2026-09-30), so Pan2 is graded on a
-  // program of its own rather than dropped with it.
+  // No preset pans, so Pan2 is graded on a program of its own.
+  // why: lessons/kit-sclang-lite.md#test-pan2
   const pan = def('{ Pan2.ar(WhiteNoise.ar * 0.1, 0.3) }');
   const out = byName(pan.d, 'Out')[0];
   ok('Pan2 reaches the speakers as output 0 left and output 1 right',
@@ -263,9 +177,9 @@ for (const p of PRESETS) {
 }
 
 {
-  // 🔴 READ IN SC_GraphDef.cpp's DoBufferColoring, THEN MEASURED ON THE ENGINE,
-  // 2026-09-30: an audio output nobody reads is allocated with a count of 0
-  // and never goes back on the free stack, so it holds its buffer to the end.
+  // An audio output nobody reads is allocated with a count of 0 and holds its buffer to the end
+  // (SC_GraphDef.cpp DoBufferColoring, measured on the engine).
+  // why: lessons/kit-sclang-lite.md#test-unread-output
   const unread = compile('{ var a = SinOsc.ar(300); SinOsc.ar(200) }');
   ok('NEGATIVE CONTROL: an oscillator nobody reads keeps its wire, so this is 2 and not 1',
     unread.ok && unread.wires === 2, unread.ok ? `${unread.wires} wires` : unread.message);
@@ -283,19 +197,17 @@ for (const p of PRESETS) {
     `${fits.ok ? fits.wires : fits.message}, then ${over.ok ? `${over.wires} compiled` : 'refused'}`);
 }
 
-// ── named controls, the knobs under the text ──────────────────────────────────
-//
-// 🔴 WHAT sclang BUILDS, READ IN `NamedControl.new` (GraphBuilder.sc) AND
-// `Control.init` / `LagControl.kr` (InOut.sc) at 19954900: one Control block
-// per name whose special index is its slot in the value array, and a
-// LagControl, with the lag as its input, for any lag that is a plain number.
+// ── named controls, the knobs under the text ──
+// As sclang builds them (NamedControl.new, Control.init, LagControl.kr at 19954900): one Control
+// per name, special index its slot, and a LagControl for a numeric lag.
+// why: lessons/kit-sclang-lite.md#test-named-controls
 
 const { KEYED } = M;
 {
   const pad = def(PRESETS[0].code);
   const knobs = pad.r.knobs ?? [];
-  // Every preset has a knob since 2026-09-30 (*"add knobs to all patches what
-  // mak sense"*), so the Pad is read by name: rel first, then cutoff and detune.
+  // Every preset has knobs, so the Pad is read by name: rel, then cutoff and detune.
+  // why: lessons/kit-sclang-lite.md#test-pad-knobs
   ok('the Pad has three knobs, rel, cutoff and detune, and rel runs 0.05 to 6 on an exponential warp from 1.5',
     knobs.map((k) => k.name).join(' ') === 'rel cutoff detune' && knobs[0].from === 'named' && knobs[0].value === 1.5
       && knobs[0].spec.min === 0.05 && knobs[0].spec.max === 6 && knobs[0].spec.warp === 'exp' && !knobs[0].spec.guessed,
@@ -310,8 +222,8 @@ const { KEYED } = M;
     slot === 3 && close(pad.d.paramValues[slot], 1.5) && !!ctl && relIn?.from === pad.d.blocks.indexOf(ctl),
     `slot ${slot}, value ${pad.d.paramValues[slot]}, release input ${relIn ? inp(pad.d, relIn) : 'none'}`);
   const others = PRESETS.slice(1).map((p) => `${p.label} ${(compile(p.code).knobs ?? []).map((k) => k.name).join(' ')}`);
-  // ⚠️ AND EVERY KNOB IN EVERY PRESET HAS A SPEC WRITTEN IN THE CODE, because
-  // an argument's or a bare control's range is a guess.
+  // Every knob in every preset has a spec in the code; an argument's range is a guess.
+  // why: lessons/kit-sclang-lite.md#test-knob-specs
   ok('and every other preset has one to four knobs, each with a spec written in the code',
     PRESETS.slice(1).every((p) => { const k = compile(p.code).knobs ?? []; return k.length >= 1 && k.length <= 4 && k.every((x) => !x.spec.guessed); }), others.join(', '));
 }
@@ -366,11 +278,9 @@ const { KEYED } = M;
     `rate ${rate?.spec.min}..${rate?.spec.max} ${rate?.spec.warp}, cut ${cut?.spec.min}..${cut?.spec.max}${cut?.spec.guessed ? ' guessed' : ''}`);
 }
 
-// ── the grain ring's UGens, added 2026-10-13 ─────────────────────────────────
-//
-// For the grain ring, /granulator/grains/. Every expected number below is read off the
-// class files of supercollider develop 1995490 (GrainUGens.sc, BufIO.sc,
-// Trig.sc, Osc.sc, Noise.sc, InOut.sc, InfoUGens.sc), not off this compiler.
+// ── the grain ring's UGens ──
+// For /granulator/grains/. Expected numbers read off supercollider develop 1995490's class files.
+// why: lessons/kit-sclang-lite.md#test-grain-ugens
 
 {
   const { PROGRAM } = await import('../granulator/grain-ring.mjs');
@@ -402,9 +312,9 @@ const { KEYED } = M;
     r.ok ? r.knobs.map((k) => k.name).join(' ') : '');
 }
 {
-  // The probe's graph, built block by block with synthdef.mjs on 2026-10-13
-  // and measured on the tab's scsynth (20.0 replies a second at dens 20),
+  // The probe's graph, built with synthdef.mjs (20.0 replies a second at dens 20 on scsynth),
   // against the same graph written as text. Byte for byte.
+  // why: lessons/kit-sclang-lite.md#test-probe
   const { graph, RATE, OP } = await import('./synthdef.mjs');
   const FR = 8 * 48000;
   const g = graph('gbuf');
@@ -474,10 +384,9 @@ const { KEYED } = M;
 }
 
 {
-  // The ring's echo, 2026-10-13: Delay.sc and InOut.sc at develop 1995490.
-  // LocalIn.ar(2) is one block, two outputs, and `argDefault.wrapExtend(2)`
-  // as its inputs, so two zeros; LocalOut is one block with no output whose
-  // inputs are the channels; DelayC is in, maxdelaytime, delaytime.
+  // The ring's echo (Delay.sc, InOut.sc at develop 1995490): LocalIn.ar(2) is one block, two
+  // outputs, two zero inputs; LocalOut has no output; DelayC is in, maxdelaytime, delaytime.
+  // why: lessons/kit-sclang-lite.md#test-echo
   const { r, d } = def("{ var x = SinOsc.ar([300, 400]) * 0.1; var fb = LocalIn.ar(2); var t = DelayC.ar(x + fb * 0.5, 1.5, 0.375); LocalOut.ar(t); x + t }");
   const li = d && byName(d, 'LocalIn'), lo = d && byName(d, 'LocalOut'), dc = d && byName(d, 'DelayC');
   ok('NEGATIVE CONTROL: LocalIn.ar(2) is one block with two outputs and one default per channel as its inputs',

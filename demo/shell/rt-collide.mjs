@@ -1,9 +1,7 @@
-// demo/shell/rt-collide.mjs: the runtime of a `collide` node on /connect/
-// (node-runtime.mjs): /code/collide/'s SuperCollider voice
-// (code/collide-voice.mjs) booted in the page's one context. Notes in on
-// collide:midi-in, `bright` and `decay` in on collide:value-in, sound out on
-// collide:audio-out. Its face is the program in the kit's code box, which
-// recompiles when an edit settles, as on /code/collide/.
+// demo/shell/rt-collide.mjs: a `collide` node on /connect/ (node-runtime.mjs), the
+// SuperCollider voice of /code/collide/ in the page's one context. midi-in and value-in
+// (`bright`, `decay`) in, audio-out out; its face is the program in the code box.
+// why: lessons/kit-rt-collide.md#header
 
 import { CODE_ROWS } from './concept-nav.mjs';
 import { createCodeBox } from './code-box.mjs';

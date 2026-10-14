@@ -1369,6 +1369,7 @@ video[hidden] { display: none; }
 .pos-check-i:disabled ~ .pos-check-t { color: var(--dim2); }
 .pos-check:has(.pos-check-i:disabled) { cursor: default; opacity: .45; }
 
+/* ── step grid (demo/shell/step-grid.mjs), a section marker step-grid-test reads */
 /* Step grid (step-grid.mjs): one pitch, declared once, read by script for
    head, ruler and arrow keys. Rows share it so labels line up with steps.
    `--pg-cell` is written from script. */

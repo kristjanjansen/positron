@@ -1,47 +1,7 @@
-// demo/shell/midi-graph-test.mjs: this browser's MIDI ports as nodes with ids
-// that survive a replug, with a fake MIDIAccess, no browser and no device.
-//
-//   node demo/shell/midi-graph-test.mjs
-//
-// Step 3 of `plans/plan-routing-migration.md` §4. The fake is the shape the
-// module reads off WebMIDI and nothing more: `inputs` and `outputs` as maps of
-// ports carrying `id`, `name`, `manufacturer`, `state`, `send`, `open` and
-// `midimessage` listeners, and a `statechange` on the access.
-//
-// ⚠️ WHAT IS NOT GRADED HERE. Whether a real browser keeps `MIDIPort.id` across
-// a replug, and whether CoreMIDI's rename is ` 2` on every macOS, are facts
-// about a browser and an OS; both paths are driven here (the id kept, and the id
-// changed so only the soft match can keep the port), and neither is measured.
-// Nothing here sends a byte to an instrument.
-//
-// MOST OF THESE ARE NEGATIVE CONTROLS, for the reason `bay-test.mjs` gives: a
-// resolver that hands back the remembered id whenever a name looks right passes
-// every positive replug check. Each one named NEGATIVE CONTROL has to see a
-// guess refused, a listener absent, a byte held or a graph not sent. The count
-// is printed at the end: 28 of 60.
-//
-// 🔴 PROVED BY BREAKING `midi-graph.mjs` ON A SCRATCH COPY, ONE FAULT AT A
-// TIME, against 60 green (2026-10-06):
-//
-//   sabotage                                              red
-//   the soft match takes the first of several             3 of 60
-//   the path step keyed by name                           4 of 60
-//   the path step ignores a disagreeing serial            1 of 60
-//   the soft match ignores a disagreeing serial           1 of 60
-//   the soft match ignores the manufacturer               1 of 60
-//   the soft match ignores the direction                  3 of 60
-//   placeholder serials taken as serials                  2 of 60
-//   two halves paired by stem when the names differ       1 of 60
-//   the graph sent on every scan                          3 of 60
-//   unlink releases nothing                               3 of 60
-//   every input listens, linked or not                    3 of 60
-//   MIDI asked for when the graph is created              2 of 60
-//   remembered absent ports left out of route-core        1 of 60
-//
-// ⚠️ TWO OF THESE WERE GREEN ON THE FIRST RUN AND WERE HOLES IN THE TEST, NOT
-// IN THE MODULE: the serial guard on the path step (every serial case was
-// settled at step 1 before the path was read) and pairing by stem (every
-// output in the test had an input of its own name). Both have asserts now.
+// demo/shell/midi-graph-test.mjs (node demo/shell/midi-graph-test.mjs): MIDI ports as nodes whose ids
+// survive a replug, on a fake MIDIAccess. 28 of 60 are negative controls; thirteen sabotages each went red.
+// Not graded: whether a real browser keeps MIDIPort.id, or CoreMIDI's ` 2` rename.
+// why: lessons/kit-midi-graph.md#test-header
 
 import { createMidiGraph, stemOf, placeholderSerial } from './midi-graph.mjs';
 import { graphProblem, createRegistry } from './graph-registry.mjs';

@@ -1,18 +1,7 @@
-// demo/shell/midi-decode-test.mjs — the decoder's arithmetic, no browser.
-//
-// 🔴 IT GRADES THE DECODER AGAINST STREAMS WHOSE ANSWER IS KNOWN, WHICH IS THE
-// ONLY KIND THAT CAN GRADE ANYTHING. Four real devices are plugged into this
-// machine, and not one of them can test this file: what a device happens to
-// send today is not a known answer, so pointing the page at a mixer proves the
-// page runs and proves nothing about whether it reads correctly.
-//
-// ⚠️ FOUR OF THESE ARE NEGATIVE CONTROLS and they are the half that proves the
-// instrument. A decoder that called everything relative would pass "it found a
-// relative encoder". These require it to call an absolute one absolute, to
-// refuse a verdict on too few samples, to leave a non-reply unparsed, and to
-// leave an NRPN without an address incomplete.
-//
-//   node demo/shell/midi-decode-test.mjs
+// demo/shell/midi-decode-test.mjs: the decoder against streams with known answers, no browser.
+// Four negative controls prove the instrument (absolute stays absolute, too few samples get
+// no verdict, a non-reply stays unparsed, an NRPN without an address stays incomplete).
+// why: lessons/kit-midi-decode.md#test-header
 
 import {
   decode, isFlood, noteName, deviceInquiry, readInquiryReply, classifyBend,
@@ -29,11 +18,8 @@ const ok = (name, got, want) => {
 console.log('\n-- channel messages');
 ok('note on is a note on', decode([0x90, 60, 100]).kind, 'note on');
 ok('NOTE ON AT VELOCITY 0 IS A NOTE OFF', decode([0x90, 60, 0]).kind, 'note off');
-// 🔴 THIS ASSERT USED TO READ `.includes('velocity 0')` AND PASSED VACUOUSLY
-// UNDER THE SABOTAGE, because a decoder that wrongly calls it a note ON also
-// writes `velocity 0` in its reading. That is CLAUDE.md's substring rule inside
-// a file written to catch exactly this. Assert the word that only the CORRECT
-// branch produces.
+// Assert the word only the correct branch writes: `velocity 0` appears in both readings.
+// why: lessons/kit-midi-decode.md#test-note-off-word
 ok('and the reading says off, not just velocity 0', decode([0x90, 60, 0]).reading.startsWith('C4 off'), true);
 ok('a real note off is a note off', decode([0x80, 60, 64]).kind, 'note off');
 ok('channel is 1-16 for a reader', decode([0x9f, 60, 100]).ch, 16);
@@ -89,12 +75,9 @@ console.log('\n-- absolute against relative, the question the page exists for');
   ok('NEGATIVE CONTROL: four messages are not enough to say',
     classifyEncoder([1, 1, 65, 1]).verdict, 'unknown');
   ok('and it says how many it needs', classifyEncoder([1, 1, 65, 1]).why.includes('10 needed'), true);
-  // 🔴 THE TRAP, AND IT WAS A REAL BUG. An absolute knob at the BOTTOM of its
-  // range, nudged gently, puts every value inside the low cluster and produces
-  // few distinct ones, which is what a relative encoder also looks like if you
-  // only ask "are the values clustered". The first build of the classifier
-  // called this relative. There is no way to tell them apart from one
-  // direction, so the honest answer is that there is no answer yet.
+  // An absolute knob nudged near zero looks like a relative encoder; one direction cannot tell,
+  // so the answer is unknown.
+  // why: lessons/kit-midi-decode.md#test-absolute-near-zero
   ok('NEGATIVE CONTROL: an absolute knob nudged only near zero is NOT relative',
     classifyEncoder([2, 3, 4, 5, 4, 3, 2, 3, 4, 5, 6]).verdict, 'unknown');
   ok('and it says which way to turn it', 
@@ -106,12 +89,9 @@ console.log('\n-- absolute against relative, the question the page exists for');
 console.log('\n-- a REAL encoder, measured, which the first classifier got wrong');
 {
   /**
-   * 🔴 THE EXACT HISTOGRAM OF A TASCAM MODEL 12 MULTI JOG, read through this
-   * module on 2026-09-20 over 525 messages. It is here because the first build
-   * of `classifyEncoder` called it `unknown`: the clusters were guessed as 1-15
-   * and 65-79, and a real MCU encoder uses the whole of 0x01..0x3F and
-   * 0x41..0x7F, so a fast turn sending 63 fell outside the window.
-   * ⚠️ NOTE `0x3F` AND `0x7F` AT THE SAME COUNT. That symmetry is the signature.
+   * The exact histogram of a Tascam Model 12 jog over 525 messages. An MCU encoder uses all of
+   * 0x01..0x3F and 0x41..0x7F; 0x3F and 0x7F at the same count is the signature.
+   * why: lessons/kit-midi-decode.md#test-tascam-jog
    */
   const jog = [];
   for (const [v, n] of [[0x44, 189], [0x04, 172], [0x3F, 48], [0x7F, 48], [0x42, 35], [0x62 & 0x7f, 0]])
@@ -136,10 +116,9 @@ console.log('\n-- seven bits wearing a fourteen bit message, both disguises MEAS
 {
   // An Evolution MK-425C wheel: the low byte is always zero.
   const mk = [[0xe0, 0, 34], [0xe0, 0, 35], [0xe0, 0, 40], [0xe0, 0, 90], [0xe0, 0, 127]];
-  // 🔴 A TASCAM Model 12 MCU fader: the low byte is a COPY of the high byte.
-  // These are real bytes off the wire. The naive test asks whether the LSB
-  // moves, and it moves on every one of these, so the naive test answers
-  // FOURTEEN BIT about a control with 128 positions.
+  // A Tascam Model 12 MCU fader, real bytes: the low byte copies the high byte, so an LSB that
+  // moves is not proof of 14 bit.
+  // why: lessons/kit-midi-decode.md#test-tascam-fader
   const m12 = [[0xe0, 0x22, 0x22], [0xe0, 0x23, 0x23], [0xe0, 0x26, 0x26],
                [0xe0, 0x2a, 0x2a], [0xe0, 0x57, 0x57]];
   const real = [[0xe0, 0x01, 0x40], [0xe0, 0x7f, 0x40], [0xe0, 0x33, 0x41],

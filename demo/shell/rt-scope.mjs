@@ -1,7 +1,6 @@
-// demo/shell/rt-scope.mjs: the runtime of a `scope` node on /connect/
-// (node-runtime.mjs). Its face is the kit wave shape; its audio-in is an
-// AnalyserNode pulled by a silent sink, because an analyser nothing pulls
-// reads silence (learned on /radio/blend/, patch-synth.mjs says so too).
+// demo/shell/rt-scope.mjs: the runtime of a `scope` node on /connect/ (node-runtime.mjs).
+// Its audio-in is an AnalyserNode pulled by a silent sink: an analyser nothing pulls reads silence.
+// why: lessons/kit-rt-scope.md#header
 
 import { createWaveShape } from './synth-view.mjs';
 

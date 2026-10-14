@@ -1,17 +1,7 @@
-// demo/shell/pappus-mod-test.mjs — the modulator, off the wire.
-//
-// `node demo/shell/pappus-mod-test.mjs`
-//
-// 🔴 WHY THIS EXISTS. Every claim `pappus-mod.mjs` makes is about arithmetic —
-// a cube, a warped offset, a sixteen-slot memory, a dead-band — and none of it
-// needs SuperCollider, a browser or a radio station to grade. The page's own
-// assert can only say that SOMETHING moved; it cannot say the pattern locked
-// when it was told to, or that an array destination did not shred it. Those are
-// exactly the defects that would sound like "the patches are a bit random",
-// which is the report this whole file was written to answer.
-//
-// ⚠️ AND IT CARRIES ITS OWN CONTROLS. A test that only checks the locked case
-// passes on a machine that always locks.
+// demo/shell/pappus-mod-test.mjs: the modulator's arithmetic, off the wire. node demo/shell/pappus-mod-test.mjs
+// It grades what the page's assert cannot (a lock that locks, an array destination not shredded),
+// and carries its own negative controls.
+// why: lessons/kit-pappus-mod.md#test-header
 
 import { createModulator, spec } from './pappus-mod.mjs';
 
@@ -21,9 +11,8 @@ const ok = (pass, msg) => { console.log(`${pass ? 'ok  ' : 'FAIL'}  ${msg}`); if
 // ── a control's own space ─────────────────────────────────────────────────
 {
   const s = spec({ min: 0.002, max: 4, warp: 'exp' });
-  // ⚠️ BOTH SAMPLES WELL INSIDE THE LANE. The first version used 2 s on a lane
-  // that ends at 4, so a tenth of the lane ran off the top and CLAMPED — and a
-  // clamped reading looks exactly like a warp that does not work.
+  // Both samples well inside the lane: a clamped reading looks exactly like a warp that does not work.
+  // why: lessons/kit-pappus-mod.md#test-inside-lane
   const lowIn = 0.004, highIn = 0.5;
   const d = 0.1;                                   // a tenth of the lane
   const lowOut = s.map(s.unmap(lowIn) + d);
@@ -110,13 +99,9 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   ok(changed > 0 && changed < 16, `machine 0.85 drifts · ${changed} of 16 values rewritten in a lap`);
 }
 
-// ── a skipped tick ages the pattern by the CLOCK, not by the tick ─────────
-//
-// 🔴 THIS IS THE CLAIM IN THE HEADER, MEASURED. With `machine 1` nothing is
-// ever rewritten, so a slot's value is fixed after the first lap — which means
-// the value at time t must equal the value at t plus a whole number of laps,
-// however many ticks did or did not happen in between. An accumulator would
-// have drifted by exactly the ticks it missed.
+// A skipped tick ages the pattern by the clock: with machine 1 the value at t equals the value a whole
+// number of laps later, however many ticks happened. An accumulator would drift.
+// why: lessons/kit-pappus-mod.md#test-skipped-tick
 {
   const r = rig({ specs: { size: SIZE }, bases: { size: 0.01 }, deadband: 0,
                   routes: [{ src: 'lfo', dest: 'size', shape: 'step', hz: 1, machine: 1, amt: 0.9 }] });
@@ -142,10 +127,8 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   ok(v[1].every((x) => x >= 0 && x <= 1), 'every element stays inside the spec');
 }
 
-// 🔴 THE ONE THE SPLIT EXISTS FOR. A Turing route on an eight-element
-// destination must advance its memory ONCE PER TICK. Evaluating the source per
-// element ran the rewrite decision eight times a step, which shreds a locked
-// pattern into noise — and it would have read as "machine does nothing".
+// A Turing route on an eight-element destination advances its memory once per tick, not per element.
+// why: lessons/kit-pappus-mod.md#test-once-per-tick
 {
   const r = rig({ specs: { probs: PROBS }, bases: { probs: [1, 1, 1, 1, 1, 1, 1, 1] },
                   routes: [{ src: 'lfo', dest: 'probs', shape: 'step', hz: 1, machine: 1, amt: 0.9 }] });
@@ -205,11 +188,8 @@ function turingSeq({ machine, steps = 32, hz = 1 }) {
   const r = rig({ specs: { size: SIZE }, bases: { size: 0.05 },
                   followers: { rms: { attack: 0.01, release: 0.35, sens: 6 } },
                   routes: [{ src: 'env', dest: 'size', amt: 0.6 }] });
-  // ⚠️ 0.12, NOT 0.5. `value()` is `clamp01(env × sens)` and sens is upstream's
-  // 6, so an rms of 0.5 pins the follower at its ceiling — where it is no
-  // longer a follower and every later reading is the same number. The first
-  // version of this test did exactly that and then asserted that the value
-  // CHANGED on release, which a saturated follower cannot do.
+  // 0.12, not 0.5: value() is clamp01(env x sens) with sens 6, so 0.5 saturates the follower.
+  // why: lessons/kit-pappus-mod.md#test-rms
   r.at(0); r.m.sense({ rms: 0 });
   r.tick(0.04);
   const quiet = r.sent.at(-1)[1];

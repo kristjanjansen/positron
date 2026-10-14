@@ -1,12 +1,7 @@
-// demo/shell/midi-devices-test.mjs: `createMidiDevices` against a real bay
-// and a fake MIDIAccess, with no browser.
-//
+// demo/shell/midi-devices-test.mjs: createMidiDevices against a real bay and a fake MIDIAccess.
 //   node demo/shell/midi-devices-test.mjs
-//
-// What is graded: an input becomes a `device` node linked to the in-ports a
-// page names; its notes travel along that link; unplugging releases what it
-// held and drops the links; a replug gets the same node id back.
-// THREE OF THE 9 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL`.
+// Three of the 9 are negative controls, marked `NEGATIVE CONTROL`.
+// why: lessons/kit-midi-devices.md#test-header
 
 import { createBay } from './bay.mjs';
 

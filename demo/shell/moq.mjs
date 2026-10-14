@@ -1,75 +1,17 @@
-// MoQ leg — browser publishes, Cloudflare's relay carries, browser subscribes.
-//
-// Everything here was measured before it was written; the source of truth is
-// rig/moq/RUNBOOK.md §6-7. The load-bearing facts:
-//
-//  · A browser CAN speak IETF MoQT to Cloudflare today. @moq/net offers a compat
-//    CLIENT_SETUP whose first varint (0x20) is byte-identical to draft-14's
-//    CLIENT_SETUP type, offering [lite-02, lite-01, DRAFT_14]; CF picks
-//    draft-14. Session in ~125 ms, verified on the wire (§6.2, §6.4).
-//  · Video works end to end: 1280x720@30 sustained 90 s, glass-to-glass
-//    p50 26.2 ms / p95 42.4 ms over n=2740 frames (§7.1).
-//  · A relay CANNOT live in a Container — no public IP, no raw listeners, so
-//    inbound QUIC is impossible. Only dial-out clients work (research/
-//    cf-containers-2026-08.md). Hence browser-to-browser, not container.
-//  · IETF moq-pub/moq-sub do NOT interoperate with hang: the catalog track name
-//    (`catalog.json` vs `.catalog`), schema (hang RootSchema vs WARP) and
-//    container declaration all differ. Both directions die at that one layer
-//    (§7.2, §7.3). So both ends here are hang, which is what was proven.
-//
-// Four of the five traps from §7.1 are handled below and marked TRAP n. The
-// fifth (fresh user-data-dir per headless run) belongs to the harness.
-// `/moq/`, not `/08-moq/`: demos are addressed by SLUG now, and this import was
-// left behind by that rename — a 404 that took the whole module down, so `moq`
-// and `ladder` never reached __demo.ready at all. It escaped the build's own
-// missing-import check because that check reads HTML files only, and this is a
-// .mjs importing a .js.
+// MoQ leg: browser publishes, Cloudflare's relay carries (draft-14), browser subscribes; both
+// ends are hang (IETF moq-pub/sub do not interoperate). Facts in rig/moq/RUNBOOK.md 6-7;
+// four of its five traps are marked TRAP n below. The vendor import is by slug, /moq/.
+// why: lessons/kit-moq.md#header
 import { Connection, Path, Broadcast, Container } from '/moq/moq-vendor.js';
 import { ROW, burn, readBurned, hueFor } from './pattern.mjs';
 
 export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
 
 /**
- * Can this browser reach the relay at all?
- *
- * CORRECTED TWICE on 2026-09-05. First I claimed Safari has no WebTransport;
- * that was wrong. Then I built a bypass on the assumption the library's block
- * was merely conservative; that was wrong too. What is actually true:
- *
- *  1. macOS Safari 26.6.2 HAS WebTransport and it connects. Asked directly,
- *     `new WebTransport('https://draft-14.cloudflare.mediaoverquic.com')`
- *     reached ready in 140 ms and created a bidirectional stream. WebTransport
- *     shipped in Safari 26.4 (24 Mar 2026) on macOS AND iOS.
- *  2. @moq/net blocks it by USER-AGENT, `bowser.satisfies({ safari: '<0' })`,
- *     which no Safari version can satisfy — a permanent blanket block.
- *  3. THE BLOCK IS CORRECT. Its source comment cites WebKit bug 319818:
- *     Safari's QUIC flow-control window never refills, so a session deadlocks
- *     after ~16 MiB or ~7,600 streams, whichever comes first. MoQ opens one
- *     stream per group, which reaches that in about two minutes.
- *     https://bugs.webkit.org/show_bug.cgi?id=319818 (NEW, P2, Aug 2026)
- *     Also open: 322201, `WebTransport.datagrams` undefined on iOS.
- *
- * Bypassing it reproduces the bug exactly. Measured here: connect 87 ms,
- * catalog fine, first frame at 0.79 s — then SIX frames total in 30 s and
- * nothing more. And it is not the encoder: Safari's WebCodecs does VP8 1280x720
- * at 370 fps (h264 72, vp9 345), so encoding had ~12x headroom.
- *
- * So the bypass is OPT-IN ONLY (`?transport=force` on demo 08), for measuring
- * the bug rather than for shipping. Default behaviour respects the block.
- *
- * The WebSocket route would work — qmux over WebSocket is a real draft
- * (draft-lcurley-qmux-websocket-00) and moq-relay implements a listener — but
- * CLOUDFLARE'S RELAY HAS NO WEBSOCKET LISTENER, so there is nothing to
- * negotiate with. Confirmed by handshake test (four failures out of four) and
- * by cloudflare/moq-rs documenting only WebTransport and raw QUIC. Note for any
- * retest: the correct subprotocols are the cross product, e.g.
- * `qmux-01.moq-lite-05`, NOT the bare `qmux-0N` I tried; and qmux-02 does not
- * exist. The conclusion is unchanged — no listener is no listener.
- *
- * The WebSocket fallback is separately useless here: @moq/net can map
- * https:->wss: with the qmux-02/01/00 subprotocols, but Cloudflare draft-14
- * refuses a WebSocket handshake outright — measured, all three subprotocols AND
- * no subprotocol, four failures out of four.
+ * Can this browser reach the relay at all? Safari has WebTransport but @moq/net blocks it by
+ * user agent, correctly (WebKit bug 319818 deadlocks after about 16 MiB); `?transport=force`
+ * bypasses it to measure the bug. Cloudflare's relay has no WebSocket listener.
+ * why: lessons/kit-moq.md#moq-support
  */
 export function moqSupport() {
   const wt = typeof self !== 'undefined' && typeof self.WebTransport === 'function';
@@ -79,10 +21,8 @@ export function moqSupport() {
     ok: wt && codecs,
     webTransport: wt,
     webCodecs: codecs,
-    // Reported so a device can SETTLE this. The library emits the same
-    // "WebTransport not supported" message whether the API is absent OR merely
-    // UA-blocked, so the error string alone cannot tell them apart — which is
-    // how I came to assert iOS lacked it without ever checking.
+    // Reported so a device can settle it: the library's error is the same for absent and UA-blocked.
+    // why: lessons/kit-moq.md#webkit-tell
     webkit: typeof self !== 'undefined' && !!self.ManagedMediaSource,
     why: !wt ? 'this browser has no WebTransport'
       : !codecs ? 'this browser has no WebCodecs'
@@ -97,15 +37,9 @@ const MOQ_ALPN = [
 ];
 
 /**
- * A WebTransport we built ourselves, for browsers the library blocklists.
- *
- * OFF unless explicitly forced. Returns undefined otherwise, so the library
- * decides — which is what should happen, both because the block is well-founded
- * and because the library also handles the http:// certificate-fingerprint path
- * we do not. When forced, only WebKit-with-WebTransport takes this route:
- * ManagedMediaSource is the WebKit tell (Chrome lacks it), and Cloudflare
- * negotiates none of the ALPNs above anyway, falling back to the compat
- * CLIENT_SETUP — byte-identical to Chrome, just past the UA check.
+ * Our own WebTransport for a UA-blocked browser, only when forced and only on WebKit
+ * (ManagedMediaSource is the tell); otherwise undefined and the library decides.
+ * why: lessons/kit-moq.md#web-transport-for
  */
 async function webTransportFor(url, force) {
   if (!force) return undefined;                    // the block is correct; see above
@@ -121,35 +55,14 @@ async function webTransportFor(url, force) {
   return t;
 }
 
-// The pattern used to be drawn here, in a copy of rig/whep/publish.html's
-// loop. It now lives in ONE place — demo/shell/pattern.mjs — which also carries
-// the ffmpeg rendering of the same spec, so the geometry cannot drift between a
-// canvas publisher and an ffmpeg one. Re-exported because `moq` (and any future
-// reader) knows this module's name.
+// The pattern lives in pattern.mjs, shared with the ffmpeg publisher; re-exported for callers.
+// why: lessons/kit-moq.md#pattern
 export { ROW, burn, readBurned, hueFor };
 
 /**
- * WHICH CODEC, AND WHY IT IS NO LONGER `vp8`.
- *
- * ⚠️ VP8 IS NOT HARDWARE-DECODED ON QUEST 3 OR QUEST 3S. Meta's own codec table
- * says so in as many words, while listing AV1 as decoded there — so a headset
- * software-decodes every frame inside a 13.9 ms budget on a six-core part.
- * (developers.meta.com/horizon/documentation/web/browser-video/)
- *
- * The old `'vp8'` was not a careless choice: it came out of a correct
- * measurement — Safari's WebCodecs does VP8 720p at 370 fps, which settled that
- * the encoder was not the bottleneck. But that was measured on a LAPTOP, and a
- * codec picked for one device's encoder is a claim about every device's
- * decoder. This project's own rule: being right about a mechanism says nothing
- * about whether it dominates somewhere else.
- *
- * So the publisher PROBES rather than declares, in preference order, and says
- * which one it got. The subscriber already read the codec out of the catalog —
- * that end needed no change.
- *
- * ⚠️ The MoQ numbers already in HANDOFF (p50 20 ms, 4K30 at zero drops) were
- * taken on VP8. Pass `codec: 'vp8'` to reproduce them; a run that changes the
- * codec and compares against them is comparing two different things.
+ * The publisher probes codecs in order rather than declaring vp8: Quest 3 and 3S do not
+ * hardware-decode VP8 (AV1 they do). The MoQ numbers in HANDOFF are VP8: pass `codec: 'vp8'`.
+ * why: lessons/kit-moq.md#codec-preference
  */
 export const CODEC_PREFERENCE = [
   // AV1 first. Hardware-decoded on Quest 3/3S, and what NVIDIA's shipping
@@ -165,11 +78,8 @@ export const CODEC_PREFERENCE = [
 ];
 
 /**
- * The first candidate this browser will actually encode.
- *
- * Asks `isConfigSupported` rather than guessing from a user agent — an error
- * string cannot tell "codec absent" from "codec refused at this size", and
- * neither can a UA.
+ * The first candidate this browser will encode, asked of `isConfigSupported`, never a user agent.
+ * why: lessons/kit-moq.md#pick-codec
  */
 async function pickCodec({ want, width, height, framerate, bitrate, log }) {
   const list = want ? [want] : CODEC_PREFERENCE;
@@ -183,22 +93,14 @@ async function pickCodec({ want, width, height, framerate, bitrate, log }) {
   return null;
 }
 
-/**
- * Start a MoQ leg.
- *
- * @param out    canvas decoded frames are drawn into
- * @param ns     namespace on the relay. Unique per run: two publishers on one
- *               namespace and the second one dies (§6.4).
- * @param role   'loopback' (publish AND subscribe — one device, one clock, so
- *               the latency delta is exact), 'pub', or 'watch'.
- * @param paint  optional (ctx, w, h, frame) that draws the whole frame in place
- *               of the pattern, clock row included. Added 2026-09-30.
- * @param hue    0..359 for the burned pattern. Defaults to a hash of the
- *               namespace, so two publishers on two devices come out different
- *               colours without anyone allocating them.
- */
-// The newest latency samples kept for `pct()`; a long run would otherwise grow
-// and re-sort without limit.
+// @param out    canvas decoded frames are drawn into
+// @param ns     namespace on the relay; unique per run, a second publisher on one dies
+// @param role   'loopback' (publish and subscribe, one clock, exact latency), 'pub' or 'watch'
+// @param paint  optional (ctx, w, h, frame) that draws the whole frame in place of the pattern
+// @param hue    0..359 for the burned pattern, default a hash of the namespace
+//
+// The newest latency samples kept for `pct()`, so a long run cannot grow without limit.
+// why: lessons/kit-moq.md#start-moq-params
 const MOQ_KEEP = 2000;
 
 /**
@@ -290,11 +192,9 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
 
     encoder = new VideoEncoder({
       output: (chunk, metadata) => {
-        // ⚠️ CARRY THE DECODER DESCRIPTION WHEN THERE IS ONE. VP8 needs none, so
-        // this was never missed; AV1 and H.264 hand their parameter sets out
-        // here, exactly once, on the first chunk. Without it the far end
-        // configures a decoder that cannot parse the stream — and the symptom
-        // is decode errors on a publisher that looks perfectly healthy.
+        // Carry the decoder description (AV1 and H.264 give it once, on the first chunk), or the far
+        // end cannot parse the stream while the publisher looks healthy.
+        // why: lessons/kit-moq.md#decoder-description
         const desc = metadata?.decoderConfig?.description;
         if (desc && !catalog.video.renditions.video.description) {
           const b = desc instanceof ArrayBuffer ? new Uint8Array(desc) : new Uint8Array(desc.buffer, desc.byteOffset, desc.byteLength);
@@ -365,12 +265,8 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     decoder = new VideoDecoder({
       output: (vf) => {
         const recv = performance.timeOrigin + performance.now();
-        // MATCH THE SOURCE, do not force it into ours. `drawImage(vf,0,0,w,h)`
-        // scaled every frame into the local 1280x720 whatever the publisher
-        // actually sent — which distorts a picture of any other shape, and is
-        // worse than cosmetic here: `readBurned` samples FIXED coordinates, so
-        // a scaled row is read at the wrong pixels. A remote publisher's size
-        // is its own business; the receiver's job is to show it as it is.
+        // Match the source size, never scale into ours: `readBurned` samples fixed coordinates.
+        // why: lessons/kit-moq.md#match-source
         const fw = vf.displayWidth || vf.codedWidth, fh = vf.displayHeight || vf.codedHeight;
         if (fw && fh && (out.width !== fw || out.height !== fh)) {
           out.width = fw; out.height = fh;                     // this also CLEARS it

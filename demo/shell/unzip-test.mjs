@@ -1,13 +1,7 @@
-// demo/shell/unzip-test.mjs — the zip reader, against the real pack.
-//
-//   CIRCUIT_PACK=<path> node demo/shell/unzip-test.mjs
-//
-// 🔴 IT READS THE OWNER'S CIRCUIT PACK, WHICH LIVES IN THE OWNER'S PRIVATE PACK
-// REPOSITORY, NOT IN THIS ONE. Reading is free and nothing here writes. It is the right fixture precisely because it is real: a
-// zip somebody made for a test has whatever shape the test wanted.
-//
-// THREE OF THESE ARE NEGATIVE CONTROLS, because a reader that returned an empty
-// array for everything would pass a suite that only counts entries.
+// The zip reader against the real pack: CIRCUIT_PACK=<path> node demo/shell/unzip-test.mjs
+// The pack is in the owner's private pack repository; nothing here writes.
+// Three negative controls, since an always-empty reader would pass an entry count.
+// why: lessons/kit-unzip.md#test-header
 import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
@@ -56,8 +50,8 @@ ok('a sample inflates to a RIFF header and its declared length',
   new TextDecoder().decode(wav.slice(0, 4)) === 'RIFF' && wav.length === wavs[0].size,
   `${wav.length} bytes of a declared ${wavs[0].size}`);
 
-// ⚠️ THE WAV'S OWN HEADER IS A SECOND SOURCE. A reader that returned the right
-// NUMBER of bytes of rubbish would pass the line above.
+// The WAV's own header is a second source against right-length rubbish.
+// why: lessons/kit-unzip.md#test-wav-header
 const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
 const channels = dv.getUint16(22, true), rate = dv.getUint32(24, true), bits = dv.getUint16(34, true);
 ok('and the bytes really are 48 kHz 16 bit mono, read out of the file itself',
@@ -93,9 +87,8 @@ ok('32 sessions are in it, every one 53,248 bytes, starting USER',
 }
 
 {
-  // 🔴 THE ONE THAT PROVES THE INFLATE IS REAL. Corrupt one byte in the middle
-  // of a deflated entry's data and it must not come back as a plausible
-  // shorter buffer.
+  // One corrupted byte in a deflated entry must not come back as a plausible shorter buffer.
+  // why: lessons/kit-unzip.md#test-corrupt
   const copy = new Uint8Array(buf);
   const e = readZip(copy).find((x) => x.method === 8 && x.size > 2000);
   const dv2 = new DataView(copy.buffer);

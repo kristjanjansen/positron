@@ -1,34 +1,7 @@
-// demo/shell/wire-test.mjs: the envelope's names, and the migration between them, with no socket.
-//
+// demo/shell/wire-test.mjs: the envelope's names and the at -> sent migration, with no socket.
 //   node demo/shell/wire-test.mjs
-//
-// `format()` and `parse()` are pure, so the shape every positron page sends is
-// gradable here. What is graded is the decision of 2026-10-04: `at` ALWAYS
-// means when the thing happens, so the envelope's send stamp is `sent`, and a
-// payload may carry `at` again.
-//
-// THE TRAP THIS FILE EXISTS FOR. Old senders keep existing for a while: the Pi
-// board until it is redeployed, the Pico until it is reflashed, a tab left
-// open, rows already in `workers/store`. Each of them writes the send stamp as
-// `at`. A new reader that took that `at` as an event time would schedule a
-// send stamp on nobody's clock, MEASURED up to 159 ms off between machines, as
-// if somebody had agreed it. `parse()` renames it to `sent` first.
-//
-// NINE OF THE 18 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and counted
-// at the end. They are written so the bug they name fails them.
-//
-// SIX SABOTAGES, MEASURED 2026-10-04, each on a copy of `wire.mjs` in a scratch
-// directory with this file beside it, 16/16 before every one:
-//
-//   W1  `format()` writing the stamp as `at` again            5 red
-//   W2  `sent` left out of the envelope list, so no throw     1 red
-//   W3  `parse()` not normalising at all                      3 red
-//   W4  normalising sets `sent` and keeps the old `at`        2 red
-//   W5  normalising on truthiness, so `at: 0` is missed       2 red
-//   W6  normalising whenever `at` is there, `sent` or not     2 red
-//
-// `openWire()`'s reconnect and close are graded against a fake WebSocket in
-// this file. Its traffic against a real room is graded by the pages.
+// `at` always means when the thing happens; parse() renames an old sender's `at` to `sent`.
+// why: lessons/kit-wire.md#test-header
 
 import { format, parse, normalise, openWire } from './wire.mjs';
 

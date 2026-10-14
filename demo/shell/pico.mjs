@@ -1,31 +1,7 @@
-// demo/shell/pico.mjs: a Raspberry Pi Pico (RP2040) in the page, running a
-// real UF2, with the 128x64 SSD1306 of rig/pico/oled/ wired to it, its four
-// keys, and its MIDI UART.
-//
-// 🔴 IT IS rig/pico/sim/ PORTED, NOT REWRITTEN, AND THE PARTS THAT MOVED ARE
-// THE PARTS NODE CANNOT GIVE A BROWSER. `pico.mjs` there reads the UF2 with
-// `node:fs`, `ssd1306.mjs` encodes a PNG with `node:zlib`, and both lean on the
-// `Simulator` wrapper, whose `execute()` runs a million instructions and then
-// `setTimeout(0)`s itself forever. In a page that is a slice of 10 to 50 ms
-// nobody chose, on the main thread, with no way to say *stop at this time*. So:
-//   - the UF2 loader, the SSD1306 model and the screen reader are the same
-//     code with the Node calls taken out;
-//   - the run loop is this file's own, `run(untilNanos, deadline)`, which
-//     stops at an emulated time OR a wall clock deadline, whichever is first,
-//     so a page can hand it a frame's budget and stay responsive;
-//   - `WiredI2CTarget` is NOT here. It modelled the pull ups for MicroPython's
-//     bit banged `i2c.scan()`. The C router never scans and never bit bangs:
-//     every byte to the display goes through the I2C peripheral.
-//
-// ⚠️ TIME IS THE EMULATOR'S CLOCK. A key held for 1 s is 1 s as the firmware
-// counts it, however long that takes to emulate. Every instruction is costed at
-// a flat 125 MHz, as rp2040js does, so nothing cycle exact is claimed.
-//
-// ⚠️ ONE CORE, NO FLASH WRITES, NO USB. rp2040js runs core 0 only and does not
-// emulate flash erase or program; the router uses neither. The UART has no baud
-// timing: a byte fed to RX is in the FIFO at once, and a byte written to TX
-// arrives at `onTx` at once, so 31250 baud is set by the firmware and not
-// exercised here.
+// demo/shell/pico.mjs: an RP2040 Pico in the page running a real UF2, with the SSD1306 OLED, four keys
+// and MIDI UART. rig/pico/sim/ ported without Node; time is the emulator's clock at a flat 125 MHz.
+// One core, no flash writes, no USB, and no UART baud timing.
+// why: lessons/kit-pico.md#header
 import { RP2040, SimulationClock, I2CMode, ConsoleLogger, LogLevel } from './vendor/rp2040js.mjs';
 import { bootromB1 } from './vendor/pico-bootrom.mjs';
 
@@ -35,9 +11,9 @@ const UF2_MAGIC = [0x0a324655, 0x9e5d5157, 0x0ab16f30];
 const CYCLE_NS = 1e9 / 125e6;          // what rp2040js's own Simulator charges
 
 /**
- * K1..K4 on GP10..GP13, to ground, read through the pull up. The words are the
- * firmware's own footer (main.c `redraw`), and the glyphs are what the kit
- * draws on the buttons. K4 acts on RELEASE, and held for 1 s it denies instead.
+ * K1..K4 on GP10..GP13 to ground, with the firmware's own footer words (main.c `redraw`).
+ * K4 acts on release, and held for 1 s it denies instead.
+ * why: lessons/kit-pico.md#keys
  */
 export const KEYS = [
   { k: 1, pin: 10, glyph: '1', does: 'PREV' },
@@ -49,9 +25,8 @@ export const DENY_HOLD_MS = 1000;      // main.c DENY_HOLD_MS
 export const DEBOUNCE_MS = 20;         // main.c DEBOUNCE_MS
 
 /**
- * A Circuit `Replace Patch`: byte 6 is 01, which on a real Circuit writes a
- * patch slot in FLASH. The router holds it until K4. Here it is bytes in an
- * emulated UART and leaves nothing but the page.
+ * A Circuit Replace Patch (byte 6 is 01, a flash write on a real Circuit). The router holds it until K4.
+ * why: lessons/kit-pico.md#replace-patch
  */
 export const REPLACE_PATCH = [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x01, 0x05,
   0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0xF7];
@@ -88,16 +63,12 @@ export function parseUF2(bytes) {
 }
 
 /**
- * 🔴 THE FONT IS ONE BYTE IN FLASH, AND THE PAGE SWITCHES IT BY PATCHING THAT
- * BYTE BEFORE BOOT. main.c keeps `FONT_PICK[8] = { 'U','I','F','O','N','T',
- * 0xFF, 0 }` in flash, volatile so the compiler reads it, and byte 6 is an
- * index into UI_FONTS (0xFF keeps the default). The same trick
- * rig/pico/sim/run-router.mjs uses to shoot every font.
- * ⚠️ IT REFUSES A MARKER FOUND TWICE OR NOT AT ALL, because patching the wrong
- * one of two would boot a firmware with a byte changed somewhere nobody chose.
+ * Pick the font by patching byte 6 after the UIFONT marker in flash (0xFF keeps the default).
+ * Refuses a marker found twice or not at all.
  * @param {Uint8Array} image   from `parseUF2`, not modified
  * @param {number} index       into UI_FONTS, or 0xFF for the default
  * @returns {Uint8Array} a patched copy
+ * why: lessons/kit-pico.md#patch-font
  */
 export function patchFont(image, index) {
   const at = findAscii(image, 'UIFONT');
@@ -110,12 +81,11 @@ export function patchFont(image, index) {
 }
 
 /**
- * 🔴 WHERE THE KEY LABELS GO IS THE NEXT BYTE, BY THE SAME TRICK. Byte 7 after
- * UIFONT: 0 a row along the bottom (the default), 1 a column down the right,
- * which is where the four buttons sit on the 0.96 inch module.
+ * Key labels placement is byte 7 after UIFONT: 0 a row along the bottom, 1 a column down the right.
  * @param {Uint8Array} image   from `parseUF2` or `patchFont`, not modified
  * @param {'bottom'|'right'} where
  * @returns {Uint8Array} a patched copy
+ * why: lessons/kit-pico.md#patch-keys
  */
 export function patchKeys(image, where) {
   const at = findAscii(image, 'UIFONT');
@@ -137,20 +107,12 @@ function findAscii(bytes, text, from = 0) {
 }
 
 /**
- * 🔴 THE FONTS ARE READ OUT OF THE FIRMWARE ITSELF, NOT RETYPED FROM ui.c.
- * Each `ui_font` is `{ const char *name; const uint8_t *glyph; uint8_t w, h,
- * adv, top, cap; }` in flash, and `UI_FONTS[]` is an array of pointers to
- * them, in the order FONT_PICK indexes. So the list a page offers and the
- * glyphs its reader matches against are the bytes the board is running: a
- * font added to ui.c arrives here with the next UF2 and nothing to edit.
- * ⚠️ IT IS A SEARCH, AND IT SAYS WHAT IT FOUND. A struct is accepted only when
- * its name pointer lands on a short lower case string, its glyph pointer lands
- * in flash, and its five sizes are ones a 128x64 font can have; the array is
- * the longest run of consecutive pointers to accepted structs. `[]` means the
- * search failed, never that the firmware has no fonts.
+ * The fonts read out of the firmware's UI_FONTS[] by a search, not retyped from ui.c.
+ * `[]` means the search failed, never that the firmware has no fonts.
  * @param {Uint8Array} image
  * @returns {Array<{name:string, index:number, w:number, h:number, adv:number,
  *                  top:number, cap:number, glyph:(code:number)=>number[]}>}
+ * why: lessons/kit-pico.md#fonts-in
  */
 export function fontsIn(image) {
   const u32 = (o) => (image[o] | (image[o + 1] << 8) | (image[o + 2] << 16) | (image[o + 3] << 24)) >>> 0;
@@ -203,12 +165,9 @@ const ARGS = {
 };
 
 /**
- * The SSD1306 on an rp2040js I2C bus: rig/pico/sim/ssd1306.mjs with the PNG
- * encoder left behind. The part of the datasheet a driver exercises: control
- * bytes with Co and D/C, 0x20 addressing mode (horizontal, vertical, page),
- * 0x21 and 0x22 ranges, page mode starts, on/off, inverse, entire on, segment
- * remap, COM scan direction, start line. Contrast, timing, charge pump and
- * scrolling are consumed with their arguments and otherwise ignored.
+ * The SSD1306 on an rp2040js I2C bus (rig/pico/sim/ssd1306.mjs without the PNG encoder).
+ * Contrast, timing, charge pump and scrolling are consumed and ignored.
+ * why: lessons/kit-pico.md#oled
  */
 export class Oled {
   constructor(i2c, address = 0x3c) {
@@ -346,12 +305,9 @@ export function createPico({ image, onTx = () => {} }) {
     get rxWaiting() { return rx.length; },
 
     /**
-     * Emulate until the board's clock reaches `untilNanos` or the wall clock
-     * reaches `deadline` (a `performance.now()` value), whichever is first.
-     * Returns true when the board got there.
-     * ⚠️ A CORE SITTING IN WFI IS NOT STEPPED, its clock jumps to the next
-     * alarm, which is what makes an idle firmware cheap. The router never
-     * sleeps (its main loop polls), so here every emulated cycle is paid for.
+     * Emulate until board time `untilNanos` or wall `deadline`, whichever first; true when it got there.
+     * The router never sleeps in WFI, so every emulated cycle is paid for.
+     * why: lessons/kit-pico.md#run
      */
     run(untilNanos, deadline = Infinity) {
       const core = mcu.core;
@@ -400,13 +356,11 @@ export function createPico({ image, onTx = () => {} }) {
 // ── reading the screen ──────────────────────────────────────────────────────
 
 /**
- * The screen read back against a font, exactly: rig/pico/sim/run-router.mjs's
- * reader. A phrase counts as on the panel only when every pixel of its cells
- * matches, lit on dark or dark on lit (the inverted header, the banner and a
- * filled footer cell are the second kind). Rows `top .. top+cap-1` of each cell
- * are compared, the band the capitals live in.
+ * The screen read back against a font, exactly: a phrase counts only when every pixel of its cells
+ * matches, lit on dark or dark on lit, over rows top .. top+cap-1.
  * @param {Uint8Array} px  128x64 from `pixels()`
  * @param {object} F       a font from `fontsIn`
+ * why: lessons/kit-pico.md#read-screen
  */
 export function readScreen(px, F) {
   const rows = F.top + F.cap;
@@ -455,11 +409,9 @@ export const litCount = (px) => { let n = 0; for (let i = 0; i < px.length; i++)
 // ── MIDI out of the UART, as messages ───────────────────────────────────────
 
 /**
- * Bytes off a UART, gathered into whole MIDI messages for a log. Running
- * status is followed, a SysEx is one message from F0 to F7, and a real time
- * byte is its own message wherever it lands. The router sends whole messages,
- * so this is mostly a counter of three; it is written for any byte stream.
+ * UART bytes into whole MIDI messages: running status, SysEx F0..F7, real time bytes on their own.
  * @param {(bytes:number[])=>void} onMessage
+ * why: lessons/kit-pico.md#midi-framer
  */
 export function createMidiFramer(onMessage) {
   let msg = [], need = 0, status = 0;
@@ -492,18 +444,13 @@ export function createMidiFramer(onMessage) {
 // ── the board in a worker, for a page ───────────────────────────────────────
 
 /**
- * One board in `pico-worker.mjs`, paced to real time. The page draws what
- * `onFrame` hands it and sends keys and bytes; it never emulates anything on
- * its own thread. See that file for why it is a worker and how a key's hold is
- * kept in board time.
- * ⚠️ NOTHING STARTS UNTIL `boot()`. Constructing this makes a worker and
- * nothing else, so a page can build its controls on load and pay for the
- * emulator only when somebody opens it.
+ * One board in pico-worker.mjs, paced to real time. Nothing starts until `boot()`.
  * @param {object} o
  * @param {(px:Uint8Array, nanos:number)=>void} [o.onFrame]  each new screen
  * @param {(bytes:number[])=>void} [o.onTx]     bytes off UART0, in order
  * @param {(s:object)=>void} [o.onStats]        speed, flatOut, mips, nanos, rx, tx
  * @param {(font:number|null)=>void} [o.onBoot]
+ * why: lessons/kit-pico.md#pico-runner
  */
 export function createPicoRunner({ onFrame, onTx, onStats, onBoot } = {}) {
   let worker = null;
@@ -535,18 +482,12 @@ export function createPicoRunner({ onFrame, onTx, onStats, onBoot } = {}) {
 export const hex = (bytes) => [...bytes].map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
 /**
- * 🔴 THE FIRMWARE'S OWN DRAWING CODE, WITHOUT THE FIRMWARE. `rig/pico/firmware/
- * ui.c` compiled a second time, to WebAssembly (`rig/pico/firmware/wasm/`), so
- * a page can draw one part of the router's screen at a time: a header, a box,
- * the key labels. Not a JavaScript copy of ui.c, which would be a second
- * implementation drifting from the first. `rig/pico/firmware/wasm/test.mjs`
- * proves the two compilations agree pixel for pixel with the emulated board.
- * ⚠️ THE MODULE IMPORTS NOTHING, so it is instantiated with `{}` and costs no
- * glue script. Fetch it when it is needed and not on a visit.
+ * The firmware's own ui.c compiled to WebAssembly, so a page draws parts of the router's screen.
+ * rig/pico/firmware/wasm/test.mjs proves it matches the board. Imports nothing; fetch on need.
  * @param {ArrayBuffer|Uint8Array} bytes   `/resources/pico/oled-ui.wasm`
  * @returns {Promise<{fonts:string[], screen:(font:number, paint:(u:object)=>void)=>Uint8Array}>}
- *   `screen` clears a 128x64 panel in that font (-1 the default), hands
- *   `paint` the drawing calls, and returns the panel as ones and zeros.
+ *   `screen` clears a panel in that font (-1 default), runs `paint`, returns ones and zeros.
+ * why: lessons/kit-pico.md#oled-ui
  */
 export async function createOledUi(bytes) {
   const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -594,18 +535,14 @@ export async function createOledUi(bytes) {
 }
 
 /**
- * The emulated Pico as a device, as /synth/dots/ plays it: the rings firmware
- * (rig/pico/rings/main.c) fetched and booted on the first note or press, MIDI
- * events in on UART0 RX, every new 128x64 screen out through `onFrame`. Lifted
- * 2026-10-14 from that page for /connect/ (plans/plan-connect-ui.md, the
- * convergence rule).
- * ⚠️ NOTHING IS FETCHED UNTIL `start()` OR THE FIRST EVENT. Bytes that arrive
- * while it boots are kept and sent once it is up.
+ * The emulated Pico as a device (the rings firmware), MIDI in on UART0, screens out through onFrame.
+ * Nothing is fetched until start() or the first event; bytes during boot are kept.
  * @param {object} [o]
  * @param {string} [o.uf2]                 the firmware image, our origin
  * @param {(px: Uint8Array) => void} [o.onFrame]
  * @param {(state: string) => void} [o.onState]   'loading', 'running' or 'failed'
  * @param {(line: string, kind?: string) => void} [o.log]
+ * why: lessons/kit-pico.md#pico-device
  */
 export function createPicoDevice({ uf2 = '/resources/pico/rings-pico.uf2', onFrame = () => {}, onState = () => {}, log = () => {} } = {}) {
   const pico = { state: 'off', runner: null, queue: [], frames: 0, px: null, bytes: 0 };

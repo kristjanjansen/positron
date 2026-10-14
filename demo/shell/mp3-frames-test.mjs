@@ -1,21 +1,7 @@
-// demo/shell/mp3-frames-test.mjs — node demo/shell/mp3-frames-test.mjs
-//
-// Frame boundaries are the one thing the whole decode path stands on: get a
-// length wrong by a byte and every later frame is garbage, which presents as
-// "the stream is broken" rather than "the scanner is". So this drives the
-// splitter at fourteen chunk sizes down to ONE BYTE — the case where a header
-// straddles two reads and a naive scanner silently drops a frame — the way
-// `icy-test.mjs` does for the metadata demuxer, and for the same reason.
-//
-// ⚠️ THE FIXTURE IS SYNTHESISED, NOT A RECORDING. No media is stored in this
-// repo (LAYOUT.md), and a real MP3 would make this test about one file. Headers
-// are built from the spec and the payload is filler — this scanner never reads
-// the payload, so filler exercises it exactly as real audio does, with one
-// exception that is tested on purpose: filler that happens to contain a sync
-// word.
-//
-// There is also a LIVE arm against the relay, which SKIPS cleanly when the
-// network is not there — a check nobody can run is a check nobody runs.
+// demo/shell/mp3-frames-test.mjs: frame boundaries at fourteen chunk sizes down to one byte.
+// The fixture is synthesised from the spec (no media in the repo); filler with a sync word is
+// tested on purpose. The live arm against the relay skips cleanly without a network.
+// why: lessons/kit-mp3-frames.md#test-header
 
 import { readHeader, readAdtsHeader, frameStarts, createFrameSplitter, framingFor }
   from './mp3-frames.mjs';
@@ -88,10 +74,8 @@ const whole = frameStarts(TEN, 0, { final: true });
 ok('ten frames are found in one pass', whole.frames.length === 10, `${whole.frames.length} frames`);
 ok('...and every byte is consumed', whole.end === TEN.length, `${whole.end}/${TEN.length}`);
 
-// ── 🔴 CHUNKED, DOWN TO ONE BYTE ──────────────────────────────────────────
-// The case a naive scanner drops silently: a four-byte header split across two
-// reads. If any size loses a frame, the arithmetic downstream is wrong for ever
-// after and the sound is noise.
+// Chunked, down to one byte: a four byte header split across two reads.
+// why: lessons/kit-mp3-frames.md#test-chunked
 const SIZES = [1, 2, 3, 4, 5, 7, 13, 64, 127, 256, 417, 418, 1000, 4096];
 let chunkedOk = 0;
 for (const size of SIZES) {
@@ -109,22 +93,17 @@ ok(`every chunk size finds all ten frames`, chunkedOk === SIZES.length,
 // find one. Starting 200 bytes into a frame must lose that frame and no more.
 const joined = frameStarts(TEN.subarray(200), 0, { final: true }).frames.length;
 ok('joining mid-frame loses one frame and resyncs', joined === 9, `${joined} of the remaining 9`);
-// ...and the STREAMING path has to do it too, which is the one a listener uses.
-// ⚠️ AND THE STREAMING PATH DEFERS ITS LAST FRAME RATHER THAN LOSING IT, which
-// is worth pinning because the two numbers look like a bug. `synced` is only set
-// AFTER the first scan returns, so that whole first push still runs with
-// confirmation on and holds the trailing frame back for want of a successor. It
-// is not dropped — it is in the tail, and the next push emits it. Over a socket
-// this is invisible; in a single-shot test it is the difference between 8 and 9.
+// ...and the streaming path, which defers the trailing frame to the next push rather than
+// losing it: 8 here, not 9.
+// why: lessons/kit-mp3-frames.md#test-streaming-defers
 const mid = createFrameSplitter();
 const first = mid.push(TEN.subarray(200)).length;
 const then = mid.push(new Uint8Array(0)).length;
 ok('the splitter resyncs mid-frame, deferring its last frame rather than losing it',
   first + then === 9, `${first} then ${then} = ${first + then} of the remaining 9`);
 
-// ── 🔴 SABOTAGE, or the checks above are decoration ───────────────────────
-// Filler that CONTAINS a sync word. `confirm` is the only thing standing
-// between this and a frame invented inside the audio payload.
+// Sabotage: filler that contains a sync word; confirm is all that stops an invented frame.
+// why: lessons/kit-mp3-frames.md#test-sabotage
 const trap = stream(6, {}, 0xff);
 const trapped = frameStarts(trap, 0, { final: true });
 ok('a sync word inside the payload does not become a frame',
@@ -194,8 +173,8 @@ ok('mono is read off the channel configuration',
   adtsProbe({ chanCfg: 1 })?.channels === 1, String(adtsProbe({ chanCfg: 1 })?.channels));
 ok('channel configuration 7 is eight channels, not seven',
   adtsProbe({ chanCfg: 7 })?.channels === 8, String(adtsProbe({ chanCfg: 7 })?.channels));
-// 🔴 THE CRC CASE CHANGES THE MINIMUM LENGTH, so a frame shorter than its own
-// header must be refused whichever of the two headers it claims to have.
+// A CRC frame shorter than its own header is refused, whichever header it claims.
+// why: lessons/kit-mp3-frames.md#test-crc
 ok('a CRC frame shorter than 9 bytes is refused',
   adtsProbe({ protectionAbsent: 0, len: 8 }) === null);
 ok('a frame shorter than its own header is refused', adtsProbe({ len: 6 }) === null);
@@ -204,9 +183,8 @@ ok('channel configuration 0 is refused: the count is not in the frame',
   adtsProbe({ chanCfg: 0 }) === null);
 ok('a non-zero layer is refused: that is MPEG audio', adtsProbe({ layer: 1 }) === null);
 
-// ── 🔴 THE CONTROL, AND IT IS THE POINT ───────────────────────────────────
-// Two scanners that both accept both streams have said nothing. Each must find
-// its own framing and find NOTHING in the other's.
+// The control: each scanner finds its own framing and nothing in the other's.
+// why: lessons/kit-mp3-frames.md#test-control
 const TEN_ADTS = adtsStream(10);
 ok('CONTROL: the ADTS reader finds every ADTS frame',
   frameStarts(TEN_ADTS, 0, { framing: 'adts', final: true }).frames.length === 10);
@@ -219,12 +197,8 @@ ok('CONTROL: ...and none at all in ADTS',
   frameStarts(TEN_ADTS, 0, { framing: 'mpeg', final: true }).frames.length === 0,
   `${frameStarts(TEN_ADTS, 0, { framing: 'mpeg', final: true }).frames.length} found`);
 
-// 🔴 CHUNKED DOWN TO ONE BYTE, AND THIS ONE CAUGHT A REAL BUG. `frameStarts`
-// bounded its walk at a hard-coded 4 — the MPEG header size — and steps forward
-// one byte whenever the reader says no. An ADTS reader says no to anything under
-// seven bytes, so the walk ate the sync byte three bytes before it could be
-// read: 0 frames out of a stream it had correctly identified, at one-byte
-// chunks, and a third of them lost at seven.
+// ADTS chunked down to one byte: the walk must not be bounded at the MPEG header size of 4.
+// why: lessons/kit-mp3-frames.md#test-adts-chunked
 let adtsChunked = 0;
 for (const size of SIZES) {
   const sp = createFrameSplitter({ framing: 'adts' });
@@ -258,11 +232,8 @@ for (const [name, bytes, want] of [['MPEG audio', TEN, 'mpeg'], ['ADTS', TEN_ADT
     `${sp.framing}, ${got} frames`);
 }
 
-// ── the live arm, skipped when the network is not there ───────────────────
-// ⚠️ A LIST, NOT ONE MOUNT. A single hard-coded station makes this arm skip for
-// a reason that is about that station rather than about the network, and a skip
-// is indistinguishable from a pass at a glance. MEASURED 2026-09-15: three of
-// ERR's five mounts answered the relay 502 while two served 200.
+// The live arm, skipped without a network. A list of mounts, so one station's 502 is not a skip.
+// why: lessons/kit-mp3-frames.md#test-live
 const BASE = process.env.SHOUT_BASE || 'https://shout.positron.studio';
 const LIVE = [
   ['MP3', 'mpeg', 44100,
@@ -320,9 +291,8 @@ for (const [label, framing, wantRate, urls] of LIVE) {
     tiled ? 'contiguous' : 'a gap between frames: the length formula is wrong');
   ok(`LIVE ${label}: one sample rate throughout`, rates.size === 1 && rates.has(wantRate),
     `${[...rates].join(',')} Hz`);
-  // 🔴 AND THE OTHER SCANNER MUST FIND NOTHING IN IT. This is the control that
-  // an A/B sharing one bug cannot give: both arms are real bytes off a real
-  // station, and each is refused by the reader that is not for it.
+  // And the other scanner must find nothing in it.
+  // why: lessons/kit-mp3-frames.md#test-live-other
   const other = framing === 'mpeg' ? 'adts' : 'mpeg';
   const wrong = frameStarts(bytes, 0, { framing: other, final: true }).frames.length;
   ok(`LIVE ${label}: the ${other} reader finds nothing in it`, wrong === 0, `${wrong} found`);

@@ -1,8 +1,7 @@
-// demo/shell/rt-store.mjs: the runtime of a file store on /connect/
-// (node-runtime.mjs): our own R2 bucket, read through the station worker's
-// /media/ door. It holds an address and opens nothing; the engine at the far
-// end of its file-out link reads from it on a person's press, and only while
-// that link holds (`upstream('file-in')`).
+// demo/shell/rt-store.mjs: a file store on /connect/ (node-runtime.mjs), our R2 bucket
+// through the station worker's /media/ door. It opens nothing; the engine on its
+// file-out link reads on a press, while that link holds.
+// why: lessons/kit-rt-store.md#header
 
 // Where each store's files are, as the pages that read them say.
 const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';

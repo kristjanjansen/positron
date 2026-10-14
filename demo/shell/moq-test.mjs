@@ -1,12 +1,7 @@
-// demo/shell/moq-test.mjs: startMoq's stop and moq-audio's bounded stats, with
-// no relay and no browser.
-//
-//   node demo/shell/moq-test.mjs
-//
-// The vendored @moq client is replaced by a fake whose catalog never arrives,
-// through a module hook, so what is graded is the wait, not the relay.
-// THREE OF THE 4 ARE NEGATIVE CONTROLS, written so the bug they name fails them.
+// demo/shell/moq-test.mjs (node demo/shell/moq-test.mjs): startMoq's stop and moq-audio's bounded
+// stats, on a fake @moq client whose catalog never arrives. 3 of 4 are negative controls.
 // Frames, codecs and latency are graded on /video/moq/ against the real relay.
+// why: lessons/kit-moq.md#test-header
 import { register } from 'node:module';
 
 let pass = 0, fail = 0, neg = 0;

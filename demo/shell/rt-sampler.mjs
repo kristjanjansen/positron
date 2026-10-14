@@ -1,10 +1,7 @@
-// demo/shell/rt-sampler.mjs: the runtime of a `sampler` node on /connect/
-// (node-runtime.mjs): /code/piano/'s SuperCollider sampler (code/sc-sampler.mjs)
-// in the page's one context, playing the Salamander piano and the Rhodes from
-// our own bucket. Notes and program changes in on sampler:midi-in, sound out
-// on sampler:audio-out.
-// 🔴 A RECORDING IS FETCHED ONLY FOR A NOTE PLAYED, and only while a store is
-// linked into sampler:file-in; with none, a note says so and sounds nothing.
+// demo/shell/rt-sampler.mjs: the `sampler` node on /connect/: code/sc-sampler.mjs in the page's one
+// context. A recording is fetched only for a note played, and only while a store is linked into
+// sampler:file-in; with none, a note says so and sounds nothing.
+// why: lessons/kit-rt-sampler.md#header
 
 import { PIANO, RHODES } from '/code/sampler.mjs';
 import { createScSampler } from '/code/sc-sampler.mjs';

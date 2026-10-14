@@ -1,14 +1,7 @@
-// demo/shell/nodes-test.mjs: the node catalogue (nodes.mjs) against bay.mjs,
-// with no browser.
-//
-//   node demo/shell/nodes-test.mjs
-//
-// What is graded: every entry's kind and ports are legal for bay.mjs, names
-// are unique in the source and never read as another entry's instance,
-// addNodes builds a bay bay.mjs links through (port order, portLabel,
-// variants), addPorts and relabel, the merges and kinds of 2026-10-14 and one
-// default label per type, and every page an entry names is on disk. Lines marked
-// NEGATIVE CONTROL must refuse something, so a check that cannot fail is caught.
+// demo/shell/nodes-test.mjs (node demo/shell/nodes-test.mjs): the node catalogue against bay.mjs,
+// no browser: legal kinds and ports, unique names, addNodes, merges, one default label per type,
+// pages on disk. NEGATIVE CONTROL lines must refuse something.
+// why: lessons/kit-nodes.md#test-header
 
 import { readFileSync, existsSync } from 'node:fs';
 import { createBay, MEDIA, NODE_KINDS, TRANSPORT_NAMES } from './bay.mjs';
@@ -210,7 +203,8 @@ check('addNodes builds every entry with all its ports', !buildFail.length, build
     && !bay.port('cf-stream:hls:video-in').transports && bay.port('cf-shout:vikerraadio:audio-out').transports.join() === 'https');
 }
 
-// ── merges (2026-10-14): one name per thing, and the pages keep their ids ──
+// ── merges: one name per thing, and the pages keep their ids ──
+// why: lessons/kit-nodes.md#test-merges
 {
   // Each merged-away name is gone, and the page that used it builds the same node through `as`.
   const MERGED = { bpm: ['tempo', 'radio/live'], granulator: ['grains', 'shader/landscape'], radio: ['player', 'granulator/grains'] };

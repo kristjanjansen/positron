@@ -1,48 +1,9 @@
-// demo/shell/midi-graph.mjs: this browser's WebMIDI ports as bay device nodes
-// with ids that survive a replug, a graph a page can announce, and links
-// between local ports run through `route-core.mjs`.
-//
-// Step 3 of `plans/plan-routing-migration.md` §4, for the gap its §3.1 names:
-// `/patchbay/` announces three ports of its own and none of the MIDI devices
-// plugged into the machine it runs on, and eight of the eleven pages that
-// should move are WebMIDI pages.
-//
-// 🔴 A PORT IS KEYED BY IDENTITY, NEVER BY NAME. CoreMIDI renames a held port
-// `Circuit` to `Circuit 2` when it is replugged (plan-patchbay §2.3), so a
-// name is a label that is allowed to change. Identity follows route-core §3,
-// which is RaspiMIDIHub's `device_id.py` (plan-wish-dawless §12), in order:
-//   1. a serial, refusing placeholders (a Digitone II ships `000000000001`);
-//   2. the port path, which in a browser is the `MIDIPort.id` the browser
-//      hands over, unless both sides carry real serials and they differ;
-//   3. a soft match on manufacturer, direction and the name with its trailing
-//      numbers taken off, ONLY when exactly one remembered port that is not
-//      present meets exactly one new port. Two identical units are never
-//      guessed between: the second one gets a node of its own, `circuit-2`.
-// ⚠️ WebMIDI EXPOSES NO SERIAL. Step 1 reads `serialOf(port)`, which is
-// `port.serial` when something put one there and nothing otherwise, so in an
-// ordinary browser identity starts at step 2. It is kept so a page that knows
-// more (a profile, WebUSB) can say so, and so the rule reads the same here as
-// on the Pi and the Pico.
-// ⚠️ WHETHER A BROWSER'S `MIDIPort.id` SURVIVES A REPLUG IS NOT MEASURED HERE.
-// How each browser derives it was not checked; if it changes, step 3 is what
-// keeps the id, and the test drives both cases.
-//
-// ⚠️ A VISIT OPENS NOTHING. Importing this file and calling `createMidiGraph`
-// asks for nothing: MIDI access is requested by `start()`, which a page calls
-// from a press, or handed over with `attach(access)` by a page that opened
-// MIDI itself. An input gets a listener only while a link starts at it.
-//
-// ⚠️ IT DOES NOT JOIN A ROOM. It takes a plain `announce(graph)` callback, so
-// a page wires it to whatever join helper it uses, and it never sends a graph
-// that has not changed (a registry that hears *changed* every beat redraws on
-// every beat). `announce()` with no argument sends it again, which is the
-// answer to `graph.ask`.
-//
-// Directions, because the two layers count them from opposite ends:
-//   WebMIDI input  (the device sends to us)  bay `site:node:out`, dir 'out',
-//                                            route-core dir 'in'
-//   WebMIDI output (we send to the device)   bay `site:node:in`,  dir 'in',
-//                                            route-core dir 'out'
+// demo/shell/midi-graph.mjs: WebMIDI ports as bay device nodes with ids that survive a replug,
+// linked through route-core.mjs. A port is keyed by identity, never name: serial, then
+// MIDIPort.id, then a soft match only when exactly one candidate meets exactly one new port.
+// A visit opens nothing: MIDI is asked for by start() or handed over with attach(access).
+// Directions: a WebMIDI input is bay dir 'out' and route-core dir 'in'; an output the reverse.
+// why: lessons/kit-midi-graph.md#header
 
 import { createCore } from './route-core.mjs';
 import { KINDS } from './midi-kinds.mjs';
@@ -127,11 +88,9 @@ export function createMidiGraph({
     ({ slug: s, dir, serial, path, manufacturer, stem, name }));
 
   /**
-   * A node slug for a new port: the node of its other half when exactly one is
-   * waiting, else a fresh one. ⚠️ THE NAME PAIRS TWO HALVES SEEN AT ONE
-   * MOMENT AND NEVER CARRIES AN ID ACROSS TIME. An input and an output called
-   * `Circuit 2` by one manufacturer are one device now, which is what CoreMIDI
-   * shows; two halves that could both be its partner are not chosen between.
+   * A node slug for a new port: its other half's node when exactly one is waiting, else fresh.
+   * The name pairs two halves seen at one moment; it never carries an id across time.
+   * why: lessons/kit-midi-graph.md#slug-for
    */
   function slugFor(e) {
     const other = e.dir === 'out' ? 'in' : 'out';

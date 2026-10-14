@@ -1,17 +1,7 @@
-// demo/shell/note-grid-test.mjs — the arithmetic of the note picture, no browser.
+// demo/shell/note-grid-test.mjs: the arithmetic of the note picture (`layout`, `place`), no browser.
 //   node demo/shell/note-grid-test.mjs
-//
-// 🔴 THE PURE HALF IS WHAT IS GRADED HERE AND THE DRAWING IS GRADED ON `/pack/`.
-// `layout` and `place` decide which patterns get a row, what one pitch scale the
-// whole picture uses and where an event lands in it; those are functions of
-// their arguments and need no canvas. Whether any ink reaches the screen is a
-// different claim and it is asserted against a real pack in the page, where a
-// `clientWidth` of 0 can make a perfectly correct picture draw nothing.
-//
-// 🔴 AND IT IS GRADED AGAINST THE OWNER'S OWN PACK WHERE THAT FILE IS PRESENT,
-// because numbers invented for a test agree with whatever the test expects.
-// `tmp/` is gitignored, so the corpus half SKIPS on a fresh clone and says so
-// rather than passing quietly.
+// Drawing is graded on /pack/. The corpus half reads the owner's pack and skips without it.
+// why: lessons/kit-note-grid.md#test-header
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,10 +17,8 @@ function ok(what, cond, detail = '') {
 }
 
 // ── names ──────────────────────────────────────────────────────────────────
-//
-// ⚠️ MIDDLE C IS C3, WHICH IS THE CIRCUIT'S OWN NUMBERING AND NOT THE ONLY ONE
-// IN USE. Roland would call note 60 C4. The instrument this page is about
-// labels its drum pads, notes 60 to 65, as octave 3, so that is what is drawn.
+// Middle C is C3, the Circuit's own numbering (Roland calls note 60 C4).
+// why: lessons/kit-note-grid.md#test-names
 ok('note 60 is C3, which is what the instrument this page is about calls it',
   noteName(60) === 'C3' && noteName(72) === 'C4' && noteName(48) === 'C2',
   `${noteName(48)} ${noteName(60)} ${noteName(72)}`);
@@ -38,11 +26,8 @@ ok('every accidental is named sharp, and the twelve wrap at C',
   noteName(61) === 'C#3' && noteName(71) === 'B3' && noteName(0) === 'C-2',
   `${noteName(61)} ${noteName(71)} ${noteName(0)}`);
 
-/* 🔴 NEGATIVE CONTROL, AND IT IS THE ONE THIS COMPONENT EXISTS TO BE HONEST
-   ABOUT. 105 of the 5,095 events in the owner's pack carry a note number above
-   127, which cannot be a MIDI note. An empty string is what a reader should get
-   for those, so the caption can say what it really is instead of printing a
-   name for a number that has none. */
+// Negative control: a number above 127 cannot be a MIDI note and gets no name.
+// why: lessons/kit-note-grid.md#test-over-127
 ok('NEGATIVE CONTROL: a number that cannot be a MIDI note gets no name at all',
   noteName(128) === '' && noteName(132) === '' && noteName(-1) === ''
   && noteName(NaN) === '' && noteName(undefined) === '',
@@ -80,8 +65,8 @@ ok('NEGATIVE CONTROL: a number that cannot be a MIDI note gets no name at all',
   const p = layout(ev);
   const lo = place(ev[0], p), hi = place(ev[1], p), other = place(ev[2], p);
 
-  /* 🔴 A HIGHER NOTE SITS HIGHER, which is the whole claim the picture makes
-     and the one a y axis gets backwards for free: a canvas counts down. */
+  // A higher note sits higher; a canvas y axis counts down.
+  // why: lessons/kit-note-grid.md#test-higher
   ok('a higher note sits higher in its row',
     hi.y < lo.y && hi.row === lo.row, `${hi.y} above ${lo.y}`);
   ok('the top of the range touches the top of the row and the bottom the bottom',
@@ -92,8 +77,8 @@ ok('NEGATIVE CONTROL: a number that cannot be a MIDI note gets no name at all',
   ok('the step is carried through untouched, because x is not this function\'s business',
     other.step === 15 && lo.step === 0);
 
-  /* 🔴 A PATTERN WITH ONE PITCH IN IT HAS NO RANGE TO DIVIDE BY, and a drum
-     pattern is exactly that. Centred, not dropped and not NaN. */
+  // One pitch has no range to divide by (a drum pattern): centred, not dropped, not NaN.
+  // why: lessons/kit-note-grid.md#test-one-pitch
   const flat = [{ region: 2, step: 1, note: 60, velocity: 64 }];
   const fp = place(flat[0], layout(flat));
   ok('a pattern whose notes are all one pitch is centred rather than divided by zero',
@@ -106,10 +91,9 @@ ok('NEGATIVE CONTROL: a number that cannot be a MIDI note gets no name at all',
 ok('a Circuit pattern is sixteen steps, read from the decoder rather than typed twice',
   STEPS === 16);
 
-// ── the footer and the walk, 2026-10-12 ────────────────────────────────────
-//
-// 🔴 THE FOOTER NAMES THE NOTE IN FOCUS AND THE ARROWS MOVE IT, so the two
-// pure halves are graded here: what each cell says, and where a key goes.
+// ── the footer and the walk ─────────────────────────────────────────────
+// The footer names the note in focus and the arrows move it: both pure halves graded here.
+// why: lessons/kit-note-grid.md#test-footer-walk
 ok('a start is counted as beat then step, which is what the column headings print',
   startOf(0) === '1.1' && startOf(5) === '2.2' && startOf(15) === '4.4' && startOf(-1) === '',
   `${startOf(0)} ${startOf(5)} ${startOf(15)}`);
@@ -186,12 +170,9 @@ if (!fs.existsSync(PACK)) {
     `${withNotes} of ${entries.length} sessions, ${total} events`);
 
   /**
-   * 🔴 AND 105 OF THEM CANNOT BE NOTES, WHICH THIS COMPONENT FOUND BY TRYING TO
-   * PUT EACH ONE SOMEWHERE. A count never had to. The values are 128 to 132,
-   * clustered, with ordinary velocities and gates, and masking bit 7 would turn
-   * them into notes 0 to 4, five octaves below anything else in the file.
-   * ⚠️ IT IS ASSERTED AS A NUMBER rather than as *some*, so the day the decoder
-   * is understood this goes red and somebody reads why.
+   * 105 events carry note numbers 128 to 132, asserted as an exact count so a decoder change
+   * goes red. Masking bit 7 would invent notes 0 to 4.
+   * why: lessons/kit-note-grid.md#test-105
    */
   ok('105 of the 5,095 carry a note number above the MIDI range, counted and not clamped',
     over === 105, `${over} above 127`);
