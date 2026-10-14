@@ -397,8 +397,8 @@
   }
   new MutationObserver(() => decorate()).observe(pb.view.el, { childList: true, subtree: true });
 
-  // Where a node runs, in the order a reader meets them.
-  const GROUPS = ['in your hands', 'made in this tab', 'kept in this tab', 'heard and seen here', 'the Pi in the studio', 'Cloudflare', 'somebody else\'s server'];
+  // What a node is in this tab, then where else it runs.
+  const GROUPS = ['controls', 'engines', 'recorders', 'outputs', 'raspberry pi', 'cloudflare', 'external'];
   function groupOf(n) {
     const site = n.id.split(':')[0];
     if (site === BOARD_SITE) return GROUPS[4];
