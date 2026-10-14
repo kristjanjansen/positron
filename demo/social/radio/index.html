@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON social/radio</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { fromFirstFrame } from '/shell/mp3-frames.mjs';
+  import { createMix, pinkNoise } from '/shell/tuner-mix.mjs';
+  import { createReel, field, font, drawWordmark, drawLowerLine, W, H, X, TEXT_W, SAFE_TOP, C } from '/shell/reel.mjs';
+
+  // A radio reel: a needle sweeps a dial across three of our own recordings,
+  // through the noise and the whistle between them, by /radio/tuner/'s maths.
+  // Every sound and every frame is a function of the deck position, so a seek,
+  // a scrub and a recorded take all hear and show the same thing.
+  const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
+  // `from` is where in the recording the reel starts (s); `rate` is bytes a
+  // second (128 kbit/s MP3, Ida's ADTS measured as 7,637,985 B over 189.5 s).
+  // Ida is near silent outside 111 to 133 s of its capture, so it starts there.
+  const STATIONS = [
+    { id: 'raadio2', label: 'Raadio 2', short: 'R2', key: 'radio/raadio2/2026-10-11.mp3', at: 0.2, echo: 0.09, from: 20, rate: 16000 },
+    { id: 'raadio4', label: 'Raadio 4', short: 'R4', key: 'radio/raadio4/2026-10-11.mp3', at: 0.5, echo: 0.11, from: 40, rate: 16000 },
+    { id: 'ida', label: 'Ida', short: 'IDA', key: 'radio/ida/2026-10-11.aac', at: 0.8, echo: 0.13, from: 111.5, rate: 40302 },
+  ];
+  const END = 14000, SPAN = 16;   // the take, and how many seconds of each recording to fetch
+  // The needle's path, [ms, dial]: noise, Raadio 2, Raadio 4, Ida, each held.
+  const KEYS = [[0, 0.06], [700, 0.06], [2000, 0.2], [4200, 0.2], [6400, 0.5], [8600, 0.5], [10800, 0.8], [END, 0.8]];
+  const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+  function dialAt(pos) {
+    if (pos <= KEYS[0][0]) return KEYS[0][1];
+    for (let i = 1; i < KEYS.length; i++) {
+      const [t1, u1] = KEYS[i], [t0, u0] = KEYS[i - 1];
+      if (pos <= t1) return u0 + (u1 - u0) * ease((pos - t0) / (t1 - t0));
+    }
+    return KEYS[KEYS.length - 1][1];
+  }
+  const mix = createMix(STATIONS);
+
+  const d = mount({
+    name: 'social/radio',
+    what: 'A dial sweeps through three radio recordings and the noise between them. Record makes the file.',
+    readout: null, index: '/social/', indexLabel: 'social',
+  });
+  const h1 = d.head.querySelector('.pos-name');
+  if (h1) h1.textContent = 'radio';
+
+  const lower = field('lower line', '', 2);
+  const note = el('p', 'reel-note', '1080 x 1920, 30 fps, with sound. Raadio 2, Raadio 4 and Ida as we recorded them on 2026-10-11, about a megabyte fetched on the first play.');
+
+  // ── the sound ───────────────────────────────────────────────────────────
+  const fetched = {};
+  async function fetchStation(ac, st) {
+    const a = Math.floor(st.from * st.rate), b = Math.floor((st.from + SPAN) * st.rate) - 1;
+    const r = await fetch(`${MEDIA}${st.key}`, { headers: { Range: `bytes=${a}-${b}` } });
+    if (!r.ok) throw new Error(`${r.status} from ${st.key}`);
+    const ab = await r.arrayBuffer();
+    fetched[st.id] = ab.byteLength;
+    // A range starts mid frame, as a capture of a live mount does.
+    const buf = await ac.decodeAudioData(fromFirstFrame(ab).buffer);
+    let sum = 0, n = 0;
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const x = buf.getChannelData(c);
+      for (let i = 0; i < x.length; i += 7) { sum += x[i] * x[i]; n++; }
+    }
+    const rms = Math.sqrt(sum / Math.max(1, n)) || 1e-4;
+    return { buf, level: Math.min(4, 0.12 / rms) };
+  }
+
+  // /radio/tuner/'s graph without the bay: each station through its clear,
+  // dulling lowpass and echo, noise and the whistle into one AM colour.
+  async function load(ac, out) {
+    const t0 = performance.now();
+    const loaded = await Promise.all(STATIONS.map((st) => fetchStation(ac, st)));
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 200; hp.Q.value = 0.7;
+    hp.channelCount = 1; hp.channelCountMode = 'explicit'; hp.channelInterpretation = 'speakers';
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3500; lp.Q.value = 0.7;
+    const shaper = ac.createWaveShaper();
+    const curve = new Float32Array(1024), k = 2.2;
+    for (let i = 0; i < curve.length; i++) { const x = (i / (curve.length - 1)) * 2 - 1; curve[i] = Math.tanh(k * x) / Math.tanh(k); }
+    shaper.curve = curve; shaper.oversample = '2x';
+    const master = ac.createGain(); master.gain.value = 0.8;
+    const hold = ac.createGain(); hold.gain.value = 0;
+    hp.connect(lp); lp.connect(shaper); shaper.connect(master); master.connect(hold); hold.connect(out);
+    const whistle = ac.createOscillator(); whistle.type = 'sine';
+    const wGain = ac.createGain(); wGain.gain.value = 0;
+    whistle.connect(wGain); wGain.connect(hp); whistle.start();
+    const noise = ac.createBufferSource(); noise.buffer = pinkNoise(ac); noise.loop = true;
+    const nGain = ac.createGain(); nGain.gain.value = 0;
+    noise.connect(nGain); nGain.connect(hp); noise.start();
+
+    const legs = STATIONS.map((st, i) => {
+      const input = ac.createGain(); input.gain.value = loaded[i].level;
+      const clear = ac.createGain(); clear.gain.value = 0;
+      const sLp = ac.createBiquadFilter(); sLp.type = 'lowpass'; sLp.frequency.value = 3500;
+      const echo = ac.createGain(); echo.gain.value = 0;
+      const delay = ac.createDelay(0.5); delay.delayTime.value = st.echo;
+      const dull = ac.createBiquadFilter(); dull.type = 'bandpass'; dull.frequency.value = 900; dull.Q.value = 0.9;
+      const fb = ac.createGain(); fb.gain.value = 0.35;
+      input.connect(clear); clear.connect(sLp); sLp.connect(hp);
+      input.connect(echo); echo.connect(delay); delay.connect(dull); dull.connect(hp); delay.connect(fb); fb.connect(delay);
+      return { buf: loaded[i].buf, input, clear, lp: sLp, echo, src: null };
+    });
+    d.log(`three recordings in, ${Object.values(fetched).reduce((a, b) => a + b, 0).toLocaleString('en')} bytes in ${Math.round(performance.now() - t0)} ms`);
+
+    // The sources run from where the deck is; a jump (a seek, a restart) restarts them.
+    let run = null;
+    function start(pos) {
+      const now = ac.currentTime;
+      for (const g of legs) {
+        try { g.src?.stop(); } catch { /* already stopped */ }
+        g.src = null;
+        const off = pos / 1000;
+        if (off >= g.buf.duration) continue;
+        g.src = ac.createBufferSource(); g.src.buffer = g.buf;
+        g.src.connect(g.input); g.src.start(now, off);
+      }
+      run = { pos, at: now };
+      hold.gain.setTargetAtTime(1, now, 0.01);
+    }
+    function halt() {
+      const now = ac.currentTime;
+      hold.gain.setTargetAtTime(0, now, 0.015);
+      for (const g of legs) { try { g.src?.stop(now + 0.1); } catch { /* gone */ } g.src = null; }
+      run = null;
+    }
+    return {
+      // where the running sources were last started from, for a check
+      get from() { return run ? run.pos : null; },
+      follow(pos, playing) {
+        if (!playing) { if (run) halt(); return; }
+        const expect = run ? run.pos + (ac.currentTime - run.at) * 1000 : NaN;
+        if (!run || Math.abs(expect - pos) > 250) start(pos);
+        const now = ac.currentTime, m = mix(dialAt(pos)), tc = 0.03;
+        legs.forEach((g, i) => {
+          const s = m.st[i];
+          g.clear.gain.setTargetAtTime(s.clear, now, tc);
+          g.echo.gain.setTargetAtTime(s.echo, now, tc);
+          g.lp.frequency.setTargetAtTime(s.bright, now, tc);
+        });
+        nGain.gain.setTargetAtTime(m.noise, now, tc);
+        wGain.gain.setTargetAtTime(m.whistle, now, tc);
+        whistle.frequency.setTargetAtTime(m.pitch, now, tc);
+      },
+    };
+  }
+
+  // ── the picture ─────────────────────────────────────────────────────────
+  function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+  const NAME_Y = SAFE_TOP + 430, NAME_PX = 190, DIAL_Y = 940, DIAL_H = 220;
+  const xOf = (u) => X + u * TEXT_W;
+
+  function drawFrame(ctx, pos) {
+    const u = dialAt(pos), m = mix(u);
+    const clear = m.st[m.near].clear, static_ = (m.noise - 0.04) / 0.26;
+    // Seeded by the frame's time, so a seek or a retake draws the same static.
+    const r = rng(Math.floor(pos / 40) + 7);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, H);
+    const pad = drawWordmark(ctx);
+
+    // static over the name band, as dense as the noise is loud
+    const dots = Math.round(2600 * static_);
+    for (let i = 0; i < dots; i++) {
+      const g = 60 + Math.floor(r() * 120);
+      ctx.fillStyle = `rgba(${g},${g},${g},${0.25 + r() * 0.5})`;
+      ctx.fillRect(X + r() * TEXT_W, NAME_Y - NAME_PX - 60 + r() * (NAME_PX + 140), 3, 3);
+    }
+
+    // the nearest station's name: whole when tuned, faint and flickering between
+    const st = STATIONS[m.near];
+    const flick = clear > 0.97 ? 1 : 0.55 + 0.45 * r();
+    ctx.globalAlpha = Math.min(1, 0.08 + 0.92 * clear) * flick;
+    ctx.font = font(600, NAME_PX);
+    ctx.fillStyle = C.fg;
+    ctx.fillText(st.label, X + (1 - clear) * (r() - 0.5) * 24, NAME_Y);
+    ctx.globalAlpha = 1;
+
+    // the dial: a scale, three station marks and the needle
+    ctx.strokeStyle = '#2a303c'; ctx.lineWidth = 2;
+    ctx.strokeRect(X, DIAL_Y, TEXT_W, DIAL_H);
+    for (let i = 0; i <= 50; i++) {
+      const x = X + 16 + (i / 50) * (TEXT_W - 32), major = i % 5 === 0;
+      ctx.fillStyle = major ? '#5b6372' : '#363d4a';
+      ctx.fillRect(x - 1, DIAL_Y + 18, 2, major ? 46 : 24);
+    }
+    ctx.font = font(400, 34);
+    ctx.textAlign = 'center';
+    STATIONS.forEach((s, i) => {
+      const on = m.st[i].clear > 0.5;
+      ctx.fillStyle = on ? C.hi : C.dim;
+      ctx.fillRect(xOf(s.at) - 3, DIAL_Y + 18, 6, DIAL_H - 36);
+      ctx.fillText(s.short, xOf(s.at), DIAL_Y + DIAL_H + 64);
+    });
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.hi;
+    const nx = xOf(u);
+    ctx.fillRect(nx - 3, DIAL_Y - 24, 6, DIAL_H + 24);
+    ctx.beginPath(); ctx.moveTo(nx - 16, DIAL_Y - 40); ctx.lineTo(nx + 16, DIAL_Y - 40); ctx.lineTo(nx, DIAL_Y - 18); ctx.fill();
+
+    drawLowerLine(ctx, lower.t.value, pad);
+  }
+
+  let voice = null;
+  const reel = await createReel({
+    d, name: 'radio', kind: 'dial', side: [lower.wrap, note],
+    timeline: () => ({ end: END, items: KEYS.map(([at, u]) => ({ at, payload: { u } })) }),
+    // At rest (a visit, or the end) the frame is the finished one: on Ida.
+    draw(ctx, { pos, playing, idle }) {
+      drawFrame(ctx, idle ? END : pos);
+      voice?.follow(pos, playing);
+    },
+    sound: { gain: 0.9, late: true, async load(ac, out) { voice = await load(ac, out); return voice; } },
+  });
+  lower.t.oninput = () => reel.rebuildSoon();
+  window.__demo.fetched = fetched;
+  window.__demo.dialAt = dialAt;
+  window.__demo.reel = reel;
+
+  if (SELFCHECK) {
+    d.assert('the take is 12 to 15 s and the needle path ends on it', END >= 12000 && END <= 15000 && KEYS.at(-1)[0] === END,
+      `${END / 1000} s`);
+    d.assert('the needle starts between stations, in noise', mix(dialAt(0)).st.every((s) => s.clear < 0.05),
+      `noise ${mix(dialAt(0)).noise.toFixed(2)}`);
+    const holds = [[2000, 4200], [6400, 8600], [10800, END]].map(([a, b]) => mix(dialAt((a + b) / 2)));
+    d.assert('each hold is tuned dead on its own station, in order', holds.every((m, i) => m.near === i && m.st[i].clear > 0.99),
+      holds.map((m) => `${STATIONS[m.near].short} ${m.st[m.near].clear.toFixed(3)}`).join(', '));
+    // both sweeps between stations: the clear path must empty and the whistle sound
+    const sweeps = [[4200, 6400], [8600, 10800]].map(([a, b]) => {
+      let best = 1, whistle = 0;
+      for (let p = a; p <= b; p += 20) { const m = mix(dialAt(p)); best = Math.min(best, Math.max(...m.st.map((s) => s.clear))); whistle = Math.max(whistle, m.whistle); }
+      return { best, whistle };
+    });
+    d.assert('each sweep passes through noise and the whistle', sweeps.every((s) => s.best < 0.05 && s.whistle > 0.03),
+      sweeps.map((s) => `clear down to ${s.best.toFixed(3)}, whistle up to ${s.whistle.toFixed(3)}`).join('; '));
+    d.assert('the needle is a function of the position, so a seek lands where a play would', dialAt(5300) === dialAt(5300) && dialAt(-5) === KEYS[0][1] && dialAt(END + 99) === KEYS.at(-1)[1]);
+    const { ctx } = reel;
+    const px = ctx.getImageData(X, NAME_Y - NAME_PX, TEXT_W, NAME_PX).data;
+    let ink = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 180) ink++;
+    d.assert('the finished frame names the station it is tuned to', ink > 2000, `${ink} bright pixels`);
+    const bytes = STATIONS.reduce((a, st) => a + Math.floor(SPAN * st.rate), 0);
+    d.assert('a play asks for under 1.5 MB, a slice of each recording', bytes < 1.5e6, `${bytes.toLocaleString('en')} bytes planned`);
+    d.assert('a visit opened no audio and fetched nothing', reel.audio === null && Object.keys(fetched).length === 0);
+  }
+  d.ready();
+</script>

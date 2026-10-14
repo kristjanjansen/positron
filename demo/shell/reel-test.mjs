@@ -1,8 +1,8 @@
 // node demo/shell/reel-test.mjs: the pure half of reel.mjs, with no browser.
 // Not graded here: the canvas, the deck, the bar and MediaRecorder itself,
 // which need a document and are graded by /social/typist/ and a real take.
-// Four of the asserts are NEGATIVE CONTROLS, marked (neg).
-import { W, H, SAFE_TOP, SAFE_BOTTOM, X, TEXT_W, TYPES, pickType, extOf, atRest } from './reel.mjs';
+// Six of the asserts are NEGATIVE CONTROLS, marked (neg).
+import { W, H, SAFE_TOP, SAFE_BOTTOM, X, TEXT_W, TYPES, pickType, extOf, atRest, waitsForSound } from './reel.mjs';
 
 let ok = 0, bad = 0;
 const t = (name, cond, detail = '') => {
@@ -31,6 +31,12 @@ t('stopped at the start is at rest', atRest(0, false, 7000));
 t('stopped at the end is at rest', atRest(7000, false, 7000));
 t('(neg) paused in the middle is not at rest, so a scrub shows the partial frame', !atRest(3000, false, 7000));
 t('playing from 0 is not at rest', !atRest(0, true, 7000));
+
+const load = async () => ({});
+t('a reel of events waits for its sounds before the first play', waitsForSound({ load }, false));
+t('(neg) a continuous reel starts now and its sound joins late', !waitsForSound({ load, late: true }, false));
+t('(neg) sounds already loaded are never waited for again', !waitsForSound({ load }, true));
+t('a reel with no sounds has nothing to wait for', !waitsForSound(undefined, false) && !waitsForSound({ gain: 1 }, false));
 
 console.log(`\n${ok}/${ok + bad} ok`);
 process.exit(bad ? 1 : 0);

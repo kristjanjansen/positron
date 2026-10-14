@@ -59,6 +59,10 @@ export const pickType = (supported) => TYPES.find((t) => supported(t)) || '';
 export const extOf = (type) => (String(type).includes('mp4') ? 'mp4' : 'webm');
 /** At rest (stopped at either end) a reel shows its finished frame. */
 export const atRest = (pos, playing, end) => !playing && (pos <= 0 || pos >= end);
+/** Does a press of play wait for the sounds? A reel of discrete events does,
+ *  or the first ones land in silence; a continuous one (`sound.late`) follows
+ *  the deck every frame, so it starts now and the sound joins when decoded. */
+export const waitsForSound = (sound, loaded) => !!sound?.load && !loaded && !sound.late;
 
 /** MediaRecorder over a canvas's frames and one audio stream. */
 export function createRecorder({ canvas, audio, fps = 30 }) {
@@ -123,7 +127,7 @@ export function field(label, value, rows) {
  * @param {() => {items: {at: number, payload: any}[], end: number}} o.timeline
  *   read on every rebuild; whatever else it returns rides along as `take`.
  * @param {(ctx: CanvasRenderingContext2D, f: {pos: number, playing: boolean, idle: boolean, take: object}) => void} o.draw
- * @param {{gain?: number, load: (ac: AudioContext, out: GainNode) => Promise<any>}} [o.sound]
+ * @param {{gain?: number, late?: boolean, load: (ac: AudioContext, out: GainNode) => Promise<any>}} [o.sound]
  * @param {(payload: any, voice: any) => void} [o.play]  an item landing.
  */
 export async function createReel({ d, name, host = d.el, side = [], timeline, draw, sound, play, kind = 'cue' }) {
@@ -152,18 +156,22 @@ export async function createReel({ d, name, host = d.el, side = [], timeline, dr
   const barHost = make('div', 'reel-bar');
   host.append(barHost, stage);
 
-  let audio = null;
-  async function loadSound() {
-    if (audio) return audio;
-    const ac = new AudioContext();
-    const out = ac.createGain();
-    out.gain.value = sound?.gain ?? 1;
-    const tap = ac.createMediaStreamDestination();
-    out.connect(ac.destination);
-    out.connect(tap);
-    const voice = await sound?.load?.(ac, out);
-    audio = { ac, out, tap, voice };
-    return audio;
+  let audio = null, loading = null;
+  // One load however many presses arrive while it runs (play, then record).
+  function loadSound() {
+    if (audio) return Promise.resolve(audio);
+    loading ??= (async () => {
+      const ac = new AudioContext();
+      const out = ac.createGain();
+      out.gain.value = sound?.gain ?? 1;
+      const tap = ac.createMediaStreamDestination();
+      out.connect(ac.destination);
+      out.connect(tap);
+      const voice = await sound?.load?.(ac, out);
+      audio = { ac, out, tap, voice };
+      return audio;
+    })().finally(() => { loading = null; });
+    return loading;
   }
   async function wake() {
     await loadSound();
@@ -187,7 +195,13 @@ export async function createReel({ d, name, host = d.el, side = [], timeline, dr
     bar = createTransportBar(barHost, deck, { loop: false, right: [rec, dlBtn], command: {
       // the first play fetches and decodes the sounds; the bar sweeps until they are in
       play: async () => {
-        if (!audio) { barHost.dataset.busy = '1'; try { await loadSound(); } finally { delete barHost.dataset.busy; } }
+        if (!waitsForSound(sound, !!audio)) {
+          if (!audio) barHost.dataset.busy = '1';
+          wake().catch((e) => d.log(`sound did not load: ${e.message}`, 'bad')).finally(() => delete barHost.dataset.busy);
+          return deck.play();
+        }
+        barHost.dataset.busy = '1';
+        try { await loadSound(); } finally { delete barHost.dataset.busy; }
         await wake();
         return deck.play();
       },

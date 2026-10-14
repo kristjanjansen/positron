@@ -38,6 +38,7 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
+  import { createMix, pinkNoise } from '/shell/tuner-mix.mjs';
 
   // An AM tuner as a patchbay: /radio/blend/ with four stations and a noise
   // source, all into one tuner effect, whose dial picks which station is clear
@@ -130,43 +131,13 @@
   // carrier slightly off tune, silent dead on and gone far away, its pitch
   // rising with the distance.
   let tune = 0.4;
-  const CLEAR_W = 0.035, ECHO_W = 0.13, ECHO_MAX = 0.35;
-  function mix(t) {
-    const st = STATIONS.map((s) => {
-      const dist = Math.abs(t - s.at);
-      const clear = Math.exp(-((dist / CLEAR_W) ** 2));
-      const echo = ECHO_MAX * Math.exp(-((dist / ECHO_W) ** 2)) * (1 - clear);
-      // Off tune the sidebands go first, so the clear path also dulls.
-      const bright = 1200 + 2300 * Math.exp(-((dist / 0.03) ** 2));
-      return { dist, clear, echo, bright };
-    });
-    const best = Math.max(...st.map((s) => s.clear));
-    const near = st.reduce((a, s, i) => (s.dist < st[a].dist ? i : a), 0);
-    const nd = st[near].dist;
-    return {
-      st, near,
-      noise: 0.04 + 0.26 * (1 - best),
-      whistle: 0.05 * (1 - Math.exp(-((nd / 0.012) ** 2))) * Math.exp(-((nd / 0.07) ** 2)),
-      pitch: Math.min(3200, 150 + 40000 * nd),
-    };
-  }
+  // The maths is demo/shell/tuner-mix.mjs, shared with /social/radio/.
+  const mix = createMix(STATIONS);
 
   // ── the sound ───────────────────────────────────────────────────────────
   let ctx = null, tuner = null;
   const legs = new Map();          // key -> { stream, in, clear, lp, echo, live }
   let noiseSrc = null;
-
-  // Pink-ish noise, four seconds, looped (Paul Kellet's economy filter).
-  function noiseBuffer() {
-    const n = ctx.sampleRate * 4, buf = ctx.createBuffer(1, n, ctx.sampleRate), a = buf.getChannelData(0);
-    let b0 = 0, b1 = 0, b2 = 0;
-    for (let i = 0; i < n; i++) {
-      const w = Math.random() * 2 - 1;
-      b0 = 0.99765 * b0 + w * 0.0990460; b1 = 0.96300 * b1 + w * 0.2965164; b2 = 0.57000 * b2 + w * 1.0526913;
-      a[i] = (b0 + b1 + b2 + w * 0.1848) * 0.12;
-    }
-    return buf;
-  }
 
   // The tuner's own graph: every source into a shared AM colour (mono, a
   // band-pass of 200 Hz to 3.5 kHz, a gentle saturation), a whistle inside it.
@@ -264,7 +235,7 @@
     ctx.resume();
     tuner ??= buildTuner();
     playing = true;
-    noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = noiseBuffer(); noiseSrc.loop = true;
+    noiseSrc = ctx.createBufferSource(); noiseSrc.buffer = pinkNoise(ctx); noiseSrc.loop = true;
     noiseSrc.connect(tuner.nIn); noiseSrc.start();
     // The press is the person asking to listen: four streams open now.
     for (const st of STATIONS) if (hold(outOf(st), relayIn(st), { consent: true, via: 'https' })) addLeg(st);

@@ -1,6 +1,6 @@
 ## Open
 
-- **/social/radio/: a reel tuning a slider across our three station recordings, with the noise and whistle in between** (2026-10-14, agent). Asked: *"do radio reel, slider with 3 stations (our recordings) with those in-between effects"*.
+- ~~**/social/radio/: a reel tuning a slider across our three station recordings, with the noise and whistle in between**~~ (2026-10-14, DONE). Asked: *"do radio reel, slider with 3 stations (our recordings) with those in-between effects"*.
 
 - **Clean the remaining scattered private lines before the push** (2026-10-14, agent). Asked: *"Say if - yes"* to cleaning the 58 LAN addresses, 37 Pi logins and 110 `/Users/...` paths left in proto/, rig/, studio/, timeline/lab, plans and research.
 

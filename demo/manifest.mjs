@@ -958,6 +958,9 @@ export const DEMOS = [
   { name: 'social/typist', title: 'typist', group: 'kit', act: 0, created: '2026-10-14', built: true, unlisted: true,
     one: 'a line types itself onto a story frame with a real typewriter, recorded to a file',
     tags: ['shell', 'MediaRecorder'] },
+  { name: 'social/radio', title: 'radio', group: 'kit', act: 0, created: '2026-10-14', built: true, unlisted: true,
+    one: 'a dial sweeps through three of our radio recordings and the noise between them, recorded to a file',
+    tags: ['shell', 'MediaRecorder', 'WebAudio'] },
 
   // 🔴 THE KIT, ONE PAGE PER PART, 2026-10-06 (plans/plan-kit-split.md). Each
   // row deploys `demo/kit/<part>/` to `/kit/<part>/` and is opened by
