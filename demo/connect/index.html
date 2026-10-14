@@ -32,29 +32,14 @@
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
-  .cn-ask { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ctl-gap); }
-  /* One button at its own size: on a phone the shell grows a group to the
-     row and lets it scroll, which stretched ask across the screen and cut its
-     glow to a dark box. One button has nothing to scroll. */
-  .cn-ask > .pos-bgroup { flex: 0 0 auto; width: auto; }
-  .cn-ask .pos-bgroup-row { overflow: visible; }
   .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
 
-  /* What a person says, in --voice (shell.css): the sentences to try, the box
-     they land in and the button that asks. Round, lowercase and in Geist,
-     because a sentence is read through rather than named. */
+  /* What a person says, in --voice (shell.css). Round, lowercase and in
+     Geist, because a sentence is read through rather than named. */
   .cn-ex > button.cn-pill { text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
     padding: 0 12px; color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
     background: transparent; }
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
-  .cn-ask .pos-field input { font-family: var(--sans); font-size: 13px; border-radius: 999px; padding: 0 14px;
-    border-color: color-mix(in oklab, var(--voice) 40%, var(--line2)); }
-  .cn-ask .pos-field input:focus-visible { border-color: var(--voice); }
-  .cn-ask button.pos-pri { text-transform: none; font-family: var(--sans); border-radius: 999px; padding: 0 18px;
-    color: var(--bg); background: var(--voice); border-color: var(--voice);
-    box-shadow: 0 0 0 1px color-mix(in oklab, var(--voice) 40%, transparent),
-                0 4px 18px -4px color-mix(in oklab, var(--voice) 55%, transparent); }
-  .cn-ask button.pos-pri:disabled, .cn-ask button.pos-pri[data-busy="1"] { box-shadow: none; }
 
   .cn-props { display: flex; flex-direction: column; gap: 12px; }
   .cn-props[hidden], .cn-pic[hidden] { display: none; }
@@ -72,8 +57,6 @@
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
-  import { createField } from '/shell/field.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
   import { NODES as CATALOGUE, addNodes, portOf } from '/shell/nodes.mjs';
   import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { CONCEPTS } from '/shell/concept-list.mjs';
@@ -253,16 +236,12 @@
     return out;
   }
 
-  const field = createField({ label: 'say what should play what', grow: 'wide', placeholder: 'the on-screen keys play plaits' });
-  const askGroup = createButtonGroup({ buttons: [{ id: 'ask', label: 'ask', primary: true }], onPress: () => ask(field.value()) });
-  field.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); askGroup.button('ask').click(); } });
-  const askRow = el('div', 'cn-ask');
-  askRow.append(field.el, askGroup.el);
-
+  // No typed request for now (asked 2026-10-14, *"rm ask button and input atm"*):
+  // an example press is the request.
   const exRow = el('div', 'cn-ex');
   for (const ex of EXAMPLES) {
     const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: `as on /${ex.page}/` });
-    b.addEventListener('click', () => { field.set(ex.say); askGroup.button('ask').click(); });
+    b.addEventListener('click', () => ask(ex.say));
     exRow.append(b);
   }
 
@@ -473,7 +452,7 @@
   }
 
   const say = el('div', 'cn-say');
-  say.append(askRow, exRow, props);
+  say.append(exRow, props);
   d.stack.add(say, pic, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
@@ -553,7 +532,7 @@
     [...exRow.children].find((b) => b.textContent === ex.say).click();
     await frame(); await asking;
     const rows = [...props.querySelectorAll('.cn-prop')];
-    A('an example press fills the box and shows its links as rows', field.value() === ex.say && rows.length === ex.links.length,
+    A('an example press shows its links as rows', rows.length === ex.links.length,
       `${rows.length} rows`);
     for (const r of rows) r.querySelector('.pos-pri').click();
     await frame();
@@ -561,8 +540,7 @@
       ex.links.every((l) => has(l.from, l.to)) && inPicture('web:plaits') && !inGrid('web:plaits') && props.hidden);
 
     // A sentence nobody listed gets the stand-in with a broken transform.
-    field.set('something else');
-    askGroup.button('ask').click();
+    ask('something else');
     await frame(); await asking;
     const broken = [...props.querySelectorAll('.cn-prop')].find((r) => /transpose/.test(r.dataset.line));
     A('a proposal with a malformed transform is shown and cannot be connected',
