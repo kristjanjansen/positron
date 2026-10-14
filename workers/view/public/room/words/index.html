@@ -20,15 +20,6 @@
 <title>Patch from words</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The same medium colours as /concepts/misc/000/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
   /* The requests and the ask button: a column of sentences, the button under it. */
   .cc-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; }
   .cc-stack > * { flex: none; }
@@ -58,9 +49,12 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
-  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
+  useMediumColours();
 
   // Words to links. A small local bay (keys, synth, filter, recorder, scope,
   // speakers), a fixed list of requests, and a button that sends the chosen
@@ -97,20 +91,16 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw synth'],
-    ['fx', 'engine', 'low-pass filter'], ['rec', 'store', 'recorder'],
-    ['scope', 'screen', 'scope'], ['speaker', 'screen', 'speakers']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
   // ── sound: a sawtooth per held note (a low-pass is inaudible on a sine) ──
   let ctx = null, bus = null, filter = null, scopeIn = null;
-  const voices = new Map();
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  // The kit voice with no filter of its own: the low-pass is the fx node, on a link.
+  const voice = createVoice({ wave: 'sawtooth', level: 0.08, cutoff: null });
   function wake() {
     if (ctx) return;
     ctx = new AudioContext();
-    bus = ctx.createGain();
+    voice.start(ctx);
+    bus = voice.out();
     filter = ctx.createBiquadFilter();
     filter.type = 'lowpass'; filter.frequency.value = 700; filter.Q.value = 4;
     scopeIn = ctx.createAnalyser();
@@ -120,26 +110,9 @@
   }
   function noteOn(n, vel) {
     wake();
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.type = 'sawtooth';
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
-    o.connect(g).connect(bus);
-    o.start();
-    voices.set(n, { o, g });
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
   // The WebAudio graph follows the audio links the bay holds, and nothing else.
   function audio() {
     if (!ctx) return;
@@ -165,20 +138,18 @@
   }
 
   // Every port has a label, because the agent reads it to know what a port is.
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'keyboard, the notes I play' },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'synth, notes in',
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', label: 'synth, sound out' },
-    { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', label: 'low-pass filter, sound in' },
-    { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', label: 'low-pass filter, sound out' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'recorder, notes to record',
-      deliver: record },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'recorder, the notes it recorded' },
-    { id: `${S}:scope:audio-in`, dir: 'in', medium: 'audio', label: 'scope, shows the sound' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', label: 'speakers' },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  const L = (label) => ({ label });
+  addNodes(bay, S, ['keys', 'synth', 'fx', 'rec', 'scope', 'speaker'], {
+    deliver: { 'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)), 'rec:midi-in': record },
+    label: { synth: 'saw synth', scope: 'scope' },
+    ports: {
+      'keys:midi-out': L('keyboard, the notes I play'),
+      'synth:midi-in': L('synth, notes in'), 'synth:audio-out': L('synth, sound out'),
+      'fx:audio-in': L('low-pass filter, sound in'), 'fx:audio-out': L('low-pass filter, sound out'),
+      'rec:midi-in': L('recorder, notes to record'), 'rec:midi-out': L('recorder, the notes it recorded'),
+      'scope:audio-in': L('scope, shows the sound'), 'speaker:audio-in': L('speakers'),
+    },
+  });
 
   const d = mount({ name: 'Patch from words', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('room/words');
@@ -198,7 +169,7 @@
 
   async function go(i) {
     const text = REQUESTS[i];
-    const ports = PORTS.map((p) => ({ id: p.id, label: p.label, dir: p.dir }));
+    const ports = bay.ports().map((p) => ({ id: p.id, label: p.label, dir: p.dir }));
     d.log(`asked: ${text}`);
     let out;
     try {
@@ -214,7 +185,7 @@
     for (const f of out.fixed || []) d.log(`the agent repaired what the model wrote: ${JSON.stringify(f)}`, 'warn');
 
     // Replace the whole patch with what passes both walls.
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     for (const l of bay.links()) bay.unlink(l.id);
     const rows = [];
     for (const l of out.links || []) {
@@ -238,7 +209,7 @@
   const buf = new Float32Array(2048);
   function frame() {
     const on = bay.links().some((l) => l.to === `${S}:scope:audio-in`);
-    if (on && voices.size) {
+    if (on && voice.held()) {
       scopeIn.getFloatTimeDomainData(buf);
       let i0 = 0;
       for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
@@ -258,7 +229,7 @@
 
   // ── the links as a picture ──────────────────────────────────────────────
   const pb = createPatchbay(bay, {
-    flowing: () => voices.size > 0,
+    flowing: () => voice.held() > 0,
     detail: (n) => [{ text: n.id === `${S}:rec` ? `${n.label}, ${kept.length} notes` : n.label || '', sans: true }],
   });
 

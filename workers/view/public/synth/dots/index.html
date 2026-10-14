@@ -20,6 +20,7 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Dot piano</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Two pictures side by side, each half the content width; one under the other on a phone. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
@@ -31,24 +32,15 @@
   .pos-vp[data-full] .cc-oled { aspect-ratio: auto; height: 100%; }
   .cc-oled canvas { display: block; image-rendering: pixelated; }
   .cc-pico-say { font-size: 12px; color: var(--dim); }
-  /* record is red, the one control that starts writing (shell.css --rec) */
-  .cc-rec { color: var(--rec, #e5484d); }
-  /* The same medium colours as /concepts/misc/000/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
   import { createGlue } from '/shell/glue.mjs';
@@ -60,6 +52,7 @@
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
   import { createPicoRunner, parseUF2, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
   import { drawOled } from '/shell/oled-view.mjs';
+  useMediumColours();
 
   // /synth/recorder/ with the kit's own transport bar and timeline glued together in
   // place of the hand-made record buttons and notes table. A take is items on a
@@ -69,45 +62,25 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED'], ['knob-volume', 'person', 'knob']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
-  // ── the synth: one sine per held note, a short fade in and out ──────────
-  let ctx = null, bus = null;
-  const voices = new Map();
+  // ── the synth: one saw per held note, a short fade in and out ───────────
+  let ctx = null;
+  // The kit voice as this page's saw: no filter, so the bus is the voice's own out.
+  const voice = createVoice({ wave: 'sawtooth', level: 0.08, cutoff: null });
   // The audio graph follows the links: the synth's bus reaches the speakers only
   // while synth:audio-out -> speaker:audio-in is held.
   function audio() {
     if (!ctx) return;
-    bus ??= ctx.createGain();
+    const bus = voice.out();
     bus.disconnect();
     if (bay.links().some((l) => l.from === `${S}:synth:audio-out` && l.to === `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
   }
 
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
   function noteOn(n, vel) {
-    if (!ctx) { ctx = new AudioContext(); audio(); }
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.type = 'sawtooth';
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
-    o.connect(g).connect(bus);
-    o.start();
-    voices.set(n, { o, g });
+    if (!ctx) { ctx = new AudioContext(); voice.start(ctx); audio(); }
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
 
   // ── the shader's picture: rings, one per pitch ───────────────────────
   // In the manner of dotpiano.com. Every pitch has its own ring, low notes inside.
@@ -276,33 +249,20 @@
   }
 
   let kb = null;
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    // The volume knob is a node of its own, as on /synth/sound/: a turn is one CC 7
-    // out of its own port, so its cable is the one that pulses.
-    { id: `${S}:knob-volume:midi-out`, dir: 'out', medium: 'midi', emits: ['cc'] },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => take(e) },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: `${S}:midi:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
-      deliver: (e) => midiIn(e) },
-    { id: `${S}:midi:value-out`, dir: 'out', medium: 'value' },
-    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value',
-      deliver: (e) => { latest = e; } },
-    { id: `${S}:shader:video-out`, dir: 'out', medium: 'video' },
-    { id: `${S}:screen:video-in`, dir: 'in', medium: 'video' },
-    { id: `${S}:pico:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
-      deliver: (e) => picoIn(e) },
-    { id: `${S}:pico:video-out`, dir: 'out', medium: 'video' },
-    { id: `${S}:oled:video-in`, dir: 'in', medium: 'video' },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  // The shapes are /shell/nodes.mjs's; the page says only what each in-port
+  // does. The volume knob is a node of its own, as on /synth/sound/: a turn is
+  // one CC 7 out of its own port, so its cable is the one that pulses.
+  addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker', 'midi-state', 'shader-dots', 'screen', 'pico', 'oled', 'volume-knob'], {
+    label: { synth: 'saw', screen: 'picture' },
+    deliver: {
+      'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
+      'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
+      'rec:midi-in': (e) => take(e),
+      'midi:midi-in': (e) => midiIn(e),
+      'shader:value-in': (e) => { latest = e; },
+      'pico:midi-in': (e) => picoIn(e),
+    },
+  });
 
   const d = mount({ name: 'Dot piano', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/dots');
@@ -331,7 +291,7 @@
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
     }
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     audio();
     pb.refresh();
     sendState();                   // a new link hears the current state once, then only changes
@@ -356,7 +316,7 @@
      
     },
     reduce() { return {}; },
-    assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
+    assertState() { voice.panic(); return {}; },
   };
   const deck = createDeck({ items: [], adapters: { note: adapter }, range: [0, TAKE_MS] });
   const pos = () => deck.transport.position();
@@ -410,7 +370,7 @@
   // ── the links as a picture, with the links and ports behind its details ──
   // A MIDI wire pulses once per event its link delivered; an audio wire is lit
   // while a voice sounds, a video wire always, because both pictures redraw every frame.
-  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voices.size > 0 });
+  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voice.held() > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');

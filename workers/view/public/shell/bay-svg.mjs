@@ -16,18 +16,17 @@
 // no cascade, so a fill is a hex and a font is a family list. The colours are
 // shell.css's `:root` tokens and patchbay.mjs's MEDIUM_COLOURS, the values the
 // page's `.lv-*` rules resolve to (BAY_VIEW_CSS in bay-view.mjs).
-// ⚠️ ONE GEOMETRY, TWO WRITERS. The numbers, `ranks()` and `rounded()` are
-// imported from bay-view.mjs, and the layout below is that file's `render()`
-// in its ACROSS arrangement, line for line. /kit/share/ asserts the two agree
-// box by box at the hero's width. The phone arrangement (stacked cards, wires
-// in a right gutter, below 480 px) is NOT ported: a width under STACK_BELOW
-// throws rather than drawing something bay-view would not.
-import { BAY_GEOMETRY, ranks, rounded } from './bay-view.mjs';
+// ⚠️ ONE GEOMETRY, TWO WRITERS. The layout is `layoutBay()` and
+// `acrossWire()` from bay-layout.mjs, the same calls bay-view.mjs makes. The
+// phone arrangement (stacked cards, wires in a right gutter, below 480 px) is
+// NOT ported: a width under STACK_BELOW throws rather than drawing something
+// bay-view would not.
+import { BAY_GEOMETRY, nodeOf, portName, layoutBay, acrossWire } from './bay-layout.mjs';
 import { MEDIUM_COLOURS } from './patchbay.mjs';
 import { TIMING_NAMES, printOptions } from './link-options.mjs';
 import M from './font-metrics.mjs';
 
-const { FONT, TITLE, ROW, PAD, GAP, MIN_GAP, STACK_BELOW, TWIN_GAP, TGAP, DROW } = BAY_GEOMETRY;
+const { FONT, TITLE, PAD, STACK_BELOW, TGAP, DROW } = BAY_GEOMETRY;
 
 /** shell.css `:root`, the dark theme, which is the only theme the site has. */
 export const INK = {
@@ -56,8 +55,6 @@ const attrs = (o) => Object.entries(o).filter(([, v]) => v != null && v !== '').
 const tag = (t, o, text) => (text == null ? `<${t} ${attrs(o)}/>` : `<${t} ${attrs(o)}>${xml(text)}</${t}>`);
 const n2 = (v) => +(+v).toFixed(2);
 
-const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
-const portName = (portId) => portId.split(':').slice(2).join(':');
 const read = (x) => (typeof x === 'function' ? x() : x);
 
 /**
@@ -70,79 +67,14 @@ const read = (x) => (typeof x === 'function' ? x() : x);
  * `{ id, x, y, w, h }`, for a check against the page's own view.
  */
 export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infinity, detail = null } = {}) {
-  let avail = width;
-  if (!(avail > 0)) throw new Error('drawBay needs a width');
+  if (!(width > 0)) throw new Error('drawBay needs a width');
   const nodes = read(bay.nodes), ports = read(bay.ports), links = read(bay.links);
-  const W = (t, size) => textWidth(t, 'mono', size);
-  const WS = (t, size) => textWidth(t, 'sans', size);
   const fieldsOf = (n) => (detail ? detail(n) || [] : []).map((f) => (f == null ? null : typeof f === 'string' ? { text: f } : f));
-  let folded = false;
-  const fieldsR = (n) => { const f = fieldsOf(n); return folded && f[0] && !f[1] ? [null, f[0], f[2]] : f; };
-  const portsOf = (n) => {
-    const mine = ports.filter((p) => nodeOf(p.id) === n.id);
-    return { ins: mine.filter((p) => p.dir === 'in'), outs: mine.filter((p) => p.dir === 'out') };
-  };
-  const { rank, back } = ranks(nodes, links);
-  const backs = links.filter((l) => back.has(l.id));
-  const LANE = 10;
-  const cols = [];
-  for (const n of nodes) (cols[rank.get(n.id)] ??= []).push(n);
-  const order = cols.flat();
-
-  const longest = (ps) => Math.max(0, ...ps.map((p) => W(portName(p.id), FONT)));
-  const nodeW = (n) => {
-    const { ins, outs } = portsOf(n);
-    const [f1, f2, f3] = fieldsR(n), fw = (f) => (f ? WS(f.text, FONT) : 0);
-    return Math.max(W(n.id, TITLE) + fw(f1) + (f1 ? 3 : 2) * PAD,
-      fw(f2) + fw(f3) + (f2 && f3 ? 3 : 2) * PAD,
-      longest(ins) + longest(outs) + (ins.length && outs.length ? 3 : 2) * PAD);
-  };
-  const boxWidth = () => Math.ceil(Math.max(...order.map(nodeW)));
-  const colWidths = () => cols.map((col) => Math.ceil(Math.max(...col.map(nodeW))));
-  let boxW = boxWidth(), colW = colWidths();
-  const boxesW = () => (stretch ? colW.reduce((a, b) => a + b, 0) : cols.length * boxW);
-  const STEP = 6, Mg = backs.length ? 8 + STEP * backs.length : 0;
-  const pairCount = new Map();
-  for (const l of links) { const k = `${l.from} ${l.to}`; pairCount.set(k, (pairCount.get(k) || 0) + 1); }
-  const wide = new Set(links.filter((l) => pairCount.get(`${l.from} ${l.to}`) > 1 && !back.has(l.id))
-    .map((l) => rank.get(nodeOf(l.from))));
-  const extra = (g) => wide.size * Math.max(0, TWIN_GAP - g);
-  const gapFor = (g) => boxesW() + (cols.length - 1) * g + extra(g) + 2 * Mg <= avail;
-  if (avail >= STACK_BELOW && !gapFor(MIN_GAP) && order.some((n) => fieldsOf(n)[0] && !fieldsOf(n)[1])) { folded = true; boxW = boxWidth(); colW = colWidths(); }
-  const GAPX = gapFor(GAP) ? GAP : MIN_GAP;
-  const need = boxesW() + (cols.length - 1) * GAPX + extra(GAPX) + 2 * Mg;
-  const across = gapFor(GAPX) || avail >= STACK_BELOW;
-  if (!across) throw new Error(`drawBay draws the across arrangement only; ${width} px is under ${STACK_BELOW}, where bay-view stacks`);
-  if (need > avail) avail = need;
-  const room = avail - 2 * Mg;
-
-  const HEAD = PAD + TITLE + TGAP + (order.some((n) => { const f = fieldsR(n); return f[1] || f[2]; }) ? DROW : 0);
-  const at = new Map();
-  const boxes = [];
-  let H = 0;
-  const k = (room - (cols.length - 1) * GAPX - extra(GAPX)) / boxesW();
-  const fixed = Math.max(boxW, sizeAs ? (room - (sizeAs - 1) * GAPX) / sizeAs : 0);
-  const wOf = (ci) => (stretch ? colW[ci] * k : fixed);
-  const gap = stretch || cols.length < 2 ? GAPX : Math.min(maxWire, (room - cols.length * fixed) / (cols.length - 1));
-  const gapAt = (i) => (wide.has(i) ? Math.max(gap, TWIN_GAP) : gap);
-  const left = [Mg];
-  for (let i = 1; i < cols.length; i++) left[i] = left[i - 1] + wOf(i - 1) + gapAt(i - 1);
-  cols.forEach((col, ci) => {
-    let y = 0;
-    for (const n of col) {
-      const { ins, outs } = portsOf(n);
-      const top = y + HEAD;
-      const h = HEAD + Math.max(ins.length, outs.length, 1) * ROW + PAD / 2;
-      const x = left[ci], w = wOf(ci);
-      boxes.push({ n, x, y, w, h });
-      ins.forEach((p, i) => at.set(p.id, { x, y: top + i * ROW + ROW / 2, side: 'l' }));
-      outs.forEach((p, i) => at.set(p.id, { x: x + w, y: top + i * ROW + ROW / 2, side: 'r' }));
-      y += h + PAD * 2;
-    }
-    H = Math.max(H, y - PAD * 2);
-  });
-  const rowH = H;
-  if (backs.length) H += LANE * (backs.length + 1);
+  const W = (t, size) => textWidth(t, 'mono', size);
+  const L = layoutBay({ nodes, ports, links }, { avail: width, stretch, sizeAs, maxWire, fieldsOf,
+    width: (t, size, sans) => textWidth(t, sans ? 'sans' : 'mono', size) });
+  if (!L.across) throw new Error(`drawBay draws the across arrangement only; ${width} px is under ${STACK_BELOW}, where bay-view stacks`);
+  const { avail, H, boxes, at, fieldsR, backs } = L;
 
   const mono = { 'font-family': FAMILY.mono };
   const colour = (m) => MEDIUM_COLOURS[m] || INK.fg;
@@ -175,23 +107,7 @@ export function drawBay(bay, { width, stretch = true, sizeAs = 0, maxWire = Infi
     const a = at.get(l.from), b = at.get(l.to);
     if (!a || !b) continue;
     const medium = ports.find((p) => p.id === l.from)?.medium || '';
-    const kk = Math.max(24, Math.abs(b.x - a.x) / 2);
-    const j = backs.indexOf(l) + 1;
-    let d, mid;
-    if (j) {
-      const y = rowH + LANE * j, xr = a.x + 8 + STEP * (j - 1), xl = b.x - 8 - STEP * (j - 1);
-      d = rounded([[a.x, a.y], [xr, a.y], [xr, y], [xl, y], [xl, b.y], [b.x, b.y]]);
-      mid = { x: (xr + xl) / 2, y };
-    } else if (o && Math.abs(b.y - a.y) < 1) {
-      const e = 4, s = Math.min(10, (b.x - a.x) / 4);
-      d = rounded([[a.x, a.y], [a.x + e, a.y], [a.x + e + s, a.y + o], [b.x - e - s, b.y + o], [b.x - e, b.y], [b.x, b.y]], 4);
-      mid = { x: (a.x + b.x) / 2, y: a.y + o };
-    } else {
-      d = `M${n2(a.x)},${n2(a.y)} C${n2(a.x + kk)},${n2(a.y + o * 2)} ${n2(b.x - kk)},${n2(b.y + o * 2)} ${n2(b.x)},${n2(b.y)}`;
-      // the cubic's own middle, t = 0.5, which is where bay-view's
-      // getPointAtLength(n / 2) lands on a symmetric S curve
-      mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + o * 1.5 };
-    }
+    const { d, mid } = acrossWire(a, b, o, backs.indexOf(l) + 1, L, n2);
     const timed = printOptions(l.options, TIMING_NAMES);
     wires.unshift(tag('path', { d, fill: 'none', stroke: colour(medium), 'stroke-width': 1.5, 'stroke-linejoin': 'round', 'stroke-dasharray': timed ? '6 4' : null }));
     if (timed) {

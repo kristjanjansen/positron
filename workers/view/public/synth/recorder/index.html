@@ -20,87 +20,54 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Recorder</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* record is red, the one control that starts writing (shell.css --rec) */
-  .cc-rec { color: var(--rec, #e5484d); }
-  /* The same medium colours as /concepts/misc/000/. */
-  :root {
-    --md-midi: #6fb8e8; --md-audio: #ee9a4d; --md-clock: #c9ced6; --md-value: #9ad16b;
-    --md-video: #e07a5f; --md-program: #c39af0; --md-file: #d68fc6; --md-state: #8a9fc4;
-  }
-  .md-midi { color: var(--md-midi); } .md-audio { color: var(--md-audio); }
-  .md-clock { color: var(--md-clock); } .md-value { color: var(--md-value); }
-  .md-video { color: var(--md-video); } .md-program { color: var(--md-program); }
-  .md-file { color: var(--md-file); } .md-state { color: var(--md-state); }
-</style>
+<link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createPatchbay } from '/shell/patchbay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  useMediumColours();
 
   // /synth/keyboard/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
   // keyboard's notes along a link while armed, `rec:midi-out` plays them back
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
-  // ── the synth: one sine per held note, a short fade in and out ──────────
-  let ctx = null, bus = null;
-  const voices = new Map();
+  // ── the synth: one saw per held note, a short fade in and out ───────────
+  let ctx = null;
+  // The kit voice as this page's saw: no filter, so the bus is the voice's own out.
+  const voice = createVoice({ wave: 'sawtooth', level: 0.08, cutoff: null });
   // The audio graph follows the links: the synth's bus reaches the speakers only
   // while synth:audio-out -> speaker:audio-in is held.
   function audio() {
     if (!ctx) return;
-    bus ??= ctx.createGain();
+    const bus = voice.out();
     bus.disconnect();
     if (bay.links().some((l) => l.from === `${S}:synth:audio-out` && l.to === `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
   }
 
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
   function noteOn(n, vel) {
-    if (!ctx) { ctx = new AudioContext(); audio(); }
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.type = 'sawtooth';
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
-    o.connect(g).connect(bus);
-    o.start();
-    voices.set(n, { o, g });
+    if (!ctx) { ctx = new AudioContext(); voice.start(ctx); audio(); }
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
 
   let kb = null;
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => take(e) },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  // The shapes are /shell/nodes.mjs's; the page says only what each in-port does.
+  addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker'], {
+    label: { synth: 'saw' },
+    deliver: {
+      'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
+      'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
+      'rec:midi-in': (e) => take(e),
+    },
+  });
 
   const d = mount({ name: 'Recorder', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/recorder');
@@ -116,7 +83,7 @@
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
     }
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     audio();
     pb.refresh();
    
@@ -180,7 +147,7 @@
     sounding.clear(); lit();
     for (const t of timers) clearTimeout(t);
     timers = [];
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     face();
   }
   function record() {
@@ -198,7 +165,7 @@
   // ── the links as a picture, with the links and ports behind its details ──
   // A MIDI wire pulses once per event its link delivered; an audio wire is lit
   // while a voice sounds.
-  const pb = createPatchbay(bay, { flowing: () => voices.size > 0 });
+  const pb = createPatchbay(bay, { flowing: () => voice.held() > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');

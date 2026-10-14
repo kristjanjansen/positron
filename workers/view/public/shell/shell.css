@@ -57,6 +57,15 @@
      `.pos-line.hi` down the file, which carries the reason. */
   --fg2: #b6bcc7;
   --hi: #ffd400;
+  /* 🔴 WHAT A PERSON SAYS: a prompt, a sentence to try, a voice. Asked
+     2026-10-14 for /connect/'s example buttons, *"find nonused color to signify
+     human input / prompt / voice"*. Teal at hue 175, the one gap on the wheel
+     between `--ok` (141) and the midi blue (204), 29 degrees from the nearest
+     meaning colour. MEASURED: 10.43:1 on `--bg`, 9.87 on `--card`, 9.32 on
+     `--card2`, and `--bg` text on it reads 10.43. `--mi-teal` and
+     `--mi-teal-lit` (180, below) are a replica's paint on /muta/, not a
+     meaning, and are duller (saturation .39 against .60 here). */
+  --voice: #4bd2c7;
 
   /* 🔴 MUTABLE INSTRUMENTS' OWN PANEL COLOURS, MEASURED 2026-09-22 RATHER THAN
      PICKED. Asked for as *"extract mutable instr brand colors and add to your

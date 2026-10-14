@@ -26,9 +26,19 @@ export const MEDIUM_COLOURS = {
   midi: '#6fb8e8', audio: '#ee9a4d', clock: '#c9ced6', value: '#9ad16b',
   video: '#e07a5f', program: '#c39af0', file: '#d68fc6', state: '#8a9fc4',
 };
+/** The `:root` `--md-*` properties and the `.md-*` colour classes, as CSS text. */
+export function mediumCss() {
+  return `:root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }\n`
+    + MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n');
+}
+
+/** Puts `mediumCss()` in the document once, for a page that colours by medium. */
+export function useMediumColours() {
+  if (document.getElementById('pos-md-css')) return;
+  document.head.append(Object.assign(document.createElement('style'), { id: 'pos-md-css', textContent: mediumCss() }));
+}
+
 const CSS = `
-  :root { ${Object.entries(MEDIUM_COLOURS).map(([m, c]) => `--md-${m}: ${c};`).join(' ')} }
-  ${MEDIA.map((m) => `.md-${m} { color: var(--md-${m}); }`).join('\n  ')}
   .pb { display: flex; flex-direction: column; }
   .pb-more { margin-top: 24px; }
   .pb-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
@@ -116,6 +126,7 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
     return { nodes, ports: [...ports, ...extra.values()], links };
   };
   const source = { nodes: () => drawn().nodes, ports: () => drawn().ports, links: () => drawn().links };
+  useMediumColours();
   if (!styled) { document.head.append(Object.assign(document.createElement('style'), { textContent: CSS })); styled = true; }
   // The view sees every link under its printed form, so the same link read
   // from a fresh bay is the same wire.
@@ -197,6 +208,14 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
   function trace() {
     const ports = source.ports();
     latest = new Map(source.links().map((l) => [keyOf(l), l]));
+    // A link that is gone takes its traffic row with it, or a page that
+    // relinks grows one row a frame reads for every link it ever held.
+    for (const key of traced) {
+      if (latest.has(key)) continue;
+      traffic.remove(view, key);
+      traced.delete(key);
+      pending.delete(key);
+    }
     for (const [key, l] of latest) {
       if (traced.has(key)) continue;
       traced.add(key);

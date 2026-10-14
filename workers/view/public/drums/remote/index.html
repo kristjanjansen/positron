@@ -31,11 +31,13 @@
   import { createSlider } from '/shell/slider.mjs';
   import { createPathChoice, hintCell, PATH_HINT, NETWORK_HINT } from '/remote/path.mjs';
   import { createOverlayScope } from '/remote/overlay-scope.mjs';
-  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
   import { createBoard, BOARD_RATE, BOARD_CHANNELS } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { VOICES, LIFE } from '/drums/voices.mjs';
 
@@ -247,6 +249,7 @@
     async function tryBoard(c) {
       board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: c, toDestination: false,
         direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      announceOn(board, bay, { label: 'Drums on the Pi' });
       kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
       if (!board.driving()) return 'this run may not drive the board';
       const t0 = performance.now();
@@ -350,13 +353,10 @@
   const bay = m.api.bay;
 
   // ── the bay: the Pi node, the scope, the crossfader, the speakers ───────
-  const piNode = bay.addNode({ id: `${BOARD_SITE}:drums`, kind: 'engine', label: 'drums on the Pi', place: 'studio-1' });
-  for (const [n, kind, label] of [
-    // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
-    // crossfader takes them.
-    ['scope', 'screen', 'waveforms'],
-    ['fader', 'person', 'fader'], ['xfade', 'engine', 'crossfader'], ['speaker', 'screen', 'speakers'],
-  ]) bay.addNode({ id: `web:${n}`, kind, label, place: 'browser' });
+  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`,
+  // `pi-1:drums`, a program on its SuperCollider engine), drawn with its ports
+  // below; the browser's are the catalogue's.
+  const PI_GRAPH = boardGraph({ room: 'studio-1', instruments: { collide: true }, gpu: false });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
   let x = 0.5, fades = 0, piIn = 0;
   /** Hits that share one time, gathered and sent as one message when this turn of the sequencer ends. */
@@ -367,37 +367,37 @@
     for (const list of pending.values()) { pi.hits(list); notePiHits(list); }
     pending.clear();
   }
-  const PORTS = [
-    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
-      if (e?.cls !== 'note' || !e.d2 || !Number.isFinite(e.at)) return;
-      const name = NAME_OF.get(e.d1);
-      if (!name) return;
-      piIn++;
-      trigger(e);
-      if (!pending.has(e.at)) pending.set(e.at, []);
-      pending.get(e.at).push({ name, perfAt: e.at, ...(name === 'hhc' ? { choke: 'hho' } : {}) });
-      if (!flushing) { flushing = true; queueMicrotask(flush); }
-    } },
-    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('scope', 'audio-in-2'), dir: 'in', medium: 'audio' },
-    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
-    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+  const piNode = addBoardNode(bay, PI_GRAPH, 'drums', { label: 'drums on the Pi', deliver: { 'midi-in': (e) => {
+    if (e?.cls !== 'note' || !e.d2 || !Number.isFinite(e.at)) return;
+    const name = NAME_OF.get(e.d1);
+    if (!name) return;
+    piIn++;
+    trigger(e);
+    if (!pending.has(e.at)) pending.set(e.at, []);
+    pending.get(e.at).push({ name, perfAt: e.at, ...(name === 'hhc' ? { choke: 'hho' } : {}) });
+    if (!flushing) { flushing = true; queueMicrotask(flush); }
+  } } });
+  // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
+  // crossfader takes them. Each port keeps its `node:port` label.
+  addNodes(bay, 'web', ['scope', 'fader', 'xfade', 'speaker'], {
+    portLabel: 'node:port',
+    label: { scope: 'waveforms' },
+    ports: { 'scope:audio-in-2': {} },
+    deliver: { 'xfade:value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;
       x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
     } },
-    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
-  const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
+  });
+  const lay = (from, to, opts) => { const r = bay.link(from, to, [], opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(SEQ_PI.from, SEQ_PI.to);
   lay(ID('mix', 'audio-out'), ID('scope', 'audio-in'));
   lay(ID('mix', 'audio-out'), ID('xfade', 'audio-in'));
   lay(PI('audio-out'), ID('scope', 'audio-in-2'));
-  lay(PI('audio-out'), ID('xfade', 'audio-in-2'));
+  // ⚠️ VIA RELAY, BECAUSE THAT IS THE WIRE IT RIDES, as on /remote/collide/.
+  // Both Pi legs read one `pi.out()` fed by the board's socket. Without it the
+  // bay took the crossfader for a second internet receiver and asked for MoQ,
+  // which the board's announced `audio-out` (relay or a data channel) refuses.
+  lay(PI('audio-out'), ID('xfade', 'audio-in-2'), { via: 'relay' });
   lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
   lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
 

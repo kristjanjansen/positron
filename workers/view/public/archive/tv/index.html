@@ -19,12 +19,12 @@
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON TV</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <script src="/proto/remixer/hls.min.js"></script>
 <style>
   /* Start and stop on their own row at the left. A flex row blockifies the
      group, so it sits on no text line. */
   .cc-top { display: flex; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
   /* Four pictures in a 2x2 grid (asked 2026-10-12, *"tv with 3 screens: to
      2x2 grid. etv etv2 just blend, fx blend"*): the two channels as they
      arrive on top, the plain crossfade and the dithered one under them. On a
@@ -44,7 +44,6 @@
      canvas to it (11, 14, 20) before a frame, the mixer fills its own with the
      same, and the channel stages match it. Asked 2026-10-12: *"same bg on all"*. */
   .cc-quad .pos-vp-stage { background: var(--bg); }
-  .cc-say { font-size: 12px; color: var(--dim); }
   /* A footer line never wraps: one line, cut at the slot's edge. */
   .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; font-variant-numeric: tabular-nums; }
 </style>

@@ -20,28 +20,22 @@
 <meta name="theme-color" content="#0b0e14">
 <title>WebRTC loopback</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Start and stop on their own row at the left, the camera picker after them
      once there is more than one camera. A flex row blockifies the group, so it
      sits on no text line; on a phone the picker wraps under it. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  .cc-top > .pos-pick[hidden] { display: none; }
   /* The camera as it leaves the page and the picture that comes back, side by
      side, each half the width. On a phone they stack, the original first. */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
-  .cc-pair canvas { display: block; width: 100%; height: 100%; }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  /* A footer line never wraps: one line, cut at the slot's edge. */
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* The word on the picture's plate is read against a picture, so full ink. */
-  .cc-proto { color: var(--fg); }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { fetchIceServers, camWhipPublish, camWhep, whepPlay, CAM_WHIP_PROXY } from '/shell/live.mjs';
@@ -98,16 +92,15 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   // The camera's video goes to Stream's WebRTC input by WHIP and comes back by WHEP.
   const bay = createBay();
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
-  bay.addNode({ id: 'cf-stream:live', kind: 'endpoint', label: 'Stream WebRTC input', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:loopback`, kind: 'screen', label: 'WebRTC', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video' });
-  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
-  bay.addPort({ id: LIVE_IN, label: 'video', dir: 'in', medium: 'video', transports: ['whip'] });
-  bay.addPort({ id: LIVE_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['whep'] });
-  bay.addPort({ id: LOOP, label: 'WebRTC', dir: 'in', medium: 'video', transports: ['whep'] });
+  addNodes(bay, S, ['camera', 'screen'], {
+    ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
+  });
+  addNodes(bay, S, ['stream-live'], { ports: { [LIVE_IN]: { label: 'video' }, [LIVE_OUT]: { label: 'video' } } });
+  addNodes(bay, S, [{ name: 'screen', as: 'loopback', label: 'WebRTC' }], {
+    ports: { 'loopback:video-in': { label: 'WebRTC', transports: ['whep'] } },
+  });
+  // Once on, the camera box takes the device's own name.
+  const camNode = (label) => relabel(bay, `${S}:camera`, label);
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b, via) {

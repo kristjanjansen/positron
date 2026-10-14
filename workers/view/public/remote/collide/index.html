@@ -29,6 +29,7 @@
   import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
@@ -38,8 +39,9 @@
   import { createCodeBox } from '/shell/code-box.mjs';
   import { createSlider } from '/shell/slider.mjs';
   import { createHueBook } from '/shell/code-lang.mjs';
-  import { BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { BOARD_SITE, boardGraph, addBoardNode } from '/shell/graph-registry.mjs';
   import { createBoard, BOARD_FRAME_MS, BOARD_CHANNELS, BOARD_RATE } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { createBoardCollide } from '/shell/board-collide.mjs';
   import { createCollideVoice, PROGRAM, rmsOf, dbfs } from '/code/collide-voice.mjs';
 
@@ -182,6 +184,7 @@
     async function tryBoard(ctx) {
       board = createBoard({ room: 'studio-1', of: 'Raspberry Pi', showName: false, audioContext: ctx, toDestination: false,
         direct: path.mode() === 'direct', directCushionMs: 40, log: (line, kind) => log(`Pi: ${line}`, kind) });
+      announceOn(board, bay, { label: 'Collide here and on the Pi' });
       kit = createBoardCollide({ board, log: (line, kind) => log(`Pi: ${line}`, kind) });
       // A harness may not drive the board (`createBoard`'s guard), so it is
       // simulated under a check without a word on the wire.
@@ -261,52 +264,45 @@
   const ID = (node, port) => `${S}:${node}:${port}`;
   const PI = (port) => `${BOARD_SITE}:collide:${port}`;
   const bay = createBay();
-  for (const [n, kind, label] of [
-    ['keys', 'person', 'keyboard'],
-    ...NAMES.map((n) => [`knob-${n}`, 'person', n]),
-    ['collide', 'engine', 'SuperCollider here'],
-    ['scope', 'screen', 'waveform here'], ['scope-pi', 'screen', 'Pi waveform'], ['speaker', 'screen', 'speakers'],
-  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  const piNode = bay.addNode({ id: `${BOARD_SITE}:collide`, kind: 'engine', label: 'SuperCollider on the Pi', place: 'studio-1' });
-  bay.addNode({ id: `${S}:fader`, kind: 'person', label: 'fader', place: 'browser' });
-  bay.addNode({ id: `${S}:xfade`, kind: 'engine', label: 'crossfader', place: 'browser' });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
   let x = 0.5, fades = 0;
   let notesIn = 0, piNotesIn = 0, paramSends = 0, piParamSends = 0;
-  const PORTS = [
-    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    ...NAMES.map((n) => ({ id: ID(`knob-${n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
-    { id: ID('collide', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
-      if (e?.cls !== 'note') return;
-      notesIn++;
-      if (e.d2) local.noteOn(e.d1, e.d2); else local.noteOff(e.d1);
-    } },
-    { id: ID('collide', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
-      if (e?.of === 'param' && local.param(e.name, e.v)) paramSends++;
-    } },
-    { id: ID('collide', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: PI('midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
-      if (e?.cls !== 'note') return;
-      piNotesIn++;
-      if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
-    } },
-    { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: NAMES }, deliver: (e) => {
-      if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++;
-    } },
-    { id: PI('audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('scope-pi', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
-    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+  // The browser's nodes are /shell/nodes.mjs's; each port keeps its `node:port` label.
+  addNodes(bay, S, ['keys', ...NAMES.map((n) => ({ name: 'knob', as: `knob-${n}` })), 'collide', 'scope', 'scope-pi', 'speaker'], {
+    portLabel: 'node:port',
+    label: { collide: 'SuperCollider here', scope: 'waveform here', 'scope-pi': 'Pi waveform' },
+    ports: { 'collide:value-in': { shape: { of: 'param', names: NAMES } } },
+    deliver: {
+      'collide:midi-in': (e) => {
+        if (e?.cls !== 'note') return;
+        notesIn++;
+        if (e.d2) local.noteOn(e.d1, e.d2); else local.noteOff(e.d1);
+      },
+      'collide:value-in': (e) => { if (e?.of === 'param' && local.param(e.name, e.v)) paramSends++; },
+    },
+  });
+  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`,
+  // `pi-1:collide` with the catalogue's ports), drawn here with this page's label,
+  // the knob names of the program it loads, and what each port does here.
+  const piNode = addBoardNode(bay, boardGraph({ room: 'studio-1', instruments: { collide: true }, gpu: false }), 'collide', {
+    label: 'SuperCollider on the Pi',
+    ports: { 'value-in': { shape: { of: 'param', names: NAMES } } },
+    deliver: {
+      'midi-in': (e) => {
+        if (e?.cls !== 'note') return;
+        piNotesIn++;
+        if (e.d2) pi.noteOn(e.d1, e.d2); else pi.noteOff(e.d1);
+      },
+      'value-in': (e) => { if (e?.of === 'param' && pi.param(e.name, e.v)) piParamSends++; },
+    },
+  });
+  addNodes(bay, S, ['fader', 'xfade'], {
+    portLabel: 'node:port',
+    deliver: { 'xfade:value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;
       x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
     } },
-    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  });
   const lay = (from, to, opts) => { const r = bay.link(from, to, [], opts); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(ID('keys', 'midi-out'), ID('collide', 'midi-in'));
   lay(ID('keys', 'midi-out'), PI('midi-in'));

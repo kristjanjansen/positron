@@ -20,30 +20,22 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Radio</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* Two pictures side by side, each half the content width; one under the other on a phone. As /synth/dots/. */
   .cc-pair { display: flex; gap: 12px; align-items: flex-start; }
   .cc-pair > * { flex: 1 1 0; min-width: 0; }
   /* In a column a 0 basis is a 0 height, so on a phone each panel takes its own height. */
   @media (max-width: 560px) { .cc-pair { flex-direction: column; align-items: stretch; } .cc-pair > * { flex: none; } }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  /* A footer line never wraps: one line, cut at the slot's edge. */
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
-  /* The kit's live wave (grain-scope) as a panel's picture: the panel's stage is the
-     edge and the ground, so the scope gives up its own margin, border and corner
-     through the kit's tokens, and its always-empty caption takes no room. The stage
-     is as tall as the scope rather than 16:9 (`aspect: 'auto'`). */
-  .cc-wave .pos-scope { margin: 0; --edge: 0px; --r: 0px; }
-  .cc-wave .pos-scope-gut { display: none; }
   /* Play on its own row: the button's own size, at the left. A flex row
      blockifies it, so it sits on no text line. */
   .cc-top { display: flex; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
@@ -78,20 +70,15 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.label, place: st.site, net: st.site });
-    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
-    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-    bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-    bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
-      address: `${BASE}/${st.mount}` });
-    bay.addNode({ id: `${S}:wave-${st.key}`, kind: 'screen', label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave`, place: 'browser' });
-    bay.addPort({ id: waveIn(st), label: 'wave', dir: 'in', medium: 'audio' });
+    addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.label }],
+      { ports: { [outOf(st)]: { label: st.label } } });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [relayIn(st)]: { label: 'relay' }, [relayOut(st)]: { label: 'relay', address: `${BASE}/${st.mount}` } } });
+    addNodes(bay, S, [{ name: 'wave', as: `wave-${st.key}`, label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave` }],
+      { ports: { [waveIn(st)]: { label: 'wave' } } });
   }
-  bay.addNode({ id: `${S}:fader`, kind: 'engine', label: 'crossfader', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: FADER_IN, label: 'crossfader', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: FADER_OUT, label: 'crossfader', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  addNodes(bay, S, ['blend-fader', 'speaker'], { ports: {
+    [FADER_IN]: { label: 'crossfader' }, [FADER_OUT]: { label: 'crossfader' }, [SPEAKER_IN]: { label: 'speakers' } } });
 
   const d = mount({ name: 'Blend', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/blend');

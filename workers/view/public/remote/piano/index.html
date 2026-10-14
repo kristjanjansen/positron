@@ -20,15 +20,11 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Piano and Rhodes on Pi</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   /* The play button alone at the top left, as /concepts/remote/000/. What the
      board says goes to the log only. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
-  /* The patch selector is a full width block, as /concepts/sampler/010/'s. */
-  .pos-pick.cc-patch { display: flex; width: 100%; }
-  .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
-  .cc-patch .pos-pick-cell { flex: 1 1 auto; width: auto; min-width: 0; }
 </style>
 <script type="module">
   // concepts remote/030 (sampler/030 until 2026-10-13), THE PIANO ON THE PI, 2026-10-11. /concepts/sampler/010/'s
@@ -66,7 +62,9 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createBoard } from '/shell/board.mjs';
+  import { announceOn } from '/shell/announce.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
   const d = mount({ name: 'Piano and Rhodes on Pi', what: '', index: '/', indexLabel: 'positron',
@@ -92,13 +90,10 @@
   const SAMPLER_IN = boardPort('sampler', 'midi-in'), SAMPLER_AUDIO = boardPort('sampler', 'audio-out'),
         SAMPLER_FILES = boardPort('sampler', 'file-in');
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  // The browser's and the bucket's nodes are /shell/nodes.mjs's, each port
+  // labelled `node:port`; the Pi's is boardGraph's, so it is drawn here.
+  addNodes(bay, S, [{ name: 'keys', variant: 'cc' }, 'patch'], { portLabel: 'node:port' });
   bay.addNode({ id: `${BOARD_SITE}:sampler`, kind: 'engine', label: 'sampler on the Pi', place: ROOM });
-  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
 
   let board = null, armed = false, program = 0, loadingSet = null, loadedAt = 0;
   // What reaches pi-1:sampler:midi-in leaves for the board, and only once armed.
@@ -116,17 +111,12 @@
     }
   }
   const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
-    { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
     { id: SAMPLER_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toSampler },
     { id: SAMPLER_FILES, dir: 'in', medium: 'file' },
     { id: SAMPLER_AUDIO, dir: 'out', medium: 'audio' },
-    { id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
-    { id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
-    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  addNodes(bay, S, ['piano-samples', 'rhodes-samples', 'scope', 'speaker'], { portLabel: 'node:port' });
   const LINKS = [
     [id('keys', 'midi-out'), SAMPLER_IN],
     [id('patch', 'midi-out'), SAMPLER_IN],
@@ -309,6 +299,7 @@
       log: (line, kind) => d.log(line, kind),
       onOpen: () => open(true),
     });
+    announceOn(board, bay, { label: 'Piano and Rhodes on Pi' });
   }
 
   async function start() {

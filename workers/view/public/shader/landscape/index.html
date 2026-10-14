@@ -20,18 +20,17 @@
 <meta name="theme-color" content="#0b0e14">
 <title>Scan landscape</title>
 <link rel="stylesheet" href="/shell/shell.css">
+<link rel="stylesheet" href="/shell/concept.css">
 <style>
   .cc-pic canvas { display: block; width: 100%; height: 100%; }
-  .cc-say { font-size: 12px; color: var(--dim); }
-  .pos-vp-foot .cc-say { white-space: nowrap; overflow: hidden; }
   .cc-top { display: flex; }
-  .cc-top > .pos-bgroup { flex: none; width: auto; }
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createKnob } from '/shell/knob.mjs';
@@ -178,31 +177,27 @@
   const KNOB_IN = (n) => `${S}:knob-${LABEL.get(n)}:value-in`;
 
   const bay = createBay();
-  bay.addNode({ id: `${SRC.store}:${SRC.id}`, kind: 'store', label: SRC.label, place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: FILE_OUT, label: 'recording', dir: 'out', medium: 'file', transports: ['https'], address: SRC.url });
-  bay.addNode({ id: `${S}:radio`, kind: 'engine', label: 'radio', place: 'browser' });
-  bay.addPort({ id: RADIO_IN, label: 'radio', dir: 'in', medium: 'file' });
-  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio' });
-  // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
-  bay.addNode({ id: `${S}:granulator`, kind: 'engine', label: 'granulator', place: 'browser' });
-  bay.addPort({ id: GRAINS_IN, label: 'granulator', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: GRAINS_OUT, label: 'granulator', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: GRAINS_EV, label: 'events', dir: 'out', medium: 'value' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER, label: 'speakers', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'scan landscape', place: 'browser' });
-  bay.addPort({ id: SH_AUDIO, label: 'level', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: SH_VAL, label: 'values', dir: 'in', medium: 'value', deliver: (ev) => valueIn(ev) });
-  bay.addPort({ id: SH_OUT, label: 'picture', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'screen', place: 'browser' });
-  bay.addPort({ id: SCREEN, label: 'screen', dir: 'in', medium: 'video' });
-  for (const c of K) {
-    LABEL.set(c.name, c.label);
-    bay.addNode({ id: `${S}:knob-${c.label}`, kind: 'person', label: c.label, place: 'browser' });
-    bay.addPort({ id: KNOB_OUT(c.name), label: c.label, dir: 'out', medium: 'value' });
-    // where a granulator's value can land later: unlinked today
-    bay.addPort({ id: KNOB_IN(c.name), label: c.label, dir: 'in', medium: 'value', deliver: (ev) => knobIn(c.name, ev) });
-  }
+  // The shapes are /shell/nodes.mjs's; the labels and the delivery are this page's.
+  for (const c of K) LABEL.set(c.name, c.label);
+  addNodes(bay, S, [{ name: 'recording', as: SRC.id, site: SRC.store, label: SRC.label }, 'radio',
+    // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
+    'granulator', 'speaker', 'shader-landscape', 'screen',
+    ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label, variant: 'unshaped' }))], {
+    label: { screen: 'screen' },
+    ports: {
+      [`${SRC.id}:file-out`]: { label: 'recording', address: SRC.url },
+      'radio:file-in': { label: 'radio' }, 'radio:audio-out': { label: 'radio' },
+      'granulator:audio-in': { label: 'granulator' }, 'granulator:audio-out': { label: 'granulator' },
+      'granulator:value-out': { label: 'events' },
+      'speaker:audio-in': { label: 'speakers' },
+      'shader:audio-in': { label: 'level' }, 'shader:value-in': { label: 'values' }, 'shader:video-out': { label: 'picture' },
+      'screen:video-in': { label: 'screen' },
+      // where a granulator's value can land later: unlinked today
+      ...Object.fromEntries(K.flatMap((c) => [[`knob-${c.label}:value-out`, { label: c.label }],
+        [`knob-${c.label}:value-in`, { label: c.label }]])),
+    },
+    deliver: { 'shader:value-in': (ev) => valueIn(ev), ...Object.fromEntries(K.map((c) => [`knob-${c.label}:value-in`, (ev) => knobIn(c.name, ev)])) },
+  });
   function hold(a, b) {
     const r = bay.link(a, b, [], { site: S });
     if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');

@@ -45,6 +45,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createGrainScope } from '/shell/grain-scope.mjs';
@@ -87,29 +88,19 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   for (const st of STATIONS) {
-    bay.addNode({ id: `${st.site}:${st.node}`, kind: 'external', label: st.label, place: st.site, net: st.site });
-    bay.addPort({ id: outOf(st), label: st.label, dir: 'out', medium: 'audio', transports: ['https'] });
-    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-    bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-    bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
-      address: `${BASE}/${st.mount}` });
+    addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.label }],
+      { ports: { [outOf(st)]: { label: st.label } } });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [relayIn(st)]: { label: 'relay' }, [relayOut(st)]: { label: 'relay', address: `${BASE}/${st.mount}` } } });
   }
   // Noise is a source like a station, made in this tab, so it has a wire of
   // its own into the tuner and can be unlinked like any other.
-  bay.addNode({ id: `${S}:noise`, kind: 'engine', label: 'noise', place: 'browser' });
-  bay.addPort({ id: NOISE_OUT, label: 'noise', dir: 'out', medium: 'audio' });
-  bay.addNode({ id: `${S}:dial`, kind: 'person', label: 'dial', place: 'browser' });
-  bay.addPort({ id: DIAL_OUT, label: 'dial', dir: 'out', medium: 'value', shape: { of: 'param' } });
-  bay.addNode({ id: `${S}:tuner`, kind: 'engine', label: 'tuner', place: 'browser' });
-  bay.addPort({ id: TUNER_IN, label: 'tuner', dir: 'in', medium: 'audio' });
-  bay.addPort({ id: TUNER_OUT, label: 'tuner', dir: 'out', medium: 'audio' });
-  bay.addPort({ id: TUNER_TUNE, label: 'tune', dir: 'in', medium: 'value',
-    shape: { of: 'param', names: ['tune'] },
-    deliver: (e) => { if (e?.name === 'tune' && Number.isFinite(e.v)) { tune = e.v; applyTune(); } } });
-  bay.addNode({ id: `${S}:wave`, kind: 'screen', label: 'wave', place: 'browser' });
-  bay.addPort({ id: WAVE_IN, label: 'wave', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
+  addNodes(bay, S, ['noise', 'dial', 'tuner', 'wave', 'speaker'], {
+    deliver: { [TUNER_TUNE]: (e) => { if (e?.name === 'tune' && Number.isFinite(e.v)) { tune = e.v; applyTune(); } } },
+    ports: { [NOISE_OUT]: { label: 'noise' }, [DIAL_OUT]: { label: 'dial' }, [TUNER_IN]: { label: 'tuner' },
+      [TUNER_OUT]: { label: 'tuner' }, [TUNER_TUNE]: { label: 'tune' }, [WAVE_IN]: { label: 'wave' },
+      [SPEAKER_IN]: { label: 'speakers' } },
+  });
 
   const d = mount({ name: 'Tuner', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/tuner');

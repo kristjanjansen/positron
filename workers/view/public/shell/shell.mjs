@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '3a5398a5-102056-262e';
+export const BUILD = 'c9e37a59-131024-c973';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -363,7 +363,7 @@ export function mount({
     return !!pass;
   }
 
-  return {
+  const pageApi = {
     el: body,
     /**
      * The page's own blocks, as a stack: `d.stack.add(bar.el, picks, keys.el)`
@@ -449,6 +449,8 @@ export function mount({
     fail: (e) => { api.failed = String(e?.stack || e); log(String(e?.message || e), 'bad'); },
     api,
   };
+  hear(pageApi);
+  return pageApi;
 }
 
 /**
@@ -996,16 +998,35 @@ export function benignNotice(e) {
   return !e?.error && BENIGN_NOTICES.has(String(e?.message ?? ''));
 }
 
-/** Surface a thrown error instead of a silently dead page. */
-export function guard(d) {
+// 🔴 AN UNCAUGHT ERROR ANYWHERE ON A PAGE MARKS IT FAILED, SINCE 2026-10-14.
+// Listened for from the moment this module loads, so a throw in a page's own
+// module (an addNodes that refused, found on grain-rig) is not a lower assert
+// count with `failed: null`. One before mount() is kept and handed over then;
+// one that stops mount() ever running still publishes a failed `__demo`.
+let heard = null, muted = 0;
+const early = [];
+function onError(err) {
+  if (heard) { heard.fail(err); return; }
+  early.push(err);
+  if (!window.__demo) window.__demo = { ready: false, failed: String(err?.stack || err), asserts: [], logs: [], muted };
+}
+function hear(d) {
+  heard = d;
+  d.api.muted += muted; muted = 0;
+  for (const err of early.splice(0)) d.fail(err);
+}
+if (typeof addEventListener === 'function' && typeof window !== 'undefined') {
   addEventListener('error', (e) => {
     // Counted rather than logged, so the filter can be proved to fire. See the
     // note on `muted` in the machine contract above.
-    if (benignNotice(e)) { if (window.__demo) window.__demo.muted++; return; }
-    d.fail(e.error || e.message);
+    if (benignNotice(e)) { if (heard) heard.api.muted++; else muted++; return; }
+    onError(e.error || e.message);
   });
-  addEventListener('unhandledrejection', (e) => d.fail(e.reason));
+  addEventListener('unhandledrejection', (e) => onError(e.reason));
 }
+
+/** Surface a thrown error instead of a silently dead page. mount() does this for every page now. */
+export function guard(d) { if (heard !== d) hear(d); }
 
 /**
  * Batched, fire-and-forget device reporting.
