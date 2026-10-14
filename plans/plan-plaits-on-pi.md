@@ -234,7 +234,40 @@ a board version). Realtime multiple, and share of one core in brackets:
 `/connect/` and `/code/plaits/` play 6 voices (READ, `rt-plaits.mjs`
 `voices: 6`); the shim's ceiling is 8 (MEASURED, `plai_max_voices()`).
 
-### 2.2 Scaled to the Pi's A72, COMPUTED
+### 2.2a The WebAssembly, MEASURED on the Pi, 2026-10-14 (step 0 done)
+
+Run by the owner: `plai.wasm` and the bench copied to `/tmp` on the Pi, run
+under node v24.21.0 on the Cortex-A72, both files removed after. Realtime
+multiple, and the share of one core (100 / x):
+
+| engine | 1 voice | 6 voices | 8 voices |
+| --- | --- | --- | --- |
+| VA | 106.5x (0.9 %) | 18.4x (5.4 %) | 13.7x (7.3 %) |
+| shaper | 93.6x (1.1 %) | 16.0x (6.2 %) | 12.0x (8.3 %) |
+| FM | 50.0x (2.0 %) | 8.5x (11.8 %) | 6.4x (15.7 %) |
+| formant | 51.4x (1.9 %) | 8.8x (11.4 %) | 6.6x (15.2 %) |
+| additive | 40.4x (2.5 %) | 6.8x (14.7 %) | 5.1x (19.6 %) |
+| table | 59.1x (1.7 %) | 10.0x (10.0 %) | 7.6x (13.2 %) |
+| chord | 69.1x (1.4 %) | 11.6x (8.6 %) | 8.6x (11.6 %) |
+| speech | 204.4x (0.5 %) | 40.9x (2.4 %) | 30.6x (3.3 %) |
+| swarm | 67.5x (1.5 %) | 11.5x (8.7 %) | 8.6x (11.7 %) |
+| noise | 89.8x (1.1 %) | 15.4x (6.5 %) | 11.6x (8.6 %) |
+| dust | 52.0x (1.9 %) | 8.7x (11.5 %) | 6.5x (15.3 %) |
+| string | 64.4x (1.6 %) | 10.9x (9.2 %) | 8.2x (12.2 %) |
+| modal | 70.7x (1.4 %) | 12.1x (8.3 %) | 9.1x (11.0 %) |
+| kick | 77.3x (1.3 %) | 13.2x (7.6 %) | 9.9x (10.1 %) |
+| snare | 91.5x (1.1 %) | 15.7x (6.4 %) | 11.8x (8.5 %) |
+| hat | 87.5x (1.1 %) | 14.7x (6.8 %) | 11.0x (9.1 %) |
+
+**The worst case is additive at 8 voices, 19.6 % of one core, not FM.** FM at
+8 voices is 15.7 %, against the 29 % computed in 2.2 (and 41 % pessimistic):
+the M2 to A72 ratio for this wasm is about 3.3, not 5.7. So the WebAssembly
+alone fits on one of the four cores with room, and the go or no go for 1.C is
+a go. The native build (1.A) is still the route that sounds beside the other
+engines on JACK; its cost is now expected under these figures, not above them.
+2.2 below is kept as the estimate this replaced.
+
+### 2.2 Scaled to the Pi's A72, COMPUTED (superseded by 2.2a)
 
 The one like for like pair this repository has: the arithmetic Rhodes in node,
 8 voices, **39.0x on this M2 Pro today** (MEASURED, `node rig/board/bench.mjs`)
