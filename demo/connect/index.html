@@ -11,18 +11,24 @@
   /* Unlinked nodes as the patchbay draws a box, four to a row, grouped by where they run. */
   .cn-site + .cn-site { margin-top: 32px; }
   .cn-site h3 { margin: 0 0 12px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
-  .cn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .cn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: 12px; }
   @media (max-width: 900px) { .cn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  .cn-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r, 4px); min-width: 0; }
+  .cn-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r, 4px); min-width: 0; }
   .cn-head { display: flex; flex-direction: column; gap: 2px; }
-  .cn-id { font: 600 13px/1.3 var(--mono); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cn-id { font: 600 13px/1.3 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
   .cn-label { font: 400 11.5px/1.3 var(--sans); color: var(--dim); }
-  .cn-ports { display: flex; justify-content: space-between; gap: 8px; font: 400 12px/1.5 var(--mono); }
-  .cn-ports > div { display: flex; flex-direction: column; align-items: flex-start; }
+  /* 11.5px so the widest pair a node has, value-in-2 beside midi-out-2, sits
+     on one line in a quarter of the column; past that it wraps, never breaks. */
+  .cn-ports { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 6px; font: 400 11.5px/1.5 var(--mono); }
+  .cn-ports > div { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
   .cn-ports > div:last-child { align-items: flex-end; }
+  /* The pages that build this node, so nothing in the grid is imaginary. */
+  .cn-pages { display: flex; flex-wrap: wrap; gap: 2px 10px; padding-top: 8px; border-top: 1px solid var(--line); font: 400 11px/1.5 var(--mono); }
+  .cn-pages a { color: var(--dim); text-decoration: underline; text-decoration-color: var(--line2); text-underline-offset: 2px; }
+  .cn-pages a:hover { color: var(--fg); text-decoration-color: currentColor; }
 
   /* A port is a link button in its medium's colour; the picked one is lit. */
-  button.pos-linkbtn.cn-port { font-family: var(--mono); color: var(--c); text-decoration-color: currentColor; }
+  button.pos-linkbtn.cn-port { font-family: var(--mono); color: var(--c); text-decoration-color: currentColor; white-space: nowrap; }
   button.pos-linkbtn.cn-port[aria-pressed="true"] { background: var(--c); color: var(--bg); text-decoration: none; }
   .lv-pname.cn-pick { cursor: pointer; }
   .lv-pname.cn-pick[aria-pressed="true"] { text-decoration: underline; font-weight: 600; }
@@ -30,120 +36,171 @@
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
   .cn-ask { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ctl-gap); }
-  .cn-ask > .pos-bgroup { flex: 0 0 auto; }
+  /* One button at its own size: on a phone the shell grows a group to the
+     row and lets it scroll, which stretched ask across the screen and cut its
+     glow to a dark box. One button has nothing to scroll. */
+  .cn-ask > .pos-bgroup { flex: 0 0 auto; width: auto; }
+  .cn-ask .pos-bgroup-row { overflow: visible; }
   .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+
+  /* What a person says, in --voice (shell.css): the sentences to try, the box
+     they land in and the button that asks. Round, lowercase and in Geist,
+     because a sentence is read through rather than named. */
+  .cn-ex > button.cn-pill { text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
+    padding: 0 12px; color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
+    background: color-mix(in oklab, var(--voice) 7%, var(--card)); }
+  .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: color-mix(in oklab, var(--voice) 14%, var(--card)); }
+  .cn-ask .pos-field input { font-family: var(--sans); font-size: 13px; border-radius: 999px; padding: 0 14px;
+    border-color: color-mix(in oklab, var(--voice) 40%, var(--line2)); }
+  .cn-ask .pos-field input:focus-visible { border-color: var(--voice); }
+  .cn-ask button.pos-pri { text-transform: none; font-family: var(--sans); border-radius: 999px; padding: 0 18px;
+    color: var(--bg); background: var(--voice); border-color: var(--voice);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--voice) 40%, transparent),
+                0 4px 18px -4px color-mix(in oklab, var(--voice) 55%, transparent); }
+  .cn-ask button.pos-pri:disabled, .cn-ask button.pos-pri[data-busy="1"] { box-shadow: none; }
+
   .cn-props { display: flex; flex-direction: column; gap: 12px; }
   .cn-props[hidden], .cn-pic[hidden] { display: none; }
   .cn-prop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
   .cn-prop-t { font: 400 12.5px/1.4 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
   .cn-prop-n { flex-basis: 100%; font: 400 12px/1.4 var(--sans); color: var(--dim); }
   .cn-prop-b { display: flex; gap: var(--ctl-gap); }
+  /* Both answers in one case: the shell sets a secondary button in capitals
+     and leaves a primary as written, which read `Connect` beside `DISMISS`. */
+  .cn-prop-b > button.pos-sm { text-transform: none; }
   .cn-prop-n:empty { display: none; }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
-  import { createBay, checkTransforms, printLink, parseLink, CLASSES } from '/shell/bay.mjs';
+  import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createField } from '/shell/field.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
+  import { NODES as CATALOGUE, addNodes, portOf } from '/shell/nodes.mjs';
+  import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { CONCEPTS } from '/shell/concept-list.mjs';
 
-  // The things the site already has, as nodes with their ports and nothing
-  // linked yet. A hand list until plans/plan-node-catalogue.md lands, when it
-  // reads demo/shell/nodes.mjs and the Pi's boardGraph() instead.
-  const NODES = [
-    // in your hands
-    ['web:keys', 'person', 'on-screen keys', ['midi-out', 'midi-in']],
-    ['web:midi', 'device', 'a plugged-in MIDI keyboard', ['midi-out']],
-    ['web:knob', 'device', 'a knob', ['value-out']],
-    ['web:camera', 'device', 'camera', ['video-out']],
-    ['web:typewriter', 'person', 'typing', ['value-out']],
-    // sound made in this tab
-    ['web:sine', 'engine', 'sine synth', ['midi-in', 'audio-out']],
-    ['web:plaits', 'engine', 'Plaits', ['midi-in', 'value-in', 'audio-out']],
-    ['web:collide', 'engine', 'SuperCollider', ['midi-in', 'value-in', 'audio-out']],
-    ['web:faust', 'engine', 'Faust', ['midi-in', 'value-in', 'audio-out']],
-    ['web:piano', 'engine', 'piano and Rhodes', ['midi-in', 'audio-out']],
-    ['web:drums', 'engine', 'drum machine', ['clock-in', 'audio-out']],
-    ['web:grains', 'engine', 'granulator', ['audio-in', 'value-in', 'audio-out']],
-    ['web:looper', 'engine', 'looper', ['midi-in', 'midi-out']],
-    ['web:tempo', 'engine', 'tempo detector', ['audio-in', 'clock-out', 'value-out']],
-    ['web:key', 'engine', 'key detector', ['audio-in', 'value-out']],
-    ['web:shader', 'engine', 'shader', ['video-in', 'value-in', 'video-out']],
-    ['web:pico', 'engine', 'emulated Pico', ['midi-in', 'video-out']],
-    ['web:recorder', 'store', 'recorder', ['midi-in', 'file-out']],
-    // where it can be heard and seen
-    ['web:speaker', 'screen', 'speakers', ['audio-in']],
-    ['web:scope', 'screen', 'waveform', ['audio-in']],
-    ['web:screen', 'screen', 'this screen', ['video-in']],
-    // the Pi in the studio
-    ['pi-1:circuit', 'device', 'Novation Circuit', ['midi-in', 'value-in', 'audio-out']],
-    ['pi-1:collide', 'engine', 'SuperCollider on the Pi', ['midi-in', 'value-in', 'audio-out']],
-    ['pi-1:piano', 'engine', 'Pi piano', ['midi-in', 'audio-out']],
-    ['pi-1:drums', 'engine', 'Pi drums', ['clock-in', 'audio-out']],
-    ['pi-1:gpu', 'engine', 'Pi GPU', ['value-in', 'video-in', 'video-out']],
-    // Cloudflare
-    ['cf-relay:room', 'external', 'Cloudflare relay', ['midi-in', 'midi-out', 'value-in', 'value-out', 'clock-in', 'clock-out']],
-    ['cf-stream:live', 'external', 'Cloudflare Stream', ['audio-in', 'video-in', 'audio-out', 'video-out']],
-    ['cf-r2:radio', 'store', 'our radio recordings', ['audio-out']],
+  // ── what the site has, read rather than typed ───────────────────────────
+  // Every node in the grid is one the site's own pages build, each shown ONCE
+  // as a type (a knob, not knob-cutoff and knob-q), with the pages that build
+  // it as links. Three sources:
+  //   1. demo/shell/nodes.mjs NODES, the browser-side types read off the
+  //      concept pages (plans/plan-node-catalogue.md, step 1). The key is the
+  //      catalogue name and it is the box's id here, because four entries share
+  //      the id segment `shader` on four different pages.
+  //   2. boardGraph() in graph-registry.mjs, fed what the board announces
+  //      (rig/board/board.mjs: synth, the granulator insert, the sampler, the
+  //      Circuit on input 1, JACK, the GPU). Only the Pi nodes a concept page
+  //      really plays are kept, and boardGraph has no `pages`, so PI_PAGES says
+  //      which, read 2026-10-14 off the pages' own BOARD_SITE ids.
+  //   3. The Cloudflare hops a page declares itself and the catalogue leaves
+  //      out (STREAMS). cf-relay is not one: the patchbay draws it from a link.
+  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true }, jack: true, gpu: true,
+    inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'] };
+  const STREAMS = [
+    { id: 'cf-shout:relay', kind: 'endpoint', label: 'radio relay', place: 'cf-shout', pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key'],
+      instance: 'one per station mount, cf-shout:<mount>', ports: { 'audio-in': ['https'], 'audio-out': ['https'] } },
+    { id: 'cf-stream:live', kind: 'endpoint', label: 'Stream WebRTC input', place: 'cloudflare', pages: ['video/webrtc'],
+      ports: { 'video-in': ['whip'], 'video-out': ['whep'] } },
+    { id: 'cf-stream:hls', kind: 'endpoint', label: 'Stream LL-HLS input', place: 'cloudflare', pages: ['video/llhls'],
+      ports: { 'video-in': [], 'video-out': ['llhls'] } },
+    { id: 'cf-moq:relay', kind: 'endpoint', label: 'MoQ relay', place: 'cloudflare', pages: ['video/moq'],
+      ports: { 'video-in': ['moq'], 'video-out': ['moq'] } },
   ];
-  const SITES = { web: 'this tab', phone: 'a phone', 'pico-1': 'a Pico', 'pi-1': 'the Pi in the studio', 'cf-relay': 'Cloudflare', 'cf-stream': 'Cloudflare', 'cf-r2': 'Cloudflare' };
-
-  // What a MIDI port sends and takes. Without these the bay reads every MIDI
-  // link as carrying nothing and refuses it. A plugged-in keyboard can send
-  // anything, SysEx included, and the Circuit never takes SysEx (CLAUDE.md).
-  const PLAYS = ['note', 'cc', 'bend'];
-  const EMITS = { 'web:keys:midi-out': ['note'], 'web:midi:midi-out': CLASSES, 'web:looper:midi-out': ['note'] };
-  const ACCEPTS = { 'web:keys:midi-in': ['note'], 'web:looper:midi-in': ['note'], 'pi-1:circuit:midi-in': ['note', 'cc', 'program'] };
-  const NEVER = { 'pi-1:circuit:midi-in': ['sysex'] };
+  // A type whose catalogue label is a pattern (`<drum>, SuperCollider`) is
+  // named for what it is; the instances are in the box's hover.
+  const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station' };
+  // A station's site is its broadcaster's, so the one box is on ERR's.
+  const siteOf = (name, e) => (name === 'station' ? 'err' : e.site ?? 'web');
+  // room/words is built and served and kept off the index (concept-list.mjs).
+  const OFF_INDEX = ['room/words'];
 
   const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
+  const PAGES = new Map(), INSTANCE = new Map();
 
   function makeBay() {
     const b = createBay();
     const failed = [];
-    for (const [id, kind, label, ports] of NODES) {
+    for (const [name, e] of Object.entries(CATALOGUE)) {
+      const site = siteOf(name, e), label = LABELS[name] ?? e.label;
+      // Every port, the optional ones too: some page builds each of them.
+      // A port has no label in the catalogue, and a refusal reads it.
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${name}:${p}`, { label: `${label} ${p}` }]));
       try {
-        // No `place`, so a node's machine is its site: the Pi and Cloudflare are three machines, not one.
-        b.addNode({ id, kind, label, ...(id.startsWith('web:') ? { place: 'browser' } : {}) });
-        for (const p of ports) {
-          const [medium, dir] = p.split('-');
-          const pid = `${id}:${p}`;
-          b.addPort({ id: pid, dir, medium, label: `${label} ${medium} ${dir}`,
-            ...(medium === 'midi' && dir === 'out' ? { emits: EMITS[pid] || PLAYS } : {}),
-            ...(medium === 'midi' && dir === 'in' ? { accepts: ACCEPTS[pid] || PLAYS, never: NEVER[pid] || [] } : {}) });
+        addNodes(b, site, [{ name, as: name, site, label }], { ports });
+        PAGES.set(`${site}:${name}`, e.pages);
+        if (e.instance) INSTANCE.set(`${site}:${name}`, e.instance);
+      } catch (x) { failed.push(`${name}: ${x.message}`); }
+    }
+    for (const n of PI.nodes) {
+      const pages = PI_PAGES[n.id.split(':')[1]];
+      if (!pages) continue;
+      try {
+        b.addNode(n);
+        for (const p of PI.ports.filter((q) => nodeOf(q.id) === n.id)) b.addPort({ ...p, label: `${n.label} ${p.id.split(':')[2]}` });
+        PAGES.set(n.id, pages);
+      } catch (x) { failed.push(`${n.id}: ${x.message}`); }
+    }
+    for (const s of STREAMS) {
+      try {
+        b.addNode({ id: s.id, kind: s.kind, label: s.label, place: s.place, ...(s.place === 'cloudflare' ? { net: 'cloudflare' } : {}) });
+        for (const [p, transports] of Object.entries(s.ports)) {
+          b.addPort({ id: `${s.id}:${p}`, ...portOf(p), label: `${s.label} ${p}`, ...(transports.length ? { transports } : {}) });
         }
-      } catch (e) { failed.push(`${id}: ${e.message}`); }
+        PAGES.set(s.id, s.pages);
+        if (s.instance) INSTANCE.set(s.id, s.instance);
+      } catch (x) { failed.push(`${s.id}: ${x.message}`); }
     }
     return { bay: b, failed };
   }
   const { bay, failed } = makeBay();
+  const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
+  const EXPECTED = Object.keys(CATALOGUE).length + PI_KEPT + STREAMS.length;
 
-  // Example requests, each with the links a right answer contains. The self-check
-  // proves every one can be made in this bay, and its stand-in answers with them.
-  const KEYS = 'web:keys:midi-out', SPK = 'web:speaker:audio-in', RADIO = 'cf-r2:radio:audio-out', KNOB = 'web:knob:value-out', CAM = 'web:camera:video-out';
+  // A link to somebody else's server or a Stream input rides the one
+  // transport its port names, as the pages that make it say (`via`).
+  function viaFor(from, to) {
+    const a = bay.port(from)?.transports || [], b = bay.port(to)?.transports || [];
+    return a.find((t) => b.includes(t)) ?? (a.length === 1 ? a[0] : b.length === 1 ? b[0] : undefined);
+  }
+
+  // Example requests, each with the links a right answer contains and the
+  // concept page that already makes them (the third field), so no example
+  // promises something no page does. The self-check proves every one can be
+  // made in this bay, and its stand-in answers with them.
+  const W = (n, p) => `web:${n}:${p}`;
+  const KEYS = W('keys', 'midi-out'), SPK = W('speaker', 'audio-in'), REC = 'cf-r2:recording:file-out';
+  const KNOB = W('knob', 'value-out'), CAM = W('camera', 'video-out'), SCREEN = W('screen', 'video-in');
+  const CIRCUIT = `${BOARD_SITE}:circuit`, PIANO = `${BOARD_SITE}:sampler`;
   const EXAMPLES = [
-    ['Let the keys play the sine synth', [[KEYS, 'web:sine:midi-in'], ['web:sine:audio-out', SPK]]],
-    ['Play Plaits from my MIDI keyboard', [['web:midi:midi-out', 'web:plaits:midi-in'], ['web:plaits:audio-out', SPK]]],
-    ['Play the Circuit in the studio', [[KEYS, 'pi-1:circuit:midi-in'], ['pi-1:circuit:audio-out', SPK]]],
-    ['Piano, but on the Pi', [[KEYS, 'pi-1:piano:midi-in'], ['pi-1:piano:audio-out', SPK]]],
-    ["The knob opens SuperCollider's filter", [[KNOB, 'web:collide:value-in']]],
-    ['The knob controls the Circuit', [[KNOB, 'pi-1:circuit:value-in']]],
-    ['The knob bends the shader', [[KNOB, 'web:shader:value-in']]],
-    ["Drums follow the radio's tempo", [[RADIO, 'web:tempo:audio-in'], ['web:tempo:clock-out', 'web:drums:clock-in'], ['web:drums:audio-out', SPK]]],
-    ['Pi drums in time with the radio', [[RADIO, 'web:tempo:audio-in'], ['web:tempo:clock-out', 'pi-1:drums:clock-in'], ['pi-1:drums:audio-out', SPK]]],
-    ["Show me Plaits' waveform", [['web:plaits:audio-out', 'web:scope:audio-in']]],
-    ['What key is the radio in?', [[RADIO, 'web:key:audio-in']]],
-    ['Grain the radio', [[RADIO, 'web:grains:audio-in'], ['web:grains:audio-out', SPK]]],
-    ['Camera through the shader on screen', [[CAM, 'web:shader:video-in'], ['web:shader:video-out', 'web:screen:video-in']]],
-    ['Send the camera to everyone', [[CAM, 'cf-stream:live:video-in']]],
-    ['Loop what I play into Faust', [[KEYS, 'web:looper:midi-in'], ['web:looper:midi-out', 'web:faust:midi-in'], ['web:faust:audio-out', SPK]]],
-    ['Record what I play', [[KEYS, 'web:recorder:midi-in']]],
-    ['Typing plays SuperCollider', [['web:typewriter:value-out', 'web:collide:value-in']]],
-    ['The keys light up the Pico', [[KEYS, 'web:pico:midi-in'], ['web:pico:video-out', 'web:screen:video-in']]],
-    ['Play the sine and the Circuit together', [[KEYS, 'web:sine:midi-in'], ['web:sine:audio-out', SPK], [KEYS, 'pi-1:circuit:midi-in'], ['pi-1:circuit:audio-out', SPK]]],
-    ["Show the Pi's GPU on screen", [[CAM, 'pi-1:gpu:video-in'], ['pi-1:gpu:video-out', 'web:screen:video-in']]],
-  ].map(([say, links]) => ({ say, links: links.map(([from, to]) => ({ from, to, transforms: [] })) }));
+    ['let the keys play the synth', 'synth/keyboard', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK]]],
+    ['play plaits from my midi keyboard', 'code/plaits', [[W('midi', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
+    ['play the circuit in the studio', 'remote/circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
+    ['change the circuit\'s patch', 'remote/circuit', [[W('patch', 'midi-out'), `${CIRCUIT}:midi-in`]]],
+    ['play the piano on the pi', 'remote/piano', [[KEYS, `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
+    ['a knob opens supercollider\'s filter', 'code/collide', [[KNOB, W('collide', 'value-in')]]],
+    ['a knob bends the mirror shader', 'shader/mirror', [[KNOB, W('shader', 'value-in')], [W('shader', 'video-out'), SCREEN]]],
+    ['show me plaits\' waveform', 'code/plaits', [[W('plaits', 'audio-out'), W('scope', 'audio-in')]]],
+    ['grain a radio recording', 'granulator/grains', [[REC, W('radio', 'file-in')], [W('radio', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['grains in time with the recording', 'granulator/beat', [[REC, W('radio', 'file-in')], [W('radio', 'audio-out'), W('grains', 'audio-in')],
+      [W('radio', 'audio-out'), W('tempo', 'audio-in')], [W('tempo', 'value-out'), W('grains', 'tempo-in')], [W('grains', 'audio-out'), SPK]]],
+    ['what key is the live radio in?', 'radio/key', [['err:station:audio-out', 'cf-shout:relay:audio-in'], ['cf-shout:relay:audio-out', W('level', 'audio-in')],
+      [W('level', 'audio-out'), W('key', 'audio-in')]]],
+    ['the dial tunes the radio', 'radio/tuner', [[W('dial', 'value-out'), W('tuner', 'value-in')], [W('tuner', 'audio-out'), SPK]]],
+    ['camera through the dither shader', 'video/shader', [[CAM, W('shader-dither', 'video-in')], [W('shader-dither', 'video-out'), SCREEN]]],
+    ['send the camera through stream and back', 'video/webrtc', [[CAM, 'cf-stream:live:video-in'], ['cf-stream:live:video-out', SCREEN]]],
+    ['the drum machine plays its drums', 'drums/machine', [[W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), SPK]]],
+    ['the camera plays the drums', 'drums/camera', [[CAM, W('pixelate', 'video-in')], [W('pixelate', 'value-out'), W('sequencer', 'value-in')],
+      [W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), SPK]]],
+    ['loop what i play into the piano', 'code/piano', [[KEYS, W('looper', 'midi-in')], [W('looper', 'midi-out'), W('sampler', 'midi-in')],
+      ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK]]],
+    ['record what i play and play it back', 'synth/recorder', [[KEYS, W('rec', 'midi-in')], [W('rec', 'midi-out'), W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK]]],
+    ['typing plays the typewriter', 'typist/typewriter', [[W('typing', 'value-out'), W('typewriter', 'value-in')],
+      ['cf-r2:typewriter-samples:file-out', W('typewriter', 'file-in')], [W('typewriter', 'audio-out'), SPK]]],
+    ['the keys light up the pico', 'synth/dots', [[KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
+  ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to]) => ({ from, to, transforms: [] })) }));
 
   const d = mount({ name: 'connect',
     what: 'Say what should play what, or press an out port and then an in port. Pressing a wire takes it away.',
@@ -156,24 +213,30 @@
   // account: only on a press, never on a visit, and never from the self-check.
   const API = new URLSearchParams(location.search).get('api') || 'https://wish.positron.studio';
   const HERE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const FACTS = 'Ports carry midi, audio, value, clock, video or file, and a link joins an out port to an in port '
+  const FACTS = 'Ports carry midi, audio, value, clock, video, program or file, and a link joins an out port to an in port '
     + 'of the same medium. Sound is only heard once an audio out reaches web:speaker:audio-in, so a request to '
     + 'play something includes that link. Transforms work on MIDI links only; every other link has none. '
     + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
-    + 'and cf-r2:radio is our recorded radio.';
+    + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
+    + 'which reaches this tab through cf-shout:relay.';
   // The self-check's stand-in for a sentence nobody listed, with one transform
   // missing its argument so the checkTransforms path is graded too.
   const CANNED = [
     { from: KEYS, to: 'web:plaits:midi-in', transforms: [] },
     { from: KEYS, to: 'web:plaits:midi-in', transforms: [{ op: 'transpose' }] },
   ];
-  // The worker refuses more than 64 ports (workers/wish/src/index.js MAX_PORTS).
-  // Left out: the relay, which is a wire rather than something to play, and the
-  // outs of an external node, whose links need a person's own press anyway.
+  // The worker refuses more than 64 ports (workers/wish/src/index.js MAX_PORTS)
+  // and the bay holds about three times that, so the model is told the most
+  // useful 64: every port an example names, then the other ports of the nodes
+  // those examples use, then nothing. The rest stay pressable in the grid.
   const MAX_PORTS = 64;
+  const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
+  const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
+  const rankOf = (p) => (EXAMPLE_PORTS.has(p.id) ? 0 : EXAMPLE_NODES.has(nodeOf(p.id)) ? 1 : 2);
   const portsForModel = () => bay.ports()
-    .filter((p) => !p.id.startsWith('cf-relay:') && !(p.dir === 'out' && bay.node(nodeOf(p.id))?.kind === 'external'))
-    .map((p) => ({ id: p.id, dir: p.dir, label: p.label }));
+    .map((p, i) => ({ p, i, r: rankOf(p) })).filter((x) => x.r < 2)
+    .sort((a, b) => a.r - b.r || a.i - b.i).slice(0, MAX_PORTS)
+    .map(({ p }) => ({ id: p.id, dir: p.dir, label: p.label }));
   let reached = 0;
   async function post(text) {
     if (SELFCHECK) {
@@ -193,15 +256,15 @@
     return out;
   }
 
-  const field = createField({ label: 'say what should play what', grow: 'wide', placeholder: 'the on-screen keys play the Plaits' });
-  const askGroup = createButtonGroup({ buttons: [{ id: 'ask', label: 'Ask', primary: true }], onPress: () => ask(field.value()) });
+  const field = createField({ label: 'say what should play what', grow: 'wide', placeholder: 'the on-screen keys play plaits' });
+  const askGroup = createButtonGroup({ buttons: [{ id: 'ask', label: 'ask', primary: true }], onPress: () => ask(field.value()) });
   field.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); askGroup.button('ask').click(); } });
   const askRow = el('div', 'cn-ask');
   askRow.append(field.el, askGroup.el);
 
   const exRow = el('div', 'cn-ex');
   for (const ex of EXAMPLES) {
-    const b = el('button', 'pos-sm', ex.say, { type: 'button' });
+    const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: `as on /${ex.page}/` });
     b.addEventListener('click', () => { field.set(ex.say); askGroup.button('ask').click(); });
     exRow.append(b);
   }
@@ -237,8 +300,8 @@
       const v = bad ? null : bay.validate(l.from, l.to, l.transforms || []);
       const note = bad ? `cannot be made: ${bad.why}` : v.ok ? '' : `the bay would refuse it: ${v.why}`;
       const buttons = el('span', 'cn-prop-b');
-      const yes = el('button', 'pos-sm pos-pri', 'Connect', { type: 'button' });
-      const no = el('button', 'pos-sm', 'Dismiss', { type: 'button' });
+      const yes = el('button', 'pos-sm pos-pri', 'connect', { type: 'button' });
+      const no = el('button', 'pos-sm', 'dismiss', { type: 'button' });
       yes.disabled = !!bad;
       yes.addEventListener('click', (e) => {
         if (connect(l.from, l.to, l.transforms || [], e.isTrusted === true)) dropRow(row);
@@ -261,7 +324,8 @@
   function connect(from, to, transforms = [], consent = false) {
     bay.seen(from); bay.seen(to);
     // A link out of somebody else's server needs a person's own press (bay.mjs, consent).
-    const r = bay.link(from, to, transforms, { consent });
+    const via = viaFor(from, to);
+    const r = bay.link(from, to, transforms, { consent, ...(via ? { via } : {}) });
     last = r;
     if (r.ok) d.log(`linked ${printLink({ from, to, transforms })}${r.warn ? `. ${r.warn}` : ''}`);
     else d.log(`refused ${from} -> ${to}: ${r.why}${r.fix ? ` ${r.fix}` : ''}`, 'warn');
@@ -302,9 +366,9 @@
     ports: () => { const s = linkedNodes(); return bay.ports().filter((p) => s.has(nodeOf(p.id))); },
     links: () => bay.links(),
   };
-  // The patchbay draws a relayed link through a `cf-relay:<room>` box, and this
-  // page already has a node called cf-relay:room, so the drawn box takes another name.
-  const pb = createPatchbay(shown, { room: 'hop' });
+  // The patchbay draws a relayed link through a `cf-relay:<room>` box. A link
+  // to the Pi rides the studio's room, so that is the box's name.
+  const pb = createPatchbay(shown, { room: 'studio-1' });
   const pic = el('div', 'cn-pic');
   pic.append(pb.el);
   pic.hidden = true;
@@ -351,32 +415,39 @@
   function linkFor(key) {
     let w;
     try { w = parseLink(key); } catch { return null; }
-    const hop = (id) => id.startsWith('cf-relay:hop:');
+    const hop = (id) => id.startsWith('cf-relay:studio-1:');
     return bay.links().find((l) => (l.from === w.from || hop(w.from)) && (l.to === w.to || hop(w.to))
       && (l.from === w.from || l.to === w.to));
   }
   new MutationObserver(() => decorate()).observe(pb.view.el, { childList: true, subtree: true });
 
+  // Where a node runs, in the order a reader meets them.
+  const GROUPS = ['in your hands', 'made in this tab', 'kept in this tab', 'heard and seen here', 'the Pi in the studio', 'Cloudflare', 'somebody else\'s server'];
+  function groupOf(n) {
+    const site = n.id.split(':')[0];
+    if (site === BOARD_SITE) return GROUPS[4];
+    if (site.startsWith('cf-')) return GROUPS[5];
+    if (site !== 'web') return GROUPS[6];
+    return { person: GROUPS[0], device: GROUPS[0], engine: GROUPS[1], store: GROUPS[2] }[n.kind] ?? GROUPS[3];
+  }
   const groups = el('div');
   function drawGrid() {
     const inPic = linkedNodes();
-    const bySite = new Map();
-    for (const n of bay.nodes()) {
-      if (inPic.has(n.id)) continue;
-      const where = SITES[n.id.split(':')[0]] || n.id.split(':')[0];
-      if (!bySite.has(where)) bySite.set(where, []);
-      bySite.get(where).push(n);
-    }
+    const byGroup = new Map(GROUPS.map((g) => [g, []]));
+    for (const n of bay.nodes()) if (!inPic.has(n.id)) byGroup.get(groupOf(n)).push(n);
     const out = [];
-    for (const [site, nodes] of bySite) {
+    for (const [where, nodes] of byGroup) {
+      if (!nodes.length) continue;
       const box = el('section', 'cn-site');
-      box.append(el('h3', '', site));
+      box.append(el('h3', '', where));
       const grid = el('div', 'cn-grid');
       for (const n of nodes) {
         const card = el('div', 'cn-box');
         card.dataset.node = n.id;
         const head = el('div', 'cn-head');
-        head.append(el('span', 'cn-id', n.id), el('span', 'cn-label', n.label || ''));
+        const id = el('span', 'cn-id', n.id);
+        if (INSTANCE.has(n.id)) id.title = `one box for the type: ${INSTANCE.get(n.id)}`;
+        head.append(id, el('span', 'cn-label', n.label || ''));
         const ports = el('div', 'cn-ports'), ins = el('div'), outs = el('div');
         for (const p of bay.ports().filter((q) => nodeOf(q.id) === n.id)) {
           const b = el('button', 'pos-linkbtn cn-port', p.id.split(':')[2], { type: 'button', 'aria-pressed': 'false' });
@@ -387,7 +458,9 @@
           (p.dir === 'out' ? outs : ins).append(b);
         }
         ports.append(ins, outs);
-        card.append(head, ports);
+        const pages = el('div', 'cn-pages');
+        for (const pg of PAGES.get(n.id) || []) pages.append(el('a', '', pg, { href: `/${pg}/` }));
+        card.append(head, ports, pages);
         grid.append(card);
       }
       box.append(grid);
@@ -421,46 +494,64 @@
     const press = (id) => document.querySelector(`button[data-port="${id}"], text[data-port="${id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-    A('every node made it into the bay', failed.length === 0 && bay.nodes().length === NODES.length,
-      `${bay.nodes().length} of ${NODES.length}${failed.length ? `, refused: ${failed.join('; ')}` : ''}`);
+    A('every node made it into the bay', failed.length === 0 && bay.nodes().length === EXPECTED,
+      `${bay.nodes().length} of ${EXPECTED}: ${Object.keys(CATALOGUE).length} catalogue types, ${PI_KEPT} Pi, ${STREAMS.length} streams`
+      + `${failed.length ? `, refused: ${failed.join('; ')}` : ''}`);
+    // Nothing imaginary: every box names a page that builds it, and every page
+    // it names is a concept page that exists.
+    const known = new Set([...CONCEPTS.map((c) => c.id), ...OFF_INDEX]);
+    const orphan = bay.nodes().filter((n) => !(PAGES.get(n.id) || []).length).map((n) => n.id);
+    const unknown = [...new Set([...PAGES.values()].flat())].filter((pg) => !known.has(pg));
+    A('every node names the pages that build it, and every one of those pages exists', !orphan.length && !unknown.length,
+      `no page: ${orphan.join(', ') || 'none'}; not a page: ${unknown.join(', ') || 'none'}`);
+    A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
+      bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
     A('nothing is linked on a visit, and no picture is drawn', bay.links().length === 0 && pic.hidden);
 
-    // Every example's links can be made, each on a fresh bay so one cannot block another.
+    // Every example's links can be made, each on a fresh bay so one cannot
+    // block another, and with the consent a person's press of Connect gives.
     const cant = [];
     for (const ex of EXAMPLES) {
       const s = makeBay().bay;
       for (const l of ex.links) {
-        const r = s.link(l.from, l.to, l.transforms);
+        const via = viaFor(l.from, l.to);
+        const r = s.link(l.from, l.to, l.transforms, { consent: true, ...(via ? { via } : {}) });
         if (!r.ok) cant.push(`"${ex.say}": ${l.from} -> ${l.to}: ${r.why}`);
       }
     }
+    const lost = EXAMPLES.filter((e) => !known.has(e.page)).map((e) => `"${e.say}" on ${e.page}`);
+    A('every example is something a concept page already does', !lost.length, lost.join('; '));
     const told = portsForModel();
-    A('the model is told few enough ports for the worker to take them', told.length <= MAX_PORTS, `${told.length} of ${MAX_PORTS}`);
+    A('the model is told few enough ports for the worker to take them', told.length <= MAX_PORTS && EXAMPLE_PORTS.size <= MAX_PORTS,
+      `${told.length} of ${MAX_PORTS}, ${EXAMPLE_PORTS.size} of them named by an example, out of ${bay.ports().length} in the bay`);
     const toldIds = new Set(told.map((p) => p.id));
     const unnamed = EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])).filter((id) => !toldIds.has(id));
     A('every port an example needs is one the model is told about', unnamed.length === 0, [...new Set(unnamed)].join(', '));
     A(`all ${EXAMPLES.length} examples can be linked in this bay`, cant.length === 0, cant.join('; '));
 
     // Picking by pressing: an out port, then an in port of the same medium.
-    press(KEYS); press('web:sine:midi-in');
+    const SYNTH_IN = W('synth', 'midi-in'), SYNTH_OUT = W('synth', 'audio-out');
+    press(KEYS); press(SYNTH_IN);
     await frame();
-    A('pressing keys midi-out then sine midi-in links them', has(KEYS, 'web:sine:midi-in'));
+    A('pressing keys midi-out then synth midi-in links them', has(KEYS, SYNTH_IN));
     A('a linked node leaves the grid and is drawn in the picture',
-      !inGrid('web:sine') && inPicture('web:sine') && !inGrid('web:keys') && inPicture('web:keys') && inGrid('web:plaits'),
-      `sine in grid ${inGrid('web:sine')}, in picture ${inPicture('web:sine')}`);
+      !inGrid('web:synth') && inPicture('web:synth') && !inGrid('web:keys') && inPicture('web:keys') && inGrid('web:plaits'),
+      `synth in grid ${inGrid('web:synth')}, in picture ${inPicture('web:synth')}`);
 
     // A port in the picture is pressable too, so a chain can be finished there.
-    press('web:sine:audio-out'); press(SPK);
+    press(SYNTH_OUT); press(SPK);
     await frame();
-    A('a port drawn in the picture can be picked', has('web:sine:audio-out', SPK) && inPicture('web:speaker'));
+    A('a port drawn in the picture can be picked', has(SYNTH_OUT, SPK) && inPicture('web:speaker'));
 
     const before = bay.links().length;
     press(KEYS); press(SPK);
     const logs = () => window.__demo.logs.map((x) => x.msg).join('\n');
     A('a medium mismatch is refused in words', bay.links().length === before && /carries midi and .* takes audio/.test(logs()),
       logs().split('\n').filter((x) => x.startsWith('refused')).pop());
-    press('web:midi:midi-out'); press('pi-1:circuit:midi-in');
-    A('a port that never takes SysEx refuses a keyboard that can send it', bay.links().length === before && /does not accept sysex/.test(logs()));
+    // A press the browser did not make is not a person asking to listen.
+    press('err:station:audio-out'); press('cf-shout:relay:audio-in');
+    A('a link out of somebody else\'s server waits for a person\'s own press', bay.links().length === before && /somebody else's server/.test(logs()),
+      logs().split('\n').filter((x) => x.startsWith('refused')).pop());
 
     // A proposal, from the stand-in, applied by pressing Connect.
     const ex = EXAMPLES[1];
