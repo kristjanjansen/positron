@@ -77,8 +77,9 @@ export function mount({
   // flag only chooses between them.
   joined = true,
   controls = [],         // [{id, label, primary?}]
-  index = '/',
-  indexLabel = 'demos',  // the word after the arrow; a concept page passes `positron`, the front page
+  // the default is for the archived demos, which every page that is not passes its own
+  index = '/archive/',
+  indexLabel = 'archive',  // the word after the arrow; a concept page passes `positron`, the front page
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
