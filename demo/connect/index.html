@@ -23,15 +23,12 @@
   .cn-ports > div { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
   .cn-ports > div:last-child { align-items: flex-end; }
   /* The pages that build this node, so nothing in the grid is imaginary. */
-  .cn-pages { display: flex; flex-wrap: wrap; gap: 2px 10px; padding-top: 8px; border-top: 1px solid var(--line); font: 400 11px/1.5 var(--mono); }
-  .cn-pages a { color: var(--dim); text-decoration: underline; text-decoration-color: var(--line2); text-underline-offset: 2px; }
-  .cn-pages a:hover { color: var(--fg); text-decoration-color: currentColor; }
 
   /* A port is a link button in its medium's colour; the picked one is lit. */
-  button.pos-linkbtn.cn-port { font-family: var(--mono); color: var(--c); text-decoration-color: currentColor; white-space: nowrap; }
+  button.pos-linkbtn.cn-port { font-family: var(--mono); color: var(--c); text-decoration: none; white-space: nowrap; }
   button.pos-linkbtn.cn-port[aria-pressed="true"] { background: var(--c); color: var(--bg); text-decoration: none; }
   .lv-pname.cn-pick { cursor: pointer; }
-  .lv-pname.cn-pick[aria-pressed="true"] { text-decoration: underline; font-weight: 600; }
+  .lv-pname.cn-pick[aria-pressed="true"] { font-weight: 600; }
   .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
 
   .cn-say { display: flex; flex-direction: column; gap: 12px; }
@@ -458,9 +455,7 @@
           (p.dir === 'out' ? outs : ins).append(b);
         }
         ports.append(ins, outs);
-        const pages = el('div', 'cn-pages');
-        for (const pg of PAGES.get(n.id) || []) pages.append(el('a', '', pg, { href: `/${pg}/` }));
-        card.append(head, ports, pages);
+        card.append(head, ports);
         grid.append(card);
       }
       box.append(grid);
