@@ -7,7 +7,7 @@
 
 - ~~**Front page: contact info into the header, footer removed**~~ (2026-10-14, DONE: footer gone, BUILD 925a6189). Asked: *"Try to get contact info to frontpage header. Rm footer"*. `demo/index.html`: Email and Instagram links between the wordmark and Feedback; on a phone they take their own line under the wordmark.
 
-- **Front page contacts: left of Feedback, buttons like it, try with and without labels** (2026-10-14). Asked: *"Put contacts left from feedback, similar buttons. Try with labels and without"*. Supersedes the icons under the hero (deployed as BUILD 925a6189).
+- ~~**Front page contacts: left of Feedback, buttons like it, try with and without labels**~~ (2026-10-14, DONE: icons only, chosen *"do icons only for contact, rm labels"*). Asked: *"Put contacts left from feedback, similar buttons. Try with labels and without"*. Supersedes the icons under the hero (deployed as BUILD 925a6189).
 
 - ~~**Front page contacts: icons, below the hero**~~ (2026-10-14, DONE, BUILD 925a6189, then moved by the line above). Asked: *"Contavts: use icons? Below hero?"*, following the header move above. Drawn SVG icons (mail, Instagram), not glyphs.
 
