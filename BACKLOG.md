@@ -1,5 +1,9 @@
 ## Open
 
+- ~~**/connect/: hold a square room for the patchbay**~~ (2026-10-14, DONE: `.cn-pic { aspect-ratio: 1 }`, 688 x 688 at 1280, the room assert reads the square). Asked: *"reserver ~ square room for the patchbay so controls and resto of groups stay away"*. `.cn-pic` in demo/connect/index.html.
+
+- ~~**/connect/: the MIDI keyboard box's button is a play icon button**~~ (2026-10-14, DONE: `icon: 'play'`, labelled Use a MIDI keyboard). Asked: *"use a midi keybaord: just use play iconbutton"*. demo/shell/rt-midi.mjs.
+
 - **Patchbay on a phone: a showy 2 column view beside the functional 1 column one, compared on a kit page** (2026-10-14). Asked: *"In bg work on alternative version of patchbay view on mobile with 2 cols and more showy while 1 col remains as functional one (more space for cables there). Shot kit comparison page. Will use it on ig, front etc"*. The 1 column bay-view stays as it is; the 2 column one is for show (Instagram, the front page). Touches bay-view / bay-svg in demo/shell/ and a new /kit/ part.
 
 - ~~**Front page social links open in a new window**~~ (2026-10-14, DONE, BUILD 218ecea0). Asked: *"add social links in new win"*.

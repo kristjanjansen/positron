@@ -43,8 +43,9 @@
 
   .cn-props { display: flex; flex-direction: column; gap: 12px; }
   .cn-props[hidden] { display: none; }
-  /* The picture's room is held from the first frame, so linking moves nothing below it. */
-  .cn-pic { min-block-size: 140px; }
+  /* The picture's room is a square held from the first frame, so linking moves
+     nothing above or below it; a patch taller than the square grows it. */
+  .cn-pic { aspect-ratio: 1; }
   .cn-pic.cn-pic-empty { display: grid; place-items: center; border: 1px dashed var(--line2); border-radius: var(--r, 4px); }
   .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
@@ -795,7 +796,8 @@
       `no page: ${orphan.join(', ') || 'none'}; not a page: ${unknown.join(', ') || 'none'}`);
     A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
       bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
-    A('nothing is linked on a visit, and the picture\'s room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && pic.getBoundingClientRect().height >= 140);
+    { const r = pic.getBoundingClientRect();
+      A('nothing is linked on a visit, and the picture\'s square room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && r.height >= r.width - 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
 
     // Every example's links can be made, each on a fresh bay so one cannot
     // block another, and with the consent a person's press of Connect gives.
