@@ -4,7 +4,7 @@
 
 - **Catalogue decisions 2 to 5** (2026-10-14). Asked: *"Do 2-5"*. (2) merge duplicates into tempo, grains, player; (3) one default label per type, the most common, a sine stays sine, "waveform" and "picture" replace the variants (changes words on pages); (4) recorder is a store, the mix knob a person; (5) per-instance nodes on /connect/ (two of a type, the single knob picker). Starts when the page-move agent (nodes.mjs) and the announce agent (/connect/) land.
 
-- **Research: WebMCP, could positron use it** (2026-10-14, agent). Asked: *"Inevstigate webmcp could we ise it. Research"*. Output `research/webmcp-2026-10-14.md`.
+- ~~**Research: WebMCP, could positron use it**~~ (2026-10-14, DONE: yes, a small local experiment on /connect/ first; waits for a go). Asked: *"Inevstigate webmcp could we ise it. Research"*. Output `research/webmcp-2026-10-14.md`.
 
 - **Move the pages onto the lifted modules (synth/keyboard onto synth-voice, patch-synth onto audio-router and synth-params), and synth's value-in into the catalogue** (2026-10-14, agent). The plan's same-change rule, deferred while the catalogue pass ran.
 
