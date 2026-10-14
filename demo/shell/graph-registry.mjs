@@ -53,6 +53,9 @@ export const JACK_ENDS = {
   // The page programs' scsynth (`rig/board/scollide.mjs`, `ENGINES.own`), a
   // third server named so it is taken for neither of the two above.
   collide: ['poscollide:out_1', 'poscollide:out_2'],
+  // Plaits as a native JACK client (rig/board/plaits/posplaits.cc): the shim's main output only,
+  // since its aux output is a different signal and not a right channel.
+  plaits: ['posplaits:out_1'],
   pappusIn: ['SuperCollider:in_1', 'SuperCollider:in_2'],
   pappusOut: ['SuperCollider:out_1', 'SuperCollider:out_2'],
   capture: ['posboard:input_1'],
@@ -93,9 +96,10 @@ export function jackRows(from, to) {
  * @param {boolean} [o.camera]   a key set AND a camera found. Off by default.
  * @param {string} [o.label]     'Raspberry Pi', since every fresh Pi's hostname is `raspberrypi`
  * @param {boolean} [o.jack]     announce JACK ends and the granulator and capture nodes. Off by default.
+ * @param {string[]} [o.plaitsParams]  the names `pi-1:plaits:value-in` takes; passed in, so this file stays import free
  * why: lessons/kit-graph-registry.md#boardgraph
  */
-export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false }) {
+export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = {}, inputs = [], alsa = [], frameMs = 20, gpu = true, camera = false, label = 'Raspberry Pi', jack = false, plaitsParams = null }) {
   const place = room;
   // Port names are `<medium>-<dir>` (plans/plan-site-names.md §4c), so the id
   // says what a port carries and which way. `graphProblem` holds a board to it.
@@ -106,7 +110,7 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
   // The synths the board can start. `pappusFx` is an insert on another sound,
   // not a sound of its own, so it is not a node here.
   for (const [k, ok] of Object.entries(instruments)) {
-    if (!ok || k === 'pappusFx' || k === 'collide') continue;
+    if (!ok || k === 'pappusFx' || k === 'collide' || k === 'plaits') continue;
     const n = slug(k);
     node(n, 'engine', k);
     // A synth lives in the board's MAIN room: `audio.start` and `note.on` go
@@ -149,6 +153,17 @@ export function boardGraph({ room, site = BOARD_SITE, net = null, instruments = 
     node('drums', 'engine', 'drums');
     port('drums', 'midi-in', { label: 'drums', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
     sound('drums', 'drums');
+  }
+  // Plaits, the same DSP as the browser's `web:plaits` compiled natively (rig/board/plaits.mjs).
+  // It keeps its catalogue name, so the Pi's node is `pi-1:plaits`.
+  if (instruments.plaits) {
+    const j = jack ? JACK_ENDS.plaits : null;
+    node('plaits', 'engine', 'Plaits');
+    port('plaits', 'midi-in', { label: 'Plaits', dir: 'in', medium: 'midi', accepts: ['note'], never: [], address: room });
+    port('plaits', 'value-in', { label: 'Plaits', dir: 'in', medium: 'value',
+      shape: { of: 'param', ...(Array.isArray(plaitsParams) && plaitsParams.length ? { names: [...plaitsParams] } : {}) }, address: room });
+    port('plaits', 'audio-out', { label: 'Plaits', dir: 'out', medium: 'audio', shape: { rate: 48000, channels: 1, frameMs },
+      address: room, transports: [...BOARD_TRANSPORTS.audio, ...(j ? ['jack'] : [])], ...(j ? { jack: [...j] } : {}) });
   }
   // The shader: rig/vis/v3dpipe on the VideoCore GPU, sent as H.264. `value-in` is video.params,
   // `program-in` is video.shader (310 es). Out on `<room>-video` or the direct `vid` channel.

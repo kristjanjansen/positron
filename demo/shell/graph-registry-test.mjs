@@ -464,5 +464,37 @@ console.log('\n== the Pi nodes the concept pages play, under their catalogue nam
     !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
 }
 
+console.log('\n== Plaits on the Pi, route A of plans/plan-plaits-on-pi.md ==');
+
+{
+  // `pi-1:plaits`, the native posplaits client of rig/board/plaits.mjs. Six asserts, three of them
+  // negative controls.
+  const NAMES = ['model', 'pitch', 'timbre'];
+  const g = desk({ jack: true, instruments: { ...INSTRUMENTS, plaits: true }, plaitsParams: NAMES });
+  const ids = (n) => g.ports.filter((p) => p.id.startsWith(`pi-1:${n}:`)).map((p) => p.id.split(':')[2]).join(',');
+  ok('plaits: one engine node, midi-in, value-in and audio-out in the page\'s order, and the graph is legal',
+    node(g, 'pi-1:plaits')?.kind === 'engine' && ids('plaits') === 'midi-in,value-in,audio-out' && graphProblem(g) === '',
+    ids('plaits') + ' ' + graphProblem(g));
+  ok('its value-in names the parameters it was given, and its midi-in takes notes only',
+    port(g, 'pi-1:plaits:value-in').shape.of === 'param' && port(g, 'pi-1:plaits:value-in').shape.names.join() === NAMES.join()
+    && port(g, 'pi-1:plaits:midi-in').accepts.join() === 'note');
+  ok('its audio-out is mono at 48 kHz on the room, relay, data channel or JACK at posplaits:out_1',
+    JSON.stringify(JACK_ENDS.plaits) === '["posplaits:out_1"]' && port(g, 'pi-1:plaits:audio-out').shape.channels === 1
+    && port(g, 'pi-1:plaits:audio-out').transports.join() === 'relay,datachannel,jack'
+    && JSON.stringify(port(g, 'pi-1:plaits:audio-out').jack) === '["posplaits:out_1"]');
+  const b = createBay();
+  for (const n of g.nodes) b.addNode(n);
+  for (const p of g.ports) b.addPort(p);
+  const v = b.validate('pi-1:plaits:audio-out', 'pi-1:capture:audio-in');
+  ok('Plaits into the Pi capture is one JACK row', v.ok && v.session?.transport === 'jack'
+    && v.session.rows.map((r) => `${r.from}>${r.to}`).join() === 'posplaits:out_1>posboard:input_1', JSON.stringify(v.session ?? v.why));
+  ok('NEGATIVE CONTROL: a board that cannot run Plaits announces none of it, and the instrument loop does not grow a second one',
+    !desk({ jack: true }).ports.some((p) => p.id.startsWith('pi-1:plaits:'))
+    && g.nodes.filter((n) => n.id === 'pi-1:plaits').length === 1);
+  ok('NEGATIVE CONTROL: without jack it names no JACK end, and without names its value-in claims none',
+    !port(desk({ instruments: { plaits: true } }), 'pi-1:plaits:audio-out').jack
+    && !('names' in port(desk({ instruments: { plaits: true } }), 'pi-1:plaits:value-in').shape));
+}
+
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

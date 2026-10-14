@@ -38,7 +38,7 @@ echo "== shipping to $IP:$DEST"
 # by tar over ssh. COPYFILE_DISABLE=1 keeps macOS `._` files out.
 # why: lessons/rig-board-io.md#push-tar
 ( cd "$SRC/../.." && COPYFILE_DISABLE=1 tar cf - --no-xattrs --exclude=node_modules --exclude='._*' \
-    rig/board rig/vis \
+    rig/board rig/vis demo/muta/build/plaits_shim.cc demo/muta/vendor/PROVENANCE-plaits.json \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
 ) | ssh "$USER_@$IP" "sudo tar xf - -C $DEST && sudo chown -R $USER_ $DEST && echo '   unpacked'"
 
@@ -57,6 +57,11 @@ ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
   done
   ls -la v3dpipe 2>/dev/null || echo "   no v3dpipe — visuals will report unavailable"
 }'
+
+echo "== building Plaits (posplaits), if its recipe, shim or host changed"
+# Compiled here from the wasm's own pins and shim (plaits/recipe.mjs). Without the JACK headers it
+# says so and the rest of the push goes on; the board then announces no plaits node.
+ssh "$USER_@$IP" "bash $DEST/rig/board/plaits/build.sh" || echo "   posplaits not built, see above"
 
 # sclang reads classes only from its Extensions directory, so engine classes are copied there too.
 # `/home/$USER_`, not `$HOME`, which the local shell would expand.
@@ -81,14 +86,17 @@ ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs
   $DEST/rig/board/scollide.mjs $DEST/rig/board/norns/poscollide-defs.scd \
   $DEST/demo/shell/sclang-lite.mjs $DEST/demo/shell/synthdef.mjs \
   $DEST/rig/board/beat.mjs $DEST/demo/shell/graph-registry.mjs \
+  $DEST/rig/board/plaits.mjs $DEST/rig/board/plaits/posplaits.cc $DEST/demo/shell/plaits-params.mjs \
   $SC_EXT/pappus/lib/Engine_Pappus.sc $SC_EXT/pappus/lib/PosSource.sc 2>/dev/null"
 md5sum "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
   "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
   "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
+  "$SRC/plaits.mjs" "$SRC/plaits/posplaits.cc" "$SRC/../../demo/shell/plaits-params.mjs" \
   "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc" 2>/dev/null \
   || md5 -r "$SRC/board.mjs" "$SRC/jacksynth.mjs" "$SRC/pappus.mjs" "$SRC/scsampler.mjs" "$SRC/sampler.mjs" "$SRC/norns/possampler-defs.scd" "$SRC/norns/run-pappus.scd" \
      "$SRC/scollide.mjs" "$SRC/norns/poscollide-defs.scd" "$SRC/../../demo/shell/sclang-lite.mjs" "$SRC/../../demo/shell/synthdef.mjs" \
      "$SRC/beat.mjs" "$SRC/../../demo/shell/graph-registry.mjs" \
+     "$SRC/plaits.mjs" "$SRC/plaits/posplaits.cc" "$SRC/../../demo/shell/plaits-params.mjs" \
      "$SRC/norns/Engine_Pappus.sc" "$SRC/norns/PosSource.sc"
 
 if [ "$RESTART" = 1 ]; then

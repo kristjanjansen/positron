@@ -12,6 +12,7 @@ import { startJackSynth, jackSynthAvailable, JACK_SYNTHS,
        } from './jacksynth.mjs';
 import { startScSampler, samplerAvailable, startPlan, stopPlan, isForSampler } from './scsampler.mjs';
 import { createCollideService, collideAvailable } from './scollide.mjs';
+import { createPlaitsService, plaitsAvailable, PLAITS_PARAMS } from './plaits.mjs';
 import { captureHolders } from './jacksynth.mjs';
 import { openPappus, CHARACTER_NAMES } from './pappus.mjs';
 import { startVideo, videoAvailable, sweepStrayEncoders, V3DPIPE } from './video.mjs';
@@ -80,6 +81,9 @@ let samp = null, sampStarting = null;
 // `collide` node's notes, and starts nothing until audio.start {source: 'collide'}.
 // why: lessons/rig-board.md#collide
 const collide = createCollideService({ onFrame: (f) => sendPcm(f), log: (l) => log('collide:', l), sampler: () => samp });
+// Plaits as a JACK source beside the sampler and collide (plaits.mjs); starts nothing until
+// audio.start {source: 'plaits'}. A held note is released once its page has been quiet 15 s.
+const plaits = createPlaitsService({ onFrame: (f) => sendPcm(f), log: (l) => log('plaits:', l), heardAt: (f) => clientSeen.get(f) });
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
@@ -417,7 +421,7 @@ async function startAudio(source = 'synth', msg = null) {
   // why: lessons/rig-board.md#capture-by-name
   if (source !== 'capture') {
     return { ok: false, reason: `unknown source ${JSON.stringify(source)}`,
-             known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture', 'sampler', 'collide'] };
+             known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture', 'sampler', 'collide', 'plaits'] };
   }
   if (backend() !== 'alsa') return { ok: false, reason: 'no arecord here — capture needs the board' };
   if (!(AUDIO_TAKE >= 1 && AUDIO_TAKE <= AUDIO_CH)) {
@@ -549,6 +553,7 @@ async function handle(msg, replyVia = null) {
   // The collide engine's own verbs first, so `audio.start {source: 'collide'}`
   // and a `note.on {node: 'collide'}` never fall through to Yoshimi.
   if (collide.handles(msg)) return collide.handle(msg, reply).then(() => true);
+  if (plaits.handles(msg)) return plaits.handle(msg, reply).then(() => true);
   switch (msg.type) {
     // A page that joins late asks, and gets the beat now rather than up to five
     // seconds from now. The beat already carries the graph (`beat.mjs`), so the
@@ -578,7 +583,7 @@ async function handle(msg, replyVia = null) {
     case 'audio.start':
       // No default instrument: a bare audio.start is refused in words.
       // why: lessons/rig-board.md#no-default
-      if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "sampler"}, "collide" or "synth"; there is no default since Yoshimi left this board on 2026-10-13' });
+      if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "sampler"}, "collide", "plaits" or "synth"; there is no default since Yoshimi left this board on 2026-10-13' });
       startAudio(msg.source, msg).then((r) => reply('audio.started', r));
       return true;
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The board does
@@ -948,6 +953,7 @@ async function handle(msg, replyVia = null) {
         : { ok: false, reason: 'nothing playing', ...insertState() }), inputs: hwInputs.status(),
         // The sampler beside it, never in place of it (option b).
         sampler: samp ? samp.status() : { ok: false, available: samplerAvailable(), starting: !!sampStarting },
+        plaits: plaits.status(),
         // The main socket's direct listeners, or null on a board without the library.
         direct: mainDirect ? mainDirect.status() : null });
     case 'sampler.cpu':
@@ -1136,12 +1142,14 @@ function connect() {
                           sampler: samplerAvailable(),
                           // The page programs' scsynth (scollide.mjs), announced as
                           // `collide` and `drums` (graph-registry.mjs `boardGraph`).
-                          collide: collideAvailable() };
+                          collide: collideAvailable(),
+                          // posplaits, built on this board (plaits/build.sh), announced as `plaits`.
+                          plaits: plaitsAvailable() };
     // `jack`: this board has a JACK graph (the sampler, or an input on JACK), so its JACK ends are
     // announced.
     // why: lessons/rig-board.md#jack-announce
-    const jack = samplerAvailable() || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
-    graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack,
+    const jack = samplerAvailable() || instruments.plaits || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
+    graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack, plaitsParams: PLAITS_PARAMS,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
                    frameMs: 1000 * FRAME / RATE, gpu: videoAvailable(), camera: cameraFound };
     send(helloMsg({ name: NAME, id: BOARD_ID, backend: s.backend, ports: s.ports, dry: DRY, since,
@@ -1240,7 +1248,7 @@ function sweepOrphans() {
   // Names nothing here starts any more stay listed: an old build's process can still hold JACK or a
   // device after a restart. `alsa_in` holds its card while it runs.
   // why: lessons/rig-board.md#orphan-names
-  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'alsa_in', 'jackd']) {
+  for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'posplaits', 'csound', 'ffmpeg', 'alsa_in', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }
   }
@@ -1320,5 +1328,5 @@ const hwInputs = createInputs({
 });
 if (!DRY && !ONCE) hwInputs.start();
 
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); stopAudio(); collide.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { camera?.stop(); stopAudio(); collide.stop(); plaits.stop(); stopSampler(); hwInputs.close(); mainDirect?.close(); try { ws?.close(); } catch {} process.exit(0); });
 connect();

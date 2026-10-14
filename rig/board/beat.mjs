@@ -26,6 +26,7 @@ export function graphOf(f) {
       // An input on JACK announces its JACK port (graph-registry `inputJack`).
       ...(i.via === 'jack' ? { jack: true, take: i.take ?? 1 } : {}) })),
     alsa: f.ports || [], frameMs: f.frameMs, gpu: f.gpu !== false, camera: f.camera === true, jack: f.jack === true,
+    ...(Array.isArray(f.plaitsParams) ? { plaitsParams: f.plaitsParams } : {}),
   });
 }
 
