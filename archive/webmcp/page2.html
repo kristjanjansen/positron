@@ -1,0 +1,12 @@
+<!doctype html><meta charset=utf-8><title>webmcp invoke</title>
+<form toolname="say_hello" tooldescription="Say hello to a name"><input name="who"><button>go</button></form>
+<script type=module>
+document.querySelector('form').addEventListener('submit', (e) => { window.__formEv = { agentInvoked: e.agentInvoked, hasRespondWith: typeof e.respondWith }; if (e.agentInvoked) { e.preventDefault(); e.respondWith(Promise.resolve({ hi: new FormData(e.target).get('who') })); } });
+await document.modelContext.registerTool({
+  name: 'start_audio', description: 'Try to start audio', inputSchema: { type: 'object', properties: {} },
+  execute: async () => { const ac = new AudioContext(); await Promise.race([ac.resume(), new Promise(r => setTimeout(r, 500))]); return { activation: navigator.userActivation.isActive, hasBeen: navigator.userActivation.hasBeenActive, state: ac.state }; },
+});
+await document.modelContext.registerTool({
+  name: 'boom', description: 'Throws', execute: () => { throw new Error('refused: ports do not fit'); },
+});
+</script>

@@ -1,0 +1,24 @@
+<!doctype html><meta charset=utf-8><title>webmcp probe</title>
+<form toolname="say_hello" tooldescription="Say hello to a name"><input name="who" toolparamdescription="the name"><button>go</button></form>
+<script type=module>
+const mc = document.modelContext || navigator.modelContext;
+window.__probe = { doc: typeof document.modelContext, nav: typeof navigator.modelContext, navTesting: typeof navigator.modelContextTesting, registered: false, calls: [] };
+if (mc) {
+  try {
+    await mc.registerTool({
+      name: 'add', description: 'Add two numbers', title: 'Add',
+      inputSchema: { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } }, required: ['a', 'b'] },
+      annotations: { readOnlyHint: true },
+      execute: ({ a, b }) => { window.__probe.calls.push([a, b]); return { sum: a + b }; },
+    });
+    window.__probe.registered = true;
+    if (mc.getTools) {
+      const tools = await mc.getTools();
+      window.__probe.tools = tools.map((t) => t.name);
+      const t = tools.find((x) => x.name === 'add');
+      if (t && mc.executeTool) window.__probe.exec = await mc.executeTool(t, { a: 2, b: 3 });
+    }
+  } catch (e) { window.__probe.err = String(e); }
+}
+window.__probe.done = true;
+</script>
