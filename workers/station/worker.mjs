@@ -12,8 +12,10 @@
 // name so every one of those URLs keeps working. Range requests answer 206,
 // which the videos need for seeking.
 
+import { OPEN } from '../_lib/http.mjs';
+
 const CORS = {
-	'access-control-allow-origin': '*',
+	...OPEN,
 	'access-control-allow-headers': 'range, authorization, content-type',
 	'access-control-expose-headers': 'content-length, content-range, accept-ranges',
 };
@@ -33,8 +35,12 @@ async function media(req, env, key) {
 	// tarball went there on 2026-10-13 (archive/yoshimi/README.md), and this
 	// door is the bucket's only public route (no r2.dev URL, no custom domain,
 	// both checked that day). Read it with `wrangler r2 object get --remote`.
-	if (decodeURIComponent(key).replace(/^\/+/, '').startsWith('archive/')) return new Response('no such object\n', { status: 404, headers: CORS });
-	const obj = await env.MEDIA.get(decodeURIComponent(key), { range: req.headers });
+	let name;
+	try { name = decodeURIComponent(key); } catch { return new Response('bad escape in key\n', { status: 400, headers: CORS }); }
+	if (name.replace(/^\/+/, '').startsWith('archive/')) return new Response('no such object\n', { status: 404, headers: CORS });
+	let obj;
+	// R2 throws on a range it cannot satisfy rather than answering null.
+	try { obj = await env.MEDIA.get(name, { range: req.headers }); } catch { return new Response('range not satisfiable\n', { status: 416, headers: CORS }); }
 	if (!obj) return new Response('no such object\n', { status: 404, headers: CORS });
 	const h = new Headers(CORS);
 	obj.writeHttpMetadata(h);

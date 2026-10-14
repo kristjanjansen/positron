@@ -74,6 +74,8 @@
 // ⚠️ `demo/wire/` reads these off `/stats` rather than assuming them, so it
 // follows whatever they are — but its recorded 298-in-three-seconds belongs to
 // the old values and is history now.
+import { json, OPEN, keyMatches } from '../../_lib/http.mjs';
+
 const MAX_BYTES = 1000 * 1024;            // per message — just under the platform's 1 MiB
 const MAX_SOCKETS = 128;                  // was 16, which a handful of browser tabs could fill
 const BYTES_PER_SEC = 8 * 1024 * 1024;    // per socket, steady
@@ -118,16 +120,16 @@ const IDLE_MS = 10 * 60 * 1000;           // silent this long, and only if the r
 // against the secret, and a missing one matches nothing.
 const CAM_ROOM = /-cam$/;
 const CAM_AUTH_MS = 10_000;               // a socket that has not proved the key by then is closed
+// Wrong keys an address may try in an hour, counted in the room's storage so
+// hibernation does not reset them. Per address only: a room-wide cap would let
+// a stranger lock the Pi out.
+const KEY_FAILS_PER_HOUR = 10;
 
-/** SHA-256 both sides, then compare every byte, so the time taken says nothing about how much matched. */
-async function keyMatches(given, secret) {
-  if (typeof given !== 'string' || !given || typeof secret !== 'string' || !secret || given.length > 512) return false;
-  const enc = new TextEncoder();
-  const [a, b] = await Promise.all([given, secret].map((x) => crypto.subtle.digest('SHA-256', enc.encode(x))));
-  const x = new Uint8Array(a), y = new Uint8Array(b);
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  return diff === 0;
+/** 4 bytes of SHA-256 of the caller's address, for counting it without keeping it. */
+async function addressTag(request) {
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip));
+  return [...new Uint8Array(d)].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export class Relay {
@@ -151,6 +153,20 @@ export class Relay {
     this.dropped = 0;
     this.closed = 0;
     this.wokeAt = Date.now();
+    this.keyFails = null;      // [{ at, who }] for the past hour, read once from storage
+  }
+
+  async #fails(who) {
+    if (!this.keyFails) this.keyFails = (await this.state.storage.get('keyFails')) || [];
+    const now = Date.now();
+    this.keyFails = this.keyFails.filter((f) => now - f.at < 3600_000);
+    return this.keyFails.filter((f) => f.who === who).length;
+  }
+
+  async #failed(who) {
+    await this.#fails(who);
+    this.keyFails.push({ at: Date.now(), who });
+    try { await this.state.storage.put('keyFails', this.keyFails); } catch { /* counted in memory */ }
   }
 
   async fetch(request) {
@@ -161,8 +177,13 @@ export class Relay {
       // Only reached for a keyed room (the router refuses the rest).
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
       if (request.method !== 'POST') return new Response('POST the key', { status: 405, headers: CORS });
+      const who = await addressTag(request);
+      if (await this.#fails(who) >= KEY_FAILS_PER_HOUR) {
+        return new Response('too many wrong keys from this address, try again within the hour', { status: 429, headers: CORS });
+      }
       const body = (await request.text()).trim();
       const ok = await keyMatches(body, this.env?.PI_CAM_KEY);
+      if (!ok) await this.#failed(who);
       return new Response(ok ? null : 'wrong key', { status: ok ? 204 : 403, headers: CORS });
     }
     // A keyed room says nothing about itself to somebody without the key.
@@ -209,7 +230,8 @@ export class Relay {
     // so a room full of dead sockets stays full forever — measured, that is
     // exactly what `studio-1` did. ONE write per connection, never per message.
     const gated = CAM_ROOM.test(url.pathname.split('/')[2] || '');
-    try { pair[1].serializeAttachment(gated ? { at: Date.now(), gated: true, ok: false } : { at: Date.now() }); } catch { /* nothing to lose */ }
+    const who = gated ? await addressTag(request) : '';
+    try { pair[1].serializeAttachment(gated ? { at: Date.now(), gated: true, ok: false, who } : { at: Date.now() }); } catch { /* nothing to lose */ }
     if (gated) {
       this.cam.set(pair[1], { gated: true, ok: false });
       // A socket that never proves the key is not left holding a place. Two
@@ -319,6 +341,12 @@ export class Relay {
     // the message that proves it.
     const me = this.#camOf(ws);
     if (me.gated && !me.ok) {
+      let who = '';
+      try { who = ws.deserializeAttachment()?.who || ''; } catch { /* old socket */ }
+      if (await this.#fails(who) >= KEY_FAILS_PER_HOUR) {
+        try { ws.close(4029, 'too many wrong keys'); } catch { /* gone */ }
+        return;
+      }
       let m = null;
       if (typeof msg === 'string' && msg.length < 2048) { try { m = JSON.parse(msg); } catch { /* not the key */ } }
       if (m?.type === 'cam.key' && await keyMatches(m.key, this.env?.PI_CAM_KEY)) {
@@ -326,6 +354,7 @@ export class Relay {
         try { ws.serializeAttachment({ ...(ws.deserializeAttachment() || {}), gated: true, ok: true }); } catch { /* memory still holds it */ }
         try { ws.send(JSON.stringify({ type: 'cam.key.ok' })); } catch { /* gone */ }
       } else {
+        await this.#failed(who);
         try { ws.close(4003, 'wrong key'); } catch { /* gone */ }
       }
       return;
@@ -364,13 +393,8 @@ export class Relay {
   async webSocketError() {}
 }
 
-const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type' };
+const CORS = { ...OPEN, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type' };
 
-const json = (o, status = 200) =>
-  new Response(JSON.stringify(o), {
-    status,
-    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
-  });
 
 export default {
   async fetch(request, env) {

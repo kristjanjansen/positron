@@ -4,12 +4,12 @@
 //   GET  /ice                          short lived TURN servers, 503 with no key
 //   POST /log                          a device reports what it saw
 //   GET  /logs[?format=text]           read those reports back
-//   POST /logs/clear                   drop them
+//   POST /logs/clear                   drop them (x-pub-key)
 //   POST /cam/whip, DELETE /cam/whip/<id>  /video/webrtc/'s WebRTC
 //                                      loopback publish, onto its OWN WebRTC
 //                                      input (CAM_WHIP_URL, "positron-cam-whip")
 //   /stage/watch /stage/status         /stage/'s own instance: the MIM film on
-//   /stage/start /stop                 WHIP while a viewer holds /stage/watch
+//   /stage/start /stop (x-pub-key)     WHIP while a viewer holds /stage/watch
 //   wss://pub.positron.studio/loop     /video/llhls/'s LL-HLS loopback: the
 //                                      camera rewrap on its own instance and its
 //                                      OWN input (LOOP_STREAM_KEY), every take deleted
@@ -30,6 +30,7 @@
 
 import { Container, getContainer } from '@cloudflare/containers';
 import { DurableObject } from 'cloudflare:workers';
+import { json, OPEN, keyMatches } from '../_lib/http.mjs';
 import { LOOP_CLEAN_MS, LOOP_OLD_MS, loopCeil, loopReady, storage, loopVideos, lifecycle, clean } from './loop.mjs';
 
 const SWEEP_MS = 30_000;   // alarm cadence
@@ -48,6 +49,9 @@ const STAGE = 'stage';
 const STAGE_PATHS = new Set(['/watch', '/status', '/start', '/stop']);
 // The main instance's routes since 2026-10-13, and the ones retired that day.
 const MAIN_PATHS = new Set(['/ice', '/log', '/logs', '/logs/clear']);
+// No page calls these; they are the owner's, with `x-pub-key` matching the
+// PUB_KEY secret (`wrangler secret put PUB_KEY`). Unset refuses.
+const OWNER_PATHS = new Set(['/stage/start', '/stage/stop', '/logs/clear']);
 const RETIRED = new Set(['/watch', '/status', '/start', '/stop', '/whip', '/cam', '/cam/status']);
 // THE CAMERA INSTANCE, which since 2026-10-13 only proxies the WebRTC publish
 // (/cam/whip) onto "positron-cam-whip". Its RTMPS camera route, /cam, and that
@@ -119,30 +123,16 @@ const pubOn = (Base, NEXT) => class extends Base {
   sleepAfter = '10m';
 
   /**
-   * 🔴 A WORKER VAR IS NOT IN THE CONTAINER'S ENVIRONMENT UNTIL IT IS PASSED.
-   * `server.mjs` reads `process.env.PUB_SOURCE` and `process.env.PUB_BURN`,
-   * and until 2026-09-30 nothing here forwarded either, so both were always
-   * undefined in the container: the film and no clocks, whatever wrangler.jsonc
-   * said. `PUB_W`/`PUB_H`/`PUB_FPS` never had this problem because they travel
-   * in the /start body. `envVars` is read when the container STARTS, so a
-   * change lands on the next cold start, not on a running publish.
-   * ⚠️ ONLY WHAT IS SET. An absent var must stay absent, because
-   * `PUB_SOURCE === undefined` is what selects the film, and `testsrc2`
-   * or `''` is the test pattern.
-   * NEXT: the same object goes to `ctx.container.start({ env })`, which is
-   * also read at start, so the rule above holds unchanged.
+   * A worker var reaches the container only through `envVars` (legacy) or
+   * `ctx.container.start({ env })` (NEXT), both read when the container starts.
    */
   constructor(ctx, env) {
     super(ctx, env);
-    const pass = {};
-    for (const k of ['PUB_SOURCE', 'PUB_BURN']) {
-      if (typeof env[k] === 'string') pass[k] = env[k];
-    }
-    if (!NEXT) { this.envVars = pass; return; }
+    if (!NEXT) return;
     // NEXT ONLY: a bigger UDP send buffer for the WHIP leg, see WHIP_SNDBUF in
     // container/server.mjs. 4 MiB is the runtime's wmem_max, MEASURED on the
     // test bed (wmem_default 212992, wmem_max 4194304).
-    this.#pass = { ...pass, PUB_WHIP_SNDBUF: String(NEXT_WHIP_SNDBUF) };
+    this.#pass = { PUB_WHIP_SNDBUF: String(NEXT_WHIP_SNDBUF) };
     // ⚠️ A RESTARTED OBJECT HAS NO INACTIVITY TIMEOUT. The docs: "A Durable
     // Object that restarts, for example after a deploy, starts without one",
     // and without one "Cloudflare stops the container shortly after the
@@ -238,13 +228,25 @@ const pubOn = (Base, NEXT) => class extends Base {
     }
     return this.#role;
   }
-  /** browser WHIP publishes: rate-limit stamps, and id -> resource URL */
-  #whipHits = [];
+  /** id -> resource URL of browser WHIP publishes */
   #whipRes = new Map();
-  /** /ice mints: { at, who } stamps for the two rate limits */
-  #iceHits = [];
-  /** camera sessions: rate-limit stamps, and the live one's counters */
-  #camHits = [];
+  /**
+   * Rate-limit stamps for the past hour, kept in storage so an eviction does
+   * not reset them: `whip` and `cam` are times, `ice` is { at, who }.
+   */
+  #hits = null;
+  async #getHits(kind) {
+    if (!this.#hits) {
+      try { this.#hits = (await this.ctx.storage.get('hits')) || {}; } catch { this.#hits = {}; }
+    }
+    const now = Date.now();
+    this.#hits[kind] = (this.#hits[kind] || []).filter((h) => now - (h.at ?? h) < 3600_000);
+    return this.#hits[kind];
+  }
+  async #addHit(kind, h) {
+    (await this.#getHits(kind)).push(h);
+    try { await this.ctx.storage.put('hits', this.#hits); } catch { /* counted in memory until the next write */ }
+  }
   #cam = null;
   /** Ring buffer of device reports. Diagnostic; dies with the DO. */
   #log = [];
@@ -358,9 +360,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       }
       const pair = new WebSocketPair();
       const now = Date.now();
-      this.#camHits = this.#camHits.filter((t) => now - t < 3600_000);
+      const camHits = await this.#getHits('cam');
       const refuse = busy
-        || (this.#camHits.length >= LOOP_PER_HOUR ? { error: 'too many camera sessions this hour', limit: LOOP_PER_HOUR, status: 429 } : null)
+        || (camHits.length >= LOOP_PER_HOUR ? { error: 'too many camera sessions this hour', limit: LOOP_PER_HOUR, status: 429 } : null)
         || (!this.#camKey() ? { error: 'no camera stream key on this worker', status: 503 } : null)
         || await this.#loopGuard();
       if (refuse) {
@@ -372,7 +374,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         } catch { /* gone */ }
         return new Response(null, { status: 101, webSocket: pair[0] });
       }
-      this.#camHits.push(now);
+      await this.#addHit('cam', now);
       const sid = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
       this.ctx.acceptWebSocket(pair[1], ['cam']);
       pair[1].serializeAttachment({ role: 'cam', sid, at: now });
@@ -462,7 +464,7 @@ const pubOn = (Base, NEXT) => class extends Base {
           .map((l) => `${l.at} ${l.ios ? 'iOS' : '   '} ${l.who} ${l.body}`)
           .join('\n');
         return new Response(txt || '(nothing reported)', {
-          headers: { 'content-type': 'text/plain; charset=utf-8', 'access-control-allow-origin': '*' },
+          headers: { 'content-type': 'text/plain; charset=utf-8', ...OPEN },
         });
       }
       return json({ lines: this.#log.length, log: this.#log });
@@ -478,12 +480,8 @@ const pubOn = (Base, NEXT) => class extends Base {
     }
 
     if (url.pathname === '/start' && request.method === 'POST') {
-      // ?tracks=av|v|a — a manual override for the audio-lag experiment. The
-      // question it answers: a video-only stream has no audio group, so if the
-      // startup stutter vanishes there, the audio track is the cause.
-      const tracks = url.searchParams.get('tracks');
-      await this.#startPublish(tracks ? { tracks } : undefined);
-      return json({ ok: true, viewers: this.viewers(), tracks: tracks || 'av' });
+      await this.#startPublish();
+      return json({ ok: true, viewers: this.viewers() });
     }
     if (url.pathname === '/stop' && request.method === 'POST') {
       await this.#stopPublish();
@@ -518,10 +516,11 @@ const pubOn = (Base, NEXT) => class extends Base {
         return json({ error: 'no TURN key on this worker, so there is no relay for networks that block UDP', iceServers: null }, 503);
       }
       const now = Date.now();
-      const who = request.headers.get('cf-connecting-ip') || 'unknown';
-      this.#iceHits = (this.#iceHits || []).filter((h) => now - h.at < 3600_000);
-      if (this.#iceHits.length >= ICE_PER_HOUR
-        || this.#iceHits.filter((h) => h.who === who).length >= ICE_PER_ADDRESS_HOUR) {
+      // Hashed, because the stamps are now kept in storage for the hour.
+      const who = await shortHash(request.headers.get('cf-connecting-ip') || 'unknown');
+      const iceHits = await this.#getHits('ice');
+      if (iceHits.length >= ICE_PER_HOUR
+        || iceHits.filter((h) => h.who === who).length >= ICE_PER_ADDRESS_HOUR) {
         return json({ error: 'too many relay requests this hour', limit: ICE_PER_ADDRESS_HOUR }, 429);
       }
       let up;
@@ -535,7 +534,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         return json({ error: `turn upstream: ${e.message}`, iceServers: null }, 502);
       }
       if (!up.ok) return json({ error: `turn upstream ${up.status}`, iceServers: null }, 502);
-      this.#iceHits.push({ at: now, who });
+      await this.#addHit('ice', { at: now, who });
       const got = await up.json();
       // Port 53 is refused by browsers and only costs a gathering timeout,
       // which is Cloudflare's own advice. Nothing else is filtered: ICE picks.
@@ -547,7 +546,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         status: 200,
         headers: {
           'content-type': 'application/json',
-          'access-control-allow-origin': '*',
+          ...OPEN,
           // A credential with a clock on it is never cached anywhere.
           'cache-control': 'no-store',
         },
@@ -579,8 +578,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       // the same discipline `ingest` has: a small per-hour cap, counted here
       // because a DO is the only place two requests cannot both pass a check.
       const now = Date.now();
-      this.#whipHits = (this.#whipHits || []).filter((t) => now - t < 3600_000);
-      if (this.#whipHits.length >= WHIP_PER_HOUR) {
+      if ((await this.#getHits('whip')).length >= WHIP_PER_HOUR) {
         return json({ error: 'too many publishes this hour', limit: WHIP_PER_HOUR }, 429);
       }
 
@@ -617,7 +615,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       this.#whipRes = this.#whipRes || new Map();
       this.#whipRes.set(id, { url: loc ? new URL(loc, whip).toString() : null, at: now });
-      this.#whipHits.push(now);
+      await this.#addHit('whip', now);
       for (const [k, v] of this.#whipRes) if (now - v.at > 6 * 3600_000) this.#whipRes.delete(k);
       await this.#camWhipSet({ id, url: this.#whipRes.get(id).url, at: now });
 
@@ -625,7 +623,7 @@ const pubOn = (Base, NEXT) => class extends Base {
         status: 201,
         headers: {
           'content-type': 'application/sdp',
-          'access-control-allow-origin': '*',
+          ...OPEN,
           'access-control-expose-headers': 'x-whip-id',
           'x-whip-id': id,
         },
@@ -663,7 +661,7 @@ const pubOn = (Base, NEXT) => class extends Base {
      */
     if (url.pathname.startsWith('/whip') && request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: {
-        'access-control-allow-origin': '*',
+        ...OPEN,
         'access-control-allow-methods': 'POST,DELETE,OPTIONS',
         'access-control-allow-headers': 'content-type',
         'access-control-max-age': '86400',
@@ -866,7 +864,7 @@ const pubOn = (Base, NEXT) => class extends Base {
     if (at === null) await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
   }
 
-  async #startPublish(extra) {
+  async #startPublish() {
     if ((await this.#getRole()) === STAGE) {
       // ONE LEG AND NO ENCODE: the pre-transcoded film copied onto WHIP.
       const url = this.env.STAGE_WHIP_URL;
@@ -880,11 +878,7 @@ const pubOn = (Base, NEXT) => class extends Base {
       } catch { /* container still waking; the sweep retries */ }
       return;
     }
-    // THE TEST PATTERN IS RETIRED (2026-10-13). The main instance used to
-    // publish it on two legs, RTMPS (STREAM_KEY, positron-demo) and WHIP
-    // (WHIP_URL, whep-rig); both inputs and both secrets are gone, so any
-    // other role publishes nothing.
-    void extra;
+    // Any other role publishes nothing since the test pattern was retired.
   }
 
   async #stopPublish() {
@@ -1100,11 +1094,6 @@ async function shortHash(v) {
   return [...new Uint8Array(d)].slice(0, 3).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-const json = (o, status = 200) =>
-  new Response(JSON.stringify(o), {
-    status,
-    headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*' },
-  });
 
 /**
  * Which runtime answers. `PUB_RT` in wrangler.jsonc is the default, and
@@ -1127,6 +1116,9 @@ export default {
         retired: { at: '2026-10-13', routes: [...RETIRED] },
         runtime: ns(env, url) === env.PUB_NEXT ? 'next' : 'legacy',
       });
+    }
+    if (OWNER_PATHS.has(url.pathname) && !await keyMatches(request.headers.get('x-pub-key'), env.PUB_KEY)) {
+      return json({ error: 'this route needs the x-pub-key header' }, 403);
     }
     // /stage/<path> is the stage instance, and only its four routes.
     if (url.pathname.startsWith('/stage/')) {

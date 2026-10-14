@@ -107,7 +107,7 @@ function randomId() {
  * OFF when the handler returns. The email handler awaits this directly, which
  * is simpler and is fine: a mail delivery is allowed to take a second.
  */
-async function sayIntoRoom(note) {
+async function sayIntoRoom(note, env = {}) {
   /**
    * 🔴 ARM FIRST, OR THE NOTE IS SIMPLY LOST. The recorder holds its socket only
    * while it has been woken and lets go after fifteen idle minutes, so a note
@@ -120,7 +120,9 @@ async function sayIntoRoom(note) {
    */
   const armed = await fetch('https://feedback.positron.studio/arm', {
     method: 'POST',
-    headers: { Origin: ORIGIN },
+    // The key, when this worker has it, lifts the per-address arm limit that
+    // every mail would otherwise share from Cloudflare's egress address.
+    headers: { Origin: ORIGIN, ...(env.FEEDBACK_KEY ? { 'x-feedback-key': env.FEEDBACK_KEY } : {}) },
   });
   if (!armed.ok) throw new Error(`the recorder refused to wake: ${armed.status}`);
 
@@ -262,7 +264,7 @@ export default {
     // 🔴 SPEAK FIRST, REFUSE SECOND. A refusal that leaves no trace is a message
     // nobody can ever find out about, and the whole point of labelling instead
     // of dropping is that a decision stays visible. The note lands either way.
-    await sayIntoRoom({ id, name, text });
+    await sayIntoRoom({ id, name, text }, env);
 
     if (refused) message.setReject(verdict.rejectReason);
 

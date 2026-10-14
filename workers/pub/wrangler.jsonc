@@ -67,22 +67,8 @@
     { "tag": "v2", "new_sqlite_classes": ["PubNext"] }
   ],
   "vars": {
-    // PUB_W, PUB_H and PUB_FPS went 2026-10-13 with the test pattern, the
-    // only publish that sent a size (/stage/'s film is a copy, the loopback a
-    // rewrap). PUB_SOURCE and PUB_BURN stay: they reach the container's env.
-    // TESTSRC2, NOT THE FILM. `testsrc2` (or empty) means testsrc2 in
-    // container/server.mjs; the word, because an empty env value was never
-    // measured surviving the container runtime.
-    // The live stream has shown testsrc2 since 2026-09-25 because the film
-    // commit was never deployed, and /moq/ is about to be matched 1:1 against
-    // this picture, so the deploy that ships the new clock layout must not
-    // also swap the picture underneath it.
-    "PUB_SOURCE": "testsrc2",
-    // THE BURNED CLOCKS ON. server.mjs defaults them OFF since the film
-    // commit, so without this the same deploy would ship testsrc2 with no
-    // ABSOLUTE and no LOCAL at all. Both reach the container through
-    // `envVars` in worker.mjs; a var here is not in the container's env alone.
-    "PUB_BURN": "1",
+    // The test pattern's vars (PUB_W, PUB_H, PUB_FPS, PUB_SOURCE, PUB_BURN)
+    // went with its leg; container/server.mjs reads none of them.
     // WHICH CLASS ANSWERS: "legacy" is `Pub`, "next" is `PubNext`. `?rt=` on
     // any request overrides it, which is how the new one was driven live
     // before anybody's viewers were moved.

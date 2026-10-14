@@ -17,6 +17,8 @@
 // metadata, say) would add a hop of latency to every byte for no gain — the
 // metadata is already in the frames the client parses.
 
+import { OPEN } from '../_lib/http.mjs';
+
 const ERR = 'https://icecast.err.ee';
 
 /**
@@ -158,7 +160,7 @@ const HEALTH_TTL_MS = 20000;
 const healthCache = new Map();
 
 const cors = (h = {}) => ({
-  'access-control-allow-origin': '*',
+  ...OPEN,
   'access-control-expose-headers': EXPOSE,
   'cache-control': 'no-store',
   ...h,
@@ -471,6 +473,8 @@ export class Mount {
     this.peak = 0;             // most listeners at one time
     this.dropped = 0;
     this.linger = null;
+    this.opening = null;       // the dial in flight, shared by every caller
+    this.upstreams = 0;        // origin connections open right now
   }
 
   async fetch(req) {
@@ -483,7 +487,8 @@ export class Mount {
         // 🔴 THE NUMBER THE WHOLE OBJECT EXISTS TO MAKE TRUE. One connection
         // upstream however many are downstream; anything but 1 here with
         // listeners on is the tee not working.
-        upstreamConnections: this.reader ? 1 : 0,
+        // Counted per dial and per pump end, so a duplicate dial shows as 2.
+        upstreamConnections: this.upstreams,
         openFor: this.startedAt ? Date.now() - this.startedAt : 0,
       }), { headers: { 'content-type': 'application/json' } });
     }
@@ -494,7 +499,7 @@ export class Mount {
     if (!origin) return new Response('no origin', { status: 400 });
 
     const opened = await this.open(origin);
-    if (!opened) return new Response('origin refused', { status: 502 });
+    if (!opened || !this.reader) return new Response('origin refused', { status: 502 });
 
     // ⚠️ EACH SUBSCRIBER COUNTS ITS OWN BYTES, because the metadata blocks are
     // written at ITS offset and not at the origin's. `sent` is why a listener
@@ -514,10 +519,17 @@ export class Mount {
     return new Response(body, { headers: h });
   }
 
-  /** Open the origin, once. Safe to call on every subscribe. */
-  async open(origin) {
+  /** Open the origin, once. Safe to call on every subscribe, including two at once. */
+  open(origin) {
     if (this.linger) { clearTimeout(this.linger); this.linger = null; }
-    if (this.reader) return true;
+    if (this.reader) return Promise.resolve(true);
+    // The input gate does not cover an outbound fetch, so a second caller
+    // arriving mid-dial must wait on the first dial, never start its own.
+    if (!this.opening) this.opening = this.dial(origin).finally(() => { this.opening = null; });
+    return this.opening;
+  }
+
+  async dial(origin) {
     const up = await fetch(origin, {
       method: 'GET',
       headers: {
@@ -544,6 +556,7 @@ export class Mount {
     this.metaint = Number(up.headers.get('icy-metaint')) || 0;
     this.startedAt = Date.now();
     this.reader = up.body.getReader();
+    this.upstreams++;
     this.pump();
     return true;
   }
@@ -562,7 +575,7 @@ export class Mount {
     try {
       for (;;) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done || this.reader !== reader) break;
         this.pulled += value.byteLength;
         let i = 0;
         while (i < value.byteLength) {
@@ -588,6 +601,10 @@ export class Mount {
         }
       }
     } catch { /* the origin hung up; fall through and close */ }
+    this.upstreams--;
+    // A pump whose reader was cancelled by the linger must not tear down the
+    // connection a later listener opened in its place.
+    if (this.reader !== reader) return;
     this.reader = null;
     for (const s of [...this.subs]) this.drop(s);
   }

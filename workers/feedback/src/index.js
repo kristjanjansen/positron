@@ -41,12 +41,15 @@
  * is a published token, which is the same argument that made the relay
  * tokenless. Nothing here is worth more protection than that buys.
  *
- * What is NOT stored, deliberately: no IP address (the recorder never sees the
- * sender's request — it hears the message over the relay), no user agent, no
+ * What is NOT stored, deliberately: no IP address with a note (the recorder
+ * hears notes over the relay; /arm keeps a 4 byte hash of the caller's address
+ * for one hour to count arms, apart from any note), no user agent, no
  * screen size, no language, no cookie and no lasting visitor id. `sender` is
  * the wire's per-CONNECTION id, which dies with the socket. Nobody typed any of
  * the rest, and a page should keep what a visitor typed.
  */
+
+import { json as baseJson, OPEN, preflight, callerIp, keyMatches } from '../../_lib/http.mjs';
 
 const RELAY = 'https://ws.positron.studio';
 
@@ -69,14 +72,17 @@ const IDLE_STOP_MS = 15 * 60 * 1000;       // stop holding the socket open
 const ALARM_MS = 30 * 1000;
 const MAX_TEXT = 4000;                     // UTF-8 bytes
 const MAX_NAME = 80;
-// ⚠️ PER SOCKET, WHICH IS NOT PER PERSON AND THE COMMENT SAYS SO RATHER THAN
-// IMPLYING OTHERWISE. The page opens a fresh connection for every send, so this
-// does not bind somebody pressing the button over and over — that is bounded in
-// the page, where it can be refused with a reason. What this catches is one
-// connection held open and flooded, which is the shape a flood actually takes,
-// and the only shape the recorder can see: it hears messages over the relay and
-// never sees a request, so there is no address here to count against.
-const PER_MIN = 20;                        // notes accepted from one socket a minute
+// A note is kept only against an arm. /arm is an HTTP request, so its Origin
+// and cf-connecting-ip are set by the browser and by Cloudflare, not by the
+// sender; each arm grants one note for CREDIT_MS, and arms are counted per
+// address (a 4 byte hash, kept one hour) and per room. A note's own `from` and
+// `origin` fields are claims and limit nothing.
+const CREDIT_MS = 60 * 1000;
+const CREDITS_MAX = 20;
+const ARMS = {
+  [LIVE_ROOM]: { perAddress: 12, total: 120 },   // an hour
+  [DEV_ROOM]: { perAddress: 600, total: 2000 },  // the harness arms once per send
+};
 
 export class Feedback {
   constructor(state, env) {
@@ -90,9 +96,7 @@ export class Feedback {
     // anything else, so two frames a millisecond apart would otherwise race
     // each other into the table. positron-store learned this the same way.
     this.chain = Promise.resolve();
-    // in memory only, and lost on hibernation — which is fine, because this is
-    // an anti-flood and not a security boundary. The boundary is the origin.
-    this.rate = new Map();
+    this.credits = [];         // expiry times, one per arm not yet spent
     this.refused = 0;
     this.sql.exec(`CREATE TABLE IF NOT EXISTS note(
       n INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,13 +137,25 @@ export class Feedback {
     return true;
   }
 
-  /** How many notes this socket has landed in the current minute. */
-  #overRate(from) {
-    const minute = Math.floor(Date.now() / 60000);
-    const seen = this.rate.get(from);
-    if (!seen || seen.minute !== minute) { this.rate.set(from, { minute, n: 1 }); return false; }
-    seen.n++;
-    return seen.n > PER_MIN;
+  /** Count this arm against its address and its room for the past hour.
+   *  Answers the refusal, or null when the arm may go ahead. */
+  async #admit(room, who) {
+    const now = Date.now();
+    const lim = ARMS[room] || ARMS[DEV_ROOM];
+    const arms = ((await this.state.storage.get('arms')) || []).filter((a) => now - a.at < 3600_000);
+    if (arms.length >= lim.total) return 'too many notes this hour';
+    if (who !== 'key' && arms.filter((a) => a.who === who).length >= lim.perAddress) return 'too many notes from this address this hour';
+    arms.push({ at: now, who });
+    await this.state.storage.put('arms', arms);
+    this.credits = this.credits.filter((t) => t > now).concat(now + CREDIT_MS).slice(-CREDITS_MAX);
+    return null;
+  }
+
+  /** Spend one arm's credit on a note, if one is still live. */
+  #spend() {
+    const now = Date.now();
+    this.credits = this.credits.filter((t) => t > now);
+    return this.credits.shift() !== undefined;
   }
 
   async #onMessage(data) {
@@ -151,11 +167,8 @@ export class Feedback {
     const meta = await this.#meta();
     meta.seen++;
 
-    // ⚠️ THE SENDER'S OWN CLAIM ABOUT WHERE IT IS, and it is the BELT rather
-    // than the braces: a message can say anything. The braces are `/arm`, which
-    // will not put this recorder in the real room for any other origin. What
-    // this adds is that a write into the real room has to LIE to get in, rather
-    // than slip in while a real visitor happens to be holding the room open.
+    // `origin` is the sender's claim and only makes a stray write lie to get
+    // in. The limit is the arm credit, which only /arm can grant.
     const wantLive = this.room === LIVE_ROOM;
     const claims = String(m.origin || '');
     const text = String(m.text ?? '').trim();
@@ -163,7 +176,7 @@ export class Feedback {
     const bad = !text ? 'empty'
       : new TextEncoder().encode(text).byteLength > MAX_TEXT ? 'too long'
       : (wantLive && claims !== LIVE_ORIGIN) ? 'wrong origin for this room'
-      : this.#overRate(from) ? 'over the per minute cap'
+      : !this.#spend() ? 'no arm for this note'
       : '';
     if (bad) {
       this.refused++;
@@ -247,6 +260,8 @@ export class Feedback {
     const meta = await this.#meta();
 
     if (url.pathname === '/arm') {
+      const no = await this.#admit(room, url.searchParams.get('who') || '');
+      if (no) return json({ armed: false, room, error: no }, 429);
       const armed = await this.#arm(room);
       return json({ armed, room, live: room === LIVE_ROOM, ...(await this.#counts()) });
     }
@@ -276,7 +291,7 @@ export class Feedback {
         text: r.text || '', sender: r.sender || '', build: r.build || '',
       }));
       const head = {
-        'access-control-allow-origin': '*',
+        ...OPEN,
         'access-control-expose-headers': 'X-Feedback',
         // what the reader is looking at, so nothing has to imply a completeness
         // it cannot check. Same idea as positron-store's X-Store.
@@ -298,14 +313,13 @@ export class Feedback {
   }
 }
 
-const json = (o, status = 200) => new Response(JSON.stringify(o), {
-  status,
-  headers: {
-    'content-type': 'application/json',
-    'access-control-allow-origin': '*',
-    'access-control-expose-headers': 'X-Feedback',
-  },
-});
+const json = (o, status = 200) => baseJson(o, status, { 'access-control-expose-headers': 'X-Feedback' });
+
+/** 4 bytes of SHA-256: enough to count one address's arms, not to name it. */
+async function shortHash(v) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  return [...new Uint8Array(d)].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 // ── not ready to be found ───────────────────────────────────────────────────
 // 🔴 THIS HOST ANSWERS 200 JSON AT `/` AND A SEARCH ENGINE WILL KEEP THAT.
@@ -350,16 +364,7 @@ const routes = {
       });
     }
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'access-control-allow-origin': '*',
-          'access-control-allow-methods': 'GET, POST, OPTIONS',
-          'access-control-allow-headers': 'content-type',
-          'access-control-max-age': '86400',
-        },
-      });
-    }
+    if (request.method === 'OPTIONS') return preflight('GET, POST, OPTIONS', 'content-type');
 
     if (url.pathname === '/' || url.pathname === '') {
       return json({
@@ -382,15 +387,19 @@ const routes = {
     // forge. No query parameter reaches this line and no body is read.
     if (url.pathname === '/arm' && request.method === 'POST') {
       const room = roomFor(request.headers.get('origin'));
+      // positron-mail arms from Cloudflare's own egress, one address for every
+      // mail, so a caller holding FEEDBACK_KEY is counted only in the room total.
+      const who = await keyMatches(request.headers.get('x-feedback-key'), env.FEEDBACK_KEY)
+        ? 'key' : await shortHash(callerIp(request));
       return env.NOTES.get(env.NOTES.idFromName(room))
-        .fetch(`https://x/arm?room=${room}`, { method: 'POST' });
+        .fetch(`https://x/arm?room=${room}&who=${who}`, { method: 'POST' });
     }
 
     // Clearing is the one destructive act, so it needs a secret — and with no
     // secret set it refuses rather than allows. `wrangler secret put FEEDBACK_KEY`.
     if (url.pathname === '/clear' && request.method === 'POST') {
       const key = env.FEEDBACK_KEY;
-      if (!key || request.headers.get('x-feedback-key') !== key) {
+      if (!await keyMatches(request.headers.get('x-feedback-key'), key)) {
         return json({ error: 'clearing needs the x-feedback-key header' }, 403);
       }
       const room = pickRoom(url.searchParams.get('room'));

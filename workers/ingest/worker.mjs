@@ -1,11 +1,7 @@
 // positron-ingest — a TOKENLESS write path to R2, with caps.
 //
-// WHY IT IS SEPARATE FROM workers/selfrec. selfrec has the same R2 binding and
-// would have been fewer files, but every route there is gated on
-// Bearer SELFREC_TOKEN. Adding one unauthenticated route into that file makes
-// the auth story "all of them except this one", which is exactly the shape that
-// gets read wrong later. The public surface lives here, alone, in one file that
-// can be read top to bottom.
+// The token-gated path was workers/selfrec, deleted from Cloudflare 2026-10-13;
+// this is the public one, alone in one file.
 //
 // WHY TOKENLESS AT ALL. A public demo page cannot hold a secret — the same
 // reasoning that made the relay tokenless. So instead of a credential, the
@@ -30,60 +26,14 @@
 // Objects are readable at https://archive.positron.studio/demo/ingest/<session>/
 // which is the same public base 14 replay already plays from.
 
+import { json as baseJson, OPEN } from '../_lib/http.mjs';
+
 const PUBLIC_BASE = 'https://archive.positron.studio';
 const PREFIX = 'demo/ingest';
 
-// ── TIERS ──────────────────────────────────────────────────────────────────
-//
-// One write path, two kinds of caller. The difference between them was two
-// Workers until 2026-09-08 (`positron-ingest` and `elektron-selfrec`), which is
-// two implementations of one job whose only real difference is WHO IS ASKING —
-// a property of a request, not of a deployment. So it is a table now.
-//
-// THE ONE RULE THIS FILE MUST NOT GET WRONG: `tierOf` returns `open` unless a
-// token VALIDATES. Never "not open" by elimination, never a truthy check on a
-// header that might be absent. The open tier is the DEFAULT VALUE, not an
-// else-branch, because a mistake in the other direction is not an error — it is
-// handing an anonymous caller the untimed path.
-const TIERS = {
-  open: {
-    ttlHours: 6,                            // then the sweep deletes it
-    maxSegmentBytes: 24 * 1024 * 1024,
-    maxSegments: 45,
-    maxSessionBytes: 24 * 1024 * 1024,
-    maxSessionsPerHour: 5,                  // per principal
-    maxBytesPerHour: 64 * 1024 * 1024,      // per principal
-  },
-  trusted: {
-    ttlHours: null,                         // kept until something deletes it
-    maxSegmentBytes: 5 * 1024 * 1024 * 1024,
-    maxSegments: Infinity,
-    maxSessionBytes: Infinity,
-    maxSessionsPerHour: Infinity,
-    maxBytesPerHour: Infinity,
-  },
-};
-
-/**
- * Which tier is asking. `open` unless a token validates — see the note above.
- *
- * Constant-time-ish compare: a length check then a char-by-char XOR, so the
- * answer does not leak the token's prefix through timing. Overkill for a demo
- * store and free to write.
- */
-export function tierOf(request, env) {
-  let tier = 'open';                        // the DEFAULT, not an else-branch
-  const secret = env?.SELFREC_TOKEN;
-  if (!secret) return tier;
-  const auth = request.headers.get('authorization') || '';
-  if (!auth.startsWith('Bearer ')) return tier;
-  const given = auth.slice(7);
-  if (given.length !== secret.length) return tier;
-  let diff = 0;
-  for (let i = 0; i < secret.length; i++) diff |= given.charCodeAt(i) ^ secret.charCodeAt(i);
-  if (diff === 0) tier = 'trusted';
-  return tier;
-}
+// One tier since 2026-10-14: the token-gated `trusted` tier was selfrec's,
+// had no other caller, and answered 403 on every segment (the session's
+// principal was `tier:trusted`, every later route compared an address hash).
 
 /** Every cap in one place, and served at /limits so the page can display them. */
 const LIMITS = {
@@ -126,15 +76,12 @@ const FORMATS = {
 };
 
 const CORS = {
-  'access-control-allow-origin': '*',
+  ...OPEN,
   'access-control-allow-methods': 'GET,PUT,POST,OPTIONS',
   'access-control-allow-headers': 'content-type',
   'access-control-max-age': '86400',
 };
-const json = (o, status = 200) => new Response(JSON.stringify(o), {
-  status,
-  headers: { 'content-type': 'application/json', ...CORS },
-});
+const json = (o, status = 200) => baseJson(o, status, CORS);
 
 /** Group one address without storing it: truncated SHA-256, same as the pub DO. */
 async function addrKey(request) {
@@ -174,10 +121,8 @@ export class Quota {
     return id ? (await this.state.storage.get(`s:${id}`)) || null : null;
   }
 
-  async #open({ addr, tier = 'open' }) {
-    // The caps and the TTL come from the TIER, not from a module constant. An
-    // unknown tier resolves to `open`, so a bug upstream cannot widen anything.
-    const L = TIERS[tier] || TIERS.open;
+  async #open({ addr }) {
+    const L = LIMITS;
     const now = Date.now();
     const hourKey = `a:${addr}`;
     const rec = (await this.state.storage.get(hourKey)) || { windowStart: now, sessions: 0, bytes: 0 };
@@ -194,13 +139,11 @@ export class Quota {
     // with or overwrite another session.
     const session = [...crypto.getRandomValues(new Uint8Array(8))]
       .map((b) => b.toString(16).padStart(2, '0')).join('');
-    // `ttlHours: null` on the trusted tier means NO EXPIRY: the session record
-    // carries no `expiresAt`, and the sweep skips anything without one.
-    const expiresAt = L.ttlHours == null ? null : now + L.ttlHours * 3600_000;
+    const expiresAt = now + L.ttlHours * 3600_000;
     await this.state.storage.put(`s:${session}`, {
       addr, createdAt: now, expiresAt, segments: 0, bytes: 0, closed: false,
     });
-    return json({ session, expiresAt, tier, limits: { ...L, segmentSeconds: LIMITS.segmentSeconds } });
+    return json({ session, expiresAt, tier: 'open', limits: L });
   }
 
   async #charge({ session, addr, bytes, seq }) {
@@ -208,9 +151,8 @@ export class Quota {
     if (!s) return json({ error: 'unknown session' }, 404);
     if (s.closed) return json({ error: 'session already closed' }, 409);
     if (s.addr !== addr) return json({ error: 'session belongs to another client' }, 403);
-    // `expiresAt == null` means the trusted tier: no expiry. Written as an
-    // explicit null check because `Date.now() > null` is TRUE — a plain
-    // comparison would 410 every trusted upload on its first segment.
+    // `!= null`: a session the retired trusted tier opened has no expiry, and
+    // `Date.now() > null` is true.
     if (s.expiresAt != null && Date.now() > s.expiresAt) {
       return json({ error: 'session expired' }, 410);
     }
@@ -260,10 +202,8 @@ export class Quota {
     const all = await this.state.storage.list({ prefix: 's:' });
     let deleted = 0, objects = 0;
     for (const [key, s] of all) {
-      // SKIP ANYTHING WITH NO EXPIRY. `now <= null` is FALSE, so without this
-      // the sweep would fall straight through and delete every trusted session
-      // on its first run — the worst bug available in this file, and it is one
-      // coercion away from being written.
+      // A session with no expiry was opened by the retired trusted tier to be
+      // kept; `now <= null` is false, so without this line it would be deleted.
       if (s.expiresAt == null) continue;
       if (now <= s.expiresAt) continue;
       const id = key.slice(2);
@@ -280,7 +220,12 @@ export class Quota {
       await this.state.storage.delete(key);
       deleted++;
     }
-    return json({ swept: deleted, objects });
+    // The per-address hour windows, once their hour is over.
+    let windows = 0;
+    for (const [key, rec] of await this.state.storage.list({ prefix: 'a:' })) {
+      if (now - (rec.windowStart || 0) > 3600_000) { await this.state.storage.delete(key); windows++; }
+    }
+    return json({ swept: deleted, objects, windows });
   }
 }
 
@@ -304,12 +249,7 @@ export default {
     if (request.method === 'GET' && parts[0] === 'limits') return json({ limits: LIMITS, publicBase: `${PUBLIC_BASE}/${PREFIX}` });
 
     if (request.method === 'POST' && parts[0] === 'open' && parts.length === 1) {
-      // The PRINCIPAL is the address for an anonymous caller and the token's
-      // tier for a trusted one, so a trusted caller's quota is not charged
-      // against whatever network it happens to be on.
-      const tier = tierOf(request, env);
-      const addr = tier === 'trusted' ? 'tier:trusted' : await addrKey(request);
-      const r = await ask(env, 'open', { addr, tier });
+      const r = await ask(env, 'open', { addr: await addrKey(request) });
       return json(r.body, r.status);
     }
 

@@ -1,8 +1,7 @@
 {
-	// positron-ingest — the ONE tokenless write path to R2. Deliberately its own
-	// worker: workers/selfrec has the same bucket binding but gates every route
-	// on Bearer SELFREC_TOKEN, and adding one unauthenticated route there would
-	// make the auth story "all of them except this one".
+	// positron-ingest, the one tokenless write path to R2. Callers on
+	// 2026-10-14: /stage/ (demo/shell/ingest.mjs), demo/shell/openers.mjs and
+	// /capture/'s SEGMENTS tab behind ?r2=1.
 	//
 	// Caps live in worker.mjs (LIMITS) and are enforced in the Quota Durable
 	// Object, so parallel uploads cannot both pass the same check.
