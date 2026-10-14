@@ -1,16 +1,7 @@
-/* demo/shell/slide.css, the stylesheet of `slide.mjs`.
-
-   🔴 A FILE OF ITS OWN AND NOT A BLOCK IN `shell.css`, AND A PAGE LINKS IT.
-   `shell.css` is read by every page on the site and a slide is drawn by one
-   (`/kit/`); two `@font-face` rules and forty slide rules there would be parsed
-   by forty-five pages that never draw one. A component stylesheet beside its
-   module is what `wave-view.mjs` does with an injected block, and this is too
-   long to live in a string. `slide.mjs` adds the link itself when a page forgot
-   it, so forgetting costs one late stylesheet and never an unstyled slide.
-
-   THE SCALE IS NOT HERE. Its six steps (size, line height, tracking) are
-   declared once, in `SCALE` in `slide.mjs`, and written onto `.sl` as custom
-   properties by `scaleCss()`. Every rule below reads them. */
+/* The stylesheet of `slide.mjs`, apart from `shell.css` so pages that draw no
+   slide do not parse it. The type scale is `SCALE` in `slide.mjs`, written
+   onto `.sl` by `scaleCss()`. */
+/* why: lessons/css-slide.md#file-header */
 
 /* THE FACE: JetBrains Mono, 400 and 600, Latin subset, from @fontsource 5.3.0,
    SIL OFL 1.1 with its licence beside it, the same files the site's `--mono`
@@ -19,20 +10,18 @@
   src: url('/shell/vendor/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
 @font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
   src: url('/shell/vendor/jetbrains-mono-latin-600-normal.woff2') format('woff2'); }
-/* THE GREEK SUBSET AT 600, for the β of the logo (`/kit/logo/`), which the
-   Latin file does not hold. Same package, same licence; its `unicode-range`
-   is @fontsource's own, so the browser asks for it only when a Greek letter is
-   laid out, and a page with none never fetches it. Declared AFTER the Latin
-   face, because faces of one family are tried last declared first. */
+/* The Greek subset at 600, for the logo's β. Its `unicode-range` means only a
+   page with a Greek letter fetches it. After the Latin face, because the last
+   declared is tried first. */
+/* why: lessons/css-slide.md#font-face-2 */
 @font-face { font-family: 'Slide JetBrains Mono'; font-weight: 600; font-style: normal; font-display: block;
   src: url('/shell/vendor/jetbrains-mono-greek-600-normal.woff2') format('woff2');
   unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF; }
 
-/* ONE SLIDE, 16:9, SIZED OFF ITS CONTAINER. The frame is an inline size
-   container, so the slide is as wide as whatever holds it and nine sixteenths
-   as tall, and the slide is a SIZE container, so every step in `cqh` is a
-   share of this slide's height and of nothing else: a slide in a kit column,
-   on a phone and filling a projector is one slide at three scales. */
+/* One 16:9 slide sized off its container: the frame is an inline size
+   container and the slide a size container, so every `cqh` step is a share of
+   this slide's height. */
+/* why: lessons/css-slide.md#sl-frame */
 .sl-frame { container-type: inline-size; }
 .sl {
   position: relative;
@@ -43,21 +32,17 @@
   background: var(--card);
   border: var(--edge); border-radius: var(--r);
   font-family: 'Slide JetBrains Mono', var(--mono);
-  /* 🔴 THE SLIDE'S ONE UNIT, a hundredth of the height of a 16:9 slide this
-     wide. On a 16:9 slide that is `1cqh`, which is what every step, inset and
-     rule was written in. A slide that is TALLER than 16:9 (a narrow player,
-     below) pins it to the width instead, so the type stays the size it is on a
-     16:9 slide and the extra height goes to the slot. Substituted where it is
-     used, so `cqh` resolves against the slide there. */
+  /* The slide's one unit, `1cqh` on a 16:9 slide. A slide taller than 16:9
+     pins it to the width, so the type keeps its size and the extra height goes
+     to the slot. */
+  /* why: lessons/css-slide.md#sl */
   --sl-u: 1cqh;
 }
 .sl[hidden] { display: none; }
 
-/* IN A PLAYER the panel's stage is the size container and the slide fills it,
-   letterboxed: in the page the stage is 16:9 already, and full screen on a
-   screen of another shape centres a 16:9 slide rather than stretching the type
-   to the screen's shape. The stage draws the edge, so the slide gives up its
-   own. (0,2,0) against `.sl` at (0,1,0). */
+/* In a player the stage is the size container and the slide letterboxes 16:9
+   in it, never stretched. The stage draws the edge. (0,2,0) against `.sl`. */
+/* why: lessons/css-slide.md#sl-player-pos-vp-stage */
 .sl-player .pos-vp-stage { container-type: size; }
 .sl-player .sl {
   position: absolute; inset: 0; margin: auto;
@@ -66,12 +51,9 @@
   border: 0; border-radius: 0;
 }
 .sl-player .sl[hidden] { display: none; }
-/* 🔴 FULL SCREEN FILLS THE SCREEN WITH THE SLIDE'S GROUND AND KEEPS ITS EDGE.
-   Asked 2026-10-05 with a 16:10 laptop full of black bands: *"fill full bg but
-   keep border"*. The panel's own full stage is `#000` (0,2,0); a slide's is
-   its card, and a split's darker half runs on to the screen edge on its side.
-   The slide is centred, so its middle is the screen's middle and a hard stop at
-   50 per cent meets the half inside the slide exactly. */
+/* Full screen fills the screen with the slide's ground. The slide is centred,
+   so a hard stop at 50 per cent meets a split's darker half exactly. */
+/* why: lessons/css-slide.md#sl-player-data-full-pos-vp-stage */
 .sl-player[data-full] .pos-vp-stage { background: var(--card); }
 .sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-side="left"]:not([hidden])) {
   background: linear-gradient(to right, var(--bg) 50%, var(--card) 50%);
@@ -80,20 +62,16 @@
   background: linear-gradient(to right, var(--card) 50%, var(--bg) 50%);
 }
 .sl-player[data-full] .sl { border: 0; border-radius: 0; }
-/* 🔴 THE SCREEN'S EDGE IS THE BORDER. Asked 2026-10-05, after a version that
-   drew the slide's edge inset from the screen: *"what is this???? just all bg
-   is slide bg and border is screens border"*. In full screen the slide's
-   ground fills the screen and no edge is drawn; the 16:9 box only keeps the
-   type and the caption where they are on every slide. */
+/* In full screen the screen's edge is the border: the slide's ground fills it
+   and no edge is drawn. */
+/* why: lessons/css-slide.md#sl-player-focus */
 .sl-player:focus { outline: none; }
 .sl-player:focus-visible { outline: 1px solid var(--hi); outline-offset: 2px; }
 
-/* ONE SLIDE FILLING THE SCREEN, `createSlide(spec, { full: true })`. The
-   frame is what goes full, by the real API or the cover in `fullscreen.mjs`,
-   both of which set `.pos-full`; a class, never `:fullscreen` (shell.css says
-   why). It becomes a SIZE container so the slide letterboxes 16:9 in it and
-   every step stays a share of the slide, not of the screen; the ground behind
-   is the slide's own, and the slide keeps its edge. (0,2,0). */
+/* One slide filling the screen: a class, never `:fullscreen`. The frame
+   becomes a size container so the slide letterboxes 16:9 and steps stay shares
+   of the slide. (0,2,0). */
+/* why: lessons/css-slide.md#sl-frame-pos-full */
 .sl-frame.pos-full {
   container-type: size;
   display: grid; place-items: center;
@@ -107,16 +85,10 @@
   height: min(100cqh, calc(100cqw * 9 / 16));
   border: 0; border-radius: 0;
 }
-/* THE ⛶, the video panel's square (`.pos-vp button.ico`), bottom right where
-   the panel keeps its own. Hidden until a pointer is on the slide or the slide
-   holds focus, and unpressable while hidden, so the corner of a slide is never
-   a control nobody can see. On a screen with no hover it is always there,
-   because a phone has no other way back out.
-   🔴 AND ON A SCREEN WITH NO HOVER IT IS TOP RIGHT, asked 2026-10-05 from the
-   slides list as item 11, *"the ⛶ sitting over long captions on a phone"*.
-   Always visible there, bottom right, it sat on the caption's line, and on a
-   phone's slide a caption is long enough to reach the corner. The top right
-   is where a headline is shortest: it is balanced and starts on the left. */
+/* Hidden until hover or focus and unpressable while hidden. With no hover it
+   is always shown, top right, because bottom right sits on a long caption and
+   a phone has no other way out. */
+/* why: lessons/css-slide.md#sl-sl-full */
 .sl .sl-full {
   position: absolute; right: 12px; bottom: 12px; z-index: 2;
   width: 34px; height: 34px; padding: 0; font-size: 15px; line-height: 1;
@@ -130,18 +102,16 @@
    so the stage drops the 300 ms double tap wait and the iOS loupe. */
 .sl-player .pos-vp-stage { touch-action: manipulation; -webkit-touch-callout: none; }
 
-/* THE INSET IS ON A BOX INSIDE THE SLIDE AND NEVER ON THE SLIDE, because a
-   container's query units measure its CONTENT box. MEASURED on the archive:
-   with the padding on the slide, a 9 per cent step came out at 7.7. */
+/* The inset is on a box inside the slide, because query units measure the
+   container's content box (a 9 per cent step came out at 7.7 with padding on
+   the slide). */
+/* why: lessons/css-slide.md#sl-in */
 .sl-in {
   height: 100%;
   display: flex; flex-direction: column;
-  /* ONE INSET, THE SAME ON ALL FOUR SIDES. Asked 2026-10-05 with a crop of a
-     split's words column, more air at the sides than at the top: *"same w and
-     h padding"*. It was 7 per cent of the height against 6 per cent of the
-     width, which at 16:9 is 10.7 per cent of the height. One number in cqh
-     now, and a split's gap is twice it, so the words stand the same distance
-     off the divide as off the edges. */
+  /* One inset in cqh on all four sides. A split's gap is twice it, so the
+     words stand the same distance off the divide as off the edges. */
+  /* why: lessons/css-slide.md#sl-in-2 */
   padding: var(--sl-pad);
 }
 /* The words column: the headline and what proves it. */
@@ -162,18 +132,15 @@
 /* THE ACCENT, on what carries the point. Same face, size and advance, so a
    character column through it still lines up. */
 .sl-hi { color: var(--hi); }
-/* A HUE JOINS A WORD TO A BOX. The diagram names a box in
-   `tint(hue, TEXT_TINT, 'var(--fg)')`, 62 per cent into the ink; this is the
-   same formula, so `Cloudflare` on a slide is the colour of the Cloudflare
-   box. The hue is a custom property per span. */
+/* A hue joins a word to a diagram box: the same `tint(hue, TEXT_TINT,
+   'var(--fg)')` formula, 62 per cent into the ink. The hue is a custom
+   property per span. */
+/* why: lessons/css-slide.md#sl-hue */
 .sl-hue { color: color-mix(in oklab, hsl(var(--sl-hue) 72% 62%) 62%, var(--fg)); }
-/* A NAME OUT OF A PROGRAM, `` `volume` `` in a slide's words, 2026-10-06:
-   *"var name is in monospace inside text"*. The slide's own mono face at the
-   size, weight and ink of the words around it (a `<code>` would otherwise
-   take the UA's smaller monospace size). Coloured only when `hueVars()` gave
-   it a knob's hue, by the code box's own formula for that name
-   (`.pos-tk-pvar[data-hue]` in shell.css), so the word, the code and the knob
-   read one hue. */
+/* A name out of a program in slide words: the slide's mono face at the
+   surrounding size and ink (a `<code>` would take the UA's smaller size), hued
+   like `.pos-tk-pvar[data-hue]`. */
+/* why: lessons/css-slide.md#sl-var */
 .sl-var { font-family: 'Slide JetBrains Mono', var(--mono); font-size: 1em; font-weight: inherit;
   letter-spacing: 0; color: inherit; background: none; padding: 0; }
 .sl-var[data-hue] { color: hsl(var(--param-hue) 75% 72%); }
@@ -197,19 +164,16 @@
 .sl-list { list-style: none; padding: 0; margin: 0; text-align: left; }
 .sl-list li { margin: 0; }
 .sl-text { max-width: 100%; text-wrap: pretty; }
-/* BODY TEXT IN THE SANS, 2026-10-06, *"use sans-serif for slide body text"*:
-   a sentence is read, so it is set in the page's reading face; headlines,
-   lines, numbers, tables and code keep the slide face. */
-/* AND EVERY OTHER LINE OF BODY, the same day, asked again on /kit/slides/ as
-   *"Use sans for slides body"*: a caption, a list and the line under a big
-   figure are read the same way a sentence is. A name in backticks inside any
-   of them stays in the slide face (`.sl-var`). */
+/* Body text is read, so it is set in the page's sans. Headlines, numbers,
+   tables and code keep the slide face. */
+/* why: lessons/css-slide.md#sl-sl-text-sl-sl-cap-sl-sl-list-sl-sl-under */
+/* Captions, lists and the line under a big figure are read too, so they are
+   sans. A backticked name inside them stays in the slide face (`.sl-var`). */
+/* why: lessons/css-slide.md#sl-sl-text-sl-sl-cap-sl-sl-list-sl-sl-under-2 */
 .sl .sl-text, .sl .sl-cap, .sl .sl-list, .sl .sl-under { font-family: var(--sans); letter-spacing: 0; }
-/* WORDS UNDER A HEADLINE START WHERE THE HEADLINE STARTS. Asked 2026-10-05,
-   twice: *"HEADLINE OVER TEXT align texts to left"*, then on the marks slide
-   *"align left the same"*. A sentence or a list is read, so it goes on the
-   headline's left edge; a number, a stack, a table or a picture is looked at
-   and stays centred. */
+/* Read words (a sentence, a list) start on the headline's left edge. Things
+   looked at (a number, a table, a picture) stay centred. */
+/* why: lessons/css-slide.md#sl-data-layout-stack-sl-ev-has-sl-list-sl-text */
 .sl[data-layout="stack"] .sl-ev:has(> .sl-list, > .sl-text) { align-items: flex-start; text-align: left; }
 .sl-big + .sl-under { margin-top: calc(-2 * var(--sl-u)); }
 /* THE TITLE SLIDE: the talk's name top left at step 5, who and when on the
@@ -222,45 +186,35 @@
    and no number says where the corner is. */
 .sl-cap { flex: 0 0 auto; margin-top: calc(3 * var(--sl-u)); align-self: stretch; text-align: left; color: var(--dim); }
 
-/* MONO DOING WHAT ONLY MONO CAN: a table of lines padded with spaces, so a
-   column is a character position. */
+/* A table of space-padded lines, so a column is a character position. */
+/* why: lessons/css-slide.md#sl-rows */
 .sl-rows { text-align: left; white-space: pre; }
-/* 🔴 ROW LINES, `rows.frame` 'none' or 'box'. A 1 px `--line` rule between
-   rows and under the header, never between columns. The air inside a row is
-   from the table's own step, in em: 0.3 above and below so a rule never
-   touches a glyph, and 0.6 either side, which is one character of this face,
-   so the padding sits on the same grid the columns do. Every row carries the
-   same inset, so the character columns line up exactly as in a plain table.
-   `box` adds the site's own edge and corner, read from the tokens. */
-/* 🔴 ONE RULE WIDTH ON A SLIDE, A SHARE OF ITS HEIGHT, SO IT SCALES WITH THE
-   SLIDE IN FULL SCREEN. Asked 2026-10-05: *"thicker table lines, same as
-   other lines. when on fullsc scale all borders proportionally"*. The diagram's
-   1.5 logical px edge prints at about 1.5 px on the kit's 386 px slide, so 0.4
-   per cent of the slide's height is the same line; never under 1 px. */
+/* Row rules 1 px `--line`, between rows and under the header, never between
+   columns. Row air in em: 0.3 above and below, 0.6 either side (one
+   character), so columns stay on the grid. */
+/* why: lessons/css-slide.md#sl-2 */
+/* One rule width, 0.4 per cent of the slide's height, so lines scale in full
+   screen. Never under 1 px. */
+/* why: lessons/css-slide.md#sl-3 */
 .sl { --sl-rule: max(1px, calc(0.4 * var(--sl-u))); --sl-pad: calc(8 * var(--sl-u));
-  /* SUBTLER, asked 2026-10-05 on the tabular log: *"subtler gradiend undert
-     hable header and trans to bg color"*. It was a full fade over two lines,
-     which read as a dark band under the header. One line now, from a third
-     strength to full, so the top row is dimmed into the ground rather than
-     dissolved. */
+  /* One line from a third strength to full, so the top row dims into the
+     ground rather than reading as a dark band. */
+  /* why: lessons/css-slide.md#sl-4 */
   --sl-log-fade: linear-gradient(to bottom, rgb(0 0 0 / 0.35), #000 1lh); }
 .sl-rows[data-frame] > .sl-row,
 .sl-log .sl-row { padding: 0.3em 0.6em; }
 .sl-rows[data-frame] > .sl-row + .sl-row { border-top: var(--sl-rule) solid var(--line); }
-/* A LOG'S RULE IS UNDER EACH ROW, NOT OVER IT. Over it, the first row in view
-   after the oldest had scrolled away drew its rule straight under the
-   header's, two lines together (*"rm doublw underline on LIVE TABULAR LOG ON
-   A SLIDE"*). Under it, the newest row has none and the header's is alone. */
+/* A log's rule is under each row, so the first row in view never draws a
+   second line under the header's. */
+/* why: lessons/css-slide.md#sl-log-body-sl-row-not-last-child */
 .sl-log-body > .sl-row:not(:last-child) { border-bottom: var(--sl-rule) solid var(--line); }
-/* FULL WIDTH, asked 2026-10-05: *"tables full w. no roundex box"*. A ruled
-   table spans the evidence region edge to edge, so its rules do too. */
+/* A ruled table spans the evidence region edge to edge, so its rules do too. */
+/* why: lessons/css-slide.md#sl-rows-data-frame */
 .sl-rows[data-frame] { align-self: stretch; }
 
-/* 🔴 A LIVE LOG IS A FIXED BOX. It takes the height of its slot and never of
-   its rows, so a row arriving moves nothing on the slide; the body scrolls to
-   its foot, so the newest row is at the bottom and the oldest leave the top.
-   The header stays put and its rule is its own bottom edge, so the line under
-   it does not depend on which row happens to be first in view. */
+/* A live log is a fixed box: it takes the slot's height, never its rows', and
+   scrolls to its foot. The header's rule is its own bottom edge. */
+/* why: lessons/css-slide.md#sl-log */
 .sl-log {
   align-self: stretch; flex: 1 1 auto; min-height: 0;
   display: flex; flex-direction: column;
@@ -271,26 +225,22 @@
   /* the same fade as the plain log's, so a row leaving is never cut in half */
   -webkit-mask-image: var(--sl-log-fade);
   mask-image: var(--sl-log-fade); }
-/* THE SHELL'S OWN LOG AT SLIDE SCALE. `.pos-log` is px type in a bordered
-   card with a 150 px ceiling; in a slot it is the slide's face at step 1, on
-   the darker half with no box of its own, as tall as the slot and no taller.
-   (0,2,0) against its (0,1,0) font shorthand. `addLine` scrolls it to its
-   foot, which is what makes the oldest line leave the top. */
+/* The shell's log at slide scale: the slide face at step 1 on the darker half,
+   no box, as tall as the slot. (0,2,0) against its font shorthand. */
+/* why: lessons/css-slide.md#sl-slot-pos-log */
 .sl-slot > .pos-log {
   align-self: stretch; flex: 1 1 auto; min-height: 0; max-height: none;
   font-family: inherit; font-weight: 400;
   font-size: var(--sl-1); line-height: var(--sl-1-lh); letter-spacing: var(--sl-1-ls);
   background: none; border: 0; border-radius: 0; padding: 0;
   overflow: hidden; column-gap: 1.2em;
-  /* NEWEST AT THE FOOT FROM THE FIRST LINE, not only once the box is full:
-     with a few short lines the grid packed them at the top and the newest sat
-     118.6 px above the foot (MEASURED, kit 328/329). Overflow then leaves by
-     the top, which is the oldest line leaving. */
+  /* Newest at the foot from the first line: otherwise a few lines pack at the
+     top (118.6 px above the foot measured). */
+  /* why: lessons/css-slide.md#sl-slot-pos-log-2 */
   align-content: end;
-  /* NO HALF LINE AT THE TOP. Reported 2026-10-05 with a crop of a line cut
-     through its middle: *"ugly cut / crrop"*. The slot is not a whole number
-     of lines tall, so the oldest line in view is always partly clipped; it
-     fades out over the top two lines instead of ending on a hard cut. */
+  /* The slot is not a whole number of lines tall, so the oldest line in view
+     fades over the top two lines instead of a hard cut. */
+  /* why: lessons/css-slide.md#sl-slot-pos-log-3 */
   -webkit-mask-image: var(--sl-log-fade);
   mask-image: var(--sl-log-fade);
 }
@@ -301,23 +251,19 @@
 .sl-stack .sl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: pre; }
 .sl-stack .sl-unit { color: var(--dim); font-weight: 400; }
 
-/* ── LAYOUTS ─────────────────────────────────────────────────────────────────
-   `stack`, the default: headline top left, evidence centred under it.
-   `top`: headline on top, the words at the bottom, left aligned, the air
-     between them.
-   `left`: everything on the left edge, the evidence vertically centred.
-   `split`: two columns, the slot on `data-side` and the words on the other,
-     the caption across the foot. */
+/* Layouts. `stack` (default): headline top left, evidence centred. `top`:
+   words at the bottom. `left`: everything on the left edge. `split`: slot on
+   `data-side`, words on the other. */
+/* why: lessons/css-slide.md#sl-data-layout-top-sl-ev */
 .sl[data-layout="top"] .sl-ev { justify-content: flex-end; align-items: flex-start; text-align: left; }
 .sl[data-layout="left"] .sl-ev { align-items: flex-start; text-align: left; }
 
 .sl[data-layout="split"] .sl-in {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  /* MORE AIR EITHER SIDE OF THE DIVIDE, asked 2026-10-05 with a crop of the
-     log's ruled rows running almost into the words: *"more x padding around
-     central divider"*. Twice the slide's one inset, so each column stands the
-     inset off the middle, which is where the darker half ends. */
+  /* Twice the slide's inset, so each column stands one inset off the middle,
+     where the darker half ends. */
+  /* why: lessons/css-slide.md#sl-data-layout-split-sl-in */
   column-gap: calc(2 * var(--sl-pad));
 }
 .sl[data-layout="split"][data-side="left"] .sl-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "slot words" "slot cap"; }
@@ -326,13 +272,10 @@
 .sl[data-layout="split"] .sl-slot { grid-area: slot; }
 .sl[data-layout="split"] .sl-cap { grid-area: cap; }
 .sl[data-layout="split"] .sl-ev { align-items: flex-start; text-align: left; }
-/* THE INTERACTIVE SIDE OF A SPLIT IS DARKER, EDGE TO EDGE. Asked
-   2026-10-05: *"use darker bg on columned layout on the interactive side"*.
-   The page's `--bg` under the slot's half, so the thing you work sits in a
-   well and the words sit on the card. A pseudo element rather than a
-   background on `.sl-slot`, because the slot sits inside the slide's inset and
-   the darker half has to reach the slide's edges. The columns are equal and
-   their gap is centred, so the half ends exactly at 50 per cent. */
+/* The interactive side of a split is darker, edge to edge. A pseudo element,
+   because the slot sits inside the inset and the ground must reach the slide's
+   edges. */
+/* why: lessons/css-slide.md#sl-data-layout-split-before */
 .sl[data-layout="split"]::before {
   content: ''; position: absolute; top: 0; bottom: 0; width: 50%;
   background: var(--bg); pointer-events: none;
@@ -340,14 +283,10 @@
 .sl[data-layout="split"][data-side="left"]::before { left: 0; }
 .sl[data-layout="split"][data-side="right"]::before { right: 0; }
 .sl[data-layout="split"] .sl-in { position: relative; }
-/* `cols: '1:2'`, A THIRD FOR THE WORDS AND TWO FOR THE SLOT, asked 2026-10-06
-   for the synths deck: *"use 1:2 cols layout"*. The DIVIDE is put at exactly
-   one third of the slide from the words' edge, so the darker part is exactly
-   two thirds and the full screen ground below can say where it ends. The grid
-   is the content box C = W - 2 pad, so the words column is the third, less
-   the inset on its outer edge and half the gap on the divide:
-   (C + 2 pad) / 3 - 2 pad. A plain split writes no `data-cols` and keeps the
-   two equal columns above. */
+/* `cols: '1:2'`: the divide sits at one third of the slide from the words'
+   edge. Content box C = W - 2 pad, so the words column is (C + 2 pad) / 3 - 2
+   pad. */
+/* why: lessons/css-slide.md#sl-data-layout-split-data-cols-1-2-data-side-rig */
 .sl[data-layout="split"][data-cols="1:2"][data-side="right"] .sl-in {
   grid-template-columns: calc((100% + 2 * var(--sl-pad)) / 3 - 2 * var(--sl-pad)) minmax(0, 1fr);
 }
@@ -359,14 +298,9 @@
 .sl[data-layout="split"][data-bottom] .sl-words { justify-content: flex-end; }
 .sl[data-layout="split"][data-bottom] .sl-ev { flex: 0 0 auto; }
 
-/* `band`: TWO ROWS, 2:1, asked 2026-10-06 with a screenshot of a split: *"its
-   better to use vertical sections here. top 2/3 is darker, centered screen and
-   buttons ton the right, below in lighter area title an desc"*, and *"use this
-   vertical 2:1 layout also for big number example"*. The well (the slot or the
-   big figure) takes two shares of the height and the words one, a gap of twice
-   the inset between them, as a split's columns have. The darker ground runs
-   edge to edge across the top, ending in the middle of that gap: the inset,
-   two thirds of what is left, then half the gap, which is (2H - 2 pad) / 3. */
+/* `band`: two rows 2:1, the well on top and the words under it, gap twice the
+   inset. The darker ground ends mid gap, at (2H - 2 pad) / 3. */
+/* why: lessons/css-slide.md#sl-data-layout-band-sl-in */
 .sl[data-layout="band"] .sl-in {
   display: grid; grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
   row-gap: calc(2 * var(--sl-pad)); position: relative;
@@ -407,33 +341,22 @@
 /* A control narrower than its logical width sits in the middle of it, so the
    scaled box centres the control and not an empty margin beside it. */
 .sl-fit-in > .sl-mid { display: flex; justify-content: center; }
-/* 🔴 A PANEL IN A FITTED BOX IS NEVER ON A PHONE. It is laid out at its own
-   logical width and scaled, so `shell.css`'s viewport query that centres an
-   instrument plate at 560 px and under, and moves the name after the
-   controls, is answering a question about the window this box never asks.
-   MEASURED 2026-10-06 at 375 px on the synths deck: the plate read
-   `[Test tone] FAU`, centred, where the ask was FAU with Test tone at its right
-   end. So the plate keeps its desk arrangement here at every width. */
+/* A panel in a fitted box is laid out at its logical width and scaled, so the
+   shell's 560 px viewport query must not apply. The plate keeps its desk
+   arrangement here. */
+/* why: lessons/css-slide.md#sl-fit-in-pos-rows-r-pos-ipanel-plate */
 .sl-fit-in .pos-rows-r.pos-ipanel-plate { justify-content: space-between; }
 .sl-fit-in .pos-rows-r.pos-ipanel-plate > .pos-ipanel-name { justify-content: flex-start; order: 0; }
 /* The diagram's own caption line is page text in px; on a slide its words go
    under the boxes instead. */
 .sl-fit-in .pos-dg-cap { display: none; }
-/* 🔴 THICKER LINES ON A SLIDE, asked 2026-10-05 as *"make diagrams thinker
-   borders in slides, adjust spacing accordinglu"*. The picture is laid out at
-   a fixed logical width and scaled, so a width here is a share of the slide:
-   a box edge and an arrow at 2 logical px against the page's 1 and 1.1. The
-   hue stays on the edge, only the width moves.
-   THE SPACING, WITHOUT TOUCHING `diagram.mjs`, whose padding and gaps are its
-   own constants: the names go from 12 to 11 px here, which the diagram
-   measures before it lays anything out, and `slideDiagram` lays the picture
-   out at 580 logical px rather than 640 (the narrowest that keeps one row of
-   columns, `COL_BREAK` is 560). Scaled back up by 640 over 580, a name prints
-   at the size it had, while every edge, box padding, gap and arrow run is 10
-   per cent larger than it was, and the edges about 2.2 times as thick.
-   (0,4,0) against the kinds' (0,3,0). */
+/* Thicker lines: the picture is scaled, so a width is a share of the slide (2
+   logical px against 1 and 1.1). Names at 11 px and a 580 px layout make
+   spacing 10 per cent larger. (0,4,0) vs (0,3,0). */
+/* why: lessons/css-slide.md#sl-5 */
 .sl { --sl-dg-edge: 1.5px; --sl-dg-link: 1.5px; --sl-dg-air: 8px; }
-/* 1.5, down from 2 on 2026-10-05: *"make borders bit thinner of slide diagrams"*. */
+/* 1.5, not 2. */
+/* why: lessons/css-slide.md#sl-pos-dg-pos-dg-n-pos-dg-box */
 .sl .pos-dg .pos-dg-n .pos-dg-box { stroke-width: var(--sl-dg-edge); }
 .sl .pos-dg .pos-dg-svg .pos-dg-link { stroke-width: var(--sl-dg-link); }
 .sl .pos-dg .pos-dg-svg .pos-dg-lab { font-size: 11px; }
@@ -450,68 +373,50 @@
   font: 500 12px/1 var(--mono); color: var(--dim);
   font-variant-numeric: tabular-nums; min-width: 7ch; text-align: center;
 }
-/* THE DECK'S TITLE IN THE COUNT'S SLOT (`createSlidePlayer({ title })`), a
-   link to the deck's own page. Since 2026-10-06 (*"ceter. less emphasis. sans
-   serif"*, with a screenshot): the page's sans at the count's size, in the
-   count's dim, centred in its slot; the page's ink and an underline only
-   under a pointer, the way a card title answers one. */
+/* The deck's title in the count's slot: the sans at the count's size and dim,
+   centred. Ink and underline only under a pointer. */
+/* why: lessons/css-slide.md#a-sl-title */
 a.sl-title { font: 400 12px/1 var(--sans); color: var(--dim); text-decoration: none;
              white-space: nowrap; justify-self: center; text-align: center; }
 a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
-/* AND CENTRED BETWEEN THE PAGER AND THE ⛶, NOT ON THE FOOTER, 2026-10-07: *"align
-   see slides centered horz better pager and fullscreen bittpns"*. The footer's
-   `1fr auto 1fr` centres the middle on the whole row, and the pager is two
-   buttons wide against the ⛶'s one, so the link sat 16 px left of the gap's
-   middle at 1280. `auto 1fr auto` gives the middle the gap itself. */
+/* `auto 1fr auto` centres the title in the gap between the pager and the full
+   screen button. `1fr auto 1fr` centred it on the row, 16 px off at 1280. */
+/* why: lessons/css-slide.md#sl-player-pos-vp-foot-has-pos-vp-c-a-sl-title */
 .sl-player .pos-vp-foot:has(> .pos-vp-c > a.sl-title) { grid-template-columns: auto minmax(0, 1fr) auto; }
-/* THE β+ AT THE FOOT OF A TITLE SLIDE (`mark: true`), 2026-10-07: content, in the
-   slide's flow and inset, the + raised and smaller as on the logo. */
+/* The β+ at the foot of a title slide: content, in the flow and inset, the +
+   raised and smaller as on the logo. */
+/* why: lessons/css-slide.md#sl-mark */
 .sl-mark { margin-top: calc(3 * var(--sl-u)); }
 .sl-mark .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
 
 
-/* ── the decks on the front page (shell/decks.mjs) ──────────────────────────
-   Two half width players a row, asking the row's OWN width and becoming one
-   column below 560 px of it, as the kit's HALF WIDTH PLAYERS and `/cam/` do.
-   The gap is the control gap twice, theirs too. */
+/* The decks on the front page (shell/decks.mjs): two players a row, one column
+   below 560 px of the row's own width. The gap is the control gap twice. */
+/* why: lessons/css-slide.md#pos-decks */
 .pos-decks { container-type: inline-size; }
 .pos-decks-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(2 * var(--ctl-gap, 10px)); }
 @container (max-width: 560px) { .pos-decks-in { grid-template-columns: minmax(0, 1fr); } }
-/* 🔴 THE FRAME IS DRAWN BEFORE THE DECK, 2026-10-06, asked as *"slides "pop
-   in" in frontpage. show the frame, lazyload ocntents"*. `groupHTML` in
-   `manifest.mjs` writes one empty player box per deck into the page's own
-   HTML, from the player's own classes (`pos-vp`, `pos-vp-stage` at 16:9,
-   `pos-vp-foot`), so it is the same box by construction rather than by a
-   typed height; the footer's one reserved line is a control's 34 px, the
-   stepper's and the full screen button's. `mountDecks` builds the player when
-   the frame nears the screen and puts it in the frame's place. */
+/* The frame is drawn before the deck: `groupHTML` writes an empty box from the
+   player's own classes, so it is the same box by construction. The footer
+   reserves a control's 34 px. */
+/* why: lessons/css-slide.md#pos-deck-ph */
 .pos-deck-ph { display: block; height: 34px; }
-/* THE SYNTHS DECK'S TITLE set solid, its two lines one block. The brand rules
-   that shared this selector moved to `brand-slides.css` on 2026-10-06. */
+/* The synths deck's title set solid, its two lines one block. Brand rules live
+   in `brand-slides.css`. */
+/* why: lessons/css-slide.md#sl-player-sl-aria-label-synths-in-code-sl-ev */
 .sl-player .sl[aria-label="synths in code"] .sl-ev { gap: 0; }
-/* THE SYNTHS DECK'S PLATE (slide-synth.mjs): the note beside FAU says what a
-   press will cost, in the plate's own small dim type, and never wraps. */
+/* The synths deck's plate (slide-synth.mjs): the note beside FAU says what a
+   press costs, in the plate's small dim type, never wrapping. */
+/* why: lessons/css-slide.md#sl-tone */
 .sl-tone { flex: 0 0 auto; }
 /* Start and Stop in one cell, the absent one hidden but still sizing it */
 .sl-tone-w { display: inline-grid; }
 .sl-tone-w > span { grid-area: 1 / 1; text-align: center; }
 .sl-tone[data-state="start"] .sl-tone-stop, .sl-tone[data-state="stop"] .sl-tone-start { visibility: hidden; }
-/* ── FULL SCREEN IS THE SLIDE AND NOTHING ELSE ─────────────────────────────
-   Asked 2026-10-06 with two screenshots of a deck in full screen: *"rm pseudo
-   app frame, paint all bg properly. where is border of screen?"* and *"what
-   the f is going on"*. Three things were drawn on top of the slide:
-   1. THE FOCUS RING. The player keeps keyboard focus so it hears its keys, and
-      a key press makes that focus visible, so the yellow 1 px ring went round
-      the whole screen (its top edge was the line under the menu bar). In full
-      screen the screen's edge is the edge, so no ring.
-   2. THE ⛶ LEAVE BUTTON in the corner, on a screen with a pointer. Esc and f
-      leave, the browser says so itself, and on a screen with no hover (a phone)
-      the button stays, because there it is the only way out.
-   3. A `band` slide's darker top stopped at the slide when the screen is not
-      16:9. It runs to the screen's top edge now, ending where the slide's own
-      does: the screen's middle plus 0.1133 of the slide's height, which is
-      (2h - 2 pad) / 3 - h / 2 with the inset at 8 per cent of h. In full screen
-      the stage is the viewport, so h is min(100vh, 56.25vw). */
+/* Full screen is the slide and nothing else: no focus ring, no leave button
+   where a fine pointer can hover (Esc and f leave), and a band's dark top runs
+   to the screen edge. */
+/* why: lessons/css-slide.md#sl-player-pos-full-focus-sl-player-pos-full-focu */
 .sl-player.pos-full:focus, .sl-player.pos-full:focus-visible,
 .sl-player[data-full]:focus, .sl-player[data-full]:focus-visible { outline: none; }
 @media (hover: hover) { .sl-player .pos-fsx { display: none; } }
@@ -522,11 +427,9 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .sl-frame.pos-full:has(> .sl[data-layout="band"]) {
   background: linear-gradient(to bottom, var(--bg) calc(50% + 0.1133 * min(100vh, 56.25vw)), var(--card) 0);
 }
-/* A 1:2 split's darker two thirds run on to the screen's edge on the slot's
-   side, ending where the slide's own does: the slide is w = min(100vw,
-   177.78vh) wide and centred, so its divide is the screen's middle less w / 6
-   with the words on the left, and plus w / 6 with them on the right. After
-   the plain split rules above, at their weight plus the attribute. */
+/* A 1:2 split's darker two thirds run to the screen's edge: the slide is w =
+   min(100vw, 177.78vh), so the divide is the middle less or plus w / 6. */
+/* why: lessons/css-slide.md#sl-player-data-full-pos-vp-stage-has-sl-data-lay */
 .sl-player[data-full] .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]:not([hidden])),
 .sl-player.pos-full .pos-vp-stage:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]:not([hidden])),
 .sl-frame.pos-full:has(> .sl[data-layout="split"][data-cols="1:2"][data-side="right"]) {
@@ -542,25 +445,25 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
    vertical scrolling and pinch, and hands a sideways drag to the player. */
 .sl-player .pos-vp-stage { touch-action: pan-y pinch-zoom; }
 
-/* THE SYNTH PANEL (slide-synth.mjs): one height on every slide, the code row
-   taking what the scope, the knob row and the plate leave, so a knob row
-   appearing shortens the code and nothing else moves (2026-10-06, *"keep
-   same fau size!!! knobs condense code area"*). And the slot's inset again
-   left and right of it (*"add x padding on fau area"*). */
+/* The synth panel: one height on every slide, the code row taking what the
+   scope, knobs and plate leave, so a knob row shortens the code and nothing
+   else moves. */
+/* why: lessons/css-slide.md#sl-slot-sl-synth-slot */
 .sl-slot.sl-synth-slot { padding-inline: var(--sl-pad); }
 .pos-ipanel.sl-synth-panel { height: var(--synth-h); }
 .pos-ipanel.sl-synth-panel > .pos-rows-r { flex: none; }
 .pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { flex: 1 1 0; min-height: 0; }
 .pos-ipanel.sl-synth-panel > .pos-rows-r.sl-synth-code { align-items: stretch; }
-/* ⚠️ `height: 100%` AS WELL AS STRETCH, 2026-10-06: the row lays out
-   sideways, so `flex` and `min-height` act on the width, and MEASURED on the
-   LFO slide the box took its 20 lines' 418 px in a 292 px row and painted
-   them over the knob row instead of scrolling */
+/* `height: 100%` as well as stretch: the row lays out sideways, so `flex` and
+   `min-height` act on the width and the code overflowed instead of scrolling
+   (418 px in 292 px). */
+/* why: lessons/css-slide.md#sl-synth-code-pos-code */
 .sl-synth-code > .pos-code { align-self: stretch; flex: 1 1 auto; min-height: 0; height: 100%; display: flex; flex-direction: column; }
 .sl-synth-code .pos-code-scroll { flex: 1 1 auto; min-height: 0; max-height: none; height: auto; }
-/* THE KNOB ROW WITH A RADIO IN IT (slide-synth.mjs, slide 6's `wave`): the
-   knobs' lattice, then each choice in a cell of its own with its name under it
-   in the knobs' label type and its hue, the row no taller than a knob. */
+/* A knob row with a radio in it: the knobs' lattice, each choice in its own
+   cell with its name under it in the knob label type and hue, no taller than a
+   knob. */
+/* why: lessons/css-slide.md#sl-synth-ctls */
 .sl-synth-ctls { display: flex; align-items: stretch; gap: var(--ctl-gap); min-width: 0; }
 .sl-synth-ctls > [hidden] { display: none; }
 .sl-radios { display: flex; gap: var(--ctl-gap); }
@@ -569,20 +472,10 @@ a.sl-title:hover { color: var(--fg); text-decoration: underline; text-underline-
 .sl-radio-head { visibility: hidden; }
 .sl-radio[data-param] .sl-radio-lab { color: hsl(var(--param-hue) 70% 62%); }
 
-/* 🔴 A SPLIT STACKS IN FULL SCREEN ON A PHONE: columns on a desk, rows on a
-   phone held upright. Asked 2026-10-06 as *"On mobile use horiz layout for
-   vertical cols in desktop"*, then *"In mobile change layout in fullscreen"*
-   and *"Non when in nonfulkscreen"*: in the page the slide stays 16:9 with its
-   columns; full screen on an upright phone it fills the screen in rows. Two
-   columns in a 375 px slide put the FAU panel at a fifth of its size.
-   Decided by the player's own width AND the window's, so a phone held sideways
-   (wider than 560) keeps the 16:9 slide with its columns.
-   - The split slide fills the screen, and `--sl-u` stays a share of a 16:9
-     slide of the same width, so the type is the size it was in the page and
-     the extra height is room for the slot. Other slides keep their 16:9 box.
-   - The split is rows: the slot on top on the darker ground, which reaches the
-     slide's edges through the slot's own bleed of one inset, the words under
-     it one inset further down, the caption last. */
+/* A split stacks in full screen on an upright phone, decided by the player's
+   width and the window's. Two columns in 375 px put the panel at a fifth of
+   its size. */
+/* why: lessons/css-slide.md#sl-player */
 .sl-player { container: sl-player / inline-size; }
 @media (max-width: 560px) { @container sl-player (max-width: 560px) {
   .sl-player[data-full] .sl[data-layout="split"] {

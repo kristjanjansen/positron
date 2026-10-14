@@ -6,24 +6,18 @@
    so the panel's full screen rule still wins. */
 @media (max-width: 560px) { .tp-panel .pos-vp-stage { --vp-aspect: 4 / 5; } }
 
-/* ── the sheet ──────────────────────────────────────────────────────────
-   White paper filling the stage and scrolling inside itself, so a long page
-   rolls up the way paper leaves a carriage. It is a size container, so the
-   type and the margins follow the sheet rather than the window, and a sheet
-   in full screen gets the same proportions as one on the page. */
+/* The sheet: white paper scrolling inside itself. A size container, so type
+   and margins follow the sheet, not the window. */
+/* why: lessons/css-paper.md#tp */
 .tp { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain;
       container-type: inline-size; background: #fff; cursor: text;
       /* the margins of a typed page: more air above than at the sides */
       padding: clamp(24px, 8cqi, 72px) clamp(20px, 7cqi, 64px); }
 
-/* ── the line ───────────────────────────────────────────────────────────
-   ONE BOX, TWO LAYERS PINNED TOGETHER, the way /typist/ does it. The
-   <textarea> on top is invisible and takes every keystroke and every tap
-   (so a phone opens its keyboard); the <pre> underneath draws the text and
-   the cursor at the offsets the browser reports. Both carry `.tp-type` and
-   NOTHING else sets a metric on either, or they drift apart by a character.
-   The column is about 64 characters, a typewriter's line on a letter sheet
-   at ten to the inch, and never wider than the sheet. */
+/* One box, two layers: an invisible `<textarea>` takes input, the `<pre>`
+   draws text and cursor. Both carry `.tp-type` and nothing else sets a metric,
+   or they drift. About 64 characters. */
+/* why: lessons/css-paper.md#tp-col */
 .tp-col { position: relative; max-inline-size: 64ch; margin-inline: auto; min-block-size: 100%;
           font: 400 clamp(16px, 2.6cqi, 22px)/1.75 var(--brand); }
 .tp-type { font: inherit; letter-spacing: 0; font-variant-ligatures: none; tab-size: 4;
@@ -35,14 +29,10 @@
            color: transparent; caret-color: transparent; -webkit-touch-callout: none; }
 .tp-keys::selection { background: transparent; }
 
-/* ── the cursor ─────────────────────────────────────────────────────────
-   A FILLED BAR 0.4 CHARACTER WIDE, filled whether or not the paper has
-   focus (asked: *"typist: always filled cursor"*, *"but thinner"*). It
-   takes no width in the flow (a zero width span with the bar drawn by its
-   ::after), so the line in the <pre> stays exactly the line in the
-   <textarea>. Drawn white over the sheet with `difference`, it reads black
-   and turns what it covers white. Without focus it stays and does not
-   blink. */
+/* A filled bar 0.4 character wide, focused or not. Zero width in the flow
+   (drawn by `::after`), so the `<pre>` line matches the `<textarea>`. White
+   with `difference`, so it reads black. */
+/* why: lessons/css-paper.md#tp-cur */
 .tp-cur { position: relative; }
 .tp-cur::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 0.4ch;
                  background: #fff; mix-blend-mode: difference;
