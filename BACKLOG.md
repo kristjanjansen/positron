@@ -1,5 +1,7 @@
 ## Open
 
+- **Skills distribution, the pre-transfer half: clean private lines, mark private skills internal, rename the public ones** (2026-10-14, a background agent). Asked: *"do these in bg"*, quoting the plan's "My part before the transfer".
+
 - **Skills distribution: move the repo to positron-studio/positron, clean it, publish skills from it** (2026-10-14). Asked: *"kristjanjansen/positron -> positron-studio/positron perhaps?"*, *"write to plan, will do later"*. Plan: `plans/plan-skills-distribution.md`. Waits on the owner (org, transfer).
 
 - ~~**Docs consolidation, steps 2 and 3 of plans/plan-consolidate-docs-2026-10-14.md**~~ (2026-10-14, DONE, 91a2d824). Asked: *"do all"*. Five merges that break nothing, ten moves to archive/plans/ with stubs, indexes updated.
