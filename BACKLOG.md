@@ -1,6 +1,8 @@
 ## Open
 
-- **Skills distribution, the pre-transfer half: clean private lines, mark private skills internal, rename the public ones** (2026-10-14, a background agent). Asked: *"do these in bg"*, quoting the plan's "My part before the transfer".
+- ~~**/social/typist/: a stop button while recording, and proof it records**~~ (2026-10-14, DONE: a headless take was 7.3 s of 1080x1920 H.264 30 fps with AAC, peak 0.0 dB, so output gain 0.7). Asked: *"no stop button when recording. does it recording at all?"*.
+
+- ~~**Skills distribution, the pre-transfer half: clean private lines, mark private skills internal, rename the public ones**~~ (2026-10-14, DONE; private originals in ~/personal/positron-private/). Asked: *"do these in bg"*, quoting the plan's "My part before the transfer".
 
 - **Skills distribution: move the repo to positron-studio/positron, clean it, publish skills from it** (2026-10-14). Asked: *"kristjanjansen/positron -> positron-studio/positron perhaps?"*, *"write to plan, will do later"*. Plan: `plans/plan-skills-distribution.md`. Waits on the owner (org, transfer).
 

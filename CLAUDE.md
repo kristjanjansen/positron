@@ -1,7 +1,7 @@
 # positron
 
 Live at **https://positron.studio**. R&D, not a product. 56 demo rows of which
-55 are built (counted 2026-10-14), a Raspberry Pi in another building, a Novation Circuit on the
+55 are built (counted 2026-10-14), a Raspberry Pi at a second site, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -75,7 +75,7 @@ somebody broke it.
 | `positron-slides` | writing or revising any slide text, deck outline, speaker notes or playable lesson, including a deck in `demo/shell/decks.mjs`. It is the words half; drawing a slide is `positron-ui` |
 | `positron-concepts` | building or changing any concept page (`demo/<group>/<slug>/`, the folders in `CONCEPT_DIRS`, each a patch of nodes, ports and links) or a card on the front page, or explaining a patchbay idea as a small page |
 | `positron-describe` | writing or changing any card description (`say`), manifest `one` line, page `what` text or readout key a visitor reads, or checking somebody's proposed copy against a page |
-| `positron-start` | somebody wanting to stand up a positron-shaped site of their own on Cloudflare, before the first command |
+| `positron-studio-start` | somebody wanting to stand up a positron-shaped site of their own on Cloudflare, before the first command |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control
@@ -84,9 +84,9 @@ moves every other control's harness press. When two apply, load both.
 ## Pushing needs the PERSONAL GitHub account, and it is not the active one
 
 🔴 **`git push` ANSWERS `Repository not found`, AND THAT IS AN AUTH FAILURE
-WEARING A 404.** Two accounts are logged in here — `<work-account>`,
-which is ACTIVE, and `kristjanjansen`, which owns `github.com/kristjanjansen/
-positron`. GitHub returns 404 rather than 403 for a private repo the caller
+WEARING A 404.** Two accounts are logged in here: the work account, which is
+ACTIVE, and `kristjanjansen`, which owns `github.com/kristjanjansen/positron`.
+GitHub returns 404 rather than 403 for a private repo the caller
 cannot see, so the message says the repository does not exist when what it means
 is that this token may not look at it. It cost most of a session, spread over
 three sittings, because "not found" reads as a wrong remote URL or a deleted
@@ -95,7 +95,7 @@ repo, and both were checked before the accounts were.
 ```sh
 gh auth switch --user kristjanjansen     # the account that owns the repo
 git push origin HEAD
-gh auth switch --user <work-account>   # put it back, ASKED FOR 2026-09-17
+gh auth switch --user <work account>     # put it back, ASKED FOR 2026-09-17
 ```
 
 ⚠️ **SWITCH BACK.** The active account is machine-wide and the work one is the
@@ -111,30 +111,26 @@ approve` does not fix it either. SSH is not a way round it as things stand —
 key on the personal account yet. Adding one is the only thing that would remove
 this dance.
 ⚠️ **AND THE COMMITS ARE AUTHORED WITH THE WORK ADDRESS.** `user.email` here is
-`<work-address>`, on a personal repository. Nothing was changed about
+the work address, on a personal repository. Nothing was changed about
 that, because attribution is not a thing to alter without being asked.
 
-## The Circuit pack lives in `<private-pack-repo>`, NOT in this repository
+## The Circuit pack lives in the owner's private pack repository, NOT in this one
 
-🔴 **IT IS `circuit/2026-09-20-circuit.circuitpack` IN THE PRIVATE REPOSITORY
-`<private-pack-repo>`, AND IT IS OUT OF THIS ONE ENTIRELY SINCE 2026-09-24.**
-Instructed: *"rm new pack, is in separate repo"*. MEASURED through the GitHub API
-BEFORE anything was removed: that repository holds two blobs and one of them is
-the pack at **3,506,555 bytes**, which is the size of the copy that was on this
-disk and of the blob that was in this history. Three numbers, one value.
+🔴 **THE BACKUP OF THE CIRCUIT IS IN THE OWNER'S PRIVATE PACK REPOSITORY, AND
+IT IS OUT OF THIS ONE ENTIRELY SINCE 2026-09-24.** Instructed: *"rm new pack, is
+in separate repo"*. MEASURED through the GitHub API BEFORE anything was removed:
+the pack in that repository is the same size, to the byte, as the copy that was
+on this disk and the blob that was in this history. Three numbers, one value.
 🔴 **BOTH OF THIS REPOSITORY'S COPIES ARE GONE, IN ONE PASS AND ON PURPOSE.**
-`tmp/personal/New Pack.circuitpack` was deleted and the blob at `419ec5c` was
-dropped from history with `git filter-repo`, while preparing this repository to
-be made public.
-⚠️ **SO `git show 419ec5c:'New Pack.circuitpack'` NO LONGER WORKS, AND THAT
-COMMIT HASH NO LONGER EXISTS.** This file named it as the recovery path for
-three days, and every hash in the history moved when the rewrite ran. **The
-recovery path is `<private-pack-repo>`.**
+The working copy was deleted and its blob was dropped from history with
+`git filter-repo`, while preparing this repository to be made public.
+⚠️ **SO NO COMMIT HERE HOLDS IT, AND ANY OLD HASH NAMED AS ITS RECOVERY PATH
+NO LONGER EXISTS.** Every hash in the history moved when the rewrite ran.
+**The recovery path is the owner's private pack repository.**
 🔴 **WHY IT HAD TO LEAVE, AND IT IS NOT TIDINESS: A PUBLIC CLONE CANNOT BE
-RECALLED.** History is what a clone gets, the file is somebody else's work, and
-the owner's words about it are *"(kept private)"*. A
-private repository of its own is the right home for it; this one was about to
-stop being private.
+RECALLED.** History is what a clone gets, and the sessions in the pack are the
+owner's own work. A private repository of its own is the right home for it;
+this one was about to stop being private.
 ⚠️ **AND TWO PAGES WERE FETCHING IT, SO THEY MOVED IN THE SAME BREATH.**
 `/pack/` and `/tom/` decided from the ORIGIN that a pack was present on a
 checkout, which stopped being true the moment the file went. Both now fetch
@@ -143,96 +139,62 @@ the reading checks stay reachable for anybody holding a pack of their own while
 nothing is asked of anybody by default. MEASURED after: `pack` and `tom`
 **59/59 green, 0 requests, 0 failed**.
 
-⚠️ **EVERYTHING BELOW IS UNCHANGED, AND IS WHY THAT OTHER REPOSITORY MATTERS.**
+⚠️ **EVERYTHING BELOW IS WHY THAT OTHER REPOSITORY MATTERS.**
 
-🔴 **A COMPLETE BACKUP OF THE NOVATION CIRCUIT ON THIS DESK**, taken 2026-09-20
-through Novation Components.
+🔴 **IT IS A COMPLETE BACKUP OF THE NOVATION CIRCUIT ON THIS DESK**, taken
+2026-09-20 through Novation Components, and the only one.
 ⚠️ **THE CIRCUIT DOES HAVE A FACTORY RESET. THIS LINE SAID IT DID NOT UNTIL
 2026-10-03**, when the owner said *"Don't be so protective about the circuit. It
 does have a factory reset. Look it up."* Novation's *"Using Components to reset
 a product to Factory Settings"* restores the factory content from Components
 (Send to Circuit on the Circuit Factory Pack, and a firmware reinstall). What a
-reset does NOT bring back is the owner's own sessions, and those live in
-`<private-pack-repo>`. So the precaution stands at its real size: three things
+reset does NOT bring back is the owner's own sessions, and those live in the
+owner's private pack repository. So the precaution stands at its real size: three things
 replace the contents (`Send to Circuit`, the Factory Pack, a `Replace Patch`
 SysEx), and before any of them the backup must exist. SysEx to the Circuit is
 an ordinary operation with that precaution, not a forbidden one: *"be careful,
 but don't be so afraid of sysacks. It's just any other device with some
 precautions"*. 49 older lines across the repository still say "no factory
 reset" and are corrected per page as each is touched (BACKLOG, 2026-10-03).
-✅ **IT IS VERIFIED, NOT ASSUMED.** A `.circuitpack` is a zip. This one holds
-**164 files**: 32 sessions, 64 patches, 64 samples, and an `index.json` reading
-`product: circuit, version: 2.0`. `patch_0.syx` is exactly **350 bytes**
-starting `F0 00 20 29 01 60`.
-🔴 **AND ALL 32 SESSIONS ARE REAL WORK, WHICH WAS CHECKED AFTER GETTING IT
-WRONG.** The first reading treated the NAMES as the evidence and implied the
-ones still called `User Session` might be blanks. **They are not**, and the
-owner said so: *"(kept private)"*. MEASURED: **32
-distinct fingerprints of 32**, not one a copy of another, **zero sessions
-entirely empty**, every one 84 to 89 per cent non-zero bytes, and the `User
-Session` rows sitting HIGHER than most of the named ones. **A name is a label
-somebody did not change. Content is the fact.**
-🔴 **AND IT IS 29 OF 32, NOT 32. THE SENTENCE ABOVE IS TRUE AND CARRIES WEIGHT IT
-CANNOT HOLD.** MEASURED 2026-09-21 against a stranger's Circuit pack:
-`session_16` is **byte identical** to a stock `Initial Session` template that
-appears ten times in that pack, and `session_10` and `session_22` differ from it
-at **exactly one byte, 0xBBAC**. The owner's other 29 differ from it by **262 to
-5,412 bytes, median 1,524**, so there is no middle ground to argue about, and
-`index.json` names all three of them `Initial Session`.
-🔴 **THE LESSON IS THE THIRD IN A ROW AND IT IS THE SAME ONE: A UNIQUE HASH IS
-NOT EVIDENCE OF CONTENT.** A one byte delta makes a distinct fingerprint, so
-distinctness can only ever say *these files are not identical*, which is a much
-smaller claim than *this is somebody's work*. First a name was not evidence, then
-a four byte head was not evidence, and now a hash is not either. **The measure
-that works is distance from the stock template.**
-⚠️ **AND THE CONCLUSION DOES NOT FLIP.** The pack holds **29 sessions of real
-work**, it is still the only backup, and nothing about not sending a pack to the
-Circuit changes. This is 32 becoming 29, not any of it becoming disposable.
-⚠️ **VERIFYING A BACKUP NEEDS NO DEVICE**: `unzip -l`, read `index.json`, check
-the session count, check one patch is 350 bytes. Fewer WAVs than sample rows is
-normal rather than damage. `plans/plan-circuit-patches.md` has the whole
+✅ **A BACKUP IS VERIFIED, NOT ASSUMED, AND VERIFYING ONE NEEDS NO DEVICE.** A
+`.circuitpack` from Components is a zip: `unzip -l`, read `index.json` (it reads
+`product: circuit, version: 2.0`), check the session count, and check one patch
+is exactly **350 bytes** starting `F0 00 20 29 01 60`. Fewer WAVs than sample
+rows is normal rather than damage. `plans/plan-circuit-patches.md` has the whole
 procedure and the list of what destroys patches.
+🔴 **WHETHER A SESSION IS SOMEBODY'S WORK IS DECIDED BY ITS CONTENT, AND THREE
+SHORTCUTS WERE TRIED HERE AND FAILED.** A session's name is a label somebody did
+not change. Its first four bytes (`USER`, `DEMO`, `INIT`) are not evidence
+either: real work was found carrying the head once published here as the blank
+signature. And a unique hash only says two files are not identical, because a
+one byte delta makes a distinct fingerprint. **The measure that works is
+distance from the stock `Initial Session` template**, and a pack of blank
+sessions is told from a pack of work by entropy and the share of non-zero
+bytes, which separated the two by two orders of magnitude when measured on
+2026-09-21.
 
-🔴 **AND SINCE 2026-09-21 THERE ARE THREE PACKS ON THIS MACHINE THAT ALL DISPLAY
-AS `*New Pack`, AND TWO OF THEM WOULD ERASE THE SESSIONS.** A purchased
-soundbank in `purchased/` carries two `.circuitpack` files whose 32 session
-files are **blanks**, measured rather than inferred from their names: **1
-distinct fingerprint of 32**, entropy **0.01 bits a byte**, **0.1 per cent
-non-zero**, and an empty `name` in all 32. The owner's own pack is 32 distinct
-of 32 with none empty.
-🔴 **AND THE FIRST FOUR BYTES ARE NOT A FOURTH TEST. THIS LINE SAID `INIT`
-AGAINST THE OWNER'S `DEMO` UNTIL 2026-09-21, AND THE PACK SAYS OTHERWISE.**
-MEASURED on both sides that day while building `/pack/`: the owner's 32
-sessions are **`USER` 22, `DEMO` 7 and `INIT` 3**. Three of somebody's real
-sessions carry the exact head published here as the blank signature, and all
-three are ordinary work at entropy 0.87 and 86.5 per cent non-zero with distinct
-fingerprints. **Deciding on the head would have condemned them.** The three
-numbers above separate the two packs by two orders of magnitude and are what the
-check rests on. ⚠️ It is the `User Session` mistake one layer down, in a field
-that looks like content rather than like a label.
-🔴 **THE VENDOR'S INSTALL NOTE SAYS TO PRESS `Send to Circuit`**, which is one
-of the three operations listed above that replace the instrument's contents (a
-factory reset restores Novation's content, never the owner's sessions). So the safe pack and the two that would wipe 32
-real sessions are three identically labelled rows in Components.
+🔴 **SEVERAL PACKS CAN DISPLAY UNDER ONE NAME IN COMPONENTS, AND A PACK OF BLANK
+SESSIONS WOULD ERASE THE REAL ONES.** A vendor's install note may say to press
+`Send to Circuit`, which is one of the three operations listed above that
+replace the instrument's contents (a factory reset restores Novation's content,
+never the owner's sessions). So the safe pack and one that would wipe every
+session can be identically labelled rows in Components.
 ⚠️ **READ THE `name` IN `index.json` BEFORE SENDING ANYTHING**, because the file
-name and the displayed name are both `New Pack` and neither tells them apart.
+name and the displayed name can be the same across packs and neither tells them
+apart.
 ⚠️ Whether that transfer really writes session slots is INFERENCE and is marked
 as such in `research/circuit-soundbank-2026-09-21.md`. The only way to confirm
 it costs the sessions if the answer is yes.
-✅ **THE 128 LOOSE `.syx` FILES IN `purchased/` ARE SAFE**: byte 6 is `00` on
-every one, re-measured 2026-09-21, which is `Replace Current Patch` and lands in
-RAM.
-🔴 **AND THAT SENTENCE HAD NO SCOPE ON IT UNTIL 2026-09-21, WHEN IT READ `NOT ONE
-FLASH-WRITING Replace Patch EXISTS IN THE ARCHIVE`. IT IS TRUE OF `purchased/`
-AND FALSE OF THE WIDER WORLD.** MEASURED on a file called
+🔴 **AN EXTENSION IS NOT EVIDENCE EITHER.** Byte 6 of a 350 byte patch message
+is the command: `00` is `Replace Current Patch` and lands in RAM, `01` is
+`Replace Patch` and writes FLASH. MEASURED 2026-09-21 on a file called
 `on_the_run.circuitpack` fetched from a public archive: **it is not a zip at
 all**, it is a raw SysEx stream of 6,930 messages, and 64 of them are Circuit
-patch messages carrying **command byte `01`, which is `Replace Patch`, the one
-that writes FLASH**, aimed at **all 64 slots, 0 through 63**. One file, every
-synth patch on the instrument, and the extension says `circuitpack`.
-🔴 **SO AN EXTENSION IS NOT EVIDENCE EITHER.** A `.circuitpack` that is not a zip
-is the shape to be afraid of: Components would not open it, so anybody handling
-it reaches for a SysEx tool, which is the one route with no safety rail on it.
+patch messages carrying **command byte `01`**, aimed at **all 64 slots, 0
+through 63**. One file, every synth patch on the instrument, and the extension
+says `circuitpack`. A `.circuitpack` that is not a zip is the shape to be afraid
+of: Components would not open it, so anybody handling it reaches for a SysEx
+tool, which is the one route with no safety rail on it.
 **Read byte 6 of every 350 byte message before touching any file that did not
 come from this repository.**
 
@@ -396,8 +358,8 @@ printed on every one of those runs.
 ## What costs real money and somebody else's server
 
 🔴 **EVERY CONNECTION THIS REPOSITORY OPENS TO AN ERR MOUNT APPEARS IN A PUBLIC
-BROADCASTER'S AUDIENCE MEASUREMENT.** Said by ERR on 2026-09-16 and relayed:
-*"(ERR's remark, kept private)"*. Their
+BROADCASTER'S AUDIENCE MEASUREMENT.** ERR told us on 2026-09-16 that our
+connections were distorting their listener statistics. Their
 LISTENER STATISTICS were being corrupted by us, which is worse than load: a
 broadcaster's audience figures are what it reports to its board and its
 funders, and a few dozen headless Chromes holding mounts open for hours are

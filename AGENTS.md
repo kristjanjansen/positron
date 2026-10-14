@@ -32,7 +32,7 @@ stand-ins, which cost nobody anything: `demo/fake-station.mjs`,
 
 ## Somebody wants to build a site like this one
 
-Read **`.claude/skills/positron-start/SKILL.md`** and follow it. It is written
+Read **`.claude/skills/positron-studio-start/SKILL.md`** and follow it. It is written
 for any agent that can run commands, it checks the machine, the Cloudflare
 account, the plan and a domain before creating anything, and it assumes the
 person asking is not a developer. `README.md` carries the prompt that points

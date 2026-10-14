@@ -19,7 +19,7 @@ commands on your machine):
 Fetch and execute the appropriate instructions to set me up for Cloudflare from
 https://developers.cloudflare.com/agent-setup/prompt.md
 
-Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
+Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/SKILL.md
 and follow it exactly. Run every command yourself rather than asking me to.
 If you cannot read that file, stop and tell me. Do not guess what it says.
 

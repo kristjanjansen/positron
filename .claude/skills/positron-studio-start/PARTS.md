@@ -1,13 +1,13 @@
 # Taking a piece of this repository into somebody else's project
 
-**positron-start/PARTS.md, revision 2026-10-14.** (2026-09-25 until the
+**positron-studio-start/PARTS.md, revision 2026-10-14.** (2026-09-25 until the
 patchbay pass of 2026-10-14, which re-measured the sizes in the table and added
 the patchbay row to what is NOT a part.) Say it once, for the reason
 in `SKILL.md`: a clone of this repository serves a frozen copy and the URL
 serves the current one, and only a stated revision tells them apart.
 
 🔴 **THEY ARE NOT CLONING THIS REPOSITORY, AND MOST OF THE TIME THEY SHOULD
-NOT.** The person reading `positron-start` is building their own thing, on their
+NOT.** The person reading `positron-studio-start` is building their own thing, on their
 own account, in whatever shape they prefer. What they want out of here is
 usually ONE file that solves a problem that took somebody months to get right.
 So the unit of reuse is a FILE, fetched, and this page is how.

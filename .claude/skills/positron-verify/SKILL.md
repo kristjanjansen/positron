@@ -1,6 +1,8 @@
 ---
 name: positron-verify
 description: Harnesses, asserts, self-checks, stand-ins and the traps that make a working page read as broken. Load before running or changing any verify harness, before adding or removing a control, before believing a red run, and before reporting a measurement or an absence.
+metadata:
+  internal: true
 ---
 
 # Grading this project, and the instruments that lie
@@ -177,9 +179,9 @@ in `demo/verify.mjs` starts it: `node demo/fake-arhiiv.mjs` (:8903), then
 header says what it cannot grade: every slug gets the same twelve seconds, and
 its URLs are absolute http, so the page's `//` pinning is never exercised.
 
-🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
-KRISTJAN:** *"(ERR's remark, kept private)"* —
-their LISTENER STATISTICS were being corrupted by us. That is a different and
+🔴 **AND THE COST IS NOT OURS TO PAY.** ERR told us on 2026-09-16 that our
+connections were distorting their listener statistics: their LISTENER
+STATISTICS were being corrupted by us. That is a different and
 worse kind of damage from load: a broadcaster's audience figures are what it
 reports to its board and its funders, and a few dozen headless Chromes holding
 mounts open for hours are counted as listeners who never leave. It cannot be
@@ -1504,7 +1506,7 @@ and wrote into `research/measured-devices-2026-09-20.md`**; `circuit-patch-test.
 existed, computed by a decoder that lived in a scratchpad and is gone**, so
 reproducing one is **two independent implementations agreeing about one real
 artefact.** ⚠️ **Where they DISAGREE the disagreement is kept and named rather
-than tuned away**, and there is one: the 49 block map is true of `session_0` and
+than tuned away**, and there is one: the 49 block map is true of the first session and
 of 21 of the 32 sessions, not of all of them.
 
 🔴 **A FLOOR PROVES AN INSTRUMENT DOES NOT INVENT MOVEMENT. ONLY A KNOWN SIGNAL
@@ -1530,7 +1532,7 @@ a list of the claims that need a document and are asserted on `/kit/`, `/tom/` o
 ⚠️ **A SKIP NAMES WHAT GOES UNMEASURED RATHER THAN PASSING QUIETLY**, the way
 `timeline/lab/csound-oracle.mjs` skips where Csound is not installed, because **a
 check nobody can run is a check nobody runs.** `mp3-frames-test.mjs`'s live arm
-against the relay, and every section that reads `New Pack.circuitpack` out of
+against the relay, and every section that reads the owner's Circuit pack out of
 gitignored `tmp/`, skip that way.
 ⚠️ **AND THE MADE-UP RULER IS THE POINT, NOT A COMPROMISE.** `diagram-test.mjs`
 uses a fixed width per character because `getComputedTextLength` needs a live

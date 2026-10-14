@@ -1,6 +1,8 @@
 ---
 name: positron-ui
 description: "Page furniture on a patchbay page: the kit in demo/shell/ and /kit/<part>/, the bay picture (createPatchbay, bay-view, medium colours), controls as node ports (a knob is a value-out, keys are midi-out plus midi-in), readouts, tables, sliders, transport bars, CSS, spacing, phone layout and the prose a visitor reads. Load before building or changing any interface, any control, any port a control stands for, any readout cell, the patchbay block on a page, or any stylesheet rule."
+metadata:
+  internal: true
 ---
 
 # The kit, the page and everything a visitor looks at
@@ -1076,7 +1078,7 @@ and no concept page.) What
   is the `chip`. On both board pages (`/keys/` and `/knobs/`, both gone by
 2026-10-13; `toggle: false` is still used by `/code/piano/`, `/pack/`,
 `/stage/` and `/kit/timeline/`, checked 2026-10-14) that is the presence badge, because the
-  fact worth having about an instrument in another building is whether it is
+  fact worth having about an instrument at another site is whether it is
   answering. ⚠️ **IT DISARMS EVERYTHING THAT DEPENDED ON PLAYING** rather than
   leaving it to read false by luck: `api.playing` is forced false, the space bar
   stops being a play key, the end-stop never arms, and `api.toggles` says so in

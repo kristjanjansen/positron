@@ -1,6 +1,8 @@
 ---
 name: positron-concepts
 description: The concept pages, small pages at /<group>/<slug>/ that each unpack one patchbay idea and are built as a patch (createBay nodes, ports and links, drawn by createPatchbay), shown as the front page's cards. Load before building or changing any concept page (demo/<group>/<slug>/, the folders in CONCEPT_DIRS), before adding a card to the front page, and before explaining a patchbay idea (site, room, node, port, link, medium, transport, a `*` link, an effect, a recorder) as a small page.
+metadata:
+  internal: true
 ---
 
 # Concepts pages

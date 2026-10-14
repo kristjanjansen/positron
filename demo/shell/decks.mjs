@@ -92,14 +92,14 @@ const SYNTHS = [
  * THE PROMPT ON THE LAST SLIDE, asked 2026-10-07 as *"add actual prompt (see
  * readme) that merges cf and positron skill lookup, put it into code box"*.
  * VERBATIM from README.md's `Build one like it`, which is where it is kept and
- * explained: Cloudflare's own setup line, then the positron-start skill. If
+ * explained: Cloudflare's own setup line, then the positron-studio-start skill. If
  * one changes, change the other.
  * ⚠️ READ ONLY, and a URL is coloured as a string so the two lookups stand out.
  */
 export const SETUP_PROMPT = `Fetch and execute the appropriate instructions to set me up for Cloudflare from
 https://developers.cloudflare.com/agent-setup/prompt.md
 
-Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md
+Then read https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/SKILL.md
 and follow it exactly. Run every command yourself rather than asking me to.
 If you cannot read that file, stop and tell me. Do not guess what it says.
 
@@ -167,7 +167,7 @@ const POSITRON_WORDS = [
   { name: 'build', say: 'Build one of your own',
     text: 'Paste this into a coding agent', textStep: 2,
     slot: promptSlot,
-    notes: 'The first line is Cloudflare\'s own setup prompt, the rest points at the positron-start skill. Close with a concrete invitation: choose one example, try a change, and tell me where you needed help.' },
+    notes: 'The first line is Cloudflare\'s own setup prompt, the rest points at the positron-studio-start skill. Close with a concrete invitation: choose one example, try a change, and tell me where you needed help.' },
 ];
 
 // every inner slide's headline at step 3, asked 2026-10-07 as *"iside slides use

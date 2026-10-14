@@ -1,6 +1,8 @@
 ---
 name: positron-compose
 description: "How anything on a page is laid out so that it looks right without a number being nudged: air, alignment, size, grouping, glued surfaces, corners, the phone, and the CSS that carries each of them without cascade side effects. Load BEFORE deciding where anything goes, before writing any padding, margin, gap, width, border or radius, and before saying a layout is done."
+metadata:
+  internal: true
 ---
 
 # Layout is a system, not arithmetic

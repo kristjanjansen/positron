@@ -1,6 +1,8 @@
 ---
 name: positron-history
 description: What positron used to be called, where the retired and archived pages went, and which workers, inputs and routes were retired. Load before following a link, a slug or a path from an older file (a /concepts/<group>/<nnn>/ address, a dashed slug, /rhythm/, /stations/, a demo slug), before repeating a claim about a rename, or when a reference in a comment does not resolve.
+metadata:
+  internal: true
 ---
 
 # What moved, what was renamed, and what is gone
@@ -100,7 +102,7 @@ It was the example named here of a page that belongs with its hardware, and it
 was RETIRED with `/keys/` on 2026-09-17; it is at `archive/keys/listen.html` and
 `LAYOUT.md` rule 2 no longer has a live example. **The rule it illustrated is
 untouched**: a page that drives hardware does not go under `demo/`, because that
-invites `built: true`, which puts a shared Raspberry Pi in another building into
+invites `built: true`, which puts a shared Raspberry Pi at another site into
 every run of the suite. Found 2026-09-18 by auditing the backlog, which is the
 second time in one day that a confident sentence in a file like this outlived
 the thing it described.
@@ -146,7 +148,7 @@ stale link is louder than a dead one.
 are at `archive/box-fluidsynth-hexter/`, out of `jacksynth.mjs` and out of
 `rig/audit.mjs`; a board asked for either answers `unknown source`. There is ONE
 jackd, ONE capture and ONE room on it, so an instrument picker was a control
-that took the sound away from somebody in another building, and it did: `/knobs/`
+that took the sound away from somebody at another site, and it did: `/knobs/`
 was found refusing to start because somebody had pressed `sampled`.
 ⚠️ The suite total that
 used to sit here was removed rather than updated: it was stale for two sessions, and a count nobody re-measures reads as

@@ -1,6 +1,8 @@
 ---
 name: positron-hardware
 description: The Raspberry Pi board (site pi-1 in room studio-1, its graph and ports), the Ableton rig, Yoshimi (retired from the board 2026-10-13), the Novation Circuit and its consent (accepts and never on its midi-in), MIDI and audio capture on this desk. Load before touching anything under rig/, before a page that plays or records real hardware (the remote concepts), and before any claim about what an instrument does.
+metadata:
+  internal: true
 ---
 
 # The machines on and off this desk
@@ -52,8 +54,8 @@ and guessing Raspberry Pi MAC prefixes in `arp -an` missed it outright — the
 board was there the whole time. One line finds it in about a minute:
 
 ```sh
-for i in $(seq 1 254); do (nc -z -G 1 -w 1 192.168.1.$i 22 2>/dev/null && echo 192.168.1.$i) & done; wait
-ssh positron@<ip> hostname -s            # it answers `raspberrypi`
+for i in $(seq 1 254); do (nc -z -G 1 -w 1 <lan-prefix>.$i 22 2>/dev/null && echo <lan-prefix>.$i) & done; wait
+ssh <user>@<pi> hostname -s              # it answers the board's hostname
 ```
 
 It also answers over the relay from any network — `node rig/board/ask.mjs --room
@@ -90,15 +92,14 @@ or checking it tells you nothing about what is running. Compare `md5sum` against
   away and it is the instrument refusing to write.**
   🔴 **AND UNLOCKING IT COSTS A POWER CYCLE, WHICH DISCARDS THE UNSAVED WORK
   THAT PROMPTED THE UNLOCKING.** 📄 The same page says `Clear Session` is
-  disabled alongside it, so both come back together on a box holding **29
-  sessions of real work** that a factory reset would not bring back (the
+  disabled alongside it, so both come back together on a box holding **the
+  owner's sessions of real work**, which a factory reset would not bring back (the
   Circuit HAS a factory reset; this line said *"no factory reset"* until
   2026-10-14, corrected per CLAUDE.md's 2026-10-03 note). ⚖️ **Whether Novation Components
   can export the LIVE session out of RAM or only what is in flash is UNMEASURED
   and worth knowing before anybody power cycles anything.** Take a fresh pack
   first either way: reading is free, the backup is dated 2026-09-20 (since
-  2026-09-24 it is `circuit/2026-09-20-circuit.circuitpack` in the private
-  repository `<private-pack-repo>`, not `New Pack.circuitpack` in this one,
+  2026-09-24 it is in the owner's private pack repository, not in this one,
   CLAUDE.md), and a diff against it says which sessions have moved since.
 
 

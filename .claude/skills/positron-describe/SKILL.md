@@ -1,6 +1,8 @@
 ---
 name: positron-describe
 description: How to write the words a visitor reads about a page, and how to decide what they say, checked against the page's code and its own patchbay links. Load before writing or changing any card description (a `say` in demo/shell/concept-list.mjs, CONCEPTS or DEMO_CARDS, or an archived card in demo/archive/index.html), a `one` line in demo/manifest.mjs, a page's `what` text, or a readout key a visitor reads, and before checking somebody's proposed copy against a page.
+metadata:
+  internal: true
 ---
 
 # Describing a page

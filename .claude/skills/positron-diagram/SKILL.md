@@ -1,6 +1,8 @@
 ---
 name: positron-diagram
 description: How a hand-written diagram (demo/shell/diagram.mjs) is written, and how it differs from the patchbay picture a concept page draws from its own bay. What goes in a box, a label, a sub, a note and an arrow, and where the picture sits. Load before drawing or editing any diagram with diagram.mjs, a slide's diagram in demo/slides/deck.mjs, or before choosing between a diagram and a patchbay picture for a page.
+metadata:
+  internal: true
 ---
 
 # A diagram is written to a different rule from prose

@@ -1,7 +1,7 @@
 ---
 type: tool_used
 tool: WebFetch
-input_contains: positron-start/SKILL.md
+input_contains: positron-studio-start/SKILL.md
 min: 1
 scored: false
 ---

@@ -1,6 +1,8 @@
 ---
 name: positron-streaming
 description: "A stream as a heavy patchbay link, and the transport it negotiates (TRANSPORTS and chooseTransport in demo/shell/bay.mjs): HLS, LL-HLS, MoQ, WHIP and WHEP, Cloudflare Stream and Workers, the relay room and its limits, ERR and somebody else's Icecast, Durable Objects, R2. Load before changing anything under workers/ or src/, before any page that plays a stream or adds an audio, video, file or state link that leaves the machine, and before quoting a latency or a bill."
+metadata:
+  internal: true
 ---
 
 # Streaming, the relay, and what each provider actually does
@@ -1576,9 +1578,9 @@ last two sentences below.
 
 Retired 2026-10-14 from this file because the code moved. On 2026-10-02
 (`0ada490f`, *"station moved to eccm"*) the station went to eccm, at
-`src/station/station.mjs` in https://github.com/kristjanjansen/eccm, and
+`src/station/station.mjs` in the eccm repository, and
 `workers/station/worker.mjs` here is 54 lines that only serve `GET /media/<key>`
-out of the bucket (the MIM videos and pictures, `kristjanjansen/`). Every
+out of the bucket (the MIM videos and pictures, under the owner's own prefix). Every
 citation of `workers/station/worker.mjs` below means the code in this
 repository's git history before `0ada490f`, or eccm's copy. The rules hold
 for any byterange HLS station.

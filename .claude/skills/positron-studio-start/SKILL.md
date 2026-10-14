@@ -1,11 +1,11 @@
 ---
-name: positron-start
+name: positron-studio-start
 description: Stand up a positron-shaped site of somebody's own on Cloudflare, from a fresh machine and possibly a fresh Cloudflare account. Load before the first command when somebody says they want to build something like this, or like one of its demos. Works for Claude Code, Codex or any agent that can run commands.
 ---
 
 # Standing up a positron of your own
 
-**positron-start, revision 2026-10-14.** (2026-09-25 until the patchbay pass
+**positron-studio-start, revision 2026-10-14.** (2026-09-25 until the patchbay pass
 of 2026-10-14, which added the section below on what a positron-shaped thing
 is, and corrected the pages, workers and sizes that had moved since.)
 
@@ -25,7 +25,7 @@ two of a push is serving the previous version. `cmp` before concluding a rule
 was ignored.
 ✅ **IF THE REVISION YOU ARE READING IS OLDER THAN A FEW MONTHS, SAY SO AND
 OFFER TO RE-FETCH IT:**
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/SKILL.md`
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/SKILL.md`
 
 
 🔴 **ASSUME THE PERSON READING THIS IS NOT A DEVELOPER.** They pasted a prompt
@@ -662,7 +662,7 @@ next to and can reload by hand when it sulks.
 file out of this repository is the same job whatever the file is, and writing it
 out once per subject is how four slightly different versions of one instruction
 get made. Read it before fetching anything:
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/PARTS.md`
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/PARTS.md`
 It carries the two base URLs, the `curl` form, the four checks that decide
 whether a file transfers at all, the table of parts that are known to, and the
 list of things that look reusable and are not.
@@ -1109,7 +1109,7 @@ worth taking and why. The mechanics of actually getting a file into somebody
 else's project, the two base URLs, the `curl` form, the four checks that decide
 whether a file transfers, and the table of parts that are known to, are one
 fetch away:
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-start/PARTS.md`
+`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/PARTS.md`
 ⚠️ **READ IT BEFORE COPYING ANY FILE OUT OF HERE**, including one this section
 recommends. A file that imports something else in this repository drags a tree
 behind it, and the failure shows up after they have built on it.

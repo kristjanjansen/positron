@@ -1,6 +1,8 @@
 ---
 name: positron-slides
 description: Write, revise, critique and compress slide text, presentation outlines, speaker notes and playable lessons in the owner's plain explanatory voice, including talks that explain a patch (sites, nodes, ports, links) in the bay's own words. Load before writing or changing any deck in demo/shell/decks.mjs or a slide's words in demo/shell/slide.mjs data, before turning research, a plan or a blog post into slides, before writing an audience-specific version of a talk, and before removing AI slop, clever titles or generic pitch language from one. Ground claims in supplied material and use literal titles.
+metadata:
+  internal: true
 ---
 
 # Slide writing
