@@ -716,11 +716,10 @@ void main(){
   const PROG_SHAPE = { of: 'glsl' };
   // The browser's nodes are /shell/nodes.mjs's, each port labelled `node:port`;
   // the Pi's is not in boardGraph() (`gpu` is), so it stays here.
-  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
   addNodes(bay, S, ['knob-segments', 'code', 'shader', 'screen'], {
+    portLabel: 'node:port',
     label: { 'knob-segments': 'knob', shader: 'mirror shader here', screen: 'picture here' },
-    ports: { ...labelled(['code:program-out', 'shader:value-in', 'shader:program-in', 'shader:video-out', 'screen:video-in']),
-      'knob-segments:value-out': { label: 'knob-segments:value-out', shape: { of: 'param', names: ['segments'] } } },
+    ports: { 'knob-segments:value-out': { shape: { of: 'param', names: ['segments'] } } },
     deliver: {
       'shader:value-in': (e) => {
         if (e?.of !== 'param' || e.name !== 'segments') return;
@@ -737,7 +736,7 @@ void main(){
   });
   // not in nodes.mjs yet: pi-1:shader is simulated and boardGraph() has no node for it
   piNode = bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
-  addNodes(bay, S, ['screen-pi'], { label: { 'screen-pi': 'Pi picture' }, ports: labelled(['screen-pi:video-in']) });
+  addNodes(bay, S, ['screen-pi'], { label: { 'screen-pi': 'Pi picture' }, portLabel: 'node:port' });
   const PORTS = [
     { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['segments'] }, deliver: (e) => {
       if (e?.of !== 'param' || e.name !== 'segments') return;

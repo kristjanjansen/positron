@@ -19,7 +19,7 @@
   import { compile } from '/shell/sclang-lite.mjs';
   import { createPanelValues } from '/shell/video-panel.mjs';
   import { createGrainRig, WINDOW_S } from '/granulator/grain-rig.mjs';
-  import { addNodes } from '/shell/nodes.mjs';
+  import { addNodes, addPorts } from '/shell/nodes.mjs';
   import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/granulator/grain-ring.mjs';
   import { createTempoDetector, STEADY, steady } from '/radio/tempo.mjs';
 
@@ -214,10 +214,9 @@
     // 2026-10-13 on a phone: *"Do not see how tempo feeds into grains"*.
     TEMPO_GRAINS = `${S}:grains:tempo-in`;
     addNodes(bay, S, ['tempo'], { ports: { 'tempo:audio-in': { label: 'tempo detector' }, 'tempo:value-out': { label: 'tempo' } } });
-    // not in nodes.mjs yet: addNodes cannot add a port to a node the rig already
-    // built, so the grains' tempo-in and the wave's value-in-2 stay inline.
-    bay.addPort({ id: TEMPO_GRAINS, label: 'tempo', dir: 'in', medium: 'value', deliver: (ev) => tempoIn(ev) });
-    bay.addPort({ id: WAVE_BEATS, label: 'beats', dir: 'in', medium: 'value', deliver: (ev) => beatsIn(ev) });
+    // Two ports on nodes the rig already built.
+    addPorts(bay, S, { [TEMPO_GRAINS]: { label: 'tempo', deliver: (ev) => tempoIn(ev) },
+      [WAVE_BEATS]: { label: 'beats', deliver: (ev) => beatsIn(ev) } });
     hold(RADIO_OUT, TEMPO_IN);
     hold(TEMPO_OUT, TEMPO_GRAINS);
     hold(TEMPO_OUT, WAVE_BEATS);

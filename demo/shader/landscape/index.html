@@ -169,7 +169,7 @@
   addNodes(bay, S, [{ name: 'recording', as: SRC.id, site: SRC.store, label: SRC.label }, 'radio',
     // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
     'granulator', 'speaker', 'shader-landscape', 'screen',
-    ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label }))], {
+    ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label, variant: 'unshaped' }))], {
     label: { screen: 'screen' },
     ports: {
       [`${SRC.id}:file-out`]: { label: 'recording', address: SRC.url },
@@ -180,7 +180,7 @@
       'shader:audio-in': { label: 'level' }, 'shader:value-in': { label: 'values' }, 'shader:video-out': { label: 'picture' },
       'screen:video-in': { label: 'screen' },
       // where a granulator's value can land later: unlinked today
-      ...Object.fromEntries(K.flatMap((c) => [[`knob-${c.label}:value-out`, { label: c.label, shape: {} }],
+      ...Object.fromEntries(K.flatMap((c) => [[`knob-${c.label}:value-out`, { label: c.label }],
         [`knob-${c.label}:value-in`, { label: c.label }]])),
     },
     deliver: { 'shader:value-in': (ev) => valueIn(ev), ...Object.fromEntries(K.map((c) => [`knob-${c.label}:value-in`, (ev) => knobIn(c.name, ev)])) },

@@ -253,12 +253,10 @@
   let x = 0.5, fades = 0;
   let notesIn = 0, piNotesIn = 0, paramSends = 0, piParamSends = 0;
   // The browser's nodes are /shell/nodes.mjs's; each port keeps its `node:port` label.
-  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
   addNodes(bay, S, ['keys', ...NAMES.map((n) => ({ name: 'knob', as: `knob-${n}` })), 'collide', 'scope', 'scope-pi', 'speaker'], {
+    portLabel: 'node:port',
     label: { collide: 'SuperCollider here', scope: 'waveform here', 'scope-pi': 'Pi waveform' },
-    ports: { ...labelled(['keys:midi-out', ...NAMES.map((n) => `knob-${n}:value-out`), 'collide:midi-in', 'collide:audio-out',
-      'scope:audio-in', 'scope-pi:audio-in', 'speaker:audio-in']),
-    'collide:value-in': { label: 'collide:value-in', shape: { of: 'param', names: NAMES } } },
+    ports: { 'collide:value-in': { shape: { of: 'param', names: NAMES } } },
     deliver: {
       'collide:midi-in': (e) => {
         if (e?.cls !== 'note') return;
@@ -283,7 +281,7 @@
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
   addNodes(bay, S, ['fader', 'xfade'], {
-    ports: labelled(['fader:value-out', 'xfade:value-in', 'xfade:audio-in', 'xfade:audio-in-2', 'xfade:audio-out']),
+    portLabel: 'node:port',
     deliver: { 'xfade:value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;
       x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();

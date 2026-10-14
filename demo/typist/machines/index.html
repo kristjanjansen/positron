@@ -182,14 +182,6 @@
   // per key type is a playback rate, and a rate is set where a sample starts.
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
-  addNodes(bay, S, ['typing', 'paper'], { deliver: { 'paper:value-in': () => {} } });
-  // not in nodes.mjs yet: addNodes adds a type's ports in catalogue order, and
-  // this page's typewriter and fx draw their inputs in another order.
-  bay.addNode({ id: `${S}:typewriter`, kind: 'engine', label: 'typewriter', place: 'browser' });
-  addNodes(bay, S, ['pick']);
-  bay.addNode({ id: `${S}:fx`, kind: 'engine', label: 'fx', place: 'browser' });
-  addNodes(bay, S, ['speaker', 'typewriter-samples']);
-
   // The index as it ARRIVES, at each end. Nothing sets these but a delivery.
   let fxIndex = 0, fxAmt = DISTINCT, twIndex = 0, twAmt = DISTINCT, tuning = character(0), pb = null;
   const arrivals = [];
@@ -211,16 +203,16 @@
     if (where === 'fx') { fxAmt = v; fx?.set(fxIndex, v); }
     else { twAmt = v; tuning = character(twIndex, v); }
   };
+  addNodes(bay, S, ['typing', 'paper', 'typewriter', 'pick', 'fx-typewriter', 'speaker', 'typewriter-samples'], {
+    deliver: {
+      'paper:value-in': () => {},
+      [`${S}:typewriter:value-in-3`]: deliverAmt('typewriter'), [`${S}:typewriter:value-in`]: () => {},
+      [`${S}:typewriter:value-in-2`]: deliverIndex('typewriter'),
+      [`${S}:fx:value-in-2`]: deliverAmt('fx'), [`${S}:fx:value-in`]: deliverIndex('fx'),
+    },
+    ports: { [`${S}:typewriter:file-in`]: {} },
+  });
   addNodes(bay, S, ['knob-distinct']);
-  bay.addPort({ id: `${S}:fx:value-in-2`, dir: 'in', medium: 'value', shape: { of: 'param' }, deliver: deliverAmt('fx') });
-  bay.addPort({ id: `${S}:typewriter:value-in-3`, dir: 'in', medium: 'value', shape: { of: 'param' }, deliver: deliverAmt('typewriter') });
-  bay.addPort({ id: `${S}:typewriter:value-in`, dir: 'in', medium: 'value', shape: { of: 'text' }, deliver: () => {} });
-  bay.addPort({ id: `${S}:typewriter:value-in-2`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex('typewriter') });
-  bay.addPort({ id: `${S}:typewriter:file-in`, dir: 'in', medium: 'file' });
-  bay.addPort({ id: `${S}:typewriter:audio-out`, dir: 'out', medium: 'audio' });
-  bay.addPort({ id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio' });
-  bay.addPort({ id: `${S}:fx:value-in`, dir: 'in', medium: 'value', shape: { of: 'index' }, deliver: deliverIndex('fx') });
-  bay.addPort({ id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio' });
   for (const [a, b] of [
     [`${S}:keys:value-out`, `${S}:paper:value-in`],
     [`${S}:keys:value-out`, `${S}:typewriter:value-in`],

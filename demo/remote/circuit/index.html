@@ -126,8 +126,7 @@
   const bay = createBay();
   // The browser's nodes are /shell/nodes.mjs's, each port labelled
   // `node:port`; the Circuit's is boardGraph's, so it is drawn here.
-  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
-  addNodes(bay, S, ['keys', 'patch'], { ports: labelled(['keys:midi-out', 'patch:midi-out']) });
+  addNodes(bay, S, ['keys', 'patch'], { portLabel: 'node:port' });
   bay.addNode({ id: `${BOARD_SITE}:${INPUT}`, kind: 'device', label: 'Circuit on the Pi', place: ROOM });
   // ── the eight macro knobs, each a node of its own ──────────────────────
   // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/ ahve
@@ -143,7 +142,7 @@
     .map((r, i) => ({ n: i + 1, cc: r.cc, name: `macro ${i + 1}`, pos: `MacroKnob${i + 1}_Position` }));
   if (MACROS.length !== 8 || MACROS.some((m, i) => m.cc !== 80 + i)) throw new Error('the macro knobs are CC 80 to 87 and the table says otherwise');
   addNodes(bay, S, [...MACROS.map((m) => ({ name: 'knob', as: `knob-macro-${m.n}`, label: `macro ${m.n}` })), 'scope', 'speaker'],
-    { ports: labelled([...MACROS.map((m) => `knob-macro-${m.n}:value-out`), 'scope:audio-in', 'speaker:audio-in']) });
+    { portLabel: 'node:port' });
 
   let board = null, armed = false, lease = null;
   let sent = { note: 0, cc: 0, program: 0 }, refused = 0, lastRefusal = '', lastProgram = null;
@@ -725,7 +724,7 @@
     // not in nodes.mjs yet: pi-1:camera is not in boardGraph() either (plans/plan-node-catalogue.md)
     bay.addNode({ id: `${BOARD_SITE}:camera`, kind: 'device', label: 'camera on the Pi', place: ROOM });
     bay.addPort({ id: CAM_OUT, label: 'camera:video-out', dir: 'out', medium: 'video' });
-    addNodes(bay, S, ['screen'], { label: { screen: 'picture' }, ports: { 'screen:video-in': { label: 'screen:video-in' } } });
+    addNodes(bay, S, ['screen'], { label: { screen: 'picture' }, portLabel: 'node:port' });
     const linked = bay.link(CAM_OUT, SCREEN_IN);
     if (!linked.ok) d.log(`${CAM_OUT} -> ${SCREEN_IN} refused: ${linked.why}`, 'warn');
 

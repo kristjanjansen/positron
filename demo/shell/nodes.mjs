@@ -4,18 +4,27 @@
 // free, so a test and the build can read it.
 //
 // Left out on purpose: the Pi side (`boardGraph()` in graph-registry.mjs), and
-// the relay and Stream hops (cf-relay, cf-shout, cf-stream, cf-moq).
+// cf-relay, which patchbay.mjs draws from a link's transport. The other hops
+// (cf-shout, cf-stream, cf-moq) are entries, each on its fixed site.
 //
 // An entry's key is the catalogue NAME. `node` is the id's second segment when
 // it is not the name (three different things are called `shader` on three
 // pages), and `site` is the id's first segment when it is not the page's.
+// No name may look like an instance another entry matches (`knob-mix` would
+// be a knob called mix), so the test refuses one and typeOf will not guess.
 // A port's key is its name; `dir` and `medium` come from it (`value-in-2` is
 // value, in) unless the port says otherwise (`cutoff-in` is audio).
 // `optional` ports are added only when a page passes a deliver or an override
-// for them. `pages` are the pages that build the type today, `labels` the
-// pages that label it something other than `label`. `match` names a
-// per-instance id a page may pass as a plain string (`knob-cutoff`), and
-// `instance` says in words how an instance is named.
+// for them. `variants` are port fields a page asks for by name
+// (`{ name: 'keys', variant: 'cc' }`). `pages` are the pages that build the
+// type today, `labels` the pages that label it something other than `label`.
+// `match` names a per-instance id a page may pass as a plain string
+// (`knob-cutoff`), and `instance` says in words how an instance is named.
+//
+// THE ORDER RULE (decided 2026-10-14): a node's ports come together with the
+// node, in the entry's port order, so bay.ports() lists node by node and the
+// details table's rows and the SVG's elements follow. A port added later to a
+// node that already exists (addPorts) lands after every port added before it.
 
 const P = (o = {}) => o;
 const NOTE = { emits: ['note'] }, TAKES_NOTE = { accepts: ['note'] };
@@ -26,12 +35,15 @@ export const NODES = {
   // ── people and the controls they hold ───────────────────────────────────
   keys: {
     kind: 'person', label: 'keyboard',
+    // radio/key draws its lights last, after the two value-ins.
     ports: {
       'midi-out': P({ ...NOTE }),
-      'midi-in': P({ ...TAKES_NOTE, optional: true }),
       'value-in': P({ optional: true }),
       'value-in-2': P({ optional: true }),
+      'midi-in': P({ ...TAKES_NOTE, optional: true }),
     },
+    variants: { cc: { 'midi-out': { emits: ['note', 'cc'] } } },
+    variantPages: { cc: ['code/piano', 'remote/piano'] },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'synth/sound', 'code/faust',
       'code/collide', 'code/plaits', 'code/piano', 'remote/circuit', 'remote/collide', 'remote/piano',
       'radio/key', 'room/words'],
@@ -53,6 +65,9 @@ export const NODES = {
     kind: 'person', label: '<name>', match: ['knob-<name>'],
     instance: 'knob-<name>, one per parameter, labelled with the parameter (the default) or "knob"',
     ports: { 'value-out': P({ ...PARAM }), 'value-in': P({ optional: true }) },
+    // An empty shape: landscape's knobs are where any value can land later.
+    variants: { unshaped: { 'value-out': { shape: {} } } },
+    variantPages: { unshaped: ['shader/landscape'] },
     pages: ['synth/sound', 'code/faust', 'code/collide', 'code/plaits', 'granulator/grains', 'granulator/beat',
       'remote/circuit', 'remote/collide', 'video/shader', 'shader/mirror', 'shader/landscape', 'shader/remote',
       'typist/machines', 'drums/knobs'],
@@ -60,14 +75,14 @@ export const NODES = {
       'remote/circuit': 'macro <n>', 'drums/knobs': '<drum> <param>', 'granulator/grains': 'wet/dry (knob-mix)',
       'granulator/beat': 'wet/dry (knob-mix)' },
   },
-  'knob-volume': {
-    kind: 'person', label: 'knob',
+  'volume-knob': {
+    node: 'knob-volume', kind: 'person', label: 'knob',
     ports: { 'midi-out': P({ emits: ['cc'] }) },
     pages: ['synth/dots'],
   },
-  // ⚠️ A knob drawn as an ENGINE: the grain pages' knob-mix is a person.
-  'knob-mix': {
-    kind: 'engine', label: 'mix knob',
+  // ⚠️ A knob drawn as an ENGINE: the grain pages' knob-mix is a person, a knob instance.
+  'mix-knob': {
+    node: 'knob-mix', kind: 'engine', label: 'mix knob',
     ports: { 'value-out': P() },
     pages: ['radio/live', 'radio/tempo', 'radio/key'],
   },
@@ -284,15 +299,15 @@ export const NODES = {
   'fx-typewriter': {
     node: 'fx', kind: 'engine', label: 'fx',
     instance: 'fx, or fx-<k> for typist k on typist/score, labelled fx <k>',
-    ports: { 'audio-in': P(), 'value-in': P({ ...INDEX }), 'value-in-2': P({ ...PARAM, optional: true }), 'audio-out': P() },
+    ports: { 'value-in-2': P({ ...PARAM, optional: true }), 'audio-in': P(), 'value-in': P({ ...INDEX }), 'audio-out': P() },
     pages: ['typist/machines', 'typist/score'],
     labels: { 'typist/score': 'fx <k>' },
   },
   typewriter: {
     kind: 'engine', label: 'typewriter',
     instance: 'typewriter, or typewriter-<k> for typist k on typist/score, labelled typewriter <k>',
-    ports: { 'value-in': P({ ...TEXT }), 'file-in': P({ optional: true }), 'value-in-2': P({ ...INDEX, optional: true }),
-      'value-in-3': P({ ...PARAM, optional: true }), 'audio-out': P() },
+    ports: { 'value-in-3': P({ ...PARAM, optional: true }), 'value-in': P({ ...TEXT }), 'value-in-2': P({ ...INDEX, optional: true }),
+      'file-in': P({ optional: true }), 'audio-out': P() },
     pages: ['typist/typewriter', 'typist/machines', 'typist/playback', 'typist/score'],
     labels: { 'typist/score': 'typewriter <k>' },
   },
@@ -445,8 +460,12 @@ export const NODES = {
   },
   camera: {
     kind: 'device', label: 'camera',
+    // relabel() gives it the device's name.
     instance: 'one per tab; the label becomes the camera\'s own name once it is on',
     ports: { 'video-out': P() },
+    // Drawn in this tab; the three loopback pages send it away and leave transports to the link.
+    variants: { page: { 'video-out': { ...PAGE } } },
+    variantPages: { page: ['video/camera', 'video/shader', 'video/recorder', 'drums/camera'] },
     pages: ['video/camera', 'video/shader', 'video/recorder', 'video/webrtc', 'video/llhls', 'video/moq', 'drums/camera'],
   },
 
@@ -494,6 +513,30 @@ export const NODES = {
     ports: { 'audio-out': P({ ...HTTPS }) },
     pages: ['history/newsreels'],
   },
+
+  // ── the hops in between: our relay for a station, Stream, MoQ ────────────
+  shout: {
+    site: 'cf-shout', place: 'site', kind: 'endpoint', label: 'relay',
+    // A page asks `{ name: 'shout', as: st.mount }` and passes the mount URL as the audio-out's address.
+    instance: 'one per station mount, cf-shout:<mount>',
+    ports: { 'audio-in': P({ ...HTTPS }), 'audio-out': P({ ...HTTPS }) },
+    pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key'],
+  },
+  'stream-live': {
+    node: 'live', site: 'cf-stream', place: 'cloudflare', net: 'cloudflare', kind: 'endpoint', label: 'Stream WebRTC input',
+    ports: { 'video-in': P({ transports: ['whip'] }), 'video-out': P({ transports: ['whep'] }) },
+    pages: ['video/webrtc'],
+  },
+  'stream-hls': {
+    node: 'hls', site: 'cf-stream', place: 'cloudflare', net: 'cloudflare', kind: 'endpoint', label: 'Stream LL-HLS input',
+    ports: { 'video-in': P(), 'video-out': P({ transports: ['llhls'] }) },
+    pages: ['video/llhls'],
+  },
+  'moq-relay': {
+    node: 'relay', site: 'cf-moq', place: 'cloudflare', net: 'cloudflare', kind: 'endpoint', label: 'MoQ relay',
+    ports: { 'video-in': P({ transports: ['moq'] }), 'video-out': P({ transports: ['moq'] }) },
+    pages: ['video/moq'],
+  },
 };
 
 /** `value-in-2` is value, in; a port named otherwise says its own. */
@@ -503,39 +546,72 @@ export function portOf(name, p = {}) {
 }
 
 const CATALOGUE = 'demo/shell/nodes.mjs NODES';
-const patternRe = (pat) => new RegExp(`^${pat.replace(/<[^>]+>/g, '[A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*')}$`);
+// `<n>` is a number (midi-2), any other `<word>` a name (knob-cutoff).
+const patternRe = (pat) => new RegExp(`^${pat.replace(/<n>/g, '\\d+').replace(/<[^>]+>/g, '[A-Za-z0-9_.]+(?:-[A-Za-z0-9_.]+)*')}$`);
 
 /** The catalogue name a plain string means: a name, or an instance one entry matches. */
 export function typeOf(name) {
-  if (Object.hasOwn(NODES, name)) return name;
   const hits = Object.keys(NODES).filter((k) => (NODES[k].match || []).some((m) => patternRe(m).test(name)));
+  if (Object.hasOwn(NODES, name)) {
+    // A name that also reads as somebody's instance means two things; refuse to pick.
+    const others = hits.filter((k) => k !== name);
+    if (others.length) throw new Error(`nodes: ${JSON.stringify(name)} is a name in ${CATALOGUE} and an instance of ${others.join(', ')}`);
+    return name;
+  }
   return hits.length === 1 ? hits[0] : null;
+}
+
+// The catalogue type of every node addNodes built, per bay, so addPorts can
+// find the entry without the page saying it again (`shader` is three types).
+const BUILT = new WeakMap();
+const PORT_LABELS = new Set(['node:port']);
+
+/** One port of entry `e` on node `id` (segment `seg`), with a page's fields over the catalogue's. */
+function addPort(bay, e, id, seg, pname, { deliver, fields, variant, portLabel }) {
+  const base = e.ports[pname] ?? e.ports[pname.replace(/-\d+$/, '')];
+  const { optional, repeat, ...cat } = base;
+  const v = variant ? e.variants[variant][pname] : undefined;
+  return bay.addPort({ id: `${id}:${pname}`, ...portOf(pname.replace(/-\d+$/, ''), base), ...cat, ...(v || {}),
+    ...(portLabel ? { label: `${seg}:${pname}` } : {}), ...(fields || {}), ...(deliver ? { deliver } : {}) }).id;
+}
+
+function checkPortLabel(portLabel) {
+  if (portLabel !== undefined && !PORT_LABELS.has(portLabel)) {
+    throw new Error(`nodes: portLabel is one of ${[...PORT_LABELS].join(', ')}, not ${JSON.stringify(portLabel)}`);
+  }
 }
 
 /**
  * Add catalogue nodes and their ports to a bay.
  * @param {object} bay        a createBay()
  * @param {string} site       the page's site, `web`
- * @param {Array<string|{name, as?, site?, label?}>} names  a catalogue name, an
- *   instance it matches (`knob-cutoff`), or `{ name: 'drum', as: 'kick' }`
+ * @param {Array<string|{name, as?, site?, label?, variant?}>} names  a catalogue
+ *   name, an instance it matches (`knob-cutoff`), or `{ name: 'drum', as: 'kick' }`
  * @param {object} [o.deliver]  `{ '<node>:<port>': fn }`, attached to that port
  * @param {object} [o.label]    `{ '<node>': 'sine' }`, this page's label
  * @param {object} [o.ports]    `{ '<node>:<port>': { ...fields } }` merged onto
  *   that port; it also asks for an optional port or a repeat (`value-out-3`)
+ * @param {string} [o.portLabel] `'node:port'` labels every port added here with
+ *   its own `<node>:<port>`, which is what a refusal names; `ports` still wins
  * @returns {{ nodes: string[], ports: string[] }} the ids added
  */
-export function addNodes(bay, site, names, { deliver = {}, label = {}, ports = {} } = {}) {
+export function addNodes(bay, site, names, { deliver = {}, label = {}, ports = {}, portLabel } = {}) {
+  checkPortLabel(portLabel);
   const added = { nodes: [], ports: [] };
   const used = new Set();
   const pick = (map, node, id) => {
     for (const k of [id, node]) if (Object.hasOwn(map, k)) { used.add(`${map === deliver ? 'd' : map === label ? 'l' : 'p'} ${k}`); return map[k]; }
     return undefined;
   };
+  if (!BUILT.has(bay)) BUILT.set(bay, new Map());
   for (const n of names) {
     const o = typeof n === 'string' ? { name: n } : n;
     const type = typeof n === 'string' ? typeOf(o.name) : (Object.hasOwn(NODES, o.name) ? o.name : null);
     if (!type) throw new Error(`nodes: no node type called ${JSON.stringify(o.name)} in ${CATALOGUE}`);
     const e = NODES[type];
+    if (o.variant !== undefined && !Object.hasOwn(e.variants || {}, o.variant)) {
+      throw new Error(`nodes: ${type} has no variant ${JSON.stringify(o.variant)} in ${CATALOGUE}`);
+    }
     const seg = o.as ?? (type === o.name ? e.node ?? o.name : o.name);
     const s = o.site ?? e.site ?? site;
     const id = `${s}:${seg}`;
@@ -543,23 +619,19 @@ export function addNodes(bay, site, names, { deliver = {}, label = {}, ports = {
     const own = e.label.includes('<') ? seg.replace(/^knob-/, '') : e.label;
     bay.addNode({ id, kind: e.kind, label: pick(label, seg, id) ?? o.label ?? own, place: where(e.place ?? 'browser'),
       ...(e.net ? { net: where(e.net) } : {}) });
+    BUILT.get(bay).set(id, type);
     added.nodes.push(id);
     const want = (pname) => {
       const key = `${seg}:${pname}`, pid = `${id}:${pname}`;
-      return { d: pick(deliver, key, pid), x: pick(ports, key, pid) };
-    };
-    const add = (pname, p, d, x) => {
-      const { optional, repeat, ...fields } = p;
-      const port = bay.addPort({ id: `${id}:${pname}`, ...portOf(pname.replace(/-\d+$/, ''), p), ...fields, ...(x || {}), ...(d ? { deliver: d } : {}) });
-      added.ports.push(port.id);
+      return { deliver: pick(deliver, key, pid), fields: pick(ports, key, pid), variant: o.variant, portLabel };
     };
     for (const [pname, p] of Object.entries(e.ports)) {
-      const { d, x } = want(pname);
-      if (!p.optional || d || x) add(pname, p, d, x);
+      const w = want(pname);
+      if (!p.optional || w.deliver || w.fields) added.ports.push(addPort(bay, e, id, seg, pname, w));
       if (!p.repeat) continue;
       for (const k of [...Object.keys(ports), ...Object.keys(deliver)]) {
         const m = k.match(new RegExp(`^(?:${id}|${seg}):(${pname}-(\\d+))$`));
-        if (m && !added.ports.includes(`${id}:${m[1]}`)) { const w = want(m[1]); add(m[1], p, w.d, w.x); }
+        if (m && !added.ports.includes(`${id}:${m[1]}`)) added.ports.push(addPort(bay, e, id, seg, m[1], want(m[1])));
       }
     }
   }
@@ -572,4 +644,40 @@ export function addNodes(bay, site, names, { deliver = {}, label = {}, ports = {
     }
   }
   return added;
+}
+
+/**
+ * Add catalogue ports to nodes addNodes already built, for a port a page adds
+ * after the node (`grains:tempo-in` once the tempo detector is on the page).
+ * @param {object} bay   the bay addNodes built the node in
+ * @param {string} site  the page's site, as given to addNodes
+ * @param {object} ports `{ '<node>:<port>': { deliver?, label?, ...fields } }`
+ * @param {string} [o.portLabel] as addNodes
+ * @returns {{ ports: string[] }} the ids added, in the order given
+ */
+export function addPorts(bay, site, ports, { portLabel } = {}) {
+  checkPortLabel(portLabel);
+  const added = { ports: [] };
+  for (const [key, spec] of Object.entries(ports)) {
+    const parts = key.split(':');
+    const [id, pname] = parts.length === 3 ? [`${parts[0]}:${parts[1]}`, parts[2]] : [`${site}:${parts[0]}`, parts[1]];
+    const type = BUILT.get(bay)?.get(id);
+    if (!type) throw new Error(`nodes: addPorts names ${JSON.stringify(key)}, and ${id} was not built by addNodes in this bay`);
+    const e = NODES[type];
+    if (!Object.hasOwn(e.ports, pname) && !(e.ports[pname.replace(/-\d+$/, '')]?.repeat)) {
+      throw new Error(`nodes: ${type} has no port ${JSON.stringify(pname)} in ${CATALOGUE}`);
+    }
+    if (bay.port(`${id}:${pname}`)) throw new Error(`nodes: ${id}:${pname} is already in this bay`);
+    const { deliver, ...fields } = spec || {};
+    added.ports.push(addPort(bay, e, id, id.split(':')[1], pname, { deliver, fields, portLabel }));
+  }
+  return added;
+}
+
+/** Give a node a new label at run time (a camera takes its device's name once it is on). */
+export function relabel(bay, id, label) {
+  const n = bay.node(id);
+  if (!n) throw new Error(`nodes: relabel names ${JSON.stringify(id)}, which is not in this bay`);
+  n.label = label;
+  return n;
 }

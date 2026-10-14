@@ -78,9 +78,7 @@
   const bay = createBay();
   // The browser's and the bucket's nodes are /shell/nodes.mjs's, each port
   // labelled `node:port`; the Pi's is boardGraph's, so it is drawn here.
-  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
-  addNodes(bay, S, ['keys', 'patch'], { ports: { ...labelled(['patch:midi-out']),
-    'keys:midi-out': { label: 'keys:midi-out', emits: ['note', 'cc'] } } });
+  addNodes(bay, S, [{ name: 'keys', variant: 'cc' }, 'patch'], { portLabel: 'node:port' });
   bay.addNode({ id: `${BOARD_SITE}:sampler`, kind: 'engine', label: 'sampler on the Pi', place: ROOM });
 
   let board = null, armed = false, program = 0, loadingSet = null, loadedAt = 0;
@@ -104,8 +102,7 @@
     { id: SAMPLER_AUDIO, dir: 'out', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
-  addNodes(bay, S, ['piano-samples', 'rhodes-samples', 'scope', 'speaker'],
-    { ports: labelled(['piano:file-out', 'rhodes:file-out', 'scope:audio-in', 'speaker:audio-in']) });
+  addNodes(bay, S, ['piano-samples', 'rhodes-samples', 'scope', 'speaker'], { portLabel: 'node:port' });
   const LINKS = [
     [id('keys', 'midi-out'), SAMPLER_IN],
     [id('patch', 'midi-out'), SAMPLER_IN],

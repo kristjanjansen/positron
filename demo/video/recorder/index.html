@@ -25,7 +25,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo, recorderMime } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { addNodes } from '/shell/nodes.mjs';
+  import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -77,19 +77,14 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  addNodes(bay, S, ['camera', 'screen', 'rec-video', 'store', 'player-video', { name: 'screen', as: 'playback', label: 'playback' }], {
+  addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'screen', 'rec-video', 'store', 'player-video',
+    { name: 'screen', as: 'playback', label: 'playback' }], {
+    portLabel: 'node:port',
     label: { screen: 'camera' },
-    ports: {
-      'camera:video-out': { label: 'camera', transports: ['page'] },
-      'screen:video-in': { label: 'camera' },
-      'rec:video-in': { label: 'rec:video-in' }, 'rec:file-out': { label: 'rec:file-out' },
-      'store:file-in': { label: 'store:file-in' }, 'store:file-out': { label: 'store:file-out' },
-      'player:file-in': { label: 'player:file-in' }, 'player:video-out': { label: 'player:video-out' },
-      'playback:video-in': { label: 'playback' },
-    },
+    ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'camera' }, 'playback:video-in': { label: 'playback' } },
   });
   // Once on, the camera box takes the device's own name.
-  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
+  const camNode = (label) => relabel(bay, `${S}:camera`, label);
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b) {

@@ -116,8 +116,8 @@
   // The shapes are /shell/nodes.mjs's. A knob is labelled with its full name,
   // and a port with its `node:port`, which is what a refusal names.
   const knobNodes = ALL.map((k) => ({ name: 'knob', as: `knob-${k.id}`, label: k.name }));
-  const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
   addNodes(bay, S, ['keys', ...knobNodes, 'plaits', 'scope', 'speaker'], {
+    portLabel: 'node:port',
     deliver: {
       'keys:midi-in': (e) => kb?.lightNote(e.d1, !!e.d2),
       'plaits:midi-in': (e) => {
@@ -132,10 +132,7 @@
         k.to(e.v);
       },
     },
-    ports: {
-      ...own(['keys:midi-out', 'keys:midi-in', ...knobNodes.map((k) => `${k.as}:value-out`), 'plaits:midi-in', 'plaits:audio-out', 'scope:audio-in', 'speaker:audio-in']),
-      'plaits:value-in': { label: 'plaits:value-in', shape: { of: 'param', names: ALL.map((k) => k.name) } },
-    },
+    ports: { 'plaits:value-in': { shape: { of: 'param', names: ALL.map((k) => k.name) } } },
   });
   const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(ID('keys', 'midi-out'), ID('plaits', 'midi-in'));

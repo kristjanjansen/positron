@@ -59,11 +59,8 @@
   for (const st of STATIONS) {
     addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.label }],
       { ports: { [outOf(st)]: { label: st.label } } });
-    // not in nodes.mjs yet: the relay hop, cf-shout:<mount>, is left out of the catalogue on purpose.
-    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-    bay.addPort({ id: relayIn(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-    bay.addPort({ id: relayOut(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'],
-      address: `${BASE}/${st.mount}` });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [relayIn(st)]: { label: 'relay' }, [relayOut(st)]: { label: 'relay', address: `${BASE}/${st.mount}` } } });
     addNodes(bay, S, [{ name: 'wave', as: `wave-${st.key}`, label: `${st.key === 'err' ? 'ERR' : 'Ida'} wave` }],
       { ports: { [waveIn(st)]: { label: 'wave' } } });
   }

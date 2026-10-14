@@ -524,13 +524,12 @@
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
   // The shapes are /shell/nodes.mjs's; the two sample sets sit on cf-r2.
-  addNodes(bay, S, ['keys', 'looper', 'sampler', 'speaker', 'piano-samples', 'rhodes-samples', 'patch'], {
+  addNodes(bay, S, [{ name: 'keys', variant: 'cc' }, 'looper', 'sampler', 'speaker', 'piano-samples', 'rhodes-samples', 'patch'], {
     deliver: {
       'keys:midi-in': (e) => kb.lightNote?.(e.d1, e.d2 > 0),
       'looper:midi-in': looperIn,
       'sampler:midi-in': (e) => sampler.midi(e),
     },
-    ports: { 'keys:midi-out': { emits: ['note', 'cc'] } },
   });
   for (const [a, b] of [
     [`${S}:keys:midi-out`, `${S}:looper:midi-in`],

@@ -241,8 +241,8 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     // The shapes are /shell/nodes.mjs's. A knob is labelled with its parameter's
     // own name, and a port with its `node:port`, which is what a refusal names.
     const knobNodes = names.map((n) => ({ name: 'knob', as: `knob-${safeName(n)}`, label: n }));
-    const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
     addNodes(next, S, ['keys', ...knobNodes, 'fau', 'scope', 'speaker'], {
+      portLabel: 'node:port',
       deliver: {
         'fau:midi-in': fauNote,
         'fau:value-in': (e) => {
@@ -251,10 +251,7 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
           if (node && a) { node.setParamValue(a, e.v); paramSends++; }
         },
       },
-      ports: {
-        ...own(['keys:midi-out', ...knobNodes.map((k) => `${k.as}:value-out`), 'fau:midi-in', 'fau:audio-out', 'scope:audio-in', 'speaker:audio-in']),
-        'fau:value-in': { label: 'fau:value-in', shape: { of: 'param', names } },
-      },
+      ports: { 'fau:value-in': { shape: { of: 'param', names } } },
     });
     const lay = (from, to) => {
       const r = next.link(from, to);

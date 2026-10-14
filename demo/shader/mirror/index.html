@@ -131,9 +131,9 @@ void main(){
   addNodes(bay, S, ['knob-segments', 'shader', 'screen'], {
     label: { 'knob-segments': 'knob', screen: 'screen' },
     deliver: { 'shader:value-in': setParam },
+    portLabel: 'node:port',
     ports: {
-      'knob-segments:value-out': { label: 'knob-segments:value-out', shape: { of: 'param', names: ['segments'] } },
-      'shader:value-in': { label: 'shader:value-in' }, 'shader:video-out': { label: 'shader:video-out' },
+      'knob-segments:value-out': { shape: { of: 'param', names: ['segments'] } },
       'screen:video-in': { label: 'screen' },
     },
   });

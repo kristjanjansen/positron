@@ -4,13 +4,14 @@
 //   node demo/shell/nodes-test.mjs
 //
 // What is graded: every entry's kind and ports are legal for bay.mjs, names
-// are unique in the source, addNodes builds a bay bay.mjs links through, and
-// every page an entry names is on disk. Lines marked NEGATIVE CONTROL must
+// are unique in the source and never read as another entry's instance,
+// addNodes builds a bay bay.mjs links through (port order, portLabel,
+// variants), addPorts and relabel, and every page an entry names is on disk. Lines marked NEGATIVE CONTROL must
 // refuse something, so a check that cannot fail is caught.
 
 import { readFileSync, existsSync } from 'node:fs';
 import { createBay, MEDIA, NODE_KINDS, TRANSPORT_NAMES } from './bay.mjs';
-import { NODES, addNodes, portOf, typeOf } from './nodes.mjs';
+import { NODES, addNodes, addPorts, relabel, portOf, typeOf } from './nodes.mjs';
 
 let failed = 0, ok = 0;
 const check = (name, pass, detail = '') => {
@@ -47,9 +48,21 @@ check('no name is written twice in the source', !dupes.length && keys.length ===
 // pair (site, node) must still say which entry it is, so a page never needs both.
 const ambiguous = names.filter((n) => typeOf(n) !== n);
 check('a catalogue name always means its own entry, never an instance of another', !ambiguous.length, ambiguous.join(' '));
-const instances = { 'knob-cutoff': 'knob', 'midi-2': 'midi', 'scope-pi': 'scope', 'wave-err': 'wave', 'screen-pi': 'screen', 'knob-mix': 'knob-mix', 'knob-volume': 'knob-volume' };
+const instances = { 'knob-cutoff': 'knob', 'midi-2': 'midi', 'scope-pi': 'scope', 'wave-err': 'wave', 'screen-pi': 'screen',
+  'knob-mix': 'knob', 'knob-volume': 'knob', 'midi-state': 'midi-state', midi: 'midi' };
 const wrong = Object.entries(instances).filter(([s, t]) => typeOf(s) !== t);
-check('an instance string resolves to its type, and an exact name wins over a pattern', !wrong.length, wrong.map(([s]) => `${s} -> ${typeOf(s)}`).join(' ') || 'all');
+check('an instance string resolves to its type: knob-mix and knob-volume are knobs called mix and volume', !wrong.length, wrong.map(([s]) => `${s} -> ${typeOf(s)}`).join(' ') || 'all');
+// No catalogue name may read as another entry's instance, or a plain string means two things.
+const shadowed = names.filter((n) => { try { typeOf(n); return false; } catch { return true; } });
+check('no catalogue name is an instance another entry matches', !shadowed.length, shadowed.join(' ') || `${names.length} names`);
+check('NEGATIVE CONTROL: midi-<n> is a number, so midi-x is nothing', typeOf('midi-x') === null, String(typeOf('midi-x')));
+{
+  // Put the old ambiguity back for a moment: a knob-shaped name must throw, not pick.
+  NODES['knob-gain'] = { kind: 'engine', label: 'gain', ports: { 'value-out': {} }, pages: [] };
+  const m = throws(() => typeOf('knob-gain'));
+  delete NODES['knob-gain'];
+  check('NEGATIVE CONTROL: a name that is also a knob instance throws rather than guessing', /knob-gain/.test(m) && /knob/.test(m), m);
+}
 
 // ── addNodes builds a bay bay.mjs accepts ─────────────────────────────────
 // Every entry with every optional port, on one bay per entry.
@@ -106,6 +119,96 @@ check('addNodes builds every entry with all its ports', !buildFail.length, build
   check('NEGATIVE CONTROL: audio into a midi-in is refused', !l.ok, l.why || 'linked');
 }
 
+// ── port order: a node's ports come with it, in the entry's order ─────────
+{
+  const bay = createBay();
+  const all = (seg) => Object.fromEntries(Object.keys(NODES[seg === 'fx' ? 'fx-typewriter' : seg].ports).map((p) => [`${seg}:${p}`, {}]));
+  addNodes(bay, 'web', ['keys', 'typewriter', 'fx-typewriter'], { ports: { ...all('keys'), ...all('typewriter'), ...all('fx') } });
+  const order = (seg) => bay.ports().filter((p) => p.id.startsWith(`web:${seg}:`)).map((p) => p.id.split(':')[2]).join(' ');
+  check('typewriter draws value-in-3, value-in, value-in-2, file-in, audio-out', order('typewriter') === 'value-in-3 value-in value-in-2 file-in audio-out', order('typewriter'));
+  check('fx (typewriter) draws value-in-2, audio-in, value-in, audio-out', order('fx') === 'value-in-2 audio-in value-in audio-out', order('fx'));
+  check('keys draws midi-out, value-in, value-in-2, midi-in', order('keys') === 'midi-out value-in value-in-2 midi-in', order('keys'));
+  const nodesOf = bay.ports().map((p) => p.id.split(':').slice(0, 2).join(':'));
+  const runs = nodesOf.filter((n, i) => n !== nodesOf[i - 1]);
+  check('bay.ports() lists node by node, each node\'s ports together', runs.length === new Set(runs).size, runs.join(' '));
+}
+
+// ── portLabel: every port added is labelled with its own node:port ────────
+{
+  const bay = createBay();
+  const r = addNodes(bay, 'web', ['keys', 'synth', { name: 'knob', as: 'knob-q' }], {
+    portLabel: 'node:port', deliver: { 'keys:midi-in': () => {} }, ports: { 'synth:audio-out': { label: 'sound' } } });
+  const lab = Object.fromEntries(r.ports.map((id) => [id.split(':').slice(1).join(':'), bay.port(id).label]));
+  check('portLabel labels each added port <node>:<port>', lab['keys:midi-out'] === 'keys:midi-out' && lab['knob-q:value-out'] === 'knob-q:value-out' && lab['synth:midi-in'] === 'synth:midi-in', JSON.stringify(lab));
+  check('a label in ports wins over portLabel', lab['synth:audio-out'] === 'sound', lab['synth:audio-out']);
+  check('portLabel asks for no optional port', !bay.port('web:keys:value-in') && !bay.port('web:knob-q:value-in') && !!bay.port('web:keys:midi-in'));
+  const plain = createBay();
+  addNodes(plain, 'web', ['keys']);
+  check('NEGATIVE CONTROL: without portLabel a port keeps no label of its own', plain.port('web:keys:midi-out').label === undefined, String(plain.port('web:keys:midi-out').label));
+  const m = throws(() => addNodes(createBay(), 'web', ['keys'], { portLabel: 'port' }));
+  check('NEGATIVE CONTROL: a portLabel other than node:port throws', /portLabel/.test(m), m);
+}
+
+// ── variants: port fields a page names rather than types ──────────────────
+{
+  const bay = createBay();
+  addNodes(bay, 'web', [{ name: 'keys', variant: 'cc' }, { name: 'camera', variant: 'page' }, { name: 'knob', as: 'knob-x', variant: 'unshaped' }, 'synth']);
+  check('keys, cc: midi-out emits note and cc', bay.port('web:keys:midi-out').emits.join() === 'note,cc', bay.port('web:keys:midi-out').emits.join());
+  check('camera, page: video-out rides the page', bay.port('web:camera:video-out').transports?.join() === 'page', String(bay.port('web:camera:video-out').transports));
+  check('knob, unshaped: value-out has an empty shape', JSON.stringify(bay.port('web:knob-x:value-out').shape) === '{}', JSON.stringify(bay.port('web:knob-x:value-out').shape));
+  const plain = createBay();
+  addNodes(plain, 'web', ['keys', 'camera', 'knob-x']);
+  check('NEGATIVE CONTROL: without the variant the catalogue\'s own fields stand',
+    plain.port('web:keys:midi-out').emits.join() === 'note' && !plain.port('web:camera:video-out').transports && plain.port('web:knob-x:value-out').shape.of === 'param');
+  const m = throws(() => addNodes(createBay(), 'web', [{ name: 'keys', variant: 'pc' }]));
+  check('NEGATIVE CONTROL: a variant the entry does not have throws', /variant/.test(m) && /pc/.test(m), m);
+}
+
+// ── addPorts: a port on a node addNodes built earlier ─────────────────────
+{
+  const bay = createBay();
+  let got = null;
+  addNodes(bay, 'web', ['grains', 'tempo', 'shader-dither']);
+  const r = addPorts(bay, 'web', { 'web:grains:tempo-in': { label: 'tempo', deliver: (e) => { got = e; } } });
+  const p = bay.port('web:grains:tempo-in');
+  check('addPorts adds a catalogue port with its medium, label and deliver', p && p.medium === 'value' && p.dir === 'in' && p.label === 'tempo' && r.ports[0] === p.id, JSON.stringify(p && { medium: p.medium, label: p.label }));
+  bay.link('web:tempo:value-out', 'web:grains:tempo-in');
+  bay.send('web:tempo:value-out', { of: 'bpm', v: 120 });
+  check('a value on the link reaches the deliver addPorts attached', got?.v === 120, JSON.stringify(got));
+  // `shader` is three types; the one addNodes built is shader-dither, which has a video-in.
+  const s = throws(() => addPorts(bay, 'web', { 'shader:video-in': {} }));
+  check('addPorts finds the type addNodes built, not the entry the segment names', /already/.test(s), s);
+  const m1 = throws(() => addPorts(bay, 'web', { 'wave:value-in-2': {} }));
+  check('NEGATIVE CONTROL: a node addNodes did not build throws', /wave/.test(m1) && /addNodes/.test(m1), m1);
+  const m2 = throws(() => addPorts(bay, 'web', { 'grains:clock-in': {} }));
+  check('NEGATIVE CONTROL: a port the type does not have throws, naming the catalogue', /clock-in/.test(m2) && /nodes\.mjs/.test(m2), m2);
+  const m3 = throws(() => addPorts(bay, 'web', { 'grains:tempo-in': {} }));
+  check('NEGATIVE CONTROL: a port already in the bay throws', /already/.test(m3), m3);
+}
+
+// ── relabel ───────────────────────────────────────────────────────────────
+{
+  const bay = createBay();
+  addNodes(bay, 'web', ['camera', 'screen']);
+  const before = bay.nodes().map((n) => n.id).join();
+  relabel(bay, 'web:camera', 'FaceTime HD Camera');
+  check('relabel changes the label and keeps the node where it was', bay.node('web:camera').label === 'FaceTime HD Camera' && bay.nodes().map((n) => n.id).join() === before, bay.node('web:camera').label);
+  check('relabel leaves every other field', bay.node('web:camera').kind === 'device' && bay.node('web:camera').place === 'browser');
+  const m = throws(() => relabel(bay, 'web:cam', 'x'));
+  check('NEGATIVE CONTROL: relabel of a node not in the bay throws', /web:cam/.test(m), m);
+}
+
+// ── the hops, each on its own site ────────────────────────────────────────
+{
+  const bay = createBay();
+  addNodes(bay, 'web', [{ name: 'shout', as: 'vikerraadio' }, 'stream-live', 'stream-hls', 'moq-relay']);
+  const n = (id) => bay.node(id);
+  check('a shout hop is cf-shout:<mount> on its own place', n('cf-shout:vikerraadio')?.place === 'cf-shout' && n('cf-shout:vikerraadio')?.kind === 'endpoint' && !n('cf-shout:vikerraadio')?.net);
+  check('Stream and MoQ sit on Cloudflare at their fixed ids', ['cf-stream:live', 'cf-stream:hls', 'cf-moq:relay'].every((id) => n(id)?.place === 'cloudflare' && n(id)?.net === 'cloudflare'));
+  check('each hop carries its transports', bay.port('cf-stream:live:video-in').transports.join() === 'whip' && bay.port('cf-stream:hls:video-out').transports.join() === 'llhls'
+    && !bay.port('cf-stream:hls:video-in').transports && bay.port('cf-shout:vikerraadio:audio-out').transports.join() === 'https');
+}
+
 // ── an unknown name throws, naming the catalogue ──────────────────────────
 const m1 = throws(() => addNodes(createBay(), 'web', ['sinth']));
 check('NEGATIVE CONTROL: an unknown name throws, naming the catalogue', /nodes\.mjs/.test(m1) && /sinth/.test(m1), m1);
@@ -116,11 +219,14 @@ check('NEGATIVE CONTROL: the object form takes only a catalogue name, not an ins
 
 // ── every page listed exists on disk ──────────────────────────────────────
 const root = new URL('../', import.meta.url);
-const listed = new Set(names.flatMap((n) => [...NODES[n].pages, ...Object.keys(NODES[n].labels || {})]));
+const listed = new Set(names.flatMap((n) => [...NODES[n].pages, ...Object.keys(NODES[n].labels || {}), ...Object.values(NODES[n].variantPages || {}).flat()]));
 const missing = [...listed].filter((p) => !existsSync(new URL(`${p}/index.html`, root)));
 check('every page in pages and labels is demo/<page>/index.html', !missing.length, missing.join(' ') || `${listed.size} pages`);
 const strays = Object.entries(NODES).flatMap(([n, e]) => Object.keys(e.labels || {}).filter((p) => !e.pages.includes(p)).map((p) => `${n} ${p}`));
 check('a page with its own label also builds the type', !strays.length, strays.join(' '));
+const vstrays = Object.entries(NODES).flatMap(([n, e]) => Object.entries(e.variantPages || {}).flatMap(([v, ps]) => [
+  ...(Object.hasOwn(e.variants || {}, v) ? [] : [`${n} ${v} no such variant`]), ...ps.filter((p) => !e.pages.includes(p)).map((p) => `${n} ${v} ${p}`)]));
+check('a variant\'s pages build the type, and the variant exists', !vstrays.length, vstrays.join(' '));
 check('NEGATIVE CONTROL: a page that is not there is reported missing', !existsSync(new URL('synth/nothing/index.html', root)));
 
 console.log(`\n${names.length} entries, ${listed.size} pages`);

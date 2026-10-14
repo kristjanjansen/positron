@@ -111,27 +111,26 @@
   for (const st of STATIONS) {
     addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.name }],
       { ports: { [STATION_OUT(st)]: { label: st.label } } });
-    // not in nodes.mjs yet: the relay hop, cf-shout:<mount>, is left out of the catalogue on purpose.
-    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-    bay.addPort({ id: RELAY_IN(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-    bay.addPort({ id: RELAY_OUT(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'], address: srcOf(st) });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [RELAY_IN(st)]: { label: 'relay' }, [RELAY_OUT(st)]: { label: 'relay', address: srcOf(st) } } });
   }
   // The station's rough energy, its loudness after levelling, eased, leaves on level:value-out.
   addNodes(bay, S, ['level', 'wave', 'key'], { ports: { [PLAYER_IN]: { label: 'level' }, [PLAYER_OUT]: { label: 'level' },
     [ENERGY_OUT]: { label: 'energy' }, [WAVE_IN]: { label: 'wave' }, [KEY_IN]: { label: 'key detector' }, [KEY_EV]: { label: 'key' } } });
   // The keyboard. Nothing paints it but what is delivered on its ins: the
   // detector never touches it, nor does the pad or autoplay.
-  // not in nodes.mjs yet: the catalogue adds keys:midi-in before value-in and
-  // value-in-2, and this page draws the lights last.
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addPort({ id: KEYS_OUT, label: 'keys', dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addPort({ id: DISPLAY_IN, label: 'key', dir: 'in', medium: 'value', deliver: (ev) => shown(ev) });
-  bay.addPort({ id: KEYS_CHORD, label: 'chord', dir: 'in', medium: 'value', deliver: (ev) => { if (ev?.of === 'param' && ev.name === 'chord') autoMark(ev.notes || []); } });
-  bay.addPort({ id: KEYS_LIGHTS, label: 'lights', dir: 'in', medium: 'midi', accepts: ['note'], deliver: (ev) => { if (ev?.cls === 'note') kb.lightNote(ev.d1, ev.d2 > 0); } });
+  addNodes(bay, S, ['keys'], {
+    ports: { [KEYS_OUT]: { label: 'keys' }, [DISPLAY_IN]: { label: 'key' }, [KEYS_CHORD]: { label: 'chord' }, [KEYS_LIGHTS]: { label: 'lights' } },
+    deliver: {
+      [DISPLAY_IN]: (ev) => shown(ev),
+      [KEYS_CHORD]: (ev) => { if (ev?.of === 'param' && ev.name === 'chord') autoMark(ev.notes || []); },
+      [KEYS_LIGHTS]: (ev) => { if (ev?.cls === 'note') kb.lightNote(ev.d1, ev.d2 > 0); },
+    },
+  });
   // Autoplay knows the key only from its value-in; the chord's root leaves on
   // midi-out-2 for the bass. The pad's midi-out is every note it sounds. Wet and
   // dry: the station is dry, the pad is wet, one knob between them.
-  addNodes(bay, S, ['autoplay', 'bass', 'pad', 'mixer', 'knob-mix', 'speaker'], {
+  addNodes(bay, S, ['autoplay', 'bass', 'pad', 'mixer', 'mix-knob', 'speaker'], {
     deliver: { [AUTO_KEY]: (ev) => autoKey(ev), [BASS_IN]: (ev) => bassEvent(ev), [PAD_IN]: (ev) => padEvent(ev),
       [PAD_LEVEL]: (ev) => padLevel(ev), [MIXER_MIX]: (ev) => mixSet(ev) },
     ports: Object.fromEntries([[AUTO_KEY, 'key'], [AUTO_OUT, 'autoplay'], [AUTO_CHORD, 'chord'], [AUTO_BASS, 'bass'],

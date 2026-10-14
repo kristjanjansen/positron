@@ -48,7 +48,7 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
   // The wave's beats and the scope's tempo are only what arrives on their value
   // ins. The fx box is a low cut plus a click on the beat grid, mixed against the
   // untouched radio by its own knob: tempo on value-in, the mix on value-in-2.
-  addNodes(bay, S, ['wave', 'bpm', 'display', 'fx-click', 'knob-mix', 'speaker'], {
+  addNodes(bay, S, ['wave', 'bpm', 'display', 'fx-click', 'mix-knob', 'speaker'], {
     deliver: { 'wave:value-in': (ev) => beatsIn(ev), 'display:value-in': (ev) => shown(ev),
       'fx:value-in': (ev) => fxTempo(ev), 'fx:value-in-2': (ev) => fxMix(ev) },
     ports: Object.fromEntries(Object.entries({ 'wave:audio-in': 'wave', 'wave:value-in': 'beats',

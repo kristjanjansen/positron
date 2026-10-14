@@ -22,7 +22,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { addNodes } from '/shell/nodes.mjs';
+  import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { camPublish, LIVE } from '/shell/live.mjs';
@@ -105,15 +105,12 @@
   addNodes(bay, S, ['camera', 'screen'], {
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
   });
-  // not in nodes.mjs yet: the Stream hops are left out of the catalogue (plan, Not settled).
-  bay.addNode({ id: 'cf-stream:hls', kind: 'endpoint', label: 'Stream LL-HLS input', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: HLS_IN, label: 'video', dir: 'in', medium: 'video' });
-  bay.addPort({ id: HLS_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['llhls'] });
+  addNodes(bay, S, ['stream-hls'], { ports: { [HLS_IN]: { label: 'video' }, [HLS_OUT]: { label: 'video' } } });
   addNodes(bay, S, [{ name: 'screen', as: 'hls', label: 'LL-HLS' }], {
     ports: { 'hls:video-in': { label: 'LL-HLS', transports: ['llhls'] } },
   });
   // Once on, the camera box takes the device's own name.
-  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
+  const camNode = (label) => relabel(bay, `${S}:camera`, label);
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b, via) {

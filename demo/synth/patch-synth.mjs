@@ -182,16 +182,13 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   // named exception to `<medium>-<dir>` (plans/plan-synth-patch.md §3 option A).
   // A port's label is its own `node:port`, which is what a refusal names.
   const knobNodes = KNOBS.map((k) => `knob-${k.name}`);
-  const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
   addNodes(bay, S, ['keys', ...knobNodes, 'osc', 'filter', 'amp', 'lfo', 'scope', 'speaker'], {
+    portLabel: 'node:port',
     label: Object.fromEntries(knobNodes.map((k) => [k, 'knob'])),
     deliver: {
       'osc:midi-in': oscNote, 'amp:midi-in': ampGate,
       ...Object.fromEntries(['osc', 'filter', 'amp', 'lfo'].map((m) => [`${m}:value-in`, deliverParam(m)])),
     },
-    ports: own(['keys:midi-out', ...knobNodes.map((k) => `${k}:value-out`),
-      'osc:midi-in', 'osc:value-in', 'osc:audio-out', 'filter:audio-in', 'filter:cutoff-in', 'filter:value-in', 'filter:audio-out',
-      'amp:audio-in', 'amp:midi-in', 'amp:value-in', 'amp:audio-out', 'lfo:value-in', 'lfo:audio-out', 'scope:audio-in', 'speaker:audio-in']),
   });
 
   /**

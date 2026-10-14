@@ -23,7 +23,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { addNodes } from '/shell/nodes.mjs';
+  import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -70,22 +70,20 @@
   // No `names` on a knob, as in /synth/patch-synth.mjs: one knob names one of the
   // shader's several, and the shader logs a name it does not have.
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
-  addNodes(bay, S, ['camera', 'shader-dither', 'screen', { name: 'screen', as: 'dither', label: 'dithered' },
+  addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'shader-dither', 'screen', { name: 'screen', as: 'dither', label: 'dithered' },
     ...KNOBS.map((k) => `knob-${k.name}`)], {
+    portLabel: 'node:port',
     deliver: { 'shader:value-in': setParam },
     label: Object.fromEntries(KNOBS.map((k) => [`knob-${k.name}`, 'knob'])),
     ports: {
-      'camera:video-out': { label: 'camera', transports: ['page'] },
-      'shader:video-in': { label: 'shader:video-in' },
-      'shader:video-out': { label: 'shader:video-out' },
-      'shader:value-in': { label: 'shader:value-in', shape: { of: 'param', names: KNOBS.map((k) => k.name) } },
+      'camera:video-out': { label: 'camera' },
+      'shader:value-in': { shape: { of: 'param', names: KNOBS.map((k) => k.name) } },
       'screen:video-in': { label: 'original' },
       'dither:video-in': { label: 'dithered' },
-      ...Object.fromEntries(KNOBS.map((k) => [`knob-${k.name}:value-out`, { label: `knob-${k.name}:value-out` }])),
     },
   });
   // Once on, the camera box takes the device's own name.
-  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
+  const camNode = (label) => relabel(bay, `${S}:camera`, label);
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b) {

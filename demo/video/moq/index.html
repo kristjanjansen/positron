@@ -22,7 +22,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { addNodes } from '/shell/nodes.mjs';
+  import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -68,15 +68,12 @@
   addNodes(bay, S, ['camera', 'screen'], {
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
   });
-  // not in nodes.mjs yet: the MoQ relay hop is left out of the catalogue (plan, Not settled).
-  bay.addNode({ id: 'cf-moq:relay', kind: 'endpoint', label: 'MoQ relay', place: 'cloudflare', net: 'cloudflare' });
-  bay.addPort({ id: RELAY_IN, label: 'video', dir: 'in', medium: 'video', transports: ['moq'] });
-  bay.addPort({ id: RELAY_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['moq'] });
+  addNodes(bay, S, ['moq-relay'], { ports: { [RELAY_IN]: { label: 'video' }, [RELAY_OUT]: { label: 'video' } } });
   addNodes(bay, S, [{ name: 'screen', as: 'moq', label: 'MoQ' }], {
     ports: { 'moq:video-in': { label: 'MoQ', transports: ['moq'] } },
   });
   // Once on, the camera box takes the device's own name.
-  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
+  const camNode = (label) => relabel(bay, `${S}:camera`, label);
 
   const held = new Map();
   function hold(a, b, via) {

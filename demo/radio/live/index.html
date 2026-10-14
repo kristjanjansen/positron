@@ -78,10 +78,8 @@
   for (const st of STATIONS) {
     addNodes(bay, S, [{ name: 'station', site: st.site, as: st.node, label: st.name }],
       { ports: { [STATION_OUT(st)]: { label: st.label } } });
-    // not in nodes.mjs yet: the relay hop, cf-shout:<mount>, is left out of the catalogue on purpose.
-    bay.addNode({ id: `cf-shout:${st.mount}`, kind: 'endpoint', label: 'relay', place: 'cf-shout' });
-    bay.addPort({ id: RELAY_IN(st), label: 'relay', dir: 'in', medium: 'audio', transports: ['https'] });
-    bay.addPort({ id: RELAY_OUT(st), label: 'relay', dir: 'out', medium: 'audio', transports: ['https'], address: srcOf(st) });
+    addNodes(bay, S, [{ name: 'shout', as: st.mount }],
+      { ports: { [RELAY_IN(st)]: { label: 'relay' }, [RELAY_OUT(st)]: { label: 'relay', address: srcOf(st) } } });
   }
   addNodes(bay, S, ['level'], { ports: { [PLAYER_IN]: { label: 'level' }, [PLAYER_OUT]: { label: 'level' } } });
   // The wave, the detector, the tempo scope and the fx box are /radio/rig.mjs.
