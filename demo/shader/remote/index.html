@@ -19,6 +19,7 @@
   import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createKnob } from '/shell/knob.mjs';
@@ -712,29 +713,32 @@ void main(){
   const PI = (port) => `${BOARD_SITE}:shader:${port}`;
   const KNOB_OUT = ID('knob-segments', 'value-out'), CODE_OUT = ID('code', 'program-out');
   const bay = createBay();
-  bay.addNode({ id: `${S}:knob-segments`, kind: 'person', label: 'knob', place: 'browser' });
-  bay.addNode({ id: `${S}:code`, kind: 'person', label: 'code box', place: 'browser' });
-  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'mirror shader here', place: 'browser' });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture here', place: 'browser' });
-  piNode = bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
-  bay.addNode({ id: `${S}:screen-pi`, kind: 'screen', label: 'Pi picture', place: 'browser' });
   const PROG_SHAPE = { of: 'glsl' };
+  // The browser's nodes are /shell/nodes.mjs's, each port labelled `node:port`;
+  // the Pi's is not in boardGraph() (`gpu` is), so it stays here.
+  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
+  addNodes(bay, S, ['knob-segments', 'code', 'shader', 'screen'], {
+    label: { 'knob-segments': 'knob', shader: 'mirror shader here', screen: 'picture here' },
+    ports: { ...labelled(['code:program-out', 'shader:value-in', 'shader:program-in', 'shader:video-out', 'screen:video-in']),
+      'knob-segments:value-out': { label: 'knob-segments:value-out', shape: { of: 'param', names: ['segments'] } } },
+    deliver: {
+      'shader:value-in': (e) => {
+        if (e?.of !== 'param' || e.name !== 'segments') return;
+        P.segments = Math.min(32, Math.max(1, Math.round(e.v)));
+        localSeg.textContent = `${P.segments} ${P.segments === 1 ? 'segment' : 'segments'}`;
+        localPending = e.at ?? performance.now();
+        delivered++;
+      },
+      'shader:program-in': (e) => {
+        lastLocal = build(e.source);
+        if (lastLocal.ok) localPending = e.at ?? performance.now();
+      },
+    },
+  });
+  // not in nodes.mjs yet: pi-1:shader is simulated and boardGraph() has no node for it
+  piNode = bay.addNode({ id: `${BOARD_SITE}:shader`, kind: 'engine', label: 'v3dpipe on the Pi, simulated', place: 'studio-1' });
+  addNodes(bay, S, ['screen-pi'], { label: { 'screen-pi': 'Pi picture' }, ports: labelled(['screen-pi:video-in']) });
   const PORTS = [
-    { id: KNOB_OUT, dir: 'out', medium: 'value', shape: { of: 'param', names: ['segments'] } },
-    { id: CODE_OUT, dir: 'out', medium: 'program', shape: PROG_SHAPE },
-    { id: ID('shader', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['segments'] }, deliver: (e) => {
-      if (e?.of !== 'param' || e.name !== 'segments') return;
-      P.segments = Math.min(32, Math.max(1, Math.round(e.v)));
-      localSeg.textContent = `${P.segments} ${P.segments === 1 ? 'segment' : 'segments'}`;
-      localPending = e.at ?? performance.now();
-      delivered++;
-    } },
-    { id: ID('shader', 'program-in'), dir: 'in', medium: 'program', shape: PROG_SHAPE, deliver: (e) => {
-      lastLocal = build(e.source);
-      if (lastLocal.ok) localPending = e.at ?? performance.now();
-    } },
-    { id: ID('shader', 'video-out'), dir: 'out', medium: 'video', transports: ['page'] },
-    { id: ID('screen', 'video-in'), dir: 'in', medium: 'video' },
     { id: PI('value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['segments'] }, deliver: (e) => {
       if (e?.of !== 'param' || e.name !== 'segments') return;
       piDelivered++;
@@ -747,7 +751,6 @@ void main(){
     } },
     // The relay's H.264 room, or the `vid` data channel on the direct link.
     { id: PI('video-out'), dir: 'out', medium: 'video', transports: ['relay-h264', 'datachannel'] },
-    { id: ID('screen-pi', 'video-in'), dir: 'in', medium: 'video' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
   const held = new Set();

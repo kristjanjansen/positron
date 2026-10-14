@@ -45,6 +45,7 @@
 
 import { el } from '/shell/shell.mjs';
 import { createBay } from '/shell/bay.mjs';
+import { addNodes } from '/shell/nodes.mjs';
 import { createPatchbay } from '/shell/patchbay.mjs';
 import { createStepGrid } from '/shell/step-grid.mjs';
 import { createPanelLayout } from '/shell/panel-layout.mjs';
@@ -322,46 +323,51 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   }
 
   // ── the bay ──────────────────────────────────────────────────────────────
+  // The shapes are demo/shell/nodes.mjs's; the labels and what arrives are
+  // this file's. Every port keeps its own `node:port` as its label.
   const bay = createBay();
-  bay.addNode({ id: `${S}:sequencer`, kind: 'engine', label: 'sequencer', place: 'browser' });
-  for (const v of ALL) bay.addNode({ id: `${S}:${v.key}`, kind: 'engine', label: `${v.label}, SuperCollider`, place: 'browser' });
-  bay.addNode({ id: `${S}:${OUT}`, kind: mix ? 'engine' : 'screen', label: mix ? mix.label : 'speakers', place: 'browser' });
-  bay.addPort({ id: SEQ, label: 'sequencer:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
   const heardBy = {};
+  const names = ['sequencer'], deliver = {}, ports = { 'sequencer:midi-out': {} };
   for (const v of ALL) {
     heardBy[v.key] = 0;
-    bay.addPort({ id: ID(v.key, 'midi-in'), label: `${v.key}:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => { if (e.d1 !== v.note || !e.d2) return; heardBy[v.key]++; hit(v, e.at); } });
-    bay.addPort({ id: ID(v.key, 'audio-out'), label: `${v.key}:audio-out`, dir: 'out', medium: 'audio' });
+    names.push({ name: 'drum', as: v.key, label: `${v.label}, SuperCollider` });
+    ports[`${v.key}:midi-in`] = {}; ports[`${v.key}:audio-out`] = {};
+    deliver[`${v.key}:midi-in`] = (e) => { if (e.d1 !== v.note || !e.d2) return; heardBy[v.key]++; hit(v, e.at); };
   }
-  bay.addPort({ id: SPK, label: `${OUT}:audio-in`, dir: 'in', medium: 'audio' });
-  if (mix) bay.addPort({ id: ID(OUT, 'audio-out'), label: `${OUT}:audio-out`, dir: 'out', medium: 'audio' });
+  names.push(mix ? { name: 'mix', as: OUT, label: mix.label } : 'speaker');
+  ports[`${OUT}:audio-in`] = {};
+  if (mix) ports[`${OUT}:audio-out`] = {};
   if (wantScopes) for (const v of ALL) {
-    bay.addNode({ id: `${S}:scope-${v.key}`, kind: 'screen', label: 'scope', place: 'browser' });
-    bay.addPort({ id: ID(`scope-${v.key}`, 'audio-in'), label: `scope-${v.key}:audio-in`, dir: 'in', medium: 'audio' });
+    const sc = `scope-${v.key}`;
+    names.push({ name: 'scope', as: sc, label: 'scope' });
+    ports[`${sc}:audio-in`] = {}; ports[`${sc}:midi-in`] = {};
     // What starts a trace arrives on a wire too: the drum's own note, filtered
     // the same way, so the scope triggers on exactly the hits its drum plays.
-    bay.addPort({ id: ID(`scope-${v.key}`, 'midi-in'), label: `scope-${v.key}:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => {
-        if (e.d1 !== v.note || !e.d2) return;
-        if (!bay.links().some((l) => l.from === ID(v.key, 'audio-out') && l.to === ID(`scope-${v.key}`, 'audio-in'))) return;
-        views?.[ALL.indexOf(v)].trigger(e.at);
-      } });
+    deliver[`${sc}:midi-in`] = (e) => {
+      if (e.d1 !== v.note || !e.d2) return;
+      if (!bay.links().some((l) => l.from === ID(v.key, 'audio-out') && l.to === ID(sc, 'audio-in'))) return;
+      views?.[ALL.indexOf(v)].trigger(e.at);
+    };
   }
   // A knob per drum, each a node of its own with a value wire into its voice.
   for (const v of KNOBS) {
-    const names = paramsOf(v).map((p) => p.name);
+    const pnames = paramsOf(v).map((p) => p.name);
     for (const p of paramsOf(v)) {
-      const n = p.name;
-      bay.addNode({ id: `${S}:knob-${n}`, kind: 'person', label: `${v.label} ${p.label ?? n}`, place: 'browser' });
-      bay.addPort({ id: ID(`knob-${n}`, 'value-out'), label: `knob-${n}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+      names.push({ name: 'knob', as: `knob-${p.name}`, label: `${v.label} ${p.label ?? p.name}` });
+      ports[`knob-${p.name}:value-out`] = {};
     }
-    bay.addPort({ id: ID(v.key, 'value-in'), label: `${v.key}:value-in`, dir: 'in', medium: 'value',
-      shape: { of: 'param', names }, deliver: (e) => {
-        if (e?.of !== 'param' || !names.includes(e.name)) return;
-        values.get(v.key).set(e.name, e.v); paramSends++;
-      } });
+    ports[`${v.key}:value-in`] = { shape: { of: 'param', names: pnames } };
+    deliver[`${v.key}:value-in`] = (e) => {
+      if (e?.of !== 'param' || !pnames.includes(e.name)) return;
+      values.get(v.key).set(e.name, e.v); paramSends++;
+    };
   }
+  // A whole pattern from a wire: every pad set to what the rows say (setPattern, below).
+  if (patternIn) {
+    ports['sequencer:value-in'] = {};
+    deliver['sequencer:value-in'] = (e) => { if (e?.of === 'pattern') setPattern(e.rows); };
+  }
+  addNodes(bay, S, names, { deliver, ports: Object.fromEntries(Object.entries(ports).map(([k, v]) => [k, { label: k, ...v }])) });
   const lay = (from, to, tf = []) => { const r = bay.link(from, to, tf, { site: S }); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   for (const v of ALL) {
     lay(SEQ, ID(v.key, 'midi-in'), [{ op: 'range', lo: v.note, hi: v.note }]);
@@ -415,10 +421,6 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   function setPattern(rows) {
     for (let r = 0; r < VOICES.length; r++) for (let s = 0; s < STEPS; s++) grid.set(r, s, !!rows?.[r]?.[s], 'quiet');
     patternsIn++;
-  }
-  if (patternIn) {
-    bay.addPort({ id: ID('sequencer', 'value-in'), label: 'sequencer:value-in', dir: 'in', medium: 'value',
-      shape: { of: 'pattern' }, deliver: (e) => { if (e?.of === 'pattern') setPattern(e.rows); } });
   }
 
   // ── the sequencer: wakes every 25 ms, hands over what is due in the next 150 ─

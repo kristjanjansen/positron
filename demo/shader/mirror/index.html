@@ -20,6 +20,7 @@
   import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createKnob } from '/shell/knob.mjs';
@@ -126,14 +127,16 @@ void main(){
 
   // ── the bay: knob, shader, screen ───────────────────────────────────────
   const bay = createBay();
-  bay.addNode({ id: `${S}:knob-segments`, kind: 'person', label: 'knob', place: 'browser' });
-  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'mirror shader', place: 'browser' });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'screen', place: 'browser' });
-  bay.addPort({ id: KNOB_OUT, label: 'knob-segments:value-out', dir: 'out', medium: 'value', shape: { of: 'param', names: ['segments'] } });
-  bay.addPort({ id: SH_VAL, label: 'shader:value-in', dir: 'in', medium: 'value',
-    shape: { of: 'param', names: ['segments'] }, deliver: setParam });
-  bay.addPort({ id: SH_OUT, label: 'shader:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: SCREEN, label: 'screen', dir: 'in', medium: 'video' });
+  // The shapes are /shell/nodes.mjs's; the labels and the delivery are this page's.
+  addNodes(bay, S, ['knob-segments', 'shader', 'screen'], {
+    label: { 'knob-segments': 'knob', screen: 'screen' },
+    deliver: { 'shader:value-in': setParam },
+    ports: {
+      'knob-segments:value-out': { label: 'knob-segments:value-out', shape: { of: 'param', names: ['segments'] } },
+      'shader:value-in': { label: 'shader:value-in' }, 'shader:video-out': { label: 'shader:video-out' },
+      'screen:video-in': { label: 'screen' },
+    },
+  });
 
   const held = new Set();
   function hold(a, b) {

@@ -23,6 +23,7 @@
   import { createBoardCollide, AHEAD } from '/shell/board-collide.mjs';
   import { bootScsynth } from '/shell/scsynth.mjs';
   import { compile } from '/shell/sclang-lite.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { VOICES, LIFE } from '/drums/voices.mjs';
 
@@ -337,13 +338,9 @@
   const bay = m.api.bay;
 
   // ── the bay: the Pi node, the scope, the crossfader, the speakers ───────
+  // The Pi's node is drawn here (it is boardGraph's, not /shell/nodes.mjs's);
+  // the browser's are the catalogue's, added with their ports below.
   const piNode = bay.addNode({ id: `${BOARD_SITE}:drums`, kind: 'engine', label: 'drums on the Pi', place: 'studio-1' });
-  for (const [n, kind, label] of [
-    // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
-    // crossfader takes them.
-    ['scope', 'screen', 'waveforms'],
-    ['fader', 'person', 'fader'], ['xfade', 'engine', 'crossfader'], ['speaker', 'screen', 'speakers'],
-  ]) bay.addNode({ id: `web:${n}`, kind, label, place: 'browser' });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
   let x = 0.5, fades = 0, piIn = 0;
   /** Hits that share one time, gathered and sent as one message when this turn of the sequencer ends. */
@@ -366,19 +363,20 @@
       if (!flushing) { flushing = true; queueMicrotask(flush); }
     } },
     { id: PI('audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('scope', 'audio-in-2'), dir: 'in', medium: 'audio' },
-    { id: ID('fader', 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } },
-    { id: ID('xfade', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ['x'] }, deliver: (e) => {
+  ];
+  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  // One scope, two ins: here on `audio-in`, the Pi on `audio-in-2`, as the
+  // crossfader takes them. Each port keeps its `node:port` label.
+  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
+  addNodes(bay, 'web', ['scope', 'fader', 'xfade', 'speaker'], {
+    label: { scope: 'waveforms' },
+    ports: labelled(['scope:audio-in', 'scope:audio-in-2', 'fader:value-out', 'xfade:value-in', 'xfade:audio-in',
+      'xfade:audio-in-2', 'xfade:audio-out', 'speaker:audio-in']),
+    deliver: { 'xfade:value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;
       x = Math.min(1, Math.max(0, e.v)); fades++; applyFade();
     } },
-    { id: ID('xfade', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-in-2'), dir: 'in', medium: 'audio' },
-    { id: ID('xfade', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  });
   const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(SEQ_PI.from, SEQ_PI.to);
   lay(ID('mix', 'audio-out'), ID('scope', 'audio-in'));

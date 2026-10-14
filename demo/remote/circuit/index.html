@@ -25,6 +25,7 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { createLease } from '/shell/openers.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
@@ -123,8 +124,10 @@
   const CIRCUIT_IN = boardPort(INPUT, 'midi-in'), CIRCUIT_AUDIO = boardPort(INPUT, 'audio-out');
   const CIRCUIT_VALUE = boardPort(INPUT, 'value-in');
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  // The browser's nodes are /shell/nodes.mjs's, each port labelled
+  // `node:port`; the Circuit's is boardGraph's, so it is drawn here.
+  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
+  addNodes(bay, S, ['keys', 'patch'], { ports: labelled(['keys:midi-out', 'patch:midi-out']) });
   bay.addNode({ id: `${BOARD_SITE}:${INPUT}`, kind: 'device', label: 'Circuit on the Pi', place: ROOM });
   // ── the eight macro knobs, each a node of its own ──────────────────────
   // Asked 2026-10-13: *"can https://positron.studio/concepts/remote/010/ ahve
@@ -139,9 +142,8 @@
   const MACROS = CIRCUIT_CC.filter((r) => r.ch === '1/2' && r.sec === 'Macro Knob')
     .map((r, i) => ({ n: i + 1, cc: r.cc, name: `macro ${i + 1}`, pos: `MacroKnob${i + 1}_Position` }));
   if (MACROS.length !== 8 || MACROS.some((m, i) => m.cc !== 80 + i)) throw new Error('the macro knobs are CC 80 to 87 and the table says otherwise');
-  for (const m of MACROS) bay.addNode({ id: `${S}:knob-macro-${m.n}`, kind: 'person', label: `macro ${m.n}`, place: 'browser' });
-  bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
+  addNodes(bay, S, [...MACROS.map((m) => ({ name: 'knob', as: `knob-macro-${m.n}`, label: `macro ${m.n}` })), 'scope', 'speaker'],
+    { ports: labelled([...MACROS.map((m) => `knob-macro-${m.n}:value-out`), 'scope:audio-in', 'speaker:audio-in']) });
 
   let board = null, armed = false, lease = null;
   let sent = { note: 0, cc: 0, program: 0 }, refused = 0, lastRefusal = '', lastProgram = null;
@@ -194,11 +196,8 @@
     }
   }
   const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
     { id: CIRCUIT_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toCircuit },
     { id: CIRCUIT_AUDIO, dir: 'out', medium: 'audio' },
-    ...MACROS.map((m) => ({ id: id(`knob-macro-${m.n}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
     // A page side port on the Circuit's node: a knob's value arrives here and
     // leaves for the Pi as its macro's control change.
     { id: CIRCUIT_VALUE, dir: 'in', medium: 'value', shape: { of: 'param', names: MACROS.map((m) => m.name) },
@@ -207,8 +206,6 @@
         if (!m || !Number.isFinite(e.v)) return;
         queueCc(m.cc, Math.max(0, Math.min(127, e.v)));
       } },
-    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
   const LINKS = [
@@ -725,10 +722,10 @@
   async function buildCamera() {
     const [{ createVideoPanel }, { createBoardVideo, WATCHING_MS }, { HTTP_BASE }] = await Promise.all([
       import('/shell/video-panel.mjs'), import('/shell/board-video.mjs'), import('/shell/wire.mjs')]);
+    // not in nodes.mjs yet: pi-1:camera is not in boardGraph() either (plans/plan-node-catalogue.md)
     bay.addNode({ id: `${BOARD_SITE}:camera`, kind: 'device', label: 'camera on the Pi', place: ROOM });
-    bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture', place: 'browser' });
     bay.addPort({ id: CAM_OUT, label: 'camera:video-out', dir: 'out', medium: 'video' });
-    bay.addPort({ id: SCREEN_IN, label: 'screen:video-in', dir: 'in', medium: 'video' });
+    addNodes(bay, S, ['screen'], { label: { screen: 'picture' }, ports: { 'screen:video-in': { label: 'screen:video-in' } } });
     const linked = bay.link(CAM_OUT, SCREEN_IN);
     if (!linked.ok) d.log(`${CAM_OUT} -> ${SCREEN_IN} refused: ${linked.why}`, 'warn');
 

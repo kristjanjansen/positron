@@ -25,6 +25,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { voices } from '/drums/voices.mjs';
 
@@ -144,17 +145,7 @@
   const bay = m.api.bay;
 
   // ── the camera and the pixelate nodes ───────────────────────────────────
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:pixelate`, kind: 'engine', label: 'squares, dithered', place: 'browser' });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
-  bay.addNode({ id: `${S}:pixels`, kind: 'screen', label: 'pixels', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: PX_IN, label: 'pixelate:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: PX_OUT, label: 'pixelate:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: PX_VAL, label: 'pixelate:value-out', dir: 'out', medium: 'value', shape: { of: 'pattern' } });
-  bay.addPort({ id: SCREEN, label: 'screen:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: PIXELS, label: 'pixels:video-in', dir: 'in', medium: 'video' });
+  // The shapes are /shell/nodes.mjs's; each port keeps its `node:port` label.
   const lay = (a, b) => { const r = bay.link(a, b, [], { site: S }); if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn'); };
   // INVERT IS A VALUE ON A WIRE: the button is a node of its own, `web:invert`,
   // whose `value-out` reaches the shader through `web:pixelate:value-in`, as a
@@ -162,17 +153,17 @@
   // Inverted by default, asked 2026-10-12: *"reverse ... default reverse setting"*.
   let invert = true, inverts = 0;
   const INV = ID('invert', 'value-out'), PX_SET = ID('pixelate', 'value-in');
-  bay.addNode({ id: `${S}:invert`, kind: 'person', label: 'invert', place: 'browser' });
-  bay.addPort({ id: INV, label: 'invert:value-out', dir: 'out', medium: 'value', shape: { of: 'param' } });
   // THE 1x / 2x TOGGLE IS ANOTHER VALUE ON A WIRE: `web:scale` into the same
   // `pixelate:value-in`. It asks the drum machine for the new shape, which
   // lands at the top of the next loop while playing; the picture follows it.
   const SCL = ID('scale', 'value-out');
   let scales = 0;
-  bay.addNode({ id: `${S}:scale`, kind: 'person', label: '1x or 2x', place: 'browser' });
-  bay.addPort({ id: SCL, label: 'scale:value-out', dir: 'out', medium: 'value', shape: { of: 'param' } });
-  bay.addPort({ id: PX_SET, label: 'pixelate:value-in', dir: 'in', medium: 'value', shape: { of: 'param', names: ['invert', 'scale'] },
-    deliver: (e) => {
+  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
+  addNodes(bay, S, ['camera', 'pixelate', 'screen', { name: 'screen', as: 'pixels', label: 'pixels' }, 'invert', 'scale'], {
+    ports: { ...labelled(['pixelate:video-in', 'pixelate:video-out', 'pixelate:value-out', 'pixelate:value-in',
+      'screen:video-in', 'pixels:video-in', 'invert:value-out', 'scale:value-out']),
+    'camera:video-out': { label: 'camera:video-out', transports: ['page'] } },
+    deliver: { 'pixelate:value-in': (e) => {
       if (e?.of === 'param' && e.name === 'scale') {
         const want = e.v >= 2 ? 2 : 1;
         scales++;
@@ -188,7 +179,10 @@
       if (!cam) render();
       d.log(invert ? 'inverted: black squares play' : 'not inverted: white squares play');
       lastKey = '';
-    } });
+    } },
+  });
+  // The camera's label becomes the device's own name once it is on: a relabel, not a new node.
+  const camNode = (label) => { const { seenAt, ...n } = bay.nodes().find((x) => x.id === `${S}:camera`); bay.addNode({ ...n, label }); };
   lay(CAM, SCREEN); lay(CAM, PX_IN); lay(PX_OUT, PIXELS); lay(PX_VAL, SEQ_IN); lay(INV, PX_SET); lay(SCL, PX_SET);
   m.api.refresh();
   const holds = (a, b) => bay.links().some((l) => l.from === a && l.to === b);

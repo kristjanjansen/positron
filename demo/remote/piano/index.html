@@ -49,6 +49,7 @@
   import { createChoice } from '/shell/choice.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { BOARD_SITE, boardPort } from '/shell/graph-registry.mjs';
 
@@ -75,13 +76,12 @@
   const SAMPLER_IN = boardPort('sampler', 'midi-in'), SAMPLER_AUDIO = boardPort('sampler', 'audio-out'),
         SAMPLER_FILES = boardPort('sampler', 'file-in');
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
+  // The browser's and the bucket's nodes are /shell/nodes.mjs's, each port
+  // labelled `node:port`; the Pi's is boardGraph's, so it is drawn here.
+  const labelled = (ks) => Object.fromEntries(ks.map((k) => [k, { label: k }]));
+  addNodes(bay, S, ['keys', 'patch'], { ports: { ...labelled(['patch:midi-out']),
+    'keys:midi-out': { label: 'keys:midi-out', emits: ['note', 'cc'] } } });
   bay.addNode({ id: `${BOARD_SITE}:sampler`, kind: 'engine', label: 'sampler on the Pi', place: ROOM });
-  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:scope`, kind: 'screen', label: 'waveform', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
 
   let board = null, armed = false, program = 0, loadingSet = null, loadedAt = 0;
   // What reaches pi-1:sampler:midi-in leaves for the board, and only once armed.
@@ -99,17 +99,13 @@
     }
   }
   const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note', 'cc'] },
-    { id: id('patch', 'midi-out'), dir: 'out', medium: 'midi', emits: ['program'] },
     { id: SAMPLER_IN, dir: 'in', medium: 'midi', accepts: ['note', 'cc', 'program'], deliver: toSampler },
     { id: SAMPLER_FILES, dir: 'in', medium: 'file' },
     { id: SAMPLER_AUDIO, dir: 'out', medium: 'audio' },
-    { id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
-    { id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] },
-    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
   ];
   for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  addNodes(bay, S, ['piano-samples', 'rhodes-samples', 'scope', 'speaker'],
+    { ports: labelled(['piano:file-out', 'rhodes:file-out', 'scope:audio-in', 'speaker:audio-in']) });
   const LINKS = [
     [id('keys', 'midi-out'), SAMPLER_IN],
     [id('patch', 'midi-out'), SAMPLER_IN],
