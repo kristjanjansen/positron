@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/social/typist/: icon buttons, its own textarea for the lower line, transport at the top**~~ (2026-10-14, DONE). Asked: *"use icon buttons. lower posittron studio makes no sense, haev a separate textartea. put transport bar to top"*.
+
 - ~~**/social/typewriter/ becomes /social/typist/, and /social/ is the index of every social piece**~~ (2026-10-14, DONE). Asked: *"/social/typist/index.html -- there gonna be more socials. make also index for them"*.
 
 - ~~**Panic stops loops too, and gets a better name**~~ (2026-10-14, DONE: `Stop`, chosen *"stop all => stop"*). Asked: *"stop loops. find better name for panic."* `demo/shell/keyboard.mjs` panic().
