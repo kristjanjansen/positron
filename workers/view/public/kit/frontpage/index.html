@@ -22,11 +22,10 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/kit-page.css">
 <style>
-  /* 🔴 EVERY FACE HERE IS SELF HOSTED, AND A VISIT ASKS NOBODY ELSE FOR ONE.
-     JetBrains Mono and Geist are under /shell/vendor/ (workers/view/build.mjs
-     lists them, with source and licence) and are declared in shell.css;
-     Gabarito is read from /weight/'s own folder, so what is shown is the file
-     that page ships rather than a copy of it. */
+  /* Every face is self hosted: JetBrains Mono and Geist under /shell/vendor/ (listed
+     in workers/view/build.mjs, declared in shell.css); Gabarito from /weight/'s own
+     folder, so what is shown is the file that page ships.
+     See lessons/page-kit-frontpage.md#kit-frontpage-1 */
 
   /* /weight/'s face, read from its own folder */
   @font-face { font-family: 'FP Gabarito'; font-weight: 200 800; font-display: swap; src: url('/weight/vendor/gabarito-latin.woff2') format('woff2'); }
@@ -67,25 +66,24 @@
   .fp-rec { font: 400 15px/1.6 var(--brand); color: var(--fg); margin: 0; max-width: 66ch; }
   .fp-rec b { color: var(--hi); font-weight: 600; }
 
-  /* HERO: four lines, each with its own gap above it, the eyebrow closest to
-     the headline it labels. Every face, size, weight, tracking and line height
-     is set per pairing from the PAIRINGS data, so the label under it reads the
-     same numbers the hero is drawn with. */
+  /* HERO: four lines, each with its own gap above, the eyebrow closest to its headline.
+     Every face, size, weight, tracking and line height comes from PAIRINGS, so the
+     label under it reads the numbers the hero is drawn with.
+     See lessons/page-kit-frontpage.md#kit-frontpage-2 */
   .fp-hero { display: flex; flex-direction: column; gap: 0; min-width: 0; }
   .fp-hero > * { margin: 0; overflow-wrap: anywhere; }
-  /* Balanced wrap on every headline, title, line and card text in the
-     specimens, so a two line heading breaks into two similar lines instead of
-     a long one and a word left alone. Asked 2026-10-12: *"use balanced wrap"*. */
+  /* Balanced wrap on every specimen heading, title, line and card text, so a two line
+     heading breaks into two similar lines.
+     See lessons/page-kit-frontpage.md#kit-frontpage-3 */
   .fp-hero-h, .fp-hero-l, .fp-hero-s, .fp-ttl-t, .fp-ttl-w, .fp-title, .fp-body,
   .fp-rule-n, .fp-cc-card, .fp-cc-card * { text-wrap: balance; }
   .fp-hero-eye { color: var(--dim); text-transform: uppercase; }
   .fp-hero-h { color: var(--fg); margin-top: 14px; }
   .fp-hero-l { color: var(--fg); margin-top: 20px; max-width: 34em; }
   .fp-hero-s { color: var(--dim2); margin-top: 14px; }
-  /* 🔴 THE LIGHT VERSION IS NOT IN THE KIT. shell.css declares one dark theme
-     and no light tokens, so this specimen re-declares the five it reads, as
-     hand-picked values, on itself only. A light front page would need these
-     decided at :root, which is a decision this sampler does not make. */
+  /* The light version is not in the kit: shell.css has one dark theme, so this
+     specimen re-declares the five tokens it reads, on itself only.
+     See lessons/page-kit-frontpage.md#kit-frontpage-4 */
   .fp-light { --bg: #ffffff; --fg: #111418; --dim: #5b6472; --dim2: #7a8391; background: var(--bg);
               border-radius: var(--r, 4px); padding: 40px 32px; }
   .fp-label { display: flex; flex-direction: column; gap: 2px; margin-top: calc(2 * var(--ctl-gap)); }
@@ -107,20 +105,18 @@
      custom properties and no slide rule is overridden but this one. */
   .fp-sl .sl-say { font-family: var(--fp-head); }
 
-  /* THE HERO, LARGE is `.pos-hero*` in shell.css since 2026-10-13, drawn by
-     demo/shell/hero.mjs, because the front page opens with the same block. */
+  /* THE HERO, LARGE is `.pos-hero*` in shell.css, drawn by demo/shell/hero.mjs,
+     because the front page opens with the same block.
+     See lessons/page-kit-frontpage.md#kit-frontpage-5 */
 
-  /* THE RULE, IN USE: JetBrains Mono for what NAMES, Geist for what is READ
-     THROUGH. Since 2026-10-12 it is what the site does: `--mono` and `--sans`
-     in shell.css are these two faces, so nothing here sets either and every
-     kit component inside (the readout, the log, the slide's text) is drawn
-     exactly as on its own page. */
+  /* THE RULE, IN USE: JetBrains Mono for what names, Geist for what is read through.
+     `--mono` and `--sans` in shell.css are these two faces, so nothing here sets them.
+     See lessons/page-kit-frontpage.md#kit-frontpage-6 */
   .fp-rule { min-width: 0; }
-  /* 🔴 THE CLEAR GAP UNDER THE LAST REAL PIECE IS ITS OWN PADDING, NOT A
-     LARGER MARGIN. The stack owns the margin between blocks and the page's
-     check holds every pair of blocks to --pos-gap, so the extra --pos-gap
-     sits inside this last block, which makes the air to the specimens below
-     2 x --pos-gap with no divider (the kit draws none between blocks). */
+  /* The clear gap under the last real piece is its own padding, not a larger margin:
+     the stack owns the margin between blocks and the check holds each pair to
+     --pos-gap, so the air to the specimens below is 2 x --pos-gap with no divider.
+     See lessons/page-kit-frontpage.md#kit-frontpage-7 */
   .fp-rule-end { padding-bottom: var(--pos-gap); }
   .fp-rule-h { font: 600 11px/1.2 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); margin: 0; }
   .fp-rule-n { font: 400 15px/1.5 var(--sans); color: var(--dim); margin: 6px 0 0; max-width: 58ch; }
@@ -164,24 +160,10 @@
   import { SCALE, stepOf, createSlide } from '/shell/slide.mjs';
 
   /**
-   * kit/frontpage, THE TYPE THE FRONT PAGE WILL BE SET IN, 2026-10-12. Asked:
-   * *"add new kit card / page. name it fronpage. lets work on it. first do
-   * typograpy sampler: all fonts we use at the momet in diffeetn sizes. we need
-   * sans serif to match our brand mono. bring in something matchin it, not just
-   * Inter"*, and the name confirmed as *"frontpage"*.
-   * ⚠️ IT WAS A SAMPLER AND IS NOW THE RECORD OF A CHANGE. Six sans faces were
-   * set here beside the brand mono, each by setting `--sans` on its own
-   * specimen; the owner picked Geist, and on 2026-10-12 (*"A is fine.
-   * Impelent font update everywhere"*) shell.css made `--mono` JetBrains Mono
-   * and `--sans` Geist, and the other faces were deleted with their files
-   * (plans/plan-fonts-minimal.md). THE RULE, IN USE is what every page does
-   * now, and the specimens below it are what the choice was made from.
-   * ⚠️ THE NUMBERS ARE MEASURED IN THIS BROWSER, on a canvas, after each face
-   * has loaded: the top of an `x` and of an `H` at 100 px, and the width of
-   * one sentence divided by its length. The OS/2 table values the face files
-   * declare are written below as `TABLE` and the self-check requires the two to
-   * agree, so a face that silently fell back cannot report a fallback's numbers.
-   * ⚠️ A VISIT OPENS NOTHING ELSEWHERE. Every check is behind `?selfcheck=1`.
+   * The type the front page is set in: JetBrains Mono and Geist, with the specimens
+   * the choice was made from. Numbers are measured on a canvas after each face loads
+   * and must agree with its OS/2 TABLE values. Checks are behind ?selfcheck=1.
+   * See lessons/page-kit-frontpage.md#kit-frontpage-8
    */
   const { d, section, out, land, checkPage } = createKitPage({
     part: 'frontpage',
@@ -195,14 +177,10 @@
   /* ── the brand, the reference every candidate is measured against ── */
   const BRAND = "'Brand JetBrains Mono'";
 
-  /* 🔴 GEIST WON, AND THE OTHER FIVE LEFT WITH THEIR FILES, 2026-10-12.
-     Six openly licensed sans faces were sampled here against JetBrains Mono's
-     three traits (a tall x-height, rounds that lean rectangular, open
-     apertures): Geist, Manrope, IBM Plex Sans, Schibsted Grotesk, Onest and
-     Space Grotesk. The owner asked for the brand mono with Geist, and
-     plans/plan-fonts-minimal.md deleted the other five (181,476 bytes).
-     `table` is the face file's own OS/2 numbers, read with a WOFF parser on
-     2026-10-12; `bytes` is 400 plus 600 off `ls -l`. */
+  /* Geist was sampled against JetBrains Mono's traits (tall x-height, rectangular
+     rounds, open apertures). `table` is the face file's own OS/2 numbers; `bytes` is
+     the 400 plus 600 weights' file sizes.
+     See lessons/page-kit-frontpage.md#kit-frontpage-9 */
   const CANDIDATES = [
     { id: 'geist', name: 'Geist', family: "'Brand Geist'", pkg: '@fontsource/geist 5.3.0',
       src: 'github.com/vercel/geist-font', table: { x: 0.530, cap: 0.710 }, bytes: [12956, 13372],
@@ -232,9 +210,9 @@
     { px: 64, w: 600, t: 'big' },
   ];
   const textFor = (t, face) => face.sample || { sentence: SENTENCE, chars: CHARS, heading: HEADING, readout: '1374 ms', big: 'Aa 1374' }[t];
-  // 🔴 THE SLIDE STEPS AS A SHARE OF A SLIDE'S HEIGHT, drawn here for a slide
-  // 405 px tall (720 px wide), the half width player's size on a desk. Read off
-  // SCALE in slide.mjs, never typed, so a change to the scale changes this.
+  // The slide steps as a share of a 405 px tall (720 px wide) slide, the half width
+  // player on a desk, read off SCALE in slide.mjs so a change to the scale shows here.
+  // See lessons/page-kit-frontpage.md#kit-frontpage-10
   const SLIDE_H = 405;
 
   /* ── measuring, on a canvas, in this browser ── */
@@ -261,9 +239,9 @@
 
   /* the blocks, newest first */
 
-  /* ── 2026-10-12, second round: *"to test samples for mixing brand font and
-     geist in different size and weights. slides, titles / subtitles"*, with a
-     hero crop for the front page set in a plain light sans ── */
+  /* Mixing the brand mono and Geist at different sizes and weights: slides, titles,
+     subtitles, and a hero crop for the front page.
+     See lessons/page-kit-frontpage.md#kit-frontpage-11 */
   const G = `'Brand Geist', ${SYS_SANS}`;
   const M = `${BRAND}, ${SYS_MONO}`;
   const nameOf = (face) => (face === G ? 'Geist' : 'JetBrains Mono');
@@ -275,10 +253,10 @@
   };
   const describe = (role, s) => `${role}: ${nameOf(s.face)} ${s.w}, ${s.px} px, tracking ${s.ls >= 0 ? '+' : ''}${s.ls} em, line ${s.lh}`;
 
-  // HERO, the owner's four lines, is hero.mjs's, so the specimens below and
-  // the front page cannot set different words.
-  // 🔴 THE PAIRINGS ARE DATA, AND THE LABEL IS WRITTEN FROM THE SAME OBJECT
-  // THE HERO IS DRAWN WITH, so a label cannot disagree with its specimen.
+  // HERO's four lines are hero.mjs's, so the specimens and front page share words.
+  // The pairings are data, and each label is written from the object its hero is
+  // drawn with, so a label cannot disagree with its specimen.
+  // See lessons/page-kit-frontpage.md#kit-frontpage-12
   const PAIRINGS = [
     { n: 'A', name: 'All Geist',
       eye: t(G, 600, 12, 0.14, 1.2), head: t(G, 600, 44, -0.03, 1.05), line: t(G, 400, 19, -0.01, 1.45), small: t(G, 400, 14, 0, 1.5) },
@@ -298,20 +276,16 @@
   section('THE HERO, LARGE',
     'The hero at front page size, the wordmark with its dot in the accent.',
     null, (add) => {
-      // The block itself is demo/shell/hero.mjs since 2026-10-13, the one the
-      // front page opens with (*"move concepts to frontpage. use
-      // http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE"*): the
-      // wordmark, the headline, the two lines and the working imaginary
-      // patchbay, a desk picture and a phone picture. This page shows it alone.
+      // The block is demo/shell/hero.mjs, the one the front page opens with: the wordmark,
+      // headline, two lines and the working imaginary patchbay. This page shows it alone.
+      // See lessons/page-kit-frontpage.md#kit-frontpage-13
       add(createHero().el);
     }, { bare: true });
 
-  // 🔴 THE RULE, IN USE, 2026-10-12: *"do make samples on top of real usage.
-  // add sapce in between woth the rest. use my copy."* The rule the session
-  // put to the owner, applied to real pieces of the site: hero C in the
-  // owner's words, the concepts index's cards from list.mjs, a concept page's
-  // header with a readout and a log, and the deck's own `connect` slide.
-  // Nothing here is written for the sampler except the readout's numbers.
+  // THE RULE, IN USE on real pieces of the site: the hero, the front page's cards,
+  // a concept page's header with a readout and a log, and the deck's connect slide.
+  // Nothing is written for the sampler except the readout's numbers.
+  // See lessons/page-kit-frontpage.md#kit-frontpage-14
   const rule = {};
   section('THE RULE, IN USE',
     'JetBrains Mono for everything that names, Geist for everything read through, on real pieces of the site.',
@@ -335,7 +309,8 @@
         el('p', 'fp-rule-n', 'The ideas behind positron and the projects that use them.'));
       const grid = el('div', 'fp-cc');
       rule.cards = [];
-      // Real rows by id, no number on a card since 2026-10-13 (*"rm numbers"*).
+      // Real rows by id, no number on a card.
+      // See lessons/page-kit-frontpage.md#kit-frontpage-15
       for (const id of ['synth/keyboard', 'radio/tuner', 'video/camera']) {
         const c = CONCEPTS.find((x) => x.id === id);
         if (!c) continue;
@@ -346,8 +321,8 @@
         grid.append(a);
         rule.cards.push({ h, s });
       }
-      // The use case card is `held`, the one listed demo since away was
-      // archived on 2026-10-13, so the rule still shows four real cards.
+      // The use case card is `held`, the one listed demo, so the rule shows four cards.
+      // See lessons/page-kit-frontpage.md#kit-frontpage-16
       const row = DEMOS.find((r) => r.name === 'held');
       if (row && DEMO_CARDS.held) {
         const a = el('a', 'fp-cc-card fp-case', '', { href: '/held/' });
@@ -360,11 +335,10 @@
       front.append(grid);
       add(front);
 
-      // 3. a concept page's header, its readout and its log, as clock/010
-      // (Message lag) draws them; the numbers are typical of the relay's
-      // p50 of about 36 ms (bay.mjs) and the log lines are that page's own
-      // Message lag left the concepts on 2026-10-12 for /archive/clock-message-lag/,
-      // so its card's words are written here as /archive/ shows them.
+      // 3. A concept page's header, readout and log, as the archived Message lag page
+      // (/archive/clock-message-lag/) draws them. The numbers are typical of the relay's
+      // p50 of about 36 ms (bay.mjs).
+      // See lessons/page-kit-frontpage.md#kit-frontpage-17
       const lag = { title: 'Message lag', say: 'Play a synth through our relay and see how long each note took to arrive, timed on one clock.' };
       const page = el('div', 'fp-rule');
       rule.title = el('h2', 'fp-ph-t', lag?.title || 'Message lag');
@@ -392,17 +366,9 @@
       add(wrap);
     }, { bare: true });
 
-  // 🔴 SHARP TEST, 2026-10-12: *"Add sharp test"*, then *"Visual sample i
-  // mean"*. It put three ways to write a sharp on real keys: A, `#` in
-  // JetBrains Mono; B, the Bravura sharp the keys drew then; C, the system's
-  // `♯` with no Bravura. The owner said *"A is fine"*, the keys print `#`
-  // since (keyboard.mjs NOTE_NAMES), and A is what is left here, drawn by the
-  // keyboard itself with nothing swapped.
-  // ⚠️ B AND C WENT, AND NOT FOR TIDINESS. B's face, Bravura, was deleted with
-  // its file. C was told apart from the other faces by measuring it in front
-  // of Bravura (a face with the sharp and no `#`), so with Bravura gone the
-  // page could no longer say which face drew C's sharp, and a specimen whose
-  // caption cannot be measured is one this page does not show.
+  // SHARP TEST: the keys print `#` in JetBrains Mono (keyboard.mjs NOTE_NAMES), drawn
+  // here by the keyboard itself with nothing swapped.
+  // See lessons/page-kit-frontpage.md#kit-frontpage-18
   const SH_NOTES = 'C#4  F#3  G#2  A#5  Bb3';
   const sharps = [];
   section('SHARP TEST',
@@ -420,10 +386,10 @@
       sharps.push({ host, kb, line, big, cap });
     });
 
-  /* WHICH FACE DREW THE SHARP, read rather than assumed: the label's own
-     computed font stack is set on a canvas, which resolves fallback per glyph
-     the way the page does, and the ink box of the sharp it draws is matched
-     against the ink box each candidate face draws on its own. */
+  /* Which face drew the sharp, read rather than assumed: the label's computed font
+     stack drawn on a canvas resolves fallback per glyph, and the sharp's ink box is
+     matched against each candidate face's own.
+     See lessons/page-kit-frontpage.md#kit-frontpage-19 */
   const SH_FACES = [
     ['JetBrains Mono', "'Brand JetBrains Mono'"],
     ['SF Mono', 'SFMono-Regular'],
@@ -445,10 +411,10 @@
   function whoDrew(fam, ch) {
     const got = ink(`400 100px ${canvasStack(fam)}`, ch);
     for (const [name, f] of SH_FACES) {
-      // a face that lacks the glyph falls through to whatever is behind it,
-      // so it is put in front of two partners that draw `#` unlike each other
-      // (the system serif and Geist): only a face that has the glyph measures
-      // the same in front of both.
+      // A face lacking the glyph falls through, so it is put in front of two partners
+      // that draw `#` unlike each other (system serif and Geist): only a face that has
+      // the glyph measures the same in front of both.
+      // See lessons/page-kit-frontpage.md#kit-frontpage-20
       const x = ink(`400 100px ${f}, serif`, ch);
       const y = ink(`400 100px ${f}, 'Brand Geist', monospace`, ch);
       if (same(x, y) && same(x, got)) return name;
@@ -587,7 +553,8 @@
       box.append(recBox);
     });
 
-  // MEASURED, Geist against the brand, as a table.
+  // Geist against the brand mono, measured, as a table.
+  // See lessons/page-kit-frontpage.md#kit-frontpage-21
   let table = null;
   section('MEASURED AGAINST THE BRAND MONO',
     'Lower case height, the lower case over the capitals, and the width of one character, each measured in this browser at 100 px.',
@@ -723,8 +690,9 @@
     rows.sort((a, b) => b._x - a._x);
     table.set([{ face: 'JetBrains Mono, the brand', x: fmt(jbm.x), xr: '100%', xc: fmt(jbm.x / jbm.cap), w: fmt(jbm.w), kb: kb(21168 + 21860) }, ...rows]);
 
-    // 🔴 THE CHOICE IS RECORDED, AND THE NUMBERS IN IT ARE MEASURED HERE, so
-    // the sentence cannot drift from the face the site loads.
+    // The choice is recorded with numbers measured here, so the sentence cannot drift
+    // from the face the site loads.
+    // See lessons/page-kit-frontpage.md#kit-frontpage-22
     const r = measured.get('geist');
     const rc = CANDIDATES.find((c) => c.id === 'geist');
     recBox.textContent = '';

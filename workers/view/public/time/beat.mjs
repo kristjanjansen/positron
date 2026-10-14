@@ -1,22 +1,7 @@
-// demo/time/beat.mjs: the BEAT tab of /time/, which was /lanes/.
-//
-// One beat, sent several ways at once. Code has to wake up and do the work, so
-// it lands within a millisecond or so; the sound card and the MIDI port are
-// given the instant in advance and hit it themselves. The page's body moved
-// here; the history of each decision is in git under `demo/lanes/index.html`.
-//
-// ⚠️ THE SOUND-CARD CHECK IS THIN AND COMES OVER AS IT IS. `audio schedule
-// anchored` passes on ONE committed click, which says the lane started and not
-// that it kept its promise. Strengthening it (more than one committed mark,
-// and the ear's measurement asserted) is its own line in `BACKLOG.md`
-// (`plans/plan-demo-structure.md` §3.2), and moving a page is not the moment.
-//
-// 🔴 THE HARDWARE BUTTON IS NOT IN `.pos-controls`. `createHardware` appends to
-// the page's control row, which the harness presses by position across the
-// whole document and which this page leaves empty and hidden. So its five nodes
-// are moved into this tab's own row the moment they exist, and the check below
-// presses the button itself, inside the open tab. Nothing makes a sound until
-// somebody presses it.
+// BEAT tab: one beat sent several ways at once. Code lands within a ms or so; the
+// sound card and MIDI port get the instant ahead and hit it themselves. The
+// hardware button moves out of `.pos-controls` into this tab's own row.
+// See lessons/page-time.md#time-8
 
 import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -53,13 +38,9 @@ export function build({ panel, d, log }) {
   // because SCHEDULE's bar is the page's.
   const bar = createTransportBar(host, deck, { scrub: false, publish: false });
 
-  // ONE MEANING FOR COLOUR, ACROSS EVERY DEMO: a mark's colour says HOW IT
-  // LANDED, never which lane it is in. Lane identity is the row, its label and
-  // the swatch beside the label.
-  //   grey        not played yet
-  //   slate       played, and this lane cannot say how well
-  //   green       played, inside what its way of firing promises
-  //   amber/red   later than that
+  // A mark's colour says how it landed, never which lane: grey not played, slate
+  // played without a promise, green inside its promise, amber or red later.
+  // See lessons/page-time.md#time-9
   const UNMEASURED = '#6f7d94', NOT_YET = '#3b424e';
   const LANES = [
     { id: 'worker', label: 'code', swatch: '#ffd400', note: 'code ran here' },
@@ -120,7 +101,8 @@ export function build({ panel, d, log }) {
   const PAD = Math.max(...LANES.map((L) => L.label.length)) + 2;
   const view = createStripView(host, deck, {
     size: 'auto', follow: false, gutter: 132,
-    // ONE TOOLTIP FOR ALL THE ROWS: this tab compares lanes at one instant.
+    // One tooltip for all the rows: this tab compares lanes at one instant.
+    // See lessons/page-time.md#time-10
     describeHit: (hit) => {
       const r = hit.row;
       if (!r) return null;
@@ -140,7 +122,8 @@ export function build({ panel, d, log }) {
     },
     lanes: [laneSpec(LANES[0])],          // the others appear with their device
   });
-  // 🔴 THE BAR AND THE STRIP ARE ONE SURFACE.
+  // The bar and the strip are one surface.
+  // See lessons/page-time.md#time-11
   const pair = createGlue(bar.el, view.surface);
 
   const showLane = (id) => {
@@ -245,10 +228,9 @@ export function build({ panel, d, log }) {
   }
 
   /**
-   * THE MIDI LOOPBACK. macOS's IAC bus returns everything sent to it.
-   * ⚠️ `e.timeStamp` IS THE SEND STAMP, measured 0.000 ms five times of five, so
-   * it pairs a note and must never be the number; `performance.now()` read in
-   * the handler is, as an UPPER BOUND on delivery.
+   * The MIDI loopback (macOS IAC bus). `e.timeStamp` is the send stamp, so it
+   * pairs a note; `performance.now()` in the handler is the upper bound on delivery.
+   * See lessons/page-time.md#time-12
    */
   let listening = null;
   function listenOn(input) {
@@ -322,15 +304,10 @@ export function build({ panel, d, log }) {
   log(`${DURATION / 1000}s, one beat every ${BEAT} ms`);
 
   /**
-   * HOW IT WORKS, read off this file and `timeline/transport.mjs`: one deck,
-   * its own Worker-timed `code` lane, and two lanes that hand the same beats
-   * over AHEAD of time to the AudioContext and to a MIDI port. The speakers
-   * and the port are drawn inside the Browser, as `/fau/` and `/collide/` draw
-   * their speakers, because a top level box with nothing in it beside a
-   * machine is drawn as a tall empty slab.
-   * ⚠️ THE MIDI HALF IS DRAWN AND NOT ALWAYS RUN. Headless Chrome has no MIDI
-   * permission, so its fact below is the picker being in this tab and what it
-   * said, not a note sent.
+   * One deck with its Worker-timed `code` lane, and two lanes handing beats ahead to
+   * the AudioContext and a MIDI port, drawn inside the Browser. Headless Chrome has
+   * no MIDI permission, so the MIDI fact is the picker, not a note sent.
+   * See lessons/page-time.md#time-13
    */
   const how = tabDiagram(panel, () => ({
     caption: 'One beat, sent three ways. Code runs it on time as best it can, and the sound card '
@@ -378,7 +355,9 @@ export function build({ panel, d, log }) {
 
   return {
     deck, bar,
-    // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
+    // Two frames on: a strip fitted before its panel lays out fits its range into
+    // the width it had then (20 s in about 160 px at 1280).
+    // See lessons/page-time.md#time-14
     show() {
       how.draw();
       requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); }));
@@ -405,7 +384,8 @@ export function build({ panel, d, log }) {
       if (deck.playing()) deck.pause();
       A('lanes agree within 50 ms at the same position', !!verdict && verdict.p50 < 50,
         verdict ? `typically ${verdict.p50.toFixed(1)} ms over ${verdict.pairs} paired positions` : 'nothing paired in 1.5 s');
-      // ⚠️ THIN, AND SAID SO IN THE HEADER: one committed click passes it.
+      // Thin: one committed click passes it.
+      // See lessons/page-time.md#time-15
       A('audio schedule anchored', !!verdict && verdict.sched > 0,
         `${verdict ? verdict.sched : 0} committed`);
       A('both lanes advanced', !!verdict && verdict.fired > 0 && verdict.sched > 0,

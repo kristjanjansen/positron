@@ -40,34 +40,18 @@
   import { addNodes } from '/shell/nodes.mjs';
   import { createTempoRig } from '/radio/rig.mjs';
 
-  // concepts radio/020 (beats/000 for an afternoon, 2026-10-11: *"move radio 020 to beats group into 000"*, then *"move beats concepts to radio, rename accordingly"*), TEMPO, 2026-10-11. Recordings of ERR's Raadio 2 and 4
-  // and of Ida, kept in our own R2 bucket (`positron-station`, read through the station
-  // worker's /media/, CORS `*`, as /code/piano/ reads its piano),
-  // played in this tab into the radio's wave, the speakers and a tempo
-  // detector, whose tempo travels as events along a `value` link into a
-  // display of its own. Asked: *"In radio demo we had some bpm detect demo.
-  // Dearcive. Rm granulator just a radio waves and sepatare visualizer. Use r2
-  // and ida. Bring to cocept to naming syrem"*. The granulator that stood here
-  // is in git history before this change.
-  //
-  // NOTHING OPENS ON A VISIT, AND NOTHING EVER OPENS IDA'S SERVER. Play fetches
-  // the recording from our bucket, once per page, and loops it. `?src=<url>`
-  // points the page at another recording (a local file for a check).
+  // Recordings of Raadio 2, Raadio 4 and Ida from our R2 bucket (station worker /media/), played
+  // into the wave, the speakers and a tempo detector whose readings travel on a `value` link.
+  // Play fetches once and loops; nothing opens on a visit. `?src=<url>` plays another recording.
+  // See lessons/page-radio.md#radio-55
   const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
-  // 🔴 ERR's RAADIO 2 AND RAADIO 4, AND IDA SINCE 2026-10-11 ~11:44 UTC. Asked
-  // first *"Ida is offline. Work on radio 2 and 4 from err"*, because the first
-  // capture of Ida was digital silence, and then *"add ida"* once a second
-  // capture had sound in it (3:09, mean -27.2 dB). Each station was captured
-  // ONCE, about three minutes through our own relay (positron-shout, one
-  // listener; Raadio 2 and 4 at 10:18 UTC, Ida from mount ida-tallinn at about
-  // 11:44 UTC), and kept in our bucket, so a visit, a play and a loop never
-  // reach ERR's or Ida's servers. Ida is ADTS AAC (44.1 kHz stereo), the other
-  // two MP3: nothing below reads the extension or the content type, and
+  // Each station captured once, about three minutes through our relay, and kept in our bucket, so
+  // nothing here ever reaches ERR's or Ida's servers. Ida is ADTS AAC, the others MP3;
   // decodeAudioData sniffs the bytes.
+  // See lessons/page-radio.md#radio-56
   const STATIONS = [
-    // Named as recordings, so none is taken for the live station (asked
-    // 2026-10-13, *"when you have radio recordings, suffix patch names with
-    // '... recording'"*). /radio/live/ plays them live and keeps the plain names.
+    // Named as recordings, so none is taken for the live station; /radio/live/ keeps the plain names.
+    // See lessons/page-radio.md#radio-57
     { id: 'raadio2', label: 'Raadio 2 recording', key: 'radio/raadio2/2026-10-11.mp3' },
     { id: 'raadio4', label: 'Raadio 4 recording', key: 'radio/raadio4/2026-10-11.mp3' },
     { id: 'ida', label: 'Ida recording', key: 'radio/ida/2026-10-11.aac' },
@@ -78,10 +62,9 @@
   const FILE_OUT = (st) => `${CF}:${st.id}:file-out`;
   const PLAYER_IN = `${S}:player:file-in`, PLAYER_OUT = `${S}:player:audio-out`;
 
-  // ── the bay ─────────────────────────────────────────────────────────────
-  // A recording is a FILE in the bucket and becomes sound only in this tab, so
-  // the bucket's port is `file-out` into a player, and the player's
+  // The bay: a recording is a file in the bucket, so `file-out` into a player in this tab, whose
   // `audio-out` feeds the wave, the speakers and the detector.
+  // See lessons/page-radio.md#radio-58
   const bay = createBay();
   for (const st of STATIONS) {
     addNodes(bay, S, [{ name: 'recording', site: CF, as: st.id, label: st.label }],
@@ -123,18 +106,10 @@
 
   // ── the recording: fetched once, decoded once, looped ────────────────────
   let bytes = 0;
-  // Every recording brought to one loudness once, as it is decoded, SECOND BY
-  // SECOND (asked 2026-10-11, *"ida signal is soooo weak"*, then *"still weak
-  // sinal in ida. measyre"*). MEASURED on the Ida capture in 5 s blocks: the
-  // music is -44 dB RMS with peaks at -30 for all but 25 s, and 110 to 135 s is
-  // something else at -14 dB that clips at +3. One gain for the whole file, as
-  // the first version did, was set by that loud stretch and raised the music
-  // only 8 dB, to about -36. So the gain is per LEVEL_S second block: each
-  // block raised (never lowered) toward LEVEL_RMS, by at most LEVEL_MAX_DB, the
-  // gains eased across blocks so a loud block is not pumped into, and the gain
-  // ramps between block centres. Anything over KNEE is bent under 1 with a
-  // tanh. Raadio 2 (-15.5 mean) is left almost alone. The detector hears the
-  // levelled sound too.
+  // Levelled per LEVEL_S block as decoded: raised (never lowered) toward LEVEL_RMS by at most
+  // LEVEL_MAX_DB, eased across blocks, a tanh over KNEE. One gain per file was set by Ida's one loud
+  // stretch and left its -44 dB music quiet.
+  // See lessons/page-radio.md#radio-59
   const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_S = 1, LEVEL_MAX_DB = 36, KNEE = 0.8;
   function level(b, st) {
     const sr = b.sampleRate, n = b.length, blk = Math.round(LEVEL_S * sr), nb = Math.ceil(n / blk);

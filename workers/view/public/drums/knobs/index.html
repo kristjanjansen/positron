@@ -32,23 +32,10 @@
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { voices } from '/drums/voices.mjs';
 
-  // /drums/machine/ plus one knob per drum. Asked 2026-10-12: *"next
-  // drum, same but each synth a parameter to tweak"*.
-  //
-  // Each drum's program declares its one number as a named control
-  // (`\pitch.kr`, `\snap.kr`, `\length.kr`, `\bright.kr`), and each knob is a
-  // bay node of its own, `web:knob-<name>:value-out`, wired into that drum's
-  // `value-in`. The value travels with every hit, in the hit's own timestamped
-  // bundle, so a turn is heard from the next hit and a hit already ringing
-  // keeps the value it started with. Which number and why is in
-  // `../voices.mjs`, `PARAMS`.
-  //
-  // Knobs under the grid, asked 2026-10-12: *"move knobs below grid"*.
-  //
-  // FOUR SCOPES ON TOP, ONE PER DRUM, asked 2026-10-12: *"add 4 scopes 1/4 each
-  // on top of 010"*. Each drum plays on an output pair of its own and each
-  // scope is a node, `web:scope-<drum>`, fed by that drum's `audio-out` alone,
-  // so a scope shows its drum and nothing else (`../drum-machine.mjs`).
+  // /drums/machine/ plus one knob per drum, each `web:knob-<name>:value-out` into its drum's
+  // `value-in`; the value rides in each hit's bundle (which number is `../voices.mjs` PARAMS).
+  // Knobs under the grid; four scopes on top, each fed by its own drum's `audio-out` alone.
+  // See lessons/page-drums.md#drums-18
   const d = mount({ name: 'Drum knobs', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('drums/knobs');
   const m = createDrumMachine(d, { voices: voices({ knobs: true }), scopes: true });

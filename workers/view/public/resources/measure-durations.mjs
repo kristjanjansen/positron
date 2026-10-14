@@ -1,36 +1,7 @@
-// demo/resources/measure-durations.mjs — how long each recording actually is.
-//
-//   node demo/resources/measure-durations.mjs            # ask only the ones with no answer yet
-//   node demo/resources/measure-durations.mjs --again    # ask every one again
-//   node demo/resources/measure-durations.mjs --only ia:videoplayback-13_202304/...
-//
-// NODE ONLY. Writes `durations.json` beside the corpus; `build-corpus.mjs`
-// reads that file and puts a `durationMs` on the matching row. It is a separate
-// step for one reason: the corpus is built from seventeen catalogues and this
-// asks twenty-six MEDIA FILES, which is a different kind of request to a
-// different kind of host. Folding it into the build would mean re-asking
-// archive.org for headers every time somebody wanted to change a date.
-//
-// 🔴 GENTLY, AND THAT IS THE WHOLE DESIGN OF THIS FILE RATHER THAN A SETTING IN
-// IT. The ask was *"do measure file lengths gently"*, and what makes it gentle
-// is measured rather than intended:
-//
-//   · ONE FILE AT A TIME, with `PAUSE_MS` between two of them. Nothing here is
-//     in a hurry; twenty-six files at two seconds apart is under a minute.
-//   · `-probesize 65536`. ffprobe reads 5 MB by default before it will say what
-//     is in a container. MEASURED on the same mp3, 64 KB against the default:
-//     the same duration to the microsecond, in 2.0 s rather than 2.9. For a
-//     file 12 MB long that is the difference between reading a header and
-//     reading half the recording.
-//   · IT ASKS EACH FILE ONCE, EVER. The answer is written down and committed,
-//     and a second run skips everything already in the file. A duration does
-//     not change; a file that has one does not need asking again. `--again` is
-//     there for a host that has replaced its media.
-//
-// ⚠️ A FILE THAT WOULD NOT ANSWER IS WRITTEN DOWN AS SUCH, with the reason. A
-// dropped row and a row nobody asked about look identical in a finished list,
-// and only one of them is a finding: `zenodo:5801697` is 225 MB of MPEG program
-// stream, which carries no duration in a header at all.
+// Writes durations.json beside the corpus for build-corpus.mjs, one file at a time, PAUSE_MS
+// apart, -probesize 65536, each file asked once. Flags: --again, --only <id>.
+// A file that would not answer is recorded with its reason, not dropped.
+// See lessons/page-resources.md#resources-28
 
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -57,11 +28,8 @@ const GIVE_UP_MS = 45000;
 const UA = 'positron-corpus/1.0 (+https://positron.studio; kristjan.jansen@gmail.com)';
 
 /**
- * 🔴 WHAT COUNTS AS A RECORDING, AND IT IS THE FILENAME AS WELL AS THE HEADER.
- * `fileType` is the content-type the HOST sent, and archive.org serves an `.avi`
- * as `video/mp4` — the same trap `/tapes/` carries a comment about, which is
- * why both ends test the extension too. Here it only decides who gets ASKED, so
- * a wrong guess costs one request and no wrong data.
+ * Tests the extension as well as fileType: archive.org serves .avi as video/mp4.
+ * See lessons/page-resources.md#resources-29
  */
 const TIME_BASED = /^(audio|video)\//i;
 const TIME_EXT = /\.(mp3|m4a|mp4|m4v|webm|ogg|oga|opus|wav|aac|flac|avi|mpg|mpeg|mov|mkv)(\?|#|$)/i;
@@ -126,9 +94,8 @@ for (const it of want) {
     console.log(`  ${String(Math.round(r.ms / 1000)).padStart(5)}s  ${it.id}`);
   } else {
     refused++;
-    // ⚠️ WRITTEN DOWN, NOT DROPPED. `ms: null` with a reason is a measurement
-    // that was made and came back empty, which is a different fact from a file
-    // nobody asked about, and the page says so in its own gutter.
+    // ms: null with a reason: asked and came back empty, not unasked.
+    // See lessons/page-resources.md#resources-30
     known[it.id] = { ms: null, why: r.why, format: r.format ?? null, at };
     console.log(`     --  ${it.id} · ${r.why}`);
   }

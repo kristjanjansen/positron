@@ -1,23 +1,13 @@
-// demo/shell/moog.mjs — a subtractive voice, as pure per-sample arithmetic.
-//
-// Same rule as rhodes.mjs: no Web Audio nodes, so the same maths runs in a
-// browser, in node on the box, and in C on a microcontroller. But where the
-// Rhodes is a STRUCK sound a sampler can capture, this one cannot be sampled
-// usefully — measured 2026-09-10, driving FluidSynth's GM "Synth Bass 1"
-// across the whole CC 74 range moved the spectral centroid from 169 Hz to
-// 154 Hz. Nothing happened. A sample freezes the filter, and on this
-// instrument the filter IS the gesture.
-//
-// Architecture is the Minimoog's: oscillators -> resonant 4-pole lowpass, with
-// an envelope on the filter as well as on the amplitude.
+// demo/shell/moog.mjs: a subtractive voice as pure per-sample arithmetic (no Web Audio nodes, like rhodes.mjs).
+// Not sampled, because a sample freezes the filter. Minimoog layout: oscillators into a resonant 4-pole
+// lowpass, with envelopes on filter and amplitude.
+// why: lessons/kit-moog.md#header
 
 const TAU = Math.PI * 2;
 
 /**
- * polyBLEP: subtract a small correction either side of the wrap so the
- * discontinuity is band-limited. A naive saw aliases hard and reads as "cheap
- * and harsh" — which is the same complaint the first Rhodes attempt earned, and
- * it is cheaper to fix here than to explain.
+ * polyBLEP: a small correction either side of the wrap band-limits the discontinuity; a naive saw aliases.
+ * why: lessons/kit-moog.md#blep
  */
 function blep(t, dt) {
   if (t < dt) { const x = t / dt; return x + x - x * x - 1; }
@@ -81,11 +71,8 @@ export function moogVoice(freq, vel = 100, opt = {}) {
       const aEnv = (sustain + (1 - sustain) * Math.exp(-t / ampDecay)) * rel
                  * (1 - Math.exp(-t * 300));            // no click at onset
 
-      // --- the ladder ------------------------------------------------------
-      // Four one-pole sections with feedback from the last into the first. The
-      // feedback is soft-clipped, which is where the drive and the fatness at
-      // high resonance come from; a linear version thins out exactly when you
-      // want it to bark.
+      // Four one-pole sections, last fed back into the first through a soft clip: the drive at high resonance.
+      // why: lessons/kit-moog.md#ladder
       let fc = cutoff + envAmt * fEnv;
       if (fc > rate * 0.45) fc = rate * 0.45;
       const g = 1 - Math.exp(-TAU * fc / rate);

@@ -26,38 +26,10 @@
   import { createGrainRig } from '/granulator/grain-rig.mjs';
   import { PATCHES, valuesOf, createRingEngine } from '/granulator/grain-ring.mjs';
 
-  // concepts sampler/060, GRANULATOR, 2026-10-13. Asked (BACKLOG): *"the plain
-  // GrainBuf ring is the real lighter twin of Pappus - do"*; archived for an
-  // afternoon and brought back the same day as THE granulator (*"but we got
-  // rid of pappus?!? 060 ???"*). The Pappus page it was the light twin of is
-  // /archive/pappus/.
-  //
-  // One small SynthDef: BufWr writes the source round an eight second mono
-  // buffer, GrainBuf reads grains out of it, and SendReply reports every
-  // grain. Its text is `../grain-ring.mjs`'s PROGRAM, compiled in this tab by
-  // `/shell/sclang-lite.mjs` as the page opens (pure JavaScript, no fetch) and
-  // run on the tab's scsynth. The text is not shown (asked 2026-10-13, *"rm
-  // code box from our granulator"*); every control in it is a named control.
-  //
-  // The ten patches are sets of control values on the one program (`/n_set`),
-  // so a patch never swaps the graph. It opens on Tape stop and on the Raadio 2 recording
-  // (asked 2026-10-13, *"do dub, put ida rec default and dub default"*). After the rig's wet/dry, seven knobs
-  // (asked 2026-10-13, *"our grain can have ~7 params + wet/dry as first"*),
-  // most audible first:
-  //   size     how long each grain is
-  //   density  how many grains a second
-  //   pitch    how fast each grain plays, an octave up at 2
-  //   back     how far behind the input the grains read
-  //   speed    how fast the read head moves: 1 follows, below 1 stretches
-  //   scatter  even grains at 0, grains at random at 1
-  //   freeze   the ring stops recording and holds what it has (off or on)
-  // What is left (FIXED below: the texture, the tone, the echo, the tape and
-  // its direction, the level) is what makes a patch that patch; the patch
-  // alone sets it, on its own wire from web:patch into web:grains, with
-  // `/n_set` at once and no glide.
-  //
-  // Everything that is not the engine is `../grain-rig.mjs`, shared with the
-  // archived Pappus page.
+  // The granulator: ../grain-ring.mjs's program, compiled in this tab by
+  // /shell/sclang-lite.mjs and run on the tab's scsynth, the rest ../grain-rig.mjs. Patches
+  // are `/n_set` sets; wet/dry plus seven knobs, and FIXED values set by the patch alone.
+  // See lessons/page-granulator.md#granulator-19
   const d = mount({ name: 'Granulator', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('granulator/grains');
 
@@ -70,8 +42,8 @@
     { name: 'back', label: 'back', kind: 'knob', min: 0, max: 4, warp: 'lin', fmt: secs },
     { name: 'speed', label: 'speed', kind: 'knob', min: 0, max: 2, warp: 'lin', fmt: times },
     { name: 'scatter', label: 'scatter', kind: 'knob', min: 0, max: 1, warp: 'lin', fmt: (v) => `${Math.round(v * 100)}%` },
-    // On or off, so a stepped knob with two positions (asked 2026-10-13,
-    // *"convert freeze to 0 1 knob"*). It steps at the start of a glide.
+    // On or off, a stepped knob with two positions. It steps at the start of a glide.
+    // See lessons/page-granulator.md#granulator-20
     { name: 'freeze', label: 'freeze', kind: 'steps', choices: [{ label: 'off', value: 0 }, { label: 'on', value: 1 }] },
   ];
   const NAMES = CONTROLS.map((c) => c.name);
@@ -90,9 +62,8 @@
     d, engine,
     patches: PATCHES.map((p) => ({ name: p.name, says: p.says, set: pick(p, NAMES), fixed: pick(p, FIXED) })),
     controls: CONTROLS, roles: { size: 'size', density: 'density' }, source: 'raadio2',
-    // The patch picker on its own row, full width, and no output scope (asked
-    // 2026-10-13, *"replace with just a patch selector (no scope/viz/footer)"*
-    // and *"patch selector full w"*).
+    // The patch picker on its own row, full width, and no output scope.
+    // See lessons/page-granulator.md#granulator-21
     outputScope: false,
     // The page's own checks: the program compiled here, and a fixed value is
     // in the engine without a knob for it.

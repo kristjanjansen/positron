@@ -1,161 +1,41 @@
-// demo/shell/xr-quit.mjs — the way out of an immersive session. Hold any
-// controller button and a ring fills in front of you; let go and it cancels.
+// demo/shell/xr-quit.mjs: the way out of an immersive session. Hold any controller button
+// and a ring fills in front of you; let go and it cancels.
 //
 //   quit = mountXRQuit(gl, session, { onQuit: () => tearDown() });   // once
 //   quit.draw(eyeVP, eyeView);                                       // per eye
 //
-// 🔴 A PAGE CANNOT FORGET IT, AND THAT IS WHY THIS FILE CHANGED ON 2026-09-19.
-// Instructed: *"global behaviour hold any vr/xr controller button to quit"*.
-// The gesture was already right and every page carried it by writing three
-// lines: build it, `update` it with the session's input sources, `draw` it.
-// `/blocks/` wrote two of the three. It built the badge, compiled its shader
-// and drew it at both hands every frame, and never called `update`, so the hold
-// could not advance and THERE WAS NO WAY OUT OF THAT PAGE AT ALL. Reported from
-// a headset as *"i was not able to get out"*. Every other page had the line, so
-// no shared code was wrong and nothing in the repo could disagree with
-// anything.
-//
-// So the hold is no longer something a page advances. `mountXRQuit` takes the
-// SESSION and drives itself from `session.requestAnimationFrame`, which is the
-// session's own frame loop and needs nothing from the page. There is no
-// `update` to forget, because there is no `update` to call.
-// ⚠️ **AND IT SURVIVES A PAGE WHOSE RENDER LOOP IS DEAD.** If the page throws
-// on its way in and never draws a frame, the hold still advances and the
-// session still ends when it fills: you hold blind for three seconds instead of
-// watching an arc. That is not the dead man's switch and does not replace it,
-// see below.
-//
-// 🔴 THE RING IS IN FRONT OF YOU, NOT AT YOUR HANDS. DIRECTED 2026-09-19:
-// *"Hold-to-quit: ui should not tied to controllers. it should be just front of
-// me"*. It used to be painted at EVERY grip matrix, and the argument for that
-// is worth keeping because it was a good one: the hold can start on either
-// controller, so a ring filling on the hand you are NOT pressing is feedback
-// pointing at the wrong place, and one badge per hand meant whichever hand you
-// pressed was the one you were looking at when it began to fill. That argument
-// dies the moment the ring is head locked. In front of you there is one of it,
-// it is already where you are looking, and WHICH hand started the hold stops
-// mattering to anybody.
-// ⚠️ **IT TOOK THE `grips?.length` GUARD WITH IT, WHICH IS A REAL GAIN.** A
-// session driven by tracked HANDS has no grip matrices, so the badge could not
-// be drawn there at all. It draws now. ⚠️ Tracked hands usually report no
-// gamepad either, so on that input there is a ring to draw and no button to
-// hold. What ends such a session is the page's dead man's switch and the
-// headset's own menu, and this file cannot honestly claim otherwise.
-//
-// 🔴 WHY THE HOLD REPLACED THREE OTHER ANSWERS. Every headset page here has had
-// its own exit and none of them was discoverable:
-//
-//   · **"any button leaves"** — a TAP on any button, which means every button is
-//     a trap. You cannot rest a thumb anywhere, and the page never says which
-//     button did it. ⚠️ THE BUTTON WAS NEVER THE FAULT, THE TAP WAS, and that
-//     distinction is what 2026-09-17 turned on: any button HELD for three
-//     seconds, with a ring saying how far it has got, cannot be reached by
-//     accident and needs nobody to be told which button to find.
-//   · **the grip** — invisible. Nothing on screen says the grip does anything,
-//     and a control you have to be told about is one nobody finds.
-//   · **a button on a tablet in your other hand** — real, labelled, and gone
-//     the moment somebody picks up ONE controller. It also costs a slab, a
-//     texture and a renderer that only one page has.
-//
-// What is left is the one thing true of every headset: there is a button under
-// your thumb. Pressing anything and keeping it pressed raises an arc in front
-// of you and fills it. Let go early and nothing happens, which is what makes it
-// safe to put on a button somebody might press by accident.
-//
-// ⚠️ THE DEAD MAN'S SWITCH STAYS AND IS NOT THIS. It ends a session when
-// NOTHING HAS BEEN DRAWN for a few seconds, which is the case where the page
-// threw and there is nothing on screen to hold a ring. The two cover different
-// failures: this one is for a person who wants out, that one is for a page that
-// has stopped being able to offer anything. CLAUDE.md records the failure it
-// prevents in as many words: session live, nothing drawing, no way out, no log
-// line. It is not a user facing exit and it belongs to the page.
-//
-// 🔴 ANY BUTTON, NOT BUTTON 4. CHANGED 2026-09-17 ON INSTRUCTION: *"all vr/ar
-// general  make one general way to get out. hold down any controller button for
-// looooong enough then it quits. no other exit methods/ui's for now."* The
-// named-button version was already the good half of this design, the hold and
-// the ring, and it still asked somebody in a headset to find one particular
-// button under their thumb. Every button advances the same hold now, so the
-// gesture is "press something and keep pressing it", which is what a person
-// does when they want out and cannot see their hands.
-//
-// ⚠️ AND THE TRIGGER IS A BUTTON. On `/blocks/` and `/mirror/` the trigger is
-// also what drags a thing, so a drag held longer than `HOLD_MS` ends the
-// session. That is a real cost and it is why the arc is drawn from the first
-// millisecond of any press rather than appearing part way: a drag that is about
-// to become an exit says so in front of you, and letting go cancels it to zero.
-// UNVERIFIED IN A HEADSET, nobody here has one, so it is written down rather
-// than claimed to be fine.
-// ⚠️ A page that needs one exact button back passes `button: 4`, which is A on a
-// right Touch controller and X on a left one in the `xr-standard` mapping.
+// It drives itself from `session.requestAnimationFrame`, so no page can forget to advance it.
+// It is not the page's dead man's switch. Tracked hands have no buttons to hold.
+// `button: 4` asks for one exact button (A or X in `xr-standard`).
+// why: lessons/kit-xr-quit.md#header
 
-// 🔴 ONE ANSWER FOR WHERE THE CAMERA IS, AND IT IS NOT COPIED HERE.
-// `eyeFromView` takes the position out of the view matrix that is doing the
-// projecting, so the badge cannot be turned against a position the page derived
-// some other way. The forward, right and up below come out of the SAME matrix
-// for the same reason.
+// Position and axes come out of the projecting view matrix, never a pose derived elsewhere.
+// why: lessons/kit-xr-quit.md#eye-from-view
 import { eyeFromView } from './xr-ray.mjs';
 
 /**
- * 🔴 HOW LONG THE HOLD IS, AND WHY THIS NUMBER.
- * 3 s. Long enough that nothing accidental reaches it: a brush is under 300 ms
- * and a deliberate press about 500, so an exit at three seconds cannot be
- * arrived at by resting a thumb. Short enough to be reachable by somebody who
- * wants out NOW, three seconds being about as long as anybody will hold a
- * control before deciding it is broken, and the ring says how far the hold has
- * got, so the wait is spent watching something happen rather than wondering.
- * ⚠️ It was 900 ms while the exit was one named button nobody would press by
- * accident. With every button live, 900 ms is a trap.
+ * 3 s: a brush is under 300 ms and a deliberate press about 500, so nothing accidental reaches it.
+ * why: lessons/kit-xr-quit.md#hold-ms
  */
 const HOLD_MS = 3000;
 const PX = 256;               // the ring texture, square
 
 /**
- * 🔴 HOW FAR IN FRONT OF THE VIEWER THE RING SITS, IN METRES.
- *
- * 1.6 m, and the three things that fix it:
- *  · **Clear of anything you are holding.** A brick on `/blocks/` is at arm's
- *    length, about 0.6 m, and the instruction for this change says in as many
- *    words that the ring must not be inside one. 1.6 m is a metre past the end
- *    of an arm.
- *  · **Inside the headset's comfortable range.** A Quest focuses at somewhere
- *    between about 1.3 and 2 m whatever the geometry says, so content a person
- *    is asked to look at for three seconds belongs in that band. Closer than
- *    a metre is where a head locked thing starts to feel like it is on your
- *    face.
- *  · **It is the distance `xr-panel.mjs` already hangs its panels at**, so on
- *    the one page that has both, the ring and the thing behind it are at one
- *    depth rather than two.
- * ⚠️ AND IT IS DEAD CENTRE, WHICH IS ONLY BEARABLE BECAUSE THE BADGE IS HOLLOW.
- * There are no words on it and nothing in the middle: the arc frames what you
- * are looking at rather than covering it, and it is on screen only while a
- * button is down.
+ * 1.6 m in front: a metre past a held brick, inside the Quest's 1.3 to 2 m comfort band, and
+ * the depth xr-panel.mjs hangs panels at. Dead centre is bearable only because the ring is hollow.
+ * why: lessons/kit-xr-quit.md#dist-m
  */
 export const DIST_M = 1.6;
 /**
- * 🔴 HOW BIG IT LOOKS, IN DEGREES, WHICH IS THE HONEST UNIT FOR SOMETHING HEAD
- * LOCKED. The badge used to be 40 mm at a controller, about 4.6 degrees across
- * at the distance a hand is held. Fixing the ANGLE rather than the metres means
- * moving `DIST_M` cannot silently change how big it reads.
- * ⚠️ The arc itself is 0.8 of the badge, so the ring is about 4 degrees.
+ * Size as an angle, so moving `DIST_M` cannot change how big it reads. The arc is 0.8 of it.
+ * why: lessons/kit-xr-quit.md#ring-deg
  */
 export const RING_DEG = 5.0;
 const SIZE = 2 * DIST_M * Math.tan((RING_DEG / 2) * Math.PI / 180);
 /**
- * 🔴 A BUTTON THAT WAS ALREADY DOWN WHEN THE SESSION STARTED DOES NOT COUNT,
- * AND THIS USED TO BE EVERY PAGE'S OWN PROBLEM.
- *
- * The press that worked the page's own "enter" control can still be down as the
- * session starts, and with every button live it IS one of the buttons the hold
- * counts, so without this a session would end about three seconds after it
- * began. `xr-panel.mjs` carried exactly this guard in the page layer and the
- * other three pages did not, which is one more line nobody should have to
- * remember. The hold arms on the first frame with NOTHING pressed.
- * ⚠️ OR AFTER THIS LONG REGARDLESS, so a stuck button cannot be the reason
- * somebody is trapped in a room. That is the better half of the two rules that
- * were merged here, and it is a deliberate trade: a genuinely stuck button ends
- * the session about six seconds in, which is worse than nothing happening only
- * if you wanted to stay.
+ * A button already down at session start does not count: the hold arms on the first frame with
+ * nothing pressed, or after this long regardless, so a stuck button cannot trap anybody.
+ * why: lessons/kit-xr-quit.md#arm-ms
  */
 const ARM_MS = 3000;
 /**
@@ -197,10 +77,8 @@ function compile(gl, vs, fs) {
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
     gl.attachShader(p, s);
   }
-  // 🔴 BEFORE `linkProgram`. Called after the link it is a no-op that reads like
-  // a fix. A Quest reported GL_INVALID_OPERATION on its first frame for exactly
-  // this and drew correctly anyway, because the linker happened to pick the
-  // same slot.
+  // Before `linkProgram`: after the link it is a no-op (a Quest reported GL_INVALID_OPERATION).
+  // why: lessons/kit-xr-quit.md#bind-before-link
   gl.bindAttribLocation(p, 0, 'aCorner');
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
@@ -212,19 +90,9 @@ function compile(gl, vs, fs) {
 export const ANY_BUTTON = 'any';
 
 /**
- * 🔴 THE GESTURE, WITH NO DOM, NO GL AND NO SESSION IN IT.
- *
- * Every bug this thing has ever had lived in the arithmetic: a hold that kept
- * its progress between presses, a hold that fired twice, a hold that counted
- * the press which opened the page. None of those need a headset to find and
- * none of them needed a browser, so they live here and `xr-quit-test.mjs`
- * drives this with a fake session on a laptop.
- *
- * 🔴 RELEASING CANCELS, AND IT CANCELS TO ZERO. A hold that kept its progress
- * between presses would let somebody quit by brushing a button nine times over
- * a minute, which is the accident this design exists to prevent.
- * ⚠️ And it only ever fires ONCE: `session.end()` is async, and a ring that
- * stays full for three more frames would ask three times.
+ * The gesture with no DOM, GL or session, driven by xr-quit-test.mjs with a fake session.
+ * Releasing cancels to zero, and it fires once (`session.end()` is async).
+ * why: lessons/kit-xr-quit.md#create-quit-hold
  */
 export function createQuitHold({ button = ANY_BUTTON, holdMs = HOLD_MS,
   onQuit = () => {} } = {}) {
@@ -244,12 +112,8 @@ export function createQuitHold({ button = ANY_BUTTON, holdMs = HOLD_MS,
       for (const src of inputSources || []) {
         const pad = src?.gamepad;
         if (!pad) continue;
-        // ⚠️ EVERY BUTTON, NOT ONE. `pad.buttons` is whatever the runtime
-        // reports for this controller, so this covers the trigger, the squeeze,
-        // the thumbstick click, A/X, B/Y, the thumbrest and the menu without
-        // this file having to know which indices a given headset uses, which is
-        // the whole point of "any". A page that named an index gets that index
-        // and nothing else.
+        // Every button `pad.buttons` reports, so no headset's index layout needs knowing.
+        // why: lessons/kit-xr-quit.md#every-button
         if (button === ANY_BUTTON) {
           for (let i = 0; i < pad.buttons.length; i++) {
             if (pad.buttons[i]?.pressed) { down = true; from = src; which = i; break; }
@@ -309,11 +173,9 @@ function createBadge(gl) {
   }
 
   /**
-   * ⚠️ REDRAWN ONLY WHEN THE PICTURE CHANGES, and the picture is a hundredth of
-   * a turn. A 256 square canvas painted and uploaded on every eye of every
-   * frame of a 90 Hz headset is 46 MB a second of traffic to say the same
-   * thing; quantising the progress means the texture moves about a hundred
-   * times over the whole hold.
+   * Redrawn only when the hundredth-quantised progress changes: every eye every frame would be
+   * 46 MB a second of uploads at 90 Hz.
+   * why: lessons/kit-xr-quit.md#paint
    */
   function paint(p) {
     const q = Math.round(p * 100);
@@ -324,22 +186,9 @@ function createBadge(gl) {
     c.clearRect(0, 0, PX, PX);
     const cx = PX / 2, cy = PX / 2, r = PX * 0.40;
     /**
-     * 🔴 NO CIRCLE UNTIL THERE IS SOMETHING TO COUNT. Reported 2026-09-16:
-     * *"initially no circle, its appears on countdown (no bg circle just
-     * arc). make it thinner and just white and bit rounded"*.
-     *
-     * There was a faint full circle behind it at all times, on the argument
-     * that the arc needs somewhere to fill INTO. That is a good argument about
-     * a progress bar on a screen and the wrong one here: a ring drawn in front
-     * of somebody who is not pressing anything is a shape that means nothing
-     * yet, and it is the loudest thing in the room. The arc appearing from
-     * nothing IS the feedback.
-     *
-     * ⚠️ WHITE, NOT THE SITE'S YELLOW. Yellow in here is spent on the thing
-     * that is running; this is the way out, which is furniture until the moment
-     * you use it. ⚠️ AND THIN, with round caps, which is the `bit rounded`:
-     * at 0.055 of the badge it read as a heavy dial, and a countdown that has
-     * only to be SEEN does not need weight.
+     * No circle until there is something to count; the arc appearing is the feedback.
+     * White (yellow is for what is running), thin, round caps.
+     * why: lessons/kit-xr-quit.md#arc-only
      */
     if (f > 0) {
       c.lineWidth = PX * 0.030;
@@ -350,18 +199,8 @@ function createBadge(gl) {
       c.stroke();
     }
     /**
-     * 🔴 NO WORDS ON IT. INSTRUCTED 2026-09-19: *"hold any controller button
-     * down long enough it shows circular coundown (no labels) and quites"*.
-     * The label was the whole discoverability argument this badge was built on,
-     * and it lost to the thing it was competing with: a word floating in front
-     * of you is furniture you read once and then look past for the rest of the
-     * session, in a picture whose whole point is what is in front of you.
-     * ⚠️ **SO THE GESTURE IS THE DOCUMENTATION.** Press anything and keep
-     * pressing it: the arc appears on the first millisecond and fills, which
-     * tells a person holding a button that holding it is doing something,
-     * without asking them to read at arm's length.
-     * ⚠️ `label` IS STILL ACCEPTED AND STILL REPORTED, so a page that wants to
-     * SAY what its way out is can put it in its own log. Nothing draws it.
+     * No words on it: the gesture is the documentation. `label` is still accepted and reported.
+     * why: lessons/kit-xr-quit.md#no-words
      */
   }
 
@@ -390,11 +229,9 @@ function createBadge(gl) {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     } catch (e) {
-      // ⚠️ A SWALLOWED COMPILE ERROR IS A CONTROL THAT IS SIMPLY ABSENT, with
-      // nothing anywhere saying why. This used to be a bare `catch {}`, so a
-      // badge that would not build looked exactly like a badge nobody asked
-      // for. Kept rather than rethrown, because a way out that will not compile
-      // must not take the session with it.
+      // Kept rather than rethrown, so a ring that will not compile cannot take the session with it,
+      // and kept in `why` so its absence says why.
+      // why: lessons/kit-xr-quit.md#compile-error
       prog = null;
       why = e?.message || String(e);
     }
@@ -402,20 +239,10 @@ function createBadge(gl) {
   }
 
   /**
-   * One ring, a fixed distance along the viewer's own forward, square to them.
-   *
-   * 🔴 EVERY NUMBER COMES OUT OF THE VIEW MATRIX THIS EYE IS BEING PROJECTED
-   * WITH. A headset draws two views 64 mm apart, and a badge turned against a
-   * position the page worked out some other way is not a smear, it is a
-   * DISPARITY: it reads as sitting at a depth it is not at. The matrix is
-   * column-major, so element (row, col) is `v[col * 4 + row]` and the
-   * rotation's ROWS are the camera's own axes in the world. Right, up and
-   * forward are three reads rather than a cross product, and `eyeFromView` is
-   * the position.
-   * ⚠️ NORMALISED ANYWAY. A view matrix is rigid and these are already unit
-   * vectors; a scale sneaking in would change the badge's SIZE with the pose,
-   * which is a very confusing thing to look at for the cost of three square
-   * roots on the frames where somebody is holding a button.
+   * One ring a fixed distance along the viewer's forward. Every number comes from this eye's
+   * view matrix (column-major, rotation rows are the camera axes), or the ring shows a disparity.
+   * Normalised anyway, so a stray scale cannot resize it.
+   * why: lessons/kit-xr-quit.md#badge-draw
    */
   function draw(vp, view) {
     if (!ensure()) return false;
@@ -446,26 +273,17 @@ function createBadge(gl) {
     // has to squint at to find out whether it is running.
     gl.uniform1f(L.a, 1);
     /**
-     * 🔴 ON TOP OF EVERYTHING, AND IT PUTS THE STATE BACK.
-     * A way out you cannot see because a wall is in front of it is the failure
-     * the dead man's switch exists for, arrived at by drawing. So the depth
-     * test is off for these four vertices and the depth mask with it, and both
-     * go back afterwards: a kit component that leaves blending on, or the depth
-     * mask off, breaks the NEXT thing its host draws and the host looks like
-     * the broken one.
+     * Depth test and depth mask off for the ring, so no wall can hide the way out; both go back after.
+     * why: lessons/kit-xr-quit.md#on-top
      */
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.disable(gl.DEPTH_TEST);
     gl.depthMask(false);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    // ⚠️ PUT BACK, NOT READ BACK. The obvious version asks `gl.isEnabled` first
-    // and restores what it found, and a glGet inside a render loop can cost a
-    // round trip to the driver: an exit that drops frames while you hold it is
-    // an exit that looks broken. This leaves the state every other component
-    // here leaves, which `xr-ray.mjs` and `xr-controller.mjs` both write down:
-    // blending off, depth test on, depth mask on. The badge is the last thing
-    // in the eye, so there is nothing after it to disagree.
+    // Put back, not read back: a glGet per frame can cost a driver round trip. Blending off,
+    // depth test on, depth mask on, as xr-ray.mjs and xr-controller.mjs leave it.
+    // why: lessons/kit-xr-quit.md#put-back
     gl.depthMask(true);
     gl.enable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
@@ -490,11 +308,8 @@ function createBadge(gl) {
 }
 
 /**
- * 🔴 ONE MOUNT PER SESSION, AND ASKING TWICE HANDS BACK THE SAME ONE.
- * Two drivers on one session is two holds counting the same thumb, and the
- * second one to fill would ask a session that is already ending to end again.
- * A page that cannot tell whether it has mounted already is a page that mounts
- * twice.
+ * One mount per session; asking twice hands back the same one, or two holds count one thumb.
+ * why: lessons/kit-xr-quit.md#mounted
  */
 const MOUNTED = new WeakMap();
 
@@ -502,28 +317,17 @@ const MOUNTED = new WeakMap();
  * The way out, mounted on a session.
  *
  * @param {WebGL2RenderingContext} gl   the context the page draws through
- * @param {XRSession|null} session      the live session. `null` builds the
- *                                      badge WITHOUT driving it, which is how a
- *                                      laptop grades the shader before anybody
- *                                      puts a headset on; such an object
- *                                      reports `driven === false`.
+ * @param {XRSession|null} session      the live session; `null` builds the badge without
+ *                                      driving it (`driven === false`), for a laptop check.
  * @param {object} [o]
- * @param {string} [o.label]    what the hold does, for a page's own log. Never
- *                              drawn, see `paint`.
+ * @param {string} [o.label]    what the hold does, for a page's own log. Never drawn.
  * @param {number|'any'} [o.button]  gamepad index, or `'any'` (the default).
  * @param {number} [o.holdMs]   how long to hold.
- * @param {Function} [o.onQuit] the page's own teardown, called once, first.
- *                              🔴 IT DOES NOT REPLACE THE EXIT. This module
- *                              ends the session itself whether a page passes
- *                              one or not, and whether the one it passes throws
- *                              or not, because "the page ends the session" is
- *                              exactly the line that went missing from
- *                              `/blocks/`.
+ * @param {Function} [o.onQuit] the page's own teardown, called once, first. The session is
+ *                              ended here anyway, whether it is passed or throws.
  * @param {Function} [o.log]    the page's log, for a line a visitor can read.
- * @param {Function} [o.say]    the beacon. 🔴 NEVER A BATCHED SHIPPER:
- *                              `createShipper` holds for 2 s and a session
- *                              ending is exactly when timers stop being
- *                              generous.
+ * @param {Function} [o.say]    the beacon. Never a batched shipper: it holds for 2 s.
+ * why: lessons/kit-xr-quit.md#mount-xr-quit
  */
 export function mountXRQuit(gl, session = null, { label = 'Hold to quit',
   button = ANY_BUTTON, holdMs = HOLD_MS, onQuit = null,
@@ -534,11 +338,8 @@ export function mountXRQuit(gl, session = null, { label = 'Hold to quit',
   let frames = 0, last = 0, running = false, done = false, failSaid = false;
 
   /**
-   * 🔴 THE PAGE IS TOLD, THEN THE SESSION ENDS. In that order, so a page gets
-   * to stop its sound and put its own things away with the session still live.
-   * Both halves are guarded: a teardown that throws must not be able to keep
-   * somebody in a room, and a session that is already ending answers the second
-   * `end()` with a rejection nobody needs to hear about.
+   * The page is told, then the session ends; both guarded so a throwing teardown cannot trap anyone.
+   * why: lessons/kit-xr-quit.md#leave
    */
   function leave() {
     if (done) return;
@@ -552,13 +353,9 @@ export function mountXRQuit(gl, session = null, { label = 'Hold to quit',
   const hold = createQuitHold({ button, holdMs, onQuit: leave });
 
   /**
-   * 🔴 THE SESSION'S OWN FRAME LOOP, NOT THE PAGE'S. This is the whole design:
-   * `XRSession.requestAnimationFrame` is a list of callbacks and anybody
-   * holding the session may add one, so the hold advances without a single line
-   * in a page and keeps advancing if the page's render loop has died.
-   * ⚠️ IT RE-REGISTERS FIRST. A throw anywhere below would otherwise end the
-   * loop silently, which is the failure this file exists to stop, arrived at
-   * from the other side.
+   * The session's own frame loop, so the hold advances with no page code and a dead render loop.
+   * It re-registers first, or a throw below would end the loop silently.
+   * why: lessons/kit-xr-quit.md#step
    */
   function step(t) {
     if (!running) return;
@@ -587,27 +384,17 @@ export function mountXRQuit(gl, session = null, { label = 'Hold to quit',
     draw(vp, view) {
       if (!vp || !view || !gl) return false;
       /**
-       * 🔴 NOTHING IS DRAWN UNTIL SOMETHING IS BEING HELD. With no label on it
-       * an idle badge is a blank square hanging in the middle of the view,
-       * which is worse than the word it replaced: it says nothing and it is
-       * still in the way. The countdown IS the badge, so there is no badge
-       * until there is a countdown.
-       * ⚠️ AND THE ARC STARTS ON THE FIRST MILLISECOND, which is the property a
-       * drag-to-quit page depends on: on `/blocks/` the trigger both drags a
-       * brick and advances this hold, so a drag that is about to end the
-       * session has to say so while there is still time to let go.
+       * Nothing drawn until something is held. The arc starts on the first millisecond, so a drag
+       * that is about to end the session says so while there is time to let go.
+       * why: lessons/kit-xr-quit.md#draw-only-holding
        */
       if (!hold.holding) return false;
       badge.paint(hold.progress);
       return badge.draw(vp, view);
     },
     /**
-     * 🔴 COMPILE NOW, SO SOMETHING OTHER THAN A HEADSET CAN GRADE IT.
-     * Everything in the badge is lazy until the first draw, which means the
-     * object existing says nothing at all about whether its shader builds. A
-     * page asserting "there is a way out" off the object alone passes on a
-     * broken badge: PROVED by making `compile` throw and watching the check
-     * stay green. Returns whether it is really ready.
+     * Compile now so a laptop can grade it; the object existing says nothing about the shader.
+     * why: lessons/kit-xr-quit.md#prepare
      */
     prepare() { return badge.ensure(); },
     /** Why the badge would not build, or null. */

@@ -1,39 +1,7 @@
-// demo/shell/note-grid.mjs. Note events, drawn where they fall in a pattern.
-//
-// 🔴 ASKED FOR TWICE, 2026-09-21: *"can we see actual notes on timeline in
-// https://positron.studio/pack/#sessions"*, then *"so can you show notes in
-// timeline in pack?"*. The events had been decoded since that morning and the
-// page was printing a COUNT of them, which is the one thing about music that
-// carries no music in it.
-//
-// 🔴 IT IS NOT `strip.mjs` AND THAT IS A DECISION. A strip draws lanes of marks
-// against a DECK, in milliseconds, and its mark colour is reserved: the project
-// rule is that colour says HOW A MARK LANDED and never which lane it is in. A
-// Circuit pattern has no milliseconds in it (sixteen steps, no tempo stored),
-// and the thing worth seeing is PITCH, which a strip has no axis for. Bending
-// either one to fit would have cost the rule or cost the picture.
-//
-// 🔴 AND IT IS NOT A PIANO ROLL OF THE WHOLE SESSION EITHER, for a reason that
-// is about the instrument rather than about drawing. A session holds sixteen
-// patterns of sixteen steps; they are alternatives, not a timeline, so laying
-// them end to end would invent an order the file does not have, and stacking
-// them on one x axis would overlay sixteen different patterns at step 1. One
-// ROW PER PATTERN is the only arrangement that says what is there.
-//
-// ⚠️ ONE PITCH SCALE FOR THE WHOLE PICTURE, NOT ONE PER ROW. A per-row scale
-// would make the same height mean a different note in each row, which is a
-// chart that punishes the reader for comparing it. The scale comes from the
-// events handed in, so a session that lives in one octave gets that octave.
-//
-// ⚠️ EMPTY PATTERNS ARE LEFT OUT AND COUNTED. Sixteen rows of which five hold
-// anything is mostly a picture of nothing; the rows that are missing are said
-// in words instead, which is the same answer `table.mjs` gives about a heading
-// it had to cut.
-//
-// MEASURED on the owner's pack, which is what the sizes below are chosen
-// against: 29 of 32 sessions hold notes, 5,095 events in all, up to 16 regions
-// holding notes in one session and up to 78 events in one region, pitch 36 to
-// 132 across the pack and velocity 1 to 127.
+// demo/shell/note-grid.mjs: note events drawn where they fall, one row per pattern (patterns are
+// alternatives, not a timeline). Not strip.mjs: a Circuit pattern has no milliseconds and pitch
+// needs an axis. One pitch scale for the whole picture; empty patterns are left out and counted.
+// why: lessons/kit-note-grid.md#header
 
 import { el } from './shell.mjs';
 import { createPanelValues } from './video-panel.mjs';
@@ -45,21 +13,15 @@ export const STEPS = 16;
 export const BEAT = 4;
 
 /**
- * How tall one pattern's row is.
- * ⚠️ IT WAS 22 UNTIL 2026-10-12 AND THAT WAS MOST OF THE MESS. MEASURED on
- * `/kit/timeline/`: the specimen's two patterns made a picture 44 px tall in
- * which fifteen semitones shared 19 px, 1.3 px a semitone under a 3 px note, so
- * a rising line and a falling one were two smears. 40 gives the same fifteen
- * semitones 2.2 px each, which a reader can follow by eye.
+ * How tall one pattern's row is. At 22 px fifteen semitones shared 19 px and lines smeared;
+ * 40 gives them 2.2 px each.
+ * why: lessons/kit-note-grid.md#row-h
  */
 export const ROW_H = 40;
 
 /**
- * 🔴 A NOTE IS DRAWN AT LEAST THIS TALL. With one scale over the whole picture,
- * a session spanning 96 semitones in one row puts two adjacent notes inside a
- * fraction of a pixel of each other, and a canvas drawing a 0.2 px rectangle
- * draws a grey smear. Three pixels is the smallest thing that still reads as a
- * mark rather than as noise.
+ * A note is drawn at least this tall: 3 px is the smallest mark that reads as a mark, not a smear.
+ * why: lessons/kit-note-grid.md#note-h
  */
 export const NOTE_H = 3;
 
@@ -70,13 +32,9 @@ export const ROW_INSET = 4;
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 /**
- * MIDI note number to the name a musician would say.
- * ⚠️ MIDDLE C IS C3 HERE, WHICH IS WHAT THE CIRCUIT ITSELF SAYS. The octave
- * numbering of note 60 is not standardised: Yamaha calls it C3, Roland C4, and
- * the MIDI specification does not say. `research/measured-devices-2026-09-20.md` records
- * the Circuit's own drum pads at notes 60, 62, 64 and 65, and the instrument
- * labels that octave 3, so a page about Circuit sessions uses the Circuit's
- * numbering and says so rather than picking the commoner one.
+ * MIDI note number to its name. Middle C is C3, the Circuit's own numbering (the octave of
+ * note 60 is not standardised).
+ * why: lessons/kit-note-grid.md#note-name
  */
 export function noteName(n) {
   const v = Math.round(Number(n));
@@ -85,23 +43,11 @@ export function noteName(n) {
 }
 
 /**
- * Which patterns hold anything, and the pitch range over all of them.
+ * Which patterns hold anything, and the pitch range over all of them. Note numbers above 127
+ * (105 of 5,095 in the owner's pack, a hole in our decoder) are drawn and counted, never clamped.
  * @param {Array<{region:number, step:number, note:number, velocity:number}>} events
  * @returns {{rows:number[], lo:number, hi:number, count:number, regions:number}}
- */
-/**
- * 🔴 AND IT COUNTS THE ONES THAT CANNOT BE NOTES, WHICH IS A HOLE IN OUR OWN
- * DECODER FOUND BY TRYING TO DRAW ITS OUTPUT. MEASURED 2026-09-21 over the
- * owner's pack: **105 of 5,095 events carry a note number above 127**, which
- * is impossible in MIDI. The values are 128, 129, 130, 131 and 132, clustered
- * rather than scattered, and their velocities and gates look ordinary. So the
- * byte `notesIn()` reads as a pitch is not only a pitch, and masking bit 7 off
- * does not rescue them either: it would turn them into notes 0, 1, 2, 3 and 4,
- * which is five octaves below anything else in the file.
- * ⚠️ **THEY ARE DRAWN AND THEY ARE COUNTED SEPARATELY**, never quietly clamped.
- * A clamp would pile them all on the top line of the picture and make a chord
- * that is not in the file, which is this project's named hazard: an instrument
- * that reports something rather than reporting that it does not know.
+ * why: lessons/kit-note-grid.md#layout
  */
 export function layout(events) {
   const list = Array.isArray(events) ? events : [];
@@ -125,12 +71,9 @@ export function layout(events) {
 }
 
 /**
- * Where one event lands, in the picture's own coordinates.
- * ⚠️ A SESSION WHOSE NOTES ARE ALL ONE PITCH HAS NO RANGE TO DIVIDE BY, and a
- * drum pattern is exactly that. It is centred rather than put at the top or
- * dropped, because `lo === hi` is a real and common answer.
- * `inset` keeps the top and bottom notes off the row's own rules; the pure
- * arithmetic is graded at 0, where the top of the range is the top of the row.
+ * Where one event lands, in the picture's coordinates. A one-pitch session (a drum pattern)
+ * is centred. `inset` keeps notes off the row rules; tests grade it at 0.
+ * why: lessons/kit-note-grid.md#place
  */
 export function place(e, { rows, lo, hi }, rowH = ROW_H, inset = 0) {
   const row = rows.indexOf(e.region);
@@ -154,13 +97,9 @@ export function startOf(step, beat = BEAT) {
 }
 
 /**
- * How long a note is, in words a footer cell can hold.
- * ⚠️ THE GRID DOES NOT KNOW THE GATE'S UNIT AND DOES NOT GUESS IT. The Circuit
- * writes a gate in steps minus one or in sixths of a step depending on a header
- * byte (`research/circuit-session-notes-2026-09-21.md`, a reading on 31 of 31),
- * and `notesIn` hands over the raw byte. So a caller that knows passes
- * `length` in steps on the event, and the grid draws and prints that; one that
- * does not gets the raw gate, labelled as a gate rather than dressed as steps.
+ * How long a note is, for a footer cell. The gate's unit depends on a header byte, so a caller
+ * that knows passes `length` in steps; otherwise the raw gate is labelled as a gate.
+ * why: lessons/kit-note-grid.md#length-of
  */
 export function lengthOf(e) {
   const n = Number(e?.length);
@@ -236,27 +175,9 @@ export function footOf(e) {
  * @param {number} [o.rowH]   pixels per pattern row
  * @param {string} [o.label]  what the picture is, for a screen reader
  * @param {(e:object|null)=>void} [o.onPick]  the note in focus changed
- *
- * 🔴 REWORKED 2026-10-12 ON *"its a mess. rm hover intereacvtion. add footer to
- * show note info. figure out left lane col. column headers?"*.
- * - NO HOVER. Pointing at the picture changes nothing. A press picks the note
- *   nearest it, and the arrows walk the notes (`stepFrom`), from the canvas,
- *   which is one tab stop.
- * - THE NOTE IN FOCUS IS ALWAYS ONE NOTE. `set()` picks the first note of the
- *   first pattern, so the footer is never an empty row that fills in on the
- *   first press, and a press or a key moves it. There is no playhead here: a
- *   Circuit pattern in a file has no clock, so nothing plays it.
- * - THE FOOTER IS CELLS IN RESERVED WIDTHS (`createPanelValues`, the kit's own
- *   footer row), so a value changing never moves its neighbour, and the row
- *   wraps by its reserves rather than by what it holds, so its height depends
- *   on the box and never on the note.
- * - THE LEFT COLUMN IS THE PATTERN NUMBER, NOT A KEYBOARD. A row is one
- *   pattern with its own small pitch scale inside it, so there is no single
- *   pitch per row for a key to name; the exact note is the footer's job. It is
- *   a DOM column as wide as its widest label, sticky when the grid scrolls
- *   sideways, and its rows ARE the grid's rows, so it cannot drift from them.
- * - THE COLUMN HEADINGS ARE THE FOUR BEATS, each spanning four step tracks of
- *   the same CSS grid the picture sits in, so they line up by construction.
+ * No hover: a press picks the nearest note and arrows walk them. One note is always in focus.
+ * The footer is reserved-width cells; the left column is the pattern number; headings are beats.
+ * why: lessons/kit-note-grid.md#create-note-grid
  */
 export function createNoteGrid(host, { rowH = ROW_H, label = '', onPick = null } = {}) {
   const wrap = el('div', 'pos-ngrid');
@@ -285,9 +206,8 @@ export function createNoteGrid(host, { rowH = ROW_H, label = '', onPick = null }
   foot.append(values.el);
   wrap.append(scroll, foot);
   host.append(wrap);
-  // ⚠️ HIDDEN UNTIL THERE IS SOMETHING TO DRAW, which is the same rule the drop
-  // footer and the empty table heading follow: a container with nothing in it
-  // must not paint its edges.
+  // Hidden until there is something to draw: an empty container must not paint its edges.
+  // why: lessons/kit-note-grid.md#hidden-empty
   wrap.hidden = true;
 
   let events = [], plan = layout([]), picked = null, said = '', labs = [];
@@ -334,10 +254,9 @@ export function createNoteGrid(host, { rowH = ROW_H, label = '', onPick = null }
     for (let r = 1; r < plan.rows.length; r++) g.fillRect(0, r * rowH, w, 1);
     g.globalAlpha = 1;
 
-    // 🔴 THE NOTES. Velocity is ALPHA rather than colour, because this project
-    // spends colour on state and a note has none: it is not late, early or
-    // refused, it is simply in the file. The one note in focus is the one
-    // thing in the accent, because it is the one thing chosen.
+    // Velocity is alpha, not colour: colour says state and a note has none. The note in focus
+    // is the one thing in the accent.
+    // why: lessons/kit-note-grid.md#velocity-alpha
     const dim = tok('--dim', '#9aa7bd'), hi = tok('--hi', '#ffd400');
     const draw = (e, colour, alpha) => {
       const p = place(e, plan, rowH, ROW_INSET);
@@ -400,16 +319,16 @@ export function createNoteGrid(host, { rowH = ROW_H, label = '', onPick = null }
   });
   canvas.addEventListener('keydown', (ev) => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(ev.key)) return;
-    // ⚠️ prevented even at an end, or an arrow at the last note scrolls the page.
+    // Prevented even at an end, or an arrow at the last note scrolls the page.
+    // why: lessons/kit-note-grid.md#prevent-default
     ev.preventDefault();
     const e = stepFrom(events, plan, picked, ev.key);
     if (e) { pick(e); reveal(); }
   });
 
   function summary() {
-    /* ⚠️ THE RANGE IS NAMED FROM THE NOTES THAT REALLY ARE NOTES. Printing
-       `C1 to ` with a blank at the end because the top value is 132 is a
-       caption reporting our own decoder's gap as if it were music. */
+    // The range is named from notes that really are notes (at most 127).
+    // why: lessons/kit-note-grid.md#range-named
     const top = plan.hi > 127 ? 127 : plan.hi;
     said = plan.count
       ? `${plan.count} note${plan.count === 1 ? '' : 's'} across `

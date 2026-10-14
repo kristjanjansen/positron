@@ -1,17 +1,7 @@
 // demo/shell/announce.mjs: the one place a page says which nodes it has, to a
-// room it is already in.
-//
-// A page's bay is `web:keys`, `web:synth`, plus whatever it draws of other
-// sites (`pi-1:circuit`). What it announces is only its own half, under a site
-// of this tab's own (`web-a1b`), in graph-registry.mjs's shape, so /connect/ and
-// every other registry in the room can say "this is open somewhere right now".
-//
-// 🔴 IT NEVER OPENS A SOCKET. `announceOn(board, bay)` rides the board's own
-// socket (`createBoard` in board.mjs), which a page opens on a person's press,
-// and a page that joins with `createBayNode` already announces through
-// `graphs: [...]`. A visit opens nothing (CLAUDE.md).
-// ⚠️ UNDER `?selfcheck=` IT SAYS NOTHING unless `?relay=` points at a stand-in
-// on this machine, so a check never puts a graph on the real relay.
+// room it is already in, under a site of this tab's own, in graph-registry.mjs's shape.
+// It never opens a socket; under `?selfcheck=` it is silent unless `?relay=` is local.
+// why: lessons/kit-announce.md#header
 
 import { randomSite, REANNOUNCE_MS } from './bay-node.mjs';
 import { GRAPH_V, graphProblem } from './graph-registry.mjs';
@@ -60,15 +50,12 @@ export function mayAnnounce(search = typeof location !== 'undefined' ? location.
 }
 
 /**
- * Announce a page's bay on a board's socket while it is open: once on every
- * open (a reconnect is a new `from`), then every `everyMs`. Read again each
- * time, so a node the page adds later is in the next one.
- * ⚠️ IT CANNOT HEAR `graph.ask`, because the board hands its messages to the
- * page; a listener hears this within `everyMs`, inside `STALE_MS`.
- * Stops when the board is closed.
+ * Announce a page's bay on a board's socket while it is open: on every open,
+ * then every `everyMs`. It cannot hear `graph.ask`. Stops when the board closes.
  * @param {{ wire: { state: Function, stats: Function, send: Function }, close: Function }} board
  * @param {object} bay
  * @param {object} [o]  `pageGraph`'s options, plus `everyMs`, `pollMs`, `may`
+ * why: lessons/kit-announce.md#announceon
  */
 export function announceOn(board, bay, { everyMs = REANNOUNCE_MS, pollMs = 1000, may = mayAnnounce(), site = randomSite(), ...o } = {}) {
   const counts = { sent: 0, held: 0 };

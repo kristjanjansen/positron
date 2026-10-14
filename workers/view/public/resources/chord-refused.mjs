@@ -1,41 +1,7 @@
-// demo/resources/chord-refused.mjs. What real charts write and `parseChord`
-// refuses, counted rather than guessed.
-//
-//   node demo/resources/chord-refused.mjs
-//   node demo/resources/chord-refused.mjs --all      every refused form, not the top 40
-//
-// Asked for 2026-09-26 after `/nola/` refused the typed line `Cmaj7 C2/E` with
-// *"C2/E is not a chord, because 2 is not a chord quality"*, beside an Open
-// Studio lesson playing exactly that chord with exactly that caption. The
-// instruction with the report was the whole of why this file exists: **do not
-// add one row and call it done, and do not guess at a second.**
-//
-// 🔴 IT CONTACTS NOBODY. Both corpora are already in gitignored
-// `tmp/chord-corpora/`, put there once by `fetch-chord-corpora.mjs`, whose
-// `--check` reports 0 requests. The standing rule about somebody else's server
-// is the reason this reads a cache rather than a URL.
-//
-// 🔴 AND IT MEASURES THE QUALITY, NOT THE ROOT. Both corpora spell their roots
-// in their own notation (Humdrum writes a flat `-`, Harte separates the quality
-// with `:`), and a root spelling is a fact about the corpus rather than about
-// this parser. So every quality is probed as `C#<quality>`: `C#` consumes the
-// accidental slot, so a quality that begins with `b` is still read as a quality
-// rather than as a flat. Probing with a bare `C` would have read `Cb9` as B
-// flat with a 9 on it and reported a refusal that was this file's fault.
-//
-// ⚠️ THE FULL SYMBOL IS ALSO RUN, because a quality is not the whole of what a
-// person types and the slash bass is the other half of the symbol that was
-// asked about. The two answers are reported separately and they are different
-// numbers for a reason that is notation rather than music: McGill Billboard
-// writes its bass as a DEGREE (`C:maj/3`, `C:maj/b7`) where iRb and a person
-// both write a NOTE (`C/E`), so every pop slash chord fails a test it was never
-// spelled for. That is counted and named rather than folded into the total.
-//
-// ⚠️ AND THE COUNT IS OF WRITTEN TOKENS, NOT OF PLAYED ONES. `parseIrb` honours
-// the `*>[A,N1,A,N2,B,A2]` expansion list and so counts a section once per
-// playing, which is the right weighting for a transition table and the wrong
-// one here: the question is what a person WRITES, so a chord written once is
-// counted once.
+// Counts what real charts write and parseChord refuses, reading tmp/chord-corpora/ only.
+// Qualities are probed as `C#<quality>`, full symbols separately (Billboard writes its bass
+// as a degree). Counts written tokens. Run: node demo/resources/chord-refused.mjs [--all]
+// See lessons/page-resources.md#resources-47
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -46,8 +12,8 @@ import { parseChord, QUALITIES } from '../shell/chords.mjs';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const X = join(REPO, 'tmp', 'chord-corpora', 'x');
 
-/* ⚠️ A SKIP NAMES WHAT GOES UNMEASURED RATHER THAN PASSING QUIETLY, which is
-   the convention every other check in this repository already keeps. */
+/* A skip names what goes unmeasured rather than passing quietly.
+   See lessons/page-resources.md#resources-48 */
 if (!existsSync(X)) {
   console.log('tmp/chord-corpora/x is not on this disk, so nothing was measured.');
   console.log('node demo/resources/fetch-chord-corpora.mjs   puts it there, once.');
@@ -122,19 +88,10 @@ function readPop() {
 /* ── the three kinds of refusal ────────────────────────────────────────────── */
 
 /**
- * 🔴 THREE BUCKETS AND NOT TWO, AND THE THIRD ONE IS THE REASON THE LIST DOES
- * NOT INFLATE. The brief asked for two, a quality the table genuinely lacks
- * against a spelling of a quality it already has, and the corpora carry a third
- * that is neither: a CORPUS WRITING CONVENTION that nobody types into a text
- * box. `C:maj(9)` is Harte's way of writing `Cadd9`, `1` is Harte's way of
- * writing *the root and nothing else*, `6(F:min7)` is iRb parking an
- * alternative chord in brackets, and `min:maj7` is iRb's quality separator
- * turning up in the middle of a quality. Counting those as parser gaps would
- * say this parser refuses 14 per cent of pop when what it refuses is a file
- * format.
- * ⚠️ AND THE BUCKET IS A JUDGEMENT, SO IT IS WRITTEN DOWN HERE RATHER THAN
- * INFERRED. Everything not named below falls to the rules under it and the tail
- * is printed, so a form nobody classified is visible rather than absorbed.
+ * Three buckets: a quality the table lacks, a spelling of one it has, and a corpus writing
+ * convention nobody types (`C:maj(9)`, `1`, `6(F:min7)`, `min:maj7`). Unclassified forms
+ * fall to the rules below and the tail is printed.
+ * See lessons/page-resources.md#resources-49
  */
 const SPELLING = {
   h7: 'min7b5', h: 'min7b5', hdim7: 'min7b5', o7: 'dim7', o: 'dim',
@@ -198,9 +155,8 @@ for (const [name, c] of all) {
 /* ── the full symbol, bass and all ─────────────────────────────────────────── */
 
 /**
- * ⚠️ THE ROOT IS TRANSLATED AND THE QUALITY IS NOT. Humdrum's `-` for a flat is
- * the same note in another hand, so writing it as `b` tests the parser rather
- * than the file format. Nothing else about the token is touched.
+ * The root is translated (Humdrum `-` to `b`) and the quality is not.
+ * See lessons/page-resources.md#resources-50
  */
 const full = { jazz: { ok: 0, no: 0, slash: 0, slashOk: 0 }, pop: { ok: 0, no: 0, slash: 0, slashOk: 0 } };
 for (const [name, c] of all) {

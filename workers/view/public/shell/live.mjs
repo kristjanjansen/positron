@@ -1,21 +1,7 @@
-// demo/shell/live.mjs: Cloudflare Stream inputs, WHIP and WHEP, shared by the
-// pages that publish to Stream or play from it.
-//
-// RETIRED 2026-10-13, AND GONE FROM THIS FILE THE SAME DAY: the test pattern
-// that `/llhls/` and `/webrtc/` played (the inputs positron-demo and whep-rig,
-// pub's /watch, /status, /start, /stop and /whip), and `/cam/`'s RTMPS camera
-// (the input positron-cam, pub's /cam). Stream deleted the three inputs and pub
-// answers those routes 410. What went with them: `LIVE.uid`, `LIVE.pub`,
-// `LIVE.pubStatus`, `llhls()`, `lifecycle()`, `waitForManifest`, `WHEP_UID`,
-// `whep()`, `WHIP_PROXY`, `whipPublish`, `CAM_PROXY`, `CAM_UID`, `camLlhls()`,
-// `camLifecycle()`, and `watchPresentedFps`, which only those two pages called.
-// They are in git at be7737d. The archived pages that
-// used them are still served and answer a press with `RETIRED_LEG` rather than
-// a 90 s wait for a publisher that no longer exists.
-//
-// What is left: /stage/'s own input, the camera's WebRTC input (video/030), the
-// LL-HLS loopback publish (`camPublish`, video/060), the TURN relay, and the
-// WHIP and WHEP helpers they share.
+// demo/shell/live.mjs: Cloudflare Stream inputs, WHIP and WHEP. Left: /stage/'s input, the
+// camera's WebRTC input, the LL-HLS loopback publish, the TURN relay and their helpers.
+// The retired test pattern and RTMPS camera helpers are in git at be7737d.
+// why: lessons/kit-live.md#header
 
 export const LIVE = {
   customer: 'customer-mwuu1cmlyif6eluy',
@@ -38,10 +24,9 @@ export const stageWhep = () => (STAGE_UID
   : null);
 
 /**
- * Hold the publisher up for as long as the page is open. The socket IS the
- * reference count: dropping it is how the container learns nobody is watching.
- * `url` has no default since 2026-10-13: the default was the test pattern's
- * /watch, which is retired, and /stage/ passes its own `STAGE_PUB`.
+ * Hold the publisher up while the page is open: the socket is the reference count.
+ * `url` has no default; /stage/ passes STAGE_PUB.
+ * why: lessons/kit-live.md#hold-publisher
  */
 export function holdPublisher(onState, url) {
   const ws = new WebSocket(url);
@@ -54,24 +39,17 @@ export function holdPublisher(onState, url) {
 }
 
 /**
- * Wait for the WHIP LEG, which is a different input from the HLS one.
- * 07 previously waited on the HLS manifest — a signal about input A while it
- * was about to play input B, so it asked for WHEP before the WHIP handshake had
- * finished and got a 409. The publisher's own status is the right signal.
- * `statusUrl` has no default since 2026-10-13 (the default was the retired
- * /status); /stage/ passes `STAGE_PUB_STATUS`.
+ * Wait for the WHIP leg via the publisher's own status, not the HLS manifest (that gave 409).
+ * `statusUrl` has no default; /stage/ passes STAGE_PUB_STATUS.
+ * why: lessons/kit-live.md#wait-for-whip
  */
 export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl } = {}) {
   const t0 = Date.now();
   const ac = new AbortController();
   const stop = () => ac.abort();
   addEventListener('pagehide', stop, { once: true });
-  // 🔴 A PAGE THAT CAN BE STOPPED HAS TO BE ABLE TO STOP THIS. Added 2026-09-29
-  // when both streaming pages gained a three state toggle whose middle state is
-  // half a minute long: a press during `starting` closes the socket, and
-  // without this the poll went on asking Cloudflare for a publisher nobody was
-  // waiting for until the timeout. `pagehide` was the only way out and a
-  // visitor who has pressed stop has not left the page.
+  // A stop press aborts the poll, so it does not ask Cloudflare until the timeout.
+  // why: lessons/kit-live.md#wait-abort
   signal?.addEventListener('abort', stop, { once: true });
   while (Date.now() - t0 < timeoutMs && !ac.signal.aborted) {
     try {
@@ -90,25 +68,14 @@ export async function waitForWhip({ timeoutMs = 90000, onTick, signal, statusUrl
   return { ok: false, aborted: ac.signal.aborted, waitedMs: Date.now() - t0 };
 }
 
-// ── publish and subscribe, shared ──────────────────────────────────────────
-//
-// Both halves of a WebRTC round trip through Cloudflare, in one place because
-// two pages need them and each carries lessons that were paid for once.
+// Both halves of a WebRTC round trip through Cloudflare, shared by two pages.
+// why: lessons/kit-live.md#publish-subscribe
 
 /**
- * 🔴 STREAM ANSWERS OVER UDP ONLY, AND A NETWORK THAT DROPS UDP GETS A 201 AND
- * NO MEDIA. MEASURED 2026-09-30 on a phone hotspot: both the WHIP and the WHEP
- * answer are `a=ice-lite` with one candidate, `udp 141.101.90.0 1473 typ host`,
- * and nothing over TCP. A `tcptype passive` candidate munged into a real answer,
- * at that port and at 443, was applied by Chrome and ICE still failed. So the
- * way round is a relay the browser reaches over TCP: Cloudflare Realtime TURN,
- * `turns:turn.cloudflare.com:443?transport=tcp`, minted by our worker so the
- * TURN key never reaches a page.
- *
- * `iceServers` is an OPTION on both helpers rather than a fork of them. Absent,
- * a peer connection is built exactly as it always was. Present, ICE is handed
- * the relay as one more route and still chooses; nothing forces relay, so a
- * network with working UDP keeps its direct path and costs no relay bytes.
+ * Stream answers over UDP only (ice-lite, one udp candidate), so a network dropping UDP
+ * gets a 201 and no media. The way round is Cloudflare TURN over TCP 443, minted by our
+ * worker. `iceServers` is an option; ICE still chooses and nothing forces relay.
+ * why: lessons/kit-live.md#ice-proxy
  */
 export const ICE_PROXY = 'https://pub.positron.studio/ice';
 
@@ -122,12 +89,9 @@ const rtcConfig = (iceServers) => ({
 const hasTurn = (iceServers) => (iceServers || []).some((s) => [].concat(s.urls).some((u) => /^turns?:/.test(u)));
 
 /**
- * Wait for ICE gathering, capped, because WHIP and WHEP to Cloudflare take no
- * trickle and the offer has to carry every candidate it is going to have.
- * ⚠️ WITH A RELAY, STOP SHORTLY AFTER THE FIRST RELAY CANDIDATE. On a network
- * that drops UDP the relay's UDP routes never answer, so gathering would sit
- * out the whole cap for nothing; the TCP relay candidate is the one that works
- * there, and waiting a moment past it lets any sibling arrive.
+ * Wait for ICE gathering, capped (no trickle). With a relay, stop shortly after the first
+ * relay candidate, since UDP routes never answer on a network that drops UDP.
+ * why: lessons/kit-live.md#gathered
  */
 async function gathered(pc, iceServers) {
   if (pc.iceGatheringState === 'complete') return;
@@ -171,13 +135,9 @@ export async function fetchIceServers({ log = () => {}, url = ICE_PROXY } = {}) 
 }
 
 /**
- * Does UDP leave this network? One STUN binding request to Cloudflare, read as
- * a server-reflexive candidate. An answer is proof that UDP gets out and back;
- * silence within the cap is reported as `udp: false`.
- * ⚠️ `known: false` when the browser cannot ask at all, which never counts as
- * blocked: "we did not look" must not read as "it is missing".
- * ⚠️ WHAT IT CANNOT SEE: a network that lets UDP to 3478 through and drops it
- * elsewhere. That shape was not met here and is not claimed.
+ * Does UDP leave this network? One STUN binding, read as a srflx candidate.
+ * known: false never counts as blocked. A network passing only UDP 3478 is not seen.
+ * why: lessons/kit-live.md#probe-udp
  */
 export async function probeUdp({ timeoutMs = 3000, iceServers = STUN_ONLY } = {}) {
   if (typeof RTCPeerConnection !== 'function') return { known: false, udp: null, ms: 0 };
@@ -202,22 +162,10 @@ export async function probeUdp({ timeoutMs = 3000, iceServers = STUN_ONLY } = {}
 }
 
 /**
- * Which path did ICE choose: `direct` or `relay`. Read off the SELECTED
- * candidate pair, because a relay candidate being gathered says nothing about
- * whether the media uses it.
- *
- * 🔴 A RELAYED LATENCY IS NOT COMPARABLE TO A DIRECT ONE, which is why a page
- * shows this cell beside its latency. Through TURN the media takes an extra hop
- * to Cloudflare's relay and, on the TCP route, pays head of line blocking too.
- *
- * The selected pair is the transport's `selectedCandidatePairId` where the
- * browser reports it (Chrome, Safari), and otherwise the nominated succeeded
- * pair (Firefox has no transport stats). The local candidate's `candidateType`
- * of `relay` is the whole test.
- *
- * Never throws. `path: null` means the pair could not be read yet, which is not
- * `direct`: "we did not look" must not read as an answer.
+ * Which path ICE chose, direct or relay, read off the selected pair; a relayed latency is not
+ * comparable to a direct one. Never throws; path null means not read yet.
  *   { path: 'direct'|'relay'|null, local, remote, protocol, relayProtocol, rttMs }
+ * why: lessons/kit-live.md#read-ice-path
  */
 export async function readIcePath(pc) {
   const none = { path: null, local: null, remote: null, protocol: null, relayProtocol: null, rttMs: null };
@@ -250,19 +198,10 @@ export async function readIcePath(pc) {
 }
 
 /**
- * Subscribe over WHEP into `video`, and hand back the stream we own.
- *
- * Promoted out of `webrtc` so a second page cannot copy it — it carries three
- * things that were each learned the hard way:
- *
- *  · Cloudflare REFUSES a single-track offer, both ways, so both transceivers
- *    are offered `recvonly` even when only one is wanted.
- *  · A WebRTC track ARRIVES MUTED and unmutes only when media flows. Assigning
- *    `srcObject` before that gives iOS a stream with no frames, and it paints
- *    black and stays there while decoding succeeds behind it.
- *  · Adopting `e.streams[0]` per track LOSES a track: Cloudflare sends audio and
- *    video with different msids, so the second `ontrack` replaces the first.
- *    One stream that we own, every arriving track added to it.
+ * Subscribe over WHEP into `video`. Both transceivers recvonly (Cloudflare refuses one),
+ * srcObject set after unmute (iOS paints black otherwise), and one owned stream
+ * for every track (audio and video arrive with different msids).
+ * why: lessons/kit-live.md#whep-play
  */
 export async function whepPlay(url, video, { log = () => {}, onTrack, iceServers = null } = {}) {
   const pc = new RTCPeerConnection(rtcConfig(iceServers));
@@ -303,25 +242,10 @@ export async function whepPlay(url, video, { log = () => {}, onTrack, iceServers
 }
 
 /**
- * POST an offer, and treat a 409 as NOT YET rather than NO.
- *
- * 🔴 THIS IS `keep`'s UNEXPLAINED 409, AND IT WAS A RACE. Cloudflare answers a
- * WHEP subscribe with 409 while the input is not publishing — and a page that
- * publishes and then immediately subscribes is asking in the gap between the
- * WHIP POST returning and ICE/DTLS finishing, which is a window of a second or
- * so that usually closes first and sometimes does not. `waitForWhip` above was
- * written for the same fault on a different page, where the container's own
- * status was available to wait on; a page publishing from itself has no such
- * signal, so the honest move is to ask again.
- *
- * ⚠️ A RECOVERY ACTION IS NOT FREE (CLAUDE.md). It is bounded at five retries
- * over ~7 s, it YIELDS rather than spinning, it re-posts the SAME offer (a 409
- * means nothing was created, so there is no second session to leak), and every
- * other status fails immediately — a 404 or a 500 is not going to become a 201
- * by being asked twice.
- *
- * Exported so `demo/shell/live-test.mjs` can drive it with a stubbed fetch:
- * a guard nobody has seen fire is a guard nobody knows they have.
+ * POST an offer and treat a 409 as not yet: the subscribe raced the WHIP handshake.
+ * Five retries over about 7 s, same offer, any other status fails at once.
+ * Exported so live-test.mjs can drive it with a stubbed fetch.
+ * why: lessons/kit-live.md#whep-retry
  */
 export const WHEP_RETRY = { tries: 5, firstMs: 600, stepMs: 400 };
 
@@ -348,45 +272,19 @@ export async function offerSdp(url, sdp, { log = () => {}, sleep = (ms) => new P
 }
 
 /**
- * A CAMERA ONTO AN LL-HLS INPUT, through the Pub Durable Object and a
- * container instance, with the key never leaving the worker.
- * plans/plan-cam-llhls.md.
- *
- *   page MediaRecorder (H.264 in WebM, 2 s keyframes, 100 ms slices)
- *     -> a pub WebSocket (`url`) -> one POST per chunk into the container
- *     -> ffmpeg -c:v copy to RTMPS -> that instance's own LL-HLS input
- *
- * 🔴 `url` HAS NO DEFAULT SINCE 2026-10-13. The default was /cam/'s RTMPS camera,
- * `wss://pub.positron.studio/cam`, whose input (positron-cam) was deleted that
- * day and whose route answers 410. The one caller left is /video/llhls/,
- * which passes `wss://pub.positron.studio/loop` (its own input,
- * positron-hls-loopback).
- * 🔴 ITS OWN INPUT, NOT THE TEST PATTERN'S. It borrowed that one by handover
- * until 2026-09-30 and /llhls/ stalled while a camera was tested on it. One
- * camera at a time; a second is refused, and that arrives here as `busy` with
- * the worker's own words, so a page shows them rather than a black box.
- * ⚠️ RECORDING STARTS ON `ready`, NEVER BEFORE. The first chunk carries the
- * WebM header, and a header that reaches the container before ffmpeg exists
- * is a stream ffmpeg can never start.
- * ⚠️ WEBM ON CHROME, NOT MP4, EVEN THOUGH FLV LOOKS MORE LIKE MP4. MEASURED in
- * the plan: Chrome's fragmented MP4 ignores the slice and waits for a whole
- * 2 s GOP. The MP4 arm is for Safari and its cadence is NOT measured.
- *
- * onState({ t, why }): t is one of
- *   ready     the container is publishing what this records
- *   busy      refused, with the worker's reason (another camera is on it)
- *   stopped  the worker ended it (idle, length cap, Stream stopped taking bytes)
- *   closed    the socket closed with nothing said
- *   unsupported  this browser cannot record H.264
+ * A camera onto an LL-HLS input through pub and a container; the key stays in the worker.
+ *   MediaRecorder (H.264 in WebM, 2 s keyframes, 100 ms slices) -> pub WebSocket `url`
+ *   -> container -> ffmpeg -c:v copy to RTMPS -> the instance's LL-HLS input
+ * `url` has no default (/video/llhls/ passes wss://pub.positron.studio/loop). Recording starts
+ * on ready. WebM on Chrome, because its fragmented MP4 waits for a whole 2 s GOP.
+ * onState({ t, why }): ready, busy, stopped, closed, unsupported
+ * why: lessons/kit-live.md#cam-publish
  */
 
 /**
- * The camera's WebRTC input ("positron-cam-whip", src/provision-cam-whip.sh,
- * recording off), published through `pub.positron.studio/cam/whip` so the key
- * stays in the worker. /video/webrtc/'s WebRTC loopback since 2026-10-13,
- * and the archived /cam/'s WebRTC leg. It borrowed the test pattern's WHIP
- * input until 2026-09-30 and was refused with 409 whenever somebody held the
- * (now retired) /watch. One camera at a time; a second gets 409 in words.
+ * The camera's WebRTC input (positron-cam-whip), through pub.positron.studio/cam/whip.
+ * One camera at a time; a second gets 409 in words.
+ * why: lessons/kit-live.md#cam-whip
  */
 export const CAM_WHIP_UID = '54791f4c5c73713859c5413eeb06a008';
 export const CAM_WHIP_PROXY = 'https://pub.positron.studio/cam/whip';
@@ -394,12 +292,9 @@ export const camWhep = () =>
   `https://${LIVE.customer}.cloudflarestream.com/${CAM_WHIP_UID}/webRTC/play`;
 
 /**
- * WHIP through our worker, for the camera's own input. It began as a copy of
- * `whipPublish`, the test pattern's publish, which was retired 2026-10-13 and
- * is gone from this file.
- * ⚠️ THE DELETE IS `keepalive`, because the worker holds the input for this
- * session until it hears it, and `stop()` also runs from `pagehide`, where an
- * ordinary fetch is cancelled with the page.
+ * WHIP through our worker, for the camera's own input. The DELETE is keepalive,
+ * because stop() also runs from pagehide.
+ * why: lessons/kit-live.md#cam-whip-publish
  */
 export async function camWhipPublish(stream, { url = CAM_WHIP_PROXY, log = () => {}, iceServers = null } = {}) {
   const pc = new RTCPeerConnection(rtcConfig(iceServers));

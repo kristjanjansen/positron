@@ -1,71 +1,7 @@
-// demo/shell/slide-synth.mjs: a Faust program on a split slide, editable, with a Test tone.
-//
-//   import { synthSlot } from '/shell/slide-synth.mjs';
-//   { layout: 'split', side: 'right', say: 'A sine in two lines', text: '...', slot: synthSlot(step) }
-//
-// 🔴 ONE INSTRUMENT PANEL IN THE SLOT SINCE 2026-10-06, asked as *"in right:
-// (instrument panel with waveform from muta, then editable code, hardcoded
-// params for minimal sine and then fau nameplate and test tone button on
-// right"*. `step` is the one entry of `SYNTH_STEPS` in
-// `demo/shell/synth-steps.mjs`, a MONO program with its numbers typed in. Top to
-// bottom, all in `createInstrumentPanel`:
-//
-//   viz       the output, live, drawn the way `/muta/` draws its scope
-//             (`createWaveShape` fed from an analyser while the tone sounds)
-//   controls  the code box, EDITABLE, edge to edge like `/fau/`'s
-//   plate     FAU, and `Start` / `Stop` at the right end; `Compiling` breathes in the code box's corner
-//
-// No keyboard: the program has no `freq`, `gain` or `gate`.
-//
-// 🔴 A SLIDER IN THE PROGRAM IS A KNOB IN A ROW BETWEEN THE CODE AND THE PLATE,
-// since 2026-10-06, asked as *"slode 3: make 0.5 into knob 0..1"*. The row is
-// `createParamKnobs`, the one `/fau/` puts under its text, and only appears
-// for a program that declares an `hslider`, `vslider` or `nentry`: the sine
-// has none and shows no row. On a VISIT nothing is compiled, so the first row
-// is read off the shipped TEXT (`readSliders`), which is the text the ahead of
-// time file was compiled from (`checkFaustAot` refuses a build where they
-// differ). From the first press on, and after every compile, it is rebuilt
-// from the compiled program's own JSON (`slidersOf`), and a knob whose name
-// survives keeps where a hand left it. A turn is `setParamValue` on the
-// sounding node; a turn before Start is kept by the knob and handed to the
-// node when it is made, before it is heard.
-// Until 2026-10-06 this module put a read only listing on the words side and
-// one octave of keys and the step's knobs in the slot, one slide per step of a
-// growing polyphonic voice; those steps left the deck the same day.
-//
-// ── THE CONTRACT, `plans/plan-live-slides.md` section 3.3 ─────────────────
-//
-//   build   (this function, called by `createSlide` on a VISIT) DRAWS ONLY: the
-//           empty scope, the code box with the Faust hues, the plate. No
-//           `import()`, no `fetch`, no AudioContext.
-//   press   `Test tone`. `sharedAudio()` and `claim()` from `audio.mjs` inside
-//           the gesture, then `import('./faust.mjs')` and:
-//             the code as shipped   `faustFactory()` of the ahead of time files,
-//                                   3.8 kB, no compiler
-//             the code edited       `faustCompile(..., { mono: true })`, which
-//                                   loads the live compiler (`faustCompiler()`,
-//                                   about 1 MB over the wire, once per tab) and
-//                                   compiles the text in the box
-//           A second press switches the tone off.
-//   start   on show, including slide 0 of a visit and every step: nothing.
-//   stop    on leaving the slide, and by `claim()` when another slot takes the
-//           sound: the tone off, and `release()`, which suspends the context
-//           when nobody holds it.
-//
-// 🔴 A COMPILE ERROR IS SHOWN, NEVER THROWN. The scope draws the compiler's
-// first line in words where the trace would be (`reason`, which
-// `createWaveShape` already lays out at the foot of an empty figure), the note
-// says `does not compile`, and nothing sounds. The figure keeps its height
-// either way, so an error arriving moves nothing.
-//
-// 🔴 `audio.mjs` IS A STATIC IMPORT AND `faust.mjs` IS NOT, ON PURPOSE.
-// `audio.mjs` does nothing on import and `sharedAudio()` has to run INSIDE the
-// gesture. `faust.mjs` is reached only through `import()`, so the front page
-// never pays for it on a visit.
-//
-// ⚠️ TYPING IN THE BOX NEVER STEPS THE DECK. The player's key handler already
-// leaves a key aimed at a TEXTAREA to it (`slide.mjs`, `onKey`), and a tap on
-// one is the slide's own (`OWN_TAPS`), so nothing here has to stop anything.
+// demo/shell/slide-synth.mjs: a mono Faust program on a split slide (synthSlot(step)): live scope, editable
+// code, knobs for its sliders, FAU plate with Start/Stop. A visit draws only; Start loads faust.mjs and the
+// 3.8 kB ahead of time program, an edit the ~1 MB compiler. A compile error is shown, never thrown.
+// why: lessons/kit-slide-synth.md#header
 
 import { el } from './shell.mjs';
 import { fitBox, hueVars } from './slide.mjs';
@@ -79,25 +15,21 @@ import { createHueBook } from './code-lang.mjs';
 import { createParamKnobs } from './param-knobs.mjs';
 import { createChoice } from './choice.mjs';
 
-/** The panel's logical width, which the fitted box scales into the slot.
- * 400 since 2026-10-06, when the deck's splits went 1:2 and the slot two
- * thirds of the slide: the fit is bound by the slot's height, so a wider
- * logical panel is a wider panel on screen at the same type size, and it holds
- * slide 3's `hslider` line on one line (it wrapped at 340). */
+/**
+ * The panel's logical width, scaled into the slot; 400 holds slide 3's hslider line on one line.
+ * why: lessons/kit-slide-synth.md#panel-px
+ */
 const PANEL_PX = 400;
-/** The logical height every synth panel is scaled by, the tallest of them, so
- * every instrument slide draws it at one scale and one type size (*"2 and 3
- * use same size of fau"*). Slide 4's, MEASURED 599 px on 2026-10-06 after
- * the owner's code layout (a blank line between blocks) took its nine lines
- * of code to a twelve row box; slide 3 is 544 and slide 2 427. A panel
- * shorter than this is centred in its slot; one taller still fits, at a
- * smaller scale, and the kit's check says so. */
+/**
+ * The logical height every synth panel is scaled by, the tallest of them (slide 4, 599 px), so every
+ * instrument slide draws at one scale. A shorter panel is centred in its slot.
+ * why: lessons/kit-slide-synth.md#panel-h
+ */
 export const PANEL_H = 599;
-/** ONE CODE BOX HEIGHT ON EVERY SLIDE, 2026-10-06: *"keep fau size the same.
- * just knobs panel appears"*. Twelve rows hold the longest program (nine
- * lines) with room to type; the panel is anchored to the top of its slot, so
- * a slide with knobs differs from one without only by the knob row under the
- * code, and every slide shares one scale (`PANEL_H`). */
+/**
+ * One code box height on every slide: twelve rows hold the longest program (nine lines) with room to type.
+ * why: lessons/kit-slide-synth.md#code-rows
+ */
 export const CODE_ROWS = 12;
 /** The scope's height in logical px, `/muta/`'s 140 less a little for half a slide. */
 const WAVE_PX = 120;
@@ -105,26 +37,20 @@ const WAVE_PX = 120;
 export const WINDOW = 512;
 /** The scope's full scales, the smallest that clears the peak by a quarter is used. */
 export const FULL_SCALE = [0.05, 0.1, 0.2, 0.5, 1, 2];
-/** The scope at rest: no name (*"rm 'output'"*), only the scale the shipped sine
- * is drawn against (a 0.5 sine reads on the 1 scale over 512 samples at
- * 48 kHz), so an idle scope says what it will measure. 2026-10-06, *"show
- * labels when no signal on waveform?"*. */
+/**
+ * The scope at rest: no name, only the scale it will measure against.
+ * why: lessons/kit-slide-synth.md#idle
+ */
 const IDLE = Object.freeze({ points: null, name: '', reason: null,
   axes: { y: '\u00b12', x: `${((WINDOW / 48000) * 1000).toFixed(1)} ms` } });
 
-/* 🔴 NO NOTE ON THE PLATE, AND AN EDIT COMPILES ITSELF, since 2026-10-06:
-   *"rm labels from footer about compiling. autocompile, show compiling... as
-   fau synth does?"*. The kit's `compile-idle.mjs` compiles the text once the
-   typing stops and breathes `Compiling` in the corner of the code box, exactly
-   as on `/fau/`. While the tone sounds, a good compile replaces the node at
-   once; a failed one keeps the last good sound and says why on the scope. The
-   first edit's compile loads the compiler (about 1 MB, once): an edit is the
-   visitor's own act, and a visit and a step still load nothing. */
+// An edit compiles itself once typing stops (compile-idle.mjs), Compiling breathing in the code box corner.
+// A failed compile keeps the last good sound and says why on the scope.
+// why: lessons/kit-slide-synth.md#autocompile
 
 /**
- * The compiler's message cut to its first useful line, for the scope's foot.
- * libfaust names the factory first (`sine_edit_2:3 : ERROR : syntax error`),
- * and that name is this module's, so it is put as `line 3` instead.
+ * The compiler's message cut to its first useful line; libfaust's factory name is put as `line N`.
+ * why: lessons/kit-slide-synth.md#first-line
  */
 export function firstLine(msg) {
   const lines = String(msg || '').split('\n').map((l) => l.trim()).filter(Boolean)
@@ -136,10 +62,9 @@ export function firstLine(msg) {
 const SLIDERS = ['hslider', 'vslider', 'nentry'];
 
 /**
- * The options of a `style:radio{...}` control, `[[name, value], ...]` in the
- * order written, or null for any other control. Faust's own JSON rewrites the
- * quotes round each name (`radio{-sine-:0;-saw-:1}` for `{'sine':0;'saw':1}`,
- * MEASURED 2026-10-06 in `demo/resources/faust/wave.json`), so either is read.
+ * The options of a style:radio{...} control as [[name, value], ...], or null. Faust's JSON rewrites the
+ * quotes round each name to dashes, so either is read.
+ * why: lessons/kit-slide-synth.md#radio-options
  */
 export function radioOptions(style) {
   const m = /^\s*radio\s*\{([^}]*)\}\s*$/.exec(String(style ?? ''));
@@ -157,10 +82,9 @@ const num = String.raw`\s*(-?[\d.]+(?:e-?\d+)?)\s*`;
 const SLIDER_RE = new RegExp(String.raw`\b(?:hslider|vslider|nentry)\s*\(\s*"([^"]*)"\s*,${num},${num},${num},${num}\)`, 'g');
 
 /**
- * The sliders written in a program's text, as `createParamKnobs` takes them,
- * for a visit, which has compiled nothing. Only literal numbers are read; the
- * compiled program's own list (`slidersOf`) replaces this on the first press.
- * A label's `[...]` metadata is not part of its name.
+ * The sliders written in a program's text, for a visit that compiled nothing; literal numbers only.
+ * slidersOf replaces this on the first press.
+ * why: lessons/kit-slide-synth.md#read-sliders
  */
 export function readSliders(code) {
   const list = [];
@@ -176,16 +100,9 @@ export function readSliders(code) {
 }
 
 /**
- * The sliders a compiled mono program declares, read off its JSON the way
- * `/fau/` reads them (`readKnobs`), with the address each is set at. The
- * address carries the compile's name, so it is kept per compiled program.
- * @returns {{list: object[], addr: Map<string, string>}}
- */
-/**
- * The knobs in the order their sliders are DECLARED in the text. Faust lists
- * its controls in the order `process` uses them (`os.osc(freq) * volume` puts
- * freq first), so a row read off the compiled program reordered itself after
- * a compile. Asked 2026-10-06 with a screenshot: *"why feq comes first?"*.
+ * The knobs in the order their sliders are declared in the text: Faust lists controls in the order
+ * process uses them, which reordered the row after a compile.
+ * why: lessons/kit-slide-synth.md#in-text-order
  */
 export function inTextOrder(list, code) {
   const order = readSliders(code).map((p) => p.name);
@@ -226,22 +143,16 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
     const scope = createWaveShape({ reason: null, colour: '--hi', height: WAVE_PX, name: '' });
     scope.set(IDLE);
     const lines = shipped.split('\n').length;
-    // NINE ROWS, three times the first program's three, asked 2026-10-06 as
-    // *"maeke code panel 3 x higher"*: room to write more than the shipped
-    // lines, and never shorter than them plus three.
-    // EACH KNOB'S SLIDER IN THE KNOB'S OWN HUE, the rest of the code toned
-    // down, as on /fau/ (2026-10-06, *"why volume is not bright colored? we
-    // tone down syntaxt exept knobs"*): one hue book, read by the code box for
-    // the slider's name and written onto the knob as `--param-hue`
+    // Code rows: never shorter than the shipped lines plus three. Each knob's slider wears the knob's hue
+    // from one hue book; the rest of the code is toned down, as on /fau/.
+    // why: lessons/kit-slide-synth.md#code-box
     const book = createHueBook();
     const code = createCodeBox({
       language: 'faust', hues: book, rows: CODE_ROWS, label: '', value: shipped,
       ariaLabel: `the Faust program Start plays, ${lines} lines, editable`,
     });
-    // START AND STOP, ONE WIDTH, asked 2026-10-06 as *"Test tone -> Start Stop
-    // button. same w on both labels"*. Both words sit in one grid cell and the
-    // one not meant is hidden, so the button is as wide as the wider word in
-    // either state and nothing beside it moves.
+    // Start and Stop share one grid cell, so the button is as wide as the wider word in either state.
+    // why: lessons/kit-slide-synth.md#start-stop
     const tone = el('button', 'sl-tone', null, { type: 'button', 'aria-pressed': 'false', 'aria-label': 'Start' });
     const toneW = el('span', 'sl-tone-w');
     toneW.append(el('span', 'sl-tone-start', 'Start'), el('span', 'sl-tone-stop', 'Stop'));
@@ -255,18 +166,15 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
 
     const panel = createInstrumentPanel({ viz: scope.el, plate: { name: 'FAU', patch: tone }, full: true });
     const codeRow = panel.addRow(code.el, { pad: false });
-    // ONE PANEL HEIGHT ON EVERY SLIDE, THE KNOBS TAKING IT FROM THE CODE,
-    // 2026-10-06: *"keep same fau size!!! knobs condense code area"*. The
-    // panel is `PANEL_H` tall and the code row has what the scope, the knob
-    // row and the plate leave; the code scrolls inside it when it must
+    // One panel height on every slide: the code row gets what the scope, knobs and plate leave, and scrolls.
+    // why: lessons/kit-slide-synth.md#panel-height
     panel.el.classList.add('sl-synth-panel');
     panel.el.style.setProperty('--synth-h', `${PANEL_H}px`);
     codeRow.classList.add('sl-synth-code');
     const mid = el('div', 'sl-mid');
     mid.append(panel.el);
-    // more room either side of the panel than above and below it, asked
-    // 2026-10-06 as *"add x padding on fau area"*: the slot's own inset again
-    // on the left and right
+    // More room either side of the panel than above and below: the slot's inset again left and right.
+    // why: lessons/kit-slide-synth.md#slot-padding
     host.classList.add('sl-synth-slot');
     const fb = fitBox(host, PANEL_PX, { h: PANEL_H, top: true, fill: true });
     fb.inner.append(mid);
@@ -288,17 +196,9 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         if (node && a) { node.setParamValue(a, v); paramSends++; }
       },
     });
-    /* 🔴 A `style:radio{...}` CONTROL IS THE KIT'S CHOICE, NOT A KNOB, since
-       2026-10-06, asked as *"how to make it a radio (sawtooth?)"*: slide 6's
-       `wave`, sine or saw. It sits in the knob row after the knobs, its name
-       under it where a knob's is, in its own hue from the same book, and a
-       pick is `setParamValue` exactly as a turn is: on the sounding node at
-       once, and kept for the node a later Start makes. A name that survives a
-       compile keeps its pick when the pick is still one of its options.
-       ⚠️ AFTER THE KNOBS AND NOT AMONG THEM. The knobs sit on one measured
-       lattice (`createParamKnobs`), whose cells are a knob's pitch wide and a
-       choice is not, so a radio declared between two sliders would still be
-       drawn after both. Every program in the deck declares its radio last. */
+    // A style:radio{...} control is the kit's choice, after the knobs in the knob row, in its own hue; a pick
+    // is setParamValue like a turn. After the knobs because their lattice cells are a knob's pitch wide.
+    // why: lessons/kit-slide-synth.md#radio-control
     const radios = new Map();
     const radioBox = el('div', 'sl-radios');
     const ctlRow = el('div', 'sl-synth-ctls');
@@ -343,11 +243,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
         if (a) { n.setParamValue(a, v); paramSends++; }
       }
     }
-    /* THE SLIDE'S OWN WORDS WEAR THE BOOK TOO, 2026-10-06 (*"in the text use
-       variable name with colorcoding"*): every `` `name` `` in the words
-       beside this slot takes its knob's hue from the same book, every time
-       the book changes, so the word, the code and the knob cannot disagree,
-       and a name with no knob (`process`) stays in the slide's ink. */
+    // Every `name` in the slide's words takes its knob's hue from the same book, so word, code and knob agree.
+    // why: lessons/kit-slide-synth.md#words-hue
     const words = host.closest('.sl-in') || host;
     const paintWords = () => hueVars(words, book.hueOf);
     /** The row from a list: made the first time there is a slider, hidden when there is none. */
@@ -392,10 +289,8 @@ export function synthSlot(step, { url = synthUrl(step.id) } = {}) {
       let i0 = 0;
       for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
       const win = buf.subarray(i0, i0 + WINDOW);
-      // ONE FIXED SCALE, 2026-10-06: *"can we keep y scale same?"* and then
-      // *"keep +- 2"*, after the auto range and its glide. With the scale fixed a
-      // turn of the volume knob changes the wave's height, which is the point
-      // of the knob; a range that followed the peak hid it
+      // One fixed scale of +-2, so a turn of the volume knob changes the wave's height.
+      // why: lessons/kit-slide-synth.md#fixed-scale
       const fs = 2;
       scope.set({
         points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / fs))), reason: '', name: '',

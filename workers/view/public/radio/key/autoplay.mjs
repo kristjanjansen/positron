@@ -1,32 +1,7 @@
-// demo/radio/key/autoplay.mjs: which chord autoplay plays next, and
-// where the pad's three voices go to play it. Plain arithmetic, no WebAudio and
-// no DOM, so `autoplay-test.mjs` beside it grades it in node and
-// `research/tools/tempo-key/autoplay-chords.mjs` runs it over our R2 recordings.
-//
-// Asked 2026-10-13 on /radio/key/: *"it feels repeating same chords all
-// the time"*. Autoplay was a fixed I vi IV V loop, four seconds a chord, every
-// chord in root position, restarting on I at every key change. The owner chose
-// two changes:
-//
-// 1. THE CHORD FOLLOWS THE RADIO. At each change the seven triads of the
-//    detected key are scored against the pitch classes the station is sounding
-//    NOW (a few seconds of chroma, not the detector's 30 s key memory): the
-//    share of that chroma that lands on the chord's notes, plus a small lean
-//    toward I, IV, V and vi, minus a small cost for repeating the chord already
-//    sounding and for root motions that sound like a step backwards. When the
-//    key is unsure or the chroma says nothing (flat, or empty), it walks
-//    I IV V vi instead of falling silent.
-// 2. VOICE LEADING. The new chord is voiced as the close position (root, first
-//    or second inversion, at any octave inside the pad's range) whose three
-//    voices move the fewest semitones from the previous chord's three, lowest
-//    to lowest, so a note the two chords share is held. The bass is not voiced
-//    here: it keeps the chord's root, as before.
-//
-// ⚠️ NOT THE KIT'S `voiceChord(..., { mode: 'lead' })` FROM demo/shell/chords.mjs,
-// on purpose. That one measures each note's distance to the NEAREST note of the
-// other chord, so two voices may both count as close to one note. A pad has
-// three voices that each go somewhere, so the motion here is paired: sorted
-// voice to sorted voice, which is what "moves the voices least" means.
+// Which chord autoplay plays next and how its three pad voices move to it; plain arithmetic,
+// graded by autoplay-test.mjs. Triads scored against the station's recent chroma (walks I IV V vi
+// if unsure), voiced by paired least motion, not chords.mjs's nearest note `voiceChord` lead mode.
+// See lessons/page-radio.md#radio-7
 
 export const SCALE = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -51,23 +26,19 @@ export function romanOf(tonic, mode, step) {
   return q === 'maj' ? r : q === 'aug' ? `${r}+` : q === 'dim' ? `${r.toLowerCase()}°` : r.toLowerCase();
 }
 
-// How much each scale step is favoured before the radio has its say: a
-// little for the home chord, less for IV, V and vi, nothing for ii and iii,
-// and a cost for the diminished triad on vii, which a pad holding it for four
-// seconds turns into a sound nobody expected.
+// How much each scale step is favoured before the radio has its say: a little for I, less for
+// IV, V and vi, nothing for ii and iii, a cost for the diminished vii a pad would hold 4 s.
+// See lessons/page-radio.md#radio-8
 export const STEP_LEAN = [0.06, 0, 0, 0.03, 0.03, 0.03, -0.06];
-// Root motion in scale steps, up, mod 7, and what it costs. Down a fifth (up
-// a fourth, 3) and down a third (5) are the strongest moves and cost nothing;
-// up a second (1) and up a fifth (4) are ordinary; up a third (2) is weaker;
-// down a second (6), V to IV or vi to V, is the one that sounds like going
-// backwards. 0 is the repeat, which has its own cost.
+// Root motion in scale steps, up, mod 7, and its cost: down a fifth (3) and down a third (5) are
+// free; up a second (1) and fifth (4) ordinary; up a third (2) weaker; down a second (6) sounds
+// backwards. 0 is the repeat, costed by REPEAT_COST.
+// See lessons/page-radio.md#radio-9
 export const MOVE_COST = [0, 0.01, 0.02, 0, 0.01, 0, 0.03];
-// The one constant that trades following the radio against variety. MEASURED
-// 2026-10-13 offline on our three R2 recordings against essentia's chord
-// track (research/tools/tempo-key/autoplay-chords.mjs): at 0.06 autoplay
-// almost never repeats but see-saws I vi I vi while the station sits on one
-// chord; at 0 it holds the station's chord for most of a song; 0.03 agrees
-// with essentia best on average and see-saws least.
+// Following the radio against variety: at 0.06 autoplay see-saws I vi while the station holds a
+// chord, at 0 it holds the station's chord; 0.03 agrees best with essentia's chord track on our
+// three R2 recordings (research/tools/tempo-key/autoplay-chords.mjs).
+// See lessons/page-radio.md#radio-10
 export const REPEAT_COST = 0.03;
 // Below this key confidence, or when the chroma's loudest class is less than
 // FLAT_PEAK times its mean, the chroma is not trusted and autoplay walks.
@@ -157,17 +128,14 @@ export function motion(a, b) {
 }
 
 /**
- * Voice a triad against the chord before it.
+ * Voice a triad against the chord before it. No prev: root position nearest `home`. Ties go to
+ * the middle note nearest the range's middle; the range edge stops a progression sinking.
  * @param {number[]|null} prev  the notes sounding now, or null for a first chord
  * @param {number[]} pcs        the new chord's pitch classes, root first
  * @param {{lo:number, hi:number, home:number}} range  the pad's notes, and where a first chord sits
  * @returns {{notes:number[], motion:number|null, held:number}}
  *   `held` is how many notes the two chords keep in place.
- * With nothing before it the chord goes in root position nearest `home`. A
- * tie on motion goes to the voicing whose middle note sits nearest the middle
- * of the range. What stops a progression that always takes the smallest step
- * from sinking for ever is the range itself: at the edge the only placements
- * left are the ones further in.
+ * See lessons/page-radio.md#radio-11
  */
 export function voiceLead(prev, pcs, range) {
   const { lo, hi } = range;
@@ -189,8 +157,10 @@ export function voiceLead(prev, pcs, range) {
   return { notes: pick, motion: best, held };
 }
 
-/** Root position, as autoplay voiced every chord before 2026-10-13: the root
- *  on scale step `step` above `base + tonic`, third and fifth stacked on it. */
+/**
+ * Root position: the root on scale step `step` above `base + tonic`, third and fifth stacked.
+ * See lessons/page-radio.md#radio-12
+ */
 export function rootPosition(tonic, mode, step, base) {
   const sc = SCALE[mode], root = base + tonic;
   return [step, step + 2, step + 4].map((k) => root + sc[k % 7] + 12 * Math.floor(k / 7));

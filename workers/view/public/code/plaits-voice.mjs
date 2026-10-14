@@ -1,19 +1,7 @@
-// demo/code/plaits-voice.mjs: the Plaits voice that /concepts/synth/110/
-// and /code/plaits/ both play, with its patches and its scope.
-//
-// THE VOICE IS /muta/'s, NOT A COPY: the same `muta-worklet.js` processor
-// (`plai-voice`) and the same `plai.wasm`, Emilie Gillet's Plaits compiled
-// unmodified. The bytes are fetched on the main thread and posted to the
-// worklet, because a worklet cannot fetch (the worklet's header has why).
-//
-// NOTHING OPENS UNTIL ASKED. `warm()` fetches the bytes and is for intent (a
-// pointer over a control); `boot()` makes the AudioContext and must be called
-// inside a press. Settings sent before the voice is up wait for it; a note
-// sent before it is up is dropped, so nothing sounds late on the first press.
-//
-// The page owns its bay. What it gets here is the sound as three nodes it
-// connects by its own links: `out()` (Plaits' main jack), `speakers()` and
-// `scopeIn()`.
+// The Plaits voice /code/plaits/ plays: /muta/'s `muta-worklet.js` and `plai.wasm`, bytes fetched
+// on the main thread because a worklet cannot fetch. `warm()` fetches, `boot()` must run in a
+// press; a note before the voice is up is dropped. Sound leaves via `out()`, `speakers()`, `scopeIn()`.
+// See lessons/page-code.md#code-34
 
 import { createWaveShape } from '/shell/synth-view.mjs';
 
@@ -34,24 +22,15 @@ export const MODELS = [
   'modal', 'bass drum', 'snare drum', 'hi-hat',
 ];
 
-// The patches, in the order worth hearing them, and both pages open on the
-// first (*"make wavetabl drift default"*), all sustained (asked
-// 2026-10-12: *"no bell sounds please or drums. longer stuff"*, *"rm saw
-// swarm"*, then *"replace additive organ and chord pad. bring in bette
-// stuff"*). `engine` is an index into MODELS, `decay` sets how long the gate
-// takes to close after a note off.
-// `gain` EVENS THE LEVELS, MEASURED rather than guessed: a held A3 on each
-// patch read 0.022 (Long string) to 0.146 (Soft FM) RMS at the scope, about
-// 16 dB apart, so each patch carries the trim that brings its held note to
-// about 0.1. Applied on Plaits' own output, so the scope and the speakers
-// both see the evened level.
+// The patches, all sustained, the first is the default. `engine` indexes MODELS, `decay` is the
+// gate's close time. `gain` trims each patch's held A3 to about 0.1 RMS at the scope (they
+// spanned 0.022 to 0.146, about 16 dB), on Plaits' own output.
+// See lessons/page-code.md#code-35
 export const PATCHES = [
   { name: 'Wavetable drift', engine: 5, harmonics: 0.3, timbre: 0.3, morph: 0.55, decay: 0.85, colour: 0.6, gain: 1.05 },
-  // The two operator FM set low and soft (a low ratio, a modest index, a
-  // little feedback): it sings rather than rings. It is the steadiest tone of
-  // the set on one held note (centroid within 5 Hz over 3 s on A3), so what
-  // moves is the overlapping line, and the timbre knob takes it from a near
-  // sine to a reedy tone.
+  // Two operator FM set low and soft. The steadiest tone of the set (centroid within 5 Hz over
+  // 3 s on A3), so the timbre knob takes it from a near sine to a reedy tone.
+  // See lessons/page-code.md#code-36
   { name: 'Soft FM', engine: 2, harmonics: 0.25, timbre: 0.4, morph: 0.3, decay: 0.85, colour: 0.5, gain: 0.75 },
   { name: 'Vowel choir', engine: 3, harmonics: 0.4, timbre: 0.45, morph: 0.5, decay: 0.85, colour: 0.5, gain: 1 },
   // The waveshaper as a low growling drone: a triangle folded by timbre,
@@ -62,16 +41,16 @@ export const PATCHES = [
   { name: 'Wind', engine: 9, harmonics: 0.35, timbre: 0.55, morph: 0.4, decay: 0.9, colour: 0.6, gain: 1 },
 ];
 
-// ── the panel /code/plaits/ and /connect/ both show ──────────────────────
-// Lifted 2026-10-14 from /code/plaits/ (plans/plan-connect-ui.md, the
-// convergence rule), with that page's reasons beside it there.
+// The panel /code/plaits/ and /connect/ both show; the reasons are beside /code/plaits/.
+// See lessons/page-code.md#code-37
 /** The models in a knob cell's six letters, MODELS' order. */
 export const MODEL_SHORT = ['analog', 'shaper', 'FM', 'formant', 'additive', 'table', 'chord', 'speech',
   'swarm', 'noise', 'dust', 'string', 'modal', 'kick', 'snare', 'hat'];
 /**
- * Every parameter /muta/ exposes, as one row of knobs in its order. `param` is
- * the key in P it sets (rounded when `round`), or 'transpose' for pitch, which
- * offsets the keys rather than reaching Plaits. `id` is a knob node's name.
+ * Every parameter /muta/ exposes, as one row of knobs in its order. `param` is the key in P it
+ * sets (rounded when `round`), or 'transpose' for pitch, which offsets the keys rather than
+ * reaching Plaits. `id` is a knob node's name.
+ * See lessons/page-code.md#code-38
  */
 export const KNOBS = [
   { name: 'model', min: 0, max: 15, step: 1, value: PATCHES[0].engine, param: 'engine', round: true,
@@ -89,11 +68,12 @@ export const KNOBS = [
 ].map((k) => ({ min: 0, max: 1, id: k.name, ...k }));
 
 /**
- * Keys into a voice: the notes held, a transpose (the pitch knob), and a first
- * note that boots the voice and plays once it is up if its key is still down.
+ * Keys into a voice: the notes held, a transpose (the pitch knob), and a first note that boots
+ * the voice and plays once it is up if its key is still down.
  * @param {object} voice   createPlaitsVoice's
  * @param {object} [o]
  * @param {() => Promise<boolean>} [o.boot]  how a note before the voice is up starts it
+ * See lessons/page-code.md#code-39
  */
 export function createPlaitsKeys(voice, { boot = () => voice.boot() } = {}) {
   const held = new Set();        // keys down that have reached Plaits, by key note
@@ -121,8 +101,9 @@ export function createPlaitsKeys(voice, { boot = () => voice.boot() } = {}) {
  * @param {Function} o.log       `(line, kind)`
  * @param {number} [o.voices]    how many voices the shim plays (1 to 8)
  * @param {Function} [o.onUp]    called once the voice is up, to connect it
- * @param {() => AudioContext} [o.context]  a context to play in (a page's shared
- *   one, at 48 kHz); left out, `boot()` makes its own, as it always has
+ * @param {() => AudioContext} [o.context]  a context to play in (a page's shared one, at
+ *   48 kHz); left out, `boot()` makes its own
+ * See lessons/page-code.md#code-40
  */
 export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {}, context = null } = {}) {
   let ctx = null, node = null, out = null, master = null, analyser = null, buf = null, freq = null;

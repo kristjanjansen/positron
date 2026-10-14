@@ -1,21 +1,6 @@
-// demo/shell/unzip.mjs — a zip file, read in the browser, with nothing vendored.
-//
-// 🔴 WHY THIS IS NOT A LIBRARY. `DecompressionStream('deflate-raw')` is in every
-// browser this project targets and in node, so the only thing a zip library
-// would add here is the container: a central directory, a local header and an
-// offset. That is about a hundred lines and it is READ ONCE, which is exactly
-// `LAYOUT.md`'s test for when to write rather than take. A 40 KB dependency for
-// a hundred lines of structure is the trade this repository already refused for
-// glTF.
-//
-// 🔴 AND IT WAS MEASURED BEFORE IT WAS WRITTEN. `New Pack.circuitpack` holds
-// **164 entries, 161 deflated and 3 stored, no zip64**, so those are the two
-// cases that have to work and the one that does not have to.
-//
-// ⚠️ IT REFUSES WHAT IT CANNOT DO, BY NAME. Zip64, encryption and any
-// compression method other than stored or deflate throw with the method number
-// in the message. A reader that silently returned nothing for an encrypted entry
-// would be the `moq.mjs` 404 again: a wrong answer that looks like an empty one.
+// demo/shell/unzip.mjs: a zip read in the browser over DecompressionStream('deflate-raw'),
+// nothing vendored. Stored and deflate only; zip64, encryption and other methods throw by name.
+// why: lessons/kit-unzip.md#header
 
 const EOCD = 0x06054b50;          // end of central directory
 const CEN  = 0x02014b50;          // central directory file header
@@ -71,10 +56,9 @@ export function readZip(buf) {
 
 async function readEntry(u8, dv, offset, method, compressed, size, name) {
   if (dv.getUint32(offset, true) !== LOC) throw new Error(`${name} has no local header`);
-  // ⚠️ THE LOCAL HEADER'S NAME AND EXTRA LENGTHS ARE NOT THE CENTRAL ONES. They
-  // are routinely different, because the extra field carries different things in
-  // the two places. Reading the central directory's lengths here gives a stream
-  // that starts a few bytes off, which inflates to noise rather than to an error.
+  // The local header's name and extra lengths differ from the central ones; using the central
+  // ones starts the stream a few bytes off, which inflates to noise.
+  // why: lessons/kit-unzip.md#local-header
   const nameLen = dv.getUint16(offset + 26, true);
   const extraLen = dv.getUint16(offset + 28, true);
   const at = offset + 30 + nameLen + extraLen;

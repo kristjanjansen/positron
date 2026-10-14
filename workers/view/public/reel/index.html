@@ -23,10 +23,9 @@
 <style>
   .film { width: 100%; aspect-ratio: 16 / 9; background: #000;
           border: 1px solid var(--line); border-radius: 4px; display: block; margin: 0 0 6px; }
-  /* EMPTY LOOKS EMPTY. A <video controls> with no source still draws a player —
-     a dead play button and 0:00 — which reads as broken rather than as waiting.
-     The box keeps its size so the line below never moves; only the furniture
-     goes. */
+  /* Empty looks empty: a <video controls> with no source draws a dead player. The box
+     keeps its size so the line below never moves; only the furniture goes.
+     See lessons/page-reel.md#reel-5 */
   .film[data-empty="1"] { background: #000; }
   .wireless { width: 100%; max-width: 440px; display: block; margin: 0 0 6px; }
   /* `display: block` beats the UA sheet's `[hidden] { display: none }`, so
@@ -34,42 +33,21 @@
      The same trap cost the `video` rule an extra line in shell.css. */
   /* the empty slot keeps its height so the line never moves under you */
   .wireless { min-height: 40px; }
-  /* THE DESCRIPTION IS BOUNDED. ERR's leads run from one line to a dozen, and a
-     block that grows with its contents pushes the line down the page by a
-     different amount for every film. Five lines here, more where there is room,
-     and the rest scrolls inside its own box — so the strip below never moves. */
-  /* ONE COLUMN PER MEDIUM: the newsreel on the left, the radio on the right. No
-     colour here — the line below carries the colour, and repeating it on a
-     block of prose competes with the marks for the same meaning. This block is
-     reference text, so it is quiet: dim, and set off from the picture above and
-     the line below by its own margin. A day that has only one of the two still
-     gets both columns, and the empty one says in words which half did not
-     survive. */
-  /* 🔴 THE GAP ABOVE IT IS THE SHELL'S, NOT A NUMBER TYPED HERE. Asked for
-     2026-09-16 with a screenshot: *"add space on top of newsreel | radio"*. It
-     carried `margin: 14px 0 4px`, so the two column headings sat tight under
-     the line and the strip and the day below it read as one block.
-     ⚠️ `margin-bottom`, NEVER the `margin` shorthand. The shorthand's implied
-     `margin-top: 0` used to BEAT the rhythm on source order at the same
-     specificity, which is exactly how this page lost the rhythm in the first
-     place and how the transport bar lost it on every page in the project.
-     `.pos-stack` closed that as a class in 2026-09-16 by outweighing a single
-     class rather than out-sitting it, and the habit is still the right one. */
+  /* The description is bounded (ERR's leads run one to a dozen lines): five lines, more
+     where there is room, the rest scrolls inside, so the strip below never moves.
+     See lessons/page-reel.md#reel-6 */
+  /* One column per medium, newsreel left and radio right, uncoloured and dim: the line
+     below carries the colour. A day with only one keeps both columns and says which is missing.
+     See lessons/page-reel.md#reel-7 */
+  /* The gap above is the shell's rhythm. `margin-bottom`, never the `margin` shorthand,
+     whose implied `margin-top: 0` can beat the rhythm on source order.
+     See lessons/page-reel.md#reel-8 */
   .picked { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
             font: 500 12px/1.6 var(--mono); color: var(--dim); margin-bottom: 4px; }
-  /* TWO COLUMNS ON A PHONE TOO. Stacked, the second archive reads as a
-     footnote to the first; side by side, the day is one thing with two halves,
-     which is what the page is about. Estonian compounds are long and a narrow
-     column cannot fit them, so words break rather than widening the column
-     past its share — `anywhere` and not `break-word`, which leaves an
-     over-long word to overflow when it is the only thing on the line.
-
-     NOT `hyphens: auto`. The page declares lang="en" and the text is Estonian,
-     so the browser hyphenated it with the wrong dictionary — `Gon-siori`,
-     `he-lidefekt`, `arhitektuur-Tallinnas`. A hyphen is a claim about where a
-     word divides; breaking without one claims nothing. The columns carry
-     lang="et" so a reader's own software knows what language it is looking
-     at, which is also the honest answer for a screen reader. */
+  /* Two columns on a phone too: the day is one thing with two halves. Words break with
+     `overflow-wrap: anywhere`; not `hyphens: auto`, since the page is lang="en" and the
+     text Estonian (wrong dictionary). The columns carry lang="et".
+     See lessons/page-reel.md#reel-9 */
   .pcol { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .pcol[data-empty="1"] { display: none; }
   /* the key carries the lane's colour — set from the INK table in the script,
@@ -78,10 +56,8 @@
   .ptitle { color: var(--dim); font-weight: 600; margin-top: 2px;
             height: calc(2 * 1.6em); overflow: hidden;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  /* TWO FACTS, TWO BOXES. The date and the link used to be one string with a
-     middot between them, and the separator was only ever there because they had
-     been glued together first. A row with a gap in it says the same thing with
-     nothing to read. */
+  /* Two facts, two boxes: the date and the link sit apart in a row with a gap.
+     See lessons/page-reel.md#reel-10 */
   .pmeta { color: var(--dim2); display: flex; flex-wrap: wrap; gap: 0 12px; }
   .pmeta a { color: var(--dim2); text-decoration: underline; text-underline-offset: 2px; }
   /* ONE HEIGHT, not a maximum. A box that shrinks to its contents moves the
@@ -99,104 +75,63 @@
   import { ifSelfcheck, SELFCHECK } from '/shell/selfcheck.mjs';
   import { formatTime } from '/timeline/strip.mjs';
   import { mediaMaster } from '/timeline/media-master.mjs';
-  // THE LINE IS SHARED SINCE 2026-10-13: the deck, the two lanes, picking a
-  // day, stepping, scrubbing and the press on a mark live in reel-line.mjs, so
-  // /history/newsreels/ draws the same year. What plays, and every reach
-  // for ERR, stays on this page.
+  // The deck, lanes, picking, stepping, scrubbing and mark presses live in reel-line.mjs
+  // (shared with /history/newsreels/). What plays, and every reach for ERR, stays here.
+  // See lessons/page-reel.md#reel-11
   import { createReelLine, YEAR_FROM, YEAR_TO, ARHIIV, INK, iso, sentenceCase } from '/shell/reel-line.mjs';
 
   /**
-   * 🔴 EVERY REACH FOR ERR GOES THROUGH HERE, AND IT IS COUNTED.
-   *
-   * Not for a readout: for a CHECK. This page's rule is that nothing is asked
-   * of a public broadcaster until somebody asks to hear something, and the
-   * honest way to grade a rule like that is to count the reaches rather than to
-   * reason about which branch was taken. A pass-through cannot be forgotten the
-   * way a counter written beside a call can, because a URL does not get to a
-   * fetch or to a media element without coming through it.
-   *
-   * ⚠️ IT COUNTS THE MEDIA AS WELL AS THE API. A content GET is one reach;
-   * handing the m3u8 to an element or to hls.js is another, and the second is
-   * the one that holds a connection open and is counted as a listener.
+   * Every reach for ERR goes through here and is counted, so a check can grade the rule
+   * that nothing is asked of a broadcaster until somebody asks to hear something. It counts
+   * media handed to an element or hls.js as well as API GETs.
+   * See lessons/page-reel.md#reel-12
    */
   let errOpens = 0;
   const reachERR = (url) => { errOpens += 1; return url; };
 
-  // NATIVE HLS ONLY ON WEBKIT, gated on ManagedMediaSource.
-  //
-  // This page shipped without the gate and the newsreels were SILENT — reported
-  // three times, and the first two "fixes" were aimed at muting, which was
-  // never the cause. `canPlayType('application/vnd.apple.mpegurl')` answers
-  // "maybe" in Chrome as well as Safari, so Chrome was handed the m3u8 and
-  // half-played it: video decoded fine, and the SEPARATE AUDIO GROUP never
-  // joined. Measured — 5,405 bytes of audio decoded against 1,127,532 of video
-  // in the same 8.5 seconds, with the element unmuted at volume 1.
-  //
-  // CLAUDE.md says in as many words: grep for `canPlayType` before trusting any
-  // HLS page. This page was the counterexample.
+  // Native HLS only on WebKit, gated on ManagedMediaSource: Chrome answers "maybe" to
+  // canPlayType for m3u8 and then never joins the separate audio group.
+  // See lessons/page-reel.md#reel-13
   const NATIVE_HLS = 'ManagedMediaSource' in window
     && !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
 
   const d = mount({
     name: 'reel',
-    // ONE SENTENCE. It was three, and the two that went said what the page
-    // shows you anyway: that the year is a picture (it is on screen) and that
-    // nothing is stored here (the log says it every time a film opens, and an
-    // assert at the foot of this file grades it).
-    // ⚠️ AND IT NAMES THE DIFFERENCE BETWEEN PICKING AND PLAYING, because that
-    // is now the difference between a page that asks a public broadcaster for
-    // something and one that does not. A sentence that said "press a mark to
-    // play it" while ‹ and › quietly did something else would be the drift
-    // CLAUDE.md's rule about a description and a control is written about.
+    // One sentence, and it names the difference between picking and playing, because only
+    // playing asks a public broadcaster for anything.
+    // See lessons/page-reel.md#reel-14
     what: "Every 1965 newsreel in ERR's archive is a mark on one line at the day "
       + 'it was broadcast, and stepping or dragging picks a day while a press on '
       + "a mark plays it with the same day's radio where any survived.",
-    // PUBLISHED, NOT DRAWN. Every cell was already on the page: the count in
-    // the lane's gutter, the date under the film's own title and again on the
-    // axis the playhead stands on, the length in the line under the strip. A
-    // second table saying the same things is a second place to keep in step and
-    // one more thing between the reader and the year.
+    // Published, not drawn: every cell is already on the page (gutter, title, axis, footer).
+    // See lessons/page-reel.md#reel-15
     readout: { picked: '', length: 'min' },
     showReadout: false,
-    // NO CONTROLS BESIDE THE PAGE. The line IS the control, and a button that
-    // plays "the first film" is a second way to do the one thing the strip
-    // already does.
-    // ⚠️ ‹ AND › ARE NOT AN EXCEPTION TO THIS. They move the playhead and
-    // change what is showing, which is a transport verb, so they are declared
-    // on the bar rather than here. See `extras` below.
+    // No controls beside the page: the line is the control. ‹ and › are transport verbs,
+    // declared on the bar (see `extras`).
+    // See lessons/page-reel.md#reel-16
     controls: [],
   });
   guard(d);
 
-  // ── the year ──────────────────────────────────────────────────────────────
-  // The deck and the line are reel-line.mjs's. A press on a mark plays it; a
-  // scrub that comes to rest keeps going if something was going, and
-  // otherwise only picks. See the header over `select` for why.
+  // The deck and the line are reel-line.mjs's. A press on a mark plays it; a scrub that comes
+  // to rest keeps going if something was going, and otherwise only picks (see `select`).
+  // See lessons/page-reel.md#reel-17
   const line = createReelLine({
     onPress: (it) => play(it),
     onLand: (it) => { if (going()) play(it); else select(it); },
   });
   const deck = line.deck;
 
-  // BOTH SLOTS EXIST FROM THE START, empty. A picture that appears out of
-  // nowhere pushes the line down the page the moment you press a film — so the
-  // thing you just aimed at moves while you are looking at it. The box is the
-  // same size before and after; only its contents change.
+  // Both slots exist from the start, empty, at the same size, so pressing a film does not
+  // push the line down the page.
+  // See lessons/page-reel.md#reel-18
   const film = el('video', 'film', null, { playsinline: '' });
   film.dataset.empty = '1';
-  // ONE PLAYER, TWO SOURCES.
-  //
-  // 1965 handed picture and sound out separately — the newsreels were shot mute
-  // and the radio is sound-only — and they have been apart ever since, in two
-  // archives with two interfaces. On a line positioned by the day they went
-  // out, putting them back together is one line of arithmetic: same date, play
-  // both.
-  //
-  // So the audio element is HIDDEN and driven, never presented. The picture is
-  // the player; it carries the controls, and the sound follows it. When a
-  // broadcast has no film to go with it the picture stays black rather than
-  // disappearing, because the transport is the picture and a page whose
-  // controls vanish is a page that has broken.
+  // One player, two sources: the newsreels were shot mute and the radio is sound-only, so
+  // the hidden audio element follows the picture, which carries the controls. A day with
+  // no film keeps a black picture so the transport never disappears.
+  // See lessons/page-reel.md#reel-19
   const wireless = el('audio', 'wireless');
   wireless.hidden = true;
   const hasSound = () => !!(wireless.getAttribute('src') || aHls);
@@ -239,33 +174,19 @@
   // the caption to what the line is pointing at, which is where a caption goes.
 
   let hls = null, aHls = null;
-  // 🔴 AND THE DAY WHOSE MEDIA IS ACTUALLY OPEN, WHICH IS A DIFFERENT FACT.
-  // Picking is free and opening is not, so most of the time a day is picked
-  // and nothing is open. `null` here means this page is holding no connection
-  // to ERR, and every branch below asks it rather than guessing from
-  // `film.paused`, which reads the same for "nothing loaded" and "stopped".
+  // The day whose media is open, which is not the picked day. `null` means no connection
+  // to ERR is held; branches ask this, not `film.paused`.
+  // See lessons/page-reel.md#reel-20
   let opened = null;
 
-  // STEP THROUGH THE YEAR. 282 films at a week to a screen means the next one is
-  // often off the edge, and hunting for it by dragging is not navigation. These
-  // are transport verbs — they move the playhead and change what is showing —
-  // so they belong on the bar rather than beside the page, which is what
-  // `extras` exists for.
-  // IS SOMETHING ACTUALLY SOUNDING? Not `film.paused`, which reads the same for
-  // a stopped film and for an element that was never given one. `opened` is the
-  // day whose media this page holds, and it is null far more often than not.
+  // Is something sounding? Not `film.paused`, which reads the same for stopped and never
+  // loaded; `opened` is the day whose media this page holds, usually null.
+  // See lessons/page-reel.md#reel-21
   const going = () => !!opened && (!film.paused || (hasSound() && !wireless.paused));
   /**
-   * 🔴 STEPPING WHILE NOTHING IS PLAYING PICKS A DAY. IT DOES NOT FETCH.
-   * Changed 2026-09-19, and see the header over `select` for why.
-   *
-   * The two readings of ‹ and › are both real and they belong to two different
-   * people. Somebody watching a newsreel who presses › means the next one, and
-   * gets it, playing. Somebody walking the year with nothing running means
-   * "show me that day": the caption fills, the mark lights, the playhead moves,
-   * and the play button starts it when they want it. The second reading costs a
-   * public broadcaster nothing, and it is the one a check walking the controls
-   * takes without knowing it.
+   * Stepping while something plays plays the next day; while nothing plays it only picks
+   * (caption, mark, playhead) and fetches nothing. See `select`.
+   * See lessons/page-reel.md#reel-22
    */
   const step = (by) => {
     const next = line.next(by);
@@ -273,64 +194,34 @@
     if (going()) play(next); else select(next);
   };
   /**
-   * 🔴 THE LOOP PLAYS THE FILM, BECAUSE THE PAGE OWNS WHAT IS BEING PLAYED.
-   * Asked for 2026-09-16: *"make loop work"*.
-   *
-   * What it did before: LOOP marked two positions on a deck of 1965 and wrapped
-   * the PLAYHEAD between them while the newsreel ran straight on to its end.
-   * The bar wraps by SEEKING, and with no `command` a seek goes to the deck,
-   * which on this page is a year rather than the thing making the picture. So
-   * the control lit, the marks were real, and nothing a visitor could see ever
-   * came back. `/replay/` had the identical fault the same week, reported as
-   * *"transport loops but video does not, time keeps increasing"*, and this is
-   * the same repair: every verb drives the element and the deck follows.
-   *
-   * ⚠️ A POSITION HERE IS A MOMENT IN 1965, WHICH IS WHAT MAKES THE MAPPING
-   * HONEST RATHER THAN CLEVER. A clip is drawn from the day it went out and is
-   * as wide as it is long, so `position - current.at` IS how far into the film
-   * the playhead has got. Press LOOP twenty seconds in and again thirty-five
-   * seconds in and the loop is that passage of that newsreel, with the same
-   * day's radio following it through the picture's own `seeked`.
+   * The loop drives the film, not only the deck, because the bar's seek would otherwise
+   * move a deck of 1965 while the newsreel ran on. A clip is drawn at its date and length,
+   * so `position - current.at` is the offset into the film.
+   * See lessons/page-reel.md#reel-23
    */
-  // ⚠️ THE ARITHMETIC IS PURE AND THE STATE IS THE THIN WRAPPER ROUND IT, so
-  // the check at the foot of this file can grade the mapping with nothing open
-  // and nothing picked, which is how this page now opens.
+  // The arithmetic is pure and the state is a thin wrapper, so the check can grade the
+  // mapping with nothing open and nothing picked.
+  // See lessons/page-reel.md#reel-24
   const intoOf = line.intoOf;
   const intoFilm = (pos) => (line.current ? intoOf(line.current, pos) : null);
   const filmSecs = () => (Number.isFinite(film.duration) && film.duration > 0 ? film.duration : null);
   const command = {
     play: () => {
       /**
-       * 🔴 THE PLAY BUTTON OPENS THE DAY THAT IS PICKED, AND NOTHING IS PICKED
-       * WHEN THE PAGE OPENS. The line said, for a year: *"Pressing play with
-       * nothing chosen starts the first film, which is what this page has
-       * always done"*, and that was written when the page had already fetched
-       * that film on load anyway. It is the same claim in a different place:
-       * the page reaching a broadcaster's server on behalf of somebody who has
-       * not asked for anything in particular.
-       *
-       * ⚠️ SO THE YEAR RUNS AND THE LOG SAYS HOW TO PICK. The playhead really
-       * does advance at one second of 1965 a second, which is about a pixel an
-       * hour at a month to a screen, and a control that moves something nobody
-       * can see needs words. This is the only honest thing left: there is
-       * nothing to start.
+       * Nothing is picked when the page opens and a load opens nothing. With nothing to start,
+       * the year runs (one second of 1965 a second) and the log says how to pick.
+       * See lessons/page-reel.md#reel-25
        */
       /**
-       * 🔴 AND SINCE 2026-09-30 A PRESS WITH NOTHING PICKED STARTS THE FIRST
-       * MARK ON THE LINE, film or radio, whichever went out first. Asked:
-       * *"when i press play, reel demo short start from first (whaterver
-       * playing). no selection needed"*. The rule above is about a VISIT and
-       * still holds: a load opens nothing. A person pressing play is a person
-       * asking to listen, which is exactly when a broadcaster's server may be
-       * reached.
-       * ⚠️ THE HARNESS PRESSES THIS BUTTON (`verify.mjs`, the transport
-       * toggle), SO UNDER `?selfcheck=1` IT PICKS AND DOES NOT OPEN. Otherwise
-       * every run of the suite would hold an ERR stream from a headless Chrome.
+       * A press with nothing picked starts the first mark, film or radio: a person pressing
+       * play may reach ERR. Under `?selfcheck=1` (the harness presses this) it picks and does
+       * not open, so no run of the suite holds an ERR stream.
+       * See lessons/page-reel.md#reel-26
        */
       const current = line.current;
       if (!current) {
-        // FIRST FROM WHERE THE PLAYHEAD STANDS, NOT FROM THE YEAR'S START
-        // (reel-line.mjs says why).
+        // First from where the playhead stands, not from the year's start (reel-line.mjs says why).
+        // See lessons/page-reel.md#reel-27
         const first = line.firstFromPlayhead();
         if (!first) { d.log('nothing to play yet, the archive list has not arrived'); deck.play(); return; }
         if (SELFCHECK) {
@@ -354,11 +245,9 @@
     pause: () => { film.pause(); if (hasSound()) wireless.pause(); deck.pause(); },
     seek: (pos) => {
       const into = intoFilm(pos), dur = filmSecs();
-      // 🔴 ONLY INSIDE THE FILM THAT IS PLAYING. A loop marked across days has
-      // both ends on the line and neither of them in this newsreel, and writing
-      // an eleven-day currentTime onto a two-minute element clamps to the end,
-      // which is a loop that plays nothing at all. Out there the picture is left
-      // alone and the playhead moves by itself, which is what it did before.
+      // Only inside the film that is playing: a loop across days would clamp currentTime to
+      // the end and play nothing, so out there the playhead moves on its own.
+      // See lessons/page-reel.md#reel-28
       if (into != null && dur != null && into >= -0.25 && into <= dur + 0.25) {
         try { film.currentTime = Math.min(Math.max(0, into), Math.max(0, dur - 0.05)); }
         catch { /* no data yet */ }
@@ -367,95 +256,46 @@
     },
   };
 
-  // THE PICTURE IS THE MASTER AND THE YEAR FOLLOWS IT. The playhead used to
-  // free-run at one second of 1965 per second of now from wherever the film was
-  // opened, which agrees with the film until somebody uses the picture's own
-  // controls: then the line says one thing, the film says another, and a mark
-  // made off the line is made in the wrong place. `anchorMs` is a function
-  // because the anchor is whichever clip is up. No rAF here: the L4 timeupdate
-  // backstop drives it, exactly as on `/replay/`.
+  // The picture is the master and the year follows it, so a mark made off the line lands
+  // where the film is. `anchorMs` is a function because the anchor is whichever clip is up.
+  // No rAF: the L4 timeupdate backstop drives it, as on /replay/.
+  // See lessons/page-reel.md#reel-29
   const master = mediaMaster(deck, film, {
     anchorMs: () => (line.current ? line.current.at : YEAR_FROM),
   });
 
   const bar = createTransportBar(d.el, deck, {
     scrub: false,
-    // 🔴 NO CLOCK. A position on this deck is a DATE, so the bar read
-    // `-2611440:00.000` over `525600:00.000`, which is correct arithmetic: zero
-    // is 1970, 1965 is before it, and a year is 525600 minutes long. A clock is
-    // simply the wrong instrument for an axis measured in days, and the axis
-    // under the bar prints the date it is standing on.
+    // No clock: a position is a date (zero is 1970), so a clock would read -2611440:00.000;
+    // the axis under the bar prints the date.
+    // See lessons/page-reel.md#reel-30
     time: false,
     command,
-    // ‹ AND ›, THE SAME PAIR `/tapes/` CARRIES. They move the playhead and
-    // change what is showing, which is a transport verb rather than something
-    // you do to the page, so they sit on the bar.
-    // ⚠️ ONE PRESS IS ONE BROADCAST DAY, NOT ONE MARK. `step` walks `days`,
-    // which folds both lanes onto the day they share: stepping through one lane
-    // alone skips the weeks the other is the only witness to, and stepping
-    // through both as a flat list hands you the same afternoon twice.
+    // ‹ and ›, as on /tapes/. One press is one broadcast day: `step` walks `days`, which folds
+    // both lanes onto the day they share, so no lane's weeks are skipped or doubled.
+    // See lessons/page-reel.md#reel-31
     extras: [
       { id: 'prev', label: '‹', aria: 'the broadcast day before this one', onClick: () => step(-1) },
       { id: 'next', label: '›', aria: 'the broadcast day after this one', onClick: () => step(+1) },
     ],
-    // 🔴 NOTHING IS LOGGED ABOUT THE LOOP, ON INSTRUCTION 2026-09-16: *"rm all
-    // loop messages."*. It said which seconds of which newsreel were being
-    // looped, and said so in words when both marks were not inside the film
-    // that is playing. The first is what the picture does in front of you; the
-    // second is now unreachable by hand, because a press starts the transport
-    // and both marks land inside the clip that is running.
+    // Nothing is logged about the loop.
+    // See lessons/page-reel.md#reel-32
   });
-  // THE LINE GOES ON THE PAGE AFTER THE BAR, which is the order the glue
-  // below has always read its anchor in.
+  // The line goes on the page after the bar, the order the glue below reads its anchor in.
+  // See lessons/page-reel.md#reel-33
   /**
-   * 🔴 WHAT YOU ARE POINTING AT GOES UNDER THE LINE, NOT OVER IT. Asked
-   * 2026-09-19 with a photograph of this page on an iPhone: *"add feature to
-   * timeline: footer section, looks like glued that shows hovered info below
-   * timeline"*. The photograph is of this strip: the sticky tap tooltip over
-   * the right half of it, four lines deep, one of them cut mid word, covering
-   * the marks it was describing. A finger has no hover, so on a phone that
-   * box has to stay up while the finger is down, which is precisely when it
-   * is in the way.
-   *
-   * 🔴 THREE LINES, WHICH IS WHAT THE TOOLTIP CARRIED AND NOT MORE. The
-   * footer covers nothing, so it could afford a fourth, and the line it would
-   * get back is the one this page cut a session ago: `silent newsreel` or
-   * `radio, with sound`. That stays cut, and for the reason that never had
-   * anything to do with room. The lane it is drawn in is CALLED `newsreels`
-   * or `radio`, in the gutter an inch to the left of the mark. What the
-   * fourth line would cost is real: this box is a fixed height whether or not
-   * anything is under the pointer, so a line nobody needs is a line of empty
-   * box under the timeline for the whole visit.
-   *
-   * ⚠️ AND THE TOOLTIP IS GONE RATHER THAN KEPT ALONGSIDE. `createStripView`
-   * turns it off for any strip with a footer unless a page asks for both, and
-   * two surfaces saying the same three lines is the thing to avoid: one of
-   * them would be the one covering the marks.
+   * What you point at goes in a footer under the line, not a tooltip over it: a finger has
+   * no hover, so a tooltip covers the marks. Three lines, fixed height; the medium is not a
+   * line, since the lane's gutter names it. createStripView drops the tooltip with a footer.
+   * See lessons/page-reel.md#reel-34
    */
   const view = line.mount(d.el, { footer: { lines: 3 } });
 
   /**
-   * 🔴 THE BAR, THE LINE AND WHAT YOU ARE POINTING AT ARE ONE SURFACE. Asked
-   * 2026-09-19: *"glue reel transport to timeline"*, and then for the footer
-   * *"looks like glued"*. The bar already passes `scrub: false` BECAUSE the
-   * line below it is this page's position surface, so the two have been one
-   * instrument all along with the page's 22 px rhythm drawn through the middle
-   * of it.
-   *
-   * 🔴 IT IS `view.surface`, NEVER `view.el`. The canvas and the footer are
-   * glued into one box by `createStripView` itself, and `surface` is that box;
-   * gluing the canvas would tear it out of its own pair and leave the footer in
-   * a box with nothing else in it. ⚠️ THE NESTING DOES NOT DOUBLE THE EDGE:
-   * `.pos-glue.pos-glue > *` weighs (0,2,0) against `.pos-glue`'s own (0,1,0),
-   * so the inner box gives up its border and radius to the outer one exactly as
-   * the canvas and the bar do, and what is left of it is the 1 px seam between
-   * the line and the footer. Read from `shell.css` rather than assumed.
-   * ⚠️ AND IT IS THE RIGHT LINE WITH NO FOOTER TOO: `surface` is the bare
-   * canvas when a strip has none, so this call does not have to know.
-   *
-   * ⚠️ THE ANCHOR IS READ BEFORE THE GLUE. `createGlue` re-parents its blocks,
-   * so a node captured after the call can be detached and `insertBefore` throws
-   * on it. `null` is append, which is what a pair at the end of the page wants.
+   * The bar, the line and the footer are one glued surface (the bar is `scrub: false`).
+   * Glue `view.surface`, never `view.el`, so the canvas keeps its footer. The anchor is read
+   * before the glue, since `createGlue` re-parents its blocks.
+   * See lessons/page-reel.md#reel-35
    */
   const afterStrip = view.surface.nextSibling;
   d.el.insertBefore(createGlue(bar.el, view.surface), afterStrip);
@@ -465,31 +305,10 @@
 
   // ── picking a day, and opening one ────────────────────────────────────────
   /**
-   * 🔴 PICKING A DAY COSTS NOTHING. OPENING ONE COSTS ERR, SO ONLY SOMEBODY
-   * ASKING TO HEAR IT OPENS ONE. Split 2026-09-19.
-   *
-   * What this page did before: it opened a newsreel AND that day's radio on
-   * LOAD, before anybody pressed anything, and every step and every landing did
-   * the same whether or not anything was playing. So a visit was two content
-   * GETs and a stream held open, and a run of the suite was that again for
-   * every button it pressed, on a page whose own sentence is that it streams
-   * from ERR.
-   *
-   * CLAUDE.md is exact about the damage, and it is not load: a few dozen
-   * headless browsers holding a broadcaster's mounts are counted as listeners
-   * who never leave, and those figures are what it reports to its board and its
-   * funders. It cannot be undone by stopping, only by not adding to it.
-   *
-   * So the two halves are separated. `select` moves the playhead, frames the
-   * view, fills the caption and colours the mark, and opens NOTHING. `play` is
-   * the half that reaches for ERR, and the only things that call it are a press
-   * on a mark, a press of the play button on a day already picked, and a step
-   * or a scrub landing while something is already playing, which is somebody
-   * watching who has asked for the next one.
-   *
-   * ⚠️ IT IS THE SAME RULE FOR EVERYBODY, and there is no harness branch in
-   * here. A page that behaves one way for a check and another way for a visitor
-   * is a page nothing grades.
+   * Picking costs nothing; opening costs ERR (listeners in its audience figures). `select`
+   * moves, frames, captions and opens nothing; `play` reaches ERR, only from a mark press,
+   * play on a picked day, or a step or scrub while playing. Same rule for every visitor.
+   * See lessons/page-reel.md#reel-36
    */
   function select(it, { empty = true } = {}) {
     close(empty);
@@ -504,24 +323,18 @@
   }
 
   /**
-   * SHUT WHAT IS OPEN. A picture left standing under another day's caption is
-   * the page disagreeing with itself.
-   *
-   * ⚠️ `empty` IS FALSE WHEN A NEW SOURCE IS ABOUT TO GO INTO THE SAME ELEMENT,
-   * AND THAT IS NOT TIDINESS. `film.load()` re-runs the media load algorithm,
-   * where WebKit re-applies the behaviour restrictions a user gesture lifted.
-   * This page has already paid for a spent gesture once: every newsreel came
-   * out SILENT, reported three times, with nothing wrong in the player.
+   * Shut what is open. `empty` is false when a new source goes into the same element:
+   * `film.load()` re-applies WebKit's gesture restrictions and the newsreel goes silent.
+   * See lessons/page-reel.md#reel-37
    */
   function close(empty = true) {
     opened = null;
     film.pause(); wireless.pause();
     if (hls) { hls.destroy(); hls = null; }
     if (aHls) { aHls.destroy(); aHls = null; }
-    // AND EMPTY IT. Destroying the hls instance leaves the element un-paused
-    // with a source that no longer exists — inaudible today, and exactly the
-    // state that becomes a phantom second sound the next time something calls
-    // play() on everything.
+    // And empty it: a destroyed hls instance leaves the element un-paused with a dead source,
+    // a phantom second sound for the next play() on everything.
+    // See lessons/page-reel.md#reel-38
     wireless.removeAttribute('src'); wireless.load();
     if (!empty) return;
     film.removeAttribute('src'); film.load();
@@ -529,33 +342,22 @@
     film.controls = false;
   }
 
-  // STREAMS, STORES NOTHING. One content GET to arhiiv.err.ee for the film's
-  // media url, then the element is given that URL. The page never holds the
-  // bytes: no fetch of segments, no blob URL over them, nothing to R2 or to
-  // localStorage. A copy is the one thing this must not make.
+  // Streams, stores nothing: one content GET to arhiiv.err.ee for the media url, then the
+  // element gets the URL. No segment fetch, no blob URL, nothing to R2 or localStorage.
+  // See lessons/page-reel.md#reel-39
   async function play(it) {
-    // BLESS THE ELEMENT NOW, before anything is awaited.
-    //
-    // A user gesture does NOT survive an `await`. This function fetches the
-    // media url first and calls `play()` after, by which time the gesture is
-    // spent — so the unmuted play was refused and the fallback muted it. Every
-    // newsreel came out silent, twice reported, and my headless check missed it
-    // because `--autoplay-policy=no-user-gesture-required` is exactly the flag
-    // that hides this.
-    //
-    // Calling `play()` synchronously inside the gesture marks the element as
-    // user-activated even though it rejects for having no source yet. That
-    // rejection IS the mechanism, not a failure.
+    // Bless the element now: a gesture does not survive an `await`, and the play after the fetch
+    // was refused and muted. A synchronous play() marks it user-activated even though it rejects.
+    // Headless `--autoplay-policy=no-user-gesture-required` hides this.
+    // See lessons/page-reel.md#reel-40
     (it.kind === 'audio' ? wireless : film).play().catch(() => {});
     // The same picking every other path does, with the film element left
     // holding its old source because a new one is about to replace it.
     const { picture, sound } = select(it, { empty: false });
 
-    // ERR hands back a PROTOCOL-RELATIVE url (`//vod.err.ee/…`). On the deployed
-    // https page that resolves to https on its own, but on a local http server
-    // it resolves to http — so the same code plays over a different protocol
-    // depending on where it runs, which is the kind of difference that is
-    // invisible until it is a mixed-content block. Pin it.
+    // ERR returns a protocol-relative url (`//vod.err.ee/...`); pin https so a local http page
+    // does not play over http and meet mixed content on the deploy.
+    // See lessons/page-reel.md#reel-41
     const streamOf = async (item, kind) => {
       try {
         const r = await fetch(reachERR(`${ARHIIV}/api/v1/content/${kind}/${encodeURIComponent(item.slug)}`));
@@ -574,14 +376,10 @@
     // goes black rather than keeping the LAST day's picture under this day's
     // caption, which is the page disagreeing with itself about what is up.
     if (picture && !src) { close(); return; }
-    // ── the sound ────────────────────────────────────────────────────────
-    // WHERE IT GOES DEPENDS ON WHETHER THERE IS A PICTURE. With a newsreel to
-    // pair against, the radio loads into the hidden element and the picture
-    // drives it. With no newsreel, the radio goes into the VIDEO element
-    // itself — a <video> plays an audio-only HLS stream perfectly well, shows
-    // a black frame, and its controls are then real controls driving real
-    // media. That is how a sound-only day gets the same transport as every
-    // other day without a second set of buttons appearing under the picture.
+    // With a newsreel the radio loads into the hidden element and the picture drives it.
+    // With none it goes into the video element itself (black frame), so a sound-only day
+    // gets the same controls.
+    // See lessons/page-reel.md#reel-42
     const su = sound ? await streamOf(sound, 'audio') : null;
     if (su && picture) {
       if (NATIVE_HLS || !window.Hls || !window.Hls.isSupported()) wireless.src = reachERR(su);
@@ -630,15 +428,9 @@
     }
     opened = it;                           // a connection to ERR is open from here
 
-    // WITH SOUND. `armVideo` mutes — that is its whole job, buying autoplay on a
-    // page that never got a gesture — and using it here made every newsreel
-    // silent. This play came FROM a gesture (a press on the line), so sound is
-    // allowed and these films have it: AAC in its own group, alongside
-    // renditions up to 1920x1080.
-    //
-    // The fallback is still there and is still needed: a browser may refuse
-    // anyway, and a muted picture beats no picture. But it is the fallback now,
-    // not the default.
+    // With sound: this play comes from a gesture, so not `armVideo`, which mutes. The muted
+    // fallback stays for a browser that refuses anyway.
+    // See lessons/page-reel.md#reel-43
     film.muted = false;
     try {
       await film.play();
@@ -650,12 +442,9 @@
       d.log('the browser refused sound. Press play on the picture to hear it', 'bad');
     }
     d.log(`playing ${picture.slug}. It streams from ERR and nothing is stored here`, 'hi');
-    // THE PICTURE DRIVES THE SOUND. Not a servo and not a sync loop — the two
-    // are different recordings of different lengths that merely share a day, so
-    // pretending to hold them in lockstep would be inventing a relationship the
-    // archive does not have. They start together, stop together, and a scrub of
-    // the picture takes the sound to the same offset. Where the radio is longer
-    // than the film, which is usual, it simply keeps its own place.
+    // The picture drives the sound: two recordings of different lengths that only share a day,
+    // so they start, stop and scrub together, and a longer radio keeps its own place.
+    // See lessons/page-reel.md#reel-44
     const follow = () => {
       if (!hasSound()) return;
       if (film.paused) wireless.pause();
@@ -669,18 +458,9 @@
       if (Number.isFinite(wireless.duration) && t <= wireless.duration
           && Math.abs(wireless.currentTime - t) > 0.25) wireless.currentTime = t;
     });
-    // THE FILMS ARE SILENT, and it took four reports of "no sound" to establish
-    // that nothing was broken.
-    //
-    // Measured: every `AK filmikroonika` audio fragment is exactly 6,766 bytes
-    // per 10 seconds — 5.4 kbps, which is what AAC costs to encode silence. A
-    // 1965 item from outside the series measured 123.8 kbps on the same path,
-    // so the player, the CORS, the audio group and the decoder are all fine.
-    // `filmikroonika` was shot MUTE; sound was added at screening or not at all.
-    //
-    // This still reports, because "silent" and "broken" look identical from the
-    // outside and the difference is the whole point. It just no longer accuses
-    // the player of a fault that belongs to 1965.
+    // The filmikroonika films are silent: 6,766 bytes per 10 s of audio (5.4 kbps, AAC
+    // silence) against 123.8 kbps for another 1965 item. Still reported, but not as a fault.
+    // See lessons/page-reel.md#reel-45
     setTimeout(() => {
       const a = film.webkitAudioDecodedByteCount;
       if (a === undefined) return;
@@ -699,22 +479,15 @@
     }, { once: true });
   }
 
-  // THE DECK AND THE PICTURE MOVE TOGETHER, WHEN THERE IS A PICTURE. Anything
-  // that starts the deck (the play button, the keyboard, a release after a
-  // scrub) starts whatever is open, and anything that stops it stops that.
-  //
-  // ⚠️ WITH NOTHING OPEN THE YEAR SIMPLY RUNS, and this branch used to open the
-  // first film instead. The playhead advances at one second of 1965 per second
-  // of now, which at a month to a screen is about a pixel an hour: invisible,
-  // and truthful. `command.play` says so in the log, which is where the words
-  // belong.
+  // The deck and the picture move together when there is a picture. With nothing open the
+  // year runs at one second of 1965 a second, and `command.play` logs it.
+  // See lessons/page-reel.md#reel-46
   deck.transport.onState((st) => {
     if (st.reason === 'play') {
       if (!opened) return;
       if (film.paused) film.play().catch(() => {});
-      // ONLY IF IT HOLDS SOMETHING. play() on a source-less element does not
-      // throw and does not make a sound; it just leaves the element reading as
-      // playing, which is a lie the next reader has to chase down.
+      // Only if it holds something: play() on a source-less element reads as playing and is silent.
+      // See lessons/page-reel.md#reel-47
       if (hasSound() && wireless.paused) wireless.play().catch(() => {});
     } else if (st.reason === 'pause') {
       if (opened && !film.paused) film.pause();
@@ -722,10 +495,9 @@
     }
   });
 
-  // ── scrubbing the year ────────────────────────────────────────────────────
-  // reel-line.mjs: the playhead follows the finger, and the broadcast nearest
-  // where it comes to rest arrives at `onLand` above, once the hand has let go.
-  // A press (not a drag) on a mark arrives at `onPress`.
+  // reel-line.mjs: the playhead follows the finger; the nearest broadcast to where it rests
+  // arrives at `onLand` once released, and a press on a mark at `onPress`.
+  // See lessons/page-reel.md#reel-48
 
   // ── load the year ─────────────────────────────────────────────────────────
   (async () => {
@@ -749,56 +521,38 @@
       `${items[0].date} to ${items[items.length - 1].date}`);
     d.assert('positions are negative: 1965 is before the epoch',
       items.every((i) => i.at < 0), `${items[0].at}`);
-    // WHY THIS IS ASSERTED AT ALL: the strip auto-detects an absolute domain by
-    // magnitude (`range[0] > 1e12`), and 1965 is NEGATIVE — so the detection
-    // says "relative" and the axis would read `-1822d` instead of `1965-01-04`.
-    // The page's `absolute: true` is what fixes that, and dropping it fails here.
+    // The strip detects an absolute domain by `range[0] > 1e12`, and 1965 is negative, so
+    // `absolute: true` is what makes the axis read dates. Dropping it fails here.
+    // See lessons/page-reel.md#reel-49
     d.assert('the axis reads as dates, not as a count of days from 1970',
       view.strip.state.absolute === true
         && /^\d{4}-\d{2}-\d{2}$/.test(formatTime(deck.position(), 86400000, view.strip.state.absolute)),
       formatTime(deck.position(), 86400000, view.strip.state.absolute));
-    // 🔴 THE LOOP'S ARITHMETIC, GRADED WITHOUT OPENING ANYTHING. A mark on this
-    // line is a moment in 1965, and the loop plays it as an offset into the film
-    // that is up, so this mapping is what the loop stands on. It is also the
-    // ONLY part of the loop this page can check: the rest needs a real stream
-    // from ERR, and a check is not a reason to open one.
+    // The loop's arithmetic, graded without opening anything: the rest needs a real ERR
+    // stream, and a check is not a reason to open one.
+    // See lessons/page-reel.md#reel-50
     d.assert('a mark on the line is an offset into the day it sits on',
       Math.abs(intoOf(items[0], items[0].at + 12345) - 12.345) < 1e-9,
       `${intoOf(items[0], items[0].at + 12345).toFixed(3)} s into ${items[0].slug}`);
     d.assert('the picture is the transport master, so the line follows it', !!master);
-    // 🔴 WHERE A SCRUB LANDS, GRADED WITHOUT OPENING ANYTHING. A finger stops
-    // between broadcasts far more often than on one, so the arithmetic that
-    // picks the nearest IS the behaviour. The rest of a scrub needs a stream
-    // from ERR, and a check is not a reason to open one.
-    // ⚠️ BOTH DIRECTIONS, because one of them alone passes for a function that
-    // always answers with the same end of the year.
+    // Where a scrub lands, graded without opening anything. Both directions, since one alone
+    // passes for a function that always answers the same end of the year.
+    // See lessons/page-reel.md#reel-51
     const after = nearestOf(items[0].at + 3600000, items);
     const before = nearestOf(items[1].at - 3600000, items);
     d.assert('a scrub lands on the broadcast nearest where it stopped',
       after === items[0] && before === items[1], `${after?.date} then ${before?.date}`);
     /**
-     * 🔴 THE RULE THIS PAGE LIVES UNDER, GRADED AS A CONNECTION COUNT RATHER
-     * THAN AS AN INTENTION. Every URL that leaves for ERR goes through
-     * `reachERR`, so both of these ask the only question worth asking: how many
-     * times did this page reach for somebody else's server?
-     *
-     * The first is data already in hand and runs for everybody, which is what
-     * makes it worth having: a visitor's own page is the honest witness to
-     * whether opening it costs a broadcaster anything.
+     * The rule as a connection count: every URL for ERR goes through `reachERR`. The first
+     * check uses data in hand and runs for everybody.
+     * See lessons/page-reel.md#reel-52
      */
     d.assert('a visit opens nothing at ERR', errOpens === 0,
       `${errOpens} reaches since the page loaded`);
     /**
-     * ⚠️ THE SECOND PRESSES A CONTROL, SO IT IS BEHIND THE GATE. `step` is what
-     * ‹ and › call, and a check that went round it would be grading a copy of
-     * the rule rather than the rule — but `selfcheck.mjs` is exact about what
-     * moves behind the gate, and "presses a control" is on its list.
-     * 🔴 THE RULE ITSELF IS NOT GATED AND MUST NEVER BE. Stepping while nothing
-     * plays picks a day for everybody; what is gated is only this page driving
-     * its own buttons to prove it.
-     * ⚠️ AND IT PUTS THE PAGE BACK. Two steps forward and back leave the day
-     * the view opened on picked; `select(null)` returns it to the state a
-     * visitor arrives in, which is nothing picked and no connection held.
+     * The second presses a control, so it is behind the gate; the rule itself is never gated.
+     * `select(null)` puts the page back: nothing picked, no connection held.
+     * See lessons/page-reel.md#reel-53
      */
     ifSelfcheck(() => {
       const reachesBefore = errOpens;
@@ -810,23 +564,10 @@
     });
 
     /**
-     * 🔴 THE LINE UNDER THE STRIP SAYS WHAT THE POINTER IS ON, AND SAYS SO WHEN
-     * IT IS ON NOTHING. Both halves are the check: a box that reports only when
-     * there is something to report is a box that collapses and takes the page
-     * down with it every time a finger moves off a mark.
-     *
-     * ⚠️ IT DRIVES THE STRIP'S OWN POINTER PATH rather than calling
-     * `footer.set` with a hit of its own making. Everything worth grading is
-     * between those two points: the hit test, `describeRow`, and the wiring
-     * `createStripView` does between the strip's `onHover` and the footer. A
-     * check that handed the footer a hit would be grading the footer's
-     * `textContent`, which nobody doubts.
-     *
-     * ⚠️ AND IT AIMS AT THE DAY THE VIEW OPENED ON, so no zoom and no pan is
-     * needed to reach it: it is at the centre of the opening month by
-     * construction, and the nearest other newsreel is days away against a hit
-     * tolerance of six pixels. Behind the gate, because moving a pointer over a
-     * page is something a person would see.
+     * The footer says what the pointer is on and says so when it is on nothing. Driven through
+     * the strip's own pointer path, at the opening day's mark (newsreels days apart, 6 px
+     * hit tolerance). Behind the gate, since a moved pointer is visible.
+     * See lessons/page-reel.md#reel-54
      */
     ifSelfcheck(() => {
       // Lay the lanes out NOW rather than on the next frame: `y` is written

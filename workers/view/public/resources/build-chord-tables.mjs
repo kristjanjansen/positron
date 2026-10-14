@@ -1,34 +1,7 @@
-// demo/resources/build-chord-tables.mjs. The table that ships, and nothing else.
-//
-//   node demo/resources/build-chord-tables.mjs           # count, pack, write, print the numbers
-//   node demo/resources/build-chord-tables.mjs --check   # print the numbers, write nothing
-//   node demo/resources/build-chord-tables.mjs --check --keep=5   # what another prune would cost
-//
-// 🔴 IT CONTACTS NOBODY. It reads the corpora
-// `demo/resources/fetch-chord-corpora.mjs` cached once under `tmp/`, which is
-// gitignored, and it writes ONE file: `demo/resources/chord-tables.json`, served
-// at `/resources/chord-tables.json` the way `/tapes/` already reads
-// `/resources/corpus.json`.
-//
-// 🔴 WHAT SHIPS IS A TABLE, NOT A CORPUS. 870 KB of other people's song data
-// stays in `tmp/`. What crosses the wire is counts over a key-relative alphabet,
-// which is a fact ABOUT the corpus rather than a copy of it.
-//
-// 🔴 AND THE LICENCE TRAVELS WITH IT. The iRb corpus is CC BY 4.0, and CC BY
-// requires attribution on derivatives as well as on the work. A counted table is
-// a derivative. `demo/resources/LICENSE-chord-tables` carries the attribution
-// and is written by this script so it cannot drift from what was counted.
-// McGill Billboard is CC0 and attaches no condition; its citation is carried
-// anyway, because a table nobody can trace back is a table nobody can check.
-//
-// ── THE PACKING, AND WHY IT IS NOT JUST JSON ────────────────────────────────
-//
-// ⚠️ THE OBVIOUS JSON IS FIVE TIMES THE SIZE AND THE NUMBERS ARE PRINTED BOTH
-// WAYS ON EVERY RUN, so the choice can be checked rather than taken on trust.
-// `{"7dom|0maj":[["9dom",412],...]}` spends most of its bytes re-typing symbol
-// names that are already in a 78 entry list. Packed, a symbol is ONE character,
-// a probability is ONE character, and a record is a fixed width so there are no
-// separators at all.
+// Writes demo/resources/chord-tables.json (packed counts, not the corpus) and its
+// LICENSE-chord-tables (iRb CC BY 4.0) from tmp/chord-corpora/. One character a symbol and
+// a probability. Flags: --check (write nothing), --check --keep=N (what another prune costs).
+// See lessons/page-resources.md#resources-96
 
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -43,12 +16,9 @@ const LIC = join(HERE, 'LICENSE-chord-tables');
 const CHECK = process.argv.includes('--check');
 
 /**
- * 🔴 `--keep=N` IS FOR MEASURING WHAT ANOTHER PRUNE WOULD COST AND IT REFUSES TO
- * WRITE. `demo/resources/chord-e6-keep.mjs` sweeps the prune and needs the byte
- * count off THIS packer rather than off a second copy of it, and a flag that
- * could also write the table would mean the shipped file's shape was decided on
- * a command line somebody typed once. The shipped number is the constant below
- * and nothing else, so a table on this disk always matches the source.
+ * `--keep=N` only measures (chord-e6-keep.mjs reads this packer's bytes) and refuses to
+ * write; the shipped prune is the constant below.
+ * See lessons/page-resources.md#resources-97
  */
 const argKeep = /^--keep=(\d+)$/.exec(process.argv.find((a) => a.startsWith('--keep=')) || '');
 if (argKeep && !CHECK) {
@@ -61,9 +31,8 @@ if (!existsSync(X)) {
   process.exit(1);
 }
 
-/* 🔴 KEEP `\\` AND `"` OUT OF THE ALPHABET. Both are legal in a JSON string and
-   both cost a backslash to write, which would make one symbol twice the size of
-   every other for no reason and would be invisible until somebody measured. */
+/* `\\` and `"` stay out of the alphabet: each would cost an escape in JSON.
+   See lessons/page-resources.md#resources-98 */
 const ALPHA = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+,-.:;<=>?@[]^_`{|}~";
 const PAD = ' ';                       // a row that is not there
 
@@ -104,103 +73,24 @@ function count(seqs) {
 const ranked = (m) => [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
 
 /**
- * 🔴 THE PRUNE, AND THE THREE NUMBERS IN IT WERE MEASURED RATHER THAN CHOSEN.
- * `demo/resources/bench-chord-suggester.mjs` graded the table at four settings on
- * held-out songs: unpruned reads 48.5 per cent top 1 and 120,662 bytes of JSON,
- * and `ctx>=8 row>=3 keep 3` reads **48.6 per cent and 25,252**. Pruning to a
- * fifth of the size costs nothing measurable, because everything it removes was
- * seen once or twice and was never going to be the top answer anyway.
- *
- * 🔴 `KEEP` WAS 3 UNTIL 2026-09-26 AND THE COMMENT BELOW ASKED FOR THIS
- * MEASUREMENT BY NAME. `demo/resources/chord-e6-keep.mjs` swept it at 3, 4, 5, 6
- * and 8, refitting the temperature at every step because the prune is itself a
- * temperature, and read the byte count off THIS packer rather than off a copy.
- * Held at the real songs' own cycle rate, which is the one comparison a scoring
- * rule cannot tilt:
- *
- *   jazz   KEEP 3  7.15 distinct in ten   KEEP 5  7.32   KEEP 8  7.41   real 7.42
- *   pop    KEEP 3  4.56                   KEEP 5  4.55   KEEP 8  4.51   real 4.65
- *
- * 🔴 SO THE VOCABULARY GAIN IS A JAZZ GAIN AND POP DOES NOT HAVE ONE. Raising
- * the prune closes 63 per cent of jazz's remaining gap and moves pop the wrong
- * way by a hundredth of a chord. That is worth knowing before anybody reads
- * *"the ceiling is the prune"* as a fact about tables in general.
- * 🔴 AND THE GAIN THAT PAID FOR THIS IS THE WAY HOME, NOT THE WALK. MEASURED
- * over 4,000 held-out jazz contexts: a four chord route to the tonic exists on
- * **92.7 per cent** of them at KEEP 3 and **98.5** at KEEP 5, over **307**
- * distinct routes against 150, with attestation 95.4 against 98.3. Seven contexts
- * in a hundred had no way home at all and now have one.
- * ⚠️ `MIN_ROW = 3` DOES NOT MOVE AND IS NOT WHAT CHANGED. A context with no
- * fourth row seen three times still keeps three rows: MEASURED, 32.6 per cent of
- * jazz contexts fill a fourth slot and 26.4 per cent a fifth, so most of them
- * never reach the new ceiling. Sampling with no floor costs 9.5 points of
- * attestation, which is the trade pure PMI was refused for.
- * ⚠️ AND 6 AND 8 WERE REFUSED RATHER THAN MISSED. They buy 0.02 and 0.09 more
- * distinct chords in ten for another 2,724 and 8,172 bytes, and take the route's
- * attestation to 95.2 and 94.4 against a floor of about 94.
+ * The prune, from chord-e6-keep.mjs: KEEP 5 lifts jazz to 7.32 distinct chords in ten (real
+ * 7.42) and a four chord route home on 98.5 per cent of contexts against 92.7; pop is flat.
+ * 6 and 8 cost 2,724 and 8,172 bytes more for no gain.
+ * See lessons/page-resources.md#resources-99
  */
 const MIN_CTX = 8, MIN_ROW = 3, KEEP = argKeep ? Number(argKeep[1]) : 5;
 
 /**
- * 🔴 THE TEMPERATURE THE PAGE DRAWS WITH, ONE NUMBER PER STYLE, AND IT IS IN THE
- * TABLE BECAUSE IT IS A FACT ABOUT THE STYLE RATHER THAN ABOUT THE CODE.
- * `plans/plan-better-chords-2026-09-25.md` measured that taking the most likely
- * chord ten times in a row falls into a repeating cycle **99.1 per cent** of the
- * time on jazz and **99.8** on pop, against **52.7** and **89.0** for the real
- * songs, and that sampling instead reproduces the real statistics.
- *
- * 🔴 AND THESE TWO NUMBERS ARE NOT THE PLAN'S TWO NUMBERS, WHICH IS THE
- * INTERESTING RESULT RATHER THAN A DISAGREEMENT. The plan swept temperatures
- * over EVERY row a context had and landed on 1.0 for jazz and 0.5 to 0.8 for
- * pop. **This table keeps three rows**, which is already a sharpening, so the
- * same variety costs a much flatter dial. MEASURED 2026-09-25 by
- * `demo/resources/chord-e4-generators.mjs`, which builds this exact shape from
- * the training split and walks ten steps through `suggest.mjs`'s own sampler:
- *
- *   jazz  T 1.0  81.6% cycle  5.92 distinct   T 3.5  53.1%  7.13   real 52.7%  7.42
- *   pop   T 1.0  92.1% cycle  4.30 distinct   T 1.4  87.3%  4.67   real 89.0%  4.65
- *
- * 🔴 AND THEY MOVED AGAIN ON 2026-09-26 BECAUSE `KEEP` MOVED, WHICH IS THE SAME
- * FINDING ARRIVING A SECOND TIME. Five rows is a flatter thing to draw from than
- * three, so the same variety costs a much COLDER dial: jazz fell from 3.5 to 1.7
- * and pop from 1.4 to 0.8. MEASURED by `demo/resources/chord-e6-keep.mjs`, which
- * refits the temperature at every prune for exactly this reason:
- *
- *   jazz  KEEP 5 T 1.7  52.5% cycle  7.33 distinct  97.0% attested   real 52.7%  7.42
- *   pop   KEEP 5 T 0.8  89.1% cycle  4.55 distinct  98.2% attested   real 89.0%  4.65
- *
- * ⚠️ A NUMBER BELOW 1 IS NOT A MISTAKE AND THE SEARCH HAD TO BE TAUGHT THAT. Pop
- * at five rows needs SHARPENING, not flattening, and a sweep floored at 1.0
- * answered 1.00 for every pop prune while missing the cycle rate by sixteen
- * points.
- * ⚠️ ATTESTATION IS THE FLOOR AND IT IS NOWHERE NEAR IT: 97.0 per cent on jazz
- * and 98.2 on pop, against the 94 nothing ships below.
+ * Temperature per style, refitted for KEEP 5 by chord-e6-keep.mjs: jazz 1.7 (52.5% cycle,
+ * 7.33 distinct; real 52.7, 7.42), pop 0.8 (89.1%, 4.55; real 89.0, 4.65). Below 1 is valid.
+ * See lessons/page-resources.md#resources-100
  */
 const TEMP = { jazz: 1.7, pop: 0.8 };
 
 /**
- * 🔴 HOW MUCH OF THE MIXTURE IS THE PLAYER'S OWN TAKE, ONE NUMBER PER STYLE, AND
- * IT IS IN THE TABLE FOR THE THIRD TIME FOR THE THIRD REASON. The temperature is
- * here because the corpora differ; so is this, and the difference is larger.
- * `plans/plan-better-chords-2026-09-25.md` section 6.2 measured 0.2 to 0.3 on
- * iRb and never looked at pop, so its range is a JAZZ range that reads as a
- * general one.
- *
- * MEASURED 2026-09-26 by `demo/resources/chord-e7-take.mjs`, with expansion off,
- * through this table's own shape and through `suggest.mjs`'s `adaptRows`:
- *
- *   jazz  w 0.25  +6.32 top 1   50.2% cycle  7.44 distinct  98.0% attested   real 52.0%  7.44
- *   pop   w 0.10  +5.09 top 1   86.7% cycle  4.67 distinct  98.4% attested   real 89.0%  4.65
- *   pop   w 0.25 would read +17.77 top 1 and 83.6% cycle with 4.89 distinct
- *
- * 🔴 SO POP'S HUGE TOP 1 GAIN IS THE PLAN'S OWN CAVEAT AT FULL VOLUME AND IS NOT
- * A REASON TO TURN THE DIAL UP. A Billboard run is a verse or a chorus, which is
- * a loop, so adapting to it predicts it almost for free and drives the generator
- * FURTHER from how real pop repeats itself rather than closer. **The four
- * measures are what refuse the bigger number**, which is the whole reason this
- * project does not score on top 1 alone.
- * ⚠️ AND A TABLE WRITTEN BEFORE THIS FIELD EXISTED READS AS 0.25, which is jazz's
- * measured value rather than a neutral one, stated here rather than hidden.
+ * Weight of the player's own take per style, from chord-e7-take.mjs: jazz 0.25, pop 0.1.
+ * Pop at 0.25 gains top 1 by over-fitting loops; a table without this field reads 0.25.
+ * See lessons/page-resources.md#resources-101
  */
 const MIX = { jazz: 0.25, pop: 0.1 };
 
@@ -224,22 +114,9 @@ const STEPS = ALPHA.length - 1;
 const pch = (p) => ALPHA[Math.max(0, Math.min(STEPS, Math.round(p * STEPS)))];
 
 /**
- * 🔴 THE UNIGRAM ON A LOG SCALE, BECAUSE ON THE LINEAR ONE ABOVE HALF THE
- * ALPHABET IS ZERO. MEASURED 2026-09-30: `pch` steps at 1/89, about 1.1 per cent,
- * and **46 counted jazz symbols and 57 counted pop symbols** are rarer than half a
- * step, so `uni` stores them as exactly 0. Every diminished, augmented and
- * suspended chord is in that list, `8dim` among them at a real **70 of 52,924**.
- * `suggest.mjs` ranks slot B by `log2(p / u)`, so a zero read as `1e-6` gave
- * every one of those chords about **17 bits** of specificity and it won slot B
- * whenever it reached the pool: **10.9 per cent of jazz slot B answers and 18.7
- * of pop** landed on a symbol whose unigram the table had thrown away.
- * ✅ ONE CHARACTER, `round(-UL * log2(u))`, SO A STEP IS A FIFTH OF A BIT AND THE
- * WORST ERROR IS 2^(1/10), ABOUT 7 PER CENT, AT ANY FREQUENCY. 88 steps reach
- * 2^-17.6, which is below one chord in the larger corpus (1 of 82,321 is
- * 2^-16.3), so no counted symbol can clamp and the build refuses if one does.
- * ⚠️ `uni` IS KEPT BESIDE IT, UNCHANGED, because eleven measurement scripts and
- * any table already cached read that field. `ulog` is new and a reader that
- * does not know it simply never sees it.
+ * The unigram on a log scale, one character `round(-UL * log2(u))`, a fifth of a bit a step:
+ * linear `uni` rounds 46 jazz and 57 pop symbols to 0. `uni` stays for existing readers.
+ * See lessons/page-resources.md#resources-102
  */
 const UL = 5;
 const ulch = (n, total) => {
@@ -279,11 +156,8 @@ function plain(m) {
 }
 
 const table = { v: 1, alpha: ALPHA, keep: KEEP, syms: SYMS };
-/* ⚠️ THE SPELLING IS A SECOND FIELD AND IT IS WHAT MAKES THE ANSWER READ AS
-   JAZZ. `7dom` is the function; the commonest surface spelling of it in iRb is
-   what a player expects to see written on the chart. A page that answers `G7`
-   where 1,966 standards wrote `G7b9` has thrown the style away while being
-   functionally correct. */
+/* The spelling is a second field: the commonest surface form, so `7dom` reads `G7b9`.
+   See lessons/page-resources.md#resources-103 */
 for (const which of ['jazz', 'pop']) {
   const { c } = styles[which];
   table[which] = {
@@ -323,13 +197,9 @@ console.log(`/nola/'s recordings, already shipped ${String(3824981).padStart(8)}
 console.log(`so the table is ${(100 * Buffer.byteLength(json) / 3824981).toFixed(2)} per cent of what that page already asks a visitor for.`);
 
 /**
- * 🔴 THE ROUND TRIP, AND THE SABOTAGE THAT PROVES IT IS NOT DECORATION. A packed
- * table is unreadable by eye, so the only thing standing between a packing bug
- * and a page that suggests the wrong chord confidently is this check. It decodes
- * what was just packed and asks nine named jazz questions of it.
- * ⚠️ AND IT IS RUN A SECOND TIME AGAINST A TRUNCATED TABLE. A check that stayed
- * green under that would be measuring nothing, which is this repository's most
- * repeated finding about its own instruments.
+ * The round trip: decode what was packed and ask nine named jazz questions, then run it again
+ * on a truncated table, which must fail.
+ * See lessons/page-resources.md#resources-104
  */
 const REV = new Map([...ALPHA].map((c, i) => [c, i]));
 function decode(st) {
@@ -372,9 +242,8 @@ console.log(`decoded: ${ok} of ${ASKS.length}.  the same check against a table t
 if (ok !== ASKS.length) { console.error('ROUND TRIP FAILED, nothing written.'); process.exit(1); }
 if (broken !== 0) { console.error('THE SABOTAGE DID NOT GO RED, so this check is decoration. Nothing written.'); process.exit(1); }
 
-/* 🔴 THE UNIGRAM ROUND TRIP, AND ITS SABOTAGE IS THE LINEAR COLUMN THIS FIELD
-   EXISTS TO REPLACE. Every counted symbol decodes to within 8 per cent of its
-   count, and the same check run over `uni` has to fail, or it is not looking. */
+/* Unigram round trip: every counted symbol within 8 per cent; the same check over `uni` must fail.
+   See lessons/page-resources.md#resources-105 */
 const uniWorst = (which, dec) => {
   const { c } = styles[which];
   let worst = 0, zero = 0;

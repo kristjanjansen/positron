@@ -44,18 +44,10 @@
   import { DEMOS } from '/manifest.mjs';
 
   /**
-   * 🔴 `/kit/` SINCE STEP 4 OF plans/plan-kit-split.md, 2026-10-06. It used to
-   * be every part of the kit on one page of eight tabs; that file moved with
-   * `git mv` to `demo/kit/slides/index.html`, so its history follows SLIDES,
-   * and every other part is a page of its own at `/kit/<part>/`.
-   * ⚠️ WHAT IT DOES: an old address naming a block, `/kit/#keyboard`, replaces
-   * itself with the part page holding that block, `/kit/input/#keyboard`; one
-   * naming a part, `/kit/#hardware`, goes to `/kit/hardware/`; anything else
-   * stays here and reads a list of the parts. The map is
-   * `demo/shell/kit-parts.mjs`, and every part page asserts its own row of it,
-   * so this page builds nothing and grades only the lookup.
-   * ⚠️ `replace`, NOT `assign`, so the back button skips the address that only
-   * existed to be forwarded.
+   * Forwards old addresses: /kit/#keyboard to the part page holding that block,
+   * /kit/#hardware to /kit/hardware/; the map is demo/shell/kit-parts.mjs. `replace`,
+   * not `assign`, so the back button skips the forwarded address.
+   * See lessons/page-kit.md#kit-1
    */
   const target = whereIs(decodeURIComponent((location.hash || '').replace(/^#/, '')));
   if (target && !SELFCHECK) location.replace(target);
@@ -67,9 +59,8 @@
     indexLabel: 'positron',
   });
 
-  // 🔴 THE KIT'S OWN INDEX SINCE 2026-10-10 (*"make a separate kit page (rm
-  // from frontpage)"*): the parts are off the front page and are cards here,
-  // each with the one line its manifest row carries, so the words cannot drift.
+  // The parts as cards, each with its manifest row's one line so the words cannot drift.
+  // See lessons/page-kit.md#kit-2
   const one = (part) => DEMOS.find((x) => x.name === `kit/${part}`)?.one || '';
   const cards = el('div', 'kit-cards');
   for (const p of KIT_PARTS) {

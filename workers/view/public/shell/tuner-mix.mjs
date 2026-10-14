@@ -5,11 +5,9 @@
 export const CLEAR_W = 0.035, ECHO_W = 0.13, ECHO_MAX = 0.35;
 
 /**
- * mix(t) for stations at points `at` (0 to 1) on the dial. Clear is a narrow
- * bell on the station; echo is a wide bell, faint, and only what clear leaves;
- * noise fills what no station holds; the whistle is the beat of a carrier
- * slightly off tune, silent dead on and gone far away, its pitch rising with
- * the distance.
+ * mix(t) for stations at `at` (0 to 1) on the dial: clear is a narrow bell, echo a faint wide
+ * one, noise fills what no station holds, and the whistle is an off-tune carrier's beat.
+ * why: lessons/kit-tuner-mix.md#create-mix
  */
 export function createMix(stations) {
   return function mix(t) {

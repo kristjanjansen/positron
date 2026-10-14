@@ -54,12 +54,10 @@
   import { drawOled, oledCanvas } from '/shell/oled-view.mjs';
   useMediumColours();
 
-  // /synth/recorder/ with the kit's own transport bar and timeline glued together in
-  // place of the hand-made record buttons and notes table. A take is items on a
-  // DECK; the deck plays them back through an adapter that sends each note out of
-  // rec:midi-out. /synth/keyboard/ plus a RECORDER, a node of its own: `rec:midi-in` takes the
-  // keyboard's notes along a link while armed, `rec:midi-out` plays them back
-  // into the synth along another.
+  // /synth/keyboard/ plus a recorder node with the kit's transport bar and timeline:
+  // `rec:midi-in` takes the keyboard's notes while armed, and the deck plays a take
+  // back out of `rec:midi-out` into the synth.
+  // See lessons/page-synth.md#synth-1
   const S = 'web';
   const bay = createBay();
 
@@ -82,19 +80,16 @@
   }
   const noteOff = (n) => voice.noteOff(n);
 
-  // ── the shader's picture: rings, one per pitch ───────────────────────
-  // In the manner of dotpiano.com. Every pitch has its own ring, low notes inside.
-  // A pen sits at the top and the whole picture turns clockwise under it, so a
-  // held note draws a continuous arc on its ring for as long as it is held. On
-  // release the arc stops growing, carries on turning and fades. The strokes live
-  // here and reach the shader as numbers every frame: a shader cannot hear a note.
+  // The shader's picture: one ring per pitch, low notes inside, turning clockwise under
+  // a pen at the top, so a held note draws an arc. The strokes live here and reach
+  // the shader as numbers every frame, because a shader cannot hear a note.
+  // See lessons/page-synth.md#synth-2
   const MAXS = 48, LIFE = 3000, LO = 48, HI = 67, SPIN = 0.7;   // SPIN in radians a second
   const strokes = [];              // { n, on, off, vel }
   const pens = new Map();          // note -> its stroke while held
-  // ── the midi node: generic MIDI STATE, nothing about pictures ──────────
-  // What is sounding and the last value of every controller, sent out of
-  // midi:value-out ON CHANGE, as a copy, to whatever is linked. CC 7 is volume and
-  // starts at 100. The shader keeps the last copy it was handed.
+  // The midi node: generic MIDI state (what sounds, the last value of every CC), sent
+  // out of midi:value-out on change as a copy. CC 7 is volume and starts at 100.
+  // See lessons/page-synth.md#synth-3
   const mstate = { notes: new Map(), cc: new Float32Array(128) };
   mstate.cc[7] = 100 / 127;
   function midiIn(e) {
@@ -151,10 +146,10 @@
     gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     uB = gl.getUniformLocation(prog, 'uBright'); uA = gl.getUniformLocation(prog, 'uAspect'); uN = gl.getUniformLocation(prog, 'uN'); uS = gl.getUniformLocation(prog, 'uS'); uW = gl.getUniformLocation(prog, 'uW');
   }
-  // TWO NODES. `midi` keeps generic MIDI state and sends it once a frame out of
-  // midi:value-out when it changes. `shader` keeps whatever arrived last on shader:value-in, keeps its
-  // own strokes from the notes in it, and turns CC 7 into brightness. It never
-  // sees an event. Cut the value link and the picture freezes.
+  // Two nodes: `midi` sends its state out of midi:value-out when it changes, `shader`
+  // keeps the last copy from shader:value-in and turns CC 7 into brightness. It never
+  // sees an event, so cutting the value link freezes the picture.
+  // See lessons/page-synth.md#synth-4
   let latest = null;               // the last state shader:value-in was handed
   function frame(now) {
     if (latest) {
@@ -194,15 +189,10 @@
   }
   requestAnimationFrame(frame);
 
-  // ── the Pico: the same rings drawn by C firmware on an emulated RP2040 ──────
-  // rig/pico/rings/main.c, built to /resources/pico/rings-pico.uf2 and run in
-  // rp2040js in a worker. pico:midi-in turns each event back into MIDI bytes and
-  // feeds them to UART0 RX, which is GP1, the DIN in. The firmware draws on its
-  // SSD1306 and every new screen comes back as 128x64 ones and zeros.
-  // ⚠️ NOTHING IS FETCHED ON A VISIT. The worker and the UF2 wait for the first
-  // key, knob or press of the panel; bytes that arrive meanwhile are kept and
-  // sent once it has booted.
-  // The device is the kit's (pico.mjs `createPicoDevice`, which /connect/ runs too).
+  // The Pico: rig/pico/rings/main.c on an emulated RP2040 in a worker, fed MIDI bytes on
+  // UART0 RX (GP1); its SSD1306 frames come back as 128x64 bits. Nothing is fetched on
+  // a visit: worker and UF2 wait for the first key, knob or press (pico.mjs createPicoDevice).
+  // See lessons/page-synth.md#synth-5
   const oledBox = el('div', 'cc-oled');
   oledBox.title = 'press to start the Pico';
   const oledCv = oledCanvas(oledBox);

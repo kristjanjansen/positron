@@ -1,14 +1,6 @@
-// The MoQ audio return, extracted from proto/jam's measured rig (session 6i,
-// 35.8 ms key->ear against WebRTC's 77.7).
-//
-// WHY IT IS FASTER, in one line: WebRTC's cushion is NetEQ's and cannot be
-// hinted away -- it clamps at 20 ms and forcing it destabilises. Here the
-// playout floor is OURS, so latency is a number you choose: the measured curve
-// maps floor ~1:1 into latency (10 -> 36 ms, 40 -> 66 ms).
-//
-// Reused rather than rewritten: /proto/jam/moq/www/moq-synth.js (the relay
-// wrapper) and /proto/jam/playout-worklet.js (pcm-capture tap + pcm-playout
-// ring with an underrun-counting floor).
+// demo/shell/moq-audio.mjs: the MoQ audio return from proto/jam (35.8 ms key to ear against
+// WebRTC's 77.7). The playout floor is ours, so latency is chosen: 10 -> 36 ms, 40 -> 66 ms.
+// why: lessons/kit-moq-audio.md#header
 
 export const MOQ_RELAY = 'https://draft-14.cloudflare.mediaoverquic.com';
 
@@ -46,36 +38,26 @@ async function pickOpus(preferUs = 5000) {
 }
 
 /**
- * Publish `bus` to the relay under `ns`. Returns { stats(), close() }.
- * `msDest` must be a MediaStreamDestination fed by the same graph — see the
- * pacer note below; without it a HEADLESS context free-runs in bursts and the
- * subscriber starves through every retry while everything reports healthy.
+ * Publish `bus` to the relay under `ns`. Returns { stats(), close() }. `msDest` must be fed by the
+ * same graph (the pacer). groupMs 200 is measured: 0.0% loss on both relays against 50 ms's
+ * 0.8 to 2.2%, and the fastest Cloudflare config.
+ * why: lessons/kit-moq-audio.md#publish-synth
  */
-// groupMs 200 IS THE MEASURED DEFAULT, not a guess. One MoQ group is one QUIC
-// uni-stream, so 50 ms groups opened 20 streams a second and 200 ms opens 5.
-// Swept across both relays, twice each: 50 ms lost 0.8% on the LAN and 2.2% over
-// Cloudflare, 200 ms lost 0.0% on BOTH -- and was also the FASTEST Cloudflare
-// config (73 ms against 76), so it costs nothing to take.
 export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 200, latencyMax = 100, frameUs = 5000, connect = null, log = () => {} }) {
   await loadWrapper();
   await ac.audioWorklet.addModule(WORKLET);
 
-  // REALTIME PACING PIN. A headless AudioContext with nothing pulling it renders
-  // in bursts (measured 0.2-2.9 s stalls then catch-up), which the capture tap
-  // faithfully reproduces and the subscriber sees as starvation. A muted element
-  // consuming the stream restores the realtime pull. One element for the page's
-  // life: a per-arm one that got paused left the SECOND run with no puller at
-  // all and zero groups on the wire.
+  // A muted element pulls the stream so a headless context renders in realtime, not in bursts
+  // (0.2 to 2.9 s stalls). One for the page's life: a paused per-arm one left the second run silent.
+  // why: lessons/kit-moq-audio.md#pacer
   const pacer = new Audio();
   pacer.srcObject = msDest.stream;
   pacer.muted = true;
   pacer.play().catch((e) => log('pacer play failed: ' + e.message));
 
-  // latencyMax is the window the relay RETAINS, and the wrapper's default is
-  // 2000 ms. Left at that, a subscriber joining mid-stream is served the whole
-  // two seconds and spends the run draining it -- measured: transit starting at
-  // 2030 ms and counting down, decode perfect, underruns zero. Everything looks
-  // healthy and every sound is two seconds old.
+  // The window the relay retains; at the wrapper's 2000 ms default a late joiner hears everything
+  // two seconds old.
+  // why: lessons/kit-moq-audio.md#latency-max
   const pub = await window.MoqSynth.publisher(relay, ns, { withVideo: false, latencyMax, connect });
   log(`moq publishing "${ns}" (relay ${pub.version ?? '?'}, retains ${latencyMax} ms)`);
 
@@ -104,10 +86,9 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
   });
   enc.configure(cfg);
 
-  // Tap the synth bus. 128-frame quanta; media timestamps are anchored ONCE off
-  // the first quantum's context time and then advanced by exact sample count --
-  // re-anchoring per quantum would inject the main thread's jitter into the
-  // timeline the decoder reads.
+  // Tap the synth bus in 128-frame quanta; timestamps anchor once and advance by sample count,
+  // so main-thread jitter never enters the timeline.
+  // why: lessons/kit-moq-audio.md#capture-tap
   const cap = new AudioWorkletNode(ac, 'pcm-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
   const sink = ac.createGain(); sink.gain.value = 0;
   bus.connect(cap); cap.connect(sink).connect(ac.destination);

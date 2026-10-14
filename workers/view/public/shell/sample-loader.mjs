@@ -1,22 +1,7 @@
-// demo/shell/sample-loader.mjs: samples out of whatever somebody drops on a
-// page. A `.circuitpack` (zip or sysex), a zip of packs or of a bulk transfer,
-// a zip of plain WAVs, or loose WAVs picked together. It returns named samples,
-// each one `readWave`'s result, in the pack's own order.
-//
-// Lifted 2026-10-12 out of /tom/, whose `openPack`, `openZip` and
-// `openStream` this is, word for word in what they say, for
-// /drums/samples/ (*"drums that play samples"*). /tom/ calls the three
-// it always had; the plain WAV cases are `openFiles` and are new.
-//
-// 🔴 READ ONLY, AND NOTHING LEAVES THE PAGE. It reads bytes a person handed
-// over with `unzip.mjs` and `circuit-sample.mjs` and names no network API,
-// MIDI port or SysEx output at all. `circuit-sample.mjs`'s own property holds
-// here: a bulk transfer is decoded, never sent; whether one WRITES FLASH on an
-// instrument is unsettled and nothing here can send one either way.
-//
-// ⚠️ A FILE THAT WILL NOT PARSE KEEPS ITS PLACE AND CARRIES ITS REASON
-// (`samplesIn`'s rule): a caller gets `wave.ok === false` and `row.why`, never
-// a shorter list.
+// demo/shell/sample-loader.mjs: samples out of whatever is dropped on a page (a .circuitpack,
+// a zip of packs or WAVs, loose WAVs), in the pack's order. Read only: it sends nothing.
+// A file that will not parse keeps its place with `wave.ok === false` and `row.why`.
+// why: lessons/kit-sample-loader.md#header
 
 import { readZip } from './unzip.mjs';
 import { samplesIn, summariseAll, containerOf, sampleSetIn, CONTAINER, readWave, summarise } from './circuit-sample.mjs';
@@ -47,7 +32,8 @@ export function createSampleLoader({ say = () => {}, log = () => {} } = {}) {
     const all = summariseAll(got.map((g) => g.wave));
     log(`${name}: ${all.parsed} of ${all.count} samples read`
       + (all.refused ? `, ${all.refused} refused` : '')
-      // ⚠️ ONLY WHERE SOMETHING PARSED. `shortest` is 0 over an empty set.
+      // Only where something parsed: `shortest` is 0 over an empty set.
+      // why: lessons/kit-sample-loader.md#shortest
       + (all.parsed ? `, ${all.shortest.toFixed(2)} s to ${all.longest.toFixed(2)} s` : ''));
     say(`${name}${from ? ` ${from}` : ''}`, 'good');
     return got;

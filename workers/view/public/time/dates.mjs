@@ -1,19 +1,7 @@
-// demo/time/dates.mjs: the DATES tab of /time/, which was /strip/.
-//
-// Two thousand years on one line, where many of the dates are a bracket rather
-// than a day. This was the SANDBOX for `timeline/strip.mjs`, and it still is:
-// every thing the component can do is pointed at a fixture small enough to
-// read. The history of each decision is in git under `demo/strip/index.html`.
-//
-// 🔴 ITS CHECKS USED TO RUN ON EVERY PRESS OF `Fit`, FOR A VISITOR TOO. They
-// were cheap, and the one that moved the view was already gated, but a page
-// that grades itself when a person presses a button is grading in front of
-// them. `Fit` fits now, and the checks run from the page's one check pass.
-// ⚠️ AND THE BAR IS GLUED TO THE STRIP, WHICH THE OLD PAGE WAS NOT. The other
-// four tabs were glued on 2026-09-25 (*"timeline demos: glue transport and
-// timelines"*) and this one was missed because it sat in another group. The
-// bar passes `scrub: false` because the strip is its position surface, which
-// is the claim gluing makes.
+// DATES tab: two thousand years on one line, many dates a bracket rather than a
+// day; the sandbox for `timeline/strip.mjs`. Checks run only from the check pass.
+// The bar is glued with `scrub: false`, the strip being its position surface.
+// See lessons/page-time.md#time-34
 
 import { el, fmtNum } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -32,22 +20,21 @@ const t0 = Date.UTC(100, 0, 1);
 const yr = (year) => t0 + (year - 100) * YEAR;
 const GLYPH = { exact: '·', ignorance: '?', vagueness: '~' };
 
-/** Four cells, all in calendar words (asked 2026-10-05 as *"fix time"*):
- *  the date under the playhead at the ruler's own precision, how much time is
- *  in view, the ruler's step, and how many of the dates are on screen. They
- *  were `year`, `grid`, `finest 0.004 ms` and `zoom left 7.0e13 ×`, and the
- *  last two measured the float behind the axis, which no visitor can use: at
- *  year 1100 the float allows a 256th of a millisecond, so the calendar runs
- *  out of meaning long before the number does. Those limits are still
- *  asserted, in `check`. */
+/**
+ * Four cells in calendar words: the date under the playhead, time in view, the
+ * ruler's step, dates on screen. The float limits behind the axis are asserted
+ * in `check`, not shown: the calendar runs out of meaning first.
+ * See lessons/page-time.md#time-35
+ */
 // What this tab is, in the fixed box under the tab row (`tab-page.mjs` rule 6).
 export const about = 'Two thousand years on one line, where many dates are a range rather than a day. Zoom in until each mark shows how sure its date is.';
 
 export const readout = { date: '', 'in view': '', grid: '', 'dates shown': '' };
 
 export function build({ panel, set, log }) {
-  // SHAPED LIKE AN ARCHIVE: dates crowd towards the present and get vaguer
-  // further back. Deterministic, so one load draws what the last one drew.
+  // Shaped like an archive: dates crowd towards the present and get vaguer further
+  // back. Deterministic, so every load draws the same.
+  // See lessons/page-time.md#time-36
   const items = [];
   for (let i = 0; i < 22; i++) {
     const u = i / 21;
@@ -70,8 +57,8 @@ export function build({ panel, set, log }) {
 
   const { adapter } = markAdapter({ rates: [0.25, 0.5, 1, 2] });
   const deck = createDeck({ items, adapters: { era: adapter }, range: [t0, t0 + SPAN] });
-  // 🔴 OPEN ON A REAL DATE. Position 0 is 1970, where `ulpMs(0)` is the
-  // smallest denormal and three of the four numbers measured the origin.
+  // Open on a real date: position 0 is 1970, where `ulpMs(0)` is the smallest denormal.
+  // See lessons/page-time.md#time-37
   deck.seek(t0 + SPAN / 2);
 
   const host = el('div');
@@ -85,23 +72,21 @@ export function build({ panel, set, log }) {
   const HI = getComputedStyle(document.documentElement).getPropertyValue('--hi').trim() || '#ffd400';
   const view = createStripView(host, deck, {
     size: 'auto',
-    // 🔴 FOLLOW OFF: following put the playhead at 28% and slid every dated
-    // thing off the left edge before the first frame.
+    // Follow off: following puts the playhead at 28% and slides the dates off the left.
+    // See lessons/page-time.md#time-38
     follow: false,
     // DATES on the axis, not a distance from 1970.
     absolute: true,
-    // ...and ruled in real years, months and days, as a calendar is, rather
-    // than in thousands of years counted from 1970 (`-1.0 ka`), which is
-    // what the ms ladder printed here until 2026-10-05.
+    // ...and ruled in real years, months and days, as a calendar is.
+    // See lessons/page-time.md#time-39
     calendar: true,
     // The `in view` cell says it, in a box that is there at every width; the
     // strip's own gutter copy dropped out at 375 and repeated it at 1280.
     zoomReadout: false,
     lanes: [
-      // The mark becomes its character where the zoom has made room.
-      // `gutterReserve` is the widest line each lane can show, so the gutter
-      // is sized for `22 of 22` and does not narrow at `0 of 0`, which moved
-      // the plot's left edge under a reader zooming in.
+      // The mark becomes its character where zoom has made room. `gutterReserve`
+      // sizes the gutter for the widest line, so the plot's left edge never moves.
+      // See lessons/page-time.md#time-40
       { id: 'sure', kind: 'era', label: 'how sure', height: 26, as: 'ticks',
         color: HI, width: 2, glyphOf: (r) => GLYPH[r.payload?.sure] || '',
         gutterReserve: `${items.length} of ${items.length} legible` },
@@ -134,12 +119,9 @@ export function build({ panel, set, log }) {
   const shown = (t0, t1) => items.filter((r) =>
     (r.when ? r.when.latest : r.at) >= t0 && (r.when ? r.when.earliest : r.at) <= t1).length;
 
-  // 🔴 THE PLOT CAN WIDEN AFTER THE FIT, AND THEN THE VIEW SHOWS MORE TIME THAN
-  // WAS FITTED. MEASURED 2026-10-05 on the 1280 shot: fitted to 2000 years,
-  // drawn as 4,862, every date in the left third, because the fit ran before
-  // the panel had its final width. So a change of plot width with the view
-  // otherwise untouched keeps the SPAN, not the scale. A zoom or a pan changes
-  // the view and is left alone.
+  // The plot can widen after the fit (2000 years drawn as 4,862). A width change
+  // with the view untouched keeps the span, not the scale; zoom and pan are left alone.
+  // See lessons/page-time.md#time-41
   let last = null;
   function keepSpan() {
     const v = strip.view();
@@ -168,14 +150,9 @@ export function build({ panel, set, log }) {
   }
 
   /**
-   * ZOOM ABOUT THE PLAYHEAD, NOT ABOUT THE MIDDLE OF THE PLOT. `zoomIn()` holds
-   * the plot's centre still, which is the playhead only if nothing has moved
-   * it by a pixel, and every pixel off is multiplied by each press after it.
-   * MEASURED 2026-10-05: after 28 presses the view was 9 to 18 Feb 1100 with
-   * the playhead on 1 Jan 1100, off the left edge. So the playhead's own x is
-   * the anchor and stays where it is on screen; if it is already off screen it
-   * is brought to the middle first, because zooming about a point nobody can
-   * see is zooming away from it.
+   * Zoom about the playhead, not the plot's centre, whose pixel error multiplies on
+   * every press. The playhead's x is the anchor; off screen, it is centred first.
+   * See lessons/page-time.md#time-42
    */
   function zoom(f) {
     const t = deck.position();
@@ -210,10 +187,9 @@ export function build({ panel, set, log }) {
   log(`${(SPAN / YEAR).toFixed(0)} years, ${bracketed} of ${items.length} dates carry a bracket`);
 
   /**
-   * HOW IT WORKS, read off this file and `timeline/strip.mjs`: dated rows, some
-   * with a `when` bracket, on a deck whose positions are epoch milliseconds,
-   * drawn by the strip in three lanes under a calendar ruler, and the zoom
-   * buttons that move the strip's view about the playhead.
+   * Dated rows, some with a `when` bracket, on a deck in epoch ms, drawn in three
+   * lanes under a calendar ruler; the zoom buttons move the view about the playhead.
+   * See lessons/page-time.md#time-43
    */
   const how = tabDiagram(panel, () => ({
     caption: 'Two thousand years on one ordinary timeline. What changes is how sure each date is '
@@ -251,7 +227,9 @@ export function build({ panel, set, log }) {
 
   return {
     deck, bar,
-    // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
+    // Two frames on: a strip fitted before its panel lays out fits its range into
+    // the width it had then (20 s in about 160 px at 1280).
+    // See lessons/page-time.md#time-44
     show() {
       how.draw();
       requestAnimationFrame(() => requestAnimationFrame(() => { strip.fit(); refresh(); }));
@@ -276,23 +254,24 @@ export function build({ panel, set, log }) {
         ulpMs(DATE_WALL_MS) > ulpMs(t), `${ulpMs(t)} ms here, ${ulpMs(DATE_WALL_MS)} ms at the wall`);
       A('past 8.64e15 ms a date is no longer a date', DATE_WALL_MS === 8.64e15, String(DATE_WALL_MS));
 
-      // THE STATISTIC IS READ OFF THE PICTURE: `aggregateStat` is what the
-      // last frame actually drew, not a second computation beside it.
+      // The statistic is read off the picture: `aggregateStat` is what the last frame drew.
+      // See lessons/page-time.md#time-45
       strip.draw();
       const a = strip.aggregateStat('spread');
       A('uncertain dates spread out, they do not spike', !!a && a.max > 0 && a.cols > 1,
         a ? `${a.cols} columns, tallest ${a.max.toFixed(4)}` : 'the lane drew nothing');
       A('the spread keeps the weight it was given', !!a && a.total > 0, a ? a.total.toFixed(3) : 'none');
-      // THE LEDGER BALANCES AT EVERY ZOOM: counted plus added-nothing is all.
+      // The ledger balances at every zoom: counted plus added-nothing is all.
+      // See lessons/page-time.md#time-46
       A('the spread accounts for every bracket it was handed',
         !!a && a.items === a.counted + a.open && a.items <= bracketed,
         a ? `${a.items} of ${bracketed} brackets in this window, counted ${a.counted},`
           + ` added nothing ${a.open}, cut by the edge ${a.clipped}` : 'none');
       A('it names the method it used', !!a && typeof a.method === 'string' && a.method.length > 0,
         a ? a.method : 'none');
-      // THE RULER IS A CALENDAR: fitted, every label is a whole year on a
-      // round step, the same writing the `date` cell uses. It read `-1.0 ka`
-      // and `0.0 ka` beside a cell reading `1100` until 2026-10-05.
+      // The ruler is a calendar: fitted, every label is a whole year on a round step,
+      // the same writing the `date` cell uses.
+      // See lessons/page-time.md#time-47
       const cal = calendarLOD(strip.view().pxPerSecond).major;
       const [v0, v1] = strip.visible();
       const labels = calendarTicks(cal, v0, v1).map((x) => calendarLabel(x, cal));

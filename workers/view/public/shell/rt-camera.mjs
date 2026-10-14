@@ -1,8 +1,7 @@
-// demo/shell/rt-camera.mjs: the runtime of a `camera` node on /connect/
-// (node-runtime.mjs): this tab's camera (camera.mjs). Its face is Start and
-// the camera picker; the picture is a screen's, so it leaves on
-// camera:video-out to whatever that link reaches, pulled a frame at a time.
-// 🔴 THE CAMERA OPENS ONLY ON A PERSON'S PRESS OF START, never on a link.
+// demo/shell/rt-camera.mjs: the runtime of a `camera` node on /connect/ (camera.mjs).
+// Face: Start and the camera picker; the picture leaves on camera:video-out a frame at a time.
+// The camera opens only on a person's press of Start, never on a link.
+// why: lessons/kit-rt-camera.md#header
 
 import { createCamera } from './camera.mjs';
 

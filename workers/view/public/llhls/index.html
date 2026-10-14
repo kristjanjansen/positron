@@ -19,42 +19,17 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
-<!-- 🔴 NO PAGE STYLESHEET SINCE 2026-09-29. It held two rules and both went with
-     the things they dressed: a bare `video` rule, now that the picture lives in
-     a video panel whose stage owns its width, height, shape and object-fit, and
-     a `.hold` pill for the publisher badge that the stream toggle replaced. A
-     `border-radius` and a `margin` on a video inside a `.pos-vp-stage` are a box
-     drawn inside a box and a gap inside a picture. -->
-<!-- 🔴 ONE PAGE RULE SET AGAIN SINCE 2026-09-30, AND IT IS ABOUT THE TWO
-     REFERENCE TABLES UNDER THE PICTURE AND NOTHING ELSE. Asked, verbatim: *"do
-     not wrap optoins. have default and recommended cols with values. use sans
-     serif for comment (change col title)"*, with maxLiveSyncPlaybackRate and
-     initialLiveManifestSize broken mid word at desk width. `table.mjs` lets a
-     cell break anywhere, which is right for a file name and wrong for an
-     identifier somebody will paste into their own config, so the no-wrap is on
-     this column only and the component is untouched.
-     ⚠️ THE TRACKS ARE IN `ch`, NOT px. `.pos-tbl` is the mono face, where `ch`
-     is exactly one character, so 31ch is `manifestLoadingMaxRetryTimeout` with
-     one to spare and cannot drift when a name is added or the size changes.
-     Every row is its own grid, so the tracks have to be declared rather than
-     `max-content`, or the header and the rows would disagree.
-     ⚠️ THE PHONE IS DECIDED BY THE TABLE'S OWN WIDTH, NOT THE WINDOW'S. Below
-     640 px of table a no-wrap name, two values and a paragraph cannot share one
-     line, so the row stacks: the name on its own line, the two values under it
-     on two columns, and the comment under those at the full width. Nothing
-     scrolls sideways. The header stacks the same way, so it reads as the key to
-     every row under it.
-     ⚠️ THE COMMENT IS THE PAGE'S PROSE FACE AT THE SIZE OF THE CAPTION JUST
-     ABOVE IT (`.pos-dg-cap`), so the words under the picture and the words in
-     the table read as one voice. -->
+<!-- No video rule: the video panel's stage owns the picture's size, shape and fit, and a
+     radius or margin inside `.pos-vp-stage` is a box inside a box.
+     See lessons/page-llhls.md#llhls-1 -->
+<!-- The two reference tables under the picture: option names never wrap, tracks are in `ch`
+     of the mono face (31ch fits the longest name), and below 640 px of table each row
+     stacks name, values, comment. The comment uses the caption's prose face.
+     See lessons/page-llhls.md#llhls-2 -->
 <style>
-/* ⚠️ REGISTERED, BECAUSE `ch` RESOLVES AGAINST EACH ELEMENT'S OWN FONT. The
-   header row is 10 px and the rows are 11 px, so `31ch` typed on the rows made
-   the header's columns ten per cent narrower than the body's and every heading
-   sat left of its column. A registered `<length>` computes ONCE, on `.hls-opts`
-   in the table's own 11 px mono, and every row inherits the same pixels. A
-   browser without `@property` gets the old per-row reading, which is a heading
-   a few pixels off, not a broken table. */
+/* Registered, because `ch` resolves against each element's own font (header 10 px, rows
+   11 px): it computes once on `.hls-opts`. Without `@property` a heading sits a few px off.
+   See lessons/page-llhls.md#llhls-3 */
 @property --hls-c1 { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --hls-c2 { syntax: '<length>'; inherits: true; initial-value: 0px; }
 @property --hls-c3 { syntax: '<length>'; inherits: true; initial-value: 0px; }
@@ -85,47 +60,28 @@
 
   const d = mount({
     name: 'llhls',
-    // 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE. This was two, and the
-    // second one (*"Opening this page is what starts the stream"*) is the whole
-    // subject of the picture at the foot of the page now, said there with the
-    // machine that does it drawn beside it. A paragraph and a diagram of one
-    // thing are two explanations and the paragraph is the weaker.
+    // One sentence, the index's own line. How the stream starts is the picture at the foot.
+    // See lessons/page-llhls.md#llhls-4
     what: 'The tuned low-latency player, whose live input was retired on 2026-10-13.',
     readout: { latency: 's', advance: '×', buffer: 's', holes: '', stalls: '', switches: '' },
-    // 🔴 NO CONTROL DECLARED HERE, AND NO PRIMARY BUTTON. Asked 2026-09-29:
-    // *"rm primary button with status togglebutton: stream off | starting | on.
-    // make a global component for this if needed"*. The control is built below,
-    // out of `createPresenceButton`, and appended to this same row, which is
-    // where `demo/verify.mjs` presses.
+    // No control declared here and no primary button: the toggle is built below with
+    // `createPresenceButton` and appended to this row, where demo/verify.mjs presses.
+    // See lessons/page-llhls.md#llhls-5
     controls: [],
   });
   guard(d);
 
   /**
-   * 🔴 THE CONTROL IS THE STATUS, AND NO NEW COMPONENT WAS WRITTEN FOR IT.
-   * `createPresenceButton` is already a control row button whose face is a live
-   * badge: it reserves the width of the longest phrase it can say so it cannot
-   * twitch, fades the word through rather than resizing, keeps its own live
-   * region for a screen reader, and four instrument pages drive one. What was
-   * missing was three words, and three words typed into two pages is the
-   * argument `presence.mjs` already makes about `WIRED`. `STREAM` is that map
-   * and `/webrtc/` takes the same one.
-   *
-   * 🔴 A PRESS DURING `starting` STOPS, AND THE CONTROL SAYS SO RATHER THAN
-   * LOOKING DEAD. The middle state is about half a minute here: a cold
-   * container, ffmpeg, and Cloudflare's ingest filling. That is long enough
-   * that somebody who pressed by accident will press again, and it is the one
-   * stretch where this page is spending a container and Stream minutes on
-   * nobody. Ignoring the press would be a control that does nothing and says
-   * nothing. The reason rides on the badge's own title, which is the two line
-   * tooltip `presence.mjs` already builds.
+   * The control is the status: `createPresenceButton` with the `STREAM` words from
+   * presence.mjs, shared with /webrtc/. A press during `starting` (about 30 s) stops, and
+   * the reason rides on the badge's tooltip.
+   * See lessons/page-llhls.md#llhls-6
    */
   const stream = createPresenceButton({
     of: '', showName: false, state: 'offline', says: streamSays('LL-HLS'), can: STREAM_CAN,
-    // 🔴 ONE NAME FOR BOTH HALVES. The label a screen reader hears has to name
-    // the ACTION, and this button's action changes with its state, so a name
-    // that said only `start` would be wrong half the time and would go stale
-    // silently. `presence.mjs` records the same trap on the instrument header.
+    // One name for both halves: the accessible label names the action, which changes with
+    // the state.
+    // See lessons/page-llhls.md#llhls-7
     aria: 'start or stop the stream',
     press: () => d.run('toggle'),
   });
@@ -134,39 +90,18 @@
   d.controls.append(stream.el);
 
   /**
-   * 🔴 NO NATIVE `controls`, AND IT WENT WITH THE VIDEO PANEL RATHER THAN ON
-   * ITS OWN. LOOKED AT 2026-09-29, at 1280 px: the element's own bar drew a
-   * play button, a `0:00` clock and a SCRUB BAR across the bottom of a LIVE
-   * stream, and its own ⛶ sat directly above the panel's ⛶. A position
-   * surface on something with no position is the shape of control this project
-   * calls a lie, and two ways to fill the screen an inch apart is the same
-   * defect one layer up. Starting and stopping is the control at the top of
-   * the page now, and filling the screen is the panel's own square.
-   * ⚠️ WHAT GOES WITH THEM IS UNMUTING, WHICH IS WORTH SAYING. This
-   * element is muted because autoplay requires it, and what it carries is a
-   * test pattern rather than anything to listen to.
+   * No native `controls`: they drew a scrub bar on a live stream and a second fullscreen
+   * button. The toggle starts and stops, the panel's square fills the screen. Muted for autoplay.
+   * See lessons/page-llhls.md#llhls-8
    */
   const video = el('video', '', null, { playsinline: '', muted: '' });
   video.muted = true;
 
   /**
-   * 🔴 THE PICTURE IS A VIDEO PANEL SINCE 2026-09-29, ASKED FOR AS *"use in
-   * llsl use videopanel with resolution / fps (fix w so it did not ump
-   * horztally) and short spec what streams it"*.
-   *
-   * 🔴 THE PARENTHESIS IS THE HARD PART AND IT IS CELLS, NOT A STRING. CLAUDE.md,
-   * written about a footer reading `Apple GPU · locked 59.9 fps`: a row of facts
-   * is cells, not one string with glue in it. So resolution, frame rate and
-   * what the encoder sends are three cells, each with its
-   * own reserved width in characters of the mono face it is set in, and
-   * `.pos-vp-v` is `tabular-nums` so a `1` is as wide as a `0`. `1280x720`
-   * becoming `1x1` for one frame then moves nothing, which the check at the
-   * foot of this page measures rather than assumes.
-   *
-   * ⚠️ NO PRESENCE DOT. `left: null`, so the value row has the left slot to
-   * itself: whether the thing feeding this picture is answering is what the
-   * control at the top of the page now says, in words, and a dot repeating it
-   * under the picture is the same fact twice.
+   * A video panel whose resolution, frame rate and encoder spec are three cells with
+   * reserved widths and `tabular-nums`, so a changing value moves nothing. `left: null`: no
+   * presence dot, the toggle already says it.
+   * See lessons/page-llhls.md#llhls-9
    */
   const panel = createVideoPanel({
     media: video,
@@ -181,32 +116,22 @@
     ],
   });
   /**
-   * The short spec, read off `workers/pub/container/server.mjs` rather than
-   * remembered: this leg is libx264 at a fixed bitrate with AAC beside it. The
-   * rest of it, the constant bitrate, the keyframe every segment and the
-   * B-frames switched off, is a sentence and lives in the picture's own note,
-   * where there is room for one.
+   * The short spec, read off workers/pub/container/server.mjs: libx264 at a fixed bitrate
+   * with AAC. The rest is in the picture's note.
+   * See lessons/page-llhls.md#llhls-10
    */
   /**
-   * 🔴 THE SPEC IS WRITTEN WHEN THERE IS A PICTURE TO BE A SPEC OF, NOT ON
-   * LOAD. Asked 2026-09-29 against a phone screenshot of this page sitting at
-   * `STREAM OFF`: *"Do not show video details until we have incomng data"*.
-   * It used to be set here, at build time, which kept the footer's value row
-   * non-empty for ever and so kept it on screen describing a stream nobody had
-   * started.
-   * ⚠️ **AND THE HIDING IS THE KIT'S, NOT THIS PAGE'S.** `createPanelValues`
-   * hides its row while every cell is empty, so all this page has to do is not
-   * write a cell early. There is no `hide()` call here to forget.
+   * The spec is written when a picture arrives, not on load; `createPanelValues` hides its
+   * row while every cell is empty, so this page only has to not write a cell early.
+   * See lessons/page-llhls.md#llhls-11
    */
   const SOURCE = 'H.264 + AAC';
   d.el.append(panel.el);
 
   /**
-   * 🔴 A CUSTOM PROPERTY, NOT `video.style.aspectRatio`. This was `matchAspect`,
-   * which writes the shape onto the ELEMENT, and an inline style beats every
-   * selector in `shell.css` including the two that let a panel fill a screen.
-   * `--vp-aspect` is the channel `video-panel.mjs` publishes for exactly this,
-   * and the stage falls back to 16 / 9 when nothing has set it.
+   * A custom property, not `video.style.aspectRatio`: an inline style beats the shell.css
+   * rules that let a panel fill a screen. `--vp-aspect` falls back to 16 / 9.
+   * See lessons/page-llhls.md#llhls-12
    */
   const shape = () => {
     const w = video.videoWidth, h = video.videoHeight;
@@ -218,10 +143,9 @@
   video.addEventListener('loadedmetadata', shape);
   video.addEventListener('resize', shape);
 
-  // ── report what this device sees ────────────────────────────────────────
-  // A phone cannot be attached to a debugger from here, so it posts instead.
-  // Batched and fire-and-forget: diagnostics must never be able to make the
-  // page worse than the problem being diagnosed.
+  // A phone cannot be attached to a debugger, so it posts its diagnostics, batched and
+  // fire-and-forget so they can never make the page worse.
+  // See lessons/page-llhls.md#llhls-13
   const pending = [];
   let shipTimer = null;
   let shipTick = 0;
@@ -250,29 +174,20 @@
   }
 
   let player = null, ws = null, stalls = 0, rebuilds = 0, resyncs = 0, holes = 0, last = null;
-  // `held` is the socket, which is what the publisher counts. It survives the
-  // badge that used to show it, because the check below reads it and because a
-  // toggle reading `on` while nothing is held would be a page lying about the
-  // one fact it is responsible for.
-  // ⚠️ DECLARED HERE RATHER THAN BESIDE `settle()`, WHICH IS WHERE IT READS
-  // BEST AND WOULD BE IN THE TEMPORAL DEAD ZONE FOR `stop()` ABOVE IT. This
-  // project has already lost seven asserts to a `let` declared after the code
-  // that reads it.
+  // `held` is the socket the publisher counts; the check reads it. Declared here rather than
+  // beside `settle()`, where `stop()` above would meet it in the temporal dead zone.
+  // See lessons/page-llhls.md#llhls-14
   let held = false, unwatchFps = null, abort = null, playing = false;
   /**
-   * 🔴 A GENERATION, BECAUSE THE START PATH AWAITS FOR HALF A MINUTE AND CAN BE
-   * STOPPED IN THE MIDDLE OF IT. Every `await` in `start()` is a place a press
-   * can land, and without a number to compare against, a start that was
-   * cancelled would come back afterwards and attach a player to a socket that
-   * had already been let go. Same shape as the per-join generation tag
-   * `workers/rtc` uses against a ghost rejoin.
+   * A generation: every `await` in `start()` is a place a press can land, so a cancelled start
+   * must not attach a player to a socket already let go. Same as workers/rtc's join tag.
+   * See lessons/page-llhls.md#llhls-15
    */
   let gen = 0;
 
-  // ?cap=360 pins the ladder at or below 360p. This is the CONTROL for the
-  // decode-bound reading: if the same phone advances at ~1.0x on 360p and
-  // ~0.2x on 720p, the bottleneck is the device presenting frames, and the
-  // FPS capping above is the fix rather than a guess.
+  // ?cap=360 pins the ladder at or below 360p, the control for the decode-bound reading: ~1.0x
+  // on 360p against ~0.2x on 720p means the device is the bottleneck.
+  // See lessons/page-llhls.md#llhls-16
   const capH = Number(new URLSearchParams(location.search).get('cap')) || 0;
 
   // ?player=native|hlsjs forces the engine. On an iPhone 'auto' now resolves to
@@ -288,35 +203,28 @@
   ship(`BUILD ${BUILD} player=${forced || 'auto'} ua=${navigator.userAgent.slice(0, 58)}`);
 
   /**
-   * The one control, and it decides from the state it is showing rather than
-   * from a flag beside it: there is only one reading of `stream off` and one of
-   * the other two, so the control cannot disagree with itself.
+   * The one control decides from the state it shows, so it cannot disagree with itself.
+   * See lessons/page-llhls.md#llhls-17
    */
   /**
-   * 🔴 `stream.state()`, NOT `stream.state`. It is a FUNCTION on the presence api
-   * (`state: () => now`) and `createPresenceButton` hands it through a getter,
-   * so the bare property is the function itself and `fn === 'offline'` is false
-   * forever. MEASURED on the first run of this control: the harness pressed the
-   * toggle, this line called `stop()` on a page that had never started, and the
-   * suite read 16/16 GREEN with the page's own assert count down from 6 to 2.
-   * `/twelve/` had already written this trap down, in these words: a comparison
-   * against a function is a comparison that cannot fail.
+   * `stream.state()` is a function on the presence api; comparing the bare property to
+   * 'offline' is always false.
+   * See lessons/page-llhls.md#llhls-18
    */
   d.on('toggle', () => (stream.state() === 'offline' ? start() : stop()));
 
   /**
-   * Let it go. Closing the socket is the whole of it from this end: the
-   * publisher counts sockets, so this page stops being one of them and the
-   * sweep on the far side does the rest about a minute later.
+   * Let it go: closing the socket is all this end does; the publisher's sweep stops about a
+   * minute later.
+   * See lessons/page-llhls.md#llhls-19
    */
   function stop() {
     gen++;                                  // anything mid-start bails on the next line it reaches
     abort?.abort(); abort = null;
     unwatchFps?.(); unwatchFps = null;
-    // ⚠️ THE SOCKET GOES FIRST AND `ws` IS NULLED WITH IT. `settle()` below is
-    // wired to the element's own events and tearing a player down fires some of
-    // them, so a `ws` still standing here would let the toggle flick back to
-    // `starting` on the way out.
+    // The socket goes first and `ws` is nulled with it, or the element's teardown events would
+    // let `settle()` flick the toggle back to `starting`.
+    // See lessons/page-llhls.md#llhls-20
     try { ws?.close(); } catch { /* already gone */ }
     ws = null;
     held = false;
@@ -331,15 +239,10 @@
     d.log('let the publisher go. it stops about a minute after the last viewer goes');
   }
 
-  /* 🔴 RETIRED 2026-10-13, AND SO EVERY TIER IS THE LIGHT ONE. The test
-     pattern this page played is gone: Stream deleted its input (positron-demo)
-     and pub answers /watch, /status, /start and /stop with 410. Before the
-     retirement a press held the publisher, woke a cold container and waited
-     up to 90 s for a manifest; now there is nothing to wait for, so a press
-     says so at once and an ordinary or a deep harness run grades the page at
-     rest. The body that ran the stream is in git at be7737d, and the player
-     itself is unchanged in `src/low-latency-player.js`, where
-     /video/llhls/ still uses it. */
+  /* The test pattern is retired (input deleted, pub answers 410), so every tier is light and a
+     press says so at once. The player is unchanged in src/low-latency-player.js, used by
+     /video/llhls/.
+     See lessons/page-llhls.md#llhls-21 */
   const LIGHT = true;
 
   async function start() {
@@ -350,20 +253,10 @@
   }
 
   /**
-   * 🔴 `on` IS A MEASUREMENT, NEVER A PROMISE. `/stage/` dropped a middle state
-   * for exactly this reason: the fact behind `soon` was only that a socket
-   * existed, so it could stand there saying soon for an hour. Here `starting`
-   * becomes `on` when this element has actually been handed a decodable
-   * picture, which is a thing that happened rather than a thing that was
-   * arranged.
-   *
-   * 🔴 AND IT IS LATCHED, NOT SAMPLED, BECAUSE `paused` IS THE WRONG QUESTION.
-   * The control says whether the STREAM is on. A visitor who pauses with the
-   * element's own controls has not stopped the publisher, is still being
-   * counted as a viewer and is still costing delivered minutes, so a toggle
-   * that fell back to `starting` there would be describing the player while
-   * claiming to describe the source. Same argument `transport-bar.mjs` writes
-   * down for `on air`: the five words are about the source, not the player.
+   * `on` is a measurement: `starting` becomes `on` when the element is handed a decodable
+   * picture. Latched, not sampled, because a paused element still holds the socket and the
+   * control describes the source, not the player.
+   * See lessons/page-llhls.md#llhls-22
    */
   function settle() {
     if (!ws) return;
@@ -390,15 +283,11 @@
   }
 
   d.on('check', async () => {
-    // ⚠️ THE SAME CLAIM THE PUBLISHER BADGE USED TO CARRY, READ OFF THE SOCKET
-    // RATHER THAN OFF A PILL. The badge is gone and the fact is not: what
-    // changed is that the detail now names the control a visitor is looking at.
+    // The publisher claim, read off the socket.
+    // See lessons/page-llhls.md#llhls-23
     /**
-     * ⚠️ AND IT READS THE STATE THROUGH THE CALL, AND REQUIRES A STRING, WHICH
-     * IS WHAT MAKES IT ABLE TO FAIL. `stream.state` without the parentheses is
-     * a function, and a function is never `'offline'`, so a check written that
-     * way would pass whatever the badge said. This one goes red on exactly the
-     * bug that shipped for one run of this page.
+     * It reads the state through the call and requires a string, so it can fail.
+     * See lessons/page-llhls.md#llhls-24
      */
     const said = (stream.badge.textContent || '').trim();
     const state = stream.state();
@@ -406,42 +295,26 @@
       held && typeof state === 'string' && state !== 'offline',
       `toggle reads ${JSON.stringify(said)}, state ${state}, socket ${held ? 'held' : 'let go'}`);
     /**
-     * 🔴 THE ASK ITSELF, GRADED. *"rm primary button with status togglebutton"*
-     * is a claim about this row, and a row is a thing a check can read: one
-     * button, it is the toggle, and nothing in it is a primary. A page that
-     * grew a second control back would say so here rather than in a
-     * screenshot somebody happened to take.
+     * One button in the row, the toggle, and nothing in it is a primary.
+     * See lessons/page-llhls.md#llhls-25
      */
     const btns = [...d.controls.querySelectorAll('button')];
     d.assert('one control, and it is the stream toggle',
       btns.length === 1 && btns[0] === stream.el && !d.controls.querySelector('.pos-pri'),
       `${btns.length} control(s), classes ${btns.map((b) => b.className || '(none)').join(' ')}`);
     /**
-     * 🔴 THE PARENTHESIS IN THE ASK, MEASURED RATHER THAN BELIEVED: *"fix w so
-     * it did not ump horztally"*. Every cell is written at its widest and at
-     * its narrowest and the ROW is measured both times, because the defect is
-     * not a cell resizing, it is a cell shoving the one after it. Without the
-     * `reserve` on each field this goes red.
-     * ⚠️ IT IS SYNCHRONOUS AND NOTHING IS PAINTED IN BETWEEN. Reading a
-     * rectangle forces layout and never a paint, and the real readings are back
-     * before this function yields, so a person watching the page sees none of
-     * it. A check that a visitor could see happen is a check this project has
-     * already been reported for.
+     * Each cell is written at its widest and narrowest and the row measured both times, so a
+     * cell shoving its neighbour goes red without `reserve`. Synchronous, nothing painted between.
+     * See lessons/page-llhls.md#llhls-26
      */
     {
       const row = panel.values.el;
       const was = panel.values.keys().map((k) => [k, panel.values.cell(k).textContent]);
       const write = (o) => { for (const [k, v] of Object.entries(o)) panel.values.set(k, v); };
       /**
-       * 🔴 THE ROW IS HIDDEN BEFORE A PRESS SINCE 2026-09-29, AND THIS CHECK
-       * HAD TO STOP RELYING ON IT BEING THERE. It used to empty `size` and
-       * `fps` and leave `source`, which held the row open. `source` is written
-       * when a picture arrives now, so on a run with no press every cell is
-       * empty, the kit hides the row, and both measurements would have read
-       * **0 px** and the comparison would have passed having measured nothing.
-       * That is this project's worst shape and it would have been green.
-       * ✅ So the check writes `source` ITSELF in both states, and `narrow > 0`
-       * is a term of the assert rather than an assumption underneath it.
+       * The row is hidden before a press, so the check writes `source` itself in both states and
+       * `narrow > 0` is part of the assert, not an assumption.
+       * See lessons/page-llhls.md#llhls-27
        */
       write({ size: '', fps: '', source: SOURCE });
       const narrow = row.getBoundingClientRect().width;
@@ -452,21 +325,9 @@
         narrow > 0 && Math.abs(wide - narrow) < 0.5,
         `${narrow.toFixed(1)} px with the other cells empty against ${wide.toFixed(1)} px at their widest`);
       /**
-       * 🔴 AND NOTHING IS SAID ABOUT A STREAM WITH NOTHING COMING IN. The ask,
-       * verbatim: *"Do not show video details until we have incomng data"*.
-       * 🔴 **WHAT IS GRADED IS THE MECHANISM, NOT THE STATE THIS RUN HAPPENS TO
-       * BE IN, AND THE FIRST DRAFT GOT THAT WRONG AND WENT RED.** It required
-       * the row to be absent at check time, which is true for a visitor who has
-       * not pressed and FALSE here, because `demo/verify.mjs` presses every
-       * control on the page: the stream reads `online`, a picture is arriving,
-       * and the footer is showing what it should. A check that fails when the
-       * page is working is a check about the harness.
-       * ✅ So it empties every cell and requires the row to go, then writes one
-       * back and requires it to return. Both directions, because hiding a row
-       * for ever is the same defect wearing the opposite sign.
-       * ⚠️ **AND IT IS SYNCHRONOUS WITH THE READINGS PUT BACK**, like the
-       * measurement above it: reading `hidden` forces no layout at all, and
-       * nothing is painted between the two writes.
+       * Grades the mechanism, not this run's state: empty every cell and the row must hide, write
+       * one back and it must return. Synchronous with the readings put back.
+       * See lessons/page-llhls.md#llhls-28
        */
       const keys = panel.values.keys();
       for (const k of keys) panel.values.set(k, '');
@@ -480,21 +341,16 @@
         + `and one cell later it was ${backWhenWritten ? 'back' : 'STILL ABSENT'}, `
         + `with the stream reading ${stream.state()} and ${keys.length} cells on the row`);
     }
-    // The stream checks went with the stream on 2026-10-13 (see `LIGHT`), the
-    // manifest fetch among them, so nothing here asks Cloudflare anything.
+    // The stream checks are gone with the stream (see `LIGHT`); nothing here asks Cloudflare.
+    // See lessons/page-llhls.md#llhls-29
     d.assert('nothing in the picture was cut or refused', dg.cuts.length === 0,
       dg.cuts.map((c) => `${c.id}: ${c.full}`).join(' / ') || 'none');
   });
 
   /**
-   * 🔴 HOW IT WORKS, INCLUDING HOW IT STOPS. Asked 2026-09-29: *"add how it
-   * works to llhsl incl how it stops"*. It is a picture and not a paragraph,
-   * because a desc here is one sentence and may not be stretched, and because
-   * the thing being described is five machines passing one picture along, which
-   * is what a diagram is for.
-   *
-   * Everything in it is read off `workers/pub/worker.mjs` and
-   * `workers/pub/container/server.mjs` rather than remembered.
+   * How it works, including how it stops, read off workers/pub/worker.mjs and
+   * workers/pub/container/server.mjs.
+   * See lessons/page-llhls.md#llhls-30
    */
   const dg = createDiagram(d.el, {
     caption: 'Retired 2026-10-13: the input and the publisher drawn here are deleted, so a press now says so and stops. '
@@ -532,13 +388,9 @@
         ] },
     ],
     links: [
-      // 🔴 WHAT THE SOCKET REALLY IS, asked 2026-09-30 as *"you can be more
-      // techincal on this connector label and desc"*. Read off
-      // `workers/pub/worker.mjs`: `/watch` is accepted with `acceptWebSocket`
-      // (hibernatable), `viewers()` is `getWebSockets().length`, the only thing
-      // ever sent is one `hello` down on connect, and `webSocketMessage` is
-      // empty, so nothing the page could send up is read. `/webrtc/` carries
-      // the same label on the same socket and must change with this one.
+      // `/watch` is a hibernatable socket: `viewers()` is `getWebSockets().length`, one `hello` goes
+      // down on connect and nothing sent up is read. /webrtc/ carries the same label.
+      // See lessons/page-llhls.md#llhls-31
       { from: 'ctl', to: 'pub', label: 'wss /watch',
         note: 'A hibernatable WebSocket to **wss://pub.positron.studio/watch**. One hello with '
             + 'the viewer count comes down and nothing goes up, because the count is '
@@ -546,10 +398,8 @@
       { from: 'pub', to: 'ff',
         note: 'Start on the first viewer, stop on the sweep. A leg that dies while somebody '
             + 'is still watching is restarted by the same sweep 30 s later.' },
-      // ⚠️ NO LABEL, AND THE COMPONENT WOULD REFUSE ONE. An arrow between two
-      // boxes inside one container shows direction only, because the gap they
-      // share is sixteen pixels tall and a name in it runs under both of them.
-      // What travels goes in the note, which is read on hover under the picture.
+      // No label: the gap between two boxes in one container is 16 px, so what travels goes in the note.
+      // See lessons/page-llhls.md#llhls-32
       { from: 'ff', to: 'stream',
         note: 'RTMPS into one live input, fed the same burned in picture the WebRTC page '
             + 'gets on a second input, because Cloudflare will not serve WHEP from an '
@@ -561,23 +411,10 @@
   }, { how: true, atEnd: true });
 
   /**
-   * 🔴 WHAT IT TAKES TO GET LOW LATENCY OUT OF hls.js, IN FULL. Asked
-   * 2026-09-30: *"add longer desc how to patch hls.js to work right"* and then
-   * *"and get ll what we need"*.
-   * ⚠️ IT IS TWO TABLES UNDER THE PICTURE AND NOT A LONGER NOTE, AND THE LIMIT
-   * IS NOT TASTE. A note over forty words is reported on `dg.cuts`, which this
-   * page ASSERTS empty, and every note is measured into the height the caption
-   * line reserves, so one long note would grow the empty line under the picture
-   * for every other box as well. The full list is about thirty facts, and a row
-   * of facts is cells, not a paragraph with glue in it.
-   * ⚠️ EVERY VALUE IS WHAT `src/low-latency-player.js` (v14) PASSES: the
-   * `new Hls({...})` literal at lines 401 to 461 and the `DEFAULTS` above it,
-   * because this page passes only `preferNative`. Every hls.js default was read
-   * off the bundled 1.7.1 and is quoted from `positron-streaming`, section
-   * "hls.js and the native path: what each default costs". Three lines of that
-   * literal change nothing (`lowLatencyMode`, `levelLoadingMaxRetry`,
-   * `levelLoadingRetryDelay` are already the defaults) and are left out, so the
-   * table is the thirteen that move something.
+   * What it takes to get low latency out of hls.js, as two tables because a note over forty words
+   * fails `dg.cuts`. Values are what src/low-latency-player.js passes; defaults are hls.js 1.7.1's,
+   * from `positron-streaming`. Lines equal to the default are left out.
+   * See lessons/page-llhls.md#llhls-33
    */
   const more = createStack();
   const knobs = createTable({

@@ -1,11 +1,7 @@
-// demo/shell/midi-devices.mjs: the MIDI inputs plugged into this machine as
-// `device` nodes on a page's bay. One node per input, `<site>:midi`,
-// `<site>:midi-2`, ..., named after the device, with one `midi-out` port
-// linked to the in-ports a page names. A device keeps its node id across a
-// replug, and an unplugged one lets go of its held notes and loses its links.
-//
-// The page decides what a message becomes (`message`); by default a note on
-// or off is sent along the device's port and anything else is ignored.
+// demo/shell/midi-devices.mjs: plugged-in MIDI inputs as `device` nodes (`<site>:midi`, `-2`, ...)
+// on a page's bay, linked to the in-ports it names. A replug keeps the node id; an unplug releases
+// held notes and drops links. `message` decides what a message becomes; by default notes pass.
+// why: lessons/kit-midi-devices.md#header
 
 /**
  * @param {object} o

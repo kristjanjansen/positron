@@ -1,36 +1,7 @@
-// demo/csound/click.mjs: the CLICK tab of /csound/, from the old /click/ page,
-// which retired on 2026-10-05 with no redirect when *"merge click and und, no
-// need for 'mobile screen' / theme"* made it this tab.
-//
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  🔴 THE PLAYER'S SCREEN IS GONE, AND THE THEME SWITCH WITH IT. The old
-//      page opened on a copy of vClick's phone client (`client/main.qml` in
-//      tarmoj/vclick): a gradient ground, a tempo line, a bar and a beat
-//      numeral and three lamps that lit and faded over one beat, in two paints,
-//      `subtle` (the default) and `original`. The owner called it the "mobile
-//      screen" and said there was no need for it or for the theme. The bar,
-//      the beat and the tempo it showed are this tab's readout cells, the cue
-//      words are the `word` lane, and the two scores still light line by line.
-//      No assert read the screen or the theme, so none went with them.
-//   2  The checks moved from load into the page's one SELFCHECK pass
-//      (`tab-page.mjs` rule 3), word for word, and the offline check now also
-//      allows `/csound/`, where this module and its page are served from.
-//   3  🔴 ITS BAR IS `publish: false`. SCORE owns the page's one published
-//      transport; this one is listed in `bars` and drilled as page asserts.
-//   4  `hide()` pauses the deck, so a click track does not run on in a tab
-//      nobody is looking at.
-//   5  It makes no sound, as the old page made none.
-//
-// ── THEIR SCORES, CARRIED RATHER THAN FETCHED ─────────────────────────────
-//
-// `server/test.sco` and `server/simple-4-4.sco` from tarmoj/vclick, GPL-3.0,
-// (c) Tarmo Johannes, copied verbatim, tabs and comments included, because a
-// score edited to suit the compiler would prove nothing about the compiler.
-//
-// ⚠️ EMBEDDED, NOT FETCHED, AND THAT IS THE POINT OF THE TAB. A click track
-// that needs the network to tell it where the beat is has put the network
-// back in the per-beat path. This tab makes NO request of any kind, no fetch
-// and no socket, and the two scores are here so that stays true.
+// The CLICK tab of /csound/: two vClick scores (tarmoj/vclick, GPL-3.0, (c) Tarmo
+// Johannes) copied verbatim and embedded, so the tab makes no request of any kind.
+// Its bar is `publish: false` (SCORE owns the transport); `hide()` pauses the deck.
+// See lessons/page-csound.md#csound-1
 
 import { el } from '/shell/shell.mjs';
 import { createChoice } from '/shell/choice.mjs';
@@ -189,27 +160,17 @@ i	"notification"	0	2	"Start"
 /** Under the tab row, in the page's one fixed box. */
 export const about = 'U:\u2019s vClick score worked out once in the page, so every player\u2019s screen could read the bar and the beat off its own clock instead of the hall\u2019s wifi.';
 
-// 🔴 `bytes` REPLACED `rows`, AND IT IS THE WHOLE COMPARISON IN ONE CELL.
-// `bytes` is what actually crosses the wire on this design, the score
-// DOCUMENT, once, and it sits next to `pushed`, which is what vClick puts on
-// the hall's wifi and which climbs for as long as the piece lasts. `late` is
-// how far each flash landed from the moment the score asks for.
+// `bytes` is the score document sent once; `pushed` is what vClick puts on the wifi
+// and climbs for the whole piece. `late` is each flash against the score's moment.
+// See lessons/page-csound.md#csound-2
 export const readout = { bar: '', beat: '', tempo: 'bpm', late: 'ms', pushed: '', bytes: 'B' };
 
 export function build({ panel, log, set }) {
   const host = panel.el;
 
-  // ── one deck, and it owns the clock ──────────────────────────────────────
-  //
-  // 🔴 THIS REPLACED A HAND-ROLLED `requestAnimationFrame` LOOP, AND THE LOOP
-  // WAS THE DEFECT. MEASURED while building the old page: in a background tab
-  // Chrome stops rAF outright, so the flashes arrived in clumps when the tab
-  // was next painted, and `late` read 2487.2 ms of somebody else's throttling.
-  // `createDeck` defaults to a WORKER tick host, which is the whole reason
-  // that option exists.
-  // ⚠️ It is still not a promise that this survives a locked phone. Their
-  // client is a native app that keeps counting in a pocket; a page needs a
-  // wake lock for that and this one has none.
+  // One deck owns the clock, on its default worker tick host: rAF stops in a
+  // background tab and bunched the flashes. A locked phone still stops it (no wake lock).
+  // See lessons/page-csound.md#csound-3
   const deck = createDeck({ items: [], adapters: {}, range: [0, 1000] });
 
   // ── compiling, which is all the work there is ────────────────────────────
@@ -220,21 +181,11 @@ export function build({ panel, log, set }) {
   let scoreName = 'test.sco';
   const warn = el('p', 'warn', '');
 
-  /** A bar statement expands into its own beats.
-   *
-   *  From THEIR orchestra (`server/metro_sendosc.orc`, instr 2), not guessed:
-   *  p4 is how many beats the bar has, p5 is the note value as a fraction of a
-   *  whole note, p6 the subdivision, p7 the bar number. Their metronome runs at
-   *  `tempo/60 * p5/4`, so beat k sits 4/p5 score-beats after the one before.
-   *
-   *  ⚠️ A NEGATIVE BAR NUMBER IS NOT A BAR BEFORE THE START. It means "do not
-   *  flash red on the first beat", for a bar built out of unequal groups.
-   *  2+3+2/8 is written as three statements, one per group, and only the first
-   *  gets the red. The FRACTIONAL part carries the beat number to start
-   *  counting from, so -5.2 is bar 5 counting from beat 2. Reading it as a
-   *  number would put four bars of the piece before bar 1.
-   *  ⚠️ `lamp` is kept on each beat though the lamps are gone: it is which
-   *  lamp vClick would light, and it is part of what their server sends.
+  /**
+   * A bar statement expands into its own beats, per their `metro_sendosc.orc` instr 2:
+   * p4 beats, p5 note value, p6 subdivision, p7 bar; beat k is 4/p5 score-beats on.
+   * A negative bar means no red first beat; its fraction is the beat to count from.
+   * See lessons/page-csound.md#csound-4
    */
   function barBeats(r) {
     const p = r.payload.p;
@@ -273,10 +224,9 @@ export function build({ panel, log, set }) {
     cp = part;
     tm = tempoMap(part.tempo.length ? part.tempo : [[0, 60]]);
 
-    // 🔴 THE SCORE BECOMES A DOCUMENT, AND THE DOCUMENT IS WHAT WOULD CROSS.
-    // The Csound rows keep their p-fields verbatim, and one use places the
-    // part once. It round-trips byte-identically, which is what makes `bytes`
-    // an honest number rather than an estimate of one.
+    // The Csound rows keep their p-fields verbatim and round-trip byte-identically,
+    // so `bytes` is the real size of the document that would cross.
+    // See lessons/page-csound.md#csound-5
     const lastBeat = part.part.rows.length
       ? Math.max(...part.part.rows.map((r) => r.at + (r.dur || 0))) : 0;
     doc = scoreDoc({
@@ -322,11 +272,11 @@ export function build({ panel, log, set }) {
     view.strip.invalidate();
     drawDoc();
 
-    // ⚠️ UTF-8 BYTES, not `String.length`, which counts UTF-16 code units, and
-    // this repo has already paid for the difference once on the wire.
+    // UTF-8 bytes, not `String.length` (UTF-16 code units).
+    // See lessons/page-csound.md#csound-6
     set('bytes', new TextEncoder().encode(scoreDocToJSONL(doc)).length);
-    // ⚠️ NOT 0. Nothing has been pushed because nothing has been played, and
-    // a zero here would read as a measurement rather than as an empty cell.
+    // Not 0: nothing has played, and a zero would read as a measurement.
+    // See lessons/page-csound.md#csound-7
     set('pushed', '');
     set('late', '');
     worstLate = 0; wouldSend = 0;
@@ -342,9 +292,8 @@ export function build({ panel, log, set }) {
       set('tempo', Math.round(p.bpm));
       set('bar', p.bar);
       set('beat', p.beat);
-      // 🔴 THE NUMBER THE TAB EXISTS TO REPORT. How late this flash was
-      // against the millisecond the score asks for, not against the previous
-      // flash, which would only measure the timer against itself.
+      // Lateness against the millisecond the score asks for, not against the previous flash.
+      // See lessons/page-csound.md#csound-8
       worstLate = Math.max(worstLate, Math.abs(deck.position() - p.ms));
       set('late', worstLate.toFixed(1));
       // what vClick would have put on the wire to reach one player: the
@@ -360,18 +309,16 @@ export function build({ panel, log, set }) {
   const wordAdapter = {
     caps: { rates: [0.5, 1, 2], continuous: false, assertOnSeek: true },
     actuate(p) { lightRow(p.row); },
-    // ⚠️ COUNT ONLY. The rows a reducer is handed are not the items that were
-    // scheduled, and reaching into their payload once took the whole page down
-    // from inside a seek. Reduce over what the deck guarantees.
+    // Count only: the rows a reducer gets are not the scheduled items, so do not read payloads.
+    // See lessons/page-csound.md#csound-9
     reduce: (rows) => ({ count: rows.length }),
     assertState: (s) => s,
   };
   deck.sched.registerAdapter('flash', flashAdapter);
   deck.sched.registerAdapter('word', wordAdapter);
 
-  // ── the operator's half, first in the tab ────────────────────────────────
-  // ⚠️ FIRST, not last. These pick WHAT you are looking at, so they belong
-  // above the thing rather than under it.
+  // The operator's half goes first: these pick what you are looking at.
+  // See lessons/page-csound.md#csound-10
   const op = el('div', 'op');
   const pick = createChoice({
     label: 'Score',
@@ -389,9 +336,9 @@ export function build({ panel, log, set }) {
   op.append(pick.el, el('label', '', 'Start from'), stepper.el, barLabel);
   host.append(op);
 
-  // ⚠️ ONE POSITION SURFACE. The strip below seeks on press AND on drag, so the
-  // bar's slider would be a second horizontal time axis at a different scale.
-  // ⚠️ AND NOT PUBLISHED: SCORE's bar is the page's transport.
+  // The strip below is the one position surface, so the bar has no slider, and it is
+  // not published: SCORE's bar is the page's transport.
+  // See lessons/page-csound.md#csound-11
   const bar = createTransportBar(host, deck, { scrub: false, publish: false });
 
   const INK = { beat: '#ffd400', word: '#6f7d94' };
@@ -438,10 +385,11 @@ export function build({ panel, log, set }) {
   let lineOfRow = new Map();     // row id -> line index in OUR document
   let srcOfRow = new Map();      // row id -> line number in THEIR score
 
-  /** Draw the document, and remember which line each row is on.
-   *  ⚠️ Rebuilt only when the SCORE changes; the per-beat path just flips
-   *  `data-state` on one element, because rewriting a block of text on every
-   *  beat is a reflow on a clock. */
+  /**
+   * Draw the document, and remember which line each row is on. Rebuilt only when the
+   * score changes; the per-beat path flips `data-state` on one element.
+   * See lessons/page-csound.md#csound-12
+   */
   function drawInto(box, lines) {
     box.textContent = '';
     lines.forEach((text, i) => {
@@ -496,14 +444,10 @@ export function build({ panel, log, set }) {
     if (wl) wl.subLabel = [`${words.length} of them,`, 'shown, never sounded'];
   }
 
-  /** Where in the piece a bar number starts.
-   *
-   *  🔴 THIS IS THE WHOLE ARGUMENT, IN ONE FUNCTION. Their server does it by
-   *  rewriting the score text: find the line whose eighth field is the bar,
-   *  replace a comment reading `;ADVANCE` with a skip statement, hunt backwards
-   *  for the last tempo line and re-insert it with a patched time. Compiled,
-   *  it is a search through a list and a `deck.seek()`, and the tempo needs no
-   *  repair because the tempo is a map over the whole piece.
+  /**
+   * Where in the piece a bar number starts: a list search and a `deck.seek()`, where
+   * vClick's server rewrites the score text. The tempo map needs no repair.
+   * See lessons/page-csound.md#csound-13
    */
   function msOfBar(n) {
     const hit = events.find((e) => e.bar === n && e.beat === 1);
@@ -518,13 +462,9 @@ export function build({ panel, log, set }) {
   }
 
   /**
-   * 🔴 HOW IT WORKS, LAST IN THE TAB, ADDED 2026-10-05 on *"add how it works
-   * diagrams to all tenchilogies"*. Its own picture rather than SCORE's,
-   * because the two tabs differ in the two things a picture shows: this one's
-   * score is carried in the page instead of typed, and it ends in the readout
-   * rather than in sound. One machine, because the tab asks no server for
-   * anything, which its last check already proves. Drawn on the first
-   * showing, into a panel that has a width, under the tab's report.
+   * How it works, last in the tab: its own picture, since the score is carried and it
+   * ends in the readout. One machine; drawn on first showing into a panel with a width.
+   * See lessons/page-csound.md#csound-14
    */
   const DIAGRAM = {
     caption: 'Nothing on this tab reaches a network: the piece is worked out once in the page and played off its own clock.',
@@ -580,8 +520,8 @@ export function build({ panel, log, set }) {
         scoreDocToJSONL(parseScoreDocJSONL(scoreDocToJSONL(doc))) === scoreDocToJSONL(doc),
         `${new TextEncoder().encode(scoreDocToJSONL(doc)).length} B`);
       {
-        // ⚠️ Counted on the DECK's side of the boundary, not on the page's: a
-        // count of what we handed over is a count of our own intention.
+        // Counted on the deck's side of the boundary, not on the page's.
+        // See lessons/page-csound.md#csound-15
         const on = deck.eventsOf('flash').length + deck.eventsOf('word').length;
         A('the whole piece is on the deck', on === events.length,
           `${on} scheduled of ${events.length}`);
@@ -600,9 +540,8 @@ export function build({ panel, log, set }) {
           `worst ${worst.toExponential(2)} ms over ${cp.part.rows.length} rows`);
       }
 
-      // 🔴 The claim about starting anywhere, checked rather than stated:
-      // every bar the score names can be seeked to, and the fold says what has
-      // sounded by then, which is what their `;ADVANCE` surgery is for.
+      // Every bar the score names can be seeked to, and the fold says what has sounded by then.
+      // See lessons/page-csound.md#csound-16
       {
         const barsIn = [...new Set(events.filter((e) => e.beat === 1 && e.bar > 0).map((e) => e.bar))];
         const found = barsIn.filter((b) => msOfBar(b) !== null);
@@ -630,13 +569,9 @@ export function build({ panel, log, set }) {
           `${rows.length} tempo rows, worst ${worst.toFixed(2)} bpm apart`);
       }
 
-      // The offline claim, asserted rather than assumed: plan-uuu-local P2.
-      // The kit, the timeline, and this page's own directory, nothing else.
-      // ⚠️ AND `/_log` IS LET THROUGH, BY NAME. It is the shell's local log
-      // tap (`shell.mjs`, TAP_LOCAL): a POST to the dev server on 127.0.0.1
-      // only, never made on the deploy. The old page asserted at load, before
-      // the tap's first 250 ms flush, so it never saw one; this check runs in
-      // the SELFCHECK pass, after it, and went red on exactly two of them.
+      // Offline: only the kit, the timeline and this page's directory. `/_log` (the shell's
+      // local log tap, TAP_LOCAL) is allowed on localhost only; it is never made on the deploy.
+      // See lessons/page-csound.md#csound-17
       {
         const own = new URL('.', import.meta.url).pathname;
         const res = performance.getEntriesByType('resource');

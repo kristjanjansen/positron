@@ -21,13 +21,9 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* THE CHAT UI WIRED TO THE PATCHBAY, built 2026-10-11 as room/002 (*"002: wire
-     in patchbay from 000 and show it"*) at /room/window/. A chat frame and
-     compose box driven by the bay: two `*` links, a line crossing the room as
-     one `bay.event`. The patchbay picture sits under the frame.
-     Moved here 2026-10-13 (*"Move chat ui wired to chat. Rm chat ui wired"*):
-     it replaces the patchbay-only chat that was /room/chat/, and /room/window/
-     is a 404, no forwarding. */
+  /* The chat UI wired to the patchbay: a chat frame and compose box driven by the bay, two
+     `*` links, a line crossing the room as one `bay.event`, the picture under the frame.
+     See lessons/page-room.md#room-7 */
 
   /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs. */
 </style>
@@ -44,10 +40,9 @@
   const d = mount({ name: 'Chat', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('room/chat');
 
-  // ── the bay ──────────────────────────────────────────
-  // Every tab is a SITE with one `chat` node and two `value` ports shaped
-  // `of: text`, and holds two `*` links: a speaker and a listener. Its own
-  // room, never studio-1. Nothing opens until Join is pressed.
+  // Every tab is a site with one `chat` node and two `value` ports of `text`, holding a
+  // speaker and a listener `*` link. Its own room, never studio-1. Nothing opens until Join.
+  // See lessons/page-room.md#room-8
   const asked = new URLSearchParams(location.search).get('room');
   const ROOM = asked && ROOM_RE.test(asked) ? asked : 'chat-1';
   const SITE = randomSite('web');

@@ -1,20 +1,7 @@
-// demo/shell/reel-line.mjs: the year of 1965 on one line, newsreels and radio
-// in two lanes at the days they went out. /reel/'s timeline, moved here so a
-// second page can have the same line without a copy of it.
-//
-// Asked 2026-10-13: *"do reel-demo-like patchbay version ... timeline is same"*
-// (/history/newsreels/). The line is this file; what plays is the page's.
-//
-// 🔴 THIS FILE OPENS NOTHING AT ERR. It reads `/reel/1965.json`, which is our
-// own catalogue (metadata only, no media), and it draws, picks, steps and
-// scrubs. Every reach for arhiiv.err.ee or vod.err.ee is in a page, behind a
-// press, counted by that page's `reachERR`. The line hands a page two moments
-// and nothing else: `onPress(it)`, a press on a mark, and `onLand(it)`, a scrub
-// or a press on nothing that has come to rest on a broadcast. What either one
-// costs a broadcaster is the page's decision, made where its count is.
-//
-// Every comment below came with the code from demo/reel/index.html, where it
-// was written; the dates and reports in them are that page's.
+// demo/shell/reel-line.mjs: 1965 on one line, newsreels and radio in two lanes by broadcast day.
+// Opens nothing at ERR: it reads our own /reel/1965.json and hands the page `onPress` and `onLand`;
+// every reach for ERR is the page's, behind a press.
+// why: lessons/kit-reel-line.md#header
 
 import { createStripView } from './strip.mjs';
 import { createDeck } from '/timeline/transport.mjs';
@@ -33,91 +20,49 @@ export const INK = {
   audio: { on: 'hsl(185 80% 62%)', off: 'hsl(185 45% 34%)' },
 };
 
-// ERR'S NEWSREEL TITLES ARE GENUINELY ALL-CAPS — 288 of 298, against 11 of
-// 494 on the radio side. That is the film archive's own record, typed on a
-// card, not a rendering accident, and it is why the two columns look unlike
-// each other. Shouting is hard to read next to a lowercase lead, so this
-// page sentence-cases them FOR DISPLAY ONLY: the fixture, the link and the
-// slug keep exactly what ERR holds.
-//
-// The limit, stated rather than hidden: with no name list there is no way to
-// tell a proper noun from a common one inside a shouted line, so a personal
-// or place name that is not the first word comes back lowercase. A title
-// that is already mixed-case is left untouched, which is what keeps the
-// radio side — where capitals mean something — exact.
+// ERR's newsreel titles are all caps (288 of 298); sentence-cased for display only.
+// Mixed-case titles are left alone; proper nouns past the first word come back lowercase.
+// why: lessons/kit-reel-line.md#sentence-case
 export const sentenceCase = (t) => {
   if (!t || t !== t.toUpperCase()) return t || '';
-  // NOT after a full stop. In Estonian a period is also the ordinal marker —
-  // `1965. aasta` is "the year 1965" and the next word is lowercase — and in
-  // a catalogue of short titles ordinals outnumber sentence ends, so
-  // capitalising after every `.` gets "1965. Aasta esimesed abiellujad".
+  // Not after a full stop: in Estonian `1965. aasta` is an ordinal and the next word stays lowercase.
+  // why: lessons/kit-reel-line.md#sentence-case-period
   return t.toLowerCase().replace(/(^|[!?]\s+)(\p{Ll})/gu, (_m, lead, ch) => lead + ch.toUpperCase());
 };
 
-// ONE LANE. The other 16 films — 16 mm rushes and a few the catalogue files
-// under no series — are a different kind of thing recorded for a different
-// reason, and a lane holding "everything that is not the other lane" is a
-// leftovers bin rather than a lane. `AK filmikroonika` alone is a series: one
-// newsreel, weekly, for a year.
+// One lane: AK filmikroonika is the series; the other 16 films are a different kind of thing.
+// why: lessons/kit-reel-line.md#series
 export const SERIES = 'AK filmikroonika 1958-1991';
 
 /**
- * The line. Built in two steps because /reel/ builds its transport bar on the
- * deck BEFORE the strip goes on the page, and that order is its DOM order.
- *
- *   const line = createReelLine({ onPress, onLand });
- *   const bar = createTransportBar(host, line.deck, ...);   // optional
- *   line.mount(host, { footer: { lines: 3 } });
- *   await line.ready;
- *
+ * The line, built in two steps so /reel/ can put its transport bar on the deck first:
+ *   const line = createReelLine({ onPress, onLand }); line.mount(host, { footer: { lines: 3 } });
  * @param {object} o
  * @param {(it: object) => void} o.onPress  a press (not a drag) on a mark
- * @param {(it: object) => void} o.onLand   a scrub that came to rest on a
- *   broadcast other than the day already picked
+ * @param {(it: object) => void} o.onLand   a scrub that came to rest on a broadcast other than the day picked
  * @param {string} [o.fixture]  the catalogue, `/reel/1965.json`
+ * why: lessons/kit-reel-line.md#create-reel-line
  */
 export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture = '/reel/1965.json' } = {}) {
-  // ── the year ──────────────────────────────────────────────────────────────
-  // ABSOLUTE POSITIONS, AND NEGATIVE ONES. 1965 is before the epoch, so every
-  // position here is a negative number of milliseconds. That is the first deck
-  // in this project ever placed outside 1970 — and it found a real bug on the
-  // way: `createDeck` opened its playhead at 0, which for any range not
-  // containing zero is OUTSIDE the range. Fixed in the library, not worked
-  // around here.
+  // Absolute positions, all negative: 1965 is before the epoch.
+  // why: lessons/kit-reel-line.md#the-year
   const deck = createDeck({ items: [], adapters: {}, range: [YEAR_FROM, YEAR_TO] });
 
   let items = [], radio = [], current = null, view = null, openOn = null;
-  // THE DAY THAT IS PICKED, IN ITS TWO HALVES. `current` is the one that was
-  // chosen; a day usually brings a newsreel AND a radio programme, and a scrub
-  // that stops over either of them has landed on the day already picked rather
-  // than on a new one.
+  // The picked day's two halves; a scrub stopping over either has landed on the day already picked.
+  // why: lessons/kit-reel-line.md#halves
   let halves = { picture: null, sound: null };
 
-  // A CLIP IS AS WIDE AS IT IS LONG.
-  //
-  // It was a day wide until the catalogue could say otherwise, and it could not:
-  // there is no duration field in ERR's item API. What there IS is a SHOT LIST
-  // with real millisecond begin/end times, so the last shot's end is a real
-  // figure — collected for 296 of the 298 films, median 2.2 min, longest 67.
-  //
-  // That works only because clips sit at MIDDAY. A bar drawn from midnight at
-  // its true length would claim the film went out at 00:00, which nobody knows;
-  // from midday it says "somewhere in this day, and this long", with room either
-  // side. The two changes are one decision.
-  //
-  // Two films have no shot list. They draw at the median rather than at zero —
-  // and the line under the strip says the length is unknown when you point at
-  // one, because a bar you can see is not a number you can trust.
+  // A clip is as wide as it is long (last shot's end; median 2.2 min) and sits at midday.
+  // The two films with no shot list draw at the median and say their length is unknown.
+  // why: lessons/kit-reel-line.md#clip-width
   let MEDIAN_MS = 132000, sharedDays = 0;   // replaced once the fixture is in
   const lengthOf = (it) => it.playedMs ?? it.catalogueMs ?? MEDIAN_MS;
   const laneFor = (id, label) => ({
     id, kind: 'part', label, height: 44, barPad: 6,
     as: 'spans', stack: false, barGap: 1, terse: true, alpha: 0.85, spanLine: false,
-    // TWO HUES, because they are two archives. Yellow is the site's own and the
-    // films are ours to show; radio gets teal, far enough round the circle to be
-    // told apart at a two-pixel mark. Neither is a quality signal — nothing here
-    // is measured — so colour carries identity only, and the playing one is the
-    // same hue at full brightness rather than a different colour.
+    // Two hues for two archives; colour is identity only, the playing one is the same hue brighter.
+    // why: lessons/kit-reel-line.md#two-hues
     colorOf: (sp) => {
       const on = sp.row?.payload?.slug === current?.slug;
       const ink = INK[id === 'radio' ? 'audio' : 'video'];
@@ -128,13 +73,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
       at: it.at, id: it.slug, kind: 'part',
       payload: { durMs: lengthOf(it), ...it },
     })),
-    // THREE SHORT LINES, AND IT WAS FOUR FACTS IN THREE. The date and the
-    // length were one string with a middot holding them apart, and the fourth
-    // line said which medium this is, which is what the lane it is drawn in is
-    // called: the gutter beside the mark says `newsreels` or `radio` an inch
-    // away. These are the lines the FOOTER under the strip shows, one per row,
-    // each clipped to its own row, so a long title ellipsises rather than
-    // wrapping and pushing the last line out of a fixed box.
+    // Three short lines, one per footer row, each clipped to its row; the lane gutter names the medium.
+    // why: lessons/kit-reel-line.md#describe-row
     describeRow: (r) => {
       const p = r.payload;
       const len = p.playedMs ? `${(p.playedMs / 60000).toFixed(1)} min, measured`
@@ -144,13 +84,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     },
   });
 
-  // EVERY BROADCAST, BY DAY. Stepping through one lane skips whole weeks the
-  // other lane is the only witness to, and stepping through both as a flat
-  // list hands you the same afternoon twice — once for its film and once for
-  // its radio — on the 283 days where both survive. So the unit is the DAY:
-  // one press, one broadcast day, and the day brings whichever halves of it
-  // reached us. The film represents a day when there is one, because the film
-  // is what carries the picture.
+  // Stepping unit is the broadcast day (283 days have both halves); the film represents it when there is one.
+  // why: lessons/kit-reel-line.md#days
   let days = [];
   const rebuildDays = () => {
     const byDate = new Map();
@@ -172,31 +107,20 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
   /** The first mark of either lane from where the playhead stands; past the
    *  last mark, the very first one. */
   const firstFromPlayhead = () => {
-    // ⚠️ FIRST FROM WHERE THE PLAYHEAD STANDS, NOT FROM THE YEAR'S START.
-    // The page opens on the first newsreel's day, and the radio archive
-    // has marks days before it, so "the first" measured from 1 January
-    // jumped the playhead BACK to a radio programme the reader never saw
-    // on screen, and `verify.mjs`'s "play advances position" caught the
-    // clock going backwards. Past the last mark, the very first one.
+    // First measured from the playhead, not 1 January, or play jumps backwards.
+    // why: lessons/kit-reel-line.md#first-from-playhead
     const all = [...items, ...radio];
     const earliest = (xs) => xs.reduce((a, b) => (!a || b.at < a.at ? b : a), null);
     const at = deck.position();
     return earliest(all.filter((it) => it.at >= at)) || earliest(all);
   };
 
-  // ⚠️ THE ARITHMETIC IS PURE AND THE STATE IS THE THIN WRAPPER ROUND IT, so
-  // a check can grade the mapping with nothing open and nothing picked.
-  // A position here is a moment in 1965: a clip is drawn from the day it went
-  // out and is as wide as it is long, so `position - item.at` IS how far into
-  // the film the playhead has got.
+  // Pure arithmetic: a clip starts at the day it went out, so `position - item.at` is how far in.
+  // why: lessons/kit-reel-line.md#into-of
   const intoOf = (item, pos) => (pos - item.at) / 1000;
 
-  // THE VIEW STAYS INSIDE THE YEAR. Centring on a clip near either end pushed
-  // the window past it, so the axis read 1964-12-24 on a page whose whole
-  // subject is 1965 — empty months either side of the material, labelled with
-  // a year that has nothing on this line. The window keeps its width and
-  // slides inward instead of being cropped, so the zoom the reader chose
-  // survives being near an edge.
+  // The view stays inside 1965: the window keeps its width and slides inward, so the zoom survives.
+  // why: lessons/kit-reel-line.md#fit-in-year
   const fitInYear = (from, to) => {
     const w = Math.min(to - from, YEAR_TO - YEAR_FROM);
     let a = from, b = a + w;
@@ -223,8 +147,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
   }
 
   /**
-   * PICK A DAY ON THE LINE. Moves the playhead, frames the view, colours the
-   * mark, and opens NOTHING. Returns both halves of the day.
+   * Pick a day: moves the playhead, frames the view, colours the mark, opens nothing.
+   * why: lessons/kit-reel-line.md#pick
    */
   function pick(it) {
     current = it || null;
@@ -233,9 +157,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
       // the day is off the edge — stepping to something you cannot see is not
       // stepping to it.
       deck.seek(it.at);
-      // KEEP THE READER'S ZOOM. Stepping re-centres on the new day at whatever
-      // span is currently shown — it does not snap back to the opening view,
-      // because someone who zoomed out to see the month meant it.
+      // Keep the reader's zoom: re-centre at the current span.
+      // why: lessons/kit-reel-line.md#pick-zoom
       const v = view.strip.view();
       const span = (view.strip.canvas.width / (window.devicePixelRatio || 1)) * 1000 / v.pxPerSecond;
       const left = v.originTime + (v.scrollX / v.pxPerSecond) * 1000;
@@ -254,34 +177,10 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     return { picture, sound };
   }
 
-  // ── scrubbing the year ────────────────────────────────────────────────────
-  /**
-   * 🔴 THE PLAYHEAD FOLLOWS THE FINGER. THE BROADCAST NEAREST WHERE IT STOPS IS
-   * WHAT PLAYS. Asked 2026-09-19: *"maek scrub work"*, and until then the strip
-   * had no `onSeek` at all, so it fell back to `deck.seek`: a drag moved the
-   * line and nothing else happened.
-   *
-   * ⚠️ THIS AXIS IS NOT `/tapes/`'S, WHICH IS WHY IT IS NOT A COPY OF IT. A
-   * tape runs end to end, so every position on that line is inside some
-   * recording. A year of weekly broadcasts is mostly GAP: the median newsreel
-   * is 2.2 minutes and the next one is a week away, so almost every position a
-   * finger can stop on has nothing under it at all. Landing on the nearest is
-   * therefore the only reading of a scrub that can always be honoured.
-   *
-   * ⚠️ AND THE EXPENSIVE HALF WAITS FOR THE HAND TO STOP AND LET GO. `onSeek`
-   * fires continuously through a drag; loading on every call would tear the
-   * media element down and build it again once per broadcast crossed, which is
-   * the lane flashing that `/tapes/` reported, and here it would also ask ERR
-   * for a stream URL per film crossed. So the landing wants two things: 140 ms
-   * of stillness, which is a hand that has stopped rather than one that is
-   * still going, and a finger that is off the glass.
-   */
-  // WHICH LANE THE FINGER IS IN. `onSeek` is handed a position and nothing
-  // else, and the two lanes are two archives, so a drag along the radio lane
-  // has to land on radio. The strip resolves the lane for its own hover and
-  // does not publish it, so the y is read here off the same geometry its
-  // `laneAt` uses: lane boxes are in canvas units, and a client y scales into
-  // them through the canvas's rect.
+  // The playhead follows the finger; the broadcast nearest where it lands is what plays, after
+  // 140 ms of stillness and a released finger. The lane comes from the pointer y, read off the
+  // strip's lane geometry.
+  // why: lessons/kit-reel-line.md#scrub
   let pointerLane = null, pressAt = null;
   const laneAtClientY = (clientY) => {
     const r = view.strip.canvas.getBoundingClientRect();
@@ -289,10 +188,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     const y = (clientY - r.top) * (view.strip.state.height / r.height);
     return view.strip.lanes().find((L) => L.show && y >= L.y && y < L.y + L.height) || null;
   };
-  // HOW NEAR A BROADCAST IS TO A MOMENT: the distance to its SPAN, not to its
-  // start. A mark is minutes wide against days of gap, so the two answers
-  // differ only when somebody has zoomed right in, which is exactly when a
-  // finger resting inside a clip means that clip.
+  // Distance to a broadcast's span, not its start, so a finger inside a clip means that clip.
+  // why: lessons/kit-reel-line.md#nearest-of
   const nearestOf = (at, pool) => {
     let best = null, gap = Infinity;
     for (const it of pool) {
@@ -314,11 +211,8 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
   }
   function landScrub() {
     scrubTimer = 0;
-    // 🔴 NOTHING PLAYS UNDER A FINGER THAT IS STILL DOWN. A hand can stop for
-    // 140 ms halfway through a drag and go on, and opening a stream at that
-    // moment is a broadcast chosen by a pause in somebody's movement rather
-    // than by where they let go. The landing is KEPT rather than dropped: the
-    // release below runs it.
+    // Nothing plays under a finger still down; the landing is kept for the release.
+    // why: lessons/kit-reel-line.md#land-scrub-held
     if (pressAt) return;
     const s = scrubTo; scrubTo = null;
     if (!s) return;
@@ -330,46 +224,34 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     // Already picked. A day brings both of its halves, so a drag that stops
     // over a newsreel's own radio programme has landed on the day it is on.
     if (!it || it === halves.picture || it === halves.sound) return;
-    // What a landing does is the page's: keep going if it was going, and
-    // otherwise just pick it. A scrub across a stopped year is somebody
-    // reading the line, and opening a stream under every finger that comes
-    // to rest is the cost these pages exist not to impose.
+    // What a landing does is the page's decision.
+    // why: lessons/kit-reel-line.md#land-scrub-on-land
     onLand(it);
   }
 
   /**
-   * Put the line on the page.
-   * @param {Element} host
-   * @param {object} [o]
-   * @param {false|object} [o.footer]  the strip's footer, `{ lines: 3 }` on
-   *   /reel/. `false` draws none, and the strip's own tooltip says the same
-   *   three lines on hover instead.
+   * Put the line on the page. @param {Element} host
+   * @param {object} [o] @param {false|object} [o.footer]  `{ lines: 3 }` on /reel/; false uses the tooltip
+   * why: lessons/kit-reel-line.md#mount
    */
   function mount(host, { footer = false } = {}) {
     view = createStripView(host, deck, {
       size: 'auto', follow: false, gutter: 150,
-      // DECLARED, not guessed. The strip's fallback asks `range[0] > 1e12`, which
-      // is 2001-09-09 — every date before that, and every negative one, fails it,
-      // so 1965 would print as a duration instead of a date.
+      // Declared: the strip's `range[0] > 1e12` guess fails for 1965 and prints a duration.
+      // why: lessons/kit-reel-line.md#absolute
       absolute: true,
-      // TWO LANES, ONE DAY. Both are positioned by the date they went out, so a
-      // newsreel and a radio programme from the same day sit at the same place —
-      // which is the thing neither archive's own interface can show you, and the
-      // reason to put them on a line at all.
+      // Both lanes positioned by broadcast date, so a day's film and radio line up.
+      // why: lessons/kit-reel-line.md#two-lanes
       lanes: [laneFor('ak', 'newsreels'), laneFor('radio', 'radio')],
       // Named rather than inline, so a check can drive the same entry a finger
       // does. What a check grades is `nearestOf`, which is the half of the
       // decision that needs nothing from ERR.
       onSeek: (at) => stripSeek(at),
-      // THE LANE'S OWN THREE LINES AND NOTHING ABOVE THEM. The strip's default
-      // block opens with the lane name and the time under the pointer, which
-      // here is `newsreels` (the gutter an inch to the left already says it) and
-      // the date (which `describeRow` already carries), and in a three line box
-      // that header pushed the length off the bottom. Off a mark, the default
-      // stands, so the box still says where the pointer is.
+      // On a mark, only the lane's three lines; off one, the strip's default.
+      // why: lessons/kit-reel-line.md#describe-hit
       describeHit: (hit) => (hit.row && hit.lane.describeRow ? hit.lane.describeRow(hit.row) : null),
-      // See /reel/ for why its three lines go UNDER the line rather than over
-      // it (*"add feature to timeline: footer section"*, 2026-09-19).
+      // See /reel/ for why its three lines go under the line.
+      // why: lessons/kit-reel-line.md#footer
       ...(footer ? { footer } : {}),
     });
 
@@ -382,14 +264,9 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     // A gesture somebody else claimed is not a choice of broadcast.
     c.addEventListener('pointercancel', () => { pressAt = null; cancelScrub(); });
     /**
-     * PRESS A MARK TO PLAY IT.
-     *
-     * ⚠️ A PRESS, NOT A DRAG, and that became load-bearing the moment the drag
-     * above started meaning something. A plain drag on this strip SEEKS, and the
-     * strip stops updating its hover for the duration of one, so the hit sitting
-     * in `hover` at the end of a drag is the mark the drag STARTED on. Without
-     * the six pixels, every scrub would finish by playing whatever it set off
-     * from.
+     * Press a mark to play it: a press, not a drag (6 px), since a drag seeks and leaves
+     * `hover` on the mark it started from.
+     * why: lessons/kit-reel-line.md#press-mark
      */
     c.addEventListener('pointerup', (e) => {
       const p = pressAt; pressAt = null;
@@ -403,16 +280,11 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
       const h = view.strip.state?.hover;
       const slug = h?.row?.payload?.slug;
       const it = slug && (items.find((x) => x.slug === slug) || radio.find((x) => x.slug === slug));
-      // A press on nothing is still a position: it lands on the broadcast
-      // nearest it, exactly as a drag does. ⚠️ AND IT LANDS HERE RATHER THAN
-      // WAITING FOR THE TIMER, because a press held longer than 140 ms has
-      // already spent the timer while the finger was down and there is no second
-      // one coming.
+      // A press on nothing lands on the nearest broadcast now: a long press already spent the timer.
+      // why: lessons/kit-reel-line.md#press-nothing
       if (!it) { if (scrubTo) landScrub(); return; }
-      // A press on a mark is an ANSWER, so the drag's deferred landing has
-      // nothing left to decide. Without this the timer fires 140 ms later and
-      // lands on whatever was nearest that pixel, which is usually the mark just
-      // pressed and is not always it.
+      // A press on a mark answers; cancel the drag's deferred landing.
+      // why: lessons/kit-reel-line.md#press-cancel
       cancelScrub();
       onPress(it);
     });
@@ -436,26 +308,12 @@ export function createReelLine({ onPress = () => {}, onLand = () => {}, fixture 
     if (known.length) MEDIAN_MS = known[known.length >> 1];
     gutters();
 
-    // A MONTH. That is a view about the YEAR rather than about one film: roughly
-    // twenty-four newsreels on screen at once, which is what makes the shape of
-    // the series visible — weekly, all year, with the gaps where a week was
-    // missed.
-    //
-    // Each clip is a 2 px mark at this span, and that is the floor doing its
-    // job rather than a failure. A 2.2-minute film in a month is 0.005 % of the
-    // view; nothing shows that honestly AND legibly at once. So the width is
-    // proportional wherever there is room for it to be, the floor keeps a clip
-    // from vanishing, and the strip prints its own span so the trade is visible
-    // instead of mysterious. Zoom in and the bars become bars.
+    // A month: the series' weekly shape is visible. Clips are 2 px marks at this span; the strip
+    // prints its span so the trade is visible.
+    // why: lessons/kit-reel-line.md#span
     const SPAN = 30 * DAY;
-    // Open on a day where BOTH survive, so the thing the page does is visible
-    // before anyone presses anything. Most days pair — 283 of them — but the
-    // first newsreel of the year is not one of them, and opening on a silent
-    // day makes the page look like it only has half the material.
-    //
-    // 🔴 THE VIEW OPENS THERE. NOTHING IS PICKED AND NOTHING IS FETCHED.
-    // Framing the month and standing the playhead on the day costs no bytes and
-    // says the same thing: here is where the material starts.
+    // Open on a day where both survive. The view opens there; nothing is picked or fetched.
+    // why: lessons/kit-reel-line.md#open-on
     const radioDays = new Set(radio.map((r) => r.date));
     openOn = items.find((i) => radioDays.has(i.date)) || items[0];
     fitInYear(openOn.at - SPAN / 2, openOn.at + SPAN / 2);

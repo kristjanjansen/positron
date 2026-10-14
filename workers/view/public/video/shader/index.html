@@ -26,9 +26,9 @@
      once there is more than one camera. A flex row blockifies the group, so it
      sits on no text line; on a phone the picker wraps under it. */
   .cc-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  /* The camera as it is on the left, the shader's picture on the right, each
-     half the content width (asked 2026-10-10, *"keep original 1/2 left, shader
-     1/2 right"*). On a phone they stack, the original first. */
+  /* The camera on the left and the shader's picture on the right, each half the content width;
+     on a phone they stack, the original first.
+     See lessons/page-video.md#video-22 */
   .cc-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
   @media (max-width: 560px) { .cc-pair { grid-template-columns: minmax(0, 1fr); } }
 </style>
@@ -45,19 +45,10 @@
   import { createCamera } from '/shell/camera.mjs';
   import { createDitherShader } from '/shell/dither-shader.mjs';
 
-  // /video/camera/ with a shader beside it. The camera feeds two pictures: the
-  // original, camera -> screen, drawn as 60 draws it, and the shader's, camera
-  // -> shader -> dither. The shader is a node of its own, `web:shader`, with
-  // a video-in and a video-out, and each picture follows its own links. One
-  // knob, its own node, is cabled into `web:shader:value-in`.
-  //
-  // THE LOOK is a two tone ordered dither: a 4x4 Bayer matrix over the frame's
-  // brightness, the page's own dark ground for off and a warm off-white for
-  // on, with the brand yellow only where the picture is brightest. It is the
-  // site's mono, dark surface drawn out of the camera, and nothing else.
-  //
-  // NOTHING OPENS ON A VISIT, and nothing ever leaves this machine. The camera
-  // is asked for on the start press; stop ends every track.
+  // /video/camera/ with a shader node (`web:shader`, video in and out) and one knob into its
+  // value-in. The look is a 4x4 Bayer two tone dither, dark ground and warm off-white, brand
+  // yellow only at the brightest. Nothing opens on a visit and nothing leaves this machine.
+  // See lessons/page-video.md#video-23
   const S = 'web';
   const CAM = `${S}:camera:video-out`, SCREEN = `${S}:screen:video-in`;
   const FX = `${S}:dither:video-in`;
@@ -151,8 +142,8 @@
   const size = el('span', 'cc-say', '');
   const panel = createVideoPanel({ media: orig, left: name });
   panel.el.querySelector('.pos-vp-r').prepend(size);
-  // An empty picture is the page's own ground, the dither's dark, not black
-  // (asked 2026-10-10, *"keep same bg color initially"*).
+  // An empty picture is the page's ground, the dither's dark, not black.
+  // See lessons/page-video.md#video-24
   const GROUND = '#0b0e14';
   function drawOrig() {
     if (camera.on() && holds(CAM, SCREEN)) drawCamera(ctx, video, FRAME_W, FRAME_H, { scrim: 0 });

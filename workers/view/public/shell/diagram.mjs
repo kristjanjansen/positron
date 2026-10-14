@@ -1,112 +1,7 @@
-// demo/shell/diagram.mjs — a picture of where the signal goes.
-//
-// For a page whose subject is a PATH — a key press that leaves this browser,
-// crosses a rented computer, reaches a board in the studio and comes back as
-// sound — the `what` paragraph is describing a SHAPE, in prose, badly. This
-// draws the shape instead. plans/plan-diagram.md is the brief; the decisions in it
-// are taken and this file implements them rather than re-opening them.
-//
-//   const dg = createDiagram(host, {
-//     title: 'a key press, and what it costs',
-//     caption: 'one line under the picture',
-//     nodes: [{ id:'you', label:'your browser', sub:'a key press', kind:'here',
-//               note: 'The browser you are reading this in. **It makes the sound too.**',
-//               children: [{ id:'synth', label:'a synthesiser', sub:'in the page' }] }, ...],
-//     links: [{ from:'you', to:'relay', label:'note number' },
-//             { from:'relay', to:'you', label:'', back:true }],
-//   });
-//   dg.cuts   // every label the drawer had to shorten, with the full text
-//
-// ⚠️ A BOX CAN HOLD BOXES, AND THAT IS HOW A MACHINE SAYS WHAT RUNS ON IT.
-// `children` puts one or more boxes INSIDE another, measured from what they
-// need plus padding rather than from a guessed height, in both layouts. The
-// plan said one level of nesting was enough and that a program could be named
-// in its machine's `sub` — which is true right up to the point where the
-// machine and the program are two different things a link can reach: an arrow
-// may target a container or any box inside one.
-//
-// 🔴 AND AN ARROW THAT NAMES A BOX ARRIVES AT THAT BOX, IN BOTH LAYOUTS. In
-// one column it used to attach to the MACHINE whichever box it named, on a
-// measurement that is still true: a vertical run into a box inside a container
-// crosses that container's own name and every box stacked above the one it
-// wants. PHOTOGRAPHED 2026-09-19 on four pages at once — `WebGL2 -> shader`
-// drawn from the Browser's own edge, `films -> video` drawn machine to machine
-// ON A WIDE SCREEN, `store -> play` arriving beside `uploader`, `ffmpeg -> up`
-// leaving the Raspberry Pi. The line turns out of the box's SIDE instead and
-// runs in a lane, which is the one strip of ground that is empty: inside a
-// container's own padding when the picture is stacked, and in the gap between
-// two columns when it is not. A step between two whole machines is untouched
-// and still runs straight down the middle.
-// ⚠️ NOTHING GRADED THIS AND THAT IS WHY IT WAS WRONG EVERYWHERE. `cuts`
-// reports a link that was REFUSED, so a link routed to the wrong END read
-// clean through it: the picture is complete, every arrow is drawn, and each
-// one arrives somewhere plausible and false. `checkEnds` measures the first
-// and last point of every path AGAINST THE BOX THE AUTHOR NAMED and reports a
-// mismatch on `cuts`, so a page that already asserts `cuts.length === 0`
-// grades its own picture.
-// 🔴 A CONTAINER IS NEVER EMPTY EITHER, AND THAT IS REPORTED THE SAME WAY. An
-// author cannot SEE a missing box: every box in a picture is drawn to ONE
-// height, so a machine with nothing in it beside a machine with three boxes is
-// a tall empty slab. See CLAUDE.md.
-//
-// 🔴 TWO BOXES IN ONE CONTAINER ARE LINKED IN THE GAP THEY ALREADY SHARE, AND
-// THAT LINK REPLACES THE TIE BETWEEN THEM. It used to be dropped with a
-// warning, on the argument that routing it would mean a third rule for a
-// picture nothing had asked for. `/station/` asked: grouping seven boxes into
-// three machines killed three real arrows at once and left plain ties standing
-// where they had been, which is a picture claiming a chain that does not
-// exist. Two boxes that are NEXT TO EACH OTHER inside their container get the
-// arrow in the gap between them, with its name beside it. One that reaches
-// PAST the box between them gets a lane inside the container's own padding,
-// which is the same idea as the lanes over and under the row, one level in.
-// A link from a container to a box inside ITSELF has no gap to run through and
-// is still refused — reported on `cuts`, never dropped in silence, because a
-// link that vanishes without a word is exactly how those three went missing.
-// ⚠️ A TIE AND AN ARROW ARE ONE WEIGHT OF INK DOWN ONE MIDDLE, so a container
-// holding both says two things in one alphabet and the headless one reads as a
-// head that went missing. That is a fact about the DESCRIPTION rather than
-// about the drawer: order a machine's boxes so every pair a reader sees side by
-// side is a pair a direction was stated for, and the mix cannot arise.
-// `api.ties` is how many headless lines the picture holds, so a page can assert
-// its own description got that right instead of anybody having to look.
-//
-// 🔴 THERE IS NO `title` ATTRIBUTE ANYWHERE IN HERE, AND THAT IS THE POINT.
-// A box used to carry an SVG `<title>`, which the browser draws as a native
-// tooltip — so pointing at one said `Raspberry Pi` in the box, `Raspberry Pi —
-// another granulator` in a yellow tooltip ON TOP of it, and the same words
-// again in the line under the picture. Three channels saying one thing is the
-// defect a legend is. The accessible name the `<title>` was also carrying moves
-// to `aria-label`, which no browser draws, so a screen reader keeps everything
-// the sighted reader just stopped seeing twice.
-//
-// `note` is what the line under the picture says while a box is hovered: a
-// SENTENCE about what that box does here, not its name a second time. It takes
-// `**bold**` and nothing else — two asterisks, written out in `boldParts`,
-// because a markdown library for one inline form is a dependency to read the
-// release notes of forever.
-//
-// 🔴 IT DRAWS A DESCRIPTION, IT IS NEVER A DRAWING. Nothing anywhere positions
-// a box. A page hands over the structure above and this file decides every
-// pixel — which is the only reason the same structure can later grow a live
-// number per box without the layout moving.
-//
-// ⚠️ SVG, AND THE TEXT IS IN THE SVG TOO. Not DOM text over a canvas: that
-// needs the layout computed twice in two coordinate systems that drift the
-// moment anything reflows, and it puts a label OUTSIDE the box it names, where
-// it can end up beside the wrong one. Not `<foreignObject>` either — patchy in
-// Safari and it re-introduces exactly that second coordinate system. The price
-// is that SVG has no line wrapping at all, which is why the plan calls the
-// wrapping "the actual work" and why it lives here, once, rather than in every
-// page that draws a diagram.
-//
-// 🔴 THE TRAP, AND IT IS THE FIRST THING TO SUSPECT: `getComputedTextLength()`
-// RETURNS 0 for a <text> that is not in the document, or that sits inside a
-// `display: none` ancestor. Every label then measures as zero, every string
-// "fits", and the whole diagram comes out one line per box with no wrapping
-// and no cuts — which looks like a wrapping bug and is an attachment bug. So
-// the probe is measured in the LIVE svg after it is attached, and if it still
-// reads 0 the drawer falls back to an estimate, says so on `dg.measured`, and
-// lays out again when the host finally has a size.
+// demo/shell/diagram.mjs: a picture of where the signal goes, drawn from a description
+// (nodes, children, links); this file decides every pixel. SVG with the text in it.
+// getComputedTextLength() reads 0 when detached, so the probe is measured in the live svg.
+// why: lessons/kit-diagram.md#header
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -114,54 +9,21 @@ const NS = 'http://www.w3.org/2000/svg';
 // A constant belongs beside the thing it governs; these govern the whole
 // picture, so this is beside it.
 /**
- * 🔴 WHERE A BOX'S WORDS SIT, AND IT IS ONE SWITCH BECAUSE IT HAS TO BE
- * REVERTABLE. Centred is what this drew for its whole life; top-left is what a
- * technical diagram wants, because a reader scanning a column of boxes wants
- * every name to start at the same x and the same y rather than to float
- * according to how much else is in its box. Two boxes of different heights,
- * centred, put their names at two different heights for a reason nobody can
- * see.
- *
- * ⚠️ IT IS A CONSTANT, NOT A PER-CALL OPTION, ON PURPOSE. Half the pictures
- * aligned one way and half the other is worse than either; and if this turns
- * out to be wrong, `'centre'` here puts every diagram in the project back the
- * way it was in one edit, which is the whole reason it is written like this.
+ * Where a box's words sit, for every diagram at once. One constant so it stays revertable:
+ * `'centre'` puts every picture back in one edit.
+ * why: lessons/kit-diagram.md#box-align
  */
 export const BOX_ALIGN = 'topleft';           // 'topleft' | 'centre'
 
 /**
- * 🔴 A BOX HAS A HUE, AND A NOTE THAT NAMES IT BORROWS THE SAME ONE.
- *
- * Every note wants to point at another box, and prose cannot: `the clock above`
- * means counting boxes, and a file path or a capitalised SERVER-SIDE means
- * nothing to anybody. So the picture carries the reference instead. Each box is
- * tinted with one hue mixed a long way into the page's own grey, and a **bold**
- * run in a note whose text is a box's NAME is drawn in that same hue, stronger.
- * Pointing is then a colour rather than a sentence.
- *
- * ⚠️ NO NEW SYNTAX, WHICH IS WHY IT WILL STILL BE TRUE NEXT YEAR. There is no
- * `[[link]]` to remember and nothing to keep in step: writing **scsynth** in a
- * note colours it because a box is called scsynth, and renaming that box moves
- * the colour with it. A bold run that matches nothing stays plain bold, which
- * is what bold already meant.
- *
- * ⚠️ AND THE TINT IS FAINT ON PURPOSE. These are boxes on a dark page, not a
- * chart: at 14% the hue is a family resemblance you notice when you look for it
- * and never a colour the picture is about. The text takes 62% because a word in
- * a line of prose has a twentieth of the area to say it with.
+ * A box has a hue, and a **bold** run in a note whose text is a box's name borrows it.
+ * The tint is faint on purpose: 14% fill, 62% for the text.
+ * why: lessons/kit-diagram.md#hue-reference
  */
 /**
- * 🔴 ONE COLOUR PER TECHNOLOGY, ACROSS EVERY DIAGRAM IN THE PROJECT. A page's
- * picture is not the only one anybody will see: Cloudflare is in four of them,
- * a browser in six, a sound pipeline in three. If each diagram picked its own
- * hues then Cloudflare would be orange here, teal there and violet on the third
- * page, and the colour would carry nothing across the set. Declared `tech` on a
- * node takes its colour from this table; anything else falls back to the
- * rotation below, which only has to keep neighbours apart within one picture.
- *
- * ⚠️ `cloudflare` IS ITS OWN BRAND ORANGE and that is the point of naming it.
- * The colour a reader has already learned from the thing itself is worth more
- * than any scheme, and the rotation had picked violet for it.
+ * One colour per technology across every diagram, so a hue means the same thing on every page.
+ * `cloudflare` is its own brand orange.
+ * why: lessons/kit-diagram.md#tech-hue
  */
 export const TECH_HUE = {
   cloudflare: 28,          // their orange
@@ -171,26 +33,13 @@ export const TECH_HUE = {
   relay: 190,              // our own sockets and workers
   device: 330,             // a machine in a room: a board, a phone, a speaker
   /**
-   * 🔴 THEIR OWN RASPBERRY, FOR THE REASON `cloudflare` IS THEIR ORANGE. Asked
-   * 2026-09-16 with their logo: *"pi should be brandcolorsih on diageam"*. The
-   * colour a reader has already learned from the thing itself is worth more
-   * than a slot in a rotation, and a Raspberry Pi is one of the few machines in
-   * these pictures that a reader can recognise by colour at all.
-   * ⚠️ 343 IS READ OFF THE LOGO, not chosen: #C51A4A is the crimson in their
-   * mark, which is hue 343 in HSL. It sits three degrees from `device`, and
-   * that is fine: `device` is any machine in a room and this is one machine
-   * anybody can name.
+   * Raspberry Pi's own crimson: #C51A4A is hue 343, read off the logo.
+   * why: lessons/kit-diagram.md#tech-hue-raspberry
    */
   raspberry: 343,          // #C51A4A, the crimson in their own logo
   /**
-   * 🔴 THEIR OWN BLUE, FOR THE REASON `cloudflare` IS THEIR ORANGE AND A
-   * RASPBERRY PI IS THEIR CRIMSON. Asked 2026-09-19: *"make both outer boxes
-   * blue (meta color)"*, about a headset and its controllers.
-   * ⚠️ 213 IS READ OFF THE BRAND, not chosen: #0064E0 is hue 213 in HSL.
-   * ⚠️ AND IT IS NOT `device`. `device` is any machine in a room, a board, a
-   * phone, a speaker, and it stays 330 for all of them. This is for the one
-   * make of headset these pages are actually written against, which a reader
-   * can name on sight, the same argument the two entries above it make.
+   * Meta's own blue: #0064E0 is hue 213. Not `device`, which stays 330 for any machine.
+   * why: lessons/kit-diagram.md#tech-hue-meta
    */
   meta: 213,               // #0064E0, their blue
   archive: 250,            // ERR, archive.org, a corpus
@@ -198,24 +47,17 @@ export const TECH_HUE = {
 };
 
 /**
- * For nodes with no `tech`. It only has to keep neighbours apart inside one
- * picture, so the order is by contrast rather than by meaning.
- * ⚠️ MIXED INTO A NEAR-BLACK GREY, every hue loses saturation and the warm ones
- * lose the most: 35 degrees at a quarter strength came out as brown and was
- * reported as muddy. The repair was not to ban warm hues, which would have made
- * Cloudflare's own colour unusable, but to move the identity into the EDGE: the
- * fill stays almost grey and the stroke carries the hue.
+ * For nodes with no `tech`, ordered by contrast so neighbours differ in one picture.
+ * Mixed into near-black the warm hues go muddy, so the stroke carries the hue.
+ * why: lessons/kit-diagram.md#hues
  */
 const HUES = [205, 168, 278, 330, 145, 250, 190, 305];
 // Almost grey. A tinted fill this faint reads as "these two belong together"
 // and never as a colour the picture is about.
 const BOX_TINT = 0.1;
-// The edge is where a hue survives the mix, so this is where identity lives.
-// ⚠️ TURNED DOWN FROM 0.75. At three quarters the strokes were saturated enough
-// to read as the subject of the picture rather than as labels on it: four
-// bright outlines around near-grey boxes puts the loudest ink on the part that
-// carries the least information. Half is still enough to tell two technologies
-// apart side by side, which is the whole job.
+// The edge carries a hue's identity. 0.75 read as the subject of the picture; half still
+// tells two technologies apart.
+// why: lessons/kit-diagram.md#edge-tint
 const EDGE_TINT = 0.52;
 const TEXT_TINT = 0.62;
 // Kinds whose stylesheet rule replaces the hue on the box edge. A name of one
@@ -237,44 +79,27 @@ const GAP_X_MAX     = 58;   // between columns: an arrow plus room for its name
 const GAP_X_MIN     = 34;
 const GAP_Y         = 16;   // between two boxes sharing a column
 const GAP_Y_COL     = 30;   // between two boxes in the one-column layout
-// A CONTAINER IS MEASURED FROM WHAT IS IN IT. These three numbers are the only
-// thing the arithmetic adds: the room around the boxes inside, the room between
-// two of them, and the room under the container's own words. Equal padding on
-// all four sides is deliberate — a box inset further from one edge than another
-// reads as a box that has drifted rather than one that is held.
+// A container is measured from what is in it. Equal padding on all four sides, so a box
+// inside reads as held rather than drifted.
+// why: lessons/kit-diagram.md#child-pad
 const CHILD_PAD     = 8;    // a container's edge to the boxes inside it
-// ⚠️ 10 RATHER THAN 6, so the line that ties two children together has room to
-// be seen. At 6 px the tie was four pixels of hairline between two box edges,
-// which is indistinguishable from the edges themselves.
+// 10 rather than 6, so the tie between two children is visible: at 6 px it merged with the edges.
+// why: lessons/kit-diagram.md#child-gap
 const CHILD_GAP     = 10;   // between two boxes inside one container
 const HEAD_GAP      = 7;    // a container's own words to its first box
-// A LINK BETWEEN TWO BOXES IN ONE CONTAINER LIVES IN THESE TWO NUMBERS.
-// ⚠️ THE LANE'S ROOM IS TAKEN FROM BOTH SIDES, so the boxes inside stay
-// centred. Taking it from the right alone would buy the lane at the price of
-// the rule above it: a box inset further from one edge than another reads as a
-// box that has drifted rather than one that is held.
+// A link between two boxes in one container. Lane room is taken from both sides so the
+// boxes inside stay centred.
+// why: lessons/kit-diagram.md#sib-lane-room
 /**
- * 🔴 20, UP FROM 14, AND THE SIX PIXELS ARE AN ARROWHEAD. Reported 2026-09-16
- * with a photograph of `/crate/`: *"can not see rightmost connector
- * arrowhead"*. It was not missing, it had nowhere to stand.
- *
- * The arithmetic, because it is the whole bug. A container insets its boxes by
- * `CHILD_PAD + maxLanes * SIB_LANE` and puts lane `i` at `CHILD_PAD +
- * SIB_LANE * (i + 0.5)` from its edge, so the straight run from the lane to the
- * box it arrives at was `14 - 7 - 3 = 4 px` — and `SIB_CORNER` is 4, so the
- * TURN ate the entire run and the marker had a zero-length segment to orient
- * itself on. At 20 the run is 10 px, the corner takes 4 and the head has 6 to
- * sit on, which is its own length.
- * ⚠️ THE COST IS 6 px OF CONTAINER WIDTH PER LANE and nothing else: the boxes
- * inset by the same amount the lane moves out, so no label gets narrower.
+ * 20, so the run from lane to box is 10 px: 4 for the corner, 6 for the arrowhead.
+ * At 14 the turn ate the whole run and the head vanished. Costs 6 px of width per lane.
+ * why: lessons/kit-diagram.md#sib-lane
  */
 const SIB_LANE      = 20;   // room inside a container for one such lane
 const SIB_CORNER    = 4;    // its turns: the run out of a box is about 5 px
-// ⚠️ AND THE GAP GROWS FOR THE HEAD, NOT FOR A NAME. An arrowhead is 7 px long
-// and is drawn back along the line from its tip, so in a 10 px gap it starts
-// inside the box it leaves: a smear between two edges rather than an arrow.
-// Sixteen leaves four pixels of line behind the head, which is what makes it
-// read as pointing somewhere.
+// Sixteen so a 7 px arrowhead has 4 px of line behind it; in 10 px it starts inside
+// the box it leaves.
+// why: lessons/kit-diagram.md#sib-gap
 const SIB_GAP       = 16;   // a gap with an arrow in it rather than a tie
 const BOX_TARGET_W  = 122;  // narrow the gaps until a box is at least this wide
 const BOX_MIN_W     = 92;   // narrower than this and it becomes one column
@@ -284,12 +109,9 @@ const COL_BREAK     = 560;  // below this, one column top to bottom
 // the width a picture gets on a 375 px iPhone mini, inside the page's two 16 px
 // gutters: what `createDiagram` lays out a second time to see the phone
 const PHONE_W       = 343;
-// 🔴 A LINK THAT CANNOT RUN STRAIGHT GETS A LANE OUTSIDE THE BOXES, and the
-// two kinds share these two numbers because they are one mechanism seen from
-// two sides: a return path runs UNDER the row (down the LEFT, in one column)
-// and a forward link that reaches past its neighbour runs OVER it (down the
-// RIGHT). One spacing, so the picture reads as one idea and the two kinds of
-// lane can never be assigned widths that disagree.
+// A link that cannot run straight gets a lane outside the boxes: returns under (left in
+// one column), skips over (right). One spacing for both, so they never disagree.
+// why: lessons/kit-diagram.md#lane-first
 const LANE_FIRST    = 18;   // how far off the boxes the first lane runs
 const LANE_STEP     = 14;   // and how much further out each one after it
 const CORNER        = 6;
@@ -306,17 +128,10 @@ const STEP_OFF      = 9;    // a step's name, off to one side of its arrow
 // target's height — which is the room its name needs. See `stepElbow`.
 const STEP_TURN     = 16;
 /**
- * 🔴 HOW A LINE REACHES A BOX THAT IS INSIDE A MACHINE, AND WHY IT COSTS
- * PADDING. An arrow that names a program has to arrive AT THAT PROGRAM, and in
- * one column every run is vertical: straight down the middle it would cross
- * the machine's own name and every box stacked above the one it wants. So it
- * turns out of the box's SIDE and runs in a lane inside the container's own
- * padding, which is the only ground in there that is empty top to bottom.
- * ⚠️ THE NUMBER IS THE LANE'S SPACING, and the padding grows by one of these
- * for every lane the busiest picture needs — the same arithmetic `SIB_LANE`
- * already does one level in. Ten leaves the run from the innermost lane to the
- * box it arrives at at 14 px: four for the corner and six for the arrowhead,
- * which is its own length. That is the measurement `SIB_LANE` was raised for.
+ * Spacing of the lanes inside a container's padding that a link takes to reach a box
+ * inside a machine without crossing its name. Padding grows by one per lane;
+ * 10 leaves the innermost run at 14 px (4 corner, 6 arrowhead).
+ * why: lessons/kit-diagram.md#dive-lane
  */
 const DIVE_LANE     = 10;
 // how far a dive lane sits in from the container's own edge
@@ -335,26 +150,16 @@ export const METRICS = {
 let seq = 0;   // arrowheads live in <defs> and need an id nobody else has
 
 // ── the pure parts ────────────────────────────────────────────────────────
-// Everything from here to the end of `layout()` is arithmetic with no document
-// in it, so `diagram-test.mjs` runs it under node. That is deliberate: the
-// wrapping and the column assignment are the two places a mistake is invisible
-// — a label that reads fine but quietly lost a word, two return paths drawn on
-// top of each other — and both are far cheaper to check than to look at.
+// From here to the end of `layout()` there is no document, so diagram-test.mjs runs it
+// under node: lost words and stacked return paths are cheaper to check than to look at.
+// why: lessons/kit-diagram.md#pure-parts
 
 /**
- * Which column each box sits in: the LONGEST forward path to it.
- *
- * 🔴 `back: true` LINKS ARE IGNORED HERE, and that is exactly what makes a
- * loopback a loopback. Counting them would put every box of a round trip in a
- * column of its own and the picture would run off the right-hand edge saying
- * the signal visits five places when it visits three.
- *
- * Longest path by relaxation rather than by a topological sort, because a spec
- * CAN hold a forward cycle — somebody forgets a `back: true` — and a sort
- * throws on one while this stops after a bounded number of passes and reports
- * it. A diagram drawn slightly wrong beats a page that threw.
- *
+ * Which column each box sits in: the longest forward path to it.
+ * `back: true` links are ignored, which is what makes a loopback a loopback.
+ * Relaxation rather than a topological sort, so a forward cycle is reported, not thrown.
  * @returns {{col: Map<string, number>, cycle: boolean}}
+ * why: lessons/kit-diagram.md#assigncolumns
  */
 export function assignColumns(nodes, links) {
   const ids = (nodes || []).map((n) => n.id);
@@ -378,34 +183,20 @@ export function assignColumns(nodes, links) {
 
   const first = relax(usable);
   if (!first.cycle) return first;
-  // ⚠️ AND THE REPAIR IS NOT "GIVE UP". Left as it is, a forward circle keeps
-  // relaxing until the cap and hands back columns like 14, 15, 16 — a picture
-  // seventeen boxes wide of a path with three steps in it, which is a much
-  // worse bug than the missing `back: true` that caused it. A link pointing at
-  // an EARLIER box in the spec's own node list is almost always the one that
-  // was meant to be a return path, so the second pass drops those, draws the
-  // right shape, and still reports the cycle so the spec gets fixed.
+  // On a forward cycle, drop links that point at an earlier node in the spec (almost always
+  // a missing `back: true`) and run again, still reporting the cycle.
+  // why: lessons/kit-diagram.md#assigncolumns-cycle
   const cut = usable.filter((l) => order.get(l.to) > order.get(l.from));
   return { col: relax(cut).col, cycle: true };
 }
 
 /**
- * How deep under the row each return path runs.
- *
- * The plan asks for "a depth that grows with how far it travels so two
- * loopbacks never overlap". Those are two rules and only the second one is the
- * point: two return paths of the SAME length that overlap — one spanning boxes
- * 1 to 3, the other 2 to 4 — travel the same distance, so a depth read off the
- * distance alone would draw them on top of each other. This does the stronger
- * thing instead: shortest first, each takes the shallowest depth where nothing
- * already lies under it. Distance still decides in practice, because a longer
- * path overlaps more; and two paths that share no ground share a depth rather
- * than stacking up for nothing, which keeps the picture shallow.
- *
+ * How deep under the row each return path runs. Shortest first, each takes the
+ * shallowest depth where nothing already lies under it, so overlaps never share one.
  * @param {Array<[number, number]>} spans  each path's real run in PIXELS, not
- *        its box index — so two paths that meet at one box and turn away from
- *        each other are correctly seen as not overlapping.
+ *        its box index, so two paths that only meet at one box do not overlap.
  * @returns {number[]} one depth level per span, in the order given
+ * why: lessons/kit-diagram.md#backlevels
  */
 export function backLevels(spans) {
   const order = spans
@@ -430,23 +221,12 @@ export function backLevels(spans) {
 }
 
 /**
- * Does this forward link have to pass over a box on its way?
- *
- * 🔴 THE ANSWER IS WHAT MAKES A FORK DRAWABLE, AND IT IS THE SAME QUESTION IN
- * BOTH LAYOUTS. A straight arrow is the right drawing for a step to the next
- * place along and routes around NOTHING; a branch that reaches further is
- * drawn straight THROUGH whatever stands between, so the arrow vanishes behind
- * a box it never touches and comes out the far side with its head in the next
- * one. That is a picture of a path the page does not have, and the name that
- * would have told the two branches apart is drawn at the midpoint, i.e. under
- * the box. The second branch of a fork always skips whatever the first one
- * landed on, so every fork breaks that way until the link is routed outside
- * the boxes instead.
- *
+ * Does this forward link have to pass over a box on its way? Such a link is routed
+ * outside the boxes; drawn straight it would vanish behind a box it never visits.
  * @param {object} l          one link
- * @param {Map<string,number>} pos  where each box sits ALONG the flow: the
- *        column in the row layout, the row in the one-column layout. One
- *        predicate, two coordinate systems, because it is one defect.
+ * @param {Map<string,number>} pos  where each box sits along the flow: the column in
+ *        the row layout, the row in the one-column layout.
+ * why: lessons/kit-diagram.md#skipsabox
  */
 function skipsABox(l, pos) {
   return !l.back && Math.abs(pos.get(l.to) - pos.get(l.from)) > 1;
@@ -454,24 +234,13 @@ function skipsABox(l, pos) {
 
 /**
  * Break one string into lines that fit, and cut the last one if it cannot.
- *
- * ⚠️ A CUT LABEL IS A REPORT, NOT A FEATURE. CLAUDE.md: anything that
- * truncates with an ellipsis is in the wrong place. That rule is about gutters
- * and readouts, and here it applies to whoever wrote the label — so every cut
- * is collected on `dg.cuts` and /kit/ prints them. The full string always
- * survives in the box's `aria-label`, which a screen reader reads and no
- * browser draws: nothing is lost, only hidden, and the author is told exactly
- * which. ⚠️ IT USED TO SURVIVE IN A `<title>`, and that is a NATIVE TOOLTIP —
- * the whole string drawn on top of the box the moment a pointer rests on it,
- * beside a line under the picture already saying the same words. Hiding a cut
- * behind a hover also let a too-long label feel harmless; it is not, and the
- * report is the point.
- *
+ * A cut is a report on `dg.cuts`; the full string survives in `aria-label`.
  * @param {string} text
  * @param {number} maxWidth               in px
  * @param {number} maxLines
  * @param {(s:string)=>number} measure
  * @returns {{lines: string[], cut: boolean, full: string}}
+ * why: lessons/kit-diagram.md#wraplines
  */
 export function wrapLines(text, maxWidth, maxLines, measure) {
   const full = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -522,15 +291,10 @@ function splitWord(word, maxWidth, measure) {
 
 /**
  * One flat list of boxes out of a description that nests one level.
- *
- * ⚠️ A CHILD TAKES ITS CONTAINER'S `kind`, and that is the colour rule rather
- * than a shortcut: the hue says WHICH MACHINE a box is, so a program drawn
- * inside a machine is that machine's colour. What tells the two apart is that
- * one is inside the other — position and size, which survive greyscale.
- *
+ * A child takes its container's `kind`, so it wears that machine's colour.
  * `_kids` and `_owner` are scratch, deleted before `layout` returns anything.
- *
  * @returns {{tops: object[], kids: object[], owner: Map<string,string>}}
+ * why: lessons/kit-diagram.md#unpack
  */
 function unpack(spec) {
   const tops = [], kids = [], owner = new Map();
@@ -554,15 +318,11 @@ function unpack(spec) {
 }
 
 /**
- * `**bold**`, and nothing else, split into runs.
- *
- * ⚠️ AN UNPAIRED `**` STAYS ON THE PAGE AS TWO ASTERISKS. The tempting
- * implementation toggles on every marker it meets, which turns one typo into a
- * sentence that is bold from the mistake to the full stop — a rendering bug
- * that looks like a writing decision. A run has to be closed to exist.
- *
+ * `**bold**`, and nothing else, split into runs. An unpaired `**` stays as two
+ * asterisks, so a typo cannot make the rest of a sentence bold.
  * @param {string} text
  * @returns {Array<{text: string, bold: boolean}>}
+ * why: lessons/kit-diagram.md#boldparts
  */
 export function boldParts(text) {
   const s = String(text ?? '');
@@ -601,11 +361,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   const sibs = [];
   const links = (spec.links || [])
     .filter((l) => byId.has(l.from) && byId.has(l.to) && l.from !== l.to)
-    // 🔴 A LINK WHOSE TWO ENDS SHARE A MACHINE NEVER REACHES THE OUTSIDE, so
-    // none of the routing below is about it. Two boxes INSIDE the container
-    // are routed between themselves by `placeSibs`; a container and a box
-    // inside itself have no gap to run a line through and are refused, in
-    // writing, on `cuts`.
+    // A link whose ends share a machine never reaches the outside: siblings go to
+    // `placeSibs`, a container to its own child is refused on `cuts`.
+    // why: lessons/kit-diagram.md#layout-inside
     .filter((l) => {
       if (ref(l.from) !== ref(l.to)) return true;
       if (owner.has(l.from) && owner.has(l.to)) sibs.push({ ...l });
@@ -613,33 +371,15 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       return false;
     })
     .map((l) => ({ ...l }));
-  // ⚠️ SEEDED FROM THE SPEC, so anything refused BEFORE the layout runs — a
-  // title under the standing heading, today — arrives in the same list the
-  // page's own `nothing cut, nothing refused` assert reads. A second channel
-  // for refusals is a refusal nobody sees.
+  // Seeded from the spec, so refusals made before layout land in the same `cuts` list.
+  // why: lessons/kit-diagram.md#layout-cuts-seed
   const cuts = Array.isArray(spec.cutsSink) ? [...spec.cutsSink] : [];
   const avail = Math.max(140, Math.floor(width));
 
-  // 🔴 A CONTAINER WITH NOTHING IN IT IS A REPORT, THE WAY A CUT LABEL IS.
-  // CLAUDE.md, 2026-09-20: a container is never empty, it holds at least one
-  // box. An author cannot SEE a missing box any more than they can see a
-  // missing arrow — the picture looks complete, the machine is drawn, and it
-  // takes a machine's worth of space to say a caption's worth of thing.
-  // ⚠️ WHAT MAKES A BOX A CONTAINER IS ITS `kind`, not an empty `children`.
-  // `here`, `cloud` and `device` are the three words that say "this is a
-  // MACHINE", and the rule's own escape hatch is the other half of that: if
-  // there is honestly nothing inside, it is not a container, so it is drawn as
-  // an ordinary box with no `kind` at all.
-  // ⚠️ AND IT IS COUNTED OFF THE BUILT NODES, never off the source. A regex
-  // sweep for this found ONE page where four are known, because a spec is a
-  // JavaScript object and `children` can be built, spread or conditional.
-  // 🔴 ONLY WHERE SOMETHING ELSE IN THE PICTURE HOLDS BOXES, WHICH IS THE
-  // WHOLE HARM. Every box in a diagram is drawn to ONE height, taken from the
-  // tallest, so a machine with nothing in it standing beside a machine with
-  // three boxes in it is a tall empty slab — /station/'s own comment records
-  // exactly that, about a box called `curl`. A picture where nothing nests has
-  // no slab in it: three machines the size of three boxes is what a diagram of
-  // three machines looks like, and reporting those would make the rule noise.
+  // An empty container is reported on `cuts`, counted off the built nodes, by `kind`
+  // (here, cloud, device). Only when something else nests: every box shares one height,
+  // so an empty machine beside a full one is a tall empty slab.
+  // why: lessons/kit-diagram.md#layout-empty-container
   const nests = nodes.some((n) => n._kids.length);
   for (const n of nodes) {
     if (!nests || !MACHINE_KINDS.has(n.kind) || n._kids.length) continue;
@@ -655,21 +395,16 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
              nodes: [], links: [], cuts, cycle: false };
   }
 
-  // The columns are a statement about the MACHINES, so a link that names a box
-  // inside one is asked about its machine — otherwise a program in the middle
-  // of a chain would be given a column of its own and the picture would say the
-  // signal visits a place it never leaves.
+  // Columns are about machines, so a link naming a box inside one is asked about its machine.
+  // why: lessons/kit-diagram.md#layout-columns
   const { col, cycle } = assignColumns(nodes,
     links.map((l) => ({ ...l, from: ref(l.from), to: ref(l.to) })));
   for (const c of kids) col.set(c.id, col.get(c._owner));
   const cols = Math.max(...nodes.map((n) => col.get(n.id))) + 1;
 
-  // ── what the boxes inside a container have to make room for ─────────────
-  // 🔴 A LINK ASKED FOR AND NOT DRAWN IS A REPORT, NOT A SILENCE. This is how
-  // three arrows went missing from /station/ without anybody seeing it: the
-  // picture looked complete, the ties between the children stood where the
-  // arrows should have been, and the only trace was a console warning nobody
-  // was reading. Every one of these is on `cuts`, which /kit/ prints.
+  // What the boxes inside a container make room for. A link asked for and not drawn goes
+  // on `cuts`, never just to the console.
+  // why: lessons/kit-diagram.md#layout-sibs
   for (const l of inside) {
     cuts.push({ id: `${l.from} to ${l.to}`, where: 'link',
                 full: l.label || `${l.from} to ${l.to}`,
@@ -682,14 +417,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   for (const n of nodes) n._kids.forEach((c, i) => kidIx.set(c.id, i));
   const sibSpan = (l) => Math.abs(kidIx.get(l.to) - kidIx.get(l.from));
 
-  // ── how wide a box gets, and whether the row layout is possible at all ──
-  // The gaps give way before the boxes do: a narrow box cuts words, a narrow
-  // gap only shortens an arrow.
-  // ⚠️ DECIDED BEFORE THE CONTAINERS ARE PADDED, which it was not until the
-  // dive lanes below needed it. Nothing here reads `childInset`: the box width
-  // comes from the column count and the gaps alone, so moving it up changes no
-  // number. What it buys is that a picture in ONE COLUMN can reserve room
-  // inside its containers that a picture in a row has no use for.
+  // How wide a box gets. Gaps give way before boxes. Decided before containers are padded,
+  // so one column can reserve dive lanes inside them.
+  // why: lessons/kit-diagram.md#layout-box-width
   let gapX = GAP_X_MAX;
   let boxW = (avail - (cols - 1) * gapX) / cols;
   while (boxW < BOX_TARGET_W && gapX > GAP_X_MIN) {
@@ -721,22 +451,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   }
   const maxLanes = laneCount.size ? Math.max(...laneCount.values()) : 0;
   /**
-   * 🔴 AND THE LANES A LINK NEEDS TO REACH A BOX INSIDE A MACHINE. In one
-   * column a step used to attach to the MACHINE whichever box it named, on the
-   * measured ground that a vertical run into a box inside `Raspberry Pi` goes
-   * straight through the words `Raspberry Pi`. That is true and it made the
-   * picture lie: PHOTOGRAPHED on four pages at once, `WebGL2 -> shader` drawn
-   * from the Browser's own edge, `store -> play` arriving beside `uploader`.
-   * The run turns out of the box's SIDE instead and goes down the container's
-   * padding, which is empty from top to bottom, and that padding has to be
-   * bought here — before a box has a width, because the width depends on it.
-   *
-   * ⚠️ THE LEVELS COME FROM THE ORDER, NOT FROM PIXELS, and that is the only
-   * reason this can be answered this early. Where two dives overlap is decided
-   * by which rows and which boxes inside them they run between, and the y they
-   * end up at follows that order exactly. `backLevels` wants real distances,
-   * so the positions are scaled up: at row units its "1 px of shared ground is
-   * a join" tolerance would swallow a whole box.
+   * The lanes a link needs to reach a box inside a machine in one column, bought here
+   * before a box has a width. Levels come from the order, scaled up for `backLevels`.
+   * why: lessons/kit-diagram.md#layout-dives
    */
   const dives = mode === 'column'
     ? links.filter((l) => !l.back && !skipsABox(l, rowOf)
@@ -752,12 +469,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     ? backLevels(dives.map((l) => [rank(l.from) * 100, rank(l.to) * 100])) : [];
   const diveLanes = diveLevel.length ? Math.max(...diveLevel) + 1 : 0;
   const childInset = CHILD_PAD + maxLanes * SIB_LANE + diveLanes * DIVE_LANE;
-  // ⚠️ THE DIVE LANES ARE BOUGHT ON THE RIGHT ONLY, since they moved there on
-  // 2026-10-05 (see `placeColumn`). Bought on both sides, the left copy was an
-  // empty strip that pushed every box off centre under its machine's name.
-  // The lanes a container keeps for its own children are on the right too
-  // (see `placeSibs`), so in one column the left inset is the padding alone.
-  // In a row nothing here moves.
+  // Dive lanes are bought on the right only; bought on both sides the left copy pushed
+  // every box off centre. In a row nothing here moves.
+  // why: lessons/kit-diagram.md#layout-insetl
   const insetL = mode === 'column' ? CHILD_PAD : childInset;
   // one gap for every container in the picture, because gaps of two sizes
   // would read as a difference that means something
@@ -770,40 +484,10 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   let colBoxW = 0;
   let skips = [], backLevel = [], skipLevel = [];
   if (mode === 'column') {
-    // The return paths run down the LEFT of the column and the forward links
-    // that skip a box down the RIGHT, so each gutter holds two things SIDE BY
-    // SIDE and not one: the lanes the paths run in, and the names written
-    // beside them.
-    //
-    // ⚠️ MEASURED, with the two stacked instead: `the sound` was drawn with a
-    // return path running straight through it, because the gutter was sized to
-    // whichever of the two was wider rather than to both together. A name that
-    // has a line through it reads as a name in the wrong place, which is what
-    // it was.
-    //
-    // 🔴 AND IT RESERVES THE LANES THERE REALLY ARE, NOT ONE PER PATH. This
-    // used the list's LENGTH — every path on a level of its own — with a
-    // comment admitting it over-reserves whenever two of them share a lane,
-    // because the real levels were read off positions that needed this width
-    // first. They do not: where two paths overlap is decided by which BOXES
-    // they run between, and the y they end up at follows that order exactly.
-    // `laneSpan` below is the same question asked of the order rather than of
-    // the pixels, so the count is exact, the gutter holds what it draws, and
-    // every pixel it gives back goes into the boxes' own words.
-    // ⚠️ THE LEVELS ARE THEN HANDED TO `placeColumn` RATHER THAN RECOMPUTED.
-    // Two answers to one question is two answers that can disagree, and a
-    // gutter reserving fewer lanes than the drawer lays down is a line outside
-    // the picture.
-    //
-    // 🔴 A GUTTER IS SIZED BY WHAT ITS NAMES NEED, NEVER BY A SHARE OF THE
-    // PICTURE. It used to be a flat 30% of the width: the name was wrapped to
-    // that, and the widest RESULT then sized the gutter — so a name that had
-    // been cut made the gutter smaller, which is a cut reinforcing itself.
-    // MEASURED at 258 px: `sound and grains` wanted 92 px, was cut to
-    // `sound and…` at 58, and the gutter then reserved 58 — while the box
-    // beside it held 166 px for text needing 128. The name is measured WHOLE
-    // here, before anything wraps it, so the number cannot be fed by its own
-    // shortening.
+    // Each gutter holds lanes and names side by side. Lanes are counted exactly and handed
+    // to `placeColumn`. Sized by its names measured whole: at 258 px a 30% gutter cut
+    // `sound and grains` (92 px) to 58 px.
+    // why: lessons/kit-diagram.md#layout-gutters
     const want = (list, lanes) => {
       if (!list.length) return 0;
       let widest = 0;
@@ -817,10 +501,8 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     // themselves still have to be somewhere, even with no room for a name
     const lanesOnly = (lanes) => (lanes ? 8 + (lanes - 1) * LANE_STEP : 0);
     skips = links.filter((l) => skipsABox(l, rowOf));
-    // ⚠️ THE ENDS ARE PULLED IN BY A HAIR, so two paths that MEET at one box
-    // and turn away from each other are seen as not overlapping and share a
-    // lane. That is `ATTACH_OFF / 2` in pixels, one level up; here it is the
-    // same idea in the units the order is counted in.
+    // Ends pulled in by a hair, so two paths that only meet at one box share a lane.
+    // why: lessons/kit-diagram.md#lanespan
     const laneSpan = (l) => {
       const a = rank(l.from) * 100, b = rank(l.to) * 100;
       return a < b ? [a + 3, b - 3] : [a - 3, b + 3];
@@ -832,15 +514,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     leftInset = want(backs, backLanes);
     rightInset = want(skips, skipLanes);
 
-    // 🔴 AND WHEN THE PICTURE IS TOO NARROW FOR ALL OF IT, THE BOXES' OWN
-    // WORDS WIN. A diagram that shortens the names of the things it is about
-    // is broken in a way a reader can see; the order is the box's text, then
-    // the arrows' names, then empty space. The binding measurement is the
-    // `sub`, because it gets ONE line and is never wrapped — so the width it
-    // needs is simply its own, with no second layout pass to find out. A
-    // `label` has two lines and gives way gracefully. MEASURED before this
-    // existed: at 258 px /kit/'s fork block cut ALL FOUR box subs while
-    // reserving a gutter nothing had asked for.
+    // Too narrow for all of it: box text wins, then arrow names, then space. The one-line
+    // `sub` is the binding measurement. At 258 px /kit/'s fork block once cut all four subs.
+    // why: lessons/kit-diagram.md#layout-boxneed
     let boxNeed = 0;
     for (const n of nodes) boxNeed = Math.max(boxNeed, measure.sub(n.sub || ''));
     // a box INSIDE a container is inset, so what it needs is what it needs
@@ -870,17 +546,13 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     : Math.max(90, Math.floor(colBoxW));
   const inner = w - BOX_PAD_X * 2;
 
-  // ── the type, which decides how tall every box is ──────────────────────
-  // One height for every box, taken from the tallest. Boxes of different
-  // heights in one row is a picture where the tall one looks important. A
-  // container is taller than a plain box by what it holds — and it hands that
-  // height to every other box in the picture rather than keeping it, for the
-  // same reason: a row of unequal panels ranks them.
+  // One height for every box in a row, taken from the tallest, containers included,
+  // so unequal panels do not rank each other.
+  // why: lessons/kit-diagram.md#layout-height
   const kidInner = Math.max(20, w - childInset - insetL - BOX_PAD_X * 2);
-  // ⚠️ ASSIGNED IN READING ORDER, PARENTS AND CHILDREN ALIKE, so neighbouring
-  // boxes never share a hue and the order is the one a reader meets them in.
-  // A node may state its own; that is what a page reaches for when two pictures
-  // have to agree about what colour a thing is.
+  // Hues assigned in reading order, parents and children alike, so neighbours never share
+  // one. A node may state its own to agree with another picture.
+  // why: lessons/kit-diagram.md#layout-hue-order
   {
     let h = 0;
     const give = (n) => {
@@ -897,10 +569,8 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
       cuts.push({ id: n.id, where: 'label', full: n._lab.full,
                   shown: n._lab.lines.join(' '), width });
     }
-    // 🔴 A LONG NOTE IS REPORTED THE WAY A LONG LABEL IS. It cannot be cut at
-    // the reader, because a note is prose and half a sentence is worse than
-    // none; what it gets instead is a line in `cuts` so the author sees it.
-    // Forty words is about two sentences at this register. See CLAUDE.md.
+    // A note over forty words is reported on `cuts`; prose cannot be cut at the reader.
+    // why: lessons/kit-diagram.md#layout-long-note
     if (n.note) {
       const words = String(n.note).trim().split(/\s+/).length;
       if (words > 40) {
@@ -916,20 +586,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   // in the order they were written, boxes inside a container included, so the
   // report reads down the description rather than by where the drawer got to
   /**
-   * 🔴 A MACHINE'S OWN NAME STARTS CLEAR OF THE LANES THAT RUN DOWN ITS SIDE.
-   * In one column a dive runs down a container's left padding, and the second
-   * lane sits at `DIVE_EDGE + DIVE_LANE`, which is 14 px in: past the 10 px a
-   * name starts at. PHOTOGRAPHED 2026-09-30 at 375 px on /cam/, the `SDP offer`
-   * lane ran straight down through the C of `Cloudflare` and the w of `worker,
-   * Stream, relay`, and /fau/, /replay/ and /station/ did the same to theirs.
-   * So the head of every container moves right by the lanes past the first,
-   * which puts it the same 6 px clear of the innermost lane that one lane
-   * always left, and the words are wrapped to what is left.
-   * ⚠️ ONE COLUMN ONLY. In a row the lanes run in the gap between columns,
-   * outside every box, and nothing here moves.
-   * 🔴 SINCE 2026-10-05 THE LANES RUN DOWN THE RIGHT PADDING, so the head no
-   * longer MOVES: it starts where every box's words start and is only WRAPPED
-   * short of the lanes, by the same amount it used to move. See `placeColumn`.
+   * One column only: a container's name is wrapped short of the dive lanes down its right
+   * padding so no lane runs through its words. In a row nothing here moves.
+   * why: lessons/kit-diagram.md#layout-headinset
    */
   // 6 px short of the innermost lane, which sits `DIVE_EDGE + DIVE_LANE` off
   // the boxes' right edge: with no child lanes that is the old
@@ -955,13 +614,9 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
   }
   boxH = Math.round(boxH);
   /**
-   * 🔴 IN ONE COLUMN EVERY MACHINE IS ITS OWN HEIGHT. The shared height above
-   * is a rule about a ROW, where unequal panels side by side rank each other.
-   * Stacked, nothing stands beside anything, and the shared height only handed
-   * every short machine the tallest one's empty floor. PHOTOGRAPHED 2026-10-05
-   * at 375 px: /stage/'s audience Browser, two boxes in it, drawn as tall as
-   * Cloudflare's four, and /moq/'s one-box Cloudflare a third empty, with the
-   * lines beside them running the length of that nothing.
+   * In one column every machine is its own height; the shared height is a row rule and
+   * stacked it only gave short machines an empty floor.
+   * why: lessons/kit-diagram.md#layout-colh
    */
   const colH = new Map(nodes.map((n) => [n.id, Math.round(n._kids.length
     ? own(n) + HEAD_GAP + n._kids.length * kidH
@@ -969,11 +624,8 @@ export function layout(spec, { width, measure, metrics = METRICS } = {}) {
     : own(n) + BOX_PAD_Y * 2)]));
 
   /**
-   * ⚠️ AN UNKNOWN `align` IS REPORTED RATHER THAN IGNORED, which is this
-   * component's own habit: a label that does not fit and a link it cannot route
-   * both land on `cuts` so the AUTHOR sees them. An option silently falling
-   * back to the default is an option that reads as broken from the page and as
-   * correct from here.
+   * An unknown `align` is reported on `cuts` rather than silently ignored.
+   * why: lessons/kit-diagram.md#layout-align
    */
   const align = spec.align === 'left' || spec.align === 'centre' || spec.align === undefined
     ? spec.align
@@ -1017,25 +669,9 @@ function gapToBox(p, b) {
 const ATTACH_REACH = 6;
 
 /**
- * 🔴 DID THE ARROW REACH THE BOX IT NAMES, OR THE MACHINE AROUND IT.
- *
- * NOTHING GRADED THIS AND IT WAS WRONG ON FOUR PAGES AT ONCE. `cuts` reports a
- * link that was REFUSED, so a link routed to the wrong endpoint reads clean
- * through it: the picture is complete, every arrow is drawn, and each one ends
- * somewhere plausible and false. PHOTOGRAPHED 2026-09-19 on /mirror/, /floor/,
- * /crate/ and /knobs/ — `WebGL2 -> shader` leaving the Browser's own edge,
- * `films -> video` drawn machine to machine on a WIDE screen, `store -> play`
- * arriving beside `uploader`, `ffmpeg -> up` leaving the Raspberry Pi.
- *
- * ⚠️ IT IS MEASURED OFF THE PATH, NEVER OFF THE ROUTER'S INTENTION. The
- * drawing is the only thing a reader sees, so the question asked here is where
- * the ink starts and stops: the first and last coordinate pair in the `d`
- * string, against the rectangle of the box the author named. A check reading
- * the variable the router chose would agree with the router by construction,
- * which is the two-numbers-from-one-field defect in CLAUDE.md.
- *
- * ⚠️ AND IT GOES ON `cuts`, so every page that already asserts `cuts.length
- * === 0` grades it with no page edit at all.
+ * Did each arrow reach the box it names? Measured off the drawn path's first and last
+ * points against the named box, never off the router's choice. Mismatches go on `cuts`.
+ * why: lessons/kit-diagram.md#checkends
  */
 export function checkEnds(out, cuts) {
   const at = new Map();
@@ -1100,33 +736,10 @@ function segmentMeets(p, q, r) {
 }
 
 /**
- * 🔴 IS ANY NAME IN THE PICTURE DRAWN OVER SOMETHING ELSE.
- *
- * NOTHING GRADED THIS, and on a phone it was wrong on two streaming pages at
- * once. PHOTOGRAPHED 2026-09-30 at 375 px: on /moq/ the return path's name
- * `frames` sat across the Browser's own edge with the `MoQT` lane running down
- * through its middle; on /cam/ `WHEP` had the container edge and two lanes
- * through it, and `SDP offer` printed over the MoQ link's name in the gap the
- * two machines share, which is why that link lost its label as a workaround.
- * `cuts` reported a name that was SHORTENED, so a name drawn whole on top of
- * another read clean through it: nothing was cut.
- *
- * ⚠️ MEASURED OFF WHAT IS DRAWN, the same way `checkEnds` is. Every link's
- * name becomes a rectangle from its anchor, its lines and the ruler that
- * wrapped it, and that rectangle is asked about four things a reader sees:
- *   - another link's name, overlapping it
- *   - another link's line, running through it (its own line is left out,
- *     because a name sits beside its own run by design)
- *   - the edge of any box or machine, crossing it
- *   - a box's own name or sub, which it is printed on top of
- * and every line in the picture is asked whether it runs through a BOX's name,
- * which is the one crossing a reader cannot read past.
- * ⚠️ A PATH IS READ AS ITS CORNER POINTS. A rounded turn is a quadratic whose
- * control point is the corner itself, so the polyline through them is the
- * path to within the corner's radius, which is well under a name's height.
- *
- * ⚠️ AND IT GOES ON `cuts`, so every page that already asserts `cuts.length
- * === 0` grades it with no page edit at all.
+ * Is any link name drawn over another name, another line, a box edge or box text, and
+ * does any line cross a box's name? Measured off what is drawn, paths as corner points.
+ * Overlaps go on `cuts`.
+ * why: lessons/kit-diagram.md#checkoverlaps
  */
 export function checkOverlaps(out, cuts, measure, m = METRICS) {
   const names = [];
@@ -1204,21 +817,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
                                   sibs, kidIx, sibSpan, childGap, childInset, align }) {
   const total = cols * w + (cols - 1) * gapX;
   /**
-   * 🔴 CENTRED IS THE DEFAULT AND `align: 'left'` IS THE ONE EXCEPTION, ADDED
-   * 2026-09-22. A figure on its own under a page's controls is centred because
-   * the picture IS the block, and that is every caller but one.
-   * 🔴 THE CALLER THAT BOUGHT IT IS `/wish/`, WHERE A PICTURE IS NO LONGER THE
-   * BLOCK. That page now draws one diagram per proposed connection, in a row
-   * that also reserves a column on its right for actions. Centring inside the
-   * space left over put the figure about 70 px in from each side, so two rows
-   * with different box counts had their first box at two different x, and
-   * nothing in the column of pictures lined up with anything.
-   * ⚠️ IT IS AN OPTION RATHER THAN A CHANGE OF DEFAULT, BECAUSE THE DEFAULT IS
-   * RIGHT FOR EVERY OTHER PAGE AND THIS PROJECT HAS ONE TREATMENT PER PICTURE.
-   * A page asking for this is saying the figure sits beside something, which is
-   * a fact about the host and not about the drawing.
-   * ⚠️ AND IT IS STILL `PAD` AT THE LEFT, never 0. The inset a figure keeps off
-   * its own edge is the same on both sides and at both alignments.
+   * Centred by default; `align: 'left'` is for a picture sitting beside something else
+   * in a row (/wish/). Still `PAD` at the left, never 0.
+   * why: lessons/kit-diagram.md#placerow-align
    */
   const left = align === 'left' ? PAD : Math.max(PAD, Math.round((avail - total) / 2));
 
@@ -1230,16 +831,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
   const colH = inCol.map((list) => list.length * boxH + (list.length - 1) * GAP_Y);
   const tallest = Math.max(...colH);
 
-  // ── a forward link that skips a column runs OVER the row ────────────────
-  // 🔴 THIS IS WHAT MAKES A FORK DRAWABLE HERE, and it is the return path's
-  // rule turned upside down: a link that cannot run straight gets a lane
-  // outside the boxes, over for onward and under for back, so the two never
-  // meet and neither is ever drawn through a box.
-  //
-  // The lanes can be worked out before a single box has a y, because every x
-  // in the row layout is fixed by the column alone. So the depths are assigned
-  // first and the whole row is then pushed down by exactly the room they need
-  // — rather than laying the picture out twice.
+  // A forward link that skips a column runs over the row, as a return runs under it.
+  // Lanes are assigned first (x is fixed by column) and the row is pushed down once.
+  // why: lessons/kit-diagram.md#placerow-over
   const cxOf = (id) => left + col.get(id) * (w + gapX) + w / 2;
   const overs = links.filter((l) => skipsABox(l, col));
   const overLevel = backLevels(overs.map(
@@ -1260,33 +854,22 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
   });
   const at = new Map();
   for (const p of placed) { at.set(p.id, p); for (const k of p.kids || []) at.set(k.id, k); }
-  // 🔴 A LINK ATTACHES TO THE BOX IT NAMES AND ITS NAME GOES OUTSIDE THE
-  // MACHINE THAT BOX IS IN. Those are two different boxes the moment anything
-  // is nested: an arrow into a program dives through its machine's edge, which
-  // is the picture, while a name at the midpoint of that dive would be written
-  // inside the machine, on top of whatever else is in there. So the path is
-  // built from the box and the name from `outer`, and with nothing nested the
-  // two are the same object — which is why a picture with no container in it
-  // comes out unchanged to the last decimal.
+  // The path attaches to the box it names; the name sits outside that box's machine
+  // (`outer`). With nothing nested the two are the same object.
+  // why: lessons/kit-diagram.md#placerow-outer
   const outer = (id) => at.get(owner.get(id) || id);
   const bottom = top + tallest;
 
-  // ── the return paths, under the row ───────────────────────────────────
-  // 🔴 UNDER, NEVER BETWEEN THE BOXES. A return drawn back through the forward
-  // path is the one thing that makes a signal diagram unreadable: with two
-  // lines between the same pair of boxes the eye cannot tell the way out from
-  // the way home.
+  // Return paths run under the row, never between the boxes beside the forward path.
+  // why: lessons/kit-diagram.md#placerow-backs
   const backs = links.filter((l) => l.back);
   const level = backLevels(backs.map((l) => {
     const f = outer(l.from), t = outer(l.to);
     return [f.cx - ATTACH_OFF, t.cx + ATTACH_OFF];
   }));
-  // ⚠️ A NAME UNDER A RETURN PATH NEEDS THE DEPTH TO MAKE ROOM FOR IT.
-  // MEASURED with two loopbacks and the step at a flat 14 px: `slow down` sat
-  // on top of the line belonging to the path below it. Two paths that do not
-  // overlap is a claim about the PATHS, and the names are a second layer that
-  // has to clear as well — so when any of them is named, the step grows by one
-  // line of that type rather than by a number picked to look right.
+  // When any return path is named, the depth step grows by one line of link type,
+  // or a name sits on the line of the path below it.
+  // why: lessons/kit-diagram.md#placerow-named
   const named = backs.some((l) => l.label);
   const step = LANE_STEP + (named ? Math.round(m.linkLh) : 0);
   let deepest = bottom;
@@ -1296,14 +879,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
   const laneBudget = (sx, tx) =>
     Math.max(LINK_MIN, Math.min(LINK_MAX, Math.abs(sx - tx) - 20));
 
-  // 🔴 TWO ARROWS THAT LAND ON ONE BOX MUST NOT LAND AT ONE POINT. Both would
-  // come in at the target's centre, so the second is drawn exactly on top of
-  // the first and their two names are written at one x and one y — MEASURED on
-  // /station/, `Range requests` and `the playlist` printed over each other into
-  // an unreadable smear, and the picture said one thing arrives where two do.
-  // A fork is spread by its branches' own targets; a JOIN has nothing to spread
-  // it, so the arrivals share out the target's edge instead. One line of link
-  // type apart at the least, because the names are what collide first.
+  // Two arrows into one box share out its edge, at least one line of type apart, or
+  // they land at one point with their names over each other.
+  // why: lessons/kit-diagram.md#placerow-arrivals
   const arrivals = new Map();
   for (const l of links) {
     if (l.back || overs.includes(l)) continue;
@@ -1311,25 +889,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     arrivals.get(l.to).push(l);
   }
   /**
-   * 🔴 AND THE ROOM THEY TAKE IS WHAT THEIR NAMES REALLY NEED, MEASURED.
-   *
-   * Two arrivals sitting ONE line apart printed through each other, because
-   * `wrapLines` is allowed two lines, a name sits ABOVE its own arrow, and
-   * both of /station/'s arrivals into `player` wrap. The repair reserved the
-   * CAP — two lines, every time — plus 18 px of air, so that two two-line
-   * names read as two arrivals rather than one clump, which is what *"can we
-   * get connectors a bit separate?"* asked for.
-   *
-   * ⚠️ AND THEN IT WAS TOO MUCH, WHICH IS THE SAME MISTAKE FROM THE OTHER
-   * END. Reserving the worst case put two arrivals 40 px apart on a box 48 px
-   * tall — one at each corner — for names that might be one line, or might not
-   * exist at all. Two arrows with NO names on them were held forty pixels
-   * apart to clear writing nobody had done. So the names are wrapped FIRST,
-   * here, and the spread is what the widest of them actually takes. Nothing
-   * about the air changes: it is the reservation that stops being a guess.
-   * ⚠️ THE BUDGET IS THE GAP BETWEEN THE MACHINES, which is fixed by their x
-   * alone, so it is known before a single link has been routed and this costs
-   * no second pass.
+   * The spread between arrivals is what their wrapped names really need plus air,
+   * measured here before routing. The budget is the gap between the machines.
+   * why: lessons/kit-diagram.md#placerow-labof
    */
   const labOf = new Map();
   for (const l of links) {
@@ -1356,26 +918,17 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     return t.cy + (list.indexOf(l) - (list.length - 1) / 2) * spreadOf.get(l.to);
   };
   /**
-   * 🔴 AND EACH ARRIVAL TURNS DOWN AT ITS OWN x, WHICH IS THE OTHER HALF.
-   *
-   * Reported with a photograph after the vertical gap was widened: *"still no x
-   * separation"*. Two arrows into one box were 46 px apart at their heads and
-   * their VERTICAL RUNS were on top of each other, because the bend is taken at
-   * `x1 + STEP_TURN` and `x1` is the source box's right edge — and on
-   * `/station/` both sources are boxes in ONE container, so they share that
-   * edge to the pixel. Two names, two heads, one line down the middle.
-   *
-   * The index into the arrival list is already the number that spreads the
-   * heads, so it spreads the bends too: arrival 0 turns first and each one
-   * after it turns further along. They nest instead of overlapping.
+   * Each arrival into one box turns down at its own x (by its arrival index), so their
+   * vertical runs nest instead of overlapping when the sources share an edge.
+   * why: lessons/kit-diagram.md#placerow-turn-step
    */
   const TURN_STEP = 13;
   const turnAt = (l, x1, x2) => {
     const list = arrivals.get(l.to);
     const i = list && list.length > 1 ? list.indexOf(l) : 0;
     const want = x1 + STEP_TURN + i * TURN_STEP;
-    // ⚠️ CLAMPED INSIDE THE RUN. A bend past the target is an elbow that
-    // doubles back, and one behind the source is a line that leaves backwards.
+    // Clamped inside the run, so the bend never doubles back or leaves backwards.
+    // why: lessons/kit-diagram.md#turnat-clamp
     return Math.max(x1 + 6, Math.min(want, Math.max(x1 + 6, x2 - 6)));
   };
 
@@ -1388,20 +941,12 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
       if (o < 0) {
         const x1 = f.x + f.w + EDGE_OUT, y1 = f.cy;
         const x2 = t.x - EDGE_OUT - 1, y2 = arriveAt(l, t);
-        // the gap between the two MACHINES, which is the room the name has —
-        // never the length of the line, which reaches further whenever one end
-        // of it is a box inside one of them. Wrapped in the pass above,
-        // because how many lines it came to is what decides how far apart two
-        // arrivals at one box have to sit.
+        // The name's room is the gap between the two machines, wrapped in the pass above.
+        // why: lessons/kit-diagram.md#placerow-name-room
         const ox1 = fm.x + fm.w + EDGE_OUT, ox2 = tm.x - EDGE_OUT - 1;
         const { lab } = labOf.get(l);
-        // 🔴 SIX PIXELS ABOVE THE LINE, AND NOW THAT IS ALL IT TAKES. The old
-        // code measured the arrow's SLOPE and lifted each name clear of it,
-        // then put the two names of a fork on opposite sides so they did not
-        // fall into the wedge the branches open. Both were repairs to the
-        // diagonal; `stepElbow` has no slope and no wedge, so the line under
-        // every name is horizontal at its own target's height and the
-        // clearance is one number.
+        // Six pixels above the line: `stepElbow` makes the line under every name horizontal.
+        // why: lessons/kit-diagram.md#placerow-name-clearance
         const turn = turnAt(l, x1, x2);
         const lx = Math.max((ox1 + ox2) / 2, turn + 1);
         drawn.push({ ...l, d: stepElbow(x1, y1, x2, y2, turn),
@@ -1409,20 +954,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
         continue;
       }
       /**
-       * Over the row, out of the source's TOP edge and down into the target's.
-       *
-       * 🔴 AND WHERE EITHER END NAMES A BOX INSIDE A MACHINE, IT GOES OUT THE
-       * SIDE INSTEAD. This ran off the MACHINE at both ends, for a reason that
-       * is still true: a lane coming down from above into a box inside a
-       * container would cross that container's own name and every box stacked
-       * over the one it wants. PHOTOGRAPHED 2026-09-19 on `/floor/` at full
-       * width, where `films -> video` was drawn machine to machine — the one
-       * arrow in that picture that reads as a fact and is not one, because
-       * both `films` and `video` sit inside machines that hold two boxes each.
-       * ⚠️ THE GROUND IT USES COSTS NOTHING. Between two columns there is
-       * already `gapX` of empty picture, so the line hugs the machine's side
-       * six pixels out and climbs there. No padding is bought and no box
-       * narrows, which is the opposite trade from the one column layout.
+       * Over the row, out of the source's top edge and down into the target's. Where an end
+       * is a box inside a machine it leaves by the side, in the gap between columns.
+       * why: lessons/kit-diagram.md#placerow-over-link
        */
       const dy = top - LANE_FIRST - overLevel[o] * overStep;
       const fKid = fm !== f, tKid = tm !== t;
@@ -1453,20 +987,9 @@ function placeRow(nodes, links, { col, cols, avail, w, boxH, kidH, owner, gapX, 
     const dy = bottom + LANE_FIRST + level[i] * step;
     deepest = Math.max(deepest, dy);
     /**
-     * 🔴 A RETURN PATH LANDS ON THE BOX IT REACHES, NOT ON THE MACHINE AROUND
-     * IT. This used the containers (`fm`, `tm`), so on `/keys/` the sound came
-     * back from the bottom edge of `Raspberry Pi` and arrived at the bottom
-     * edge of `Cloudflare`, with nothing joining it to `capture` or to `sound
-     * back`. REPORTED in exactly those terms: *"capture should conntect to
-     * sound back and that should connet to playout"*.
-     *
-     * ⚠️ A FORWARD LINK ALREADY DID THIS. `at.get(id)` resolves a child to the
-     * child and a top-level node to itself, so the two halves of the picture
-     * were disagreeing about what a link connects, and only the return half was
-     * wrong. Where a link names a whole machine, `f` IS `fm` and nothing moves.
-     * ⚠️ IT CROSSES THE CONTAINER'S OWN EDGE, which is correct rather than
-     * untidy: the line is going into that machine, and stopping at the wall
-     * would say it arrives at the building rather than at the thing inside it.
+     * A return path lands on the box it reaches, not the machine around it, crossing the
+     * container's edge, the same as a forward link does.
+     * why: lessons/kit-diagram.md#placerow-return-attach
      */
     const sx = f.cx - ATTACH_OFF, tx = t.cx + ATTACH_OFF;
     const sy = f.y + f.h, ty = t.y + t.h + EDGE_OUT + 1;
@@ -1494,26 +1017,14 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
                              dives = [], diveLevel = [], diveLanes = 0,
                              backLevel = [], skipLevel = [],
                              sibs, kidIx, sibSpan, childGap, childInset }) {
-  // ⚠️ ONE COLUMN IS NOT THE ROW LAYOUT ROTATED. A horizontal diagram on a
-  // phone is a diagram nobody reads, so below the break the steps stack top to
-  // bottom in the order the signal takes them, the return paths run down the
-  // left-hand gutter, and a forward link that reaches past the box under it
-  // runs down the right-hand one. Onward on the right, back on the left: two
-  // gutters that cannot collide, and neither line is ever behind a box.
+  // One column is not the row rotated: steps stack in signal order, returns run down the
+  // left gutter, skips down the right, so neither is ever behind a box.
+  // why: lessons/kit-diagram.md#placecolumn
   const x = leftInset + PAD;
   /**
-   * 🔴 A GAP THAT CARRIES SEVERAL NAMES GIVES EACH ONE A ROW OF ITS OWN.
-   * Every forward link that is not a skip crosses exactly one gap, the one
-   * under the higher of its two machines, and every name was written at that
-   * gap's middle. Two dives through one gap therefore printed their names at
-   * one height, ten pixels apart across: PHOTOGRAPHED 2026-09-30 on /cam/ at
-   * 375 px, `SDP offer` over the MoQ link's name, which is why that link was
-   * left unlabelled on purpose; /replay/ and /station/ did the same to theirs.
-   * So where a gap holds two or more names and at least one of them belongs to
-   * a dive, the gap grows by one line of type for each name past the first and
-   * the names stack in it. A gap with one name, or with names only on straight
-   * steps (which the pairs rule below already spreads), keeps its 30 px to the
-   * digit.
+   * A gap carrying two or more names, one of them a dive's, grows a line per extra name
+   * and stacks them. A gap with one name keeps its 30 px.
+   * why: lessons/kit-diagram.md#placecolumn-gap-names
    */
   const overSet = new Set(links.filter((l) => skipsABox(l, rowOf)));
   const diveSet = new Set(dives);
@@ -1536,11 +1047,8 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
     named.sort((a, b) => (diveSet.has(b) - diveSet.has(a))
       || (diveLevel[dives.indexOf(b)] ?? 0) - (diveLevel[dives.indexOf(a)] ?? 0));
     stacked.set(g, named);
-    // ⚠️ AND A DIVE THAT LEAVES OR REACHES A WHOLE MACHINE TURNS SIDEWAYS IN
-    // THE GAP, which used to be at its middle and is now a row of names:
-    // MEASURED on /stage/ at 375 px, the `questions` jog ran straight through
-    // `WebRTC`. So the jogs out of a machine get a row above the names and the
-    // jogs into one a row below them.
+    // Jogs out of a whole machine get a row above the names, jogs into one a row below.
+    // why: lessons/kit-diagram.md#placecolumn-jogs
     jogs.set(g, { top: list.some((l) => diveSet.has(l) && !owner.has(l.from)) ? 1 : 0,
                   bot: list.some((l) => diveSet.has(l) && !owner.has(l.to)) ? 1 : 0 });
   }
@@ -1567,73 +1075,33 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   const right = x + w;
 
   /**
-   * 🔴 A LINK ATTACHES TO THE BOX IT NAMES, IN THIS LAYOUT TOO. `outer` above
-   * resolves a box to the machine around it and every link in here used to go
-   * through it, so an arrow naming a program was drawn to the machine's edge.
-   * Where the run reaches a box SIDEWAYS — a return path out of the left
-   * gutter, a skip out of the right one — nothing was ever in the way: the
-   * only ground it crosses is the container's own padding, which is empty. The
-   * vertical steps are the ones that needed a lane, and they get one below.
+   * A link attaches to the box it names in this layout too. Sideways runs only cross
+   * empty padding; vertical steps get a lane below.
+   * why: lessons/kit-diagram.md#placecolumn-side
    */
   const side = (id) => at.get(id);
-  // ⚠️ THE LEVELS ARRIVE FROM `layout`, WHICH ALREADY HAD TO KNOW THEM. The
-  // gutters are sized before a box has a width, so the number of lanes was
-  // worked out there; computing it a second time here from the pixels is two
-  // answers to one question, and the one that can be wrong is the one that
-  // lays lines down outside the gutter reserved for them.
+  // The lane levels come from `layout`; recomputing them here could disagree with the
+  // gutter reserved for them.
+  // why: lessons/kit-diagram.md#placecolumn-back-levels
   const backs = links.filter((l) => l.back);
   const level = backLevel;
   const overs = links.filter((l) => skipsABox(l, rowOf));
   const overLevel = skipLevel;
-  // ⚠️ AND EVERY `bx` BELOW COUNTS LANES, NOT PATHS. These read the list's
-  // LENGTH while the gutter was reserved for the same worst case, so the two
-  // agreed by both being wrong. With the gutter sized to the lanes there
-  // really are, a `bx` still counting paths puts the shallowest lane a whole
-  // LANE_STEP inside the picture and draws it through its own name — which is
-  // the defect the gutter's own check was written for, arriving from the other
-  // side.
+  // Every `bx` below counts lanes, not paths, to match the gutter.
+  // why: lessons/kit-diagram.md#placecolumn-backlanes
   const backLanes = level.length ? Math.max(...level) + 1 : 0;
   const overLanes = overLevel.length ? Math.max(...overLevel) + 1 : 0;
-  // Which lane inside a container each dive runs in. Level 0 is the shortest
-  // run and sits INNERMOST, a step from the boxes; a longer one moves out
-  // toward the container's edge and passes outside it. That is the right
-  // gutter's rule one level in, and it leaves the innermost lane `DIVE_LANE`
-  // plus `DIVE_EDGE` clear of the box it arrives at — four for the corner and
-  // six for the arrowhead.
-  //
-  // 🔴 DOWN THE RIGHT PADDING, NOT THE LEFT, SINCE 2026-10-05. The left was
-  // already the return paths' side, so on /stage/ at 375 px six vertical lines
-  // shared the left 70 px of the picture, two going up and four going down,
-  // and a reader could not tell which was which without following each one to
-  // its head. Reported from a UX review as *"a tangle of long return lines
-  // running down the left side"*. The right padding was already bought, because
-  // `childInset` insets the boxes on BOTH sides, and it sat empty. Now the
-  // picture has one rule a reader can learn from one line: a line on the left
-  // goes back up, a line on the right goes on down. That is the rule this
-  // function's opening comment already states for the gutters, carried one
-  // level in.
+  // Which lane inside a container each dive runs in; level 0 is innermost. Down the right
+  // padding: left goes back up, right goes on down.
+  // why: lessons/kit-diagram.md#placecolumn-diveof
   const diveOf = new Map(dives.map((l, i) => [l, diveLevel[i]]));
-  // ⚠️ COUNTED OUT FROM THE BOXES' RIGHT EDGE, with any lane a container
-  // keeps for its own children OUTSIDE these. The other way round, MEASURED
-  // on /station/ at 375 px, the `chunks -> Worker` lane ran straight through
-  // the base of every arrowhead arriving at `programmes`. With no such lane
-  // this is the old left-hand spacing mirrored: the innermost lane 14 px off
-  // the box, the outermost `DIVE_EDGE` in from the container's edge.
+  // Counted out from the boxes' right edge, outside any sibling lanes, or a lane runs
+  // through the bases of arrowheads. Innermost lane 14 px off the box.
+  // why: lessons/kit-diagram.md#placecolumn-lanex
   const laneX = (l) => x + w - childInset + DIVE_EDGE + (1 + (diveOf.get(l) || 0)) * DIVE_LANE;
-  // 🔴 A STEP'S NAME TAKES THE ROW IT SITS IN, NOT HALF A BOX. Between two
-  // stacked boxes is a gap that is EMPTY right across the picture, and the
-  // only thing in it is one short vertical arrow. The budget used to be "the
-  // half of the box it starts over" — MEASURED at 258 px in /kit/'s fork
-  // block, that handed `settings` 41 px with 106 px of nothing beside it, and
-  // cut it to `settin…`. A name is now measured against the space it is
-  // actually drawn in.
-  //
-  // It goes on the WIDER side of the arrow, and on the same side for every
-  // step, because in one column every box shares an x — so the choice is made
-  // once from real positions and the names line up in a column instead of
-  // alternating. Which side is wider is not a guess: a left gutter pushes the
-  // boxes right, so the room is usually on the left, and with no gutters at
-  // all the two are equal and it stays where it has always been.
+  // A step's name is measured against the empty row it sits in, on the wider side of
+  // the arrow, the same side for every step so the names line up.
+  // why: lessons/kit-diagram.md#placecolumn-step-names
   const laneR = backLanes ? PAD + 4 + (backLanes - 1) * LANE_STEP + 6 : PAD;
   const laneL = overLanes
     ? right + rightInset - 4 - (overLanes - 1) * LANE_STEP - 6 : avail - PAD;
@@ -1642,14 +1110,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   const stepLeft = roomL > roomR;
   const fwdBudget = Math.min(LINK_MAX, Math.floor(Math.max(0, roomL, roomR)));
 
-  // 🔴 AND TWO LINKS BETWEEN ONE PAIR OF MACHINES ARE ONE LINE WITH TWO NAMES,
-  // WHICH MUST NOT BE WRITTEN AT ONE POINT. Stacked, every link attaches to the
-  // machine, so `Worker -> player` and `programmes -> player` are the SAME
-  // vertical run: their two names landed on one x and one y and printed over
-  // each other. MEASURED on /station/ at 390 px, both at y 641.8. The row
-  // layout spreads the same case across the target's edge, which it can because
-  // the two arrows are distinct there; here the arrow is one thing and only the
-  // names can move.
+  // Two links between one pair of machines are one vertical run, so their names are
+  // spread apart or they print at one point.
+  // why: lessons/kit-diagram.md#placecolumn-pairs
   const pairs = new Map();
   for (const l of links) {
     if (l.back || overs.includes(l)) continue;
@@ -1667,20 +1130,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
       const o = overs.indexOf(l);
       if (o < 0) {
         /**
-         * 🔴 A STEP REACHES THE BOX IT NAMES, AND WHERE THAT BOX IS INSIDE A
-         * MACHINE IT GETS THERE SIDEWAYS. This was a straight vertical at the
-         * MACHINE's centre whichever box the author named, on a measured
-         * ground that is still true: a vertical run into a box inside
-         * `Raspberry Pi` goes through the words `Raspberry Pi` and through
-         * every box stacked above the one it wants. What was wrong was the
-         * conclusion. The line turns out of the box's SIDE, runs down a lane
-         * in the container's own padding — the one strip in there that is
-         * empty top to bottom — crosses the gap between the machines in it,
-         * and turns in at the far box's side.
-         * ⚠️ A STEP BETWEEN TWO WHOLE MACHINES IS UNTOUCHED, to the digit: it
-         * has no box to reach past, so it stays the straight vertical down the
-         * middle that the one-column layout is built around, and a picture
-         * with nothing nested in it comes out exactly as it did.
+         * A step reaching a box inside a machine leaves by the side, runs a padding lane, crosses
+         * the gap and turns in. A step between two whole machines stays a straight vertical.
+         * why: lessons/kit-diagram.md#placecolumn-dive-step
          */
         const down = rowOf.get(l.to) > rowOf.get(l.from);
         const dive = diveOf.has(l);
@@ -1689,17 +1141,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
         const y1 = down ? fm.y + fm.h + EDGE_OUT : fm.y - EDGE_OUT;
         const y2 = down ? tm.y - EDGE_OUT - 1 : tm.y + tm.h + EDGE_OUT + 1;
         const midY = (y1 + y2) / 2;
-        // where the name goes, and it is always in the GAP between the two
-        // machines, never beside the part of the run that is inside one: that
-        // strip is a container's padding and a name in it sits on the boxes.
-        // ⚠️ A DIVE'S NAME STARTS PAST THE INNERMOST LANE IN ITS GAP, not
-        // past its own. Every lane through a gap runs its full height, so a
-        // name beside an OUTER lane had the inner ones through it: /moq/'s
-        // `frames` and /cam/'s `WHEP` both carried a lane through the middle.
-        // With one lane in the gap, or with this lane the innermost, the x is
-        // the one it always was.
-        // ⚠️ AND WITH THE LANES ON THE RIGHT THE INNERMOST IS THE LEFTMOST, so
-        // the name ENDS short of it and reads leftward into the empty gap.
+        // The name goes in the gap between the machines, ending short of the innermost lane in
+        // that gap so no lane runs through it.
+        // why: lessons/kit-diagram.md#placecolumn-dive-name
         const inner = dive
           ? Math.min(...(inGap.get(gapOf(l)) || [l]).filter((o) => diveSet.has(o)).map(laneX))
           : 0;
@@ -1725,11 +1169,8 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
           const jogOut = st ? gy0 + slotY(g, 0) : midY;
           const jogIn = st ? gy0 + slotY(g, stacked.get(g).length + jogs.get(g).top) : midY;
           const pts = [];
-          // ⚠️ A BOX A DIVE BOTH REACHES AND LEAVES TAKES THEM AT TWO HEIGHTS,
-          // the arrival above and the departure below, the way the left gutter
-          // spaces a return path's two ends by ATTACH_OFF. MEASURED on /stage/
-          // at 375 px: `questions` arriving at Relay object and `questions`
-          // leaving it for video met at one point and read as one line.
+          // A box a dive both reaches and leaves takes them at two heights, arrival above.
+          // why: lessons/kit-diagram.md#placecolumn-both
           const both = (id) => dives.some((o) => o.to === id) && dives.some((o) => o.from === id);
           const fy = f.cy + (both(l.from) ? ATTACH_OFF / 2 : 0);
           const ty = t.cy - (both(l.to) ? ATTACH_OFF / 2 : 0);
@@ -1750,14 +1191,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
         drawn.push({ ...l, d, lab, lx: nameX, ly, anchor: nameAnchor, stack: 'none' });
         continue;
       }
-      // 🔴 OUT OF THE RIGHT EDGE, DOWN THE RIGHT GUTTER, BACK IN AT THE RIGHT
-      // EDGE. The straight vertical this replaces left the source's CENTRE and
-      // ran behind every box between the two, which is the fork bug: the
-      // branch emerges under a box it never visits with its head in the next
-      // one, and its name is drawn at the midpoint, i.e. under that box.
-      // The lanes fill the RIGHT of the gutter and the names the left of it,
-      // so a deeper path moves further right and never under a name — the
-      // left gutter's rule, mirrored.
+      // Out of the right edge, down the right gutter, back in at the right edge. Lanes fill
+      // the gutter's right, names its left, so a deeper path never runs under a name.
+      // why: lessons/kit-diagram.md#placecolumn-skip-lane
       const bx = right + rightInset - 4 - (overLanes - 1 - overLevel[o]) * LANE_STEP;
       const sy = f.cy + ATTACH_OFF / 2, ty = t.cy - ATTACH_OFF / 2;
       const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w + EDGE_OUT + 1;
@@ -1782,19 +1218,12 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
       cuts.push({ id: `${l.from} to ${l.to}`, where: 'link', full: lab.full,
                   shown: lab.lines.join(' '), width: backBudget });
     }
-    // 🔴 BELOW ITS OWN RUN, NOT BETWEEN THE TWO. A box's two attachment
-    // points are ATTACH_OFF apart — 12 px — and a line of this type is 11 px
-    // tall, so a name placed between them cannot clear both: MEASURED in
-    // /kit/, the run LEAVING a box cut 2 px through the ascenders of the name
-    // belonging to the run ARRIVING at it. Below is also where the row layout
-    // puts a return's name, so the two layouts now agree.
+    // A return's name goes below its own run: the two attachment points are 12 px apart and
+    // a name is 11 px tall, so between them it is cut by a line.
+    // why: lessons/kit-diagram.md#placecolumn-return-name
     drawn.push({ ...l, d: sideLane(sx, sy, tx, ty, bx, 1), lab,
-                 // ⚠️ OFF THE MACHINE'S EDGE, NOT THE BOX'S. For a box inside a
-                 // container `t.x` is inset, so a name anchored 6 px short of it
-                 // sat across the container's own edge and over the dive lanes
-                 // in its padding: /moq/'s `frames`, /cam/'s `WHEP`, and five
-                 // more pages the same way at 375 px. For a whole box the two
-                 // are one x and nothing moves.
+                 // Off the machine's edge, not the box's, or the name crosses the container edge.
+                 // why: lessons/kit-diagram.md#placecolumn-return-name-x
                  lx: tm.x - 6, ly: ty + 4 + m.linkSize * 0.85,
                  anchor: 'end', stack: 'none', level: level[i], bx });
   }
@@ -1804,12 +1233,9 @@ function placeColumn(links, { order, rowOf, avail, w, boxH, kidH, owner, leftIns
   return { width: avail, height: Math.round(bottom + PAD), nodes: placed, links: drawn };
 }
 
-// ── the two lane shapes ───────────────────────────────────────────────────
-// One rounded L out of a box's edge, along a lane that clears every box in the
-// way, and back in at the other end. Both kinds of routed link — a return
-// under the row and a forward link over it — are the SAME shape with one sign
-// flipped, so they are one function each rather than four copies of a path
-// string. A copy is where the two would drift apart.
+// The two lane shapes: one rounded L out of a box, along a lane, back in. Returns and
+// skips are the same shape with one sign flipped, so one function each.
+// why: lessons/kit-diagram.md#lane-shapes
 
 /** a lane that runs ACROSS the picture: `vs` +1 under the boxes, -1 over them */
 function acrossLane(sx, sy, tx, ty, dy, vs) {
@@ -1822,29 +1248,9 @@ function acrossLane(sx, sy, tx, ty, dy, vs) {
 }
 
 /**
- * A STEP from one column to the next: out of the box, across, and in.
- *
- * 🔴 IT USED TO BE ONE STRAIGHT LINE FROM EDGE TO EDGE, and for a step between
- * two boxes at the same height that is exactly what this still draws. The
- * problem was the other case: a fork puts two boxes in one column, so its
- * arrows ran DIAGONALLY, and a diagonal is the only line in the whole picture
- * that is not horizontal or vertical — the lanes over and under the row have
- * turned corners since they were written, the boxes have rounded corners, and
- * two slanted arrows in the middle of that read as a different drawing.
- * Reported twice, on two different pictures, as wanting `-|` with rounded
- * turns. Same `CORNER` as the lanes above, so there is one radius in the file.
- *
- * ⚠️ THE TURN IS EARLY, NEAR THE SOURCE, AND THAT IS WHAT THE NAMES NEED. Turn
- * late and every branch shares one long trunk at the source's height, so their
- * names stack on top of each other; turn early and each branch gets the whole
- * gap at its OWN target's height to be named in. The short stub they share is
- * the fork, which is how a fork ought to look anyway.
- *
- * ⚠️ AND A FORK'S NAMES NO LONGER NEED LIFTING OFF THEIR OWN ARROWS. The old
- * code measured the slope and pushed each name clear of the wedge two diverging
- * branches open — MEASURED in `/kit/` at 655 px, `settings` climbed 5.4 px
- * through the middle of its own word. There is no wedge now and no slope: the
- * line under a name is horizontal, so the name sits a fixed distance above it.
+ * A step from one column to the next: out, across, in, with rounded turns, never a
+ * diagonal. The turn is early, so each branch of a fork is named at its own height.
+ * why: lessons/kit-diagram.md#stepelbow
  */
 /**
  * The join between two boxes stacked inside one machine: straight down the
@@ -1863,31 +1269,11 @@ function tieElbow(sx, sy, tx, ty) {
 }
 
 /**
- * Every link whose two ends are boxes inside ONE container.
- *
- * 🔴 IT REPLACES THE TIE, IT IS NEVER DRAWN ON TOP OF ONE. A tie is a bracket
- * saying "these are parts of one machine" and carries no head, because a head
- * would claim an order the drawing does not know. Where the author has DECLARED
- * a link the order is known and said out loud, so the bracket has nothing left
- * to add and the arrow takes its place. Two lines between one pair of boxes is
- * the defect a return path under the row exists to avoid, one level in.
- *
- * 🔴 AND IT CARRIES NO NAME. The gap two stacked boxes share is sixteen pixels
- * tall and about half a box wide, so a name in it either runs under both boxes
- * or shrinks past the point of being read. The DIRECTION is the whole message
- * here; what travels goes in the link's `note`, which is read on hover in the
- * line under the picture where there is room for a sentence. A label written on
- * one anyway is reported on `cuts` rather than quietly ignored, because an
- * author who cannot see their own label has no way to know where it went.
- *
- * Two shapes, and which one is used is not a preference:
- *   next to each other: the arrow runs down the gap they already share, where
- *     the tie ran.
- *   reaching past a box: a lane inside the container's own padding, out of one
- *     side and back in at the same side, because down the middle it would pass
- *     straight through a box it never visits.
- *
+ * Every link whose two ends are boxes inside one container. It replaces the tie and
+ * carries no name (a label is reported on `cuts`). Adjacent boxes: down the shared gap;
+ * reaching past a box: a lane in the container's padding.
  * @returns {object[]} drawable links, in the same shape the placers produce
+ * why: lessons/kit-diagram.md#placesibs
  */
 function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
   const drawn = [];
@@ -1918,25 +1304,18 @@ function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
     const i = lanes.get(c.id) || 0;
     lanes.set(c.id, i + 1);
     /**
-     * 🔴 AN INLET AND AN OUTLET MAY NOT BE THE SAME POINT, AND ON ONE EDGE THEY
-     * WERE. Reported 2026-09-16 with a photograph of `/station/`: two lanes
-     * arriving at the Worker's right edge landed on one arrowhead at `t.cy`,
-     * because a lane's arrival y was the target's CENTRE whatever else was
-     * already there. The forward links across the picture have shared out a
-     * target's edge since the day two names printed over each other; the lanes
-     * inside a container never learned it.
-     * ⚠️ HALF THE SPREAD THE OUTER ONES USE. Those are keeping two NAMES apart
-     * and a name is two lines tall; a lane inside a container carries no label
-     * at all, so what has to be apart is two arrowheads.
+     * Lanes into one box share out its edge so an inlet and outlet are never one point;
+     * half the outer spread, since only arrowheads need to be apart.
+     * why: lessons/kit-diagram.md#placesibs-into
      */
     const inTo = sibs.filter((x) => x.to === l.to && sibSpan(x) > 1);
     const k = inTo.length > 1 ? inTo.indexOf(l) - (inTo.length - 1) / 2 : 0;
     const ty0 = t.cy + k * ATTACH_OFF;
-    // ⚠️ OUTSIDE THE DIVE LANES, which share this right padding in one column
-    // since 2026-10-05 and sit next to the boxes; see `laneX` in placeColumn
+    // Outside the dive lanes, which share this right padding in one column.
+    // why: lessons/kit-diagram.md#placesibs-bx
     const bx = c.x + c.w - CHILD_PAD - SIB_LANE * (i + 0.5);
-    // ⚠️ THE HEAD LANDS ON THE BOX'S EDGE, not three pixels short of it. Those
-    // three were the last of the four the corner needed; see `SIB_LANE`.
+    // The head lands on the box's edge; see `SIB_LANE`.
+    // why: lessons/kit-diagram.md#placesibs-head
     const sx = f.x + f.w + EDGE_OUT, tx = t.x + t.w;
     drawn.push({ ...l, sib: true, ...mid,
                  d: sideLane(sx, f.cy, tx, ty0, bx, -1, SIB_CORNER) });
@@ -1945,24 +1324,9 @@ function placeSibs(sibs, at, { owner, kidIx, sibSpan, cuts }) {
 }
 
 /**
- * A line through a list of corners, every turn rounded the way every other
- * line in the picture is.
- *
- * 🔴 IT EXISTS BECAUSE A DIVE HAS THREE TURNS AND THE THREE SHAPES ABOVE HAVE
- * TWO. `acrossLane`, `sideLane` and `stepElbow` are each one fixed shape
- * written out by hand, which is right while a shape is fixed: a link that
- * leaves a box inside a machine, runs down that machine's padding, crosses the
- * gap and turns into a box inside the next one has a different number of
- * corners depending on which of its two ends names a program. Writing that as
- * a fourth and fifth hand-rolled string is where two of them would drift apart.
- *
- * ⚠️ THE RADIUS IS CLAMPED PER CORNER, never once for the path. A dive turns
- * inside a container's padding, where a run can be fourteen pixels long, and a
- * 6 px corner on a 10 px run doubles back on itself. Each turn takes the
- * smaller of the radius and half of each run it joins.
- * ⚠️ AND A POINT THAT REPEATS ITS NEIGHBOUR IS DROPPED. A dive whose two ends
- * happen to line up would otherwise ask for a turn through zero degrees, which
- * renders as a dot of ink on the line.
+ * A line through a list of corners, every turn rounded. The radius is clamped per
+ * corner to half of each run it joins; a point repeating its neighbour is dropped.
+ * why: lessons/kit-diagram.md#roundedpath
  */
 function roundedPath(pts, r = CORNER) {
   const p = [];
@@ -2002,10 +1366,8 @@ function stepElbow(sx, sy, tx, ty, bx) {
 
 /**
  * a lane that runs DOWN the side: `hs` +1 left of the column, -1 right of it.
- * ⚠️ THE RADIUS IS A PARAMETER FOR ONE REASON: a lane inside a container has
- * about five pixels to turn in, and a 6 px corner on a 5 px run doubles back
- * on itself. Every lane outside the boxes keeps `CORNER`, so there is still
- * one radius in the picture a reader can see.
+ * The radius is a parameter because a lane inside a container has about 5 px to turn in.
+ * why: lessons/kit-diagram.md#sidelane
  */
 function sideLane(sx, sy, tx, ty, bx, hs, corner = CORNER) {
   const k = ty < sy ? 1 : -1;          // the usual return direction: bottom to top
@@ -2018,59 +1380,29 @@ function sideLane(sx, sy, tx, ty, bx, hs, corner = CORNER) {
 }
 
 /**
- * Every string the line under the picture will ever hold.
- *
- * 🔴 THE CAPTION IS ONE OF THEM, AND LEAVING IT OUT IS WHY THE PAGE JUMPED.
- * That line is the caption until a box is hovered and that box's own sentence
- * while it is, so its height has to be reserved for the TALLEST of those — or
- * everything below the picture moves the moment the pointer touches a box. The
- * reservation used to start from whatever the element happened to be showing,
- * which is the caption only if nothing is hovered: a re-layout while the
- * pointer is on a box destroys the `<g>` that would have fired `pointerleave`,
- * so the element is left holding a five-word sentence and the whole block is
- * reserved at 19 px under a caption that needs 97. It reads as fixed, because
- * the next hover in and out repairs it.
- *
- * Pure, so the test can check the list rather than the pixels: what went wrong
- * is WHICH STRINGS were measured, not how.
+ * Every string the line under the picture will ever hold, caption included, so its
+ * height is reserved for the tallest and the page does not jump on hover. Pure.
+ * why: lessons/kit-diagram.md#captiontexts
  */
 export function captionTexts(spec, nodes) {
-  // 🔴 WHAT THE LINE WILL SAY IS A `note` OR NOTHING, AND THE OLD FALLBACK WAS
-  // AN ECHO. It read `n.note || n.title || n.label.full`, so a box with no
-  // sentence wrote its own NAME into the line — under a box with that name
-  // printed an inch above it. Every container has no note BY RULE, so pointing
-  // at one printed `Raspberry Pi` under a box reading `Raspberry Pi`.
-  // PHOTOGRAPHED on /mirror/. It is worst on a phone, where there is no
-  // pointer to leave: whatever was last touched stays named indefinitely.
-  // ⚠️ SAYING NOTHING IS THE CAPTION, NEVER A COLLAPSED LINE. The caption is
-  // the first string in this list and stays reserved, so a box with no
-  // sentence simply leaves the line where it was.
+  // The line says a `note` or keeps the caption; it never echoes a box's name.
+  // why: lessons/kit-diagram.md#captiontexts-says
   const says = (n) => n?.note || '';
   const out = [spec?.caption || ''];
   for (const n of (nodes || [])) {
     out.push(says(n));
     for (const k of (n.kids || [])) out.push(says(k));
   }
-  // ⚠️ AND A LINK'S SENTENCE IS ONE OF THEM TOO, WHICH IT NEVER WAS. The line
-  // has held these since arrows became hoverable and the reservation never
-  // learned about them, so a note longer than the caption grew the block on
-  // hover — the exact jump this list exists to prevent.
+  // A link's note is one of the strings too, or hovering an arrow grows the block.
+  // why: lessons/kit-diagram.md#captiontexts-links
   for (const l of (spec?.links || [])) out.push(String(l?.note || ''));
   return out;
 }
 
 /**
- * one box's geometry, and the baseline of every line of type inside it — plus,
- * for a container, the boxes it holds.
- *
- * 🔴 A CONTAINER IS MEASURED FROM ITS CONTENTS, NOT GUESSED AT. `h` already
- * holds the room its children need (`layout` took the tallest of every box in
- * the picture, containers included), so the only thing left here is to put the
- * words and the boxes in it: the whole block — the container's own name, the
- * gap under it, every child and every gap between them — is centred in the
- * height, exactly as a plain box's two lines of type are. A container that
- * top-aligned its contents would sit differently from every other box in the
- * row for a reason a reader cannot see.
+ * One box's geometry and the baseline of every line of type in it, plus a container's
+ * children. A container's whole block is placed the same way a plain box's text is.
+ * why: lessons/kit-diagram.md#box
  */
 function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PAD, insetL = childInset) {
   const lab = n._lab, sub = n._sub;
@@ -2079,19 +1411,16 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
   const stack = ks.length
     ? HEAD_GAP + ks.length * kidH + (ks.length - 1) * childGap : 0;
   const block = own + stack;
-  // ⚠️ THE CHILDREN STILL HANG OFF `top`, whichever way the text is aligned, so
-  // a container's contents move with its head rather than needing a second rule.
+  // Children hang off `top` whichever way the text is aligned.
+  // why: lessons/kit-diagram.md#box-top
   const top = BOX_ALIGN === 'topleft' ? y + BOX_PAD_Y : y + (h - block) / 2;
   const out = {
     id: n.id, kind: n.kind || 'plain', x, y, w, h,
     hue: n.hue,
     cx: x + w / 2, cy: y + h / 2,
-    // Where a line of text STARTS, and what it is anchored by. One pair, read
-    // by the renderer, so the switch above is the only place that decides.
-    // ⚠️ A CONTAINER's words used to move right by `headInset`, clear of the
-    // dive lanes down its left side. The lanes run down the right since
-    // 2026-10-05, so the words start where every box's do and are only wrapped
-    // short of them; see `layout`
+    // Where a line of text starts and what anchors it, read by the renderer, so `BOX_ALIGN`
+    // is the only place that decides.
+    // why: lessons/kit-diagram.md#box-tx
     tx: BOX_ALIGN === 'topleft' ? r1(x + BOX_PAD_X)
                                 : r1(x + w / 2),
     anchor: BOX_ALIGN === 'topleft' ? 'start' : 'middle',
@@ -2101,10 +1430,9 @@ function box(n, x, y, w, h, m, kidH, childGap = CHILD_GAP, childInset = CHILD_PA
     title: [lab.full, sub.full].filter(Boolean).join(', '),
   };
   if (n.note) out.note = String(n.note);
-  // ⚠️ CARRIED THROUGH TO THE RENDER NODE EXPLICITLY. `box()` builds a fresh
-  // object rather than spreading the spec, so a flag the author sets is invisible
-  // to the painter unless it is copied here. `set` went missing exactly that way
-  // and read as "the option does nothing".
+  // Copied explicitly: `box()` builds a fresh object, so an author flag is lost unless
+  // carried here.
+  // why: lessons/kit-diagram.md#box-set
   if (n.set) out.set = true;
   if (n.join === false) out.join = false;
   if (ks.length) {
@@ -2141,27 +1469,8 @@ function s(tag, attrs, text) {
  * @returns {{el, svg, cuts, mode, measured, render, destroy}}
  */
 /**
- * 🔴 ONE HEADING, ONE WORDING, ONE PLACE. Every page that explains itself ends
- * with the same picture under the same three words, and the moment that is
- * typed per page it becomes "How this works" on one, "How it works" on the
- * next and "how this works" on a third. That is not a hypothetical: it was
- * MEASURED across the tree on 2026-09-16 and there were THREE treatments in
- * six pages. `items`, `radio`, `replay` and `station` passed `how: true` and
- * got this constant; `crate` typed `title: 'how it works'` and got its own
- * lowercase heading; `grains` had no heading at all. It is a constant because
- * it is a promise the site makes, not a label a page chooses.
- *
- * 🔴 AND THE WORDING IS `it`, NOT `this`, DECIDED 2026-09-16 ON A DIRECT ASK.
- * Three reasons, in the order they matter:
- *   · "How it works" is the settled English phrase. A reader recognises it
- *     without parsing, which is the whole job of a heading read once.
- *   · `it` ALREADY HAS THE RIGHT REFERENT ON THESE PAGES. Every `what`
- *     paragraph uses it for the demo: *"It keeps taking a few seconds of
- *     whatever is on air"*. `this` introduces a second pointer at the same
- *     thing, in a heading, three inches below the first one.
- *   · `this` is doing a job POSITION already does. The diagram is last on the
- *     page it belongs to, so nothing else could be meant, and a word that
- *     disambiguates something never ambiguous is a word to cut.
+ * One heading, one wording, one place for every page that explains itself.
+ * why: lessons/kit-diagram.md#how
  */
 export const HOW = 'How it works';
 
@@ -2173,21 +1482,9 @@ export const HOW = 'How it works';
 export function createDiagram(host, spec, { onRender, how = false, atEnd = false } = {}) {
   const uid = `dg${++seq}`;
   /**
-   * 🔴 A PAGE MAY NOT TYPE ITS OWN TITLE UNDER THE STANDING HEADING, AND IT
-   * COULD, AND THE RESULT WAS TWO HEADINGS. PHOTOGRAPHED on `/station/`:
-   *
-   *     HOW THIS WORKS
-   *     HOW IT WORKS
-   *     [the picture]
-   *
-   * The page had carried `title: 'how it works'` since before `how` existed,
-   * and adding `how: true` put the standing one above it rather than instead of
-   * it. Neither half is wrong on its own, which is why nothing caught it.
-   *
-   * Refused rather than silently dropped, and reported on `cuts` like every
-   * other thing this component will not draw: an author who cannot see their
-   * own title has no way to know where it went, and the page's own
-   * `nothing cut, nothing refused` assert is what tells them.
+   * A page may not type its own title under the standing heading (two headings result);
+   * it is refused and reported on `cuts`.
+   * why: lessons/kit-diagram.md#title-under-how
    */
   if (how && spec && spec.title) {
     (spec.cutsSink || (spec.cutsSink = [])).push({
@@ -2196,14 +1493,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
            + 'Remove the title, or drop `how`', width: 0 });
     spec = { ...spec, title: '' };
   }
-  // 🔴 `atEnd` PUTS IT AFTER THE LOG, WHICH IS THE ACTUAL BOTTOM OF THE PAGE.
-  // `mount()` appends the log to `document.body`, not to `.pos-body`, so a
-  // diagram appended to the page's own element lands ABOVE it however late it
-  // is built — which is the whole page except the last box. A page that wants
-  // its explanation last has to say so, because "last" is not where the host
-  // element ends.
-  // ⚠️ Outside `.pos-body` the shell's `* + *` rhythm does not reach it, so the
-  // gap above comes from a class rather than from the page's own spacing.
+  // `atEnd` appends to `document.body`, after the log, which is the page's real bottom.
+  // Outside `.pos-body` the gap above comes from a class.
+  // why: lessons/kit-diagram.md#atend
   const place = atEnd ? document.body : host;
   if (atEnd) place.classList.add('has-dg-end');
   if (how) {
@@ -2222,19 +1514,13 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
 
   const svg = s('svg', { class: 'pos-dg-svg', xmlns: NS, role: 'img' });
   const defs = s('defs');
-  // ⚠️ `markerUnits="userSpaceOnUse"`, NOT the default. The default scales an
-  // arrowhead by its line's stroke width, so a heavier line would grow a
-  // heavier head — and stroke weight is one of the two channels carrying
-  // `kind` in greyscale, which must stay a statement about BOXES only.
+  // `markerUnits="userSpaceOnUse"` so a heavier stroke does not grow a heavier head;
+  // stroke weight carries `kind`.
+  // why: lessons/kit-diagram.md#marker-units
   /**
-   * 🔴 FOUR HEADS, NOT TWO, SINCE 2026-09-22. Asked on `/wish/` as *"when
-   * refused, paint recused conector/label red"*.
-   * ⚠️ **A MARKER DOES NOT INHERIT THE LINE'S STROKE**, which is the whole
-   * reason this is four entries rather than one CSS rule. An SVG marker is
-   * painted from its own fill, so a red line would have arrived at a grey
-   * arrowhead and the picture would have contradicted itself at the one end a
-   * reader looks at. `fill: context-stroke` would say it in one place and is
-   * not safe to rely on here, so the refused pair is declared instead.
+   * Four heads, not two: a marker does not inherit its line's stroke, so the refused
+   * (red) pair is declared rather than relying on `context-stroke`.
+   * why: lessons/kit-diagram.md#marker-refused
    */
   for (const [name, cls] of [
     ['f', 'pos-dg-head'], ['b', 'pos-dg-head pos-dg-head-b'],
@@ -2249,10 +1535,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     defs.append(mk);
   }
   svg.append(defs);
-  // ⚠️ `aria-label`, NEVER `<title>`. A `<title>` on the svg root is a NATIVE
-  // TOOLTIP over the whole picture, so the drawer that says it has no tooltips
-  // had one covering everything. `role="img"` plus a label is the same
-  // accessible name with nothing drawn.
+  // `aria-label`, never `<title>`, which is a native tooltip over the whole picture.
+  // why: lessons/kit-diagram.md#svg-aria-label
   svg.setAttribute('aria-label', spec.title || 'a diagram');
 
   // The ruler. Parked off to one side rather than hidden, because a
@@ -2266,13 +1550,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
 
   const cap = document.createElement('figcaption');
   cap.className = 'pos-dg-cap';
-  // ⚠️ ONE FUNCTION WRITES THIS LINE, and the height reservation calls the
-  // SAME one. Bold is wider than the face beside it, so a sentence measured as
-  // plain text and drawn with a bold run in it can take one more line than was
-  // reserved — which is the jump this whole mechanism exists to prevent,
-  // reintroduced by the measurement instead of by the drawing.
-  // Every box's name, lower-cased, to the hue it was drawn in. Rebuilt on each
-  // layout because a re-layout can change what is in the picture.
+  // One function writes the caption line and the height reservation calls the same one.
+  // Every box's name, lower-cased, to its hue; rebuilt on each layout.
+  // why: lessons/kit-diagram.md#say
   let hueOfName = new Map();
   const say = (text) => {
     cap.textContent = '';
@@ -2281,10 +1561,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       if (!part.bold) { cap.append(part.text); continue; }
       const b = document.createElement('strong');
       b.textContent = part.text;
-      // 🔴 THE REFERENCE IS A COLOUR. A bold run whose text is a box's name is
-      // drawn in that box's own hue, so a note can point at a box without
-      // saying "the one above" or naming a file. Anything else stays plain
-      // bold, which is what bold already meant.
+      // A bold run whose text is a box's name is drawn in that box's hue.
+      // why: lessons/kit-diagram.md#say-hue
       const hue = hueOfName.get(part.text.trim().toLowerCase());
       if (hue != null) b.style.color = tint(hue, TEXT_TINT, 'var(--fg)');
       cap.append(b);
@@ -2319,10 +1597,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       probe.textContent = str;
       let px = 0;
       try { px = probe.getComputedTextLength(); } catch { px = 0; }
-      // 🔴 0 means "not measurable yet", never "an empty string" — that case
-      // returned above. Estimating from the character count keeps the picture
-      // roughly right until the host has a size, and `measured` says which of
-      // the two happened, so /kit/ cannot report an estimate as a measurement.
+      // 0 means not measurable yet; estimate from character count and say so on `measured`.
+      // why: lessons/kit-diagram.md#measure-estimate
       if (px > 0) api.measured = true;
       else px = str.length * fallbackSize * 0.6;
       cache.set(key, px);
@@ -2330,10 +1606,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     };
   }
 
-  // ⚠️ ONE PLACE DECIDES LINE HEIGHT, and it derives it from the size the
-  // stylesheet actually computed rather than from a number typed twice. Change
-  // a font-size in shell.css and the boxes follow it, instead of leaving two
-  // lines of type overlapping inside a box sized for the old one.
+  // Line height derives from the computed font-size, so boxes follow shell.css.
+  // why: lessons/kit-diagram.md#sizes
   function sizes() {
     const px = (cls, fallback) => {
       probe.setAttribute('class', cls);
@@ -2350,30 +1624,15 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
   }
 
   /**
-   * one box, drawn — a plain one, a container, or a box inside a container.
-   *
-   * 🔴 A CONTAINER AND THE BOXES IN IT ARE SIBLINGS IN THE MARKUP, never
-   * nested `<g>`s, and that is a CSS decision rather than a drawing one:
-   * `.pos-dg-n[data-kind="here"] .pos-dg-box` is a DESCENDANT selector, so a
-   * box drawn inside a `here` group would take the container's styling as well
-   * as its own, and hovering the machine would restyle everything in it. Two
-   * flat groups cannot do that. The nesting a reader sees is geometry, which
-   * is where this file keeps everything else.
+   * one box, drawn: plain, container, or inside a container. Container and children are
+   * sibling `<g>`s, never nested, or descendant selectors restyle everything inside.
+   * why: lessons/kit-diagram.md#nodegroup
    */
   const nodeGroup = (n) => {
     const g = s('g', { class: 'pos-dg-n', 'data-kind': n.kind, tabindex: '0' });
-    // 🔴 `aria-label`, NOT `<title>`. A `<title>` here is the browser's own
-    // tooltip, which drew this box's name ON TOP of the box while the line
-    // under the picture was already saying it — the same words in three
-    // places. The label is the only thing a screen reader now has, so it
-    // carries the whole of the box: its name and its sub UNCUT, which keeps
-    // the promise that shortening hides text and never loses it, and the
-    // sentence, which is what a sighted reader gets from the caption.
-    //
-    // ⚠️ WITH THE ASTERISKS TAKEN OUT. A reader of the page sees a heavier
-    // face; a reader of this attribute would have heard "star star" twice a
-    // sentence, which is the mark leaking out of the one place that renders
-    // it. MEASURED on /grains/ before this line existed.
+    // `aria-label`, not `<title>` (a native tooltip): name and sub uncut plus the sentence,
+    // with the `**` taken out so a screen reader does not say them.
+    // why: lessons/kit-diagram.md#nodegroup-aria-label
     const spoken = (t) => boldParts(t).map((q) => q.text).join('');
     g.setAttribute('aria-label',
       [n.title, n.note && spoken(n.note)].filter(Boolean).join('. '));
@@ -2381,10 +1640,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       class: n.kids ? 'pos-dg-box pos-dg-cbox' : 'pos-dg-box',
       x: n.x + 0.5, y: n.y + 0.5, width: n.w - 1, height: n.h - 1, rx: 5, ry: 5,
     });
-    // ⚠️ SET AS CUSTOM PROPERTIES, NOT AS `fill`. The stylesheet still owns
-    // which state wins — a hovered box, a container, a dashed cloud — and it
-    // reads these two. An inline `fill` would beat every one of those rules and
-    // the kinds would quietly stop meaning anything.
+    // Custom properties, not `fill`, so the stylesheet's state rules still win.
+    // why: lessons/kit-diagram.md#nodegroup-hue
     if (n.hue != null) {
       rect.style.setProperty('--dg-fill', tint(n.hue, BOX_TINT, 'var(--card2)'));
       rect.style.setProperty('--dg-stroke', tint(n.hue, EDGE_TINT, 'var(--line2)'));
@@ -2402,19 +1659,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       g.append(s('text', { class: 'pos-dg-sub', x: n.tx, y: n.subY,
                            'text-anchor': n.anchor }, n.sub.lines[0]));
     }
-    // Hovering writes what this box DOES into the line under the picture.
-    // Not a tooltip: a tooltip is drawn on top of the thing it describes and
-    // is read again every time you point at one, so it has to stay two short
-    // lines. A line under the picture is read in place, has room for a whole
-    // sentence, and costs no positioning code at all.
-    //
-    // ⚠️ AND IT SAYS SOMETHING THE BOX DOES NOT, OR IT SAYS NOTHING.
-    // It used to fall back to the box's own name and sub — `Raspberry Pi,
-    // another granulator`, under a box reading `Raspberry Pi` / `another
-    // granulator`. A container has no note BY RULE, so every container did
-    // that, and it was PHOTOGRAPHED on /mirror/. A line that repeats the box an
-    // inch above it is the third channel a legend is; with no sentence to add,
-    // the line keeps the caption, which is a fact the reader has not got yet.
+    // Hovering writes what this box does into the line under the picture, not a tooltip.
+    // With no note the line keeps the caption rather than repeating the box's name.
+    // why: lessons/kit-diagram.md#nodegroup-show
     const show = () => {
       g.dataset.on = '1';
       if (!n.note) return;
@@ -2451,14 +1698,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       },
     });
     /**
-     * 🔴 AND THE PHONE IS ASKED EVEN WHEN THE PICTURE IS NOT ON ONE. The
-     * harness lays every page out at desk width, where the picture is a row,
-     * so a collision that only exists in the one column layout was a defect no
-     * run could see: /cam/ and /moq/ both read `cuts` empty with names printed
-     * over each other at 375 px. The same description is laid out a second
-     * time at the width it gets on the narrowest current iPhone, off screen
-     * and drawing nothing, and only its OVERLAPS are added, marked with the
-     * width, because a name shortened at one width is that width's own report.
+     * At desk width the picture is a row, so it is also laid out off screen at phone width
+     * (375 px) and only that layout's overlaps are added to `cuts`, marked with the width.
+     * why: lessons/kit-diagram.md#render-phone
      */
     if (L.mode === 'row') {
       const P = layout({ ...spec, cutsSink: [] }, {
@@ -2475,20 +1717,14 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     }
     probe.textContent = '';
 
-    // ⚠️ REBUILT ON EVERY LAYOUT, not once at construction. A re-layout can put
-    // different boxes in the picture, and a stale name-to-hue map would colour
-    // a word after the box it named had gone.
+    // Rebuilt on every layout, or a word keeps the hue of a box that has gone.
+    // why: lessons/kit-diagram.md#render-hueofname
     hueOfName = new Map();
     for (const n of L.nodes) {
       const add = (x) => {
-        // 🔴 ONLY A BOX THAT PAINTS ITS HUE MAY LEND IT TO A WORD. `here` is the
-        // browser you are reading this in, and the stylesheet gives it a lighter
-        // fill and a plain grey edge on purpose: being filled is its whole
-        // signal and it carries no colour. Its `tech` hue was still going into
-        // this map, so the word `browser` came out BLUE under a picture where
-        // the browser box is grey — a reader matching ink to ink finds nothing,
-        // which is worse than no colour at all, because a colour that matches
-        // nothing reads as a box they have missed.
+        // Only a box that paints its hue may lend it to a word; `here` is drawn grey, so it
+        // lends none.
+        // why: lessons/kit-diagram.md#render-hueless
         if (x.hue != null && x.label?.full && !HUELESS_KINDS.has(x.kind)) {
           hueOfName.set(x.label.full.trim().toLowerCase(), x.hue);
         }
@@ -2500,42 +1736,23 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     svg.setAttribute('width', L.width);
     svg.setAttribute('height', L.height);
     svg.setAttribute('viewBox', `0 0 ${L.width} ${L.height}`);
-    // 🔴 THE CAPTION GOES BACK FIRST, BECAUSE THE NEXT LINE DESTROYS THE BOX
-    // THAT WOULD HAVE PUT IT BACK. `pointerleave` fires on an element, and an
-    // element removed from under the pointer never fires it — so a re-layout
-    // while a box is hovered (a resize, an orientation change, the first
-    // ResizeObserver callback) leaves the line holding a sentence about a box
-    // that no longer exists, and the reservation below then measures THAT.
-    // Restoring here is the whole repair: nothing else can know a hover was
-    // interrupted rather than ended.
+    // Restore the caption first: removing a hovered box means `pointerleave` never fires.
+    // why: lessons/kit-diagram.md#render-resetcaption
     resetCaption();
     field.textContent = '';
 
-    // 🔴 THREE PASSES, AND THE ORDER IS THE WHOLE OF IT. Containers first,
-    // because an arrow that reaches a box INSIDE one has to cross that
-    // container's edge and would otherwise be painted over by the machine it
-    // is entering — the fork bug in a new costume, where a line ends somewhere
-    // the reader cannot see it end. Then the links, so no box is drawn under
-    // its own arrow. Then every box that holds nothing, which is the layer the
-    // reader is meant to read. With no container in the picture the first pass
-    // emits nothing and the order is what it always was.
+    // Three passes: containers, then links (so an arrow into a container is not painted
+    // over), then the boxes that hold nothing.
+    // why: lessons/kit-diagram.md#render-passes
     for (const n of L.nodes) if (n.kids) field.append(nodeGroup(n));
 
     for (const l of L.links) {
-      // 🔴 AN ARROW IS A THING YOU CAN POINT AT NOW, AND IT NEEDED A HIT AREA TO
-      // BE ONE. A `<path>` with no fill is only hittable ON ITS STROKE, and the
-      // stroke is one pixel — so the arrow that carries the most interesting
-      // sentence in the picture ("what actually travels here") was the one thing
-      // a pointer could not reach. The fat transparent copy underneath is the
-      // standard repair: same geometry, twelve pixels wide, invisible.
-      /* 🔴 `bad: true` PAINTS THE WHOLE LINK, LINE, LABEL AND HEAD, IN `--bad`.
-         A page declares it; nothing here infers it, the same way `back: true`
-         is an author flag. It is for a link the picture is REPORTING rather
-         than describing: `/wish/` draws what a model asked for, and a refusal
-         is the most important thing on that picture.
-         ⚠️ IT IS A SECOND CHANNEL, NEVER THE ONLY ONE. The label still says
-         `refused` in words, because colour alone fails a reader who cannot
-         separate these two hues and fails a screenshot in greyscale. */
+      // A path with no fill is hittable only on its 1 px stroke, so a transparent 12 px copy
+      // underneath is the hit area.
+      // why: lessons/kit-diagram.md#render-hit-area
+      // `bad: true` paints the whole link (line, label, head) in `--bad`. An author flag
+      // and a second channel: the label still says refused in words.
+      // why: lessons/kit-diagram.md#render-bad
       const lg = s('g', { class: 'pos-dg-l', tabindex: '0', role: 'img' });
       if (l.bad) lg.setAttribute('data-bad', '');
       lg.append(s('path', { class: 'pos-dg-hit', d: l.d }));
@@ -2557,14 +1774,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
         if (l.lab.cut) t.setAttribute('aria-label', l.lab.full);
         lg.append(t);
       }
-      // ⚠️ AND IT SAYS WHAT TRAVELS, not what the arrow is called. The label is
-      // already on the picture; a hover that repeated it would be the third
-      // channel carrying one fact, which is the mistake the boxes' own note
-      // exists to avoid. So with no `note` written the line KEEPS THE CAPTION,
-      // the same as a box with nothing to add. The old fallback ended at
-      // `wrk to player`, which is two ids out of the source.
-      // ⚠️ THE ACCESSIBLE NAME STILL FALLS BACK, because a thing with no name
-      // at all is worse to a screen reader than a clumsy one, and nobody sees it.
+      // Hover says what travels (`note`); with none the line keeps the caption.
+      // The accessible name still falls back to the label or the ids.
+      // why: lessons/kit-diagram.md#render-link-label
       lg.setAttribute('aria-label', l.note || l.lab.full || `${l.from} to ${l.to}`);
       const lshow = () => {
         lg.dataset.on = '1';
@@ -2580,55 +1792,19 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       field.append(lg);
     }
 
-    // 🔴 HOW MANY BRACKETS THIS PICTURE DREW, AND IT IS COUNTED BECAUSE A PAGE
-    // HAS NO OTHER WAY TO ASK. A tie is the one mark in here that carries no
-    // head, so "is there a headless line in my diagram" is the exact question
-    // behind the report that bought the rule below, and until this existed the
-    // only answer was to look at it. `cuts` cannot see it: nothing was cut.
+    // `api.ties` counts headless lines, so a page can assert its description has none.
+    // why: lessons/kit-diagram.md#render-ties
     let ties = 0;
     for (const n of L.nodes) {
       if (n.kids) {
-        // 🔴 THE THINGS INSIDE ONE MACHINE ARE JOINED, AND THE JOIN HAS NO
-        // ARROWHEAD. Three boxes stacked inside a container read as three
-        // unrelated things that happen to be in the same room; a line between
-        // them says they are one chain. ⚠️ AND NO HEAD, WHICH IS THE WHOLE
-        // POINT: every arrow in this picture means "the signal goes this way",
-        // and a head here would claim an ORDER between the parts of one machine
-        // that the drawing does not know. It is a bracket, not a step.
-        // Drawn BEFORE the children so a box's own fill covers its ends.
-        // ⚠️ DOWN THE MIDDLE, NOT DOWN THE LEFT. It used to hang at a fixed
-        // 12 px inset, which put it under the first letter of each label and
-        // read as a margin rule rather than as a join between two boxes. A tie
-        // leaves the bottom edge of one and meets the top edge of the next, and
-        // it steps across with a rounded turn where their centres differ, which
-        // is the same shape every other link in the picture makes.
-        // 🔴 AND A TIE IS NOT DRAWN WHERE A DECLARED LINK ALREADY RUNS. The
-        // author has said there is a direction between those two boxes, so the
-        // bracket has nothing left to say and two lines down one gap is the
-        // thing every routing rule in this file exists to prevent.
-        // 🔴 BUT A GAP NOBODY DECLARED ACROSS STILL GETS ONE, AND THAT IS A
-        // DECISION RATHER THAN AN OVERSIGHT. /station/ was reported as "where
-        // is the arrowhead between programmes and schedule": its Cloudflare box
-        // had an arrow, then a tie, then an arrow, and a headless line between
-        // two headed ones reads as a head that fell off. Taking every tie out
-        // of a container the moment one arrow is declared in it was tried and
-        // is wrong. It puts the fix in the drawer for a fact only the author
-        // knows, and it silently deletes the bracket from any machine whose
-        // parts really are unordered. The repair belongs in the description:
-        // order the boxes so that every pair the reader sees side by side is a
-        // pair a direction has been stated for. `api.ties` is how a page checks
-        // that it did, and /kit/ shows both halves of this gap on purpose.
+        // Boxes inside one machine are joined; a gap nobody declared a link across gets a tie,
+        // drawn down the middle before the children. Order the boxes so every visible pair
+        // has a stated direction; `api.ties` checks it.
+        // why: lessons/kit-diagram.md#render-tie
         /**
-         * 🔴 `join: false` DRAWS NOTHING BETWEEN THEM AT ALL, which is a third
-         * answer and was asked for on sight: *"no connections between
-         * keyboard/playout and and notesout/soundback"*.
-         *
-         * The three are now: an ARROW (the default, they feed each other), a
-         * BRACKET (`set: true`, they are parts of one machine and the drawing
-         * says so), and NOTHING (`join: false`). The last is right where the
-         * container's own box already carries the whole relationship: `Browser`
-         * holds a keyboard and a playout, and a line between them adds no fact,
-         * it just gives the eye something to follow that leads nowhere.
+         * Three answers between children: an arrow (default), a bracket (`set: true`), nothing
+         * (`join: false`) where the container already says it all.
+         * why: lessons/kit-diagram.md#render-join-false
          */
         if (n.join === false) { for (const k of n.kids) field.append(nodeGroup(k)); continue; }
         const stepped = new Set();
@@ -2641,22 +1817,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
           const ax = a.x + a.w / 2, bx = b.x + b.w / 2;
           const y0 = a.y + a.h, y1 = b.y;
           /**
-           * 🔴 AN ARROWHEAD, AND THIS REVERSES WHAT THE BLOCK ABOVE ARGUES.
-           * Instructed 2026-09-16 with a screenshot of `video`, `cue log` and
-           * `timeline` joined by bare lines: *"need arrowheads between inner
-           * boxes (make it a rule)"*.
-           *
-           * The old reasoning was that a head claims an ORDER between the parts
-           * of one machine that the drawing does not know. True, and it is the
-           * wrong thing to optimise: a reader meeting a headed line, then a
-           * headless one, then a headed one down a single column does not read
-           * "this pair is unordered", they read a head that fell off. That was
-           * REPORTED on `/station/` and now again here.
-           *
-           * ⚠️ SO THE DEFAULT FLIPS AND THE ESCAPE HATCH IS EXPLICIT. A
-           * container whose children really are a SET rather than a chain says
-           * `set: true` and gets brackets, which is the one case the old rule
-           * was right about and the only one it should ever have covered.
+           * Inner boxes get arrowheads by default; a headless line among headed ones reads as a
+           * head that fell off. A real set says `set: true` and gets brackets.
+           * why: lessons/kit-diagram.md#render-inner-heads
            */
           field.append(s('path', {
             class: n.set ? 'pos-dg-tie' : 'pos-dg-tie pos-dg-tie-arrow',
@@ -2671,30 +1834,9 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
       } else field.append(nodeGroup(n));
     }
 
-    // 🔴 THE LINE UNDER THE PICTURE KEEPS ITS HEIGHT, OR HOVERING MOVES THE
-    // PAGE. A three-line caption replaced by a five-word sentence is two lines
-    // shorter, so everything below the diagram jumps up the moment the pointer
-    // touches a box and back down when it leaves — on a page of several
-    // diagrams that is the whole article twitching under the cursor. The tallest
-    // thing the line will ever hold is reserved once per layout, which costs a
-    // few reflows here and nothing at all afterwards.
-    //
-    // ⚠️ AND IT RESERVES FOR THE CAPTION EXPLICITLY, never for "whatever the
-    // element is showing". Those are the same string only while nothing is
-    // hovered, and the one moment they differ is the one moment a re-layout
-    // is running — which is when this code is reached. MEASURED at the point
-    // the two came apart: `min-height: 19px` under a 97 px caption, so the
-    // next un-hover grew the block by 78 px. `captionTexts` names the set,
-    // which now includes every box's own SENTENCE and every box inside a
-    // container — the two things this line can hold that the boxes did not
-    // used to have.
-    //
-    // ⚠️ AND IT IS MEASURED THROUGH `say`, THE SAME WRITER THE HOVER USES.
-    // Setting `textContent` here would measure `**bold**` as six characters of
-    // literal asterisks in the ordinary face, while the hover draws a heavier
-    // one that is wider — so the string that reserved three lines could be
-    // drawn in four. A reservation taken with a different renderer is not a
-    // reservation.
+    // Reserve the caption line's height for the tallest string in `captionTexts`, measured
+    // through `say` (the hover's writer), or hovering moves the page.
+    // why: lessons/kit-diagram.md#render-caption-height
     cap.style.minHeight = '';
     const keep = [...cap.childNodes];       // put back exactly what was there
     let capH = 0;
@@ -2710,10 +1852,8 @@ export function createDiagram(host, spec, { onRender, how = false, atEnd = false
     api.ties = ties;
     api.mode = L.mode;
     for (const l of L.inside || []) {
-      // a container and a box inside ITSELF: there is no gap between the two
-      // to run a line through. Two boxes that are both inside one container do
-      // have one and are drawn there; this is the case that is left. It is on
-      // `cuts` as well, which is the report anybody actually reads.
+      // A container and a box inside itself have no gap to run a line through; also on `cuts`.
+      // why: lessons/kit-diagram.md#render-refused-self
       console.warn(`[diagram] ${l.from} holds ${l.to}, so there is no gap `
         + 'between them for an arrow and none is drawn');
     }

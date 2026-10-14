@@ -22,10 +22,9 @@
 <link rel="stylesheet" href="/slides/deck.css">
 
 <script type="module">
-  // The sample and the system. Every slide engine piece (rendering, the scale,
-  // the faces, the marks, navigation, keys, full screen, notes, the checks)
-  // lives in /slides/deck.mjs and /slides/deck.css since 2026-10-05, shared
-  // with /talk/. What is left here is the talk itself.
+  // The talk itself. The slide engine (render, scale, faces, keys, notes, checks)
+  // is /slides/deck.mjs and deck.css, shared with /talk/.
+  // See lessons/page-slides.md#slides-1
   import { mount, guard } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createDeck, checkDeck, liveDiagram, livePicture, liveSteps, liveReadout } from '/slides/deck.mjs';
@@ -39,16 +38,10 @@
   guard(d);
 
   /**
-   * The machines, as `diagram.mjs` draws them. Declared here rather than
-   * inside the live element because the words on other slides take their hue
-   * from the same boxes: `createDeck` reads its `hues` off this, so a box that
-   * changes its `tech` changes the word on every slide with it. Each note
-   * names other boxes in **bold**, which the diagram draws in that box's hue,
-   * and that rendered word is what the self-check compares the slides against.
-   * A top level box's `desc` is what the box is, set by the deck as slide text
-   * under its column; the diagram itself draws names only (deck.mjs,
-   * `liveDiagram`, asked 2026-10-05: *"do not use diagram native descs below
-   * but use slides text and postion"*).
+   * The machines as diagram.mjs draws them. createDeck reads its `hues` off this, so
+   * a box's `tech` colours its word on every slide; a box's `desc` is slide text
+   * under its column, and the diagram draws names only.
+   * See lessons/page-slides.md#slides-2
    */
   const MACHINES = {
     nodes: [
@@ -60,8 +53,9 @@
         ] },
       { id: 'cf', label: 'Cloudflare', tech: 'cloudflare', set: true, desc: 'a relay and Stream',
         children: [
-          // 1 to 2 ms: PROGRESS.md:3472, the DO hop MEASURED +1.0, +1.6 and
-          // +0.8 ms over three runs against the runtime's own ping.
+          // 1 to 2 ms: PROGRESS.md:3472, the DO hop at +1.0, +1.6 and +0.8 ms over three
+          // runs against the runtime's own ping.
+          // See lessons/page-slides.md#slides-3
           { id: 'rl', label: 'relay', tech: 'relay',
             note: 'One **Durable Object** per room carries notes from the **page** to the '
                 + '**synths** on the **Raspberry Pi**. The hop through it measured 1 to 2 ms.' },
@@ -83,43 +77,13 @@
   };
 
   // ── the talk ──────────────────────────────────────────────────────────────
-  // `say` is the headline at step 4: one sentence, no full stop, no colon,
-  // semicolon, dash or middot, two lines in every face (asserted). The widest
-  // face, Atkinson at 0.632 em, holds 18 characters a line at step 4 (MEASURED,
-  // logged by the check), so two lines hold 36 and every headline is written
-  // to wrap greedily into two lines of 18. What proves it is ONE of: `big` (one figure
-  // at step 6), `list` (up to three lines), `rows` (a table of text padded
-  // into character columns), `stack` (figures whose decimal points line up)
-  // or `live` (a running part). Evidence is at step 3, or step 2 when it has
-  // four rows, because four rows at step 3 do not fit under a two line
-  // headline. `statement: true` makes `say` the whole slide at step 5, up to
-  // three lines, 12 characters a line in Atkinson.
-  // `cap` is the caption at step 1, bottom left, and `link` the slug it points
-  // at, written out as a full URL. A link is not a fetch.
-  //
-  // THE ACCENT: `*26.2*` in any string paints those characters in `--hi`, on
-  // what carries the point and never on every word (the owner, 2026-10-05:
-  // *"do not have be on single one"*, so a slide may have two).
-  // THE HUES: `[Pi|Raspberry Pi]` paints `Pi` in the hue the diagram of the
-  // machines gives its box called Raspberry Pi, so a word on any slide is
-  // joined by colour to the box it means. Only the two outer boxes that paint
-  // a hue, Cloudflare and Raspberry Pi: MEASURED 2026-10-05, the diagram
-  // colours a bold name in a note only for a top level box (page, relay and
-  // synths came back plain bold), so a word joined to an inner box would have
-  // nothing on screen to match.
-  // The check reports both counts per slide and their contrast.
-  //
-  // 🔴 EVERY NUMBER ON A SLIDE IS A MEASURED ONE, AND ITS SOURCE IS THE
-  // COMMENT ABOVE IT. A number with no comment is a defect.
-  //
-  // `rows` is { head, body, align }: `align` is one letter a column, l or r,
-  // and the widths are worked out from the longest cell, so a column is a
-  // character position. Rows are written to Atkinson's 27 characters at step 3.
+  // `say` is a two line headline of 18 characters a line; evidence is one of `big`,
+  // `list`, `rows`, `stack` or `live`. Every number has its source in a comment.
+  // See lessons/page-slides.md#slides-4
   const SLIDES = [
     // ── what this is ──
-    // 46 rows and 44 built: CLAUDE.md's count command over the manifest, run
-    // 2026-10-05, printed `46 44`. Counted, never remembered. (The command is
-    // not quoted here because the build reads an import in a comment as real.)
+    // 46 rows and 44 built, from CLAUDE.md's count command over the manifest.
+    // See lessons/page-slides.md#slides-5
     { name: 'lab', say: 'Positron is a lab for *live* media', statement: true,
       cap: '44 demos built, of 46 in the manifest', link: '' },
     { name: 'machines', say: '[Cloudflare|Cloudflare] carries the streams',
@@ -130,12 +94,9 @@
     // readBurned, 600/600 exact through three moves of the clock row.
     { name: 'clock', say: 'Latency is read off a burned clock',
       live: livePicture, cap: 'the test picture, live, its clock read 600 of 600', link: 'webrtc' },
-    // PROGRESS.md:4712-4719, both browser to Cloudflare to browser, burned
-    // pixels: MoQ p50 26.2 / p95 42.4 / p99 104.8 ms (n=2740, PROGRESS.md:6624),
-    // WHEP p50 67.0 / p95 76.9 / p99 84.1 ms (n=17,501, PROGRESS.md:4712).
-    // Quicker is the median, steadier is the p99 under MoQ's. No hue: both
-    // ride Cloudflare, and diagram.mjs's TECH_HUE has no entry that tells the
-    // two transports apart, so the two winning figures are the yellow instead.
+    // PROGRESS.md:4712 and :6624, browser to Cloudflare to browser: MoQ p50 26.2, p99
+    // 104.8 ms (n=2740); WHEP p50 67.0, p99 84.1 ms (n=17,501). No hue tells them apart.
+    // See lessons/page-slides.md#slides-6
     { name: 'transports', say: 'MoQ is quicker, WebRTC steadier',
       rows: { head: ['', 'p50', 'p95', 'p99'],
         body: [['MoQ', '*26.2*', '42.4', '104.8'], ['WHEP', '67.0', '76.9', '*84.1*']], align: 'lrrr' },
@@ -147,15 +108,14 @@
       stack: [['stock, run A', '7.60', 's'], ['stock, run B', '15.41', 's'],
         ['tuned, run A', '*1.87*', 's'], ['tuned, run B', '*3.05*', 's']],
       cap: 'behind live, one [Cloudflare|Cloudflare] stream, same settings', link: 'llhls' },
-    // plans/plan-away-webrtc.md:212-214, laptop and Pi on one network: key
-    // press to speakers ~175 ms over the relay, ~48 ms over a direct WebRTC
-    // data channel. Another network is NOT measured (:216-217), which the
-    // caption says.
+    // plans/plan-away-webrtc.md:212-214, one network: key to speakers ~175 ms over the
+    // relay, ~48 ms over a WebRTC data channel. Another network is not measured.
+    // See lessons/page-slides.md#slides-7
     { name: 'pi', say: 'Direct to the [Pi|Raspberry Pi] skips the relay',
       big: '*48 ms*', cap: 'key to speakers, was 175, one network so far', link: 'away' },
-    // research/circuit-archive-2026-09-21.md:253-256: 3 sessions with no note
-    // events and 29 with, so 32; plans/plan-circuit-editor.md:65: 64 patches,
-    // all 350 bytes.
+    // research/circuit-archive-2026-09-21.md:253-256: 29 sessions with notes, 3
+    // without, so 32; plans/plan-circuit-editor.md:65: 64 patches, all 350 bytes.
+    // See lessons/page-slides.md#slides-8
     { name: 'circuit', say: 'The Circuit holds *29* real sessions',
       rows: { body: [['sessions', '32'], ['with notes', '29'], ['patches', '64'], ['bytes each', '350']],
         align: 'lr' },
@@ -169,7 +129,8 @@
       big: '1.8 ms', cap: 'median gap between beats, one peer 137 ms fast', link: 'sync' },
 
     // ── how it is built ──
-    // 167: `ls demo/shell/*.mjs | wc -l`, 2026-10-05.
+    // 167: `ls demo/shell/*.mjs | wc -l`.
+    // See lessons/page-slides.md#slides-9
     { name: 'kit', say: 'Every demo uses one kit of parts',
       live: liveReadout, cap: 'a readout from the kit, 167 modules in it', link: 'kit' },
     // positron-verify SKILL.md:29 (radio 48/48, zero bytes from anybody's
@@ -186,10 +147,9 @@
       cap: 'the board itself has run nothing yet', link: 'kit/hardware/' },
 
     // ── what it learned ──
-    // positron-streaming SKILL.md:228-230, a 13 point sweep of each 2 h window
-    // on 2026-09-06: etv refused its newest ~45 min, etv2 its oldest ~78 min,
-    // etvpluss nothing. The 2 h is plans/plan-live-timeline.md:42, 3750
-    // segments of 1.92 s.
+    // positron-streaming SKILL.md:228-230: etv refused its newest ~45 min, etv2 its
+    // oldest ~78 min. The 2 h is plans/plan-live-timeline.md:42, 3750 x 1.92 s.
+    // See lessons/page-slides.md#slides-10
     { name: 'refusals', say: 'ERR refuses by programme, not age',
       rows: { body: [['etv', 'newest 45 min'], ['etv2', 'oldest 78 min'], ['etvpluss', 'none']], align: 'll' },
       cap: 'refused part of each 2 h window, 13 points', link: 'archive/tv' },
@@ -197,9 +157,9 @@
     // 38/38 on /tapes/, a hole found only by breaking the stand-in.
     { name: 'sabotage', say: '*Break* the check first', statement: true,
       cap: '38/38 still green with every recording silent', link: 'tapes' },
-    // research/cf-models-speech-to-patch-2026-09-21.md:243-244: Workers AI,
-    // llama 3.3 70B, a patch from a sentence: loose schema 1.6 s, one branch
-    // per operation 10.2 to 11.6 s and looping until the tokens ran out.
+    // research/cf-models-speech-to-patch-2026-09-21.md:243-244: llama 3.3 70B patch
+    // from a sentence, loose schema 1.6 s, one branch per operation 10.2 to 11.6 s.
+    // See lessons/page-slides.md#slides-11
     { name: 'schema', say: 'A loose schema made it faster',
       stack: [['loose', '*1.6*', 's'], ['strict', '10.2', 's']],
       cap: 'Workers AI proposing patch links from a sentence', link: 'patchbay' },

@@ -1,34 +1,7 @@
-// ROUND TRIP, from the retired `/keep/` (2026-10-04, `plans/plan-demo-structure.md`
-// §3.5).
-//
-// 🔴 RETIRED 2026-10-13. Its WHIP leg went out through pub's /whip onto the
-// input whep-rig and came back over WHEP from it; that input is deleted and
-// /whip answers 410. Send and receive now asks for the relay servers (the one
-// check that needs no leg) and then says the leg is retired, at once, rather
-// than failing a publish. A deep run (`DEMO_DEEP=1`) therefore reads the two
-// leg asserts red with that reason, and `roundTripChecks()` with them: those
-// reds are EXPECTED and say so in their detail. The leg's code is in git at
-// be7737d. A round trip that still has an input behind it is
-// /video/webrtc/ (WebRTC loopback). The picture you send goes out to Cloudflare over WHIP and comes back
-// over WHEP, and what you record is the copy that came back. Every frame
-// carries a clock written into the pixels before it left, so dragging the line
-// and watching that clock move by the same amount proves the seek landed.
-//
-// 🔴 THE ROUND TRIP IS A DEEP CHECK. It holds a WHIP and a WHEP leg on
-// Cloudflare Stream for 20 to 30 s and records two takes, which is Stream
-// minutes on every run. An ordinary run (`selfcheck=1`) presses Send and
-// receive, grades the one thing that needs no leg (the relay servers were asked
-// for on the press and not on load), and stops with `left for the deep run`.
-// `DEMO_DEEP=1 node demo/verify.mjs capture` runs `roundTripChecks()`, keep's
-// fourteen, unchanged. A person's press is never affected.
-//
-// WHAT CHANGED IN THE MOVE:
-//   - `keep` published four readout keys and hid the row. The round trip and
-//     the route already sit on the received picture as panel values, so the
-//     four are gone rather than drawn as a second copy.
-//   - `keep` fetched its remembered R2 takes back on LOAD with `?r2=1`. A tab
-//     opens nothing until a press (`tab-page.mjs` rule 1), so they come back on
-//     the first press of Send and receive, and the log says so on open.
+// ROUND TRIP: the WHIP and WHEP leg is retired (its input is deleted, /whip is
+// 410), so Send and receive asks for relay servers, then logs the leg as retired.
+// A deep run reads the leg asserts red with that reason, by design.
+// See lessons/page-capture.md#capture-15
 
 import { el, armVideo, recorderMime } from '/shell/shell.mjs';
 import { setIcon } from '/shell/icon-button.mjs';
@@ -80,10 +53,9 @@ export function build({ panel, assert, log }) {
   let pub = null, sub = null, legs = [];
   const scratch = document.createElement('canvas');
 
-  // ── the source: our own picture, published out ──────────────────────────
-  // ALIVE WHILE A LEG IS UP: a captured stream off a canvas that stops being
-  // drawn stops, and the far end would freeze for a reason that is not the
-  // network's.
+  // The source: our own picture. Alive while a leg is up, because a captured
+  // stream off a canvas that stops being drawn stops.
+  // See lessons/page-capture.md#capture-16
   const source = createSource({
     opts: () => ({ hue: videoHue(parts.length) }),
     alive: () => !!pub,
@@ -98,9 +70,9 @@ export function build({ panel, assert, log }) {
   live.muted = true;
   seq.append(live);
   const seqCap = el('figcaption', 'pos-cap', 'received');
-  // THE ROUND TRIP AND THE ROUTE IT TOOK, AS TWO CELLS on the picture they
-  // describe: `direct`, or `relay` when either leg went through Cloudflare's
-  // TURN relay, because a relayed round trip is not comparable to a direct one.
+  // Round trip and route as two cells on the picture: `direct` or `relay`, since a
+  // relayed round trip is not comparable to a direct one.
+  // See lessons/page-capture.md#capture-17
   const legVals = createPanelValues([
     { key: 'rt', label: 'round trip', reserve: 7 },
     { key: 'path', label: '', reserve: 6 },
@@ -146,10 +118,9 @@ export function build({ panel, assert, log }) {
   const partAt = (pos) => parts.find((p) => pos >= p.startMs && pos < p.startMs + p.lenMs);
   const localOf = (p, ms) => Math.max(0, Math.min((p.lenMs ?? 0) - 40, ms - p.startMs)) / 1000;
 
-  // ── the round trip ────────────────────────────────────────────────────────
-  // 🔴 RELAY SERVERS ARE ASKED FOR ON THE PRESS, NEVER ON LOAD, and handed to
-  // both legs. `fetchIceServers` never throws: with no relay it returns STUN
-  // alone and says why. ICE still picks the route.
+  // Relay servers are asked for on the press, never on load. `fetchIceServers`
+  // never throws: with no relay it returns STUN alone and says why.
+  // See lessons/page-capture.md#capture-18
   let ice = null, iceAsks = 0, pressAt = null;
   // Measured, not counted by this tab: every request the browser made to the
   // relay route, from resource timing, and how many started before the press.
@@ -180,13 +151,14 @@ export function build({ panel, assert, log }) {
     if (useR2 && !restored) { restored = true; await restore(); }
     iceAsks++;
     ice = await fetchIceServers({ log: (m) => log(m) });
-    // 🔴 GRADED HERE, RIGHT AFTER THE PRESS: it is the one fact that needs no
-    // leg, so it runs on an ordinary run as well.
+    // Graded right after the press: the one fact that needs no leg.
+    // See lessons/page-capture.md#capture-19
     assert('relay servers were asked for on the press and not on load',
       iceAsks >= 1 && iceLoadAsks() === 0 && !!ice,
       `${iceAsks} ask(s) after the press, ${iceLoadAsks()} before it by resource timing, `
       + (ice.relay ? 'a relay came back' : `no relay: ${ice.why}`));
-    // 🔴 THE ROUND TRIP IS A DEEP CHECK (see the header).
+    // The round trip is a deep check (see the header).
+    // See lessons/page-capture.md#capture-20
     if (SELFCHECK && !DEEP) {
       log('left for the deep run: the round trip through Cloudflare and its two takes (DEMO_DEEP=1)');
       return;
@@ -198,15 +170,16 @@ export function build({ panel, assert, log }) {
       // with the network
       if (SELFCHECK) await roundTripChecks();
     };
-    // RETIRED 2026-10-13 (see the header): no leg to open, so say so and stop.
+    // No leg to open (see the header), so say so and stop.
+    // See lessons/page-capture.md#capture-21
     log(`${RETIRED_LEG}: its input and pub's /whip are deleted, so nothing is sent`, 'bad');
     await noLegs(RETIRED_LEG);
   });
 
   /**
-   * HOW FAR THE PICTURE TRAVELLED, on one clock. The number in the received
-   * frame was written by THIS machine before the picture left, so `now -
-   * burned` is the whole round trip with no cross-machine offset to guess at.
+   * How far the picture travelled, on one clock: this machine burned the number
+   * before it left, so `now - burned` needs no cross-machine offset.
+   * See lessons/page-capture.md#capture-22
    */
   let readable = 0, unreadable = 0;
   function legSampler() {
@@ -286,10 +259,9 @@ export function build({ panel, assert, log }) {
 
   async function landPart(part) {
     if (!part.blobs.length) { log(`take ${part.n}: nothing recorded`, 'bad'); return; }
-    // WHERE THE PICTURE COMES BACK FROM decides what this tab is claiming. In R2
-    // mode the local copies are DROPPED and playback is fetched back. ONE FILE
-    // PER TAKE: an eight-second take is about 900 KB, and slicing it buys
-    // nothing while costing a dense sequence the worker would refuse whole.
+    // In R2 mode local copies are dropped and playback is fetched back, one file per
+    // take: about 900 KB for eight seconds, and slicing buys nothing.
+    // See lessons/page-capture.md#capture-23
     let blob = null;
     if (useR2) {
       const whole = new Blob(part.blobs, { type: part.mime });
@@ -367,8 +339,9 @@ export function build({ panel, assert, log }) {
     mm.release('handover');
     handovers.push(`${from ? from.n : 'none'} to ${p.n} at ${Math.round(pos)}`);
   }
-  // EVERY SEEK IS A COMMAND TO THE ELEMENT. Without this mirror the clock check
-  // read the SAME frame twice: "playhead +2161 ms, picture +0 ms".
+  // Every seek is a command to the element; without this mirror the clock check
+  // reads the same frame twice.
+  // See lessons/page-capture.md#capture-24
   let inServo = false, queuedSeek = null;
   deck.transport.onState((st) => {
     if (st.reason !== 'seek' || inServo || !parts.length) return;
@@ -442,13 +415,10 @@ export function build({ panel, assert, log }) {
   let asserted = false, didClock = false, checking = false;
 
   /**
-   * 🔴 EVERY CHECK `keep` HAS, DRIVEN TO THE END, FROM ONE PLACE. Called after
-   * the round trip is up (or has failed), under SELFCHECK only: it records two
-   * short takes of what came back and lets each land. Every assert is made
-   * exactly once whatever happens, red with the reason when the network gave
-   * nothing to record, so the count is the same on a run where WHEP media never
-   * arrived. ⚠️ It waits for a READABLE frame first: Cloudflare ramps WHEP up
-   * from 640x360, where the burned row cannot be read. 20 s at most.
+   * Every round trip check from one place, under SELFCHECK: records two short takes.
+   * Each assert is made exactly once, red with the reason when nothing arrived.
+   * Waits up to 20 s for a readable frame, since WHEP ramps up from 640x360.
+   * See lessons/page-capture.md#capture-25
    */
   async function roundTripChecks() {
     if (checking) return;
@@ -482,8 +452,9 @@ export function build({ panel, assert, log }) {
         'by object identity against getReceivers()');
       assert('the round trip is a real number, not a guess', legs.length > 0 && median(legs) > 0,
         legs.length ? `${Math.round(median(legs))} ms, n=${legs.length}` : 'nothing read');
-      // THE ROW NEEDS FULL RESOLUTION: WHEP ramps 640x360, 960x540, 1280x720
-      // over the first half-minute, and the row is drawn on a 1280 grid.
+      // The row needs full resolution: WHEP ramps 640x360, 960x540, 1280x720 over
+      // the first half-minute, and the row is drawn on a 1280 grid.
+      // See lessons/page-capture.md#capture-26
       assert('the clock survived the round trip', readable > 0,
         `${readable} clean of ${readable + unreadable} read, now ${live.videoWidth}x${live.videoHeight}`);
       assert('the format was negotiated, not assumed', !!parts[0]?.mime, parts[0]?.mime || 'none');
@@ -505,12 +476,10 @@ export function build({ panel, assert, log }) {
   }
 
   /**
-   * THE CHECK THIS TAB EXISTS FOR. The number was written BEFORE the picture
-   * crossed a real network and two encoders, and the receiving side cannot fake
-   * it. Seek to two positions inside ONE take, read the clock out of the pixels
-   * at each, and assert it advanced by as much as the playhead did. Across two
-   * takes it would measure the pause between them, which the line throws away
-   * and the pixels keep.
+   * Seek to two positions inside one take, read the burned clock at each, and
+   * assert it advanced as much as the playhead. Across two takes it would measure
+   * the pause between them, which the line drops and the pixels keep.
+   * See lessons/page-capture.md#capture-27
    */
   async function clockChecks() {
     if (parts.length < 2) {
@@ -527,7 +496,8 @@ export function build({ panel, assert, log }) {
       parts.filter((p) => deck.position() >= p.startMs && deck.position() < p.startMs + p.lenMs).length === 1,
       `at ${Math.round(deck.position())} ms`);
 
-    // 🔴 EVERYTHING BELOW DRIVES THE PLAYHEAD, so it waits for a harness.
+    // Everything below drives the playhead, so it waits for a harness.
+    // See lessons/page-capture.md#capture-28
     await ifSelfcheck(async () => {
       const readAt = async (pos) => {
         deck.seek(pos);
@@ -548,8 +518,9 @@ export function build({ panel, assert, log }) {
       assert('the clock in the picture moved with the playhead',
         Math.abs(err) <= FRAME_MS * 3,
         `playhead +${p2 - p1} ms, picture +${e2 - e1} ms, ${err >= 0 ? '+' : ''}${Math.round(err)} ms apart`);
-      // AND THE GAP THE LINE THREW AWAY IS STILL IN THE PIXELS. Reported, not
-      // asserted: it depends on how long a person waited.
+      // The gap the line dropped is still in the pixels. Reported, not asserted: it
+      // depends on how long a person waited.
+      // See lessons/page-capture.md#capture-29
       const endOf1 = await readAt(Math.round(parts[0].startMs + parts[0].lenMs - 200));
       const startOf2 = await readAt(Math.round(parts[1].startMs + 120));
       if (endOf1 !== null && startOf2 !== null) {
@@ -595,8 +566,8 @@ export function build({ panel, assert, log }) {
   return {
     get bars() { return [{ name: 'round trip', bar, strip: stripCanvas }]; },
     /**
-     * Presses Send and receive. An ordinary run grades the relay ask and stops;
-     * a deep run holds both legs and runs keep's fourteen inside the press.
+     * Presses Send and receive. An ordinary run grades the relay ask and stops.
+     * See lessons/page-capture.md#capture-30
      */
     async check({ A }) {
       A('building this tab opened nothing: no relay ask, no leg, no camera',

@@ -1,8 +1,7 @@
-// demo/shell/rt-typing.mjs: the runtime of a `typing` node on /connect/
-// (node-runtime.mjs). Its face is /typist/'s sheet of paper (typist/paper.mjs);
-// every input on it leaves on typing:value-out as `{ of: 'text', text, kind,
-// column }`, kind being the InputEvent's inputType. Typing is a person's press,
-// so it starts the page's sound.
+// demo/shell/rt-typing.mjs: a `typing` node on /connect/, whose face is /typist/'s paper.
+// Every input leaves on typing:value-out as `{ of: 'text', text, kind, column }` (kind is the
+// inputType); typing is a press, so it starts the page's sound.
+// why: lessons/kit-rt-typing.md#header
 
 import { createPaper } from '/typist/paper.mjs';
 

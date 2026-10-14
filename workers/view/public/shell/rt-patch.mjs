@@ -1,8 +1,6 @@
-// demo/shell/rt-patch.mjs: the runtime of a `patch` node on /connect/
-// (node-runtime.mjs). Its face is the kit picker; a pick leaves on
-// patch:midi-out as one program change, which is how every instrument on this
-// desk is switched. 64 programs, 0 to 63, the most the Circuit's gate lets
-// through. A name read back from an instrument is that instrument page's.
+// demo/shell/rt-patch.mjs: the runtime of a `patch` node on /connect/ (node-runtime.mjs).
+// A pick leaves on patch:midi-out as one program change, 0 to 63 (the Circuit's gate).
+// why: lessons/kit-rt-patch.md#header
 
 import { createPicker } from './picker.mjs';
 

@@ -47,24 +47,15 @@
   import * as bytes from './bytes.mjs';
   import * as notes from './notes.mjs';
 
-  /*
-   * 🔴 TWO OLD PAGES AS TWO TABS, decided 2026-10-04 (*"names ok, looper
-   * retires, no redrect, capture is fine"*, plans/plan-demo-structure.md §3.3).
-   * BYTES is the old `/wire/`: a message as the exact bytes that go out and
-   * come back. NOTES is the old `/instrument/`: a keyboard over the same relay,
-   * and how late a note lands on another machine. Each tab is a module beside
-   * this file, built the first time it is opened, with its own readout and log.
-   *
-   * ⚠️ THE TWO TABS USE TWO ROOMS ON PURPOSE. BYTES's room is the shared `wire`
-   * whose history is its subject, so the manifest keeps `room: 'fixed'` and the
-   * harness passes no `?room=`. NOTES names its own (`notes.mjs` says how), so
-   * two harness runs never play into each other.
-   */
+  /* Two tabs: BYTES (a message as the exact bytes out and back) and NOTES (a keyboard
+     over the same relay). BYTES uses the shared `wire` room (manifest `room: 'fixed'`);
+     NOTES names its own so harness runs never play into each other.
+     See lessons/page-wire.md#wire-1 */
   const d = mount({
     name: 'wire',
-    // No `what` under the title: each tab says what it is in the box under the
-    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
-    // The manifest's `one` line still describes the page on the index.
+    // No `what` under the title: each tab describes itself under the tab row. The
+    // manifest's `one` line still describes the page on the index.
+    // See lessons/page-wire.md#wire-2
     readout: null,
     showLog: false,
   });

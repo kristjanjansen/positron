@@ -1,16 +1,7 @@
-// demo/shell/patchbay.mjs: a bay as a block of a page. A `patchbay` heading
-// with a `See details` link button right after it, the picture `createBayView`
-// draws, and behind the button the links and the ports as tables. Generic:
-// it reads `nodes()`, `ports()` and `links()` and nothing a page types, so
-// any bay, or `heldPicture()` of one, can be handed to it.
-//
-// Traffic is drawn on the wires by `createBayTraffic`: an event medium pulses
-// once per event a link delivered (its own `sent`) and once per `pulse(from,
-// to)` a page calls for a leg the bay does not count (a raw room message, a
-// line a store played back); a stream medium is lit while `flowing(link,
-// medium)` answers true, which only the page can know. A wire is keyed by its
-// printed link, not by the bay's id, so a page that builds a fresh bay per
-// action keeps its wires. Call `refresh()` after the links change.
+// demo/shell/patchbay.mjs: a bay as a page block, the `createBayView` picture with traffic on
+// its wires (`createBayTraffic`). Reads only `nodes()`, `ports()` and `links()`; wires are keyed
+// by printed link, so a fresh bay per action keeps them. Call `refresh()` after links change.
+// why: lessons/kit-patchbay.md#header
 
 import { el } from './shell.mjs';
 import { createTable } from './table.mjs';
@@ -70,18 +61,10 @@ const list = (xs) => (xs && xs.length ? xs.join(', ') : '');
  * @param {string} [o.room]       the relay room, named on the relay's box, `cf-relay:<room>`
  */
 export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () => false, open = false, details = false, room = 'room' } = {}) {
-  /* 🔴 THE RELAY IS DRAWN AS A BOX, 2026-10-11. Asked: *"why relay can no be
-     another box?"*, *"why it can have standard node naming?"*, then, after a
-     prototype on /room/chat/, *"ok do it and update patcbays"*. Every
-     link the relay carries is drawn as two hops through `cf-relay:<room>`,
-     named like any node (as `cf-store:history`), with one in and one out port
-     per medium it carries. PICTURE ONLY: the bay still holds and routes the
-     one link, and the relay announces nothing, because it passes messages on
-     without reading them. A link counts as carried by the relay when its
-     session or `via` says `relay` (`relay`, `relay-h264`), or when it is a
-     LIGHT link between two sites with neither, which rides the room as one
-     `bay.event`. A heavy link with no session is not guessed at: an ERR
-     stream or a WHIP leg is not the relay. */
+  // Picture only: a link the relay carries (session or `via` says relay, or a light link between
+  // two sites with neither) is drawn as two hops through a `cf-relay:<room>` box.
+  // A heavy link with no session is not guessed at.
+  // why: lessons/kit-patchbay.md#relay-box
   const RELAY = `cf-relay:${room}`;
   const mediumIn = (ports, l) => mediumOf(ports, l.from) || mediumOf(ports, l.to);
   const relayed = (ports, l) => {
@@ -89,11 +72,9 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
     if (by) return String(by).startsWith('relay');
     return siteOf(l.from) !== siteOf(l.to) && !HEAVY.includes(mediumIn(ports, l));
   };
-  // 🔴 A HOP KEEPS ONE OBJECT ACROSS READS. The traffic layer counts a wire's
-  // events as the change in `sent` on the SAME object, and treats a new object
-  // as a new wire; a hop built afresh on every read was a new wire every time,
-  // so no MIDI ever pulsed on a relayed link (found 2026-10-11 on
-  // /remote/circuit/ when it was synth/070, *"i do not see midi animation on circuilt patchbay"*).
+  // A hop keeps one object across reads: traffic counts `sent` on the same object, and a new
+  // object is a new wire that never pulses.
+  // why: lessons/kit-patchbay.md#hop-cache
   const hopCache = new Map();
   const drawn = () => {
     const ports = raw.ports(), links = [], extra = new Map(), hops = new Map();
@@ -147,10 +128,8 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
   const more = createLinkButton({ label: open ? 'Hide details' : 'See details', expanded: open, onPress: () => toggle() });
   const button = more.el;
   const head = el('div', 'pb-head');
-  // ⚠️ THE DETAILS ARE ARCHIVED, NOT DELETED, 2026-10-10: *"archive see details
-  // of patchbay component. revisit later"*. The link and the two tables are
-  // built as before and left off the page unless a caller passes
-  // `details: true`. BACKLOG.md carries the revisit.
+  // The details link and tables are built but left off unless `details: true` (BACKLOG.md).
+  // why: lessons/kit-patchbay.md#details-archived
   head.append(el('h3', 'pos-sec-h', title), ...(details ? [button] : []));
 
   const linksT = createTable({ columns: [

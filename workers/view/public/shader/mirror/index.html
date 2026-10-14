@@ -22,9 +22,9 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <style>
-  /* The picture at half the content width (asked 2026-10-12, *"1/2
-     videpanel"*), the whole width on a phone. The program sits under the
-     knob, not beside the picture (*"shader code box is below parameters"*). */
+  /* The picture at half the content width, the whole width on a phone. The program sits
+     under the knob.
+     See lessons/page-shader.md#shader-6 */
   .cc-half { width: calc(50% - 8px); }
   @media (max-width: 560px) { .cc-half { width: 100%; } }
   .cc-half canvas { display: block; width: 100%; height: 100%; }
@@ -43,31 +43,10 @@
   import { createCompileIdle } from '/shell/compile-idle.mjs';
   import { createMirrorShader, MIRROR_FS, GLSL } from '/shell/mirror-shader.mjs';
 
-  // /mirror/'s kaleidoscope, running in this tab, with one parameter left.
-  // Asked 2026-10-12: *"use same shader you have in mirror demo, just less
-  // parameters"*. The knob is a node of its own, `web:knob-segments`, cabled
-  // into `web:shader:value-in`, and the shader reads `uSegments` only off that
-  // link, so a turn is a value crossing a wire. The shader makes its own
-  // picture, so nothing feeds its video side and there is no source node.
-  //
-  // THE TEXT IS /mirror/'s `FS_BODY`, TOKEN FOR TOKEN, with three changes:
-  // - `uSeg` is `uSegments` (asked 2026-10-12, *"uSeg -> uSegments, Mirros
-  //   param -> Segments"*); v3dpipe sets both names from its `seg`;
-  // - /mirror/'s own lines, with one long line broken in two and the uniform
-  //   line split (whitespace only);
-  // - `uFb`, `uScale`, `uWarp` and `uHue` are `const` at /mirror/'s own
-  //   values (0.78 and 0.08 are what its `paint()` hard-codes, 4 and 1 are
-  //   the `mid` and `full` its GRAIN and HUE controls open on).
-  // `uT` is a frame counter over 30, as /mirror/ and the C drive it, and the
-  // feedback tap reads the previous frame through the same two-target
-  // ping-pong. /mirror/'s look crossfade and headset copy are not here.
-  //
-  // ⚠️ `uSegments` IS THE NUMBER OF WEDGES THE ANGLE IS FOLDED INTO, which
-  // /mirror/'s control calls `mirrors` and offers as 2, 8 and 24 (8 is its
-  // default). The knob gives it 1 to 32 directly. At 1 the fold is a single
-  // mirror down the horizontal; every N is N-fold symmetric.
-  //
-  // NOTHING OPENS ON A VISIT: no camera, no fetch, no room.
+  // /mirror/'s kaleidoscope (`FS_BODY`, `uSeg` renamed `uSegments`, `uFb` `uScale` `uWarp`
+  // `uHue` const at /mirror/'s values), driven only by `web:knob-segments` on the shader's
+  // value-in. `uSegments` is the wedge count, 1 to 32. Nothing opens on a visit.
+  // See lessons/page-shader.md#shader-7
   const S = 'web';
   const SH_OUT = `${S}:shader:video-out`, SH_VAL = `${S}:shader:value-in`;
   const SCREEN = `${S}:screen:video-in`;
@@ -121,8 +100,7 @@
   const build = (text) => shader.build(text);
   const render = () => shader.render(P.segments, { out: holds(SH_OUT, SCREEN) });
   // The footer says what draws the picture and how fast, as /mirror/'s does.
-  // Asked 2026-10-12: *"mirror shader - repalce with what renders it and fps"*.
-  // The knob already shows the mirror count.
+  // See lessons/page-shader.md#shader-8
   const name = el('span', 'cc-say', '');
   const count = el('span', 'cc-say', '');
   const panel = createVideoPanel({ media: canvas, left: name });
@@ -140,20 +118,15 @@
     raf = requestAnimationFrame(frame);
   }
 
-  // ── the code box: the program itself, compiled once the typing stops ────
-  // Asked 2026-10-12: *"can we make shader be in compiling codebox and be
-  // editable?"*. The kit's idle compile, as /fau/ and /code/faust/
-  // use it: `IDLE_MS` after the last keystroke, never two at once, `Compiling`
-  // breathing in the box's corner and `Did not compile` left standing with
-  // the GL's log in its `title` (and in the log below) while the last good
-  // program keeps drawing.
+  // The code box: the kit's idle compile, `IDLE_MS` after the last key, never two at once;
+  // a failed compile leaves `Did not compile` with the GL log while the last good program draws.
+  // See lessons/page-shader.md#shader-9
   const code = createCodeBox({ language: GLSL, value: FS, rows: CODE_ROWS, label: '',
     hues: { hueOf: (n) => (n === 'uSegments' ? HUE : null) },
     ariaLabel: 'the fragment shader this page runs, edit it and it recompiles' });
-  // ⚠️ A PROGRAM WITH NO `uSegments` COMPILES AND RUNS, AND THE KNOB THEN DRIVES
-  // NOTHING. The kit's note has no state for "compiled, with a caveat", so the
-  // page writes that one line into it once the compile has settled, and the
-  // next compile paints over it as usual (a kit candidate, see the report).
+  // A program with no `uSegments` compiles and runs with the knob driving nothing; the kit's
+  // note has no state for that, so the page writes the line after the compile settles.
+  // See lessons/page-shader.md#shader-10
   const NO_KNOB = 'No uSegments, the knob drives nothing';
   const idle = createCompileIdle({
     input: code.input,

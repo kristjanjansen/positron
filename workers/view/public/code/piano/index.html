@@ -22,66 +22,10 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/shell/concept.css">
 <script type="module">
-  // concepts sampler/000, THE SAMPLER, 2026-10-12. Four pages made one. Asked
-  // (BACKLOG, "Merge sampler/000, 010 and 040"): *"merge 000 and 010 with sc
-  // piano (and put it looper too)"*. What each page brought:
-  //   - 000 (Piano): the on-screen keys playing the Salamander grand from R2,
-  //     `cf-r2:piano:file-out -> web:sampler:file-in`.
-  //   - 010 (Piano and Rhodes): the jRhodes3d set beside it and a separate
-  //     `web:patch` node that sends a program change (0 piano, 1 Rhodes) into
-  //     the sampler's midi-in, the way a hardware synth switches. When the
-  //     Rhodes is picked, the notes the keys on screen reach come down at once
-  //     (`warm: [48, 69]`), so its first note is not a cold fetch.
-  //   - 040 (SuperCollider piano): the readout, key to sound, boot, first note
-  //     and underruns, measured off scsynth's own meter after the sum.
-  //   - 020 (Looper): everything below this line about the looper, unchanged,
-  //     and the page was started from it, because the owner plays it on a real
-  //     keyboard. 010, 020 and 040 forward here, keeping their query string.
-  // All of it plays through /code/sc-sampler.mjs: the Pi's two
-  // SynthDefs on wasm scsynth in this tab.
-  //
-  // THE LOOPER, 2026-10-11 (020). A MIDI looper between the keys and the
-  // sampler. Asked: *"Looper. Triggered from Sustain pedal. Shows as zoomed in
-  // timeline. First start second stop. Raw. No quant no bpm"*.
-  //
-  // THE RULES, all of them:
-  //   - The only control is the sustain: CC 64 from a plugged in keyboard, or
-  //     the Sustain button in the on-screen keyboard's footer.
-  //   - A PRESS is the pedal value crossing from below 64 to 64 or above (a
-  //     pedal sends 127 going down and 0 coming up: the 127 is the press, the 0
-  //     does nothing). One click of the Sustain button is one press.
-  //   - Press 1 starts recording. Every note still goes straight through to the
-  //     sampler while it is recorded.
-  //   - Press 2 stops recording. The loop is EXACTLY the time between the two
-  //     presses, nothing rounded, no grid, no tempo, and plays from that moment
-  //     on, round and round. A key still held at press 2 gets its note off at
-  //     the loop's end. A note off whose note on came before press 1 is dropped.
-  //   - Press 3 over a playing loop starts an overdub layer, press 4 keeps it
-  //     (since 2026-10-11, `pressAction` below). A fresh loop starts only
-  //     after a clear.
-  //   - A press under SPRING_MS after a release is the pedal springing back and
-  //     does nothing.
-  //   - A press that would close a loop under MIN_LOOP_MS does nothing, and
-  //     recording carries on.
-  //   - A press held CLEAR_HOLD_MS, pedal still down, stops and empties the
-  //     loop. The press acts the moment it lands; the clear comes only when the
-  //     hold reaches the mark and throws away what that press started. Nothing
-  //     ever waits for a second press.
-  //   - `Panic` in the keyboard's footer stops the loop and empties it.
-  //
-  // `demo/shell/looper.mjs` is the kit's AUDIO looper (a ring of sound, a kept
-  // AudioBuffer, directions). None of it applies to a list of note events, so
-  // nothing is shared; what is shared is the kit timeline the loop is drawn on.
-  // NOTHING IS FETCHED ON A VISIT. MIDI access is asked for on load, as /nola/
-  // does, so a pedal on a plugged in keyboard works from the first press.
-  //
-  // SINCE 2026-10-12 THE SAMPLER IS SUPERCOLLIDER IN THE TAB
-  // (/code/sc-sampler.mjs, *"all in"*), and a replay is a
-  // TIMESTAMPED OSC BUNDLE: the looper hands each note over AHEAD_MS before
-  // its time with the time it should be heard, and scsynth starts it on that
-  // sample rather than whenever the 4 ms timer next ran. A download hint for
-  // the wasm is all a visit costs; a pointer over the keys, a touch, a focus
-  // or the first MIDI message boots the engine.
+  // Piano and Rhodes from R2 through /code/sc-sampler.mjs (wasm scsynth in the tab), with a MIDI
+  // looper driven only by the sustain (CC 64 crossing 64, or the Sustain button): press to record,
+  // press to loop, press to overdub. Nothing is fetched on a visit; MIDI access is asked on load.
+  // See lessons/page-code.md#code-16
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
@@ -98,8 +42,8 @@
   import { createScSampler, warmOnIntent } from '/code/sc-sampler.mjs';
   import { createPicker } from '/shell/picker.mjs';
 
-  // 040's four cells, under the title with the log alone at the foot. Asked
-  // 2026-10-12: *"yeah when concept has readout move to top"*.
+  // The readout sits under the title, with the log alone at the foot.
+  // See lessons/page-code.md#code-17
   const d = mount({ name: 'Piano and Rhodes', what: '', index: '/', indexLabel: 'positron',
     joined: false,
     readout: { 'key to sound': 'ms', boot: 'ms', 'first note': 'ms', underruns: '' } });
@@ -107,9 +51,9 @@
 
   // ── the sampler ─────────────────────────────────────────────────────────
   let fetchedAt = 0;
-  // Piano and Rhodes, as /concepts/sampler/010/ (asked: *"add rhodes sound too
-  // to looper"*): a `web:patch` node sends a program change straight into the
-  // sampler, so the loop plays back in whichever sound is picked now.
+  // A `web:patch` node sends a program change straight into the sampler, so the loop plays back
+  // in whichever sound is picked now.
+  // See lessons/page-code.md#code-18
   const INSTRUMENTS = [PIANO, RHODES];
   const sampler = createScSampler({
     instruments: INSTRUMENTS,
@@ -123,16 +67,10 @@
     onReady: (eng) => { d.set('boot', sampler.stat().timing.readyMs); listenStart(eng); },
   });
 
-  // ── key to sound, as /concepts/sampler/040/ measured it ──────────────────
-  // COPIED from 040 (which copied /remote/piano/): per press, the first
-  // 1 ms block over ONSET and three times the 30 ms before it, on the speaker's
-  // clock (`getOutputTimestamp`, so the browser's own output latency is inside
-  // it). The tap is scsynth's meter, after the sum. `first note` is the first
-  // press to its sound, the engine boot and its recording included.
-  // A press is a LIVE note on, counted where it enters the looper; a replay is
-  // not a press. ⚠️ A replay's onset can still be taken for a live press whose
-  // own sound never came (a dropped note) within WAIT_MS of it, because the
-  // meter hears the sum and cannot tell the two apart.
+  // Key to sound: per live press, the first 1 ms block over ONSET and three times the 30 ms before
+  // it, on the speaker's clock, tapped off scsynth's meter after the sum. A replay's onset within
+  // WAIT_MS of a dropped live note can be taken for it: the meter cannot tell them apart.
+  // See lessons/page-code.md#code-19
   const KEEP_MS = 200, ONSET = 0.02, WAIT_MS = 1500;
   const env = [], pendingPress = [], lags = [];
   let lastLag = null, readUpTo = 0, firstPress = null, fbuf = null, firstNoteMs = null, ctx = null, meter = null;
@@ -188,36 +126,26 @@
     setInterval(() => { const n = ctx.playbackStats?.underrunEvents; d.set('underruns', n == null ? '' : n); }, 500);
   }
 
-  // ── the looper ──────────────────────────────────────────────────────────
-  // The three numbers are plans/plan-sustain-pedal.md section 3, asked for with
-  // *"fix all"* on 2026-10-11. The MK-425C scans its pedal every 65.95 ms
-  // (research/sustain-pedal-pressing-2026-10-11.md section 5), so a press one
-  // tick after a release is the pedal springing back, and the owner's export
-  // showed loops of 0.132 s and 0.199 s made that way. 015 copies pressAction
-  // and these numbers to report what 020 would do; change both together.
+  // The looper. The MK-425C scans its pedal every 65.95 ms, so a press one tick after a
+  // release is the pedal springing back. Original comment: lessons/page-code.md#code-20.
+  // See lessons/page-code.md#code-33
   const SPRING_MS = 70;          // a press this soon after a release is ignored
   const MIN_LOOP_MS = 500;       // a press that would close a shorter loop is ignored
-  // 3 s since section 10 of the plan (asked: *"i can not reach panic. make it 3s
-  // then"*): the owner holds a closing press 1.45 to 1.65 s while the chord
-  // rings, and at 1 s that cleared six loops in one session.
+  // A closing press is often held 1.45 to 1.65 s while the chord rings; 1 s cleared loops.
+  // See lessons/page-code.md#code-21
   const CLEAR_HOLD_MS = 3000;    // a press held this long with no note played clears the loop
-  // plans/plan-looper-accuracy.md section 9, the owner's first Copy log: 4 of 7
-  // takes lost their opening chord, played 17 to 98 ms before the press the
-  // keyboard reported (it scans its pedal every 66 ms; the keys are timed to
-  // about 1 ms), and the closing press came 117 to 146 ms after the chord it
-  // closed on. So a take starts at a note that began up to LOOKBACK_MS before
-  // the press, the end moves back by the same amount (the length stays press
-  // to press, the plan's section 2.1 trap), and a note in the last SEAM_MS of
-  // the loop that repeats a pitch from its first SEAM_MS is the same downbeat
-  // played twice, so it is dropped. The keys' last BUFFER_MS are always kept.
+  // Keyboards report the pedal up to ~100 ms off the chord: a take starts at a note up to
+  // LOOKBACK_MS before the press, a SEAM_MS repeat of the opening pitch at the end is dropped,
+  // and the keys' last BUFFER_MS are always kept. The length stays press to press.
+  // See lessons/page-code.md#code-22
   const LOOKBACK_MS = 150;
   const SEAM_MS = 150;
   const BUFFER_MS = 2000;
-  /** What a press does: 'spring', 'short' (both ignored), 'close', 'start',
-   *  'overdub' (while looping) or 'keep' (while overdubbing). Overdub since
-   *  2026-10-11 (*"how i overdub?"*, then *"Okay, build."*): the third Copy
-   *  log showed a press over a 15 s loop replacing it with a 1.85 s take. A
-   *  fresh loop now starts only after a clear, the 3 s hold. */
+  /**
+   * What a press does: 'spring', 'short' (both ignored), 'close', 'start', 'overdub' (while
+   * looping) or 'keep' (while overdubbing). A fresh loop starts only after a clear.
+   * See lessons/page-code.md#code-23
+   */
   function pressAction(state, t1, releasedAt, now) {
     if (now - releasedAt < SPRING_MS) return 'spring';
     if (state === 'recording') return now - t1 < MIN_LOOP_MS ? 'short' : 'close';
@@ -243,13 +171,9 @@
     notesInHold: 0,          // note ons since the pedal last went down
     prev: null,              // { events, len } the loop a new take replaced, until it has notes
   };
-  // ── the journal, for Copy log ───────────────────────────────────────────
-  // Asked 2026-10-11: *"add a copy button to the looper ... in order to debug,
-  // record all you have, and let's analyze it"*. Every key and pedal message as
-  // it came in, with the time the device stamped on it (`sent`, the MIDI
-  // message's own timeStamp; the press time for the on-screen keys) and the
-  // time the looper saw it (`seen`), and every decision the looper made.
-  // Memory only, the last 5000 of each.
+  // The journal for the log copy: every key and pedal message with the device's timestamp
+  // (`sent`) and when the looper saw it (`seen`), and every decision. Memory only, last 5000 each.
+  // See lessons/page-code.md#code-24
   const J = { inputs: [], decisions: [] };
   const jin = (src, kind, d1, d2, ch, sent) => {
     J.inputs.push({ sent: +sent.toFixed(2), seen: +performance.now().toFixed(2), src, kind, d1, d2, ch });
@@ -268,17 +192,16 @@
     // The clear is armed by every press, an ignored one too: a pedal held down
     // for a second is a hold whatever the edge before it looked like.
     clearTimeout(L.hold);
-    // Since section 9 of the plan: a pedal held while playing is a sustain
-    // pedal held, not a clear. Four takes were lost to the old rule. So a hold
-    // clears only when no note was played during it, and then only what the
-    // press itself left: a take with no notes, and the loop before it.
+    // A pedal held while playing is a sustain held, not a clear: a hold clears only when no note
+    // was played during it, and only what the press itself left.
+    // See lessons/page-code.md#code-25
     L.notesInHold = 0;
     L.hold = setTimeout(() => {
       if (L.pedal < PEDAL_ON) return;
       if (L.notesInHold) { jdo('hold kept', `${L.notesInHold} notes played during the hold`); return; }
-      // Asked: *"cancelling just removes the last layer"*. A hold over a loop
-      // with overdubs takes the newest layer away; only a loop of one layer, or
-      // a take still recording, is cleared whole.
+      // A hold over a loop with overdubs removes the newest layer; only a loop of one layer, or a
+      // take still recording, is cleared whole.
+      // See lessons/page-code.md#code-26
       const had = L.state;
       if (had === 'overdub' && !L.events.some((e) => e.d2 && e.layer === L.layer)) {
         // the press just started an empty overdub: drop it, then undo the one before
@@ -360,9 +283,9 @@
       }
       L.state = 'looping'; L.lapStart = now; L.lastPos = 0; L.lap = 0; L.headLap = 0; L.fired = [];
       deck.setRange([0, len]);
-      // The loop's start and end on the timeline (asked 2026-10-11, *"show start
-      // and end of loop, in timebar above lanes"*): the strip's own loop band
-      // and edges, from the deck's loop view, with a little air either side.
+      // The loop's start and end on the timeline: the strip's own loop band and edges, with a little
+      // air either side.
+      // See lessons/page-code.md#code-27
       deck.setLoopView({ a: 0, b: len, state: 'on' });
       strip.strip.fit(-len * 0.04, len * 1.04);
       strip.strip.invalidate();
@@ -392,10 +315,9 @@
     face();
   }
 
-  // Overdub: a note's place in the loop is the loop's own clock at its device
-  // time, so the pedal's 66 ms scan does not touch it and nothing is moved.
-  // A note added now must not also replay in this lap (it was just played
-  // live), so it carries the lap it was played in and is skipped there.
+  // Overdub: a note's place is the loop's clock at its device time, so the 66 ms pedal scan does
+  // not touch it. It carries the lap it was played in and is not replayed in that lap.
+  // See lessons/page-code.md#code-28
   const loopPos = (t) => (((t - L.lapStart) % L.len) + L.len) % L.len;
   /** The lap the loop's own clock is in at `t`: the lap a note played live at `t` was heard in. */
   const lapOf = (t) => Math.floor((t - L.lapStart) / L.len);
@@ -454,19 +376,10 @@
     strip.strip.invalidate();
   }
 
-  // Playback: every few ms, hand over the events between where the loop's
-  // HEAD was and where it is now. Positions come from the first lap's start and
-  // the loop length, never from the last tick, so the loop cannot drift.
-  //
-  // 🔴 THE HEAD RUNS AHEAD_MS IN FRONT OF THE CLOCK, AND EACH NOTE CARRIES THE
-  // TIME IT SHOULD BE HEARD (`at`). The sampler sends it to scsynth as a
-  // timestamped bundle, so the 4 ms timer's own lateness, measured 0.1 to 4.1
-  // ms before this, no longer reaches the sound. A note is set to sound at its
-  // place in the loop plus the live path's latency (`sampler.latencyMs()`), so
-  // a replay lands where the same note played live did, not that much early.
-  // ⚠️ 40 ms is ten timer ticks and well inside SuperSonic's 500 ms direct
-  // window; a timer stalled longer than that hands a note over late, and the
-  // engine plays a late bundle at once.
+  // Playback hands over the events between the head's last and current place, computed from the
+  // first lap's start and the length so it cannot drift. The head runs AHEAD_MS (40 ms) early and
+  // each note is a timestamped scsynth bundle at its place plus `sampler.latencyMs()`.
+  // See lessons/page-code.md#code-29
   const AHEAD_MS = 40;
   function fire(ev, lapStart, lap) {
     if (ev.skipLap === lap) return;
@@ -593,12 +506,9 @@
   // A pointer over the keys, a touch or a focus boots SuperCollider. A visit boots nothing.
   warmOnIntent(host, sampler);
 
-  // ── keyboards plugged into this machine ────────────────────────────────
-  // As /synth/keyboard/ (asked: *"where is midi in parchbay in sampler
-  // 020"*): one `device` node per MIDI input, named after the device, its
-  // midi-out linked to the looper (notes and the sustain pedal, CC 64) and to
-  // the keys (they light). Each message carries the device's own timeStamp as
-  // `t`, which the looper times by. A device keeps its node id across a replug.
+  // One `device` node per MIDI input, linked to the looper (notes and CC 64) and the keys. Each
+  // message carries the device's timeStamp as `t`, which the looper times by. Ids survive a replug.
+  // See lessons/page-code.md#code-30
   createMidiDevices({ bay, site: S, to: [`${S}:looper:midi-in`, `${S}:keys:midi-in`], emits: ['note', 'cc'],
     message: (e, { send, hold }) => {
       // The first message from a plugged in keyboard is an intent: boot the engine.
@@ -652,8 +562,8 @@
     }
     d.log(`copied ${J.inputs.length} inputs, ${J.decisions.length} decisions and ${L.events.length} loop events`);
   }
-  // No Copy log button since 2026-10-13 (*"rm copy log"*); the journal is still
-  // kept and `await __demo.copyLog()` copies it from the console.
+  // No Copy log button; `await __demo.copyLog()` copies the journal from the console.
+  // See lessons/page-code.md#code-31
   window.__demo.copyLog = copy;
 
   d.stack.add(surface, patchPick.el, host, pb.el);

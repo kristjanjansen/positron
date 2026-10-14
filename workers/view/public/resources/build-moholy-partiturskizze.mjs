@@ -1,52 +1,7 @@
-// Builds `demo/resources/moholy-partiturskizze.json`, Moholy-Nagy's
-// Partiturskizze zu einer mechanischen Exzentrik (1924, plate in Bauhausbuecher
-// 4, 1925) read off the archive.org scan as data.
-//
-//   node demo/resources/build-moholy-partiturskizze.mjs          # writes the JSON
-//   node demo/resources/build-moholy-partiturskizze.mjs --check  # prints the reading, writes nothing
-//
-// NODE ONLY. Never shipped to a browser, never imported by a page.
-//
-// THE SAME KIND OF THING AS `build-held-in-human.mjs`, WITH ONE DIFFERENCE.
-// Held in Human is a text that a parser reads. This is a picture, so there is
-// nothing to parse: every number below was MEASURED BY HAND on 2026-10-04, in
-// pixels, on the one image the scan holds of the plate, and typed here. The
-// JSON is generated from these tables so that the fractions, the checks and the
-// summary are computed once and never typed.
-//
-// THE IMAGE. `Schlemmer et al. - 1925 - Die Buehne am Bauhaus.pdf` on
-// archive.org, PDF page 47, its one embedded JPEG, 902 x 345 px, extracted with
-// `pdfimages -f 47 -l 47 -j` and read pixel by pixel. That JPEG IS the best
-// copy the item has: the item's original is that PDF (ABBYY FineReader 10,
-// 2014) and every other format in it (the JP2 zip, the page images) is derived
-// from it, so no request could have returned more detail (INFERRED from the
-// item's file list, which was read: one PDF, then derivatives). The plate is
-// photographed flat and SIDEWAYS in it, title on the left.
-//
-// ORIENTATION. Moholy prints it to be read vertically, title at the top, time
-// running DOWN. The scan has time running RIGHT. Everything in the JSON is
-// stated in the hung orientation:
-//   - `at` / `from` / `to` are fractions of the scored length, 0 at the top of
-//     the lanes, 1 at the bottom.
-//   - `across` is a fraction of a column's width, 0 at its LEFT edge as hung
-//     (which is the BOTTOM of the scan), 1 at its right edge.
-//   - directions: scan right = down (with time), scan left = up (against
-//     time), scan up = right, scan down = left. The columns run 1, 2, 3, 4
-//     from left to right as hung.
-//
-// THE SCORED LENGTH. Pixel 177 to pixel 852 along the scan, which is where
-// column 3 (light) starts and ends. Column 3 is the only one with a stated time
-// scale (*"Die Breite der Streifen bedeutet die Dauer"*), so it defines 0 and 1.
-// The other columns start and end within two pixels of it. 675 px, so one scan
-// pixel is 0.0015 of the length and NOTHING HERE IS FINER THAN THAT.
-//
-// WHAT `how` MEANS ON EVERY ROW.
-//   seen      the shape and its extent are in the pixels; anyone with the same
-//             JPEG gets the same numbers within a pixel or two.
-//   inferred  my reading: a meaning, a match to the FOLGE list, a label I could
-//             not read in this scan. It says why in `note`.
-// A hex is `sampled`: the mean RGB of the span's interior in the 2014 JPEG of a
-// 1925 print, which is the colour of the scan and not of Moholy's ink.
+// Builds moholy-partiturskizze.json from pixel readings, typed by hand, of the one JPEG
+// (902 x 345, PDF page 47) of Die Buehne am Bauhaus on archive.org. Node only; --check prints.
+// Hung orientation: time runs down; `at`/`from`/`to` are fractions of 675 px (col 3).
+// See lessons/page-resources.md#resources-79
 
 import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -70,13 +25,9 @@ const frac = (x) => r4((x - X0) / LEN);
 // scan y to `across`, 0 at the hung column's left edge (the scan's bottom)
 const across = (yHi, yLo) => [r4((Y_BOT - yLo) / (Y_BOT - Y_TOP)), r4((Y_BOT - yHi) / (Y_BOT - Y_TOP))];
 
-// ── column 3, light ─────────────────────────────────────────────────────────
-//
-// [x from, x to (exclusive), colour, sampled hex, note]. These TILE the column:
-// the check below refuses a gap or an overlap. Read at y = 115, 130, 145, 160
-// with a colour classifier and checked against a 5x enlargement by eye.
-// White is unprinted paper; reading it as white light (rather than as nothing
-// scored) is INFERRED, since the key defines only black.
+// Column 3, light: [x from, x to (exclusive), colour, hex, note]. These tile the column and
+// the check refuses a gap or overlap. White read as white light is inferred.
+// See lessons/page-resources.md#resources-80
 
 const LIGHT = [
 	[177, 186, 'black', '#050603'],
@@ -147,9 +98,9 @@ const LIGHT = [
 	[823, 852, 'yellow', '#e4d160'],
 ];
 
-// Narrow stripes INSIDE a wide one, running along the time axis, which is what
-// the key calls *"schmale vertikale Streifen"*: simultaneous partial lightings.
+// Narrow stripes inside a wide one, along time (simultaneous partial lightings).
 // [x from, x to, colour, hex, scan y top, scan y bottom, note]
+// See lessons/page-resources.md#resources-81
 const LIGHT_INSIDE = [
 	[217, 252, 'dark red', '#461309', 160, 168, 'along the left edge of the column, under the yellow stripe and on into the black after it'],
 	[273, 303, 'yellow', '#ddc84c', 144, 168, 'the left two fifths of the white stripe'],
@@ -160,10 +111,9 @@ const LIGHT_INSIDE = [
 	[498, 534, 'yellow', '#b0a857', 158, 161, 'narrow bar near the left edge of the long black, running on past the thin yellow line'],
 ];
 
-// ── column 4, music ─────────────────────────────────────────────────────────
-//
-// The sirens are the coloured bars running along time, read at scan y 86 to 90.
+// Column 4, music: the sirens are coloured bars along time at scan y 86 to 90.
 // [x from, x to, colour, hex, note]
+// See lessons/page-resources.md#resources-82
 const SIRENS = [
 	[177, 300, 'blue', '#4b748e', 'starts with the lane; staff strips cross it'],
 	[304, 459, 'yellow', '#daca56'],
@@ -177,10 +127,9 @@ const SIREN_INSIDE = [
 	[804, 808, 'red', '#b85139', 'a short red block inside the grey bar'],
 ];
 
-// Staff fragments: grey strips laid ACROSS the lane, with dark dots that are
-// noteheads. [centre x, group, note]. A group is a set joined by a drawn
-// bracket. NO NOTE, CLEF OR PITCH IS READABLE: a notehead is one or two dark
-// pixels in this scan.
+// Staff fragments across the lane: [centre x, group, note]. A group shares a drawn bracket.
+// No note, clef or pitch is readable at this resolution.
+// See lessons/page-resources.md#resources-83
 const STAFFS = [
 	[191, 'a'], [205, 'a'],
 	[231, null],
@@ -199,11 +148,9 @@ const MUSIC_MARKS = [
 	[796, 800, 'zigzag line along a staff strip', 'seen', 'a trill, a glissando or a siren howl drawn as a wave: inferred, unsettled'],
 ];
 
-// ── columns 1 and 2, form and movement ──────────────────────────────────────
-//
-// [id, x from, x to, label (hung orientation), folge item or null, how of the
-// match, note]. The SHAPES are seen; every FOLGE match is inferred unless the
-// glyph is the word itself.
+// Columns 1 and 2, form and movement: [id, x from, x to, label, folge item or null, how,
+// note]. Shapes are seen; FOLGE matches are inferred unless the glyph is the word.
+// See lessons/page-resources.md#resources-84
 
 const COL1 = [
 	['c1-yellow-arrow', 176, 216, 'yellow arrow pointing down the column', 'Pfeile stürzen', 'inferred', 'an arrow pointing down with time; nearly the word itself'],
@@ -239,8 +186,8 @@ const COL2 = [
 	['c2-funnel', 600, 803, 'grey funnel widening down the column from the square', 'Kino auf Tageswand', 'inferred', 'a projection beam; the strongest match in column 2'],
 ];
 
-// The FOLGE list, from the page 44 image and the item's OCR, in the book's
-// order. Columns 3 and 4 *"sind ohne Schlagworte deutlich"*.
+// The FOLGE list from the page 44 image and OCR, in the book's order.
+// See lessons/page-resources.md#resources-85
 const FOLGE = {
 	1: ['Pfeile stürzen', 'Lamellen öffnen sich', 'Kreise rotieren', 'Elektro-Apparate', 'Blitz Donner', 'Gittersysteme von Farben', 'schießen auf-ab hin-her', 'Phosphoreszenz', 'Riesen-Apparate schwingen', 'blitzen', 'Gitter weiter', 'Räder', 'Explosionen', 'Gerüche', 'Clownerie', 'Menschmechanik'],
 	2: ['Pfeile stürzen', 'Lamellen öffnen sich', 'Kreise rotieren', 'Kino auf Tageswand', 'rückwärts gedreht', 'Aktion', 'Tempo', 'wild'],

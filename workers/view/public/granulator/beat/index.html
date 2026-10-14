@@ -36,26 +36,10 @@
   import { PROGRAM, PATCHES, RING_SECONDS, valuesOf } from '/granulator/grain-ring.mjs';
   import { createTempoDetector, STEADY, steady } from '/radio/tempo.mjs';
 
-  // concepts sampler/070, BEAT GRANULATOR, 2026-10-13. Asked (BACKLOG): *"make
-  // followup demo with ida, dub and add tempo detection and feed it into
-  // granulator"*. sampler/060's Granulator (the grain ring, `../grain-ring.mjs`,
-  // and everything else `../grain-rig.mjs`) on the Ida recording and the Dub
-  // patch, plus /radio/tempo/'s tempo detector (`/radio/tempo.mjs`)
-  // hearing the same recording. Its readings travel on a wire of their own,
-  // web:tempo:value-out into web:grains:tempo-in, apart from the knobs' wires
-  // into web:grains:value-in, and the grains take the timing from them:
-  //   time     the echo: Dub's is three quarters of a beat, every other
-  //            patch's the nearest of BEAT_FRACTIONS to its own time
-  //   density  a whole number of grains a beat, the nearest to the knob
-  //   back     a whole number of quarter beats, the nearest to the knob
-  //   lock     the program's beat grid on (`\lock`, `../grain-ring.mjs`), and
-  //            `\beat` raised on every beat, so the even grains start on it
-  // The knobs keep what a person or a patch set; only what reaches the engine
-  // is put on the beat. The grains ALWAYS FOLLOW (asked 2026-10-13: *"Beat
-  // granulator: always follow"*): every reading moves them, a sure one or an
-  // unsure one, and there is no switch to take them off it. The echo time
-  // glides to each new tempo by the program's own lag on `\time` (0.3 s);
-  // density and back step.
+  // Beat granulator: /granulator/grains/'s rig on the Ida recording and Dub patch, plus
+  // /radio/tempo.mjs on the same sound, on its own wire into web:grains:tempo-in. Only what
+  // reaches the engine is put on the beat (time, density, back, `\lock`); the knobs keep theirs.
+  // See lessons/page-granulator.md#granulator-1
   const d = mount({ name: 'Beat granulator', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('granulator/beat');
 
@@ -78,10 +62,9 @@
   // Dub first: the page opens on it.
   const LIST = [PATCHES.find((p) => p.name === 'Dub'), ...PATCHES.filter((p) => p.name !== 'Dub')];
 
-  // ── the beat ─────────────────────────────────────────────────────────────
-  // An echo on the beat: a quarter, a dotted eighth, an eighth, a dotted
-  // quarter's half, a beat, one and a half, two. Dub's is a dotted eighth,
-  // three quarters of a beat, the classic dub delay.
+  // Echo times on the beat, from a quarter to two beats. Dub's is a dotted eighth, three
+  // quarters of a beat, the classic dub delay.
+  // See lessons/page-granulator.md#granulator-2
   const BEAT_FRACTIONS = [1 / 4, 3 / 8, 1 / 2, 3 / 4, 1, 3 / 2, 2];
   const OWN_BEATS = { Dub: 3 / 4 };
   const MAX_TIME = 1.5;              // the program's DelayC holds 1.5 s
@@ -187,11 +170,9 @@
     showTempo();
   }
 
-  // ── the beat on the engine: `\beat` raised on every beat of the grid ─────
-  // A 10 ms timer on this tab's audio clock: when the next beat of the
-  // grid is due, `\beat` goes to 1 and back to 0 15 ms later (the Phasor in
-  // the program resets on the rise). So a beat lands within a timer tick and
-  // an audio block of the grid, a few ms, which the self check measures.
+  // `\beat` on every grid beat: a 10 ms timer on the audio clock raises it to 1 and back to 0
+  // 15 ms later (the program's Phasor resets on the rise), so a beat lands within a few ms.
+  // See lessons/page-granulator.md#granulator-3
   let nextBeat = null, pulseGrid = null, pulses = 0, pulser = 0;
   function pulse() {
     if (!eng || !ctx || !rig.api.playing() || !locked()) { nextBeat = null; return; }
@@ -222,9 +203,9 @@
     RADIO_OUT = ports.RADIO_OUT;
     TEMPO_IN = `${S}:tempo:audio-in`; TEMPO_OUT = `${S}:tempo:value-out`;
     const WAVE_BEATS = `${S}:wave:value-in-2`;
-    // The grains' own input for the tempo, so its wire is one of its own and
-    // not one more on the knobs' run into web:grains:value-in. Asked
-    // 2026-10-13 on a phone: *"Do not see how tempo feeds into grains"*.
+    // The grains' own input for the tempo, so its wire is not one more on the knobs' run into
+    // web:grains:value-in.
+    // See lessons/page-granulator.md#granulator-4
     TEMPO_GRAINS = `${S}:grains:tempo-in`;
     addNodes(bay, S, ['tempo'], { ports: { 'tempo:audio-in': { label: 'tempo detector' }, 'tempo:value-out': { label: 'tempo' } } });
     // Two ports on nodes the rig already built.

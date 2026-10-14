@@ -1,19 +1,7 @@
-// demo/time/schedule.mjs: the SCHEDULE tab of /time/, which was /transport/.
-//
-// Twenty events, one a second. Timers are set only a fraction of a second
-// ahead and can still be cancelled, so pause really stops and dragging really
-// skips. The whole of the old page, moved; its comments came with it where they
-// are about this code, and the history of the page is in git under
-// `demo/transport/index.html`.
-//
-// 🔴 THIS TAB'S BAR IS THE PAGE'S `__demo.transport`. Of the five bars on
-// `/time/` it is the one the harness drills itself, because SCHEDULE is the
-// tab the page opens on and the bar the other four exist to be compared with.
-// Every other tab builds its bar with `publish: false` and lists it in `bars`.
-// ⚠️ SO THIS TAB'S MEASUREMENTS ARRIVE AFTER `ready`, the way they always did:
-// the harness presses play for 500 ms, the mark at 0 fires, and `report()`
-// below asserts on that first row. Pressing play here inside the check pass
-// would cost the page's boot a second for something the harness does anyway.
+// SCHEDULE tab: twenty events, one a second, timers armed a fraction ahead so
+// pause stops and dragging skips. Its bar is the page's `__demo.transport`, so
+// its measurements arrive after `ready`, from the harness's 500 ms play.
+// See lessons/page-time.md#time-16
 
 import { el } from '/shell/shell.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -52,11 +40,9 @@ export function build({ panel, assert, log }) {
     onDrift: (_rows, all) => report(all),
   });
 
-  // LATE AGAINST WHAT? Each mark is judged against what its own way of firing
-  // promises: a committed timer aims at the instant and lands within a few ms;
-  // a mark the sweep caught was never given a timer and can be anywhere inside
-  // the check interval. One absolute 5 ms scale painted the documented baseline
-  // amber, and a scale whose normal reading is a warning has no warning left.
+  // Each mark is judged against its own way of firing: a committed timer lands
+  // within a few ms, a swept mark anywhere in the check interval.
+  // See lessons/page-time.md#time-17
   const budgetFor = (m) => (m.origin === 'tick-late' ? TICK : 5);
   const BANDS = [
     [1, '#8fd6a8', 'as expected'],
@@ -81,9 +67,9 @@ export function build({ panel, assert, log }) {
       // scrubbing back is not an observation, so colour comes from `measured`.
       id: 'mark', kind: 'mark', label: 'events', height: 72, width: 2,
       color: '#6a7280',
-      // 🔴 A LINE UNDER THE NAME FROM THE FIRST FRAME, which is what stops the
-      // label block jumping 29 px up when the numbers arrive (reported
-      // 2026-09-25, measured 51 then 22). The numbers replace it in place.
+      // A line under the name from the first frame keeps the label block from jumping
+      // when the numbers arrive; they replace it in place.
+      // See lessons/page-time.md#time-18
       subLabel: 'nothing fired yet',
       terse: true,
       colorOfRow: (r) => {
@@ -102,8 +88,8 @@ export function build({ panel, assert, log }) {
       },
     }],
   });
-  // 🔴 THE BAR AND THE STRIP ARE ONE SURFACE ("timeline demos: glue transport
-  // and timelines", 2026-09-25). `createGlue` re-parents both out of `host`.
+  // The bar and the strip are one surface; `createGlue` re-parents both out of `host`.
+  // See lessons/page-time.md#time-19
   const pair = createGlue(bar.el, view.surface);
   panel.add(pair);
   view.strip.fit?.();
@@ -120,16 +106,17 @@ export function build({ panel, assert, log }) {
       L.subLabel = [`typical +${typical.toFixed(2)} ms`, `worst +${worst.toFixed(2)} ms`];
       view.strip.invalidate();
     }
-    // On the FIRST row: the harness plays for 500 ms, which is one mark.
-    // ⚠️ BEHIND THE GATE, which the old page did not have: these lines are
-    // grading, and a visitor pressing play is not asking to be graded.
+    // On the first row (the harness plays 500 ms, one mark), behind the selfcheck
+    // gate: a visitor pressing play is not asking to be graded.
+    // See lessons/page-time.md#time-20
     if (!SELFCHECK || asserted) return;
     asserted = true;
     assert('every mark reports a real lateness', xs.every(Number.isFinite),
       `n=${xs.length} typical=${typical}`);
     assert('fire count <= item count', fired.length <= 20, `${fired.length}/20`);
-    // 🔴 THE REPORTED JUMP, GRADED AGAINST THE PICTURE, two frames on because
-    // `invalidate()` schedules a draw rather than making one.
+    // The jump graded against the picture, two frames on, because `invalidate()`
+    // schedules a draw rather than making one.
+    // See lessons/page-time.md#time-21
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const after = gutterTop();
       assert('the lane does not move when the numbers arrive',
@@ -168,10 +155,9 @@ export function build({ panel, assert, log }) {
   log(`${DURATION / 1000}s, 20 events, speeds ${adapter.caps.rates.join('/')}x`);
 
   /**
-   * HOW IT WORKS, read off this file and `timeline/transport.mjs`: the bar
-   * moves a deck, the deck's scheduler is woken by a Worker, arms a one-shot
-   * for each event inside `HORIZON`, and the strip colours what came back.
-   * Every number in it is one of the constants handed to `createDeck` above.
+   * The bar moves a deck whose Worker-woken scheduler arms a one-shot per event
+   * inside `HORIZON`; the strip colours what came back. Numbers are the constants above.
+   * See lessons/page-time.md#time-22
    */
   const how = tabDiagram(panel, () => ({
     caption: 'One deck keeps the time. Everything else in this tab asks it where it has got to.',
@@ -212,7 +198,9 @@ export function build({ panel, assert, log }) {
 
   return {
     deck, bar,
-    // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
+    // Two frames on: a strip fitted before its panel lays out fits its range into
+    // the width it had then (20 s in about 160 px at 1280).
+    // See lessons/page-time.md#time-23
     show() {
       how.draw();
       requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit?.(); view.strip.invalidate(); }));
@@ -222,9 +210,9 @@ export function build({ panel, assert, log }) {
     // No `bars`: this one is published and the harness drills it.
     bars: [],
     async check({ A }) {
-      // 🔴 ONE BAR AND ONE STRIP, COUNTED FROM THE DOM RATHER THAN LOOKED AT.
-      // `/stage/` carried a doubled bar through two reports because
-      // `createTransportBar(parent, ...)` appends to the parent it is given.
+      // One bar and one strip, counted from the DOM: `createTransportBar(parent, ...)`
+      // appends to its parent, so a second call doubles the bar.
+      // See lessons/page-time.md#time-24
       const tab = panel.el;
       A('one bar and one strip, and they are one surface',
         tab.querySelectorAll('.tbar').length === 1

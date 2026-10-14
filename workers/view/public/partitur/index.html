@@ -26,10 +26,9 @@
   /* The link picks and the scene marks wait for the room, and `display: flex`
      or `grid` below beats the browser's own [hidden] (positron-ui). */
   .pt-text[hidden] { display: none; }
-  /* The three link picks share one label column, so every row's options start
-     on one x (positron-compose section 2: label and control rows are one grid).
-     Each pick is a subgrid row of it. Above the phone width only: below it the
-     kit stacks a pick's label over its options and there is no column to share. */
+  /* The three link picks share one label column (each pick a subgrid row), so their
+     options start on one x. Above phone width only: below it the label stacks.
+     See lessons/page-partitur.md#partitur-1 */
   @media (min-width: 561px) {
     .pt-links { display: grid; grid-template-columns: max-content minmax(0, 1fr); row-gap: 10px; column-gap: 8px; }
     .pt-links > .pos-choice { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; height: auto; }
@@ -45,34 +44,21 @@
   import { createTabPage } from '/shell/tab-page.mjs';
   import * as wall from './wall.mjs';
 
-  /*
-   * 🔴 THE SCORE AND ITS WALL AS ONE PAGE, asked 2026-10-05: *"unify partitur
-   * and wall to tabbed page"*. `/wall/` was its own unlisted page for a day and
-   * is gone with no redirect, the way the 2026-10-04 regrouping retired pages.
-   *
-   *   SCORE  Moholy-Nagy's 1924 plate as a timeline, its three lanes as sources
-   *   WALL   any screen as the light lane's destination
-   *
-   * A wall is usually ANOTHER browser (a projector, a phone), so the two tabs
-   * meet through the room, never through this page's memory: the check pass
-   * proves it by joining both to the run's own room and sending a stripe
-   * across. `demo/shell/tab-page.mjs` does the rest. SCORE owns the page's one
-   * published transport bar.
-   */
+  /* The score and its wall as tabs. A wall is usually another browser, so the tabs
+     meet through the room, never through page memory. SCORE owns the transport bar.
+     See lessons/page-partitur.md#partitur-2 */
   const d = mount({
     name: 'partitur',
-    // No `what` under the title: each tab says what it is in the box under the
-    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
+    // No `what` under the title: each tab describes itself under the tab row.
+    // See lessons/page-partitur.md#partitur-3
     readout: null,
     showLog: false,
     controls: [],
   });
   guard(d);
-  // ⚠️ IMPORTED AFTER `mount()`, NOT AT THE TOP. `score.mjs` awaits the score
-  // file while it loads, and a static import holds the whole script, `mount()`
-  // and its inline favicon included, until that fetch lands. MEASURED
-  // 2026-10-05: in that gap Chrome sometimes asked for /favicon.ico, and the
-  // 404 turned `no console errors` red on one run in three.
+  // Imported after mount(): score.mjs awaits the score file, and a static import
+  // would hold mount() and its inline favicon, letting Chrome ask for /favicon.ico.
+  // See lessons/page-partitur.md#partitur-4
   const score = await import('./score.mjs');
 
   const page = createTabPage(d, {

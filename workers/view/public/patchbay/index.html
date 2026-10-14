@@ -84,15 +84,10 @@
     return box;
   };
 
-  /* 🔴 `/rout/` AND `/graph/` AS ONE PAGE, asked 2026-10-04: *"i am cofused
-     over rout and graph demo. unify? better name?"*, named *"Patchbay"*. The
-     graph decides what exists and how a link travels; the routing core decides
-     what happens to each MIDI message inside a link, and here a MIDI link from
-     the keys really runs through it. Both old pages stay at their URLs.
-     🔴 WHY THIS PAGE EXISTS: `plans/plan-universal-routing.md`, asked
-     2026-10-04 as *"What about route-anything work?"* then *"Do it ... Nee
-     demo"*. It is step 2 of that plan made visible: `bay.mjs` knows eight
-     media, and a link of a heavy one carries a session instead of bytes. */
+  /* The graph decides what exists and how a link travels; the routing core decides
+     what happens to each MIDI message inside a link, and a MIDI link from the keys
+     really runs through it (plans/plan-universal-routing.md).
+     See lessons/page-patchbay.md#patchbay-1 */
   d.stack.titled('WHY',
     say('positron moves notes, sound, video, code and recordings between browsers, a Raspberry Pi and '
       + 'Cloudflare, and every pair used to have code of its own. Here each is a link between two ports.',
@@ -104,12 +99,9 @@
       + 'second pieces and are kept for six hours.'));
 
   // ── the desk ─────────────────────────────────────────────────────────────
-  //
-  // ⚠️ A DESCRIPTION OF THINGS THAT EXIST, NOT A SIMULATION OF THEM. Every node
-  // is something positron already talks to, named the way the plan names it,
-  // and every shape is the one the wire already declares (the board's
-  // `audioChannels` and `frameMs`, the GPU's video). `place` is the machine,
-  // `net` the network it is on, and the transport is chosen from those two.
+  // A description of things that exist, not a simulation: `place` is the machine,
+  // `net` its network, and the transport is chosen from those two.
+  // See lessons/page-patchbay.md#patchbay-2
 
   const NODES = [
     { id: 'web:keys', kind: 'person', label: 'keys', place: 'browser', net: 'home' },
@@ -139,8 +131,8 @@
 
   /* The lines a visitor can step through, in the order they teach: a light
      link, a heavy one on one network, code to an engine, video across the
-     internet, a recording, the same sound to a second listener, then the two
-     a validator exists for. */
+     internet, a recording, a second listener, then the two a validator refuses.
+     See lessons/page-patchbay.md#patchbay-3 */
   const EXAMPLES = [
     'web:keys:midi-out -> pi-1:circuit:midi-in { channel 1 }',
     'pi-1:circuit:audio-out -> web:screen:audio-in',
@@ -161,20 +153,9 @@
   }
 
   // ── the live desk: what announces itself in the studio's room ──────────
-  //
-  // 🔴 STEP 3 OF THE PLAN: `/graph/` draws what exists. The board puts its graph
-  // on every `board.alive` (`demo/shell/graph-registry.mjs`), this page sends
-  // its own as `graph.announce`, and anything else in the room that announces
-  // is drawn too. A board that stops answering is still drawn, marked stale.
-  // ⚠️ JOINING THE ROOM OPENS NOTHING BUT OUR OWN RELAY: no audio is asked for,
-  // no lease is taken, and the page only listens and says what it is.
-  // 🔴 AND IT JOINS ON A PRESS OF Join, NEVER ON LOAD, IN `?room=` WHEN THE PAGE
-  // HAS ONE, SINCE 2026-10-06 (`demo/shell/bay-node.mjs`, plan-routing-migration
-  // §3.4). Until then `ROOM` was `studio-1` with no `?room=` read and the join
-  // ran at the top of this script, so every visit and every suite run put a
-  // `web` site on the owner's desk and asked the Pi `graph.ask`.
-  // 🔴 AND THIS TAB IS A SITE OF ITS OWN, `web-<four>`, not `web`: two visitors'
-  // patchbays used to overwrite each other's `web` in every registry in the room.
+  // Joins on a press of Join, never on load, in `?room=` when given, as site
+  // `web-<four>`. It opens nothing but our relay; a silent board is drawn stale.
+  // See lessons/page-patchbay.md#patchbay-4
   const ROOM = roomFor({ slug: 'patchbay' });
   const SITE = randomSite('web');
   const SELF = {
@@ -197,14 +178,9 @@
     screenVideo: [`${SITE}:screen:video-in`, 'web:screen:video-in'],
   };
   const mine = (id) => id.startsWith(`${SITE}:`) || id.startsWith('web:');
-  /* 🔴 THE STORE IS ANNOUNCED BY THIS PAGE, BECAUSE THIS PAGE IS WHAT WRITES
-     TO IT (plan-universal-routing §10 item 5). A recording is made by the
-     browser that hears the sound and uploaded through ingest, so the store's
-     ports exist exactly as long as a page that can use them does.
-     ⚠️ IT IS NOT SENT TO THE ROOM. A registry keeps one graph per socket and
-     site since 2026-10-06, so it could be, and is still not: every patchbay
-     describes the same store, and its ports are used only by the page that
-     announces them. It lives in this page's own registry (`local`). */
+  /* The store is announced by this page, since this page writes to it through
+     ingest. It is kept in this page's own registry (`local`), not sent to the room.
+     See lessons/page-patchbay.md#patchbay-5 */
   const STORE = {
     v: 1, site: 'r2', place: 'cloudflare', net: 'cloudflare', kind: 'store', label: 'recordings',
     nodes: [{ id: 'r2:recordings', kind: 'store', label: 'recordings', place: 'cloudflare', net: 'cloudflare' }],
@@ -213,10 +189,9 @@
       { id: 'r2:recordings:audio-out', label: 'recordings', dir: 'out', medium: 'audio', address: 'archive.positron.studio' },
     ],
   };
-  /* The room, the announce, `graph.ask`, the re-announce and `link.request`
-     are `bay-node.mjs`'s. Building it opens nothing; Join does. It is made
-     further down, beside the rest of the room's handlers, and only its
-     registry is needed before then. */
+  /* The room, the announce, `graph.ask`, the re-announce and `link.request` are
+     bay-node.mjs's, made further down. Building it opens nothing; Join does.
+     See lessons/page-patchbay.md#patchbay-6 */
   const node = createBayNode({
     room: ROOM, graphs: [SELF], local: [STORE],
     log: (line, kind) => d.log(line, kind),
@@ -233,13 +208,9 @@
   let made = [];
 
   // ── the picture, built from whatever the bay holds ───────────────────────
-  //
-  // ⚠️ `atEnd: false`, the one exception `positron-diagram` allows: this
-  // picture changes when the reader presses something, so it sits beside it.
-  // 🔴 A PLACE WITH SOURCES AND RECEIVERS IS DRAWN TWICE, BY ROLE. The first
-  // layout put the browser's screen beside its keys, so sound from the Pi came
-  // back right to left under the row, through other boxes. Split by role (the
-  // `/keys/` shape `positron-diagram` records), links read left to right.
+  // `atEnd: false`: the picture changes on a press, so it sits beside it. A place
+  // with sources and receivers is drawn twice, by role, so links read left to right.
+  // See lessons/page-patchbay.md#patchbay-7
   const PLACE = { browser: 'Browser', phone: 'Phone', cloudflare: 'Cloudflare', err: 'ERR', pi: 'Raspberry Pi' };
   const TECH = { person: 'browser', screen: 'browser', device: 'sound', engine: 'graphics', store: 'cloudflare', external: 'station' };
   const placeLabel = (p) => PLACE[p] || (/^studio/.test(p) ? 'Raspberry Pi' : p);
@@ -313,18 +284,9 @@
       d.log(v === 'live' ? `the live desk: what announces itself in ${ROOM}` : 'the example desk'); },
   });
   // ── scenes: a set of links kept under a name ─────────────────────────────
-  //
-  // 🔴 A RECALL IS A DIFF, NOT A TEARDOWN (`plans/plan-route-core.md` §5,
-  // *"Changes are diffs"*). A link in both the current set and the scene is not
-  // touched, so a stream that is open stays open; a link only in the current set
-  // is closed and unlinked; a link only in the scene is made and DESCRIBED.
-  // ⚠️ AND A RECALL OPENS NOTHING, WHEREVER IT CAME FROM. Opening stays a
-  // person's press on Open, so a `scene.recall` from another page in the room,
-  // such as `/partitur/`'s scenes lane, can change what is described and close
-  // what a scene leaves out, and cannot start a stream on anybody's hardware.
-  // ⚠️ SCENES LIVE IN THIS BROWSER, in `localStorage`, which may throw or come
-  // back empty, so every read and write is wrapped and the page works without
-  // it. The harness keeps them in memory only, so a run leaves nothing behind.
+  // A recall is a diff and opens nothing, even from another page's `scene.recall`.
+  // Scenes live in localStorage, every access wrapped; the harness keeps them in memory.
+  // See lessons/page-patchbay.md#patchbay-8
   const SCENES_KEY = 'positron.patchbay.scenes';
   function loadScenes() {
     try {
@@ -408,10 +370,9 @@
   }
   drawScenes();
 
-  /* ⚠️ NOT IN `.pos-controls`. The harness presses that row by position, and
-     this press joins a room: a run that pressed it would join, and a control
-     added there moves every other control's press. The check pass joins the
-     run's own room itself, explicitly. */
+  /* Not in `.pos-controls`: the harness presses that row by position, and this joins
+     a room. The check pass joins the run's own room itself.
+     See lessons/page-patchbay.md#patchbay-9 */
   const joinRow = createButtonGroup({ buttons: [
     { id: 'join', label: `Join ${ROOM}`, onPress: () => joinRoom() },
   ] });
@@ -469,9 +430,9 @@
       id: l.id,
       line: printLink(l),
       medium: mediumOf(l),
-      // ⚠️ WHILE A LINK IS OPEN ITS ROW SAYS WHAT IS REALLY CARRYING IT. The
-      // plan's table chose WHEP for the Pi's video; the opener uses the board's
-      // relay H.264 path, and a row naming the plan's choice would be a claim.
+      // While a link is open its row names what really carries it: the opener uses the
+      // board's relay H.264 path, not the plan's WHEP.
+      // See lessons/page-patchbay.md#patchbay-10
       by: opened.get(printLink(l))?.via?.() || (l.session ? l.session.transport : 'routing core'),
       where: l.session ? l.session.where : 'bytes',
       says: (l.session ? `${l.session.says}\naddress ${l.session.address}` : 'the bytes travel through the link itself')
@@ -554,10 +515,9 @@
     redraw();
   });
 
-  /* 🔴 THE FIRST BOARD HEARD GETS THREE LINKS, WHERE ITS PORTS EXIST. With no
-     links the picture has no left and right, so every machine stacked in one
-     column at one height and the browser's two boxes stood empty and tall. A
-     link here is a description in memory and opens nothing. */
+  /* The first board heard gets three described links, where its ports exist, so the
+     picture has a left and right. Describing a link opens nothing.
+     See lessons/page-patchbay.md#patchbay-11 */
   function starter(site) {
     const want = [`${SITE}:keys:midi-out -> ${site}:circuit:midi-in`, `${site}:circuit:audio-out -> ${SITE}:screen:audio-in`,
       `${site}:shader:video-out -> ${SITE}:screen:video-in`];
@@ -568,16 +528,9 @@
   }
 
   // ── step 4: opening a link for real ──────────────────────────────────────
-  //
-  // 🔴 A DESCRIBED LINK OPENS NOTHING, AND ONLY A PERSON'S PRESS OPENS ONE.
-  // The starter links, a visit and the harness all leave the board alone: a
-  // lease starts a capture on hardware in another building, and the rule here
-  // is that a visit opens nothing. Under `?selfcheck=1` Open says so and stops.
-  // 🔴 THE OPENERS ARE `demo/shell/openers.mjs` SINCE 2026-10-06, chosen by the
-  // TRANSPORT the link's session names, not by its medium (plan-routing-migration
-  // step 2). They were eight functions in this page; the board verbs they send
-  // are unchanged. Each open link wears a `link-badge.mjs` word, STARTING,
-  // RECEIVING or STALLED, from what its far side counted, the stage's tag.
+  // Only a person's press opens a link; under `?selfcheck=1` Open says so and stops.
+  // Openers (openers.mjs) are chosen by the session's transport, with a link-badge.
+  // See lessons/page-patchbay.md#patchbay-12
   const opened = new Map();          // link line -> { kind, close(), state(), count(), badge }
   /** A port that another page announced, as opposed to the Pi or this browser. */
   const pageOwned = (id, b = bay) => !mine(id) && b.node(id.split(':').slice(0, 2).join(':'))?.place === 'browser';
@@ -804,7 +757,8 @@
     const keys = t.link(`${SITE}:keys:midi-out`, 'pi-1:circuit:midi-in');
     d.assert('a board\u2019s announced Circuit can be linked to this browser, as a stream', toScreen.ok && !!toScreen.session, toScreen.why || toScreen.session?.transport);
     d.assert('and this browser\u2019s keys can be linked to the Circuit, as bytes', keys.ok && !keys.session, keys.why || keys.id);
-    // ⚠️ NEGATIVE CONTROL: a graph that is not on its own site is not heard.
+    // Negative control: a graph that is not on its own site is not heard.
+    // See lessons/page-patchbay.md#patchbay-13
     const bad = createRegistry();
     d.assert('a graph that lies about its site is not heard',
       bad.ingest({ type: 'board.alive', from: 'x', graph: { v: 1, site: 'a', nodes: [{ id: 'b:n' }], ports: [] } }) === false);
@@ -827,7 +781,8 @@
     d.assert('and the two store links open as a recording and a playback',
       !!recL && !!playL && kindOf(recL, t) === 'record' && kindOf(playL, t) === 'play',
       `${recL && kindOf(recL, t)} ${playL && kindOf(playL, t)}`);
-    // ⚠️ NEGATIVE CONTROL: the store takes sound, so a picture is refused.
+    // Negative control: the store takes sound, so a picture is refused.
+    // See lessons/page-patchbay.md#patchbay-14
     const vid = t.link('pi-1:shader:video-out', 'r2:recordings:audio-in');
     d.assert('video into the sound recordings is refused', !vid.ok && /video/.test(vid.why || ''), vid.why);
     // The guard, with openers that only count and a map that is not the page's.
@@ -838,8 +793,9 @@
     d.assert('the record opener under the harness opens nothing',
       !held.ok && held.kind === 'record' && called === 0 && into.size === 0 && opened.size === before && sources.size === 0,
       held.why);
-    // ⚠️ NEGATIVE CONTROL: the same call without the guard reaches the opener,
+    // Negative control: the same call without the guard reaches the opener,
     // so the check above is the guard and not a link that never matched.
+    // See lessons/page-patchbay.md#patchbay-15
     const reached = await openLink(recL, { on: t, selfcheck: false, openers: counting, into });
     d.assert('and the same link without the guard reaches the record opener', reached.ok && called === 1 && into.size === 1,
       reached.why || reached.kind);
@@ -858,13 +814,13 @@
       far.ok && /^internet/.test(find(far)?.session?.where || ''), JSON.stringify(find(far)?.session || far.why));
     mk(EXAMPLES[4]);
     const second = mk(EXAMPLES[5]);
-    /* ⚠️ THIS SAID `a third listener ... is many receivers` UNTIL 2026-10-06,
-       and the third was the recording. A link into a store is an upload, not a
-       listener (`bay.mjs` `whereOf`), so the phone after it is the first
-       receiver across the internet. Many receivers is graded in `bay-test.mjs`. */
+    /* A link into a store is an upload, not a listener (bay.mjs `whereOf`), so the
+       phone after it is the first receiver across the internet.
+       See lessons/page-patchbay.md#patchbay-16 */
     d.assert('a recording is not a listener, so the phone after it is the first receiver across the internet',
       second.ok && find(second)?.session?.where === 'internet-one', JSON.stringify(find(second)?.session || second.why));
-    // ⚠️ NEGATIVE CONTROLS: the two links this graph exists to refuse.
+    // Negative controls: the two links this graph exists to refuse.
+    // See lessons/page-patchbay.md#patchbay-17
     const noConsent = mk(EXAMPLES[6]);
     d.assert('somebody else’s server is refused without a person who will listen', !noConsent.ok, noConsent.why);
     const withConsent = mk(EXAMPLES[6], { consent: true });
@@ -898,7 +854,8 @@
     d.assert('and opens nothing, closing only the link it removed and leaving the shared one open',
       closed.join(' | ') === A.line && open.has(B.line) && !open.has(C) && opened.size === before && !opened.has(C),
       `closed ${closed.length}, open ${[...open].join(', ')}`);
-    // ⚠️ NEGATIVE CONTROL: a scene identical to now changes nothing at all.
+    // Negative control: a scene identical to now changes nothing at all.
+    // See lessons/page-patchbay.md#patchbay-18
     const ids = t.links().map((x) => x.id).join(' ');
     const same = applyScene(t, r.made, { name: 'same', lines: r.made }, { close: (line) => { closed.push(line); return true; } });
     d.assert('a recall of a scene identical to now changes nothing',
@@ -912,7 +869,8 @@
   d.assert('the description is one sentence', !/[;:]/.test(WHAT), WHAT);
   d.assert('every listed test case loads and passes', vectors.length > 0 && passed === vectors.length, `${passed} of ${vectors.length}`);
   {
-    // ⚠️ NEGATIVE CONTROL: the test-case comparison has to be able to fail.
+    // Negative control: the test-case comparison has to be able to fail.
+    // See lessons/page-patchbay.md#patchbay-19
     const v = vectors.find((x) => x.out.length) || vectors[0];
     const bent = v && { ...v, out: v.out.map((e, i) => (i ? e : { ...e, bytes: toHex(fromHex(e.bytes).map((b, j) => (j === 0 ? b ^ 1 : b))) })) };
     d.assert('a case with one expected byte changed reads as failing', !!v && !grade(bent).ok, v?.file);
@@ -932,8 +890,9 @@
   }
 
   {
-    // 🔴 THE OPENER IS CHOSEN BY THE SESSION'S TRANSPORT (openers.mjs), on a
-    // scratch live desk from fixtures: data only, nothing opens.
+    // The opener is chosen by the session's transport (openers.mjs), on a scratch
+    // live desk from fixtures: data only, nothing opens.
+    // See lessons/page-patchbay.md#patchbay-20
     const reg = createRegistry();
     reg.ingest({ type: 'graph.announce', from: 'self', graph: SELF });
     reg.ingest({ type: 'graph.announce', from: 'self', graph: STORE });
@@ -959,18 +918,17 @@
         && got.video.transport === 'relay-h264' && got.record.transport === 'ingest' && got.play.transport === 'https'
         && got.listen.transport === 'relay' && got.keys.transport === 'bytes',
       Object.entries(got).map(([k, v]) => `${k} ${v.kind} by ${v.transport}`).join(' | '));
-    // ⚠️ NEGATIVE CONTROL: a picture from a page that says nothing of how it
-    // travels is WHEP by the table, and nothing here opens WHEP. Dispatch on the
-    // medium would have sent it to the board's video.start.
+    // Negative control: a picture that says nothing of how it travels is WHEP by the
+    // table, which nothing here opens; dispatch by medium would pick video.start.
+    // See lessons/page-patchbay.md#patchbay-21
     const cam = at('cam-1:cam:video-out', `${SITE}:screen:video-in`);
     d.assert('a video link whose session is WHEP finds no opener, rather than the board\u2019s video one',
       cam.kind === null && cam.transport === 'whep' && /nothing here opens whep/.test(cam.why || ''), `${cam.kind} by ${cam.transport}: ${cam.why}`);
   }
   {
-    // 2026-10-11: a link between two of the Pi's own audio ports rides its JACK
-    // graph, and the board applies it (`jack.link`, openers.mjs `jack`). Graded
-    // on a scratch bay; the far side, the graph read back and the sound in the
-    // room, is `rig/board/jack-bay-live.mjs` against the real board.
+    // A link between two of the Pi's audio ports rides its JACK graph (`jack.link`).
+    // Graded on a scratch bay; the real board is rig/board/jack-bay-live.mjs.
+    // See lessons/page-patchbay.md#patchbay-22
     const reg2 = createRegistry();
     reg2.ingest({ type: 'board.alive', from: 'b', graph: boardGraph({ room: 'studio-1', instruments: { sampler: true, pappusFx: true },
       inputs: [{ name: 'circuit', jack: true, take: 1, midi: null }], jack: true }) });
@@ -989,8 +947,9 @@
       w({ startedAt: 9_000 }) === 'coming' && w({ startedAt: 1_000, lastCountAt: 9_500 }) === 'online'
         && w({ startedAt: 1_000, lastCountAt: 7_000 }) === 'offline' && w({}) === 'unknown',
       ['coming', 'online', 'offline', 'unknown'].join(', '));
-    // ⚠️ NEGATIVE CONTROL: a count that never grows stays starting and never
+    // Negative control: a count that never grows stays starting and never
     // reads receiving, and a growing one does, through the real badge.
+    // See lessons/page-patchbay.md#patchbay-23
     let n = 5;
     const still = createLinkBadge({ count: () => 5, stallMs: 60, pollMs: 1000 }).start();
     const moving = createLinkBadge({ count: () => n, stallMs: 60, pollMs: 1000 }).start();
@@ -1006,16 +965,16 @@
     still.stop(); moving.stop();
     d.assert('a stopped badge is hidden', still.el.hidden && moving.el.hidden);
   }
-  // 🔴 THE ROOM (bay-node.mjs). These two read state and open nothing.
+  // The room (bay-node.mjs). These two read state and open nothing.
+  // See lessons/page-patchbay.md#patchbay-24
   d.assert('building the page joined no room, the room waits for Join', !node.joined() && !node.joining(),
     node.joining() ? 'a socket is open' : 'no socket');
   d.assert('this tab is a site of its own and the harness is in a room of its own, never the studio\u2019s',
     /^web-[a-z0-9]{3}$/.test(SITE) && (!SELFCHECK || ROOM !== 'studio-1'), `${SITE} in ${ROOM}`);
   if (SELFCHECK) {
-    // 🔴 THE ROUND TRIP, in the run's own room only: a second node in this tab
-    // stands in for another page, announces a lane, and answers link.request.
-    // The patchbay hears it, links it, opens it with the remote opener, and the
-    // lane's own page says yes or no. Nothing reaches the studio.
+    // Round trip, in the run's own room only: a second node stands in for another
+    // page, announces a lane and answers link.request. Nothing reaches the studio.
+    // See lessons/page-patchbay.md#patchbay-25
     const until = async (ok, ms) => { const t0 = performance.now(); while (!ok() && performance.now() - t0 < ms) await new Promise((r) => setTimeout(r, 50)); return ok(); };
     const PEER = randomSite('peer');
     const asked = [];
@@ -1039,7 +998,9 @@
       heard && yes.ok && yes.kind === 'remote' && asked.length === pre + 2 && asked[pre].open === true,
       heard ? `${yes.kind} ${yes.why || 'opened'}, ${asked.length - pre} asked, in ${ROOM}` : `never heard ${PEER} in ${ROOM}`);
     d.assert('and a refusal comes back in that page\u2019s own words', !no.ok && /that wall is shut/.test(no.why || ''), no.why);
-    // ⚠️ NEGATIVE CONTROL: this page's own keys, asked for by another page, are refused in words, not left unanswered.
+    // Negative control: this page's own keys, asked for by another page, are refused
+    // in words, not left unanswered.
+    // See lessons/page-patchbay.md#patchbay-26
     const mineAsked = await peer.request(`${SITE}:keys:midi-out`, `${PEER}:wall:in`, true, { timeoutMs: 4000 });
     d.assert('this page answers a request for its own keys with a refusal, because a person here opens them',
       mineAsked?.open === false && /a person here/.test(mineAsked.why || ''), JSON.stringify(mineAsked));

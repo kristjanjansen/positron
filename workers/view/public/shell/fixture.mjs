@@ -1,13 +1,10 @@
-// demo/shell/fixture.mjs — the minimum honest adapter, shared by Act 0.
-//
-// Act 0 has no network and no media, so it needs a kind that actuates something
-// observable and can be re-folded on seek. That is exactly the four-part
-// adapter contract: {caps, actuate, reduce, assertState}.
+// demo/shell/fixture.mjs: the minimum honest adapter for Act 0, which has no network and no media:
+// the four-part contract {caps, actuate, reduce, assertState}.
+// why: lessons/kit-fixture.md#header
 
 /**
- * A kind whose "actuation" is appending to a list. reduce()/assertState() make
- * it seek-correct: after any seek the fold is recomputed from the rows, so the
- * demo shows the real two-phase behaviour rather than approximating it.
+ * A kind whose actuation appends to a list; reduce() and assertState() make it seek-correct.
+ * why: lessons/kit-fixture.md#markadapter
  */
 export function markAdapter({ rates = [0.25, 0.5, 1, 2, 4], onFire } = {}) {
   const fired = [];
@@ -22,11 +19,10 @@ export function markAdapter({ rates = [0.25, 0.5, 1, 2, 4], onFire } = {}) {
         fired.push({ at: ev?.at ?? null, wall: Date.now(), payload });
         onFire?.(payload, ev);
       },
-      /** state at a position = every mark at or before it.
-       *
-       * reduceAt() hands us the PREFIX already (rows <= pos), and each row is
-       * the PAYLOAD rather than the event, so there is nothing left to filter
-       * and no `r.at` to filter on. */
+      /**
+       * State at a position is every mark at or before it; reduceAt() already hands the prefix of payloads.
+       * why: lessons/kit-fixture.md#reduce
+       */
       reduce(rows) {
         return { count: rows.length, last: rows.length ? rows[rows.length - 1] : null };
       },

@@ -1,8 +1,6 @@
-// demo/shell/rt-rec.mjs: the runtime of a `rec` node on /connect/
-// (node-runtime.mjs): /synth/recorder/'s recorder (note-recorder.mjs). What
-// reaches rec:midi-in while Record is on is taken; Play sends the same notes
-// out of rec:midi-out at the times they came. Its face is Record, Play and the
-// table of what was taken.
+// demo/shell/rt-rec.mjs: the `rec` node on /connect/ (note-recorder.mjs). Record takes what reaches
+// rec:midi-in; Play sends it out of rec:midi-out at the times it came.
+// why: lessons/kit-rt-rec.md#header
 
 import { createNoteRecorder } from './note-recorder.mjs';
 

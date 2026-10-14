@@ -1,38 +1,7 @@
-// demo/resources/bench-chord-suggester.mjs. Does a chord suggester know any jazz.
-//
-//   node demo/resources/bench-chord-suggester.mjs           # every section, to stdout
-//   node demo/resources/bench-chord-suggester.mjs --devices # only the named device tests
-//
-// 🔴 IT CONTACTS NOBODY. It reads `tmp/chord-corpora/`, which
-// `demo/resources/fetch-chord-corpora.mjs` filled once and which is gitignored.
-// Run that first if this says the cache is empty.
-//
-// ── THE TRAP THIS BENCHMARK EXISTS TO NOT FALL INTO ─────────────────────────
-//
-// 🔴 A SUGGESTER SCORED ONLY ON *DID IT PREDICT THE CHORD THAT CAME NEXT* IS
-// MAXIMISED BY ALWAYS OFFERING THE COMMONEST CONTINUATION, AND THE COMMONEST
-// CONTINUATION IS THE DEFINITION OF A CLICHE. So top 1 accuracy and the
-// instruction *"no cliches"* are directly opposed, and a benchmark reporting
-// accuracy alone would drive the build in exactly the wrong direction while
-// looking rigorous. Three families of number are reported and they are allowed
-// to disagree:
-//   PREDICTIVE  did the real next chord turn up in what was offered
-//   IDIOMATIC   does anybody ever actually play this here, measured on songs
-//               the table has never seen. A suggestion with zero support is
-//               WRONG rather than adventurous, and this is the floor.
-//   PREDICTABLE how much of the time is the suggester just naming the global
-//               maximum, how many different things does it ever say, and how
-//               surprising is what it says
-//
-// ⚠️ AND A NEGATIVE CONTROL IS THE HALF THAT PROVES THE INSTRUMENT. Two things
-// in here are SUPPOSED to score badly: `random`, which draws from the
-// vocabulary, and `cross`, which is the other style's table. A benchmark that
-// scored those well would be a broken benchmark and nothing else it says would
-// mean anything.
-//
-// ⚠️ NOTHING IS TRAINED AND TESTED ON THE SAME DATA. The split is by SONG and
-// not by transition, because two transitions from one song are not independent,
-// and it is deterministic so two runs grade the same thing.
+// Grades chord suggesters on held-out songs (split by song): predictive, idiomatic and
+// predictable measures, with `random` and `cross` as negative controls. Reads tmp/chord-corpora/.
+// Run: node demo/resources/bench-chord-suggester.mjs [--devices]
+// See lessons/page-resources.md#resources-86
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -80,9 +49,8 @@ function loadPop() {
 }
 
 /**
- * ⚠️ THE SPLIT IS BY SONG. Splitting by transition would put a song's bars on
- * both sides, and a table that has read half of `Autumn Leaves` predicting the
- * other half is not predicting anything.
+ * The split is by song, so no song's bars land on both sides.
+ * See lessons/page-resources.md#resources-87
  */
 const split = (songs, frac = 0.2) => {
   const test = [], train = [];
@@ -118,10 +86,9 @@ const ranked = (m) => (m ? [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -
    of candidate symbols. The first is what a one-slot page would show. */
 
 /**
- * 🔴 THE 173 BYTE RULE FROM `research/chord-learning-2026-09-23.md`, VERBATIM.
- * Its whole alphabet is the seven diatonic triads of a major key, so it has no
- * row for a dominant seventh, a half diminished, a borrowed chord, a secondary
- * dominant or anything in a minor key. That is the point of grading it.
+ * The 173 byte rule from research/chord-learning-2026-09-23.md, verbatim: seven diatonic
+ * triads only, which is the point of grading it.
+ * See lessons/page-resources.md#resources-88
  */
 const RULE173 = { I: ['vi', 'IV', 'V', 'ii', 'iii'], ii: ['V', 'vii', 'I', 'IV'], iii: ['vi', 'IV', 'ii'], IV: ['V', 'I', 'ii', 'vi'], V: ['I', 'vi', 'IV'], vi: ['IV', 'ii', 'V', 'I'], vii: ['I', 'iii'] };
 /** The seven diatonic triads as symbols in this alphabet, both directions. */
@@ -135,7 +102,7 @@ function rule173(ctx, { lenient = false } = {}) {
   const last = ctx[ctx.length - 1];
   if (last === undefined) return [];
   const num = TO_NUMERAL[lenient ? lenientSym(last) : last];
-  if (num === undefined) return [];                      // 🔴 nothing at all
+  if (num === undefined) return [];                      // nothing at all. See lessons/page-resources.md#resources-89
   return (RULE173[num] || []).map((n) => DIATONIC[n]);
 }
 
@@ -166,20 +133,10 @@ function makeProb(c) {
 }
 
 /**
- * 🔴 THE TWO SLOT SUGGESTER, WHICH IS THE THING THE BRIEF ASKED TO HAVE
- * EVALUATED RATHER THAN ASSUMED. The original ask was already for a THIRD and a
- * FOURTH chord, which is two slots, so they are given two different jobs instead
- * of being a ranked pair of one job.
- *   SLOT A  the idiomatic continuation: argmax P(next | context).
- *   SLOT B  the one worth hearing: argmax POINTWISE MUTUAL INFORMATION among
- *           candidates the corpus actually attests at least `floor` times.
- * PMI is log P(next|context) minus log P(next), so it is high for a chord that
- * is SPECIFIC TO THIS CONTEXT and low for a chord that is common everywhere.
- * That is precisely the difference between an idiom and a cliche, and it is a
- * quantity rather than a taste.
- * ⚠️ THE FLOOR IS WHAT KEEPS SLOT B HONEST. Without a count floor, PMI is
- * maximised by whatever was seen once, which is noise wearing the costume of
- * daring.
+ * Two slots, two jobs. A: argmax P(next | context). B: argmax PMI among candidates attested
+ * at least `floor` times, so it favours chords specific to this context; the floor keeps it
+ * from rewarding a single sighting.
+ * See lessons/page-resources.md#resources-90
  */
 function makeTwoSlot(c, { floor = 3, lambda = 1, pool = 4 } = {}) {
   return (ctx) => {
@@ -190,14 +147,8 @@ function makeTwoSlot(c, { floor = 3, lambda = 1, pool = 4 } = {}) {
     if (!d) return ranked(c.uni).map(([s]) => s);
     const rows = ranked(d);
     const A = rows[0][0];
-    /* 🔴 `pool` IS THE SECOND RAIL AND IT IS NOT THE SAME AS THE FLOOR. A count
-       floor says *somebody played this here*; it does not say *this is one of
-       the reasonable things to play here*. With no pool, PMI reaches past a dozen
-       ordinary answers for whatever is most SPECIFIC to the context, and on a
-       thin context that is an augmented triad seen four times. Restricting the
-       search to the N commonest continuations and then re-ranking those by PMI
-       asks a different and better question: OF THE THINGS THAT BELONG HERE,
-       WHICH ONE IS LEAST GENERIC. The sweep below is what set N. */
+    /* `pool` limits B to the N commonest continuations before ranking by PMI; the sweep set N.
+       See lessons/page-resources.md#resources-91 */
     const scored = rows.slice(0, pool === Infinity ? rows.length : pool)
       .filter(([s, n]) => s !== A && n >= floor)
       .map(([s, n]) => {
@@ -451,11 +402,8 @@ if (!ONLY_DEVICES) {
     console.log(`${pad('', 18)} top 1 suggestion DIFFERS on ${disagree} of ${n} (${(100 * disagree / n).toFixed(1)} per cent)`);
     console.log(`${pad('', 18)} mean Jensen-Shannon divergence ${(weighted / wtot).toFixed(3)} bits (0 = identical tables, 1 = no overlap)`);
   }
-  /* ⚠️ AND THE DIAL MOVES THE SPELLING AS WELL AS THE TABLE, WHICH IS A SECOND
-     AND SEPARATE WAY IT IS VISIBLE. The function `0maj` is written `Cmaj7` by
-     jazz players and `C` by pop players, and that difference is in the corpora
-     rather than in anybody's taste. A page that changed its table and not its
-     spelling would be half a dial. */
+  /* The style dial moves the spelling too: `0maj` is `Cmaj7` in jazz and `C` in pop.
+     See lessons/page-resources.md#resources-92 */
   {
     const both = [...jc.spell.keys()].filter((s) => pc.spell.has(s));
     let differ = 0; const ex = [];
@@ -475,12 +423,8 @@ if (!ONLY_DEVICES) {
 /* ── The named device tests ────────────────────────────────────────────────── */
 
 /**
- * 🔴 NAMED TESTS WITH EXPECTED ANSWERS ARE A STRONGER INSTRUMENT THAN AGGREGATE
- * ACCURACY, and they are the only thing here that can answer *"is this Open
- * Studio quality"*. An aggregate says a suggester is right 40 per cent of the
- * time and cannot say whether it has ever heard of a backdoor cadence.
- * Everything is written in C so it can be read, and it is converted to the
- * key-relative alphabet before it is looked up.
+ * Named tests with expected answers, written in C and converted to the key-relative alphabet.
+ * See lessons/page-resources.md#resources-93
  */
 const DEVICES = [
   ['ii-V', ['2min'], '7dom', 'Dm7 wants G7'],
@@ -531,11 +475,8 @@ console.log(`\nthe jazz table has the named answer in its top 2 for ${hits} of $
 console.log(`the two slot suggester would PUT IT ON THE PAGE for ${slotHits} of ${DEVICES.length}.`);
 
 /**
- * 🔴 AND THE OTHER DIRECTION, WHICH IS A DISCOVERY RATHER THAN A TEST. A named
- * test asks *does the table know where this chord goes*. This asks the table
- * *where does this chord actually live*, and it is the half that can correct the
- * person writing the tests. One of the expectations above was wrong and this is
- * how it was caught.
+ * The reverse: where each chord actually lives in the table, which can correct a test.
+ * See lessons/page-resources.md#resources-94
  */
 console.log('\n' + '='.repeat(78));
 console.log('WHERE EACH CHROMATIC DEVICE ACTUALLY LIVES, counted rather than assumed (jazz)');
@@ -604,13 +545,8 @@ if (!ONLY_DEVICES) {
   }
 
   /**
-   * 🔴 THE TIMING IS TAKEN ON THE SHAPE THAT WOULD SHIP, NOT ON THE BENCHMARK'S.
-   * `makeNgram` re-sorts a Map and rebuilds the whole fallback list on every
-   * call, because inside a benchmark that costs nothing and is easier to read.
-   * A page would read a pre-sorted array out of a plain object. The prior
-   * research already measured this exact gap on the recogniser and found a
-   * factor of ninety, so timing the convenient version and calling it the cost
-   * would be repeating a mistake this repository has already written down.
+   * Timed on the shape that would ship (pre-sorted arrays), not on makeNgram's per-call sort.
+   * See lessons/page-resources.md#resources-95
    */
   const shipped = table(jc, { minCtx: 8, minRow: 3, keep: 3 });
   const shippedFallback = ranked(jc.uni).slice(0, 3).map(([s]) => s);

@@ -1,46 +1,7 @@
-// ONE SCOPE, BOTH WAVES ON IT, EACH HELD FROM ITS OWN ONSET.
-// Lifted 2026-10-13 out of /remote/collide/ (Collide on Pi) so
-// /drums/remote/ (Drums on the Pi) draws the same picture; asked that
-// day on 040 as *"can not see viz improvements"*.
-//
-// What it was built for, on 020: asked on a shot of two half panels (here a
-// clean slow wave, the Pi a dense jittering band): *"how to make less
-// nervous?"*, then *"overlay 2 waves on top of each other, full w"*.
-// MEASURED first, the real board on the relay, held keys on three notes:
-// both panels drew with the SAME code (512 samples from the first rising zero
-// crossing, redrawn every frame), so the drawing was not the difference. The
-// Pi's copy is clean (exact digital zero between notes, no dither); what it
-// carries more of is energy above 4 kHz, 10 to 20 dB more relative to its
-// note, which is int16 quantisation (about -101 dBFS) under a note at -35 to
-// -50 dBFS. And on the relay its playout trimmed or ran dry 3 to 9 times in a
-// few seconds, each one a splice in the wave. A free running scope redraws
-// whatever 11 ms the last frame held, so every splice and every frame boundary
-// moved the Pi's picture.
-//
-// So the scope is HELD, the kit's triggered idea (/kit/devices/, TRIGGERED
-// SCOPE): on each trigger (a key on 020, a bar's first hit on 040), each
-// side's window is taken from THAT SIDE'S OWN onset and kept until the next
-// trigger. The onsets are found separately because the Pi's arrives 100 to
-// 300 ms after this tab's. One scale for both, the larger peak, so a level
-// difference still shows. A trigger whose onset cannot be found keeps the
-// previous picture.
-//
-// TWO WAYS TO FIND THE PI'S ONSET, because the two pages differ:
-//   'onset'  (020, the default) from the trigger, the first 1 ms block over
-//            three times the 30 ms before it (as remote/030 finds a note),
-//            then the first rising zero crossing after it. A resonant saw
-//            crosses zero more than once a cycle, so the Pi's window is then
-//            slid up to `slide` further to where it matches this tab's best
-//            (the largest correlation). A keyboard note starts from a quiet
-//            side, so the first onset after the key is the note.
-//   'match'  (040) a drum pattern is never quiet: between a hit and the Pi's
-//            copy of it, 90 to 300 ms later, the Pi plays its copies of the
-//            hits before it, so the first onset after the hit is the wrong
-//            hit. The Pi's copy is found instead by matching the loudness
-//            shape of this tab's `refMs` after its onset (1 ms blocks, the
-//            best normalised correlation) inside `minLagMs` to `maxLagMs`,
-//            then slid by up to `back` either way, `2 * back` in all, to the
-//            best sample by sample match, as 'onset' does.
+// One scope, both waves, each held from its own onset (/remote/collide/, /drums/remote/): the Pi's
+// copy arrives 100 to 300 ms late and splices, so a free scope jitters. One scale for both. 'onset'
+// finds the Pi's note after the trigger; 'match' (drums, never quiet) matches the loudness shape.
+// See lessons/page-remote.md#remote-31
 import { createWaveShape, captureTrace } from '/shell/synth-view.mjs';
 
 const FLAT = Array(512).fill(0);
@@ -135,8 +96,8 @@ export function createOverlayScope({ win = 1024, slide = 960, axis = '21 ms', he
   /**
    * A trigger: take each side's window from its own onset, once it has one.
    * `at` is the trigger's time on `ctx`'s clock (a key: now; a hit: when it is
-   * due). `sides.local()` and `sides.pi()` answer that side's AnalyserNode, or
-   * null while it has no sound or no link to the scope.
+   * due). `sides.local()` and `sides.pi()` answer that side's AnalyserNode, or null.
+   * See lessons/page-remote.md#remote-32
    */
   function hold({ ctx, at, sides }) {
     if (!ctx) return;

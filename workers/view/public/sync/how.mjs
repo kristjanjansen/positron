@@ -1,27 +1,7 @@
-// demo/sync/how.mjs: the "How it works" picture of one /sync/ tab, drawn
-// into that tab and graded from that tab's own check.
-//
-// 🔴 ONE PICTURE PER TAB, BECAUSE THE FOUR TABS WORK FOUR DIFFERENT WAYS.
-// INSTANT goes through the relay and back, CLOCKS agrees a time between two
-// clocks and then sends nothing, LATE VIDEO holds a cue for a picture that
-// arrives late, REPLAY lets a recording be the clock. One picture under the
-// whole page would describe none of them, which is what `/stage/` was told
-// about its own (*"move how it works to control room and archive"*).
-// ⚠️ SO IT IS `atEnd: false`. `atEnd` appends to `document.body`, under every
-// tab at once, and the picture would leave the tab it describes.
-//
-// 🔴 DRAWN ON THE TAB'S FIRST SHOWING, NEVER AT BUILD. A diagram laid out in a
-// closed panel measures 0 and lays out for 320 px; `tab-page.mjs` only builds
-// a tab into an open panel, but `ensure()` can build one closed, and the
-// picture comes after the tab's readout and log, which `tab-page.mjs` adds
-// after `build` returns. `show()` is after both.
-//
-// 🔴 THE CHECK GRADES FOUR THINGS, AND THE THIRD IS THE ONE THAT CATCHES THE
-// CLOSED-PANEL BUG. Built; measured with real type (`measured`, or a clean
-// `cuts` means nothing, see `/stage/`); drawn at the width its box has NOW,
-// so a picture laid out for 320 px inside a 700 px panel reads red; nothing
-// cut; and the boxes on screen are the boxes the tab declares, name and sub,
-// read back off the drawing rather than off the spec.
+// The "How it works" picture of one /sync/ tab, one per tab since each works
+// differently. `atEnd: false` keeps it inside its tab; it is drawn on the tab's
+// first showing, never at build, because a closed panel measures 0.
+// See lessons/page-sync.md#sync-4
 
 import { el } from '/shell/shell.mjs';
 import { createDiagram } from '/shell/diagram.mjs';

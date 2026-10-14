@@ -1,18 +1,7 @@
-// TAKES, from the retired `/take/` (2026-10-04, `plans/plan-demo-structure.md`
-// §3.5). Record, then record again: each take lands on the line after the one
-// before, and the whole line plays and scrubs as one. The body is `take`'s, moved
-// rather than rewritten; the comments that carried a measurement came with it.
-//
-// WHAT CHANGED IN THE MOVE, AND WHY:
-//   - `take` published four readout keys and hid the row (`showReadout: false`)
-//     because every one of them was already drawn on the page. A tab's report
-//     has no hidden mode, and nothing graded those four, so they are gone
-//     rather than drawn twice.
-//   - Its checks used to run when a take landed after a HARNESS press of record,
-//     one take only, so its eight sequence checks never ran under the suite.
-//     The tab's `check` records two short takes itself, so all fourteen run.
-//   - The camera is this tab's own button, not a `.pos-controls` one
-//     (`tab-page.mjs` rule 4).
+// TAKES: record, then record again. Each take lands on the line after the one
+// before, and the whole line plays and scrubs as one. The tab's `check` records
+// two short takes itself, so every sequence check runs.
+// See lessons/page-capture.md#capture-37
 
 import { recorderMime, el, armVideo } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -44,10 +33,9 @@ export function build({ panel, assert, log }) {
   let recording = null, landing = null, totalMs = 0;
   let previewT0 = performance.now();
 
-  // WHAT IS BURNED IS THE POSITION ON THE LINE while recording, so a reader
-  // drags to 6.5 s, reads 6.5 off the picture, and the claim checks itself.
-  // Not recording, the frame shows the wall clock: this picture is not on the
-  // line yet, and a rehearsal counter would contradict the transport bar.
+  // While recording the burned number is the position on the line, so 6.5 s reads
+  // 6.5 off the picture. Otherwise it is the wall clock, the frame not being on it.
+  // See lessons/page-capture.md#capture-38
   const source = createSource({
     opts: () => {
       const rec = recording;
@@ -113,12 +101,9 @@ export function build({ panel, assert, log }) {
     mm.release('handover');
   }
 
-  // EVERY SEEK IS A COMMAND TO THE ELEMENT. With a media master attached a
-  // `deck.seek()` alone does nothing visible: L1 reads the picture, sees the
-  // vector has wandered and pulls it straight back. One mirror, here, for every
-  // seek that did not come from the servo itself. ONE SEEK IN FLIGHT, LATEST
-  // WINS: a drag fires a seek per pointermove, and queueing them walks the
-  // picture through every position the finger passed.
+  // Every seek is a command to the element, or the media master pulls the vector
+  // back. One seek in flight, latest wins: a drag fires one per pointermove.
+  // See lessons/page-capture.md#capture-39
   const seeks = [];
   let pendingSeek = null, inServo = false, queuedSeek = null;
   deck.transport.onState((st) => {
@@ -151,8 +136,9 @@ export function build({ panel, assert, log }) {
     if (!parts.length) return;
     const playing = deck.playing();
     let pos = deck.position();
-    // A PART RUNNING OUT IS A HANDOVER, resolved BEFORE the servo reads an ended
-    // element as the clock, or the playhead pins itself to the boundary.
+    // A part running out is a handover, resolved before the servo reads an ended
+    // element as the clock, or the playhead pins to the boundary.
+    // See lessons/page-capture.md#capture-40
     if (active && active.video.ended) {
       const next = parts[parts.indexOf(active) + 1];
       if (next) pos = next.startMs;
@@ -202,8 +188,8 @@ export function build({ panel, assert, log }) {
         part.recordedMs = performance.now() - t0;
         landing = { ...part, lenMs: Math.round(part.recordedMs) };
         recording = null;
-        // SHRINK THE AXIS ONCE, here: collapsing a 10 s runway seconds later
-        // moved every mark on the strip, which read as the cursor jumping.
+        // Shrink the axis once, here: collapsing the runway later moves every mark.
+        // See lessons/page-capture.md#capture-41
         deck.setRange([0, Math.round(totalMs + landing.lenMs)]);
         previewT0 = performance.now();
         setRecUI(false);
@@ -219,9 +205,9 @@ export function build({ panel, assert, log }) {
     rec.start(SLICE_MS);
     // A RUNWAY: the axis opens to the full cap and the take grows into it.
     deck.setRange([0, Math.round(totalMs + capMs)]);
-    // A HEAD THAT MOVES WITH THE RECORDING, which is the strip's wall cursor
-    // and NOT the playhead: seeking the deck every frame would drive the
-    // previous take's element and corrupt the one seek measurement here.
+    // A head that moves with the recording is the strip's wall cursor, not the
+    // playhead: seeking the deck every frame would corrupt the seek measurement.
+    // See lessons/page-capture.md#capture-42
     view.strip.armWall(part.startMs);
     setRecUI(true);
     log(`take ${part.n}: recording ${mime}, ${SLICE_MS} ms slices, stop when you like, ${capMs / 1000}s cap`, 'hi');
@@ -258,10 +244,9 @@ export function build({ panel, assert, log }) {
     part.url = URL.createObjectURL(new Blob(part.blobs, { type: part.mime }));
     const v = el('video', '', null, { playsinline: '', muted: '' });
     v.muted = true; v.hidden = true;
-    // ARM BEFORE THE SOURCE: with no `src` its `play()` rejects and the
-    // activation is consumed without starting anything. Arming after `src`
-    // started a hidden element, media-master bent the PAUSED deck to it, and
-    // the playhead crept and snapped back ("moving a bit and then resetting").
+    // Arm before the source: with no `src`, `play()` rejects and consumes the
+    // activation. Arming after `src` lets the paused deck creep and snap back.
+    // See lessons/page-capture.md#capture-43
     armVideo(v);
     v.autoplay = false;
     v.src = part.url;
@@ -299,8 +284,9 @@ export function build({ panel, assert, log }) {
     return a[a.length >> 1];
   };
 
-  // THE TAKE IN FLIGHT IS ALREADY ON THE LINE. `parts` holds landed takes only,
-  // because every assert reads it; this is a VIEW for the strip.
+  // The take in flight is already on the line. `parts` holds landed takes only,
+  // because every assert reads it; this is a view for the strip.
+  // See lessons/page-capture.md#capture-44
   const inFlight = () => {
     const r = recording;
     if (!r) return null;
@@ -358,8 +344,9 @@ export function build({ panel, assert, log }) {
   });
 
   function paint() {
-    // A GUTTER CARRIES WHAT ITS LANE MEASURED, and with nothing measured it
-    // carries nothing. It counts what the lane DRAWS, in-flight take included.
+    // A gutter carries what its lane measured, counting what the lane draws,
+    // in-flight take included; with nothing measured it carries nothing.
+    // See lessons/page-capture.md#capture-45
     const L = view.strip.lanes();
     const sh = shown();
     const C = L.find((l) => l.id === 'chunks');
@@ -417,8 +404,9 @@ export function build({ panel, assert, log }) {
         `${Math.round(p1.recordedMs)} ms against a ${p1.capMs} ms cap`);
     }
 
-    // THE SEQUENCE ASSERTS NEED TWO PARTS to mean anything; a vacuous pass on
-    // one is how a subject goes missing, so they wait and the log says so.
+    // The sequence asserts need two parts; a vacuous pass on one hides a missing
+    // subject, so they wait and the log says so.
+    // See lessons/page-capture.md#capture-46
     if (parts.length < 2) {
       log(`${parts.length} take on the line. The eight sequence checks (end to end, `
         + 'boundary handover, one clock) need a second one. Press record again.', 'hi');
@@ -433,9 +421,9 @@ export function build({ panel, assert, log }) {
       deck.durationMs === parts.reduce((a, p) => a + p.lenMs, 0),
       `${deck.durationMs} ms`);
 
-    // 🔴 THE SIX BELOW SEEK THIS TAB'S OWN TRANSPORT, TWICE, so they wait for a
-    // harness: they would jump the playhead across the join in front of
-    // somebody who has just stopped recording.
+    // The six below seek this tab's own transport twice, so they wait for a harness
+    // rather than jump the playhead in front of somebody who just stopped recording.
+    // See lessons/page-capture.md#capture-47
     await ifSelfcheck(async () => {
       const b = parts[1].startMs;
       await seekAndWait(Math.max(0, b - 400));
@@ -473,9 +461,9 @@ export function build({ panel, assert, log }) {
   return {
     bar,
     /**
-     * Two short takes, pressed through the bar's own record button as a person would, so
-     * every check above runs. The first assert is the tab's own half of
-     * `tab-page.mjs` rule 1: building it asked for nothing.
+     * Two short takes, pressed through the bar's own record button, so every check
+     * above runs. The first assert: building the tab asked for nothing.
+     * See lessons/page-capture.md#capture-48
      */
     async check({ A }) {
       A('building this tab opened nothing: no camera, no recording',

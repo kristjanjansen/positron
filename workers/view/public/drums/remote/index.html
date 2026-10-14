@@ -41,79 +41,10 @@
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { VOICES, LIFE } from '/drums/voices.mjs';
 
-  // /drums/machine/ with the same four drums also played on the
-  // Raspberry Pi, the way /remote/collide/ pairs a voice here with one on
-  // the Pi. plans/plan-pi-supercollider-defs.md §3.4 and §4 step 6 (the plan
-  // calls it rhythm/020; that number went to the sample drums).
-  //
-  // ONE PI NODE, NOT FOUR. `pi-1:drums` has one `midi-in` and one `audio-out`,
-  // because the board's sound comes back as one summed stream and cannot
-  // honestly offer four outs (plan §3.4). The sequencer's `midi-out` is wired
-  // to it with no filter; its `deliver`, on this page, turns General MIDI's
-  // drum notes into the four program names and gathers the hits that share a
-  // time into one `sc.hit` message. A closed hat carries `choke: 'hho'`, so
-  // the board closes every open hat still ringing in the same bundle, as the
-  // local side does with `/n_set gate 0`.
-  //
-  // ONE TIME FOR BOTH SIDES. A hit due at S on this tab's clock sounds here at
-  // S (a timestamped bundle to the scsynth in this tab) and on the Pi at S
-  // (`at` on the board's clock, which `board-collide.mjs` keeps with
-  // `clock.ping` and the fastest round trip). So both sides are handed over
-  // on the Pi's path: 250 ms early on the relay, 150 direct (plan §2.4,
-  // `AHEAD` in board-collide.mjs).
-  //
-  // PLAY JOINS THE PI, NOTHING ON A VISIT. Asked 2026-10-12: *"rm, play button
-  // reaches for pi too"*, so the separate Pi button is gone. A press of Play
-  // makes the page's 48 kHz context, boots this tab's scsynth, then (the
-  // drum machine's `onStart`, while the bar shows busy) asks the board in
-  // `studio-1` for `audio.status` and gives it ASK_MS. No answer, or a run
-  // under a harness (`createBoard` will not drive the board under
-  // `?selfcheck=` unless `?board=1`), means the Pi side is SIMULATED here, and
-  // the Pi panel's footer, the Pi node's label and the `path` cell say so. A
-  // board that answers is started (`audio.start {source: 'collide'}`), given
-  // the four programs as text (`sc.load`, `same` says whether its compile is
-  // this tab's), and its clock found before the first hit is sent, so the
-  // first hit already has the Pi's lead. Stop leaves the Pi (`onStop`).
-  //
-  // SIMULATED: a second scsynth in this tab with the same four programs,
-  // each hit started UP_MS after it is handed over (so a lead shorter than the
-  // trip makes it late, counted the way the board counts), and its sound
-  // folded to mono and delayed DOWN_MS on the way back.
-  //   UP_MS    36, tab to Pi on the relay, two ~18 ms legs (plan §2.4, MEASURED).
-  //   DOWN_MS  139, a sound on the Pi to this tab's speakers on the relay:
-  //            ~175 ms key to speakers for Yoshimi minus that 36 (plan §3.1,
-  //            COMPUTED from a measurement). A MODEL, NOT THE BOARD.
-  //   ⚠️ MEASURED ON THE REAL PI 2026-10-12, Pi lag (first hit after a start):
-  //   176 to 317 ms on the relay and 82 to 112 ms direct, so the model's 139
-  //   is short on the relay by 40 to 180 ms.
-  //
-  // THE FOUR CELLS, on top (a concept page with a readout shows it on top):
-  //   Pi late     the board's own `late + droppedLate` from `sc.stats` every
-  //               2 s, counted from this join: hits that reached its scsynth
-  //               after their time. The
-  //               simulation's count of the same thing in simulation.
-  //   Pi lag      from a hit's time S to the first sound of it back from the
-  //               Pi, at the Pi side's meter plus this context's output
-  //               latency. Timed only on a hit with no Pi hit in the 600 ms
-  //               before it and silence on the Pi side at S, so a ring or the
-  //               previous hit cannot pass for it: in practice the first hit
-  //               after a start. ⚠️ The stand-in board's sound is a constant
-  //               tone, so against it this cell stays empty.
-  //   network     the board's own answer time on the path, `board.stats().rttMs`
-  //               (`round trip` until 2026-10-13, renamed as remote/010's was).
-  //   path        relay, direct, model (the Pi simulated in this tab; the word
-  //               `simulated` did not fit the cell at 1280), or empty while stopped.
-  //
-  // THE SCOPE, asked 2026-10-13 (*"can not see viz improvements"*, on the two
-  // half width panels this page still had): remote/020's one full width
-  // scope, both sides' drums on it, here yellow and the Pi blue, from
-  // /remote/overlay-scope.mjs. Each bar's first hit is the trigger;
-  // each side's window starts at its own copy of that hit and is held until
-  // the next bar. The Pi's copy is found by its shape ('match' there), since
-  // a pattern is never quiet in the 90 to 300 ms before it arrives.
-  //
-  // THE ASSERT THE PLAN NAMES, read by a check through `__demo.drums.check()`:
-  // hits handed over to the board equal the hits it started.
+  // /drums/machine/ also played on the Pi as one node `pi-1:drums`; both sides sound each hit at
+  // the same time S, handed over on the Pi's lead. Play joins the board, else (or under ?selfcheck=
+  // without ?board=1) the Pi is simulated with UP_MS and DOWN_MS, a model short on the relay.
+  // See lessons/page-drums.md#drums-20
   const d = mount({
     name: 'Drums on the Pi', what: '', index: '/', indexLabel: 'positron',
     // The four cells under the title, the log at the foot, as remote/020.
@@ -123,39 +54,16 @@
   conceptNav('drums/remote');
 
   const q = new URLSearchParams(location.search);
-  // RELAY OR DIRECT, asked 2026-10-13: *"add direct option to all remote
-  // instruments."* The same choice, cell and fall back as remote/010 and 030
-  // (`/remote/path.mjs`): the relay unless `?path=direct`, direct
-  // offered once the board answers, the relay kept for presence and as the
-  // fall back when no channel opens in 3 s or it drops. A change of choice
-  // while playing leaves the board and joins it again on the new path.
+  // Relay or direct via `/remote/path.mjs`: the relay unless `?path=direct`, falling back to it when
+  // no channel opens in 3 s or it drops. A change while playing leaves the board and rejoins.
+  // See lessons/page-drums.md#drums-21
   const path = createPathChoice({ log: d.log, onPick: () => switchPath() });
   const ASK_MS = 3000;
   const UP_MS = 36, DOWN_MS = 139;
-  // THE PI'S SOUND IS LIFTED BY PI_LIFT BEFORE THIS PAGE METERS, DRAWS OR
-  // PLAYS IT. Asked 2026-10-14 (*"fix"*, on HANDOFF session 76's "every voice
-  // still about 5 dB under the tab"). MEASURED, not a meter artefact: both
-  // chains rendered on wasm scsynth in one context (the tab's as
-  // drum-machine.mjs builds it, the board's as scollide.mjs does, fold 0.5 and
-  // Limiter 0.49) read the board 0.6 to 1.0 dB OVER the tab on every voice,
-  // by peak, by whole-hit energy and by this page's own 512-sample meter
-  // polled every 5 ms, which reads within 0.2 dB of the true window maximum.
-  // The real Pi read 4.9 to 5.5 dB UNDER after the fix and 6.7 to 13.4 under
-  // before it, and the model minus 6.02 dB gives 5.0 to 5.4 and 6.9 to 13.4:
-  // a clean factor of two lost on the Pi's side of the wire, in both limiter
-  // regimes. The suspect it fits is the board's capture (rig/board/jacksynth.mjs
-  // `ensureCapture`): `ffmpeg -f jack` registers TWO ports by default
-  // (`-channels` 2), the board sums everything into `input_1` only, and
-  // `-ac 1` AVERAGES that with the silent `input_2`. ffmpeg 9 here halves a
-  // stereo input with one silent channel exactly (0.500 in, 0.250 out); the
-  // Pi's own ffmpeg was not asked. `inputs.mjs` passes `-channels 1` for the
-  // same demuxer; `ensureCapture` does not.
-  //   2    the capture's halving, undone.
-  //   0.9  bootScsynth's `out` gain, which this tab's drums pass through and
-  //        the board's never do (the simulated Pi passes it too, so it is not
-  //        lifted).
-  // ⚠️ IF THE BOARD'S CAPTURE IS EVER GIVEN `-channels 1`, THIS GOES BACK TO
-  // 0.9, or the Pi reads 6 dB over the tab.
+  // PI_LIFT: the board's capture (`ffmpeg -f jack -ac 1`, two ports, one silent) halves the Pi's
+  // sound, so 2 undoes that and 0.9 matches bootScsynth's out gain on this tab's drums.
+  // If `ensureCapture` is ever given `-channels 1`, this goes back to 0.9.
+  // See lessons/page-drums.md#drums-22
   const PI_LIFT = 2 * 0.9;
   const STATS_MS = 2000;
   const NAME_OF = new Map(VOICES.map((v) => [v.note, v.name]));
@@ -236,10 +144,12 @@
     };
   }
 
-  // ── the Pi side: THE ONE PLACE THE BOARD GOES IN ─────────────────────────
+  // The Pi side: the one place the board goes in.
+  // See lessons/page-drums.md#drums-23
   /**
    * `mode()`: `idle` (not joined), `checking`, then `relay`, `direct`, `turn`
    * or `simulated`. `join(ctx)`, `leave()`, `hits(list)`, `out()`.
+   * See lessons/page-drums.md#drums-24
    */
   function createPiSide({ log, onMode = () => {} }) {
     let mode = 'idle', board = null, kit = null, sim = null, joining = null, timer = 0, last = null, base = null, loaded = [];
@@ -352,10 +262,9 @@
   });
   const bay = m.api.bay;
 
-  // ── the bay: the Pi node, the scope, the crossfader, the speakers ───────
-  // The Pi's node is the one the board announces (graph-registry.mjs `boardGraph`,
-  // `pi-1:drums`, a program on its SuperCollider engine), drawn with its ports
-  // below; the browser's are the catalogue's.
+  // The bay: the Pi node is the one the board announces (graph-registry.mjs `boardGraph`,
+  // `pi-1:drums`); the browser's are the catalogue's.
+  // See lessons/page-drums.md#drums-25
   const PI_GRAPH = boardGraph({ room: 'studio-1', instruments: { collide: true }, gpu: false });
   /** 0 is all here, 1 is all Pi. Opens at the middle. */
   let x = 0.5, fades = 0, piIn = 0;
@@ -392,10 +301,9 @@
   lay(ID('mix', 'audio-out'), ID('scope', 'audio-in'));
   lay(ID('mix', 'audio-out'), ID('xfade', 'audio-in'));
   lay(PI('audio-out'), ID('scope', 'audio-in-2'));
-  // ⚠️ VIA RELAY, BECAUSE THAT IS THE WIRE IT RIDES, as on /remote/collide/.
-  // Both Pi legs read one `pi.out()` fed by the board's socket. Without it the
-  // bay took the crossfader for a second internet receiver and asked for MoQ,
-  // which the board's announced `audio-out` (relay or a data channel) refuses.
+  // Via relay, because that is the wire it rides: both Pi legs read one `pi.out()`. Without it
+  // the bay asks for MoQ, which the board's announced `audio-out` refuses.
+  // See lessons/page-drums.md#drums-26
   lay(PI('audio-out'), ID('xfade', 'audio-in-2'), { via: 'relay' });
   lay(ID('fader', 'value-out'), ID('xfade', 'value-in'));
   lay(ID('xfade', 'audio-out'), ID('speaker', 'audio-in'));
@@ -466,10 +374,9 @@
   // The simulation's late count, read the same way, every 2 s.
   setInterval(() => { const s = pi.sim(); if (s && pi.mode() === 'simulated') d.set('Pi late', String(s.stat.late)); }, STATS_MS);
 
-  // ── the scope: both sides on one, each from its own copy of the bar's first hit
-  // A window of 4096 samples, 85 ms at 48 kHz: a kick's attack and its first
-  // few cycles. This tab's onset may lie up to 50 ms before the hit's time,
-  // because the time is when it is HEARD and the analyser sees it earlier.
+  // The scope: both sides on one, each from its own copy of the bar's first hit. 4096 samples,
+  // 85 ms at 48 kHz; this tab's onset may lie up to 50 ms before the hit's (heard) time.
+  // See lessons/page-drums.md#drums-27
   const overlay = createOverlayScope({ win: 4096, axis: '85 ms', find: 'match', slackMs: 50 });
   const scoped = (s) => bay.links().some((l) => l.from === s.from && l.to === s.scope);
   const sideAn = (s) => () => (s.an && s.out() && scoped(s) ? s.an : null);

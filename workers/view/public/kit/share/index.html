@@ -43,18 +43,10 @@
   import { createKitPage } from '/shell/kit-page.mjs';
 
   /**
-   * 🔴 kit/share, THE SHARE CARD, 2026-10-13. Asked: *"Build frontpage og card
-   * and apply to all pages"*, then *"What headless chrome?!!? See ../eccm etc"*.
-   * The card every page names in its og:image and the Instagram portrait
-   * beside it, both the front page's hero type alone (*"No patchbay. Do like
-   * frontpage. Do also ig image"*), written as SVG by demo/shell/share-card.mjs
-   * with no DOM and made PNGs at build by resvg (workers/view/og/render.mjs).
-   * eccm's /social is the model: the images a page is shared with, as they ship.
-   * ⚠️ THE PNG EXISTS ONLY IN A BUILD. The dev server serves the repository,
-   * where there is no og/ directory, so this page asks for the PNG only when
-   * its own head carries the og:image the build writes, and says so otherwise
-   * rather than logging a 404.
-   * ⚠️ A VISIT OPENS NOTHING. The SVG is drawn from data in this tab.
+   * The og:image card and Instagram portrait, drawn as SVG by demo/shell/share-card.mjs
+   * and made PNGs at build by workers/view/og/render.mjs. The PNG exists only in a
+   * build, so it is asked for only when this page's head carries og:image.
+   * See lessons/page-kit-share.md#kit-share-1
    */
   const { d, section, land, checkPage } = createKitPage({
     part: 'share',

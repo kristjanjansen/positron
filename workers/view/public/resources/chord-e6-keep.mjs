@@ -1,35 +1,7 @@
-// EXPERIMENT 6. THE PRUNE IS ITSELF A TEMPERATURE, SO SWEEP IT.
-//
-//   node demo/resources/chord-e6-keep.mjs
-//
-// 🔴 WHY THIS EXISTS. `plans/plan-better-chords-2026-09-25.md` section 13 ended
-// on a ceiling rather than on a dial: uniform over the three kept rows is 40.5
-// per cent cycling and 7.53 distinct chords in ten, so no temperature reaches
-// the real songs' 52.7 and 7.42 at once while only three rows are kept.
-// `build-chord-tables.mjs:123` says the same thing in its own comment:
-// *"Raising `KEEP` is the only thing that would move it"*. Nobody had measured
-// what raising it buys.
-//
-// 🔴 AND THE DIAL HAS TO BE REFITTED AT EVERY PRUNE, WHICH IS THE LESSON THAT
-// ALREADY COST ONE NUMBER. The plan swept a temperature over every row a context
-// had and landed on 1.0 for jazz; the shipped shape keeps three rows, which is
-// already a sharpening, and the same variety cost 3.5. So a KEEP sweep that held
-// the temperature still would be measuring two changes at once and reporting one.
-// Every KEEP here gets its own temperature sweep and its own best fit, scored on
-// the cycle rate and the vocabulary at once so neither can be traded away.
-//
-// ⚠️ `MIN_ROW = 3` IS THE COUNT FLOOR AND IT DOES NOT MOVE. The plan measured
-// that sampling with no floor costs 9.5 points of attestation for 1.8 bits of
-// surprisal. Raising KEEP is not lowering the floor: a context with no fourth
-// row seen three times does not gain one, it keeps three rows, and the column
-// `rows/ctx` below says how often the extra slots are filled at all.
-//
-// 🔴 THE BYTES ARE MEASURED BY THE REAL PACKER, NOT BY A COPY OF IT. This file
-// spawns `build-chord-tables.mjs --check --keep=N` and reads the byte count it
-// prints. A second implementation of the packing would be the one thing in this
-// experiment nobody could check.
-//
-// It contacts nobody. tmp/chord-corpora/ is already on this disk.
+// Experiment 6: sweep KEEP, refitting the temperature at every prune and scoring cycle rate
+// and vocabulary together; MIN_ROW 3 stays. Bytes come from build-chord-tables.mjs --check
+// --keep=N itself. Run: node demo/resources/chord-e6-keep.mjs. Reads tmp/chord-corpora/ only.
+// See lessons/page-resources.md#resources-38
 
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -39,12 +11,9 @@ import { sampleRow, mkRandom, twoSlots, routeOver, rowsFor as rowsForShip }
   from '../shell/suggest.mjs';
 
 const KEEPS = [3, 4, 5, 6, 8];
-/* The grid runs to uniform-over-the-rows at each KEEP, because the ceiling moves
-   with the prune and a sweep that stopped short would report its last entry as
-   the answer. That is exactly how `chord-e4-generators.mjs` had to be extended.
-   ⚠️ AND IT IS FINE RATHER THAN ROUND, WHICH WAS FOUND BY GETTING IT WRONG. A
-   grid of 1, 1.5, 2, 2.5, 3, 3.5 made KEEP 5 look WORSE than KEEP 3, because the
-   fit it wanted sat between two of its points. A coarse grid measures the grid. */
+/* The grid runs to uniform at each KEEP and is fine, not round: a coarse grid made KEEP 5
+   look worse than KEEP 3 because the fit fell between two points.
+   See lessons/page-resources.md#resources-39 */
 const TEMPS = [];
 for (let T = 0.4; T <= 6.01; T += 0.1) TEMPS.push(Number(T.toFixed(2)));
 for (const T of [7, 8, 10, 12, 16, 24, 1e6]) TEMPS.push(T);
@@ -129,10 +98,8 @@ function run(label, songs) {
   const rows = [];
   for (const keep of KEEPS) {
     const ship = shipShape(c, { id: label.toLowerCase(), keep });
-    /* 🔴 HOW OFTEN THE EXTRA SLOTS ARE ACTUALLY FILLED, WHICH IS THE HONEST HALF
-       OF RAISING A CEILING. `MIN_ROW = 3` does not move, so a context with no
-       fourth row seen three times keeps three rows however high KEEP goes, and
-       these columns say how much of the raise is real. */
+    /* How often the extra slots are filled: MIN_ROW 3 holds, so a context may keep only three.
+       See lessons/page-resources.md#resources-40 */
     let tot = 0, nctx = 0;
     const atLeast = { 4: 0, 5: 0, 6: 0 };
     for (const m of [ship.tri, ship.bi]) for (const r of m.values()) {
@@ -147,19 +114,12 @@ function run(label, songs) {
       const dd = Math.abs(g.cyc - want.cyc) / 10 + Math.abs(g.dist - want.dist);
       if (dd < bestD && g.att >= 94) { bestD = dd; bestT = T; best = g; }
     }
-    /* 🔴 AND THE SECOND READING HOLDS ONE AXIS STILL, WHICH IS THE ONE THAT
-       CANNOT BE ARGUED WITH. A joint fit trades a little cycle rate for a little
-       vocabulary and back, so two KEEPs can swap places on the scoring rule
-       rather than on the music. Pinning the cycle rate to the real songs' own
-       and reading the vocabulary off there asks the prune one question: at the
-       rate real music repeats itself, how many different chords does this shape
-       have to offer. */
+    /* Second reading: pin the cycle rate to the real songs' and read the vocabulary there, so
+       two KEEPs cannot swap places on the scoring rule.
+       See lessons/page-resources.md#resources-41 */
     const atRate = (() => {
-      /* ⚠️ THE RANGE OPENS BELOW 1 AND THAT WAS A DEFECT BEFORE IT WAS A
-         SETTING. A wider prune is a flatter draw at the same dial, so the
-         temperature that matches a given cycle rate FALLS as KEEP rises, and a
-         search floored at 1.0 answered `T 1.00` for every pop prune above three
-         while missing the rate by up to sixteen points. */
+      /* The range opens below 1: a wider prune needs a lower temperature for the same cycle rate.
+         See lessons/page-resources.md#resources-42 */
       let lo = 0.05, hi = 1e6, out = null;
       for (let i = 0; i < 22; i++) {
         const mid = Math.sqrt(lo * hi);
@@ -196,18 +156,13 @@ function run(label, songs) {
     + `${f(want.dist, 2).padStart(9)}${'100.0'.padStart(9)}%`
     + `${f(rsurp / rsurpN, 2).padStart(11)}${pct(rgm, rgmN).padStart(10)}%`);
 
-  /* ══ WHAT A PLAYER ACTUALLY SEES, WHICH THE WALK ABOVE CANNOT REACH ═══════ */
-  /* 🔴 THE WALK GRADES SLOT A AND `/nola/` DRAWS SLOT B. Slot B is the pointwise
-     mutual information pick over the first `POOL` rows, and `POOL` is 4 while the
-     shipped table keeps 3, so at KEEP 3 slot B is choosing between at most TWO
-     candidates and the pool has never once been full. Every measure above can
-     stand still while this one moves, and this one is the one on screen. */
-  /* 🔴 AND SLOT B IS ITSELF AN ARGMAX, WHICH IS WHY THE COLUMN `distinct B`
-     BELOW READS EXACTLY 2.00 AT EVERY PRUNE. B is the highest pointwise mutual
-     information row that A did not take, so it is the PMI top unless A collided
-     with the PMI top, in which case it is the PMI second. **Two values, for any
-     width of table.** The plan's whole lesson was applied to slot A and never to
-     slot B, and slot B is the one on screen. `bTemp` draws it the same way. */
+  /* What a player sees, which the walk above cannot reach.
+     See lessons/page-resources.md#resources-43 */
+  /* The walk grades slot A; /nola/ draws slot B, the PMI pick over the first POOL (4) rows,
+     so at KEEP 3 slot B chooses between at most two.
+     See lessons/page-resources.md#resources-44 */
+  /* Slot B is an argmax, so `distinct B` reads 2.00 at every prune; bTemp draws it instead.
+     See lessons/page-resources.md#resources-45 */
   console.log(`\n  SLOT B, WHICH IS THE ONE THE PAGE DRAWS, over ${Math.min(2000, tc.length)} contexts`
     + ` and 40 draws each`);
   console.log(`  KEEP     T  bTemp   pool  B moves  distinct B  B is ${topSym}  B attested`);
@@ -251,9 +206,8 @@ function run(label, songs) {
     const ps = new Map();
     for (const t of tc.slice(0, 4000)) {
       tr++;
-      /* ⚠️ THE BEAM IS `keep**3 + 1`, WHICH IS A CEILING RATHER THAN A FILTER.
-         A beam that pruned would be an argmax wearing a different name, and the
-         shipped default of 64 starts pruning the moment KEEP passes 3. */
+      /* The beam is keep**3 + 1, a ceiling not a filter; the shipped 64 prunes past KEEP 3.
+         See lessons/page-resources.md#resources-46 */
       const rt = routeOver(ship, t.ctx, aim, 4, { temp: T, rnd, beam: r.keep ** 3 + 1 });
       if (!rt) continue;
       fd++;

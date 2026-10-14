@@ -20,41 +20,24 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* The list IS this page, where in `wire` it is a side channel. The shared
-     component caps itself at 300 px so a feed that keeps arriving cannot push
-     the rest of the page down the screen; these rows arrive once and their
-     count never changes, so there is nothing for that ceiling to hold back.
-     Tall enough for a long look on a laptop, and it still scrolls inside its
-     own box on a phone, where a long title wraps to two or three lines. */
+  /* See lessons/page-resources.md#resources-210 */
   /* Taller than the component's default: this is a list of 333 records and the
      page has nothing else on it, so the box is the page. `--tbl-h` is the
      component's own knob rather than an override of its rule. */
-  /* 🔴 AS TALL AS THE SCREEN, NOT A NUMBER I PICKED. 620 px showed
-     twenty-three of 334 records on a laptop and rather fewer on anything
-     smaller — REPORTED as *"page should fit more"*. What is above the table is
-     the back link, the name and four lines of prose; `dvh` rather than `vh`
-     because a phone's address bar comes and goes and `vh` measures the taller
-     state, which puts the last rows under it. The floor keeps it a table rather
-     than a slot on a short window. */
+  /* As tall as the screen less what is above it (back link, name, prose), with a 420 px
+     floor; `dvh` because `vh` measures the taller phone state and hides the last rows.
+     See lessons/page-resources.md#resources-211 */
   .pos-tbl { --tbl-h: max(420px, calc(100dvh - 250px)); }
-  /* 🔴 WIDER THAN THE PROSE, AND THE PAGE SAYS WHY RATHER THAN JUST DOING IT.
-     The shell caps a page at 720 px, which is right for a paragraph — 62
-     characters is a readable line and CLAUDE.md's one vertical rhythm assumes
-     it. This page is not a paragraph. Six columns need 510 px of fixed track
-     before the NAME gets a pixel, so inside 720 the titles were cut after about
-     twenty characters — MEASURED on the first render: `Erkki Kurenniemi
-     Archiv…`, `Coveted Beauty, Short F…`. The table breaks out to 1100 px and
-     the prose above it does not, because they are answering different
-     questions. Below that width it simply takes what there is. */
+  /* Wider than the prose: six columns need 510 px of fixed track before the name gets any,
+     so the table breaks out to 1100 px while the 720 px prose does not.
+     See lessons/page-resources.md#resources-212 */
   .pos-tbl { width: min(1100px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); }
 </style>
 
 <script type="module">
   import { mount, guard } from '/shell/shell.mjs';
-  // The shared list from the kit — the same renderer `wire`, `cues` and `patch`
-  // draw their rows with, taken unchanged. It owns three fixed gutters and one
-  // fluid column, and everything this page has to say is fitted to that shape
-  // rather than laid out again here.
+  // The kit's declared-column table.
+  // See lessons/page-resources.md#resources-213
   import { createTable } from '/shell/table.mjs';
   // One assert here opens a second file. Every other one reads the list this
   // page is already showing, so those keep running for everybody.
@@ -66,13 +49,7 @@
   const CORPUS = '/resources/corpus.json';
   const DECK = '/proto/deck/corpus.json';
 
-  // ⚠️ THREE BUTTONS THAT ARE REALLY ONE CHOICE. Only one ordering can be in
-  // force, so only one of these may look chosen — and the shell paints the
-  // `primary` one yellow once, at mount, which left `Oldest first` lit while
-  // the list was sorted by something else. The class moves with the press
-  // below. (The kit HAS a radio group, `choice.mjs`; it is not used here
-  // because another session is editing that file today, and a component whose
-  // behaviour may change under you is not a component you can assert on.)
+  // See lessons/page-resources.md#resources-214
 
   const d = mount({
     name: 'resources',
@@ -81,56 +58,27 @@
         + 'from and how wide the bracket is, or at the rest of the row for what the record is and '
         + 'why its date is not narrower. Nothing is copied, one row can stand for a whole set, and '
         + 'places that refused are listed with what they answered.',
-    // 🔴 NO READOUT AND NO CONTROLS, AND BOTH WENT ON THE SAME INSTRUCTION.
-    // The page carried four counters and five buttons above a list of 334 rows
-    // — three orderings, two filters — which is more furniture than list before
-    // a reader has read a single line. Every number in that row was a count of
-    // the thing directly below it, and the orderings answered a question nobody
-    // had asked yet.
-    //
-    // What the counters said is not lost: the log line under the list gives the
-    // row count and the number of places, once, when the corpus loads. That is
-    // the right shape for a figure that changes when something happens rather
-    // than on a clock.
-    //
-    // ⚠️ THE FILTERS WENT WITH THEIR BUTTONS, AND SO DID THEIR TWO ASSERTS.
-    // Keeping the filtering behind a check nobody can reach would be a test of
-    // dead code, which reads as coverage and is not.
+    // No readout and no controls: the log line under the list gives the row and place counts
+    // once, when the corpus loads.
+    // See lessons/page-resources.md#resources-215
     readout: null,
   });
   guard(d);
 
-  // `newestFirst: false` — `set()` hands the rows over one at a time and the
-  // default prepends, which would draw this list upside down. The cap is well
-  // over the size of the corpus so no row is dropped in silence; the check
-  // below counts the rows against the items anyway.
+  // The cap is well over the corpus size; the check below counts rows against items anyway.
+  // See lessons/page-resources.md#resources-216
   /**
-   * 🔴 THE COLUMNS ARE DECLARED, AND THAT IS THE WHOLE CHANGE. This page was
-   * built on `messages.mjs`, whose columns are a relay message's — a direction,
-   * a size, a marker word and wrapped text — and every need here arrived as
-   * another option on it: a fourth column for the licence, a way to remove the
-   * third, a size the caller formats, a switch to stop wrapping. Four options
-   * to describe one table. REPORTED as *"just make reusable component that take
-   * different types of cols"*; `shell/table.mjs` is that, and this is its first
-   * caller.
-   *
-   * ⚠️ AND THE PADDED-MONOSPACE TRICK IS GONE WITH IT. The date and the source
-   * used to be `padEnd()` fields inside one text cell, which lines up only
-   * while every glyph is one width and cannot give a column its own colour,
-   * alignment or link. They are tracks now.
+   * The columns are declared to shell/table.mjs, each its own track with its own colour,
+   * alignment or link.
+   * See lessons/page-resources.md#resources-217
    */
   const table = createTable({
-    // 🔴 THE CAP IS NOT DECORATION AND IT IS CHECKED AT BOTH ENDS. A table that
-    // silently draws fewer rows than the corpus holds is a page reporting a
-    // smaller archive than was found, which is the worst shape a cap can have.
-    // `build-corpus.mjs` now refuses to WRITE a file over this, so the two
-    // cannot disagree, and the assert below counts rows against items anyway.
+    // build-corpus.mjs refuses to write more rows than this cap, and an assert counts them too.
+    // See lessons/page-resources.md#resources-218
     cap: 600,
-    // The sentences a record carries and no column can hold — see `note` in
-    // table.mjs. Several of the diary rows are only legible through it, and it
-    // is where the argument for a bracket goes: `when.note` says why a date is
-    // not narrower, which is a paragraph on the rows that have been read against
-    // a source and has no business being squeezed into 84 px.
+    // Sentences a record carries that no column can hold (see `note` in table.mjs), including
+    // `when.note`, why a date is not narrower.
+    // See lessons/page-resources.md#resources-219
     note: 'about',
     empty: 'nothing in this view',
     columns: [
@@ -138,25 +86,16 @@
       // A size can only exist if there is something to measure, which is why
       // this replaced a column that said the word `file` beside the kind.
       { key: 'size', label: 'size', width: 58, align: 'right' },
-      // 🔴 A DATE IS A CLAIM AND THE CELL CANNOT HOLD ITS EVIDENCE. `1962–1963-07-11`
-      // is eighteen months where a Wikidata title match had said `1963`, and
-      // until now a visitor could see the bracket get WIDER with nowhere to find
-      // out why. The two lines on hover are the two facts a reader cannot see:
-      // who says so, and how wide this is. Everything longer than two lines is
-      // on the row, which is the one surface in this component sized for prose.
+      // A date is a claim: the two hover lines say who says so and how wide the bracket is.
+      // See lessons/page-resources.md#resources-220
       { key: 'date', label: 'when', width: 84, hover: 'dateWhy' },
       { key: 'source', label: 'who holds it', width: 122 },
       // The name, linked to the record, cut to one line with the whole of it on
       // `title`. `hi` because it is the thing on the row you are looking for.
       { key: 'title', label: 'what', grow: true, link: 'url', clip: true, hi: true },
-      // ⚠️ CLIPPED, LIKE THE NAME. `public domain mark` is eighteen characters
-      // and wrapped to a second line on about a third of the rows — MEASURED on
-      // the first render — which made those rows double height and broke the
-      // one thing a table is for, which is scanning down it. The full string is
-      // on `title`, and there is nowhere to widen to: the name column is the
-      // one that should get any spare pixel.
-      // `licence` is the short form; `licenceFull` is what the holder actually
-      // said, on hover. Narrow, because four characters is the point.
+      // Clipped like the name, so rows stay one line; the full string is on `title`.
+      // `licence` is the short form, `licenceFull` what the holder said, on hover.
+      // See lessons/page-resources.md#resources-221
       { key: 'licence', label: 'licence', width: 76, align: 'right',
         clip: true, hover: 'licenceFull' },
     ],
@@ -164,15 +103,8 @@
   d.el.append(table.el);
   table.clear('reading the list…');
 
-  // ── what goes in each column ────────────────────────────────────────────
-  //
-  // 🔴 THE SOURCE HAS A COLUMN, AND GETTING ONE IS WHY THIS PAGE CHANGED
-  // COMPONENT. On the message list its three fixed gutters are 34, 40 and 52 px
-  // of 11 px mono — five, six and eight characters — while the names here run
-  // from `Yle` to `Wikimedia Commons`. Neither way out was acceptable:
-  // abbreviating institutions invents names nobody can search for, and widening
-  // a gutter in `shell.css` changes every other page that draws that list. A
-  // declared column costs neither.
+  // What goes in each column. The source gets its own column, unabbreviated.
+  // See lessons/page-resources.md#resources-222
 
   // The one kind too long for the first gutter, and the object it names — a
   // DIMI-A in a Stockholm museum — is a synthesiser. The rest are already
@@ -187,16 +119,9 @@
   const fileOf = (it) => !!it.file;
 
   /**
-   * 🔴 WHERE A DATE COMES FROM, IN WORDS. `when.how` is a slug a machine wrote
-   * for a machine — `ojanen-2020-thesis-p205-n402`, `edm-literal-length` — and
-   * showing one to a visitor is showing them a field name and calling it an
-   * answer. Most of them were already written as English with hyphens for
-   * spaces, so the fallback is honest; the ones named here are the ones that
-   * read as a database column, plus the citations, which become the form a
-   * reader could look up in a library.
-   *
-   * ⚠️ NOT A COLUMN. Thirty-nine distinct values, some of them a full clause,
-   * against a table that already has to cut the titles.
+   * Where a date comes from, in words: `when.how` slugs mapped to English or a citation,
+   * falling back to the slug with spaces. Shown on hover, not as a column (39 values).
+   * See lessons/page-resources.md#resources-223
    */
   const SAYS = {
     'national-gallery-yearFrom-yearTo': "the catalogue's own year fields",
@@ -256,15 +181,9 @@
   // then why its date is not narrower.
   const aboutOf = (it) => [it.note, it.when.note].filter(Boolean).join('\n\n');
   /**
-   * The size column, and the page does the arithmetic because the page owns the
-   * measurement — `messages.mjs` prints what it is handed.
-   *
-   * ⚠️ NOT RAW BYTES. The largest file here is 990,701,568 of them, which is
-   * eleven characters in a column sized for six, and a byte count is not a
-   * thing anybody reads at that magnitude anyway.
-   * ⚠️ AND A ROW THAT STANDS FOR SEVERAL THINGS SAYS HOW MANY INSTEAD. A set of
-   * 3,986 photographs has no single size; `3986×` is the honest answer and it
-   * is the same question the column asks — how much is behind this row.
+   * The size column, formatted by the page. Not raw bytes (up to 990,701,568); a row standing
+   * for several things says `3986×` instead.
+   * See lessons/page-resources.md#resources-224
    */
   const sizeOf = (it) => {
     if (it.count > 1) return `${it.count}\u00d7`;
@@ -279,27 +198,9 @@
   // else — all rights reserved, licensed per screening, not stated, unknown —
   // is not something this page will tell you that you may reuse.
   /**
-   * The licence, short enough to be a column you can read DOWN.
-   *
-   * 🔴 THE POINT IS THE COLUMN, NOT THE SAVING. `CC BY-NC-SA 4.0` is fifteen
-   * characters and `public domain mark` is eighteen, so the column was as wide
-   * as the holder's name and still wrapped or clipped — and a licence you have
-   * to read word by word on every row is a licence nobody reads at all.
-   * Shortened, the whole column is scanned in one movement and the odd ones out
-   * are the ones that are not four characters.
-   *
-   * ⚠️ THE FULL STRING IS ON HOVER AND THE EXACT ONE THE SOURCE GAVE IS IN THE
-   * FILE. An abbreviation nobody can expand is worse than a long word, so the
-   * cell carries `licenceFull` as its `title` and `corpus.json` keeps
-   * `licenceRef` verbatim — this is a display, never the record.
-   *
-   * ⚠️ AND `not stated` / `unknown` PRINT NOTHING. 173 of 333 rows say one or
-   * the other, which is a third of the table shouting a non-answer; nothing
-   * unmeasured prints as a value here, the same rule the readout cells follow.
-   * The blank IS the fact, and the column heading says what the blank means.
-   * ⚠️ CC0 STAYS CC0 RATHER THAN BECOMING PD. A dedication and a statement of
-   * fact are different claims about who could be wrong — collapsing them would
-   * make this page say something the holder did not.
+   * The licence, short enough to scan down a column; `licenceFull` is on hover and corpus.json
+   * keeps `licenceRef` verbatim. `not stated` and `unknown` print blank; CC0 stays CC0.
+   * See lessons/page-resources.md#resources-225
    */
   const SHORT_LIC = [
     [/^cc0/i, 'CC0'],
@@ -345,11 +246,8 @@
 
   function draw() {
     const rows = view();
-    // 🔴 THE NAME IS A LINK TO THE THING. Every row here is a POINTER at
-    // something held somewhere else, and until now there was no way to go there
-    // — REPORTED as *"titles should be links"*. A row with no URL still shows
-    // its name; it just does not lead anywhere, which is the truth about it and
-    // not a reason to hide it.
+    // The name links to the thing; a row with no URL still shows its name.
+    // See lessons/page-resources.md#resources-226
     table.set(rows.map((it) => ({
       kind: kindOf(it),
       size: sizeOf(it),
@@ -371,20 +269,9 @@
     corpus = await res.json();
     items = corpus.items || [];
     /**
-     * 🔴 A ROW TAKEN OUT ON PURPOSE IS NOT A ROW THAT DRIFTED, AND THE TWO ARE
-     * IDENTICAL TO EVERY CHECK BELOW: both leave an id that something else
-     * names and this list does not hold. MEASURED 2026-09-25, when `Saharan uni
-     * I` was removed on instruction and THREE asserts went red for it, two of
-     * them reporting a gathering that had silently lost a row.
-     *
-     * `corpus.removed` is the ledger that tells them apart, written by whoever
-     * takes a row out, and it is consulted rather than trusted: a row is only
-     * excused if it is NAMED there. An unexplained absence still reads red,
-     * which is the whole value of those two checks.
-     *
-     * ⚠️ AND IT IS SAID OUT LOUD IN THE LOG. A removal nobody is told about
-     * cannot be told apart from a leak, which is this repository's own rule
-     * about a sweep that reports nothing.
+     * A row removed on purpose is named in `corpus.removed`, which excuses it from the drift
+     * checks below and is logged; an unnamed absence still fails.
+     * See lessons/page-resources.md#resources-227
      */
     const gone = new Set((corpus.removed?.rows || []).map((r) => r.id));
     d.log(`${items.length} rows from ${corpus.sources.length} places, `
@@ -395,11 +282,9 @@
 
     d.assert('the list loaded', items.length > 0, `${items.length} rows`);
 
-    // The question this page exists to answer: is there something to put in
-    // every column? A column blank on most rows is a column to drop, and the
-    // only way to know is to COUNT the blanks rather than read a few rows.
-    // The DATE is deliberately not in this list — 33 of these rows have no
-    // date anywhere and saying so is the honest outcome, not a failure.
+    // Count the blanks in every column; a column blank on most rows should go. The date is
+    // left out: 33 rows have no date anywhere.
+    // See lessons/page-resources.md#resources-228
     const blank = items.filter((it) => !it.kind || !it.title || !it.source || !it.url);
     d.assert('every row says what it is, what it is called and who holds it',
       blank.length === 0, `${items.length - blank.length} of ${items.length} complete`);
@@ -425,10 +310,8 @@
     d.assert('nothing is served from here', here.length === 0,
       here.length ? here[0] : `${items.filter(fileOf).length} files, all somewhere else`);
 
-    // Every place that was asked has a row in the corpus's ledger, and the
-    // ledger's counts add up to the list. A source that quietly stopped
-    // returning anything would leave a ledger row reading 0 rather than
-    // vanishing, which is the difference between a finding and a silent drop.
+    // Every place asked has a ledger row, and the ledger's counts add up to the list.
+    // See lessons/page-resources.md#resources-229
     const named = new Set(corpus.sources.map((s) => s.name));
     const orphan = items.filter((it) => !named.has(it.source));
     const summed = corpus.sources.reduce((n, s) => n + s.items, 0);
@@ -436,37 +319,26 @@
       orphan.length === 0 && summed === items.length,
       `${corpus.sources.length} places, ${summed} rows counted`);
 
-    // A place that refused is in the list WITH ITS REASON. This is the check
-    // that keeps "we could not reach it" from decaying into "it does not
-    // exist": every row whose source did not answer 200 has to say what it did
-    // answer, in words a reader can act on.
+    // Every row whose source did not answer 200 says what it did answer.
+    // See lessons/page-resources.md#resources-230
     const refused = items.filter((it) => it.http !== 200);
     const mute = refused.filter((it) => !it.note);
-    // ⚠️ THE DETAIL IS WRITTEN FOR THE FAILING CASE FIRST. Proved by breaking
-    // it: with the pass-case string in both slots this read "4 refused:
-    // lahteilla.fi DNS ENOTFOUND, …" beside a red FAIL — true, and no help at
-    // all in finding the row that had gone quiet.
+    // The detail is written for the failing case first.
+    // See lessons/page-resources.md#resources-231
     d.assert('every place that refused says what it answered',
       refused.length > 0 && mute.length === 0,
       mute.length ? `${mute.length} of ${refused.length} say nothing — first ${mute[0].id}`
         : `${refused.length} refused: ${[...new Set(refused.map((it) => `${it.source} ${it.http}`))].join(', ')}`);
 
-    // 🔴 ONE GATHERING, NOT TWO. The deck at `/proto/deck/` plays from its
-    // own shorter list, and this corpus folds that list in rather than
-    // re-researching it. That fold happens when the corpus is built, so it can
-    // go stale in exactly the way nobody notices — both pages keep working and
-    // quietly disagree about what exists. Checking it from this end costs one
-    // fetch of a file that is already deployed, and turns a silent drift into
-    // a red run.
-    // ⚠️ AND THAT FETCH IS WHY IT IS THE ONE CHECK BEHIND THE GATE. It is a
-    // second list, downloaded for nobody: a reader of this page never sees a
-    // row of it. The drift it guards against happens when the corpus is BUILT,
-    // so a harness run catches it at exactly the same moment a visit would.
+    // Every id in /proto/deck/'s list must be here (folded in at build time). It is the one
+    // check behind SELFCHECK because it fetches a second file nobody reads.
+    // See lessons/page-resources.md#resources-232
     if (SELFCHECK) {
       const deckRes = await fetch(DECK);
       const deck = deckRes.ok ? await deckRes.json() : null;
       const have = new Set(items.map((it) => it.id));
-      // ⚠️ A ROW THE LEDGER NAMES IS NOT A DRIFT. See `gone` above.
+      // A row the ledger names is not a drift. See `gone` above.
+      // See lessons/page-resources.md#resources-233
       const lost = (deck?.items || []).filter((it) => !have.has(it.id) && !gone.has(it.id));
       const cut = (deck?.items || []).filter((it) => gone.has(it.id)).length;
       d.assert('everything the deck plays is in this list, bar what was removed by hand',
@@ -477,28 +349,19 @@
             + (cut ? `, bar ${cut} the ledger says was removed by hand` : ''));
     }
 
-    // 🔴 FOURTEEN DATES HERE REST ON A BOOK, AND THEY WERE ONE BUILD AWAY FROM
-    // BEING ERASED. They were hand-written into a generated file, so the next
-    // run of `build-corpus.mjs` would have put every one of them back to a
-    // filename year or the span of a compilation, with nothing on this page
-    // saying anything had changed. The values live in code now, twelve in
-    // `proto/deck/ingest.mjs` and two in `build-corpus.mjs`, and this is the
-    // check that was missing: a rebuild that loses them reads red here.
+    // Fourteen dates rest on a book (twelve in proto/deck/ingest.mjs, two in build-corpus.mjs);
+    // a rebuild that loses them fails here.
+    // See lessons/page-resources.md#resources-234
     const rows = corpus.amended?.rows || [];
-    // ⚠️ AND A ROW REMOVED BY HAND IS EXCUSED HERE TOO, BY NAME. `rows.length`
-    // is still 14 because the ledger of READINGS is a record of work that was
-    // done, and deleting an entry from it to make a count come out would be
-    // falsifying the thing this check exists to protect.
+    // A row removed by hand is excused by name; `rows.length` stays 14.
+    // See lessons/page-resources.md#resources-235
     const brackets = rows.filter((r) => {
       if (gone.has(r.id)) return false;
       const it = items.find((x) => x.id === r.id);
       return !it || it.when.edtf !== r.edtf || !it.when.note;
     });
-    // ⚠️ ONE VALUE TYPED HERE, AND IT HAS TO BE. Everything above compares the
-    // document with itself, which cannot notice the document being rebuilt
-    // without the readings in it — the ledger would simply be gone too. On-Off
-    // is the row a plain rebuild puts back to a bare `1963` off a Wikidata title
-    // match, so it is the one the page knows by heart.
+    // One value typed here: On-Off, which a plain rebuild would put back to a bare `1963`.
+    // See lessons/page-resources.md#resources-236
     const onOff = items.find((it) => it.id.endsWith('Erkki Kurenniemi - On-Off.mp3'));
     const WIDENED = '1962–1963-07-11';
     d.assert('the fourteen dates read off the thesis are still in the list',

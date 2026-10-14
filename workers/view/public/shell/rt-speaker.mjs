@@ -1,7 +1,6 @@
-// demo/shell/rt-speaker.mjs: the runtime of a `speaker` node on /connect/
-// (node-runtime.mjs): a gain into the page's one way out to the speakers.
-// `heard()` is the level measured there, so it reads silence when nothing
-// reaches the speakers whatever the links say.
+// demo/shell/rt-speaker.mjs: the `speaker` node on /connect/: a gain into the page's one way out.
+// `heard()` is the level measured there, so it reads silence whatever the links say.
+// why: lessons/kit-rt-speaker.md#header
 
 export function make({ level }) {
   let master = null;

@@ -1,97 +1,7 @@
-// demo/shell/circuit-sample.mjs
-// The SAMPLE half of a Novation Circuit pack: one RIFF/WAVE file read by
-// walking its chunks, and the numbers a table can sort on.
-//
-// 🔴 NOTHING HERE SENDS ANYTHING ANYWHERE. There is no Web MIDI, no
-// `requestMIDIAccess`, no output port, no SysEx frame and no network call, and
-// that is a safety property rather than an omission. `New Pack.circuitpack` is
-// the only backup of an instrument with no factory reset, and the three
-// operations that replace its contents are all one press away in Components.
-// This module reads bytes that are already in memory and returns numbers.
-// `circuit-sample-test.mjs` asserts the absence TWICE, the way
-// `circuit-session-test.mjs` does: once over the exported names, and once over
-// this file's own source text with the comments stripped, because a name test
-// cannot see a call inside a function.
-// 🔴 AND IT OPENS NO AUDIO DEVICE EITHER. There is no `AudioContext`, no
-// `decodeAudioData` and no worklet in here. `toMono()` hands back a
-// `Float32Array` and the page decides whether anything is ever heard, which
-// keeps the decoder testable in node with no browser at all.
-//
-// 🔴 THE CHUNKS ARE WALKED, NOT ASSUMED, AND THE CORPUS WOULD NEVER CATCH THE
-// DIFFERENCE. MEASURED 2026-09-21 on all 64 samples in `New Pack.circuitpack`:
-// every one is `fmt ` then `data` and nothing else, so the audio starts at
-// offset 44 in 64 of 64 and a hard-coded 44 byte header would read this pack
-// perfectly. It would also read a file carrying a `LIST` or a `fact` chunk as
-// noise, silently, which is the shape of defect this repository keeps paying
-// for. The walker is graded on a synthetic file with an extra chunk in it and
-// an odd length one that needs its pad byte, because the real pack cannot grade
-// it.
-//
-// 🔴 THE DURATION IS DERIVED FROM THE DATA LENGTH AND FROM NOTHING THAT CLAIMS
-// IT. `byteRate` in the header is a claim, and so is a `fact` chunk's frame
-// count. Both are believed by most players and both can lie. What is counted
-// here is bytes actually present divided by `blockAlign`, so a truncated file
-// reports the length it really has and says that it was truncated.
-//
-// ⚖️ WHAT A FIELD MEANS IS NOT GUESSED, THE SAME STANCE `circuit-session.mjs`
-// TAKES. Everything decoded below is defined by the RIFF/WAVE specification.
-// 🔴 THERE IS NO PAD MAPPING IN HERE BECAUSE NOTHING CORROBORATES ONE. The only
-// thing a second source confirms is which FILE is which SLOT: `index.json` in
-// the pack lists 64 samples named `Sample1` to `Sample64` against
-// `samples/sample_0.wav` to `samples/sample_63.wav`, in order, measured. Which
-// of the Circuit's drum pads ends up playing slot 37 is a property of a SESSION
-// and not of the sample, it is not in any WAV header, and the experiment that
-// would settle it is one assignment on the instrument, one export and a diff.
-//
-// 🔴 AND SINCE 2026-09-21 IT READS A SECOND CONTAINER, BECAUSE ELEVEN FILES IN
-// THE ARCHIVE DOWNLOAD CARRY SIXTY FOUR SAMPLES EACH AND NEITHER `/tom/` NOR
-// `/pack/` COULD OPEN ONE. A `.circuitpack` that is not a zip is a bulk SysEx
-// transfer, and `research/dump-samples-2026-09-21.md` measured the whole layout.
-// The instruction was three words: *"one line reading byte 0 - do it"*.
-// `containerOf()` is that line. **`50 4b` is a zip and `f0` is a stream**, and
-// everything below it exists because the second answer used to be a refusal.
-// 🔴 THE RESTORATION IS PROVED RATHER THAN PLAUSIBLE, WHICH IS THE ONLY REASON
-// ANY OF IT IS HERE. The stream end carries a **CRC32 of the unpacked payload**
-// and **36 of 36 streams on this disk verify**, 24 sample and 12 session, over
-// 145 MB of somebody else's packing. A single wrong bit breaks it, and
-// `streamsIn()` REFUSES a stream that fails rather than handing back audio that
-// merely looks like audio.
-// 🔴 AND IT STILL BUILDS NOTHING AND STILL SENDS NOTHING. `unpack7()` is
-// imported from `circuit-syx.mjs`; there is no packer here, no message builder
-// and no stream writer, and a complete bulk sample transfer is exactly the file
-// that would replace every sample slot on an instrument with no factory reset.
-// The test builds the corrupt streams it needs and they cannot leave that file.
-//
-// 🔴 AND SINCE 2026-09-28 IT READS 24 BIT AND IT MIXES STEREO DOWN, BECAUSE
-// `/pack/` OPENS ANYBODY'S ZIP NOW AND 152 REAL FILES ON THIS DISK OPENED WITH
-// NO PEAK, NO SOUND SHARE, NO WAVEFORM AND NO PLAYBACK. Asked for in five
-// words: *"pack: make support of any wavs in zip and change desc accrodingly"*.
-// MEASURED the same day over the six zips in `tmp/packs` that hold audio: 989
-// named `.wav` entries, 88 of them Mac resource forks, leaving **901 real
-// files**. `readWave()` read every one of the 901 perfectly and `toMono()`
-// refused 152 of them, so every header cell was true and every measured cell
-// was empty. The shapes are **534 at 44.1 kHz 16 bit mono, 215 at 48 kHz 16 bit
-// mono, 98 at 44.1 kHz 24 bit stereo, 52 at 44.1 kHz 16 bit stereo and 2 at
-// 44.1 kHz 24 bit mono**, and whole zips sat in the refused half: all 64 of
-// `Gabe Miller Drums 2020.zip` and all 40 of `one-shots.zip` are 24 bit stereo.
-// 🔴 THE TWO SHAPES ADDED ARE THE TWO THE DISK CAN GRADE AND NOTHING ELSE.
-// 8 bit, 32 bit integer, IEEE float and `WAVE_FORMAT_EXTENSIBLE` are all real
-// shapes in the wild and there are **zero of each in 965 real files here**,
-// counting the 64 nested one archive deeper. They are refused BY NAME, with the
-// count in the refusal, which is the honest version of a widened constant. The
-// header's own rule has not moved: untested arithmetic that silently produces
-// plausible audio is worse than a refusal a caller can read out.
-//
-// 🔴 A `blockAlign` SMALLER THAN THE FRAME IT DESCRIBES USED TO THROW A
-// `RangeError` OUT OF THREE EXPORTED FUNCTIONS, AND THAT WAS FOUND WHILE DOING
-// THE ABOVE RATHER THAN BY A HARNESS. `frames` comes from the DECLARED block
-// align and the reader steps by the DERIVED one, so a file declaring 1 on a
-// 16 bit mono frame asked for twice the bytes it has and `toMono`, `content`
-// and `summarise` all died inside a `DataView`. A page opening somebody's zip
-// is exactly where that file arrives. The frame count is clamped to what the
-// data can actually supply now and `framesClamped` says it happened, which is
-// the module's standing rule arriving one function further in: a refusal is a
-// value a caller can show and nothing here throws.
+// demo/shell/circuit-sample.mjs: Circuit pack samples, as RIFF/WAVE walked by chunk or a bulk SysEx
+// stream verified by CRC32. Sends nothing, opens no audio device; the test asserts the absence.
+// Duration comes from bytes present; 16 and 24 bit, mono or stereo mixed down; nothing throws.
+// why: lessons/kit-circuit-sample.md#header
 
 import { messages, unpack7 } from './circuit-syx.mjs';
 
@@ -119,32 +29,17 @@ export const FORMAT_NAMES = {
 };
 
 /**
- * The bit depths `toMono()` knows how to turn into floats.
- *
- * 🔴 TWO ENTRIES, AND BOTH ARE GRADED AGAINST REAL FILES RATHER THAN WIDENED.
- * This read `[16]` until 2026-09-28 and the comment beside it said an 8 bit or
- * a 24 bit branch would be code nothing here could grade. That was true of the
- * pack and stopped being true of the disk: **100 of the 901 real `.wav` files
- * in `tmp/packs` are 24 bit**, 98 stereo and 2 mono, and two whole zips are
- * nothing else. So 24 arrives with a corpus behind it and the rest do not.
- *
- * 🔴 AND WHAT IS NOT IN IT IS THE POINT. **8 bit is unsigned with a 128 bias**
- * where every other depth is signed, which is arithmetic that fails by halving
- * the level and adding a DC offset, which is the exact shape of plausible
- * audio this module refuses to invent. **32 bit integer** is rarer still. There
- * are **zero of either in 965 real files on this disk**. Both are refused by
- * name, with that count in the refusal, and the thing that would change it is a
- * file rather than an argument.
+ * The bit depths `toMono()` turns into floats: the two the real corpus holds (100 of 901 are 24 bit).
+ * 8 bit (unsigned, 128 bias) and 32 bit integer are refused by name: zero of either in 965 files.
+ * why: lessons/kit-circuit-sample.md#depths
  */
 export const DEPTHS = [16, 24];
 /** Divisor for 16 bit signed, which runs -32768 to 32767. */
 export const FULL_SCALE_16 = 32768;
 /**
  * Divisor for 24 bit signed, which runs -8388608 to 8388607.
- * 🔴 THREE BYTES LITTLE ENDIAN AND THE SIGN LIVES IN THE TOP ONE, so a reader
- * that takes the low two bytes and calls it 16 bit gets noise at a random
- * amplitude rather than an error. `DataView` has no `getInt24`, so the bytes
- * are assembled here and the sign is extended by hand.
+ * Three bytes little endian, sign in the top one; `DataView` has no `getInt24`.
+ * why: lessons/kit-circuit-sample.md#full-scale-24
  */
 export const FULL_SCALE_24 = 8388608;
 
@@ -152,56 +47,17 @@ export const FULL_SCALE_24 = 8388608;
 export const FULL_SCALE = { 16: FULL_SCALE_16, 24: FULL_SCALE_24 };
 
 /**
- * 🔴 HOW MANY CHANNELS ARE MIXED DOWN, AND WHY IT IS TWO RATHER THAN ANY.
- * The mixdown below is a plain average, which is the right answer for one
- * channel and for two and is a GUESS for more: a 5.1 file has a centre, a
- * surround pair and an LFE, and weighting all six equally is a downmix nobody
- * here has measured against anything. There are **zero files above 2 channels
- * in the 965 on this disk**, so more than two is refused by name.
+ * At most two channels are mixed: a plain average is a guess for 5.1, and there are
+ * zero files above 2 channels in the 965 here.
+ * why: lessons/kit-circuit-sample.md#mix-channels-max
  */
 export const MIX_CHANNELS_MAX = 2;
 
 /**
- * 🔴 THE MIXDOWN IS THE MEAN OF THE CHANNELS, AND IT IS WRITTEN DOWN HERE
- * BECAUSE A PEAK TAKEN AFTER IT IS A DIFFERENT NUMBER FROM A PEAK TAKEN PER
- * CHANNEL AND SOMEBODY WILL COMPARE THE TWO. `content()` reports BOTH, so the
- * comparison is a cell rather than an argument.
- *
- * The three candidates and why this one:
- * - **The mean, which is what runs.** It cannot leave -1 to 1, so `peak` stays
- *   a fraction of full scale and `clipped` keeps meaning *this file touches the
- *   rail* rather than *our arithmetic did*. A frame is at the rail after the
- *   mean only when BOTH channels are at the rail, which is a stronger and truer
- *   statement than either channel alone.
- * - **The sum.** Invents clipping the file does not have: two channels of
- *   correlated material at 0.8 read 1.6, so a page would show a normalised
- *   sample as ruined.
- * - **The left channel alone.** Throws half the file away, and on a hard
- *   panned one shows silence for a sample that is not silent.
- * 🔴 MEASURED OVER THE 150 REAL STEREO FILES IN `tmp/packs`, AND THE SPREAD IS
- * THE ARGUMENT FOR REPORTING BOTH NUMBERS RATHER THAN A FOOTNOTE ON IT. The
- * mean's peak against the louder channel's peak runs **0.46642 at worst,
- * 0.99996 at the median and exactly 1 at best**: 39 of the 150 land on 1
- * exactly, 34 come in under 0.99 and **15 under 0.9**. 26 of the 150 are dual
- * mono, where the two readings agree by construction. So the widest file in the
- * corpus reads at **less than half** the level of its own loudest channel after
- * the mix, which is a real fact about a wide sample and is indistinguishable
- * from a quiet one unless both numbers are on screen.
- * ⚠️ THAT MEDIAN WAS WRITTEN HERE AS `1.0000` FOR AN HOUR AND IT IS 0.99996.
- * The survey that produced it printed `toFixed(4)`, the assert built on the
- * printed figure went red, and the difference is 4 parts in 100,000 of one
- * sample of one file. **A rounded reading is a reading and not a fact**, which
- * this repository has paid for before at a different scale.
- *
- * ⚠️ AND THE ONE CASE WHERE THE MEAN LIES OUTRIGHT IS NAMED AND REPORTED
- * RATHER THAN LEFT TO BE DISCOVERED. Two channels in exact anti phase average
- * to digital silence, so `peak` reads 0 on a file that is loud. `content()`
- * sets `cancelled` when the mix is silent and a channel is not, because *this
- * file is empty* and *this mixdown cancelled* are two findings and a single
- * zero collapses them into the wrong one.
- * ⚖️ **THERE ARE ZERO ANTI PHASE FILES IN THE 901**, so that flag has no real
- * subject on this disk and is graded on a fixture built for it. It is a guard
- * against a shape rather than a report of one.
+ * The mixdown is the mean: it stays in -1 to 1, so `clipped` means the file touches the rail.
+ * Mixed peak over the louder channel's peak runs 0.46642 to 1 (median 0.99996) on 150 stereo
+ * files, so `content()` reports both; `cancelled` flags anti phase silence.
+ * why: lessons/kit-circuit-sample.md#mix
  */
 export const MIX = 'mean of the channels';
 
@@ -222,15 +78,8 @@ function no(why, extra = {}) {
 
 /**
  * One sample at a byte offset, as a float in -1 to 1.
- *
- * 🔴 24 BIT IS THREE BYTES LITTLE ENDIAN AND THE SIGN IS IN THE TOP BYTE, so
- * the top byte is shifted up and then the whole value is brought down by 2^24
- * when bit 23 is set. Doing it with `<< 16` on a signed byte would be a second
- * way to write the same thing and a first way to get it wrong, because `|` and
- * `<<` in JavaScript work on 32 bit signed integers and the sign would land in
- * the wrong bit.
- * ⚠️ IT IS TOTAL OVER `DEPTHS` AND OVER NOTHING ELSE. Every caller checks the
- * depth first, which is why this has no refusal of its own to return.
+ * 24 bit sign is extended by subtracting 2^24 when bit 23 is set. Total over `DEPTHS` only.
+ * why: lessons/kit-circuit-sample.md#readsample
  */
 function readSample(u8, at, bits) {
   if (bits === 16) {
@@ -243,11 +92,9 @@ function readSample(u8, at, bits) {
 }
 
 /**
- * Whether this wave's SHAPE can be turned into floats, and the reason when not.
- * 🔴 ONE PREDICATE, READ BY `readWave`, BY `slotWave` AND BY `toMono`, so the
- * `decodable` cell a page shows and the refusal a decoder gives cannot disagree.
- * They were two expressions in two files until 2026-09-28 and widening one of
- * them would have left the other saying no.
+ * Whether this wave's shape can be turned into floats, and the reason when not.
+ * One predicate for `readWave`, `slotWave` and `toMono`, so `decodable` and a refusal agree.
+ * why: lessons/kit-circuit-sample.md#shapefault
  */
 function shapeFault(bits, channels) {
   if (!DEPTHS.includes(bits)) {
@@ -336,14 +183,9 @@ export function readWave(buf) {
   const format = dv.getUint16(fmt.at, true);
   if (format !== FORMAT_PCM) {
     const named = FORMAT_NAMES[format];
-    // 🔴 THE FORMAT GATE IS WHERE IEEE FLOAT AND WAVE_FORMAT_EXTENSIBLE ARE
-    // TURNED AWAY, AND THAT IS A DECISION RATHER THAN AN OMISSION. Both are
-    // real shapes in the wild and there are ZERO of either among the 965 real
-    // `.wav` files on this disk, so neither has anything here to be graded
-    // against. Float in particular is not a depth: it is a different number
-    // line, it is allowed to run past 1.0, and `peak`, `clipped` and the rail
-    // test below all mean something different on it. A refusal that names the
-    // format is an answer a page can print. Arithmetic nothing graded is not.
+    // IEEE float and WAVE_FORMAT_EXTENSIBLE are refused by name: zero of either in 965 files, and
+    // float may run past 1.0, which changes what `peak` and `clipped` mean.
+    // why: lessons/kit-circuit-sample.md#format-gate
     return no(`format tag ${format}${named ? `, ${named},` : ''} is not decoded here, and only ${FORMAT_PCM}, PCM, is`,
       { format });
   }
@@ -356,20 +198,9 @@ export function readWave(buf) {
   if (!rate) return no('the fmt chunk says 0 Hz, so no duration can be worked out');
   if (!blockAlign) return no('block align is 0, so a frame has no length and frames cannot be counted');
 
-  // ⚠️ `frames` USES THE DECLARED BLOCK ALIGN RATHER THAN channels x bits / 8.
-  // They agree in all 64 files here and `blockAlignOk` says whether they agree
-  // in the file in hand. Deriving the frame length instead of reading it would
-  // hide exactly the disagreement a caller wants to be told about.
-  //
-  // 🔴 AND THEN IT IS CLAMPED TO WHAT THE DATA CAN SUPPLY, WHICH IS THE OTHER
-  // HALF AND WAS MISSING UNTIL 2026-09-28. A file declaring a block align
-  // SMALLER than its own frame claims more frames than there are bytes to read
-  // at the real stride, and the reader walked straight off the end of the
-  // `DataView` and threw a `RangeError` out of `toMono`, `content` and
-  // `summarise` alike. MEASURED on a 16 bit mono file declaring a block align
-  // of 1: 8 frames claimed over 8 bytes, 16 bytes needed, three exported
-  // functions dead. Nothing else in this module throws and this must not
-  // either, so the count comes down and `framesClamped` says it did.
+  // `frames` uses the declared block align, so `blockAlignOk` can report a disagreement, then is
+  // clamped to what the data supplies (`framesClamped`); a block align of 1 on 16 bit mono threw.
+  // why: lessons/kit-circuit-sample.md#frames
   const claimed = Math.floor(data.size / blockAlign);
   const stride = frameBytes(bits, channels);
   const holdable = stride ? Math.floor(data.size / stride) : 0;
@@ -412,20 +243,11 @@ export function readWave(buf) {
 }
 
 /**
- * The PCM as plain mono floats in -1 to 1, ready for
- * `AudioBuffer.copyToChannel`, with no round trip through a decoder.
- *
- * 🔴 IT READS THE MODEL AND NOT THE FILE. `readWave()` copied the data chunk,
- * so a caller that overwrites the buffer it parsed still gets the right audio,
- * and the test proves that by scribbling over the source.
- *
- * 🔴 AND A STEREO FILE IS MIXED DOWN BY THE `MIX` ABOVE, WHICH IS THE MEAN.
- * `mixed` says whether anything was mixed at all, so a page never has to work
- * it out from the channel count, and `mix` carries the name of the arithmetic
- * so a reading of this audio can be attributed to it.
- *
+ * The PCM as plain mono floats in -1 to 1, ready for `AudioBuffer.copyToChannel`.
+ * Reads the model, not the source buffer. Stereo is mixed by `MIX`; `mixed` and `mix` say so.
  * @param {object} wave  what `readWave()` returned
  * @returns {{ok:false, why:string}|{ok:true, samples:Float32Array, frames:number, rate:number, mixed:boolean, mix:string}}
+ * why: lessons/kit-circuit-sample.md#tomono
  */
 export function toMono(wave) {
   if (!wave || !wave.ok) return no(wave && wave.why ? wave.why : 'that is not a parsed WAVE');
@@ -451,17 +273,11 @@ export function toMono(wave) {
 }
 
 /**
- * Every channel's own peak, taken from the bytes BEFORE anything is mixed.
- *
- * 🔴 IT IS A SECOND, INDEPENDENT READING AND THAT IS THE WHOLE REASON IT
- * EXISTS. `content().peak` is a property of the mixdown; these are properties
- * of the file. CLAUDE.md's rule about two numbers derived from one field is
- * what this answers: a page that showed only the mixed peak could not tell a
- * quiet file from a wide one, and could not tell either from the anti phase
- * case where the mean is silent and both channels are loud.
- *
+ * Every channel's own peak, taken from the bytes before anything is mixed: an independent
+ * reading that tells a wide file from a quiet one.
  * @param {object} wave  what `readWave()` returned
  * @returns {{ok:false, why:string}|{ok:true, peaks:number[]}}
+ * why: lessons/kit-circuit-sample.md#channelpeaks
  */
 export function channelPeaks(wave) {
   if (!wave || !wave.ok) return no(wave && wave.why ? wave.why : 'that is not a parsed WAVE');
@@ -483,32 +299,19 @@ export function channelPeaks(wave) {
 }
 
 /**
- * What is actually in the audio, as numbers a table can sort on.
- *
- * `peak` and `rms` are fractions of full scale rather than dBFS, because a
- * column of negative decibels reads worse than a column of 0 to 1 and the page
- * can convert. `leadingZeros` and `trailingZeros` are counted in FRAMES, and
- * they are how a page says how much of a 2 second sample is sound.
- *
- * ⚠️ A FILE OF NOTHING BUT ZEROS COUNTS AS ALL LEADING AND NO TRAILING. Counting
- * it both ways would make `sound` negative, and the honest reading of a silent
- * file is that it never started rather than that it ended twice.
- *
+ * What is in the audio as sortable numbers: `peak` and `rms` as fractions of full scale,
+ * leading and trailing zeros in frames. An all-zero file counts as all leading.
  * @param {object} wave  what `readWave()` returned
+ * why: lessons/kit-circuit-sample.md#content
  */
 export function content(wave) {
   const mono = toMono(wave);
   if (!mono.ok) return mono;
   const s = mono.samples;
   const n = s.length;
-  // ⚠️ THE RAIL IS ONE STEP OF THIS FILE'S OWN DEPTH, NOT A CONSTANT. This read
-  // `32767 / FULL_SCALE_16` until 2026-09-28, which is 0.99997 and is 256 steps
-  // wide on a 24 bit file, so everything in the top 0.003 per cent of it would
-  // have counted as clipped. One step of 24 bit is 0.00000012.
-  // ⚖️ AND IT CHANGES NOTHING ON THIS CORPUS, WHICH IS SAID RATHER THAN LEFT
-  // FOR SOMEBODY TO ASSUME OTHERWISE. MEASURED over the 100 real 24 bit files:
-  // **0 samples at the 24 bit rail and 0 at the 16 bit one**, so not one row
-  // moves either way. It is graded on a fixture built to sit between the two.
+  // The rail is one step of the file's own depth (24 bit: 0.00000012), not 32767/32768.
+  // No sample in the 100 real 24 bit files sits at either rail.
+  // why: lessons/kit-circuit-sample.md#rail
   const scale = FULL_SCALE[wave.bits];
   const rail = (scale - 1) / scale;
   let peak = 0, peakAt = -1, sumsq = 0, clipped = 0;
@@ -550,10 +353,8 @@ export function content(wave) {
     /** The loudest channel, which is what `peak` is compared against. */
     channelPeak: widest,
     /**
-     * 🔴 THE ONE READING THE MEAN CANNOT GIVE ON ITS OWN. Two channels in anti
-     * phase average to digital silence, so `peak` reads 0 on a file that is
-     * loud. *This file is empty* and *this mixdown cancelled* are two findings
-     * and a bare zero is the wrong one of them.
+     * Anti phase channels average to silence: `peak` 0 on a loud file. This says the mix cancelled.
+     * why: lessons/kit-circuit-sample.md#cancelled
      */
     cancelled: peak === 0 && widest > 0,
   };
@@ -590,11 +391,8 @@ export function summarise(wave, name = '') {
     chunks: wave.chunkIds.join(' '),
     truncated: wave.truncated,
     peak: c.ok ? round(c.peak, 4) : null,
-    // ⚠️ THE PEAK OF THE LOUDEST CHANNEL, BESIDE THE PEAK OF THE MIX, BECAUSE
-    // THEY ARE DIFFERENT NUMBERS ON A WIDE FILE AND A READER COMPARING TWO
-    // COLUMNS SHOULD NOT HAVE TO DECODE THE FILE AGAIN TO DO IT. They are equal
-    // on every mono file by construction, which is why a page showing one
-    // column on a mono pack was never wrong, only narrow.
+    // The loudest channel's peak beside the mix peak; equal on mono, different on a wide file.
+    // why: lessons/kit-circuit-sample.md#chanpeak
     chanPeak: c.ok ? round(c.channelPeak, 4) : null,
     mixed: c.ok ? c.mixed : null,
     cancelled: c.ok ? c.cancelled : null,
@@ -608,10 +406,8 @@ export function summarise(wave, name = '') {
 }
 
 /**
- * The totals a page shows above a table of 64 rows.
- * ⚠️ A REFUSED FILE IS COUNTED, NOT DROPPED. `refused` is the number that says
- * a pack is not what it looks like, so a total taken over the ones that parsed
- * would hide the only thing worth seeing.
+ * The totals a page shows above a table of 64 rows. A refused file is counted, not dropped.
+ * why: lessons/kit-circuit-sample.md#summariseall
  */
 export function summariseAll(waves) {
   const good = waves.filter((w) => w && w.ok);
@@ -636,48 +432,19 @@ export function summariseAll(waves) {
     median,
     bytes: good.reduce((n, w) => n + w.length, 0),
     truncated: good.filter((w) => w.truncated).length,
-    // ⚠️ HOW MANY OF THEM HAD TO BE MIXED DOWN, so a total taken over a pack
-    // that is half stereo says so rather than leaving the reader to infer it
-    // from a `channels` list that only says WHICH counts appear.
+    // How many had to be mixed down.
+    // why: lessons/kit-circuit-sample.md#mixed
     mixed: good.filter((w) => w.channels > 1).length,
   };
 }
 
 /**
- * 🔴 THE SAMPLES OUT OF AN OPEN PACK, IN ONE PLACE, BECAUSE TWO PAGES WANT
- * THEM. Instructed 2026-09-21: *"use shared code to get samples"*, while a
- * second page that opens a `.circuitpack` was being started. `/pack/` had this
- * loop inline and the new page would have had a second copy of it, which is
- * exactly the shape CLAUDE.md names: a control that exists in one page and
- * nowhere else is a component nobody has noticed yet, and the version that
- * arrives second is always subtly different.
- *
- * ⚠️ IT TAKES THE ENTRY LIST `unzip.mjs` RETURNS, NOT THE PACK'S BYTES. A page
- * opening a pack wants its patches and its sessions out of the same list, so
- * reading the zip twice to get two halves of one file would be the waste that
- * is easy not to notice. The caller unzips once and hands the list round.
- *
- * ⚠️ AND THE ORDER IS THE PACK'S OWN, BY NUMBER RATHER THAN BY NAME.
- * `sample_10.wav` sorts before `sample_2.wav` as text, and the owner's
- * `index.json` names them `Sample1` to `Sample64` against `sample_0.wav` to
- * `sample_63.wav` IN ORDER, 64 of 64. A page showing slot 10 where slot 2 lives
- * would be wrong in a way nobody would spot by looking.
- *
- * 🔴 A FILE THAT WILL NOT PARSE KEEPS ITS PLACE AND CARRIES ITS REASON. It is
- * the rule the patch reader already follows: a reader that silently drops one
- * leaves a pack looking smaller than it is, which is a wrong answer wearing an
- * empty one's clothes. `summariseAll` counts them as `refused` for the same
- * reason.
- * ⚠️ AND A MANIFEST IS A PROMISE WHILE THE ARCHIVE IS THE INVENTORY, which was
- * MEASURED 2026-09-21 on the two packs in `purchased/`: their `index.json`
- * lists 128 samples between them, every one with an empty name, pointing at
- * `samples/sample_0.wav` onward, and **neither zip holds a single `.wav`**. A
- * page building its table from the index would show sixty four rows of audio
- * that is not in the file. So this reads the ENTRIES and never the index.
- *
- * @param {{name:string,size:number,read:()=>Promise<Uint8Array>}[]} entries
- *   whatever `readZip()` returned
+ * The samples out of an open pack's zip entries, shared by the pages that open packs.
+ * Ordered by slot number, not name. Unparsable files keep their place with a reason.
+ * Reads the entries, never `index.json`: a manifest can list 128 samples a zip does not hold.
+ * @param {{name:string,size:number,read:()=>Promise<Uint8Array>}[]} entries whatever `readZip()` returned
  * @returns {Promise<{name:string,size:number,wave:object,row:object}[]>}
+ * why: lessons/kit-circuit-sample.md#samplesin
  */
 export async function samplesIn(entries) {
   const wav = (entries || [])
@@ -699,12 +466,8 @@ function num(name) {
   return m ? +m[1] : -1;
 }
 
-// ── the other container ───────────────────────────────────────────────────
-//
-// 🔴 ONE LINE READING BYTE 0, AND IT IS WORTH ELEVEN FILES AND 336 SAMPLES.
-// Instructed 2026-09-21. Both pages used to hand a non-zip `.circuitpack` to
-// `readZip()`, catch the throw, and tell the visitor it was not a pack. It is a
-// pack. It is simply not a zip.
+// The other container: a `.circuitpack` that is not a zip is a SysEx stream, told by byte 0.
+// why: lessons/kit-circuit-sample.md#other-container
 
 /** A zip local header, and every `.zip` and every zipped `.circuitpack`. */
 export const ZIP_HEAD = [0x50, 0x4b];
@@ -719,16 +482,11 @@ export const SYSEX_START = 0xf0;
 export const CONTAINER = { zip: 'zip', sysex: 'sysex', unknown: 'unknown' };
 
 /**
- * The first two bytes, and nothing else.
- *
- * ⚠️ AN EXTENSION IS NOT EVIDENCE AND THAT IS WHY THIS EXISTS. `CLAUDE.md`
- * records a `.circuitpack` off a public archive that is a raw SysEx stream of
- * 6,930 messages, and the archive download holds eleven more. The name says
- * pack on all of them, Components opens six of the seventeen, and the byte at
- * offset 0 separates them in one comparison.
- *
+ * The first two bytes, and nothing else. An extension is not evidence: `50 4b` is a zip,
+ * `f0` is a SysEx stream.
  * @param {ArrayBuffer|Uint8Array} buf
  * @returns {{kind:string, head:string, why:string}}
+ * why: lessons/kit-circuit-sample.md#containerof
  */
 export function containerOf(buf) {
   const u8 = bytesOf(buf);
@@ -752,15 +510,9 @@ export function containerOf(buf) {
 // ── the checksum the stream carries about itself ──────────────────────────
 
 /**
- * 🔴 THIS IS WHAT MAKES THE RESTORATION EXACT RATHER THAN PLAUSIBLE. The stream
- * end declares a CRC32 of the unpacked payload and 36 of 36 streams on this disk
- * verify, over 145 MB packed by four unrelated authors. One wrong bit in
- * 5,763,072 breaks it.
- *
- * ⚠️ IT IS PLAIN JAVASCRIPT ON PURPOSE. `node:zlib` has `crc32` and a browser
- * has nothing, and this module runs in both. The test grades this function
- * against `zlib.crc32`, which is the independent second source the rule about
- * two-numbers-from-one-field asks for.
+ * CRC32 over the unpacked payload: 36 of 36 streams here verify, 145 MB by four authors.
+ * Plain JavaScript so it runs in a browser; the test grades it against `zlib.crc32`.
+ * why: lessons/kit-circuit-sample.md#crc32
  */
 const CRC_POLY = 0xedb88320;
 let CRC_TABLE = null;
@@ -798,13 +550,9 @@ export const STREAM_END = 0x7a;
 export const STREAM_PREFIX = [0xf0, 0x00, 0x20, 0x29, 0x00];
 
 /**
- * ✅ The six nibble field at bytes 8 to 13 of a stream start, MEASURED at
- * `0x23B000` on all 24 sample streams and `0x2E000` on all 12 session streams on
- * this disk, by four unrelated authors.
- * ⚖️ **WHAT IT MEANS IS A READING AND STAYS ONE.** A destination address, a
- * capacity and a type tag that happens to look numeric are all consistent with
- * what is measured. Nothing here decides a stream's kind from it: the slot
- * walker decides, because the walker can be wrong in a way a reader can see.
+ * The six nibble field at bytes 8 to 13 of a stream start: `0x23B000` on all 24 sample streams,
+ * `0x2E000` on all 12 session streams. What it means is unknown; the slot walker decides kind.
+ * why: lessons/kit-circuit-sample.md#region-samples
  */
 export const REGION_SAMPLES = 0x23b000;
 export const REGION_SESSIONS = 0x2e000;
@@ -830,26 +578,11 @@ function hex(v) {
 }
 
 /**
- * Every logical stream in a file, verified against its own declared length and
- * its own checksum.
- *
- * 🔴 IT SPLITS ON `0x77` AND `0x7a` BEFORE IT UNPACKS ANYTHING, AND THAT IS THE
- * WHOLE DIFFERENCE. A `.circuitpack` that is not a zip is TWO streams back to
- * back, 33 sessions of 53,248 bytes then a 64 slot sample table, and
- * concatenating all 29,376 carriers first makes one 7,520,256 byte run that is
- * neither. `research/dump-samples-2026-09-21.md` §7.3 measured the existing
- * reader doing exactly that and answering `sessions: 141` where the answer is
- * 33.
- *
- * 🔴 AND A STREAM THAT FAILS ITS CHECKSUM IS REFUSED, NOT RETURNED WITH A
- * WARNING. Audio that decodes is not audio that decoded correctly, and the
- * stream carries the answer.
- *
- * ⚠️ A CARRIER'S LENGTH IS NOT ASSERTED. All 29,376 measured are 300 bytes and a
- * short final one would be legal; the declared length and the checksum catch
- * anything the carrier walk got wrong, which is a stronger test than the shape.
- *
+ * Every logical stream in a file, verified against its declared length and checksum.
+ * Splits on `0x77`/`0x7a` before unpacking (one run read 141 sessions where there are 33).
+ * A stream failing its checksum is refused. Carrier length is not asserted.
  * @param {ArrayBuffer|Uint8Array} buf
+ * why: lessons/kit-circuit-sample.md#streamsin
  */
 export function streamsIn(buf) {
   const u8 = bytesOf(buf);
@@ -947,52 +680,25 @@ export const SLOT_MARK = 0x01;
  */
 export const SLOT_RATES = [48000];
 /**
- * 🔴 THE SLOT WALKER'S OWN DEPTH LIST, SPLIT OUT OF `DEPTHS` ON 2026-09-28,
- * AND THE SPLIT IS THE POINT RATHER THAN THE VALUE. This walk used to test
- * `DEPTHS.includes(bits)`, so widening the DECODER to read 24 bit files off a
- * stranger's zip would silently have widened the walker's SYNC CHECK at the
- * same time. They are two claims about two corpora: the decoder's list is what
- * the disk holds, and this one is **16 bit on all 1,536 Circuit slots
- * measured**. A sync check that accepts a second byte value is a sync check
- * twice as likely to find a sample table in noise, and this file's negative
- * controls are the only thing standing between a page and 64 rows of plausible
- * audio out of a session image.
- * ⚠️ It is `bay.mjs`'s lesson in a new costume: one list doing two jobs breaks
- * everything or protects nothing, so it is two lists.
+ * The slot walker's own depth list, apart from `DEPTHS`: it is a sync check, 16 bit on all
+ * 1,536 Circuit slots measured, and widening it would find tables in noise.
+ * why: lessons/kit-circuit-sample.md#slot-depths
  */
 export const SLOT_DEPTHS = [16];
 /**
- * 🔴 THE CHANNEL COUNT IS NOT IN THE SLOT HEADER AND THIS IS AN ASSUMPTION
- * WEARING A CONSTANT'S CLOTHES, SO IT IS NAMED. Ten bytes carry a flags byte, a
- * marker, a depth, a rate and a length, and no field anywhere says how many
- * channels. `positron-hardware` records the rule this sits under: **a channel
- * count cannot be inferred from a payload**, and guessing wrong plays an octave
- * out, which sounds like a broken instrument rather than a broken header.
- * ✅ What corroborates 1 is a different corpus: all 64 samples in
- * `New Pack.circuitpack` are 48 kHz 16 bit MONO with a real `fmt ` chunk saying
- * so, and every recovered slot lands in the same length range as those.
- * ⚠️ IT WOULD TAKE A STEREO SLOT TO PROVE THIS WRONG AND NONE HAS BEEN SEEN.
- * A slot wave carries `channelsFromHeader: false` so a page can say so.
+ * The slot header has no channel count; 1 is an assumption, corroborated by 64 of 64 pack WAVs
+ * being 48 kHz 16 bit mono. A slot wave carries `channelsFromHeader: false`.
+ * why: lessons/kit-circuit-sample.md#slot-channels
  */
 export const SLOT_CHANNELS = 1;
 /** What `slotWave()` puts in `from`, so a slot model is never mistaken for a file. */
 export const SLOT_SOURCE = 'sample slot';
 
 /**
- * Walk the unpacked image as 64 variable length records.
- *
- * ✅ CONFIRMED THREE WAYS in `research/dump-samples-2026-09-21.md` §3.3 and
- * reproduced here: `80 bb 00 00` occurs exactly 64 times in the image and
- * nowhere else, the gap from one header to the next minus the declared length is
- * exactly 10 on all 63 gaps, and a slot of length 0 advances 10 bytes and lands
- * on the next valid header.
- *
- * 🔴 IT REFUSES THE WHOLE IMAGE RATHER THAN RETURNING WHAT IT GOT. A walk that
- * has lost the table produces records at arbitrary offsets whose audio is
- * plausible noise, which is the worst thing a decoder can hand a page. The
- * reason names the slot and the byte.
- *
+ * Walk the unpacked image as 64 variable length records (`80 bb 00 00` occurs exactly 64 times,
+ * every gap is length + 10). Refuses the whole image on a lost table, naming slot and byte.
  * @param {ArrayBuffer|Uint8Array} plain  a VERIFIED stream's unpacked payload
+ * why: lessons/kit-circuit-sample.md#slotsin
  */
 export function slotsIn(plain) {
   const u8 = bytesOf(plain);
@@ -1037,10 +743,8 @@ export function slotsIn(plain) {
     });
     p = at + pcmBytes;
   }
-  // ⚠️ THE TAIL IS REPORTED AND NOT REFUSED. A sample transfer is a fixed size
-  // image of the whole sample memory, so 3,743,408 of `80S Drums_sampleset.syx`
-  // are zero fill after the last slot. That is normal and it is also 70.3 blocks
-  // of 53,248, which is where the `141 sessions` in the research came from.
+  // The zero tail after the last slot is reported, not refused: the image is fixed size.
+  // why: lessons/kit-circuit-sample.md#tail
   let tailNonZero = 0;
   for (let i = p; i < u8.length; i++) if (u8[i]) tailNonZero++;
   return {
@@ -1057,21 +761,11 @@ export function slotsIn(plain) {
 }
 
 /**
- * One slot as the model `readWave()` returns, so `toMono()`, `content()` and
- * `summarise()` read it with no special case.
- *
- * 🔴 IT BUILDS A MODEL AND NOT A FILE, WHICH IS DELIBERATE. Wrapping the PCM in
- * a 44 byte RIFF header would be the obvious route and it would put a byte
- * WRITER in this module, and this module's whole arrangement is that the test
- * builds bytes and the module does not. Nothing downstream needs the container:
- * every consumer reads the model.
- * ⚠️ THE FIELDS A RIFF FILE HAS AND A SLOT DOES NOT ARE `null`, NEVER INVENTED.
- * `riffSizeOk`, `byteRateOk` and `blockAlignOk` are agreements between two
- * header fields, and a slot header has only one of each, so reporting `true`
- * would be a check that never looked at anything.
- *
+ * One slot as the model `readWave()` returns, so `toMono()`, `content()` and `summarise()` read it.
+ * Builds a model, not a RIFF file, so this module writes no bytes. Header agreements are `null`.
  * @param {ArrayBuffer|Uint8Array} plain  the image the slot was walked out of
  * @param {object} slot  one entry from `slotsIn().slots`
+ * why: lessons/kit-circuit-sample.md#slotwave
  */
 export function slotWave(plain, slot) {
   const u8 = bytesOf(plain);
@@ -1119,18 +813,10 @@ export function slotWave(plain, slot) {
 }
 
 /**
- * 🔴 THE WHOLE JOURNEY, FOR A PAGE: bytes in, the same
- * `{name, size, wave, row}` rows `samplesIn()` hands back out.
- *
- * It answers in the order a reader needs: what container is this, what streams
- * are in it, did each one verify, and only then what audio came out. A file with
- * no sample table is not an error and says what it is instead.
- *
- * ⚠️ THE UNPACKED IMAGES ARE DROPPED FROM THE RESULT. Two streams of a
- * `.circuitpack` are 7.5 MB of payload and a page that only wants the audio
- * would hold it for nothing. The slot data is already copied into each wave.
- *
+ * Bytes in, the same `{name, size, wave, row}` rows `samplesIn()` returns: container, streams,
+ * verification, then audio. Unpacked images (7.5 MB) are dropped from the result.
  * @param {ArrayBuffer|Uint8Array} buf  a whole file
+ * why: lessons/kit-circuit-sample.md#samplesetin
  */
 export function sampleSetIn(buf) {
   const u8 = bytesOf(buf);
@@ -1167,9 +853,8 @@ export function sampleSetIn(buf) {
     row.seconds = row.waves.reduce((n, w) => n + w.duration, 0);
   }
 
-  // ⚠️ THE NAME CARRIES THE STREAM ONLY WHEN THERE IS MORE THAN ONE, because
-  // sixty four rows reading `stream 1 slot 0` on a file with one table is noise
-  // in every cell of a column.
+  // The name carries the stream only when there is more than one.
+  // why: lessons/kit-circuit-sample.md#names
   const many = sampleStreams > 1;
   let k = 0;
   for (const row of rows) {

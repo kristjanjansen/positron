@@ -1,7 +1,7 @@
-// demo/shell/rt-knob.mjs: the runtime of one knob on /connect/
-// (node-runtime.mjs). One node per parameter, `web:knob-<name>` (decision D2),
-// a turn leaving on its value-out as `{ of: 'param', name, v }`. The dial's
-// travel and reading are synth-params.mjs's when the name is one of its.
+// demo/shell/rt-knob.mjs: one knob node per parameter on /connect/, `web:knob-<name>` (decision D2).
+// A turn leaves on its value-out as `{ of: 'param', name, v }`; travel and reading come from
+// synth-params.mjs when the name is one of its.
+// why: lessons/kit-rt-knob.md#header
 
 import { createKnob } from './knob.mjs';
 import { PARAMS, knobRaw } from './synth-params.mjs';

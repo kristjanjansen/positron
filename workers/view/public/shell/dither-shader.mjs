@@ -1,12 +1,7 @@
-// demo/shell/dither-shader.mjs: /video/shader/'s ordered dither as an engine,
-// a picture in and a picture out. Lifted 2026-10-14 from that page for
-// /connect/ (plans/plan-connect-ui.md slice 4, the convergence rule).
-//
-// `draw(src, size, { out })` renders one frame of `src` (a playing <video> or
-// a canvas) into `canvas` and answers whether there was a picture to dither;
-// `out: false` clears to the page's ground, as a picture with no link out.
-// The WebGL2 context is made here; with none, the log says so and `draw`
-// does nothing.
+// demo/shell/dither-shader.mjs: /video/shader/'s ordered dither as an engine, a picture in and out.
+// `draw(src, size, { out })` renders one frame into `canvas`; `out: false` clears to the ground.
+// With no WebGL2 context the log says so and `draw` does nothing.
+// why: lessons/kit-dither-shader.md#header
 
 import { FRAME_W, FRAME_H } from './pattern.mjs';
 
@@ -19,10 +14,9 @@ export function createDitherShader({ w = FRAME_W, h = FRAME_H, log = () => {} } 
     const vs = `#version 300 es
       in vec2 p;
       void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
-    // Brightness per cell of uSize pixels, a little contrast, then one Bayer
-    // threshold: below it the page's ground, above it warm off-white, which
-    // leans toward --hi only in the brightest cells. Outside the contained
-    // frame there is no input.
+    // Brightness per uSize cell, a little contrast, one Bayer threshold: ground below, warm
+    // off-white above, leaning to --hi in the brightest cells. Nothing outside the contained frame.
+    // why: lessons/kit-dither-shader.md#fragment-shader
     const fs = `#version 300 es
       precision highp float;
       uniform sampler2D uTex; uniform vec2 uRes; uniform vec2 uFit;

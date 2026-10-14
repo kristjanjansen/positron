@@ -1,90 +1,7 @@
-// demo/granulator/grain-rig.mjs: everything a granulator concept page has
-// that is not its engine. Lifted out of sampler/050 (now /archive/pappus/) on 2026-10-13 when its
-// lighter twin sampler/060 arrived (BACKLOG, *"the plain GrainBuf ring is the
-// real lighter twin of Pappus - do"*), so the two pages share one copy:
-// the sources, the patchbay, the two scopes with their grain ticks, the grain
-// events, the two knobs, Play, `window.__demo.grains` and the self check.
-// A page hands in an ENGINE and its PATCHES and nothing else.
-//
-// Named for what it is rather than `grain-sources.mjs`: the sources are one
-// part of it, and a file called sources that also holds the scopes would be a
-// name somebody has to see past.
-//
-// THE ENGINE CONTRACT. `engine` is
-//   {
-//     label,                          the web:grains box's label
-//     boot({ ctx, input, grain, log }) -> { meter, out, timing, scsynth }
-//         bring it up with `input` (an AudioNode) feeding its input bus;
-//         `meter` is an analyser on its output and `out` a gain the rig
-//         opens and closes for the speaker wire, `scsynth` the booted
-//         engine for a check over CDP. Call `grain(g)` for every
-//         grain the ENGINE reports, `g = { pos, ago, dur, voice, half }`:
-//         `pos` 0..1 of the window it reads, `ago` how many seconds ago the
-//         audio under it arrived. Nothing here invents a grain.
-//     land(i, now)                     what patch i sets that is NOT a knob
-//                                      (the knobs glide there on their own);
-//                                      `now` is every knob's value right now
-//     fixed(set)                       a patch's fixed values, written at once
-//     knob(name, v)                    one control, by its name in `controls`,
-//                                      and 'mix' (0 dry to 1 wet) when `mixes`
-//     mixes                            true when the engine blends its own
-//                                      input against its grains; otherwise
-//                                      the rig mixes outside it, with the
-//                                      dry source on a wire of its own
-//     run(on)                          pause or resume, keeping the ring
-//     read(name) -> Promise<number>    a knob's value ASKED OF THE SERVER
-//     glitches() -> number|null
-//     moving() -> string[]             optional: controls the engine moves by
-//                                      itself, so their read back value is the
-//                                      patch's plus that movement
-//     value(ev) -> boolean             optional: an event on web:grains:value-in
-//                                      that is not a knob's or a patch's (070's
-//                                      tempo, its follow switch); true when the
-//                                      engine took it
-//   }
-// `controls` is everything a patch sets, each a knob a person may turn:
-// `{ name, label, kind: 'knob', min, max, warp: 'lin' | 'exp', fmt }` for an
-// amount, `{ name, label, kind: 'steps', choices: [{ label, value }] }` for a
-// choice (the kit's stepped knob, `step: 1`; a value may be an array, a chord
-// or a figure, and is matched whole). Each knob is a cell of its own in
-// one row (asked 2026-10-13, *"no grouped buttons"*), its label short enough
-// to fit the cell,
-// and `patches` is `[{ name, says, set, fixed }]`: `set` a value for every
-// knob, `fixed` everything else the patch sets, and each name written as it
-// is to be shown (sentence case).
-//
-// FEW KNOBS, THE REST FIXED. Asked 2026-10-13: *"reduce granulator knobs a
-// lot. fix values. patch only changes those"*. What is not a knob is set by
-// the patch alone: `web:patch:value-out-2` carries it, one `{ of: 'fixed',
-// set }` event per patch change, straight into `web:grains:value-in`, and the
-// engine writes it at once with no glide (`engine.fixed(set)`).
-//
-// THE PATCH IS A NODE AND THE KNOBS TAKE INPUT. Asked 2026-10-13: *"expose
-// them. route patch to knobs (should take input)"* and *"patch selection
-// should slowly go to new values"*. `web:patch:value-out` is wired into every
-// knob's `value-in`; a patch change is ONE event carrying the whole set, and
-// each knob takes its own value and glides there over `GLIDE_MS`, eased, its
-// own needle moving. Every knob's `value-out` goes into `web:grains:value-in`,
-// so the knobs are the only thing that drives the grains. A hand on a knob
-// during a glide stops that knob's glide, and what it is turned to holds
-// until the next patch. A stepped knob (a mode, a chord, freeze) steps at the
-// START of the glide: halfway between two chords is a third chord nobody
-// chose, and a freeze that lands at the start holds the moment you chose.
-// The wet/dry is first in the row (asked 2026-10-13, *"move wet/dry to
-// first"*) and no patch moves it.
-//
-// THE SOURCES. A source is an audio node into the granulator's input and that
-// is the whole contract: each entry's `open(ctx)` resolves to `{ node, stop }`.
-// A recording decodes a file from our R2 bucket and loops it. A microphone, a
-// tab's audio, the Pi over the relay or our own stage stream are one more
-// entry each with their own `open`, and nothing else changes, because both
-// engines record whatever reaches their input bus and never see a file.
-// `store` says where the bytes come from, for the patchbay; a live source has
-// none. Never an outside station: these were captured once and are kept in
-// our bucket.
-//
-// NOTHING OPENS ON A VISIT. No AudioContext, no fetch, no engine, no prefetch
-// hint: Play brings the engine up, fetches the recording and starts both.
+// Everything a granulator page has but its engine: sources, patchbay, scopes, grain events,
+// knobs, Play, `__demo.grains` and the self check. A page hands in an engine (contract in the
+// lessons) and its patches. Nothing opens on a visit: Play boots, fetches and starts.
+// See lessons/page-granulator.md#granulator-5
 import { el } from '/shell/shell.mjs';
 import { fromFirstFrame } from '/shell/mp3-frames.mjs';
 import { SELFCHECK } from '/shell/selfcheck.mjs';
@@ -102,12 +19,9 @@ import { createKnobGrid } from '/shell/knob-grid.mjs';
 export const WINDOW_S = 8;
 export const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
 
-// ── the recordings ─────────────────────────────────────────────────────────
-// One gain per second of the file, raised (never lowered) toward -16 dB RMS by
-// at most 36 dB and eased across seconds, then a soft knee over 0.8. It is
-// /radio/tempo/'s levelling made shorter: MEASURED there, the Ida
-// capture is -44 dB RMS under one loud stretch, so one gain for the whole file
-// would leave it inaudible.
+// Per second gains raised (never lowered) toward -16 dB RMS by at most 36 dB, eased, then a
+// soft knee over 0.8, as on /radio/tempo/: the Ida capture is -44 dB RMS under one loud stretch.
+// See lessons/page-granulator.md#granulator-6
 const LEVEL_RMS = 10 ** (-16 / 20), LEVEL_MAX_DB = 36, KNEE = 0.8;
 export function level(b) {
   const sr = b.sampleRate, n = b.length, blk = Math.round(sr), nb = Math.ceil(n / blk);
@@ -165,9 +79,8 @@ export function createSources({ log = () => {} } = {}) {
     return { id, label, kind: 'recording', store: 'cf-r2', url, open: (ac) => openRecording(ac, id, label, url) };
   };
   const list = [
-    // A recording is named as one, so it is never taken for the live station
-    // (asked 2026-10-13, *"when you have radio recordings, suffix patch names
-    // with '... recording'"*).
+    // A recording is named as one, so it is never taken for the live station.
+    // See lessons/page-granulator.md#granulator-7
     recording('raadio2', 'Raadio 2 recording', 'radio/raadio2/2026-10-11.mp3'),
     recording('raadio4', 'Raadio 4 recording', 'radio/raadio4/2026-10-11.mp3'),
     recording('ida', 'Ida recording', 'radio/ida/2026-10-11.aac'),
@@ -189,14 +102,9 @@ const CSS = `
   .cc-patch .pos-pick-seg { display: flex; flex: 1 1 auto; min-width: 0; }
   .cc-patch .pos-pick-cell { width: auto; flex: 1 1 0; min-width: 0; }
 `;
-// The kit's grain scope as a panel's picture, as /radio/tempo/ draws
-// it: the panel's stage is the edge and the ground, so the scope gives up its
-// own margin, border and corner, and its always-empty caption takes no room.
-// The grains' start times over the output scope are a canvas laid exactly on
-// the scope's, so it moves nothing. Play sits on its own row, at its own size.
-// A patch picker standing alone (`outputScope: false`) spans its row, with
-// the kit's own phone arrangement of `.pos-pick` (shell.css) at every width
-// (asked 2026-10-13, *"patch selector full w"*).
+// The grain scope as a panel's picture: the panel's stage is the edge, so the scope drops its
+// margin, border and corner. A patch picker alone (`outputScope: false`) spans its row.
+// See lessons/page-granulator.md#granulator-8
 
 /**
  * @param {object} o
@@ -208,28 +116,21 @@ const CSS = `
  *                   second, for the self check: `{ size, density }`
  * @param o.hue      `(knob) => number|null`, a knob's hue, so a page that shows
  *                   its program can colour a knob and its control alike
- * @param o.under    elements that go under the knobs (a code box: knobs above
- *                   the code, as every concept page with both has them)
+ * @param o.under    elements that go under the knobs (a code box)
  * @param o.check    `async (tools) => {}`, the page's own checks, run inside the
  *                   self check while the sound is still playing
  * @param o.outputScope false for no output scope: the patch picker then stands
- *                   alone where the scope's panel was (050, asked 2026-10-13,
- *                   *"replace with just a patch selector (no scope/viz/footer)"*)
- * @param o.source   the id of the source the picker opens on (060 opens on
- *                   `ida`, asked 2026-10-13, *"put ida rec default"*); the
- *                   first one when it is not given or names none
- * @param o.wire     `({ bay, hold, holds, ports }) => {}`, called once the rig's own
- *                   nodes and links are in the bay and before the patchbay is
- *                   drawn, so a page can add nodes and links of its own (070's
- *                   tempo detector). `ports` names the rig's ports.
- * @param o.audio    `({ ctx, bus }) => {}`, called once when Play first builds
- *                   the audio graph: `bus` is the chosen source, the same node
- *                   the granulator and the source scope hear
- * @param o.top      elements after Play on its row (070's follow switch)
+ *                   alone where the scope's panel was
+ * @param o.source   the id of the source the picker opens on; the first one when
+ *                   it is not given or names none
+ * @param o.wire     `({ bay, hold, holds, ports }) => {}`, called once the rig's
+ *                   nodes and links are in the bay and before the patchbay is drawn,
+ *                   so a page can add its own (/granulator/beat/'s tempo detector)
+ * @param o.audio    `({ ctx, bus }) => {}`, called once when Play first builds the
+ *                   graph: `bus` is the chosen source, what the granulator hears
+ * @param o.top      elements after Play on its row
  * @param o.context  `() => AudioContext` to play in (48 kHz); left out, Play makes one
- *
- * Added 2026-10-13 for /granulator/beat/; a page that passes none of
- * wire, audio, top or `engine.value` gets what it got before.
+ * See lessons/page-granulator.md#granulator-9
  */
 export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
   hue = () => null, under = [], check: pageCheck = null, outputScope = true, source: firstSource = null,
@@ -339,11 +240,10 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     bay.send(GRAINS_EV, ev);
   }
 
-  // ── the pictures ────────────────────────────────────────────────────────
-  // The SOURCE scope: the last eight seconds of what went into the granulator,
-  // which is exactly what its ring holds, with every grain a tick at the place
-  // in that sound it read. The kit's `grainSeconds` puts a mark of position p
-  // at `(1 - p) * 8` seconds ago, so each grain is handed `1 - ago / 8`.
+  // The source scope: the last eight seconds that went in, exactly what the ring holds, each
+  // grain a tick where it read. `grainSeconds` puts position p at `(1 - p) * 8` s ago, so a
+  // grain is handed `1 - ago / 8`.
+  // See lessons/page-granulator.md#granulator-10
   const waveHost = el('div', 'cc-wave');
   const wave = createGrainScope(waveHost, { seconds: WINDOW_S, height: 120, fullScale: 1, grainSeconds: WINDOW_S });
   function waveGrain(ev) {
@@ -508,10 +408,9 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
     }
     if (eng) engine.knob(ev.name, ev.v);
   }
-  // A knob's travel is 0 to 1 and its warp says what that means: `exp` puts
-  // the middle of the knob at the middle of the octaves (20 ms to 4 s, 0.5 to
-  // 64 a second), `lin` is straight. A glide moves the travel, so an `exp`
-  // knob glides evenly in octaves.
+  // A knob travels 0 to 1 and its warp says what that means: `exp` puts the middle at the
+  // middle of the octaves (20 ms to 4 s, 0.5 to 64 a second), so a glide is even in octaves.
+  // See lessons/page-granulator.md#granulator-11
   const byName = new Map([MIX, ...controls].map((c) => [c.name, c]));
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const stepOf = (c, v) => Math.max(0, c.choices.findIndex((x) => same(x.value, v)));
@@ -708,10 +607,9 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
       `size knob ${knobs.get(SZ.name).value().toFixed(3)}, density ${toV(DN, knobs.get(DN.name).value()).toFixed(3)}/s, still gliding: ${glidingNow().join(' ') || 'none'}`);
     const lv2 = await meterRms(1500);
     d.assert('the new patch still sounds', lv2 > 0.001, `rms ${lv2.toFixed(4)}, ${grainCount - n0} grains since`);
-    // Wet and dry. What is heard is compared with the source: at 0 it IS the
-    // source (a correlation near 1, at whatever lag the engine adds), at 1
-    // it is grains, which are other moments of it at other pitches and much
-    // less alike. The tick ink is read off both canvases.
+    // Wet and dry against the source: at 0 the output is the source (correlation near 1 at the
+    // engine's lag), at 1 it is grains, much less alike. The tick ink is read off both canvases.
+    // See lessons/page-granulator.md#granulator-12
     const corr = () => {
       const a = new Float32Array(2048), b = new Float32Array(2048);
       srcTap.getFloatTimeDomainData(a); heard.getFloatTimeDomainData(b);

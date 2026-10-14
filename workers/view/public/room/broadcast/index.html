@@ -21,16 +21,13 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* concepts room/003, THE CHAT WINDOW WITH A BROADCAST COLUMN, 2026-10-11.
-     Asked: *"do room 003. move members chat the 1/3 col right. in left area
-     have admin chat for broadcast messages. first in the room becomes admin.
-     next ones only see broadcast messages, no composer in left"*, then *"use
-     030 room wiring"*: room/030's chat, notice and admin links, without its
-     camera. No history and no store since 2026-10-11 (*"no history in
-     room/003"*): what was said before you joined is room/004's. */
+  /* The chat window with a broadcast column: members chat in the right third, the admin's
+     broadcasts on the left, room/030's chat, notice and admin links without the camera.
+     No history and no store here; that is /room/history/.
+     See lessons/page-room.md#room-1 */
 
-  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs (asked 2026-10-11,
-     *"(make it reusable) as all chat ui elements"*). Only the footer row is the page's. */
+  /* The chat's pieces are the kit's, demo/shell/chat-ui.mjs. Only the footer row is the page's.
+     See lessons/page-room.md#room-2 */
   .rc-foot { display: flex; gap: var(--ctl-gap, 8px); }
 </style>
 <script type="module">
@@ -54,12 +51,10 @@
   const OUT = `${SITE}:chat:value-out`, IN = `${SITE}:chat:value-in`;
   const AOUT = `${SITE}:admin:value-out`, NOTICE = `${SITE}:notice:value-in`;
 
-  // FIRST IN THE ROOM IS ADMIN. A tab stamps its graph with `since`, the
-  // moment it joined, and every tab reads the same registry, so every tab
-  // picks the same one: the live site with the earliest `since`, ties by id.
-  // When that tab leaves (its graph goes stale), the next earliest takes over.
-  // ⚠️ NOTHING PROVES IT, as on room/030: a clock that runs early wins, and the
-  // bay checks that ports fit, not who holds them.
+  // First in the room is admin: every tab picks the live site with the earliest `since`,
+  // ties by id, and the next earliest takes over when it leaves. Nothing proves it: an
+  // early clock wins, and the bay checks that ports fit, not who holds them.
+  // See lessons/page-room.md#room-3
   let since = 0, admin = false, adminSite = '';
   const selfGraph = () => ({
     v: 1, site: SITE, place: 'browser', kind: 'browser', label: 'browser', ...(since ? { since } : {}),
@@ -75,11 +70,9 @@
       ...(admin ? [{ id: AOUT, label: 'admin', dir: 'out', medium: 'value', transports: ['relay'] }] : []),
     ],
   });
-  // ── the links, room/030's without the camera ─────────────────────────────
-  //   chat     <me>:chat:value-out -> *:chat:value-in        (speaker)
-  //            *:chat:value-out -> <me>:chat:value-in        (listener)
-  //   admin    <me>:admin:value-out -> *:notice:value-in     (admin only)
-  //            *:admin:value-out -> <me>:notice:value-in     (every tab)
+  // The links, room/030's without the camera: chat speaker and listener `*` links, and
+  // admin:value-out -> *:notice:value-in (admin only) with *:admin:value-out back to notice.
+  // See lessons/page-room.md#room-4
   function bay() {
     const b = node.registry.fill(createBay());
     if (b.port(IN)) b.addPort({ ...b.port(IN), deliver: heard });
@@ -131,8 +124,8 @@
   const clock = (at = Date.now()) => new Date(at).toTimeString().slice(0, 5);
   const short = (site) => (site === SITE ? 'you' : site);
 
-  // The broadcast area is one broadcast on show, a sign (asked 2026-10-11,
-  // *"copy broadcast message rendering to 003"*); the chat is a log.
+  // The broadcast area shows one broadcast, as a sign; the chat is a log.
+  // See lessons/page-room.md#room-5
   const casts = createChatSign();
   const chats = createChatLog();
 
@@ -170,8 +163,8 @@
   const chatCol = createChatColumn({ title: 'CHAT', body: chats, compose: chatBox });
 
   const join = createButtonGroup({ buttons: [{ id: 'join', label: `Join ${ROOM}`, onPress: () => node.join() }] });
-  // Clear, as on room/030 (asked 2026-10-11, *"003 add clear button to footer"*):
-  // every tab in the room empties both columns.
+  // Clear, as on room/030: every tab in the room empties both columns.
+  // See lessons/page-room.md#room-6
   function wipe() { casts.el.replaceChildren(); chats.clear(); }
   function clearAll() {
     node.send({ type: 'chat.clear' });

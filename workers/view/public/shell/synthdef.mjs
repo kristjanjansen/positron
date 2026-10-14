@@ -1,34 +1,6 @@
-// demo/shell/synthdef.mjs — a SuperCollider synth definition, as bytes, in
-// both directions: written here, read back here, and upgraded from the old
-// layout to the one a 2026 SuperCollider writes.
-//
-// WHY THIS EXISTS. `plans/plan-visuals.md` §1.2 says a fragment shader is a
-// DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at any
-// resolution" — and that generated GLSL is a defensible thing to send across a
-// wire. The sound half of that argument had never been written down. A
-// SuperCollider synth definition is the same shape of thing: a few kilobytes
-// that completely describe an instrument, with no interpreter at the far end.
-// `research/supercollider-browser-2026-09.md` §2.1 measured that wasm scsynth
-// accepts one as RAW BYTES and plays it. This module is the bytes.
-//
-// 🔴 WHAT GRADES THIS FILE IS NOT THIS FILE. CLAUDE.md: "when you implement
-// somebody else's format, only their implementation can grade you" —
-// `timeline/csound.mjs` was 22/22 green for months with two real defects
-// because its test compared it against the same formula it implements. The
-// grader here is real scsynth, compiled to wasm, which either plays the bytes
-// or does not. The reader below is deliberately a SEPARATE PASS over the same
-// buffer rather than a mirror of the writer's variables, so a round trip is at
-// least not vacuous — but a round trip is NOT the evidence. The engine is.
-//
-// ⚠️ VERSION 2, ALWAYS, AND THAT IS NOT COSMETIC. The `.scsyndef` files shipped
-// with Sonic Pi are format version 1; sclang has written version 2 for years.
-// The two differ in the WIDTH of nearly every count and index — 16 bits against
-// 32 — so a reader written for one silently mis-parses the other from the first
-// count onward. Testing against a v1 file would prove the wrong thing
-// (research §7), which is why `toVersion2` is here and why `writeSynthDef`
-// emits v2 only.
-//
-// THE LAYOUT, from the SuperCollider source's own `SynthDef` file format notes:
+// demo/shell/synthdef.mjs: a SuperCollider synth definition as bytes, written, read back,
+// and upgraded from version 1 to 2. Real scsynth (wasm) grades it, not the round trip.
+// Version 2 always: v1 and v2 differ in the width of every COUNT, INDEX and SOURCE.
 //
 //   "SCgf"                     4 bytes
 //   version                    int32   (1 or 2)
@@ -40,7 +12,7 @@
 //     parameter names          COUNT, then (pstring, INDEX) pairs
 //     building blocks          COUNT, then that many:
 //       class name             pstring
-//       rate                   int8    0 once · 1 slow · 2 per sample · 3 on demand
+//       rate                   int8    0 once, 1 slow, 2 per sample, 3 on demand
 //       inputs                 COUNT
 //       outputs                COUNT
 //       special index          int16   ALWAYS 16 bits, in both versions
@@ -48,51 +20,15 @@
 //       outputs                one int8 rate each
 //     variants                 int16 count, then (pstring, one float32 per parameter)
 //
-// In version 1 every field written COUNT, INDEX or SOURCE above is int16. In
-// version 2 they are int32. `specialIndex` is int16 in both, and the definition
-// count is int16 in both. That is the whole difference.
+// COUNT, INDEX and SOURCE are int16 in version 1 and int32 in version 2.
+// why: lessons/kit-synthdef.md#header
 
 export const MAGIC = 'SCgf';
 
-/**
- * THE LARGEST DEFINITION THAT CAN BE SENT OVER A SOCKET AND ARRIVE.
- *
- * Over this size wasm scsynth answers NOTHING AT ALL to `/d_recv` — no `/fail`,
- * no late reply, no thrown exception, no console line, no counter moving. A
- * silent refusal is the worst failure shape there is, because a definition that
- * was never received is indistinguishable from one that loaded and makes no
- * sound; both answer `/fail /s_new "SynthDef not found"`.
- *
- * ⚠️ IT IS NOT A UNIVERSAL CEILING AND THE COMMENT HERE USED TO SAY IT WAS.
- * "The ceiling both ends default to" was written before it had been measured.
- * Measured, the BOARD has no ceiling at all: sclang routes anything over 16,383
- * bytes to `/d_load`, which read a megabyte from disk in 44 ms — so every rung
- * of Pappus, FULL included, already loads there and always has. This binds a
- * BROWSER, which has no disk to load from.
- */
-// 🔴 65,488 — NOT 65,536, AND THE ROUND NUMBER WAS WRONG IN THE DANGEROUS
-// DIRECTION. `64 * 1024` passed a 65,536-byte definition through `fitsCeiling`
-// and into the silent refusal this constant exists to prevent: the guard said
-// yes and the engine said nothing.
-//
-// MEASURED by bisection, `research/synthdef-size-limit-2026-09.md`:
-//
-//   browser (SuperSonic)        largest definition that loads  65,520
-//   native scsynth over UDP     largest definition that loads  65,488
-//   native scsynth over TCP     none found at 1,000,000
-//   native /d_load from disk    none found at 1,000,000, 44 ms
-//
-// 🔴 AND IT BINDS THE MESSAGE, NOT THE DEFINITION — proved rather than argued:
-// adding 12 bytes of completion message moved the definition edge from 65,520
-// to 65,504, **exactly 16**, the wire cost. In both framings the largest
-// MESSAGE that loads is 65,536. So the budget is on the message and the
-// definition ceiling is whatever is left after framing.
-//
-// The number here is the NATIVE UDP figure, which is the smaller of the two, so
-// anything that fits here fits in a browser too. ⚠️ Its origin is
-// `SC_ComPort.cpp`'s `kTextBufSize = 65536` on the UDP port — and on native
-// that buffer can never actually be reached, because an IPv4 UDP payload maxes
-// at 65,507, 29 bytes below it.
+// The largest definition that arrives over a socket: native scsynth over UDP, 65,488 bytes
+// (browser 65,520). Over it /d_recv answers nothing at all. The limit is on the 65,536 byte
+// message; the board loads larger ones from disk with /d_load.
+// why: lessons/kit-synthdef.md#size-ceiling
 export const SIZE_CEILING = 65488;
 
 /** Does this definition fit the ceiling both ends honour? Reports the margin,
@@ -106,13 +42,9 @@ export const fitsCeiling = (bytes) => {
 export const RATE = { once: 0, slow: 1, sample: 2, demand: 3 };
 
 /**
- * The arithmetic `BinaryOpUGen` does, by its special index.
- *
- * ⚠️ THIS TABLE IS THE ONE THING HERE THAT CANNOT BE CHECKED BY READING BYTES
- * BACK. A wrong number writes a perfectly well-formed file that computes the
- * wrong thing — plus where it should multiply — so the check that grades it is
- * audible, not structural: `patch` asserts that the loudness knob SCALES the
- * output, which only holds if 2 really is multiply.
+ * BinaryOpUGen special indices. A wrong number still writes a well-formed file, so the
+ * patch check grades it audibly: the loudness knob must scale the output.
+ * why: lessons/kit-synthdef.md#op
  */
 export const OP = { add: 0, sub: 1, mul: 2, div: 4 };
 
@@ -178,12 +110,8 @@ export function graph(name) {
   };
 
   /**
-   * Declare every parameter at once and get a reference to each.
-   *
-   * One `Control` block with one output per parameter, which is what sclang
-   * emits for a plain `{ |freq = 440, amp = 0.15| … }`. Its special index is
-   * where its first parameter sits in the value array — 0, since there is only
-   * ever one of these.
+   * Declare every parameter at once: one Control block, special index 0, as sclang emits.
+   * why: lessons/kit-synthdef.md#params
    */
   function params(pairs) {
     if (controlAt >= 0) throw new Error('synthdef: params() is called once, with every parameter');
@@ -205,15 +133,9 @@ export function graph(name) {
   }
 
   /**
-   * One more control of its own, which is what sclang's `NamedControl` makes
-   * for `\name.kr(value)`: a `Control` block with one output whose special
-   * index is its slot in the value array (`Control.init` in
-   * `SCClassLibrary/Common/Audio/InOut.sc`, `specialIndex =
-   * synthDef.controls.size`). With a lag it is a `LagControl` instead, whose
-   * inputs are the lag times as constants (`LagControl.kr` in the same file):
-   * sclang builds that for any lag that is a plain number, because
-   * `NamedControl.new` sets `fixedLag` whenever `lags.rate == \scalar`.
-   * Several of these in one graph is ordinary sclang output.
+   * One more control, as sclang's NamedControl makes: a Control block at its slot in the
+   * value array, or a LagControl with the lag times as constant inputs.
+   * why: lessons/kit-synthdef.md#control
    */
   function control(k, v, lag = 0) {
     claim(k);
@@ -242,28 +164,24 @@ export function graph(name) {
   }
 
   /**
-   * The last block: where the sound goes.
-   *
-   * `Out` has NO outputs, which is the one place the format's symmetry breaks
-   * and the one a writer forgets. Channel 0 of the hardware, then one input per
-   * channel of sound.
+   * The last block, to hardware channel 0. Out has no outputs, the one place a writer forgets.
+   * why: lessons/kit-synthdef.md#out
    */
   function out(...channels) {
     return block('Out', RATE.sample, [value(0), ...channels], 0, 0);
   }
   /**
-   * The same, to an output bus other than 0. Added 2026-10-12 for
-   * the `/drums/` concept pages' four drums, each on a stereo pair of its own so a
-   * page can split the engine's output into one scope per drum. A bus past the
-   * engine's output channels is an INPUT bus (scsynth numbers outputs first),
-   * so the caller boots the engine with enough outputs for it.
+   * The same, to another output bus. A bus past the engine's output channels is an input bus,
+   * so the caller boots the engine with enough outputs.
+   * why: lessons/kit-synthdef.md#out-at
    */
   function outAt(bus, ...channels) {
     return block('Out', RATE.sample, [value(bus), ...channels], 0, 0);
   }
 
   function bytes() {
-    // ⚠️ The magic is four RAW bytes, not a pstring — no length byte in front.
+    // The magic is four raw bytes, not a pstring.
+    // why: lessons/kit-synthdef.md#magic
     const w = new Bytes();
     for (const c of MAGIC) w.u8(c.charCodeAt(0));
     w.i32(2);                                  // version
@@ -295,15 +213,9 @@ export function graph(name) {
 // ── reading ─────────────────────────────────────────────────────────────────
 
 /**
- * A separate pass over the same bytes, used by the page to READ OUT OF THE FILE
- * what it is about to send — the header, the version, the name, how many
- * building blocks — rather than reporting what the writer happened to have in a
- * variable. That distinction is the whole reason this is not one function with
- * a flag.
- *
- * It reads BOTH versions, because the files a real SuperCollider shipped are
- * version 1 and reading them is the only check here that a file this repo did
- * not write parses correctly.
+ * A separate pass over the bytes, so the page reports what the file says rather than
+ * the writer's variables. Reads both versions, so real v1 files can be checked.
+ * why: lessons/kit-synthdef.md#read-synthdef
  */
 export function readSynthDef(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
@@ -353,10 +265,8 @@ export function readSynthDef(input) {
     defs.push({ name, constants, paramValues, paramNames, blocks, variants });
   }
 
-  // 🔴 CONSUMED TO THE EXACT BYTE, OR IT IS NOT UNDERSTOOD. A parser that stops
-  // early and reports a plausible structure is the same class of failure as a
-  // green suite with no coverage: every number it printed would look right.
-  // research §2.1 made the same demand of its converter and said so.
+  // Consumed to the exact byte, or it is not understood.
+  // why: lessons/kit-synthdef.md#exact-byte
   if (p !== bytes.length) {
     throw new Error(`synthdef: read ${p} of ${bytes.length} bytes; the rest is not accounted for`);
   }
@@ -364,12 +274,9 @@ export function readSynthDef(input) {
 }
 
 /**
- * The old layout, widened to the current one.
- *
- * Every count and index goes from 16 bits to 32; `specialIndex` and the
- * definition count stay 16. Nothing is reinterpreted, so a file that came out
- * of a real sclang in 2015 is the same graph afterwards — it is a re-encoding,
- * not a translation.
+ * The old layout widened to the current one: counts and indices 16 to 32 bits, specialIndex
+ * and the definition count stay 16. A re-encoding, not a translation.
+ * why: lessons/kit-synthdef.md#to-version2
  */
 export function toVersion2(input) {
   const parsed = readSynthDef(input);

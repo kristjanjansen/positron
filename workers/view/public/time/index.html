@@ -46,20 +46,10 @@
 </style>
 
 <script type="module">
-  /*
-   * 🔴 FIVE OLD PAGES AS THE TABS OF ONE, decided by the owner 2026-10-04:
-   * *"names ok, looper retires, no redrect, capture is fine"*. SCHEDULE was
-   * `/transport/`, BEAT `/lanes/`, LOOPS `/loops/`, SCORE `/score/` and DATES
-   * `/strip/` (`plans/plan-demo-structure.md` §3.2). Each tab is a module
-   * beside this page; `createTabPage` builds a tab the first time it is
-   * opened, gives it its own log, and runs its checks and its bar's drill.
-   *
-   * ⚠️ ONE PUBLISHED BAR, SCHEDULE'S, because it is the tab the page opens on
-   * and the clock the other four are compared with. The other four build with
-   * `publish: false` and are drilled as page asserts by `bar-drill.mjs`.
-   * ⚠️ NOTHING SOUNDS OR OPENS ON LOAD OR ON A TAB'S BUILD. BEAT's sound card
-   * and MIDI wait for the press in its own tab.
-   */
+  /* Five tabs, each a module beside this page, built by `createTabPage` on first
+     open. One published bar, SCHEDULE's, the clock the other four compare with.
+     Nothing sounds or opens on load or build; BEAT waits for its own press.
+     See lessons/page-time.md#time-1 */
   import { mount, guard } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createTabPage } from '/shell/tab-page.mjs';
@@ -71,9 +61,8 @@
 
   const d = mount({
     name: 'time',
-    // No `what` under the title: each tab says what it is in the box under the
-    // tab row (`tab-page.mjs` rule 6), asked 2026-10-05 as *"rm top desriptions"*.
-    // The manifest's `one` line still describes the page on the index.
+    // No `what` under the title: each tab describes itself under the tab row.
+    // See lessons/page-time.md#time-2
     readout: null,
     showLog: false,
     controls: [],

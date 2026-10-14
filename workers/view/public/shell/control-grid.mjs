@@ -1,41 +1,7 @@
-// demo/shell/control-grid.mjs — controls on a square lattice, any count by any.
-//
-// 🔴 THE ASK, 2026-09-22, WITH A CROP OF FOUR KNOBS: *"make component for know
-// etc grid where centers of 2x2 knobs make square etc"*, and then *"it can be
-// any x y count of elements, right?"*. Yes, and the arithmetic is the same
-// whatever the counts are.
-//
-// 🔴 WHY A ROW OF KNOBS AND A COLUMN OF KNOBS DO NOT AGREE BY THEMSELVES. A
-// control is a working surface and furniture: `--ctl-head` above it and
-// `--ctl-foot` below, which `shell.css` declares and `positron-ui` calls the
-// contract. So the distance between two dial centres ACROSS is the dial's width
-// plus one gap, and the distance DOWN is the dial's height plus the value line
-// plus the label plus the sub plus one gap. On `/plai/` that was 46 px across
-// and about 100 down, so four knobs made a tall rectangle and were reported as
-// one.
-//
-// ✅ **THE FIX IS TO WIDEN THE COLUMN PITCH TO MATCH THE ROW PITCH, NEVER TO
-// SHRINK THE ROW.** Cutting the furniture is cutting the value readout or the
-// label, and both are the only things naming what the control does. A knob
-// narrow enough to make the square by shrinking is the one `positron-ui`
-// already refuses: *"a pad narrow enough to fit a phone is one nobody can
-// hit"*, one component along.
-//
-// ⚠️ **AND THE DIAL'S OFFSET INSIDE ITS CELL DOES NOT MATTER**, which is what
-// makes this cheap. A dial sits high in its cell, under the value and above the
-// label. It sits at the SAME height in every cell, so equal pitches put the
-// centres on a square lattice whatever that offset is. Nothing here has to know
-// where the dial is.
-//
-// 🔴 **THE PITCH IS MEASURED, NOT TYPED.** A row's height is whatever the
-// labels come to, a sub that wraps changes it, and a caller who typed a number
-// would be typing a guess that goes stale the first time a label grows. This
-// reads the first cell back off the page and writes `--cg-pitch`, which is the
-// same arrangement `step-grid.mjs` uses for `--pg-cell` and for the same
-// reason: the token is written from script because no stylesheet can know it.
-// ⚠️ A CUSTOM PROPERTY AND NEVER THE PROPERTY, so a page can still take it
-// back. `video-panel.mjs` wrote `style.aspectRatio` from an option and left one
-// page's picture square on a 16:9 screen.
+// demo/shell/control-grid.mjs: controls on a square lattice, any count by any. The column pitch is
+// widened to the row pitch, never the row shrunk, since that cuts the value or label. The pitch is
+// measured off the cells and written as `--cg-pitch`, a custom property a page can take back.
+// why: lessons/kit-control-grid.md#header
 
 import { el } from './shell.mjs';
 
@@ -76,14 +42,9 @@ function ensureCss() {
 }
 
 /**
- * The pitch two centres should sit at, given a cell's natural size and a gap.
- *
- * 🔴 PURE AND EXPORTED SO IT CAN BE GRADED WITH NO BROWSER, which is the half
- * of this component that has arithmetic in it. Everything else needs a layout.
- * ⚠️ IT TAKES THE LARGER OF THE TWO AND NEVER THE AVERAGE. A square whose side
- * is the mean of a wide cell and a tall one fits neither: the tall content
- * overflows its cell and the wide content is clipped. The lattice is as big as
- * its biggest cell needs.
+ * The pitch two centres should sit at, given a cell's natural size and a gap. Pure, so it is
+ * graded with no browser. The larger of the two, never the mean, or one side is clipped.
+ * why: lessons/kit-control-grid.md#pitchfor
  */
 export function pitchFor(cellW, cellH, gap = 0) {
   const w = Number(cellW) || 0;
@@ -105,10 +66,8 @@ export function pitchFor(cellW, cellH, gap = 0) {
 export function createControlGrid(o = {}) {
   const { items = [], cols, gap = 10, host, cls = '' } = o;
   /**
-   * 🔴 REFUSED RATHER THAN GUESSED, FOR THE REASON `knob.mjs` REFUSES A KNOB
-   * WITH NO LABEL. A grid that picked its own column count would pick a
-   * different one as the list grew, so the shape would be a property of how
-   * many controls a page happened to have rather than a decision anybody made.
+   * Refused rather than guessed: a guessed column count would change as the list grew.
+   * why: lessons/kit-control-grid.md#cols
    */
   if (!Number.isInteger(cols) || cols < 1) {
     throw new Error(`a control grid needs a column count, got ${JSON.stringify(cols)}`);
@@ -132,14 +91,9 @@ export function createControlGrid(o = {}) {
   const rows = Math.ceil(cells.length / cols);
 
   /**
-   * Measure one cell and write the pitch both tracks use.
-   *
-   * ⚠️ **THE WIDEST AND THE TALLEST, NOT THE FIRST.** A row of knobs whose
-   * labels are `FM` and `HARMONICS` has two different widths, and sizing the
-   * lattice off cell zero would clip whichever cell is bigger than it. This
-   * walks them.
-   * ⚠️ AND IT RETURNS THE NUMBERS RATHER THAN LOGGING THEM, so a check can ask
-   * what it decided instead of reading pixels back and hoping.
+   * Measure every cell and write the pitch both tracks use: the widest and tallest, not the first.
+   * Returns the numbers so a check can ask what it decided.
+   * why: lessons/kit-control-grid.md#size
    */
   function size() {
     let w = 0, h = 0;
@@ -147,14 +101,9 @@ export function createControlGrid(o = {}) {
       // The intrinsic size, with the pitch taken OFF, or the second call would
       // measure the width this function set on the first.
       c.style.width = 'auto';
-      /* 🔴 THE LAID OUT SIZE, NOT THE RECT, SINCE 2026-10-06. A rect is the
-         box AFTER every transform above it, and a grid scaled into a slide by
-         `fitBox` (`slide.mjs`) measured its cells at the slide's scale, wrote
-         that as its pitch and then drew at it scaled AGAIN: on the front
-         page's synths deck the knobs were clipped to their values, the dials
-         and names cut off. The computed width and height are the box before
-         any transform, and for a grid nobody scales they are the rect's own
-         numbers, so no other page moves. */
+      // The laid out size, not the rect: a rect includes transforms, and a grid scaled by `fitBox`
+      // would be scaled twice.
+      // why: lessons/kit-control-grid.md#computed-size
       const cs = getComputedStyle(c);
       const r = { width: parseFloat(cs.width) || 0, height: parseFloat(cs.height) || 0 };
       if (r.width > w) w = r.width;
@@ -181,10 +130,8 @@ export function createControlGrid(o = {}) {
     size,
     measured,
     /**
-     * Where each cell's DIAL sits, which is what the request was about.
-     * ⚠️ IT LOOKS FOR A DIAL AND FALLS BACK TO THE CELL, because this grid
-     * takes any control and only a knob has one. A check on a grid of faders
-     * gets the cell's own centre, which is the same claim one element out.
+     * Where each cell's dial sits; falls back to the cell's centre for a control with no dial.
+     * why: lessons/kit-control-grid.md#centres
      */
     centres: () => cells.map((c) => {
       const dial = c.querySelector('.pos-knob-dial, .pos-fdr-lane, canvas') || c;

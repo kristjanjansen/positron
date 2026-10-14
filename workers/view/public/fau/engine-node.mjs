@@ -1,52 +1,7 @@
-// demo/fau/engine-node.mjs: a page that IS a synth, as an engine node /patchbay/ can draw and link.
-//
-// 🔴 STEP 5 OF `plans/plan-routing-migration.md` FOR THE TWO ENGINE PAGES, 2026-10-06.
-// Its §2.1 rows: `/nola/` is *"an engine node with a midi in port; local only"* and
-// `/fau/` is *"engine with program and midi in, audio out (univ §3 names it)"*. Both
-// pages already play from every MIDI keyboard on the machine through `createMidi`.
-// This module adds the half that was missing: the page says what it is to the room,
-// so `/patchbay/` can draw the engine and the keyboards beside it, and a person
-// there can say WHICH keyboard plays it.
-//
-// ⚠️ IT LIVES IN `demo/fau/` AND `/nola/` IMPORTS IT FROM HERE, which is a stopgap
-// and not a design. Two copies of one join rule is the defect `bay-node.mjs` was
-// written to end, so there is one copy; its home is `demo/shell/engine-node.mjs`,
-// which the agent that wrote this was not allowed to create. Moving it is a
-// `git mv` and two import lines.
-//
-// WHAT IT DECIDES:
-//   1  NOTHING ON LOAD. Building it opens no socket and asks for no MIDI.
-//      `join()` does both, and a page calls it from the Join press or from its
-//      own check pass. A visit opens nothing.
-//   2  THE ROOM AND THE SITE ARE `bay-node.mjs`'s: `?room=`, the run's own room
-//      under the harness, `studio-1` for a person, and a site of this tab's own.
-//   3  ONE GRAPH, ONE SITE: the engine node and this browser's MIDI devices
-//      (`midi-graph.mjs`) on the same site, so a link from a keyboard here to the
-//      engine here is a link between two of this page's own ports, and this page
-//      is the one `bay-node.mjs` hands the `link.request` to.
-//   4  LOCAL ONLY. The audio out says `transports: ['webaudio']`, so the bay
-//      refuses to carry it off the machine in words. Nothing here sends a sound,
-//      a note or a program anywhere: a request for that is refused in words.
-//   5  OMNI UNTIL PATCHED. With no link open the engine plays every MIDI input,
-//      which is what both pages did before this file existed and is still what a
-//      visitor who never presses Join gets. Once a link is open the engine plays
-//      ONLY the linked keyboards, and when the last one closes it goes back to
-//      all of them. Every switch lets go of every note first, because a
-//      keyboard that stops being heard mid-note would leave that note held.
-//
-// 🔴 THE BADGE COUNTS ON THE FAR SIDE. What it counts is MIDI messages that
-// reached this engine through an open link, counted in the handler that hands
-// them to the page's own note functions: the engine is the far side of that
-// link. A press of Open only makes it `starting`.
-// ⚠️ ITS STALL WINDOW IS NOT THE PICTURE'S TWO SECONDS. A keyboard rests between
-// phrases; two seconds of nobody playing is not a stalled link. `MIDI_STALL_MS`
-// is thirty seconds, which still turns a link to an unplugged keyboard grey.
-//
-// ⚠️ WHAT IS NOT MEASURED: whether a second `MIDIAccess` in one tab (the one
-// `midi-graph.mjs` asks for at Join, beside the one `createMidi` asked for)
-// delivers every message to both. Chrome's WebMIDI hands each access its own
-// port objects; no device was plugged in when this was written, so the linked
-// path has run only against the stand-in access in the page's check pass.
+// demo/fau/engine-node.mjs: a synth page as an engine node (midi in, audio out, program in for fau).
+// Nothing on load: join() opens the socket and asks for MIDI. Omni until a link is open, then only
+// linked keyboards; every switch calls allOff. Audio is webaudio only, MIDI_STALL_MS is 30 s.
+// See lessons/page-fau.md#fau-2
 
 import { openWire } from '../shell/wire.mjs';
 import { createBayNode, roomFor, randomSite } from '../shell/bay-node.mjs';
@@ -60,11 +15,10 @@ export const MIDI_STALL_MS = 30_000;
 export const ENGINE_TAKES = ['note', 'cc', 'program'];
 
 /**
- * The same five lines `createMidi` dispatches with (`demo/shell/midi.mjs`), for a
- * message that arrived on ONE linked port. ⚠️ A SECOND COPY OF A DISPATCH, which
- * that module warns against, kept because `createMidi` exports no decoder and says
- * nothing about which port a message came from. Velocity 0 is a note off.
+ * The dispatch `createMidi` uses (demo/shell/midi.mjs), for a message on ONE linked port,
+ * because createMidi exports no decoder. Velocity 0 is a note off.
  * @returns {string|null} what it was, or null for a kind the engine ignores
+ * See lessons/page-fau.md#fau-3
  */
 export function dispatchMidi(data, ts, h) {
   const [st, a, b] = data;
@@ -240,20 +194,15 @@ export function createEngineNode({
 }
 
 /**
- * The Join press and the badge, as one inline group a page puts on its own panel.
- * ⚠️ NOT IN `.pos-controls`: the harness presses that row by position, and this
- * press joins a room. The check pass joins its own in-memory room explicitly.
- * 🔴 THE BADGE IS IN A WRAPPER, AND THE WRAPPER IS WHAT IS HIDDEN. `.pos-pres` is
- * `display: inline-flex`, which beats the browser's own `[hidden]`, and
- * `shell.css` has no `.pos-pres[hidden]` rule, so `link-badge.mjs` setting
- * `hidden` on it changed an attribute and left the badge drawn. A plain span has
- * no author `display`, so its `hidden` is the browser's and it works.
+ * The Join press and the badge, as one inline group. Not in `.pos-controls`, which the harness
+ * presses by position. The badge sits in a plain span that is hidden, because `.pos-pres` is
+ * inline-flex and that beats the browser's own `[hidden]`.
+ * See lessons/page-fau.md#fau-4
  */
 export function createEngineUi(engine, { el, log = () => {} }) {
   const root = el('span', 'eng-bay');
-  /* 🔴 ONE WORD, AND THE ROOM IN THE HOVER. `Join studio-1` wrapped to three
-     lines on the keyboard's foot at 375 px, photographed, and a label never
-     wraps. The log says the room the moment it is joined. */
+  /* One word, the room in the hover: a label never wraps at 375 px.
+     See lessons/page-fau.md#fau-5 */
   const btn = el('button', 'pos-sm', 'Join');
   btn.type = 'button';
   btn.title = `join ${engine.room} as ${engine.site}, so /patchbay/ can link a keyboard to it`;

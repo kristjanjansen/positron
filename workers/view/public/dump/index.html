@@ -20,30 +20,12 @@
 <meta name="theme-color" content="#0b0e14">
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* ⚠️ THIS PAGE WENT FULL WIDTH FOR ONE AFTERNOON AND CAME BACK, ASKED FOR
-     2026-09-20 as *"make dump page regular width"*, a few hours after *"can be
-     full w below the header / desc / feedback"*. It takes the standing 720px
-     like every other page, so there is no `body { max-width }` here and no
-     `.pos-head` override. **Do not reintroduce either without being asked**:
-     a page rule beating the stylesheet on source order is a thing this project
-     measures going wrong, and the reason to carry that risk was removed. */
+  /* Standard 720px width: no body max-width and no .pos-head override on this page.
+     See lessons/page-dump.md#dump-1 */
 
-  /* 🔴 THE TWO HEIGHT RULES THAT STOOD HERE ARE GONE, AND DELETING THEM IS
-     PART OF THE CHANGE RATHER THAN A TIDY-UP. They were
-     `.ports .pos-tbl-body { max-height: 190px }` and
-     `.traffic .pos-tbl-body { max-height: min(60vh, 620px) }`, both CEILINGS,
-     so each box was whatever height its rows made it underneath one: nothing
-     at all when empty and hundreds of pixels a second later. Both tables ask
-     for `minRows` now, and `shell.css`'s `.pos-tbl[data-rows] .pos-tbl-body`
-     answers with `height` AND `max-height: none` at (0,3,0), which beats a
-     page's (0,2,0) whatever the source order says. Leaving them would have
-     left two DEAD RULES reading as correct, which this project measures as its
-     second most expensive kind of defect after a dead JavaScript guard.
-     ⚠️ THE HEIGHTS ARE READ BACK RATHER THAN REASONED ABOUT. See the three
-     measurements in `check`: empty, overflowing and cleared, one number.
-     ⚠️ `.ports` and `.traffic` stay and nothing styles them. They are what
-     tells the two tables apart in the DOM, in a screenshot and in the checks
-     below, and the sizes they used to carry now live beside the tables. */
+  /* No height rules here: both tables use minRows, and shell.css sizes .pos-tbl[data-rows]
+     .pos-tbl-body at (0,3,0). .ports and .traffic are unstyled names for the DOM and checks.
+     See lessons/page-dump.md#dump-2 */
 </style>
 
 <script type="module">
@@ -56,131 +38,53 @@
   } from '/shell/midi-decode.mjs';
 
   /**
-   * 🔴 WHY THIS PAGE EXISTS. Three plan documents in this repo describe four
-   * devices almost entirely from documentation, and several of their central
-   * claims cannot be checked from any document at all: TASCAM publishes no
-   * controller numbers for the Model 12 in Mackie Control mode at any firmware
-   * revision, and Novation never wrote down whether the Circuit's NRPN rides
-   * the usual convention. Both are answerable in about four seconds of turning
-   * one knob in front of this page.
-   *
-   * 🔴 AND THE ANSWER IS ONLY WORTH ANYTHING IF THE READING IS SEPARABLE FROM
-   * THE BYTES. A relative encoder reads as a position if you interpret it, so
-   * every row carries the raw bytes in their own column beside whatever this
-   * page thinks they mean.
+   * Shows what a MIDI device actually sends, to settle claims no documentation answers.
+   * Every row keeps the raw bytes in their own column beside this page's reading of them.
+   * See lessons/page-dump.md#dump-3
    */
 
   const MAX_ROWS = 400;
 
   /**
-   * 🔴 THE TABLES ARE DRAWN AT ONCE, EMPTY, AT A HEIGHT THEY KEEP. Asked for
-   * 2026-09-25: *"dump: nothing asked yet / press Listen, then play something /
-   * show empthy tables / miditables immidately with fixed heigh. no texdt in
-   * them until dumps arrive"*. The two quoted strings were this page's `empty`
-   * captions and they are gone: `minRows` makes the TABLE ITSELF the empty
-   * state, so a heading and a stack of ruled rows stand where a sentence used
-   * to, and nothing is written in them until a message lands.
-   *
-   * ⚠️ AND IT BUMPS INTO `an empty box is a line`, WHICH POINTS THE OTHER WAY
-   * AND IS NOT IN CONFLICT HERE. `demo/shell/roll.mjs:111` argues FOR a caption,
-   * because a container with nothing in it must not paint its own edges, and
-   * this project has paid for that three times (`/typist/`'s 2 px band,
-   * `.pos-controls`'s 14 px one, `drop.mjs`'s hidden footer). **A framed table
-   * is not an empty box.** Its heading names the columns and its ruled rows say
-   * how many records will fit, which is structure a reader can see and read a
-   * meaning off. What that rule refuses is a rectangle saying nothing, and this
-   * is the opposite of one. **So this is not a caption waiting to be put
-   * back**, and `/pack/`'s `an empty table draws no heading` is not being
-   * contradicted either: that assert is about a heading over NOTHING, and there
-   * is something under this one.
-   *
-   * 🔴 FLOOR AND CEILING ARE ONE NUMBER, WHICH IS THE HALF THAT COST SOMETHING
-   * ELSEWHERE. `/wish/` records a box that was *"7 lines for one connection and
-   * 16 for the next"* and therefore moved the log and the end of the page on
-   * every press. Rows land here in hundreds and they land on their own, so a
-   * box that grew with them would do that to everything under it without
-   * anybody touching the page.
-   *
-   * ⚠️ TWO NUMBERS, NOT ONE, AND THE SECOND ONE IS A CHOICE RATHER THAN A
-   * MEASUREMENT. `PORTS_ROWS` is 6 because that is what this box already is:
-   * the `max-height: 190px` it replaces is 5.9 rows at `--tbl-row-h`, and
-   * `/circuit/` and `/evo/` both reserve exactly 6 for a MIDI table through
-   * `createMidiLog({ reserve: 6 })`, which is the same request one step
-   * earlier. `TRAFFIC_ROWS` is 16 because this page's whole subject is the
-   * traffic and the other two reserve 6 for a side panel: 16 rows is 518.40 px,
-   * which is under the 620 px ceiling it replaces and is 60vh of an 864 px
-   * viewport, a 1080p screen with an ordinary browser on it. **Answering a
-   * request about the EMPTY state by making the one table this page exists for
-   * five times shorter would be answering a different request.**
+   * Both tables draw at once, empty, at a fixed height (minRows is floor and ceiling), so rows
+   * landing in hundreds never move the page. 6 port rows match the MIDI tables elsewhere;
+   * 16 traffic rows is 518.40 px, about 60vh of an 864 px viewport.
+   * See lessons/page-dump.md#dump-4
    */
   const PORTS_ROWS = 6;
   const TRAFFIC_ROWS = 16;
 
   const d = mount({
     name: 'dump',
-    // ⚠️ ONE SENTENCE, AND THE COMMENT HERE USED TO GIVE THE WRONG REASON. It
-    // said "because this page has a diagram", which was true for about an hour
-    // and stopped being true when the diagram was removed on instruction. The
-    // rule stands on its own: a description is a single sentence, not stretched
-    // with a colon, a semicolon or a dash buying a second clause. It is still
-    // the same sentence the index card carries, so a visitor arriving from
-    // there is not told the same thing twice in two wordings that can drift.
+    // One sentence, the same one the index card carries.
+    // See lessons/page-dump.md#dump-5
     what: 'Every message a plugged-in instrument sends, as raw bytes beside a reading of them.',
     // SIX CELLS. `clock` and `sensing` are here rather than in the table for
     // the reason written on `isFlood`: they are floods, and listing them buries
     // everything else within seconds. Every one of these moves.
     readout: { inputs: '', messages: '', channels: '', kinds: '', clock: '', sensing: '' },
     /**
-     * 🔴 THREE CONTROLS, AND `Known stream` IS NOT ONE OF THEM. Asked for
-     * 2026-09-20: *"rm other buttons that listen fro user"*, then *"leave ask
-     * for version and listen and clear"*. The one that went was the page's own
-     * self-grading machinery showing through the interface, which is the same
-     * argument `/shout/` makes about a `Run the checks` button: a visitor has
-     * no use for a stream of invented messages, and the harness can reach the
-     * checks another way.
-     * ⚠️ **SO THE CHECKS MOVED TO `Listen`, WHICH IS NOW THE ONLY CONTROL THAT
-     * CAN REACH THEM.** See its handler. CLAUDE.md is explicit that a control a
-     * harness cannot press is a check nobody runs, and removing a button is
-     * exactly how that happens.
-     * 🔴 CONTROL 0 IS THE ONE THE HARNESS GIVES `settleMs` TO, and putting
-     * anything in front of `listen` moves every other control's press. That has
-     * already cost this project an intermittent failure on a page where nothing
-     * had changed.
-     * 🔴 AND NO BUTTON HERE IS PRIMARY. Asked 2026-09-28: *"dump: all buttons
-     * secondary"*. `Listen` carried `primary: true` and so wore `pos-pri`, the
-     * site's one accent, which is spent on what is CHOSEN or LIVE. Neither
-     * control on this page is either: both are a question put to whatever is
-     * plugged in, and the accent belongs to the traffic that answers. Dropping
-     * the FLAG is all that changed. The ORDER is untouched, for the reason
-     * directly above, and `pos-pri` is unchanged for every other page.
+     * Control 0 is the one the harness gives settleMs to; keep listen first. The checks run
+     * from Listen under SELFCHECK, since there is no Known stream button. None is primary:
+     * both controls ask a question, and the accent belongs to the traffic that answers.
+     * See lessons/page-dump.md#dump-6
      */
     controls: [
       { id: 'listen', label: 'Listen' },
       { id: 'ask', label: 'Ask for versions' },
       /**
-       * 🔴 `Clear` IS NOT HERE. Asked 2026-09-20: *"move clear below table to
-       * right and small button"*. It sits under the traffic table in a `.kpad`
-       * row, which is the SAME component and the same class as `Notes off`
-       * under the keyboard, chosen rather than invented because `keyboard.mjs`
-       * already made this exact argument: a control that UNDOES something
-       * belongs apart from the controls that do things, and small, and next to
-       * the thing it undoes.
-       * ⚠️ **A MOVED BUTTON IS A BUTTON THE HARNESS NO LONGER PRESSES.**
-       * `demo/verify.mjs` drives `.pos-controls`, so leaving this row costs
-       * `Clear` its automatic press. Nothing is graded behind it, which is why
-       * it could move at all, and CLAUDE.md's rule about a control a harness
-       * cannot reach is why that had to be checked rather than assumed.
+       * Clear is not a control: it sits under the traffic table in a .kpad row, so the harness
+       * does not press it. Nothing is graded behind it.
+       * See lessons/page-dump.md#dump-7
        */
     ],
   });
   guard(d);
 
   /**
-   * 🔴 A VISIT OPENS NOTHING, AND ON THIS PAGE THAT RULE HAS TEETH.
-   * `navigator.requestMIDIAccess()` raises a browser permission dialog, and
-   * SysEx is a SECOND, separate permission. A page that costs a visitor a
-   * bandwidth bill is one thing; a page that puts a dialog in front of somebody
-   * who has not pressed anything is worse. Nothing below runs until a press.
+   * Nothing runs until a press: requestMIDIAccess raises a permission dialog, and SysEx
+   * is a second one.
+   * See lessons/page-dump.md#dump-8
    */
 
   const ports = createTable({
@@ -191,8 +95,8 @@
       { key: 'state', label: 'state', width: 86 },
     ],
     cap: 40,
-    // ⚠️ NO `empty:`. `minRows` ignores one, and a sentence inside a framed
-    // table lands in the first ruled row and reads as a record.
+    // No empty: minRows ignores it, and a sentence in a framed table reads as a record.
+    // See lessons/page-dump.md#dump-9
     minRows: PORTS_ROWS,
     note: 'hover',
   });
@@ -203,18 +107,15 @@
       { key: 'at', label: 'at', width: 64, align: 'right' },
       { key: 'ch', label: 'ch', width: 34, align: 'right' },
       { key: 'what', label: 'what', width: 96 },
-      // 🔴 THE BYTES ARE A COLUMN OF THEIR OWN AND THEY ARE NEVER REPLACED BY
-      // THE READING BESIDE THEM. This is the whole design of the page.
+      // The raw bytes are their own column and are never replaced by the reading beside them.
+      // See lessons/page-dump.md#dump-10
       { key: 'bytes', label: 'bytes', width: 104, hi: true },
       { key: 'reading', label: 'reading', grow: true, clip: true },
     ],
     cap: MAX_ROWS,
-    // 🔴 THE NEWEST ROW STAYS IN VIEW. Asked 2026-09-20: *"scroll dump to
-    // bottom always"*. MEASURED on a real MK-425C the same hour: **733 messages
-    // in eight seconds** from one keyboard, so without this the only rows on
-    // screen are the ones from several seconds ago.
-    // ⚠️ IT STANDS DOWN WHILE THE KEYBOARD IS IN THE TABLE, or it would drag
-    // the view off the focused row between two arrow presses.
+    // Keeps the newest row in view (one keyboard sent 733 messages in 8 s); it stands down
+    // while keyboard focus is in the table.
+    // See lessons/page-dump.md#dump-11
     stick: true,
     minRows: TRAFFIC_ROWS,
     // The port name is what somebody checks AFTER finding a row, never what
@@ -225,13 +126,9 @@
   traffic.el.classList.add('traffic');
 
   /**
-   * `Clear`, under the table it clears, small and on the right.
-   *
-   * ⚠️ IT REUSES `.kpad` AND `.kpad-right` RATHER THAN INVENTING A SIZE.
-   * `keyboard.mjs` puts `Notes off` in exactly this row for exactly this
-   * reason, and `shell.css` already carries the 26px height and the 11px mono
-   * face. Hand rolling a small button here would be a fourth copy of a control
-   * that exists, which is the thing `/kit/` was built to stop.
+   * Clear, under the table it clears, small and on the right. It reuses .kpad and
+   * .kpad-right, which shell.css already sizes, as keyboard.mjs does for Notes off.
+   * See lessons/page-dump.md#dump-12
    */
   const clearRow = el('div', 'kpad');
   const clearBtn = el('button', 'kpad-right', 'Clear');
@@ -241,13 +138,10 @@
 
   d.el.append(ports.el, traffic.el, clearRow);
 
-  /* 🔴 ON THE PATCHBAY ON A PRESS OF Join, NEVER ON LOAD (plans/plan-routing-migration.md
-     step 5). The instruments plugged into this machine are announced as devices,
-     keyed by their ports and never by their names, and this page announces a
-     sink of its own beside them: a tap a person can put on any of those outs
-     from `/patchbay/`, whose badge says whether anything is arriving. Join sits
-     outside `.pos-controls` and asks for MIDI first when Listen has not.
-     `midi-node.mjs` in the shell has the rest. */
+  /* Joins the patchbay on a press of Join, never on load: the instruments as devices keyed
+     by port, plus a sink of this page's own. Join asks for MIDI when Listen has not.
+     See midi-node.mjs.
+     See lessons/page-dump.md#dump-13 */
   const bayMidi = createMidiNode({ slug: 'dump', log: (line, kind) => d.log(line, kind), tap: true,
     listen: async () => { if (!access) await open({ sysex: false }); return access; } });
   d.el.append(bayMidi.el);
@@ -267,10 +161,8 @@
     d.set('messages', shown || '');
     d.set('channels', channels.size || '');
     d.set('kinds', kinds.size || '');
-    // ⚠️ THESE TWO STAY EMPTY UNTIL ONE ARRIVES rather than showing 0. A zero
-    // reads as a very confident measurement of nothing, and on this page it
-    // would read as `this device sends no clock`, which is a real claim about
-    // a real device that nobody has measured.
+    // Empty until one arrives rather than 0: a zero would claim this device sends no clock.
+    // See lessons/page-dump.md#dump-14
     d.set('clock', clock || '');
     d.set('sensing', sensing || '');
   }
@@ -287,26 +179,10 @@
    * @param {string} from  which port it arrived on
    */
   /**
-   * ── the tap: what arrived, written where a session can read it ───────────
-   *
-   * 🔴 WHY. This page reads MIDI in a browser, and a browser is where a person
-   * is sitting rather than where a session can look. Getting the first real
-   * measurements off this desk meant driving a second Chrome through an
-   * extension and reading its console back one question at a time, which the
-   * person at the desk called ridiculous and was right about: every reading
-   * cost a round trip, and a press that landed between two of them was lost.
-   * Now the presses land in `.tap/midi.jsonl` and anybody can read the file.
-   *
-   * 🔴 THE DEV SERVER ONLY, AND THE CHECK IS ON THE ORIGIN. `workers/view` has
-   * no `/_tap` route, deliberately, so a deployed `/dump/` posts nowhere and a
-   * visitor's instrument is never written to anybody's disk. **This is not a
-   * page feature and it must never become one.**
-   *
-   * ⚠️ BATCHED, BECAUSE THE RATE IS THE POINT OF THIS PAGE. MEASURED on one
-   * MK-425C: 733 messages in eight seconds. A request per message is 90 a
-   * second at a dev server, so they go in one post every 500 ms.
-   * ⚠️ AND IT IS FIRE AND FORGET. A failed post must never cost a message on
-   * screen, because the screen is what a person is actually watching.
+   * The tap: on the dev server only, presses are posted to /_tap and land in .tap/midi.jsonl.
+   * workers/view has no /_tap route, so a deployed page posts nowhere. Batched every 500 ms
+   * (one keyboard sends about 90 messages a second) and fire and forget.
+   * See lessons/page-dump.md#dump-15
    */
   const LOCAL = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
   let pending = [], tapTimer = 0, tapped = 0, tapDead = false;
@@ -314,20 +190,9 @@
   function tap(m, from) {
     if (!LOCAL || tapDead) return;
     /**
-     * 🔴 A HARNESS RUN MUST NOT WRITE INTO THE CAPTURE FILE, AND IT DID.
-     * MEASURED 2026-09-20: `node demo/verify.mjs dump` drives the known stream
-     * to grade the decoder, every message of it went down the tap, and
-     * `read-tap.mjs` then reported `known stream ch1 CC 99` beside real
-     * readings off a Circuit and a Model 12. **739 messages, and 32 of them per
-     * verify run were invented.**
-     * ⚠️ THE ROWS WERE LABELLED AND THAT WAS NOT ENOUGH. Every one carried
-     * `from: 'known stream'`, so nothing was lying, and the counts, the
-     * histograms and every verdict `classifyEncoder` produced were still
-     * computed over a mixture. **A label on a row does not keep it out of an
-     * aggregate**, which is the same lesson as a lane with no feedback counting
-     * as zero in a score.
-     * ⚠️ AND THE FILE IS A RECORD OF SOMETHING THAT HAPPENED ONCE. Nobody can
-     * re-press a knob to find out which rows were real.
+     * A harness run writes nothing to the capture file: a label on a row does not keep it
+     * out of the counts read-tap.mjs computes.
+     * See lessons/page-dump.md#dump-16
      */
     if (SELFCHECK) return;
     pending.push({ from, bytes: m.bytes, ch: m.ch, kind: m.kind, d1: m.d1, d2: m.d2 });
@@ -337,9 +202,8 @@
       fetch('/_tap', { method: 'POST', body: JSON.stringify({ at: Date.now(), rows: batch }) })
         .then((r) => {
           if (r.ok) { tapped += batch.length; return; }
-          // 🔴 SAY IT ONCE AND STOP. A dev server without the route answers 404
-          // on every batch, and a log line twice a second is a page shouting
-          // about a thing that is not this page's job.
+          // Say it once and stop: a server without the route answers 404 on every batch.
+          // See lessons/page-dump.md#dump-17
           tapDead = true;
           d.log('nothing is listening on /_tap, so nothing is being written down');
         })
@@ -404,22 +268,10 @@
   }
 
   /**
-   * 🔴 `open()` EXPLICITLY, AND THIS PAGE SHIPPED WITHOUT IT AND READ AS A DESK
-   * WITH NOTHING ON IT. MEASURED 2026-09-20 with four instruments plugged in
-   * and transmitting: every port read `connected/closed`, the page showed an
-   * empty table, and fifteen seconds of moving a fader produced nothing. One
-   * `await p.open()` on each port took the same fifteen seconds to 239
-   * messages.
-   * ⚠️ **THE SPECIFICATION SAYS ASSIGNING `onmidimessage` OPENS THE PORT**, and
-   * that is why the line was not there. It is also why the failure is so quiet:
-   * there is no error, no rejected promise and no console line, so a page with
-   * closed ports is pixel for pixel a page watching a silent instrument. The
-   * one thing that can tell them apart is `port.connection`, which is why it is
-   * a column in the ports table rather than a detail on the hover.
-   * ⚠️ AND IT HAD WORKED EARLIER IN THE SAME SESSION, which is worse than never
-   * working: the implicit open is real but it is not reliable across a reload
-   * with another client holding the device. An intermittent silent failure on
-   * the one page whose whole job is to report what a device sends.
+   * open() each port explicitly. Assigning onmidimessage is meant to open it, but not
+   * reliably across a reload, and a closed port fails silently; port.connection, shown in
+   * the ports table, is the one thing that tells them apart.
+   * See lessons/page-dump.md#dump-18
    */
   async function wire() {
     for (const p of access.inputs.values()) {
@@ -437,9 +289,8 @@
 
   async function open({ sysex }) {
     if (!navigator.requestMIDIAccess) {
-      // ⚠️ A BROWSER WITHOUT WEB MIDI IS NOT A FAULT. Safari has none at all,
-      // and a page that reports a missing optional capability as an error
-      // teaches its reader that red means nothing.
+      // No Web MIDI (Safari) is not a fault, so it is a warning and not an error.
+      // See lessons/page-dump.md#dump-19
       d.log('this browser has no Web MIDI, so there is nothing to read here', 'warn');
       return false;
     }
@@ -467,32 +318,17 @@
         : 'no MIDI inputs. Plug something in and this list follows it.', n ? 'hi' : '');
     }
     /**
-     * 🔴 THE CHECKS HANG OFF THE ONLY CONTROL THERE IS, AND THEY RUN THE KNOWN
-     * STREAM THEMSELVES. `demo/verify.mjs` presses every control and never
-     * calls `check`, so a page's asserts have to be driven by one of its own
-     * buttons. With `Known stream` removed there is exactly one.
-     * ⚠️ **THIS IS THE `/mirror/` PATTERN, NOT A SELF-CHECK BRANCH IN
-     * DISGUISE.** CLAUDE.md records that a control a harness cannot reach is a
-     * check nobody runs, and the sanctioned repair is for the page to drive the
-     * unreached path behind `SELFCHECK`. A visitor pressing Listen gets their
-     * own instruments and nothing invented; a harness, which has no permission
-     * and no device, gets the bytes written down in this file.
-     * ⚠️ AND IT MUST NOT PUT FAKE ROWS IN FRONT OF A PERSON. That is the whole
-     * reason it is gated rather than always run.
+     * verify.mjs presses controls and never calls check, so Listen runs it under SELFCHECK,
+     * feeding the known stream itself. A visitor gets only their own instruments.
+     * See lessons/page-dump.md#dump-20
      */
     if (SELFCHECK) await d.run('check');
   });
 
   /**
-   * 🔴 DEVICE INQUIRY, WHICH IS THE ONE QUESTION EVERY MANUFACTURER'S BOX
-   * UNDERSTANDS. Reading a firmware version is otherwise a different ritual per
-   * device: a menu dive and a jog dial on the Model 12, a web application for
-   * the Circuit, and nothing at all for the other two.
-   *
-   * 🔴 IT REFUSES TO TOUCH REAL HARDWARE UNDER `?selfcheck=1`, WHICH IS WHAT
-   * `board.mjs` ALREADY DOES AND FOR THE SAME REASON. A harness run must not
-   * put bytes into an instrument on somebody's desk. It answers the stand-in
-   * instead and says which it did.
+   * Device inquiry: the one version question every maker's box understands. Under
+   * ?selfcheck=1 it sends nothing to real hardware and answers from the stand-in.
+   * See lessons/page-dump.md#dump-21
    */
   d.on('ask', async () => {
     if (SELFCHECK) {
@@ -508,9 +344,8 @@
     for (const p of access.outputs.values()) { p.send(deviceInquiry()); sent++; }
     d.log(sent ? `asked ${sent} output${sent === 1 ? '' : 's'} for a version`
                : 'no MIDI outputs to ask', sent ? '' : 'warn');
-    // ⚠️ A SILENCE IS A PERMITTED ANSWER AND IS NOT THE SAME AS AN ABSENT
-    // DEVICE. A device may ignore the inquiry, which is allowed, and saying so
-    // is a real result rather than a failure to report.
+    // A device may ignore the inquiry; silence is a permitted answer, not an absent device.
+    // See lessons/page-dump.md#dump-22
     setTimeout(() => {
       if (!inquiries.length && sent) {
         d.log(`no reply after 1.5 s. A device is allowed to ignore this, so `
@@ -520,9 +355,8 @@
   });
 
   /**
-   * ⚠️ STILL REGISTERED AS A HANDLER AND ALSO WIRED TO THE BUTTON. The handler
-   * is what `d.run('clear')` reaches, and the button is what a person presses;
-   * having both means the control cannot drift from the thing it does.
+   * Both a handler and the button's action, so d.run('clear') and a press do the same thing.
+   * See lessons/page-dump.md#dump-23
    */
   clearBtn.onclick = () => d.run('clear');
 
@@ -536,16 +370,9 @@
   // ---------------------------------------------------------------- the stand-in
 
   /**
-   * 🔴 A KNOWN STREAM, AND IT IS AN ORDINARY CONTROL RATHER THAN A SELF-CHECK
-   * BRANCH. The rule here is that a page which behaves one way for
-   * `?selfcheck=1` and another way for a person is a page nothing grades, so
-   * the harness presses the same button a visitor can press. It costs nothing
-   * and opens nothing: these bytes are written down in this file.
-   *
-   * ⚠️ FOUR REAL DEVICES ARE PLUGGED INTO THE MACHINE THIS WAS WRITTEN ON, AND
-   * NOT ONE OF THEM CAN GRADE THE DECODER. What a device happens to send today
-   * is not a known answer, so pointing this page at a mixer proves it runs and
-   * proves nothing about whether it reads correctly.
+   * A known stream, written down here: the only input that can grade the decoder, since what
+   * a real device sends is not a known answer. Fed by check only.
+   * See lessons/page-dump.md#dump-24
    */
   const KNOWN = [
     [0x90, 60, 100],              // middle C down
@@ -594,19 +421,9 @@
 
   d.on('check', async () => {
     /**
-     * 🔴 THE EMPTY FRAME IS READ BEFORE ANYTHING IS PUT IN IT, which is the
-     * only moment it exists. Everything below this line feeds the known stream,
-     * and a measurement of the empty state taken after that would be a
-     * measurement of a full table.
-     * ⚠️ THE BODY, NOT THE WRAPPER. `shell.css` sets the height on
-     * `.pos-tbl-body`, which is the box that scrolls; the wrapper also holds
-     * the heading and would report a different number for a reason that has
-     * nothing to do with this.
-     * ⚠️ AND `getComputedStyle(...).display` FOR THE HEADING, NOT `.hidden`.
-     * `el.hidden` is a fact about an attribute and this project has already
-     * shipped an assert reading it green while the heading was on screen:
-     * `.pos-tbl-row`'s own `display: grid` beat the browser's `[hidden]` until
-     * `shell.css` said otherwise. Only the computed value knows what is drawn.
+     * Read the empty frame before anything is fed. Measure .pos-tbl-body, the box that
+     * scrolls, and the heading's computed display, since [hidden] alone can lose to display: grid.
+     * See lessons/page-dump.md#dump-25
      */
     const bodyOf = (t) => t.el.querySelector('.pos-tbl-body');
     const boxH = (t) => +bodyOf(t).getBoundingClientRect().height.toFixed(2);
@@ -626,13 +443,14 @@
     d.assert('the known stream reached the table',
       traffic.count() === KNOWN.length - 4, `${traffic.count()} rows for ${KNOWN.length} messages`);
 
-    // 🔴 THE FLOODS ARE THE POINT OF THAT SUBTRACTION.
+    // The four flood messages are why the row count is KNOWN.length - 4.
+    // See lessons/page-dump.md#dump-26
     d.assert('clock and active sensing were counted, not listed',
       clock === 3 && sensing === 1, `${clock} clock, ${sensing} sensing`);
 
-    // ⚠️ AND THE NEGATIVE HALF: if `isFlood` were switched off, the count above
-    // would be zero AND the row count would be four higher. Asserting both
-    // means the sabotage cannot pass by moving the failure somewhere quiet.
+    // With isFlood off, the count above would be zero and the row count four higher,
+    // so asserting both stops the failure moving somewhere quiet.
+    // See lessons/page-dump.md#dump-27
     d.assert('no flood reached the table',
       !traffic.columns || clock + sensing === 4, `${clock + sensing} of 4 counted`);
 
@@ -646,19 +464,16 @@
     const abs = v.find((x) => x.cc === 74);
     const rel = v.find((x) => x.cc === 16);
 
-    // 🔴 THE QUESTION THIS PAGE EXISTS FOR, ASSERTED IN BOTH DIRECTIONS.
-    // A page that called everything relative would pass the first of these and
-    // fail the second, which is what makes the pair worth having.
+    // Asserted in both directions: a page calling everything relative passes only the first.
+    // See lessons/page-dump.md#dump-28
     d.assert('a swept knob is read as absolute', abs?.verdict === 'absolute',
       `CC 74: ${abs?.verdict} (${abs?.why})`);
     d.assert('a clicked encoder is read as relative', rel?.verdict === 'relative',
       `CC 16: ${rel?.verdict} (${rel?.why})`);
 
-    // The four NRPN messages stay as four rows AND the fourth says what they meant.
-    // ⚠️ `.pos-tbl-head` CARRIES `.pos-tbl-row` TOO, so an unfiltered query
-    // returns 33 rows for 32 messages and the extra one has no hex in it. The
-    // assert below went red on exactly that, which is the right outcome: it
-    // was measuring one more row than the page has.
+    // The four NRPN messages stay rows and the fourth says what they meant.
+    // .pos-tbl-head also carries .pos-tbl-row, so the query excludes it.
+    // See lessons/page-dump.md#dump-29
     const rows = Array.from(traffic.el.querySelectorAll('.pos-tbl-row:not(.pos-tbl-head)'))
       .map((r) => r.textContent);
     d.assert('the NRPN write is spelled out on its last message',
@@ -666,9 +481,8 @@
     d.assert('and its four messages are all still rows',
       rows.filter((t) => / 06 | 62 | 63 /.test(t)).length >= 3, 'CC 99, 98 and 6');
 
-    // 🔴 RAW BYTES BESIDE THE READING, WHICH IS THE PAGE'S ONE DESIGN RULE.
-    // Asserted on the DOM rather than on the data, because the rule is about
-    // what is on screen.
+    // Raw bytes beside the reading, asserted on the DOM because the rule is about the screen.
+    // See lessons/page-dump.md#dump-30
     d.assert('every row shows its raw bytes',
       rows.every((t) => /[0-9A-F]{2} /.test(t)), `${rows.length} rows`);
 
@@ -682,9 +496,8 @@
       inquiries.length === 1 && inquiries[0].reply.includes('version 1.2.3.4'),
       inquiries[0]?.reply || 'nothing parsed');
 
-    // ⚠️ THE PORTS TABLE IS EMPTY UNTIL SOMEBODY PRESSES LISTEN, AND THAT IS
-    // THE POINT. Asserting it is empty here is asserting that a visit opened
-    // nothing, which is the rule that cost this project four separate repairs.
+    // The ports table stays empty until Listen: a visit opens nothing.
+    // See lessons/page-dump.md#dump-31
     d.assert('nothing was opened without a press',
       !SELFCHECK || access === null || countInputs() >= 0,
       access ? `${countInputs()} inputs, after a press` : 'no MIDI access taken');
@@ -693,15 +506,9 @@
 
     // ── the frame, measured at every filling it can have ──────────────────
     /**
-     * 🔴 A READOUT CELL IS NOT AN ASSERT AND NEITHER IS A NUMBER IN A COMMENT.
-     * The whole point of `minRows` is that the box does not move, so the check
-     * is four readings of one box at four fillings: empty before anything
-     * arrived, overflowing, emptied again by the real `Clear` handler, and
-     * holding a single row. If any one of them differs the page is pushing
-     * everything under it up and down as messages land, which is the defect
-     * `/wish/` paid for.
-     * ⚠️ THE CLEAR IS THE REAL HANDLER, driven through `d.run`, so what is
-     * measured is the button a person presses rather than a private reset.
+     * minRows means the box never moves: one height at four fillings (empty, overflowing,
+     * cleared by the real Clear handler through d.run, and a single row).
+     * See lessons/page-dump.md#dump-32
      */
     const full = { h: boxH(traffic), rows: traffic.count() };
     await d.run('clear');
@@ -714,10 +521,9 @@
       `${empty.h} px at ${empty.rows} rows, ${full.h} px at ${full.rows}, `
       + `${cleared.h} px cleared, ${one.h} px at ${one.rows}`);
 
-    // ⚠️ THE NEGATIVE HALF, and it is the half that says the box is holding
-    // itself open rather than being held open by the rows in it: the room a
-    // placeholder takes is given back one row at a time, so the two always sum
-    // to the reserved count and a placeholder is never counted as a record.
+    // The other half: placeholder rows are given back one at a time, always summing to the
+    // reserved count, and a placeholder is never counted as a record.
+    // See lessons/page-dump.md#dump-33
     d.assert('the room is given back a row at a time, and a row of room is not a row',
       cleared.room === TRAFFIC_ROWS && cleared.rows === 0
         && one.room === TRAFFIC_ROWS - 1 && one.rows === 1,

@@ -1,16 +1,7 @@
-// demo/typist/sampler.mjs: the Hermes Precisa 305 sampler of
-// /typist/typewriter/ and /typist/machines/, lifted for /typist/score/, where
-// several typewriters share ONE set of decoded buffers. 010 and 020 still carry
-// their own copy and are unchanged.
-//
-// Two halves, because 030 has one of the first and many of the second:
-//   - `createSamples()`: the nine files from our R2 bucket, fetched and decoded
-//     once into AudioBuffers on the first `load(ctx)`, which a page calls on a
-//     press and never on a visit. Provenance in `typewriter/SOURCES.md`.
-//   - `createVoice(ctx, samples, ...)`: one typewriter. One
-//     AudioBufferSourceNode per key into the voice's own `out` gain, so a press
-//     costs no fetch and no decode; the pitch per key type comes from a
-//     character (`machines/fx.mjs`), read when a sample starts.
+// The Hermes Precisa 305 sampler, shared so several typewriters use one set of buffers.
+// `createSamples()` fetches and decodes the nine R2 files on the first `load(ctx)` (a press,
+// never a visit); `createVoice()` is one typewriter, rate per key from machines/fx.mjs.
+// See lessons/page-typist.md#typist-27
 
 // R2, through the station worker's /media/ door, which answers CORS for any origin.
 export const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/typewriter/hermes-precisa-305/';

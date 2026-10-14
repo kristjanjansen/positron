@@ -1,21 +1,7 @@
-// demo/video/loopback.mjs: what the two loopback pages share, the
-// WebRTC one (/video/webrtc/) and the LL-HLS one (/video/llhls/).
-// Split 2026-10-12, *"Split hls and webrtc loopbacks"*: each page holds one
-// round trip and its own patchbay, and this module holds what is the same on
-// both, so it is written once:
-//
-//   - the camera, with the clock row burned over it, as the frame that leaves
-//     the page (`createLoopCamera`), its start button, its camera picker, and
-//     the original's picture panel with the camera's name and size;
-//   - a picture panel drawn from a video element, faded over the ground as a
-//     press runs out (`createPicture`);
-//   - the delay read off the burned clock of each presented frame (`meter`),
-//     and the warmup count in a footer (`warm`).
-//
-// A page owns its leg, its cap, its bay and its footers' other cells.
-//
-// NOTHING OPENS ON A VISIT. The camera, and whatever a page then does with it,
-// are made on the start press; building any of this opens nothing.
+// What /video/webrtc/ and /video/llhls/ share: the clock-burned camera (`createLoopCamera`),
+// a fading picture panel (`createPicture`), the delay off the burned clock (`meter`) and the
+// warmup cell (`warm`). A page owns its leg, cap, bay and footers. Nothing opens on a visit.
+// See lessons/page-video.md#video-11
 import { el, armVideo } from '/shell/shell.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createButtonGroup } from '/shell/button-group.mjs';
@@ -34,10 +20,9 @@ export const median = (a) => {
 export const delayText = (x) => (x == null ? '' : x < 1000 ? `${Math.round(x)} ms` : `${(x / 1000).toFixed(1)} s`);
 
 /**
- * Glass to glass off the burned clock, per PRESENTED frame, as /cam/ does:
- * this one page stamps the row and reads it, so one clock is on both ends
- * and the difference is exact. A frame whose row does not read (its checksum
- * fails, which a scaled or mid-ramp frame can) is skipped, never guessed.
+ * Glass to glass off the burned clock per presented frame: one page stamps and reads, so the
+ * difference is exact. A frame whose row fails its checksum is skipped, never guessed.
+ * See lessons/page-video.md#video-12
  */
 export function meter(v) {
   const m = { samples: [], frames: 0, read: 0, live: true, firstAt: null };
@@ -60,12 +45,9 @@ export function meter(v) {
 }
 
 /**
- * Warmup, per leg: from the press to the first frame back whose burned clock
- * reads. While it runs the cell counts whole seconds and the word at the left
- * says `warming up`; then the cell holds the measured time, to a tenth, and
- * the word clears, because the numbers beside it already say so (2026-10-12,
- * *"cound time for warmup. move readout data to videpanel footers"*).
- * `leg` is `{ askedAt, firstMs, live }`.
+ * Warmup per leg, press to the first readable frame back: the cell counts whole seconds with
+ * `warming up`, then holds the time to a tenth. `leg` is `{ askedAt, firstMs, live }`.
+ * See lessons/page-video.md#video-13
  */
 export function warm(cells, word, leg, m, label, log) {
   if (leg.askedAt == null) return;
@@ -89,11 +71,9 @@ export function returnVideo() {
 }
 
 /**
- * A canvas the size of the frame that leaves. The returns are drawn by the
- * test picture's own `drawCamera`, contained, no scrim, so the only difference
- * between the original and a return is the trip. `alpha` below 1 lays the
- * picture over the ground at that strength, which is how a picture fades out
- * over the last seconds of a press.
+ * A canvas the size of the frame that leaves; returns drawn by the test picture's
+ * `drawCamera`, contained, so the only difference is the trip. `alpha` below 1 fades it out.
+ * See lessons/page-video.md#video-14
  */
 export function createPicture() {
   const c = el('canvas');
@@ -117,14 +97,10 @@ export function createPicture() {
 export const fadeAt = (endAt, fadeMs) => (endAt ? Math.max(0, Math.min(1, (endAt - performance.now()) / fadeMs)) : 1);
 
 /**
- * The camera, the frame that leaves, and the controls that start it.
- *
- * `start` and `stop` are the PAGE's: the button and the camera picker call
- * them, so a press always goes through the page's own leg as well. The page's
- * `start` calls `open()` first and `stop` calls `close()` last. `render` is
- * called every animation frame while the camera is on, to paint the pictures.
- * `extra` is the one video element per return the page wants `armVideo`d on
- * the press, before any await, or iOS refuses it later.
+ * The camera and its controls. `start` and `stop` are the page's, which calls `open()` first
+ * and `close()` last; `render` runs every frame while on. `extra` videos are `armVideo`d on
+ * the press before any await, or iOS refuses them later.
+ * See lessons/page-video.md#video-15
  */
 export function createLoopCamera({ log, start, stop, render, extra = [] }) {
   const video = returnVideo();

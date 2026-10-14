@@ -1,65 +1,12 @@
-// demo/shell/timebase.mjs: when a light event should land, against a heavy link's picture or sound.
-//
-//   node demo/shell/timebase-test.mjs
-//
-// plans/plan-routing-time.md is the why. This is step 1 of it: the arithmetic,
-// with no page, no socket, no element and no clock of its own. Every time it
-// handles is passed in, so the whole policy is gradable in node.
-//
-// THREE CLOCKS, AND EVERY NUMBER HERE SAYS WHICH ONE IT IS ON.
-//
-//   local   this document's `performance.timeOrigin + performance.now()`, ms.
-//           What a page can actually set a timer against.
-//   shared  the peer clock: local + offsetMs, where offsetMs is
-//           `peer.offsetMs()` from proto/looper/peer.mjs. MEASURED to agree
-//           across two machines to ~3 ms (demo/jam/index.html). `null` until a
-//           page has agreed with anybody, and null is NOT zero.
-//   stamp   whatever a heavy link's own media carries: a PDT on LL-HLS, an RTP
-//           or sender-report time on WebRTC, a frame timestamp in a MoQ
-//           container, the double in the Pi's 12-byte PCM header, currentTime
-//           on a recording. Each link says how a stamp becomes shared time
-//           (`stampOffsetMs`), and when nobody knows, it says null.
-//
-// WHAT A HEAVY LINK GIVES THIS MODULE: observations. Each is a pair
-// `{ local, stamp }` meaning "the moment stamped `stamp` was on the glass (or
-// at the ear) at local time `local`". A rVFC callback gives one per frame
-// (expectedDisplayTime, and mediaTime or a PDT); `hls.playingDate` gives one
-// per poll; a PCM playout gives one per frame it schedules. The module keeps
-// the MEDIAN of the recent `stamp - rate * local` differences, so one late
-// timer read does not move a caption, and it re-anchors only on a STEP: a run
-// of `stepCount` observations all off the median by more than `stepMs` on the
-// same side. That is the drift-seek, the rebuild, the jitter buffer growing,
-// a seek in a recording. MEASURED shapes it has to survive are in the plan §3.
-//
-// WHAT A LIGHT EVENT CARRIES: `at` and its siblings, flat on the event, and
-// nothing else is read.
-//
-//   no at, beat or stamp           as it happens: fire on arrival
-//   { at: S }                      scheduled ahead: fire when the peer clock reads S
-//   { at: S, follow: id }          fire when the moment S reaches THIS glass on link id,
-//                                  i.e. S plus that link's lag here. Needs the link's
-//                                  stamps to be convertible to shared time.
-//   { stamp: M, on: id }           fire when link id PRESENTS the moment stamped M.
-//                                  Needs no peer clock at all: it is local to the link.
-//   { beat: B, clock: {bpm, epoch}, follow? }
-//                                  a beat on a loop clock (plan-xr-together), which
-//                                  is a shared time by arithmetic
-//
-// `at` ALWAYS MEANS WHEN THE THING HAPPENS, decided by the owner 2026-10-04: a
-// timeline row's position (`timeline/transport.mjs`) and, on the wire, an
-// event's moment in shared ms. `when` stays the uncertainty bracket around an
-// `at`. The wire envelope's send stamp, which used to be called `at`, is `sent`
-// now, and `parse()` in `wire.mjs` renames an old sender's envelope `at` to
-// `sent` before anything here can mistake it for an event time.
-// ⚠️ `on` IS A LINK ID ONLY WHEN IT IS A STRING. A light's payload may say
-// `on: true`, and that is not a request to wait for a link called true.
-//
-// 🔴 CANNOT TELL HOLDS, IT NEVER FIRES. Every method answers null when the
-// inputs do not determine an answer (no peer clock, no observation yet, a link
-// whose stamps nobody can put on the shared clock, a paused recording), and
-// `decide` turns null into `hold`. A caption fired at the wrong moment cannot
-// be taken back; `src/timed-messages.js` paid for reading "cannot tell" as a
-// number and this module copies its answer.
+// demo/shell/timebase.mjs: when a light event should land against a heavy link's picture or
+// sound (plans/plan-routing-time.md, graded by timebase-test.mjs). Every time is passed in.
+// Clocks: local (performance ms), shared (local + peer offsetMs, null until agreed, never 0),
+// stamp (the link's own media time). Links feed `{ local, stamp }` observations; the median
+// holds, and only a run of `stepCount` deviants past `stepMs` re-anchors.
+// Events: `{ at }`, `{ at, follow }`, `{ stamp, on }` (`on` a string), `{ beat, clock }`.
+// `at` is when the thing happens; the envelope send stamp is `sent`.
+// Cannot tell holds and never fires: every method answers null and `decide` turns it into `hold`.
+// why: lessons/kit-timebase.md#header
 
 /** Median of a non-empty array of finite numbers. Even counts take the mean of the middle two. */
 function median(xs) {

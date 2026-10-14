@@ -1,8 +1,6 @@
-// demo/shell/rt-sequencer.mjs: the runtime of a `sequencer` node on /connect/
-// (node-runtime.mjs). Its face is /drums/machine/'s transport and step grid
-// (rt-drums.mjs); every step it plays leaves on sequencer:midi-out, and a whole
-// pattern arriving on sequencer:value-in sets the grid (a picture's squares on
-// /drums/camera/).
+// demo/shell/rt-sequencer.mjs: a `sequencer` node on /connect/ with /drums/machine/'s face (rt-drums.mjs).
+// Every step leaves on sequencer:midi-out; a pattern on sequencer:value-in sets the grid.
+// why: lessons/kit-rt-sequencer.md#header
 
 import { machineFor } from './rt-drums.mjs';
 

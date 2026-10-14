@@ -1,19 +1,7 @@
-// FAR END, from the retired `/show/` (2026-10-04, `plans/plan-demo-structure.md`
-// §3.5). A picture goes live over WebRTC to a second connection in this same
-// page, and what that far end receives, decode losses and all, is what gets
-// recorded, then played back on a deck.
-//
-// The peer is a second RTCPeerConnection in this page. That is a real WebRTC
-// hop (offer and answer, ICE, encode, packetize, decode) and the only shape
-// deterministic enough to assert on with one browser. It costs nobody anything:
-// no relay, no Cloudflare, host candidates only. `?room=NAME` additionally
-// offers the stream to the relay so a second copy of this page anywhere joins as
-// a genuine remote peer; that leg is logged and never asserted, because an
-// assert that needs a second human varies the suite total.
-//
-// WHAT CHANGED IN THE MOVE: the controls are this tab's own buttons, and the
-// checks press them rather than waiting for a harness to. The six readout cells
-// and the nine checks are `show`'s.
+// FAR END: a picture goes live over WebRTC to a second RTCPeerConnection in this
+// page, and what it receives is recorded and played back. Host candidates only.
+// `?room=NAME` also offers it over the relay; that leg is logged, never asserted.
+// See lessons/page-capture.md#capture-9
 
 import { recorderMime, el, armVideo, playOrPrompt } from '/shell/shell.mjs';
 import { hueFor } from '/shell/pattern.mjs';
@@ -39,8 +27,8 @@ export function build({ panel, log, set }) {
   let srcStream = null, pcOut = null, pcIn = null, remote = null;
   let recording = false;
 
-  // ALIVE WHILE THE LEG IS UP: the canvas is the wire's source of truth, and a
-  // captured stream off a canvas that stops being drawn stops.
+  // Alive while the leg is up: a captured stream off an undrawn canvas stops.
+  // See lessons/page-capture.md#capture-10
   const source = createSource({ opts: () => ({ hue: hueFor('show') }), alive: () => !!pcOut });
   const pair = el('div', 'cap-pair');
   const srcFig = el('figure');
@@ -137,8 +125,8 @@ export function build({ panel, log, set }) {
         fps = (framesDecoded - lastFrames) / ((now - lastStatsAt) / 1000);
         set('fps', Math.round(fps * 10) / 10, fps > 15 ? 'ok' : fps > 5 ? '' : 'bad');
       }
-      // A BACKGROUND TAB IS NOT A BROKEN DEMO: Chrome throttles the source
-      // canvas's timer to ~1 Hz when the page is hidden.
+      // A background tab is not a broken demo: Chrome throttles the canvas timer to ~1 Hz.
+      // See lessons/page-capture.md#capture-11
       if (!saidThrottled && fps != null && fps < 5 && document.visibilityState === 'hidden') {
         saidThrottled = true;
         log('the page is in the background, so the source canvas is throttled to ~1 fps, not the wire', 'bad');
@@ -148,9 +136,9 @@ export function build({ panel, log, set }) {
   }, 1000);
 
   /**
-   * The optional real remote leg, `?room=NAME`. Logged, never asserted. It
-   * BOTH offers and answers, with glare broken by id order, so two copies of
-   * this page connect instead of each sending an offer nobody answers.
+   * The optional real remote leg, `?room=NAME`. Logged, never asserted. It both
+   * offers and answers, glare broken by id order, so two copies connect.
+   * See lessons/page-capture.md#capture-12
    */
   function joinRoom() {
     const ws = new WebSocket(`wss://ws.positron.studio/room/${ROOM}/ws`);
@@ -275,9 +263,9 @@ export function build({ panel, log, set }) {
     if (dur == null) return null;
     if (!deck) {
       deck = createDeck({ items: [], adapters: {}, range: [0, Math.round(dur * 1000)] });
-      // THE PICTURE IS THE MASTER (media-master L1). Somebody still has to apply
-      // a scrub to the picture, or the vector snaps back a tick later; every
-      // seek path goes through `deck.seek()`, so wrapping it once is the whole of it.
+      // The picture is the master: every seek goes through `deck.seek()`, so wrapping it
+      // once applies a scrub to the picture before the vector snaps back.
+      // See lessons/page-capture.md#capture-13
       mediaMaster(deck, back, {});
       const seek = deck.seek.bind(deck);
       deck.seek = (p, opts) => {
@@ -344,9 +332,8 @@ export function build({ panel, log, set }) {
       // the archive is a FILE, not a live stream
       A('playback is off the recording, not the live stream',
         back.srcObject == null && String(back.src).startsWith('blob:'), String(back.src).slice(0, 24));
-      // BACK TO THE START, so the bar drill that follows has to move the
-      // playhead to land its seek: left at the middle, its `5` key would land
-      // where the check above already put it and could not fail.
+      // Back to the start, so the bar drill's `5` key has to move the playhead to land.
+      // See lessons/page-capture.md#capture-14
       deck?.pause?.();
       deck?.seek(0);
       back.pause();

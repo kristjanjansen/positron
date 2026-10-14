@@ -35,21 +35,10 @@
   import { createCompileIdle } from '/shell/compile-idle.mjs';
   import { createCollideVoice, PROGRAM, rmsOf } from '/code/collide-voice.mjs';
 
-  // /code/faust/'s shape with the sound made by a program in
-  // /collide/'s small subset of SuperCollider, compiled in this tab and run on
-  // scsynth compiled to WebAssembly. Asked 2026-10-12 (BACKLOG, "synth/090
-  // Collide synth and synth/100"): *"do 090 synth, similar to 080 but with
-  // collide, local. 2 parameters that make sense"*.
-  //
-  // The program and why its two knobs are `bright` and `decay` are in
-  // `../collide-voice.mjs`, shared with /remote/collide/. Each knob is a
-  // bay node of its own, `web:knob-<name>:value-out`, cabled into
-  // `web:collide:value-in`, as on 080.
-  //
-  // NOTHING OPENS ON A VISIT. The text is compiled in JavaScript as the page
-  // opens (no fetch). A pointer over the keys or a focus on them fetches the
-  // engine from our origin, and the first key makes the AudioContext, boots
-  // scsynth and loads the program, then sounds the note it was pressed for.
+  // /code/faust/'s shape, the sound made by a /collide/ program run on wasm scsynth; the program
+  // and its knobs are in `../collide-voice.mjs`. Nothing opens on a visit: hover or focus on the
+  // keys fetches the engine, and the first key boots it and sounds the note.
+  // See lessons/page-code.md#code-6
   const d = mount({ name: 'Collide synth', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('code/collide');
 
@@ -165,22 +154,15 @@
   const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() }, {
     flowing: (l) => on && (l.from !== ID('keys', 'midi-out') || voice.held().length > 0),
   });
-  // The program in the kit's code box, its two knob names in the knobs' own
-  // hues (the box finds `\name.kr` in whatever is typed, so an edited text
-  // keeps them). EDITABLE since 2026-10-12, *"make 090 editable"*: the kit's
-  // idle compile, as /fau/ and /shader/mirror/ use it, `IDLE_MS` (600)
-  // after the last key, no button. A good compile is the voice for the NEXT
-  // note; a note already held finishes on the program it started with
-  // (`collide-voice.mjs`, the header of `createCollideVoice`). A failed one
-  // leaves `Did not compile` in the box's corner with collide's own error (a
-  // line and a column) in its title and in the log, and the keys go on
-  // playing the last good program.
+  // The program in the kit's code box, recompiled `IDLE_MS` (600) after the last key. A good
+  // compile is the voice for the next note; a failed one shows `Did not compile` with the
+  // error, and the keys go on playing the last good program.
+  // See lessons/page-code.md#code-7
   const code = createCodeBox({ language: 'sclang', rows: CODE_ROWS, label: '', value: PROGRAM,
     hues: book, ariaLabel: 'the SuperCollider program this synth plays, edit it and it recompiles' });
-  // ⚠️ A PROGRAM WITHOUT `\bright` OR `\decay` COMPILES AND PLAYS, AND THAT
-  // KNOB THEN DRIVES NOTHING. The kit's note has no state for "compiled, with
-  // a caveat", so the page writes that line into it once the compile has
-  // settled, as shader/000 does for `uSeg`; the next compile paints over it.
+  // A program without `\bright` or `\decay` compiles and plays, and that knob drives nothing;
+  // the page writes that into the box's note after the compile settles.
+  // See lessons/page-code.md#code-8
   let compiles = 0, refused = 0;
   const idle = createCompileIdle({
     input: code.input,
@@ -209,8 +191,8 @@
       return out;
     },
   });
-  // Knobs above the code, asked 2026-10-12: *"when there are code and knobs on
-  // concepts, move knobs on top of code"*.
+  // Knobs above the code.
+  // See lessons/page-code.md#code-9
   d.stack.add(wave.el, grid.el, host, code.el, pb.el);
 
   window.__demo.knobs = grid;

@@ -25,11 +25,10 @@
   .cc-stack > * { flex: none; }
   .cc-stack > .pos-bgroup { width: auto; }
   .cc-h { margin: 0; font-size: 14px; color: var(--dim); font-weight: 500; }
-  /* KIT DEFECT, REPAIRED HERE ONLY BECAUSE shell.css IS NOT THIS PAGE'S TO
-     CHANGE: `.step { height: 34px }` (shell.css 3831) beats the column choice,
-     whose rule never sets the segment's height, so five options were squeezed
-     into one 34 px box at 13 px each. MEASURED 2026-10-10. Belongs in
-     `.pos-choice[data-orient="column"] .pos-seg`. */
+  /* Kit defect, repaired here because shell.css is not this page's: `.step { height: 34px }`
+     beats the column choice and squeezed five options into one 34 px box. Belongs in
+     `.pos-choice[data-orient="column"] .pos-seg`.
+     See lessons/page-room.md#room-19 */
   .cc-stack .pos-choice[data-orient="column"] .pos-seg { height: auto; }
   .cc-stack .pos-choice[data-orient="column"] .pos-seg > button { text-align: left; }
   /* A request is a sentence, not a name, so on a phone it wraps rather than
@@ -56,24 +55,10 @@
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   useMediumColours();
 
-  // Words to links. A small local bay (keys, synth, filter, recorder, scope,
-  // speakers), a fixed list of requests, and a button that sends the chosen
-  // request plus this bay's real port list to the wish agent
-  // (workers/wish/src/wish.mjs, POST /wish). The model PROPOSES; this page
-  // checks every proposed link with the same two walls /wish/ uses,
-  // `checkTransforms` for the shape of each transform and `bay.validate` (inside
-  // `bay.link`) for the ports, and holds only what passes. Refusals are listed
-  // in words beside the lines the model wrote.
-  //
-  // THE MODEL is the first, leftmost, in /wish/'s PATCH row:
-  // @cf/meta/llama-3.3-70b-instruct-fp8-fast, at $0.293 per million input
-  // tokens and $2.253 per million output tokens (Cloudflare's pricing page as
-  // quoted in demo/wish/index.html, 2026-09-22).
-  //
-  // WHAT IT COSTS: every press of Ask is ONE Workers AI call on a paid account.
-  // MEASURED 2026-10-10 on this page, two presses: 781 and 783 prompt tokens,
-  // 109 and 86 completion tokens, $0.00047 and $0.00042, about 3 s each. Nothing opens on a
-  // visit: no fetch, no AudioContext, until somebody presses.
+  // Words to links: Ask sends a request and this bay's port list to the wish agent (POST
+  // /wish); only links passing `checkTransforms` and `bay.link` are held. One Workers AI call
+  // per press (llama-3.3-70b, about 780 + 100 tokens, $0.0005, 3 s). Nothing opens on a visit.
+  // See lessons/page-room.md#room-20
   const S = 'web';
   const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
   const PRICE_IN = 0.293 / 1e6, PRICE_OUT = 2.253 / 1e6;

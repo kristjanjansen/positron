@@ -1,30 +1,7 @@
-// demo/shell/mp3-frames.mjs — where one audio frame ends and the next begins.
-//
-// TWO FRAMINGS, ONE JOB. MPEG audio (Layer III, every Icecast `audio/mpeg`
-// mount) and ADTS (every Icecast `audio/aac` mount). They share a sync word and
-// nothing else, and the ONE bit that separates them is the pair of layer bits:
-// MPEG audio never writes `00` there because it is the reserved layer, and ADTS
-// always writes `00` because AAC has no layers. Everything below hangs off that.
-//
-// 🔴 WHY A PAGE HERE NEEDS THIS AT ALL. `/archive/radio/` played an Icecast mount
-// through an `<audio>` element and tapped it with `createMediaElementSource`.
-// MEASURED on an iPhone (iOS 18.7, Safari 26.6.1): the element plays, the
-// AudioContext runs, and the analyser reads **0.0000 on every line for the whole
-// run** — while a 440 Hz oscillator through the SAME analyser reads 0.33–0.80.
-// The graph can hear; WebKit simply does not route that element into it. So the
-// bytes have to be decoded by the page instead of by the element, and every way
-// of doing that wants frames:
-//
-//   - `AudioDecoder` (WebCodecs) takes ONE `EncodedAudioChunk` per frame.
-//   - `decodeAudioData` will only accept a buffer that STARTS on a frame sync,
-//     so chunking a stream for it means knowing where the syncs are.
-//
-// ⚠️ IT IS A SCANNER, NOT A DECODER. It reads headers and reports lengths; it
-// never touches the audio payload. That is the whole reason it can be written
-// here rather than vendored — the subject is "where are the boundaries", which
-// is forty lines of table lookup, not "turn MPEG audio into samples", which is
-// somebody else's life's work. If this file ever starts wanting to decode, that
-// is the signal to take a library instead (LAYOUT.md).
+// demo/shell/mp3-frames.mjs: where one audio frame ends and the next begins, for MPEG Layer III
+// and ADTS (AAC). The layer bits tell them apart: 00 is ADTS, never MPEG. A scanner, not a
+// decoder: iOS WebKit feeds an element's audio to an analyser as 0.0000, so pages decode frames.
+// why: lessons/kit-mp3-frames.md#header
 
 // Layer III only — that is what every Icecast `audio/mpeg` mount is.
 const BITRATES_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
@@ -36,14 +13,9 @@ const RATES = {
 };
 
 /**
- * Read a frame header at `i`, or return null when there is not one there.
- *
- * ⚠️ A SYNC WORD IS NOT A FRAME. Eleven set bits occur in ordinary audio data
- * about once every 2 KB by chance, so every field is validated — a reserved
- * version, a non-Layer-III layer, a `free` or `bad` bitrate index and a reserved
- * sample rate all mean this was not a header. Callers confirm a candidate by
- * checking that a header also sits at `i + length` (see `frameStarts`), which is
- * what makes a false positive vanishingly unlikely rather than merely unlikely.
+ * Read an MPEG audio frame header at `i`, or null. A sync word occurs by chance about once
+ * every 2 KB, so every field is validated and callers confirm the next header (`frameStarts`).
+ * why: lessons/kit-mp3-frames.md#read-header
  */
 export function readHeader(b, i) {
   if (i + 4 > b.length) return null;
@@ -60,10 +32,9 @@ export function readHeader(b, i) {
   const bitrate = (mpeg1 ? BITRATES_V1 : BITRATES_V2)[brIdx] * 1000;
   const padding = (b[i + 2] >> 1) & 0x01;
   const channelMode = (b[i + 3] >> 6) & 0x03;        // 3 = single channel
-  // MPEG1 Layer III carries 1152 samples a frame, MPEG2/2.5 carry 576 — and the
-  // frame LENGTH formula halves with it. Getting this pair wrong desynchronises
-  // after one frame rather than failing outright, which is why both come from
-  // the same branch.
+  // MPEG1 carries 1152 samples a frame, MPEG2/2.5 576, and the length formula follows; getting
+  // the pair wrong desynchronises after one frame, so both come from one branch.
+  // why: lessons/kit-mp3-frames.md#samples-per-frame
   const samplesPerFrame = mpeg1 ? 1152 : 576;
   const length = Math.floor((samplesPerFrame / 8) * bitrate / sampleRate) + padding;
   if (length < 24) return null;
@@ -85,52 +56,28 @@ export function readHeader(b, i) {
 const ADTS_RATES = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050,
                     16000, 12000, 11025, 8000, 7350, 0, 0, 0];
 /**
- * `channel_configuration` -> channels. Index 0 means "the channel count is in
- * the AudioSpecificConfig", which an ADTS frame does not carry — so it is
- * REJECTED rather than guessed at.
- *
- * 🔴 A CHANNEL COUNT CANNOT BE INFERRED FROM A PAYLOAD (CLAUDE.md). Guessing
- * stereo for a mono stream plays it an octave down, which sounds like a broken
- * instrument rather than a broken header. If the frame will not say, this is
- * not a frame we can use.
+ * `channel_configuration` -> channels. Index 0 (count in the AudioSpecificConfig) is rejected,
+ * never guessed: stereo guessed for mono plays an octave down.
+ * why: lessons/kit-mp3-frames.md#adts-channels
  */
 const ADTS_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 8];
 
 /**
- * Read an ADTS (AAC) frame header at `i`, or return null when there is not one
- * there. Same shape as `readHeader` above, so one caller can hold either.
- *
- * ⚠️ THE SAME SYNC WORD AS MPEG AUDIO, AND THE SAME WARNING APPLIES. Twelve set
- * bits occur in arbitrary data about once every 4 KB, so every field is checked
- * — a reserved sample rate, a channel configuration of 0, a length shorter than
- * the header itself — and callers confirm a candidate by checking that another
- * header sits at `i + length` (see `frameStarts`).
- *
- * The layout, which is why the shifts below are what they are. Bit 0 is the top
- * bit of byte 0:
- *
- *   0..11   syncword, all ones
- *   12      MPEG version, 0 = MPEG-4, 1 = MPEG-2. Not validated: both are legal.
- *   13..14  layer, ALWAYS 00. This is what distinguishes ADTS from MPEG audio.
- *   15      protection_absent. 0 means a 2-byte CRC follows the 7-byte header.
- *   16..17  profile, the audio object type minus one
- *   18..21  sampling_frequency_index
- *   22      private
- *   23..25  channel_configuration
- *   26..29  original, home, copyright id, copyright start
- *   30..42  aac_frame_length, INCLUDING the header and any CRC
- *   43..53  adts_buffer_fullness
- *   54..55  number_of_raw_data_blocks_in_frame, minus one
+ * Read an ADTS frame header at `i`, or null; same shape as `readHeader`. Twelve set bits occur
+ * by chance about once every 4 KB, so every field is checked and callers confirm the next header.
+ * Bits, 0 the top bit of byte 0: 0..11 sync, 12 version, 13..14 layer (always 00),
+ * 15 protection_absent (0: 2-byte CRC follows), 16..17 profile, 18..21 sampling_frequency_index,
+ * 22 private, 23..25 channel_configuration, 26..29 flags, 30..42 aac_frame_length (incl. header
+ * and CRC), 43..53 adts_buffer_fullness, 54..55 raw data blocks minus one.
+ * why: lessons/kit-mp3-frames.md#read-adts-header
  */
 export function readAdtsHeader(b, i) {
   // Seven bytes, because `number_of_raw_data_blocks` lives in the last of them
   // and the sample count depends on it.
   if (i + 7 > b.length) return null;
-  // 🔴 ONE MASK FOR SYNC AND LAYER TOGETHER. `0xf6` is the top four sync bits
-  // plus the two layer bits; the version bit at `0x08` and `protection_absent`
-  // at `0x01` are left free because both values are legal. Requiring the layer
-  // bits to be 00 here is the whole of the format discrimination: `readHeader`
-  // above requires them to be 01, so no byte pair can satisfy both.
+  // `0xf6` masks the top sync bits and the two layer bits; requiring 00 here and 01 in
+  // `readHeader` is the whole format discrimination.
+  // why: lessons/kit-mp3-frames.md#sync-layer-mask
   if (b[i] !== 0xff || (b[i + 1] & 0xf6) !== 0xf0) return null;
   const protectionAbsent = b[i + 1] & 0x01;
   const profile = (b[i + 2] >> 6) & 0x03;             // 1 = LC, which is mp4a.40.2
@@ -149,9 +96,8 @@ export function readAdtsHeader(b, i) {
   const samplesPerFrame = 1024 * ((b[i + 6] & 0x03) + 1);
   return {
     length, sampleRate, samplesPerFrame, channels,
-    // ⚠️ AAC HAS NO BITRATE FIELD, so this is THIS FRAME's rate rather than the
-    // stream's. AAC is variable rate by nature, so it wobbles frame to frame
-    // and only means something averaged. It is here because callers log it.
+    // AAC has no bitrate field: this is this frame's rate, meaningful only averaged; callers log it.
+    // why: lessons/kit-mp3-frames.md#adts-bitrate
     bitrate: Math.round((length * 8 * sampleRate) / samplesPerFrame),
     // `mp4a.40.2` for LC, which is what every Icecast AAC mount measured here
     // sends. Derived rather than hard-coded: a Main or LTP stream configures a
@@ -162,19 +108,9 @@ export function readAdtsHeader(b, i) {
 }
 
 /**
- * The two framings, by name. `read` is the header parser, `min` is how many
- * bytes it needs before it can say anything, and `types` are the `content-type`
- * values an Icecast mount serves them under.
- *
- * 🔴 `min` IS NOT DECORATION AND LEAVING IT OUT COST A WHOLE STREAM. `frameStarts`
- * used to bound its walk at a hard-coded 4, which is the MPEG header size, and
- * it advances by ONE BYTE whenever the reader says no. An ADTS reader says no to
- * anything under seven bytes — so on a socket delivering small chunks the walk
- * chewed through the sync byte three bytes before it could have been read, every
- * time, and the splitter returned **0 frames from 120 KB of a stream it had
- * correctly identified**. MEASURED at one-byte chunks, which is where it is
- * total; at seven it was 82 frames of a possible 129, which is the same bug
- * quietly losing a third of the audio.
+ * The two framings: `read` the parser, `min` the bytes it needs, `types` Icecast content-types.
+ * `min` bounds the walk; a hard-coded 4 made ADTS on one-byte chunks yield 0 frames from 120 KB.
+ * why: lessons/kit-mp3-frames.md#framings
  */
 export const FRAMINGS = {
   mpeg: { read: readHeader, min: 4, types: ['audio/mpeg', 'audio/mp3', 'audio/mpeg3', 'audio/x-mpeg'] },
@@ -182,13 +118,9 @@ export const FRAMINGS = {
 };
 
 /**
- * Which framing a `content-type` names, or null when it names neither.
- *
- * 🔴 A URL IS THE WRONG THING TO BRANCH ON and this project has paid for that
- * twice — `canPlayType` answering "maybe" in two browsers, and an `.mp3` suffix
- * on a path that carried something else. The response says what it is sending.
- * A null answer is an honest "this header did not say", which `createFrameSplitter`
- * turns into a look at the bytes rather than into a default.
+ * Which framing a `content-type` names, or null. Never branch on a URL; null makes
+ * `createFrameSplitter` look at the bytes rather than default.
+ * why: lessons/kit-mp3-frames.md#framing-for
  */
 export function framingFor(contentType) {
   const t = String(contentType || '').split(';')[0].trim().toLowerCase();
@@ -198,42 +130,25 @@ export function framingFor(contentType) {
 }
 
 /**
- * Walk `bytes` from `from`, returning every frame found and where it stopped.
- *
- * `end` is the offset of the first byte NOT consumed — a caller streaming from
- * a socket keeps the tail and prepends it to the next read, because a frame
- * almost always straddles a chunk boundary. (`icy.mjs` carries the same caveat
- * for the same reason, and its test drives one-byte chunks to prove it.)
- *
- * ⚠️ `confirm` IS WHAT MAKES THIS RELIABLE ON A RESYNC. A lone valid-looking
- * header is accepted only if another header sits exactly one frame later, so
- * random audio bytes that happen to look like a sync are rejected. It costs one
- * extra header read per frame and it is the difference between joining a live
- * stream cleanly and emitting one burst of noise. MEASURED over real captures:
- * without it the MPEG reader finds 67 frames in a megabyte of AAC and the ADTS
- * reader finds 32 in 300 KB of MP3. With it both find zero.
- *
- * `framing` picks the reader. It defaults to `mpeg`, which is what every caller
- * wanted before there was a choice.
+ * Walk `bytes` from `from`; `end` is the first byte not consumed, kept by a socket caller.
+ * `confirm` accepts a header only if another sits one frame later (without it: 67 false MPEG
+ * frames in 1 MB of AAC). `framing` picks the reader, `mpeg` by default.
+ * why: lessons/kit-mp3-frames.md#frame-starts
  */
 export function frameStarts(bytes, from = 0, { confirm = true, final = false, framing = 'mpeg' } = {}) {
   const { read, min } = FRAMINGS[framing] || FRAMINGS.mpeg;
   const frames = [];
   let i = from;
-  // ⚠️ `min`, NEVER A CONSTANT. See the note on FRAMINGS: a walk that steps past
-  // bytes its own reader was never given enough of cannot find the frame that
-  // starts in them, and it looks exactly like a stream with no frames in it.
+  // `min`, never a constant: see FRAMINGS.
+  // why: lessons/kit-mp3-frames.md#min-not-constant
   while (i + min <= bytes.length) {
     const h = read(bytes, i);
     if (!h) { i++; continue; }
     if (confirm) {
       const next = i + h.length;
-      // Not enough bytes to confirm yet. A SOCKET caller must stop and bring
-      // more — guessing here is a click in the output — but a caller holding a
-      // COMPLETE buffer has no more to bring, and refusing its last frame would
-      // silently drop one frame from every finite decode. `final` is that
-      // distinction, and it has to be the caller's to make: this function
-      // cannot tell a short read from the end of a file.
+      // Not enough bytes to confirm: a socket caller brings more; `final` lets a complete buffer keep
+      // its last frame. Only the caller can tell a short read from the end of a file.
+      // why: lessons/kit-mp3-frames.md#final
       if (next + min > bytes.length) {
         if (final && i + h.length <= bytes.length) { frames.push({ at: i, ...h }); i += h.length; }
         break;
@@ -248,20 +163,10 @@ export function frameStarts(bytes, from = 0, { confirm = true, final = false, fr
 }
 
 /**
- * A stateful splitter for a socket: feed it chunks, get whole frames out.
- * Keeps the straddling tail itself so no caller has to remember to.
- *
- * @param {{framing?: 'mpeg'|'adts'|null}} opts
- *   `framing` is what the response's `content-type` said. Leave it out, or pass
- *   null, when the header said nothing recognisable: the splitter then tries
- *   both readers on the arriving bytes and LATCHES the one that syncs.
- *
- * ⚠️ THE SNIFF IS A FALLBACK, NOT THE POLICY. When a `content-type` is present
- * and understood it decides, because that is the sender answering the question.
- * The sniff exists so that an unlabelled mount plays rather than silently
- * producing nothing, which is what a default would do — and a default is the
- * worse failure, because the page goes on reporting bytes arriving while not
- * one sample comes out.
+ * A stateful splitter for a socket: feed chunks, get whole frames; it keeps the straddling tail.
+ * @param {{framing?: 'mpeg'|'adts'|null}} opts from the content-type; null sniffs both readers
+ *   and latches the one that syncs (a fallback, never the policy).
+ * why: lessons/kit-mp3-frames.md#create-frame-splitter
  */
 export function createFrameSplitter({ framing = null } = {}) {
   let tail = new Uint8Array(0);
@@ -279,20 +184,15 @@ export function createFrameSplitter({ framing = null } = {}) {
       if (kind) {
         got = frameStarts(buf, 0, { confirm: !synced, framing: kind });
       } else {
-        // ⚠️ CONFIRMED FRAMES ONLY, AND THE BEST OF THE TWO RATHER THAN THE
-        // FIRST. A single confirmed hit is already vanishingly unlikely to be
-        // chance, but taking whichever reader found MORE of them costs nothing
-        // and cannot be fooled by one coincidence in a stream of the other kind.
+        // Confirmed frames only, and the reader that found more of them rather than the first.
+        // why: lessons/kit-mp3-frames.md#sniff-best
         for (const name of Object.keys(FRAMINGS)) {
           const r = frameStarts(buf, 0, { confirm: true, framing: name });
           if (!got || r.frames.length > got.frames.length) { got = r; kind = r.frames.length ? name : null; }
         }
         if (!kind) {
-          // Nothing recognisable yet, so bring more bytes — but BOUNDED. An
-          // endless stream of something neither reader understands would
-          // otherwise be held in memory in its entirety, for ever. The longest
-          // frame either format can write is 8191 bytes, so 32 KiB is four of
-          // them plus room to confirm a fifth.
+          // Bring more bytes, bounded: the longest frame is 8191 bytes, so 32 KiB holds four plus a fifth.
+          // why: lessons/kit-mp3-frames.md#sniff-bound
           tail = buf.length > 32768 ? buf.slice(buf.length - 32768) : buf;
           return [];
         }
@@ -316,29 +216,13 @@ export function createFrameSplitter({ framing = null } = {}) {
 }
 
 /**
- * The same bytes from their first confirmed frame on, for `decodeAudioData`.
- *
- * 🔴 SAFARI REFUSES A FILE THAT DOES NOT START ON A FRAME, AND A RECORDING CUT
- * FROM A LIVE MOUNT NEVER DOES. Reported 2026-10-13 from an iPhone on the
- * granulator: *"Raadio 2 recording did not open: Decoding failed"*. MEASURED
- * the same day in desktop Safari 27 against our own bucket: Raadio 2 starts
- * with 127 bytes of the middle of a frame and Raadio 4 with 120, because both
- * were captured by joining an Icecast mount mid stream; `decodeAudioData`
- * answered `Decoding failed` on both as fetched and decoded both whole once cut
- * at the first frame (183.20 s and 183.04 s). Chrome and ffmpeg skip the junk
- * themselves, which is why nothing here ever saw it. The Ida ADTS file starts
- * on a frame and is handed back untouched.
- * ⚠️ THE FRAMING IS READ OFF THE BYTES, NOT THE URL OR THE TYPE, which is the
- * rule at `framingFor`: whichever reader confirms a frame first wins, and a
- * buffer neither reader can sync on is returned as it came, so a WAV, an Ogg
- * or an MP4 still reaches the decoder and gets its own answer.
- * ⚠️ AN ID3 TAG IS NOT JUNK AND IS KEPT. A file that opens `ID3` is a tagged
- * MP3 every decoder knows how to skip, and cutting into it would be cutting
- * into a file that was never broken.
- *
+ * The bytes from their first confirmed frame on, for `decodeAudioData`: Safari refuses a file
+ * that starts mid-frame, which a recording joined mid-stream does. Framing is read off the
+ * bytes; an unsyncable buffer and an ID3 tag are returned as they came.
  * @param {ArrayBuffer} ab
  * @param {number} [scan] how far into the file to look for the first frame
  * @returns {{ buffer: ArrayBuffer, skipped: number, framing: string|null }}
+ * why: lessons/kit-mp3-frames.md#from-first-frame
  */
 export function fromFirstFrame(ab, scan = 65536) {
   const u = new Uint8Array(ab);

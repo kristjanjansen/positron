@@ -21,11 +21,9 @@
 <title>Sample drums</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  /* A sample's name can be forty letters (`NOVHTG Hit - Drumstation - 808
-     Crash D1T1`), and the label column is as wide as its widest name, so it
-     is held to a fifth of the screen and no more than 22 letters, and a name
-     past that ends in an ellipsis with the whole of it in the row's hover.
-     At 375 that is 75 px beside 16 pads; at 1280 it is 132 px. */
+  /* Label column: a fifth of the screen and at most 22 letters, a longer name ellipsed with the
+     whole in the hover. 75 px beside 16 pads at 375, 132 px at 1280.
+     See lessons/page-drums.md#drums-34 */
   .rh-samples .pos-pg-labs { max-width: min(22ch, 20vw); }
   .rh-samples .pos-pg-lab { text-overflow: ellipsis; }
 </style>
@@ -37,30 +35,10 @@
   import { createDrumMachine } from '/drums/drum-machine.mjs';
   import { sampleRows, rowNames, createSampleBank, MAX_ROWS } from '/drums/sample-voices.mjs';
 
-  // The drum machine of /drums/machine/ with its rows playing SAMPLES,
-  // on the same one SuperCollider engine. The definition, the default kit and
-  // the rows are in `../sample-voices.mjs`.
-  //
-  // EVERY SAMPLE IS A ROW, NAMED, AND THE GRID STARTS EMPTY. Asked 2026-10-13:
-  // *"show all samples with their names. no preatterns. "drawable" drum grid
-  // as in tom"*. The default kit's four rows show on load, named from
-  // DEFAULT_KIT before anything is fetched; a dropped `.circuitpack`, zip of
-  // WAVs or set of WAVs becomes one row per sample, up to 64 (a Circuit pack's
-  // slot count and /tom/'s row count), and the grid is built again, empty.
-  // Like /tom/, every row is on the page and the page grows tall; nothing
-  // scrolls inside it.
-  //
-  // DRAWN AS ON /tom/: the grid is the kit's `createStepGrid`, so a press and
-  // a drag paints every pad it crosses, along a row or across rows, and the
-  // first pad decides on or off for the whole stroke (a stroke that starts on
-  // a lit pad erases).
-  //
-  // THE PATCHBAY draws one box per row up to eight, and above eight one
-  // `web:samples` box with one wire in and one out, because 64 boxes is a
-  // column five thousand pixels tall. The bay itself keeps one wire per row.
-  //
-  // NOTHING OPENS ON A VISIT: the engine and the default kit wait for play, and
-  // a dropped file is read in the tab and sent nowhere.
+  // /drums/machine/ with rows playing samples (`../sample-voices.mjs`): a dropped pack, zip or WAVs
+  // becomes one row each, up to 64, drawn by dragging as on /tom/. Above eight rows the patchbay
+  // draws one `web:samples` box. Nothing opens on a visit; dropped files stay in the tab.
+  // See lessons/page-drums.md#drums-35
   const d = mount({ name: 'Sample drums', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('drums/samples');
 
@@ -84,10 +62,9 @@
     m?.api.refresh();
   }
 
-  // The default kit's names are known before anything is fetched.
-  // No default kit since 2026-10-13 (asked: *"no default grid / player /
-  // patchbay, do all on load"*): the page opens on the SAMPLES box alone, and
-  // the grid, its transport and the patchbay appear when a kit is loaded.
+  // No default kit: the page opens on the SAMPLES box alone, and the grid, its transport and the
+  // patchbay appear when a kit is loaded.
+  // See lessons/page-drums.md#drums-36
 
   m = createDrumMachine(d, {
     voices: VOICES,

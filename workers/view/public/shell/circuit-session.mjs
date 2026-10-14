@@ -1,46 +1,7 @@
-// demo/shell/circuit-session.mjs
-// The container of a Novation Circuit session: the fifty regions a
-// `.circuitsession` is made of, and a rebuild that has to come back byte
-// identical.
-//
-// 🔴 NOTHING HERE SENDS ANYTHING ANYWHERE. There is no Web MIDI, no
-// `requestMIDIAccess`, no output port, no SysEx frame and no network call, and
-// that is a safety property rather than an omission. Putting a session back on
-// the Circuit is one of the three operations that replace an instrument with no
-// factory reset, and `New Pack.circuitpack` is the backup of that instrument.
-// `rebuild()` returns an array in memory and the only thing that can be done
-// with it here is to compare it against the array that came in.
-// `circuit-session-test.mjs` asserts the absence twice: once over the exported
-// names, the way `circuit-patch-test.mjs` does, and once over this file's own
-// source text, because a name test cannot see a call inside a function.
-//
-// 🔴 THE MODEL IS A FIXED GRID, NOT A RUN LENGTH SCAN, AND THAT IS A CORRECTION.
-// `research/circuit-session-format-2026-09-21.md` §1 maps the file by finding
-// every run of `0xFF` sixteen bytes or longer and calling what is between them a
-// data block. That is a true description of `session_0` and it gives **49 blocks
-// of 1 x 528, 15 x 452, 32 x 32 and 1 x 848**. MEASURED here: it gives 49 blocks
-// in **21 of the 32 sessions** and anything from 50 to 332 in the other eleven,
-// because a scan keyed on the absence of data moves when there is more data.
-// ✅ The grid below does not move. It is the same fifty regions at the same
-// offsets in all 32, and in all 64 sessions of the two purchased packs as well.
-// `runs()` still exists, because the published figures are reproduced against it.
-//
-// 🔴 AND THE ROUND TRIP PROVES LESS THAN IT LOOKS LIKE IT PROVES. Any partition
-// of a file into regions, where each region is stored as its leading data plus a
-// count of trailing erasure, rebuilds byte identically whatever the boundaries
-// are. So a green round trip says the partition is COMPLETE and the rebuild is
-// FAITHFUL. It says nothing about whether these boundaries are the format's
-// boundaries. The evidence for the boundaries is separate and is in the test:
-// the offsets are constant across all 32, two independent derivations of the
-// stride agree, the last region's length is the same in all 32, and the two
-// synth patch payloads land exactly where the grid says they do.
-//
-// ⚖️ WHAT A FIELD MEANS IS NOT KNOWN AND IS NOT GUESSED HERE. Two things are
-// decoded by name and both are corroborated against a second source: the four
-// byte tag and the 32 byte session name, which agrees with `index.json` in
-// 32 of 32. Everything else is offered as bytes at an offset. The experiment
-// that would settle a field is one export, one change on the Circuit, a second
-// export and a diff, and it needs a person at the instrument.
+// demo/shell/circuit-session.mjs: a `.circuitsession` as a fixed grid of fifty regions, and a rebuild
+// that must come back byte identical. Sends nothing; the test asserts the absence. A green round
+// trip proves the partition complete, not that these are the format's boundaries.
+// why: lessons/kit-circuit-session.md#header
 
 /** Every session file measured on this machine, 96 of them, is this long. */
 export const SESSION_BYTES = 53248;
@@ -49,28 +10,9 @@ export const ERASED = 0xff;
 
 /**
  * The fixed grid, measured across all 32 of the owner's sessions.
- *
- * 🔴 THE NAMES `SYNTH` AND `DRUM` ARE A READING AND THEY WERE PUBLISHED AS A
- * FACT, CORRECTED 2026-09-21. A page showed the sixteen 1,508 byte regions as
- * `synth 1` through `synth 16` and the owner asked **"five synths??"**, which is
- * the right question: **a Circuit has TWO synth parts.** Nothing in this module
- * corroborates the names. What IS corroborated is the opposite: the two real
- * synth patches are decoded out of the TAIL region by `patchPayloads`, and even
- * those are marked as a reading at `PATCH_AT`.
- * ⚠️ **IT IS THE FOURTH TIME IN TWO DAYS THAT A LABEL WAS READ AS CONTENT.**
- * First a name in an index (`User Session`), then a four byte head (`INIT`),
- * then a unique hash, and now a name this module typed itself. The pattern is
- * the same each time and the repair is the same each time: say what was
- * measured, and let the thing that was not measured be visibly absent.
- * ⚖️ **A CANDIDATE READING, MARKED AS ONE.** The counts fit `2 synth parts x 8
- * patterns` and `4 drum parts x 8 patterns`, which is probably where the names
- * came from. That is arithmetic that happens to land, not evidence. The
- * experiment that would settle it is one change on the instrument, one export
- * and a diff, and it needs a person at the Circuit.
- * ✅ **SO THE KINDS ARE NAMED FOR THEIR STRIDE AND FOR NOTHING ELSE.** `wide`
- * is the 1,508 byte stride and `narrow` is the 720 byte one. Both names are
- * true by construction and neither can be mistaken for a part of an
- * instrument.
+ * Kinds are named for their stride (`wide` 1,508 bytes, `narrow` 720), not synth or drum:
+ * that reading is unconfirmed and a Circuit has two synth parts.
+ * why: lessons/kit-circuit-session.md#grid
  */
 export const HEADER_LEN = 76;
 export const WIDE_SLOTS = 16;
@@ -79,14 +21,9 @@ export const NARROW_SLOTS = 32;
 export const NARROW_SLOT_LEN = 720;
 export const TAIL_LEN = 6004;
 
-// ⚖️ THE 76 IS DERIVED, NOT CHOSEN. The first data block of a clean session is
-// 528 bytes and every other one is 452, and 528 less 452 is 76. That is the only
-// offset which makes the first record the same length as all the others, and
-// 76 + 16 x 1508 lands on 24204, which is exactly where the 720 stride begins.
-// ⚠️ It is still a place to draw a line rather than a documented header length.
-// The same bytes partition identically if you call the first region 1584 long
-// and have fifteen records after it. Nothing here depends on which reading is
-// right, because the bytes are the same either way.
+// 76 is derived: the first block is 528 and the rest 452, and 76 + 16 x 1508 = 24204 where the
+// 720 stride begins. A place to draw a line, not a documented header length.
+// why: lessons/kit-circuit-session.md#narrow-at
 export const NARROW_AT = HEADER_LEN + WIDE_SLOTS * WIDE_SLOT_LEN;   // 24204
 export const TAIL_AT = NARROW_AT + NARROW_SLOTS * NARROW_SLOT_LEN;  // 47244
 
@@ -111,25 +48,21 @@ export const SLOTS = (() => {
 /** The first four bytes, read as text. All 96 files here carry one of these. */
 export const TAGS = ['USER', 'DEMO', 'INIT'];
 /**
- * 🔴 A TAG DOES NOT TELL A BACKUP FROM A BLANK AND IT WAS PUBLISHED AS IF IT
- * DID. `INIT` is on both sides: three of the owner's own sessions say `INIT`
- * and so do all 64 purchased blanks. `circuit-patch-test.mjs` already carries
- * that correction and this module inherits it.
+ * The tag does not tell a backup from a blank: `INIT` is on both sides.
+ * why: lessons/kit-circuit-session.md#tag-at
  */
 export const TAG_AT = 0;
 export const TAG_LEN = 4;
 /**
- * ⚖️ TWO BYTES THAT ARE `DC BB` IN ALL 32 OF THE OWNER'S SESSIONS AND `00 00`
- * IN ALL 64 BLANKS. MEASURED, on 96 files. Calling it a signature or a format
- * version is a reading, and what is a fact is that it separates the two sets
- * cleanly where the tag does not.
+ * `DC BB` in all 32 owner sessions, `00 00` in all 64 blanks (96 files measured).
+ * What it means is a reading; that it separates the two sets is a fact.
+ * why: lessons/kit-circuit-session.md#magic-at
  */
 export const MAGIC_AT = 4;
 export const MAGIC = [0xdc, 0xbb];
 /**
- * The session name, 32 bytes of space padded ASCII.
- * ✅ CORROBORATED AGAINST A SECOND SOURCE: decoded from the bytes it agrees with
- * the name `index.json` gives for the same file in 32 of 32.
+ * The session name, 32 bytes of space padded ASCII; agrees with `index.json` in 32 of 32.
+ * why: lessons/kit-circuit-session.md#name-at
  */
 export const NAME_AT = 16;
 export const NAME_LEN = 32;
@@ -137,14 +70,9 @@ export const NAME_LEN = 32;
 // ------------------------------------------------------------- the last slot
 
 /**
- * The final region holds two synth patch payloads in the same 340 byte layout
- * `circuit-patch.mjs` decodes, at these offsets inside it.
- * ✅ MEASURED rather than assumed: the two names sit 340 apart, every one of the
- * 64 payloads has its reserved block 18 to 31 zero and not one byte above 0x7F,
- * and **10 of the 64 are byte identical to a `patches/patch_*.syx` payload in
- * the same pack**.
- * ⚖️ That they are synth 1 and synth 2 in that order is a reading. What is
- * measured is that there are two of them and that they decode.
+ * The final region holds two synth patch payloads in the 340 byte layout `circuit-patch.mjs`
+ * decodes, at these offsets. 10 of 64 are byte identical to a pack `.syx`; their order is a reading.
+ * why: lessons/kit-circuit-session.md#patch-at
  */
 export const PATCH_AT = 56;
 export const PATCH_LEN = 340;
@@ -219,16 +147,11 @@ export function readSession(buf) {
 }
 
 /**
- * Put a session back together out of the model.
- *
- * 🔴 IT REBUILDS RATHER THAN COPIES, WHICH IS THE WHOLE POINT. Nothing in here
- * reads the buffer that was parsed: the output is each region's `data` followed
- * by `pad` bytes of erasure, in the order the model holds them. A region moved,
- * a `pad` wrong by one or a byte changed in `data` all come out as a different
- * file, and the test proves each of those three by doing it.
- *
+ * Put a session back together out of the model: each region's `data` then `pad` bytes of erasure.
+ * It never reads the parsed buffer.
  * @param {{slots:{data:Uint8Array, pad:number}[]}} session
  * @returns {Uint8Array}
+ * why: lessons/kit-circuit-session.md#rebuild
  */
 export function rebuild(session) {
   let total = 0;
@@ -247,10 +170,9 @@ export function rebuild(session) {
 // ------------------------------------------------------- what is in the file
 
 /**
- * The byte census, over the WHOLE file.
- * ⚠️ AND THAT IS THE TRAP THIS FILE WAS CAUGHT BY ONCE. Four fifths of a session
- * is erased flash, so any share taken over `length` measures the erasure and not
- * the session. `payload` is the denominator for a statement about content.
+ * The byte census, over the whole file. Four fifths is erased flash, so use `payload` as the
+ * denominator for a statement about content.
+ * why: lessons/kit-circuit-session.md#census
  */
 export function census(buf) {
   const u8 = bytesOf(buf);
@@ -284,11 +206,9 @@ export function census(buf) {
 }
 
 /**
- * The run length reading the research published: every run of `ERASED` at least
- * `min` long is padding, everything between two of them is a block.
- * ⚠️ IT IS DATA DEPENDENT. 49 blocks in 21 of the owner's 32 sessions, one block
- * in a purchased blank, 332 in the busiest one. Kept so the published figures
- * can be reproduced, and not used as the model.
+ * The published run length reading: every run of `ERASED` at least `min` long is padding.
+ * Data dependent (49 blocks in 21 of 32, up to 332); kept to reproduce figures, not the model.
+ * why: lessons/kit-circuit-session.md#runs
  */
 export function runs(buf, min = MIN_ERASED_RUN) {
   const u8 = bytesOf(buf);
@@ -385,9 +305,8 @@ export function summarise(session) {
     magicOk: session.header.magicOk,
     length: session.length,
     used: sum(session.slots),
-    // ⚠️ NAMED FOR THE STRIDE, NOT FOR A PART OF AN INSTRUMENT. See the note on
-    // the grid above: these were `synthSlots` and `drumSlots` and a page printed
-    // sixteen synths on a machine that has two.
+    // Named for the stride, not for a part of an instrument. See the grid.
+    // why: lessons/kit-circuit-session.md#wideslots
     wideSlots: kind('wide').length,
     wideUsed: sum(kind('wide')),
     narrowSlots: kind('narrow').length,
@@ -400,29 +319,10 @@ export function summarise(session) {
 // ------------------------------------------------------- the note data
 
 /**
- * 🔴 A `wide` REGION HOLDS SEQUENCER NOTE DATA, AND THIS IS THE FIRST THING
- * THIS MODULE HAS EVER BEEN ABLE TO SAY ABOUT WHAT A REGION HOLDS. Asked
- * 2026-09-21: *"can we get note data out of regions?"*, and then, against a
- * page still printing *"what they hold is not known"*, *"where is note data?"*.
- *
- * ✅ TWO INDEPENDENT IMPLEMENTATIONS AGREE TO THE EVENT: **5,095 note events**
- * across the owner's 32 sessions, **0** across all 64 purchased blanks, and
- * `session_0`'s first event is note 55 with gate 2 and velocity 41 in both.
- * `research/circuit-session-notes-2026-09-21.md` has the whole derivation.
- *
- * ⚠️ THE 28 WAS FOUND BLIND, BEFORE ANY RECORD WAS READ. Matching byte `i`
- * against byte `i + L` over all 512 of the owner's wide regions puts the top
- * four lags at 56, 112, 84 and 28, which are the four multiples of 28, against
- * a 68.03 per cent baseline over all 128 lags.
- *
- * 🔴 AND A CONSISTENCY SCORE ON ITS OWN IS A LIAR, WHICH IS WHY NOTHING HERE
- * RESTS ON ONE. Strides 56, 112, 224 and 448 all BEAT 28 and are multiples of
- * it that read one record in two, four, eight or sixteen: **they score better
- * by finding less.** Four origins at stride 28 score a perfect 100 per cent
- * with zero events, because they land on bytes that are always zero. What
- * carries the claim is the YIELD against the controls: random bytes score
- * 11.08 per cent on the mask test, and the owner's own sessions with every
- * non-erasure byte SHUFFLED score 18.99, against 99.62.
+ * A `wide` region holds sequencer note data in 28 byte records: 5,095 events over the owner's 32,
+ * 0 over 64 blanks, two implementations agreeing. The claim rests on yield against controls
+ * (random 11.08 per cent, shuffled 18.99, real 99.62), not on a consistency score.
+ * why: lessons/kit-circuit-session.md#note-data
  */
 export const STEPS = 16;
 export const STEP_LEN = 28;
@@ -430,39 +330,20 @@ export const STEP_SLOTS = 6;
 export const SLOT_LEN = 4;
 
 /**
- * ⚖️ WHERE VELOCITY LIVES, SELECTED BY HEADER BYTE 8, AND THE SECOND SOURCE IS
- * A GENUINE ROSETTA STONE THAT WAS SITTING ON THIS DISK.
- * `purchased/Ghostly Intro.circuitsession` is **byte identical** to the owner's
- * `session_17`, and `Ghostly Intro (2)` is a different file with the same name.
- * Byte 8 is `0x07` in the first and `0xFF` in the second, and **the two decode
- * to the same music**: 31 note events each, note number and velocity agreeing
- * on 31 of 31, read out of different bytes.
- * ⚠️ MEASURED ACROSS BOTH PACKS: the owner's 32 are `0xFF` 24 and `0x07` 8, and
- * all 64 blanks are `0x00`. So it is a third byte that separates the two packs,
- * after the marker and the yield.
- * ⚠️ AND IT IS A READING OF WHAT THE BYTE SELECTS, not of what it MEANS. No
- * firmware was consulted and no instrument was in the loop.
+ * Header byte 8 selects where velocity lives (`0xFF` or `0x07`): two files with the same music
+ * decode to 31 of 31 equal events either way. A reading of what it selects, not what it means.
+ * why: lessons/kit-circuit-session.md#velocity-at
  */
 export const VELOCITY_AT = 8;
 export const VELOCITY_PER_STEP = 0x07;
 
 /**
  * Every note event in a session, in region then step then slot order.
- *
- * 🔴 IT READS THE MASK AND NEVER THE NOTE BYTES, AND THAT IS NOT A STYLE
- * CHOICE. 31 records of 8,192 carry a popcount ONE BELOW their filled slot
- * count, and the popcount is never greater, 8,192 of 8,192. The reading is a
- * stale note byte left in a freed slot, and a decoder that counted non-zero
- * note bytes instead would invent those 31 events.
- *
- * ⚠️ IT DECODES AND IT CANNOT WRITE. Like everything else in this file: no
- * message is built, nothing is sent, and a writer is deliberately absent,
- * because one that emitted only what it understands would destroy everything
- * else in the file.
- *
+ * Reads the mask, never the note bytes: 31 of 8,192 records keep a stale note in a freed slot.
+ * Decodes only; there is deliberately no writer.
  * @param {ArrayBuffer|Uint8Array} buf  a whole session
- * @returns {{region:number, step:number, slot:number, at:number,
- *            note:number, gate:number, velocity:number}[]}
+ * @returns {{region:number, step:number, slot:number, at:number, note:number, gate:number, velocity:number}[]}
+ * why: lessons/kit-circuit-session.md#notesin
  */
 export function notesIn(buf) {
   const u8 = bytesOf(buf);
@@ -500,11 +381,9 @@ export function notesPerRegion(buf) {
 }
 
 /**
- * ⚠️ THE SHAPE CLAIM, SO A CALLER CAN REFUSE A FILE RATHER THAN READ NOISE OUT
- * OF IT. Bytes 2 and 3 of every step record are zero in 8,192 of 8,192 of the
- * owner's records and in 16,384 of 16,384 blanks, and in **0 of 2,048** records
- * of random bytes. It is the cheapest thing that tells a session from a file
- * that merely happens to be 53,248 bytes long.
+ * Shape check so a caller can refuse a file: bytes 2 and 3 of every step record are zero in all
+ * real and blank records and in 0 of 2,048 random ones.
+ * why: lessons/kit-circuit-session.md#stepgrid
  */
 export function stepGridLooksRight(buf) {
   const u8 = bytesOf(buf);

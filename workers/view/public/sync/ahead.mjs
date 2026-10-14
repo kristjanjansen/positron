@@ -1,35 +1,7 @@
-// demo/sync/ahead.mjs: the AHEAD tab of /sync/, from the old /jam/
-// (plans/plan-demo-structure.md §3.1, step 6). The owner's "two clocks" demo:
-// BACKLOG, *"Can we do demo on synving thing and two clocks"*.
-//
-// The second of the four regimes in plans/plan-routing-time.md: SCHEDULED
-// AHEAD ON THE PEER CLOCK. Nothing is sent per beat. Every beat is a moment on
-// a loop clock `{ bpm, epoch }` that both ends compute for themselves
-// (`beatToShared` in demo/shell/timebase.mjs), so what has to cross the wire is
-// only the answer to *what time is it over there*, and `proto/looper/peer.mjs`
-// answers it NTP's way, keeping the fastest sample.
-//
-// WHAT CAME OVER FROM /jam/: the peer clock, the deck on it, the eight beat
-// pulse, the score as a document, the count of what has sounded at every beat.
-// WHAT CHANGED ON THE WAY IN, AND WHY:
-//   1  🔴 TWO CLOCKS IN ONE TAB, ONE OF THEM WRONG ON PURPOSE. /jam/'s subject
-//      was two machines and every run graded one: `alone means zero offset`,
-//      `0 peer(s)`. Here a second peer runs beside this one over
-//      `pairTransports` (peer.mjs's in-process pair, a real setTimeout hop with
-//      a chosen delay), and its clock is SKEW_MS fast. So *the offset was
-//      found* and *the beats agree* are graded on one machine, against a skew
-//      the test chose and the peers were not told.
-//   2  🔴 THE BEATS ARE ON THE GRID, NOT WHEREVER PLAY WAS PRESSED. /jam/'s
-//      deck started from 0 at the press, so two machines pressing at
-//      different moments counted the same eight beats at different times, and
-//      its loop seeked to 0 from the eighth beat, which put beat 1 on top of
-//      beat 8 and made the loop seven steps long. Here play joins the count
-//      where the shared clock has got to, and a lap ends by stepping back
-//      exactly one loop, so the grid is never left.
-//   3  🔴 NO RELAY UNTIL A PRESS. /jam/ joined `jam-demo` on load. Here
-//      `Join the room` is the only thing that opens a socket, and both clocks
-//      join, so a phone or `node rig/peer.mjs --room jam-demo` on the Pi sees
-//      them both. That round trip is a DEEP check (selfcheck=2).
+// AHEAD tab: every beat is a moment on a loop clock `{ bpm, epoch }` both ends
+// compute, so only the clock offset crosses the wire. A second peer, SKEW_MS
+// fast, runs beside this one over `pairTransports`; the relay waits for a press.
+// See lessons/page-sync.md#sync-15
 
 import { el } from '/shell/shell.mjs';
 import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -53,7 +25,7 @@ const LAPS = 2;                               // the deck holds two laps; see `w
 const CLOCK = { bpm: (60000 / STEP), epoch: 0 };   // the loop clock both ends compute
 const SKEW_MS = 137;                          // how fast the second clock runs, unknown to it
 const HOP_MS = 20, HOP_JITTER_MS = 2;         // the in-tab hop: 18 to 22 ms each way
-const AGREE_MS = 3;                           // what /jam/ MEASURED between two real machines
+const AGREE_MS = 3;                           // measured between two real machines. See lessons/page-sync.md#sync-16
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mod = (a, n) => ((a % n) + n) % n;
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[s.length >> 1] : NaN; };
@@ -61,9 +33,9 @@ const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.lengt
 const rid = () => Math.random().toString(36).slice(2, 8);
 
 /**
- * `wsTransport` keeps ONE callback and a second `onMessage` replaces the
- * first, so a socket that both a peer and a counter listen to is fanned out
- * here first.
+ * `wsTransport` keeps one callback (a second `onMessage` replaces the first), so
+ * a socket both a peer and a counter listen to is fanned out here.
+ * See lessons/page-sync.md#sync-17
  */
 function fan(t) {
   const cbs = [];
@@ -89,11 +61,9 @@ export const about = `Two clocks, the second set ${SKEW_MS} ms fast on purpose, 
 export const readout = { correction: 'ms', apart: 'ms', 'round trip': 'ms', beat: '' };
 
 /**
- * THE PICTURE, READ OFF THIS FILE. Both clocks, both decks and the click live
- * in this one Browser, and the relay is a side leg that only `Open to other
- * devices` adds. The chain inside the Browser is the path to the sound: the
- * second clock corrects itself against this one, this clock's deck plays the
- * grid, and its beats click. Every number in it is this file's constant.
+ * Both clocks, both decks and the click in one Browser; the relay is a side leg
+ * only `Open to other devices` adds. Every number is this file's constant.
+ * See lessons/page-sync.md#sync-18
  */
 export const diagramSpec = () => ({
   caption: 'Two clocks agree once on what time it is, and after that every beat is worked out at each end and never sent.',
@@ -152,15 +122,10 @@ export function build({ panel, log, set }) {
     uses: [quotation({ id: 'u1', ref: 'pulse', at: 0, in: 0, out: BEATS })],
   });
 
-  // ── the two clocks ────────────────────────────────────────────────────────
-  // 🔴 THE CLOCK IS THE WHOLE DIFFERENCE. `performance.now()` is private to a
-  // document, and asking a Worker what time it is measured ±50 ms of BIAS.
-  // ✅ MEASURED ON A REAL LINK, 2026-09-10: two machines agreeing to ~3 ms,
-  // and 0.69 ms with two peers on one machine on a 66 to 74 ms path. Quote
-  // 3 ms, never 0.15.
-  // ⚠️ THE SECOND ID SORTS AFTER THE FIRST BY CONSTRUCTION. peer.mjs elects
-  // the LOWEST id as the reference, so `this clock` is the one the other
-  // follows, and the skew it must find is exactly SKEW_MS.
+  // The two clocks. Two machines agree to about 3 ms over a real link; quote 3 ms.
+  // The second id sorts after the first, and peer.mjs elects the lowest as the
+  // reference, so the skew the other must find is exactly SKEW_MS.
+  // See lessons/page-sync.md#sync-19
   const id = rid();
   const pair = pairTransports({ schedule: (ms, fn) => setTimeout(fn, ms), delayMs: HOP_MS,
                                 jitterMs: HOP_JITTER_MS, rng: Math.random });
@@ -183,9 +148,9 @@ export function build({ panel, log, set }) {
   }
 
   /**
-   * One deck on one peer's clock, with its beats recorded in TRUE time
-   * (`epochNow()`, which neither peer's correction touches) and by the grid
-   * beat they were for, so two decks can be compared beat for beat.
+   * One deck on one peer's clock, beats recorded in true time (`epochNow()`) and
+   * by grid beat, so two decks compare beat for beat.
+   * See lessons/page-sync.md#sync-20
    */
   function deckOn(peer, row) {
     const fires = [];            // { k: grid beat, trueAt, intendedTrue }
@@ -211,10 +176,9 @@ export function build({ panel, log, set }) {
           lit = row.cells.findIndex((c) => c.classList.contains('on'));
         }
         hooks.onBeat?.(p, deck);
-        // 🔴 THE LAP, AND IT KEEPS THE GRID. A beat in the second lap steps the
-        // deck back exactly one loop, so position and shared clock keep the
-        // relation `play` set up. A microtask, because seeking from inside the
-        // thing the seek will re-fire is re-entrant.
+        // The lap keeps the grid: a beat in the second lap steps back exactly one loop.
+        // A microtask, because seeking from inside what the seek re-fires is re-entrant.
+        // See lessons/page-sync.md#sync-21
         if (p.i >= BEATS) queueMicrotask(() => deck.seek(deck.position() - LOOP));
       },
       reduce: (rs) => ({ count: rs.length }),
@@ -222,9 +186,9 @@ export function build({ panel, log, set }) {
     });
     for (const r of rows) deck.schedule({ at: r.at, kind: 'beat', id: `b${r.i}`, payload: { beat: (r.i % BEATS) + 1, i: r.i } });
     /**
-     * 🔴 PLAY JOINS THE COUNT WHERE THE SHARED CLOCK HAS GOT TO. The position
-     * becomes the loop clock's phase, in whichever lap keeps it at or after
-     * where it was, so `play advances position` stays true for the bar.
+     * Play joins the count where the shared clock has got to, in the lap that keeps
+     * the position at or after where it was, so `play advances position` holds.
+     * See lessons/page-sync.md#sync-22
      */
     function start() {
       const was = deck.position(), ph = phase(peer);
@@ -257,13 +221,10 @@ export function build({ panel, log, set }) {
   }
   A1.hooks.onBeat = (p) => { click(); set('beat', `${p.beat}/${BEATS}`); };
 
-  // ── the bar and the strip: one surface ────────────────────────────────────
-  // The bar drives this clock's deck, and the second clock's deck follows the
-  // same presses, the way a second machine would be running anyway.
-  // ⚠️ THE SHELF IS IN THE PAGE BEFORE THE STRIP IS MADE. A strip built into a
-  // detached element measures 300 px, fits its view to that, and never fits
-  // again, so the two laps came out a seventh of the width with fourteen
-  // seconds of empty lane after them.
+  // The bar drives this clock's deck; the second deck follows the same presses.
+  // The shelf is in the page before the strip is made: a detached strip measures
+  // 300 px and never refits.
+  // See lessons/page-sync.md#sync-23
   const btns = createButtonGroup({ buttons: [
     { id: 'join', label: 'Open to other devices', onPress: () => joinRoom() },
     { id: 'sound', label: 'Sound on', onPress: () => {
@@ -374,10 +335,9 @@ export function build({ panel, log, set }) {
         A('the count of what has sounded is exact at every beat', wrong === 0, `${BEATS * LAPS} probed, ${wrong} wrong`);
       }
 
-      // 🔴 THE NEGATIVE CONTROL, built here and thrown away: the same skewed
-      // clock, but every clock message is lost, so it never learns it is off.
-      // The comparison below must then see the whole skew, or it could not see
-      // a disagreement at all and the agreement above would prove nothing.
+      // Negative control: the same skewed clock with every clock message lost. The
+      // comparison must see the whole skew, or the agreement above proves nothing.
+      // See lessons/page-sync.md#sync-24
       const lost = pairTransports({ schedule: (ms, fn) => setTimeout(fn, ms), lossRate: 1, rng: () => 0 });
       const deaf = createPeer({ id: `${id}~~`, transport: lost.b, now: () => epochNow() + SKEW_MS, pingEveryMs: 0 });
       const N = deckOn(deaf, null);
@@ -406,8 +366,8 @@ export function build({ panel, log, set }) {
       bar.api.el.querySelector('.tbar-toggle').click();
       A1.deck.seek(0); B1.deck.seek(0);
 
-      // ⚠️ A RELAY ROUND TRIP IS A DEEP CHECK. An ordinary run says so in the
-      // log rather than counting it as a pass.
+      // A relay round trip is a deep check; an ordinary run logs that, not a pass.
+      // See lessons/page-sync.md#sync-25
       if (DEEP) {
         btns.button('join').click();
         const t = performance.now() + 6000;

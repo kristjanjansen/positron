@@ -1,235 +1,57 @@
-// demo/shell/keyboard.mjs — the ONE on-screen keyboard, and the pad under it.
-//
-// Extracted from `instrument`, which had the good one: black keys drawn as
-// black keys, pointer capture so a held finger is a held note, and a separate
-// colour for a note somebody ELSE played. `rig/m1` had grown eight
-// equal grey buttons instead, and its mapping drifted diatonic because the
-// picture could not show a sharp — the shape constrains the mapping, so the
-// shape comes first.
-//
-// THE RULE THAT MATTERS: a key is lit by a NOTE, never by the press that caused
-// it. Light it from the press and a note arriving over MIDI or from another
-// player does not light, while a local press stays lit after its note stops.
-// `press()` and `release()` therefore only report; `lightNote()` paints.
-//
-// ── THE PAD, and why it is part of the keyboard rather than part of a page ──
-//
-// Octave down, octave up, notes off. /keys/ declared these three as ordinary
-// controls, which put them in the row at the TOP of the page — a hand's width
-// away from the keys they act on, and after four other buttons that do
-// something else entirely. They are not page controls: every one of them is
-// about the keyboard and nothing else, and any page that draws a keyboard wants
-// all three. So they are drawn with it, always, and a page gets them without
-// asking. There is no option to turn the pad off: one keyboard that sometimes
-// has an octave control is two components.
-//
-// ⚠️ NO OCTAVE NUMBER ON THE PAD, on purpose. Every key already prints its own
-// note name (`C4`, `A#4`), and all of them move together when the octave does —
-// so the octave is written across the keyboard in thirteen places. A
-// fourteenth, in a different place, is a second copy that can disagree.
-//
-// 🔴 `verify.mjs` CANNOT PRESS THESE. It presses `.pos-controls button, .tbar-x`
-// with `element.click()` and nothing else, and the pad is deliberately NOT in
-// `.pos-controls` — that is the whole point of moving it. So a page that ships
-// the pad and asserts nothing about it has three ungraded controls, which is
-// how `mirror` lost two asserts while reading green. The effect is observable
-// without a click and does not need one: `shiftOctave()` returns the new base,
-// `base` reads it back, and every key's printed note name moves with it. A
-// page in the suite should drive those from its own check — the same bargain
-// `slider.mjs` makes with `set()`. (Today the two pages that draw a pad,
-// `/keys/` and `/kit/`, are both `built: false` and the suite never opens
-// either, so there is nothing for them to assert INTO; that is a gap in
-// coverage, not a gap in this file.)
-//
-// ── A FINGER, 2026-09-17 ────────────────────────────────────────────────────
-//
-// This was a flat row of thirteen equal slivers that only a mouse could use.
-// Four rounds of real phone reports later it is a piano that scrolls.
-//
-// 🔴 IT IS A PIANO NOW, NOT A CHROMATIC ROW. Eight white keys in a grid, five
-// black ones RAISED over the boundaries between them, narrower and shorter and
-// painted on top, which is the shape everybody already knows how to read. The
-// black key's column is worked out from the map rather than hard-coded, so a
-// caller that passes a different set of letters still gets a keyboard.
-//   ⚠️ THE OVERLAP IS A HIT-TEST PROBLEM AND IT SOLVES ITSELF. A raised black
-//   key covers the top corners of the two whites beside it, so a finger aiming
-//   at C# lands on a point that is inside C and inside C# at once. The hit test
-//   is `document.elementFromPoint`, which returns the TOPMOST element, and the
-//   black keys are the topmost because they are painted last. Nothing had to be
-//   written for it; what had to be written is the assert. MEASURED while trying
-//   to break it: TWO things in `shell.css` deliver that priority and either one
-//   alone is enough, so a single sabotage of either reads green. The assert has
-//   to sample BOTH sides of a black key, because the white on its left is
-//   covered by DOM order in every arrangement and only the right side depends
-//   on the stacking at all.
-//
-// 🔴 A SWIPE SCROLLS THE ROW AND PLAYS NOTHING. A DRAG PLAYS ONLY ONCE A NOTE
-// IS ALREADY SOUNDING. Instructed in those words: *"Drag to play happens when
-// playing is there"*. One horizontal gesture across the keys has to mean two
-// opposite things, and this is the rule that separates them. The numbers are
-// `SWIPE_FRAMES` and `SWIPE_PX` below.
-//
-// 🔴 AND THE SCROLLING IS THE PLATFORM'S, NOT OURS. `touch-action: pan-x` on
-// the row hands the gesture to the browser, which brings its own momentum and
-// its own rubber-band at the ends for nothing. The edge-hold autoscroll that
-// used to live here is GONE: it existed because `touch-action: none` meant a
-// finger could not move the row at all, and a hand-rolled ramp beside a native
-// scroller is two answers to one question.
-//
-// ── WHAT WAS HERE AND IS NOT ─────────────────────────────────────────────────
-//
-// 🔴 HOLD-TO-RETRIGGER IS REMOVED, ASKED FOR AND THEN UNASKED. *"Rm
-// retriggering"*. The measurement it produced is worth more than the feature
-// and is kept here because nothing else records it. MEASURED on the board in
-// `studio-1` on 2026-09-17, one note, twice, amplitude envelope of a 3 s hold
-// against the same note retriggered every 250 ms:
-//   · It made NO audible pulse on either patch this project uses. Peak to dip
-//     1.07 to 1.16, against a held note's own floor of 1.04 to 1.13. The two
-//     ranges overlap, so there is no rhythm in it to hear.
-//   · What it moved was the LEVEL, in opposite directions. `AddSynth Morph`
-//     came out 1.7x LOUDER retriggered, because its release tail outlives a
-//     250 ms period and the tails stack. `Analog Filter 1` came out 2.9x
-//     QUIETER, because it takes about two seconds to swell and a repeat never
-//     lets it get there.
-//   · Neither patch is plucked, so the pizzicato case is UNVERIFIED and nothing
-//     on that board can answer it.
-// The one piece of machinery worth remembering: `press()` and `release()` are
-// the single funnel every note goes through, by every route. That is where a
-// recorder attaches, and it is why the hold could be added and removed in one
-// place.
+// demo/shell/keyboard.mjs: the one on-screen keyboard, and the pad under it.
+// A key is lit by a NOTE, never by the press that caused it: `press()`/`release()` only report,
+// `lightNote()` paints. A swipe scrolls the row and plays nothing; a drag plays once a note sounds.
+// why: lessons/kit-keyboard.md#header
 
-/**
- * 🔴 49 px, WHICH IS TWO THIRDS OF 74. Asked for in those words: *"Keys 2/3 on
- * wideneds"*. The history in one line, all MEASURED at 390 CSS px on
- * `/knobs/`: thirteen equal keys at **24.77 px**, then thirteen at 74, now
- * eight white keys at 49.
- * ⚠️ AND 44 px IS THE FLOOR THIS IS NOW CLOSE TO. Apple's minimum touch target
- * is 44 pt and Android's is 48 dp; 49 clears the first by 5 px and the second
- * by 1. There is no room left underneath it, so the next request to make the
- * keys smaller is a request to make them too small to hit, and that is worth
- * saying before it arrives rather than after.
- * ⚠️ IT IS A FLOOR, NOT A WIDTH, and it is UNCONDITIONAL now. It used to be
- * armed by a container query and `(pointer: coarse)` so that a desktop layout
- * could not move; with eight columns instead of thirteen a white key is wider
- * than 49 px in any container over about 413 px, so the floor only ever binds
- * on a narrow one and the two queries were inert. One rule, no breakpoint.
- */
+// A white key's floor is 49 px, two thirds of 74, measured at 390 CSS px on `/knobs/`.
+// It clears Apple's 44 pt touch minimum by 5 px and Android's 48 dp by 1: there is no room below it.
+// why: lessons/kit-keyboard.md#key-floor
 import { createToggle } from './toggle.mjs';
-/* 🔴 THE SAME MACHINE `/num/` WAS BUILT TO GET RIGHT, AND NOT A SECOND COPY OF
-   IT. Asked 2026-09-23: *"num works. how come you can not add it to keyboard"*.
-   Nothing prevented it: the ten slot state machine was already written and
-   already graded with no browser, and this component had one tape and one
-   button. `numloop.mjs` owns WHICH slot is doing what; the keyboard owns what
-   recording and looping MEAN, which is the same division the page keeps with the
-   keyboard. */
-/* ⚠️ `RATIOS` AND `TEMPO_BAND` COME ACROSS WITH IT, AND THEY ARE THE RESERVES
-   RATHER THAN THE ARITHMETIC. The two footer cells added 2026-09-25 must not
-   change width while a player is looking at them, so each one reserves the
-   widest thing it can ever say. Reading those widths off the module that
-   decides them means adding a ratio or moving the band cannot leave a cell
-   quietly too narrow, which is the `--sld-col` defect this project has already
-   paid for twice: a shared measurement typed in two files is a measurement that
-   will disagree. */
+// `numloop.mjs` owns which slot is doing what; this file owns what recording and looping mean.
+// why: lessons/kit-keyboard.md#numloop-import
+// `RATIOS` and `TEMPO_BAND` size the tempo and ratio cells' reserved widths, read off the module
+// that decides them so a new ratio cannot leave a cell too narrow.
+// why: lessons/kit-keyboard.md#ratios-import
 import { createNumLoop, RATIOS, TEMPO_BAND } from './numloop.mjs';
-/* 🔴 THE NAMER ALREADY EXISTS AND IT IS NOT `chords.mjs`. Asked 2026-09-25:
-   *"add chord name to the footer, right from the transpose message"*. The
-   obvious first move is `chords.mjs`, because that file is about chords and is
-   imported all over this project, and it is the WRONG DIRECTION: it turns
-   `Cmaj` into notes. This needs notes turned into `Cmaj`, which
-   `demo/shell/name.mjs` does, which `name-test.mjs` grades with ten negative
-   controls, and whose own header spends a page on why the two are different
-   problems rather than one problem with the arrow turned round.
-   ⚠️ SO NOTHING IS NAMED TWICE HERE. The reserved width below is computed from
-   that module's own `RECOGNISED` and `NOTE_LETTERS` rather than from a number
-   typed in this file, which is the same reason `name.mjs` takes its letters out
-   of `chords.mjs` instead of writing them again. */
+// Notes to a chord name is `name.mjs`, not `chords.mjs` (which goes the other way).
+// The chord cell's reserved width is computed from its `RECOGNISED` and `NOTE_LETTERS`.
+// why: lessons/kit-keyboard.md#name-import
 import { nameChord, RECOGNISED, NOTE_LETTERS } from './name.mjs';
-/* 🔴 A KEY SOUNDS IN A FRAME, NOT IN A GESTURE, SO THE KEYBOARD WAKES THE PAGE'S
-   AUDIO. The whole argument is beside `wakeAudioOnGesture` in `audio.mjs`: a
-   touch sounds two animation frames after it lands, a page's lazy
-   `new AudioContext()` therefore runs outside any gesture, and on an iPhone that
-   context stays suspended for ever. Building a keyboard installs the waker, so
-   every page with these keys gains it without a line of its own. */
+// A key sounds two frames after the touch, outside the gesture, so building a keyboard installs
+// the audio waker (see `audio.mjs`) or an iPhone keeps the page's AudioContext suspended.
+// why: lessons/kit-keyboard.md#wake-audio
 import { wakeAudioOnGesture } from './audio.mjs';
 
-/**
- * 🔴 WHERE A BLACK KEY SITS, AS FRACTIONS OF ITS OWN WIDTH, FROM
- * `research/piano-key-proportions-2026-09.md`. Seven white keys have to share
- * five black ones, so the two groups cannot both sit on their joins and leave
- * the whites equal: centring makes D, G and A **59 per cent** of C's back
- * width, where a piano keeps every white within 8 per cent of every other.
- * C# and D# move by a sixth, F# and A# by a quarter, G# not at all, outward
- * from the middle of the group.
- * ⚠️ IT IS READ OFF THE PITCH CLASS, NOT THE LETTER, because a caller may pass
- * its own `map` and keying this on `w`/`e`/`t`/`y`/`u` would break the promise
- * that a keyboard can be built from any letters.
- */
-/**
- * 🔴 5 px, WHICH IS ABOUT AN EIGHTH OF A KEY AND IS ALL THERE IS TO SPEND. A
- * sharp is 66 per cent of a white and straddles the join, so it eats about a
- * third of the white on that side. Moving a name a third of a key would put it
- * against the far edge; 5 px clears the overlap that was photographed while
- * leaving the name visibly ON its key.
- */
+// Where a black key sits, as fractions of its own width (research/piano-key-proportions-2026-09.md):
+// C#/D# a sixth, F#/A# a quarter, G# none, outward. Centring makes D, G, A 59 % of C's width.
+// Keyed on pitch class, not letter, so any letter map still works.
+// why: lessons/kit-keyboard.md#sharp-off
+// 5 px, about an eighth of a key: clears the raised sharp's overlap while the name stays on its key.
+// why: lessons/kit-keyboard.md#nudge-px
 export const NUDGE_PX = 5;
 
 export const SHARP_OFF = { 1: -1 / 6, 3: 1 / 6, 6: -1 / 4, 8: 0, 10: 1 / 4 };
 
-/**
- * 🔴 HOW MUCH OF THAT OFFSET TO ACTUALLY TAKE, AND IT IS HALF. Asked
- * 2026-09-23 with a crop of `F♯3` sitting off the line above it: *"black keys
- * should be centered to verical line / white key gap"*, then *"or bit in
- * between current and ideal..."*.
- * ⚠️ THE TWO ENDS ARE BOTH DEFENSIBLE AND NEITHER IS FREE. At 0 every black key
- * centres on the join it straddles, which is what the piano roll's rules point
- * at and what the eye expects when a line runs down the picture; the cost is
- * that the white keys BEHIND them stop being equal, because seven whites
- * sharing five blacks cannot have both. At 1 the whites are within a few per
- * cent of each other, which is what a real piano does and what
- * `research/piano-key-proportions-2026-09.md` measured, and the cost is that a
- * black key never lines up with anything above it.
- * ✅ 0.5 IS THE ASK TAKEN LITERALLY, AND ALL THREE SETTINGS WERE MEASURED ON
- * `/nola/` AT 42.7 px A WHITE KEY RATHER THAN ARGUED ABOUT:
- *
- *   nudge 0    narrowest white strip 16.51 px, black centre 1.00 px off its join
- *   nudge 0.5  narrowest white strip 19.78 px, black centre 2.27 px off its join
- *   nudge 1    narrowest white strip 23.04 px, black centre 5.54 px off its join
- *
- * ⚠️ SO THE TRADE IS 3.3 px OF THE NARROWEST WHITE KEY FOR 3.3 px OF
- * ALIGNMENT, almost exactly one for one, and neither end is free. Half gives
- * back most of the alignment a reader notices while leaving the narrowest strip
- * 3 px wider than centring would.
- * ⚠️ AND 1.00 px IS NOT ZERO AT NUDGE 0, which is the measurement saying
- * something the arithmetic does not: a black key is 66 per cent of a white and
- * the column gap is taken off its width, so a `translateX(-50%)` lands it half
- * a gap off the join by construction.
- */
+// Half of the piano offset: measured on `/nola/` at 42.7 px a white key, nudge 0/0.5/1 gives narrowest
+// white 16.51/19.78/23.04 px and black centre 1.00/2.27/5.54 px off its join. One for one trade.
+// why: lessons/kit-keyboard.md#sharp-nudge
 export const SHARP_NUDGE = 0.5;
 
 /**
  * Put one key in the grid, and hand back the running white count.
- *
- * 🔴 EXPORTED BECAUSE A SECOND DRAWING OF THE SAME KEYBOARD EXISTS NOW.
- * `demo/shell/roll.mjs` draws a dot per key ABOVE an instrument, and the one
- * thing a roll must do is line up with the keys under it. `/nola/`'s chord
- * charts already failed at exactly that and were corrected: same width, same
- * key size, different base, so a shape could not be carried down the page,
- * which is the only thing a chart is for. **Two copies of this arithmetic is
- * that defect waiting to happen again**, so there is one copy and both
- * drawings call it.
- *
+ * Exported so `roll.mjs` lines up with the keys from the same arithmetic, never a second copy.
  * @param {HTMLElement} node   the element to place
  * @param {{sharp:boolean, whites:number, pitchClass:number}} o
  * @returns {number} the white count after this key
+ * why: lessons/kit-keyboard.md#placekey
  */
 export function placeKey(node, { sharp, whites, pitchClass }) {
   node.style.gridColumn = String(whites + 1);
   if (sharp) {
     const off = SHARP_OFF[pitchClass] * SHARP_NUDGE;
     if (off) node.style.setProperty('--k-off', String(off));
-    // ⚠️ A KEYBOARD THAT OPENS ON A SHARP KEEPS IT ON THE EDGE. With no white
-    // key before it there is no join to straddle, so the pull-back comes off
-    // and it sits flush at the left instead of hanging half outside the row.
+    // With no white key before it there is no join to straddle, so the sharp sits flush left.
+    // why: lessons/kit-keyboard.md#opens-on-sharp
     if (whites === 0) node.style.transform = 'none';
   }
   return sharp ? whites : whites + 1;
@@ -237,118 +59,32 @@ export function placeKey(node, { sharp, whites, pitchClass }) {
 
 export const KEY_MIN_PX = 49;
 
-/**
- * 🔴 A BLACK KEY IS TWO THIRDS OF A WHITE ONE, WHICH IS WIDER THAN A PIANO'S.
- * A real piano's black key is 13.7 mm against 23.5, so 0.58. This is 0.66, the
- * same two thirds the whites were just taken to, so the page carries one ratio
- * instead of two.
- * ⚠️ AND IT IS STILL THE SMALLEST TARGET ON THE PAGE. 0.66 of 49 is 32 px,
- * which is under the 44 px minimum and cannot be fixed by widening it further
- * without the keyboard ceasing to look like a keyboard. Two things pay for it:
- * a black key is 46 px TALL, so the target is 32 by 46 rather than 32 square,
- * and it WINS the overlap, so a finger that is half on C and half on C# gets
- * C#. That is the honest cost of piano geometry and it is a trade rather than
- * an oversight.
- */
+// 0.66, wider than a piano's 0.58, the same two thirds as the whites. 32 px of 49 is under the 44 px
+// minimum; it pays with 46 px of height and by winning the overlap.
+// why: lessons/kit-keyboard.md#black-ratio
 export const BLACK_RATIO = 0.66;
 
-/**
- * 🔴 WHAT SEPARATES A SWIPE FROM A PRESS: 10 px OF SIDEWAYS TRAVEL INSIDE THE
- * FIRST TWO ANIMATION FRAMES.
- *
- * A finger that lands and covers 10 px before the verdict is a swipe. The row
- * scrolls and NOTHING SOUNDS: there is no note to release, because the note was
- * never sent. A finger that is still there at the verdict is a press. Its note
- * sounds, and from that moment the row is frozen under it and sliding across
- * the keys plays them, which is the glissando.
- *
- * `SWIPE_PX` 10: Chrome's own touch slop, the distance it waits before starting
- * a scroll, is about 8 px. Ten is just over it, and a resting finger's wobble on
- * glass is 2 to 4 px and never trips it.
- *
- * 🔴 `SWIPE_FRAMES` 2, AND FRAMES RATHER THAN MILLISECONDS IS THE POINT.
- * Two frames is the shortest window that can see more than one touch sample,
- * and touch is sampled at the display's own rate, so the same COUNT is the same
- * number of samples on every screen. MEASURED here at 60 Hz: **33 ms**, against
- * **48 ms** for a 30 ms deadline, because a deadline in milliseconds rounds up
- * to the next frame anyway and often skips one. On a 120 Hz phone it is about
- * 17 ms; that is UNVERIFIED, since nothing here has a phone.
- * ⚠️ AND THE SPEED IT SEPARATES AT MOVES WITH THE SCREEN: 10 px in two frames
- * is about 300 px/s at 60 Hz and 600 px/s at 120 Hz. A flick meant to throw a
- * row is 800 px/s and up, so both sit under it, but the margin is thinner on a
- * fast screen and that is the honest cost of tying the window to frames.
- * ⚠️ THE BIAS IS DELIBERATE AND IT IS TOWARD THE SWIPE, on instruction: a stray
- * note goes to a shared instrument in another building, and a scroll that
- * needed a second try costs nobody anything.
- *
- * 🔴 AND THE NOTE WAITS FOR THE VERDICT RATHER THAN BEING TAKEN BACK. That is
- * the whole trade in this feature and both halves of it are real.
- *   · WHAT IT COSTS: MEASURED from `pointerdown` to the key lighting, six takes
- *     each on `/knobs/`. A finger: median **33 ms**. A mouse: median **0.1 ms**,
- *     because nothing on a desktop can steal a drag and a mouse never waits.
- *     On `/knobs/` press to sound is about 190 ms already (36 ms round trip,
- *     153 ms of cushion, both MEASURED and both printed on the page), so this
- *     is +17%. On `/instrument/`, which makes its own sound in this browser,
- *     33 ms is most of the latency there is.
- *   · WHAT THE OTHER ONE WOULD HAVE COST: sounding on `pointerdown` and
- *     releasing when the gesture turns out to be a swipe. Zero added latency,
- *     and every swipe sends a `note.on` and a `note.off` about 30 ms apart over
- *     the relay to a Raspberry Pi in another building. MEASURED on that board:
- *     both patches take longer than 40 ms to reach level, so the blip would be
- *     close to inaudible THERE and a plain click on `/instrument/`'s local
- *     WebAudio. It is still two messages and a note nobody asked for.
- */
+// 10 px sideways inside the first two animation frames is a swipe: the row scrolls, no note is sent.
+// 10 px is just over Chrome's ~8 px touch slop; 2 frames measured 33 ms at 60 Hz. The bias is toward
+// the swipe. The note waits for the verdict: a finger pays ~33 ms, a mouse 0.1 ms.
+// why: lessons/kit-keyboard.md#swipe
 export const SWIPE_PX = 10;
 export const SWIPE_FRAMES = 2;
 
 /** QWERTY as a piano octave: the home row is white, the row above holds sharps. */
-/**
- * 🔴 `l` IS THE FOURTEENTH AND IT IS A D, NOT A C SHARP. Asked 2026-09-23:
- * *"l dhould work in asd keyboard"*. This ran `a` to `k`, one octave and its
- * top C, so the finger sitting on `l` played nothing at all.
- * ⚠️ IT IS 14 BECAUSE THE LAYOUT IS A PIANO AND NOT A ROW. The white keys are
- * `a s d f g h j k l` and the blacks sit above them on `w e t y u`, so the
- * letter after the top C is the D ABOVE it and the C sharp between them belongs
- * to `o`. Numbering `l` as 13 would put a white letter on a black key and every
- * shape a hand knows would be one key out.
- * ⚠️ AND `o` AND `p` ARE DELIBERATELY NOT HERE. One letter was asked for; the
- * pair that completes that octave is two more lines and nobody has asked.
- */
+// `l` is 14, the D above the top C, because the whites are `a s d f g h j k l` and the blacks
+// `w e t y u`. 13 would put a white letter on a black key.
+// why: lessons/kit-keyboard.md#qwerty
 export const QWERTY_CHROMATIC = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, l: 14 };
 export const SHARP_KEYS = new Set(['w', 'e', 't', 'y', 'u']);
 
 /**
- * 🔴 A KEYBOARD OF N SEMITONES, AND IT IS A COMPONENT BECAUSE THE SECOND PAGE
- * ASKED FOR IT. Asked on `/knobs/` 2026-09-25 as *"make keyboard 25 full w."*.
- * `/nola/` already builds exactly this inline, twenty-five keys from a letter
- * map with `hi<n>` ids for the ones no letter reaches, and `/knobs/` was about
- * to write it a second time. **A control that exists in one page and nowhere
- * else is a component that has not been noticed yet**, which is this project's
- * own rule and the reason three pages once had three different radio rows.
- *
- * ⚠️ 25 KEYS IS `span: 24`, AND THE OFF BY ONE IS THE WHOLE NAMING PROBLEM.
- * A 25 key controller is two octaves C to C, which is 24 SEMITONES inclusive of
- * both ends. The argument is the span in semitones because that is what a note
- * number is measured in and what `base + span` means; `KEY_SPAN_25` is here so
- * a caller never has to do that subtraction in its own head.
- *
- * 🔴 THE LETTERS ARE READ OFF THE MAP'S VALUES AND NEVER OFF ITS ORDER, WHICH
- * `/nola/` RECORDS AS A REAL BUG. `QWERTY_CHROMATIC` has a GAP in it: `l` is 14
- * and nothing sits at 13, so handing the nth letter to the nth semitone puts a
- * white letter on a black key and moves every shape a hand knows one key out.
- * ⚠️ AND A KEY WITH NO LETTER STILL NEEDS AN ID, because `keys` is a list of
- * ids and `map` is keyed by them. `hi<semitone>` is what `/nola/` chose and it
- * is kept, so the two builds produce identical ids and nothing that reads one
- * has to learn the other.
- * ⚠️ `letters` COMES BACK AS A SET rather than `true`, which is what
- * `createKeyboard` wants for a layout with more keys than the computer keyboard
- * has letters. The component's own note beside `letters` argues it.
- *
- * @param {number} [span] semitones from the leftmost key to the rightmost,
- *   inclusive of both, so a two octave picture is 24 and gives 25 keys.
- * @returns {{map, keys, sharps, letters, whites}} the four arguments
- *   `createKeyboard` takes, plus the white key count a caller may want for a
- *   width. Spread it: `createKeyboard(host, { ...keyRange(24), base: 48 })`.
+ * A keyboard of N semitones. 25 keys is `span: 24`. Letters come off the map's values, never its order
+ * (`QWERTY_CHROMATIC` has a gap at 13); a key with no letter gets the id `hi<semitone>`.
+ * @param {number} [span] semitones from leftmost to rightmost key inclusive, so 24 gives 25 keys.
+ * @returns {{map, keys, sharps, letters, whites}} `createKeyboard`'s four arguments plus the white count.
+ *   Spread it: `createKeyboard(host, { ...keyRange(24), base: 48 })`.
+ * why: lessons/kit-keyboard.md#keyrange
  */
 export const KEY_SPAN_25 = 24;
 
@@ -413,107 +149,31 @@ export function createKeyboard(host, {
   log = null,
   /** name the chord being held, in the footer. See the block beside it. */
   chord: wantChord = true,
-  /**
-   * 🔴 A ROW OF THE PAGE'S OWN UNDER THE COMPONENT'S, WITH A RULE ACROSS THE
-   * BOX ABOVE IT. `foot: true` and the row comes back as `api.foot`.
-   *
-   * 🔴 IT EXISTS BECAUSE A PAGE BUILT ONE BY HAND AND THE OWNER SAW THE JOIN.
-   * Reported 2026-09-25 against `/nola/`: *"the border on top of footer goes
-   * edge to edge. in the life of me i don ot understand why you do not see it
-   * and build a soliutiojn that stays (glued panels) not invent custom css with
-   * measurements each time"*. That page carried `.nola-foot` with a
-   * `--foot-air: 10px` of its own and a `border-top`, appended INSIDE `.kbd`,
-   * which is `padding: var(--kbd-pad)`. **So the rule stopped 9 px short of the
-   * box's border at both ends**, and the number it was drawn with was a second
-   * copy of a distance this stylesheet already publishes.
-   * ⚠️ AND THE COMPLAINT IS ABOUT WHERE IT WAS BUILT RATHER THAN ABOUT THE
-   * PIXELS. `/tom/` repaired the nameplate's padding in its own stylesheet and
-   * *"every page after it inherited the defect and not the fix"*, which was
-   * re-reported on `/plai/`. Ten pages import this module, so this is written
-   * once and no page writes that border again.
-   * ⚠️ IT IS NOT THE PAD ROW AND DOES NOT TOUCH IT. The octave pair, the
-   * displacement, the chord name, `Loop`, `Sustain` and `Panic` are
-   * controls ABOUT THE KEYS and stay where they are; this is the row for what
-   * the keys PLAY, which is the page's business.
-   */
+  // `foot: true` adds a row of the page's own under the pad, returned as `api.foot`. The component
+  // owns its rule and edges so no page hand-builds a border inside `.kbd`'s padding.
+  // why: lessons/kit-keyboard.md#opt-foot
   foot: wantFoot = false,
-  /** 🔴 THE BOX SPANS ITS HOST INSTEAD OF SIZING TO THE KEYS. See `full` below. */
+  // The box spans its host instead of sizing to the keys. See `full` below.
+  // why: lessons/kit-keyboard.md#opt-full
   full = false,
   swipeFrames = SWIPE_FRAMES, swipePx = SWIPE_PX,
 } = {}) {
   wakeAudioOnGesture();
-  /**
-   * 🔴 `letters` MAY BE A SET NOW, AND THE RULE IT ENFORCES IS UNCHANGED.
-   * The rule below is *a key labelled `a` that does nothing when you press `a`
-   * is worse than a key with no letter on it*, and a boolean could only apply
-   * it to a whole keyboard. A 25 key layout has no 25 letters to give: the
-   * computer keyboard has one octave's worth and `z` and `x` are already the
-   * octave pair here. A Set says WHICH keys have one, so the middle octave of
-   * `/nola/` stays playable from the keys under your hands and the two outer
-   * octaves carry note names only.
-   * ⚠️ THE BINDINGS ARE STILL ALL OR NOTHING, on purpose. They are three
-   * listeners on `window` and they already refuse a key that is not in the map,
-   * so a Set changes what is DRAWN and nothing about what is heard.
-   */
+  // `letters` may be a Set of keys that carry a letter; the window bindings stay all or nothing.
+  // why: lessons/kit-keyboard.md#opt-letters
   const keys = keyOpts || Object.keys(map);
   const noteOf = (k) => base + map[k];
-  // A key carries two names: the note it plays and the letter that plays it.
-  // The note goes on TOP because it is the one that changes — an octave shift
-  // moves every note name and no letter — and because a player reading a
-  // keyboard is looking for a pitch, not for a keystroke.
-  /* 🔴 `#`, NOT `♯` U+266F, SINCE 2026-10-12, AND IT IS A REVERSAL. On
-     2026-09-23 this chose `♯` over `#` so a sharp was drawn as notation rather
-     than as punctuation, with `shell.css` binding U+266D to U+266F to a 4,508
-     byte subset of Bravura Text. Asked 2026-10-12: *"no bravura needed i hope.
-     can we do without?"*, and decided on the /kit/frontpage/ SHARP TEST as
-     *"A is fine"*, which is `#` in JetBrains Mono.
-     ⚠️ WHY `#`: neither vendored face carries U+266F (MEASURED off each
-     woff2's cmap), so `♯` would fall per glyph to a different system face on
-     every platform. `#` in the mono sits on the line by construction, ink
-     73.0 to 0.0 at 100 px against the `F` beside it at 73.1 to 0, and it is
-     what the chord labels on the same pad already print (`chords.mjs`), so a
-     key and a chord stop spelling one note two ways. What it gives up is the
-     notation shape, and that was the owner's call
-     (plans/plan-fonts-minimal.md section 3). */
+  // A key carries its note name on top, because that is what an octave shift changes.
+  // why: lessons/kit-keyboard.md#key-labels
+  // `#`, not `♯` U+266F: neither vendored face has U+266F, and `#` matches the chord labels.
+  // why: lessons/kit-keyboard.md#note-names
   const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  /**
-   * 🔴 A KEY IS NAMED AS A NOTE, AND SINCE 2026-09-28 THERE IS NO SECOND
-   * NAMING TO CHOOSE. Instructed: *"finally: rm N | D setting from keyboard
-   * component"*. What stood here was a second table, `1 ♭2 2 ♭3 …`, naming each
-   * key as a SCALE DEGREE against a tonic, with a segmented pair on the pad to
-   * switch between the two. The argument for that pair is kept beside the pad,
-   * where the control was, because it was overruled rather than answered.
-   * 🔴 AND THE NOTE NAME IS WHAT SURVIVES, WHICH IS THE DECISION THE ASK DID
-   * NOT MAKE. It was the default every page has ever opened on; it is an
-   * absolute pitch, so nothing has to be told to it before it is right; and the
-   * degree naming needed a tonic that NOT ONE CALLER EVER SET, which was
-   * checked rather than assumed. `setTonic` was documented in this file as the
-   * thing `/nola/` would use and `/nola/` never called it, so a keyboard left
-   * to guess called its own leftmost key the tonic, which is right in C and
-   * wrong in every other key anybody plays in.
-   */
+  // A key is named as a note only; the scale degree naming was removed.
+  // why: lessons/kit-keyboard.md#notename
   const noteName = (n) => `${NOTE_NAMES[((n % 12) + 12) % 12]}${Math.floor(n / 12) - 1}`;
-  /**
-   * 🔴 A DOT WHERE THE LETTER USED TO BE, AND THE KEY'S BACKGROUND NO LONGER
-   * MOVES AT ALL. Asked 2026-09-23: *"do not change bg colors. do colored dots
-   * istead. rm wasd hints, dots will be there. lightlightgray dots for hints,
-   * yellow for actual presses."*
-   *
-   * ⚠️ AND A KEY AT REST DRAWS NO DOT AT ALL. Asked 2026-09-23: *"rm dots from
-   * keyboard by defualt"*. The first version marked every key the computer
-   * keyboard can reach with a faint one, which is what the drawn letter used to
-   * mean, and thirteen permanent dots under a row of keys is a picture of the
-   * bindings rather than of the instrument. The dot now says only what is
-   * HAPPENING: held here, held elsewhere, or part of a chord somebody picked.
-   * ⚠️ `letters` THEREFORE ONLY DECIDES WHETHER THE COMPUTER KEYBOARD IS BOUND,
-   * and a Set passed to it no longer changes what is drawn, because nothing is.
-   * The binding was always all or nothing.
-   *
-   * ⚠️ AND THE DOT IS ALWAYS IN THE DOM, EVEN WHEN IT SAYS NOTHING. `.k` is a
-   * three row grid and the bottom row used to be reserved by a letter that only
-   * some keys had; an element that appears and disappears would change a key's
-   * inner layout per key. It is drawn transparent and painted by class.
-   */
+  // A key's background never changes; a dot says held here, held elsewhere or part of a chord.
+  // At rest there is no dot. The dot element is always in the DOM so the key's grid never shifts.
+  // why: lessons/kit-keyboard.md#label-dot
   const label = (b, k) => {
     b.textContent = '';
     const nn = document.createElement('span'); nn.className = 'kn'; nn.textContent = noteName(noteOf(k));
@@ -532,78 +192,22 @@ export function createKeyboard(host, {
   };
 
   const el = make('div', 'kbd');
-  /**
-   * 🔴 A KEYBOARD THAT SPANS ITS HOST, ASKED FOR ON `/knobs/` 2026-09-25 AS
-   * *"make keyboard 25 full w."*. `.kbd` is `width: fit-content` by default and
-   * that is the right default, because a full width panel holding a 496 px
-   * keyboard is a box of empty surface that reads as a layout which failed.
-   * ⚠️ IT DOES NOT TOUCH THE KEY CEILING, WHICH IS A DIFFERENT DECISION AND
-   * STANDS. `shell.css` records *"make it higher in desktop to have similar
-   * proportions as monile. do not stretch it ever"* and pins a white key
-   * between 49 and 62 px. `full` makes the BOX span its host; the keys keep
-   * their own range inside it, so a 25 key layout fills a panel because
-   * fifteen white keys are wider than the panel rather than because anything
-   * was stretched to fit.
-   * ⚠️ OPT IN, so the nine pages that pass nothing are unchanged.
-   */
+  // `full` makes the box span its host; the keys keep their own 49 to 62 px range inside it. Opt in.
+  // why: lessons/kit-keyboard.md#full
   if (full) el.classList.add('kbd-full');
   const keysEl = make('div', 'keys');
   const els = new Map();
   const letterOf = new Map();         // element -> letter, for the hit test
 
-  // ── where a key goes ─────────────────────────────────────────────────────
-  //
-  // 🔴 THE GRID HAS ONE COLUMN PER WHITE KEY AND THE BLACK ONES SIT ON THE
-  // JOINS. A white takes the next free column. A black takes the column that
-  // STARTS at the boundary it belongs on, and `shell.css` pulls it back by half
-  // its own width plus half a gap, so it straddles the join the way a piano's
-  // does. Both are read off the map rather than hard-coded, so a caller that
-  // passes its own letters still gets a keyboard rather than a pile.
-  //
-  // ⚠️ THE COLUMN COUNT IS PUBLISHED AS `--k-cols`, because a stylesheet cannot
-  // count the children. It is the number of WHITE keys, which is 8 for an
-  // octave and not 13.
-  //
-  // ⚠️ AND A KEYBOARD THAT OPENS ON A SHARP KEEPS IT ON THE EDGE. With no white
-  // key before it there is no join to straddle, so the pull-back is taken off
-  // and it sits flush at the left. Nothing in this project does that today; it
-  // is one line and the alternative is half a key hanging outside the row.
-  /**
-   * 🔴 A REAL PIANO DOES NOT CENTRE ITS BLACK KEYS ON THE JOINS, AND THIS ONE
-   * DID. From `research/piano-key-proportions-2026-09.md`, 2026-09-17. Seven
-   * white keys have to share five black ones, so the two groups cannot both sit
-   * on their joins and leave the whites equal: centring makes D, G and A **59
-   * per cent** of C's back width, where a piano keeps every white within 8 per
-   * cent of every other.
-   *
-   * The offsets are fractions of the black key's own width: C# and D# by a
-   * sixth, F# and A# by a quarter, G# not at all, outward from the middle of the
-   * group. MEASURED on this component at 390 px with the layout applied from a
-   * harness: the narrowest white strip goes **19.67 px to 27.00** and the spread
-   * between strips **14.66 to 2.44**, while the row width stays 413 px and the
-   * hit test stays at 0 misses in 15 probes. Nothing about the fit changes.
-   *
-   * ⚠️ IT IS READ OFF THE PITCH CLASS, NOT THE LETTER. A caller may pass its own
-   * `map`, so keying this on `w`/`e`/`t`/`y`/`u` would break the promise that a
-   * keyboard can be built from any letters. The note's distance above its own C
-   * is what decides which of the five a sharp is.
-   * ⚠️ AND EVERY MUSIC APP EXAMINED THAT DRAWS A PIANO OFFSETS THEM, except
-   * LMMS. GarageBand uses a single constant, ±4.0 pt, on both phone and tablet;
-   * Ardour's own shift table works out to exactly the sixths and quarters used
-   * here. The pair is kept rather than a constant because a constant gives
-   * 24.56 px of narrowest strip against 27.00, at identical cost.
-   */
-  /**
-   * 🔴 WHICH SHOULDER OF A WHITE KEY HAS A BLACK KEY ON IT, WHICH IS WHAT
-   * DECIDES WHERE ITS NAME CAN SIT. A raised sharp covers the top corner of the
-   * white it straddles, and `BACKLOG.md` photographed the result on two pages:
-   * `F4` with its `4` under `F#4`, `B4` reading as `34` under `A#4`.
-   * ⚠️ IT IS ASKED OF THIS KEYBOARD'S OWN MAP rather than assumed from the
-   * pitch class, because a caller may hand over any set of keys: the two
-   * outermost keys of a two octave layout have a neighbour in theory and none
-   * on screen, and a name nudged away from a key that is not there is a name
-   * pushed off centre for nothing.
-   */
+  // One grid column per white key; a black takes the column starting at its join and `shell.css`
+  // pulls it back by half its width plus half a gap. `--k-cols` is the white count, 8 an octave.
+  // why: lessons/kit-keyboard.md#key-grid
+  // Black keys are offset like a real piano's, not centred: measured at 390 px the narrowest white goes
+  // 19.67 to 27.00 px, row width stays 413 px. Read off the pitch class, not the letter.
+  // why: lessons/kit-keyboard.md#black-offsets
+  // Which shoulder of a white key has a black key on it decides where its name sits.
+  // Asked of this keyboard's own map, since an edge key has no neighbour on screen.
+  // why: lessons/kit-keyboard.md#shoulders
   const semitones = new Set(keys.map((k) => map[k]));
   const blackAt = (semi) => {
     for (const k of keys) if (map[k] === semi && sharps.has(k)) return true;
@@ -618,10 +222,8 @@ export function createKeyboard(host, {
     if (!sharp) {
       const left = semitones.has(map[k] - 1) && blackAt(map[k] - 1);
       const right = semitones.has(map[k] + 1) && blackAt(map[k] + 1);
-      /* Away from one, centred between two or none. `NUDGE_PX` is a length
-         rather than a percentage because `translateX` on a percentage is a
-         fraction of the LABEL, which is two or three characters wide and would
-         move `C3` and `D#3` by different amounts. */
+      // A length, not a percentage: `translateX` on a percentage is of the label, which varies in width.
+      // why: lessons/kit-keyboard.md#name-nudge
       if (right && !left) b.style.setProperty('--kn-x', `${-NUDGE_PX}px`);
       else if (left && !right) b.style.setProperty('--kn-x', `${NUDGE_PX}px`);
     }
@@ -633,27 +235,10 @@ export function createKeyboard(host, {
   keysEl.style.setProperty('--k-cols', String(Math.max(1, whites)));
   el.append(keysEl);
 
-  // ── a finger on the keys ─────────────────────────────────────────────────
-  //
-  // 🔴 THE CAPTURE IS ON THE ROW. It used to be on each key, which is what made
-  // a glissando impossible: `b.setPointerCapture()` retargets every later event
-  // for that pointer to `b`, so the second key a sliding finger reached never
-  // saw it. One capture on the row means one gesture, hit-tested per move.
-  //
-  // ⚠️ `document.elementFromPoint`, NOT the event's target. Under capture the
-  // target IS the row for the whole gesture, so it says nothing about which key
-  // is under the finger. It is also what gives a raised black key priority
-  // where it covers a white one, for free: it returns the TOPMOST element.
-  //
-  // ⚠️ AND THE CAPTURE IS WRAPPED. A `PointerEvent` built in script is
-  // untrusted and `setPointerCapture` throws on it, so a page's own check could
-  // not drive this path at all. Nothing downstream needs the capture to have
-  // succeeded.
-  //
-  // 🔴 A TOUCH IS UNDECIDED WHEN IT LANDS. `playing` is false until the verdict
-  // and NO NOTE HAS BEEN SENT; `moveTo` refuses to sound anything while it is
-  // false, so an undecided finger crossing three keys is silent. A mouse or a
-  // stylus is decided at birth, because nothing can take a drag away from one.
+  // Pointer capture is on the row so a slide is one gesture, hit-tested per move with
+  // `elementFromPoint` (topmost wins, so the raised black key wins). Capture is wrapped: it throws on
+  // a scripted event. A touch is undecided and silent until the verdict; mouse and stylus are not.
+  // why: lessons/kit-keyboard.md#finger
   const touches = new Map();   // pointerId -> {key, x, y, x0, y0, playing, timer}
 
   function keyAtPoint(x, y) {
@@ -669,12 +254,9 @@ export function createKeyboard(host, {
     return false;
   };
 
-  /**
-   * Move a gesture onto a key, sounding and releasing as it goes. While the
-   * gesture is undecided this only remembers where the finger is: `playing` is
-   * what makes it audible, which is the whole of *"drag to play happens when
-   * playing is there"*.
-   */
+  // Move a gesture onto a key, sounding and releasing as it goes. While undecided it only
+  // remembers where the finger is; `playing` makes it audible.
+  // why: lessons/kit-keyboard.md#moveto
   function moveTo(t, k) {
     if (!t || t.key === k) return;
     const was = t.key;
@@ -684,21 +266,9 @@ export function createKeyboard(host, {
     if (k != null) press(k, 'pointer');
   }
 
-  /**
-   * 🔴 THE VERDICT IS TIMED ON `requestAnimationFrame`, AND A `setTimeout`
-   * MEASURED 3.4x LATE. This was `setTimeout(startPlaying, 30)` and MEASURED
-   * 2026-09-17 in headless Chrome: a bare `setTimeout(30)` on the same page
-   * lands at 30 to 32 ms, and the SAME call made from inside a `pointerdown`
-   * handler during a touch lands at **101 ms**, four takes, 100.5 to 101.9.
-   * Chrome's renderer scheduler deprioritises timer queues for about 100 ms
-   * after a touch begins, so the one clock that must not be late during a touch
-   * is the one that stops working during one. Animation frames are on the
-   * compositor's path and are not deprioritised.
-   * ⚠️ THE SYMPTOM IS THE THING TO REMEMBER: every number in the code was
-   * right, the constant said 30, and the instrument was 100 ms late. A timer
-   * read against a stopwatch on an idle page proves nothing about a timer set
-   * while a finger is down.
-   */
+  // Timed on `requestAnimationFrame`: a 30 ms `setTimeout` set during a touch measured 101 ms in
+  // Chrome, which deprioritises timers for about 100 ms after a touch begins.
+  // why: lessons/kit-keyboard.md#armverdict
   function armVerdict(id, t) {
     let frames = 0;
     const step = () => {
@@ -742,56 +312,31 @@ export function createKeyboard(host, {
     const t = touches.get(e.pointerId);
     if (!t) return;                              // a mouse crossing the keys with no button down
     t.x = e.clientX; t.y = e.clientY;
-    // ⚠️ THE DISTANCE IS SIDEWAYS ONLY. The row scrolls sideways, so only
-    // sideways travel can be a swipe; a finger that slides DOWN off the keys is
-    // leaving the keyboard, which is a different thing and already handled.
+    // Sideways only: the row scrolls sideways, and sliding down off the keys is leaving the keyboard.
+    // why: lessons/kit-keyboard.md#sideways
     if (!t.playing && Math.abs(t.x - t.x0) >= swipePx) { abandon(e.pointerId); return; }
     moveTo(t, keyAtPoint(t.x, t.y));
   });
 
-  // 🔴 ONCE A NOTE IS SOUNDING THE BROWSER MUST NOT TAKE THE GESTURE, AND
-  // `touch-action` CANNOT SAY THAT. It is read once when the finger lands and
-  // cannot be changed mid-gesture, so `pan-x` leaves the browser free to start
-  // scrolling at any later moment — which would arrive as a `pointercancel` in
-  // the middle of a glissando. A non-passive `touchmove` that calls
-  // `preventDefault` while anything is playing is the only thing that stops it,
-  // and it is the reason `touch-action: pan-x` and this listener are one
-  // mechanism rather than two.
-  // ⚠️ IT MUST NOT FIRE WHILE UNDECIDED. Preventing the default during the
-  // verdict window would stop the scroll that a swipe is asking for, before we
-  // have decided it is a swipe.
+  // `touch-action` is read once at touch start, so this non-passive `touchmove` stops the browser
+  // scrolling once a note sounds. Never while undecided, or a swipe could not scroll.
+  // why: lessons/kit-keyboard.md#ontouchmove
   const onTouchMove = (e) => {
     for (const t of touches.values()) if (t.playing) { e.preventDefault(); return; }
   };
   keysEl.addEventListener('touchmove', onTouchMove, { passive: false });
 
-  // ⚠️ `lostpointercapture` IS IN HERE ON PURPOSE. A capture taken away by the
-  // browser mid-gesture delivers no pointerup and no pointercancel, and the
-  // note it was holding would sound until something else stopped it.
-  // ⚠️ AND `pointercancel` IS THE BROWSER SAYING IT TOOK THE GESTURE FOR A
-  // SCROLL. It runs the same path: whatever was sounding stops, and what was
-  // never sounded never was.
+  // `lostpointercapture` delivers no pointerup, so it ends the touch too; `pointercancel` means the
+  // browser took it for a scroll. Same path: what sounded stops.
+  // why: lessons/kit-keyboard.md#endtouch
   const endTouch = (e) => abandon(e.pointerId);
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     keysEl.addEventListener(type, endTouch);
   }
 
-  // 🔴 TWO QUICK TAPS ON A KEY ARE TWO NOTES, NEVER A ZOOM. Reported 2026-10-13
-  // from an iPhone: *"Dbltap should not zoom"*. `html, body` carry
-  // `touch-action: manipulation` in shell.css, and this row carries `pan-x`
-  // because a swipe has to scroll it, and the effective action on a key is
-  // their intersection, which is `pan-x`: a value that says nothing about
-  // double tap, and Safari is free to zoom on one. A repeated note IS a double
-  // tap, so the instrument's commonest gesture was the one that zoomed.
-  // ✅ `preventDefault` ON THE SECOND `touchend` is the one thing every WebKit
-  // honours: it cancels the double tap gesture and the synthesised click, and
-  // the keys never used the click, because they play on pointer events. Pinch
-  // is a two finger gesture and is not touched. The window is 350 ms, just over
-  // Safari's own double tap interval.
-  // ⚠️ AND THE GESTURE THAT WAKES AUDIO IS NOT LOST. `preventDefault` stops the
-  // default action, not the event: the `touchend` is still dispatched as user
-  // activation, and `wakeAudioOnGesture` hears it on `window` in the capture
-  // phase before this listener runs.
+  // Two quick taps are two notes, never a zoom: `pan-x` says nothing about double tap, so
+  // `preventDefault` on a second `touchend` inside 350 ms. The audio waker still hears the event.
+  // why: lessons/kit-keyboard.md#double-tap
   let lastTouchEnd = 0;
   const onTouchEnd = (e) => {
     const now = e.timeStamp;
@@ -801,118 +346,25 @@ export function createKeyboard(host, {
   keysEl.addEventListener('touchend', onTouchEnd, { passive: false });
 
 
-  // ── the pad ──────────────────────────────────────────────────────────────
-  // ⚠️ NO WORD AT ALL. It was `octave` once before the pair — better than a word
-  // on each button, and still one more thing to read on a control whose two
-  // glyphs sit under a row of keys that are already labelled with their octave
-  // number. Thirteen keys reading `C4` say what − and + move. Two
-  // buttons that have to be read to be told apart are not one control.
-  /**
-   * 🔴 THE PAD IS OPTIONAL SINCE 2026-09-23, AND THE RULE ABOVE SAID IT NEVER
-   * WOULD BE. That rule reads *"There is no option to turn the pad off: one
-   * keyboard that sometimes has an octave control is two components"*, and it
-   * was right about every caller it had, because every one was an INSTRUMENT.
-   * `/nola/` draws a list of CHORD CHARTS: a row of small keyboards with a
-   * chord lit on each, which nobody plays an octave on and nobody sends a panic
-   * from. An octave pair and a `Panic` under each of twelve chords is a
-   * screen of controls that do not belong to anything.
-   * ⚠️ SO THE RULE'S OWN ARITHMETIC IS WHAT CHANGED, NOT ITS REASONING. It says
-   * a keyboard that sometimes has an octave control is two components; a
-   * picture of a chord and an instrument you play ARE two things, and this is
-   * the flag that says which one a caller wants. The alternative was a second
-   * module drawing a second piano, and two drawings of a piano is exactly what
-   * this file exists to prevent.
-   * ⚠️ AND IT IS NOT A WAY TO MOVE THE PAD SOMEWHERE ELSE. A page that turns it
-   * off and builds its own octave buttons has hand rolled a control that
-   * exists, which is the thing `/keys/` did before this component was written.
-   */
+  // No word on the octave pair: the keys already print their octave.
+  // why: lessons/kit-keyboard.md#pad
+  // `pad: false` is for a chord chart, which is a picture and not an instrument. Not a way to move
+  // the pad elsewhere: a page building its own octave buttons hand-rolls a control that exists.
+  // why: lessons/kit-keyboard.md#pad-optional
   const pad = make('div', 'kpad');
-  /**
-   * 🔴 THE ROW IS TWO ENDS IN TWO BOXES SINCE 2026-09-28, AND THAT IS WHAT
-   * MAKES IT WRAP WITHOUT STRANDING ANYTHING. Reported at phone width:
-   * *"keyboard lower bittons (+- panic etc) go to the same line"*, off a crop
-   * of `/nola/` with the octave pair on one line and `Loop Sustain Panic`
-   * pushed to the RIGHT END of a second line under them.
-   *
-   * 🔴 WHAT WAS WRONG WAS THE AUTO MARGIN, NOT THE MARKING. The row used to
-   * put `kpad-right` on the first of the right hand controls and `kpad-tight`
-   * on the rest, and the principle behind that is kept word for word: the
-   * BUILDER says where the groups are and the stylesheet does not infer it. A
-   * `margin-left: auto` can only ever be right on a line with room to spare,
-   * because a flex line hands its free space to the auto margins ON THAT LINE,
-   * so the wrapped line right-aligned itself exactly the way the full one did.
-   * Two boxes and `space-between` say the same thing and survive the wrap,
-   * because `space-between` parks a lone item on a line at the START.
-   *
-   * ⚠️ ADDING A FOURTH CONTROL IS STILL ONE LINE AND NO CSS, which is the
-   * property the old arrangement was built for. So is TAKING ONE AWAY while
-   * the page is open, which `offerLoop` below does and which the classes could
-   * not have done without re-marking whichever control inherited first place.
-   *
-   * ⚠️ AND AT 375 px THE ROW STILL CANNOT HOLD EVERYTHING ON ONE LINE, WHICH IS
-   * MEASURED AND IS NOT WHAT THIS CHANGES. `/nola/`'s row is 323 px there and
-   * its children need 523.4 px: 272.9 px of that is the five controls, and the
-   * other 218.5 px is the three reserved readout cells (`kpad-chord`,
-   * `kpad-tempo`, `kpad-ratio`), which hold their widest reading whether or not
-   * anything is written in them. The controls alone would fit with 50 px to
-   * spare. Putting the readouts on a line of their own is a narrow arrangement
-   * and needs the row's own box to decide it, which is `BACKLOG.md`.
-   */
+  // Two boxes and `space-between` instead of an auto margin, so a wrapped line starts at the left.
+  // Adding or removing a control is one line and no CSS.
+  // why: lessons/kit-keyboard.md#pad-groups
   const padStart = make('div', 'kpad-grp kpad-grp-start');
   const padEnd = make('div', 'kpad-grp kpad-grp-end');
-  // ⚠️ IT WEARS `.step`, WHICH IS THE STEPPER'S CLASS, AND THAT IS THE POINT.
-  // The segmented geometry — borders overlapped by a pixel so a join is one
-  // line, corners rounded only on the outer two, the hovered button raised so
-  // its own border is not painted over — is already solved once in `.step`
-  // (see stepper.mjs). Copying those four rules at a new height is how two
-  // controls drift into looking like two kinds of thing; shell.css only
-  // changes the SIZE here.
-  /**
-   * 🔴 THE NAMING PAIR IS GONE FROM THIS ROW, AND ITS ARGUMENT IS KEPT HERE
-   * BECAUSE IT WAS OVERRULED RATHER THAN ANSWERED. Instructed 2026-09-28:
-   * *"finally: rm N | D setting from keyboard component"*, and then, on being
-   * told it was being held while two page agents were mid-run on pages that
-   * carry a keyboard: *"N D can be last"*. The ordering was the owner's too.
-   *
-   * WHAT STOOD HERE: two segments, `N` and `D`, relabelling every key as a note
-   * name or as a scale degree. TWO SEGMENTS RATHER THAN A SWITCH, because
-   * neither naming is the absence of the other and `C` is not `1` turned off.
-   * It wore `.step`, the stepper's segmented geometry, for the reason the
-   * octave pair beside it still does: copying four rules at a new height is how
-   * two controls drift into looking like two kinds of thing. And it was drawn
-   * only with the pad, so a chord chart could not grow a control nobody can
-   * use.
-   * 🔴 THE LABEL WAS SPELLED FIVE TIMES AND EVERY SPELLING IS KEPT, BECAUSE
-   * THE ARGUMENT MOVED RATHER THAN BEING WON: *"c | 1 - someting more
-   * descriptive?"*, then `C D E | 1 2 3`, then *"Notes | Degrees"* on
-   * 2026-09-23, then *"keyboard component: Notes | Degreens -> Nt | Dg."* on
-   * 2026-09-25, then *"Nt | Dg to N | D in keyboard"* the same day. MEASURED on
-   * `/nola/` at 1280 px, the same segmented row built as words and shortened:
-   * **118.48 px against 65.50**. The sixth spelling is no control at all, and
-   * 65.50 px is what this row stops spending.
-   * ⚠️ AND THE ACCESSIBILITY ARGUMENT IS WHY THE PAIR WAS DEFENSIBLE AT ONE
-   * LETTER RATHER THAN CHEAP: `N` and `D` are not self explanatory, so each
-   * button carried a `title` naming the naming in full and an `aria-label` that
-   * made the accessible NAME the words, because a `title` is a description and
-   * a screen reader would otherwise have announced *"N, pressed"*.
-   * ⚠️ WHAT A READER CAN CHECK IS THE ROW, AND ONE PAGE NAMED THIS CONTROL IN
-   * A SELECTOR. `/nola/` measures its own nameplate's ink against the FIRST
-   * control on this row, which is the octave pair now; it read `.kpad-names
-   * button` and would have thrown on `null` the moment this left.
-   */
+  // It wears `.step`, the stepper's segmented geometry; `shell.css` only changes the size here.
+  // why: lessons/kit-keyboard.md#octpair
+  // why: lessons/kit-keyboard.md#naming-pair
 
   const octPair = make('span', 'step pos-seg kpad-oct');
-  /* 🔴 SHIFT MOVES ONE SEMITONE, AND THE PICTURE DOES NOT CHANGE SHAPE.
-     Asked 2026-09-23: *"shift +- should transpose with semitones"*. There were
-     two readings of that and only one is cheap. Moving the WINDOW by a semitone
-     makes the leftmost key a C#, and every caller decides which keys are sharps
-     from the key INDEX (`BLACK.has(i % 12)`), which assumes the base is a C, so
-     the drawn black and white pattern would stop matching the notes it plays
-     and the whole layout would have to be recomputed from the note.
-     ✅ WHAT HAPPENS INSTEAD IS WHAT TRANSPOSE MEANS ON A HARDWARE KEYBOARD: the
-     keyboard keeps its shape, every key's printed note name moves with it, and
-     a key still plays exactly what it says. The MK-425C on this desk does the
-     same thing. */
+  // Shift transposes by a semitone without changing the drawn shape: every key's name moves and a key
+  // plays what it says. Callers derive sharps from the key index, assuming base C.
+  // why: lessons/kit-keyboard.md#transpose
   const mkOct = (text, title, steps) => {
     const b = make('button', 'ico', text, { type: 'button', title });
     b.onclick = (e) => api.shiftBy(e.shiftKey ? Math.sign(steps) : steps);
@@ -921,31 +373,12 @@ export function createKeyboard(host, {
   };
   const downBtn = mkOct('−', 'down one octave (z), or one semitone with shift', -12);
   const upBtn = mkOct('+', 'up one octave (x), or one semitone with shift', 12);
-  /* ⚠️ THE OCTAVE PAIR IS THE FIRST THING ON THIS ROW SINCE 2026-09-28, AND
-     IT WAS SECOND FOR FIVE DAYS. The naming pair came first on *"change order
-     of c|1 and +-"*, 2026-09-23, because what the keys are CALLED reads before
-     where they are, and it is what left.
-     🔴 AND WHATEVER IS APPENDED HERE IS BUILT ABOVE, NOT HERE. Appending the
-     naming pair before its own `const` was a temporal dead zone that threw on
-     every keyboard page at once, reported in four words: *"Cannot access
-     'nameSeg' before initialization"*. The shape is always the same: a
-     declaration shadows its whole block from the top, and moving an APPEND is
-     enough to open one. */
+  // Whatever is appended here is built above: appending before its `const` is a temporal dead zone.
+  // why: lessons/kit-keyboard.md#pad-order
   padStart.append(octPair);
-  /**
-   * 🔴 HOW FAR FROM HOME, WHICH AMENDS THIS FILE'S OWN RULE AND IS NOT THE
-   * THING THAT RULE REFUSED. The header says there is no octave number on the
-   * pad, because every key already prints its own note name and *"a fourteenth,
-   * in a different place, is a second copy that can disagree"*. That is true of
-   * the octave a key is IN, and this is not that: it is the DISPLACEMENT from
-   * where this keyboard started, which no key shows and nothing else can say.
-   * Asked 2026-09-23 as *"show -1 +1 etc to the right on +- on keyboard"*.
-   * ⚠️ TWO FORMATS, AND EACH ONE IS UNAMBIGUOUS BECAUSE ONLY ONE CARRIES A
-   * UNIT. Whole octaves read `+1` and `-2`, which is what the ask asked for and
-   * what the buttons do on their own. Anything else is a semitone count and
-   * says so, `+7st`, because `+7` alone would be read as seven octaves by
-   * somebody who had just pressed the button seven times.
-   */
+  // The displacement from where this keyboard started, which no key shows. Whole octaves read `+1`;
+  // anything else carries its unit, `+7st`.
+  // why: lessons/kit-keyboard.md#displacement
   const atEl = make('span', 'kpad-at', '');
   const HOME = base;
   const paintAt = () => {
@@ -953,45 +386,14 @@ export function createKeyboard(host, {
     atEl.textContent = d === 0 ? '0'
       : d % 12 === 0 ? `${d > 0 ? '+' : '−'}${Math.abs(d) / 12}`
       : `${d > 0 ? '+' : '−'}${Math.abs(d)}st`;
-    /* ⚠️ DELETED, NEVER SET TO THE EMPTY STRING. `[data-home]` matches on
-       PRESENCE, so `= ''` would leave every keyboard that has ever been at home
-       looking like it still is. That is a defect this project has already
-       measured once, in `video-panel.mjs`'s full screen state. */
+    // Deleted, never set to `''`: `[data-home]` matches on presence.
+    // why: lessons/kit-keyboard.md#data-home
     if (d === 0) atEl.dataset.home = '1'; else delete atEl.dataset.home;
   };
   padStart.append(atEl);
-  /**
-   * 🔴 WHAT IS BEING HELD, NAMED, TO THE RIGHT OF THE DISPLACEMENT. Asked
-   * 2026-09-25: *"add chord name to the footer, right from the transpose
-   * message. avoind text moving in x axis"*.
-   *
-   * 🔴 THE SECOND SENTENCE IS THE HARD HALF AND IT IS SOLVED BY A RESERVE, NOT
-   * BY A SHORT NAME. A chord name is one character for `C` and eleven for
-   * `G#min7b5/D#`, so a cell that sizes to its content moves everything beside
-   * it on every chord somebody plays, which is exactly the rule this project
-   * already has in writing: nothing that redraws while somebody is looking at
-   * it may change how much room it takes. The widest thing this cell can ever
-   * say is reserved at build time and the name is drawn inside it.
-   * ⚠️ AND THE WIDTH IS COMPUTED FROM `name.mjs`'s OWN TABLES RATHER THAN
-   * TYPED. A root letter (`C` or `C#`), the longest quality that module will
-   * ever return (`min7b5`), a slash and a bass letter. A number typed here
-   * would be right today and silently narrow the first time a quality is added
-   * to `RECOGNISED`, and a name clipped by an ellipsis is this project's own
-   * signal that something is in the wrong place. `presence.mjs` reserves its
-   * word the same way and for the same reason.
-   * ⚠️ `ch` ON A MONO FACE IS EXACTLY CHARACTERS, which is what makes the
-   * arithmetic above a measurement rather than an estimate.
-   *
-   * 🔴 IT IS A CELL BESIDE THE DISPLACEMENT, NOT A STRING JOINED TO IT. Two
-   * facts, two elements, no separator between them, which is the standing rule
-   * about a row of facts being cells rather than one string with glue in it.
-   *
-   * ⚠️ TWO INKS, AND THEY ARE `/nola/`'s TWO, because that page is giving this
-   * readout up to this component and the two must not disagree about what a
-   * colour means. A name the recogniser is sure of and two readings it cannot
-   * choose between are different statements: `--dim` for the first, `--dim2`
-   * for the second. `name.mjs` measured the margin that separates them.
-   */
+  // The chord being held, in a cell reserved in `ch` for the widest name `name.mjs` can return, so
+  // the row never moves in x. A separate cell, not a joined string. `--dim` sure, `--dim2` a guess.
+  // why: lessons/kit-keyboard.md#chord-cell
   const LETTER_CH = Math.max(...NOTE_LETTERS.map((l) => l.length));
   const CHORD_CH = LETTER_CH + Math.max(...RECOGNISED.map(([q]) => q.length))
                  + 1 + LETTER_CH;
@@ -1000,47 +402,9 @@ export function createKeyboard(host, {
     chordEl.style.minWidth = `${CHORD_CH}ch`;
     padStart.append(chordEl);
   }
-  /**
-   * 🔴 TWO MORE CELLS, AND ONLY ON A KEYBOARD THAT LOOPS. Asked 2026-09-25:
-   * *"in keyboadd looper: do basic bmp detection / quant and when first loop
-   * set, all next ones align on it, either times shorter, same or longer"*. The
-   * arithmetic is `numloop.mjs`'s and it deliberately chose no cells, because a
-   * readout is the surface's and this is the surface.
-   *
-   * 🔴 GATED ON `wantLoop`, WHICH IS WHAT KEEPS THIS OFF THE PAGES THAT DO NOT
-   * LOOP. MEASURED 2026-09-26: seven pages mount this component and exactly two
-   * of them pass `loop: true`, `/kit/` and `/nola/`, so two cells appear on two
-   * pages and the other five rows are byte for byte what they were. That is the
-   * `:has(> .panel-strip:empty)` argument one component along: a component rule
-   * with a CONDITION on it can be provably narrow, where a page-local repair to
-   * a shared component is how a defect gets paid for twice.
-   *
-   * 🔴 A TEMPO NOBODY HAS PLAYED IS AN EMPTY CELL. Never `0`, which reads as a
-   * very confident measurement of nothing, and never `120`, which is this
-   * project's favourite invented number. `numloop.mjs` answers `bpm: null` with
-   * a sentence saying what was missing and this draws the empty string.
-   * 🔴 AND WHETHER IT WAS HEARD OR SET IS PART OF THE READING, NOT A FOOTNOTE.
-   * A detected tempo is an INFERENCE off three gaps in somebody's playing, and
-   * this project has paid repeatedly for printing one as a fact. The WORD says
-   * which (`heard` off the playing, `set` by a page with its own clock) and the
-   * ink corroborates it the way `.kpad-chord` already does for a name it is sure
-   * of. The word is the channel; the colour is the second opinion.
-   *
-   * 🔴 AND A REFUSED SNAP IS A WORD RATHER THAN A BLANK. When a take is further
-   * than `MAX_STRETCH` from every allowed ratio the lap stays exactly as it was
-   * played, which is a real outcome a player should be able to tell from
-   * *nothing happened*. `as played` says so. `first` is the take that SET the
-   * unit, which is not a refusal and must not read like one.
-   *
-   * ⚠️ RESERVED IN `ch` FROM THE TABLES THAT DECIDE THEM. A bpm this module
-   * detects is folded into `TEMPO_BAND`, so three digits is the widest it can
-   * ever be, and the ratio words come off `RATIOS`. Nothing here is a typed
-   * number that goes quietly narrow the first time somebody adds `1/8`.
-   * ⚠️ A `given` TEMPO CAN SIT OUTSIDE THE BAND AND IS THE ONE CASE THAT WIDENS
-   * THIS CELL, and it is not the failure the reserve exists to stop: a page sets
-   * that once, at build, where the rule is about a cell changing size under a
-   * player's hands. Nothing in this repository calls `assume` yet.
-   */
+  // Only with `loop`. No tempo is an empty cell, never `0` or `120`; `heard` or `set` says where it
+  // came from; `as played` is a refused snap. Widths reserved from `TEMPO_BAND` and `RATIOS`.
+  // why: lessons/kit-keyboard.md#tune-cells
   const TEMPO_CH = String(Math.round(TEMPO_BAND[1])).length + ' bpm '.length
                  + Math.max('heard'.length, 'set'.length);
   const RATIO_CH = Math.max('as played'.length, 'first'.length,
@@ -1052,54 +416,18 @@ export function createKeyboard(host, {
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
     padStart.append(tempoEl, ratioEl);
   }
-  // `Stop` since 2026-10-14 (was `Panic`): it stops every note and every loop.
+  // `Stop`: it stops every note and every loop.
+  // why: lessons/kit-keyboard.md#stop
   const panicBtn = make('button', '', 'Stop', {
     type: 'button', title: 'stop every note and every loop',
   });
   panicBtn.onclick = () => api.panic();
-  /**
-   * 🔴 THE SUSTAIN LIVES IN THE KEYBOARD'S OWN FOOTER NOW. Asked 2026-09-23:
-   * *"integrate sustain to footer, create toggle button, big and small, use
-   * small below keyboard, left from notes off"*. It is the same argument the
-   * pad itself was built on: an octave pair, a `Panic` and a damper are all
-   * controls ABOUT the keys, and a hand's width away at the top of the page is
-   * the wrong place for any of them. `/nola/` and `/fau/` each drew their own
-   * switch in their own row, which is two pages solving one problem twice.
-   * ⚠️ THE COMPONENT DRAWS IT AND THE PAGE OWNS WHAT IT MEANS. Nothing here
-   * knows about `demo/shell/pedal.mjs`, two sets of notes or a damper time: it
-   * reports that a foot went down, and the page decides what that does to its
-   * own graph. That is the same division `pedal.mjs` already states.
-   * ⚠️ AND IT IS OFF BY DEFAULT, because a chord chart and a keyboard nobody
-   * sustains should not grow a control they cannot use.
-   */
-  /**
-   * 🔴 THE ROW IS `Loop`, `Sustain`, `Panic`, STATED IN THOSE WORDS, and it
-   * is a keyboard function rather than a page mode. Asked 2026-09-23 as *"wait
-   * make it a keyboard funcion, a button in bottom rihjt (left from sustain)
-   * called 'Loop'"*, after a first reading that would have made it a third option
-   * on `/nola/`'s roll picker.
-   * ⚠️ AND THE ORDER TOOK THREE MESSAGES, WHICH IS WORTH RECORDING BECAUSE THE
-   * FIRST TWO WERE READ WRONG. *"move loop button to right"* and then *"loop is
-   * leftmost of 3 in riht"* were both read as *move Loop along the row*, so it
-   * went to the middle and then to the end. What they were about was the GROUP:
-   * two `margin-left: auto` on one flex line split the free space instead of
-   * sharing it, so `Loop` was stranded out in the row rather than sitting with
-   * the others, and it was leftmost of three that were not together. Settled by
-   * *"buttons: Loop Sustain Notes off"*, which is where it started.
-   * 🔴 SO THE DEFECT WAS THE GAP AND THE REPORT NAMED A POSITION. Moving the
-   * button twice was answering the words rather than the picture, and the
-   * stylesheet is where it was wrong the whole time.
-   * ⚠️ THE CORRECTION IS THE INTERESTING PART AND IS WHY IT IS HERE. A mode is
-   * something a PAGE is in and excludes the others; looping what you play is
-   * something you do WHILE typing chords, or while the page is learning them, or
-   * on a page that has neither. It belongs to the instrument, beside the damper,
-   * which is the same argument the sustain button itself was moved on.
-   * ⚠️ AND THE COMPONENT DRAWS IT AND THE PAGE OWNS WHAT IT MEANS. Nothing here
-   * records or plays anything: it reports that the button went on or off, and a
-   * page decides what looping IS on its own graph. Same division as the damper.
-   * ⚠️ OFF BY DEFAULT, because a keyboard nobody loops should not grow a control
-   * it cannot use.
-   */
+  // The damper toggle in the pad. It only reports a foot went down; the page decides what that does.
+  // Off by default.
+  // why: lessons/kit-keyboard.md#sustain
+  // `Loop` is a keyboard function, not a page mode. The component reports on/off; the page decides
+  // what looping is on its own graph. Off by default.
+  // why: lessons/kit-keyboard.md#loop-button
   const loopBtn = wantLoop
     ? createToggle({ label: 'Loop', size: 'small',
                      title: 'record what you play and play it back around, '
@@ -1111,19 +439,15 @@ export function createKeyboard(host, {
                      title: 'hold the notes on after the keys come up, the way a pedal does',
                      onChange: (on) => onSustain?.(on) })
     : null;
-  /* 🔴 THE ROW SAYS WHERE ITS OWN GROUPS ARE, AND THE STYLESHEET NO LONGER
-     GUESSES. These go in the row's far end, in this order, and the box they go
-     in is what pushes them right and what keeps them together when the row
-     wraps. Adding a fourth control is one more entry in this array and no CSS
-     at all, which is the opposite of what the `margin-left: auto` on every
-     toggle did when `Loop` arrived. */
+  // The far end's box pushes these right and keeps them together on a wrap. A fourth control is
+  // one more entry here and no CSS.
+  // why: lessons/kit-keyboard.md#pad-end
   padEnd.append(...[loopBtn?.el, sustainBtn?.el, panicBtn].filter(Boolean));
   pad.append(padStart, padEnd);
   if (wantPad) el.append(pad);
-  /* 🔴 THE PAGE'S ROW GOES IN LAST, AND THE COMPONENT OWNS ITS EDGES. The rule
-     above it bleeds through `--kbd-pad` to the box's own border and the row's
-     content is inset by that same token, so the left, top and bottom air is one
-     number read once. See `.kbd-foot` in `shell.css` for the measurement. */
+  // The page's row goes in last; its rule bleeds through `--kbd-pad` to the box border. See
+  // `.kbd-foot` in `shell.css`.
+  // why: lessons/kit-keyboard.md#foot-el
   const footEl = wantFoot ? make('div', 'kbd-foot') : null;
   if (footEl) el.append(footEl);
 
@@ -1131,37 +455,16 @@ export function createKeyboard(host, {
 
   const held = new Set();
 
-  // 🔴 ONE FUNNEL. Every note this component produces goes through exactly one
-  // `press` and one `release`, by every route there is: a finger, a slide
-  // across the keys, the letter row, a page calling `api.press`. That is what
-  // let hold-to-retrigger be added and removed in one place, and it is where a
-  // recorder would attach if the loop idea in `BACKLOG.md` is ever built.
-  /* 🔴 THE FUNNEL MARKS ITSELF WHILE IT IS INSIDE THE PAGE'S CALLBACK, and the
-     one thing that reads this is `lightNote`. A page's `onDown` almost always
-     lights the key it was just handed, so without a mark the component cannot
-     tell its OWN note coming back from a note the page played on its own, and a
-     key press would be taped twice. `release` is the half that proves it is
-     needed: it deletes from `held` BEFORE calling `onUp`, so a membership test
-     answers the wrong way on every key up. */
+  // One funnel: every note this component produces goes through one `press` and one `release`.
+  // why: lessons/kit-keyboard.md#funnel
+  // Set while inside the page's callback, so `lightNote` can tell this component's own note coming
+  // back from one the page played, and a key press is not taped twice.
+  // why: lessons/kit-keyboard.md#viakey
   let viaKey = 0;
 
-  /**
-   * 🔴 WHAT IS SOUNDING IS TWO SETS AND NOT ONE, WHICH IS THE ONE THING ABOUT
-   * NAMING A CHORD HERE THAT IS NOT OBVIOUS. `held` is the KEYS this
-   * component's own funnel pressed; `fingerNotes` is the NOTES a page lit from
-   * somewhere this component never saw, which is the MIDI case and is the whole
-   * point on a page with a keyboard plugged in. Reading either one alone names
-   * half an instrument: `held` alone says nothing about a chord played on a
-   * real keyboard, and `fingerNotes` alone says nothing about a chord clicked
-   * on screen.
-   * ⚠️ `hint`, `remote` AND `ai` ARE DELIBERATELY NOT IN IT. `lightNote` keeps
-   * them out of `fingerNotes` already, and they are notes nobody is holding: a
-   * proposal named as though it were being played is the colour rule this
-   * component already keeps, arriving as a readout.
-   * ⚠️ AND IT IS A SET OF NOTES RATHER THAN OF KEYS, so a note played past the
-   * drawn range still counts toward the name. A 25 key picture does not bound
-   * what a hand can play into it.
-   */
+  // Two sets: `held` keys from this funnel and `fingerNotes` lit from outside (MIDI). `hint`, `remote`
+  // and `ai` are not in it. Notes, not keys, so a note past the drawn range still counts.
+  // why: lessons/kit-keyboard.md#sounding
   const sounding = () => {
     const out = new Set();
     for (const k of held) out.add(noteOf(k));
@@ -1169,30 +472,16 @@ export function createKeyboard(host, {
     return [...out];
   };
 
-  /**
-   * 🔴 ONE NOTE IS NOT A CHORD AND THE KEY ITSELF ALREADY SAYS WHAT IT IS.
-   * Below two notes this cell is empty, because every key on this keyboard
-   * prints its own note name and a footer repeating one of them is the same
-   * fact twice. From two up, `name.mjs`'s own margin decides what is said and
-   * how confidently: MEASURED there, a bare fifth is the only two note reading
-   * it is ever sure of, which is exactly right, and everything else comes back
-   * as a faint guess until a third note pins it down.
-   * ⚠️ NO SETTLING WINDOW HERE, WHICH IS A DECISION. `name.mjs` exports
-   * `createSettler` for a page that is LEARNING chords and needs the largest
-   * set held across a roll, and `/nola/` uses it for exactly that. A footer is
-   * a readout of what is down right now, it has no timer, and a debounce would
-   * make this component's answer depend on a clock that nothing here can grade.
-   * The name flickers while a chord is being rolled; the LAYOUT does not, which
-   * is the half the ask was about.
-   */
+  // Below two notes the cell is empty: the key already says it. No settling window; the name may
+  // flicker while a chord is rolled, the layout does not.
+  // why: lessons/kit-keyboard.md#paintchord
   function paintChord() {
     if (!chordEl) return;
     const down = sounding();
     const r = down.length >= 2 ? nameChord(down) : null;
     chordEl.textContent = r?.ok ? r.label : '';
-    /* ⚠️ DELETED, NEVER SET TO THE EMPTY STRING, which is the same trap
-       `paintAt` above names: `[data-sure]` matches on PRESENCE, so a guess
-       would wear the confident ink for the rest of the page's life. */
+    // Deleted, never set to `''`: `[data-sure]` matches on presence.
+    // why: lessons/kit-keyboard.md#data-sure
     if (r?.sure) chordEl.dataset.sure = '1'; else delete chordEl.dataset.sure;
   }
 
@@ -1214,44 +503,11 @@ export function createKeyboard(host, {
     paintChord();
   }
 
-  /**
-   * 🔴 THE LOOP LIVES HERE, WHERE THE FILE ALREADY SAID IT WOULD. The comment
-   * above `press` has read *"it is where a recorder would attach if the loop
-   * idea in BACKLOG.md is ever built"* since that funnel was made, and this is
-   * that. Asked 2026-09-23: *"do not wire nola, its gloabl keyboard fn. nola
-   * gets just chords as if i played htem"*, after a first build put the tape on
-   * one page.
-   * ⚠️ THAT CORRECTION IS THE WHOLE ARCHITECTURE. A page owning the tape is one
-   * page solving a problem every page with keys has, and it would have had to
-   * know about recording, laps and scheduling to get chords it already knows how
-   * to play. Here it needs no code at all: playback goes through `press` and
-   * `release`, so a looped note is indistinguishable from a finger, arrives on
-   * the page's own `onDown` with `how` saying `loop`, lights the key, feeds the
-   * roll and takes the damper.
-   * ⚠️ IT RECORDS KEYS, NOT NOTES, so a loop follows the octave pad: shift the
-   * keyboard while a loop is running and it transposes with you. That is a
-   * consequence rather than a decision, and it is the one a keyboard should
-   * have.
-   * ⚠️ AND THE LAP IS THE TAKE. There is no clock in this component and no tempo
-   * anywhere near it, so a loop is as long as what you played, first press to
-   * the moment you pressed `Loop` again. Rounding to a beat would invent a grid
-   * nobody set.
-   */
-  /**
-   * 🔴 TEN TAKES, NOT ONE, AND THE STATE MACHINE IS `/num/`'s. Asked 2026-09-23:
-   * *"num works. how come you can not add it to keyboard"*, and the honest answer
-   * was that nothing prevented it. `numloop.mjs` had been built, graded with no
-   * browser and proved against the real number pad; this component had one tape
-   * and one button, so the two halves of a looper were sitting in the repository
-   * not talking to each other.
-   * ⚠️ THE DIVISION IS THE SAME ONE THIS FILE ALREADY KEEPS. `numloop.mjs` owns
-   * WHICH slot is recording, looping, stopped or empty, and knows nothing about
-   * audio or keys. This owns what those words MEAN: a take is a list of key
-   * movements, a lap is how long it ran, and playing one back is pressing keys.
-   * ⚠️ A TAKE IS A KEY MOVEMENT LIST AND NOTHING ELSE. No audio is copied, so ten
-   * loops cost ten arrays of small objects and the sound is made fresh every lap
-   * by the page, exactly as it is for a finger.
-   */
+  // The loop lives in the keyboard, not a page: playback goes through `press`/`release` with `how`
+  // `loop`. It records keys, so it follows the octave pad. A lap is the take; no clock, no grid.
+  // why: lessons/kit-keyboard.md#loop
+  // Ten takes, run by `numloop.mjs`'s state machine. A take is a list of key movements, no audio.
+  // why: lessons/kit-keyboard.md#slots
   const SLOTS = Math.max(1, Math.round(wantLoops));
   const takes = Array.from({ length: SLOTS }, () => ({
     tape: null,        // the movements, or null when this slot is empty
@@ -1264,83 +520,32 @@ export function createKeyboard(host, {
     notes: new Set(),
     outside: 0,        // movements that came in past the keys, for the log
     pressedAt: 0,      // when the button was touched. See `onTouch` below
-    /* How this take's lap was fitted to the first one, or null while the slot
-       holds nothing. It is `numloop.mjs`'s whole answer rather than the number
-       it arrived at, because `lap` alone cannot say whether it was snapped, to
-       what, or why a snap was refused, and all three are what the footer and
-       `onLoop` report. */
+    // `numloop.mjs`'s whole fit answer, or null while empty: `lap` alone cannot say if or why it snapped.
+    // why: lessons/kit-keyboard.md#take-fit
     fit: null,
   }));
 
-  /* 🔴 ONE FLAG FOR *THESE NOTES ARE COMING BACK, NOT GOING IN*, AND IT REPLACED
-     A PER SLOT ONE THE MOMENT THERE WAS MORE THAN ONE SLOT. A note replayed by
-     loop 1 reaches the page, which lights it, which is where the tape listens, so
-     without this loop 2 would record loop 1 while it recorded you and the two
-     would compound every lap. The old single loop checked its OWN `looping`,
-     which is exactly the test that stops working when a second slot exists. */
+  // Notes coming back, not going in: without it loop 2 would record loop 1 and compound every lap.
+  // why: lessons/kit-keyboard.md#replaying
   let replaying = 0;
 
-  /**
-   * 🔴 WHAT YOUR FINGERS ARE HOLDING, WHICH IS NOT WHAT THE LOOP IS HOLDING, AND
-   * CONFUSING THE TWO MADE THE PAGE FORGET REAL NOTES. Reported 2026-09-23:
-   * *"pressing loop, just repssing is cutting off sound, does not held note"*,
-   * and `/nola/`'s own tap said it exactly: *"the wire says 57,61 and the page
-   * says nothing"*.
-   * 🔴 A NOTE CAN BE HELD BY A FINGER AND BY A LOOP AT ONCE, AND A SET CANNOT
-   * COUNT. When a loop replayed a note somebody was also holding, the loop's
-   * note-off went to the page and the page let go of the FINGER'S note: the wire
-   * still had the key down, the page had nothing, and the sound stopped under
-   * your hand. Stopping a loop did the same thing in one go, which is the *"just
-   * pressing is cutting off sound"* half.
-   * ⚠️ AND THE KEY PATH WAS WORSE THAN THE NOTE PATH. Replay did `held.delete(k)`
-   * before pressing, to force a retrigger, which ERASES a finger's hold outright
-   * rather than shadowing it.
-   * ✅ SO A LOOP NEVER TOUCHES A NOTE A FINGER IS ON. It does not press one that
-   * is already sounding under a hand and it never releases one, which leaves the
-   * player in charge of their own notes and costs the loop a doubled attack it
-   * could not have made audible anyway.
-   */
+  // A note can be held by a finger and a loop at once and a set cannot count, so a loop never
+  // presses or releases a note a finger is on.
+  // why: lessons/kit-keyboard.md#fingernotes
   const fingerNotes = new Set();
 
-  /* 🔴 THE TAKE STARTS AT THE FIRST NOTE, NOT AT THE BUTTON. Reported as *"still
-     no looping"* with the machinery correct and graded on both paths, then said
-     plainly: *"arm should as long as it takes when i start to play"*. The clock
-     used to start when the button was armed, so arming, getting your hands down
-     and then playing put every one of those seconds INSIDE the take: the loop
-     came round and did nothing at all until the lead-in had elapsed again, which
-     is indistinguishable from a loop button that does not work.
-     ⚠️ THE TRAILING SILENCE IS KEPT AND ONLY THE LEAD-IN IS DROPPED. Where you
-     stop is a decision and a rest at the end of a phrase should survive. Where
-     you START is not a decision, it is how long it took to get ready. */
+  // The take starts at the first note, not at the button. Trailing silence is kept, the lead-in dropped.
+  // why: lessons/kit-keyboard.md#startclock
   const startClock = (t, at) => { if (!t.at) t.at = at; };
 
-  /**
-   * 🔴 A LOOP BUTTON ALWAYS LANDS LATE, SO THE TAKE REACHES BACK. Asked
-   * 2026-09-23: *"when loop button lands bit later, do consider earlier played
-   * keys"*. You play the phrase and then press, because pressing first and
-   * playing into silence is not how anybody plays. Without this the first chord
-   * of every take is the one you lose, and the loop comes round a beat short of
-   * what you meant.
-   * ⚠️ IT REACHES BACK TO THE START OF THE PHRASE, NOT BY A FIXED TIME. A window
-   * would cut a long chord in half and keep half of the one before it. A phrase
-   * here is simply *from when nothing was sounding*, which is a boundary the
-   * movements already carry and needs no clock and no tempo.
-   * ⚠️ AND IT IS 1200 ms OF REACH, WHICH IS A JUDGEMENT. If the last thing you
-   * played was longer ago than that, arming means arming and the take starts
-   * empty, or every loop would open with whatever happened to be lying around.
-   * ⚠️ THE BUFFER IS PRUNED TO 4 s AND HOLDS MOVEMENTS, NOT AUDIO. It costs a few
-   * small objects and exists whether or not anything is armed, because the whole
-   * point is to have kept what you did before you decided to keep it.
-   */
+  // A loop button lands late, so arming reaches back to the start of the phrase (from when nothing
+  // sounded), at most 1200 ms ago. The buffer holds 4 s of movements, not audio.
+  // why: lessons/kit-keyboard.md#pre-roll
   const PRE_ROLL = 4000, REACH_BACK = 1200;
   const recent = [];
 
-  /* 🔴 THE BUFFER ONLY HOLDS WHAT NO TAKE HAS CLAIMED. Found by the two slot
-     check: a phrase recorded LIVE into take 1 was still sitting in the buffer, so
-     arming take 2 a moment later reached back and took the same performance
-     again, and the player would have heard it twice with nothing on screen
-     saying why. A movement that went into a take is committed; the buffer is for
-     what nobody has kept yet, which is the whole idea of a pre-roll. */
+  // The buffer holds only what no take has claimed, or arming take 2 would replay take 1's phrase.
+  // why: lessons/kit-keyboard.md#remember
   const remember = (mv) => {
     if (takes.some((t) => t.rec)) return;
     recent.push(mv);
@@ -1369,41 +574,12 @@ export function createKeyboard(host, {
     }
   };
 
-  /**
-   * 🔴 A NOTE THE PAGE PLAYED WITHOUT TOUCHING THESE KEYS, AND IT IS THE WHOLE
-   * REASON THE FIRST BUILD WAS SILENT. Reported 2026-09-23: *"can not hear
-   * looping"*. The funnel above is honest about what it covers, which is *every
-   * note this COMPONENT produces*: a finger, a slide, the letter row, a page
-   * calling `api.press`. A MIDI keyboard produces none of them. `/nola/` takes
-   * its own `midiDown` straight to its own `press`, so the component never saw a
-   * note, the tape stayed empty, and a loop with nothing in it is correctly
-   * silent. Playing the same notes on screen worked perfectly.
-   * 🔴 THIS IS THE THIRD TIME THAT SHAPE HAS COST A SESSION ON THIS PAGE. The
-   * Rhodes was inaudible over MIDI and audible on screen for the same reason a
-   * layer down, and the fix is the same sentence: the on-screen path and the MIDI
-   * path are two paths, and anything that must be true of PLAYING has to sit
-   * where both of them pass.
-   * ✅ AND BOTH OF THEM PASS THROUGH `lightNote`. Every page here lights the key
-   * it is sounding, by every route, which makes that the note level funnel this
-   * component already had and had named after the lamp. So the loop records there
-   * and no page needs a line of code, which is what *"do not wire nola, its
-   * gloabl keyboard fn"* asks for.
-   * ⚠️ IT RECORDS THE NOTE AND NOT A KEY, so unlike a finger it does not follow
-   * the octave pad, and it can hold a note this keyboard does not draw. Both are
-   * right: what arrived was a note number somebody played, and the pad moves
-   * which keys are on screen rather than what a MIDI keyboard sent.
-   */
-  /**
-   * 🔴 AND IT CARRIES VELOCITY, BECAUSE A LOOP THAT DOES NOT IS PLAYING SOMETHING
-   * ELSE. Asked 2026-09-23: *"do y preserve velocity at all?"*, and the answer
-   * was no: every looped note came back at a flat 100 whatever was played. On a
-   * page with velocity LAYERS that is not a loudness error, it is the wrong
-   * RECORDING: `/nola/` picks a different sample for a soft note and a hard one,
-   * so a quiet phrase came back as a different instrument played hard.
-   * ⚠️ ONLY THE NOTE PATH HAS ONE. A key on screen is a click and has no
-   * velocity to preserve, which is why a page gives those a flat value of its
-   * own. `null` here means *nobody said*, and the page's default stands.
-   */
+  // MIDI notes never reach `press`, but every page lights what it sounds, so the loop records at
+  // `lightNote`. Records the note, not a key, so it does not follow the octave pad.
+  // why: lessons/kit-keyboard.md#tapenote
+  // Carries velocity, or a layered sampler replays a soft phrase as a hard one. `null` means nobody
+  // said, and the page's default stands.
+  // why: lessons/kit-keyboard.md#velocity
   const tapeNote = (note, down, vel) => {
     if (replaying) return;
     const at = performance.now();
@@ -1416,45 +592,25 @@ export function createKeyboard(host, {
     }
   };
 
-  /* 🔴 STOPPING A LOOP MID NOTE MUST NOT LEAVE THE NOTE ON. Cutting the timers
-     stops the next movement arriving, which means the note-off that was due never
-     comes: what a player hears is the loop stopping with a chord still sounding,
-     and the only way out is `Panic`. */
+  // Stopping mid note must release it, or the due note-off never comes.
+  // why: lessons/kit-keyboard.md#stoptake
   const stopTake = (i) => {
     const t = takes[i];
     for (const timer of t.timers) clearTimeout(timer);
     t.timers.clear();
     t.going = false;
     t.rec = false;
-    /* ⚠️ AND STOPPING LETS GO OF WHAT THE LOOP HAD DOWN AND NOTHING ELSE. A note
-       a finger is on stays down, which is the other half of *"pressing loop is
-       cutting off sound"*. */
+    // Lets go of what the loop had down and nothing else; a finger's note stays.
+    // why: lessons/kit-keyboard.md#stoptake-keys
     for (const k of t.keys) release(k, 'loop');
     t.keys.clear();
     for (const n of t.notes) { if (!fingerNotes.has(n)) onUp(n, 'loop'); }
     t.notes.clear();
   };
 
-  /**
-   * 🔴 EVERY EVENT IS SCHEDULED AGAINST AN ABSOLUTE GRID, NOT AGAINST THE ROUND
-   * BEFORE IT, AND THE DIFFERENCE IS WHETHER A LOOP KEEPS TIME. Reported
-   * 2026-09-23: *"loops do not sound right (timings)"*.
-   * A round used to end with `setTimeout(round, lap)`, so the next round began
-   * whenever that timer actually fired. A timer is never early and is routinely a
-   * few milliseconds late, and the lateness was then the ORIGIN for that round's
-   * own events, so every lap inherited the drift of every lap before it. A loop
-   * does not drift a little, it drifts CUMULATIVELY: ten laps of 4 ms late is 40
-   * ms, a hundred is nearly half a beat, and the phrase walks away from itself
-   * while each individual timer looks fine.
-   * ✅ THE ANCHOR IS THE MOMENT THE LOOP STARTED AND NOTHING MOVES IT. Round `n`
-   * is `anchor + n * lap`, so a round that fires late schedules its events at the
-   * times they were always due and simply has less notice. Error stops
-   * accumulating and becomes the jitter of one timer, which is the floor a page
-   * cannot get under.
-   * ⚠️ AND A DUE TIME IN THE PAST IS FIRED AT ONCE RATHER THAN SKIPPED. A note
-   * that is a few milliseconds late is a note; a note that is dropped is a hole
-   * in the phrase, and the hole is far easier to hear.
-   */
+  // Every event is due at `anchor + n * lap`, never relative to the last round, so timer lateness
+  // does not accumulate. A due time in the past fires at once rather than being skipped.
+  // why: lessons/kit-keyboard.md#absolute-grid
   /* A timer that leaves `t.timers` when it fires, so the set holds only what is
      still pending rather than growing by a lap's worth of events every lap. */
   const later = (t, fn, ms) => {
@@ -1474,14 +630,11 @@ export function createKeyboard(host, {
           if (!t.going) return;
           replaying++;
           try {
-            /* 🔴 TWO KINDS OF MOVEMENT AND THEY REPLAY DIFFERENTLY. A key goes
-               back through `press`, so it follows the octave pad and lights up
-               like a finger. A note played past the keys has no key to press, so
-               it is handed to the page directly, marked `loop` the same way. */
+            // A key replays through `press` (follows the pad, lights up); a note past the keys goes to the page.
+            // why: lessons/kit-keyboard.md#replay-kinds
             if (e.k !== undefined) {
-              /* ⚠️ A KEY A FINGER IS ON IS LEFT ALONE, BOTH WAYS. `held` holds
-                 fingers and loops together, so `t.keys` is what says this loop
-                 pressed it and a key held by anything else is not ours to move. */
+              // `held` mixes fingers and loops, so `t.keys` says which keys this loop pressed.
+              // why: lessons/kit-keyboard.md#replay-finger
               if (e.down) {
                 if (!held.has(e.k) || t.keys.has(e.k)) {
                   held.delete(e.k); press(e.k, 'loop'); t.keys.add(e.k);
@@ -1501,13 +654,8 @@ export function createKeyboard(host, {
     round();
   };
 
-  /**
-   * 🔴 250 ms IS A JUDGEMENT ON THE LAP AND NOT ON THE EVENTS. Found by the check
-   * in `/kit/`, which presses four keys with no waiting between them: the take
-   * was a few milliseconds long and the loop turned 118 times in 260 ms, which is
-   * a stuck note with extra steps. A person cannot play a take that short but CAN
-   * arm and press again straight away, which is the same take.
-   */
+  // 250 ms floor on the lap: a near-zero take looped 118 times in 260 ms in `/kit/`'s check.
+  // why: lessons/kit-keyboard.md#min-lap
   const MIN_LAP = 250;
 
   const paintLoop = () => {
@@ -1518,26 +666,12 @@ export function createKeyboard(host, {
     else loopBtn.el.setAttribute('data-loop', s);
   };
 
-  /**
-   * 🔴 THE LAST TAKE CLOSED, WHICH IS WHAT THE RATIO CELL IS ABOUT, AND IT IS
-   * KEPT HERE RATHER THAN READ OFF A SLOT. Ten slots can each hold a fit and the
-   * cell holds one reading, so *which* has to be a decision: it is the take a
-   * player most recently sent round, because that is the one they are asking
-   * about when they look.
-   * ⚠️ AND IT LETS GO WHEN ITS OWN SLOT DOES. Clearing the slot the cell is
-   * describing would otherwise leave a reading about a loop that no longer
-   * exists, which is the stale-readout defect this project keeps finding.
-   */
+  // The ratio cell describes the take most recently closed, and lets go when that slot is cleared.
+  // why: lessons/kit-keyboard.md#lastfit
   let lastFit = null, lastFitSlot = -1;
 
-  /**
-   * 🔴 THE TWO CELLS, AND THE ABSENCES ARE THE HALF WORTH READING. An empty cell
-   * where there is no tempo, never `0` and never `120`; `as played` where the
-   * snap was refused, because a refusal is an outcome and a blank is not.
-   * ⚠️ IT IS SIDE EFFECT FREE ON THE MACHINE. `tempo()` and `unit()` are
-   * readers, so a repaint cannot change what it is reporting, which is how this
-   * can be called from every branch of `enterLoop` without thinking about it.
-   */
+  // Empty cell for no tempo, `as played` for a refused snap. Side effect free: only readers are called.
+  // why: lessons/kit-keyboard.md#painttune
   const paintTune = () => {
     if (!tempoEl) return;
     const tu = machine.tempo();
@@ -1564,10 +698,9 @@ export function createKeyboard(host, {
     const n = SLOTS > 1 ? `loop ${i + 1}` : 'loop';
     if (to === 'recording') {
       t.tape = []; t.at = 0; t.outside = 0; t.going = false; t.rec = true; t.fit = null;
-      /* 🔴 THE PHRASE YOU HAD ALREADY PLAYED GOES IN FIRST. See `phraseStart`.
-         It also means the 250 ms a press waits to find out whether it is half of
-         a double one costs no notes: anything played inside that window is in the
-         buffer and arrives here. */
+      // The phrase already played goes in first; see `phraseStart`. Notes inside the 250 ms double press
+      // window are in the buffer and arrive here.
+      // why: lessons/kit-keyboard.md#phrase-first
       const from = phraseStart(t.pressedAt);
       if (from) {
         t.at = from;
@@ -1577,11 +710,8 @@ export function createKeyboard(host, {
           if (m.k !== undefined) e.k = m.k; else { e.note = m.note; e.v = m.vel; t.outside++; }
           t.tape.push(e);
         }
-        /* 🔴 A PHRASE IS CLAIMED ONCE. Found by the two slot check, which armed a
-           second take 120 ms after the first had captured a phrase and got the
-           SAME phrase again: the buffer still held it, so both takes opened with
-           one performance and the player would hear it twice with no way to see
-           why. Arming consumes what it reached back for. */
+        // Arming consumes what it reached back for, so a second take cannot claim the same phrase.
+        // why: lessons/kit-keyboard.md#claim-once
         recent.length = 0;
       }
       log?.(t.tape.length
@@ -1592,16 +722,13 @@ export function createKeyboard(host, {
     } else if (to === 'looping') {
       if (was === 'recording') {
         t.rec = false;
-        /* 🔴 THE LAP IS MEASURED TO THE PRESS AND NOT TO THE SETTLE, WHICH IS THE
-           ONE PLACE THE DOUBLE PRESS WINDOW WOULD HAVE BEEN AUDIBLE. A press is
-           held for 250 ms to find out whether it is half of a double one, so
-           closing a take on the settle would put that 250 ms inside the lap: at a
-           two second loop that is 12 per cent too long, every turn, for ever.
-           `onTouch` stamps the real moment and this reads it. */
+        // Measured to the press, not the settle, or the 250 ms double press wait lands inside the lap
+        // (12 % at a 2 s loop). `onTouch` stamps the real moment.
+        // why: lessons/kit-keyboard.md#lap-press
         const raw = t.at ? Math.round(t.pressedAt - t.at) : 0;
         if (!t.tape || !t.tape.length) {
-          /* ⚠️ NOTHING PLAYED IS NOT A LOOP, so the slot goes back to empty
-             rather than sitting on with nothing behind it. */
+          // Nothing played is not a loop: the slot goes back to empty.
+          // why: lessons/kit-keyboard.md#empty-take
           stopTake(i);
           t.tape = null;
           machine.clear(i);
@@ -1611,23 +738,9 @@ export function createKeyboard(host, {
           onLoop?.(false, { slot: i, state: 'empty' });
           return;
         }
-        /**
-         * 🔴 THE ONE CALL THAT ALIGNS A LAP, AND IT SITS EXACTLY WHERE THE LAP
-         * WAS ALREADY BEING SET. Asked 2026-09-25: *"in keyboadd looper: do
-         * basic bmp detection / quant and when first loop set, all next ones
-         * align on it, either times shorter, same or longer"*. `fitLap` is the
-         * only method on the machine that changes the tempo or the unit, so
-         * putting it here means a lap is decided once, in the one place this
-         * file has ever decided one.
-         * ⚠️ THE FLOOR IS APPLIED FIRST AND STILL BELONGS TO THIS FILE. 250 ms
-         * is a judgement about a take too short to be a performance, and it has
-         * to bite before anything is snapped or the unit could be set to a few
-         * milliseconds and every later loop would be a ratio of nothing.
-         * ⚠️ AND THE ONSETS ARE THE KEY-DOWNS, NOT THE MOVEMENTS. A tape holds a
-         * down and an up for every note, and feeding both in would report a
-         * pulse at twice the tempo somebody is playing, with a key's HOLD LENGTH
-         * masquerading as a gap between notes.
-         */
+        // `fitLap` is the one call that aligns a lap to the first. The 250 ms floor applies first; onsets
+        // are key-downs only, or hold lengths would read as gaps and double the tempo.
+        // why: lessons/kit-keyboard.md#fitlap
         const heardBefore = machine.tempo().source;
         const fit = machine.fitLap(i, Math.max(MIN_LAP, raw), {
           onsets: t.tape.filter((e) => e.down).map((e) => e.t),
@@ -1640,12 +753,8 @@ export function createKeyboard(host, {
             + `${raw < MIN_LAP ? `, the take being ${raw} ms and held to the 250 ms floor` : ''}`
             + `${t.outside ? `, ${t.outside} of them played past the keys on screen` : ''}`
             + `${fromKeys && t.outside ? ` and ${fromKeys} on them` : ''}`);
-        /* 🔴 THE ACCOUNT IS LOGGED, BECAUSE A LAP THAT CHANGED UNDER A PLAYER
-           AND SAID NOTHING IS THE THING THEY WILL REPORT AS A BUG. `fit.why` is
-           a finished sentence from the module that made the decision, so the log
-           cannot drift from the arithmetic the way a sentence written here
-           would. The tempo's own sentence goes with it the one time it changes,
-           which is the take that found it. */
+        // A lap that changed under a player must say so; `fit.why` is the deciding module's own sentence.
+        // why: lessons/kit-keyboard.md#log-fit
         log?.(fit.why);
         if (heardBefore === 'none' && machine.tempo().source !== 'none') {
           log?.(machine.tempo().why);
@@ -1655,11 +764,8 @@ export function createKeyboard(host, {
       }
       t.going = true;
       runTake(i);
-      /* ⚠️ FOUR MORE FIELDS, AND THEY ARE SENT ON A REPLAY AS WELL AS ON A
-         CLOSE. `t.fit` is a fact about the take and not about the press, so a
-         slot coming back from `stopped` reports the same ratio it has always
-         had rather than an empty one, which is what a page drawing a row per
-         slot needs. */
+      // Sent on replay as well as close: `t.fit` is a fact about the take, not the press.
+      // why: lessons/kit-keyboard.md#onloop-fields
       onLoop?.(true, { slot: i, state: 'looping', lap: t.lap, moves: t.tape.length,
                        outside: t.outside,
                        ratio: t.fit?.label || '', snapped: !!t.fit?.snapped,
@@ -1675,9 +781,8 @@ export function createKeyboard(host, {
       stopTake(i);
       t.tape = null;
       t.fit = null;
-      /* ⚠️ THE CELL LETS GO WITH THE SLOT IT WAS DESCRIBING. Leaving it standing
-         would report a ratio for a take that has just been thrown away, which a
-         reader cannot tell from a ratio for one that is still there. */
+      // The cell lets go with the slot it was describing.
+      // why: lessons/kit-keyboard.md#clear-ratio
       if (i === lastFitSlot) { lastFit = null; lastFitSlot = -1; }
       if (had) log?.(`${n} thrown away, ${had} movement(s) with it`);
       onLoop?.(false, { slot: i, state: 'empty' });
@@ -1686,75 +791,27 @@ export function createKeyboard(host, {
     paintTune();
   };
 
-  /**
-   * 🔴 THE MACHINE IS `/num/`'s, PRESS FOR PRESS. A slot walks empty, recording,
-   * looping, stopped and then alternates for ever, and a double press inside the
-   * window throws it away or, on an empty slot, silences the others and records.
-   * ⚠️ AND THE BUTTON IS SLOT 1. A keyboard with `loops: 1` is exactly what it
-   * was before this, one take on one button, which is why no page had to change.
-   */
+  // `/num/`'s machine press for press: empty, recording, looping, stopped. A double press throws a take
+  // away. The button is slot 1, so `loops: 1` is one take on one button.
+  // why: lessons/kit-keyboard.md#machine
   const machine = createNumLoop({
     slots: SLOTS,
     onTouch: (i) => { takes[i].pressedAt = performance.now(); },
     onEnter: (i, to, o) => enterLoop(i, to, o.was),
   });
-  /* ⚠️ PAINTED ONCE AT BUILD, SO THE TWO CELLS OPEN EMPTY RATHER THAN HOLDING
-     whatever `textContent` a fresh span happens to have. It is the empty string
-     either way; doing it here is what makes that a decision rather than a
-     coincidence, and it is the same reason `paintAt` runs before anybody has
-     pressed an octave button. */
+  // Painted once at build so the two cells open empty by decision.
+  // why: lessons/kit-keyboard.md#painttune-build
   paintTune();
 
   function setLoop() { machine.press(0); }
 
   /**
-   * 🔴 OFFER THE `Loop` CONTROL, OR TAKE IT AWAY. Asked 2026-09-28: *"rm loop
-   * button when evolution keyboad is not connected"*. A keyboard plugged in
-   * after the page opened brings it back and one unplugged takes it away, so
-   * this is a method rather than a build-time flag: `wantLoop` is read once,
-   * and a cable is not a fact that holds still.
-   *
-   * 🔴 THE PAGE DECIDES WHAT `connected` MEANS AND THIS DECIDES WHAT THE ROW
-   * LOOKS LIKE, which is the division this file keeps everywhere else and which
-   * `midi.mjs` states outright: a page owns MIDI. Nothing here asks for a MIDI
-   * port, reads a device name or knows what an Evolution is; it is handed a
-   * boolean. Putting the device test in here would make seven pages request
-   * Web MIDI to draw a keyboard.
-   *
-   * 🔴 AND A LOOP THAT IS SOUNDING IS STOPPED AND KEPT, NEVER CLEARED. The
-   * control is the only way to stop one, so withdrawing it while a loop runs
-   * would leave a phrase going round with nothing that can reach it, and
-   * `Panic` stops notes rather than loops. Clearing would be worse: a take is
-   * something somebody played. So every sounding slot is walked to `stopped`,
-   * which is one press of its own key and keeps its tape, and plugging the
-   * keyboard back in gives the control back with the takes still on it.
-   * ⚠️ `press` THEN `settle` IS ONE IMMEDIATE PRESS. A press is held for
-   * `doubleMs` to find out whether it is half of a double one, and `settle`
-   * runs it now; a clock cannot wait here, because the row has to be right
-   * before the next frame.
-   *
-   * ⚠️ IT IS THE DEFAULT THAT IS SHOWN, so a page that never calls this is
-   * exactly what it was. `/kit/` is that page: its keyboard is a specimen of
-   * the component and has no MIDI at all, and a gallery that hid the control
-   * this component grew most recently would be a gallery nobody can read.
-   *
-   * 🔴 AND THE TEMPO AND RATIO CELLS GO WITH IT, WHICH IS WHAT MAKES THE ROW
-   * FIT A PHONE. Those two are readouts ABOUT the loop and can say nothing at
-   * all while there is no control to start one, so leaving them standing is a
-   * reserved slot outliving its label, which this project has measured once as
-   * 75 px of drift down a five row column on `/circuit/`. MEASURED here: at
-   * 375 px on `/nola/` they are 86.1 px and 59.6 px of the 523.4 px a 323 px
-   * row was being asked to hold, and taking them with the button brings it to
-   * 304.4 px, so `-`, `+`, `0`, `Sustain` and `Panic` land on ONE LINE. That is
-   * the second half of *"keyboard lower bittons (+- panic etc) go to the same
-   * line"*, arriving from the ask next to it.
-   * ⚠️ THEY ARE REMOVED AND RE-APPENDED RATHER THAN HIDDEN, the same way the
-   * button is, because `[hidden]` on an element whose stylesheet rule sets a
-   * `display` is a fact about an attribute rather than about the screen, and
-   * four components here have needed that patch already.
-   *
+   * Offer the `Loop` control or take it away; the page decides what `connected` means. A sounding loop
+   * is stopped and kept, never cleared. The tempo and ratio cells go with it, which lets the row fit
+   * on one line at 375 px. Removed and re-appended, not `[hidden]`.
    * @param {boolean} present
    * @returns {boolean} whether the control is now in the row
+   * why: lessons/kit-keyboard.md#offerloop
    */
   function offerLoop(present) {
     if (!loopBtn) return false;
@@ -1788,37 +845,21 @@ export function createKeyboard(host, {
     paintAt();
   }
   paintPad();
-  /**
-   * 🔴 `loop: 'evolution'` BUILDS THE CONTROL AND STARTS IT WITHDRAWN. Asked
-   * 2026-09-30 for every keyboard page: *"enable loop button and fucntioanly on
-   * onscreen keyboar when evolution is connceted"*. The word names what the page
-   * will be watching for and nothing here watches: `midi.mjs` decides whether a
-   * port is the Evolution and calls `offerLoop`, which keeps the division in the
-   * block above, where this file never learns a device name.
-   * ⚠️ WITHDRAWN FIRST BECAUSE THE ANSWER IS NOT KNOWN YET. A control on screen
-   * for the moment it takes `requestMIDIAccess` to resolve and then gone is a
-   * control vanishing under a hand; absent and then offered is one arriving.
-   */
+  // `loop: 'evolution'` builds the control withdrawn; `midi.mjs` calls `offerLoop` when it sees the
+  // port. Absent then offered, never a control vanishing under a hand.
+  // why: lessons/kit-keyboard.md#loop-evolution
   if (wantLoop === 'evolution') offerLoop(false);
 
-  // ⚠️ `z` AND `x` ARE THE OCTAVE, and they are part of the keyboard for the
-  // same reason the pad is: the row `a`..`k` is an octave of notes, and the one
-  // thing you need while playing it is the octave it sits in. Reaching for a
-  // mouse to move it is the interruption the pad already exists to remove — and
-  // a page that draws a keyboard should not have to bind this itself.
-  //
-  // They are next to each other, under the left hand, below the note row: the
-  // same place a tracker and a hardware synth put them, and far enough from
-  // `a`..`k` that a mis-press is a mis-press rather than a wrong note.
+  // `z` and `x` move the octave, under the left hand and away from `a`..`k`.
+  // why: lessons/kit-keyboard.md#oct-keys
   const OCT_KEYS = { z: -1, x: 1 };
 
   // preventDefault ONLY on mapped keys, or typing anywhere else on the page
   // stops working.
   const onKeyDown = (e) => {
     if (e.repeat) return;
-    // ⚠️ NOT WHILE SOMEBODY IS TYPING. `wire` has a compose box and `/keys/` a
-    // room field; a global keydown that swallows `z` would make them unusable,
-    // and this listener is on `window`.
+    // Not while somebody is typing in a field: this listener is on `window`.
+    // why: lessons/kit-keyboard.md#not-typing
     const t = e.target;
     if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName || ''))) return;
     const k = e.key.toLowerCase();
@@ -1834,15 +875,8 @@ export function createKeyboard(host, {
   const onKeyUp = (e) => { const k = e.key.toLowerCase(); if (k in map) release(k, 'key'); };
   // A tab that loses focus never sees keyup, which is a stuck note.
   const onBlur = () => { for (const k of [...held]) release(k, 'key'); };
-  /**
-   * 🔴 THE LETTER ROW IS OPTIONAL, BECAUSE TWO KEYBOARDS ON ONE PAGE BOTH HEAR
-   * IT. Added 2026-09-17 for `/kit/`, which now shows a full-width keyboard and
-   * a narrow one side by side: both bind `window`, so one press of `a` sounded
-   * two notes and lit two keys, which in a gallery reads as a broken component
-   * rather than as two components doing what they were told.
-   * ⚠️ THE DRAWN LETTERS GO WITH IT. A key labelled `a` that does nothing when
-   * you press `a` is worse than a key with no letter on it.
-   */
+  // The letter row is optional because two keyboards on one page both hear `window`.
+  // why: lessons/kit-keyboard.md#letters
   if (letters) {
     addEventListener('keydown', onKeyDown);
     addEventListener('keyup', onKeyUp);
@@ -1851,62 +885,32 @@ export function createKeyboard(host, {
 
   const api = {
     el, keysEl, pad,
-    /**
-     * The page's own row inside the keyboard's box, or `null` where the caller
-     * did not ask for one. `foot: true`. The rule above it and the air around
-     * its contents belong to this component. See the option's own block.
-     */
+    // The page's own row inside the keyboard's box, or `null` without `foot: true`.
+    // why: lessons/kit-keyboard.md#api-foot
     foot: footEl,
     /** the three pad buttons, in the order they are drawn — for a page's own check */
     padButtons: [downBtn, upBtn, panicBtn],
     /** the displacement readout, so a check reads what a player reads */
     atEl,
-    /**
-     * The damper control, or `null` on a keyboard that did not ask for one.
-     * ⚠️ IT KEEPS `set(on, quiet)`, WHICH IS WHAT A PAGE NEEDS RATHER THAN A
-     * PREFERENCE. A real pedal moving has to move the lamp WITHOUT calling back
-     * into the page that is already handling the pedal, or the page answers its
-     * own message. `/nola/` asserts exactly that and the assert would go with
-     * this method.
-     */
+    // The damper control, or `null`. `set(on, quiet)` moves the lamp without calling back into the page.
+    // why: lessons/kit-keyboard.md#api-sustain
     sustain: sustainBtn,
     /** the `Loop` toggle, or null when the caller did not ask for one */
     loop: loopBtn,
-    /**
-     * Put the `Loop` control in the row or take it out of it, and say which it
-     * is now. The full account is on `offerLoop` above; the short version is
-     * that the page decides what *connected* means, a sounding loop is stopped
-     * and kept rather than cleared, and a keyboard with no `loop: true` answers
-     * `false` and does nothing.
-     */
+    // Put the `Loop` control in or out of the row; see `offerLoop`.
+    // why: lessons/kit-keyboard.md#api-offerloop
     offerLoop,
     /** whether the `Loop` control is in the row right now */
     loopOffered: () => !!loopBtn && padEnd.contains(loopBtn.el),
-    /**
-     * 🔴 THE TAKES, AND THIS IS WHAT A NUMBER PAD DRIVES. Asked 2026-09-23:
-     * *"num works. how come you can not add it to keyboard"*. A page that has a
-     * numeric pad on its MIDI keyboard calls `press(i)` with the slot and gets
-     * the whole of `/num/`'s behaviour: record, loop, stop, play again, and a
-     * double press inside the window to throw it away.
-     * ⚠️ THE PAGE OWNS THE PAD AND THIS OWNS THE LOOP, which is the same division
-     * as everywhere else here. Nothing in this component listens to MIDI, so a
-     * page maps a program change to a slot number and stops there.
-     * ⚠️ `settle` IS FOR A CHECK, and it says so on `numloop.mjs`: it runs a held
-     * press now rather than waiting out the double press window, which only a
-     * clock or a test can know is safe.
-     */
+    // The takes: `press(i)` with a slot gives `/num/`'s behaviour. The page maps its pad to slots.
+    // `settle` is for a check: it runs a held press now.
+    // why: lessons/kit-keyboard.md#api-loops
     loops: {
       press: (i) => machine.press(i),
       settle: (i) => machine.settle(i),
       clear: (i) => machine.clear(i),
-      /**
-       * Throw away the movements an arm would otherwise reach back for.
-       * ⚠️ IT IS NOT A SECOND `clear`. That empties a TAKE; this empties the
-       * rolling buffer behind `phraseStart`, so the next arm starts from silence
-       * whatever was played a moment ago. A check needs it because its blocks run
-       * back to back in milliseconds, which is a gesture no player can make, and
-       * a page wanting a deliberately empty arm can use it too.
-       */
+      // Empties the reach-back buffer, not a take, so the next arm starts from silence.
+      // why: lessons/kit-keyboard.md#loops-forget
       forget: () => { recent.length = 0; },
       /** one turn of a take in ms, for a page reporting on its own timing */
       lap: (i) => takes[i]?.lap || 0,
@@ -1915,34 +919,19 @@ export function createKeyboard(host, {
       state: (i) => machine.state(i),
       states: () => machine.states(),
       slots: SLOTS,
-      /**
-       * 🔴 THE TEMPO, AND `bpm` IS `null` RATHER THAN A NUMBER WHEN NOBODY HAS
-       * PLAYED ONE. `source` says `detected`, `given` or `none` and `why` is a
-       * finished sentence, so a page reporting this can never print a guess as a
-       * measurement by accident.
-       */
+      // `bpm` is `null` when nobody has played one; `source` and `why` say where it came from.
+      // why: lessons/kit-keyboard.md#loops-tempo
       tempo: () => machine.tempo(),
       /** the length every later loop is aligned to and which slot set it, or null */
       unit: () => machine.unit(),
-      /**
-       * How this slot's lap was fitted, or `null` while it holds nothing. A
-       * COPY, because the caller must not be able to edit the account of a
-       * decision this component has already acted on.
-       */
+      // How this slot's lap was fitted, or `null`. A copy, so a caller cannot edit it.
+      // why: lessons/kit-keyboard.md#loops-fit
       fit: (i) => (takes[i]?.fit ? { ...takes[i].fit } : null),
-      /**
-       * A page with its own clock says what the tempo is, and then nothing here
-       * is inferring anything. `step-grid.mjs`'s `clock.bpm()` is the caller
-       * this exists for, and the cell says `set` rather than `heard` after it.
-       */
+      // A page with its own clock states the tempo; the cell then says `set`, not `heard`.
+      // why: lessons/kit-keyboard.md#loops-assume
       assume(bpm) { const r = machine.assume(bpm); paintTune(); return r; },
-      /**
-       * Drop the unit and the tempo on purpose, without clearing a slot.
-       * ⚠️ IT IS THE OTHER HALF OF `assume`, AND IT IS HERE SO A CHECK CAN PUT
-       * THIS KEYBOARD BACK AS IT FOUND IT. A tempo a page stated survives every
-       * slot being cleared, by design, so without this a block that says what
-       * the tempo is has changed the component for every block after it.
-       */
+      // Drop the unit and tempo without clearing a slot, so a check can put the keyboard back.
+      // why: lessons/kit-keyboard.md#loops-releaseunit
       releaseUnit() { machine.releaseUnit(); paintTune(); },
     },
     /** what a loop is doing, for a page that wants to say so and for a check */
@@ -1951,27 +940,14 @@ export function createKeyboard(host, {
     taped: (i = 0) => (takes[i]?.tape ? takes[i].tape.length : 0),
     /** how far this keyboard has moved from where it was built, in semitones */
     displacement: () => base - HOME,
-    /* ⚠️ `nameButtons`, `setNaming`, `naming`, `setTonic` AND `tonic` STOOD
-       HERE AND LEFT WITH THE `N | D` PAIR ON 2026-09-28. Nothing outside this
-       file called any of the five, which was GREPPED rather than assumed, and
-       `setTonic` is the one worth naming: its own comment said `/nola/` reads a
-       key off the first chord in its line and should say so, and `/nola/` never
-       did. A setter nobody calls is what made the degree naming a branch that
-       could only ever be right in C. See the pad. */
+    // why: lessons/kit-keyboard.md#removed-naming
     noteOf, keyOf, press, release,
     get base() { return base; },
-    /**
-     * Move the whole keyboard by octaves. Any note still held is released
-     * FIRST and at its old pitch — shifting under a held key would send a
-     * note-off for a note that was never started, and leave the real one
-     * sounding forever.
-     */
+    // Move the whole keyboard by octaves. Held notes are released first at their old pitch.
+    // why: lessons/kit-keyboard.md#shiftoctave
     shiftOctave(delta, opts) { return api.shiftBy(delta * 12, opts); },
-    /**
-     * Move the whole keyboard by SEMITONES. `shiftOctave` is this with a
-     * multiplication in front of it, so there is one clamp, one release and one
-     * relabel rather than two of each.
-     */
+    // Move the whole keyboard by semitones; `shiftOctave` calls this, so one clamp and one relabel.
+    // why: lessons/kit-keyboard.md#shiftby
     shiftBy(steps, { min = minBase, max = maxBase } = {}) {
       for (const k of [...held]) release(k, 'key');
       const was = base;
@@ -1984,29 +960,17 @@ export function createKeyboard(host, {
       if (base !== was) onOctave?.(base);
       return base;
     },
-    /**
-     * Stop everything. Every held key is released through the normal path, so
-     * the page's own `onUp` sends whatever note-off it would have sent anyway
-     * and nothing special has to be taught about panics.
-     *
-     * ⚠️ AND THEN THE PAINT IS CLEARED BY HAND, which is the one place the
-     * "light from the note, never from the press" rule is set aside. A note
-     * lit over MIDI is a note this component never saw pressed, so releasing
-     * held keys cannot clear it — and a key still glowing under a button
-     * labelled `notes off` is the component contradicting itself in public.
-     * `remote` keys are left alone: those are somebody ELSE's notes on
-     * somebody else's machine, and this button does not reach them.
-     */
+    // Stop everything: held keys release through the normal path, then the paint is cleared by hand
+    // because a MIDI-lit note was never pressed here. `remote` keys are left alone.
+    // why: lessons/kit-keyboard.md#panic
     panic() {
-      // ⚠️ AND THE FINGERS ARE FORGOTTEN TOO. A pointer still down when this is
-      // pressed would otherwise keep its `key` and send a second note-off on
-      // lift, or re-press on its next move — which is a keyboard that starts
-      // playing again immediately after being told to stop.
+      // Forget the fingers too, or a pointer still down sends a second note-off or re-presses on move.
+      // why: lessons/kit-keyboard.md#panic-fingers
       for (const t of touches.values()) if (t.raf) cancelAnimationFrame(t.raf);
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
-      /* Every loop stops too (asked 2026-10-14, *"stop loops"*), through the same
-         walk `offerLoop(false)` uses, so the Loop button and `onLoop` follow. */
+      // Every loop stops too, through the same walk `offerLoop(false)` uses.
+      // why: lessons/kit-keyboard.md#panic-loops
       for (let i = 0; i < SLOTS; i++) {
         if (machine.state(i) === 'recording') { machine.press(i); machine.settle(i); }
         if (machine.state(i) === 'looping') { machine.press(i); machine.settle(i); }
@@ -2017,98 +981,46 @@ export function createKeyboard(host, {
         t.keys.clear();
       }
       for (const b of els.values()) b.classList.remove('down');
-      /* ⚠️ AND THE NOTES LIT FROM OUTSIDE GO WITH THE PAINT, or the footer
-         goes on naming a chord under a button labelled `Panic`. The lamps
-         above are cleared by hand for exactly this reason and the set behind
-         them was not. `remote` is left alone here as it is there: those are
-         somebody else's notes and this button does not reach them. */
+      // Notes lit from outside go with the paint, or the footer names a chord after Stop.
+      // why: lessons/kit-keyboard.md#panic-fingernotes
       fingerNotes.clear();
       paintChord();
       onPanic?.();
     },
-    /**
-     * paint a key. `who` is 'self', 'remote' or 'hint', and they are three
-     * different colours.
-     *
-     * 🔴 `hint` IS MUTED GREY AND IT IS DELIBERATELY THE QUIETEST OF THE THREE.
-     * Asked for on `/nola/` 2026-09-23: *"a parser that shows hilited keys
-     * (muted gray) on keyboard"*. The other two say something HAPPENED, a
-     * finger here or a player elsewhere, and this one says something COULD:
-     * these are the notes of a chord, nobody is holding them. Painting that in
-     * an ink that means an event would be the colour rule this project already
-     * holds for marks, one component along, where a colour says how a thing
-     * landed and never which lane it is in.
-     * ⚠️ THE THREE ARE SEPARATE CLASSES RATHER THAN ONE ATTRIBUTE, so a key can
-     * be hinted AND held at once, which is exactly what happens when somebody
-     * plays along with a chord on screen.
-     */
+    // Paint a key. `who` is 'self', 'remote', 'hint' or 'ai': separate classes, so a key can be hinted
+    // and held at once. `hint` is muted grey: a chord nobody is holding.
+    // why: lessons/kit-keyboard.md#lightnote
     lightNote(note, on, who = 'self', vel = null) {
       const k = keyOf(note);
-      /* 🔴 AND THIS IS WHERE A NOTE PLAYED PAST THE KEYS REACHES THE LOOP. See
-         `tapeNote`. Only the plain lamp counts: `hint`, `ai` and `remote` are
-         somebody else's notes or a suggestion nobody played, and looping those
-         would record a proposal as a performance. `viaKey` excludes this
-         component's own notes coming back through the page's callback. */
+      // Where a note played past the keys reaches the loop. Only 'self' counts; `viaKey` excludes our own.
+      // why: lessons/kit-keyboard.md#lightnote-tape
       if (who === 'self' && !viaKey && !replaying) {
         if (on) fingerNotes.add(note); else fingerNotes.delete(note);
       }
       if (who === 'self' && !viaKey) tapeNote(note, !!on, vel);
-      /* 🔴 AND THE FOOTER IS REPAINTED HERE AS WELL AS IN THE FUNNEL, BECAUSE
-         THIS IS THE ONLY ROUTE A MIDI NOTE TAKES. A note played on a keyboard
-         plugged into the machine never reaches `press`: the page hears it and
-         lights it, which is this component's own rule that a key is lit by a
-         NOTE and never by the press that caused it. Repainting only in the
-         funnel would give `/knobs/` and `/instrument/` a chord cell that stays
-         empty while somebody plays a chord, which is the shape of control this
-         project calls a lie.
-         ⚠️ IT IS OUTSIDE THE `if (!k) return` BELOW, so a note past the drawn
-         range still counts toward the name. */
+      // Repainted here because a MIDI note only arrives through `lightNote`. Before `if (!k) return`,
+      // so a note past the drawn range still counts.
+      // why: lessons/kit-keyboard.md#lightnote-chord
       paintChord();
       if (!k) return;
-      /* 🔴 `ai` IS A FOURTH LAMP AND NOT A FOURTH COLOUR OF THE SAME ONE. Asked
-         2026-09-23: *"when fading, fade them also in keyboard so smaller are on
-         top of larger"*. A proposal and a key under a finger are two different
-         facts about one key and a player needs to see both at once, so this one
-         paints a smaller mark INSIDE the dot rather than recolouring it. */
+      // `ai` is a smaller mark inside the dot, so a proposal and a held key show at once.
+      // why: lessons/kit-keyboard.md#ai-lamp
       const cls = who === 'remote' ? 'remote' : who === 'hint' ? 'hint'
         : who === 'ai' ? 'ai' : 'down';
       els.get(k)?.classList.toggle(cls, !!on);
     },
     /** every note this keyboard can produce, for a caller that needs the range */
     notes: () => keys.map(noteOf),
-    /**
-     * 🔴 WHAT THE FOOTER IS SAYING, AND THE ELEMENT IT SAYS IT IN, BECAUSE A
-     * CONTROL A CHECK CANNOT READ IS A CONTROL NOTHING GRADES. This component
-     * already learned that about the pad, whose own header records three
-     * ungraded controls: `verify.mjs` presses `.pos-controls` and nothing else,
-     * so anything drawn here has to be observable from the api or it is
-     * invisible to every harness in the project.
-     * ⚠️ IT RETURNS THE READING AND THE ELEMENT, NOT JUST THE STRING. The
-     * string answers *what does it say*; `el` is what answers *does it move*,
-     * which is the half the ask was actually about and which only a rect can
-     * settle.
-     */
+    // The footer's reading and its element, so a check can read it and measure that it does not move.
+    // why: lessons/kit-keyboard.md#api-chord
     chord: () => {
       const down = sounding();
       const r = down.length >= 2 ? nameChord(down) : null;
       return { el: chordEl, notes: down, name: chordEl ? chordEl.textContent : '',
                sure: !!r?.sure, reading: r };
     },
-    /**
-     * 🔴 WHAT THE TWO LOOP CELLS ARE SAYING, AND THE ELEMENTS THEY SAY IT IN,
-     * FOR THE SAME REASON `chord()` EXISTS: a control a check cannot read is a
-     * control nothing grades, and `verify.mjs` presses `.pos-controls` and
-     * nothing else.
-     * ⚠️ IT RETURNS THE STRINGS AND THE ELEMENTS. The strings answer *what does
-     * it say*, which is the half about absences; the elements answer *does it
-     * move*, which only a rect can settle and which is the whole reason both
-     * cells carry a reserve.
-     * ⚠️ AND IT IS THE DRAWN TEXT RATHER THAN A SECOND FORMATTING OF THE STATE.
-     * A reader built here that re-derived `124 bpm heard` from `tempo()` could
-     * agree perfectly with itself while the cell on screen said something else,
-     * which is this project's two-numbers-from-one-field defect arriving as a
-     * check.
-     */
+    // The two loop cells' drawn text and elements, read off the screen, not re-derived from state.
+    // why: lessons/kit-keyboard.md#api-tune
     tune: () => ({
       tempoEl,
       ratioEl,
@@ -2119,15 +1031,8 @@ export function createKeyboard(host, {
     }),
     /** what this keyboard was built with, so a check can grade the numbers as well as the machinery */
     timing: { swipeFrames, swipePx, keyMinPx: KEY_MIN_PX, blackRatio: BLACK_RATIO },
-    /**
-     * ⚠️ THREE LISTENERS OF THIS COMPONENT'S ARE ON `window`, NOT ON ITS OWN
-     * ELEMENT, so removing the element does not remove the keyboard: `a`..`k`
-     * and `z`/`x` go on reaching it, and every note it sends goes to a page
-     * that cannot see it any more. No page needs this — a demo's keyboard
-     * lives as long as the demo — but a page's own CHECK builds throwaway ones,
-     * and a check that leaves live keyboards bound to the window has changed
-     * the page it was grading.
-     */
+    // Three listeners are on `window`, so removing the element does not remove the keyboard. For checks.
+    // why: lessons/kit-keyboard.md#destroy
     destroy() {
       for (let i = 0; i < SLOTS; i++) stopTake(i);
       api.panic();

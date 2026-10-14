@@ -1,55 +1,12 @@
-// demo/shell/looper.mjs — the looper, for every page that keeps seconds of sound.
-//
-// 🔴 IT WAS `/archive/radio/`'S AND IS NOW EVERY PAGE'S, ASKED FOR IN THOSE WORDS:
-// *"make it use same looping ui as radio (make it global)"*. What was on that
-// page was a vocabulary of ways to play a kept lap, a button glued to LOOP that
-// cycles → ← ⇆, a ring that keeps the sound, and one voice that reads the lap
-// under whichever way is showing. None of that is about radio. Two pages had a
-// LOOP button and only one of them could turn a loop round, which is the shape
-// this repo already paid for three times: a control that exists in one page and
-// nowhere else is a component that has not been noticed yet.
-//
-// The split, which is the whole of why this is a module and not a copy:
-//
-//   THIS FILE owns what a loop IS. The ring, the kept buffer, the mirrored
-//   copy, the voice, the lap, where the sound has got to, the button's face.
-//   THE PAGE owns what else happens on its own graph: which node stops being
-//   heard while a loop plays, what the log calls the thing it is looping, and
-//   what its picture does.
-//
-// ⚠️ TWO PAGES REACH `keep()` AND `close()` AT DIFFERENT MOMENTS, AND BOTH ARE
-// RIGHT. On a live station the sound the loop will play HAS NOT ARRIVED YET, so
-// the first press opens a window and the second closes it: `keep` on the bar's
-// `fill`, `close` on its `set`. On a tape both marks are behind you and the bar
-// loops the file itself, so the first lap comes off the tape while the ring
-// fills: `keep` on `set`, `close` on the first `wrap`. From there the two pages
-// are the same instrument.
-//
-// ⚠️ NEGATIVE PLAYBACK RATES DO NOT EXIST. `AudioBufferSourceNode.playbackRate`
-// will not go below zero in any shipping engine, so backwards is a MIRRORED
-// COPY of the samples and pingpong is the two joined end to end. That is the
-// reason this module has to hold the audio at all: a page cannot play a media
-// element backwards, and a kept lap it can.
-//
-// The arithmetic is separated from the wiring on purpose: `ringOrder`,
-// `planVoice` and `headOf` are pure and are graded by `looper-test.mjs`, with
-// no browser and no audio hardware. Every bug this module has ever had was in
-// one of those three (a ring copied from the wrong index sounds like an edit
-// nobody made; a pingpong head that was a ramp sat at the right edge for the
-// whole return half).
+// demo/shell/looper.mjs: what a loop is (ring, kept buffer, mirrored copy, voice, lap, head, button face);
+// the page owns the rest of its graph. Negative playback rates do not exist, so back is a mirrored copy.
+// ringOrder, planVoice and headOf are pure and graded by looper-test.mjs.
+// why: lessons/kit-looper.md#header
 
 /**
- * 🔴 THE WAYS, AND THE ORDER OF THIS TABLE IS LOAD-BEARING. Every check in
- * `/archive/radio/` drives a way BY NUMBER, so `pingpong` is fifth rather than third:
- * renumbering them would make four asserts grade a different way than their own
- * labels claim. Each is a different MECHANISM rather than a different number of
- * one, which is the rule the twelve sounds were rebuilt under.
- *
- *   round  the kept seconds as they arrived        the default
- *   back   the same samples, mirrored              a direction
- *   half   the same lap, twice as long             a speed
- *   chop   a sixteenth of the lap, repeating       a length
- *   pingpong  forwards then backwards, seamless    a direction
+ * The ways, in a load-bearing order: checks drive them by number. round, back (mirrored), half (speed),
+ * chop (a sixteenth of the lap), pingpong (forwards then backwards).
+ * why: lessons/kit-looper.md#loop-ways
  */
 export const LOOP_WAYS = [
   ['round', 'round'], ['back', 'back'], ['half', 'half'], ['chop', 'chop'],
@@ -57,20 +14,14 @@ export const LOOP_WAYS = [
 ];
 
 /**
- * 🔴 THE THREE THE BUTTON CYCLES, IN THE ORDER IT CYCLES THEM. Directions, and
- * only directions: `half` is what a rate row beside it is for and `chop` is a
- * length with no control today. Both are still reachable and both are still
- * driven by the checks, which is a loose end written down rather than left to
- * be found.
+ * The three directions the button cycles, in its order. half and chop have no control today.
+ * why: lessons/kit-looper.md#loop-turn
  */
 export const LOOP_TURN = [0, 1, 4];
 
 /**
- * The face of the button for each way. ⚠️ A GLYPH IS THE STATE, NOT THE NEXT
- * PRESS, which is the opposite of what LOOP's own word does. The difference is
- * that LOOP has three states with two names and this has three states with
- * three faces: showing the next one would mean the button never says which way
- * the loop you are listening to is running.
+ * The button's face for each way. The glyph is the state, not the next press.
+ * why: lessons/kit-looper.md#way-glyph
  */
 export const WAY_GLYPH = { round: '→', back: '←', pingpong: '⇆', half: '→', chop: '→' };
 export const WAY_SAYS = {
@@ -101,29 +52,17 @@ const CUT = 0.012;
 const clamp01 = (f) => Math.min(1, Math.max(0, f));
 
 /**
- * Where the oldest kept sample sits in the ring.
- *
- * ⚠️ NOT ZERO ONCE IT HAS WRAPPED. The ring's write head is the oldest sample
- * the moment it is full, so copying from index 0 plays the seconds in two
- * pieces with the join in the middle, which sounds like an edit nobody made.
+ * Where the oldest kept sample sits in the ring: the write head once it has wrapped, not zero.
+ * why: lessons/kit-looper.md#ring-order
  */
 export function ringOrder({ filled, len, w }) {
   return filled >= len ? ((w % len) + len) % len : 0;
 }
 
 /**
- * What one voice reads, for a way and a place to pick it up.
- *
- * `unit` is one pass of the KEPT seconds, which is what a picture of the loop is
- * as wide as. `whole` is the buffer this way actually reads, which is twice
- * `unit` under pingpong. `fromFrac` is a fraction of the PICTURE, so a press
- * does not throw you back to the top of the loop.
- *
- * 🔴 `null` MEANS THE TOP OF THE LOOP AND IT IS NOT THE SAME AS `0`. Zero is the
- * left edge of the picture, and under `back` the top of the loop is the RIGHT
- * edge: the mirrored buffer's first sample is the kept seconds' last one. A new
- * loop opening backwards at picture 0 mirrors to an offset of the buffer's whole
- * duration, where there is nothing left to read.
+ * What one voice reads. unit is one pass of the kept seconds, whole the buffer read (2 x unit under
+ * pingpong), fromFrac a fraction of the picture. null is the top of the loop, which under back is the right edge.
+ * why: lessons/kit-looper.md#plan-voice
  */
 export function planVoice({ way, unit, fromFrac = null, rate = 1 }) {
   const back = way === 'back';
@@ -134,29 +73,24 @@ export function planVoice({ way, unit, fromFrac = null, rate = 1 }) {
     : whole;
   const cont = Number.isFinite(fromFrac);
   const f = cont ? clamp01(fromFrac) : 0;
-  // Where that fraction of the PICTURE sits in the buffer this voice reads.
-  // ⚠️ AGAINST `unit`, NEVER `whole`: under pingpong the buffer is twice the
-  // picture, and against `whole` a press at the middle of the wave would pick
-  // the sound up at the turn.
+  // Where the picture fraction sits in the buffer, against unit, never whole.
+  // why: lessons/kit-looper.md#plan-voice-here
   const here = cont ? (back ? 1 - f : f) * unit : 0;
   const from = way === 'chop' ? Math.min(Math.max(0, here), Math.max(0, whole - lap)) : 0;
   return {
     back, ping, whole, unit,
     lapFrom: from,
     lapTo: from + lap,
-    // 🔴 WHERE IT ACTUALLY STARTS READING, AND IT WAS ALWAYS THE TOP ONCE.
-    // `loopStart`/`loopEnd` bound the lap; the second argument to `start()` is
-    // where inside it to begin, and they are different numbers. Only `chop` was
-    // getting this, so pressing ← jumped the sound to the far end of the picture.
+    // Where reading starts inside the lap; loopStart and loopEnd only bound it.
+    // why: lessons/kit-looper.md#plan-voice-begin
     begin: way === 'chop' ? from : here,
     rate: (way === 'half' ? 0.5 : 1) * rate,
   };
 }
 
 /**
- * Where the voice is reading, in seconds of the buffer it reads.
- * ⚠️ FROM WHERE THE VOICE WAS TOLD TO BEGIN (`off`), not from the top of its
- * lap: a way change picks the sound up where it already was.
+ * Where the voice is reading, from where it was told to begin (off), not the top of its lap.
+ * why: lessons/kit-looper.md#voice-pos
  */
 function voicePos({ lapFrom, lapTo, off, rate, elapsed }) {
   const lap = lapTo - lapFrom;
@@ -164,17 +98,9 @@ function voicePos({ lapFrom, lapTo, off, rate, elapsed }) {
 }
 
 /**
- * Where the SOUND is, as a fraction of the kept seconds a picture draws.
- *
- * From the voice's own clock rather than from a deck's, because a deck's
- * fraction is only the same thing until a loop can run backwards, at half
- * speed, or a slice at a time. ⚠️ MIRRORED UNDER `back`: sample `i` of the
- * reversed buffer is sample `n - 1 - i` of what the picture shows.
- *
- * 🔴 PINGPONG IS A TRIANGLE AND IT WAS A RAMP THAT STUCK. The voice reads one
- * buffer of `2 x unit`, so divided by `unit` and clamped the line crossed the
- * picture over the first half and then sat at the right edge for the whole
- * return, which is the half a reader is listening for.
+ * Where the sound is as a fraction of the picture, from the voice's own clock. Mirrored under back;
+ * under pingpong a triangle, not a ramp that sits at the right edge for the return.
+ * why: lessons/kit-looper.md#head-of
  */
 export function headOf({ back, ping, unit, lapFrom, lapTo, off, rate, elapsed }) {
   if (!(lapTo - lapFrom > 0) || !(unit > 0)) return null;
@@ -186,22 +112,9 @@ export function headOf({ back, ping, unit, lapFrom, lapTo, off, rate, elapsed })
 }
 
 /**
- * The looper itself.
- *
- *   seconds   how long the ring holds, which is the longest loop this page can
- *             promise. A button promising more than the page can deliver is a
- *             control that lies at the moment it is used.
- *   log       `(text, kind)`, the page's own logger.
- *   onWay     `(wayName, lapSeconds)` after a way change that moved the sound,
- *             for a page with something to retune to the lap.
- *
- * 🔴 IT IS BUILT WITHOUT AN `AudioContext` AND GIVEN ONE LATER, WHICH IS NOT
- * FUSSINESS. Every page here builds its graph on the first press, because an
- * `AudioContext` made at load is a suspended context on a real browser, and the
- * transport bar is built long before that: the bar needs `wayExtra()` at
- * construction and the ring needs a sample rate. Splitting the two is what lets
- * one object own both ends. Before `attach()` every audio verb is a no-op, which
- * is right: there is no sound yet to loop.
+ * The looper. seconds: what the ring holds; log: (text, kind); onWay: (wayName, lapSeconds) after a move.
+ * Built without an AudioContext and given one by attach(); before that every audio verb is a no-op.
+ * why: lessons/kit-looper.md#create-looper
  */
 export function createLooper({ seconds = 20, channels = 2, log = () => {},
   onWay = null } = {}) {
@@ -235,13 +148,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
   }
 
   /**
-   * Start, or restart, the one voice that plays the kept seconds.
-   *
-   * ⚠️ A DIP, NOT A CUT. A buffer source cannot change its buffer or its loop
-   * points cleanly while it runs, so a way change is a new voice, and swapping
-   * one mid-sample is a click every time somebody presses a button. The first
-   * voice of a loop needs none of that: `loopOut` is still at zero and the
-   * caller ramps it up straight afterwards.
+   * Start or restart the one voice. A way change is a new voice under a dip, not a cut, to avoid a click.
+   * why: lessons/kit-looper.md#start-voice
    */
   function startVoice(fromFrac) {
     if (!ctx || !buf) return;
@@ -249,13 +157,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
     const plan = planVoice({ way: name, unit: buf.duration, fromFrac, rate });
     if ((plan.back || plan.ping) && !mirrored) mirrored = reversedCopy(buf);
     /**
-     * 🔴 PINGPONG IS ONE BUFFER, NOT TWO VOICES TAKING TURNS. Alternating two
-     * sources on a timer puts a gap or an overlap at every turn, and at these
-     * lap lengths that is a click twice a lap. Forwards followed by the same
-     * samples backwards is a single buffer whose end already matches its start,
-     * so `loop: true` joins it to itself with nothing to hear, and the join in
-     * the middle is seamless by construction: the last sample forwards IS the
-     * first sample backwards.
+     * Pingpong is one joined buffer, not two voices taking turns: its ends match, so loop: true is seamless.
+     * why: lessons/kit-looper.md#pingpong-buffer
      */
     if (plan.ping && !joined) joined = joinedCopy(buf, mirrored);
     const reading = plan.ping ? joined : plan.back ? mirrored : buf;
@@ -278,10 +181,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       g.linearRampToValueAtTime(1, when + CUT);
     }
     v.start(when, plan.begin);
-    // ⚠️ THE OLD ONE STOPS AT THE INSTANT THE NEW ONE STARTS, SCHEDULED RATHER
-    // THAN TIMED. A `setTimeout` stop leaves both voices in `loopOut` for as
-    // long as the timer is late, which is two copies of the loop at different
-    // phases: the thing that sounds like a broken instrument.
+    // The old voice stops at the new one's start, scheduled: a late setTimeout plays two phases at once.
+    // why: lessons/kit-looper.md#voice-stop-scheduled
     const dying = src;
     if (dying) { try { dying.stop(when); } catch { /* already done */ } }
     src = v;
@@ -302,14 +203,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
 
   const api = {
     /**
-     * Give it the graph.
-     *
-     *   tap   the node whose output is kept. Upstream of any fader, so a loop is
-     *         the material rather than a recording of where a blend happened to
-     *         be standing.
-     *   out   where the kept seconds are played back into. Downstream of it
-     *         everything gets the loop for free: a granulator chews it, an
-     *         analyser measures it, a meter reads what actually left.
+     * Give it the graph. tap: the node kept, upstream of any fader. out: where the loop plays back into.
+     * why: lessons/kit-looper.md#attach
      */
     attach(context, { tap, out }) {
       if (ctx) return api;
@@ -321,13 +216,9 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
         w: 0, filled: 0, on: false,
       };
       /**
-       * ⚠️ A SCRIPT PROCESSOR AS A TAP, deliberately rather than lazily. It is
-       * deprecated and it runs on the main thread, which is the objection; what
-       * it does here is copy two blocks into a typed array and return, and a
-       * worklet would be a second file and a module load for that. It is wired
-       * to a SILENT sink so it is pulled without reaching the speakers: a node
-       * that is not connected to the destination is not scheduled at all, which
-       * is the trap that makes a tap look like it is working and record nothing.
+       * A ScriptProcessor tap on purpose: it copies two blocks and returns. Wired to a silent sink, because an
+       * unconnected node is never scheduled and records nothing.
+       * why: lessons/kit-looper.md#tap-node
        */
       tapNode = ctx.createScriptProcessor(4096, channels, channels);
       tapNode.onaudioprocess = (e) => {
@@ -366,11 +257,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
      *  A check can compare it with `buffer()` sample by sample. */
     voiceBuffer: () => (src ? src.buffer : null),
     /**
-     * 🔴 THE NODE THE SOUND ACTUALLY COMES OUT OF, published for a check.
-     * Which buffer it holds, how long its lap is and what rate it runs at are
-     * three facts about the audio graph rather than three variables a page set,
-     * and a check that reads the second kind passes over a row wired to nothing
-     * at all.
+     * The node the sound comes out of, for a check to read the graph rather than variables.
+     * why: lessons/kit-looper.md#voice
      */
     voice: () => src,
     /** The mirrored copy, once something has needed one. "Reversed" is the one
@@ -393,14 +281,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       if (!ctx || !ring) return 0;
       ring.on = false;
       const n = ring.filled;
-      // A window that caught nothing is not a loop. It happens when nothing was
-      // actually playing at the press, and saying so is better than looping
-      // silence and letting somebody wonder.
-      // 🔴 SILENTLY, ON INSTRUCTION 2026-09-16: *"rm all loop messages."*. It
-      // said `nothing was playing, so there is nothing to loop`, which is true
-      // and is a sentence about a loop. The caller gets 0 and the button goes
-      // back to `off`, which is the same fact in the two channels that already
-      // carry it.
+      // A window that caught under 0.25 s is not a loop: return 0, silently, and the button goes back to off.
+      // why: lessons/kit-looper.md#close-empty
       if (n < ctx.sampleRate * 0.25) return 0;
       const b = ctx.createBuffer(channels, n, ctx.sampleRate);
       const start = ringOrder(ring);
@@ -408,16 +290,11 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
         const dst = b.getChannelData(c), s = ring.ch[c];
         for (let i = 0; i < n; i++) dst[i] = s[(start + i) % ring.len];
       }
-      // ⚠️ THE SECONDS ARE KEPT AND THE VOICE THAT PLAYS THEM IS A SEPARATE
-      // THING. This is the material; the way decides which part of it a voice
-      // reads, and a way change rebuilds the voice without touching it.
+      // The kept seconds are the material; a way change rebuilds the voice without touching them.
+      // why: lessons/kit-looper.md#close-material
       buf = b; mirrored = null; joined = null;
-      // 🔴 IT OPENS THE WAY THE BUTTON IS SHOWING, rather than resetting to
-      // `round`. The button is on the bar with no loop running, so a direction
-      // can be chosen BEFORE pressing LOOP, and a control reading ← over a
-      // sound running forwards is the page lying about itself. The normalising
-      // happens in `stop()`, where the button is the only thing left to be true
-      // to.
+      // It opens the way the button is showing; a direction can be chosen before LOOP.
+      // why: lessons/kit-looper.md#close-opens-way
       startVoice(null);
       loopOut.gain.setTargetAtTime(1, ctx.currentTime, 0.005);
       return n / ctx.sampleRate;
@@ -432,12 +309,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       const dying = src; src = null;
       if (dying) setTimeout(() => { try { dying.stop(); } catch { /* already done */ } }, 120);
       buf = null; mirrored = null; joined = null;
-      // ⚠️ THE DIRECTION SURVIVES THE LOOP AND ONLY A WAY WITH NO FACE IS PUT
-      // BACK. Somebody who chose ← meant ←, and taking it away the moment a loop
-      // ends makes the choice something that has to be re-made every time.
-      // `half` and `chop` have no face on the bar, so leaving the button showing
-      // → over a loop that would come back chopped is the one case where keeping
-      // it would be the lie.
+      // The direction survives the loop; only half and chop, which have no face, go back to round.
+      // why: lessons/kit-looper.md#stop-direction
       if (!LOOP_TURN.includes(way)) api.setWay(0, { quiet: true });
     },
 
@@ -484,21 +357,19 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
       // says it louder than any line of prose could. See above.
 
     },
-    /** One press of the button glued to LOOP: → then ← then ⇆ then → again.
-     *  ⚠️ A WAY THAT IS NOT IN `LOOP_TURN` LANDS ON THE FIRST: pressing after
-     *  `half` or `chop` is a reader asking for a direction, and the honest
-     *  answer is the first direction rather than an index arithmetic accident. */
+    /**
+     * One press: then the next of LOOP_TURN. A way not in LOOP_TURN lands on the first.
+     * why: lessons/kit-looper.md#cycle
+     */
     cycle() {
       const i = LOOP_TURN.indexOf(way);
       api.setWay(LOOP_TURN[(i + 1) % LOOP_TURN.length]);
     },
 
     /**
-     * The entry for `createTransportBar`'s `loopExtras`, so a page declares the
-     * button by handing over this and nothing else.
-     *
-     * ⚠️ `always: true` KEEPS IT ON THE BAR WITH NO LOOP RUNNING, and it is not
-     * an inert control: it changes what the NEXT press of LOOP does.
+     * The entry for createTransportBar's loopExtras. always: true keeps it on the bar with no loop running,
+     * where it sets what the next LOOP press does.
+     * why: lessons/kit-looper.md#way-extra
      */
     wayExtra() {
       return {
@@ -513,12 +384,8 @@ export function createLooper({ seconds = 20, channels = 2, log = () => {},
     bind(b) { bar = b; paintWay(); return api; },
 
     /**
-     * 🔴 A LOOP LONGER THAN THE RING CANNOT BE TURNED ROUND, AND THE BUTTON HAS
-     * TO SAY SO RATHER THAN SIT THERE. A page that marks its loop on a file can
-     * mark one of any length; this holds `seconds` of it. Greying the button
-     * with the reason on it is what `caps.mjs` does for a demo this browser
-     * cannot run, and for the same reason: a control that looks live and does
-     * nothing is worse than one that says why it cannot.
+     * A loop longer than the ring cannot be turned round, so the button greys with the reason on it.
+     * why: lessons/kit-looper.md#say-too-long
      */
     sayTooLong(why) {
       const b = bar?.loopExtra?.('way');

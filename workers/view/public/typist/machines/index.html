@@ -22,18 +22,10 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/typist/paper.css">
 <style>
-  /* concepts typist/020, TYPEWRITERS, 2026-10-11. 010's paper and sampler,
-     with the sound going through an fx box of its own. Asked: *"do 020 as
-     multiple sounds, ... can i be separate fx box takes audio in / out and
-     index or smth?"*, then *"can be more than 4, support somehting that makes
-     sense and then repeating. or unique all the time, choose"* (unique was
-     chosen), *"only keep stepper"*, *"all machine n's"* and *"why
-     handtuned? just universal logic?"*. So `web:fx` takes audio in, audio out
-     and an index on `value-in`, and a stepper (`web:pick`) sends it any
-     positive number, each one a machine generated from that number by one
-     rule (`fx.mjs`). The samples are 010's,
-     the same nine CC0 cuts of a Hermes Precisa 305 in R2, provenance in
-     `../typewriter/SOURCES.md`. Nothing is fetched until the first key press. */
+  /* Typewriters: /typist/typewriter/'s paper and sampler through an fx box (`web:fx`:
+     audio in, audio out, an index on `value-in`); a stepper sends any positive index, each
+     a machine from fx.mjs. Samples in ../typewriter/SOURCES.md; nothing fetched before a key.
+     See lessons/page-typist.md#typist-9 */
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -87,13 +79,10 @@
     else if (c.top - line < s.top) sheet.scrollTop -= s.top - (c.top - line);
   }
 
-  // ── the typewriter: a sampler of one Hermes Precisa 305 ─────────────────
-  // Nine short files from our R2 bucket, decoded once into AudioBuffers and
-  // played with one AudioBufferSourceNode per key, so a press costs no fetch
-  // and no decode. NOTHING OPENS ON A VISIT: the AudioContext is made and the
-  // files are fetched on the first key press, which is also the gesture a
-  // browser needs before it lets a page make sound.
-  // R2, through the station worker's /media/ door, which answers CORS for any origin.
+  // The typewriter: nine files from our R2 bucket (through the station worker's /media/
+  // door, CORS for any origin), decoded once, one AudioBufferSourceNode per key. Nothing
+  // opens on a visit: the AudioContext and fetch wait for the first key press.
+  // See lessons/page-typist.md#typist-10
   const BASE = 'https://positron-station.kristjan-jansen.workers.dev/media/typewriter/hermes-precisa-305/';
   const FILES = ['key-1', 'key-2', 'key-3', 'key-4', 'key-5', 'space', 'bell-1', 'bell-2', 'return'];
   const STRIKES = ['key-1', 'key-2', 'key-3', 'key-4', 'key-5'];
@@ -179,20 +168,19 @@
   function typed(e) {
     if (muted) return;
     const at = performance.now();
-    // The press that wakes the typewriter always sounds, however long the
-    // samples took (asked 2026-10-11, *"first typing is not hear"*); only a
-    // press that arrives while they are still coming down is dropped if late.
+    // The press that wakes the typewriter always sounds, however long the samples took; only
+    // a press arriving while they are still coming down is dropped if late.
+    // See lessons/page-typist.md#typist-11
     const first = !ctx;
     const go = () => { if (first || performance.now() - at < LATE) sound(e); else stat.dropped++; };
     if (ready) go();
     else wake().then(go);
   }
 
-  // ── the patchbay ─────────────────────────────────────────────────────────
-  // 010's graph with an fx box between the typewriter and the speakers, and a
-  // stepper whose number reaches the fx box through the bay. The number also
-  // reaches the typewriter, on a second value input, because a machine's pitch
-  // per key type is a playback rate, and a rate is set where a sample starts.
+  // /typist/typewriter/'s graph with an fx box before the speakers, and a stepper whose
+  // number reaches the fx box and the typewriter's second value input (the per key rate is
+  // set where a sample starts).
+  // See lessons/page-typist.md#typist-12
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
   // The index as it ARRIVES, at each end. Nothing sets these but a delivery.
@@ -207,8 +195,8 @@
     else { twIndex = n; tuning = character(n, twAmt); }
   };
 
-  // DISTINCT, how far from the original, arrives on its own input at each end
-  // (asked 2026-10-11, *"distictivness as sepaate knob"*), 0 to 1.
+  // DISTINCT, how far from the original, 0 to 1, arrives on its own input at each end.
+  // See lessons/page-typist.md#typist-13
   const deliverAmt = (where) => (e) => {
     const a = Number(e?.v);
     if (!Number.isFinite(a)) return;
@@ -246,10 +234,9 @@
   });
 
   /**
-   * THE ROUTER, as /synth/patch-synth.mjs's: reads `bay.links()` and connects exactly the
-   * audio links that are held, out to in, after disconnecting every out. With
-   * no link into the fx box, nothing reaches it; with no link out of it,
-   * nothing reaches the speakers.
+   * The router, as /synth/patch-synth.mjs's: connects exactly the held audio links after
+   * disconnecting every out, so an unlinked fx box hears nothing and sends nothing.
+   * See lessons/page-typist.md#typist-14
    */
   const routed = [];
   function route() {
@@ -268,10 +255,9 @@
     }
   }
 
-  // `file` and `audio` are stream media on the wire, lit rather than pulsed.
-  // The file wire is lit while the samples come down and for 600 ms after, so
-  // a fetch from the local server is still seen; the audio wires while a
-  // sample sounds, plus the fx box's room.
+  // `file` and `audio` wires are lit, not pulsed: the file wire while the samples come down
+  // and 600 ms after (so a local fetch shows), the audio wires while a sample or room sounds.
+  // See lessons/page-typist.md#typist-15
   const flowing = (l, medium) => {
     if (medium === 'file') return !!loading && (stat.decoded < FILES.length || performance.now() - fetchedAt < 600);
     if (medium === 'audio') return !!ctx && !muted && ctx.currentTime < until + (l.from.startsWith(`${S}:fx`) ? (character(fxIndex, fxAmt).room?.ms || 0) / 1000 : 0);
@@ -303,11 +289,9 @@
     if (out) out.gain.value = muted ? 0 : 1;
     keys.focus({ preventScroll: true });
   } });
-  // The stepper is the `web:pick` node: any positive number, sent through the
-  // bay. Its list grows as it is stepped, so there is no last machine. It
-  // starts at Machine 0, the original, and after every choice the focus goes
-  // back to the paper (asked 2026-10-11, *"when witching patchs get my focys
-  // back to typewriter"*).
+  // The stepper is `web:pick`: any positive number, its list growing as it is stepped. It
+  // starts at Machine 0, the original, and focus goes back to the paper after each choice.
+  // See lessons/page-typist.md#typist-16
   let pickN = 0, listTo = 0;
   const pick = (n, refocus = true) => {
     pickN = Math.max(0, n);
@@ -342,10 +326,9 @@
     get stat() { return { ...stat, muted, state: ctx?.state || 'none' }; },
     get buffers() { return [...buf].map(([k, b]) => ({ name: k, s: +b.duration.toFixed(3), rate: b.sampleRate })); },
   };
-  // Read only, the fx box: the index that last ARRIVED at each end, every
-  // arrival with the link it came on, the audio links the router connected,
-  // how many chains are live (two only during a fade), and an offline render
-  // of one sample through one machine, measured.
+  // Read only: the index that last arrived at each end and its link, the connected audio
+  // links, how many chains are live (two only during a fade), and an offline render.
+  // See lessons/page-typist.md#typist-17
   window.__demo.fx = {
     get index() { return fxIndex; },
     get live() { return fx ? { index: fx.index, chains: fx.live, trim: fx.trim && +fx.trim.toFixed(2) } : null; },

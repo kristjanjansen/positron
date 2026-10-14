@@ -24,96 +24,10 @@
 
 <script type="module">
   /**
-   * collide. A synth typed in SuperCollider, compiled in this tab, played by
-   * SuperCollider's own server running in the tab.
-   *
-   * Asked 2026-09-30: *"can you do simple supercollider script browser compile
-   * demo as in fau called collide? do we have moving pieces?"*. `/fau/` is the
-   * model, and this page is laid out the way that one is so the two read as a
-   * pair: type a program, it compiles when you stop typing, you play it from
-   * the keys.
-   *
-   * ── WHAT IS ACTUALLY HAPPENING ───────────────────────────────────────────────
-   *
-   * 🔴 THE TEXT IS A SMALL SUBSET OF THE SuperCollider LANGUAGE, AND THE PAGE
-   * SAYS SO IN ITS ONE SENTENCE. sclang, the real language, does not run in a
-   * browser (`research/supercollider-browser-2026-09.md` §1.3), and running it
-   * on the Raspberry Pi was refused because it would run a visitor's text on
-   * the board, where sclang can shell out. So `demo/shell/sclang-lite.mjs`
-   * reads the text and writes the bytes of a SynthDef in JavaScript, which is
-   * what sclang would have handed the server. Anything it does not know is
-   * refused with a line and a column, never guessed. Its header lists what it
-   * takes and what it refuses.
-   * ✅ THE SERVER IS THE REAL ONE. scsynth compiled to WebAssembly (SuperSonic,
-   * vendored in `demo/shell/vendor/`, booted by `demo/shell/scsynth.mjs`, the
-   * same engine `/grains/` and `/archive/radio/` run) takes the bytes with `/d_recv`
-   * and plays a note per key with `/s_new`. So a wrong byte is heard or
-   * refused by SuperCollider itself, and the checks below grade the engine's
-   * answers rather than this page's opinion of its own output.
-   *
-   * ── WHEN THINGS HAPPEN ──────────────────────────────────────────────────────
-   *
-   * 🔴 THE COMPILE IS ON LOAD AND THE ENGINE IS ON THE FIRST TOUCH, WHICH IS
-   * `/fau/`'s SHAPE (*"fau: compile on loading so i can play"*). The compile
-   * here costs less than a millisecond and pulls nothing, so the box opens
-   * with its program already compiled and its size in the readout. The engine
-   * is a sound device (an AudioContext and an AudioWorklet) and 1.83 MB of
-   * this site's own files, so it is built by the first gesture on the
-   * instrument and not by a visit, as on every sound page here.
-   * ⚠️ A KEY PRESSED WHILE THE ENGINE IS STILL BOOTING IS KEPT AND SOUNDED WHEN
-   * IT IS UP, and a key let go inside that window is taken out again, which is
-   * `/fau/`'s `waiting` map for the same reason.
-   *
-   * 🔴 A RECOMPILE DOES NOT CUT A HELD NOTE, SO THE IDLE COMPILE NEVER WAITS.
-   * `/fau/` hands `compile-idle.mjs` a `notNow` because its recompile builds a
-   * new worklet node and forgets every key. Here a compile is a new DEFINITION
-   * sent under the one name `collide`: a synth already sounding keeps the graph
-   * it was started with and still answers its own `gate`, and only the next key
-   * uses the new one. So `notNow` is left at its default.
-   * ✅ ONE NAME SINCE 2026-09-30, BECAUSE scsynth ALREADY DOES THE BOOKKEEPING.
-   * This page used a new name per compile (`collide_1`, `collide_2`, ...) and
-   * freed the old ones itself off `/n_end`, because replacing a definition
-   * under a running synth had never been measured. READ in
-   * `server/scsynth/SC_GraphDef.cpp` at commit 19954900: `GraphDef_Define`
-   * takes the old definition out of the table and decrements its `mRefCount`,
-   * every running synth holds one reference (`Graph_Ctor` increments it in
-   * `SC_Graph.cpp`), and `Graph_Dtor` frees the definition when the last synth
-   * on it ends. MEASURED on this engine the same day: a sine on `x` read
-   * 0.0707 rms before and 0.0707 after a filtered saw was sent as `x`, still
-   * answered `/n_set freq 880`, which the new program does not have, and a new
-   * `/s_new x` ran the saw beside it (6 UGens, then 13 with both). So the
-   * page's own copy of that reference counting went, and the checks below
-   * grade the property on every run.
-   *
-   * ── A KEY, AND LETTING IT GO ────────────────────────────────────────────────
-   *
-   * A key sends `/s_new` with `freq` and, where the program declares one,
-   * `gate 1`. What letting go does depends on what the compiler reported:
-   *   a `gate` that an EnvGen reads and a `doneAction: 2`  ->  `/n_set gate 0`
-   *   no gate, and a `doneAction: 2`                       ->  nothing, it ends
-   *   no `doneAction: 2` anywhere                           ->  `/n_free`, a cut
-   * The third is said in the log when it is compiled, because a cut is audible
-   * and a visitor should know it is the program and not the page.
-   *
-   * ── THE KNOBS UNDER THE TEXT ────────────────────────────────────────────────
-   *
-   * 🔴 EVERY CONTROL THE PROGRAM DECLARES, EXCEPT THE ONES A KEY SETS, IS A
-   * KNOB IN ONE ROW UNDER THE TEXT, AND THE SYNTAX IS SuperCollider's OWN.
-   * Asked 2026-09-30 (*"variables in code ... that are under the code and
-   * adjust parameters in real time"*), and settled as real syntax so the text
-   * still runs in a real SuperCollider: an argument, or a NamedControl like
-   * `\rel.kr(1.5, spec: [0.05, 6, \exp])`, whose spec is the knob's range and
-   * warp. `sclang-lite.mjs` reports them as `knobs`, `param-knobs.mjs` draws
-   * them, and a turn sends `/n_set <node> <name> <value>` to every node that is
-   * still sounding on a program that has that control, released ones
-   * included, while a new key sends the knob's value in its `/s_new`.
-   * ⚠️ THE PAD'S `rel` IS A NAMED CONTROL AND NOT AN ARGUMENT ON PURPOSE. An
-   * argument carries no range in the language, so its knob would be drawn
-   * from a guess; a spec is written where the number is, and it is the form
-   * sclang's own GUIs read.
-   * ⚠️ AND A RELEASE IS READ WHEN THE GATE CLOSES. EnvGen takes a segment's
-   * time as the segment starts, so a turn changes the tail of a held note and
-   * of every note after it, and not a tail that has already begun.
+   * A SuperCollider subset compiled to SynthDef bytes in JS (sclang-lite.mjs), played
+   * by the real scsynth in WebAssembly. Compile on load, engine on first touch; a
+   * recompile replaces the one definition `collide` and never cuts a held note.
+   * See lessons/page-collide.md#collide-2
    */
   import { mount, guard, el } from '/shell/shell.mjs';
   import { ifSelfcheck } from '/shell/selfcheck.mjs';
@@ -140,10 +54,9 @@
     // The index's own line, verbatim, because this page has a diagram.
     what: ONE,
     /**
-     * Four cells and every one moves: a compile takes a different time, a
-     * different program is a different size and a different number of blocks,
-     * and every load is timed. `load` stays empty until the engine exists,
-     * because nothing unmeasured prints as 0.
+     * Four cells that all move. `load` stays empty until the engine exists, because
+     * nothing unmeasured prints as 0.
+     * See lessons/page-collide.md#collide-3
      */
     readout: {
       compile: 'ms',
@@ -168,8 +81,9 @@
   let sent = 0;
 
   /**
-   * Bring scsynth up. The AudioContext is made HERE, synchronously, so a key
-   * press is the gesture that owns it; the boot after it is an await.
+   * Bring scsynth up. The AudioContext is made here, synchronously, so a key press
+   * is the gesture that owns it; the boot after it is an await.
+   * See lessons/page-collide.md#collide-4
    */
   function boot() {
     if (eng) return Promise.resolve(eng);
@@ -184,11 +98,9 @@
   }
 
   // ── what the server says about its nodes ────────────────────────────────────
-  //
-  // `bootScsynth` sends `/notify 1`, so every node start and end comes back.
-  // `/n_end` is consumed here: it is what a check reads to know a note has
-  // really finished rather than gone quiet. Freeing a replaced definition is
-  // the server's own job, see the header.
+  // `bootScsynth` sends `/notify 1`; `/n_end` is read here so a check knows a note
+  // really finished. Freeing a replaced definition is the server's own job.
+  // See lessons/page-collide.md#collide-5
   const ended = new Set();
   /** Every node still on the server, held or releasing, and the program it runs. */
   const live = new Map();
@@ -218,12 +130,9 @@
     }
   }
   /**
-   * 🔴 ONE HUE BOOK FOR THE TEXT AND THE KNOBS, ASSIGNED ON A COMPILE THAT
-   * WORKED AND NEVER ON A KEYSTROKE (`code-lang.mjs`, `createHueBook`). The
-   * code box reads it for each parameter's snippet and this page writes the
-   * same number onto each knob as `--param-hue`, so a name in the text and its
-   * knob are one colour by construction. Only a parameter with a knob gets
-   * one: `freq`, `amp` and `gate` are set by a key and stay plain.
+   * One hue book for the text and the knobs, assigned on a compile that worked, so
+   * a name and its knob share a colour. Key-set `freq`, `amp`, `gate` stay plain.
+   * See lessons/page-collide.md#collide-6
    */
   const book = createHueBook();
   function paintHues() {
@@ -285,9 +194,9 @@
   }
 
   /**
-   * Hand the bytes to scsynth and wait for its own `/done`. Over its ceilings
-   * the engine answers nothing (`synthdef.mjs`, `sclang-lite.mjs`), so the
-   * timeout IS the answer, and it is reported rather than swallowed.
+   * Hand the bytes to scsynth and wait for its `/done`. Over its ceilings the engine
+   * answers nothing, so the timeout is the answer, and it is reported.
+   * See lessons/page-collide.md#collide-7
    */
   async function load(r) {
     const t0 = performance.now();
@@ -309,10 +218,9 @@
   /* The box is as tall as the longest preset, read off the presets rather
      than typed, which is `/fau/`'s rule after its box cut a listing in half. */
   const ROWS = Math.max(...PRESETS.map((p) => p.code.split('\n').length));
-  /* 🔴 THE KIT'S CODE BOX SINCE 2026-09-30 (`demo/shell/code-box.mjs`,
-     `plans/plan-code-editor.md`): the same field textarea, transparent, over
-     the program drawn in SuperCollider's colours, with each knob's parameter
-     in the knob's own hue. */
+  /* The kit's code box (code-box.mjs): a transparent textarea over the program in
+     SuperCollider's colours, each knob's parameter in the knob's hue.
+     See lessons/page-collide.md#collide-8 */
   const source = createCodeBox({
     language: 'sclang',
     rows: ROWS,
@@ -328,9 +236,9 @@
     ...keyRange(),
     base: 48,
     minBase: 24, maxBase: 84,
-    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN (`9c683e2`, asked for every
-       keyboard page). A looped note comes back through `onDown` marked `loop`,
-       with the velocity a MIDI key played it at when the take heard one. */
+    /* `Loop` while the evolution is plugged in. A looped note comes back through
+       `onDown` marked `loop`, with the velocity the take heard.
+       See lessons/page-collide.md#collide-9 */
     loop: 'evolution',
     log: (line, kind) => d.log(line, kind),
     onDown: (note, how, vel) => press(note, vel),
@@ -474,10 +382,9 @@
   };
 
   // ── compiling what was typed, once the typing stops ─────────────────────────
-  //
-  // The kit's idle compile, wired the way `/fau/` wires it: the timer, the
-  // queue and the breathing note in the corner of the text are the module's,
-  // and this page supplies what a compile is. No `notNow`, see the header.
+  // The kit's idle compile, as /fau/ wires it; this page supplies what a compile is.
+  // No `notNow`: a recompile never cuts a held note.
+  // See lessons/page-collide.md#collide-10
   idle = createCompileIdle({
     input: source.input,
     host: source.el,
@@ -486,15 +393,11 @@
 
   // ── the page ────────────────────────────────────────────────────────────────
 
-  /* The text is the picture row, edge to edge, as on `/fau/`. The live scope
-     that sat above it went on 2026-09-30, asked as *"rm waveform from
-     collide"*. */
-  /* 🔴 ON THE PATCHBAY AFTER A PRESS OF JOIN, AND NEVER ON A VISIT
-     (`plans/plan-routing-migration.md` step 5, `engine-node.mjs`). The engine
-     is a node with notes in, sound out and the program in; this browser's MIDI
-     devices come with it. Beside the name sit the control and the badge that
-     says whether a keyboard linked in from `/patchbay/` is arriving, which is
-     the owner's *"visual indication"* rather than a patch view. */
+  /* The text is the picture row, edge to edge, as on /fau/.
+     See lessons/page-collide.md#collide-11 */
+  /* On the patchbay after a press of Join, never on a visit (engine-node.mjs): notes
+     in, sound out, the program in, plus a badge for a linked keyboard arriving.
+     See lessons/page-collide.md#collide-12 */
   const bay = createEngineNode({
     slug: 'collide', label: 'collide', accepts: ['note'], program: { language: 'sclang' },
     playing: () => !!eng && !!current, log: (line, kind) => d.log(line, kind),
@@ -530,10 +433,9 @@
     caption: 'The text becomes a SuperCollider synth definition in this tab, and SuperCollider\'s '
       + 'own server, compiled to WebAssembly, plays it.',
     nodes: [
-      /* ⚠️ NO MIDI KEYBOARD MACHINE. It was drawn the way `/fau/` draws one and
-         came out as a slab the height of the Browser holding one box, and on a
-         phone a screen of nothing (shot 2026-09-30). The picture is about the
-         compile path; what a key sends is in the scsynth note. */
+      /* No MIDI keyboard machine: the picture is about the compile path, and what a key
+         sends is in the scsynth note.
+         See lessons/page-collide.md#collide-13 */
       { id: 'br', label: 'Browser', sub: 'phone or laptop', kind: 'here', tech: 'browser',
         children: [
           { id: 'box', label: 'text box', sub: 'a function literal', tech: 'browser',
@@ -616,15 +518,14 @@
       panel.shape().join(' '));
 
     /* ── the knob row, before any sound ──────────────────────────────────────
-       🔴 READ OFF THE SCREEN, NOT OFF THE COMPILE: the compiler's own list is
-       graded by `sclang-lite-test.mjs`, and what this page can get wrong is
-       drawing it. `display` rather than `hidden`, which is a fact about an
-       attribute and not about what is drawn. */
+       Read off the screen: the compiler's list is graded by sclang-lite-test.mjs.
+       `display` rather than `hidden`, which says nothing about what is drawn.
+       See lessons/page-collide.md#collide-14 */
     const drawn = () => getComputedStyle(knobRow).display !== 'none';
     const onRow = () => [...knobRow.querySelectorAll('.pos-knob[data-param]')];
     const relKnob = () => knobRow.querySelector('.pos-knob[data-param="rel"]');
-    /* Every preset has knobs since 2026-09-30 (*"add knobs to all patches what
-       mak sense"*): the Pad's are rel, cutoff and detune, in the code's order. */
+    /* The Pad's knobs are rel, cutoff and detune, in the code's order.
+       See lessons/page-collide.md#collide-15 */
     d.assert('under the Pad\'s text is one row with three knobs, rel, cutoff and detune, and rel starts where the code says, 1.50',
       drawn() && onRow().map((k) => k.dataset.param).join(' ') === 'rel cutoff detune' && !!relKnob()
         && relKnob().querySelector('.pos-knob-v').textContent === '1.50' && knobs.value('rel') === 1.5,
@@ -633,11 +534,9 @@
       /\\rel\.kr\(1\.5, spec: \[0\.05, 6, \\exp\]\)/.test(PRESETS[0].code)
         && relKnob()?.getAttribute('title') === 'rel, 0.05 to 6, exp',
       relKnob()?.getAttribute('title') ?? 'no knob');
-    /* 🔴 ONE HUE, READ OFF THE SCREEN ON BOTH SIDES. The snippet's
-       `--param-hue` is the code box's, the knob's is this page's, and the
-       two have to be the same number from the same book; the knob's name is
-       drawn in the ink its arc is. `freq` and `gate` are parameters in the
-       text and have no knob, so they carry no hue. */
+    /* One hue, read off the screen on both sides: the snippet's `--param-hue` and the
+       knob's must match. `freq` and `gate` have no knob and carry no hue.
+       See lessons/page-collide.md#collide-16 */
     /* The arc eases to a new stroke over 120 ms (`.pos-knob-arc`), so the hue
        it was just given is read once that has run. */
     await sleep(150);
@@ -661,12 +560,9 @@
     const litAfter = snip('rel')?.dataset.active;
     d.assert('holding the rel knob lights rel\'s text in the box and nothing else, and letting go puts it out',
       litHeld && litAfter === undefined, `held ${litHeld ? 'lit' : 'not lit'}, after ${litAfter ?? 'out'}`);
-    /* 🔴 THE ROW DOES NOT MOVE THE KEYS. Asked 2026-09-30: *"make the area h
-       for thise buttons fixed so no junmp"*. The keys' top is read with the
-       Pad's knobs and with a program that has none.
-       ⚠️ THE EMPTY ROW WAS THE GROWL UNTIL EVERY PRESET GOT KNOBS, the same
-       day, so the empty case is a program typed with no control a knob could
-       turn, compiled straight through the queue as the checks further down do. */
+    /* The knob row has a fixed height, so the keys do not jump: their top is read with
+       the Pad's knobs and with a typed program that has none.
+       See lessons/page-collide.md#collide-17 */
     const keysTop = () => panel.keys.getBoundingClientRect().top;
     const withKnob = keysTop();
     {
@@ -699,9 +595,9 @@
       idle.error());
     d.assert('and the corner says it did not compile, standing still with the reason in its title',
       idle.shown() === NOTE_SAYS.error && idle.el.title === idle.error(), `"${idle.shown()}"`);
-    /* 🔴 THE CODE BOX'S ONE INVARIANT, READ OFF THE RENDERED ELEMENTS, after a
-       typed edit: the coloured layer holds exactly the textarea's text, at
-       the textarea's metrics, and a refused compile gave no hue away. */
+    /* The code box's invariant after a typed edit: the coloured layer holds exactly
+       the textarea's text at its metrics, and a refused compile gave no hue away.
+       See lessons/page-collide.md#collide-18 */
     {
       const cs = (e) => getComputedStyle(e);
       const PROPS = ['font-size', 'line-height', 'padding-top', 'padding-left', 'white-space'];
@@ -715,8 +611,8 @@
     }
 
     // ── the engine ───────────────────────────────────────────────────────────
-    // 🔴 WHAT GRADES THE COMPILER. Under `?selfcheck=1` only: this starts a
-    // sound device and plays notes, which a visit never does.
+    // What grades the compiler. Under `?selfcheck=1` only: it starts a sound device.
+    // See lessons/page-collide.md#collide-19
     await applyPatch(0);
     await arm();
     d.assert('SuperCollider came up and took the Pad, answering /done to /d_recv',
@@ -726,28 +622,23 @@
        MIDI devices, so nothing reaches a relay and the browser is asked for no
        MIDI port (`engine-node.mjs`). */
     await bay.check(d.assert);
-    /* ⚠️ ASKED WITH THE ENGINE UP, because before it exists nothing can be
-       sent at all and "a refusal sent nothing" would be true of any page. */
+    /* Asked with the engine up: before it exists "a refusal sent nothing" is trivially true.
+       See lessons/page-collide.md#collide-20 */
     const sentBefore = sent, onServer = current;
     typeInto(`${PRESETS[0].code.replace('gate, doneAction', 'gate, doneAction: 2, mull: 3, x')}`);
     await idle.settled();
     d.assert('with the engine up, a refused program sends the server nothing and the Pad stays on it',
       sent === sentBefore && current === onServer && /mull/.test(idle.error()),
       `${sent - sentBefore} sends, ${current?.name} still on the server, ${idle.error()}`);
-    /* 🔴 THE METER READS ZERO WITH NOTHING PLAYING, OR NOTHING BELOW MEANS
-       ANYTHING. A meter stuck at a level would pass every "it made a sound". */
+    /* The meter reads zero with nothing playing, or nothing below means anything.
+       See lessons/page-collide.md#collide-21 */
     const silent = await level();
     d.assert('with nothing playing, the meter on the engine\'s output reads silence',
       silent === 0, silent.toFixed(6));
 
-    /* ⚠️ ONE ASSERT PER STEP, AND EVERY RELEASE IS SPLIT IN TWO. The harness
-       stops collecting after 2.0 s with no new assert, and the longest release
-       here is 1.5 s on top of its hold, so a single assert at the end of each
-       preset lost everything after the first one on the first run here (13
-       asserts, green, and the presets never graded). Every preset is held
-       350 ms, let go, heard 200 ms later still sounding and quieter, and then
-       heard to end by itself: the owner's rule for these patches is that the
-       key opens and closes them. */
+    /* One assert per step, releases split in two: the harness stops 2.0 s after the
+       last assert. Each preset is held 350 ms, heard quieter 200 ms after, then ends.
+       See lessons/page-collide.md#collide-22 */
     for (const [i, p] of PRESETS.entries()) {
       if (i > 0) await applyPatch(i);
       const s = await eng.status();
@@ -776,13 +667,9 @@
     }
 
     /* ── the knob, on the real engine ─────────────────────────────────────────
-       🔴 DRIVEN THROUGH THE KNOB'S OWN KEYS, NOT `knobs.set` AND NOT `turn()`:
-       a keydown on the dial is what a person's arrow key does, and it goes
-       through the component, the warp, `onChange` and the page's `/n_set`.
-       Home is the bottom of the range, and eight Page Ups are 80 of 127 steps
-       of the travel, which on 0.05 to 6 exponential is 1.02 s.
-       🔴 AND WHAT IS MEASURED IS THE SERVER'S OWN ANSWER: the time from the
-       gate closing to `/n_end`, which is how long the release really took. */
+       Driven by keydown on the dial: Home, then eight Page Ups is 1.02 s on the 0.05
+       to 6 exp range. Measured as the server's gate close to `/n_end` time.
+       See lessons/page-collide.md#collide-23 */
     await applyPatch(0);
     const dial = () => relKnob().querySelector('.pos-knob-dial');
     const key = (k, n = 1) => {
@@ -828,13 +715,9 @@
     dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     d.assert('and a double press puts it back where the program wrote it', knobs.value('rel') === 1.5,
       String(knobs.value('rel')));
-    /* 🔴 THE INVISIBLE HAND TURNS IT ON THE SERVER. Asked 2026-09-30: *"add
-       invisible hands to these cutoff buttons"*. From the bottom of the
-       travel, a held note, the hand's button pressed and pressed again, and
-       then the server is ASKED what `rel` is on that node with `/s_get`: its
-       answer is the knob's value, and the page counted `/n_set`s from the
-       hand. A hand that moved the dial and not `onChange` sends none, and the
-       server would still say 0.05. */
+    /* The invisible hand turns it on the server: `/s_get rel` on the held node must
+       read the knob's value, and the page counts the hand's `/n_set`s.
+       See lessons/page-collide.md#collide-24 */
     key('Home');
     const handNode = sound(60);
     await sleep(80);
@@ -855,15 +738,12 @@
     key('Home');
     dial().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     await waitEnd(handNode, 2000);
-    /* 🔴 A LAG THAT REALLY LAGS. `\lvl.kr(0.1, 0.5)` is a LagControl on the
-       server, so the level falls away over half a second (60 dB in the lag
-       time) after the knob drops to 0 rather than at once. */
-    /* ⚠️ FROM HERE ON A PROGRAM IS COMPILED STRAIGHT THROUGH THE QUEUE AND NOT
-       TYPED, since 2026-09-30. The idle compile is graded above; typed, each
-       of these three paid its 600 ms wait and the note's 800 ms showing, and
-       with the hand and the Loop checks added the tail of this block ran past
-       the harness's 24 s ceiling and was dropped with the run still green
-       (34 asserts where 46 were written). */
+    /* `\lvl.kr(0.1, 0.5)` is a LagControl, so the level falls over half a second
+       (60 dB in the lag time) after the knob drops to 0.
+       See lessons/page-collide.md#collide-25 */
+    /* From here a program is compiled straight through the queue, not typed, so the
+       block stays inside the harness's 24 s ceiling.
+       See lessons/page-collide.md#collide-26 */
     const compileNow = async (text) => { source.set(text); await serial(() => build(text, 'the check')); };
     await compileNow('{ SinOsc.ar(440, mul: \\lvl.kr(0.1, 0.5)) }');
     const lagged = nextNode;
@@ -881,9 +761,9 @@
     held.delete(69);
     d.assert('and 1.2 s later it is gone, so the knob did reach it', fallen < 1e-3, `${fallen.toFixed(6)} rms at 1.3 s`);
 
-    /* 🔴 THE ARITHMETIC, GRADED BY THE ENGINE. A multiply written as an add
-       is a well formed file that loads and plays (research §9.3b), and the
-       node test cannot hear it. A sine at amplitude a has an RMS of a / sqrt 2. */
+    /* The arithmetic, graded by the engine: a multiply written as an add still plays.
+       A sine at amplitude a has an RMS of a / sqrt 2.
+       See lessons/page-collide.md#collide-27 */
     await compileNow('{ |amp = 0.1| SinOsc.ar(440, mul: amp) }');
     const tone = nextNode;
     sound(69);
@@ -891,11 +771,9 @@
     const at1 = await level();
     d.assert('mul: multiplies: amp 0.1 reads 0.0707 rms',
       Math.abs(at1 - 0.1 / Math.SQRT2) < 0.007, `${at1.toFixed(4)} at 0.1`);
-    /* 🔴 REPLACING THE DEFINITION UNDER A SOUNDING NOTE, graded on every run.
-       The next program is sent under the same name while the tone plays. The
-       tone must keep its level, and must still answer `amp`, which the new
-       program does not have: if the node had moved to the new graph, amp 0
-       would change nothing and it would go on reading 0.1414. */
+    /* Replacing the definition under a sounding note: the tone keeps its level and
+       still answers `amp`, which the new program lacks, so amp 0 must read silence.
+       See lessons/page-collide.md#collide-28 */
     await compileNow('{ SinOsc.ar(440, 0, 0.05 + 0.05 * 2) }');
     const kept = await level();
     d.assert('a new program under the same name leaves the sounding note on its old graph, at the same level',

@@ -27,10 +27,10 @@
   import { createMix, pinkNoise } from '/shell/tuner-mix.mjs';
   import { createReel, field, font, drawWordmark, drawLowerLine, W, H, X, TEXT_W, SAFE_TOP, C } from '/shell/reel.mjs';
 
-  // A radio reel: a needle sweeps a dial across three of our own recordings,
-  // through the noise and the whistle between them, by /radio/tuner/'s maths.
-  // Every sound and every frame is a function of the deck position, so a seek,
-  // a scrub and a recorded take all hear and show the same thing.
+  // A radio reel: a needle sweeps a dial across three of our own recordings, by
+  // /radio/tuner/'s maths. Every sound and frame is a function of deck position,
+  // so a seek, a scrub and a recorded take all hear and show the same thing.
+  // See lessons/page-social.md#social-1
   const MEDIA = 'https://positron-station.kristjan-jansen.workers.dev/media/';
   // `from` is where in the recording the reel starts (s); `rate` is bytes a
   // second (128 kbit/s MP3, Ida's ADTS measured as 7,637,985 B over 189.5 s).

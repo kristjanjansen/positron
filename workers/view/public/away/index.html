@@ -21,34 +21,10 @@
 <link rel="stylesheet" href="/shell/shell.css">
 
 <script type="module">
-  // demo/away/index.html: listen to the Circuit in another building.
-  //
-  // Asked 2026-09-30: *"make other demo for this, 'away', do not touch knobs
-  // tdemo. allow me just to listen in circuit audio from pi in wave visualizer"*,
-  // then *"use stnd waverform display not video canvas on away"*. The picture is
-  // the kit's `createWaveView`, handed the last few seconds of what arrived.
-  //
-  // 🔴 THE CIRCUIT IS AN INPUT IN A ROOM OF ITS OWN, NOT THE BOARD'S ONE SLOT.
-  // Asked the same day: *"can we support both yoshimi and circuit?"*. The board
-  // streams each hardware input into `<room>-<name>` (rig/board/inputs.mjs), so
-  // this page joins `studio-1-circuit` and Yoshimi in `studio-1` is untouched by
-  // anything here, and the other way round.
-  //
-  // 🔴 LISTEN HOLDS A LEASE, AND THAT IS WHAT RUNS THE CAPTURE. The board cannot
-  // see a listener, so while Listen is on this page says `input.want` every
-  // `RENEW_MS` and the board stops capturing a minute after the last one. A
-  // visit alone starts nothing; it joins the room and shows whether the board is
-  // there.
-  //
-  // 🔴 A NODE ON THE PATCHBAY SINCE 2026-10-06 (plans/plan-routing-migration.md
-  // step 5). The page says what it is in the studio's discovery room through
-  // `bay-node.mjs`: its keys as a MIDI out and its picture as an audio in, on a
-  // site of this tab's own. It JOINS ON A PRESS (Listen, or a key a person
-  // plays), never on load, so a visit puts nothing on the owner's desk. The
-  // lease is `openers.mjs`'s `createLease`, the one the patchbay uses, and the
-  // picture wears `link-badge.mjs`'s word while Listen is on, counted from the
-  // frames that reached this page. No patch view: the owner's answer on the
-  // stage was *"perhaps just visual indication of picture happening"*.
+  // demo/away/index.html: listen to the Circuit in another building. It joins the input
+  // room `studio-1-circuit`; Listen holds a lease that runs the board's capture, and the
+  // page joins the bay as a node only on a press, never on load.
+  // See lessons/page-away.md#away-1
   import { mount, guard, el } from '/shell/shell.mjs';
   import { createBoard } from '/shell/board.mjs';
   import { createWaveView } from '/shell/wave-view.mjs';
@@ -73,40 +49,32 @@
   const SECONDS = 4;
   // A sample at or past this is on the rail. 32767 / 32768.
   const CLIP = 32767 / 32768;
-  // Well inside the board's 60 s lease, so one lost message costs nothing.
-  // ⚠️ THE NUMBER IS `openers.mjs`'s `RENEW_MS` NOW, which is this page's own
-  // 20 s lifted into the kit; `createLease` defaults to it.
-  // 10 ms frames on the direct path unless `?frame=20`, which is there to
-  // measure one against the other (plans/plan-away-webrtc.md §5.3, P3).
+  // Well inside the board's 60 s lease; `createLease` defaults to `RENEW_MS`.
+  // 10 ms frames on the direct path unless `?frame=20`, kept to compare the two.
+  // See lessons/page-away.md#away-2
   const DIRECT_FRAME_MS = q.get('frame') === '20' ? 20 : 10;
 
   const d = mount({
     name: 'away',
     what: 'Play and listen to a Novation Circuit in another building, through a Raspberry Pi that captures its sound and draws it as it arrives.',
     readout: { level: 'dBFS', clipped: '', buffer: 'ms', lag: 'ms', via: '', 'round trip': 'ms' },
-    // 🔴 LISTEN AND ONLINE ARE ONE BUTTON, asked 2026-09-30: *"listen + online
-    // is same button"*. The kit's presence button, wearing the badge
-    // `createBoard` already drives, so the face says whether the board is
-    // there and a press starts or stops listening. Built below, once the board
-    // exists, and appended to the control row where the harness presses.
+    // Listen and online are one button: the kit's presence button with the badge
+    // `createBoard` drives. Built below once the board exists, in the control row.
+    // See lessons/page-away.md#away-3
     controls: [],
   });
   guard(d);
 
   const board = createBoard({
     room: ROOM,
-    // ⚠️ NO `relay:` FROM THE QUERY SINCE 2026-10-06. This page handed
-    // `createBoard` its own `?relay=` unchecked, so a link could point it at
-    // any relay. `wire.mjs` reads `?relay=` itself and honours only a ws://
-    // address on this machine, which is what the stand-in board needs.
+    // No `relay:` from the query here: `wire.mjs` reads `?relay=` itself and honours only
+    // a ws:// address on this machine.
+    // See lessons/page-away.md#away-4
     of: 'Raspberry Pi',
     showName: false,
-    // 🔴 80 ms, DOWN FROM 160, BECAUSE THE LUMPS ARE GONE. MEASURED 2026-09-30:
-    // with arecord at its default 125 ms period the frames arrived in bursts
-    // (p90 gap 117 ms) and 160 was what rode them; at a 10 ms period the gaps
-    // read p50 19.9, p90 23.2, max 94.5. The playout raises its own floor when
-    // it runs dry, up to `maxCushionMs`, so a start that is too low costs one
-    // click and then corrects itself.
+    // 80 ms start cushion: at a 10 ms arecord period frame gaps read p50 19.9, p90 23.2 ms.
+    // The playout raises its own floor up to `maxCushionMs` when it runs dry.
+    // See lessons/page-away.md#away-5
     cushionMs: 80,
     maxCushionMs: 250,
     direct: true,
@@ -136,13 +104,10 @@
   // ── the picture ───────────────────────────────────────────────────────────
   const host = el('div', 'away-pic');
   const wave = createWaveView(host, { height: 160, label: `the last ${SECONDS} seconds from the board` });
-  /* 🔴 THE LINK'S WORD ON THE PICTURE IT FEEDS: STARTING, RECEIVING or STALLED,
-     from the frames that reached THIS page, the far side of the wire. The
-     video panel's own tag look (`.pos-vp-tag`), top left, hidden while Listen
-     is off. The presence badge beside the name says whether the board is
-     there; this says whether its sound is arriving here, which is a different
-     question with a different answer when the board is up and capturing
-     nothing. */
+  /* The link's word on the picture: starting, receiving or stalled, from frames that
+     reached this page. The presence badge says whether the board is there; this says
+     whether its sound arrives. Hidden while Listen is off.
+     See lessons/page-away.md#away-6 */
   const tag = el('div', 'pos-vp-tag away-tag');
   tag.hidden = true;
   const linkBadge = createLinkBadge({ count: () => frames,
@@ -150,17 +115,10 @@
   tag.append(linkBadge.el);
   host.append(tag);
 
-  // ── playing it ───────────────────────────────────────────────────────────
-  //
-  // 🔴 A PART IS A CHANNEL, AND A DRUM IS ALSO A NOTE. `plans/plan-circuit-model12.md`
-  // §3.1 and §3.2: Synth 1 on channel 1, Synth 2 on channel 2, all four drums on
-  // channel 10 with Drum 1 at note 60 and Drum 2 at 62 (+2, +2, +1, not even).
-  // So on a drum part every key plays that one drum, and the key only chooses
-  // how hard.
-  // ⚠️ THE BOARD DECIDES WHAT REACHES THE INSTRUMENT, NOT THIS PAGE. It lets
-  // note on, note off and all notes off through on 1, 2 and 10 and refuses the
-  // rest (rig/board/inputs.mjs `midiVerdict`), because a room name is not a
-  // password and the Circuit has no factory reset.
+  // A part is a channel: Synth 1 on 1, Synth 2 on 2, drums on 10 (plan-circuit-model12.md
+  // §3.1), so on a drum part every key plays that drum and only chooses velocity. The
+  // board's `midiVerdict` decides what reaches the instrument, not this page.
+  // See lessons/page-away.md#away-7
   const PARTS = {
     s1: { ch: 1 }, s2: { ch: 2 },
     d1: { ch: 10, note: 60 }, d2: { ch: 10, note: 62 },
@@ -198,19 +156,10 @@
     onPick: (v, name) => { part = PARTS[v]; d.log(`playing ${name}`); showPatch(); },
   });
 
-  // ── the patch ────────────────────────────────────────────────────────────
-  //
-  // 🔴 A PROGRAM CHANGE ON CHANNEL 1 OR 2, AND ONLY THERE. Asked 2026-09-30:
-  // *"use instument panel for away and patch selector"*. 📄 The Circuit's own
-  // table (`plans/plan-circuit-model12.md` §3.7): on 1 and 2 a program change
-  // selects one of 64 synth patches into RAM; on 16 it selects a SESSION. The
-  // board's gate (`midiVerdict` in rig/board/inputs.mjs) is what enforces that,
-  // not this page. A drum part has no patch here: drums change by CC, which
-  // the gate refuses, so the picker is switched off on one.
-  // ⚠️ IT OPENS EMPTY, BECAUSE NOTHING SAYS WHICH PATCH THE CIRCUIT IS ON.
-  // The board sends nothing back about the instrument's state, so a name here
-  // before a choice would be a claim nobody measured. It shows what THIS page
-  // last sent to each synth.
+  // Program change on channel 1 or 2 only selects a synth patch into RAM; on 16 it would
+  // select a session, which `midiVerdict` refuses. Drum parts have no patch here. It opens
+  // empty: the board reports no instrument state, so it shows what this page last sent.
+  // See lessons/page-away.md#away-8
   const PATCHES = Array.from({ length: 64 }, (_, i) => `Patch ${i + 1}`);
   const chosen = { 1: null, 2: null };
   let lastPatchBytes = null;
@@ -249,10 +198,9 @@
     ...keyRange(),
     base: 48,
     full: true,
-    /* 🔴 `Loop` WHILE THE EVOLUTION IS PLUGGED IN, asked 2026-09-30 for every
-       keyboard page. A looped note comes back through `onDown` marked `loop`, so
-       it goes to the Circuit by exactly the route a finger does, and a note the
-       take heard over MIDI keeps the velocity it was played with. */
+    /* `Loop` while the Evolution is plugged in: a looped note comes back through `onDown`
+       marked `loop` and reaches the Circuit by the same route as a finger.
+       See lessons/page-away.md#away-9 */
     loop: 'evolution',
     log: (line, kind) => d.log(line, kind),
     onDown: (note, how, vel) => { kb.lightNote(note, true); joinBay(); noteOn(note, vel ?? VEL); },
@@ -260,10 +208,9 @@
     onPanic: () => panic(),
   });
 
-  // ── the instrument ───────────────────────────────────────────────────────
-  // Asked 2026-09-30 with the patch selector. The kit's panel owns the order,
-  // the seams and the insets: the picture, the part row, the keys, and a plate
-  // with ONLINE beside the name and the patch at the far end, unlabelled.
+  // The kit's panel owns order, seams and insets: picture, part row, keys, and a plate
+  // with ONLINE beside the name and the patch at the far end.
+  // See lessons/page-away.md#away-10
   const panel = createInstrumentPanel({
     viz: host,
     rows: [[[partPick.el, midiBtn], { align: 'between' }]],
@@ -272,11 +219,10 @@
   });
   d.stack.add(panel.el);
 
-  // ── MIDI in, from a keyboard on this machine ─────────────────────────────
-  // Asked for on a press, or opened by itself only when the browser has
-  // ALREADY said yes: `requestMIDIAccess` is a prompt, and a visit asks nothing.
-  // Every incoming note goes to the part chosen above, whatever channel the
-  // keyboard itself sends on.
+  // MIDI in from a keyboard on this machine: asked for on a press, or opened by itself only
+  // when the browser already said yes, since `requestMIDIAccess` prompts. Every note goes
+  // to the chosen part, whatever channel the keyboard sends on.
+  // See lessons/page-away.md#away-11
   let midi = null;
   function openMidi() {
     if (midi) return midi;
@@ -300,19 +246,10 @@
   })();
   addEventListener('pagehide', () => panic());
 
-  // ── lag: key press to sound ──────────────────────────────────────────────
-  //
-  // 🔴 MEASURED ON THE SOUND, NOT ADDED UP FROM PARTS. Asked 2026-09-30:
-  // *"show lag"*. A press stamps the clock and remembers how loud the last
-  // 200 ms were; the first frame that comes back at least twice that loud (and
-  // above a floor) is the note arriving. Its arrival time plus the cushion the
-  // playout is holding is when it leaves the speakers, which is what a player
-  // feels. Adding a ping to a buffer would be a number about the pipe, not
-  // about this note.
-  // ⚠️ OVER A LOUD LOOP IT CAN MISS OR MISFIRE, and it says so rather than
-  // guessing: a Circuit pattern already playing can hide a quiet note or land
-  // its own beat inside the window. No onset in `ONSET_WAIT_MS` leaves the cell
-  // alone and says why in the log.
+  // Lag is measured on the sound: the first frame at least twice as loud as the last 200 ms
+  // marks the note's arrival, plus the playout cushion. Over a loud loop it can miss; no
+  // onset in `ONSET_WAIT_MS` leaves the cell alone and says why in the log.
+  // See lessons/page-away.md#away-12
   const ONSET_WAIT_MS = 1500;
   const ONSET_FLOOR = 0.01;
   const isOnset = (frameRms, baseRms) => frameRms > Math.max(ONSET_FLOOR, baseRms * 2);
@@ -383,9 +320,8 @@
   }
   requestAnimationFrame(redraw);
 
-  // ── what the board says it is playing ────────────────────────────────────
-  // What the board is capturing goes in the log when it changes, not in a
-  // cell: asked 2026-09-30, *"rm playing from readout"*.
+  // What the board is capturing goes in the log when it changes, not in a cell.
+  // See lessons/page-away.md#away-13
   function showPath() {
     const st = board.stats();
     d.set('via', listening ? st.via : '', st.via === 'relay' ? 'warn' : 'ok');
@@ -409,15 +345,10 @@
     return r;
   }
 
-  // ── Listen ───────────────────────────────────────────────────────────────
-  // ⚠️ MUTE DISCONNECTS THE SPEAKERS, IT DOES NOT SUSPEND THE CONTEXT.
-  // board.mjs reads a suspended context as the browser refusing sound and says
-  // "tap anywhere", which would be a false instruction after a deliberate mute.
-  // ⚠️ AND MUTE STOPS RENEWING RATHER THAN SAYING `input.stop`, because somebody
-  // else may be listening to the same input; the lease lapses on its own.
-  // ⚠️ THE LEASE IS `createLease` FROM `openers.mjs`, the patchbay's own, which
-  // was lifted out of this page. It asks at once and renews every `RENEW_MS`;
-  // the ask is wrapped so each answer still says what the board is capturing.
+  // Mute disconnects the speakers rather than suspending the context (board.mjs reads that
+  // as a blocked browser), and stops renewing rather than sending `input.stop`, since
+  // others may listen. The lease is `createLease` from `openers.mjs`.
+  // See lessons/page-away.md#away-14
   let listening = false, lease = null;
   const wantAsk = async (m, type, ms) => {
     const r = await board.ask(m, type, ms);
@@ -452,19 +383,18 @@
     }
   });
 
-  // ── a node on the patchbay ───────────────────────────────────────────────
-  //
-  // 🔴 THE DISCOVERY ROOM IS THE BOARD'S MAIN ROOM, NOT THE INPUT ROOM THIS PAGE
-  // LISTENS IN. `?room=` here names the input room (`studio-1-circuit`), so
-  // the bay room is that name without its `-<input>`, which is where the Pi
-  // and `/patchbay/` meet. Under a harness with no `?room=` it is the run's
-  // own room (`roomFor`), never `studio-1`.
+  // The discovery room is the board's main room: `?room=` minus its `-<input>`, where the
+  // Pi and `/patchbay/` meet. Under a harness with no `?room=` it is `roomFor`'s room.
+  // See lessons/page-away.md#away-15
   const askedRoom = q.get('room');
   const BAY_ROOM = askedRoom
     ? roomFor({ slug: 'away', search: `?room=${askedRoom.endsWith(`-${INPUT}`) ? askedRoom.slice(0, -INPUT.length - 1) : askedRoom}` })
     : roomFor({ slug: 'away' });
-  /** The port the Pi announces for the Circuit's MIDI in (`boardGraph`), on
-   *  site `pi-1` since 2026-10-10 while its room stays `studio-1`. */
+  /**
+   * The port the Pi announces for the Circuit's MIDI in (`boardGraph`), site `pi-1`,
+   * room `studio-1`.
+   * See lessons/page-away.md#away-16
+   */
   const INSTRUMENT_IN = boardPort(INPUT, 'midi-in');
   const SITE = randomSite('away');
   const KEYS_OUT = `${SITE}:keys:out`;
@@ -479,12 +409,9 @@
       { id: `${SITE}:screen:audio`, label: 'away picture', dir: 'in', medium: 'audio' },
     ],
   };
-  /* 🔴 WHAT THIS PAGE ANSWERS WHEN `/patchbay/` ASKS FOR ONE OF ITS LINKS. The
-     keys reach the Circuit in the room this page listens in, always, and that
-     is the one link it has: asked for, it is already open and says so. Any
-     other destination, and a close, is refused in words, because the keys here
-     are a person's hands on one instrument and a remote page does not get to
-     move them somewhere else or take them away. */
+  /* The answer when `/patchbay/` asks for a link: the keys to the Circuit is the one link,
+     already open. Any other destination, and a close, is refused in words.
+     See lessons/page-away.md#away-17 */
   function answerLink({ source, target, open }) {
     if (source !== KEYS_OUT) return { ok: false, why: `${source} is not one of this page’s ports` };
     if (!open) return { ok: false, why: `this page’s keys always play the ${INPUT}, so close the page to stop them` };
@@ -544,10 +471,9 @@
     d.assert('the patch picker sits on the plate with no label', !!patchPick.el.closest('.pos-ipanel-plate') && !patchPick.el.querySelector('.pos-pick-l'));
     d.assert('the four parts are Synth 1, Synth 2, Drums 1 and Drums 2',
       JSON.stringify(Object.values(PARTS).map((p) => [p.ch, p.note ?? null])) === '[[1,null],[2,null],[10,60],[10,62]]');
-    /* `Loop` follows the Evolution, and a loop reaches `board.send`, counted by
-       the board module on the far side of this page: a harness run is refused
-       there, so this is every note that was on its way to the Circuit and
-       nothing was heard. */
+    /* A loop reaches `board.send`, counted by the board module; a harness run is refused
+       there, so this counts notes on their way to the Circuit with nothing heard.
+       See lessons/page-away.md#away-18 */
     await checkEvolutionLoop(d, {
       keys: kb, heard: () => board.refusedToBoard(),
       ports: (names) => offerLoopFor(kb, names, d.log), real: () => midi?.names() ?? [],
@@ -568,11 +494,9 @@
     await bayChecks();
   }, { log: d.log });
 
-  /* 🔴 THE BADGE READS THE FAR SIDE. Run only with frames arriving (the stand-in
-     board holds a listener, so they do under the harness): the page's own
-     badge, started on the frame counter the waveform reads, has to say
-     receiving, and a NEGATIVE CONTROL on a count that never grows must not.
-     Nothing is sent and no lease is taken: the badge is display only. */
+  /* The badge reads the far side: with frames arriving it must say receiving, and a
+     negative control on a count that never grows must not. Nothing is sent, no lease.
+     See lessons/page-away.md#away-19 */
   async function badgeChecks() {
     d.assert('the link badge sits on the picture and is hidden while Listen is off',
       host.contains(tag) && tag.hidden && linkBadge.state() === 'unknown', `${linkBadge.state()}, hidden ${tag.hidden}`);
@@ -591,13 +515,10 @@
     d.assert('and it hides again when the link closes', tag.hidden, linkBadge.state());
   }
 
-  /* 🔴 THE PAGE AS A NODE, GRADED IN THE RUN'S OWN ROOM. A visit joins nothing;
-     the harness joins on purpose and a stand-in patchbay in the same room asks
-     for the page's one link, another destination, and a close, and gets a yes
-     and two refusals in this page's words. A request about a port that is not
-     this page's gets no answer at all, which is the owner rule from the other
-     side. Only against a relay on this machine: a harness has no business
-     holding sockets on the production relay to find this out. */
+  /* The page as a node in the run's own room: a stand-in patchbay asks for its link, another
+     destination and a close, and gets a yes and two refusals; a foreign port gets no answer.
+     Only against a relay on this machine, never the production relay.
+     See lessons/page-away.md#away-20 */
   async function bayChecks() {
     d.assert('a visit joins nothing on the patchbay: no socket, no join and no announce clock',
       !bayOnLoad.joined && !bayOnLoad.joining && !bayOnLoad.ticking, JSON.stringify(bayOnLoad));

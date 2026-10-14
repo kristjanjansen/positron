@@ -1,8 +1,6 @@
-// demo/shell/rt-grains.mjs: the runtime of a `grains` node on /connect/
-// (node-runtime.mjs): /granulator/grains/'s grain ring (grain-ring.mjs
-// `createRingEngine`), on scsynth in the page's one context. What arrives on
-// grains:audio-in is written round its eight second ring; its grains leave on
-// grains:audio-out, and every grain the engine reports is counted.
+// demo/shell/rt-grains.mjs: a `grains` node on /connect/, grain-ring.mjs on the page's scsynth.
+// grains:audio-in is written round an eight second ring; grains leave on grains:audio-out.
+// why: lessons/kit-rt-grains.md#header
 
 import { createRingEngine } from '/granulator/grain-ring.mjs';
 

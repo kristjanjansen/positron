@@ -22,12 +22,9 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <link rel="stylesheet" href="/typist/paper.css">
 <style>
-  /* concepts typist/000, PAPER, 2026-10-11. Asked: *"something which you
-     similar to video panel, and there you have footer with full screen, and
-     the top area is just white paper, white, and black or very dark type in
-     our brand font, and there is also a cursor, a bit more blocky, and the
-     first demo is just something you can type in, maybe a example message"*.
-     Nothing here opens anything and nothing makes a sound (that is 010). */
+  /* Paper: a video-panel-like frame whose top is white paper with dark type in the brand
+     font and a blocky cursor. Nothing here opens anything or makes a sound.
+     See lessons/page-typist.md#typist-19 */
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
@@ -76,11 +73,9 @@
     else if (c.top - line < s.top) sheet.scrollTop -= s.top - (c.top - line);
   }
 
-  // ── the patchbay (asked 2026-10-11, *"can we patchbay 000?"*) ───────────
-  // The keyboard is a node whose typing leaves on `keys:value-out`, shaped
-  // text; the paper takes it on `paper:value-in`. One link, inside this tab.
-  // Every keystroke is one event along it, so the wire pulses as you type;
-  // the paper draws from the textarea as before.
+  // The keyboard node sends typing on `keys:value-out` (text) to `paper:value-in`: one link
+  // in this tab, one event per keystroke, so the wire pulses as you type.
+  // See lessons/page-typist.md#typist-20
   const S = 'web';
   const bay = createBay();
   addNodes(bay, S, ['typing', 'paper'], { deliver: { 'paper:value-in': () => {} } });

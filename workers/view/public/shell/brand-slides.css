@@ -1,20 +1,19 @@
-/* demo/shell/brand-slides.css: the rules only the brand slides need, moved out
-   of slide.css with the slides themselves on 2026-10-06, when the `brand` deck
-   became the blocks of /kit/logo/ (brand-slides.mjs). Each rule is scoped to
-   `.brand-sl`, the class /kit/logo/ puts on every block holding one of these
-   slides, at the weight the `.sl-player` form had, so it still beats the
-   slide's own rules. */
+/* The rules only the brand slides need (brand-slides.mjs). Scoped to
+   `.brand-sl` at the `.sl-player` weight, so they still beat the slide's own
+   rules. */
+/* why: lessons/css-brand-slides.md#file-header */
 
 /* THE LOGO set solid, the three lines one mark, and the wordmarks, which are
    grids of letters, the same way. */
 .brand-sl .sl[aria-label="logo"] .sl-ev,
 .brand-sl .sl[aria-label^="wordmark"] .sl-ev { gap: 0; }
-/* THE + AS A SUPERSCRIPT, as the positron is written, β⁺. Asked 2026-10-05:
-   *"+ as superscript?"*. A span raised and made smaller rather than U+207A,
-   which the vendored subsets do not carry. */
+/* The + as a superscript, a raised smaller span, because the vendored subsets
+   do not carry U+207A. */
+/* why: lessons/css-brand-slides.md#brand-sl-sl-aria-label-logo-sl-line-sl-hi */
 .brand-sl .sl[aria-label="logo"] .sl-line .sl-hi { font-size: 0.55em; vertical-align: 0.75em; line-height: 0; }
-/* ONE EMPTY LINE between β+ and the wordmark, asked 2026-10-06 as *"add one
-   line bettween β+ and workmark"*, a line of the wordmark's own step (`1lh`). */
+/* One empty line between β+ and the wordmark, a line of the wordmark's own
+   step (`1lh`). */
+/* why: lessons/css-brand-slides.md#brand-sl-sl-aria-label-logo-sl-line-sl-line-not */
 .brand-sl .sl[aria-label="logo"] .sl-line + .sl-line:not(.sl-line + .sl-line + .sl-line) { margin-top: 1lh; }
 
 /* THE ICON SLIDES (`favicon`, `appIcon`), one column per mark shown, each
@@ -23,7 +22,7 @@
 .dk-col { display: flex; flex-direction: column; align-items: center; gap: 4cqh; }
 .dk-icons[data-n="1"] { --dk-n: 1; }
 .dk-sizes { display: flex; align-items: flex-end; gap: 3cqh; }
-/* the two app icons stand further apart, *"add hor gap a biiit"* */
+/* why: lessons/css-brand-slides.md#dk-apps */
 .dk-apps { gap: 7cqh; }
 .dk-real { display: block; }
 .dk-app { display: flex; flex-direction: column; align-items: center; gap: 6px; font: 400 11px/1 var(--sans); color: var(--fg); }

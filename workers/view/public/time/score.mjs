@@ -1,15 +1,7 @@
-// demo/time/score.mjs: the SCORE tab of /time/, which was /score/.
-//
-// One file format for scores written in different languages; the line that is
-// sounding lights up. The page's body moved here; the history of each decision
-// is in git under `demo/score/index.html`. Its stylesheet (`.sc`) is in
-// `demo/time/index.html`, because a page owns its own sheet.
-//
-// 🔴 THE FIVE SCORES ARE A CHOICE IN THIS TAB, NOT FIVE `.pos-controls`
-// BUTTONS. The harness pressed all five on the old page and asserted nothing
-// about the presses; here the check picks each one and asserts the score block
-// held its twelve lines through all five, which is the thing the old page's own
-// comment says the fixed height is for.
+// SCORE tab: one file format for scores written in different languages; the
+// sounding line lights up. The five scores are a choice in this tab, and the
+// check asserts the score block holds its twelve lines through all five.
+// See lessons/page-time.md#time-4
 
 import { el } from '/shell/shell.mjs';
 import { createChoice } from '/shell/choice.mjs';
@@ -244,7 +236,8 @@ export function build({ panel, log }) {
         describeRow: (r) => [`${Math.round(r.payload?.bpm ?? 0)} bpm`, 'read off the score'] },
     ],
   });
-  // 🔴 THE BAR AND THE STRIP ARE ONE SURFACE, and the score goes under them.
+  // The bar and the strip are one surface, and the score goes under them.
+  // See lessons/page-time.md#time-5
   const pair = createGlue(bar.el, view.surface);
 
   // ── highlighting, driven by the deck and never by a timer ───────────────
@@ -357,10 +350,9 @@ export function build({ panel, log }) {
   load(0);
 
   /**
-   * HOW IT WORKS, read off this file, `timeline/csound.mjs` and
-   * `timeline/score.mjs`: Csound text compiled into rows, a MIDI part written
-   * as rows, both into one document, the document loaded into a nest of one
-   * deck per part, and the deck's `actuate()` lighting the document's lines.
+   * How it works: Csound text and a MIDI part compiled into one document's rows,
+   * loaded into one deck per part, whose `actuate()` lights the document's lines.
+   * See lessons/page-time.md#time-6
    */
   const how = tabDiagram(panel, () => ({
     caption: 'A score is compiled once into one document, and the document is what plays.',
@@ -403,7 +395,9 @@ export function build({ panel, log }) {
 
   return {
     deck: parent, bar,
-    // ⚠️ TWO FRAMES ON: a strip fitted before its panel has laid out fits its whole range into the width it had then, MEASURED on the first 1280 shot as 20 s drawn in about 160 px.
+    // Two frames on: a strip fitted before its panel lays out fits its range into
+    // the width it had then (20 s in about 160 px at 1280).
+    // See lessons/page-time.md#time-7
     show() {
       how.draw();
       requestAnimationFrame(() => requestAnimationFrame(() => { view.strip.fit(); view.strip.invalidate(); }));

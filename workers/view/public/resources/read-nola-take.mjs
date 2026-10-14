@@ -1,27 +1,7 @@
-// demo/resources/read-nola-take.mjs. What a pair of hands actually does, read
-// off a take recorded on /nola/.
-//
-//   node demo/resources/read-nola-take.mjs ~/Downloads/nola-take-*.json
-//
-// 🔴 WHY THIS EXISTS. Every timing number on that page is a guess and
-// `research/chord-learning-2026-09-23.md` says so in its own words: nobody
-// played any of it, its session was generated, and it put a factor of ten
-// between a chord held and a chord passed through BY CONSTRUCTION. Its own
-// closing section names the three things only a person can settle, and this is
-// the tool that settles them:
-//
-//   1. how long a rolled chord takes on this desk, assumed 30 to 120 ms
-//   2. the gap between a chord MEANT and a chord PASSED THROUGH, assumed 10x
-//   3. whether `LEARN_GATE` at 400 ms sits anywhere near that gap
-//
-// ⚠️ IT READS THE WIRE, NOT THE PAGE'S READING OF THE WIRE. The take is raw note
-// numbers with timestamps, so a different gate can be tried against the same
-// playing without anybody playing it twice. That is the whole point of keeping
-// the recording rather than the page's conclusions.
-// ⚠️ AND IT REPORTS DISTRIBUTIONS, NOT AVERAGES. A mean hold time over a take
-// that contains both held chords and passing ones is a number describing
-// neither, which is the trap the research already walked into once from the
-// other side.
+// Reads raw note timing off a /nola/ take: roll time, held versus passing chord gap, and
+// whether LEARN_GATE (400 ms) sits in that gap. Reports distributions, not averages.
+// Run: node demo/resources/read-nola-take.mjs ~/Downloads/nola-take-*.json
+// See lessons/page-resources.md#resources-19
 
 import { readFileSync } from 'node:fs';
 
@@ -89,10 +69,8 @@ for (const gate of [0, 100, 200, 300, 400, 600, 800, 1200]) {
 }
 
 /* ── 4. is there a gap between held and passed at all ───────────────────── */
-/* 🔴 THE ONE THE RESEARCH COULD NOT SETTLE. Its synthetic session had passing
-   chords under 250 ms and loop chords over 1,200, so every gate from 200 to 800
-   worked. If a real take has no valley, the gate is a much harder choice and
-   might not exist, and this is where that shows. */
+/* If a real take has no valley between passing and held chords, no gate value works.
+   See lessons/page-resources.md#resources-20 */
 const lo = pct(holds, 0.25), hi = pct(holds, 0.75);
 const valley = [];
 for (let ms = 50; ms <= 1500; ms += 50) {

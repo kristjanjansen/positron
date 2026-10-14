@@ -1,8 +1,7 @@
-// demo/shell/rt-shader.mjs: the runtime of a `shader` node on /connect/
-// (node-runtime.mjs): /shader/mirror/'s kaleidoscope (mirror-shader.mjs).
-// `segments` arrives on shader:value-in and nowhere else; a screen at the far
-// end of shader:video-out pulls a frame. Its face is the program in the kit's
-// code box, recompiled when an edit settles, as on /shader/mirror/.
+// demo/shell/rt-shader.mjs: runtime of a `shader` node on /connect/, /shader/mirror/'s kaleidoscope.
+// `segments` arrives on shader:value-in only; a screen on shader:video-out pulls frames. Its face
+// is the program in the kit's code box, recompiled when an edit settles.
+// why: lessons/kit-rt-shader.md#header
 
 import { CODE_ROWS } from './concept-nav.mjs';
 import { createCodeBox } from './code-box.mjs';

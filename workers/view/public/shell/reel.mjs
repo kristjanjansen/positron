@@ -1,17 +1,13 @@
-// demo/shell/reel.mjs: a social reel. A 1080 x 1920 frame drawn from a deck's
-// position, the standard transport bar over it, record and download at the
-// bar's right, and the take on `__demo.take`. Lifted out of /social/typist/
-// (asked as "one test page, next we abstract into reusable lib").
-//
-// A page brings its own `draw` and its timeline: what happens at what time and
-// what it sounds like. A visit draws the finished frame and opens nothing; the
-// page's sounds are loaded on the first press of play or record.
+// demo/shell/reel.mjs: a 1080 x 1920 social reel frame drawn from a deck's position, the
+// transport bar over it, record and download, the take on `__demo.take`. A visit opens nothing;
+// sounds load on the first play or record.
 //
 //   const reel = await createReel({ d, name: 'typist', side: [fields],
 //     timeline: () => ({ items: [{ at, payload }], end }),
 //     draw: (ctx, { pos, playing, idle, take }) => ...,
 //     sound: { gain: 0.7, load: async (ac, out) => voice },
 //     play: (payload, voice) => voice.sound(...) });
+// why: lessons/kit-reel.md#header
 
 export const W = 1080, H = 1920;
 // Instagram covers about 14% at the top and up to 35% at the bottom of a reel

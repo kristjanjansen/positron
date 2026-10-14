@@ -1,27 +1,7 @@
-// demo/shell/knob-grid.mjs, knobs in boxes of their own, on a grid that keeps a
-// slot for every knob it was given.
-//
-// 🔴 THE ASK, 2026-10-10: *"Knobs: each has its own wrapper box, in a grid,
-// already reserve room for it. A kit component. In 40 41"*. `/concepts/synth/040/` (removed 2026-10-13)
-// had taken a knob the step did not offer out of the row (`cc-gone`) and hid
-// the whole bank when a step offered none (`cc-off`), so the row closed up and
-// opened out under the reader on every step. Here a knob that is switched off
-// keeps its box where it was, and only what is in the box dims, so nothing
-// reflows when a knob comes or goes.
-//
-// ⚠️ IT IS NOT `control-grid.mjs`, AND THE REASON IS WHAT EACH ONE IS FOR.
-// That one puts dial centres on a SQUARE lattice by MEASURING the biggest cell
-// and writing a fixed column count from script. This one is boxes of one
-// declared size whose count the browser derives from the width (`auto-fill`),
-// which is a stylesheet rule and needs no measurement at all. Folding the two
-// would have given the square lattice a second mode with nothing in common
-// with its first.
-// ⚠️ AND IT IS NOT `createKnobBank`, which is a single scrolling row with
-// optional hairlines: a bank compares knobs ACROSS, and a grid of boxes wraps.
-//
-// 🔴 NO STYLE PROPERTY IS WRITTEN FROM HERE. The only thing set on an element
-// is `--kgrid-cols`, a custom property, from the `cols` option; the rules that
-// read it are in `shell.css` beside the knob bank.
+// demo/shell/knob-grid.mjs: knobs in boxes of their own, on an `auto-fill` grid that keeps a
+// slot for every knob, so a knob switched off dims in place and nothing reflows. Not
+// `control-grid.mjs` (measured square lattice) nor `createKnobBank` (one scrolling row).
+// why: lessons/kit-knob-grid.md#grid-header
 
 /** One knob's name, from what the caller handed in. */
 function nameOf(item, i) {
@@ -45,8 +25,8 @@ export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {})
   const list = knobs instanceof Map
     ? [...knobs].map(([name, knob]) => ({ name, knob }))
     : [...knobs].map((k, i) => (k && k.knob ? { name: nameOf(k, i), knob: k.knob } : { name: nameOf(k, i), knob: k }));
-  /* 🔴 REFUSED, FOR THE REASON THE KNOB BANK REFUSES: a grid with no knobs is
-     a container painting its own edges. */
+  // Refused, as the knob bank refuses: a grid with no knobs paints only its own edges.
+  // why: lessons/kit-knob-grid.md#grid-empty
   if (!list.length) throw new Error('a knob grid with no knobs is an empty box painting its own edges');
   if (cols !== undefined && !(Number.isInteger(cols) && cols > 0)) {
     throw new Error(`a knob grid's cols is a ceiling of at least 1, got ${JSON.stringify(cols)}`);
@@ -59,9 +39,9 @@ export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {})
 
   const root = document.createElement('div');
   root.className = cls ? `pos-kgrid ${cls}` : 'pos-kgrid';
-  // `row`: one row that scrolls sideways and never wraps, the knobs area of a
-  // concept synth (asked 2026-10-10, *"knobs ... independent in the knobs
-  // area, horiz scrollable"*). It takes no `cols`.
+  // `row`: one row that scrolls sideways and never wraps, a concept synth's knobs area.
+  // It takes no `cols`.
+  // why: lessons/kit-knob-grid.md#grid-row
   if (row) {
     if (cols) throw new Error('a knob row is one row; cols is for a wrapping grid');
     root.dataset.row = '';
@@ -90,13 +70,9 @@ export function createKnobGrid(knobs = [], { cols, row = false, cls = '' } = {})
   }
 
   /**
-   * Switch a knob on or off. Off keeps its box and dims what is in it.
-   *
-   * ⚠️ IT GOES THROUGH THE KNOB'S OWN `enable`, so an off knob takes no drag,
-   * no wheel and no tab stop, which is the honest state of a knob whose cable
-   * reaches nothing. A knob a page had already disabled for a reason of its
-   * own is switched back on by `show(x, true)`; a page with both reasons keeps
-   * the second one itself.
+   * Switch a knob on or off. Off keeps its box and dims what is in it, through the knob's own
+   * `enable`, so an off knob takes no drag, wheel or tab stop.
+   * why: lessons/kit-knob-grid.md#grid-show
    */
   function show(x, on = true) {
     const e = find(x);

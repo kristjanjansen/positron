@@ -1,40 +1,7 @@
-// demo/shell/fader.mjs — a slider that stands up, and says where its value came
-// from.
-//
-// 🔴 IT WAS PARKED FOR AN HOUR AND THE REASON IS WORTH KEEPING. It was written
-// to put the Circuit's eight macros on screen, and that was the wrong shape:
-// **the Circuit has eight rotary KNOBS and no fader on it anywhere.** Reported
-// in four words the moment it was proposed, *"circuit has no vert fader"*.
-// Every number behind the proposal was measured and correct, and the control it
-// was drawn as was still wrong, because a CC number says what TRAVELS and says
-// nothing about what a hand TOUCHES. **Measure the device, then look at it.**
-//
-// ✅ IT IS IN USE AGAIN, ASKED FOR 2026-09-20 as *"make exmaples with knobs,
-// haldpads, fullpad and vert slider under each other"*. And it is the right
-// component for the Model 12, which has eight channel faders and an FX fader,
-// measured sending pitch bend on channels 1 to 9.
-//
-// 🔴 WHY A SECOND SLIDER EXISTS AT ALL, BECAUSE THIS PROJECT'S RULE IS TO USE
-// THE ONE IN THE KIT. `slider.mjs` is a three column grid: a label, a lane and a
-// number, side by side, sharing columns across a group so several of them line
-// up. That shape is the whole component and it is horizontal by construction.
-// Eight of them stacked is 8 rows deep and unreadable as a bank.
-// What a hardware bank wants is the opposite: eight narrow columns side by side,
-// which is how every mixer and every macro row on every synth is laid out,
-// because a person compares them ACROSS rather than reading them down.
-// ⚠️ ASKED FOR 2026-09-20 in the device layout work: *"perhaps we could use our
-// sliders vertically"*.
-//
-// 🔴 AND THE PART THAT IS NOT ABOUT ORIENTATION: A FADER HERE KNOWS WHETHER A
-// HAND OR A PIECE OF HARDWARE LAST MOVED IT. A control bound to a knob in the
-// room is a control with two masters, and a page that cannot tell them apart
-// cannot report the one failure that matters, which is a binding that has
-// quietly stopped arriving. A fader that has never heard from its hardware looks
-// exactly like one whose hardware is unplugged.
-// ⚠️ THE SOURCE IS A COUNTER, NEVER A FLAG. CLAUDE.md: a counter beats a state
-// when a check runs next to an event. `hardwareMoves()` counts what has EVER
-// arrived, so a check asking "is this binding live" cannot be satisfied by an
-// instant that happens to be true.
+// demo/shell/fader.mjs: a vertical slider for a bank of hardware faders (the Model 12), which
+// `slider.mjs`'s horizontal grid cannot lay out across. It counts whether a hand or the hardware
+// last moved it: `hardwareMoves()` is a counter, never a flag, so a dead binding is visible.
+// why: lessons/kit-fader.md#header
 
 import { MOVES, MOVE_TURN, MOVE_GLYPH, MOVE_SAYS, MOVE_OFF, plan, positionAt }
   from './hand.mjs';
@@ -43,7 +10,6 @@ const VMIN = 0, VMAX = 127;
 
 /**
  * One vertical fader.
- *
  * @param {object} o
  * @param {string} o.label     under the lane, uppercased by CSS. Keep it short.
  * @param {string} [o.sub]     a second, dimmer line under the label: `CC 80`.
@@ -51,20 +17,13 @@ const VMIN = 0, VMAX = 127;
  * @param {number} [o.max]     default 127
  * @param {number} [o.value]   where it starts, default the midpoint
  * @param {string} [o.title]   hover text on the whole control
- * @param {boolean} [o.hand]   an invisible hand: one button that makes this
- *   fader move by itself, for watching a binding without touching the desk.
- *   🔴 **IT USES `hand.mjs`'s PLANNER, NOT A LOOP OF ITS OWN.** `slider.mjs`
- *   already drives a control from `plan()` and `positionAt()`, and a second
- *   implementation of the same idea is how two controls come to move
- *   differently while both claim to be doing the same thing.
- *   ⚠️ **THE GLYPH ROTATES.** `⇄` is a left and right pair, drawn for a
- *   horizontal lane. On a fader it is turned 90 degrees, because an arrow
- *   pointing across a control that moves up and down is a picture of the wrong
- *   gesture.
+ * @param {boolean} [o.hand]   a button that moves the fader by itself, with hand.mjs's planner;
+ *   its ⇄ glyph is rotated 90 degrees to match the gesture.
  * @param {(v:number, from:string)=>void} [o.onInput]   every move
  * @param {(v:number, from:string)=>void} [o.onChange]  on release and on a key
  * @returns {{el:HTMLElement, set:Function, value:()=>number, source:()=>string,
  *            hardwareMoves:()=>number, handMoves:()=>number, destroy:Function}}
+ * why: lessons/kit-fader.md#createfader
  */
 export function createFader({
   label, sub = '', min = VMIN, max = VMAX, value, title = '',
@@ -76,10 +35,8 @@ export function createFader({
 
   let v = clamp(value === undefined ? min + span / 2 : value);
   let from = '';                 // '' until something moves it
-  // ⚠️ `byHand`, NOT `hand`. The option added later is called `hand`, and a
-  // counter sharing its name is a SyntaxError at module load that takes every
-  // page importing this file down with it. Second time in this kit: `knob.mjs`
-  // had the same collision between an `arc` option and its `arc` element.
+  // `byHand`, not `hand`: sharing the option's name is a SyntaxError at module load.
+  // why: lessons/kit-fader.md#byhand
   let hw = 0, byHand = 0, off = !!disabled;
 
   const el = (tag, cls, text) => {
@@ -93,16 +50,14 @@ export function createFader({
   if (title) root.title = title;
 
   const num = el('div', 'pos-fdr-v', String(Math.round(v)));
-  // 🔴 A LANE AND A HANDLE, AND NO FILL. `.sld-knob` is the slider's whole
-  // reading and this is the same control turned 90 degrees, so a fill would be
-  // the value said twice by two elements that can disagree by a pixel.
+  // A lane and a handle, no fill: a fill would say the value twice and disagree by a pixel.
+  // why: lessons/kit-fader.md#lane
   const lane = el('div', 'pos-fdr-lane');
   const cap = el('div', 'pos-fdr-cap');
   lane.append(cap);
 
-  // 🔴 THE LANE IS THE FOCUSABLE THING, NOT THE WRAPPER. A wrapper that takes
-  // focus puts the ring round the label and the number too, which reads as the
-  // whole column being selected rather than as a control being steerable.
+  // The lane takes focus, not the wrapper, so the ring is round the steerable part only.
+  // why: lessons/kit-fader.md#lane-focus
   lane.tabIndex = 0;
   lane.setAttribute('role', 'slider');
   lane.setAttribute('aria-label', label);
@@ -121,16 +76,13 @@ export function createFader({
 
   function paint() {
     const frac = (v - min) / span;
-    // ⚠️ A SHARE OF THE TRAVEL, NEVER OF THE HEIGHT, so both ends land flush.
-    // `slider.mjs` does the same arithmetic on `left` and its comment says why.
+    // A share of the travel, never of the height, so both ends land flush (as slider.mjs).
+    // why: lessons/kit-fader.md#cap-position
     cap.style.bottom = `calc(${(frac * 100).toFixed(3)}% - ${(frac * 100).toFixed(3)} * var(--fdr-knob) / 100)`;
     num.textContent = String(Math.round(v));
     lane.setAttribute('aria-valuenow', String(Math.round(v)));
-    // ⚠️ AN ATTRIBUTE, NOT A CLASS, and DELETED rather than emptied when there
-    // is no source. `[data-from]` matches on PRESENCE, so `= ''` would leave a
-    // fader that had been touched once looking touched for the rest of the
-    // page's life. That exact bug was measured in `video-panel.mjs` on
-    // 2026-09-19 and it survived because entering a state is what gets tested.
+    // An attribute, deleted rather than emptied: `[data-from]` matches on presence.
+    // why: lessons/kit-fader.md#data-from
     if (from) root.dataset.from = from; else delete root.dataset.from;
   }
 
@@ -155,11 +107,9 @@ export function createFader({
     return v;
   }
 
-  // ── the hand ───────────────────────────────────────────────────────────
-  //
-  // ⚠️ POINTER EVENTS, NOT MOUSE EVENTS, and capture on the LANE so a drag that
-  // leaves the column keeps steering it. A fader 34 px wide is one a finger
-  // slides off constantly.
+  // ── the hand ──
+  // Pointer events, captured on the lane, so a drag off a 34 px column keeps steering it.
+  // why: lessons/kit-fader.md#the-hand
   let dragging = false;
 
   const fromY = (e) => {
@@ -214,17 +164,11 @@ export function createFader({
 
   if (hand) {
     handBtn = el('button', 'pos-fdr-hand', null);
-    // ⚠️ THE GLYPH IS IN A SPAN BECAUSE A TRANSFORM NEEDS AN ELEMENT. Rotating
-    // the button would turn its border too; rotating a bare text node is not
-    // possible at all.
+    // The glyph is in a span because a transform needs an element; rotating the button turns its border.
+    // why: lessons/kit-fader.md#glyph-span
     /**
-     * 🔴 `hand.mjs`'s OWN GLYPH, ROTATED. It was swapped for two geometric
-     * triangles because U+21C4 has an emoji presentation and rendered in
-     * colour; asked back on 2026-09-21, *"keep ⇄ emoji just 90rot"*, and the
-     * emoji rendering is accepted rather than worked around.
-     * ⚠️ **THE POINT IS THAT IT IS THE SLIDER'S GLYPH.** A fader and a slider
-     * running the same planner should wear the same mark, and a substitution
-     * here would be the two drifting apart over a rendering detail.
+     * hand.mjs's own ⇄, rotated, emoji rendering accepted: the fader wears the slider's mark.
+     * why: lessons/kit-fader.md#hand-glyph
      */
     handBtn.append(el('span', 'pos-fdr-hand-g', MOVE_GLYPH[MOVES[MOVE_TURN[0]][0]]));
     handBtn.type = 'button';
@@ -232,21 +176,17 @@ export function createFader({
     handBtn.setAttribute('aria-pressed', 'false');
     handBtn.onclick = () => (running ? stopHand() : startHand());
     /**
-     * 🔴 BELOW THE LANE, SQUARE, JOINED TO IT. Corrected 2026-09-21: *"no.
-     * soubl be on bottom and keep ⇄ emoji just 90rot, be square"*.
-     * ⚠️ **SO WHAT A PAD COLUMN LINES UP WITH IS THE FADER'S LAST CONTROL, NOT
-     * ITS LANE.** With the button underneath, the lane ends 33 px above the
-     * fader's controls do, and the honest fix is the check knowing that rather
-     * than the page pushing the pads around to hide it. A hand is a mode: it
-     * changes where the control ends, and everything beside it ends there too.
+     * Below the lane, square, joined to it. A pad column lines up with the fader's last control,
+     * 33 px below the lane's end, and the check knows that.
+     * why: lessons/kit-fader.md#hand-button
      */
     lane.after(handBtn);
   }
 
   const frame = () => {
     const t = performance.now() - t0;
-    // ⚠️ THE PLAN IS REGENERATED WHEN IT RUNS OUT, so a hand left on does not
-    // repeat itself. Same reasoning as the slider's own loop.
+    // The plan is regenerated when it runs out, so a hand left on does not repeat itself.
+    // why: lessons/kit-fader.md#plan
     if (t >= pl.totalMs) { pl = planFor(); t0 = performance.now(); }
     const nv = fromT(positionAt(pl, performance.now() - t0));
     if (nv !== v) set(nv, { from: 'hand' });
@@ -286,7 +226,10 @@ export function createFader({
     value: () => v,
     /** '' until something has moved it, then 'hand' or 'hardware'. */
     source: () => from,
-    /** 🔴 COUNTERS, so "is this binding live" is answerable after the fact. */
+    /**
+     * Counters, so whether a binding is live is answerable after the fact.
+     * why: lessons/kit-fader.md#counters
+     */
     hardwareMoves: () => hw,
     handMoves: () => byHand,
     destroy() { lane.replaceWith(lane.cloneNode(true)); },
@@ -294,17 +237,12 @@ export function createFader({
 }
 
 /**
- * Several faders in a row, which is the only reason a vertical one exists.
- *
- * ⚠️ IT SCROLLS SIDEWAYS RATHER THAN SHRINKING. Eight faders at 34 px plus gaps
- * do not fit a 390 px phone, and a fader narrow enough to fit is one a finger
- * cannot hit. `overflow-x` cannot shrink a flex item below its content, so the
- * row carries `min-width: 0` on the scroller, which is the trap CLAUDE.md
- * records: without it the PAGE drags sideways instead of the row.
- *
+ * Several faders in a row. It scrolls sideways rather than shrinking (8 at 34 px exceed 390 px);
+ * the scroller carries `min-width: 0` or the page drags instead.
  * @param {ReturnType<createFader>[]} faders
  * @param {object} [o]
  * @param {string} [o.label]  a gutter word above the row
+ * why: lessons/kit-fader.md#createfaderbank
  */
 export function createFaderBank(faders = [], { label = '' } = {}) {
   if (!faders.length) throw new Error('a fader bank with no faders is an empty box painting its own edges');

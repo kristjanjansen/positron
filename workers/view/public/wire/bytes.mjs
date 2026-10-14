@@ -1,21 +1,7 @@
-// demo/wire/bytes.mjs: the BYTES tab of `/wire/`, which is the old `/wire/`
-// moved into a module (plans/plan-demo-structure.md §3.3, decided 2026-10-04).
-//
-// 🔴 UNCHANGED IN WHAT IT DOES, AND THAT INCLUDES ONE THING THE TAB CONVENTION
-// ARGUES AGAINST. `tab-page.mjs` says a tab's `build` opens nothing and a join
-// waits for the first press in its own tab. This tab joins its room and reads
-// the history the moment it is built, because what other people left in the
-// room IS the subject: *"already on the page when you arrive"*. The brief was
-// "today's /wire/ unchanged", so it is, and the tension is reported rather than
-// resolved here. It is still lazy in the sense the page can guarantee: open
-// `/wire/#notes` and this tab is never built, so nothing of it is opened.
-//
-// 🔴 ITS CONTROLS ARE NOT IN `.pos-controls`. The harness pressed that row by
-// position; inside a tab page it would press them blind in a closed tab and
-// every control after them would move. So the buttons live in the tab, and
-// `check()` presses them in the order the harness did (send, store, bytes,
-// toobig, overfill, clear) and awaits each one, which is what the harness's
-// `data-busy` wait did.
+// The BYTES tab of /wire/. Unlike the tab convention it joins and reads history
+// when built, because what others left in the room is the subject. Its controls
+// live in the tab, and check() presses them in order, awaiting each.
+// See lessons/page-wire.md#wire-4
 
 import { el } from '/shell/shell.mjs';
 import { openWire, LIMITS, RELAY_BASE } from '/shell/wire.mjs';
@@ -31,10 +17,9 @@ export const readout = null;
 
 export function build({ panel, log, d }) {
   const q = new URLSearchParams(location.search);
-  // ONE shared room by default. It used to be a room per tab, which made
-  // loading the history on arrival meaningless: a fresh room has no past.
-  // Sharing it means what you find on load is what other people left. The
-  // manifest row keeps `room: 'fixed'` so the harness does not rename it.
+  // One shared room by default, so the history found on load is what others left.
+  // The manifest keeps `room: 'fixed'` so the harness does not rename it.
+  // See lessons/page-wire.md#wire-5
   const ROOM = q.get('room') || 'wire';
   const STORE = q.get('store') || 'https://store.positron.studio';
   // Small on purpose: the retention rule is 1,000 messages or 24 hours, and a
@@ -46,18 +31,16 @@ export function build({ panel, log, d }) {
   const SHOW_CHECKS = q.has('checks');
 
   // ── the composer ────────────────────────────────────────────────────────
-  // ⚠️ NO `kind` FIELD. A text box whose value went straight into the
-  // envelope's `type` asked a visitor to invent a protocol before they could
-  // say hello. The kind of a message somebody types into a box is CHAT; the
-  // other kinds here (`toobig`, `fill`, `chatter`) are set by the checks that
-  // send them, where they mean something.
+  // No `kind` field: typed messages are chat; `toobig`, `fill` and `chatter` are set
+  // by the checks that send them.
+  // See lessons/page-wire.md#wire-6
   const TYPE = 'chat';
   const compose = el('div', 'compose');
   const body = el('input', 'body', null, { type: 'text', value: 'hello', 'aria-label': 'what it says' });
   compose.append(el('label', null, 'says'), body);
 
-  // ⚠️ NO PRIMARY HERE. This page's whole subject is the DIFFERENCE between
-  // sending and storing, and lighting one says the other is a variant.
+  // No primary here: the subject is the difference between sending and storing.
+  // See lessons/page-wire.md#wire-7
   const SPECS = [
     { id: 'send', label: 'Send' },
     { id: 'store', label: 'Send and keep' },
@@ -87,12 +70,9 @@ export function build({ panel, log, d }) {
   }
   const on = (id, fn) => handlers.set(id, fn);
 
-  // 🔴 ONE LIST. Live traffic and the stored history are the SAME MESSAGES,
-  // and `stored` is the whole of the difference between them.
-  // 🔴 `table.mjs`, NOT `messages.mjs`: two list components on one site means
-  // two places a row can be styled. `text` DOES NOT CLIP: a line of JSON cut
-  // with an ellipsis is a line nobody can read, and the exact bytes are the
-  // subject. It is the growing column, so it wraps.
+  // One list: live traffic and stored history are the same messages, `stored` the
+  // only difference. `text` does not clip, since the exact bytes are the subject.
+  // See lessons/page-wire.md#wire-8
   const msgs = createTable({
     cap: 40,
     columns: [
@@ -103,8 +83,8 @@ export function build({ panel, log, d }) {
     empty: 'nothing sent yet. Press Send, and watch the bytes go out and come back',
   });
   const rowOf = (r) => ({ ...r, size: `${r.bytes} B` });
-  // ⚠️ NO WRAPPER AROUND IT. The table draws its own edge, and a padded card
-  // around it drew a box inside a box.
+  // No wrapper: the table draws its own edge.
+  // See lessons/page-wire.md#wire-9
   panel.add(compose, acts, msgs.el);
 
   // ── state ───────────────────────────────────────────────────────────────
@@ -161,8 +141,8 @@ export function build({ panel, log, d }) {
 
   // ── the recorder, asked for before anything is sent ──────────────────────
   // It joins the room as an ordinary socket, so the relay still parses nothing.
-  // Never awaited without a ceiling: a page that cannot reach the history must
-  // say so, not hang.
+  // Never awaited without a ceiling: an unreachable history must say so, not hang.
+  // See lessons/page-wire.md#wire-10
   async function startRecording() {
     try {
       const res = await fetch(`${STORE}/room/${ROOM}/record`, {
@@ -184,15 +164,15 @@ export function build({ panel, log, d }) {
   async function readHistory(query = `last=${CAP * 4}`) {
     const res = await fetch(`${STORE}/room/${ROOM}/history?${query}`, { signal: AbortSignal.timeout(4000) });
     const text = await res.text();
-    // ⚠️ THE HEADER NAME IS A CROSS-WIRE RENAME AND NOTHING TYPE-CHECKS IT.
-    // It read `X-Backlog` for one deploy while the worker sent `X-Store`, so
-    // `held` parsed to 0 and `the cap holds` failed against a working store.
+    // The header name must match the worker's `X-Store`; nothing type-checks it.
+    // See lessons/page-wire.md#wire-11
     const header = res.headers.get('X-Store') || '';
     const num = (k) => Number(new RegExp(`${k}=(\\d+)`).exec(header)?.[1] ?? 0);
     const held = num('kept'); const seen = num('seen'); const oldest = num('oldest');
     const rows = text.split('\n').filter(Boolean);
-    // ⚠️ THE HISTORY SEEDS THE LIST, IT DOES NOT REPLACE IT, or a check that
-    // reads it would wipe the live rows it had just put there.
+    // The history seeds the list, it does not replace it, or a check would wipe the
+    // live rows it had just added.
+    // See lessons/page-wire.md#wire-12
     if (!seeded) {
       seeded = true;
       msgs.set(rows.map((r) => rowOf({ dir: '', bytes: new TextEncoder().encode(r).length, stored: true, text: short(r) })));
@@ -209,9 +189,9 @@ export function build({ panel, log, d }) {
   };
 
   // ── controls ────────────────────────────────────────────────────────────
-  // Every assert below is made by the tab's own `A`, which `check()` hands in.
-  // A visitor pressing these gets the same work and the asserts are recorded
-  // the same way: they only read what the press already did.
+  // Every assert uses the tab's own `A` from check(); they only read what the press
+  // already did, so a visitor's press does the same work.
+  // See lessons/page-wire.md#wire-13
   let A = (what, pass, detail) => d.assert(`BYTES: ${what}`, pass, detail);
 
   on('send', async () => {
@@ -327,13 +307,9 @@ export function build({ panel, log, d }) {
   const kept = `${CAP} kept`;
   const SPEC = {
     caption: 'One WebSocket to a relay that keeps nothing, and a recorder beside it that keeps what you ask it to.',
-    // ⚠️ THE ORDER IS LAYOUT, AND IT WAS SEARCHED RATHER THAN GUESSED. A
-    // return path runs under the row and climbs into its box from below, so
-    // with both workers in one Cloudflare box one of the three lines into the
-    // list was always drawn behind the box above it or over another's name.
-    // Two workers are two machines anyway (`workers/relay`, `workers/store`),
-    // and of the twelve orders of three machines and two Browser boxes, Store,
-    // Browser, Relay is the one clean at desk width and on a phone.
+    // Order is layout: Store, Browser, Relay is the one order of the twelve that
+    // draws every return path clean at desk width and on a phone.
+    // See lessons/page-wire.md#wire-14
     nodes: [
       { id: 'cfs', label: 'Cloudflare', sub: 'store worker', kind: 'cloud', tech: 'cloudflare',
         children: [

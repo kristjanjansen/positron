@@ -1,32 +1,7 @@
-// demo/shell/circuit-patch.mjs — what is inside a Novation Circuit pack: the
-// 340 address synth patch, and the four numbers that tell a backup from a blank.
-//
-// 🔴 THIS EXISTED ONCE AND WAS NOT KEPT, WHICH IS WHY IT IS HERE.
-// `research/circuit-soundbank-2026-09-21.md` built a decoder, graded it against
-// the published `patch_0` at 246 varying fields of 324 exactly, and it lived in
-// a scratchpad that is gone. `plans/plan-pack-page.md` §4 makes rebuilding it
-// step one, because a page that decodes inline is the third place in this
-// repository that knows the format and the first one nothing grades.
-//
-// 🔴 NOTHING HERE PRODUCES BYTES. There is no encoder, no writer and no sender,
-// and that is a safety property rather than an omission. `Replace Current Patch`
-// and `Replace Patch` differ by ONE byte at offset 6; the second overwrites a
-// patch in FLASH on an instrument with no factory reset, and
-// `New Pack.circuitpack` is the only backup of that flash. The function that
-// turns an intention into a message does not exist, so it cannot be called by
-// mistake. `circuit-patch-test.mjs` asserts the absence.
-//
-// 🔴 THE ADDRESS TABLE IS GENERATED, NOT TYPED. Parsed out of 📄 the Circuit
-// Programmer's Reference Guide v1.1 (Paul Whittington and Jonathan Page,
-// Novation / Focusrite) read with `pdftotext -layout`, the same method
-// `circuit-cc.mjs` used, and checked to be 340 contiguous addresses 0..339 with
-// no duplicates before it was written out. Two rows wrap across two lines in
-// that document and truncate mid-word, so addresses 91 and 99 are written out by
-// hand as bitfields and are marked as such below.
-//
-// ⚠️ A `d` HERE IS THE DOCUMENT'S DEFAULT, NOT A MEASUREMENT OF THIS DESK. It is
-// what tells a parameter somebody moved from one nobody touched, which is the
-// only thing the detail panel can honestly shade.
+// demo/shell/circuit-patch.mjs: what is inside a Circuit pack: the 340 address synth patch, and the
+// four numbers that tell a backup from a blank. Nothing here produces bytes, a safety property.
+// The address table was parsed from the Programmer's Reference; `d` is its default, not a measurement.
+// why: lessons/kit-circuit-patch.md#header
 
 /** The whole file: 6 header bytes, command, location, reserved, 340 data, F7. */
 export const PATCH_BYTES = 350;
@@ -39,10 +14,9 @@ export const NAME_LEN = 16;
 /** `F0` then the Novation manufacturer, product type and product number. */
 export const SYSEX_HEAD = [0xf0, 0x00, 0x20, 0x29, 0x01, 0x60];
 
-// 🔴 BYTE 6 IS THE WHOLE SAFETY QUESTION ABOUT A `.syx` ON DISK. `00` is a
-// message that lands in RAM and is forgotten at the next patch change; `01`
-// overwrites one of the 64 patches in flash. Every one of the 128 loose `.syx`
-// files in this repository's archive is `00`, measured.
+// Byte 6 is the whole safety question about a `.syx`: `00` lands in RAM, `01` overwrites a flash patch.
+// All 128 loose `.syx` files in the archive are `00`, measured.
+// why: lessons/kit-circuit-patch.md#commands
 export const COMMANDS = {
   0x00: { name: 'replace current patch', flash: false, slot: 'synth' },
   0x01: { name: 'replace patch', flash: true, slot: 'patch' },
@@ -114,16 +88,9 @@ export const ZERO_DEPTH = 64;
 export const MOD_SLOTS = 20;
 export const MACRO_KNOBS = 8;
 
-// 🔴 SEVEN OF FIFTEEN CATEGORY VALUES HAVE A WORD AND EIGHT DO NOT, AND THE
-// SEVEN ARE DERIVED RATHER THAN PUBLISHED. 📄 The reference gives
-// `Patch_Category` a range of 0..14 and no label table at all.
-// `research/circuit-soundbank-2026-09-21.md` §4.3 recovered these by correlating
-// the byte against a vendor's own spreadsheet column across 128 patches, with
-// the agreement counts kept beside each one. The owner's factory bank also uses
-// 5, 10, 11, 12 and 14, and there is no evidence anywhere on this machine of
-// what those five mean.
-// ⚠️ SO AN UNKNOWN CATEGORY GETS NO INVENTED WORD. `categoryName` returns `''`,
-// which is `instruments.mjs`'s rule about an unrecognised port arriving here.
+// Seven of fifteen category values have a word, derived by correlation, not published.
+// An unknown category gets no invented word: `categoryName` returns ''.
+// why: lessons/kit-circuit-patch.md#categories
 export const CATEGORIES = [
   'None',
   'Arp',
@@ -153,19 +120,9 @@ export const CATEGORY_DERIVED = {
 };
 
 /**
- * 📄 The 71 macro knob destinations. The Programmer's Reference gives this
- * parameter a range of 0..70 and NO table at all, and
- * `research/circuit-soundbank-2026-09-21.md` §8 lists these names as
- * unobtainable from this machine. They were read off the live DOM of Novation's
- * own Circuit editor on 2026-09-21.
- * ✅ THE STRUCTURAL FIT IS WHAT MAKES THEM CREDIBLE RATHER THAN PLAUSIBLE:
- * values 51 to 70 are `Mod Matrix 1` to `Mod Matrix 20`, twenty consecutive
- * entries landing exactly on the twenty slots this format has, and ending
- * precisely at the documented maximum of 70.
- * 🔴 AND HOW THEY WERE OBTAINED WAS NOT AUTHORISED. The instrument was
- * CONNECTED while that page was driven by a script, with `Send to Circuit` in
- * the header. `plans/plan-circuit-synth-editor.md` opens with the whole account.
- * The data was re-verified here index by index; the reading was not the problem.
+ * The 71 macro knob destinations, read off Novation's editor (the reference has no table).
+ * 51 to 70 are Mod Matrix 1 to 20, landing exactly on the format's twenty slots.
+ * why: lessons/kit-circuit-patch.md#macro-destinations
  */
 export const MACRO_DESTINATIONS = [
   'No Destination',
@@ -601,10 +558,9 @@ export function address(a) {
 }
 
 /**
- * The address of a parameter, by the reference's own name.
- * ⚠️ IT THROWS ON A NAME THAT IS NOT THERE. A lookup that answered `undefined`
- * would be read as byte 0, which is the first letter of the patch name, and a
- * wrong reading that looks like a reading is this repository's costliest shape.
+ * The address of a parameter by the reference's name. Throws on a missing name, since `undefined`
+ * would read as byte 0, the patch name's first letter.
+ * why: lessons/kit-circuit-patch.md#addressof
  */
 export function addressOf(name) {
   const a = BY_NAME.get(name);
@@ -641,7 +597,8 @@ export function readPatch(buf) {
     bytes: u8,
     command,
     commandName: spec.name,
-    // 🔴 The one fact worth reading before anything else about a `.syx`.
+    // The one fact worth reading before anything else about a `.syx`.
+    // why: lessons/kit-circuit-patch.md#writesflash
     writesFlash: spec.flash,
     slot: u8[7],
     slotName: spec.slot === 'patch' ? `patch ${u8[7]}` : `synth ${u8[7] + 1}`,
@@ -650,21 +607,9 @@ export function readPatch(buf) {
 }
 
 /**
- * The 340 address payload on its own, with no message wrapped round it.
- *
- * 🔴 THIS EXISTS BECAUSE A SESSION CARRIES TWO PATCHES AND THEY ARE NOT
- * MESSAGES. `demo/shell/circuit-session.mjs` finds them at offsets 47,300 and
- * 47,640 of a `.circuitsession`, as bare 340 byte payloads, and MEASURED, 10 of
- * 64 are byte identical to a `patch_*.syx` payload in the same pack. Before
- * this, the only way to decode one was to build a SysEx frame around it, and
- * **building a message is the first half of sending one**, so that function
- * deliberately does not exist anywhere in this repository.
- * ⚠️ IT READS, IT DOES NOT MAKE. Everything `summarise`, `patchFields` and
- * `modSlots` need is `data`, so they all work on a payload unchanged.
- * ⚠️ AND THE MESSAGE FIELDS ARE NOT GUESSED, THEY ARE REPORTED ABSENT. A
- * payload has no command byte and no destination, so `commandName` is empty and
- * `writesFlash` is false because a payload cannot write anything: it is not a
- * message. That is different from a message that happens to be safe.
+ * The 340 address payload alone, as a session carries two (offsets 47,300 and 47,640). It reads,
+ * it does not make: no SysEx frame is built. Message fields are reported absent, not guessed.
+ * why: lessons/kit-circuit-patch.md#readpatchdata
  */
 export function readPatchData(buf) {
   const data = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
@@ -695,9 +640,8 @@ export function readPatchData(buf) {
 
 /** The derived word for a category byte, or `''` when nobody here knows. */
 export function categoryName(n) {
-  // ⚠️ LOWERCASED, because every other word this module returns is a value read
-  // off a table and reads in running prose.  is a category the instrument
-  // offers and is not the same as "we do not know", which is still .
+  // Lowercased to read in running prose; an unknown value is still ''.
+  // why: lessons/kit-circuit-patch.md#categoryname
   return CATEGORIES[n] ? CATEGORIES[n].toLowerCase() : '';
 }
 
@@ -707,9 +651,8 @@ function label(table, v) {
 }
 
 /**
- * All 340 addresses decoded, for a detail panel.
- * `changed` is against the document's default, which is what separates a
- * parameter somebody moved from one nobody touched.
+ * All 340 addresses decoded, for a detail panel; `changed` is against the document's default.
+ * why: lessons/kit-circuit-patch.md#patchfields
  */
 export function patchFields(patch) {
   return ADDRESSES.map((row) => {
@@ -727,10 +670,9 @@ export function patchFields(patch) {
 }
 
 /**
- * The word for a value where a table exists for it, otherwise ''.
- * ⚠️ KEYED ON THE PARAMETER NAME, NEVER ON THE VALUE'S RANGE. Two parameters
- * with the same 0..29 range can mean different things, which is the trap
- * `circuit-cc.mjs` already records about controller numbers on two channels.
+ * The word for a value where a table exists, otherwise ''. Keyed on the parameter name, never the
+ * value's range.
+ * why: lessons/kit-circuit-patch.md#named
  */
 export function named(p, v) {
   if (p === 'Voice_PolyphonyMode') return label(POLYPHONY, v);
@@ -766,13 +708,9 @@ export function modSlots(patch) {
 }
 
 /**
- * The one row a table shows for a patch.
- * ⚠️ `lfo` IS A FLOOR AND NOT A TOTAL, and the reason is published rather than
- * hidden: it counts an LFO that reaches something through a mod matrix slot,
- * and 📄 the reference gives macro destinations a range of 0..70 with NO table,
- * so an LFO routed only through a macro knob is invisible here. That is
- * `research/circuit-soundbank-2026-09-21.md` §4.4's own caveat about its
- * 126 of 128.
+ * The one row a table shows for a patch. `lfo` is a floor, not a total: an LFO routed only
+ * through a macro knob is invisible here.
+ * why: lessons/kit-circuit-patch.md#summarise
  */
 export function summarise(patch) {
   const slots = modSlots(patch).filter((s) => s.used);
@@ -800,48 +738,10 @@ export function summarise(patch) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// The four numbers that tell a backup from a blank.
-//
-// 🔴 THIS IS THE FEATURE THAT EARNS THE PAGE AND IT IS A SAFETY CHECK.
-// There are three packs on this machine that all display as `*New Pack` in
-// Novation Components: the owner's own backup, and two purchased ones whose 32
-// sessions are blanks. MEASURED HERE 2026-09-21, both sides, from the files:
-//
-//   owner's `New Pack.circuitpack`   32 distinct fingerprints of 32
-//                                    entropy 0.827 to 1.462 bits a byte
-//                                    84.57 to 89.58 per cent non-zero
-//   the two purchased packs          1 distinct fingerprint of 32, each
-//                                    entropy 0.009, flat
-//                                    0.07 per cent non-zero
-//
-// The vendor's install note says to press `Send to Circuit`, which is one of the
-// three operations that replace the instrument's contents on a box with no
-// factory reset.
-//
-// 🔴 AND THE FIRST FOUR BYTES ARE NOT THE FOURTH DISCRIMINATOR. THEY WERE
-// PUBLISHED AS ONE AND THE PACK DISAGREES. `CLAUDE.md`, `plans/plan-pack-page.md`
-// §2.1 and `research/circuit-soundbank-2026-09-21.md` all said `INIT` against the
-// owner's `DEMO`. The owner's 32 sessions are **`USER` 22, `DEMO` 7 and `INIT`
-// 3**, so three of somebody's real sessions carry the exact head published as the
-// blank signature, and all three are ordinary work: entropy 0.87, 86.5 per cent
-// non-zero, 2,016 payload bytes, distinct fingerprints. **A head of `INIT` would
-// have condemned three real sessions.** The other three numbers separate the two
-// packs by two orders of magnitude and are what the check rests on. `head` is
-// still reported, because it is a fact about the file and a reader should see
-// that it is the same on both sides.
-// ⚠️ A NAME IS NOT EVIDENCE, and this project got that wrong about these very
-// sessions once: the ones still called `User Session` were implied to be blanks
-// and measurement said 32 distinct of 32 with none empty. The head is the same
-// mistake one layer down, in a field that looks like content.
-//
-// ⚠️ AND ASK WHAT THE DENOMINATOR IS, which is why two size readings are here
-// rather than one. A session file is four fifths `0xFF` erasure, and a statistic
-// over the whole artefact measures the erasure: 44,071 high bytes of 53,248 was
-// published here as *not seven bit* when the real payload was 9,180 bytes of
-// which two were above 0x7F. `notErased` is that published reading, the bytes
-// that are not `0xFF`; `payload` is the stricter one, the bytes that are neither
-// `0xFF` nor `0x00`. MEASURED on session_0: 9,179 and 2,238.
+// The four numbers that tell a backup from a blank: distinct fingerprints, entropy and non-zero share
+// separate the owner's pack from blanks by two orders of magnitude. The four-byte head does not
+// (3 real sessions read `INIT`). `notErased` excludes 0xFF, `payload` also 0x00.
+// why: lessons/kit-circuit-patch.md#sessionstats
 
 /**
  * @param {Uint8Array|ArrayBuffer} buf one session file

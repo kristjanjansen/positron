@@ -1,34 +1,7 @@
-// demo/drums/voices.mjs: the four drum voices /drums/machine/ and
-// /drums/knobs/ play, each a small program in /collide/'s subset of
-// SuperCollider, compiled in the tab and run on scsynth compiled to WebAssembly.
-//
-// Asked 2026-10-12 (BACKLOG, "A rhythm concept group"): *"make new grpup
-// concept rythm. make a 16 x 4 grid pad componetn (global one), 4 sc (or fau?)
-// synths for kick snare hho hhc and patchbay. 000"*, then *"next drum, same but
-// each synth a parameter to tweak"* for 010.
-//
-// WHY SUPERCOLLIDER AND NOT FAUST. Two reasons, both about machinery that
-// already exists. First, `scsynth.mjs` has `sendAt`, an OSC bundle with a
-// timetag that SuperSonic maps to the speakers' clock, so a hit can be handed
-// over ahead of time and sound at its time: the scheduling half is already
-// built. A Faust voice in this kit is one AudioWorkletNode whose parameters
-// are set by message, so a gate at an exact future sample would be new code.
-// Second, a drum hit is a node that starts, decays and frees itself
-// (`doneAction: 2`), which is what scsynth does with no bookkeeping, four
-// definitions on one engine, any number of hits overlapping. Faust would need
-// a polyphonic wrapper per voice or four always-running worklets.
-//
-// ONE TEXT PER DRUM, TWO PAGES. Each program has one number that 010 turns
-// into a knob. On 000 it is that number written in; on 010 it is a named
-// control, `\name.kr(default, spec: [min, max])`, so the knob's range is the
-// program's own. Same sound at the default either way.
-//
-// THE SUBSET HAS NO BPF, NO XLine AND NO Decay, so every sweep is an EnvGen
-// scaled and offset, and every band is an HPF. That is enough for an 808-ish
-// kit and keeps each program a dozen lines a reader can follow.
-//
-// 🔴 THE OPERATORS ARE LEFT TO RIGHT, AS IN SuperCollider: `a * b + c * d` is
-// `((a * b) + c) * d`. Every last line below is written for that.
+// The drum voices, each a small /collide/-subset program run on wasm scsynth: SuperCollider for
+// `sendAt` timestamped hits and self-freeing nodes. No BPF, XLine or Decay, so sweeps are EnvGens.
+// Operators run left to right as in SuperCollider: `a * b + c * d` is `((a * b) + c) * d`.
+// See lessons/page-drums.md#drums-37
 
 /** General MIDI's drum notes, which is what the sequencer sends and what each
  *  wire into a voice lets through. */
@@ -36,15 +9,10 @@ export const NOTE = { kick: 36, snare: 38, hhc: 42, hho: 46, clap: 39, tomlo: 45
   ride: 51, crash: 49, shaker: 70, tamb: 54, claves: 75, congalo: 64, congahi: 63, tommid: 47, agogo: 67 };
 
 /**
- * The one knob per drum on 010, and why each is the one most fun to turn.
- *   kick  pitch   the note the thump falls to, from a sub you feel (30 Hz) to
- *                 a tom (110 Hz). It retunes the whole kit's low end.
- *   snare snap    how long the wires ring, from a dry crack (50 ms) to a
- *                 splash (0.6 s). It changes the snare's character outright.
- *   hho   length  how long the open hat rings, from a short chick (0.1 s) to
- *                 a wash across four steps (1.5 s), so it changes the groove.
- *   hhc   bright  where the hat's filter starts, from a dull chick (2 kHz) to
- *                 a glassy tick (12 kHz).
+ * The one knob per drum on /drums/knobs/:
+ *   kick pitch 30 to 110 Hz, snare snap 50 ms to 0.6 s, hho length 0.1 to 1.5 s,
+ *   hhc bright 2 to 12 kHz.
+ * See lessons/page-drums.md#drums-38
  */
 export const PARAMS = {
   kick: { name: 'pitch', value: 50, min: 30, max: 110, unit: 'Hz' },
@@ -141,20 +109,9 @@ const ROWS = [
 ];
 
 
-// ── FOUR MORE, FOR /drums/camera/ ONLY ───────────────────────────────
-// Asked 2026-10-12: *"add 4 more drum isntrumets to 050"*. Chosen to read as
-// different from the four above and from each other, by ear and on a scope:
-//   clap     three quick noise bursts and a tail, the 808's clap. The one
-//            sound in a kit that is a rhythm of its own, and nothing above is
-//            made of bursts.
-//   low tom  a sine falling 130 to 90 Hz over 0.4 s: pitched like the kick but
-//            an octave up and longer, so it reads as a drum with a note.
-//   high tom the same a fifth above, 210 to 150 Hz, shorter. With the low tom
-//            it makes a fill: two notes that answer each other.
-//   cowbell  two square waves at 540 and 800 Hz (the 808's own), filtered:
-//            the only clearly PITCHED metal, where the hats are noise-like.
-// Rim shot was the other candidate and was left out: on a laptop speaker a
-// short click reads as the closed hat's tick.
+// Four more, for /drums/camera/ only: clap (three noise bursts), low tom (130 to 90 Hz), high
+// tom (210 to 150 Hz), cowbell (squares at 540 and 800 Hz), each distinct by ear and on a scope.
+// See lessons/page-drums.md#drums-39
 const clap = () => `// three quick bursts of noise and a tail, as many hands
 { |amp = 0.9|
 
@@ -193,14 +150,9 @@ const cowbell = () => `// the 808's two square waves at 540 and 800 Hz, filtered
     HPF.ar(tone, 400) * env * amp
 }`;
 
-// A NINTH, 2026-10-12, when 050 stopped dropping a picture row (*"just split
-// the video up to squares. add more drum rows if needed"*):
-//   rim shot  the 808's own: two sines at 455 and 1667 Hz for 40 ms over a
-//             3 ms noise tick. Earlier left out because on a laptop speaker a
-//             short click reads as the closed hat's tick; with the hats above
-//             7 kHz and the cowbell's squares at 540 and 800, it is the one
-//             PITCHED, WOODY tick in the mid range, and a ninth row has room
-//             for it. A shaker or a ride would be a third noise above 7 kHz.
+// A ninth: rim shot, sines at 455 and 1667 Hz for 40 ms over a 3 ms noise tick, the one woody
+// pitched tick in the mid range.
+// See lessons/page-drums.md#drums-40
 const rim = () => `// the 808's rim shot: two sines, a woody tick, gone in 40 ms
 { |amp = 0.7|
 
@@ -223,22 +175,9 @@ const EXTRAS = [
   { key: 'rim', label: 'rim shot', make: rim },
 ];
 
-// ── NINE MORE, FOR /drums/camera/'s 2x ONLY ──────────────────────────
-// Asked 2026-10-12: *"can we deliver 2x more res button and drum instruments as
-// toggle?"*. At 2x the picture is 32 by 18 squares, so eighteen rows. Each of
-// these is a sound the first nine do not make:
-//   ride        six squares at inharmonic ratios, filtered high, ringing 1.2 s:
-//               a pitched wash, where the open hat is a short noisy one
-//   crash       bright noise and metal, 1.5 s: the longest thing in the kit
-//   shaker      noise with a soft 20 ms attack, 80 ms: the only sound that
-//               swells rather than strikes
-//   tambourine  jingles: four squares at 2.5 to 5.3 kHz with noise, 0.25 s
-//   claves      one sine at 2.5 kHz for 50 ms: the highest pitched wood
-//   low conga   a sine 230 to 200 Hz, 0.25 s
-//   high conga  330 to 300 Hz, 0.18 s
-//   mid tom     170 to 120 Hz, 0.35 s, between the two toms
-//   agogo       two sines at 900 and 1350 Hz, 0.3 s: a bell with a note,
-//               above the cowbell's squares
+// Nine more, for /drums/camera/'s 2x only (eighteen rows): ride, crash, shaker, tambourine,
+// claves, low and high conga, mid tom, agogo, each a sound the first nine do not make.
+// See lessons/page-drums.md#drums-41
 const ride = () => `// six squares at inharmonic ratios, high passed, ringing
 { |amp = 0.35|
     var metal = HPF.ar(Mix(Pulse.ar([310, 456, 620, 782, 1053, 1240], 0.5, 0.25)), 3000);
@@ -290,12 +229,10 @@ const MORE = [
 ];
 
 /**
- * The four drums in grid order, top to bottom: the row's name, the bay node,
- * the definition's name on the server, its program, its note, and (with knobs)
- * the one parameter its knob turns.
- * `extras: true` adds the four above after them (050's eight).
- * `more: true` adds the nine after those (050's 2x eighteen).
+ * The drums in grid order: name, bay node, definition, program, note, knob parameter. `extras`
+ * adds EXTRAS (nine rows), `more` also MORE (eighteen). Original: lessons/page-drums.md#drums-42.
  * @param {{ knobs?: boolean, extras?: boolean, more?: boolean }} [o]
+ * See lessons/page-drums.md#drums-43
  */
 export function voices({ knobs = false, extras = false, more = false } = {}) {
   return [...ROWS, ...(extras || more ? EXTRAS : []), ...(more ? MORE : [])].map((r) => ({

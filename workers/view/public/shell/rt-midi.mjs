@@ -1,12 +1,7 @@
-// demo/shell/rt-midi.mjs: the runtime of a `midi` node on /connect/
-// (node-runtime.mjs): every MIDI keyboard plugged into this machine, through the
-// kit's midi-devices.mjs, as the one `web:midi` box. Its face is a button that
-// asks the browser for MIDI, and the names of what is plugged in.
-//
-// 🔴 THE PERMISSION IS ASKED ONLY ON A PERSON'S PRESS OF THAT BUTTON, never on a
-// link or a visit. midi-devices.mjs keeps its device nodes on a bay of this
-// runtime's own, so the inputs it finds are not new boxes on the page; their
-// notes leave on web:midi:midi-out.
+// demo/shell/rt-midi.mjs: the `midi` node on /connect/ (node-runtime.mjs): every plugged in keyboard
+// as the one `web:midi` box, via midi-devices.mjs on a bay of its own. MIDI permission is asked only
+// on a person's press of the face's button, never on a link or a visit.
+// why: lessons/kit-rt-midi.md#header
 
 import { createBay } from './bay.mjs';
 import { createMidiDevices } from './midi-devices.mjs';

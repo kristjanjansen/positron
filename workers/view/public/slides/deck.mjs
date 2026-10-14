@@ -1,16 +1,6 @@
-// demo/slides/deck.mjs, the slide deck engine.
-//
-// A talk is a list of slide objects. This module turns the list into slides
-// inside a `createVideoPanel`, steps them, presents them full screen, sets them
-// in JetBrains Mono, shows speaker notes when asked, and grades
-// the result. `/slides/` (the sample and the system) and `/talk/` (the talk
-// about positron) both import it from `/slides/deck.mjs` and link
-// `/slides/deck.css`; neither page carries deck code of its own.
-// plans/plan-slides.md has the research, the scale and the slide model.
-//
-// ⚠️ ONE DECK A PAGE. The word hues are module state, set by `createDeck` from
-// the diagram it is told lends them, so two decks on one page would share one
-// map. Nothing here needs two.
+// The slide deck engine shared by /slides/ and /talk/ (plans/plan-slides.md).
+// One deck a page: the word hues are module state set by createDeck.
+// See lessons/page-slides.md#slides-12
 
 import { el, createReport } from '/shell/shell.mjs';
 import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -23,25 +13,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 // ── the face ────────────────────────────────────────────────────────────────
-// ONE FACE SINCE 2026-10-12. This was seven self-hosted monospaced faces behind
-// a picker, with `?face=plex` in the address, and JetBrains Mono the default
-// since 2026-10-05 (*"jetbrains default"*, plans/plan-slides.md section 9).
-// plans/plan-fonts-minimal.md cut the site to JetBrains Mono and Geist, so the
-// other six left with their files, the picker went (a choice of one is not a
-// choice) and `?face=` is ignored. `FACES` stays a list so the measuring pass
-// below, which loops over it, reads the same with one entry.
+// One face, JetBrains Mono; `?face=` is ignored. `FACES` stays a list so the
+// measuring pass below reads the same with one entry.
+// See lessons/page-slides.md#slides-13
 export const FACES = [
   { id: 'jetbrains', name: 'JetBrains',   family: 'SL JetBrains Mono' },
 ];
 const faceStack = (f) => `'${f.family}', var(--mono)`;
 
 // ── the marks in a slide string ─────────────────────────────────────────────
-// `*x*` paints x in `--hi`, on what carries the point. `[x|box]` paints x in
-// the hue the deck's diagram gives its box called `box`, so a word on any
-// slide is joined by colour to the box it means. Only boxes that paint a hue
-// lend one, and MEASURED 2026-10-05 the diagram colours a bold name in a note
-// only for a top level box (page, relay and synths came back plain bold), so
-// a word joined to an inner box would have nothing on screen to match.
+// `*x*` paints x in `--hi`; `[x|box]` paints x in the hue of the diagram's box.
+// Only top level boxes lend a hue: the diagram colours no inner box's bold name.
+// See lessons/page-slides.md#slides-14
 
 /** A box's name, lower-cased, to the hue the diagram paints it in. */
 let NAME_HUE = new Map();
@@ -100,8 +83,9 @@ function padRows({ head, body, align }) {
 }
 
 /**
- * A stack of figures, label and number and unit per row. `rows` is
- * [label, value, unit]; a live stack sets a value later through `set(i, t)`.
+ * A stack of figures. `rows` is [label, value, unit]; a live stack sets a value
+ * later through `set(i, t)`.
+ * See lessons/page-slides.md#slides-15
  */
 export function stackOf(rows) {
   const g = el('div', `sl-stack sl-t sl-t${evStep(rows.length)}`);
@@ -116,12 +100,9 @@ export function stackOf(rows) {
 }
 
 // ── live elements ───────────────────────────────────────────────────────────
-// A slide's `live(host)` is called the first time the slide is shown, because a
-// box in a hidden slide measures 0, and the element runs only while its slide
-// is the one on screen. None of them opens a connection. Each returns
-// { start, stop, value, subject }, `windowMs` when its value moves slower than
-// every frame so the check knows how long to look, and `fit` when it scales
-// itself to the slide, so the check can re-fit it synchronously.
+// `live(host)` runs on first showing (a hidden box measures 0), opens nothing, and
+// returns { start, stop, value, subject }, plus `windowMs` and `fit` when needed.
+// See lessons/page-slides.md#slides-16
 
 /** A component laid out at `w` logical px and scaled into `host`. */
 export function fitBox(host, w) {
@@ -149,8 +130,8 @@ export function liveReadout(host) {
   const { inner, fit } = fitBox(host, 360);
   const r = createReport({ readout: { fps: '', frames: '' }, showLog: false, joined: false });
   inner.append(r.readoutEl);
-  // `frames` is there because `fps` alone does not move on a screen locked to
-  // its refresh rate: MEASURED in headless Chrome, 60.0 for a whole second.
+  // `frames` too, since `fps` reads 60.0 for a whole second on a refresh-locked screen.
+  // See lessons/page-slides.md#slides-17
   let raf = 0, last = 0, times = [], shown = 0, count = 0;
   const tick = (t) => {
     count++;
@@ -194,17 +175,10 @@ export function livePicture(host) {
 }
 
 /**
- * A diagram, drawn by `diagram.mjs`, a lit box walking through it.
- *
- * 🔴 BOX NAMES ONLY, AND WHAT EACH TOP LEVEL BOX IS GOES UNDER ITS COLUMN AS
- * SLIDE TEXT. Asked 2026-10-05: *"do not use diagram native descs below but
- * use slides text and postion"*. So every `sub` and every link `label` is
- * taken out before the diagram sees the spec, the diagram's own caption line
- * is not shown on a slide (deck.css), and a top level node's `desc` is set at
- * step 1 in the chosen face, one line under that box, centred on it. A desc
- * may carry the same marks as any slide string.
- * The row is reserved before the picture is fitted (two lines of step 1 and
- * half a line of air), so the picture and its words are centred together.
+ * A diagram by diagram.mjs, a lit box walking through it. Box names only: `sub`
+ * and link labels are stripped, and each top level `desc` is slide text set one
+ * line under its box, with that row reserved before the picture is fitted.
+ * See lessons/page-slides.md#slides-18
  */
 export function liveDiagram(spec, { w = 760 } = {}) {
   const tops = spec.nodes;
@@ -304,11 +278,9 @@ export function liveDiagram(spec, { w = 760 } = {}) {
 }
 
 /**
- * A step grid from the kit at a tempo this slide made up, and the time each
- * step lands behind its own mark, in ms, under it. The grid's clock is a frame
- * clock (`step-grid.mjs`: the step is a function of the clock, read once a
- * frame), so a step can only appear on the first frame after its time, and
- * what the stack prints is how long after.
+ * A kit step grid at a made-up tempo, and how many ms after its time each step
+ * appears. The grid's clock is a frame clock, so a step lands on the next frame.
+ * See lessons/page-slides.md#slides-19
  */
 export function liveSteps(host) {
   const { inner, fit } = fitBox(host, 480);
@@ -342,25 +314,9 @@ export function liveSteps(host) {
 }
 
 // ── the deck ────────────────────────────────────────────────────────────────
-//
-// A slide object:
-//   name       short id for the log and the checks, lowercase
-//   say        the headline at step 4: one sentence, no full stop, no colon,
-//              semicolon, dash or middot, two lines in every face (asserted)
-//   statement  true makes `say` the whole slide at step 5, up to three lines
-//   big        one figure at step 6
-//   list       up to three lines
-//   rows       { head, body, align }, a table of text padded into character
-//              columns; `align` is one letter a column, l or r
-//   stack      [label, value, unit] rows whose decimal points line up
-//   live       a builder, see above
-//   cap        the caption at step 1, bottom left
-//   link       the slug the caption links, written out as a full URL; '' is
-//              the front page. A link is not a fetch.
-//   notes      what to say, shown under the panel only with `?notes=1`
-//
-// 🔴 EVERY NUMBER ON A SLIDE IS A MEASURED ONE, AND ITS SOURCE IS THE COMMENT
-// ABOVE THE SLIDE IN THE PAGE. A number with no comment is a defect.
+// A slide: name, say, statement, big, list, rows, stack, live, cap, link, notes
+// (the page's talk comment spells them out). Every number cites its source above.
+// See lessons/page-slides.md#slides-20
 
 /**
  * @param d          the page's `mount()` result
@@ -450,8 +406,8 @@ export function createDeck(d, { slides, hues = null }) {
     notesEl.append(p);
   }
 
-  // The face, one since 2026-10-12, so there is no picker and the address
-  // carries no `?face=`.
+  // One face, so no picker and no `?face=` in the address.
+  // See lessons/page-slides.md#slides-21
   let face = FACES[0];
   function setFace(f) {
     face = f;
@@ -486,11 +442,9 @@ export function createDeck(d, { slides, hues = null }) {
     return want;
   };
 
-  // Keys. A clicker sends PageUp and PageDown (Logitech R400), F5 and Escape
-  // from its play button, and a full stop from its blank button. Escape leaves
-  // full screen as well as the browser's own Escape does on the real API, so
-  // the fallback cover leaves on it too, and on a desktop, where deck.css
-  // hides the way-out button over a slide, Escape, `f` and F5 are the way out.
+  // Keys: a clicker sends PageUp, PageDown, F5, Escape and a full stop. Escape leaves
+  // the fallback cover too, and on a desktop Escape, `f` and F5 are the way out.
+  // See lessons/page-slides.md#slides-22
   const NEXT = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
   const PREV = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
   document.addEventListener('keydown', (e) => {
@@ -617,8 +571,8 @@ export async function checkDeck(deck, { range = [12, 16], kitLive = [], minLive 
   const A = d.assert;
   const go = deck.go, at = () => deck.at();
   const t0 = performance.now();
-  // The face in before counting requests. It loads from `/shell/vendor/`,
-  // the files every page of the site ships, since 2026-10-12.
+  // The face in before counting requests; it loads from `/shell/vendor/`.
+  // See lessons/page-slides.md#slides-23
   const loaded = await Promise.all(FACES.map((f) => Promise.all([
     document.fonts.load(`600 20px '${f.family}'`), document.fonts.load(`400 20px '${f.family}'`)])));
   const missing = FACES.filter((f, i) => !loaded[i].every((l) => l.length)
@@ -700,9 +654,9 @@ export async function checkDeck(deck, { range = [12, 16], kitLive = [], minLive 
     `slide ${s0.getBoundingClientRect().width.toFixed(1)} x ${h0.toFixed(1)}, stage ${vp.width.toFixed(1)} x ${vp.height.toFixed(1)}`);
 
   // ── the measuring pass: every slide, every face, two widths ──
-  // Every slide is laid out at once, unseen, so each face at each width is one
-  // synchronous layout. A fitted picture is re-fitted by hand on every slide,
-  // because its ResizeObserver does not run inside a synchronous loop.
+  // All slides lay out at once, unseen, one synchronous layout per face and width.
+  // A fitted picture is re-fitted by hand: its ResizeObserver does not run here.
+  // See lessons/page-slides.md#slides-24
   const was = deck.face(), wasAt = at();
   const tm = performance.now();
   const meas = document.createElement('canvas').getContext('2d');
@@ -899,11 +853,9 @@ export async function checkDeck(deck, { range = [12, 16], kitLive = [], minLive 
   const hcr = hiEl ? ratio(getComputedStyle(hiEl).color, ground) : 0;
   A('the yellow accent is at least 7:1 against the slide ground', hcr >= 7, `${hcr.toFixed(1)}:1`);
 
-  // Every hued word is the colour the diagram itself draws that box's name
-  // in. Each box's note names others in bold, and the diagram paints a bold
-  // name in its box's hue, so focusing every box gives one rendered word per
-  // box to compare against. The caption line is not shown on a slide, and a
-  // computed colour does not need it to be.
+  // Every hued word is the colour the diagram draws that box's name in: focusing
+  // each box renders its bold name in its hue, one word per box to compare against.
+  // See lessons/page-slides.md#slides-25
   const mi = SLIDES.findIndex((sl) => sl.name === hueSlide);
   go(mi); await frame(); await frame();
   const dgm = nodes[mi].ctl.dg;

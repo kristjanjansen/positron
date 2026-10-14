@@ -1,47 +1,7 @@
-// demo/drums/drum-machine.mjs: the drum machine /drums/machine/
-// and /drums/knobs/ are built from. A page mounts the shell and calls
-// `createDrumMachine(d, { voices })`, and gets the glued transport and grid,
-// the patchbay, and, when the voices carry a parameter (010), one row of knobs,
-// each knob a bay node `web:knob-<name>` with a value wire into its drum.
-//
-// A drum machine as a patchbay: a 16 step by 4 row grid, a sequencer that
-// sends each hit as a MIDI note, and four SuperCollider voices (kick, snare,
-// open hat, closed hat), each a node of its own on the bay. Asked 2026-10-12
-// (BACKLOG, "A rhythm concept group"): *"make new grpup concept rythm. make a
-// 16 x 4 grid pad componetn (global one), 4 sc (or fau?) synths for kick
-// snare hho hhc and patchbay. 000"*.
-//
-// THE GRID IS THE KIT'S `createStepGrid`, the one /tom/ and /kit/devices/
-// use, with its rows named. Its label column used to be a fixed 22 px, which
-// cut every name past two letters; `shell.css` now sizes it to the widest
-// label with 22 px as the floor, so every numbered grid is unchanged.
-//
-// EVERY HIT CROSSES A WIRE. The sequencer has one `midi-out` and sends General
-// MIDI drum notes on channel 10 (36 kick, 38 snare, 46 open hat, 42 closed
-// hat). Each voice is linked to it through a `range` transform that lets its
-// own note through and nothing else, so the patchbay shows four wires, each
-// carrying one drum. Take a wire away and that drum stops.
-//
-// SCHEDULED AHEAD ON THE AUDIO CLOCK, as /concepts/clock/010/ argues: a timer
-// wakes every 25 ms and hands over every hit due in the next 150 ms, each
-// carrying the time it must sound at (`at`, on performance.now()'s clock).
-// The voice sends it to scsynth as a timestamped OSC bundle (`sendAt`), which
-// SuperSonic maps to the speakers' clock, so a late timer makes a hit late to
-// HAND OVER, never late to SOUND.
-//
-// ONE ENGINE, ONE OUTPUT. The four voices are four definitions on one scsynth,
-// and their sound leaves as one mix, so a voice's `audio-out -> speaker` link
-// is honoured where it can be: a voice whose link is gone starts no hits.
-//
-// THE CHOKE is a drum machine's: a closed hat cuts an open hat that is still
-// ringing. The closed hat voice sends `/n_set gate 0` to the open hat's node,
-// in the same bundle time as its own hit; the open hat's program closes in
-// 15 ms on that gate.
-//
-// NOTHING OPENS ON A VISIT. The four programs are compiled in JavaScript as
-// the page opens (no fetch). A pointer over the transport fetches the engine
-// from our origin; the first press of play makes the AudioContext, boots
-// scsynth, loads the four definitions and starts.
+// The drum machine the /drums/ pages build on: the kit's step grid, a sequencer whose GM drum
+// notes (ch 10) reach each SuperCollider voice through its own filtered wire, hits scheduled
+// 150 ms ahead as timestamped bundles, a closed hat choking the open one. A visit opens nothing.
+// See lessons/page-drums.md#drums-9
 
 import { el } from '/shell/shell.mjs';
 import { createBay } from '/shell/bay.mjs';
@@ -62,66 +22,40 @@ import { compile } from '/shell/sclang-lite.mjs';
 import { LIFE } from './voices.mjs';
 
 /**
+ * `createDrumMachine(d, o)`: transport, grid, patchbay and optional knobs. A voice's `label` and
+ * `title` are read on every draw; `opens` and `closes` name the choke pair (default hho, hhc).
  * @param {object} d  what `mount()` returned, for its log
  * @param {object} o
  * @param {object[]} o.voices  from `voices()` in voices.mjs, with or without knobs
- * @param {boolean} [o.patternIn]  give the sequencer a `value-in` that takes a
- *   whole pattern, `{ of: 'pattern', rows: [[0|1 x 16] x 4] }`, and makes the
- *   grid read only and empty, with no clear button: the pattern arrives on a
- *   wire (rhythm/050, where a picture is the pattern).
- * @param {(lap: number) => void} [o.onBar]  called just before the first step
- *   of every bar is handed over, which is where a page sends that bar's pattern
+ * @param {boolean} [o.patternIn]  a sequencer `value-in` taking a whole pattern,
+ *   `{ of: 'pattern', rows }`; the grid is read only and empty (/drums/camera/)
+ * @param {(lap: number) => void} [o.onBar]  called before each bar's first step is handed over
  * @param {(link: object, playing: boolean) => boolean} [o.flowing]  which wires the patchbay lights
- * @param {(engine: object, ctx: AudioContext) => Promise<void>} [o.onWake]  awaited
- *   once the engine is up and the definitions are in, before the first hit
- *   (rhythm/020 loads its samples here). A voice may also bring `def` (bytes),
- *   `params` (several knobs) and `args()` (extra `/s_new` arguments per hit,
- *   or null to skip the hit); see `paramsOf` and `hit`.
- * @param {(ctx: AudioContext) => Promise<void>} [o.onStart]  awaited on every
- *   press of Play, after the engine is up and before the first hit, while the
- *   bar shows it is busy (remote/040 joins the Pi here, so the lead is the
- *   Pi's path from the first hit)
- * @param {() => void} [o.onStop]  called on every stop (remote/040 leaves the Pi)
- * @param {boolean} [o.scopes]  one scope per drum, each a node `web:scope-<drum>`
- *   fed by that drum's own `audio-out` (rhythm/010)
- * @param {number | (() => number)} [o.ahead]  how far ahead each hit is handed
- *   over, ms, read on every tick; 150 by default. remote/040 hands over on the
- *   Pi's path, 250 on the relay and 150 direct (plans/plan-pi-supercollider-defs.md §2.4)
- * @param {() => AudioContext} [o.context]  the page's own context, made on the
- *   first press; left out, the machine makes one (remote/040 needs 48 kHz)
- * @param {{ node: string, label: string }} [o.mix]  the drums go into a node
- *   of this name (`web:<node>:audio-in`) with an `audio-out` of its own, and
- *   the mix is NOT connected to the speakers: the page routes `api.mixOut()`
- *   where its own wires say (remote/040's crossfader). Left out, the node is
- *   `web:speaker` and the mix goes to the speakers.
- * @param {{ rows: number, steps: number }} [o.shape]  how many of `voices` are
- *   rows (the first n) and how many steps a loop has, 16 by default. Changed
- *   with `api.setShape`, which lands at the next loop while playing
- *   (rhythm/050's 1x and 2x). The other rows' drums stay loaded on the engine
- *   and leave the grid and the patchbay.
- * @param {(shape: {rows: number, steps: number}) => void} [o.onShape]  called as
- *   a new shape lands, before its first step is read, so a page that writes the
- *   pattern can write it for the new shape first
- * @param {boolean} [o.start]  false: the grid starts empty rather than with the
- *   house four on the floor (rhythm/020, whose rows are whatever was loaded)
- * @param {(rows: number) => number} [o.gain]  the mix's level for this many
- *   rows, read at the first play and at every new shape; left out, it follows
- *   how many drums there are in all, as it always has
- * @param {(ev: object) => void} [o.sequence]  where the grid's notes go instead of
- *   along this machine's own sequencer wires (/connect/, whose own link carries
- *   them to `api.play`); left out, they go along the wires as always
- * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]
- *   above `over` rows the patchbay draws the rows as ONE box, `web:<node>`,
- *   with one MIDI wire in and one audio wire out (rhythm/020 with a 64 sample
- *   pack). It is the picture only: the bay still holds one filtered wire per
- *   row, and every hit still crosses its own.
- *
- * A voice's `label` and `title` are read every time they are drawn, so a voice
- * whose label is a getter renames its row and its box (rhythm/020's sample
- * names); `opens` and `closes`, when a voice has them, say which rows are an
- * open hat and the closed hat that chokes it (by default the `hho` and `hhc`
- * keys, as on 000).
+ * @param {(engine: object, ctx: AudioContext) => Promise<void>} [o.onWake]  awaited once the
+ *   engine and definitions are in (/drums/samples/ loads samples). Voices may bring `def`,
+ *   `params` and `args()` (null skips the hit); see `paramsOf` and `hit`
+ * @param {(ctx: AudioContext) => Promise<void>} [o.onStart]  awaited on every Play before the
+ *   first hit (/drums/remote/ joins the Pi here)
+ * @param {() => void} [o.onStop]  called on every stop
+ * @param {boolean} [o.scopes]  one scope per drum, `web:scope-<drum>` (/drums/knobs/)
+ * @param {number | (() => number)} [o.ahead]  ms each hit is handed over early, read every
+ *   tick; 150 by default
+ * @param {() => AudioContext} [o.context]  the page's own context; left out, one is made
+ * @param {{ node: string, label: string }} [o.mix]  the drums go into `web:<node>`, not the
+ *   speakers; the page routes `api.mixOut()`. Left out, the node is `web:speaker`
+ * @param {{ rows: number, steps: number }} [o.shape]  rows (the first n voices) and steps, 16
+ *   by default; `api.setShape` lands at the next loop. Other rows stay loaded
+ * @param {(shape: {rows: number, steps: number}) => void} [o.onShape]  called as a new shape
+ *   lands, before its first step is read
+ * @param {boolean} [o.start]  false: the grid starts empty, not four on the floor
+ * @param {(rows: number) => number} [o.gain]  the mix's level for this many rows; left out,
+ *   it follows how many drums there are in all
+ * @param {(ev: object) => void} [o.sequence]  where the grid's notes go instead of the
+ *   sequencer wires
+ * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]  above
+ *   `over` rows the patchbay draws them as one box; the picture only, each hit keeps its wire
  * @returns {{ surface: HTMLElement, knobs: ?HTMLElement, scopes: ?HTMLElement[], patchbay: HTMLElement, api: object }}
+ * See lessons/page-drums.md#drums-10
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
   onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null,
@@ -132,12 +66,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   const OUT = mix ? mix.node : 'speaker';
   const SPK = ID(OUT, 'audio-in');
 
-  // ── the tempo and the bar ────────────────────────────────────────────────
-  // 120 bpm, the house default, four steps to a beat: a step is 125 ms and the
-  // sixteen of them are one 2 s bar, looped. The tempo is the bar's `- bpm +`
-  // stepper, 60 to 180 in fives (asked 2026-10-12: *"rm step of and bpm. use
-  // bpm selector on right and add clear button"*), the kit's `createStepper`
-  // as /tom/ wears it.
+  // The tempo and the bar: 120 bpm, four steps a beat, a 125 ms step and a 2 s bar, looped.
+  // The tempo is the bar's `- bpm +` stepper (the kit's `createStepper`), 60 to 180 in fives.
+  // See lessons/page-drums.md#drums-11
   const BPM_AT_START = 120, BPM_MIN = 60, BPM_MAX = 180, BPM_STEP = 5;
   let STEPS = shapeOpt?.steps ?? 16;
   const stepMsAt = (b) => 60000 / (b * 4);
@@ -150,30 +81,18 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   /** The drums that are rows now: the first `shape.rows` of `voices`. */
   let VOICES = ALL.slice(0, shapeOpt?.rows ?? ALL.length);
   /**
-   * A voice's knobs: `v.params` (a list, rhythm/020's pitch and length per row)
-   * or `v.param` (one, rhythm/010). Each is `{ name, value, min, max, unit }`
-   * plus, optionally, `control` (the definition's control the value is sent as,
-   * default `name`), `label` and `sub` for the knob, `toArg(x)` (what is sent,
-   * default the value itself) and `life: true` for the one that says how long
-   * a hit rings (the open hat's choke window follows it). `name` is the bay
-   * node's (`web:knob-<name>`), so it is unique on the page.
+   * A voice's knobs: `v.params` (a list) or `v.param` (one), each `{ name, value, min, max, unit }`
+   * plus optional `control`, `label`, `sub`, `toArg(x)` and `life: true` (how long a hit rings,
+   * which the choke window follows). `name` is the bay node's, so unique on the page.
+   * See lessons/page-drums.md#drums-12
    */
   const paramsOf = (v) => v.params ?? (v.param ? [v.param] : []);
   const KNOBS = ALL.filter((v) => paramsOf(v).length);
 
-  // ── the four programs, compiled now (pure JavaScript, no fetch) ──────────
-  // EACH DRUM ON A STEREO PAIR OF ITS OWN: drum i's last line goes to output
-  // busses 2i and 2i+1, and the engine is booted with eight outputs. So the
-  // engine's output can be split per drum, which is what makes a drum's
-  // `audio-out` wire real (the speaker hears exactly the drums wired to it)
-  // and what lets a scope see one drum alone.
-  //
-  // 🔴 UNLESS THERE ARE MORE THAN SIXTEEN DRUMS. An AudioWorkletNode carries at
-  // most 32 channels in Chrome, so 16 pairs is the ceiling; rhythm/050's 2x has
-  // eighteen. Then every drum plays on busses 0 and 1, the engine has two
-  // outputs, and a drum's `audio-out` wire is honoured at the hit instead (a
-  // drum with no wire to the speakers starts no hits). Nothing with scopes has
-  // that many drums.
+  // Each drum on a stereo pair of its own (busses 2i, 2i+1), so a drum's `audio-out` wire and its
+  // scope are real. Over sixteen drums (a worklet carries at most 32 channels in Chrome) all play
+  // on 0 and 1 and a drum's wire is honoured at the hit instead.
+  // See lessons/page-drums.md#drums-13
   const SPLIT = 2 * ALL.length <= 32;
   const BUS = new Map(ALL.map((v, i) => [v.key, SPLIT ? 2 * i : 0]));
   // A voice may bring its definition as bytes (`v.def`, rhythm/020's
@@ -214,10 +133,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       const e = await bootScsynth({ audioContext: ctx, log: d.log, onReply: heard,
         scsynthOptions: { numOutputBusChannels: SPLIT ? 2 * ALL.length : 2, numInputBusChannels: 2 } });
       stat.bootMs = Math.round(e.bootMs);
-      // The engine's sound goes where the bay says, so it comes off the
-      // speakers here. A silent branch to the destination stays, because Web
-      // Audio pulls and an engine nobody pulls never answers /d_recv
-      // (collide-voice.mjs measured that).
+      // The engine's sound goes where the bay says, so it comes off the speakers here. A silent
+      // branch to the destination stays: an engine nobody pulls never answers /d_recv.
+      // See lessons/page-drums.md#drums-14
       e.out.disconnect();
       const pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);
       e.out.connect(pull);
@@ -420,21 +338,19 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     patternsIn++;
   }
 
-  // ── the sequencer: wakes every 25 ms, hands over what is due in the next 150 ─
-  // The deck only carries the bar's play state (the bar shows no time). Its
-  // range is a day, because the deck runs in milliseconds and pauses itself at
-  // its end, which would stop the loop through the bar's own command.
+  // The sequencer wakes every 25 ms and hands over what is due in the next 150. The deck carries
+  // only the play state; its range is a day, because it pauses itself at its end.
+  // See lessons/page-drums.md#drums-15
   const deck = createDeck({ items: [], range: [0, 24 * 3600e3] });
   let loop = null, raf = 0, t0 = 0, next = 0, playing = false, laps = 0, shown = -1;
   /** The absolute step the current loop began at, so a loop can change length at its end. */
   let loopStart = 0, loopIndex = 0;
   const stepOf = new Map();                       // absolute step -> [the step of the grid it played, which loop]
   /**
-   * WHEN EACH STEP SOUNDS, AS AN ANCHOR AND A STEP LENGTH. A tempo change moves
-   * the anchor to the first step not yet handed over, at the time it already
-   * had, and only the steps after it get the new length. Hits already handed
-   * to the engine keep their times, so a change lands from the next step with
-   * no step played twice, skipped or squeezed.
+   * When each step sounds, as an anchor and a step length. A tempo change moves the anchor to the
+   * first step not yet handed over; handed over hits keep their times, so nothing is doubled,
+   * skipped or squeezed.
+   * See lessons/page-drums.md#drums-16
    */
   let anchor = { k: 0, t: 0, ms: stepMsAt(bpm) };
   const heardAt = (k) => anchor.t + (k - anchor.k) * anchor.ms;   // performance.now() ms of absolute step k
@@ -633,14 +549,10 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
    *  is on its own scope and nowhere else. */
   const scopeLevels = new Map(ALL.map((v) => [v.key, []]));
   /**
-   * TRIGGERED, HELD SCOPES, asked 2026-10-12: *"scopes are very "nervous"."*.
-   * Each scope takes its drum's window from the hit's onset (it knows the
-   * time the hit sounds, off its `midi-in`) and holds it until the next hit,
-   * the previous trace faint underneath. The kit's own option:
-   * `createWaveShape({ mode: 'triggered', window, fade, source })`. The
-   * window suits the drum: a kick's body and fall, a snare's crack and wires,
-   * the open hat's ring, the closed hat's tick. The label and the span are
-   * fixed strings, so nothing on a scope changes size as it redraws.
+   * Triggered, held scopes: each takes its drum's window from the hit's onset and holds it until
+   * the next hit, the previous trace faint beneath (`createWaveShape({ mode: 'triggered' })`).
+   * Label and span are fixed strings, so nothing changes size on redraw.
+   * See lessons/page-drums.md#drums-17
    */
   const WINDOW = { kick: 250, snare: 200, hho: 500, hhc: 80 };
   // The analyser exists only once the engine is up, so it is handed over then (`listen`).

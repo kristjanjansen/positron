@@ -31,10 +31,10 @@
   import { createVoice } from '/shell/synth-voice.mjs';
   useMediumColours();
 
-  // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
-  // Named from the bay's side: what the keyboard PLAYS leaves it (an out), what
-  // it SHOWS arrives (an in). Notes travel keys -> synth only along a link the
-  // bay holds; the synth's sound goes to the speakers by WebAudio. No room.
+  // The on-screen keyboard and a sine synth as bay nodes in this tab, no room. Notes
+  // travel keys -> synth only along a link the bay holds; ports are named from the
+  // bay's side (what the keys play is an out, what they show is an in).
+  // See lessons/page-synth.md#synth-6
   const S = 'web';
   const bay = createBay();
 
@@ -78,14 +78,10 @@
     pb.refresh();
   }
 
-  // ── the links as a picture, with the links and ports behind its details ──
-  // A MIDI wire pulses once per event its link delivered; the audio wire is lit
-  // while the sine sounds.
-  // The picture reads only nodes(), ports() and links(), and the bay has no way
-  // to forget a node, so an unplugged device is hidden here and its links are
-  // dropped. With nothing plugged in the picture is the three nodes it always was.
-  // Keyboards plugged into this machine: each a `device` node whose midi-out is
-  // linked to the synth (it sounds) and to the keys (they light).
+  // The links as a picture: a MIDI wire pulses per delivered event, the audio wire is
+  // lit while the sine sounds. The bay cannot forget a node, so an unplugged keyboard's
+  // `device` node is hidden here and its links dropped.
+  // See lessons/page-synth.md#synth-7
   const { plugged, ask: askMidi } = createMidiDevices({ bay, site: S, to: [`${S}:synth:midi-in`, `${S}:keys:midi-in`],
     onChange: () => pb.refresh(), log: (line, kind) => d.log(line, kind) });
   const shown = (id) => !id.startsWith(`${S}:midi`) || plugged.has(id.split(':').slice(0, 2).join(':'));

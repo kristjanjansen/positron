@@ -1,57 +1,18 @@
-// demo/shell/xr-ray.mjs — the pointer ray, as a billboard rather than a stick.
-//
-//   const ray = createXRRay(gl);
-//   ray.draw({ vp, eyePos, pose, len, held });   // once per EYE, per frame
-//   ray.dispose();
-//
-// 🔴 WHY IT IS NOT A LONG THIN BOX, WHICH IS WHAT THIS REPO HAD.
-// `xr-room.mjs`'s `beamM` scales a cube 4 mm x 4 mm x however far, and a box
-// has a fixed cross-section in the WORLD: point along it and you see a square
-// end-on, roll the controller and the lit face changes, and at 12 m it is four
-// millimetres of shaded geometry trying to be a line. It also ends at a hard
-// edge in mid-air, which reads as the pointer stopping rather than as the
-// pointer running out.
-//
-// A billboard has a fixed cross-section in the VIEW instead. It is a ribbon
-// built along the ray whose width axis is chosen per-vertex to be perpendicular
-// to both the ray and the direction to the eye, so it presents the same face
-// from everywhere, cannot be rolled, and has no end-on degenerate angle.
-//
-// 🔴 AND THE BILLBOARDING IS IN THE VERTEX SHADER, WHICH IS NOT A STYLE CHOICE.
-// A headset draws the same geometry twice from two eye positions ~64 mm apart.
-// Orienting the ribbon on the CPU picks one of those two and is therefore wrong
-// for the other — and the error is not a smear, it is a DISPARITY: the two eyes
-// see the ribbon at different widths and slightly different places, which the
-// visual system reads as depth. A pointer that sits at the wrong depth is worse
-// than one that looks wrong, because it looks fine and lands somewhere else.
-// `uEye` is per-draw, and the host passes the view's own position.
-//
-// ⚠️ IT FADES AT BOTH ENDS ON PURPOSE. Near the hand because a line growing out
-// of a controller model intersects it and reads as a skewer; in the distance
-// because a hard end is a claim about where the ray stops, and this ray does
-// not stop — it is an aim, not a measurement. Anything that wants to say where
-// the ray LANDS says it at the landing, not by terminating the beam.
+// demo/shell/xr-ray.mjs: the pointer ray as a view-facing billboard ribbon, not a thin box.
+//   const ray = createXRRay(gl); ray.draw({ vp, eyePos, pose, len, held }); // per eye, per frame
+// Billboarded in the vertex shader per eye (CPU orientation gives a disparity); fades at both ends.
+// why: lessons/kit-xr-ray.md#header
 
-/** How far along the ray the ribbon has faded in, and started to fade out.
- *  ⚠️ Exported because the check below and the shader must agree about them,
- *  and a test that re-types its subject's constants grades nothing. */
+/**
+ * How far along the ray the ribbon has faded in, and started to fade out.
+ * Exported so the check and the shader share them.
+ * why: lessons/kit-xr-ray.md#fade
+ */
 export const FADE_IN = 0.10, FADE_OUT = 0.45;
 /**
- * 🔴 THE RAY IS GREY, EVERYWHERE, AND THERE IS NO WAY TO MAKE IT ANYTHING ELSE.
- * Instructed 2026-09-17: *"use global rays, (white, ends faded). when something
- * active happens lighten them up. no coloring of rays, grayscale."*
- *
- * It used to be teal at rest and yellow with hold of something, with a second
- * grey pair beside it for `floor`, which is one pointer with two looks: you
- * learn the colour again per page, and a hue on a pointer is a hue that is not
- * available to say how something LANDED. Now the only channel the ray has is
- * how BRIGHT it is, which is the same channel doing the same job on every page,
- * and a page cannot opt out — `draw` takes no colour at all.
- *
- * ⚠️ `MONO_AIM` AND `MONO_HELD` ARE THE SAME TWO VALUES AND ARE KEPT AS NAMES
- * ONLY. They were `floor`'s private pair; now that every ray is grey there is
- * nothing private about them, and a page importing either gets what the module
- * would have used anyway.
+ * The ray is grey everywhere; brightness is its only channel and `draw` takes no colour.
+ * MONO_AIM and MONO_HELD are the same two values, kept as names.
+ * why: lessons/kit-xr-ray.md#grey
  */
 export const AIM_RGB = [0.55, 0.55, 0.55];
 export const HELD_RGB = [1.0, 1.0, 1.0];
@@ -115,18 +76,9 @@ void main(){
 }`;
 
 /**
- * Where the camera is, taken out of its own view matrix.
- *
- * 🔴 DERIVED RATHER THAN PASSED, AND THAT IS THE WHOLE POINT. The billboard has
- * to be turned against the eye that is ALSO projecting it, and a headset draws
- * two views 64 mm apart. Handing the position down beside the matrix means two
- * values that must agree and nothing that makes them — the first draft threaded
- * a `viewPos` through two modules and three call sites, every one of which had
- * a HEAD position already sitting next to it in the right shape. Taking it out
- * of the matrix makes disagreement impossible.
- *
- * A view matrix is `-R * e` in its translation with an orthonormal R above it,
- * so the inverse is a transpose and three dot products.
+ * Where the camera is, taken out of its own view matrix, so position and matrix cannot disagree.
+ * The translation is -R * e with R orthonormal: a transpose and three dot products.
+ * why: lessons/kit-xr-ray.md#eye-from-view
  */
 export function eyeFromView(v) {
   const t0 = v[12], t1 = v[13], t2 = v[14];
@@ -145,11 +97,8 @@ function compile(gl, type, src) {
 }
 
 /**
- * One ribbon, reusable by every page and every eye.
- *
- * ⚠️ IT PUTS BACK EVERY PIECE OF GL STATE IT CHANGES. A kit component that
- * leaves blending on, or the depth mask off, is a component that breaks the
- * NEXT thing its host draws — and the host will look like the broken one.
+ * One ribbon, reusable by every page and eye. It restores every piece of GL state it changes.
+ * why: lessons/kit-xr-ray.md#create-xr-ray
  */
 export function createXRRay(gl) {
   const prog = gl.createProgram();
@@ -192,16 +141,12 @@ export function createXRRay(gl) {
   return {
     /**
      * @param vp      the view-projection for THIS eye
-     * @param view    THIS eye's view matrix. The position is taken out of it —
-     *                see `eyeFromView` for why it is not a separate argument.
-     * @param eyePos  an override, for a caller that has no view matrix to hand
+     * @param view    THIS eye's view matrix; the position is taken out of it (eyeFromView)
+     * @param eyePos  an override, for a caller with no view matrix
      * @param pose    the controller's target-ray matrix (column-major 16)
-     * @param len     metres to draw. To what it has hold of, else what it is
-     *                on, else a fixed reach — the host owns that rule.
-     * @param held    something ACTIVE is happening on this ray — a hit, a grab,
-     *                a press. The ribbon lightens from grey to white; it never
-     *                changes hue, because it has none. There is deliberately no
-     *                `colour` parameter: see the note by AIM_RGB.
+     * @param len     metres to draw; the host owns the rule
+     * @param held    something active on this ray: grey lightens to white. There is no colour.
+     * why: lessons/kit-xr-ray.md#draw
      */
     draw({ vp, view = null, eyePos = null, pose, len = 2.4, held = false }) {
       if (!pose) return;
@@ -221,9 +166,8 @@ export function createXRRay(gl) {
       gl.uniform2f(L.fade, FADE_IN, FADE_OUT);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE);
-      // ⚠️ DEPTH TESTED, DEPTH MASK OFF. Tested, so the ray really does go
-      // behind anything in front of it; not WRITTEN, so a ribbon that is mostly
-      // transparent does not occlude whatever is drawn after it.
+      // Depth tested so the ray goes behind things; mask off so a mostly transparent ribbon occludes nothing.
+      // why: lessons/kit-xr-ray.md#depth
       gl.depthMask(false);
       gl.bindVertexArray(vao);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, count);
@@ -238,41 +182,15 @@ export function createXRRay(gl) {
 }
 
 /**
- * 🔴 THE RAY, GRADED BY RENDERING IT — WHICH IS THE ONLY WAY A BILLBOARD CAN BE
- * GRADED AT ALL.
- *
- * The whole claim is about a vertex shader that chooses an orientation per eye,
- * and there is no arithmetic on this side of the GPU to check: a node test
- * would have to re-implement the shader and would then be grading its own copy.
- * So this renders into a 64 px framebuffer and counts ink, and every number it
- * returns is a comparison between two renders of the SAME run — no golden
- * image, for the reason `verify-gl.mjs` records at length.
- *
- * Three questions, and the second is the one that earns its place:
- *
- *  · does it draw at all, from a viewpoint beside the ray?
- *  · does it TURN? The same ray is drawn a second time with `uEye` moved 90
- *    degrees around the ray's own axis — which is exactly the bug of orienting
- *    on the CPU and using one eye's answer for both. A ribbon that really faces
- *    the eye it is given comes out edge-on and nearly disappears; a stretched
- *    box, or a ribbon with the billboarding broken, does not change at all.
- *    ⚠️ So the test PASSES when the second render is much dimmer. A check that
- *    wanted both to look the same would be satisfied by the bug.
- *  · and does it fade at both ends rather than stopping?
- *
- * Returns raw counts; the host asserts on them, so the numbers appear in the
- * page that has the ray rather than in a file nobody runs.
+ * Grades the ray by rendering it and counting ink: draws at all, turns edge-on when `uEye` moves
+ * 90 degrees round the ray (passes when that render is much dimmer), fades at both ends.
+ * Returns raw counts; the host asserts on them.
+ * why: lessons/kit-xr-ray.md#ray-check
  */
 export function rayCheck(gl) {
-  // 🔴 THE FRAMEBUFFER HAS TO BE ABLE TO RESOLVE THE THING IT IS GRADING, AND
-  // THE FIRST VERSION COULD NOT. At 64 px the frame covers 2.39 m, so the
-  // shipping ribbon — 18 mm across — was **half a pixel** wide and the check
-  // read 0 ink both ways: a component that draws correctly, reported as drawing
-  // nothing at all. ⚠️ And the two zeroes would have satisfied a sloppier
-  // assert: `facing >= edgeOn` is true of 0 and 0. At 512 the ribbon is 3.8 px.
-  // ⚠️ The width is NOT widened for the test. Grading the shipped RAY_W means
-  // setting it to zero fails here, which is the point of having the number in
-  // one place.
+  // 512 px so the shipped 18 mm ribbon is 3.8 px wide (at 64 px it was half a pixel and read 0).
+  // RAY_W is not widened for the test.
+  // why: lessons/kit-xr-ray.md#check-n
   const N = 512;
   const fbTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, fbTex);
@@ -285,12 +203,9 @@ export function rayCheck(gl) {
   // the ray: from the origin, straight along -Z, 2 m of it
   const pose = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   const LEN = 2;
-  // ⚠️ THE CAMERA DISTANCE IS COMPUTED, NOT CHOSEN. At a 1.2 rad field of view
-  // the half-width visible at distance D is D * tan(0.6), and the fade check
-  // below reads the two ENDS of the ribbon — so if the ray overflows the frame
-  // those columns are sampling the middle of it and "the ends are dark" is a
-  // statement about the background. 1.75 m puts the 2 m ray inside the frame
-  // with about 8 px of margin at each end.
+  // 1.75 m at a 1.2 rad field of view keeps the 2 m ray in frame with about 8 px each end,
+  // so the fade check reads the ends and not the middle.
+  // why: lessons/kit-xr-ray.md#camera-distance
   const at = [0, 0, -LEN / 2];
   const eyeA = [1.75, 0, -LEN / 2];
   // ...90 degrees round the ray's own axis, i.e. above it. Handing THIS to a
@@ -309,10 +224,8 @@ export function rayCheck(gl) {
   };
   const nrm = (v) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
   const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  // ⚠️ up is a PARAMETER here. The obvious helper takes (eye, at) and assumes
-  // +Y, and eyeB looks straight down -Y — where that assumption is degenerate
-  // and hands back a matrix of NaN, so the second render would be blank for a
-  // reason that has nothing to do with the ray.
+  // `up` is a parameter: eyeB looks straight down -Y, where an assumed +Y gives NaN.
+  // why: lessons/kit-xr-ray.md#up-param
   const view = (e, a, up) => {
     const f = nrm([a[0] - e[0], a[1] - e[1], a[2] - e[2]]);
     const r = nrm(crs(f, up));
@@ -344,10 +257,8 @@ export function rayCheck(gl) {
 
   const viewA = view(eyeA, at, [0, 1, 0]);
   const vpA = mul(proj, viewA);
-  // ⚠️ AND THE DERIVATION IS ROUND-TRIPPED, because it has an exact expected
-  // answer and almost nothing else here does: this matrix was BUILT from eyeA,
-  // so taking the position back out of it must give eyeA again. A transpose
-  // written the wrong way round still produces a plausible position.
+  // Round-trips eyeFromView against eyeA, the one exact answer here; a wrong transpose looks plausible.
+  // why: lessons/kit-xr-ray.md#round-trip
   const back = eyeFromView(viewA);
   const backErr = Math.max(...back.map((v, i) => Math.abs(v - eyeA[i])));
   const facing = shoot(vpA, eyeA);

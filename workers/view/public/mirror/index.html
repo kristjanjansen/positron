@@ -23,13 +23,10 @@
   /* The line a pane shows while it has no picture in it. It goes INSIDE the
      panel's own picture area, which the kit already makes `position:
      relative`, so it covers the picture and never the row of facts under it. */
-  /* ⚠️ BALANCED, WHICH IS THE SHELL'S RULE FOR SHORT CENTRED PROSE ARRIVING
-     HERE. `shell.css` carries the argument in full at `.pos-lr-say`. MEASURED
-     on this sentence 2026-09-23, in the one state that ever shows it, a browser
-     with no WebGL2: greedy wrapping laid it out at **281.8 px over 245.6 px**
-     in a 336 px box and **310.7 over 216.8** at 390 px, and it is 260.1 and
-     267.3 at both widths now, because balancing makes the break the same one
-     at every size the pane takes. */
+  /* Balanced wrapping, the shell's rule for short centred prose (argument at
+     lessons/css-shell.md#pos-lr-say): the break lands in the same place at every
+     pane width, 260.1 and 267.3 px at 336 and 390 px.
+     See lessons/page-mirror.md#mirror-1 */
   .none {
     position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
     text-wrap: balance;
@@ -42,66 +39,26 @@
     display: grid; justify-items: center; gap: calc(2 * var(--ctl-gap));
   }
   .none-in [hidden] { display: none; }
-  /* 🔴 THE FOOTER IS A ROW OF CELLS, AND IT USED TO BE ONE GLUED STRING.
-     It read the renderer's name, then the word `locked`, then `29.9 fps`, all
-     strung onto one line with a separator between them, and the separator
-     existed only because the values had been joined before anybody asked what
-     they were. Reported on sight, with a photograph. A cell carries its own
-     key, so there is nothing left to join, and each value sits
-     in a box reserved for the widest reading it can ever show, so a digit
-     changing moves nothing beside it.
-     ⚠️ IT SCROLLS RATHER THAN DRAGGING THE PAGE SIDEWAYS. `overflow-x` cannot
-     shrink a flex item below its content without `min-width: 0`, and CLAUDE.md
-     records the measurement: 390 px of screen gave 141 px of document overflow
-     with that half missing. Both properties or neither.
-     ⚠️ AND IT IS NOT SELECTABLE. These numbers sit a thumb's width from the ⛶,
-     so every long press here is a miss rather than a copy: photographed on an
-     iPhone with selection handles dragged across `30.0 fps`. shell.css keeps
-     readouts selectable as a rule; this row is the exception because it is part
-     of a control strip. */
-  /* The control group: the four things that change both pictures.
-     🔴 TWO BY TWO, AND IT WAS A WRAPPED ROW. Asked as *"look should controls
-     should be 2x2 controls grid"*. `flex-wrap` fitted `LOOK`, `MIRRORS` and
-     `GRAIN` onto one line and dropped `HUE` alone underneath, which is a shape
-     nobody chose: it is whatever the four widths happened to add up to at this
-     window size, and it changes as the window moves. Two columns by two rows is
-     a decision, and `LOOK MIRRORS` over `GRAIN HUE` is the reading order the
-     controls are already in.
-     ⚠️ NOTHING HERE SAYS HOW WIDE A CONTROL IS. shell.css already puts each kit
-     row's label on top under 560 px and gives its options the whole width, so
-     the phone case only has to stop being two columns. A media query of this
-     page's own about widths would be a fourth copy of a decision the stylesheet
-     already makes for every page.
-     ⚠️ `flex-basis: 100%` IS WHAT PUTS IT ON ITS OWN LINE, and that is the
-     other half of the ask below: the group above can only have air under it if
-     there is something under it. */
+  /* A row of cells, each held at its widest reading so a changing digit moves nothing.
+     Scrolls instead of widening the page: `overflow-x` needs `min-width: 0` here.
+     Not selectable: it sits a thumb from the fullscreen button and is a control strip.
+     See lessons/page-mirror.md#mirror-2 */
+  /* The four controls that change both pictures, two by two: LOOK MIRRORS over
+     GRAIN HUE. Widths and the phone layout are shell.css's rule for kit rows.
+     `flex-basis: 100%` puts the group on its own line so the row above has air under it.
+     See lessons/page-mirror.md#mirror-3 */
   .knobs {
     display: grid; grid-template-columns: 1fr 1fr; gap: 12px 22px;
     align-items: center; min-width: 0; flex-basis: 100%;
-    /* 🔴 MORE AIR UNDER THE HEADSET BUTTONS, AND THIS IS THE PAGE SAYING SO.
-       Asked as *"add more space under them"*: the two session buttons sat 8 px
-       above `LOOK`, which is `.pos-controls`' own gap, so six controls read as
-       one block instead of as two kinds of thing. `.pos-controls` is one flex
-       row with one gap, so raising it there would move every control row in the
-       project for a claim about this one relationship. 14 px on top of the
-       row's 8 makes 22, which is the single vertical rhythm `.pos-body` already
-       uses between two blocks, so this is the project's own number rather than
-       a new one. */
+    /* 14 px on top of `.pos-controls`' 8 px gap makes 22, the `.pos-body` rhythm
+       between two blocks, so the session buttons read apart from the controls.
+       See lessons/page-mirror.md#mirror-4 */
     margin-top: 14px;
   }
-  /* 🔴 ONE LABEL COLUMN, BECAUSE COLUMNS MAKE A RAGGED EDGE VISIBLE. In a
-     wrapped row nobody could see that `LOOK`, `MIRRORS`, `GRAIN` and `HUE` are
-     four different widths. Stacked in two columns their labels sit directly
-     above each other and every segment starts at a different x.
-     ⚠️ IT IS A PIXEL FLOOR, NOT `7ch`, AND THE REASON IS THAT THE TWO LABELS
-     ARE NOT THE SAME TYPE. `.pos-choice-l` is 9.5 px tracked at .1em and
-     `.pos-pick-l` is 11 px tracked at .06em, so one `ch`-based rule reserves
-     two different widths and lines nothing up. 48 px is `MIRRORS`, the widest
-     of the four, MEASURED in this browser rather than computed; the check in
-     this page compares the four left edges, so a label that outgrows it says so
-     rather than quietly going ragged again.
-     ⚠️ WIDE ONLY. Under 560 px both labels are `display: block` on their own
-     line and there is no column to share. */
+  /* One label column so the four segments start at the same x. A px floor, not `ch`:
+     `.pos-choice-l` and `.pos-pick-l` are different type. 48 px is MIRRORS, the widest,
+     and the page's check compares the four left edges. Wide only; under 560 px labels stack.
+     See lessons/page-mirror.md#mirror-5 */
   .knobs .pos-choice-l, .knobs .pos-pick-l { min-width: 48px; }
   @media (max-width: 560px) {
     .knobs { grid-template-columns: 1fr; gap: 12px; width: 100%; }
@@ -114,10 +71,8 @@
   }
   .facts::-webkit-scrollbar { display: none; }
   .fact { display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
-  /* ⚠️ THE SAME KEY STYLE AS THE READOUT AND THE KIT'S OWN CONTROL LABELS,
-     copied from `.pos-k` rather than invented: these name a value the way every
-     other label in the project names one, and a second convention for one job
-     is how a set of pages stops looking like one thing. */
+  /* The same key style as `.pos-k` and the kit's control labels.
+     See lessons/page-mirror.md#mirror-6 */
   .fact-k {
     font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
     color: var(--dim2);
@@ -138,14 +93,10 @@
   import { XR_MODE, canEnter, reasonFor, onXrCaps } from '/shell/xr-caps.mjs';
   import { createPresence } from '/shell/presence.mjs';
   import { createDiagram } from '/shell/diagram.mjs';
-  // 🔴 TWO PANEL COMPONENTS, ON PURPOSE, AND NEITHER IS THE OTHER'S LEFTOVER.
-  // `video-panel.mjs` is the DOM panel and it draws the two panes on the FLAT
-  // PAGE: real elements, a footer of real cells, the kit's own fullscreen
-  // button and a second storey under it while it is full. `panel.mjs` draws a
-  // panel INTO A CANVAS, and that is what a panel hung in a HEADSET is: a
-  // framebuffer holds no text, so the footer there has to be laid out as pixels
-  // and uploaded as a texture every time a number moves. Neither can do the
-  // other's job, so deleting either one takes half this page with it.
+  // Two panel components: `video-panel.mjs` draws the DOM panes on the flat page;
+  // `panel.mjs` draws a panel into a canvas, which is what a headset panel is
+  // (a framebuffer holds no text). Each does a job the other cannot.
+  // See lessons/page-mirror.md#mirror-7
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createPanel, createPanelFooter, FOOT } from '/shell/panel.mjs';
   import { createXRPanels, beacon, facing, barOf, grabOffset, heldAt, PLACE } from '/shell/xr-panel.mjs';
@@ -159,19 +110,10 @@
   import { createLinkBadge, linkStateOf, LINK_STALL_MS } from '/shell/link-badge.mjs';
 
   /**
-   * 🔴 THE ROOM AND THE SOCKET ARE `bay-node.mjs`'s SINCE 2026-10-06, AND THE
-   * PAGE NO LONGER JOINS ON LOAD (plan-routing-migration step 5). It opened a
-   * socket to `studio-1` at the top of this script and asked the Pi to draw, so
-   * every visit and every harness run started the board's encoder. Now the
-   * room is `roomFor`: `?room=` when given, `studio-1` for a person, and a
-   * private room of the run's own under `?selfcheck=1`, so a harness cannot
-   * reach the Pi at all. Nothing is opened until somebody presses
-   * `Show the board` in the right-hand pane.
-   * ⚠️ AND THIS TAB IS A SITE OF ITS OWN, `web-<four>`, announcing two ports,
-   * so `/patchbay/` draws it: its shader as a `program` out, and its right
-   * pane as a `video` in. The Pi already announces `pi-1:shader:program-in` and
-   * `pi-1:shader:video-out` (`graph-registry.mjs` `boardGraph`); its site is
-   * `pi-1` and no longer the room, since 2026-10-10.
+   * The room and socket are `bay-node.mjs`'s and nothing joins on load: `roomFor` gives
+   * `?room=`, `studio-1` for a person, a private room under `?selfcheck=1`. This tab is
+   * site `web-<four>`: shader `program` out, right pane `video` in (see `boardGraph`).
+   * See lessons/page-mirror.md#mirror-8
    */
   const ROOM = roomFor({ slug: 'mirror' });
   const GPU_PROGRAM = boardPort('shader', 'program-in'), GPU_VIDEO = boardPort('shader', 'video-out');
@@ -179,14 +121,10 @@
   const PROGRAM_PORT = `${SITE}:webgl:program`;
   const SCREEN_PORT = `${SITE}:screen:video`;
   /**
-   * ⚠️ AND THE LEFT PANE IS IN THE GRAPH TOO SINCE 2026-10-09, so the bay sees
-   * this tab's local half (`plans/plan-site-names.md` §4e). The browser's own
-   * render goes out as `webgl:video` and the left pane takes it in as
-   * `left:video`. Both are on this tab, so the bay gives the link the `page`
-   * transport and nothing is opened for it: the page already draws that pane.
-   * The left pane is a node of its own rather than a second port on `screen`,
-   * because two ports that differ in role are two nodes (§4c). `screen` keeps
-   * its name until the §4c sweep renames it `right`.
+   * The left pane is in the graph too: `webgl:video` out to `left:video` in, both on
+   * this tab, so the bay gives the link the `page` transport and opens nothing. A node
+   * of its own, not a second port on `screen` (plans/plan-site-names.md §4c, §4e).
+   * See lessons/page-mirror.md#mirror-9
    */
   const WEBGL_VIDEO_PORT = `${SITE}:webgl:video`;
   const LEFT_PORT = `${SITE}:left:video`;
@@ -208,32 +146,18 @@
 
   const d = mount({
     name: 'mirror',
-    // 🔴 ONE SENTENCE, AND IT IS THE INDEX'S OWN LINE, VERBATIM. A page with a
-    // diagram says what it is once and lets the picture at the bottom carry the
-    // machinery: a paragraph and a drawing of the same thing are two
-    // explanations and the paragraph is the weaker of them. This was FOUR
-    // sentences and 62 words, PHOTOGRAPHED on an iPhone as the top half of the
-    // screen before anything could be pressed.
+    // One sentence, the index's own line verbatim; the diagram carries the machinery.
+    // See lessons/page-mirror.md#mirror-10
     what: 'The same shader drawn by your browser and by a Raspberry Pi, side by side.',
-    // ⚠️ NO SHELL READOUT. Every number here belongs to ONE of the two pictures,
-    // so it goes in that picture's own footer rather than in a row above both:
-    // joining a figure to its ink across two elements is exactly what makes a
-    // legend necessary, and a single row under two panes cannot say which pane
-    // it means without repeating the word every time. The machine surface is
-    // `__demo.panes`, set below.
+    // No shell readout: every number belongs to one picture and goes in that pane's
+    // footer. The machine surface is `__demo.panes`, set below.
+    // See lessons/page-mirror.md#mirror-11
     readout: {},
     /**
-     * 🔴 THE ROW IS FILLED BY THIS PAGE, AND IT IS STILL `.pos-controls`. Both
-     * harnesses press `.pos-controls button`, which is a DESCENDANT selector,
-     * so a group mounted inside that row keeps every button pressable while a
-     * row of controls anywhere else is a subject the suite cannot reach. This
-     * page has paid for that once already: the look stepper sat in the knob row
-     * for one revision and the assert count went 9 to 7 while the page read
-     * GREEN.
-     * ⚠️ `mount()` HIDES A ROW IT PUT NOTHING IN, which is the standing rule
-     * about a container with nothing in it not painting its edges. This one is
-     * filled a few lines down, so it is shown again rather than left as a band
-     * of dead space that is about to have five controls in it.
+     * Filled by this page and still `.pos-controls`: both harnesses press
+     * `.pos-controls button`, so a control outside this row is never exercised.
+     * `mount()` hides an empty row; it is shown again once filled below.
+     * See lessons/page-mirror.md#mirror-12
      */
     controls: [],
   });
@@ -241,22 +165,10 @@
   d.controls.hidden = false;
 
   /**
-   * 🔴 THE TWO SESSION CONTROLS ARE ONE KIT COMPONENT NOW, AND THIS WAS THE ONE
-   * XR PAGE WITH NO CAPABILITY PROBE AT ALL. `Run in VR` and `Run in AR` were
-   * live buttons on a phone that has no WebXR, so the only way to find out was
-   * to press one and watch nothing happen. `xr-caps.mjs` answers `absent` in
-   * the same turn wherever there is nothing to ask, which is every iPhone, and
-   * the group switches the control off WITH THE REASON IN WORDS: a grey control
-   * with no explanation reads as a broken page rather than as a browser that
-   * cannot do the thing.
-   *
-   * 🔴 THE ID IS `vr` AND IT WAS `xr`. Four XR pages had three spellings for
-   * one control, so a check written against one could not be read against
-   * another.
-   *
-   * ⚠️ PREPENDED, NOT APPENDED, AND THE ORDER IS LOAD-BEARING. The harness
-   * presses this row in DOM order and `settleMs` only ever lands on control 0,
-   * so the session controls stay at the front of it.
+   * The VR and AR session controls are one kit group: `xr-caps.mjs` disables a control
+   * with the reason in words where WebXR is absent. Id `vr`, as on the other XR pages.
+   * Prepended: the harness presses in DOM order and `settleMs` lands on control 0.
+   * See lessons/page-mirror.md#mirror-13
    */
   const xrGroup = createButtonGroup({
     buttons: [
@@ -269,46 +181,19 @@
     onPress: (id) => d.run(id),
   });
   d.controls.prepend(xrGroup.el);
-  // 🔴 SUBSCRIBED, NOT READ ONCE. `isSessionSupported` is a promise, so a
-  // button decided at load would be decided on `asking` every time. `onXrCaps`
-  // fires at once with what is known and again on every change, and `canEnter`
-  // counts `asking` as yes, so nothing is ever greyed out on a guess.
+  // Subscribed, not read once: `onXrCaps` fires now and on every change, and
+  // `canEnter` counts `asking` as yes, so nothing is greyed out on a guess.
+  // See lessons/page-mirror.md#mirror-14
   onXrCaps((c) => {
     xrGroup.enable('vr', canEnter(c.vr), reasonFor(c.vr, 'vr'));
     xrGroup.enable('ar', canEnter(c.ar), reasonFor(c.ar, 'ar'));
   });
 
   /**
-   * 🔴 TWO CELLS A FOOTER, AND FOR ONE SESSION THERE WERE FIVE. What a pane
-   * says under it is WHAT DREW IT and HOW FAST, which is what it said before
-   * anybody touched this page. The move to `video-panel.mjs` also added `clock`
-   * here and `kbit/s` and `lost` over there, and none of that was asked for:
-   * *"you broke video footer. i never asked this info added"*. A cell has to
-   * earn its place, and three of those five were earning a reader's attention
-   * without being anything a reader had come for.
-   *
-   * ⚠️ AND NONE OF THE THREE WAS DELETED, WHICH IS THE HALF THAT MATTERS.
-   * Whether this pane is running on its own count or on the board's, how many
-   * kbit/s are actually arriving and how many frames the relay dropped are all
-   * real, and the relay dropping frames with no error anywhere is the reason
-   * that counter exists at all. They are in the LOG and on the BEACON now,
-   * which is where this page already puts facts about a session: see
-   * `sayLinkRate`, `sayLinkLost` and the two lock lines.
-   *
-   * ⚠️ BOTH FOOTERS CARRY THE SAME TWO, ON PURPOSE. Two footers of different
-   * lengths under two pictures being compared read as two different kinds of
-   * thing, which is the argument the headset panels' own footers already lost.
-   *
-   * The third number in the triple is the width the value is held at, in
-   * characters, so a figure that changes every second cannot move the figure
-   * beside it.
-   *
-   * ⚠️ EVERY CELL IS ALWAYS DRAWN, EVEN BEFORE IT HAS A VALUE. Building a
-   * footer from only the facts that happen to be known means the first cell
-   * starts at the left edge and JUMPS right the moment a frame rate lands. An
-   * empty value under its own key says "not measured yet", which is true, where
-   * an absent cell says nothing at all and a zero would be a very confident
-   * measurement of nothing.
+   * Two cells a footer, the same two under both panes: what drew it and how fast.
+   * Link rate, lost frames and the clock go to the log and beacon (`sayLinkRate`, `sayLinkLost`).
+   * The third number is the held width in characters; every cell is drawn even when empty.
+   * See lessons/page-mirror.md#mirror-15
    */
   const FIELDS = {
     here: [['picture', 'picture', 0], ['fps', 'fps', 5]],
@@ -318,26 +203,17 @@
     picture: (v) => String(v),
     fps: (v) => v.toFixed(1),
   };
-  // ⚠️ THE MACHINE COPY, WRITTEN FROM THE SAME VALUES IN THE SAME CALL. Two
-  // places that can disagree is how a readout ends up describing something the
-  // page is not doing. It is built HERE rather than further down because
-  // `relabel` writes into it while the panes are still being made, and this
-  // file has already been bitten three times by reading something before its
-  // line ran.
+  // The machine copy, written from the same values in the same call. Built here because
+  // `relabel` writes into it while the panes are being made.
+  // See lessons/page-mirror.md#mirror-16
   window.__demo.panes = { here: {}, box: {} };
 
   const panes = el('div', 'panes');
   /**
-   * One pane: a picture, a row of facts under it, and the way to fill the
-   * screen with it.
-   *
-   * 🔴 IT IS `video-panel.mjs` AND IT USED TO BE A HAND-ROLLED BAR. That bar
-   * carried its own fullscreen button, its own three-column layout, its own
-   * narrow-screen rearrangement and a routine that dragged the page's controls
-   * into it, every one of which the kit now owns. `fullMode: 'footer'` keeps
-   * the row of facts on screen while the panel is full, the ⛶ in that row is
-   * the way back out on a phone with no Escape key, and `under()` carries this
-   * page's own controls into a second storey beneath it.
+   * One pane: a picture, a row of facts under it, and the way to fill the screen with it.
+   * `fullMode: 'footer'` keeps the facts on screen when full, its fullscreen button is
+   * the way out without Escape, and `under()` carries the page's controls beneath it.
+   * See lessons/page-mirror.md#mirror-17
    */
   const mk = (which) => {
     const c = el('canvas');
@@ -353,12 +229,9 @@
       facts.set(key, val);
     }
     /**
-     * 🔴 ONLY THE FAR PANE GETS A PRESENCE DOT, AND THAT IS THE WHOLE POINT OF
-     * THE SLOT. The fact worth having about a Raspberry Pi in another building
-     * is whether it is answering. The same dot under the left picture would be
-     * a badge about the browser you are reading this in, which can never say
-     * anything but online, and a control with one honest state is the shape
-     * this project calls a lie.
+     * Only the far pane gets a presence dot: whether the Pi answers is worth knowing,
+     * and a dot for this browser could only ever say online.
+     * See lessons/page-mirror.md#mirror-18
      */
     const pres = which === 'box'
       ? createPresence({ of: 'the Raspberry Pi', mode: 'dot', state: 'unknown' })
@@ -368,47 +241,32 @@
       left: pres ? pres.el : false,
       centre: factsEl,
       fullMode: 'footer',
-      // 🔴 IT ASKS WHICH PANE IS FULL RATHER THAN BELIEVING THE ONE THAT
-      // SPOKE, AND THAT IS NOT TIDINESS. A `fullscreenchange` is a DOCUMENT
-      // event, so both panels hear every one of them: the pane going full
-      // reports `true` and the other reports `false` in the same turn, and
-      // whichever spoke last would have decided. With two panels on the page
-      // that means the second one hands the controls straight back out of the
-      // first, which is a row that vanishes at the moment it is needed.
+      // Asks which pane is full instead of trusting the event: `fullscreenchange` is a
+      // document event both panels hear, so the last to speak would hand the row back out.
+      // See lessons/page-mirror.md#mirror-19
       onFull: () => handControls(),
     });
     panes.append(panel.el);
     return { c, panel, facts, pres };
   };
-  // ⚠️ THE PICTURE NAMES THE THING THAT DREW IT, not the side of the screen it
-  // is on. "here" and "the box" say where to look; the chip says what you are
-  // looking at, which is the comparison the page exists to make. Until each end
-  // reports, it says what it can.
-  // ⚠️ NO ARTICLES. "a Raspberry Pi" reads as prose in a slot that is a name,
-  // and beside a chip string like "Apple M2 Pro" the mismatch is obvious.
+  // The chip names what drew the picture, not which side it is on; until each end
+  // reports, it says what it can. No articles: it is a name slot.
+  // See lessons/page-mirror.md#mirror-20
   const WHERE = { here: 'your browser', box: 'Raspberry Pi' };
   const chip = { here: null, box: null };
   /**
-   * ⚠️ NAME THE CHIP, NOT THE FIRST COMMA, AND DO IT FOR BOTH ENDS. Splitting
-   * "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)" on
-   * its first comma leaves the word "Apple", which says nothing at all; the part
-   * worth printing is what follows "Renderer:".
-   * ⚠️ AND IT IS CAPPED, because this is one cell in a row three slots wide. A
-   * driver is free to hand back forty characters, and a name that long pushes
-   * the row past what a half-page footer can show. 24 fits every string either
-   * end has been measured reporting, and a longer one is cut rather than
-   * allowed to take the whole footer.
+   * Names the chip after "Renderer:", not before the first comma, for both ends.
+   * Capped at 24 characters, which fits every string either end has reported.
+   * See lessons/page-mirror.md#mirror-21
    */
   const shortChip = (s) => {
     const m = String(s).match(/Renderer:\s*([^,)]+)/)?.[1]
       ?? String(s).replace(/^ANGLE \(|\)$/g, '');
     return m.trim().slice(0, 24);
   };
-  // ⚠️ DECLARED HERE BECAUSE `relabel` READS IT, and `relabel` is called while
-  // the panes are being built. A `let` further down is in the temporal dead
-  // zone until its line runs, so the first call threw at module scope: a blank
-  // page, no asserts, and a harness reporting "the page reports no renderer".
-  // Second time in this file; the first was `knobRow`.
+  // Declared here because `relabel` reads it while the panes are built; a `let`
+  // further down is in the temporal dead zone and throws at module scope.
+  // See lessons/page-mirror.md#mirror-22
   let lockedFrame = null, lockedAt = 0;
 
   /** Write one pane's cells out of the machine copy, so the two cannot differ. */
@@ -424,16 +282,9 @@
   }
 
   /**
-   * 🔴 THE NAME AND THE CLOCK ARE TWO CELLS, AND THEY USED TO BE ONE STRING.
-   * The renderer's name had the word `locked` glued onto the end of it, and
-   * that glue is what let a third and a fourth fact be bolted on without
-   * anybody deciding to. Reported on sight with a photograph, twice in one
-   * minute.
-   *
-   * 🔴 AND IT ONCE PRINTED THE SAME NAME TWICE IN ONE FOOTER. The chip falls
-   * back to the string `WHERE` holds, so before the board reported its own both
-   * halves read `Raspberry Pi`. Which side you are looking at is already said
-   * by WHICH PANE IT IS; the cell only has to name what drew it.
+   * The name and the clock are two cells. The chip falls back to `WHERE`'s string;
+   * which side is meant is said by which pane it is.
+   * See lessons/page-mirror.md#mirror-23
    */
   function relabel(which) {
     window.__demo.panes[which].picture = chip[which] || WHERE[which];
@@ -443,27 +294,19 @@
   const far = mk('box');
   relabel('here'); relabel('box');
   /**
-   * 🔴 THE DOT UNDER THE FAR PICTURE FOLLOWS THE FRAMES, NOT THE SOCKET. A
-   * relay that is reachable says nothing about whether a board in another
-   * building is plugged in, and the two are routinely different: the socket
-   * opens in about 200 ms and the encoder may be switched off. Thirty frames a
-   * second with thirty allowed to go missing is one second of silence, which is
-   * the same deadline this page already uses to unlock its own frame counter,
-   * written once rather than twice.
-   * ⚠️ IT STARTS FOLLOWING AT THE PRESS, NOT AT LOAD. Before anybody asks, the
-   * board has not been asked anything, so the dot stays `unknown` rather than
-   * counting down to a silence nobody requested.
+   * The far dot follows decoded frames, not the socket: the socket opens in about
+   * 200 ms while the encoder may be off. 30 missed frames at 30 fps is one second.
+   * It starts at the press; before that it stays `unknown`.
+   * See lessons/page-mirror.md#mirror-24
    */
   const followFar = () => far.pres.follow({
     everyMs: 1000 / 30, misses: 30, since: Date.now(),
     why: 'nothing has answered in this room yet',
   });
   /**
-   * 🔴 THE PRESS THAT ASKS THE BOARD LIVES IN THE PANE IT FILLS, AND OUTSIDE
-   * `.pos-controls` ON PURPOSE. Both harnesses press that row, so a button there
-   * would join a room on every run, and a control added there moves every other
-   * control's press. A person looks at the empty right-hand picture and finds
-   * the button in it.
+   * The press that asks the board lives in the pane it fills, outside `.pos-controls`,
+   * so harness presses never join a room or shift other controls.
+   * See lessons/page-mirror.md#mirror-25
    */
   const farNone = el('div', 'none');
   const farSay = el('span', 'none-say', 'The Raspberry Pi is asked nothing until you press.');
@@ -481,13 +324,10 @@
     if (!farNone.isConnected) far.panel.stage.append(farNone);
   }
   /**
-   * 🔴 A LINK BADGE ON THE BOARD'S PICTURE, AND NOTHING MORE THAN THAT. The
-   * owner's words about a page moving onto the patchbay: *"perhaps just visual
-   * indication of picture happening"*. So no patch view here: the right pane
-   * wears STARTING, RECEIVING or STALLED, counted from frames DECODED here, the
-   * far side of the link, and `/patchbay/` stays where links are drawn.
-   * ⚠️ THE TAG SLOT IS HIDDEN WITH THE BADGE, because the slot paints its own
-   * dark pill and a hidden child does not make it `:empty`.
+   * A link badge on the board's picture only: STARTING, RECEIVING or STALLED, counted
+   * from frames decoded here. `/patchbay/` draws links. The tag slot is hidden with
+   * the badge because its pill is not `:empty` while a hidden child is in it.
+   * See lessons/page-mirror.md#mirror-26
    */
   const badge = createLinkBadge({
     count: () => (bv.isOpen() ? bv.decoded() : null),
@@ -498,78 +338,39 @@
   d.stack.add(panes);
 
   /**
-   * 🔴 ONE CONTROL GROUP, AND ALL FOUR ROWS COME OUT OF THE KIT. Asked as
-   * *"look,mirrort etc all into controls group"*. `LOOK` was already a
-   * `createPicker`; `MIRRORS`, `GRAIN` and `HUE` were HAND-ROLLED here with
-   * page-local `.knob` and `.seg` rules, and `choice.mjs`'s own opening comment
-   * names this page as one of the three hand-built copies that made it a
-   * component. The copy is gone and so is its CSS.
-   *
-   * 🔴 AND THE "FILL THE WIDTH ON A PHONE" ASK NEEDED NO CSS AT ALL. shell.css
-   * already puts a choice's label on top under 560 px and gives its options the
-   * whole row, growing to share it and scrolling rather than folding a word in
-   * half. `.knob` matched none of those selectors, which was the entire bug:
-   * converting to the component fixes it and a media query of this page's own
-   * would have been a fourth copy of the same decision.
+   * One control group, all four rows from the kit (`createPicker` and `choice.mjs`).
+   * Phone width needs no CSS of this page's: shell.css already lays choices out under 560 px.
+   * See lessons/page-mirror.md#mirror-27
    */
   const knobRow = el('div', 'knobs');
 
   /**
-   * ⚠️ THREE CHOICES, AND THEY DRIVE BOTH PANES. A control that moved only the
-   * local picture would break the one claim this page makes, that the two sides
-   * are the same shader, and would do it invisibly: the panes would simply stop
-   * matching and look like a bug. So each press sets the local uniform AND
-   * sends `video.params` to the box.
+   * Three choices that drive both panes: each press sets the local uniform and sends
+   * `video.params` to the box, so the two pictures stay the same shader.
+   * See lessons/page-mirror.md#mirror-28
    */
-  // ⚠️ WIDE ENOUGH TO SEE FROM ACROSS THE ROOM. The first pair were 4/8/16
-  // mirrors and three feedback amounts, and the three steps of each looked like
-  // the same picture in a slightly different mood: a control whose settings a
-  // viewer cannot tell apart is a control that teaches nothing. These are
-  // ranges chosen so the ends are unmistakable, and the middle of each is the
-  // value the renderer ships with, so "mid mid mid" is the picture the rest of
-  // this repo measured.
+  // Ranges wide enough that the ends are unmistakable; the middle of each is the
+  // value the renderer ships with.
+  // See lessons/page-mirror.md#mirror-29
   const KNOBS = {
     // 2 is a single fold, almost a mirror down the middle. 24 is a doily.
     mirrors: { label: 'mirrors', steps: [['2', 2], ['8', 8], ['24', 24]], at: 1 },
     // The noise frequency, which decides whether the shapes are continents or
     // filigree. An eightfold span, because a doubling is not visible here.
     grain:   { label: 'grain',   steps: [['coarse', 1.2], ['mid', 4], ['fine', 16]], at: 1 },
-    // HOW FAR APART THE THREE COLOUR CHANNELS ARE. The colour is three cosines
-    // of the same field, offset by vec3(0, 0.33, 0.67), a third of a turn each,
-    // which is what makes a full rainbow. Scaling those offsets is the whole
-    // palette in one number: near zero the three channels move together and the
-    // picture is a duotone sweep; at 1 it is the rainbow; past 1 the offsets
-    // wrap and the hues come back round in a different order.
-    // ⚠️ 2.2 WAS NOT "WIDER", IT WAS THE SAME RAINBOW RESHUFFLED, and it looked
-    // it. Three phases a third of a turn apart is the MAXIMUM colour separation
-    // there is: anything past that wraps and lands somewhere else on the circle
-    // with no more spread than before, which is why `mid` and `wide` were hard
-    // to tell apart. 1.5 is the interesting place instead: the green channel
-    // goes half a turn while red and blue come back to nearly the same phase,
-    // so the picture splits into two opposed colours, magenta against green,
-    // rather than running through all of them. Checked by sweeping
-    // 0.12/0.45/1.0/1.5/1.8/2.2 and looking at the six.
+    // How far apart the three colour channels are: three cosines offset by a third of a turn.
+    // Near 0 a duotone, 1 the rainbow, 1.5 splits into magenta against green. Past
+    // 1 the offsets wrap and give no more spread.
+    // See lessons/page-mirror.md#mirror-30
     hue:     { label: 'hue',     steps: [['close', 0.12], ['full', 1], ['split', 1.5]], at: 1 },
   };
 
-  // 🔴 THE WHOLE GROUP GOES IN `.pos-controls`, AND THAT IS NOT A LAYOUT
-  // PREFERENCE. The look control sat in the knob row for one revision and the
-  // assert count went 9 to 7 while the page read GREEN: both harnesses press
-  // `.pos-controls button` and nothing else, so a control anywhere else is
-  // never exercised and its asserts never run. That is this project's oldest
-  // failure, a green suite over a path the suite cannot reach, committed by
-  // moving a button.
-  //
-  // It is a PICKER rather than a "next" because a list you can only walk
-  // forwards through is one you have to go all the way round to revisit.
+  // The whole group goes in `.pos-controls`: both harnesses press only
+  // `.pos-controls button`. A picker, not "next", so any look can be revisited directly.
+  // See lessons/page-mirror.md#mirror-31
   {
-    // 🔴 `createPicker`, NOT A STEPPER PLUS A SPAN. This was `createStepper` with
-    // a hand-made `.lookname` next to it, which is the shape CLAUDE.md warns
-    // about by name: a control that exists in one page and nowhere else is a
-    // component that has not been noticed yet. The picker already puts the
-    // current name INSIDE the row, already carries the die, and already sits on
-    // the shared segmented join, so the separate span and the CSS rule for it go
-    // with it. REPORTED, after the same swap had been made on `/archive/radio/`.
+    // `createPicker` shows the current name inside the row and carries the die.
+    // See lessons/page-mirror.md#mirror-32
     const jump = (to) => {
       lookAt_ = (to + LOOKS.length) % LOOKS.length;
       const { name, body } = LOOKS[lookAt_];
@@ -592,11 +393,9 @@
       random: () => jump(Math.floor(Math.random() * LOOKS.length)),
       onPick: (i) => jump(i),
     });
-    // ⚠️ THE LIST IS FILLED WHERE `LOOKS` EXISTS, NOT HERE. The shader sources
-    // are declared BELOW this row, so reading `LOOKS[0].name` at build time is a
-    // temporal dead zone: `Cannot access 'LOOKS' before initialization`, at
-    // module scope, which means a blank page with no asserts and no log line
-    // saying why. This file's own comments already record two of these.
+    // The list is filled where `LOOKS` exists: the shaders are declared below, and reading
+    // `LOOKS[0]` here is a temporal dead zone at module scope.
+    // See lessons/page-mirror.md#mirror-33
     knobRow.append(look.el);
     window.__lookPicker = look;
   }
@@ -617,17 +416,10 @@
   d.controls.append(knobRow);
 
   /**
-   * 🔴 THE CONTROLS FOLLOW THE PICTURE INTO FULL SCREEN, AND IT IS THE SAME ROW
-   * MOVED RATHER THAN A SECOND COPY. Asked as *"extend videopanel footer in
-   * fullscreen so it can have section below the footer bar (separaet with
-   * line). put controlgroup there"*. Two rows of buttons that can disagree
-   * about which option is chosen would be a readout living in two files, so the
-   * panel takes this row, remembers where it came from and puts it back on the
-   * way out. Off screen it is in `.pos-controls`, which is where a visitor
-   * looks for it and where both harnesses can press it.
-   *
-   * ⚠️ ONE PANEL AT A TIME. A row cannot be in two places, so whichever pane is
-   * not full hands it back before the one that is takes it.
+   * The controls follow the picture into full screen as the same row moved, not a copy:
+   * the panel takes it, remembers its home and returns it on the way out. One panel at
+   * a time: the pane that is not full hands it back first.
+   * See lessons/page-mirror.md#mirror-34
    */
   let wasFull = false;
   function handControls() {
@@ -635,10 +427,8 @@
     for (const pane of [local, far]) {
       if (!full || pane.panel !== full.panel) pane.panel.under(null);
     }
-    // ⚠️ ASKED BEFORE IT IS HANDED OVER. `under()` puts the row home and picks
-    // it up again, so calling it on a panel that already holds the row is a
-    // detach and a re-attach for nothing, and every fullscreen change reaches
-    // both panels.
+    // Checked first: `under()` detaches and reattaches, and every fullscreen change reaches both panels.
+    // See lessons/page-mirror.md#mirror-35
     if (full && full.panel.under() !== knobRow) full.panel.under(knobRow);
     if (!!full !== wasFull) {
       wasFull = !!full;
@@ -648,13 +438,9 @@
   }
 
   /**
-   * One choice pressed, on both pictures.
-   *
-   * ⚠️ THE SOCKET IS ALLOWED TO BE SHUT. Every press sends to the board, and
-   * until a harness started pressing these they were only ever reached by a
-   * hand on a page whose socket was open. A throw out of a click handler is a
-   * control that looks like it worked and left an exception behind it, so the
-   * send is guarded and the local picture changes either way.
+   * One choice pressed, on both pictures. The socket may be shut: the send is guarded
+   * so a click never throws, and the local picture changes either way.
+   * See lessons/page-mirror.md#mirror-36
    */
   function choose(key, idx) {
     const k = KNOBS[key];
@@ -674,71 +460,43 @@
   window.__P = P;
 
   /**
-   * Each pane's own numbers, under it, written through the machine copy so the
-   * two cannot come apart. `FIELDS`, `FMT` and `paintFacts` are up with the
-   * panes, where the cells are made.
+   * Each pane's own numbers, written through the machine copy so the two cannot come
+   * apart. `FIELDS`, `FMT` and `paintFacts` are up with the panes.
+   * See lessons/page-mirror.md#mirror-37
    */
   function stat(which, fields) {
     Object.assign(window.__demo.panes[which], fields);
     paintFacts(which);
   }
 
-  // ── the panels that hang in a headset ───────────────────────────────────
-  //
-  // 🔴 TWO PANELS, BECAUSE THE PAGE'S SUBJECT IS TWO PICTURES. It was one panel
-  // showing whichever end happened to be sending, which is the flat page's
-  // comparison collapsed into a single rectangle — you could not hold the two
-  // against each other, which is the only thing this demo is for.
-  //
-  // 🔴 AND THE LEFT ONE IS RENDERED IN THE HEADSET RATHER THAN COPIED INTO IT.
-  // A page's own WebGL canvas is a DIFFERENT CONTEXT from the one an immersive
-  // session draws with: its programs and textures do not exist there, so the
-  // only way a canvas reaches a headset is as a bitmap copied across every
-  // frame — a photograph of a render taken a frame ago. `liveMirror` below
-  // compiles the SAME shader body into the session's own context and hands back
-  // a texture, so the picture in the headset is the graphics chip in the
-  // headset drawing it. What that costs is measured rather than assumed: see
-  // `liveWhereCost` on `__demo.xr`.
-  //
-  // 🔴 THE 2-D PAGE IS INVISIBLE ONCE A HEADSET IS ON. The log, the two bars and
-  // every number in them are behind your face, so anything worth reading while
-  // wearing it has to be drawn INTO the picture. A rendered picture cannot carry
-  // a word, so its numbers arrive as a separate strip — a ninth of the pixels,
-  // handed over only when a number moves.
+  // The panels that hang in a headset: two, one per picture. The left is rendered in the
+  // session's own GL context by `liveMirror` (a page canvas is a different context); its
+  // cost is `liveWhereCost` on `__demo.xr`. Numbers come as a separate strip texture.
+  // See lessons/page-mirror.md#mirror-38
   const PANEL_W = 640, PANEL_H = 400;          // css units; the canvas is 2x this
   const FOOT_FRAC = FOOT / PANEL_H;            // the strip's share of the quad
   const panelHere = createPanel({ width: PANEL_W, height: PANEL_H, title: 'here' });
   const panelBox = createPanel({ width: PANEL_W, height: PANEL_H, title: 'the box' });
   const footHere = createPanelFooter({ width: PANEL_W });
 
-  // 🔴 HOW BIG THE LIVE PICTURE IS RENDERED, AND IT IS DERIVED RATHER THAN
-  // CHOSEN. The panel is 1.28 m across at 1.6 m, which is 43.6 degrees; a Quest
-  // 3 eye is 1680 px over roughly 95 degrees, so the panel covers about 770 of
-  // them. Anything past that is pixels nobody can resolve, and this shader is
-  // ALU-bound (`plan-visuals` §3.4: ~50 Mpix/s on the Pi's GPU at both 720p and
-  // 1080p), so resolution is paid for linearly and buys nothing above the eye.
-  // 960 is a comfortable margin over 770 and the height follows the picture
-  // area's own aspect — the panel minus its footer strip — so the render is
-  // never stretched to fit the quad.
+  // Render size derived: the 1.28 m panel at 1.6 m covers about 770 px of a Quest 3 eye,
+  // and the shader is ALU bound (about 50 Mpix/s, plan-visuals §3.4), so 960 wide, height
+  // from the picture area's aspect minus the footer strip, never stretched.
+  // See lessons/page-mirror.md#mirror-39
   const LIVE_W = 960;
   const LIVE_H = Math.round(LIVE_W * (PANEL_H - FOOT) / PANEL_W);
-  // ⚠️ DRAWN ONLY WHEN SOMEBODY IS LOOKING AT IT. Copying the picture into the
-  // panel and laying out five numbers costs real time every frame, and this
-  // page MEASURES ITS OWN FRAME RATE — a decoration that quietly lowers the
-  // number the page exists to report is worse than no decoration. It is off
-  // until a session is running, and turned on for a quarter of a second when
-  // the checks want to look at it.
+  // Drawn only while a session runs (or for a quarter second when the checks look):
+  // copying the picture each frame would lower the frame rate this page reports.
+  // See lessons/page-mirror.md#mirror-40
   let wantPanel = false, panelDrawn = 0;
-  // Assigned inside the renderer block below, because that is where they live.
-  // ⚠️ DECLARED UP HERE, though: this file has already been bitten three times
-  // by reading a `let` before its line ran — `knobRow`, `lockedFrame` and
-  // `LOOKS` — and each one was a blank page with no log line saying why.
+  // Assigned inside the renderer block below, declared up here so nothing reads a
+  // `let` before its line runs (a temporal dead zone throw is a blank page).
+  // See lessons/page-mirror.md#mirror-41
   let mirrorStep = null, flatRaf = 0, xr = null;
   let startFlat = () => {}, stopFlat = () => {};
-  // The shader body both renderers are running. ⚠️ ONE STRING, because the live
-  // renderer is built when a session starts — long after a look may have been
-  // changed — and a second copy is how the two ends of this page would come to
-  // be drawing different pictures while claiming to draw one.
+  // The shader body both renderers run, one string: the live renderer is built when a
+  // session starts, after a look may have changed, and must draw the same picture.
+  // See lessons/page-mirror.md#mirror-42
   let liveBody = null;
   let makeKaleidoscope = null;                 // filled in by the renderer block
   let liveK = null;                            // the session's own instance
@@ -746,11 +504,9 @@
 
   /**
    * The left-hand picture, rendered by whatever graphics context it is given.
-   *
-   * ⚠️ `attach` IS HANDED THE SESSION'S CONTEXT AND COMPILES INTO IT. Nothing
-   * from the flat page's context can be reused — not the program, not the
-   * feedback targets, not the textures — which is exactly why this is a
-   * measurement worth taking rather than a copy with fewer steps.
+   * `attach` compiles into the session's context: nothing from the flat page's
+   * context (program, feedback targets, textures) can be reused there.
+   * See lessons/page-mirror.md#mirror-43
    */
   const liveMirror = {
     pixels: { w: LIVE_W, h: LIVE_H },
@@ -771,15 +527,10 @@
   };
 
   /**
-   * ⚠️ CALLED FROM INSIDE THE RENDER CALLBACK THAT JUST DREW, never on a timer
-   * of its own. The left-hand canvas is a 3-D surface with no preserved
-   * drawing buffer, so it can only be copied in the same turn as the frame that
-   * filled it — read it a task later and you get a cleared surface, which would
-   * reach the panel as a black rectangle that looks like a broken stream.
-   *
-   * ⚠️ AND A PANEL THAT IS NOT LIVE SAYS SO IN WORDS. A frozen frame reads as a
-   * broken stream — `plans/plan-xr-room.md` §5.6, and the same rule as a blank readout
-   * cell collapsing "we did not look" into "we looked and it was fine".
+   * Called from inside the render callback that just drew: the canvas has no preserved
+   * drawing buffer, so a later read is a cleared, black surface. A panel that is not
+   * live says so in words (plans/plan-xr-room.md §5.6).
+   * See lessons/page-mirror.md#mirror-44
    */
   function drawPanel() {
     const inXR = xr?.state?.presenting === true;
@@ -787,41 +538,18 @@
     const fps = inXR ? xr.state.fps : (localFps || null);
     // ── the left panel: this machine's own picture ───────────────────────
     const hereFoot = [
-      // 🔴 WHICH PATH DREW WHAT YOU ARE LOOKING AT. The two cost different
-      // things and look identical, so the picture has to say which it is or the
-      // comparison is one nobody can make.
+      // Which path drew the picture: the two cost different things and look identical.
+      // See lessons/page-mirror.md#mirror-45
       ['picture', rendered ? 'drawn here' : (inXR ? 'copied in' : 'this browser')],
       ['fps', fps == null ? '' : fps.toFixed(1)],
-      // ⚠️ THE CARD'S OWN TIME, AND IT IS BLANK WHERE NO DRIVER WOULD SAY. A
-      // zero here would read as "free", which is a claim nobody measured.
-      // 🔴 `card` AND `floor` ARE GONE — reported from the headset as the two
-      // that did not make sense, and both were right to go for the same reason:
-      // a panel's footer carries what THAT PANEL measured, and neither was
-      // about this panel.
-      //
-      // `card` is the graphics card's own time for the live render, and on the
-      // Quest it was permanently blank: that driver exposes no GPU timer, so
-      // the cell could never say anything on the machine it was added for. A
-      // cell that cannot change is a cell that teaches you to stop reading the
-      // row.
-      //
-      // `floor` is whose floor the dots are on — a fact about the ROOM, printed
-      // under a picture of a shader. It was put here because the 2-D page is
-      // behind your face in a headset, which is a real problem and the wrong
-      // solution: it belongs where the room is described, not in a panel whose
-      // subject is one rendering of one shader.
-      //
-      // ⚠️ Neither fact is DELETED. The card's time is still in the
-      // once-a-second beacon (`live Y ms cpu / Z ms gpu`), and the floor's
-      // provenance is on the first-frame line (`grid drawing on the page` /
-      // `on your room`) — so both are readable, in the log, where a fact about
-      // the session belongs.
+      // The card's own time and the floor's owner are not footer cells: the Quest exposes no
+      // GPU timer, and the floor is a fact about the room. Both are in the log, the beacon's
+      // `live Y ms cpu / Z ms gpu` and the first-frame line.
+      // See lessons/page-mirror.md#mirror-46
     ];
-    // ⚠️ ONLY WHEN A NUMBER ACTUALLY MOVED. The strip is a texture upload in the
-    // headset, and a version counter that ticks on every draw makes the "only
-    // when it changed" upload rule a lie — the exact shape of an optimisation
-    // that reads as working. Comparing the values is cheap and exact; a clock
-    // would be a second rule to keep in step.
+    // Only when a number moved: the strip is a texture upload in the headset, and
+    // comparing the values is cheap and exact where a draw counter would always tick.
+    // See lessons/page-mirror.md#mirror-47
     const footKey = hereFoot.map(([k, v]) => `${k}=${v}`).join('|');
     if (footKey !== lastFootKey) { lastFootKey = footKey; footHere.draw(hereFoot); }
     if (!rendered) {
@@ -841,45 +569,23 @@
       footer: [
         ['picture', boxLive ? (chip.box || 'Raspberry Pi') : ''],
         ['fps', boxLive && farFps ? farFps.toFixed(1) : ''],
-        // ⚠️ THE PROCESSOR'S TIME, NOT THE CARD'S. This is how long it takes to
-        // hand this panel to the graphics card each frame; the card's own time
-        // for the copy cannot be read from here at all.
-        // ⚠️ And the same trim on this side, so the two panels stay a PAIR.
-        // Two footers of different lengths under two pictures being compared
-        // read as two different kinds of thing. `copy` is the processor's time
-        // to hand this panel to the card — a cost of the DISPLAY path, not of
-        // what crossed the network — and `lost` is in the beacon.
+        // The processor's time to hand this panel to the card each frame; the card's own
+        // time for the copy cannot be read. The same trim as the other panel so they pair.
+        // See lessons/page-mirror.md#mirror-48
       ],
     });
     panelDrawn++;
   }
 
   /**
-   * 🔴 THE FAKE LIGHT THE PICTURES THROW ON THE FLOOR, AND WHERE ITS ONE NUMBER
-   * COMES FROM.
-   *
-   * The whole of it is the AVERAGE COLOUR of the left-hand picture, taken by
-   * drawing that canvas into an 8x8 one and reading it back — so it is a real
-   * measurement of the picture, and it is the only thing that crosses from the
-   * picture to the floor. See GRID_FS in shell/xr-room.mjs for the list of
-   * things it is not: no area, no inverse square, no shadow, nothing else in
-   * the room lit by it.
-   *
-   * ⚠️ FOUR OR FIVE TIMES A SECOND, NOT NINETY. `getImageData` is a readback and
-   * a readback at frame rate on a tile-based part is a stall; light also does
-   * not need to be exact to be convincing, which is the one place a fake has an
-   * easier job than the real thing.
-   *
-   * ⚠️ AND THE AMPLITUDE IS HELD LOW ON PURPOSE. "a bit" was the whole of the
-   * request, and a convincing fake invites somebody to believe a measurement
-   * nobody made.
+   * The fake floor light is the average colour of the left picture (canvas drawn into
+   * 8x8 and read back); see GRID_FS in shell/xr-room.mjs for what it is not. Four or
+   * five times a second, since a readback per frame stalls; amplitude held low.
+   * See lessons/page-mirror.md#mirror-49
    */
-  // ⚠️ 0.34 WAS INVISIBLE, MEASURED OFF A RENDERED FRAME rather than guessed
-  // at: with the pool falling off round a panel 1.6 m above the floor, the
-  // brightest point of the wash came out at about 7 of 255 — a fake nobody can
-  // see, which is not a subtle fake but an absent one. This is still "a bit":
-  // at the picture's usual brightness it lands near 0.22, and the floor under
-  // the panels takes about 4% of the dots' own strength in the picture's hue.
+  // 0.34 gave a brightest wash of about 7 of 255, invisible. This lands near 0.22 at
+  // the picture's usual brightness, about 4% of the dots' strength in its hue.
+  // See lessons/page-mirror.md#mirror-50
   const GLOW_MAX = 0.45;
   const tiny = document.createElement('canvas');
   tiny.width = 8; tiny.height = 8;
@@ -904,41 +610,28 @@
       // mean would wash to grey the moment the picture was pale.
       const m = Math.max(r, g2, b) || 1;
       glowCol = [r / m, g2 / m, b / m];
-      // ⚠️ AND IT MUST NOT SIT AT THE CEILING. The first version multiplied by
-      // 1.6 and this picture pinned it at the maximum on every frame — a value
-      // that cannot move is a value that says nothing, whatever it is
-      // measuring. Straight through, so a dark look is a dim room and only a
-      // white picture reaches the top.
+      // Straight through, not boosted: a 1.6 gain pinned it at the maximum every frame.
+      // A dark look is a dim room and only a white picture reaches the top.
+      // See lessons/page-mirror.md#mirror-51
       glowAmp = Math.min(GLOW_MAX, lum * GLOW_MAX);
     } catch { glowAmp = 0; }
   }
-  // ⚠️ AND THE RADIUS IS 3 m RATHER THAN 2.4, for the same reason: the nearest
-  // floor is already 1.6 m from a panel hanging at eye height, so a radius near
-  // that distance spends most of the falloff before the light reaches anything.
+  // 3 m radius: the nearest floor is already 1.6 m from a panel at eye height, so a
+  // radius near that spends the falloff before the light reaches anything.
+  // See lessons/page-mirror.md#mirror-52
   const glowNow = () => (glowAmp > 0 ? { col: glowCol, amp: glowAmp, radius: 3.0 } : null);
 
 
-  // ── the picture, here ────────────────────────────────────────────────────
-  //
-  // ⚠️ THIS IS THE SAME SHADER AS rig/vis/v3dpipe.c, PORTED RATHER THAN
-  // REWRITTEN — and the port is three lines of difference, which is itself the
-  // argument the page is making. The board runs `#version 310 es` because it
-  // has GLES 3.1; WebGL2 is GLSL ES 3.00, and nothing in the fragment shader
-  // needs 3.10. Everything else — gl_VertexID, `out vec4`, texture(), highp —
-  // is unchanged.
-  //
-  // ⚠️ AND `uT` IS A FRAME COUNTER, NOT A CLOCK. The C drives it as i/30.0. If
-  // this drove it from wall time the two panes would be the same shader making
-  // visibly different motion, and the page's whole claim would read as false
-  // while both halves were working.
+  // The picture, here: the shader of rig/vis/v3dpipe.c, ported. Only the header differs
+  // (GLES 3.1 `310 es` on the board, WebGL2 `300 es` here). `uT` is a frame counter,
+  // driven as i/30.0 as in the C, so both panes make the same motion.
+  // See lessons/page-mirror.md#mirror-53
   const VS = `#version 300 es
     void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
       gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
-  // ⚠️ THE BODY IS SHARED, THE HEADER IS NOT. The board compiles this same
-  // text as `#version 310 es` and the browser as `300 es`, so what travels over
-  // the socket is the BODY and each end puts its own first line on it. Until
-  // now the two copies agreed by discipline: edit one, forget the other, and
-  // nothing anywhere says so. One text, two compilers.
+  // The body is shared, the header is not: the body travels over the socket and each
+  // end adds its own `#version` line. One text, two compilers.
+  // See lessons/page-mirror.md#mirror-54
   const GLSL300 = '#version 300 es\n';
   const FS_BODY = `
     precision highp float;
@@ -961,13 +654,10 @@
   const FS = GLSL300 + FS_BODY;
 
   /**
-   * Other looks, on the SAME uniforms — so the three knobs keep meaning what
-   * they say whichever one is running. A body that invented its own controls
-   * would make the knobs lie, which is worse than not having the body.
-   *
-   * These are deliberately short. The point is not a shader library; it is that
-   * a picture can be replaced while it is being watched, on two machines at
-   * once, and you can see it happen.
+   * Other looks, on the same uniforms, so the knobs keep their meaning whichever runs.
+   * Deliberately short: the point is replacing a picture while it is watched, on two
+   * machines at once.
+   * See lessons/page-mirror.md#mirror-55
    */
   const HEAD = `
     precision highp float;
@@ -1018,31 +708,16 @@
 
   const gl = local.c.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
   let rendererName = null, localFps = 0, drewAny = 0;
-  // ⚠️ LOCK THE LOCAL PICTURE TO THE BOARD'S FRAME NUMBER WHEN ONE IS ARRIVING.
-  // Free-running, the two panes are the same shader counting from different
-  // starts — the same family of shape in unrelated colours, which a viewer
-  // reads as "these do not match" and which makes the page argue against
-  // itself. The board's per-frame sequence number IS its frame counter, so
-  // driving `uT` from it puts both panes on the same instant. Then anything
-  // still visibly different between them is the PIPELINE, which is the thing
-  // worth looking at.
-  // (`lockedFrame` and `lockedAt` are declared with `chip`, above, because
-  // `relabel` reads them while the panes are still being built.)
+  // Lock the local picture to the board's frame number when one arrives, so both panes
+  // show the same instant and any remaining difference is the pipeline. `lockedFrame`
+  // and `lockedAt` are declared with `chip` above because `relabel` reads them early.
+  // See lessons/page-mirror.md#mirror-56
 
   /**
-   * 🔴 THE WHOLE PICTURE, AS A FUNCTION OF A GRAPHICS CONTEXT.
-   *
-   * It used to be one block of code closed over this page's own `gl`, which
-   * made it unusable anywhere else — and "anywhere else" turned out to be the
-   * one place that mattered: an immersive session draws with a DIFFERENT
-   * WebGL2 context, where none of these programs, targets or textures exist. A
-   * canvas can only reach that context as a bitmap copied across every frame.
-   *
-   * So the shader machinery takes its context as an argument and there are two
-   * instances of it: one on the flat page's canvas, one inside the headset's
-   * session. Same text, same uniforms, same feedback tap, same crossfade — and
-   * that is the page's own claim ("the same shader on two machines") applied to
-   * the two ends of one browser.
+   * The whole picture as a function of a graphics context: one instance on the flat
+   * page's canvas and one in the headset session's WebGL2 context, which shares no
+   * programs, targets or textures. Same text, uniforms, feedback tap and crossfade.
+   * See lessons/page-mirror.md#mirror-57
    */
   makeKaleidoscope = function makeKaleidoscope(g, KW, KH) {
     const compile = (type, src) => {
@@ -1073,11 +748,9 @@
       return { p: p2, uT: u('uT'), uRes: u('uRes'), uPrev: u('uPrev'), uSeg: u('uSeg'),
                uFb: u('uFb'), uScale: u('uScale'), uWarp: u('uWarp'), uHue: u('uHue') };
     };
-    // ⚠️ MIXING IS A THIRD PROGRAM, NOT A UNIFORM IN THE OTHER TWO. A crossfade
-    // done with an `uAlpha` would only work on shaders that agreed to carry
-    // one — and the whole point is to accept a body somebody just wrote. Two
-    // pictures, drawn to their own targets, mixed by something that knows
-    // nothing about either.
+    // Mixing is a third program, not a uniform in the other two, so any body somebody
+    // writes can be crossfaded without carrying an `uAlpha`.
+    // See lessons/page-mirror.md#mirror-58
     const MIX_FS = GLSL300 + `
       precision highp float;
       uniform sampler2D uA, uB; uniform float uMix; uniform vec2 uRes;
@@ -1097,9 +770,8 @@
     let cur = makeProg(FS_BODY), incoming = null, fadeFrom = 0;
     let tmpA = null, tmpB = null, scratch = null;
     const FADE_MS = 900;
-    // ⚠️ ONE VERTEX ARRAY PER CONTEXT, BOUND ONCE. A vertex array object belongs
-    // to the context that made it; the session's context has none of this
-    // page's, which is the whole reason this function takes `g`.
+    // One vertex array per context, bound once: a VAO belongs to the context that made it.
+    // See lessons/page-mirror.md#mirror-59
     g.bindVertexArray(g.createVertexArray());
     // The feedback tap needs the same ping-pong the C does: two targets, swapped
     // every frame, with the previous one bound as the texture.
@@ -1126,10 +798,9 @@
       if (!incoming) {
         paint(cur, B.f, tNow, Pv, KW, KH);
       } else {
-        // ⚠️ THE MIXED RESULT IS WHAT FEEDS BACK, not either half. This shader
-        // reads its own previous frame; feeding it one arm of a crossfade would
-        // make the trail disagree with the picture and the fade would look like
-        // a glitch rather than a dissolve.
+        // The mixed result feeds back, not either half, so the trail matches the picture
+        // and a fade reads as a dissolve.
+        // See lessons/page-mirror.md#mirror-60
         const k = Math.min(1, (performance.now() - fadeFrom) / FADE_MS);
         paint(cur, tmpA.f, tNow, Pv, KW, KH);
         paint(incoming, tmpB.f, tNow, Pv, KW, KH);
@@ -1151,12 +822,9 @@
     }
 
     /**
-     * The same pass at a fraction of the size, into a target nobody sees.
-     *
-     * ⚠️ IT DOES NOT TOUCH THE PICTURE. Rendering the probe into the visible
-     * ping-pong would put one soft frame into the feedback tap and leave a
-     * smear that lasts as long as the trail does — a measurement changing the
-     * thing it measures, on the one page where the trail IS the subject.
+     * The same pass at a fraction of the size, into a target nobody sees, so the probe
+     * never puts a soft frame into the feedback trail.
+     * See lessons/page-mirror.md#mirror-61
      */
     function probe(scale, tNow, Pv) {
       const w = Math.max(2, Math.round(KW * scale)), h = Math.max(2, Math.round(KH * scale));
@@ -1187,11 +855,9 @@
   } else {
     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
     rendererName = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
-    // ⚠️ SAY WHICH RENDERER, ALWAYS. A visitor on a software rasteriser is a
-    // real visitor, and a page that is quietly slow teaches nothing. It is also
-    // what demo/verify-gl.mjs checks its own answer against.
-    // The parse and the cap are `shortChip`, up with the names, because the
-    // board's string goes through exactly the same one.
+    // Always say which renderer: a software rasteriser is a real visitor, and
+    // demo/verify-gl.mjs checks against it. Parse and cap are in `shortChip`.
+    // See lessons/page-mirror.md#mirror-62
     chip.here = shortChip(rendererName);
     relabel('here');
 
@@ -1199,13 +865,9 @@
     liveBody = FS_BODY;
 
     /**
-     * A new look, on BOTH renderers.
-     *
-     * 🔴 AND THE BODY IS REMEMBERED, because the second renderer may not exist
-     * yet. A look chosen on the flat page and then a headset put on would
-     * otherwise start the session on the shader this file happened to ship
-     * with — two ends of one page drawing different pictures while the page's
-     * whole claim is that they draw the same one.
+     * A new look, on both renderers. The body is remembered because the headset
+     * renderer may not exist yet and must start on the chosen look.
+     * See lessons/page-mirror.md#mirror-63
      */
     window.__applyShader = function applyShader(body) {
       try {
@@ -1229,47 +891,36 @@
     };
 
     let i = 0, tick = 0, lastAt = performance.now();
-    // ⚠️ WHICH FRAMEBUFFER HOLDS THE FRAME THAT WAS JUST DRAWN. Reading pixels
-    // without binding one reads whatever happens to be current, and with
-    // `preserveDrawingBuffer: false` the default framebuffer is not readable
-    // after the frame ends at all — so a check would sample an undefined
-    // surface and report a flat field on a picture that is fine.
+    // Bind the framebuffer holding the frame just drawn: with `preserveDrawingBuffer:
+    // false` the default one is not readable after the frame ends.
+    // See lessons/page-mirror.md#mirror-64
     window.__lastFbo = null;
 
-    // How often the flat picture is still drawn while the headset is drawing
-    // its own. ⚠️ NOT ZERO, and for one reason: the fake light on the floor is
-    // the average colour of that canvas, and a canvas nobody is drawing to has
-    // no colour to average. Five times a second is enough for light and it is
-    // 1 frame in 18 of the headset's, which is named here rather than left for
-    // somebody to find in the A/B.
+    // The flat picture still draws while the headset draws its own, five times a second
+    // (1 frame in 18 of the headset's), because the floor light averages its colour.
+    // See lessons/page-mirror.md#mirror-65
     const FLAT_EVERY = 18;
 
-    // ⚠️ ONE FRAME, AND A SCHEDULER THAT IS NOT PART OF IT. Inside a headset
-    // this page's own requestAnimationFrame stops being the clock — the session
-    // has its own, at the headset's rate — so the thing that draws a frame has
-    // to be callable from either.
+    // One frame, callable from any scheduler: in a session the headset's clock drives it,
+    // not this page's requestAnimationFrame.
+    // See lessons/page-mirror.md#mirror-66
     const step = () => {
-      // ⚠️ A LOCK WITH NO TIMEOUT FREEZES THE THING IT LOCKED. When the box
-      // stops sending — it died, the stream ended, the socket dropped without a
-      // `video.stopped` — the counter stops advancing and this pane stops with
-      // it. Both pictures then appear dead and only one of them actually is,
-      // which is the page failing at the exact moment it should be showing that
-      // the local one needs nobody. Unlock after a second of silence.
+      // The lock times out: when the box stops sending, unlock after a second of silence
+      // so the local pane keeps moving and only the dead one stops.
+      // See lessons/page-mirror.md#mirror-67
       if (lockedFrame !== null && performance.now() - lockedAt > 1000) {
         lockedFrame = null;
         i = Math.max(i, 1);
         relabel('here');
-        // 🔴 THE LOCK IS A STATE CHANGE AND IT GOES IN THE LOG, WHICH IS WHERE
-        // A STATE CHANGE GOES. It was a `clock` cell for one session and a
-        // the word `locked` glued onto the end of the renderer's name before
-        // that; neither was asked for. Both edges are said now, here and where a frame arrives,
-        // so the fact is still reported and it is reported when it moves.
+        // The lock is a state change and goes in the log, on both edges, here and where a
+        // frame arrives.
+        // See lessons/page-mirror.md#mirror-68
         d.log('the box stopped sending. This pane is free-running again', 'warn');
         stat('box', { fps: null });
       }
-      // ONE CLOCK FOR BOTH RENDERERS. `uT` is a frame counter, not wall time —
-      // the board drives it as i/30 — so the two ends only match if they are
-      // handed the same number, and the headset's renderer reads it from here.
+      // One clock for both renderers: `uT` is a frame counter (the board drives it as i/30),
+      // and the headset's renderer reads it from here.
+      // See lessons/page-mirror.md#mirror-69
       lastT = (lockedFrame ?? i) / 30;
       const inXR = xr?.state?.presenting === true;
       const rendered = inXR && xr.isLive();
@@ -1281,12 +932,9 @@
         gl.blitFramebuffer(0, 0, W, H, 0, 0, W, H, gl.COLOR_BUFFER_BIT, gl.NEAREST);
         window.__lastFbo = pageK.fbo;
         drewAny++;
-        // In the SAME turn as the frame that filled the canvas — a WebGL canvas
-        // with no preserved drawing buffer reads back empty one task later.
-        // ⚠️ AND ONLY WHERE SOMETHING IS LIT BY IT. `getImageData` is a readback;
-        // paying for one on every visitor who will never put a headset on is a
-        // cost with nothing on the other side of it, which is the same argument
-        // that keeps the session's own context unbuilt until it is needed.
+        // In the same turn as the frame that filled the canvas, which reads back empty a
+        // task later. Only while something is lit by it: a readback costs every visitor.
+        // See lessons/page-mirror.md#mirror-70
         if (inXR || wantPanel) sampleGlow();
         if (!rendered) { tick++; }
       }
@@ -1306,26 +954,18 @@
     startFlat();
   }
 
-  // ── the same panels, in a headset ───────────────────────────────────────
-  //
-  // 🔴 THE SESSION ITSELF IS demo/shell/xr-panel.mjs, NOT THIS PAGE. Getting
-  // into an immersive session is the most expensive code in this repo to get
-  // right — five separate defects, every one of them found by a real Quest and
-  // every one of them silent from outside — so it lives in one module and this
-  // page hands it pictures and a way to keep them up to date. The rules it
-  // holds are listed at the top of that file.
+  // The same panels, in a headset. The session is demo/shell/xr-panel.mjs: entering
+  // one is costly to get right, so it lives in one module and holds its rules at its top.
+  // See lessons/page-mirror.md#mirror-71
   xr = createXRPanels({
-    // 1.28 m across at 1.6 m in front of you: about 44 degrees, which is wide
-    // enough to read without moving and narrow enough to turn away from. Being
-    // able to turn away from it is the whole of the gaze-gating in
-    // `plans/plan-xr-room.md` §2, so the panels are placed in the room rather than
-    // pinned to your face — and either can be picked up by the bar under it and
-    // put somewhere else.
+    // 1.28 m across at 1.6 m, about 44 degrees: readable without moving and narrow
+    // enough to turn away from (plans/plan-xr-room.md §2). Placed in the room, movable
+    // by the bar under each.
+    // See lessons/page-mirror.md#mirror-72
     panels: [
-      // The left one, RENDERED IN THE HEADSET. `canvas` is still here and it is
-      // not redundant: it is the other arm of the A/B, so the thumbstick can
-      // put the copied-in picture back on the same quad and the two can be held
-      // against each other without taking the headset off.
+      // The left one, rendered in the headset. `canvas` stays as the other arm of the A/B:
+      // the thumbstick puts the copied picture back on the same quad.
+      // See lessons/page-mirror.md#mirror-73
       { canvas: panelHere.canvas, live: liveMirror,
         foot: footHere.canvas, footVersion: () => footHere.dirty(), footFrac: FOOT_FRAC,
         w: 1.28, h: 0.80 },
@@ -1334,71 +974,47 @@
       // texture upload however you get it.
       { canvas: panelBox.canvas, w: 1.28, h: 0.80 },
     ],
-    // 🔴 A FLOOR AND NOTHING ELSE. The room `scene` rolls has a kaleidoscope
-    // sky cube and a dozen objects in it, and both were asked to go from this
-    // page: what should be in here is the two pictures and something to stand
-    // on. ⚠️ IT IS A PER-PAGE OPTION, NOT A CHANGE TO THE MODULE — `scene` is
-    // a page about a room made of objects and it still gets all of them.
-    // ⚠️ AND THE WALLS WERE CARRYING THE LIGHT. Their brightness was raised
-    // once because without it "the room reads as black"; with them gone that
-    // is now literally what is behind the floor, so `bg` is chosen here rather
-    // than inherited, and the panels and the fake light off them are what is
-    // left to carry the place. It is a dark room on purpose.
+    // A floor and nothing else: a per-page option to `scene`'s room, which keeps its sky
+    // and objects there. With no walls behind the floor, `bg` is chosen here; a dark room.
+    // See lessons/page-mirror.md#mirror-74
     room: { seed: 424242, sky: false, things: false, bg: [0.030, 0.036, 0.050] },
-    // ⚠️ WIDER THAN THE MODULE'S DEFAULT, AND IT IS ARITHMETIC RATHER THAN
-    // TASTE. A 1.28 m panel at 1.6 m subtends 2·atan(0.64/1.6) = 0.76 rad, so
-    // the default 0.70 rad between centres puts their edges in contact and the
-    // pair reads as one folded screen rather than as two pictures. 0.86 leaves
-    // about six degrees of room between them.
+    // A 1.28 m panel at 1.6 m subtends 2 atan(0.64/1.6) = 0.76 rad, so the default
+    // 0.70 rad between centres makes edges touch. 0.86 leaves about six degrees.
+    // See lessons/page-mirror.md#mirror-75
     fan: 0.86,
     // The fake light. See `sampleGlow` above for what the number is, and
     // GRID_FS in shell/xr-room.mjs for the list of things it is not.
     glow: glowNow,
     log: (m, k) => d.log(m, k),
-    // ⚠️ THIS PAGE'S OWN LOOP IS THE THING THAT STOPS. Inside a session the
-    // headset owns the clock, so the shader is stepped from here — without it
-    // the panel would carry the last frame drawn before the session started,
-    // which is a frozen picture and reads as a broken stream.
-    // ⚠️ AND `drawPanel` IS NOT CALLED AGAIN HERE. `step` already draws the
-    // panels on any frame where a session is running; calling it twice would
-    // lay out the numbers twice a frame and put that cost into the very
-    // measurement this page is taking.
+    // In a session the headset owns the clock, so the shader is stepped from here.
+    // `drawPanel` is not called again: `step` already draws the panels.
+    // See lessons/page-mirror.md#mirror-76
     onFrame: () => { mirrorStep?.(); },
     onEnd: () => { startFlat(); },
   });
 
   window.__demo.xr = xr.state;
-  // 🔴 THE ONE WAY TO LOOK AT WHAT A HEADSET WOULD SEE, FROM A MACHINE WITH NO
-  // HEADSET. `Page.captureScreenshot` cannot see an immersive view — measured,
-  // research §3.3 — so without this the only reviewer of this page's 3-D is
-  // somebody wearing it. A harness can drive the same per-eye draw off-screen
-  // and get a PNG back.
+  // Renders what a headset would see without one: `Page.captureScreenshot` cannot see
+  // an immersive view (research §3.3), so a harness drives the per-eye draw off-screen.
+  // See lessons/page-mirror.md#mirror-77
   window.__demo.xrPreview = (o) => xr.preview(o);
 
   /**
-   * One handler, two kinds of session.
-   *
-   * 🔴 BOTH ARE REAL BRANCHES AND BOTH ASSERT, on every run. A page that
-   * branches must grade every branch or the suite is green over a path nobody
-   * reached — this project's oldest and most expensive failure. The labels
-   * carry the mode so two runs can be held side by side rather than merged.
+   * One handler, two kinds of session. Both branches assert on every run, labelled
+   * with the mode so two runs can be compared.
+   * See lessons/page-mirror.md#mirror-78
    */
-  // 🔴 WHICH MODES HAVE ALREADY BEEN GRADED, AND THIS IS NOT A CACHE. Both
-  // session controls are switched off on any browser that cannot open a
-  // session, which is every laptop and every phone, so the press that used to
-  // run the checks below never happens there any more. `runChecks` drives
-  // whichever mode nobody reached rather than letting a disabled control take a
-  // branch out of the run, and this is what stops the two ever both firing.
+  // Which modes have been graded. Session controls are off where no session can open,
+  // so `runChecks` drives the mode nobody reached; this stops both firing twice.
+  // See lessons/page-mirror.md#mirror-79
   const graded = { 'immersive-vr': false, 'immersive-ar': false };
   async function enterHeadset(mode) {
     graded[mode] = true;
     const ar = mode === 'immersive-ar';
     const who = ar ? 'passthrough' : 'VR';
-    // ⚠️ WAIT FOR THE PROBE, NEVER RE-ASK IT. Whether this browser can show an
-    // immersive session is answered once at load, away from any gesture,
-    // because asking again here can spend the user activation `requestSession`
-    // needs. On a very fast press the answer may not be back yet, and a bounded
-    // wait is the difference between "we have not looked" and "there is none".
+    // Wait for the load-time probe, never re-ask: asking here can spend the user
+    // activation `requestSession` needs. The wait is bounded.
+    // See lessons/page-mirror.md#mirror-80
     const can = () => (ar ? xr.supportedAr() : xr.supported());
     for (let i = 0; i < 20 && can() === null; i++) await new Promise((r) => setTimeout(r, 50));
     let got = false;
@@ -1408,12 +1024,9 @@
       // picture twice per headset frame and report double the frame rate.
       if (got) stopFlat();
     } catch (e) {
-      // ⚠️ A LAST NET, ON THE BEACON. Every await inside the module is guarded,
-      // but the failure that cost two headset runs was a plain synchronous
-      // statement between the guarded parts — and a handler whose failure mode
-      // is silence cannot be trusted to its own internal care. The batched
-      // shipper is no use here: entering a session is exactly when timers stop
-      // being generous.
+      // A last net on the beacon, sent directly: a synchronous throw between the module's
+      // guarded parts would otherwise be silent, and timers are unreliable on session entry.
+      // See lessons/page-mirror.md#mirror-81
       beacon(`FAIL enter(${mode}): ${e.name}, ${e.message}`);
       d.log(`entering failed. ${e.name}: ${e.message}`, 'bad');
       try { await xr.end(); } catch { /* it may never have started */ }
@@ -1427,51 +1040,36 @@
       can() === true || can() === false,
       `${mode}: ${can()}`);
 
-    // ⚠️ THE ROOM IS ARITHMETIC, SO A LAPTOP CAN GRADE IT. The panels' frame
-    // rate needs a headset and nothing here can change that — but what the room
-    // is made of, and whether the page can SAY where the dotted floor came
-    // from, are answerable on this machine.
+    // The room is arithmetic, so a laptop can grade it; only the panel frame rate needs a headset.
+    // See lessons/page-mirror.md#mirror-82
     const R = xr.state.room;
-    // 🔴 THIS ASSERT USED TO READ `things > 0` AND IT WOULD NOW BE FALSE FOR
-    // THE RIGHT REASON, which is the worst kind of red. The objects were turned
-    // off on purpose, so the thing worth grading moved to the floor — and the
-    // property it grades is one that has actually broken here: the dots used to
-    // reach 5 m while the fade did not finish until 11, leaving them at two
-    // thirds strength where the quad simply stopped. A hard edge, five metres
-    // in front of your face, drawn by the fade's own constants disagreeing with
-    // the floor's.
+    // Grades the floor: the dots must stop where the fade finishes, or the quad ends in
+    // a hard edge at two thirds strength.
+    // See lessons/page-mirror.md#mirror-83
     d.assert('the panels hang over a floor whose dots fade out before it ends',
       !!R?.on && !!R.dots && R.dots.span / 2 === R.dots.fadeFar && R.dots.fadeNear < R.dots.fadeFar,
       R?.dots
         ? `seed ${R.seed}, ${R.scenery}, ${R.dots.span} m of floor, dots fading from ${R.dots.fadeNear} to ${R.dots.fadeFar} m`
         : 'there is no room, so the panels would hang in nothing');
-    // 🔴 "NO SURFACES" MUST NEVER BE DRAWN AS "NO WALLS". Real room data is
-    // optional and it does not gate the grid: with none, the dots go on the
-    // page's own floor and the page has to SAY that is what they are. The
-    // sentence is the assert, because a grid nobody can attribute is a picture
-    // claiming to be a measurement.
+    // No surfaces must never be drawn as no walls: without room data the dots go on the
+    // page's own floor and the page says so. The sentence is the assert.
+    // See lessons/page-mirror.md#mirror-84
     d.assert(`and it says whose floor the dotted grid is on, in ${who}`,
       typeof R?.note === 'string' && R.note.length > 10
       && ['not asked', 'waiting', 'refused', 'unreadable', 'none', 'yours'].includes(R.surfaces),
       `${R?.surfaces}, and it says: ${R?.note}`);
-    // 🔴 THE CONTROLLER INTERFACE IS THE ROOM'S, NOT THIS PAGE'S, AND IT HAS NO
-    // SESSION MODE IN IT. The same stand-ins, the same beam off the right
-    // hand's target ray, the same tablet on the left — out of the same two
-    // modules `scene` uses, so there is no second copy here to drift. The
-    // string is the one both pages beacon on their first headset frame, which
-    // is how two runs in two modes are compared without a third.
+    // The controller interface is the room's, from the same two modules `scene` uses,
+    // with no session mode in it. Its string is what both pages beacon on the first frame.
+    // See lessons/page-mirror.md#mirror-85
     d.assert(`the controllers and the tablet describe themselves without naming a kind of session (${who})`,
       typeof xr.state.ui === 'string' && xr.state.ui.includes('control(s)')
       && !/\b(vr|ar|immersive|passthrough|opaque)\b/i.test(xr.state.ui),
       xr.state.ui);
 
     if (got) {
-      // ⚠️ A BOUNDED WAIT FOR A SECOND OF FRAMES, not for the first one. The
-      // frame rate is counted over a one-second window, and the FIRST of those
-      // seconds contains the shader compiling and the panel's first, largest
-      // copy to the graphics card — so a rate read at the first frame is a
-      // number about starting up rather than about running. It is bounded
-      // because a session that never draws must report that, not hang here.
+      // A bounded wait for a second of frames: the first second includes the shader compile
+      // and the first panel upload. Bounded so a session that never draws reports it.
+      // See lessons/page-mirror.md#mirror-86
       for (let i = 0; i < 40 && (xr.state.fps == null || xr.state.frames < 60); i++) {
         await new Promise((r) => setTimeout(r, 100));
       }
@@ -1481,11 +1079,9 @@
         xr.state.fb
           ? `${xr.state.fb.w}x${xr.state.fb.h}, ${xr.state.eye.w}x${xr.state.eye.h} an eye, ${xr.state.frames} frames`
           : 'nothing drew');
-      // 🔴 PASSTHROUGH IS GRADED ON THE BLEND MODE, NEVER ON THE SESSION'S
-      // NAME. A session can be called `immersive-ar` and still composite
-      // `opaque`, which presents as a drawing bug rather than as a session one
-      // — and in VR `opaque` is the correct answer, so the two modes expect
-      // opposite things from the same field.
+      // Passthrough is graded on the blend mode, never the session name: `immersive-ar`
+      // can still composite `opaque`, which is correct for VR.
+      // See lessons/page-mirror.md#mirror-87
       if (ar) {
         d.assert('and passthrough really is compositing over your room',
           xr.state.blendMode === 'alpha-blend' || xr.state.blendMode === 'additive',
@@ -1495,19 +1091,10 @@
           xr.state.blendMode === 'opaque',
           `environmentBlendMode ${xr.state.blendMode ?? 'not reported'}`);
       }
-      // 🔴 THE NUMBER `plans/plan-xr-room.md` §4.1 EXISTS TO GET: a Quest 3 holds 89.8
-      // frames a second in an empty room, and what the pictures cost against
-      // that is the open question the rest of the room depends on. The detail
-      // now carries the whole bill — the copy in, the render here, and the
-      // card's own time for it where a driver will say.
-      //
-      // ⚠️ GRADED AGAINST WHAT THIS HEADSET PROMISES, NEVER AGAINST A TYPED
-      // NUMBER. A fixed floor of 60 was tried and it flapped on the first thing
-      // that ran at 60 — a threshold sitting exactly on a plausible refresh rate
-      // has no warning left in it. Where the headset says what it runs at, nine
-      // tenths of that is the floor; where it will not say — and a Quest 3 does
-      // not — 55 is a stall detector and the detail says so, because a number
-      // whose basis is invisible cannot be argued with.
+      // The frame rate cost of the pictures (plans/plan-xr-room.md §4.1; empty room 89.8 fps
+      // on a Quest 3). Floor is nine tenths of the headset's stated rate; where it states
+      // none, 55 as a stall detector, and the detail says which.
+      // See lessons/page-mirror.md#mirror-88
       const promised = xr.state.frameRate
         ?? (xr.state.supportedFrameRates?.length ? Math.max(...xr.state.supportedFrameRates) : null);
       d.assert(`and it holds the rate this headset promises, with the pictures on it (${who})`,
@@ -1517,20 +1104,15 @@
         + `, copy ${xr.state.uploadCpuMs == null ? 'not measured' : `${xr.state.uploadCpuMs.toFixed(2)} ms`} cpu`
         + `, render ${xr.state.liveCpuMs == null ? 'not measured' : `${xr.state.liveCpuMs.toFixed(2)} ms`} cpu`
         + `, ${xr.state.liveWhereCost}`);
-      // ⚠️ ASSERT ON THE ERROR FLAG. A page will draw a right-looking picture
-      // with an error pending — a Quest did exactly that, for an attribute
-      // binding made one call too late, and nobody would have seen it by
-      // looking.
+      // Assert on the GL error flag: a page can draw a right-looking picture with an error pending.
+      // See lessons/page-mirror.md#mirror-89
       d.assert(`and it drew with no graphics error pending (${who})`,
         xr.state.glError === 0,
         xr.state.glError === 0 ? 'clean' : `error ${xr.state.glError} at ${xr.state.glWhere}`);
     } else if (can() === true) {
-      // 🔴 A HEADSET THAT REFUSED IS NOT A LAPTOP, and the assert below would
-      // have said it was. "There is no headset here" and "there is one and it
-      // would not start" are opposite conclusions and they were reading as the
-      // same pass — the same collapse as a blank cell meaning both "we did not
-      // look" and "we looked and it was fine". The line above says which step
-      // did not come back; this says that it is a failure.
+      // A headset that refused to start is a failure, not "no headset here"; the line above
+      // says which step did not come back.
+      // See lessons/page-mirror.md#mirror-90
       d.assert(`a headset is here, so the ${who} session has to start`, false,
         'it did not. The line above says which step never came back');
     } else {
@@ -1543,19 +1125,10 @@
   d.on('ar', () => enterHeadset(XR_MODE.ar));
 
 
-  // ── the picture, from the board ──────────────────────────────────────────
-  //
-  // ⚠️ A SECOND SOCKET, TO `<room>-video`. The relay counts messages per socket
-  // and the box's audio is already 50 a second; thirty video frames on the
-  // same socket would crowd it, and the bucket drops the excess with no error
-  // at all. It also keeps the binary framing unambiguous: every other page
-  // here reads a binary frame as PCM.
-  //
-  // 🔴 THE FIRST SOCKET IS `bay-node.mjs`'s, AND IT OPENS ON A PRESS. It used to
-  // be a WebSocket made at the top of this block, so a visit asked the Pi to
-  // draw. `node.join()` is called by `Show the board` and by nothing else; the
-  // harness never presses it, and the check pass grades the links on a scratch
-  // bay instead, so no run reaches the real Pi.
+  // The picture from the board, on a second socket to `<room>-video`: the relay limits
+  // messages per socket and drops excess silently, and other pages read binary as PCM.
+  // The first socket is `bay-node.mjs`'s and opens only on `Show the board`.
+  // See lessons/page-mirror.md#mirror-91
   const node = createBayNode({
     room: ROOM, graphs: [SELF],
     log: (line, kind) => d.log(line, kind),
@@ -1568,10 +1141,9 @@
     },
     onGraph: () => describeLinks(),
     onMessage: (msg) => heard(msg),
-    // 🔴 `/patchbay/` MAY ASK THIS PAGE TO OPEN ITS SHADER LINK, and the answer
-    // is the same act a look press makes: the running body goes to the board in
-    // this page's room. Any other target is refused in words, because this page
-    // only ever sends to the one board it joined.
+    // `/patchbay/` may ask this page to open its shader link: the same act as a look
+    // press, to the board in this page's room. Any other target is refused in words.
+    // See lessons/page-mirror.md#mirror-92
     onLinkRequest: ({ source, target, open }) => {
       if (source !== PROGRAM_PORT) return { ok: false, why: `${source} is not this page's shader` };
       if (!open) return { ok: true, why: 'nothing to close: a shader that was sent stays sent' };
@@ -1586,15 +1158,10 @@
   const send = (m) => node.send(m);
 
   /**
-   * 🔴 TWO LINKS, DESCRIBED IN A BAY BEFORE ANYTHING IS OPENED. The shader goes
-   * out as `<site>:webgl:program -> pi-1:shader:program-in` and the picture comes back
-   * as `pi-1:shader:video-out -> <site>:screen:video`, which the bay gives the
-   * `relay-h264` session because that is the only way the board's port says it
-   * travels. Which opener takes the video is `openers.pick`, the same choice
-   * `/patchbay/` makes, so the two pages cannot disagree about it.
-   * ⚠️ THE PROGRAM LINK HAS NO OPENER IN THE KIT, AND `pick` SAYS SO. A shader
-   * is a light link, one message, and `openers.mjs` has no `program` row, so the
-   * page opens it itself with `video.shader`, which is exactly what it did before.
+   * Two links described in a bay before anything opens: program out to
+   * `pi-1:shader:program-in`, video back via `relay-h264`, opener chosen by `openers.pick`.
+   * `openers.mjs` has no `program` row, so the page sends that one itself with `video.shader`.
+   * See lessons/page-mirror.md#mirror-93
    */
   const openers = createOpeners({ log: (line, kind) => d.log(line, kind), host: el('div'),
     self: { screenVideo: [SCREEN_PORT] } });
@@ -1642,10 +1209,9 @@
 
   function heard(msg) {
     if (!msg || typeof msg.type !== 'string') return;
-    // ⚠️ THE SAME BODY GOES TO BOTH ENDS. This page compiles it as 300 es and
-    // forwards it untouched to the board, which compiles it as 310 es — so the
-    // demo's claim ("the same shader, two GPUs") becomes literally one text
-    // rather than two copies kept in step by hand.
+    // The same body goes to both ends: compiled here as 300 es, forwarded untouched to the
+    // board as 310 es.
+    // See lessons/page-mirror.md#mirror-94
     if (msg.type === 'dev.shader' && typeof msg.body === 'string') {
       const okHere = window.__applyShader(msg.body);
       if (okHere && msg.toBox !== false) {
@@ -1672,29 +1238,22 @@
       // the second status at the latest, because the renderer prints it on its
       // own first line and the reply may be composed before that lands.
       if (msg.renderer) { chip.box = shortChip(msg.renderer); relabel('box'); }
-      // ⚠️ TELL THE BOX WHAT THIS PAGE IS SET TO. The knobs only sent on a
-      // press, so at load the page rendered its own defaults and the box
-      // rendered ITS defaults — and the two agreed only because the numbers
-      // happened to be the same on both sides. Changing one of them anywhere
-      // would have made the panes quietly disagree, which is the one thing this
-      // page must never do. Sent on every start, so a box that restarted comes
-      // back matching whatever is on screen.
+      // Tell the box this page's settings on every start, so a restarted box matches the
+      // screen instead of relying on matching defaults.
+      // See lessons/page-mirror.md#mirror-95
       send({ type: 'video.params', ...P });
-      // ⚠️ DO NOT REOPEN A STREAM THAT IS ALREADY OPEN. Every client's
-      // `video.status` is answered to the whole room, so a second visitor's
-      // question tore this one's decoder down and built it again — which showed
-      // up as a bar reading "not arriving" next to a live frame rate.
+      // Do not reopen an open stream: `video.status` answers go to the whole room, and
+      // another visitor's question would otherwise rebuild this decoder.
+      // See lessons/page-mirror.md#mirror-96
       far.pres.checking(false).because(null);
       if (!bv.isOpen()) openPicture(msg);
     }
     if (msg.type === 'video.stopped') { d.log(`the box stopped after ${msg.frames ?? 0} frames`); closeVideo(); }
   }
   /**
-   * The picture link, opened through the description. 🔴 A REFUSAL FROM THE BAY
-   * STOPS IT, IN WORDS. The board's graph normally arrives first, because joining
-   * asks `graph.ask` before `video.status`; if it has not arrived after two
-   * seconds the picture is opened without a link and the log says so, which is
-   * what this page did for every visitor before links existed.
+   * The picture link, opened through the description; a bay refusal stops it, in words.
+   * If the board's graph has not arrived after two seconds, open without a link and log it.
+   * See lessons/page-mirror.md#mirror-97
    */
   async function openPicture(info) {
     for (let i = 0; i < 20 && !linked.video && !linked.why; i++) {
@@ -1706,24 +1265,18 @@
     if (!linked.video) d.log('the board has not described itself yet, so its picture is opened without a link', 'warn');
     openVideo(info.room, info);
   }
-  // 🔴 ASKED ON A PRESS SINCE 2026-10-06. This said *"ask on connect, not on a
-  // press"*, and connecting happened on load, so a visit started the encoder.
-  // What survives is the half that was right: once somebody has pressed, the
-  // box is asked at once and stops on its own when the room empties, so nobody
-  // has to remember to switch it off.
+  // Asked only after a press; then the box is asked at once and stops on its own when
+  // the room empties.
+  // See lessons/page-mirror.md#mirror-98
   function askForPicture() {
     d.log('asking the box to draw…', 'hi');
     send({ type: 'video.start', w: 1280, h: 720, fps: 30 });
   }
 
   /**
-   * Ask again, slowly, for as long as the page is open.
-   *
-   * ⚠️ Every five seconds and NOT faster: the thing being asked is a Raspberry
-   * Pi with one hardware encoder, and a page that retries hard is a page that
-   * queues work on a device which blocks rather than fails. Five seconds is
-   * slow enough to be polite and quick enough that someone switching the box on
-   * sees the picture without reloading.
+   * Ask again every five seconds while the page is open: the Pi has one hardware encoder
+   * that blocks rather than fails, and five seconds still shows a box switched on soon.
+   * See lessons/page-mirror.md#mirror-99
    */
   let retry = null;
   function scheduleRetry() {
@@ -1735,10 +1288,9 @@
     retry.unref?.();
   }
 
-  // 🔴 THE RECEIVER IS THE KIT'S SINCE 2026-10-12, `demo/shell/board-video.mjs`,
-  // so /shader/remote/ decodes the board's picture with this same code
-  // rather than a second copy of it. What stays here is what this page DOES
-  // with a frame: the lock to the board's counter, the badge, the log lines.
+  // The receiver is the kit's `demo/shell/board-video.mjs`, shared with /shader/remote/.
+  // This page keeps what it does with a frame: the lock, the badge, the log lines.
+  // See lessons/page-mirror.md#mirror-100
   let farFps = 0;
   const bv = createBoardVideo({
     canvas: far.c, send,
@@ -1761,13 +1313,12 @@
         d.log('this pane is locked to the board\u2019s frame number');
       }
     },
-    // ⚠️ A DECODER MUST START ON A KEYFRAME, so a joiner waits up to one
-    // second at this GOP, which is a GOP choice and not a fault.
+    // A decoder must start on a keyframe, so a joiner waits up to one second at this GOP.
+    // See lessons/page-mirror.md#mirror-101
     onKey: () => d.log('a keyframe arrived. The box\u2019s picture starts here'),
-    // ⚠️ THE COUNTER IS IN THE PAYLOAD BECAUSE A BINARY FRAME HAS NO ENVELOPE,
-    // and the relay drops frames with no error, no close and no backpressure.
-    // Measured: at 8 Mbit/s it lost 101 of 361 frames and nothing else on the
-    // path said so. It reports into the log rather than a cell under the picture.
+    // The counter is in the payload because a binary frame has no envelope, and the relay
+    // drops frames silently: at 8 Mbit/s it lost 101 of 361. Reported to the log.
+    // See lessons/page-mirror.md#mirror-102
     onLost: (n) => sayLinkLost(n),
     onRate: (kbit, fps) => { farFps = fps; stat('box', { fps: farFps }); sayLinkRate(kbit); },
     onClose: () => d.log('the box’s video socket closed'),
@@ -1775,22 +1326,10 @@
   });
 
   /**
-   * 🔴 WHAT THE LINK COSTS IS SAID IN THE LOG AND ON THE BEACON, NOT IN A ROW
-   * UNDER A PICTURE. `kbit/s` and `lost` were footer cells for one session and
-   * were never asked for. They are still worth having: the relay drops frames
-   * with NO error, no close and no backpressure, so a sequence number in the
-   * payload is the only witness there is, and a rate that has collapsed is the
-   * difference between a link that is working and one that is barely there.
-   *
-   * ⚠️ A RATE IS SAID ONCE AND A LOSS IS SAID WHEN IT HAPPENS. A line a second
-   * is the slop log this project already has a rule about, so the rate goes out
-   * on the first second of a stream and the totals go out when it stops. A loss
-   * is an EVENT, which is exactly what a log is for, with a floor under how
-   * often so a bad link cannot fill the box.
-   *
-   * ⚠️ AND THE BEACON, because a phone or a headset has no log anybody can
-   * read. That is where this page already ships the things it wants back from a
-   * device.
+   * What the link costs goes to the log and the beacon, not a footer: the payload
+   * sequence number is the only witness to relay drops. The rate is said once on the
+   * first second, totals at stop, a loss when it happens (with a floor on how often).
+   * See lessons/page-mirror.md#mirror-103
    */
   window.__demo.link = { kbit: null, lost: 0, frames: 0 };
   let saidRate = false, saidLost = 0, saidLostAt = 0, beaconedLost = false;
@@ -1807,24 +1346,18 @@
     if (n === saidLost || now - saidLostAt < 5000) return;
     saidLost = n; saidLostAt = now;
     d.log(`the relay has dropped ${n} frame${n === 1 ? '' : 's'} of the box\u2019s picture`, 'warn');
-    // ⚠️ THE BEACON GETS THE FIRST ONE AND THE TOTAL, NEVER A LINE EVERY FIVE
-    // SECONDS. A tab left open on a lossy link would be 720 posts an hour into
-    // the ring buffer a headset run depends on being able to read, which is a
-    // diagnostic drowning the diagnostics. The first loss is the event worth
-    // shipping; the total goes out when the stream stops.
+    // The beacon gets the first loss and the total, never a line every five seconds:
+    // a lossy tab would post 720 an hour into the ring buffer headset runs rely on.
+    // See lessons/page-mirror.md#mirror-104
     if (!beaconedLost) {
       beaconedLost = true;
       beacon(`mirror: the relay began dropping frames of the box\u2019s picture, ${n} so far`);
     }
   }
-  // ⚠️ SAY THAT SOMEBODY IS WATCHING, so the box can stop when nobody is. It
-  // cannot tell from its side: the relay reported seven sockets in the video
-  // room while nothing was watching, because a test run that exits without a
-  // clean close leaves one behind. `document.hidden` is checked because a tab
-  // in the background is not a viewer either, and a socket count could never
-  // have seen that.
-  // The ten second `video.watching` is sent by `createBoardVideo` while its
-  // socket is open and the tab is not hidden, exactly as it was here.
+  // Say somebody is watching so the box can stop when nobody is: socket counts include
+  // dead test sockets and hidden tabs. `createBoardVideo` sends the ten second
+  // `video.watching` while its socket is open and the tab is visible.
+  // See lessons/page-mirror.md#mirror-105
 
   function closeVideo() {
     const { decoded: farDecoded, lost: farGaps } = bv.close();
@@ -1832,12 +1365,9 @@
     // locked would be two different claims wearing one label.
     lockedFrame = null;
     relabel('here');
-    // ⚠️ THE MACHINE COPY IS WHAT THE FOOTER SAYS AND NOTHING MORE. It once
-    // carried "not arriving" beside a live 27.7 fps, because a field the bar
-    // had stopped drawing was still being written. Nothing on screen showed it,
-    // which is worse: the machine surface and the picture disagreed and only a
-    // harness would ever have noticed. What the LINK cost lives on
-    // `__demo.link`, under its own name, because it is not in this row.
+    // The machine copy is what the footer says and nothing more, so the two cannot
+    // disagree. Link cost lives on `__demo.link`.
+    // See lessons/page-mirror.md#mirror-106
     stat('box', { fps: null });
     // The totals, once, where the stream ended. A line nobody can read on a
     // phone is also on the beacon, which is where that page reads it.
@@ -1845,9 +1375,8 @@
       d.log(`the box\u2019s picture stopped after ${farDecoded} frames, ${farGaps} lost`);
       beacon(`mirror: the box\u2019s picture stopped after ${farDecoded} frames, ${farGaps} lost`);
     }
-    // ⚠️ "Waiting…" HAS TO BE TRUE. Saying it and then doing nothing is the
-    // worst of both: a reader waits for something nobody is asking for. The
-    // page re-asks, and the word is a promise it keeps.
+    // "Waiting" has to be true: the page re-asks while it says it.
+    // See lessons/page-mirror.md#mirror-107
     badge.stop();
     farWaits('Waiting…');
     far.pres.because('no frames are arriving from the board');
@@ -1867,40 +1396,24 @@
     badge.start();
   }
 
-  // ── what a harness can check ─────────────────────────────────────────────
-  // The renderer goes on `__demo` directly, because demo/verify-gl.mjs asserts
-  // the page's own answer against what it found itself — two ends disagreeing
-  // about which context they are looking at is worth catching.
+  // What a harness can check. The renderer goes on `__demo` directly because
+  // demo/verify-gl.mjs compares it with what it found itself.
+  // See lessons/page-mirror.md#mirror-108
   window.__demo.gl = { renderer: rendererName, ok: !!gl };
   /**
-   * ⚠️ THE CHECKS RUN THEMSELVES, because the controls are gone.
-   *
-   * This project's usual hook is a button the harness presses — "a control the
-   * harness cannot press is a subject the suite cannot reach". With no controls
-   * the same rule points the other way: the page must reach its own checks, and
-   * demo/verify-gl.mjs waits for `__demo.ready` instead of pressing anything.
-   *
-   * It waits for the box before running, but only for a bounded time: a page
-   * whose asserts never fire because a Raspberry Pi is switched off reads as
-   * broken, and the left-hand pane is a claim that stands on its own.
+   * The checks run themselves and demo/verify-gl.mjs waits for `__demo.ready`.
+   * They wait for the box only for a bounded time, so a switched-off Pi does not leave
+   * the page with no asserts; the left pane stands on its own.
+   * See lessons/page-mirror.md#mirror-109
    */
   async function runChecks() {
-      // ⚠️ THE LOCAL PANE IS ASSERTED WITHOUT THE BOARD, ON PURPOSE. It is a
-      // pure function of (parameters, clock) and needs no network at all —
-      // which is the claim the page exists to make. Tying its asserts to a
-      // Raspberry Pi being switched on would make the page read red for a
-      // reason that is not about the page.
+      // The local pane is asserted without the board: it is a pure function of
+      // parameters and clock, so a Pi being off must not turn it red.
+      // See lessons/page-mirror.md#mirror-110
       /**
-       * 🔴 THE LOOK PICKER NAMES THE SHADER THAT IS RUNNING, BEFORE ANYBODY
-       * TOUCHES IT. PHOTOGRAPHED reading a long em dash with ten looks loaded
-       * and one of them drawing: `createPicker`'s `options()` filled the hidden
-       * select and set its index and never told the visible cell, so the
-       * placeholder stood until somebody pressed ‹ or ›. Every other check on
-       * this page grades the PICTURE, and none of them could see a control that
-       * had gone blank about it.
-       *
-       * ⚠️ IT READS THE CELL, NOT THE SELECT. The select was right the whole
-       * time; the half that was wrong is the half a reader looks at.
+       * The look picker names the running shader before anyone touches it. Reads the
+       * visible cell, not the hidden select, which can be right while the cell is blank.
+       * See lessons/page-mirror.md#mirror-111
        */
       {
         const cell = document.querySelector('.pos-pick-n');
@@ -1914,30 +1427,18 @@
       await new Promise((r) => setTimeout(r, 1200));
       d.assert('it keeps drawing', drewAny > 30, `${drewAny} frames`);
       d.assert('and it reports a real frame rate', localFps > 5, `${localFps.toFixed(1)} fps`);
-      // ⚠️ THE PICTURE IS NOT A FLAT FIELD. A shader that compiles, links and
-      // draws can still be producing one colour — "it rendered" and "there is
-      // something in it" are different claims and only the second is the one
-      // anybody cares about.
-      //
-      // ⚠️ AND IT IS READ OVER THE WHOLE FRAME, NOT AT FOUR POINTS. Four points
-      // read `5 of 765` on a picture whose true range is 26..254 — because this
-      // image is EIGHT-FOLD SYMMETRIC and radial, so any two samples at similar
-      // radius are similar BY CONSTRUCTION. The assert was measuring the
-      // symmetry of the thing it was checking, and it failed a working page.
-      // A whole frame at this size is 900 KB and reads in a millisecond.
+      // The picture is not a flat field, read over the whole frame: the image is eight-fold
+      // symmetric, so a few samples at similar radius agree by construction. A whole
+      // frame at this size is 900 KB and reads in a millisecond.
+      // See lessons/page-mirror.md#mirror-112
       let spread = 0;
       if (gl && window.__lastFbo) {
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, window.__lastFbo);
         const px = new Uint8Array(W * H * 4);
         gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-        // ⚠️ PER CHANNEL, NOT THE SUM — AND THE SUM IS THE ONE STATISTIC THAT
-        // CANNOT SEE THIS PICTURE. The colour is
-        // `0.5 + 0.5*cos(2pi*(w + vec3(0, 0.33, 0.67)) + uT)`: three cosines
-        // about 120 degrees apart, and three cosines 120 degrees apart SUM TO A
-        // CONSTANT. So the image varies almost entirely in HUE at near-constant
-        // total luminance — measured, R+G+B spans 377..386 of 765 while red
-        // alone spans 26..254. A luminance check reported a flat field on a
-        // vivid kaleidoscope and failed a page that was perfectly fine, twice.
+        // Per channel, not the sum: three cosines 120 degrees apart sum to a constant, so
+        // R+G+B spans 377..386 of 765 while red alone spans 26..254.
+        // See lessons/page-mirror.md#mirror-113
         const lo = [255, 255, 255], hi = [0, 0, 0];
         for (let i = 0; i < px.length; i += 4) {
           for (let k = 0; k < 3; k++) {
@@ -1948,35 +1449,20 @@
         }
         spread = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
       }
-      // ⚠️ NOT A PIXEL COMPARISON AGAINST A GOLDEN IMAGE. The same shader with
-      // identical inputs summed 48,147,330 of red on ANGLE Metal and 68,001,881
-      // on SwiftShader — 41% apart — because the standard GLSL hash amplifies
-      // last-bit float differences into unrelated noise. Structure is portable;
-      // exact pixels are not.
+      // Not a pixel comparison with a golden image: identical inputs summed 48,147,330 red
+      // on ANGLE Metal and 68,001,881 on SwiftShader. Structure is portable, pixels are not.
+      // See lessons/page-mirror.md#mirror-114
       d.assert('there is a picture in it, not a flat field', spread > 60,
                `the widest colour channel spans ${spread} of 255`);
 
-      // 🔴 THE SIX BELOW COST THIS PAGE THE NUMBER IT EXISTS TO REPORT, so they
-      // wait for a harness. Turning the panels on copies the picture and lays
-      // out five figures every frame, which is why they are off until a session
-      // needs them, and the preview compiles the whole room's shaders and draws
-      // fourteen per-eye frames into an off-screen canvas. Neither is anything a
-      // visitor asked for, and the first one quietly lowers the frame rate
-      // printed under the left-hand picture while they are reading it.
-      //
-      // ⚠️ THE PICTURE'S OWN CHECKS ABOVE AND THE PANEL ARITHMETIC BELOW STILL
-      // RUN FOR EVERYBODY. Both are read out of what is already on this machine:
-      // one reads back the frame the page just drew, the other is pure geometry
-      // against the same functions a session calls.
+      // The six below wait for a harness: turning on the panels and the preview cost frame
+      // rate this page reports. The picture checks above and the panel arithmetic below
+      // run for everybody, reading only what is already on this machine.
+      // See lessons/page-mirror.md#mirror-115
       if (SELFCHECK) {
-        // ── the panels, graded on a laptop ──────────────────────────────────
-        //
-        // ⚠️ THE HALF THAT DOES NOT NEED A HEADSET IS GRADED WITHOUT ONE. That
-        // the picture lands on the panel and that the numbers are under it is
-        // ordinary code and can be checked here; what only a Quest can say — the
-        // frame rate it holds in a 3360x1760 framebuffer — is asserted by the
-        // controls above and by nothing on this machine. Leaving all of it to the
-        // device would mean the only test of it runs where nobody is watching.
+        // The panels, graded on a laptop: the picture landing on the panel and the numbers
+        // under it. Only the frame rate in a Quest's framebuffer needs the device.
+        // See lessons/page-mirror.md#mirror-116
         wantPanel = true;
         await new Promise((r) => setTimeout(r, 300));
         // With no local renderer there is no frame callback to ride on, so draw
@@ -1986,12 +1472,9 @@
           let picSpread = 0, footInk = 0;
           try {
             const sc = pan.canvas.width / PANEL_W;          // device pixels per unit
-            // ⚠️ THE BOTTOM OF THE PICTURE, NOT ALL OF IT — and that is the same
-            // mistake this page already made once. panel.mjs writes its "nothing
-            // arriving yet" line across the middle, so a spread taken over the
-            // whole picture area would be measuring the TEXT and would pass just
-            // as well with no picture at all. A statistic that is high by
-            // construction over your subject is blind, not weak.
+            // The bottom of the picture only: panel.mjs writes its "nothing arriving" line across
+            // the middle, so a spread over the whole area would measure the text.
+            // See lessons/page-mirror.md#mirror-117
             const pic = pan.ctx.getImageData(60 * sc, 200 * sc, 520 * sc, 130 * sc).data;
             const lo = [255, 255, 255], hi = [0, 0, 0];
             for (let i = 0; i < pic.length; i += 4) {
@@ -2016,11 +1499,9 @@
         d.assert('the left panel carries this picture with its numbers under it',
           here.picSpread > 30 && here.footInk > 200,
           `the widest colour channel spans ${here.picSpread} of 255, with ${here.footInk} lit pixels in the footer`);
-        // 🔴 THE STRIP THE RENDERED PANEL WEARS INSTEAD OF A FOOTER, graded on its
-        // own. It is a different canvas from the one above and it is the ONLY
-        // place a number appears when the picture is drawn by the headset — so a
-        // strip that silently stopped being filled would take every number in
-        // there with it and leave a picture that looks perfect.
+        // The strip the rendered panel wears instead of a footer, graded on its own: it is the
+        // only place a number appears when the headset draws the picture.
+        // See lessons/page-mirror.md#mirror-118
         let stripInk = 0;
         try {
           const sc = footHere.canvas.width / PANEL_W;
@@ -2033,26 +1514,17 @@
         d.assert('and the rendered panel gets the same numbers on a strip of its own',
           stripInk > 200, `${stripInk} lit pixels in it`);
 
-        // ── the room, drawn on this machine ─────────────────────────────────
-        //
-        // 🔴 EVERY PIXEL OF THE HEADSET'S PICTURE USED TO BE UNREACHABLE FROM
-        // HERE. The floor, the glow, the grab bars, the panel quads and the live
-        // renderer all live behind `requestSession`, so a shader that would not
-        // compile or an error flag left standing cost a headset run to find — and
-        // the owner gets one run. `preview` drives the SAME per-eye draw with a
-        // hand-made projection into an off-screen canvas: no compositor, no frame
-        // rate, nothing said about a device — only "does it draw, and is it
-        // clean", which are the two questions a laptop can answer.
+        // The room, drawn on this machine: `preview` drives the same per-eye draw with a
+        // hand-made projection into an off-screen canvas. It answers only "does it draw,
+        // and is it clean", never anything about a device.
+        // See lessons/page-mirror.md#mirror-119
         let pv = null;
         try { pv = await xr.preview({ frames: 14 }); }
         catch (e) { d.log(`the room preview threw: ${String(e.message).slice(0, 70)}`, 'warn'); }
         wantPanel = false;
-        // 🔴 WHAT ONE LIVE PASS COSTS, ON WHATEVER IS IN FRONT OF YOU. It is NOT
-        // a headset number and this line says so — a laptop's card tells you
-        // nothing about an Adreno, the same refusal demo/verify-gl.mjs makes
-        // about a software rasteriser. What it establishes is that the instrument
-        // works and what shape the cost has, so the one run that has to happen on
-        // the device produces a number somebody can already interpret.
+        // What one live pass costs on this machine. Not a headset number; it shows the
+        // instrument works and the shape of the cost.
+        // See lessons/page-mirror.md#mirror-120
         if (pv?.ok) {
           d.log(`the headset's own copy of the shader, timed here: ${pv.whereCost}`
             + `, at ${pv.pixels ? `${pv.pixels.w}x${pv.pixels.h}` : 'an unknown size'}`
@@ -2068,48 +1540,25 @@
             ? `the widest colour channel spans ${pv.spread} of 255, ${(pv.litShare * 100).toFixed(1)}% of the frame has ink in it`
               + `, grab bars ${pv.bars ? 'compiled' : 'DID NOT COMPILE'}, picture ${pv.live ? 'rendered here' : 'copied in'}`
             : `it did not draw: ${pv?.why ?? 'no answer'}`);
-        // 🔴 AND THE WAY OUT, WHICH IS THE ONE CONTROL A HEADSET RUN CANNOT
-        // RECOVER FROM BEING WRONG ABOUT. Everything else in here can be got out
-        // of by leaving, and leaving is this. It used to be a tap on ANY button:
-        // no warning, nothing on screen naming it, so reaching for a control
-        // could end the session and the gesture somebody needs most was the one
-        // they had to discover. It is a hold on one named button now, drawn on
-        // the controller with its own words and a ring that fills as you hold.
-        //
-        // ⚠️ IT IS GRADED HERE RATHER THAN BESIDE THE SESSION, and the difference
-        // is not tidiness. Written into `enterHeadset` it reported `no badge was
-        // built` on this laptop, which is a FALSE claim about the page dressed as
-        // a true one about the machine: with no headset there is no context, so
-        // nothing had been compiled yet and the check was grading the absence of
-        // a GPU. This block exists precisely because a preview builds the same
-        // context the headset would, so by here the question has an answer.
-        //
-        // ⚠️ AND IT GRADES THE COMPILE, NOT THE OBJECT. `createXRQuit` is lazy
-        // until its first draw, so an object alone proves nothing. PROVED by
-        // sabotage: with the badge's `compile` made to throw, this check stayed
-        // GREEN until the module was made to compile it up front.
+        // The way out: a hold on one named controller button with a filling ring. Graded here
+        // because the preview has built the GL context; it grades the compile, since
+        // `createXRQuit` is lazy until its first draw.
+        // See lessons/page-mirror.md#mirror-121
         const q = window.__demo?.xrState?.quit ?? xr.state.quit;
         d.assert('the way out is a long hold on any button, drawn where the hand is',
           !!q?.built && q.button === 'any' && q.holdMs >= 2000
           && typeof q.label === 'string' && /hold/i.test(q.label),
           q?.built ? `hold any button for ${(q.holdMs / 1000).toFixed(1)} s, labelled "${q.label}"`
                    : `nothing on screen says how to leave: ${q?.why ?? 'no answer'}`);
-        // ⚠️ ASSERT ON THE ERROR FLAG, HERE TOO. A Quest reported 1282 on its
-        // first frame and DREW CORRECTLY ANYWAY; the only way that is ever caught
-        // before a device run is by a laptop reading the same flag.
+        // Assert on the error flag here too: a Quest reported 1282 on its first frame and drew correctly anyway.
+        // See lessons/page-mirror.md#mirror-122
         d.assert('and it left no graphics error pending',
           pv?.ok ? pv.glError === 0 : false,
           pv?.ok ? pv.glWhere : 'nothing drew, so nothing was checked');
-        // 🔴 THE FAKE LIGHT HAS TO ANSWER TO THE PICTURE OR IT IS A DECORATION.
-        // A cell that cannot change teaches the reader to ignore it, and this one
-        // very nearly could not: the colour is three cosines 120° apart, which
-        // SUM TO A CONSTANT, so a mean taken the obvious way is grey whatever the
-        // picture does. The amplitude is read here against the picture that was
-        // actually on screen.
-        // ⚠️ AND STRICTLY INSIDE ITS RANGE, NOT MERELY WITHIN IT. A number pinned
-        // at its ceiling is a constant wearing a measurement's clothes — which is
-        // what this one did on its first run, and only a bound that excludes the
-        // end caught it.
+        // The fake light must follow the picture: a naive mean of three cosines 120 degrees
+        // apart is constant grey. Asserted strictly inside its range, so a value pinned at
+        // the ceiling fails.
+        // See lessons/page-mirror.md#mirror-123
         d.assert('the light the picture throws on the floor is a measurement of that picture',
           !!xr.state.glow && xr.state.glow.amp > 0.002 && xr.state.glow.amp < GLOW_MAX,
           xr.state.glow
@@ -2120,15 +1569,9 @@
           + 'checks wait for the harness so this page keeps the frame rate it exists to '
           + 'report', 'hi');
       }
-      // ── picking a panel up, graded with no headset in the building ──────
-      //
-      // 🔴 THE ONE THING ON THIS PAGE THAT CANNOT BE TRIED WITHOUT A CONTROLLER,
-      // AND IT HAS NEVER RUN. The trigger arms a drag and the "any button
-      // leaves" scan used to end the session on that same press, so a panel
-      // drag was unreachable in every headset run this page has ever had. The
-      // arithmetic is pure, so it is driven here with a made-up pose — against
-      // the SAME functions the session calls, never a second copy, because a
-      // test against a copy grades the copy.
+      // Picking a panel up, graded with no headset: the drag arithmetic is pure, so it is
+      // driven with a made-up pose against the same functions the session calls.
+      // See lessons/page-mirror.md#mirror-124
       {
         const W_M = 1.28, H_M = 0.80;
         const head = { x: 0, y: 1.6, z: 0 };
@@ -2173,20 +1616,10 @@
           reach <= PLACE.far + 1e-3 && c2[1] >= PLACE.lowest - 1e-3 && c2[1] <= PLACE.highest + 1e-3,
           `shoved to 20 m away and 4 m under the floor, it stopped at ${reach.toFixed(2)} m out and ${c2[1].toFixed(2)} m up`);
         /**
-         * 🔴 IT FACES YOU IN BOTH AXES, AND THIS CHECK REVERSED ON 2026-09-17.
-         * It used to assert the opposite — that a panel stays world-upright
-         * whatever height the head is at — and the instruction is explicit:
-         * *"make them always look at me not only horiz but also vertic"*.
-         *
-         * ⚠️ THE NUMBER THAT MATTERS IS THE ANGLE BETWEEN THE PANEL'S NORMAL
-         * AND THE LINE TO THE HEAD, and it has to be zero. Checking "its up is
-         * no longer world up" would pass on a panel tipped the WRONG WAY, which
-         * is the same picture with the sign flipped and is exactly what a
-         * hand-built basis gets wrong.
-         *
-         * ⚠️ AND THE ROLL IS STILL PINNED. `right` must stay level or a panel
-         * tilted to meet you also leans sideways, and nothing about a head
-         * being higher than a picture says the horizon moved.
+         * It faces you in both axes: the angle between the panel's normal and the line to
+         * the head must be zero, which a sign flip would fail. The roll stays pinned:
+         * `right` stays level.
+         * See lessons/page-mirror.md#mirror-125
          */
         const eyeAt = { x: 0, y: 2.4, z: 0 };
         const M2 = facing(c2, eyeAt, W_M, H_M);
@@ -2212,22 +1645,18 @@
       }
 
       /**
-       * 🔴 THE PICTURE REPORTS ITS OWN DAMAGE. `createDiagram` collects every
-       * label it had to shorten, every note over about forty words, every link
-       * it could not route and a title passed alongside `how`, and a page that
-       * never reads that list ships a cut label looking exactly like a picture
-       * that is fine.
+       * The picture reports its own damage: `createDiagram` lists cut labels, notes over about
+       * forty words, unroutable links and a title passed with `how`.
+       * See lessons/page-mirror.md#mirror-126
        */
       d.assert('nothing in the picture was cut, shortened or left undrawn',
         (dg.cuts?.length ?? 0) === 0,
         (dg.cuts?.length ?? 0) === 0 ? `${dg.ties ?? 0} tie(s), nothing reported`
           : dg.cuts.map((c) => `${c.id}: ${c.shown}`).join(', '));
       /**
-       * 🔴 AND IT IS LAST, UNDER THE STANDING HEADING. `how` and `atEnd` are
-       * `createDiagram`'s THIRD argument, so writing them inside the spec gives
-       * two unread keys rather than an error: nothing can see it, not the
-       * parser, not `cuts`, not the suite. Another page shipped with no heading
-       * and its picture above the log for exactly that.
+       * Last, under the standing heading. `how` and `atEnd` are `createDiagram`'s third
+       * argument; inside the spec they are silently ignored.
+       * See lessons/page-mirror.md#mirror-127
        */
       const kids = [...document.body.children].map((e) => e.className.split(' ')[0]);
       const fig = kids.lastIndexOf('pos-dg');
@@ -2237,19 +1666,10 @@
         `${kids.join(' -> ')}, heading "${document.querySelector('.pos-how')?.textContent || 'none'}"`);
 
       /**
-       * 🔴 NOTHING IN A FOOTER IS DRAWN ON TOP OF ANYTHING ELSE, AND THIS IS
-       * THE REGRESSION THIS CHECK EXISTS FOR. Reported 2026-09-19 from a crop
-       * of the far pane on a DESKTOP: the presence dot was painted over the
-       * first label and a value ran under the ⛶. The cause was two rows of the
-       * footer's grid resolving to ZERO width, because an `auto` track's growth
-       * limit is its max-content and the flexible tracks beside it are only
-       * given what is left. MEASURED before the repair at 1280 px: left slot
-       * 0 px with the dot 2 px inside the centre, right slot 0 px with the
-       * button 2 px inside it.
-       * ⚠️ IT ASKS WHERE THE INK IS, NOT WHAT THE STYLESHEET SAYS. A rule that
-       * is present and inert reads exactly like one that works, which is why
-       * this measures two rectangles against a third rather than reading
-       * `grid-template-columns` back.
+       * Nothing in a footer overlaps: an `auto` grid track can resolve to 0 px beside
+       * flexible ones, putting the dot over a label. Measured from rectangles of ink,
+       * not by reading `grid-template-columns` back.
+       * See lessons/page-mirror.md#mirror-128
        */
       {
         const bad = [], said = [];
@@ -2270,16 +1690,10 @@
           bad.length === 0, bad.length ? bad.join(', ') : said.join(', '));
       }
       /**
-       * 🔴 THE FOUR CONTROL ROWS SHARE ONE LABEL COLUMN. Asked with the 2x2
-       * grid, because columns are what make a ragged left edge visible: `LOOK`,
-       * `MIRRORS`, `GRAIN` and `HUE` are four different widths and in a wrapped
-       * row nobody could see it. What is graded is the OFFSET of each segment
-       * inside its own cell, which is the same number at every width: 56 px in
-       * two columns, 0 px on a phone where the label goes on its own line.
-       * ⚠️ A PIXEL FLOOR CAN BE OUTGROWN, which is the whole reason this is a
-       * check rather than a comment. A label wider than the reserve pushes its
-       * own segment along and nothing else moves, so the row goes quietly
-       * ragged again and only a comparison can see it.
+       * The four control rows share one label column: graded on each segment's offset in
+       * its cell, 56 px in two columns, 0 px on a phone. A label outgrowing the px floor
+       * pushes only its own segment, which only a comparison sees.
+       * See lessons/page-mirror.md#mirror-129
        */
       {
         const rows = [...knobRow.children].map((c) => {
@@ -2294,34 +1708,20 @@
           `${rows.map((r) => `${r.name} at ${r.at}`).join(', ')}, spread ${spread.toFixed(1)} px`);
       }
 
-      // 🔴 A CONTROL THAT IS SWITCHED OFF STILL HAS ITS SUBJECT GRADED, AND
-      // WITHOUT THIS THE TWO SESSION BRANCHES WOULD HAVE LEFT THE RUN IN
-      // SILENCE. Both buttons go off on any browser that cannot open a session,
-      // so on this machine nothing presses them: ten asserts that used to fire
-      // on every run, gone, with the page still reading green. That is this
-      // project's oldest failure and it arrives here by way of a repair. The
-      // same call the button makes is made for whichever mode nobody reached;
-      // in a headset both controls are live, a visitor presses them, and this
-      // does nothing.
-      // ⚠️ BEHIND THE GATE. A self-check never runs for a visitor, and a
-      // visitor who could press these is a visitor for whom this is a no-op.
+      // Disabled session controls still have their subject graded: the same call the button
+      // makes runs for whichever mode nobody reached. Behind the self-check gate; in a
+      // headset both controls are live and this does nothing.
+      // See lessons/page-mirror.md#mirror-130
       if (SELFCHECK) {
         for (const mode of [XR_MODE.vr, XR_MODE.ar]) {
           if (!graded[mode]) await enterHeadset(mode);
         }
       }
 
-      // ── the links, graded with no socket at all ──────────────────────────
-      //
-      // 🔴 A VISIT OPENS NOTHING, AND THAT IS ASSERTED RATHER THAN BELIEVED.
-      // Nothing on this page joins a room until `Show the board` is pressed, and
-      // the harness never presses it, so by here no socket was made, nothing
-      // was announced and no re-announce clock is running.
-      // ⚠️ FOR EVERYBODY, NOT ONLY THE HARNESS: a visit that has not pressed is
-      // the same claim, and reading three counters costs nothing.
-      // ⚠️ UNDER THE HARNESS IT IS ASSERTED WHATEVER HAPPENED, because nobody
-      // there can have pressed, so a join by then is the defect. Skipping it on
-      // `joining()` would make a page that joins on load skip its own check.
+      // The links, graded with no socket: a visit opens nothing until `Show the board`.
+      // Checked for everybody (three counters are free), and under the harness always,
+      // since nobody there can have pressed; skipping on `joining()` would hide a load join.
+      // See lessons/page-mirror.md#mirror-131
       if (SELFCHECK || !node.joining()) {
         const st = node.stats();
         d.assert('nothing joined a room on load, so the board was asked for nothing',
@@ -2332,14 +1732,10 @@
         SELFCHECK ? ROOM !== 'studio-1' : ROOM === (new URLSearchParams(location.search).get('room') || 'studio-1'),
         `room ${ROOM}, site ${SITE}`);
       /**
-       * 🔴 THE TWO LINKS, ON A SCRATCH BAY FED THE BOARD'S REAL GRAPH. The graph
-       * is `boardGraph`, the function the Pi itself runs, so the ports linked
-       * here are the ports the Pi announces. The video link must get the
-       * `relay-h264` session and the shared `video` opener; the program link
-       * must be accepted and say in words that no kit opener takes it.
-       * ⚠️ NEGATIVE CONTROL: the same picture asked for over WHEP is refused,
-       * naming the one transport the board's port allows. A bay that accepted
-       * every link would pass the first half and fail this one.
+       * The two links on a scratch bay fed `boardGraph`, the function the Pi runs: video gets
+       * `relay-h264` and the `video` opener, program is accepted with no kit opener. Negative
+       * control: the same picture over WHEP is refused, naming the allowed transport.
+       * See lessons/page-mirror.md#mirror-132
        */
       {
         const reg = createRegistry();
@@ -2361,11 +1757,9 @@
         d.assert('the same picture asked for over WHEP is refused, naming the transport the board allows',
           !whep.ok && /relay-h264/.test(whep.why || ''), whep.why || 'it was accepted');
         /**
-         * 🔴 THE LEFT PANE IS A LINK ON THIS TAB, AND THE BAY GIVES IT `page`.
-         * Both ends are this browser, so `TRANSPORTS.video.machine` applies and
-         * nothing is opened. ⚠️ NEGATIVE CONTROL: the board's picture linked
-         * into the same left pane crosses a wire and must NOT get `page`, or a
-         * bay answering `page` for every video link would pass the first half.
+         * The left pane is a link on this tab and gets `page` (`TRANSPORTS.video.machine`).
+         * Negative control: the board's picture into the same pane must not get `page`.
+         * See lessons/page-mirror.md#mirror-133
          */
         d.assert('the left picture is a link on this tab, and the bay gives it the page itself',
           got.leftTransport === 'page' && !got.leftWhy,
@@ -2376,10 +1770,10 @@
           far.ok ? `${far.session?.transport}, ${far.session?.where}` : far.why);
       }
       /**
-       * 🔴 THE BADGE SAYS WHAT ARRIVED, NOT WHAT WAS ASKED. Its rule as fixtures:
-       * a press with nothing yet is `coming`, a count that grew a moment ago is
-       * `online`, and the same count gone quiet past the stall window is
-       * `offline`. And before any link the badge and its slot draw nothing.
+       * The badge says what arrived: a press with nothing yet is `coming`, a recently grown
+       * count `online`, the same count quiet past the stall window `offline`. Before any
+       * link the badge and its slot draw nothing.
+       * See lessons/page-mirror.md#mirror-134
        */
       {
         const t0 = 1_000_000;
@@ -2398,27 +1792,19 @@
       d.ready();
   }
   /**
-   * 🔴 THE PICTURE GOES LAST AND IT IS REFERENCE. `{ how: true, atEnd: true }`
-   * and no title: the heading lives in `diagram.mjs` so no page can invent a
-   * second wording for it. A diagram is read once, on purpose, by somebody who
-   * has already watched the two pictures and wants to know what is behind
-   * them, which is under the controls rather than in front of them.
-   *
-   * ⚠️ BUILT BEFORE THE CHECKS START, because `runChecks` reads `dg` and a
-   * `const` below the line that reads it is this file's most repeated defect.
+   * The picture goes last as reference: `{ how: true, atEnd: true }` and no title; the
+   * heading lives in `diagram.mjs`. Built before the checks start because `runChecks`
+   * reads `dg`.
+   * See lessons/page-mirror.md#mirror-135
    */
   const dg = createDiagram(d.el, {
     caption: 'What crosses is the shader text, not the picture: each end puts its own version '
       + 'line on the same body, and only the board’s result comes back as video.',
     nodes: [
       /**
-       * ⚠️ `join: false`. These two are not a chain and an arrow between them
-       * would say they were: one draws a shader, the other draws frames that
-       * arrived from somewhere else, and they never touch. The container's own
-       * box already carries everything their neighbouring says.
-       * ⚠️ AND NO `sub` AND NO `note` ON A CONTAINER. A box holding other boxes
-       * is a machine, and the boxes inside it name it better than a phrase
-       * above them can.
+       * `join: false`: the two draw unrelated pictures, so no arrow between them.
+       * No `sub` and no `note` on a container; its children name it.
+       * See lessons/page-mirror.md#mirror-136
        */
       { id: 'browser', label: 'Browser', kind: 'here', tech: 'browser', join: false,
         children: [
@@ -2430,13 +1816,9 @@
               + 'a canvas. It has to start on a keyframe, so a late joiner waits up to a second.' },
         ] },
       /**
-       * 🔴 ONE DURABLE OBJECT, DRAWN AS TWO BOXES BY ROLE. With a single box
-       * three arrows would meet at one node and the return would have to be
-       * routed back through the picture. Split by what each half carries it is
-       * a ring: out along the top, down the board, back along the bottom.
-       * ⚠️ IT IS NOT TWO RELAYS. A drawing may split a thing by role to be
-       * read; it may not invent a second machine, which is what `Relay object`
-       * under each of them is there to say.
+       * One Durable Object drawn as two boxes by role, so the links form a ring instead of
+       * meeting at one node. `Relay object` under each says it is one machine.
+       * See lessons/page-mirror.md#mirror-137
        */
       { id: 'cf', label: 'Cloudflare', kind: 'cloud', tech: 'cloudflare', join: false,
         children: [
@@ -2454,45 +1836,31 @@
             note: 'The board compiles the same body on its own graphics chip and draws 1280x720 '
               + 'thirty times a second. Nothing in that picture is copied from this browser.' },
           { id: 'enc', label: 'ffmpeg', sub: 'H.264, 2Mbit', tech: 'graphics',
-            // ⚠️ NO DEVICE PATH IN HERE. A note is read by a visitor, and the
-            // name of a node under /dev tells them nothing and tells a reader
-            // of the code something they could have grepped.
+            // No device path in a note: a /dev name tells a visitor nothing.
+            // See lessons/page-mirror.md#mirror-138
             note: 'One hardware encoder, and it is a single exclusive device that a second '
               + 'program cannot have. Its frames leave as raw H.264 with nothing wrapped '
               + 'round them.' },
         ] },
     ],
-    // One way round, and it is a ring. Out along the top, down the board, back
-    // along the bottom. ⚠️ `back: true` IS AN AUTHOR FLAG and nothing infers
-    // it: without it a right to left link is laid out as a forward step and
-    // drawn through whatever stands in the way.
+    // One way round, a ring: out along the top, down the board, back along the bottom.
+    // `back: true` is an author flag; without it a right to left link routes as forward.
+    // See lessons/page-mirror.md#mirror-139
     links: [
-      // ⚠️ BOTH HALVES OF A JOURNEY CARRY THE SAME LABEL, because the same
-      // thing is travelling. One arrow naming the format and the next saying
-      // nothing reads as two different journeys.
+      // Both halves of a journey carry the same label, because the same thing travels.
+      // See lessons/page-mirror.md#mirror-140
       { from: 'webgl', to: 'out', label: 'GLSL' },
       { from: 'out', to: 'v3d', label: 'GLSL' },
-      // 🔴 NO LABEL BETWEEN TWO BOXES IN ONE MACHINE, AND THE DRAWER REFUSES
-      // ONE. The gap two stacked children share is sixteen pixels tall and half
-      // a box wide, so a name in it either runs under both boxes or shrinks
-      // below being read. The direction is the whole message there and what
-      // travels goes in the note, which is read on hover with room for it.
+      // No label between two boxes in one machine; the drawer refuses one. The 16 px gap
+      // cannot hold it, so what travels goes in the note.
+      // See lessons/page-mirror.md#mirror-141
       { from: 'v3d', to: 'enc',
         note: 'Raw RGBA out of the renderer and straight into the encoder, never touching a '
           + 'file. One passes 1280x720 pixels a frame to the other thirty times a second.' },
       /**
-       * 🔴 `H.264` IS THE PROJECT'S NAME FOR A PICTURE COMING BACK, SETTLED
-       * 2026-09-19: *"h.264 - unify label and longer desc on all diagrams where
-       * stream back pcm or mp4 video"*. Sound coming back is `PCM` on
-       * `/knobs/`, `/grains/` and the specimens in `/kit/`. This page already
-       * had the right word on both halves and had no note on either, which is
-       * the half that was missing: a label is WHAT TRAVELS, and the note is
-       * what that actually is.
-       * ⚠️ NEITHER NOTE REPEATS A BOX'S. `enc` already says the frames leave
-       * raw, `back` already says each one carries a sequence number, and
-       * `codecs` already says a joiner waits for a keyframe. What is left for
-       * these two is the number that was measured and the claim the page
-       * exists to make.
+       * `H.264` is the project's label for a picture coming back (sound back is `PCM`). The
+       * label is what travels and the note what it is; neither note repeats a box's.
+       * See lessons/page-mirror.md#mirror-142
        */
       { from: 'enc', to: 'back', label: 'H.264', back: true,
         note: 'One WebSocket message a frame, at 2 Mbit/s. That ceiling was measured rather '
@@ -2503,16 +1871,13 @@
           + 'compared frame against frame. Anything still different between them is what the '
           + 'encode and the network did to it.' },
     ],
-    // ⚠️ `how` AND `atEnd` ARE THE THIRD ARGUMENT, NOT PART OF THE SPEC.
+    // `how` and `atEnd` are the third argument, not part of the spec.
+    // See lessons/page-mirror.md#mirror-143
   }, { how: true, atEnd: true });
 
-  // ⚠️ IT WAITS FOR THE BOX ONLY WHEN SOMEBODY ASKED FOR IT. Nothing joins on
-  // load now, so waiting the box's twelve seconds would be a wait for nothing.
-  // 🔴 BUT IT STILL WAITS FOR THIS PAGE'S OWN FIRST FRAMES. Those twelve
-  // seconds were also what let the left pane start drawing before its checks
-  // read it: without them `the shader compiled and linked` read 0 frames on a
-  // page that was drawing a moment later. Measured 2026-10-06, so it waits for
-  // a drawn frame, bounded at the same twelve seconds.
+  // Waits for the box only when somebody asked for it, but always for this page's own
+  // first drawn frame (bounded at twelve seconds), or the compile check reads 0 frames.
+  // See lessons/page-mirror.md#mirror-144
   (async () => {
     for (let i = 0; i < 30 && (node.joining() ? bv.decoded() === 0 : (gl && drewAny === 0)); i++) {
       await new Promise((r) => setTimeout(r, 400));
@@ -2521,10 +1886,9 @@
     runChecks();
   })();
 
-  // ⚠️ ARRIVED FROM THE INDEX WITH `?xr=1` — put the one press that matters
-  // under the hand. A link CANNOT enter VR: WebXR needs a transient user
-  // activation, so the button still has to be pressed. This only means you do
-  // not have to find it, which through a headset is most of the work.
+  // Arrived from the index with `?xr=1`: put the press that matters under the hand.
+  // A link cannot enter VR, since WebXR needs a transient user activation.
+  // See lessons/page-mirror.md#mirror-145
   if (new URLSearchParams(location.search).has('xr')) {
     const b = xrGroup.button('vr');
     if (b) { b.scrollIntoView({ block: 'center' }); setTimeout(() => b.focus(), 60); }

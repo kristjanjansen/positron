@@ -1,29 +1,7 @@
-// demo/sync/follow.mjs: the FOLLOW tab of /sync/, which was the whole of
-// /sync/ until 2026-10-04 and moved here unchanged in behaviour
-// (plans/plan-demo-structure.md §3.1, step 4).
-//
-// 🔴 ONE PAGE FOR plans/plan-routing-time.md, asked 2026-10-04 as *"Put to
-// single demo"* after step 2 was offered as `/partitur/` plus `/wall/`. A
-// score sends a cue every two seconds, and each cue belongs to a moment of a
-// picture that reaches this screen late, by the lag positron MEASURED on the
-// link chosen. Two walls take the same cues: the left fires each one the
-// moment its message arrives, the right asks `demo/shell/timebase.mjs` when
-// the picture will show that moment here and fires then.
-//
-// ⚠️ THE LINKS ARE MODELLED, NOT OPENED, AND THAT IS THE POINT OF THIS TAB.
-// The picture is drawn in this tab and held back by a lag function shaped
-// like the measurements (plan-routing-time §3): WebRTC 67 ms with a few ms of
-// jitter, LL-HLS 4 s that steps to 6 s on a stall and back on a drift-seek,
-// the Pi's audio 175 ms. The cue messages ride a light link of about 30 ms,
-// the relay's measured pub to subscriber leg. So the tab opens nothing and
-// asks no server for anything; what it grades is the timebase's policy
-// against those shapes, which is what the plan's step 2 needed graded first.
-//
-// ⚠️ ONE MACHINE, SO THE PEER CLOCK IS THIS PAGE'S OWN: `setOffset(0)`.
-// Between two machines it is `peer.offsetMs()`, which agrees to about 3 ms
-// (MEASURED in the old /jam/, and graded on one machine in the AHEAD tab).
-// The negative control below runs the same score with the offset left
-// unagreed, and the following wall must then fire nothing.
+// FOLLOW tab: cues belong to moments of a picture that arrives late. The left
+// wall fires on arrival, the right asks timebase.mjs when the picture shows it.
+// Links are modelled, nothing opens; one machine, so `setOffset(0)`.
+// See lessons/page-sync.md#sync-10
 
 import { createVideoPanel } from '/shell/video-panel.mjs';
 import { createChoice } from '/shell/choice.mjs';
@@ -32,7 +10,7 @@ import { tabDiagram } from './how.mjs';
 import { font as monoFont } from '/shell/canvas-font.mjs';
 
 const CUE_MS = 2000;           // one cue every two seconds of the score
-const LIGHT_MS = 30;           // the relay leg a cue message rides, MEASURED 27 to 38 ms
+const LIGHT_MS = 30;           // the relay leg a cue message rides, measured 27 to 38 ms. See lessons/page-sync.md#sync-11
 const FRAME_MS = 1000 / 60;    // one observation of the picture per frame
 const PALETTE = ['#e8b14a', '#4fc3ff', '#e0584f', '#7ccf6b', '#b48cf0', '#f0f0f0'];
 
@@ -60,14 +38,10 @@ function rng(seed) {   // mulberry32
 }
 
 /**
- * The whole model, one step at a time, with no clock and no element of its
- * own: the live tab steps it from requestAnimationFrame, the self check
- * steps it in a loop. Times are local ms; with offset 0 local IS shared.
- * Every surface is SEEN on a frame, so every time recorded is the frame on
- * which that surface changed: the picture when its score time crosses the
- * cue, the arrival wall when the message is in, the following wall when the
- * timebase's answer has come due. Timing one exactly and the others by frame
- * would grade a frame of rounding as an error of the policy.
+ * The whole model, one step at a time, stepped by rAF live or by a loop in the
+ * check. Times are local ms. Every surface is timed by the frame it changed on,
+ * so a frame of rounding is not graded as a policy error.
+ * See lessons/page-sync.md#sync-12
  */
 function createRun(key, start, { offset = 0, seed = 7 } = {}) {
   const L = LINKS[key], r = rng(seed);
@@ -138,16 +112,10 @@ export const about = 'A modelled picture arrives late, and two walls get the sam
 export const readout = { 'picture late': 'ms', 'cue early': 'ms', 'off by': 'ms', 'delay jumps': '' };
 
 /**
- * THE PICTURE, READ OFF THIS FILE. Six plain boxes and no machine around them,
- * because every one of them runs inside this tab: the two links are models,
- * and the caption says so.
- * ⚠️ NO `Browser` CONTAINER, AND IT WAS TRIED. With the score and the links
- * outside it and the four surfaces inside, every plain box was drawn to the
- * container's height, three tall empty slabs; and the links are not outside
- * the Browser anyway. With nothing nested every box is its own size.
- * ⚠️ `cue link` IS LISTED FIRST SO IT SITS ON TOP: its long arrow to
- * `following` then leaves over the row instead of through `picture link`,
- * which `createDiagram` reported as an overlap.
+ * Six plain boxes and no machine around them: everything runs in this tab. No
+ * `Browser` container, which draws every box to its height. `cue link` first so
+ * its arrow to `following` passes over `picture link`, not through it.
+ * See lessons/page-sync.md#sync-13
  */
 export const diagramSpec = () => ({
   caption: 'Both links are modelled in this page on measured lags, so nothing is opened.',
@@ -292,8 +260,9 @@ export function build({ panel, log, set }) {
       A('LL-HLS: the arrival wall is seconds early and the following wall follows both lag steps',
         med(H2.early()) > 3000 && H2.moves() >= 3 && worst(H2.off()) <= 3 * FRAME_MS + 1,
         `arrival a median ${med(H2.early()).toFixed(0)} ms early, ${H2.moves()} steps, following worst ${worst(H2.off()).toFixed(1)} ms`);
-      // ⚠️ THE NEGATIVE CONTROL: no agreed peer clock, so nothing can be told
-      // and the following wall must HOLD every cue rather than fire on a guess.
+      // Negative control: no agreed peer clock, so the following wall must hold every
+      // cue rather than fire on a guess.
+      // See lessons/page-sync.md#sync-14
       const N = simulate('whep', { offset: null });
       const fired = N.cues.filter((c) => c.followAt != null).length;
       const why = (N.cues.find((c) => c.held) || {}).held || '';

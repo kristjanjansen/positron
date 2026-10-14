@@ -34,50 +34,19 @@
   import { createPicker } from '/shell/picker.mjs';
   import { createPlaitsVoice, createPlaitsKeys, PATCHES, P, KNOBS } from '../plaits-voice.mjs';
 
-  // A second Plaits concept. Asked 2026-10-12: *"make second plaits demo with
-  // keyboard and all parameters. 2 row patamters perhaps to mimic muta
-  // grouping"*. The voice is /concepts/synth/110/'s (`../plaits-voice.mjs`,
-  // /muta/'s worklet and wasm), played from the kit keyboard and from any MIDI
-  // keyboard plugged into this machine, with every parameter /muta/ exposes as
-  // a knob of its own.
-  //
-  // EVERY KNOB IS A NODE, `web:knob-<name>`, with a value link into
-  // `web:plaits:value-in`, so turning one is a value crossing a wire. ONE ROW
-  // in /muta/'s order, scrolling sideways when it does not fit (*"synth 120,
-  // all params in one line, scrollabel"*): model, pitch, harmonics, timbre,
-  // morph, timbre CV, FM CV, morph CV, decay, colour. No voices knob (*"rm
-  // voices param"*); the voice count stays the shared voice's 6.
-  // THE MODEL IS A STEPPED KNOB, not a second picker: it is a Plaits parameter
-  // like the others, so it gets the same node and link, and a second picker
-  // beside the patch picker would be two controls that look alike and do
-  // different things. Its number reads as a short model name.
-  // PITCH IS THE FREQUENCY KNOB AS A TRANSPOSE. On the module, V/OCT adds to
-  // FREQUENCY; here each key's note is offset by the knob's semitones, which
-  // a key pressed after the turn plays (a held note keeps its pitch).
-  // THE CV AMOUNTS: with nothing patched into those inputs, Plaits routes its
-  // own decay envelope through them (and FM sweeps the pitch), so each is
-  // heard on a note's attack.
-  //
-  // THE PATCH PICKER SETS EVERY KNOB, and the knobs send the values over their
-  // own links. It is not a node of its own here: on 110 a program change
-  // carried what no knob held, here every value has a knob, so a program
-  // change would be a second road around them.
-  //
-  // NOTHING PLAYS ON A VISIT. A pointer over the keys fetches the wasm from
-  // this origin; the first key makes the AudioContext, boots, and plays that
-  // key once the voice is up if it is still held. Asking for MIDI shows the
-  // browser's prompt once, as /synth/keyboard/ does.
+  // Plaits from the kit keyboard and any MIDI keyboard, every /muta/ parameter a knob node with a
+  // value link into `web:plaits:value-in`, one scrolling row. The model is a stepped knob, pitch a
+  // transpose, and the patch picker sets the knobs. Nothing plays on a visit; the first key boots.
+  // See lessons/page-code.md#code-41
   const d = mount({ name: 'Plaits', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('code/plaits');
 
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const P0 = PATCHES[0];
-  // The knobs, in /muta/'s order, are plaits-voice.mjs's KNOBS (/connect/
-  // shows the same panel). `to` is what the value does at Plaits. `short` is
-  // the word under a dial whose name would be cut with an ellipsis (the knob
-  // cell holds about six letters); the full name is its hover, its node's
-  // label and the value's name on the wire.
+  // The knobs are plaits-voice.mjs's KNOBS. `to` is what the value does at Plaits; `short` is the
+  // word under a dial whose name would not fit (about six letters), the full name is its hover.
+  // See lessons/page-code.md#code-42
   const ALL = KNOBS.map((k) => ({ ...k,
     to: k.param === 'transpose' ? (v) => keys.setTranspose(v) : (v) => param(P[k.param], k.round ? Math.round(v) : v) }));
   const byName = new Map(ALL.map((k) => [k.name, k]));

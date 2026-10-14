@@ -1,25 +1,7 @@
-// demo/shell/code-lang.mjs: one tokenizer, a small rule table per language,
-// and the finder that says which stretch of a program is a parameter.
-//
-// 🔴 PURE, SO IT IS GRADED IN NODE WITH NO BROWSER. `code-box.mjs` draws what
-// this returns; everything that can be wrong about a highlighter (a character
-// dropped, a comment read as code, a slider in a comment called a parameter)
-// is decided here, and `code-lang-test.mjs` grades it against the Faust
-// compiler and `sclang-lite.mjs`, which are sources this file did not come
-// from. `plans/plan-code-editor.md` is the spec and the measurements.
-//
-// 🔴 THE ENGINE NEVER THROWS AND NEVER DROPS A CHARACTER. A highlighter runs
-// on every half-typed state a program passes through, so an unclosed `/*` or
-// `"` runs to the end (the compiler would read it the same way) and anything
-// no rule matches is plain text, one character at a time. The tokens joined
-// back together ARE the input, which is the one invariant the whole overlay
-// rests on: the drawn layer must hold exactly the textarea's text.
-//
-// ⚠️ A LANGUAGE IS DATA: `{ name, rules: [[RegExp, type]], params?(src) }`.
-// Rules are tried in order at each position as sticky copies and the first
-// non-empty match wins. That is what Prism, Monarch and CodeMirror's
-// `simple-mode` all do, and none of them has Faust or a Csound score, which is
-// why the tables are written here rather than imported (plan section 1).
+// demo/shell/code-lang.mjs: one tokenizer, a rule table per language, and the parameter finder.
+// Pure, graded in node. It never throws and never drops a character: tokens joined are the input.
+// A language is data, `{ name, rules: [[RegExp, type]], params?(src) }`; first sticky match wins.
+// why: lessons/kit-code-lang.md#header
 
 // ── the engine ──────────────────────────────────────────────────────────────
 
@@ -72,10 +54,9 @@ function closeParen(src, open) {
   return -1;
 }
 
-// ── Faust ───────────────────────────────────────────────────────────────────
-// The word lists are facts about the language, read from Grame's own Monarch
-// tokenizer for the Faust IDE and its web component (plan section 1), written
-// fresh in this format.
+// ── Faust ──
+// Word lists read from Grame's own Monarch tokenizer for the Faust IDE.
+// why: lessons/kit-code-lang.md#faust
 
 const FAUST_KW = 'import|component|library|environment|declare|with|letrec|where|process|effect'
   + '|seq|par|sum|prod|inputs|outputs';
@@ -107,9 +88,8 @@ export const faust = {
     [new RegExp(`\\b(?:${FAUST_KW})\\b`), 'keyword'],
     [new RegExp(`\\b(?:${FAUST_PRIM})\\b`), 'builtin'],
     [/\b\d+(?:\.\d*)?(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?/, 'number'],
-    // ⚠️ THE COMMA IS LEFT PLAIN. It is Faust's parallel composition and the
-    // prototype coloured it, and every comma inside an `hslider(...)` argument
-    // list lit up. Right for the language, wrong for the eye (plan section 3).
+    // The comma is left plain: colouring it lit every `hslider(...)` argument list.
+    // why: lessons/kit-code-lang.md#comma
     [/<:|:>|[:~]/, 'compose'],
     [/[A-Za-z_][A-Za-z0-9_]*/, ''],
   ],
@@ -123,9 +103,8 @@ export const faust = {
     FAUST_CONTROL.lastIndex = 0;
     let m;
     while ((m = FAUST_CONTROL.exec(src))) {
-      // ⚠️ RESUME ONE CHARACTER ON, NOT AFTER THE MATCH. A dead match can run
-      // from inside a string across the closing quote into real code, so
-      // `"see hslider("; q = hslider("real", ...)` swallowed `real` whole.
+      // Resume one character on, not after the match: a dead match can cross a closing quote.
+      // why: lessons/kit-code-lang.md#resume
       if (dead(m.index)) { FAUST_CONTROL.lastIndex = m.index + 1; continue; }
       const open = src.indexOf('(', m.index);
       const q = src.indexOf('"', open);
@@ -138,13 +117,10 @@ export const faust = {
   },
 };
 
-// ── SuperCollider, the subset `sclang-lite.mjs` compiles ──────────────────
-// Borrowed shape: Prism's `supercollider` component (MIT), which is
-// Smalltalk-ish tokens in C clothing. ⚠️ `sclang-lite.mjs`'s own `lex()` is
-// NOT reusable here: it throws outside the subset and drops comments, and a
-// highlighter has to survive every half-typed state and show comments.
-// ⚠️ NESTED `/* /* */ */` IS NOT HANDLED, which sclang allows. The rule stops
-// at the first `*/`. No preset nests.
+// ── SuperCollider, the subset `sclang-lite.mjs` compiles ──
+// Shaped on Prism's `supercollider` (MIT); `sclang-lite`'s `lex()` throws and drops comments.
+// Nested `/* /* */ */` is not handled; no preset nests.
+// why: lessons/kit-code-lang.md#sclang
 
 export const sclang = {
   name: 'sclang',
@@ -210,11 +186,9 @@ export const sclang = {
   },
 };
 
-// ── Csound score ────────────────────────────────────────────────────────────
-// What `/csound/` holds is a SCORE, not an orchestra: one statement letter at the
-// start of a line, then p-fields. Borrowed shape: the csound VS Code plugin's
-// `csound-sco.tmLanguage.json` (MIT). No parameters: p-fields are positions,
-// not names.
+// ── Csound score ──
+// A score, not an orchestra: a statement letter, then p-fields. No parameters, p-fields are positions.
+// why: lessons/kit-code-lang.md#csound-sco
 
 export const csoundSco = {
   name: 'csound-sco',
@@ -229,12 +203,9 @@ export const csoundSco = {
     [/[A-Za-z_]\w*/, ''],
   ],
   /**
-   * 🔴 WHAT A LINE IS, SO A PAGE CAN DRAW IT IN THE COLOUR OF THE LANE THAT
-   * SHOWS IT. Asked 2026-09-30 on `/csound/` with a screenshot of the score over
-   * its strip: *"can you mathc lane colors and code colors somehow"*. The strip
-   * has three lanes, `part`, `event` and `tempo`, and the score has exactly
-   * those three kinds of line, so the statement letter decides the kind and
-   * every coloured token on the line carries it. Comments keep their own ink.
+   * What a line is (`part`, `event`, `tempo`), so a page can draw it in its strip lane's colour.
+   * Comments keep their own ink.
+   * why: lessons/kit-code-lang.md#linekind
    */
   lineKind: (line) => {
     const m = /^[ \t]*([a-zA-Z])(?=[ \t]|$)/.exec(line);
@@ -287,15 +258,9 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     if (params.length && p.from < params[params.length - 1].to) continue;
     params.push(p);
   }
-  /* 🔴 THE VARIABLE A KNOB'S CONTROL IS BOUND TO WEARS THE KNOB'S HUE, AND SO
-     DOES EVERY USE OF IT. Asked 2026-09-30 with a crop of `/fau/`'s Sweep:
-     *"cutoff var should be blue"*. `cutoff = hslider(...)` coloured only the
-     quoted label, so `min(cutoff, ...)` three lines down, which is where the
-     knob actually acts, read as any other name. The binding is read off the
-     control's own line (`name = ` right before it, which is Faust's
-     definition and sclang's `var name = `); an argument is its own name.
-     Only a bare identifier token is matched, so `cutoffs`, a comment and a
-     string are never coloured. */
+  // The variable a knob's control is bound to wears the knob's hue, and so does every use of it.
+  // Only a bare identifier token is matched.
+  // why: lessons/kit-code-lang.md#bound
   const bound = new Map();
   for (const p of params) {
     const hue = hueOf(p.name);
@@ -303,9 +268,8 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
     if (p.kind === 'arg') { bound.set(p.name, { name: p.name, hue }); continue; }
     const lineStart = src.lastIndexOf('\n', p.from - 1) + 1;
     const m = /(?:^|[^\w.])([A-Za-z_]\w*)\s*=\s*$/.exec(src.slice(lineStart, p.from));
-    // ⚠️ ONLY WHEN IT IS THE ONLY CONTROL IN THAT DEFINITION. `q = hslider("a",
-    // ...) + hslider("b", ...)` makes `q` neither `a` nor `b`, and colouring it
-    // as the first would put one knob's ink on a mix of two.
+    // Only when it is the only control in that definition; a mix of two gets no hue.
+    // why: lessons/kit-code-lang.md#only-control
     const semi = src.indexOf(';', p.to);
     const end = semi < 0 ? src.length : semi;
     const alone = !params.some((o) => o !== p && o.from >= lineStart && o.from < end);
@@ -357,27 +321,16 @@ export function render(src, language, { hueOf = () => null, active = null } = {}
 // ── one hue per knob parameter ──────────────────────────────────────────────
 
 /**
- * 🔴 SIX HUES, ORDERED SO NEIGHBOURS ARE FAR APART ON THE WHEEL. The first four
- * are `diagram.mjs`'s own rotation, reordered: its order put 190 beside 205
- * and 145 beside 168, which read as one colour on a knob label. Every ink at
- * `hsl(h 75% 72%)` is above 6:1 on `--bg` (plan section 6, MEASURED).
- * ⚠️ NO YELLOW (`--hi`, spent on what is chosen or live), NO RED (`--bad`),
- * NO GREEN NEAR 145 (`--ok`). A parameter colour is identity and must not
- * borrow a meaning it does not have.
+ * Six hues, neighbours far apart on the wheel; every `hsl(h 75% 72%)` is above 6:1 on `--bg`.
+ * No yellow, no red, no green near 145: those are `--hi`, `--bad`, `--ok`.
+ * why: lessons/kit-code-lang.md#param-hues
  */
 export const PARAM_HUES = [205, 330, 168, 278, 28, 250];
 
 /**
- * The one map from a parameter name to its hue, owned by the page and read by
- * the code box and the knob row alike, so the two cannot disagree.
- * - `assign(names)` is called on a SUCCESSFUL compile with the names that got
- *   a knob. A name keeps its hue while it exists; a name that went away frees
- *   its hue; a new name takes the first free one. Never on a keystroke, or
- *   typing `cutoff` would hand hues to `c`, `cu` and `cut` on the way.
- * - `clear()` when a preset is loaded, so the same preset always opens with
- *   the same colours, assigned in order of appearance.
- * - Past six a name gets no hue and `cuts` says so, the way `createDiagram`
- *   reports a label it had to cut.
+ * The one map from parameter name to hue, shared by code box and knob row. `assign(names)` on a
+ * successful compile only; `clear()` on a preset; past six a name gets none and `cuts` says so.
+ * why: lessons/kit-code-lang.md#createhuebook
  */
 export function createHueBook({ hues = PARAM_HUES } = {}) {
   const book = new Map();

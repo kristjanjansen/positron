@@ -43,16 +43,10 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createMp3Stream } from '/shell/mp3-stream.mjs';
 
-  // A simple radio as a patchbay: one ERR station and one Ida station, each an
-  // external site, into a crossfader in this tab, into the speakers. The streams
-  // come through positron's own relay (`cf-shout`, the positron-shout worker), which holds ONE upstream
-  // connection per mount, exactly as /archive/radio/ reaches them. `?base=` points the
-  // page at demo/fake-station.mjs instead.
-  //
-  // NOTHING OPENS ON A VISIT. No AudioContext and no fetch to either station
-  // until somebody presses play. The patch is held from load so the picture
-  // does not change with play; an `external` node refuses a link out of it
-  // without `consent: true`, so the page names it where the link is made.
+  // One ERR and one Ida station, each an external site, through our relay (`cf-shout`, one
+  // upstream per mount) into a crossfader and the speakers; `?base=` points at fake-station.mjs.
+  // Nothing opens on a visit: no AudioContext and no fetch to a station until play.
+  // See lessons/page-radio.md#radio-1
   const BASE = new URLSearchParams(location.search).get('base') || 'https://shout.positron.studio';
   const S = 'web';
   const STATIONS = [
@@ -107,10 +101,9 @@
   }
 
   hold(FADER_OUT, SPEAKER_IN);
-  // The whole patch is held from load, so the picture is the same playing or
-  // stopped. Holding a link opens nothing: the streams open only on play,
-  // which is the press where a person asks to listen, so the station link is
-  // made with that consent named here rather than at the press.
+  // The patch is held from load so the picture never changes. Holding a link opens nothing; the
+  // streams open only on play, so the station link's `consent: true` is named here.
+  // See lessons/page-radio.md#radio-2
   for (const st of STATIONS) {
     hold(outOf(st), relayIn(st), { consent: true, via: 'https' });
     hold(relayOut(st), FADER_IN, { via: 'https' });
@@ -139,10 +132,9 @@
   const pair = el('div', 'cc-pair');
   pair.append(...panels.map((p) => p.el));
 
-  // The sound follows the links the bay holds, as the archived effects concept did (archive/concepts/effects.md): a station
-  // reaches the fader only along relay -> fader, its wave only along relay ->
-  // wave, and the fader the speakers only along fader -> speaker. Unlink one
+  // The sound follows the bay's links: relay to fader, relay to wave, fader to speaker. Unlink one
   // and that edge goes quiet.
+  // See lessons/page-radio.md#radio-3
   const holds = (a, b) => held.has(`${a} ${b}`);
   function route() {
     if (!ctx) return;
