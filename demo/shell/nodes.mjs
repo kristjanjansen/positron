@@ -141,10 +141,13 @@ export const NODES = {
 
   // ── engines: what makes or changes a sound, a picture or an event ───────
   synth: {
-    kind: 'engine', label: 'saw',
-    ports: { 'midi-in': P({ ...TAKES_NOTE }), 'audio-out': P() },
+    // The kit voice (synth-voice.mjs) is a sine, so that is what an unlabelled synth says.
+    kind: 'engine', label: 'sine',
+    // value-in takes the voice's parameters (synth-params.mjs PARAM_NAMES), only on /connect/ today.
+    ports: { 'midi-in': P({ ...TAKES_NOTE }), 'audio-out': P(),
+      'value-in': P({ shape: { of: 'param', names: ['wave', 'cutoff', 'q', 'attack', 'release'] }, optional: true }) },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'room/words'],
-    labels: { 'synth/keyboard': 'sine', 'room/words': 'saw synth' },
+    labels: { 'synth/keyboard': 'sine', 'synth/recorder': 'saw', 'synth/timeline': 'saw', 'synth/dots': 'saw', 'room/words': 'saw synth' },
   },
   osc: {
     kind: 'engine', label: 'oscillator',

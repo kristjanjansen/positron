@@ -36,10 +36,22 @@ A('every reason is a sentence, not an empty string', Object.values(NOT_YET).ever
 A('a Pi node has a reason too', /Raspberry Pi/.test(whyNot(null, 'pi-1:circuit')));
 A('the five that run are keys, synth, speaker, knob and scope',
   ['keys', 'synth', 'speaker', 'knob', 'scope'].every((k) => typeof RUNTIMES[k] === 'function') && Object.keys(RUNTIMES).length === 5);
-const extraNames = EXTRA_PORTS.synth['value-in'].shape.names;
-A('the synth\'s extra value-in lists exactly the parameters the voice takes',
-  extraNames.length === PARAM_NAMES.length && extraNames.every((n) => PARAM_NAMES.includes(n)));
-A('the extra port is not already in the catalogue, so it is still needed', !Object.hasOwn(NODES.synth.ports, 'value-in'));
+// The synth's value-in is the catalogue's since 2026-10-14; nodes.mjs is import
+// free, so its names are typed there and held to the voice's here.
+const catNames = NODES.synth.ports['value-in']?.shape?.names ?? [];
+A('the synth\'s catalogue value-in lists exactly the parameters the voice takes, in order',
+  catNames.join() === PARAM_NAMES.join(), catNames.join());
+A('it is optional, so a page that only plays the synth does not grow it', NODES.synth.ports['value-in']?.optional === true);
+A('no extra port doubles a catalogue one', Object.entries(EXTRA_PORTS).every(([t, ps]) => Object.keys(ps).every((p) => !Object.hasOwn(NODES[t]?.ports || {}, p))),
+  JSON.stringify(EXTRA_PORTS));
+{
+  const plain = createBay(), asked = createBay();
+  addNodes(plain, 'web', ['synth']);
+  addNodes(asked, 'web', ['synth'], { ports: { 'synth:value-in': {} } });
+  A('NEGATIVE CONTROL: a synth built with no word about value-in has none', !plain.port('web:synth:value-in'));
+  A('asked for, it comes last, after midi-in and audio-out, as /connect/ drew it from EXTRA_PORTS',
+    asked.ports().map((p) => p.id.split(':')[2]).join() === 'midi-in,audio-out,value-in', asked.ports().map((p) => p.id).join());
+}
 
 // ── plan(): one runtime per linked node ───────────────────────────────────
 const L = (from, to) => ({ from, to });
@@ -149,8 +161,7 @@ for (const [name, fn] of Object.entries(ROUTER_SABOTAGE)) {
 // ── knobLinks(): one knob node per parameter ───────────────────────────────
 {
   const bay = createBay();
-  addNodes(bay, 'web', ['keys', 'knob', 'synth', 'collide']);
-  bay.addPort({ id: 'web:synth:value-in', ...EXTRA_PORTS.synth['value-in'] });
+  addNodes(bay, 'web', ['keys', 'knob', 'synth', 'collide'], { ports: { 'synth:value-in': {} } });
   const pairs = knobLinks(bay, 'web:knob:value-out', 'web:synth:value-in');
   A('the knob type into a named value-in makes one knob per name', pairs?.length === PARAM_NAMES.length
     && PARAM_NAMES.every((n) => bay.node(`web:knob-${n}`) && pairs.some(([f]) => f === `web:knob-${n}:value-out`)));

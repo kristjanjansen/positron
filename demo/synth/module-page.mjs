@@ -20,6 +20,7 @@ import { createKnob } from '/shell/knob.mjs';
 import { createKnobGrid } from '/shell/knob-grid.mjs';
 import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
 import { createWaveShape } from '/shell/synth-view.mjs';
+import { scopeWindow } from '/shell/rt-scope.mjs';
 import { createSynth, KNOBS, knobRaw, withKnobs } from '/synth/patch-synth.mjs';
 
 /**
@@ -36,18 +37,12 @@ export function modulePage(d, { patch, knobs: names, preset = {} }) {
   const owner = (name) => KNOBS.find((k) => k.name === name).owner;
   const inPatch = (node) => bay.links().some((l) => l.from.split(':')[1] === node || l.to.split(':')[1] === node);
 
-  // ── the waveform: one window from the first rising zero crossing, so a
-  // steady tone stands still, at one fixed scale, so a level change shows ──
-  const WINDOW = 512, FULL = 0.5;
+  // ── the waveform, framed as /connect/'s scope frames it (rt-scope.mjs) ──
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
   function frame() {
     const buf = synth.on() ? synth.read('scope') : null;
-    if (buf) {
-      let i0 = 0;
-      for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
-      const win = buf.subarray(i0, i0 + WINDOW);
-      wave.set({ points: Array.from(win, (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
-    } else wave.set({ points: null, reason: null, name: '' });
+    if (buf) wave.set({ points: scopeWindow(buf), reason: '', name: '' });
+    else wave.set({ points: null, reason: null, name: '' });
     requestAnimationFrame(frame);
   }
 

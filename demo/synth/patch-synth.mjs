@@ -21,23 +21,23 @@
 
 import { createBay, parsePatch } from '/shell/bay.mjs';
 import { addNodes } from '/shell/nodes.mjs';
+import { routeAudio } from '/shell/audio-router.mjs';
+import { WAVES, hz, expo, hzText, sText, PARAMS } from '/shell/synth-params.mjs';
 
 export const S = 'web';
 const id = (node, port) => `${S}:${node}:${port}`;
 const nodeName = (portId) => portId.split(':')[1];
 const portName = (portId) => portId.split(':')[2];
 
-export const WAVES = ['sine', 'triangle', 'sawtooth', 'square'];
-export const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+export { WAVES, hz };
 
-/** Exponential travel for a knob whose raw value runs 0 to 127. */
-const expo = (lo, hi) => ({
-  to: (raw) => lo * (hi / lo) ** (raw / 127),
-  from: (v) => (127 * Math.log(v / lo)) / Math.log(hi / lo),
-});
 const F = expo(55, 880), C = expo(80, 8000), A = expo(0.003, 2), D = expo(0.02, 3), R = expo(0.02, 3), L = expo(0.05, 12);
-const hzText = (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`);
-const sText = (v) => (v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms`);
+// The five the kit voice shares come from synth-params.mjs; this page's own
+// starting dial positions and the module that owns each stay here.
+const kit = (name, owner, raw) => {
+  const { min, max, step, value, format } = PARAMS.find((p) => p.name === name);
+  return { name, owner, min, max, ...(step === undefined ? {} : { step }), raw, value, format };
+};
 
 /**
  * Every knob a module has. `owner` is the module whose `value-in` takes the
@@ -46,13 +46,13 @@ const sText = (v) => (v >= 1 ? `${v.toFixed(2)} s` : `${Math.round(v * 1000)} ms
  */
 export const KNOBS = [
   { name: 'freq', owner: 'osc', min: 0, max: 127, raw: F.from(220), value: F.to, format: (r) => hzText(F.to(r)) },
-  { name: 'wave', owner: 'osc', min: 0, max: 3, step: 1, raw: 2, value: (r) => WAVES[Math.round(r)], format: (r) => WAVES[Math.round(r)].replace('sawtooth', 'saw') },
-  { name: 'cutoff', owner: 'filter', min: 0, max: 127, raw: C.from(1100), value: C.to, format: (r) => hzText(C.to(r)) },
-  { name: 'q', owner: 'filter', min: 0.7, max: 15, raw: 5, value: (r) => r, format: (r) => r.toFixed(1) },
-  { name: 'attack', owner: 'amp', min: 0, max: 127, raw: A.from(0.008), value: A.to, format: (r) => sText(A.to(r)) },
+  kit('wave', 'osc', 2),
+  kit('cutoff', 'filter', C.from(1100)),
+  kit('q', 'filter', 5),
+  kit('attack', 'amp', A.from(0.008)),
   { name: 'decay', owner: 'amp', min: 0, max: 127, raw: D.from(0.35), value: D.to, format: (r) => sText(D.to(r)) },
   { name: 'sustain', owner: 'amp', min: 0, max: 1, step: 0.01, raw: 0.55, value: (r) => r, format: (r) => `${Math.round(r * 100)}%` },
-  { name: 'release', owner: 'amp', min: 0, max: 127, raw: R.from(0.45), value: R.to, format: (r) => sText(R.to(r)) },
+  kit('release', 'amp', R.from(0.45)),
   { name: 'rate', owner: 'lfo', min: 0, max: 127, raw: L.from(0.35), value: L.to, format: (r) => `${L.to(r).toFixed(2)} Hz` },
   // Depth is in octaves and travels as cents, because the LFO moves the
   // filter's detune rather than its frequency. A swing in Hz below a low
@@ -259,16 +259,16 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
    * module's audio out to the far module's input, which is a node or, for
    * `cutoff-in`, the filter's detune AudioParam. Every out is disconnected
    * first, so an unlinked edge goes silent. Called after every link change.
-   * As `route()` on /radio/blend/, lifted to every module.
+   * The wiring is the kit's routeAudio (audio-router.mjs), lifted from here.
    */
   function route() {
     if (!ctx) return;
-    for (const m of Object.values(N)) if (m.out) { try { m.out.disconnect(); } catch { /* not connected */ } }
-    for (const l of bay.links()) {
-      if (bay.port(l.from)?.medium !== 'audio') continue;
-      const src = N[nodeName(l.from)]?.out, dst = N[nodeName(l.to)]?.input(portName(l.to));
-      if (src && dst) src.connect(dst);
-    }
+    routeAudio({
+      edges: bay.links().filter((l) => bay.port(l.from)?.medium === 'audio'),
+      out: (p) => N[nodeName(p)]?.out,
+      input: (p) => N[nodeName(p)]?.input(portName(p)),
+      outs: Object.values(N).map((m) => m.out),
+    });
     // With no key on the osc, it plays the freq knob's pitch.
     if (!keyed()) N.osc.osc.frequency.setTargetAtTime(P.osc.freq, at(), 0.01);
     oscGate();

@@ -23,7 +23,6 @@
 // and gets { id, type, bay, log, send(port, ev), wake(), peerParam(name), level() }.
 
 import { addNodes } from './nodes.mjs';
-import { PARAM_NAMES } from './synth-params.mjs';
 import { routeAudio } from './audio-router.mjs';
 
 export const RUNTIMES = {
@@ -70,11 +69,9 @@ export function whyNot(type, nodeId = '') {
   return 'no runtime is written for it';
 }
 
-// Ports a runtime has that the catalogue does not name yet. Kept here, not in
-// nodes.mjs, while another pass edits the catalogue; reported in the plan.
-export const EXTRA_PORTS = {
-  synth: { 'value-in': { dir: 'in', medium: 'value', shape: { of: 'param', names: [...PARAM_NAMES] } } },
-};
+// Ports a runtime has that the catalogue does not name yet. Empty since synth's
+// value-in moved into nodes.mjs; kept because /connect/ still reads it.
+export const EXTRA_PORTS = {};
 
 const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
 

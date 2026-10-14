@@ -37,6 +37,7 @@
   import { createButtonGroup } from '/shell/button-group.mjs';
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
   import { addNodes } from '/shell/nodes.mjs';
@@ -81,12 +82,13 @@
 
   // ── sound: a sawtooth per held note (a low-pass is inaudible on a sine) ──
   let ctx = null, bus = null, filter = null, scopeIn = null;
-  const voices = new Map();
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  // The kit voice with no filter of its own: the low-pass is the fx node, on a link.
+  const voice = createVoice({ wave: 'sawtooth', level: 0.08, cutoff: null });
   function wake() {
     if (ctx) return;
     ctx = new AudioContext();
-    bus = ctx.createGain();
+    voice.start(ctx);
+    bus = voice.out();
     filter = ctx.createBiquadFilter();
     filter.type = 'lowpass'; filter.frequency.value = 700; filter.Q.value = 4;
     scopeIn = ctx.createAnalyser();
@@ -96,26 +98,9 @@
   }
   function noteOn(n, vel) {
     wake();
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.type = 'sawtooth';
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
-    o.connect(g).connect(bus);
-    o.start();
-    voices.set(n, { o, g });
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
   // The WebAudio graph follows the audio links the bay holds, and nothing else.
   function audio() {
     if (!ctx) return;
@@ -188,7 +173,7 @@
     for (const f of out.fixed || []) d.log(`the agent repaired what the model wrote: ${JSON.stringify(f)}`, 'warn');
 
     // Replace the whole patch with what passes both walls.
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     for (const l of bay.links()) bay.unlink(l.id);
     const rows = [];
     for (const l of out.links || []) {
@@ -212,7 +197,7 @@
   const buf = new Float32Array(2048);
   function frame() {
     const on = bay.links().some((l) => l.to === `${S}:scope:audio-in`);
-    if (on && voices.size) {
+    if (on && voice.held()) {
       scopeIn.getFloatTimeDomainData(buf);
       let i0 = 0;
       for (let i = 1; i < buf.length - WINDOW; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { i0 = i; break; }
@@ -232,7 +217,7 @@
 
   // ── the links as a picture ──────────────────────────────────────────────
   const pb = createPatchbay(bay, {
-    flowing: () => voices.size > 0,
+    flowing: () => voice.held() > 0,
     detail: (n) => [{ text: n.id === `${S}:rec` ? `${n.label}, ${kept.length} notes` : n.label || '', sans: true }],
   });
 

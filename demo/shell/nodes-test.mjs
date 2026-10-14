@@ -89,14 +89,14 @@ check('addNodes builds every entry with all its ports', !buildFail.length, build
   const heard = [];
   addNodes(bay, 'web', ['keys', 'synth', 'speaker'], {
     deliver: { 'synth:midi-in': (e) => heard.push(e.d1), 'keys:midi-in': () => {} },
-    label: { synth: 'sine' },
+    label: { synth: 'saw' },
   });
   const a = bay.link('web:keys:midi-out', 'web:synth:midi-in');
   const b = bay.link('web:synth:audio-out', 'web:speaker:audio-in');
   check('the keyboard page links keys to synth to speakers', a.ok && b.ok, a.why || b.why || '');
   bay.send('web:keys:midi-out', { cls: 'note', ch: 1, d1: 60, d2: 100 });
   check('a note sent on keys:midi-out reaches the deliver the page passed', heard[0] === 60, JSON.stringify(heard));
-  check('a page label overrides the default', bay.node('web:synth').label === 'sine', bay.node('web:synth').label);
+  check('a page label overrides the default', bay.node('web:synth').label === 'saw' && NODES.synth.label !== 'saw', bay.node('web:synth').label);
   check('an optional port with a deliver is added', !!bay.port('web:keys:midi-in'));
   check('NEGATIVE CONTROL: an optional port nobody asked for is left out', !bay.port('web:keys:value-in'));
   const c = bay.link('web:synth:audio-out', 'web:keys:midi-out');

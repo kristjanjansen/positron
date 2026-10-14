@@ -3,6 +3,8 @@
 // (plans/plan-connect-ui.md slice 1, decision D5: lift one copy). With the
 // defaults it is that sine: level 0.2 at full velocity, 10 ms in, 50 ms out,
 // and a lowpass at 8 kHz that a sine under A4 never reaches.
+// `cutoff: null` builds no filter at all, so a page that had none (the saw
+// copies, /synth/keyboard/) keeps exactly the nodes it made: osc, gain, bus.
 //
 // NOTHING OPENS HERE. Parameters are plain state until `start(ctx)` is handed
 // an AudioContext; a note before that is dropped, and a knob turned before it
@@ -20,10 +22,12 @@ export function createVoice(opts = {}) {
   function start(c) {
     if (ctx) return;
     ctx = c;
-    filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass'; filter.frequency.value = P.cutoff; filter.Q.value = P.q;
+    if (P.cutoff !== null) {
+      filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass'; filter.frequency.value = P.cutoff; filter.Q.value = P.q;
+    }
     out = ctx.createGain();
-    filter.connect(out);
+    filter?.connect(out);
   }
 
   function noteOn(n, vel = 100) {
@@ -33,7 +37,7 @@ export function createVoice(opts = {}) {
     o.frequency.value = hz(n);
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(P.level * (vel / 127), t + P.attack);
-    o.connect(g).connect(filter);
+    o.connect(g).connect(filter ?? out);
     o.start();
     voices.set(n, { o, g });
     return true;
@@ -57,6 +61,7 @@ export function createVoice(opts = {}) {
     P[name] = v;
     if (!ctx) return true;
     const t = ctx.currentTime;
+    if (!filter && (name === 'cutoff' || name === 'q')) return true;
     if (name === 'cutoff') filter.frequency.setTargetAtTime(v, t, 0.02);
     if (name === 'q') filter.Q.setTargetAtTime(v, t, 0.02);
     if (name === 'wave') for (const { o } of voices.values()) o.type = v;

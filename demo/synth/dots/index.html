@@ -24,6 +24,7 @@
   import { mount, el } from '/shell/shell.mjs';
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
@@ -49,41 +50,24 @@
   const S = 'web';
   const bay = createBay();
 
-  // ── the synth: one sine per held note, a short fade in and out ──────────
-  let ctx = null, bus = null;
-  const voices = new Map();
+  // ── the synth: one saw per held note, a short fade in and out ───────────
+  let ctx = null;
+  // The kit voice as this page's saw: no filter, so the bus is the voice's own out.
+  const voice = createVoice({ wave: 'sawtooth', level: 0.08, cutoff: null });
   // The audio graph follows the links: the synth's bus reaches the speakers only
   // while synth:audio-out -> speaker:audio-in is held.
   function audio() {
     if (!ctx) return;
-    bus ??= ctx.createGain();
+    const bus = voice.out();
     bus.disconnect();
     if (bay.links().some((l) => l.from === `${S}:synth:audio-out` && l.to === `${S}:speaker:audio-in`)) bus.connect(ctx.destination);
   }
 
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
   function noteOn(n, vel) {
-    if (!ctx) { ctx = new AudioContext(); audio(); }
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.type = 'sawtooth';
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.08 * (vel / 127), t + 0.01);
-    o.connect(g).connect(bus);
-    o.start();
-    voices.set(n, { o, g });
+    if (!ctx) { ctx = new AudioContext(); voice.start(ctx); audio(); }
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
 
   // ── the shader's picture: rings, one per pitch ───────────────────────
   // In the manner of dotpiano.com. Every pitch has its own ring, low notes inside.
@@ -256,7 +240,7 @@
   // does. The volume knob is a node of its own, as on /synth/sound/: a turn is
   // one CC 7 out of its own port, so its cable is the one that pulses.
   addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker', 'midi-state', 'shader-dots', 'screen', 'pico', 'oled', 'volume-knob'], {
-    label: { screen: 'picture' },
+    label: { synth: 'saw', screen: 'picture' },
     deliver: {
       'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
       'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
@@ -294,7 +278,7 @@
       const r = bay.link(a, b, tr, { site: S });
       if (!r.ok) d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
     }
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     audio();
     pb.refresh();
     sendState();                   // a new link hears the current state once, then only changes
@@ -319,7 +303,7 @@
      
     },
     reduce() { return {}; },
-    assertState() { for (const n of [...voices.keys()]) noteOff(n); return {}; },
+    assertState() { voice.panic(); return {}; },
   };
   const deck = createDeck({ items: [], adapters: { note: adapter }, range: [0, TAKE_MS] });
   const pos = () => deck.transport.position();
@@ -373,7 +357,7 @@
   // ── the links as a picture, with the links and ports behind its details ──
   // A MIDI wire pulses once per event its link delivered; an audio wire is lit
   // while a voice sounds, a video wire always, because both pictures redraw every frame.
-  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voices.size > 0 });
+  const pb = createPatchbay(bay, { flowing: (l, medium) => medium === 'video' || voice.held() > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');

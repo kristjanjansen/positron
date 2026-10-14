@@ -15,6 +15,7 @@
   import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createMidiDevices } from '/shell/midi-devices.mjs';
+  import { createVoice } from '/shell/synth-voice.mjs';
   useMediumColours();
 
   // The on-screen keyboard and a sine synth as patchbay nodes, all in this tab.
@@ -24,31 +25,14 @@
   const S = 'web';
   const bay = createBay();
 
-  // ── the synth: one sine per held note, a short fade in and out ──────────
+  // ── the synth: the kit voice, one sine per held note, no filter ─────────
   let ctx = null;
-  const voices = new Map();
-  const hz = (n) => 440 * 2 ** ((n - 69) / 12);
+  const voice = createVoice({ cutoff: null });
   function noteOn(n, vel) {
-    ctx ??= new AudioContext();
-    if (voices.has(n)) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime;
-    o.frequency.value = hz(n);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.2 * (vel / 127), t + 0.01);
-    o.connect(g).connect(ctx.destination);
-    o.start();
-    voices.set(n, { o, g });
+    if (!ctx) { ctx = new AudioContext(); voice.start(ctx); voice.out().connect(ctx.destination); }
+    voice.noteOn(n, vel);
   }
-  function noteOff(n) {
-    const v = voices.get(n);
-    if (!v) return;
-    const t = ctx.currentTime;
-    v.g.gain.cancelScheduledValues(t);
-    v.g.gain.setValueAtTime(v.g.gain.value, t);
-    v.g.gain.linearRampToValueAtTime(0, t + 0.05);
-    v.o.stop(t + 0.06);
-    voices.delete(n);
-  }
+  const noteOff = (n) => voice.noteOff(n);
 
   let kb = null;
   // The shapes are /shell/nodes.mjs's; the page says only what each in-port does.
@@ -77,7 +61,7 @@
         if (r.ok) held.set(k, r.id); else d.log(`${a} -> ${b} refused: ${r.why}`, 'warn');
       } else if (!on && held.has(k)) { bay.unlink(held.get(k)); held.delete(k); }
     }
-    for (const n of [...voices.keys()]) noteOff(n);
+    voice.panic();
     pb.refresh();
   }
 
@@ -96,7 +80,7 @@
     nodes: () => bay.nodes().filter((n) => shown(n.id)),
     ports: () => bay.ports().filter((p) => shown(p.id)),
     links: () => bay.links(),
-  }, { flowing: () => voices.size > 0 });
+  }, { flowing: () => voice.held() > 0 });
 
   // A key press is one event leaving keys:midi-out, sent through the bay.
   const host = el('div');

@@ -7,6 +7,13 @@ import { createWaveShape } from './synth-view.mjs';
 
 const WINDOW = 512, FULL = 0.5;
 
+/** One window from the first rising zero crossing, so a steady tone stands still, at one fixed scale, so a level change shows. */
+export function scopeWindow(b) {
+  let i0 = 0;
+  for (let i = 1; i < b.length - WINDOW; i++) if (b[i - 1] < 0 && b[i] >= 0) { i0 = i; break; }
+  return Array.from(b.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / FULL)));
+}
+
 export function make() {
   const wave = createWaveShape({ reason: null, colour: '--hi', height: 120, name: '' });
   let an = null, pull = null, buf = null, raf = 0;
@@ -15,12 +22,8 @@ export function make() {
     an.getFloatTimeDomainData(buf);
     return buf;
   }
-  // One window from the first rising zero crossing, so a steady tone stands still.
   function frame() {
-    const b = read();
-    let i0 = 0;
-    for (let i = 1; i < b.length - WINDOW; i++) if (b[i - 1] < 0 && b[i] >= 0) { i0 = i; break; }
-    wave.set({ points: Array.from(b.subarray(i0, i0 + WINDOW), (v) => Math.max(-1, Math.min(1, v / FULL))), reason: '', name: '' });
+    wave.set({ points: scopeWindow(read()), reason: '', name: '' });
     raf = requestAnimationFrame(frame);
   }
   return {
