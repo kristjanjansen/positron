@@ -1,6 +1,6 @@
 ## Open
 
-- **Code pages (Collide and the rest): the code sample moves below, just above the patchbay** (2026-10-14). Asked: *"move collide et code samples below, above the patchbay"*.
+- ~~**Code pages (Collide and the rest): the code sample moves below, just above the patchbay**~~ (2026-10-14, DONE: faust and collide, the two with a code box). Asked: *"move collide et code samples below, above the patchbay"*.
 
 - ~~**Clean private lines from code and standing files before the push**~~ (2026-10-14, DONE, ebafe2b3; scattered hits remain in proto/, rig/, timeline/lab, plans and research). Asked: *"yes"* to: rig/audit.mjs, rig/board/README.md, rig/m1/live-setup.mjs, demo/pack, demo/tom, three Circuit tests, HANDOFF, BACKLOG, PROGRESS, LESSONS, LAYOUT.
 
