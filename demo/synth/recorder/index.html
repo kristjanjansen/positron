@@ -14,6 +14,7 @@
   import { createTable } from '/shell/table.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
   useMediumColours();
@@ -23,9 +24,6 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
   // ── the synth: one sine per held note, a short fade in and out ──────────
   let ctx = null, bus = null;
@@ -64,19 +62,14 @@
   }
 
   let kb = null;
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => take(e) },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  // The shapes are /shell/nodes.mjs's; the page says only what each in-port does.
+  addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker'], {
+    deliver: {
+      'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
+      'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
+      'rec:midi-in': (e) => take(e),
+    },
+  });
 
   const d = mount({ name: 'Recorder', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/recorder');

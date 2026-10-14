@@ -13,6 +13,7 @@
   import { conceptNav, CODE_ROWS } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
@@ -237,27 +238,24 @@ process = wave : ve.moog_vcf_2bn(res, sweep) * amp * gain * 0.5 : ef.echo(1, 0.3
     const oldKeys = old.links().find((l) => l.from === ID('keys', 'midi-out'));
     const next = createBay();
     names = list.map((p) => p.name);
-    const N = [
-      ['keys', 'person', 'keyboard'],
-      ...names.map((n) => [`knob-${safeName(n)}`, 'person', n]),
-      ['fau', 'engine', 'Faust'],
-      ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
-    ];
-    for (const [n, kind, label] of N) next.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-    const P = [
-      { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-      ...names.map((n) => ({ id: ID(`knob-${safeName(n)}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
-      { id: ID('fau', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: fauNote },
-      { id: FAU_IN, dir: 'in', medium: 'value', shape: { of: 'param', names }, deliver: (e) => {
-        if (e?.of !== 'param') return;
-        const a = addr.get(e.name);
-        if (node && a) { node.setParamValue(a, e.v); paramSends++; }
-      } },
-      { id: ID('fau', 'audio-out'), dir: 'out', medium: 'audio' },
-      { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-      { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-    ];
-    for (const p of P) next.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+    // The shapes are /shell/nodes.mjs's. A knob is labelled with its parameter's
+    // own name, and a port with its `node:port`, which is what a refusal names.
+    const knobNodes = names.map((n) => ({ name: 'knob', as: `knob-${safeName(n)}`, label: n }));
+    const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
+    addNodes(next, S, ['keys', ...knobNodes, 'fau', 'scope', 'speaker'], {
+      deliver: {
+        'fau:midi-in': fauNote,
+        'fau:value-in': (e) => {
+          if (e?.of !== 'param') return;
+          const a = addr.get(e.name);
+          if (node && a) { node.setParamValue(a, e.v); paramSends++; }
+        },
+      },
+      ports: {
+        ...own(['keys:midi-out', ...knobNodes.map((k) => `${k.as}:value-out`), 'fau:midi-in', 'fau:audio-out', 'scope:audio-in', 'speaker:audio-in']),
+        'fau:value-in': { label: 'fau:value-in', shape: { of: 'param', names } },
+      },
+    });
     const lay = (from, to) => {
       const r = next.link(from, to);
       if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn');

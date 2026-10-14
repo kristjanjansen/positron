@@ -74,6 +74,7 @@
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { PEDAL_ON, SUSTAIN_CC } from '/shell/pedal.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createMidiDevices } from '/shell/midi-devices.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
@@ -522,24 +523,15 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const S = 'web', CF = 'cf-r2';
   const bay = createBay();
-  bay.addNode({ id: `${S}:keys`, kind: 'person', label: 'keyboard', place: 'browser' });
-  bay.addNode({ id: `${S}:looper`, kind: 'store', label: 'looper', place: 'browser' });
-  bay.addNode({ id: `${S}:sampler`, kind: 'engine', label: 'SuperCollider sampler', place: 'browser' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addNode({ id: `${CF}:piano`, kind: 'store', label: 'piano samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${CF}:rhodes`, kind: 'store', label: 'Rhodes samples', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:patch`, kind: 'person', label: 'patch', place: 'browser' });
-  bay.addPort({ id: `${S}:patch:midi-out`, dir: 'out', medium: 'midi', emits: ['program'] });
-  bay.addPort({ id: `${CF}:rhodes:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
-  bay.addPort({ id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note', 'cc'] });
-  bay.addPort({ id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => kb.lightNote?.(e.d1, e.d2 > 0) });
-  bay.addPort({ id: `${S}:looper:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'], deliver: looperIn });
-  bay.addPort({ id: `${S}:looper:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] });
-  bay.addPort({ id: `${S}:sampler:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'program'], deliver: (e) => sampler.midi(e) });
-  bay.addPort({ id: `${S}:sampler:file-in`, dir: 'in', medium: 'file' });
-  bay.addPort({ id: `${S}:sampler:audio-out`, dir: 'out', medium: 'audio' });
-  bay.addPort({ id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' });
-  bay.addPort({ id: `${CF}:piano:file-out`, dir: 'out', medium: 'file', transports: ['https'] });
+  // The shapes are /shell/nodes.mjs's; the two sample sets sit on cf-r2.
+  addNodes(bay, S, ['keys', 'looper', 'sampler', 'speaker', 'piano-samples', 'rhodes-samples', 'patch'], {
+    deliver: {
+      'keys:midi-in': (e) => kb.lightNote?.(e.d1, e.d2 > 0),
+      'looper:midi-in': looperIn,
+      'sampler:midi-in': (e) => sampler.midi(e),
+    },
+    ports: { 'keys:midi-out': { emits: ['note', 'cc'] } },
+  });
   for (const [a, b] of [
     [`${S}:keys:midi-out`, `${S}:looper:midi-in`],
     [`${S}:looper:midi-out`, `${S}:sampler:midi-in`],

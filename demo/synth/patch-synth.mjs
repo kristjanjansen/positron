@@ -20,6 +20,7 @@
 // first key press.
 
 import { createBay, parsePatch } from '/shell/bay.mjs';
+import { addNodes } from '/shell/nodes.mjs';
 
 export const S = 'web';
 const id = (node, port) => `${S}:${node}:${port}`;
@@ -177,45 +178,21 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   }
 
   // ── the bay ─────────────────────────────────────────────────────────────
-  const NODES = [
-    ['keys', 'person', 'keyboard'],
-    ...KNOBS.map((k) => [`knob-${k.name}`, 'person', 'knob']),
-    ['osc', 'engine', 'oscillator'], ['filter', 'engine', 'lowpass filter'],
-    ['amp', 'engine', 'amp and envelope'], ['lfo', 'engine', 'lfo'],
-    ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
-  ];
-  for (const [n, kind, label] of NODES) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  const param = (mod) => ({ id: id(mod, 'value-in'), dir: 'in', medium: 'value',
-    shape: { of: 'param', names: NAMES[mod] }, deliver: deliverParam(mod) });
-  const PORTS = [
-    { id: id('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    // No `names` on a knob: the bay's shape check wants names to be equal, and
-    // one knob names one of a module's several. The module ignores and logs a
-    // name it does not have.
-    ...KNOBS.map((k) => ({ id: id(`knob-${k.name}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
-    { id: id('osc', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: oscNote },
-    param('osc'),
-    { id: id('osc', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: id('filter', 'audio-in'), dir: 'in', medium: 'audio' },
-    // ⚠️ A NAMED EXCEPTION TO THE `<medium>-<dir>` RULE (plans/plan-site-names.md
-    // §0), chosen in plans/plan-synth-patch.md §3 option A. A modulation input
-    // is named for the parameter it moves, because that is the fact a reader
-    // needs; its medium is still on the port. `audio-in-2` would say nothing
-    // about which of the filter's two audio inputs is the signal.
-    { id: id('filter', 'cutoff-in'), dir: 'in', medium: 'audio' },
-    param('filter'),
-    { id: id('filter', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: id('amp', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('amp', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: ampGate },
-    param('amp'),
-    { id: id('amp', 'audio-out'), dir: 'out', medium: 'audio' },
-    param('lfo'),
-    { id: id('lfo', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: id('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: id('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-  ];
+  // The shapes are /shell/nodes.mjs's, among them `filter:cutoff-in`, the
+  // named exception to `<medium>-<dir>` (plans/plan-synth-patch.md §3 option A).
   // A port's label is its own `node:port`, which is what a refusal names.
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  const knobNodes = KNOBS.map((k) => `knob-${k.name}`);
+  const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
+  addNodes(bay, S, ['keys', ...knobNodes, 'osc', 'filter', 'amp', 'lfo', 'scope', 'speaker'], {
+    label: Object.fromEntries(knobNodes.map((k) => [k, 'knob'])),
+    deliver: {
+      'osc:midi-in': oscNote, 'amp:midi-in': ampGate,
+      ...Object.fromEntries(['osc', 'filter', 'amp', 'lfo'].map((m) => [`${m}:value-in`, deliverParam(m)])),
+    },
+    ports: own(['keys:midi-out', ...knobNodes.map((k) => `${k}:value-out`),
+      'osc:midi-in', 'osc:value-in', 'osc:audio-out', 'filter:audio-in', 'filter:cutoff-in', 'filter:value-in', 'filter:audio-out',
+      'amp:audio-in', 'amp:midi-in', 'amp:value-in', 'amp:audio-out', 'lfo:value-in', 'lfo:audio-out', 'scope:audio-in', 'speaker:audio-in']),
+  });
 
   /**
    * Replace the whole patch with `text`. Returns the lines the bay refused,

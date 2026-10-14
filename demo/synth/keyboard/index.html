@@ -12,6 +12,7 @@
   import { mount, el } from '/shell/shell.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createMidiDevices } from '/shell/midi-devices.mjs';
   useMediumColours();
@@ -22,9 +23,6 @@
   // bay holds; the synth's sound goes to the speakers by WebAudio. No room.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'sine'], ['speaker', 'screen', 'speakers']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
   // ── the synth: one sine per held note, a short fade in and out ──────────
   let ctx = null;
@@ -53,16 +51,14 @@
   }
 
   let kb = null;
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => kb?.lightNote(e.d1, !!e.d2) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  // The shapes are /shell/nodes.mjs's; the page says only what each in-port does.
+  addNodes(bay, S, ['keys', 'synth', 'speaker'], {
+    label: { synth: 'sine' },
+    deliver: {
+      'keys:midi-in': (e) => kb?.lightNote(e.d1, !!e.d2),
+      'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
+    },
+  });
 
   const d = mount({ name: 'Keyboard', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/keyboard');

@@ -12,6 +12,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createMidiDevices } from '/shell/midi-devices.mjs';
   import { createKnob } from '/shell/knob.mjs';
@@ -90,11 +91,6 @@
 
   // ── the bay ──────────────────────────────────────────────────────────────
   const bay = createBay();
-  for (const [n, kind, label] of [
-    ['keys', 'person', 'keyboard'],
-    ...ALL.map((k) => [`knob-${k.id}`, 'person', k.name]),
-    ['plaits', 'engine', 'Plaits'], ['scope', 'screen', 'waveform'], ['speaker', 'screen', 'speakers'],
-  ]) bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
 
   const voice = createPlaitsVoice({ log: d.log, voices: 6, onUp: () => route() });
   voice.setGain(P0.gain);   // the first patch's level trim
@@ -117,26 +113,30 @@
     if (playing.has(n)) { voice.noteOff(playing.get(n)); playing.delete(n); }
   }
   let kb = null;
-  const PORTS = [
-    { id: ID('keys', 'midi-out'), dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: ID('keys', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => kb?.lightNote(e.d1, !!e.d2) },
-    ...ALL.map((k) => ({ id: ID(`knob-${k.id}`, 'value-out'), dir: 'out', medium: 'value', shape: { of: 'param' } })),
-    { id: ID('plaits', 'midi-in'), dir: 'in', medium: 'midi', accepts: ['note'], deliver: (e) => {
-      if (e?.cls !== 'note') return;
-      notesIn++;
-      if (e.d2 > 0) noteOn(e.d1, e.d2); else noteOff(e.d1);
-    } },
-    { id: ID('plaits', 'value-in'), dir: 'in', medium: 'value', shape: { of: 'param', names: ALL.map((k) => k.name) }, deliver: (e) => {
-      const k = e?.of === 'param' && byName.get(e.name);
-      if (!k) return;
-      paramsIn++;
-      k.to(e.v);
-    } },
-    { id: ID('plaits', 'audio-out'), dir: 'out', medium: 'audio' },
-    { id: ID('scope', 'audio-in'), dir: 'in', medium: 'audio' },
-    { id: ID('speaker', 'audio-in'), dir: 'in', medium: 'audio' },
-  ];
-  for (const p of PORTS) bay.addPort({ label: p.id.split(':').slice(1).join(':'), ...p });
+  // The shapes are /shell/nodes.mjs's. A knob is labelled with its full name,
+  // and a port with its `node:port`, which is what a refusal names.
+  const knobNodes = ALL.map((k) => ({ name: 'knob', as: `knob-${k.id}`, label: k.name }));
+  const own = (ids) => Object.fromEntries(ids.map((i) => [i, { label: i }]));
+  addNodes(bay, S, ['keys', ...knobNodes, 'plaits', 'scope', 'speaker'], {
+    deliver: {
+      'keys:midi-in': (e) => kb?.lightNote(e.d1, !!e.d2),
+      'plaits:midi-in': (e) => {
+        if (e?.cls !== 'note') return;
+        notesIn++;
+        if (e.d2 > 0) noteOn(e.d1, e.d2); else noteOff(e.d1);
+      },
+      'plaits:value-in': (e) => {
+        const k = e?.of === 'param' && byName.get(e.name);
+        if (!k) return;
+        paramsIn++;
+        k.to(e.v);
+      },
+    },
+    ports: {
+      ...own(['keys:midi-out', 'keys:midi-in', ...knobNodes.map((k) => `${k.as}:value-out`), 'plaits:midi-in', 'plaits:audio-out', 'scope:audio-in', 'speaker:audio-in']),
+      'plaits:value-in': { label: 'plaits:value-in', shape: { of: 'param', names: ALL.map((k) => k.name) } },
+    },
+  });
   const lay = (from, to) => { const r = bay.link(from, to); if (!r.ok) d.log(`${from} -> ${to} refused: ${r.why}`, 'warn'); };
   lay(ID('keys', 'midi-out'), ID('plaits', 'midi-in'));
   for (const k of ALL) lay(ID(`knob-${k.id}`, 'value-out'), ID('plaits', 'value-in'));

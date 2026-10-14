@@ -25,6 +25,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   import { createTransportBar } from '/shell/transport-bar.mjs';
   import { createStripView } from '/shell/strip.mjs';
@@ -47,9 +48,6 @@
   // into the synth along another.
   const S = 'web';
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw'], ['rec', 'store', 'recorder'], ['speaker', 'screen', 'speakers'], ['midi', 'engine', 'midi state'], ['shader', 'engine', 'shader'], ['screen', 'screen', 'picture'], ['pico', 'device', 'Pico (emulated)'], ['oled', 'screen', 'OLED'], ['knob-volume', 'person', 'knob']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
   // ── the synth: one sine per held note, a short fade in and out ──────────
   let ctx = null, bus = null;
@@ -254,33 +252,20 @@
   }
 
   let kb = null;
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    // The volume knob is a node of its own, as on /synth/sound/: a turn is one CC 7
-    // out of its own port, so its cable is the one that pulses.
-    { id: `${S}:knob-volume:midi-out`, dir: 'out', medium: 'midi', emits: ['cc'] },
-    { id: `${S}:keys:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')) },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'],
-      deliver: (e) => take(e) },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'] },
-    { id: `${S}:midi:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
-      deliver: (e) => midiIn(e) },
-    { id: `${S}:midi:value-out`, dir: 'out', medium: 'value' },
-    { id: `${S}:shader:value-in`, dir: 'in', medium: 'value',
-      deliver: (e) => { latest = e; } },
-    { id: `${S}:shader:video-out`, dir: 'out', medium: 'video' },
-    { id: `${S}:screen:video-in`, dir: 'in', medium: 'video' },
-    { id: `${S}:pico:midi-in`, dir: 'in', medium: 'midi', accepts: ['note', 'cc'],
-      deliver: (e) => picoIn(e) },
-    { id: `${S}:pico:video-out`, dir: 'out', medium: 'video' },
-    { id: `${S}:oled:video-in`, dir: 'in', medium: 'video' },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  // The shapes are /shell/nodes.mjs's; the page says only what each in-port
+  // does. The volume knob is a node of its own, as on /synth/sound/: a turn is
+  // one CC 7 out of its own port, so its cable is the one that pulses.
+  addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker', 'midi-state', 'shader-dots', 'screen', 'pico', 'oled', 'knob-volume'], {
+    label: { screen: 'picture' },
+    deliver: {
+      'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
+      'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),
+      'rec:midi-in': (e) => take(e),
+      'midi:midi-in': (e) => midiIn(e),
+      'shader:value-in': (e) => { latest = e; },
+      'pico:midi-in': (e) => picoIn(e),
+    },
+  });
 
   const d = mount({ name: 'Dot piano', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('synth/dots');
