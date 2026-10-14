@@ -24,19 +24,20 @@
   @media (max-width: 640px) { .tw-stage { grid-template-columns: minmax(0, 1fr); } }
   .tw-cv { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 9 / 16; border-radius: var(--r, 4px); background: #0b0e14; border: 1px solid var(--line2); box-sizing: border-box; }
   .tw-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .tw-field { display: flex; flex-direction: column; gap: 6px; }
+  .tw-l { font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
   .tw-side textarea {
-    display: block; inline-size: 100%; min-block-size: 9em; box-sizing: border-box; resize: vertical;
+    display: block; inline-size: 100%; box-sizing: border-box; resize: vertical;
     font: 400 14px/1.5 var(--mono); color: var(--fg); background: var(--card);
     border: 1px solid var(--line2); border-radius: var(--r, 4px); padding: 10px 12px;
   }
-  .tw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .tw-dl { font: 400 13px/1.4 var(--mono); color: var(--fg); }
   .tw-note { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--dim); }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createSamples, createVoice } from '/typist/sampler.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
 
   // A typewriter reel for a story: the text types itself onto a 1080 x 1920
   // frame with the Hermes Precisa's own key sounds, and Record makes the file.
@@ -60,20 +61,32 @@
   const cv = el('canvas', 'tw-cv');
   cv.width = W; cv.height = H;
   const ctx = cv.getContext('2d');
-  const ta = el('textarea', '', '', { spellcheck: 'false', 'aria-label': 'the text to type' });
-  ta.value = 'Connect anything\nto everything.';
-  const play = el('button', '', 'Play', { type: 'button' });
-  const rec = el('button', 'pos-pri', 'Record', { type: 'button' });
-  const dl = el('a', 'tw-dl');
-  dl.hidden = true;
+  const field = (label, value, rows) => {
+    const wrap = el('label', 'tw-field');
+    const t = el('textarea', '', '', { spellcheck: 'false', rows: String(rows) });
+    t.value = value;
+    wrap.append(el('span', 'tw-l', label), t);
+    return { wrap, t };
+  };
+  const main = field('typed', 'Connect anything\nto everything.', 4);
+  const lower = field('lower line', '', 2);
+  const ta = main.t;
+  // play, record, and the take's download, as the kit's square icon buttons
+  const transport = createButtonGroup({ buttons: [
+    { id: 'play', icon: 'play', label: 'play' },
+    { id: 'rec', icon: 'record', label: 'record' },
+    { id: 'dl', icon: 'download', label: 'download the take' },
+  ] });
+  const play = transport.button('play'), rec = transport.button('rec'), dlBtn = transport.button('dl');
+  transport.enable('dl', false, 'record a take first');
+  const dl = el('a');
+  dlBtn.onclick = () => { if (dl.href) dl.click(); };
   const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. Words stay clear of the top 14% and the bottom 35%.');
-  const row = el('div', 'tw-row');
-  row.append(play, rec, dl);
   const side = el('div', 'tw-side');
-  side.append(ta, row, note);
+  side.append(main.wrap, lower.wrap, note);
   const stage = el('div', 'tw-stage');
   stage.append(cv, side);
-  d.el.append(stage);
+  d.el.append(transport.el, stage);
 
   const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
   const font = (w, px) => `${w} ${px}px ${mono}`;
@@ -142,10 +155,12 @@
       ctx.fillStyle = C.hi;
       ctx.fillRect(cx + 6, cy - SIZE * 0.78, SIZE * 0.08, SIZE * 0.92);
     }
-    // the address, small, inside the safe band
-    ctx.font = font(400, 30);
-    ctx.fillStyle = C.dim;
-    ctx.fillText('positron.studio', X, SAFE_BOTTOM - 40);
+    // the lower line, if any, small and inside the safe band
+    if (lower.t.value.trim()) {
+      ctx.font = font(400, 34);
+      ctx.fillStyle = C.dim;
+      lower.t.value.trim().split('\n').forEach((ln, i, all) => ctx.fillText(ln, X, SAFE_BOTTOM - 40 - (all.length - 1 - i) * 46));
+    }
   }
 
   let audio = null;
@@ -200,7 +215,7 @@
     if (running) return;
     running = 'rec';
     rec.dataset.busy = '';
-    dl.hidden = true;
+    transport.enable('dl', false, 'recording');
     try {
       const a = await sound();
       const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
@@ -219,8 +234,8 @@
       if (dl.href) URL.revokeObjectURL(dl.href);
       dl.href = URL.createObjectURL(blob);
       dl.download = `positron-typist.${ext}`;
-      dl.textContent = `Download ${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB`;
-      dl.hidden = false;
+      transport.enable('dl', true);
+      dlBtn.title = `download ${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB`;
       d.log(`recorded ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB`);
       if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
     } catch (e) {
@@ -229,7 +244,7 @@
   };
 
   // The finished frame, drawn once the face is in.
-  ta.oninput = () => { if (!running) draw(ta.value, ta.value.length, 0, false); };
+  ta.oninput = lower.t.oninput = () => { if (!running) draw(ta.value, ta.value.length, 0, false); };
   await document.fonts.load(font(600, SIZE)).catch(() => {});
   draw(ta.value, ta.value.length, 0, false);
 
