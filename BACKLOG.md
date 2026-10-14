@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**/social/typewriter/ becomes /social/typist/, and /social/ is the index of every social piece**~~ (2026-10-14, DONE). Asked: *"/social/typist/index.html -- there gonna be more socials. make also index for them"*.
+
 - ~~**Panic stops loops too, and gets a better name**~~ (2026-10-14, DONE: `Stop`, chosen *"stop all => stop"*). Asked: *"stop loops. find better name for panic."* `demo/shell/keyboard.mjs` panic().
 
 - ~~**Profile images for GitHub and YouTube as files**~~ (2026-10-14, DONE in build.mjs, a4105307). Asked: *"do profile images for gh and yt. i did isnta already"*. Same pipeline as the Instagram avatar (share-card.mjs, og/render.mjs): GitHub square at 460, YouTube circle crop at 800.
