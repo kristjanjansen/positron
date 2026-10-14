@@ -271,7 +271,8 @@ refusedCap: 0`).
 ```sh
 cd workers/view && node build.mjs \
   && env -u CF_API_TOKEN -u CLOUDFLARE_API_TOKEN wrangler deploy
-node verify.mjs        # 38/38, writes verify-report.json + shots/
+# workers/view/verify.mjs was deleted 2026-10-14: it drove /proto/megatimeline/
+# and /api/stats, which no longer exist. Grade pages with node demo/verify.mjs.
 ```
 
 The `env -u` is the house auth trap (`workers/osc/DEPLOYED.md`): a

@@ -1,4 +1,4 @@
-// demo/collide/engine-node.mjs: a sound engine page as a node on the patchbay.
+// demo/shell/engine-node.mjs: a sound engine page as a node on the patchbay.
 //
 // Step 5 of `plans/plan-routing-migration.md` for an ENGINE page (§2.1: "an
 // engine node with a `midi` in port; local only", and for `/collide/` "sclang
@@ -16,10 +16,11 @@
 // It is all one graph on one site, because the registry keeps one graph per
 // socket and site and a second graph on the same site would replace the first.
 //
-// 🔴 A COPY, AND IT SAYS SO. `demo/muta/engine-node.mjs` is the same file
-// byte for byte. A page agent may not write `demo/shell/`, so this is reported
-// as a kit module waiting to be lifted (`demo/shell/engine-node.mjs`), and a
-// lift is a `git mv` of one of the two and a delete of the other.
+// ONE COPY SINCE 2026-10-14. It was `demo/collide/engine-node.mjs` with a byte
+// identical copy in `demo/muta/`; both pages import it from here now.
+// ⚠️ `demo/fau/engine-node.mjs` (used by /fau/ and /nola/) is a DIFFERENT
+// module that also names this path as its future home. Merging the two is
+// still open (BACKLOG, routing follow-ups item 1).
 //
 // WHAT A LINK REQUEST GETS, for a port this page owns:
 //   device out -> this engine's midi   open: yes once the sound is up, and the

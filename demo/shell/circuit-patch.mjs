@@ -765,26 +765,6 @@ export function modSlots(patch) {
   return out;
 }
 
-/** The 32 macro legs, four per knob. */
-export function macroLegs(patch) {
-  const out = [];
-  for (let k = 1; k <= MACRO_KNOBS; k++) {
-    for (const leg of ['A', 'B', 'C', 'D']) {
-      const depth = patch.value(`MacroKnob${k}_Depth${leg}`);
-      out.push({
-        knob: k,
-        leg,
-        destination: patch.value(`MacroKnob${k}_Destination${leg}`),
-        start: patch.value(`MacroKnob${k}_StartPos${leg}`),
-        end: patch.value(`MacroKnob${k}_EndPos${leg}`),
-        depth,
-        used: depth !== ZERO_DEPTH,
-      });
-    }
-  }
-  return out;
-}
-
 /**
  * The one row a table shows for a patch.
  * ⚠️ `lfo` IS A FLOOR AND NOT A TOTAL, and the reason is published rather than

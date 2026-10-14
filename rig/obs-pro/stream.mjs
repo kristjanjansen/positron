@@ -19,12 +19,20 @@
 import { readFileSync } from 'node:fs';
 import { ObsClient } from '../obs-docker/control.mjs';
 
-// Both inputs were DELETED from Stream on 2026-10-13, so the hls and whip modes have no input to publish to.
-const HLS_UID  = '0e390aa48b55d49a57284e6c2c535477';   // "positron-demo"
-const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig"
+// RETIRED 2026-10-13 for `hls` and `whip`: both inputs below were DELETED from
+// Stream that day, so those modes have no input to publish to. They refuse
+// (exit 2) rather than ask the API for a key that is not there. `moq` publishes
+// to Cloudflare's public draft-14 relay, not to an input of ours, and `off`
+// only stops OBS, so those two still run.
+const HLS_UID  = '0e390aa48b55d49a57284e6c2c535477';   // "positron-demo", deleted
+const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig", deleted
 const RELAY    = 'https://draft-14.cloudflare.mediaoverquic.com';
 
 const [mode, secsArg] = process.argv.slice(2);
+if ((mode === 'hls' || mode === 'whip') && !process.argv.includes('--anyway')) {
+  console.log(`rig/obs-pro/stream.mjs ${mode} is retired (2026-10-13): its Stream input was deleted. See the header.`);
+  process.exit(2);
+}
 const secs = Number(secsArg || 30);
 
 const env = Object.fromEntries(readFileSync(new URL('../../.env', import.meta.url), 'utf8')

@@ -133,3 +133,18 @@ rig/pico/patch/build-*/
 # are a secret in a public repository and live only in the working tree.
 rig/pico/net/build-*/
 rig/pico/net/pico/wifi_secrets.h
+
+# ── secrets, binaries and generated files that were tracked before a rule ──
+# Untracked 2026-10-14 (plans/plan-code-review-2026-10-14.md, section B and E2).
+# `.wrangler/` and `__pycache__/` above already said so; those files were
+# committed before the rule existed, and a rule does not untrack anything.
+*.pyc
+*.pem
+*.so
+# The prebuilt amd64 QUIC probe the quic-test Dockerfile copies in (8 MB).
+rig/obs-cloud/quic-test/moq-clock-ietf
+# esbuild bundles of rig/moq/spike/src. The pages next to them stay tracked.
+rig/moq/spike/www/*.js
+# m2m run logs and screenshots, 1,128 files. proto/m2m/NOTES.md cites them as
+# evidence; they stay on this disk, not in a clone.
+proto/m2m/logs/

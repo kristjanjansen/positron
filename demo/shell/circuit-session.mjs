@@ -428,8 +428,6 @@ export const STEPS = 16;
 export const STEP_LEN = 28;
 export const STEP_SLOTS = 6;
 export const SLOT_LEN = 4;
-/** 16 x 28 is 448, then 4 bytes, then 11 blocks of 96 is 1,056. 1,508 exactly. */
-export const STEP_GRID_LEN = STEPS * STEP_LEN;
 
 /**
  * ⚖️ WHERE VELOCITY LIVES, SELECTED BY HEADER BYTE 8, AND THE SECOND SOURCE IS
@@ -447,7 +445,6 @@ export const STEP_GRID_LEN = STEPS * STEP_LEN;
  */
 export const VELOCITY_AT = 8;
 export const VELOCITY_PER_STEP = 0x07;
-export const VELOCITY_PER_NOTE = 0xff;
 
 /**
  * Every note event in a session, in region then step then slot order.

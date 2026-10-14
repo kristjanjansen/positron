@@ -139,8 +139,6 @@ if (!navigator.xr?.isSessionSupported) supportedAr = false;
 
 /** true, false, or null while the browser has not answered yet. */
 export const headsetSupported = () => supported;
-/** the same, for passthrough. */
-export const passthroughSupported = () => supportedAr;
 
 const PANEL_VS = `#version 300 es
   in vec3 aPos;

@@ -33,11 +33,6 @@
 
 import { COMMANDS, PATCH_BYTES } from './circuit-patch.mjs';
 
-/** `F0` then Novation, then the product bytes this stream uses. */
-export const STREAM_HEAD = [0xf0, 0x00, 0x20, 0x29, 0x00];
-/** A patch message carries the other product number, the one `circuit-patch.mjs` reads. */
-export const PATCH_HEAD = [0xf0, 0x00, 0x20, 0x29, 0x01, 0x60];
-
 /** Byte 5 of a stream message says what kind it is. MEASURED on two files. */
 export const KIND = {
   0x77: 'stream start',
