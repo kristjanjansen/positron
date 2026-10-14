@@ -129,12 +129,11 @@ void main(){
   const bay = createBay();
   // The shapes are /shell/nodes.mjs's; the labels and the delivery are this page's.
   addNodes(bay, S, ['knob-segments', 'shader', 'screen'], {
-    label: { 'knob-segments': 'knob', screen: 'screen' },
     deliver: { 'shader:value-in': setParam },
     portLabel: 'node:port',
     ports: {
       'knob-segments:value-out': { shape: { of: 'param', names: ['segments'] } },
-      'screen:video-in': { label: 'screen' },
+      'screen:video-in': { label: 'picture' },
     },
   });
 

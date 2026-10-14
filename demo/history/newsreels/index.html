@@ -86,7 +86,6 @@
   const PICTURE_CLOCK = `${S}:screen:clock-out`, SPEAKER_CLOCK = `${S}:speaker:clock-in`;
   const bay = createBay();
   addNodes(bay, S, ['newsreel', 'err-radio', 'screen', 'speaker', 'timeline'], {
-    label: { screen: 'picture' },
     ports: {
       [REEL_OUT]: { label: 'newsreel' }, [RADIO_OUT]: { label: 'radio' },
       [SCREEN_IN]: { label: 'picture' }, [REEL_DAY]: { label: 'day' }, [PICTURE_CLOCK]: { label: 'position' },

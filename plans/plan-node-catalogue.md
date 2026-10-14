@@ -1,6 +1,6 @@
 # One node catalogue for the browser side
 
-Status (2026-10-14): open. Asked: *"can we not centralize is somehow?"*, then *"do it"*.
+Status (2026-10-14): steps 1 and 2 done, decisions 2 to 5 done; step 3 (/connect/ reads NODES) done. Asked: *"can we not centralize is somehow?"*, then *"do it"*.
 Starts when review phase 5 (plans/plan-code-review-2026-10-14.md) has landed,
 because it touches the same pages.
 
@@ -276,10 +276,43 @@ its catalogue name on every site and only the site prefix changes: `pi-1:shader`
 beside `web:shader`, `pi-1:collide` beside `web:collide`. A name says what a node
 does, never which chip runs it.
 
+## Decisions 2 to 5, decided by the owner and done 2026-10-14
+
+Asked as *"Do 2-5"*. Not committed or deployed by the agent that built them.
+
+- **2. One name per thing, done.** `bpm` merged into `tempo`, `granulator`
+  into `grains`, `radio` into `player`. The pages keep their ids through `as`
+  (`{ name: 'tempo', as: 'bpm' }` in `radio/rig.mjs`, `{ name: 'grains', as:
+  'granulator' }` on shader/landscape, `{ name: 'player', as: 'radio' }` in
+  `grain-rig.mjs` and landscape), so those pictures are byte for byte the same.
+  `grains:value-in` became optional, because landscape's granulator never had
+  one; the grain pages get it by delivering to it. Labels did not move with
+  the merges: landscape keeps `granulator` (*"no grains mentions"*), the grain
+  pages and landscape keep `radio` over the `player` default.
+- **3. One default label per type, done.** The screen's default is `picture`,
+  the scope's `waveform`, a knob's its parameter, the synth's `sine`. Kept on
+  purpose: `original` where a second picture sits beside it (video/shader,
+  webrtc, llhls, moq, drums/camera), the pairing `here` (`waveform here`,
+  `SuperCollider here`, `mirror shader here`, `picture here`), instance names
+  (`ERR wave`, `Ida wave`, `typist <k>`, `macro <n>`, `<drum> <param>`,
+  `wet/dry`) and station names. Changed on screen: synth/sound's ten knobs and
+  video/shader's, shader/mirror's and shader/remote's knob from `knob` to the
+  parameter; `screen` to `picture` on shader/mirror and shader/landscape (the
+  port too); `camera` to `picture` on video/recorder (the port too); `scope` to
+  `waveform` on room/words (and its port's words) and drums/knobs' four scopes;
+  `waveforms` to `waveform` on drums/remote; `saw synth` to `saw` on room/words;
+  `source scope` to `wave` on the two grain pages. The drums/knobs card says
+  "a waveform for each drum".
+- **4. Kinds, done.** `rec-video` is a store and the mix knob a person.
+  `nodes-test.mjs` walks every recorder and every knob and has a negative
+  control that puts the old kinds back.
+- **5. Per instance nodes on /connect/, done** (`plan-connect-ui.md` D2 and D6).
+  The knob box into a value-in naming several parameters asks which one and
+  makes one `web:knob-<name>`; a second synth or scope is `synth-2`, `scope-2`,
+  with its own runtime, face and knob row (`knob-<name>-2`).
+
 ## Open questions for the owner
 
-- **`pi-1:camera` (remote/circuit) and `pi-1:shader` (shader/remote) are not in
-  `boardGraph()`.** The board announces `gpu`, not `shader`, and no camera
-  node at all; both pages declare the node by hand, and /connect/ cannot show
-  either. Should the board announce them (a change to `graph-registry.mjs` and
-  `rig/board/`), or do the pages keep drawing them? Not changed here.
+- ~~**`pi-1:camera` and `pi-1:shader` are not in `boardGraph()`**~~. Decided 2026-10-14
+  (*"Make pi announce"*, *"shader is better than gpu"*): the board announces `collide`,
+  `drums`, `shader` (was `gpu`) and `camera` since 59b8b2f6, pushed to the Pi the same day.

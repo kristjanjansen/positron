@@ -10,7 +10,8 @@ import { PARAMS, knobRaw } from './synth-params.mjs';
 export const after = true;
 
 export function make({ id, send, peerParam }) {
-  const name = id.split(':')[1].replace(/^knob-?/, '') || 'knob';
+  // knob-cutoff-2 is the cutoff knob of a second synth (node-runtime.mjs knobFor).
+  const name = id.split(':')[1].replace(/^knob-?/, '').replace(/-\d+$/, '') || 'knob';
   const p = PARAMS.find((x) => x.name === name) ?? { name, min: 0, max: 127, value: (r) => r, format: null };
   const now = peerParam(name);
   let sent = 0;

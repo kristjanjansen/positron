@@ -103,6 +103,7 @@
   // the box's grey line names) and comes back as LL-HLS.
   const bay = createBay();
   addNodes(bay, S, ['camera', 'screen'], {
+    label: { screen: 'original' },
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
   });
   addNodes(bay, S, ['stream-hls'], { ports: { [HLS_IN]: { label: 'video' }, [HLS_OUT]: { label: 'video' } } });

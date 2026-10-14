@@ -80,8 +80,7 @@
   addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'screen', 'rec-video', 'store', 'player-video',
     { name: 'screen', as: 'playback', label: 'playback' }], {
     portLabel: 'node:port',
-    label: { screen: 'camera' },
-    ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'camera' }, 'playback:video-in': { label: 'playback' } },
+    ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'picture' }, 'playback:video-in': { label: 'playback' } },
   });
   // Once on, the camera box takes the device's own name.
   const camNode = (label) => relabel(bay, `${S}:camera`, label);

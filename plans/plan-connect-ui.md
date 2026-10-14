@@ -624,7 +624,14 @@ Local at http://127.0.0.1:8890/connect/. Not committed, not deployed.
   parameters (`wave`, `cutoff`, `q`, `attack`, `release`). `rt-knob.mjs`.
   Linking the `knob` box to a value-in whose shape lists names makes one
   `web:knob-<name>` node per name and links each (D2, all names at once; there
-  is no picker yet).
+  is no picker yet). **Superseded 2026-10-14:** the knob box into a value-in
+  that names several parameters asks which one (a button per name, and
+  cancel) and makes ONE `web:knob-<name>` instance; with one name it makes it
+  without asking (`knobChoices`, `knobFor` in `node-runtime.mjs`).
+- **D6, built 2026-10-14.** A synth or a scope may be used twice: once every
+  instance of the type is linked, the grid offers the next free one
+  (`web:synth-2`, `web:scope-2`), with its own runtime and face, and its knobs
+  are `web:knob-<name>-2` in a row of their own (`knobs on web:synth-2`).
 - **Slice 3.** `rt-scope.mjs`: the kit wave shape over an AnalyserNode pulled
   by a silent sink.
 

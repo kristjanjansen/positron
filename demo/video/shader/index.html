@@ -74,7 +74,7 @@
     ...KNOBS.map((k) => `knob-${k.name}`)], {
     portLabel: 'node:port',
     deliver: { 'shader:value-in': setParam },
-    label: Object.fromEntries(KNOBS.map((k) => [`knob-${k.name}`, 'knob'])),
+    label: { screen: 'original' },
     ports: {
       'camera:video-out': { label: 'camera' },
       'shader:value-in': { shape: { of: 'param', names: KNOBS.map((k) => k.name) } },

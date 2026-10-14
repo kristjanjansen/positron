@@ -63,7 +63,7 @@ export const NODES = {
   },
   knob: {
     kind: 'person', label: '<name>', match: ['knob-<name>'],
-    instance: 'knob-<name>, one per parameter, labelled with the parameter (the default) or "knob"',
+    instance: 'knob-<name>, one per parameter, labelled with the parameter; knob-<name>-<n> is a second knob for the same parameter of the n-th instance (/connect/)',
     ports: { 'value-out': P({ ...PARAM }), 'value-in': P({ optional: true }) },
     // An empty shape: landscape's knobs are where any value can land later.
     variants: { unshaped: { 'value-out': { shape: {} } } },
@@ -71,8 +71,7 @@ export const NODES = {
     pages: ['synth/sound', 'code/faust', 'code/collide', 'code/plaits', 'granulator/grains', 'granulator/beat',
       'remote/circuit', 'remote/collide', 'video/shader', 'shader/mirror', 'shader/landscape', 'shader/remote',
       'typist/machines', 'drums/knobs'],
-    labels: { 'synth/sound': 'knob', 'video/shader': 'knob', 'shader/mirror': 'knob', 'shader/remote': 'knob',
-      'remote/circuit': 'macro <n>', 'drums/knobs': '<drum> <param>', 'granulator/grains': 'wet/dry (knob-mix)',
+    labels: { 'remote/circuit': 'macro <n>', 'drums/knobs': '<drum> <param>', 'granulator/grains': 'wet/dry (knob-mix)',
       'granulator/beat': 'wet/dry (knob-mix)' },
   },
   'volume-knob': {
@@ -80,9 +79,9 @@ export const NODES = {
     ports: { 'midi-out': P({ emits: ['cc'] }) },
     pages: ['synth/dots'],
   },
-  // ⚠️ A knob drawn as an ENGINE: the grain pages' knob-mix is a person, a knob instance.
+  // A control, as every knob is; its value-out carries no shape, so it is not a knob instance.
   'mix-knob': {
-    node: 'knob-mix', kind: 'engine', label: 'mix knob',
+    node: 'knob-mix', kind: 'person', label: 'mix knob',
     ports: { 'value-out': P() },
     pages: ['radio/live', 'radio/tempo', 'radio/key'],
   },
@@ -147,7 +146,7 @@ export const NODES = {
     ports: { 'midi-in': P({ ...TAKES_NOTE }), 'audio-out': P(),
       'value-in': P({ shape: { of: 'param', names: ['wave', 'cutoff', 'q', 'attack', 'release'] }, optional: true }) },
     pages: ['synth/keyboard', 'synth/recorder', 'synth/timeline', 'synth/dots', 'room/words'],
-    labels: { 'synth/keyboard': 'sine', 'synth/recorder': 'saw', 'synth/timeline': 'saw', 'synth/dots': 'saw', 'room/words': 'saw synth' },
+    labels: { 'synth/recorder': 'saw', 'synth/timeline': 'saw', 'synth/dots': 'saw', 'room/words': 'saw' },
   },
   osc: {
     kind: 'engine', label: 'oscillator',
@@ -238,15 +237,12 @@ export const NODES = {
       'value-in': P({ shape: { of: 'param', names: ['invert', 'scale'] } }) },
     pages: ['drums/camera'],
   },
-  radio: {
-    kind: 'engine', label: 'radio',
-    ports: { 'file-in': P(), 'audio-out': P() },
-    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape'],
-  },
+  // `radio` until 2026-10-14: the grain pages and landscape ask `{ name: 'player', as: 'radio' }`.
   player: {
     kind: 'engine', label: 'player',
     ports: { 'file-in': P(), 'audio-out': P() },
-    pages: ['radio/tempo'],
+    pages: ['radio/tempo', 'granulator/grains', 'granulator/beat', 'shader/landscape'],
+    labels: { 'granulator/grains': 'radio', 'granulator/beat': 'radio', 'shader/landscape': 'radio' },
   },
   'player-video': {
     node: 'player', kind: 'engine', label: 'player',
@@ -258,31 +254,25 @@ export const NODES = {
     ports: { 'audio-in': P(), 'audio-out': P(), 'value-out': P({ optional: true }) },
     pages: ['radio/live', 'radio/key'],
   },
+  // `granulator` until 2026-10-14: landscape asks `{ name: 'grains', as: 'granulator' }` and
+  // keeps the word granulator (asked 2026-10-13: *"no grains mentions"*).
   grains: {
     kind: 'engine', label: 'grain ring',
-    ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P(), 'value-out': P(),
+    ports: { 'audio-in': P(), 'audio-out': P(), 'value-in': P({ optional: true }), 'value-out': P(),
       'tempo-in': P({ dir: 'in', medium: 'value', optional: true }) },
-    pages: ['granulator/grains', 'granulator/beat'],
-  },
-  granulator: {
-    kind: 'engine', label: 'granulator',
-    ports: { 'audio-in': P(), 'audio-out': P(), 'value-out': P() },
-    pages: ['shader/landscape'],
+    pages: ['granulator/grains', 'granulator/beat', 'shader/landscape'],
+    labels: { 'shader/landscape': 'granulator' },
   },
   'patch-values': {
     node: 'patch', kind: 'engine', label: 'patch',
     ports: { 'value-out': P(), 'value-out-2': P() },
     pages: ['granulator/grains', 'granulator/beat'],
   },
-  bpm: {
-    kind: 'engine', label: 'tempo detector',
-    ports: { 'audio-in': P(), 'value-out': P() },
-    pages: ['radio/live', 'radio/tempo'],
-  },
+  // `bpm` until 2026-10-14: radio/rig.mjs asks `{ name: 'tempo', as: 'bpm' }`.
   tempo: {
     kind: 'engine', label: 'tempo detector',
     ports: { 'audio-in': P(), 'value-out': P() },
-    pages: ['granulator/beat'],
+    pages: ['granulator/beat', 'radio/live', 'radio/tempo'],
   },
   key: {
     kind: 'engine', label: 'key detector',
@@ -387,9 +377,8 @@ export const NODES = {
     ports: { 'value-in': P({ ...TEXT }), 'value-out': P({ ...TEXT }) },
     pages: ['typist/playback'],
   },
-  // ⚠️ An ENGINE here, where every other recorder is a store.
   'rec-video': {
-    node: 'rec', kind: 'engine', label: 'recorder',
+    node: 'rec', kind: 'store', label: 'recorder',
     ports: { 'video-in': P(), 'file-out': P() },
     pages: ['video/recorder'],
   },
@@ -421,14 +410,15 @@ export const NODES = {
       'value-in': P({ optional: true }) },
     pages: ['synth/sound', 'code/faust', 'code/collide', 'code/plaits', 'remote/circuit', 'remote/collide',
       'remote/piano', 'drums/knobs', 'drums/remote', 'room/words'],
-    labels: { 'remote/collide': 'waveform here', 'drums/knobs': 'scope', 'drums/remote': 'waveforms', 'room/words': 'scope' },
+    // "here" pairs it with the Pi's waveform beside it.
+    labels: { 'remote/collide': 'waveform here' },
   },
   wave: {
     kind: 'screen', label: 'wave', match: ['wave-<name>'],
     instance: 'wave; wave-<station> per station on radio/blend (ERR wave, Ida wave)',
     ports: { 'audio-in': P(), 'value-in': P({ optional: true }), 'value-in-2': P({ optional: true }) },
     pages: ['radio/blend', 'radio/tuner', 'radio/tempo', 'radio/live', 'radio/key', 'granulator/grains', 'granulator/beat'],
-    labels: { 'granulator/grains': 'source scope', 'granulator/beat': 'source scope', 'radio/blend': 'ERR wave, Ida wave' },
+    labels: { 'radio/blend': 'ERR wave, Ida wave' },
   },
   display: {
     kind: 'screen', label: 'tempo scope',
@@ -436,13 +426,14 @@ export const NODES = {
     pages: ['radio/tempo', 'radio/live'],
   },
   screen: {
-    kind: 'screen', label: 'original', match: ['screen-<name>'],
+    kind: 'screen', label: 'picture', match: ['screen-<name>'],
     instance: 'screen; a second picture beside it is its own node: screen-pi (Pi picture), dither (dithered), playback, loopback (WebRTC), hls (LL-HLS), moq (MoQ), pixels',
     ports: { 'video-in': P(), 'value-in': P({ optional: true }), 'clock-out': P({ optional: true }) },
     pages: ['synth/dots', 'shader/mirror', 'shader/remote', 'shader/landscape', 'video/camera', 'video/shader',
       'video/recorder', 'video/webrtc', 'video/llhls', 'video/moq', 'drums/camera', 'remote/circuit', 'history/newsreels'],
-    labels: { 'synth/dots': 'picture', 'video/camera': 'picture', 'remote/circuit': 'picture', 'history/newsreels': 'picture',
-      'shader/mirror': 'screen', 'shader/landscape': 'screen', 'shader/remote': 'picture here', 'video/recorder': 'camera' },
+    // `original` where a second picture beside it needs telling apart; "here" pairs with the Pi's.
+    labels: { 'video/shader': 'original', 'video/webrtc': 'original', 'video/llhls': 'original', 'video/moq': 'original',
+      'drums/camera': 'original', 'shader/remote': 'picture here' },
   },
   oled: {
     kind: 'screen', label: 'OLED',

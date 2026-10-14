@@ -184,7 +184,6 @@ export function createSynth({ log = () => {}, onParam = () => {} } = {}) {
   const knobNodes = KNOBS.map((k) => `knob-${k.name}`);
   addNodes(bay, S, ['keys', ...knobNodes, 'osc', 'filter', 'amp', 'lfo', 'scope', 'speaker'], {
     portLabel: 'node:port',
-    label: Object.fromEntries(knobNodes.map((k) => [k, 'knob'])),
     deliver: {
       'osc:midi-in': oscNote, 'amp:midi-in': ampGate,
       ...Object.fromEntries(['osc', 'filter', 'amp', 'lfo'].map((m) => [`${m}:value-in`, deliverParam(m)])),

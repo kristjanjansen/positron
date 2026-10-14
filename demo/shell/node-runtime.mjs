@@ -46,10 +46,10 @@ export const NOT_YET = {
     ['osc', 'filter', 'amp', 'lfo']),
   ...why('its engine makes its own AudioContext, so it cannot join this page\'s one context until it takes one',
     ['plaits', 'sampler', 'sequencer', 'drum']),
-  ...why('its engine is a group module shaped for its own pages, which needs an adapter first', ['fau', 'collide', 'radio',
-    'player', 'player-video', 'level', 'grains', 'patch-values', 'bpm', 'tempo', 'fx-click', 'fx-typewriter', 'typewriter',
+  ...why('its engine is a group module shaped for its own pages, which needs an adapter first', ['fau', 'collide',
+    'player', 'player-video', 'level', 'grains', 'patch-values', 'tempo', 'fx-click', 'fx-typewriter', 'typewriter',
     'timeline', 'rec-text', 'mix-knob', 'display']),
-  ...why('its engine is a kit piece that is not bound to a runtime yet', ['granulator', 'noise', 'tuner', 'pico',
+  ...why('its engine is a kit piece that is not bound to a runtime yet', ['noise', 'tuner', 'pico',
     'shader-landscape', 'wave', 'oled']),
   ...why('its engine lives only inside one page and has to be lifted into demo/shell/ first', ['midi-state', 'shader',
     'shader-dots', 'shader-dither', 'pixelate', 'key', 'fx', 'autoplay', 'bass', 'pad', 'mixer', 'xfade', 'blend-fader',
@@ -98,21 +98,29 @@ export function routes(links) {
 }
 
 /**
- * Linking the `knob` type box to a value-in that lists its parameter names
- * makes one knob node per name (decision D2) and links each. Returns the pairs
- * to link, or null when this is not such a link.
+ * The parameters a knob could turn when the `knob` type box is linked to a
+ * value-in that names them (decision D2), or null when this is not such a link.
  */
-export function knobLinks(bay, from, to, site = 'web') {
+export function knobChoices(bay, from, to, site = 'web') {
   if (from !== `${site}:knob:value-out`) return null;
   const names = bay.port(to)?.shape?.names;
-  if (!Array.isArray(names) || !names.length) return null;
-  const pairs = [];
-  for (const name of names) {
-    const id = `${site}:knob-${name}`;
-    if (!bay.node(id)) addNodes(bay, site, [`knob-${name}`], { ports: { [`knob-${name}:value-out`]: { label: `${name} knob value-out` } } });
-    pairs.push([`${id}:value-out`, to]);
+  return Array.isArray(names) && names.length ? [...names] : null;
+}
+
+/**
+ * One knob instance for parameter `name` of the node `to` is on, added to the
+ * bay if it is not there, and the pair to link. `knob-<name>` serves the first
+ * of a type, `knob-<name>-<n>` its instance n (`synth-2`), so two synths never
+ * share a knob (decision D6).
+ */
+export function knobFor(bay, to, name, site = 'web') {
+  const n = to.split(':')[1].match(/-(\d+)$/)?.[1];
+  const seg = `knob-${name}${n ? `-${n}` : ''}`;
+  const id = `${site}:${seg}`;
+  if (!bay.node(id)) {
+    addNodes(bay, site, [{ name: 'knob', as: seg, label: name }], { ports: { [`${seg}:value-out`]: { label: `${name} knob value-out` } } });
   }
-  return pairs;
+  return [`${id}:value-out`, to];
 }
 
 /**

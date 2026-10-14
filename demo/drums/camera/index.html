@@ -160,6 +160,7 @@
   let scales = 0;
   addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'pixelate', 'screen', { name: 'screen', as: 'pixels', label: 'pixels' }, 'invert', 'scale'], {
     portLabel: 'node:port',
+    label: { screen: 'original' },
     deliver: { 'pixelate:value-in': (e) => {
       if (e?.of === 'param' && e.name === 'scale') {
         const want = e.v >= 2 ? 2 : 1;

@@ -336,7 +336,7 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
   names.push(mix ? { name: 'mix', as: OUT, label: mix.label } : 'speaker');
   if (wantScopes) for (const v of ALL) {
     const sc = `scope-${v.key}`;
-    names.push({ name: 'scope', as: sc, label: 'scope' });
+    names.push({ name: 'scope', as: sc });
     // What starts a trace arrives on a wire too: the drum's own note, filtered
     // the same way, so the scope triggers on exactly the hits its drum plays.
     deliver[`${sc}:midi-in`] = (e) => {

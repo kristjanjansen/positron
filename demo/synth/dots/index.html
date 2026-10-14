@@ -240,7 +240,7 @@
   // does. The volume knob is a node of its own, as on /synth/sound/: a turn is
   // one CC 7 out of its own port, so its cable is the one that pulses.
   addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker', 'midi-state', 'shader-dots', 'screen', 'pico', 'oled', 'volume-knob'], {
-    label: { synth: 'saw', screen: 'picture' },
+    label: { synth: 'saw' },
     deliver: {
       'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
       'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),

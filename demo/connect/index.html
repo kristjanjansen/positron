@@ -79,6 +79,11 @@
   .cn-dot.cn-ring { color: var(--dim2); }
   .cn-dot.cn-ring::after { display: none; }
   .cn-port.cn-inert { color: var(--c); white-space: nowrap; }
+  /* Which parameter a new knob turns: asked under the picture, on the press that needs it. */
+  .cn-choose { display: flex; flex-direction: column; gap: 8px; }
+  .cn-choose[hidden] { display: none; }
+  .cn-choose-q { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--fg); }
+  .cn-choose button { text-transform: none; }
   .cn-livemark { fill: var(--ok); }
 </style>
 <script type="module">
@@ -89,7 +94,7 @@
   import { NODES as CATALOGUE, addNodes } from '/shell/nodes.mjs';
   import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { CONCEPTS } from '/shell/concept-list.mjs';
-  import { createRuntimes, EXTRA_PORTS, knobLinks } from '/shell/node-runtime.mjs';
+  import { createRuntimes, EXTRA_PORTS, knobChoices, knobFor } from '/shell/node-runtime.mjs';
   import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { knobRaw } from '/shell/synth-params.mjs';
@@ -146,6 +151,8 @@
   // A knob made per parameter (`web:knob-cutoff`) is a knob; every other node is the type it was built as.
   const typeOf = (id) => TYPE.get(id) ?? (/^web:knob-/.test(id) ? 'knob' : null);
   const isInstance = (id) => !TYPE.has(id) && typeOf(id) === 'knob';
+  // A numbered synth or scope is drawn in the grid only while it is the free one of its type.
+  const hiddenSpare = (id) => MULTI.includes(TYPE.get(id)) && !linkedNodes().has(id) && firstFree(TYPE.get(id)) !== id;
 
   function makeBay() {
     const b = createBay();
@@ -177,6 +184,26 @@
     return { bay: b, failed };
   }
   const { bay, failed } = makeBay();
+
+  // ── a second of a kind (decision D6) ─────────────────────────────────────
+  // A synth or a scope may be used twice: once every one of them is linked, the
+  // grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
+  const MULTI = ['synth', 'scope'];
+  const instancesOf = (type) => bay.nodes().filter((n) => TYPE.get(n.id) === type).map((n) => n.id);
+  // The bay cannot drop a node, so an instance unlinked again stays in it and the grid shows the first free one.
+  const firstFree = (type) => { const s = linkedNodes(); return instancesOf(type).find((id) => !s.has(id)) ?? null; };
+  function addInstance(type) {
+    const e = CATALOGUE[type], label = LABELS[type] ?? e.label;
+    let k = 2;
+    while (bay.node(`web:${type}-${k}`)) k++;
+    const as = `${type}-${k}`;
+    addNodes(bay, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    TYPE.set(`web:${as}`, type);
+    PAGES.set(`web:${as}`, e.pages);
+    INSTANCE.set(`web:${as}`, `instance ${k} of ${type}, with its own runtime and face`);
+    return `web:${as}`;
+  }
+  function spares() { for (const t of MULTI) if (!firstFree(t)) addInstance(t); }
   const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
   const EXPECTED = Object.keys(CATALOGUE).length + PI_KEPT;
 
@@ -204,9 +231,9 @@
     ['a knob opens supercollider\'s filter', 'code/collide', [[KNOB, W('collide', 'value-in')]]],
     ['a knob bends the mirror shader', 'shader/mirror', [[KNOB, W('shader', 'value-in')], [W('shader', 'video-out'), SCREEN]]],
     ['show me plaits\' waveform', 'code/plaits', [[W('plaits', 'audio-out'), W('scope', 'audio-in')]]],
-    ['grain a radio recording', 'granulator/grains', [[REC, W('radio', 'file-in')], [W('radio', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
-    ['grains in time with the recording', 'granulator/beat', [[REC, W('radio', 'file-in')], [W('radio', 'audio-out'), W('grains', 'audio-in')],
-      [W('radio', 'audio-out'), W('tempo', 'audio-in')], [W('tempo', 'value-out'), W('grains', 'tempo-in')], [W('grains', 'audio-out'), SPK]]],
+    ['grain a radio recording', 'granulator/grains', [[REC, W('player', 'file-in')], [W('player', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['grains in time with the recording', 'granulator/beat', [[REC, W('player', 'file-in')], [W('player', 'audio-out'), W('grains', 'audio-in')],
+      [W('player', 'audio-out'), W('tempo', 'audio-in')], [W('tempo', 'value-out'), W('grains', 'tempo-in')], [W('grains', 'audio-out'), SPK]]],
     ['what key is the live radio in?', 'radio/key', [['err:station:audio-out', 'cf-shout:relay:audio-in'], ['cf-shout:relay:audio-out', W('level', 'audio-in')],
       [W('level', 'audio-out'), W('key', 'audio-in')]]],
     ['the dial tunes the radio', 'radio/tuner', [[W('dial', 'value-out'), W('tuner', 'value-in')], [W('tuner', 'audio-out'), SPK]]],
@@ -339,12 +366,11 @@
   // ── linking, by press or by confirming a proposal ────────────────────────
   let last = { ok: true, why: '' };
   function connect(from, to, transforms = [], consent = false) {
-    // The knob type into a value-in that names its parameters is one knob per parameter.
-    const many = knobLinks(bay, from, to);
-    if (many) {
-      d.log(`one knob per parameter of ${nodeOf(to)}: ${many.map(([f]) => nodeOf(f).split(':')[1]).join(', ')}`);
-      return many.map(([f, t]) => connect(f, t, transforms, consent)).some(Boolean);
-    }
+    // The knob type into a value-in that names its parameters is ONE knob, for
+    // the parameter a person picks; with one name there is nothing to ask.
+    const names = knobChoices(bay, from, to);
+    if (names?.length === 1) return connect(...knobFor(bay, to, names[0]), transforms, consent);
+    if (names) { askParam(to, names, transforms, consent); return false; }
     bay.seen(from); bay.seen(to);
     // A link out of somebody else's server needs a person's own press (bay.mjs, consent).
     const via = viaFor(from, to);
@@ -371,6 +397,23 @@
     d.log(`removed ${printLink(l)}`);
     redraw();
   }
+
+  // Which parameter a new knob turns: one button per name, and Cancel.
+  const chooser = el('div', 'cn-choose');
+  chooser.hidden = true;
+  let asked = null;
+  function askParam(to, names, transforms, consent) {
+    asked = { to, names };
+    const q = el('p', 'cn-choose-q', `which parameter of ${nodeOf(to)} should the knob turn?`);
+    const group = createButtonGroup({ buttons: [
+      ...names.map((n) => ({ id: n, label: n, onPress: () => { closeAsk(); connect(...knobFor(bay, to, n), transforms, consent); } })),
+      { id: 'cancel', label: 'cancel', onPress: () => { closeAsk(); d.log('no knob made'); } },
+    ] });
+    chooser.replaceChildren(q, group.el);
+    chooser.hidden = false;
+    d.log(`${nodeOf(to)} takes ${names.join(', ')}: pick one for the knob`);
+  }
+  function closeAsk() { asked = null; chooser.replaceChildren(); chooser.hidden = true; }
 
   let armed = null;
   function pick(portId, e) {
@@ -561,7 +604,7 @@
   function drawGrid() {
     const inPic = linkedNodes();
     const byGroup = new Map(GROUPS.map((g) => [g, []]));
-    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id)) byGroup.get(groupOf(n)).push(card(n, bay.ports().filter((q) => nodeOf(q.id) === n.id)));
+    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id) && !hiddenSpare(n.id)) byGroup.get(groupOf(n)).push(card(n, bay.ports().filter((q) => nodeOf(q.id) === n.id)));
     const pi = live.sites.get(BOARD_SITE);
     // What the Pi says it has and no page here draws: a box of its own, quietly marked.
     for (const n of pi?.graph.nodes || []) {
@@ -648,6 +691,7 @@
 
   function redraw() {
     if (armed && !bay.port(armed)) armed = null;
+    spares();
     pic.classList.toggle('cn-pic-empty', bay.links().length === 0);
     drawGrid();
     pb.refresh();
@@ -660,17 +704,23 @@
   // faces. One knob row for every knob, rebuilt only when the set of knobs changes.
   const faces = el('div', 'cn-faces');
   faces.hidden = true;
-  let knobRow = null, knobKey = '';
+  // One knob row per node the knobs turn, so two synths' cutoffs are told apart.
+  const knobRows = new Map();   // target node -> { key, grid }
   const part = (title, face) => { const p = el('section', 'cn-face'); p.append(el('h3', 'pos-sec-h', title), face); return p; };
   function drawFaces() {
     const all = runtime.list().filter((x) => x.rt.face);
     const knobs = all.filter((x) => x.rt.slot === 'knob');
     const parts = all.filter((x) => x.rt.slot === 'picture').map((x) => part(x.id, x.rt.face));
-    if (knobs.length) {
-      const key = knobs.map((x) => x.id).join();
-      if (key !== knobKey) { knobRow = createKnobGrid(knobs.map((x) => ({ name: x.rt.name, knob: x.rt.knob })), { row: true }); knobKey = key; }
-      parts.push(part(knobs.length === 1 ? knobs[0].id : 'knobs', knobRow.el));
-    } else knobKey = '';
+    const turns = (id) => nodeOf(bay.links().find((l) => nodeOf(l.from) === id)?.to ?? '');
+    const byTarget = new Map();
+    for (const x of knobs) { const t = turns(x.id); if (!byTarget.has(t)) byTarget.set(t, []); byTarget.get(t).push(x); }
+    for (const t of [...knobRows.keys()]) if (!byTarget.has(t)) knobRows.delete(t);
+    for (const [t, list] of byTarget) {
+      const key = list.map((x) => x.id).join();
+      if (knobRows.get(t)?.key !== key) knobRows.set(t, { key, grid: createKnobGrid(list.map((x) => ({ name: x.rt.name, knob: x.rt.knob })), { row: true }) });
+      const title = byTarget.size > 1 ? `knobs on ${t}` : list.length === 1 ? list[0].id : 'knobs';
+      parts.push(part(title, knobRows.get(t).grid.el));
+    }
     parts.push(...all.filter((x) => x.rt.slot === 'keys').map((x) => part(x.id, x.rt.face)));
     faces.replaceChildren(...parts);
     faces.hidden = !parts.length;
@@ -680,7 +730,7 @@
 
   const say = el('div', 'cn-say');
   say.append(exRow, props);
-  d.stack.add(say, faces, pic, groups);
+  d.stack.add(say, faces, pic, chooser, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
 
@@ -831,14 +881,29 @@
     const still = scope?.heard() ?? 1;
     A('NEGATIVE CONTROL: the same scope reads zero once nothing sounds', !!scope && still < 1e-4, `peak ${still.toExponential(2)}`);
 
-    // ── slice 2: one knob per parameter, into the synth's value-in ──────────
+    // ── slice 2: one knob, for the parameter a person picks (decision D2) ────
     const SYNTH_VAL = W('synth', 'value-in');
+    const NAMES = CATALOGUE.synth.ports['value-in'].shape.names;
+    const choose = (n) => chooser.querySelector(`button[data-id="${n}"]`)?.click();
+    const knobLinksNow = () => bay.links().filter((l) => /^web:knob/.test(l.from));
+    const rowOf = (t) => knobRows.get(t)?.grid;
     press(KNOB); press(SYNTH_VAL);
+    await frame();
+    const offered = [...chooser.querySelectorAll('button')].map((b) => b.dataset.id);
+    A('pressing the knob box and then the synth\'s value-in asks which parameter, one button each, and makes no knob yet',
+      !chooser.hidden && offered.join() === [...NAMES, 'cancel'].join() && knobLinksNow().length === 0
+        && !bay.nodes().some((n) => isInstance(n.id)), `offered ${offered.join(' ')}, ${knobLinksNow().length} knob links`);
+    choose('cancel');
     await runtimes();
-    const knobIds = runtime.list().filter((x) => x.type === 'knob').map((x) => x.id);
-    A('linking the knob box to the synth makes one knob per parameter, in one row',
-      knobIds.length === 5 && knobRow?.knobs.length === 5 && faces.contains(knobRow.el) && !has(KNOB, SYNTH_VAL),
-      knobIds.join(', '));
+    A('NEGATIVE CONTROL: cancel makes no knob and links nothing', chooser.hidden && knobLinksNow().length === 0
+      && !runtime.list().some((x) => x.type === 'knob'));
+    press(KNOB); press(SYNTH_VAL);
+    choose('cutoff');
+    await runtimes();
+    const knobIds = () => runtime.list().filter((x) => x.type === 'knob').map((x) => x.id);
+    A('picking cutoff makes ONE knob instance, web:knob-cutoff, linked to the synth, in a row of its own',
+      chooser.hidden && knobIds().join() === 'web:knob-cutoff' && has('web:knob-cutoff:value-out', SYNTH_VAL) && !has(KNOB, SYNTH_VAL)
+        && rowOf('web:synth')?.knobs.length === 1 && faces.contains(rowOf('web:synth').el), knobIds().join(', '));
     // A key is held while the knob turns: Chrome stops processing a filter with
     // nothing sounding into it, and then its frequency never reads back the glide.
     const cutoff = RT('web:knob-cutoff');
@@ -850,13 +915,59 @@
     await sleep(200);
     A('turning the cutoff knob moves the synth cutoff, read back off the filter',
       Math.abs(synth.param('cutoff') - 500) < 5 && Math.abs(fq - 500) < 25, `asked 500, the synth holds ${synth.param('cutoff')?.toFixed(1)}, the filter reads ${fq.toFixed(1)} Hz`);
+    press(KNOB); press(SYNTH_VAL); choose('q');
+    await runtimes();
     const q = RT('web:knob-q'), q0 = synth.param('q');
+    A('a second pick adds a second knob to the same row', !!q && rowOf('web:synth')?.knobs.length === 2, knobIds().join(', '));
     removeLink(bay.links().find((l) => l.from === 'web:knob-q:value-out')?.id);
     await runtimes();
     q?.knob.set(knobRaw('q', 9));
     A('NEGATIVE CONTROL: an unlinked knob moves nothing, and its face is gone',
-      !!q && synth.param('q') === q0 && !faces.contains(q.face) && !RT('web:knob-q') && knobRow?.knobs.length === 4,
+      !!q && synth.param('q') === q0 && !faces.contains(q.face) && !RT('web:knob-q') && rowOf('web:synth')?.knobs.length === 1,
       `q ${q0} then ${synth.param('q')}`);
+
+    // ── a second synth and a second scope, each its own instance (decision D6) ──
+    A('with the synth and the scope linked, the grid offers one free box of each: synth-2 and scope-2',
+      inGrid('web:synth-2') && inGrid('web:scope-2') && !inGrid('web:synth') && !inGrid('web:synth-3') && instancesOf('synth').length === 2,
+      `synths ${instancesOf('synth').join(' ')}, scopes ${instancesOf('scope').join(' ')}`);
+    const S2 = (p) => `web:synth-2:${p}`;
+    press(KEYS); press(S2('midi-in'));
+    press(S2('audio-out')); press('web:scope-2:audio-in');
+    await runtimes();
+    const synth2 = RT('web:synth-2'), scope2 = RT('web:scope-2');
+    A('the second synth and the second scope run as runtimes of their own, and each scope has its own face',
+      !!synth2 && synth2 !== synth && !!scope2 && scope2 !== scope && faces.contains(scope.face) && faces.contains(scope2.face)
+        && inGrid('web:synth-3') && inGrid('web:scope-3') && !inGrid('web:synth-2'),
+      `runtimes ${runtime.list().map((x) => x.id).join(' ')}`);
+    const n2 = synth2.heard();
+    kb.press(A3);
+    await sleep(300);
+    const h2 = [scope.heard(), scope2.heard(), synth2.heard() - n2];
+    kb.release(A3);
+    await sleep(400);
+    A('one key plays both synths, and each scope shows its own', h2[2] === 1 && h2[0] > 0.01 && h2[1] > 0.01,
+      `synth-2 heard ${h2[2]}, scopes ${h2.slice(0, 2).map((v) => v.toFixed(4)).join(' and ')}`);
+    press(KNOB); press(S2('value-in')); choose('cutoff');
+    await runtimes();
+    RT('web:knob-cutoff-2')?.knob.set(knobRaw('cutoff', 900));
+    A('the second synth\'s cutoff is a knob of its own, web:knob-cutoff-2, in a row of its own, and it moves that synth only',
+      has('web:knob-cutoff-2:value-out', S2('value-in')) && rowOf('web:synth-2')?.knobs.length === 1 && knobRows.size === 2
+        && Math.abs(synth2.param('cutoff') - 900) < 5 && Math.abs(synth.param('cutoff') - 500) < 5
+        && [...faces.querySelectorAll('.pos-sec-h')].some((h) => h.textContent === 'knobs on web:synth-2'),
+      `synth ${synth.param('cutoff')?.toFixed(0)}, synth-2 ${synth2.param('cutoff')?.toFixed(0)}`);
+    removeLink(bay.links().find((l) => l.from === KEYS && l.to === S2('midi-in'))?.id);
+    await runtimes();
+    kb.press(A3);
+    await sleep(300);
+    const cut = [scope.heard(), scope2.heard()];
+    kb.release(A3);
+    A('NEGATIVE CONTROL: with the keys taken off the second synth, its scope reads nothing while the first scope still shows the key',
+      !!RT('web:scope-2') && cut[1] < 1e-4 && cut[0] > 0.01, `scope ${cut[0].toFixed(4)}, scope-2 ${cut[1].toExponential(2)}`);
+    for (const l of [...bay.links()].filter((x) => [nodeOf(x.from), nodeOf(x.to)].some((n) => /^web:(synth-2|scope-2|knob-cutoff-2)$/.test(n)))) removeLink(l.id);
+    await runtimes();
+    A('unlinked again, the second synth\'s runtime and knob row go, and the grid offers one free synth, synth-2',
+      !RT('web:synth-2') && !knobRows.has('web:synth-2') && inGrid('web:synth-2') && !inGrid('web:synth-3') && !!RT('web:synth'));
+    await sleep(200);
 
     // ── the negative control on the speakers ────────────────────────────────
     removeLink(bay.links().find((l) => l.from === SYNTH_OUT && l.to === SPK)?.id);

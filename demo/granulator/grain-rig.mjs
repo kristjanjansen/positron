@@ -266,8 +266,8 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   // Every knob's value comes in on grains:value-in, one port for all of them,
   // as on /code/collide/; the event names its control. Every grain the engine
   // reports leaves on grains:value-out, so a scope follows the grains by a link.
-  addNodes(bay, S, ['radio', 'grains', 'wave', ...(outputScope ? ['scope'] : []), 'speaker', 'patch-values'], {
-    label: { grains: engine.label, wave: 'source scope', ...(outputScope ? { scope: 'output scope' } : {}) },
+  addNodes(bay, S, [{ name: 'player', as: 'radio', label: 'radio' }, 'grains', 'wave', ...(outputScope ? ['scope'] : []), 'speaker', 'patch-values'], {
+    label: { grains: engine.label, ...(outputScope ? { scope: 'output scope' } : {}) },
     deliver: { 'grains:value-in': (ev) => valueIn(ev), 'wave:value-in': (ev) => waveGrain(ev),
       ...(outputScope ? { 'scope:value-in': (ev) => scopeGrain(ev) } : {}) },
     ports: { ...lab({ 'radio:file-in': 'radio', 'radio:audio-out': 'radio', 'grains:audio-in': 'grains',

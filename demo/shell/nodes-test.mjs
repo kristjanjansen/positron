@@ -6,8 +6,9 @@
 // What is graded: every entry's kind and ports are legal for bay.mjs, names
 // are unique in the source and never read as another entry's instance,
 // addNodes builds a bay bay.mjs links through (port order, portLabel,
-// variants), addPorts and relabel, and every page an entry names is on disk. Lines marked NEGATIVE CONTROL must
-// refuse something, so a check that cannot fail is caught.
+// variants), addPorts and relabel, the merges and kinds of 2026-10-14 and one
+// default label per type, and every page an entry names is on disk. Lines marked
+// NEGATIVE CONTROL must refuse something, so a check that cannot fail is caught.
 
 import { readFileSync, existsSync } from 'node:fs';
 import { createBay, MEDIA, NODE_KINDS, TRANSPORT_NAMES } from './bay.mjs';
@@ -207,6 +208,66 @@ check('addNodes builds every entry with all its ports', !buildFail.length, build
   check('Stream and MoQ sit on Cloudflare at their fixed ids', ['cf-stream:live', 'cf-stream:hls', 'cf-moq:relay'].every((id) => n(id)?.place === 'cloudflare' && n(id)?.net === 'cloudflare'));
   check('each hop carries its transports', bay.port('cf-stream:live:video-in').transports.join() === 'whip' && bay.port('cf-stream:hls:video-out').transports.join() === 'llhls'
     && !bay.port('cf-stream:hls:video-in').transports && bay.port('cf-shout:vikerraadio:audio-out').transports.join() === 'https');
+}
+
+// ── merges (2026-10-14): one name per thing, and the pages keep their ids ──
+{
+  // Each merged-away name is gone, and the page that used it builds the same node through `as`.
+  const MERGED = { bpm: ['tempo', 'radio/live'], granulator: ['grains', 'shader/landscape'], radio: ['player', 'granulator/grains'] };
+  for (const [old, [into, page]] of Object.entries(MERGED)) {
+    const m = throws(() => addNodes(createBay(), 'web', [old]));
+    check(`NEGATIVE CONTROL: ${old} is no catalogue name any more, it is ${into}`, !Object.hasOwn(NODES, old) && typeOf(old) === null
+      && /nodes\.mjs/.test(m) && NODES[into].pages.includes(page), m);
+  }
+  const bay = createBay();
+  addNodes(bay, 'web', [{ name: 'tempo', as: 'bpm' }, { name: 'grains', as: 'granulator', label: 'granulator' }, { name: 'player', as: 'radio', label: 'radio' }]);
+  const ids = (seg) => bay.ports().filter((p) => p.id.startsWith(`web:${seg}:`)).map((p) => p.id.split(':')[2]).join(' ');
+  check('bpm is a tempo detector at web:bpm, with the ports it had', bay.node('web:bpm')?.label === 'tempo detector' && ids('bpm') === 'audio-in value-out', ids('bpm'));
+  check('landscape\'s granulator is grains at web:granulator with no value-in, as it had', bay.node('web:granulator')?.label === 'granulator'
+    && ids('granulator') === 'audio-in audio-out value-out', ids('granulator'));
+  check('the grain pages\' radio is a player at web:radio, file in and audio out', bay.node('web:radio')?.label === 'radio'
+    && bay.node('web:radio').kind === 'engine' && ids('radio') === 'file-in audio-out', ids('radio'));
+  const g = createBay();
+  addNodes(g, 'web', ['grains'], { deliver: { 'grains:value-in': () => {} } });
+  check('the grain pages still get grains:value-in, because they deliver to it', !!g.port('web:grains:value-in')
+    && g.ports().map((p) => p.id.split(':')[2]).join(' ') === 'audio-in audio-out value-in value-out');
+}
+
+// ── kinds: a recorder is a store, a knob is a person ──────────────────────
+{
+  const segOf = (n) => NODES[n].node ?? n;
+  const recorders = (cat) => Object.keys(cat).filter((n) => /^(rec|looper)$/.test(cat[n].node ?? n) && cat[n].kind !== 'store');
+  const knobs = (cat) => Object.keys(cat).filter((n) => /^knob/.test(cat[n].node ?? n) && cat[n].kind !== 'person');
+  check('every recorder is a store, rec-video among them', !recorders(NODES).length && NODES['rec-video'].kind === 'store', recorders(NODES).join(' '));
+  check('every knob is a person, the mix knob among them', !knobs(NODES).length && NODES['mix-knob'].kind === 'person', knobs(NODES).join(' '));
+  const old = { ...NODES, 'rec-video': { ...NODES['rec-video'], kind: 'engine' }, 'mix-knob': { ...NODES['mix-knob'], kind: 'engine' } };
+  check('NEGATIVE CONTROL: the two checks find the kinds as they were', recorders(old).join() === 'rec-video' && knobs(old).join() === 'mix-knob',
+    `${recorders(old)} ${knobs(old)}`);
+  check('the rec and knob families are what the checks walk', ['rec', 'rec-text', 'rec-video', 'looper'].every((n) => /^(rec|looper)$/.test(segOf(n)))
+    && ['knob', 'volume-knob', 'mix-knob'].every((n) => /^knob/.test(segOf(n))));
+}
+
+// ── one default label per type ────────────────────────────────────────────
+{
+  // A page label left in `labels` must be a word the owner kept: a pairing "here", a
+  // second picture's "original", an instance's own name. The retired ones never.
+  const RETIRED = { scope: ['scope', 'waveforms'], screen: ['screen', 'camera'], synth: ['saw synth'], knob: ['knob'], wave: ['source scope'] };
+  const back = (cat) => Object.entries(RETIRED).flatMap(([n, words]) => Object.entries(cat[n].labels || {}).filter(([, l]) => words.includes(l)).map(([p, l]) => `${n} ${p} ${l}`));
+  check('the scope says waveform, the screen picture, a knob its parameter', NODES.scope.label === 'waveform' && NODES.screen.label === 'picture'
+    && NODES.knob.label === '<name>' && NODES.synth.label === 'sine' && !back(NODES).length, back(NODES).join('; '));
+  const was = { ...NODES, scope: { ...NODES.scope, labels: { ...NODES.scope.labels, 'drums/remote': 'waveforms' } } };
+  check('NEGATIVE CONTROL: a retired label put back is found', back(was).join() === 'scope drums/remote waveforms', back(was).join());
+  // Every page that passes a label for these types in its source passes a kept one.
+  const root = new URL('../', import.meta.url);
+  const words = { scope: /\bscope: '([^']+)'/g, screen: /\bscreen: '([^']+)'/g, synth: /\bsynth: '([^']+)'/g };
+  const found = [];
+  for (const page of new Set(names.flatMap((n) => NODES[n].pages))) {
+    const f = new URL(`${page}/index.html`, root);
+    if (!existsSync(f)) continue;
+    const text = readFileSync(f, 'utf8');
+    for (const [n, re] of Object.entries(words)) for (const m of text.matchAll(re)) if (RETIRED[n].includes(m[1])) found.push(`${page} ${n} ${m[1]}`);
+  }
+  check('no concept page passes a retired label for the scope, the screen or the synth', !found.length, found.join('; '));
 }
 
 // ── an unknown name throws, naming the catalogue ──────────────────────────

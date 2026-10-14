@@ -13,7 +13,7 @@
 import { NODES } from './nodes.mjs';
 import { createBay } from './bay.mjs';
 import { addNodes } from './nodes.mjs';
-import { RUNTIMES, NOT_YET, EXTRA_PORTS, plan, routes, knobLinks, whyNot } from './node-runtime.mjs';
+import { RUNTIMES, NOT_YET, EXTRA_PORTS, plan, routes, knobChoices, knobFor, whyNot } from './node-runtime.mjs';
 import { routeAudio } from './audio-router.mjs';
 import { PARAM_NAMES, PARAMS, knobRaw } from './synth-params.mjs';
 
@@ -158,18 +158,25 @@ for (const [name, fn] of Object.entries(ROUTER_SABOTAGE)) {
   A(`NEGATIVE CONTROL: a router that ${name} is caught`, red > 0, 'every claim stayed green');
 }
 
-// ── knobLinks(): one knob node per parameter ───────────────────────────────
+// ── knobChoices() and knobFor(): one knob, for the parameter a person picks ──
 {
   const bay = createBay();
-  addNodes(bay, 'web', ['keys', 'knob', 'synth', 'collide'], { ports: { 'synth:value-in': {} } });
-  const pairs = knobLinks(bay, 'web:knob:value-out', 'web:synth:value-in');
-  A('the knob type into a named value-in makes one knob per name', pairs?.length === PARAM_NAMES.length
-    && PARAM_NAMES.every((n) => bay.node(`web:knob-${n}`) && pairs.some(([f]) => f === `web:knob-${n}:value-out`)));
-  A('every one of those links is one the bay takes', pairs.every(([f, t]) => bay.validate(f, t, []).ok));
-  const again = knobLinks(bay, 'web:knob:value-out', 'web:synth:value-in');
-  A('a second time adds no second knob node', again.length === pairs.length && bay.nodes().filter((n) => n.id.startsWith('web:knob-')).length === PARAM_NAMES.length);
-  A('NEGATIVE CONTROL: a value-in with no names is linked as it is', knobLinks(bay, 'web:knob:value-out', 'web:collide:value-in') === null);
-  A('NEGATIVE CONTROL: anything but the knob type is linked as it is', knobLinks(bay, 'web:keys:midi-out', 'web:synth:value-in') === null);
+  addNodes(bay, 'web', ['keys', 'knob', 'synth', 'collide', { name: 'synth', as: 'synth-2' }],
+    { ports: { 'synth:value-in': {}, 'synth-2:value-in': {} } });
+  const names = knobChoices(bay, 'web:knob:value-out', 'web:synth:value-in');
+  A('the knob type into a named value-in offers every name, and adds nothing yet', names?.join() === PARAM_NAMES.join()
+    && !bay.nodes().some((n) => n.id.startsWith('web:knob-')), names?.join());
+  const pair = knobFor(bay, 'web:synth:value-in', 'cutoff');
+  A('picking one name makes exactly one knob node, labelled by its parameter', pair[0] === 'web:knob-cutoff:value-out'
+    && bay.nodes().filter((n) => n.id.startsWith('web:knob-')).length === 1 && bay.node('web:knob-cutoff').label === 'cutoff'
+    && bay.validate(...pair, []).ok);
+  const again = knobFor(bay, 'web:synth:value-in', 'cutoff');
+  A('a second time adds no second knob node', again.join() === pair.join() && bay.nodes().filter((n) => n.id.startsWith('web:knob-')).length === 1);
+  const two = knobFor(bay, 'web:synth-2:value-in', 'cutoff');
+  A('the same parameter of a second synth is a knob of its own', two[0] === 'web:knob-cutoff-2:value-out' && !!bay.node('web:knob-cutoff-2')
+    && bay.node('web:knob-cutoff-2').label === 'cutoff' && bay.validate(...two, []).ok);
+  A('NEGATIVE CONTROL: a value-in with no names offers nothing', knobChoices(bay, 'web:knob:value-out', 'web:collide:value-in') === null);
+  A('NEGATIVE CONTROL: anything but the knob type offers nothing', knobChoices(bay, 'web:keys:midi-out', 'web:synth:value-in') === null);
 }
 
 // ── the parameter table ────────────────────────────────────────────────────
