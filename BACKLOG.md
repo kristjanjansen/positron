@@ -1,5 +1,19 @@
 ## Open
 
+- **Front page: contact info into the header, footer removed** (2026-10-14, in progress). Asked: *"Try to get contact info to frontpage header. Rm footer"*. `demo/index.html`: Email and Instagram links between the wordmark and Feedback; on a phone they take their own line under the wordmark.
+
+- **Front page contacts: icons, below the hero** (2026-10-14). Asked: *"Contavts: use icons? Below hero?"*, following the header move above. Drawn SVG icons (mail, Instagram), not glyphs.
+
+- **Research: how to distribute our skills** (2026-10-14, a background agent). Asked: *"In bg investigate how we should distribute our skills"*. Output `research/skills-distribution-2026-10-14.md`.
+
+- **Research: local MCP tools or DIY for UI video capture, for Instagram stories** (2026-10-14, a background agent). Asked: *"In bg research what local mcp tools or diy we can do for ui video capture for ig stories etc"*. Output `research/ui-video-capture-2026-10-14.md`.
+
+- **Plans and research: review, mark done, perhaps consolidate** (2026-10-14, a background agent). Asked: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. A status line on each, an index, and a consolidation proposal; moves and merges wait for a yes.
+
+- **Code review and simplification proposal** (2026-10-14, a background agent). Asked: *"In bg do comprehensive code revirew and simplification proposal"*. A plan in `plans/plan-code-review-2026-10-14.md`, no code changes.
+
+- **Skills: review all of `.claude/skills/` and rewrite them around the patchbay** (2026-10-14, a background agent). Asked: *"In bg review skills and rewrite them to latest patchbay centric approach"*. 12 skills, 8352 lines. Keep measurements, dates and quoted reports (CLAUDE.md: move rules verbatim, never summarise); restructure around site/room/node/port/link and the concept pages.
+
 - ~~**Front page footer: make it fit the rest, mono labels; the copyright does not fit**~~ (2026-10-13, DONE). Asked: *"it kina does not fit to rest, work on in. mono labels?"*, *"also copyriht stuff does not fit"*. Labels as the group headings, values as card lines, the wordmark and year in mono in place of ©.
 
 - ~~**Front page footer: smaller, no underline, more space before it**~~ (2026-10-13, DONE). Asked: *"too big lower texts. no underline"*, *"add moore space before it"*. 13 px, labels 12, a link lights on hover, 140 px above.
