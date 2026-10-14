@@ -1,8 +1,10 @@
 ## Open
 
-- **Clean private lines from code and standing files before the push** (2026-10-14, agent). Asked: *"yes"* to: rig/audit.mjs, rig/board/README.md, rig/m1/live-setup.mjs, demo/pack, demo/tom, three Circuit tests, HANDOFF, BACKLOG, PROGRESS, LESSONS, LAYOUT.
+- **Code pages (Collide and the rest): the code sample moves below, just above the patchbay** (2026-10-14). Asked: *"move collide et code samples below, above the patchbay"*.
 
-- **Delete view's ERR proxy and the Gate Durable Object (migration)** (2026-10-14, agent). Asked: *"view's ERR proxy: delete it? - yes"*.
+- ~~**Clean private lines from code and standing files before the push**~~ (2026-10-14, DONE, ebafe2b3; scattered hits remain in proto/, rig/, timeline/lab, plans and research). Asked: *"yes"* to: rig/audit.mjs, rig/board/README.md, rig/m1/live-setup.mjs, demo/pack, demo/tom, three Circuit tests, HANDOFF, BACKLOG, PROGRESS, LESSONS, LAYOUT.
+
+- ~~**Delete view's ERR proxy and the Gate Durable Object (migration)**~~ (2026-10-14, DONE, 75fcd59a; the migration runs on the next deploy). Asked: *"view's ERR proxy: delete it? - yes"*.
 
 - **Review phase 5: consolidate repeated code into the kit, and bay-traffic remove()** (2026-10-14, agent). Asked: *"do review"*.
 
