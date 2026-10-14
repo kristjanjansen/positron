@@ -249,7 +249,26 @@
   const KEYS = W('keys', 'midi-out'), SPK = W('speaker', 'audio-in'), REC = 'cf-r2:recording:file-out';
   const KNOB = W('knob', 'value-out'), CAM = W('camera', 'video-out'), SCREEN = W('screen', 'video-in');
   const CIRCUIT = `${BOARD_SITE}:circuit`, PIANO = `${BOARD_SITE}:sampler`;
+  const DRUMS = `${BOARD_SITE}:drums`, PI_SHADER = `${BOARD_SITE}:shader`;
+  // Examples are patches no page makes: parts of two pages meeting, this tab and the Pi
+  // in one patch, or one out port into two. plans/plan-connect-use-cases.md section 3.
   const EXAMPLES = [
+    ['the drum machine plays plaits', [[W('sequencer', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
+    ['granulate plaits as i play', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['one keyboard plays the synth and lights the pico', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK], [KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
+    ['granulate the piano as i play it', [[KEYS, W('sampler', 'midi-in')], ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['the drum machine plays the circuit', [[W('sequencer', 'midi-out'), `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
+    ['the drum machine plays the pi piano', [[W('sequencer', 'midi-out'), `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
+    ['record here, play it back on the circuit', [[KEYS, W('rec', 'midi-in')], [W('rec', 'midi-out'), `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
+    ['granulate the circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['plaits here and the circuit there, one keyboard', [[KEYS, W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK], [KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
+    ['my midi keyboard plays the pi drums', [[W('midi', 'midi-out'), `${DRUMS}:midi-in`], [`${DRUMS}:audio-out`, SPK]]],
+    ['the studio camera through my dither shader', [[`${BOARD_SITE}:camera:video-out`, W('shader-dither', 'video-in')], [W('shader-dither', 'video-out'), SCREEN]]],
+    ['a knob here bends the shader on the pi', [[KNOB, `${PI_SHADER}:value-in`], [`${PI_SHADER}:video-out`, SCREEN]]],
+  ].map(([say, links]) => ({ say, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
+  // The patches the concept pages make, one per page: never shown, built only by the
+  // self-check to grade each runtime, and the record an example must not copy.
+  const RIGS = [
     ['let the keys play the synth', 'synth/keyboard', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK]]],
     ['play plaits from my midi keyboard', 'code/plaits', [[W('midi', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
     ['play the circuit in the studio', 'remote/circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
@@ -278,6 +297,7 @@
   // A third field on a link is the parameter a knob into a value-in turns, so
   // an example makes that one knob instance rather than asking.
   ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
+  const rigOf = (say) => EXAMPLES.find((e) => e.say === say) || RIGS.find((e) => e.say === say);
 
   const d = mount({ name: 'connect',
     what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
@@ -345,7 +365,7 @@
   const exRow = el('div', 'cn-ex');
   for (const ex of EXAMPLES) {
     const r = runsOf(ex);
-    const lines = [`as on /${ex.page}/`];
+    const lines = [`builds ${r.nodes.join(', ')}`];
     if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
     if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
     const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
@@ -815,7 +835,7 @@
     // Every example's links can be made, each on a fresh bay so one cannot
     // block another, and with the consent a person's press of Connect gives.
     const cant = [];
-    for (const ex of EXAMPLES) {
+    for (const ex of [...EXAMPLES, ...RIGS]) {
       const s = makeBay().bay;
       for (const l of ex.links) {
         const via = viaFor(l.from, l.to);
@@ -823,15 +843,18 @@
         if (!r.ok) cant.push(`"${ex.say}": ${l.from} -> ${l.to}: ${r.why}`);
       }
     }
-    const lost = EXAMPLES.filter((e) => !known.has(e.page)).map((e) => `"${e.say}" on ${e.page}`);
-    A('every example is something a concept page already does', !lost.length, lost.join('; '));
+    const key = (e) => e.links.map((l) => `${l.from}>${l.to}`).sort().join(' ');
+    const copies = EXAMPLES.filter((e) => RIGS.some((r) => key(r) === key(e))).map((e) => e.say);
+    const lost = RIGS.filter((r) => !known.has(r.page)).map((r) => `"${r.say}" on ${r.page}`);
+    A('no example is a patch one concept page already makes, and every page patch the check builds is a real page', !copies.length && !lost.length,
+      `copies: ${copies.join('; ') || 'none'}; no page: ${lost.join('; ') || 'none'}`);
     const told = portsForModel();
     A('the model is told few enough ports for the worker to take them', told.length <= MAX_PORTS && EXAMPLE_PORTS.size <= MAX_PORTS,
       `${told.length} of ${MAX_PORTS}, ${EXAMPLE_PORTS.size} of them named by an example, out of ${bay.ports().length} in the bay`);
     const toldIds = new Set(told.map((p) => p.id));
     const unnamed = EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])).filter((id) => !toldIds.has(id));
     A('every port an example needs is one the model is told about', unnamed.length === 0, [...new Set(unnamed)].join(', '));
-    A(`all ${EXAMPLES.length} examples can be linked in this bay`, cant.length === 0, cant.join('; '));
+    A(`all ${EXAMPLES.length} examples and ${RIGS.length} page patches can be linked in this bay`, cant.length === 0, cant.join('; '));
 
     // Picking by pressing: an out port, then an in port of the same medium.
     const SYNTH_IN = W('synth', 'midi-in'), SYNTH_OUT = W('synth', 'audio-out');
@@ -858,7 +881,7 @@
       logs().split('\n').filter((x) => x.startsWith('refused')).pop());
 
     // An example press builds its patch at once, replacing what was linked.
-    const ex = EXAMPLES[1];
+    const ex = EXAMPLES[0];
     const reached0 = reached;
     [...exRow.children].find((b) => b.textContent === ex.say).click();
     await frame();
@@ -880,9 +903,9 @@
     const target = bay.links().find((l) => l.from === 'web:plaits:audio-out');
     svgOf()?.querySelector(`.cn-hit[data-link="${target?.id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     A('pressing a wire removes that link', !!target && !bay.links().some((l) => l.id === target.id));
-    const midiLink = bay.links().find((l) => l.from === 'web:midi:midi-out');
-    removeLink(midiLink?.id);
-    A('a node with no links left goes back to the grid', inGrid('web:plaits') && inGrid('web:midi') && !inPicture('web:plaits'));
+    const seqLink = bay.links().find((l) => l.from === 'web:sequencer:midi-out');
+    removeLink(seqLink?.id);
+    A('a node with no links left goes back to the grid', inGrid('web:plaits') && inGrid('web:sequencer') && !inPicture('web:plaits'));
     armed = null; lightArmed();
 
     await runtimes();
@@ -891,9 +914,9 @@
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const RT = (id) => runtime.get(id);
     const keyboards = () => faces.querySelectorAll('.kbd').length;
-    [...exRow.children].find((b) => b.textContent === EXAMPLES[0].say).click();
+    build(rigOf('let the keys play the synth'), false);
     await runtimes();
-    A('the example "let the keys play the synth" shows exactly one keyboard, runs the synth and the speaker, and opens no sound device yet',
+    A('the patch "let the keys play the synth" shows exactly one keyboard, runs the synth and the speaker, and opens no sound device yet',
       keyboards() === 1 && !!RT('web:synth') && !!RT('web:speaker') && contexts() === 0,
       `keyboards ${keyboards()}, runtimes ${runtime.list().map((x) => x.id).join(' ')}, contexts ${contexts()}`);
     const kb = RT('web:keys').kb, synth = RT('web:synth'), speaker = RT('web:speaker');
@@ -1048,7 +1071,7 @@
     const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
     const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(50); return fn(); };
     const RT = (id) => runtime.get(id);
-    const pressEx = async (say) => { [...exRow.children].find((b) => b.textContent === say).click(); await runtimes(); };
+    const pressEx = async (say) => { build(rigOf(say), false); await runtimes(); };
     const shows = (id) => !!RT(id)?.face && faces.contains(RT(id).face);
     const linkOf = (from, to) => bay.links().find((l) => l.from === from && l.to === to);
     const logs = () => window.__demo.logs.map((x) => x.msg).join('\n');
@@ -1096,7 +1119,7 @@
     const drumsLoud = runtime.level();
     A('Play on its bar sends steps over web:sequencer -> web:drum, and the drums reach the speakers',
       seq.heard() > s0 && drum.heard() > d0 + 4 && drumsLoud > 0.005,
-      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}`);
+      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}; inside the machine ${drum.level?.().toFixed?.(4)}, engine ${!!drum.machine.engine?.()}, context ${runtime.context()?.state}`);
     // A second link out of the sequencer keeps it running, so taking the drums' link away is the only change.
     const KEYS_IN = W('keys', 'midi-in');
     connect(W('sequencer', 'midi-out'), KEYS_IN);
@@ -1336,16 +1359,8 @@
   async function checkExamples() {
     const A = d.assert;
     const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
-    // What each example is, written down here rather than read off the code it
-    // grades, so a mark that goes missing or appears is a red assert, not a new one.
-    const EXPECT = {
-      'grains in time with the recording': ['web:tempo'],
-      'what key is the live radio in?': 'press',
-      'the dial tunes the radio': ['web:dial', 'web:tuner'],
-      'send the camera through stream and back': 'press',
-      'the camera plays the drums': ['web:pixelate'],
-      'loop what i play into the piano': ['web:looper'],
-    };
+    // Every example runs here; a mark that appears is a red assert, not a new one.
+    const EXPECT = {};
     let ran = 0;
     const skipped = [];
     for (const [i, ex] of EXAMPLES.entries()) {
