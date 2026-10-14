@@ -305,6 +305,11 @@ export const DEMOS = [
     one: 'where every part of the kit lives now, and a way on from an old link to one of its blocks',
     tags: ['shell', 'no network'] },
 
+  // /connect/: every part the site builds, linked by a visitor; a card beside the kit.
+  { name: 'connect', group: 'kit', act: 0, created: '2026-10-14', built: true, bootMs: 120000,
+    one: 'every part the site builds, linked port to port by you, and the linked parts that can run here run',
+    tags: ['shell', 'Workers AI', 'WebMIDI', 'getUserMedia'] },
+
   // /social/: pictures and reels the site makes of itself, a card beside the kit.
   // why: lessons/manifest.md#social
   { name: 'social', group: 'kit', act: 0, created: '2026-10-14', built: true,

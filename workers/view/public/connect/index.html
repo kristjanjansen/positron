@@ -1,0 +1,1531 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Connect">
+<meta property="og:description" content="Link the site&apos;s parts port to port. A part that can run here appears once it is linked.">
+<meta property="og:url" content="https://positron.studio/connect/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON connect</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* Unlinked nodes as the patchbay draws a box, four to a row, grouped by where they run. */
+  .cn-site + .cn-site { margin-top: 32px; }
+  .cn-site h3 { margin: 0 0 12px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
+  .cn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: 12px; }
+  @media (max-width: 900px) { .cn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .cn-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r, 4px); min-width: 0; }
+  .cn-head { display: flex; flex-direction: column; gap: 2px; }
+  .cn-id { font: 600 13px/1.3 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
+  .cn-label { font: 400 11.5px/1.3 var(--sans); color: var(--dim); }
+  /* 11.5px so the widest pair a node has, value-in-2 beside midi-out-2, sits
+     on one line in a quarter of the column; past that it wraps, never breaks. */
+  .cn-ports { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 6px; font: 400 11.5px/1.5 var(--mono); }
+  .cn-ports > div { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+  .cn-ports > div:last-child { align-items: flex-end; }
+  /* The pages that build this node, so nothing in the grid is imaginary. */
+
+  /* A port is a link button in its medium's colour; the picked one is lit. */
+  button.pos-linkbtn.cn-port { font-family: var(--mono); color: var(--c); text-decoration: none; white-space: nowrap; }
+  button.pos-linkbtn.cn-port[aria-pressed="true"] { background: var(--c); color: var(--bg); text-decoration: none; }
+  .lv-pname.cn-pick { cursor: pointer; }
+  .lv-pname.cn-pick[aria-pressed="true"] { font-weight: 600; }
+  .cn-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+
+  .cn-say { display: flex; flex-direction: column; gap: 12px; }
+  .cn-ex { display: flex; flex-wrap: wrap; gap: var(--ctl-gap); }
+
+  /* What a person says, in --voice (shell.css). Round, lowercase and in
+     Geist, because a sentence is read through rather than named. */
+  .cn-ex > button.cn-pill { text-transform: none; font-family: var(--sans); font-weight: 400; border-radius: 999px;
+    padding: 0 var(--pad-seg); color: var(--voice); border-color: color-mix(in oklab, var(--voice) 45%, var(--line2));
+    background: transparent; }
+  .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
+
+  .cn-props { display: flex; flex-direction: column; gap: 12px; }
+  .cn-props[hidden] { display: none; }
+  /* The picture's room is a square held from the first frame, so linking moves
+     nothing above or below it; a patch taller than the square grows it. */
+  .cn-pic { aspect-ratio: 1; }
+  .cn-pic.cn-pic-empty { display: grid; place-items: center; border: 1px dashed var(--line2); border-radius: var(--r, 4px); }
+  .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
+  .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
+  .cn-empty { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
+  .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
+  /* An example whose patch does not run yet is dimmed, never disabled: it still
+     builds its picture, and its title says what is missing. */
+  .cn-ex > button.cn-pill[data-runs="marked"] { opacity: .5; }
+  .cn-ex > button.cn-pill[data-runs="marked"]:hover, .cn-ex > button.cn-pill[data-runs="marked"]:focus-visible { opacity: 1; }
+  .cn-prop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  .cn-prop-t { font: 400 12.5px/1.4 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
+  .cn-prop-n { flex-basis: 100%; font: 400 12px/1.4 var(--sans); color: var(--dim); }
+  .cn-prop-b { display: flex; gap: var(--ctl-gap); }
+  /* Both answers in one case: the shell sets a secondary button in capitals
+     and leaves a primary as written, which read `Connect` beside `DISMISS`. */
+  .cn-prop-b > button.pos-sm { text-transform: none; }
+  .cn-prop-n:empty { display: none; }
+
+  /* The faces of the linked nodes, in a concept page's order: pictures, panels, the
+     knob row, the keys. Empty paints nothing. */
+  .cn-faces { display: flex; flex-direction: column; gap: 24px; }
+  .cn-faces[hidden] { display: none; }
+  .cn-face { min-width: 0; }
+  /* A node's own panel (Plaits' knobs, the drum grid, the Pi's Join): one column. */
+  .cn-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .cn-face-say { margin: 0; font: 400 12px/1.4 var(--sans); color: var(--dim); }
+  .cn-pi-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
+  .cn-pi-row button { text-transform: none; }
+  /* Record in red, the one control that starts writing (concept.css's .cc-rec, which this page does not load). */
+  .cn-panel .cc-rec { color: var(--rec, #e5484d); }
+  /* The OLED as /synth/dots/ draws it: dark ink, the 128x64 canvas whole-number scaled in the middle. */
+  .cn-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: #05070c; border-radius: var(--r, 4px); }
+  .cn-oled canvas { display: block; image-rendering: pixelated; }
+  /* The typist's sheet takes the height of its box. */
+  .cn-paper { height: 240px; border-radius: var(--r, 4px); overflow: hidden; }
+
+  /* The listen control sits in the raspberry pi group, under its heading. */
+  .cn-live { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .cn-live-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--ctl-gap); }
+  .cn-live-row > .pos-field { flex: 0 1 220px; }
+  /* Listen and Stop in one case, as the proposal buttons above. */
+  .cn-live-row button { text-transform: none; }
+  .cn-live-st { margin: 0; font: 400 12px/1.4 var(--sans); color: var(--dim); }
+  .cn-site h3 .cn-site-st { margin-left: 10px; letter-spacing: normal; text-transform: none; font-weight: 400; color: var(--dim); }
+  .cn-site h3 .cn-site-st:empty { display: none; }
+  /* The kit's presence dot: green when its site answered inside STALE_MS, an empty ring once quiet. */
+  .cn-dot { display: inline-block; vertical-align: middle; color: var(--ok); margin-left: 6px; }
+  .cn-dot.cn-ring { color: var(--dim2); }
+  .cn-dot.cn-ring::after { display: none; }
+  .cn-port.cn-inert { color: var(--c); white-space: nowrap; }
+  /* Which parameter a new knob turns: asked under the picture, on the press that needs it. */
+  .cn-choose { display: flex; flex-direction: column; gap: 8px; }
+  .cn-choose[hidden] { display: none; }
+  .cn-choose-q { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--fg); }
+  .cn-choose button { text-transform: none; }
+  .cn-livemark { fill: var(--ok); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
+  import { NODES as CATALOGUE, addNodes } from '/shell/nodes.mjs';
+  import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
+  import { CONCEPTS } from '/shell/concept-list.mjs';
+  import { createRuntimes, EXTRA_PORTS, knobChoices, knobFor, loaderOf, FACED } from '/shell/node-runtime.mjs';
+  import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { knobRaw } from '/shell/synth-params.mjs';
+  import { createBayNode, roomFor, ROOM_RE, STUDIO_ROOM } from '/shell/bay-node.mjs';
+  import { createRegistry, STALE_MS } from '/shell/graph-registry.mjs';
+  import { RELAY_BASE, DEFAULT_RELAY, openWire } from '/shell/wire.mjs';
+  import { pageGraph } from '/shell/announce.mjs';
+  import { createField } from '/shell/field.mjs';
+  import { createButtonGroup } from '/shell/button-group.mjs';
+
+  // Every socket this page opens, counted from its first line, so "a visit opens
+  // nothing" is an assert over a counter rather than a reading of the file.
+  const OPENED = [], MIDI_ASKED = [], CAMERA_ASKED = [];
+  if (SELFCHECK) {
+    const Native = window.WebSocket;
+    window.WebSocket = class extends Native { constructor(u, p) { super(u, p); OPENED.push(String(u)); } };
+    // The MIDI prompt, counted the same way: only a person's press on the midi box asks.
+    const ask = navigator.requestMIDIAccess?.bind(navigator);
+    if (ask) navigator.requestMIDIAccess = (o) => { MIDI_ASKED.push(o); return ask(o); };
+    const gum = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    if (gum) navigator.mediaDevices.getUserMedia = (o) => { CAMERA_ASKED.push(o); return gum(o); };
+  }
+
+  // Every node the site's pages build, once per type, read from three sources:
+  // nodes.mjs NODES (concept pages), boardGraph() for the Pi nodes a page plays
+  // (PI_PAGES says which), and the catalogue's endpoint hops between sites.
+  // See lessons/page-connect.md#connect-1
+  const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true, collide: true }, jack: true, gpu: true,
+    camera: true, inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
+  const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'], collide: ['remote/collide'], drums: ['drums/remote'],
+    shader: ['shader/remote'], camera: ['remote/circuit'] };
+  const HOPS = Object.keys(CATALOGUE).filter((n) => CATALOGUE[n].kind === 'endpoint');
+  // A box is `<site>:<name>`, except where the name is not what the pages draw:
+  // the hops, and the two knobs renamed so they cannot read as a knob instance.
+  const AS = { shout: 'relay', 'stream-live': 'live', 'stream-hls': 'hls', 'moq-relay': 'relay',
+    'volume-knob': 'knob-volume', 'mix-knob': 'knob-mix' };
+  // A type whose catalogue label is a pattern (`<drum>, SuperCollider`) is
+  // named for what it is; the instances are in the box's hover.
+  const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station', shout: 'radio relay' };
+  // A value-in whose names the catalogue leaves to the page, as the pages give
+  // them, so the knob box asks which one. The collide runtime's own list is
+  // held to this by the self-check.
+  const PARAM_NAMES = { collide: ['bright', 'decay'] };
+  // A station's site is its broadcaster's, so the one box is on ERR's.
+  const siteOf = (name, e) => (name === 'station' ? 'err' : e.site ?? 'web');
+  // room/words is built and served and kept off the index (concept-list.mjs).
+  const OFF_INDEX = ['room/words'];
+
+  const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
+  const PAGES = new Map(), INSTANCE = new Map(), TYPE = new Map();
+  // A knob made per parameter (`web:knob-cutoff`) is a knob; every other node is the type it was built as.
+  const typeOf = (id) => TYPE.get(id) ?? (/^web:knob-/.test(id) ? 'knob' : null);
+  const isInstance = (id) => !TYPE.has(id) && typeOf(id) === 'knob';
+  // A numbered synth or scope is drawn in the grid only while it is the free one of its type.
+  const hiddenSpare = (id) => MULTI.includes(TYPE.get(id)) && !linkedNodes().has(id) && firstFree(TYPE.get(id)) !== id;
+
+  function makeBay() {
+    const b = createBay();
+    const failed = [];
+    const type = (name) => {
+      const e = CATALOGUE[name], site = siteOf(name, e), label = LABELS[name] ?? e.label, as = AS[name] ?? name;
+      // Every port, the optional ones too: some page builds each of them.
+      // A port has no label in the catalogue, and a refusal reads it.
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${p}`,
+        ...(p === 'value-in' && PARAM_NAMES[name] ? { shape: { of: 'param', names: PARAM_NAMES[name] } } : {}) }]));
+      try {
+        addNodes(b, site, [{ name, as, site, label }], { ports });
+        for (const [p, f] of Object.entries(EXTRA_PORTS[name] || {})) b.addPort({ id: `${site}:${as}:${p}`, ...f, label: `${label} ${p}` });
+        TYPE.set(`${site}:${as}`, name);
+        PAGES.set(`${site}:${as}`, e.pages);
+        if (e.instance) INSTANCE.set(`${site}:${as}`, e.instance);
+      } catch (x) { failed.push(`${name}: ${x.message}`); }
+    };
+    for (const name of Object.keys(CATALOGUE)) if (!HOPS.includes(name)) type(name);
+    for (const n of PI.nodes) {
+      const pages = PI_PAGES[n.id.split(':')[1]];
+      if (!pages) continue;
+      try {
+        b.addNode(n);
+        for (const p of PI.ports.filter((q) => nodeOf(q.id) === n.id)) b.addPort({ ...p, label: `${n.label} ${p.id.split(':')[2]}` });
+        PAGES.set(n.id, pages);
+      } catch (x) { failed.push(`${n.id}: ${x.message}`); }
+    }
+    for (const name of HOPS) type(name);
+    return { bay: b, failed };
+  }
+  const { bay, failed } = makeBay();
+
+  // ── a second of a kind (decision D6) ─────────────────────────────────────
+  // A synth, a scope or a screen may be used twice: once every one of them is linked,
+  // the grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
+  const MULTI = ['synth', 'scope', 'screen'];
+  const instancesOf = (type) => bay.nodes().filter((n) => TYPE.get(n.id) === type).map((n) => n.id);
+  // The bay cannot drop a node, so an instance unlinked again stays in it and the grid shows the first free one.
+  const firstFree = (type) => { const s = linkedNodes(); return instancesOf(type).find((id) => !s.has(id)) ?? null; };
+  function addInstance(type) {
+    const e = CATALOGUE[type], label = LABELS[type] ?? e.label;
+    let k = 2;
+    while (bay.node(`web:${type}-${k}`)) k++;
+    const as = `${type}-${k}`;
+    addNodes(bay, 'web', [{ name: type, as, label }], { ports: Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${k} ${p}` }])) });
+    TYPE.set(`web:${as}`, type);
+    PAGES.set(`web:${as}`, e.pages);
+    INSTANCE.set(`web:${as}`, `instance ${k} of ${type}, with its own runtime and face`);
+    return `web:${as}`;
+  }
+  function spares() { for (const t of MULTI) if (!firstFree(t)) addInstance(t); }
+  const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
+  const EXPECTED = Object.keys(CATALOGUE).length + PI_KEPT;
+
+  // A link to somebody else's server or a Stream input rides the one
+  // transport its port names, as the pages that make it say (`via`).
+  function viaFor(from, to) {
+    const a = bay.port(from)?.transports || [], b = bay.port(to)?.transports || [];
+    return a.find((t) => b.includes(t)) ?? (a.length === 1 ? a[0] : b.length === 1 ? b[0] : undefined);
+  }
+
+  // Example requests: the links a right answer contains and the concept page that
+  // already makes them. The self-check proves each can be made in this bay.
+  // See lessons/page-connect.md#connect-2
+  const W = (n, p) => `web:${n}:${p}`;
+  const KEYS = W('keys', 'midi-out'), SPK = W('speaker', 'audio-in'), REC = 'cf-r2:recording:file-out';
+  const KNOB = W('knob', 'value-out'), CAM = W('camera', 'video-out'), SCREEN = W('screen', 'video-in');
+  const CIRCUIT = `${BOARD_SITE}:circuit`, PIANO = `${BOARD_SITE}:sampler`;
+  const EXAMPLES = [
+    ['let the keys play the synth', 'synth/keyboard', [[KEYS, W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK]]],
+    ['play plaits from my midi keyboard', 'code/plaits', [[W('midi', 'midi-out'), W('plaits', 'midi-in')], [W('plaits', 'audio-out'), SPK]]],
+    ['play the circuit in the studio', 'remote/circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
+    ['change the circuit\'s patch', 'remote/circuit', [[W('patch', 'midi-out'), `${CIRCUIT}:midi-in`]]],
+    ['play the piano on the pi', 'remote/piano', [[KEYS, `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
+    ['a knob opens supercollider\'s filter', 'code/collide', [[KNOB, W('collide', 'value-in'), 'bright']]],
+    ['a knob bends the mirror shader', 'shader/mirror', [[KNOB, W('shader', 'value-in')], [W('shader', 'video-out'), SCREEN]]],
+    ['show me plaits\' waveform', 'code/plaits', [[W('plaits', 'audio-out'), W('scope', 'audio-in')]]],
+    ['grain a radio recording', 'granulator/grains', [[REC, W('player', 'file-in')], [W('player', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
+    ['grains in time with the recording', 'granulator/beat', [[REC, W('player', 'file-in')], [W('player', 'audio-out'), W('grains', 'audio-in')],
+      [W('player', 'audio-out'), W('tempo', 'audio-in')], [W('tempo', 'value-out'), W('grains', 'tempo-in')], [W('grains', 'audio-out'), SPK]]],
+    ['what key is the live radio in?', 'radio/key', [['err:station:audio-out', 'cf-shout:relay:audio-in'], ['cf-shout:relay:audio-out', W('level', 'audio-in')],
+      [W('level', 'audio-out'), W('key', 'audio-in')]]],
+    ['the dial tunes the radio', 'radio/tuner', [[W('dial', 'value-out'), W('tuner', 'value-in')], [W('tuner', 'audio-out'), SPK]]],
+    ['camera through the dither shader', 'video/shader', [[CAM, W('shader-dither', 'video-in')], [W('shader-dither', 'video-out'), SCREEN]]],
+    ['send the camera through stream and back', 'video/webrtc', [[CAM, 'cf-stream:live:video-in'], ['cf-stream:live:video-out', SCREEN]]],
+    ['the drum machine plays its drums', 'drums/machine', [[W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), SPK]]],
+    ['the camera plays the drums', 'drums/camera', [[CAM, W('pixelate', 'video-in')], [W('pixelate', 'value-out'), W('sequencer', 'value-in')],
+      [W('sequencer', 'midi-out'), W('drum', 'midi-in')], [W('drum', 'audio-out'), SPK]]],
+    ['loop what i play into the piano', 'code/piano', [[KEYS, W('looper', 'midi-in')], [W('looper', 'midi-out'), W('sampler', 'midi-in')],
+      ['cf-r2:piano-samples:file-out', W('sampler', 'file-in')], [W('sampler', 'audio-out'), SPK]]],
+    ['record what i play and play it back', 'synth/recorder', [[KEYS, W('rec', 'midi-in')], [W('rec', 'midi-out'), W('synth', 'midi-in')], [W('synth', 'audio-out'), SPK]]],
+    ['typing plays the typewriter', 'typist/typewriter', [[W('typing', 'value-out'), W('typewriter', 'value-in')],
+      ['cf-r2:typewriter-samples:file-out', W('typewriter', 'file-in')], [W('typewriter', 'audio-out'), SPK]]],
+    ['the keys light up the pico', 'synth/dots', [[KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
+  // A third field on a link is the parameter a knob into a value-in turns, so
+  // an example makes that one knob instance rather than asking.
+  ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
+
+  const d = mount({ name: 'connect',
+    what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
+    readout: null, index: '/', indexLabel: 'positron' });
+  useMediumColours();
+
+  // The wish worker proposes and never connects, so an answer becomes rows a person
+  // confirms. Each call spends paid Workers AI: only on a press, never in a self-check.
+  // See lessons/page-connect.md#connect-3
+  const API = new URLSearchParams(location.search).get('api') || 'https://wish.positron.studio';
+  const HERE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const FACTS = 'Ports carry midi, audio, value, clock, video, program or file, and a link joins an out port to an in port '
+    + 'of the same medium. Sound is only heard once an audio out reaches web:speaker:audio-in, so a request to '
+    + 'play something includes that link. Transforms work on MIDI links only; every other link has none. '
+    + 'Ids starting web: are in this browser tab, pi-1: is a Raspberry Pi in the studio, cf- ids are Cloudflare, '
+    + 'cf-r2:recording is a radio programme we recorded, and err:station is a live station on its broadcaster\'s server, '
+    + 'which reaches this tab through cf-shout:relay.';
+  // The self-check's stand-in for a sentence nobody listed, with one transform
+  // missing its argument so the checkTransforms path is graded too.
+  const CANNED = [
+    { from: KEYS, to: 'web:plaits:midi-in', transforms: [] },
+    { from: KEYS, to: 'web:plaits:midi-in', transforms: [{ op: 'transpose' }] },
+  ];
+  // The worker refuses more than 64 ports (MAX_PORTS), so the model gets the ports the
+  // examples name, then the other ports of those nodes. The rest stay pressable.
+  // See lessons/page-connect.md#connect-4
+  const MAX_PORTS = 64;
+  const EXAMPLE_PORTS = new Set(EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])));
+  const EXAMPLE_NODES = new Set([...EXAMPLE_PORTS].map(nodeOf));
+  const rankOf = (p) => (EXAMPLE_PORTS.has(p.id) ? 0 : EXAMPLE_NODES.has(nodeOf(p.id)) ? 1 : 2);
+  const portsForModel = () => bay.ports()
+    .map((p, i) => ({ p, i, r: rankOf(p) })).filter((x) => x.r < 2)
+    .sort((a, b) => a.r - b.r || a.i - b.i).slice(0, MAX_PORTS)
+    .map(({ p }) => ({ id: p.id, dir: p.dir, label: p.label }));
+  let reached = 0;
+  async function post(text) {
+    if (SELFCHECK) {
+      const ex = EXAMPLES.find((e) => e.say === text);
+      return { links: ex ? ex.links : CANNED, fixed: [], ms: 0, model: 'canned', usage: { total_tokens: 0 } };
+    }
+    reached++;
+    let r;
+    try {
+      r = await fetch(`${API}/wish`, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text, ports: portsForModel(), facts: FACTS }) });
+    } catch {
+      throw new Error(`nothing answered at ${API}`);
+    }
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`the agent said: ${out.error || `HTTP ${r.status}`}`);
+    return out;
+  }
+
+  // An example press is the request. A node with no runtime marks its pill, and a
+  // node that opens a paid service or somebody else's server is a person's press only.
+  // See lessons/page-connect.md#connect-5
+  const PRESS_ONLY = {
+    'cf-stream:live': 'Stream is billed by the minute',
+    'err:station': 'a live station is somebody else\'s server',
+  };
+  function runsOf(ex) {
+    const nodes = [...new Set(ex.links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))];
+    return { nodes, missing: nodes.filter((n) => !PRESS_ONLY[n] && !loaderOf(n, typeOf)), press: nodes.filter((n) => PRESS_ONLY[n]) };
+  }
+  const exRow = el('div', 'cn-ex');
+  for (const ex of EXAMPLES) {
+    const r = runsOf(ex);
+    const lines = [`as on /${ex.page}/`];
+    if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
+    if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
+    const b = el('button', 'cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
+    b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
+    if (r.missing.length) b.dataset.missing = r.missing.join(' ');
+    b.addEventListener('click', (e) => build(ex, e.isTrusted));
+    exRow.append(b);
+  }
+
+  const props = el('div', 'cn-props');
+  props.hidden = true;
+  let asking = Promise.resolve();
+  async function ask(text) {
+    text = String(text || '').trim();
+    if (!text) { d.log('say something first, for example one of the sentences under the box'); return; }
+    const run = (async () => {
+      d.log(`asking: ${text}`);
+      try {
+        const out = await post(text);
+        for (const f of out.fixed || []) d.log(`the model wrote "${f.said}" on ${f.op}, read as ${f.read}`);
+        d.log(`the answer came back in ${out.ms ?? '?'} ms with ${out.links?.length ?? 0} link(s), ${out.usage?.total_tokens ?? '?'} tokens`);
+        showProposals(out.links || []);
+      } catch (e) {
+        d.log(e.message, 'warn');
+      }
+    })();
+    asking = run;
+    return run;
+  }
+
+  function showProposals(links) {
+    props.replaceChildren();
+    if (!links.length) props.append(el('div', 'cn-prop-n', 'nothing proposed: the sentence named nothing here'));
+    for (const l of links) {
+      const row = el('div', 'cn-prop');
+      row.dataset.line = printLink(l);
+      const bad = checkTransforms(l.transforms || []);
+      const v = bad ? null : bay.validate(l.from, l.to, l.transforms || []);
+      const note = bad ? `cannot be made: ${bad.why}` : v.ok ? '' : `the bay would refuse it: ${v.why}`;
+      const buttons = el('span', 'cn-prop-b');
+      const yes = el('button', 'pos-sm pos-pri', 'connect', { type: 'button' });
+      const no = el('button', 'pos-sm', 'dismiss', { type: 'button' });
+      yes.disabled = !!bad;
+      yes.addEventListener('click', (e) => {
+        if (connect(l.from, l.to, l.transforms || [], e.isTrusted === true)) dropRow(row);
+        else row.querySelector('.cn-prop-n')?.replaceChildren(document.createTextNode(`refused: ${last.why}`));
+      });
+      no.addEventListener('click', () => { d.log(`dismissed ${printLink(l)}`); dropRow(row); });
+      buttons.append(yes, no);
+      row.append(el('span', 'cn-prop-t', printLink(l)), buttons, el('span', 'cn-prop-n', note));
+      props.append(row);
+    }
+    props.hidden = false;
+  }
+  function dropRow(row) {
+    row.remove();
+    if (!props.querySelector('.cn-prop')) { props.replaceChildren(); props.hidden = true; }
+  }
+
+  // ── linking, by press or by confirming a proposal ────────────────────────
+  let last = { ok: true, why: '' };
+  function connect(from, to, transforms = [], consent = false, param = null) {
+    // The knob type into a value-in that names its parameters is ONE knob, for
+    // the parameter a person picks; with one name, or an example's own, there is nothing to ask.
+    const names = knobChoices(bay, from, to);
+    if (names?.length === 1) return connect(...knobFor(bay, to, names[0]), transforms, consent);
+    if (names && names.includes(param)) return connect(...knobFor(bay, to, param), transforms, consent);
+    if (names) { askParam(to, names, transforms, consent); return false; }
+    bay.seen(from); bay.seen(to);
+    // A link out of somebody else's server needs a person's own press (bay.mjs, consent).
+    const via = viaFor(from, to);
+    const r = bay.link(from, to, transforms, { consent, ...(via ? { via } : {}) });
+    last = r;
+    if (r.ok) d.log(`linked ${printLink({ from, to, transforms })}${r.warn ? `. ${r.warn}` : ''}`);
+    else d.log(`refused ${from} -> ${to}: ${r.why}${r.fix ? ` ${r.fix}` : ''}`, 'warn');
+    redraw();
+    return r.ok;
+  }
+  // An example press builds its patch straight away: the links are known, so no
+  // model is asked. It replaces whatever was linked, because an example is a whole patch.
+  function build(ex, person) {
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    let made = 0;
+    for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person, l.param) ? 1 : 0;
+    for (const b of exRow.children) b.setAttribute('aria-pressed', String(b.textContent === ex.say));
+    d.log(`built "${ex.say}", ${made} of ${ex.links.length} links`);
+    redraw();
+  }
+  function removeLink(id) {
+    const l = bay.links().find((x) => x.id === id);
+    if (!l || !bay.unlink(id)) return;
+    d.log(`removed ${printLink(l)}`);
+    redraw();
+  }
+
+  // Which parameter a new knob turns: one button per name, and Cancel.
+  const chooser = el('div', 'cn-choose');
+  chooser.hidden = true;
+  let asked = null;
+  function askParam(to, names, transforms, consent) {
+    asked = { to, names };
+    const q = el('p', 'cn-choose-q', `which parameter of ${nodeOf(to)} should the knob turn?`);
+    const group = createButtonGroup({ buttons: [
+      ...names.map((n) => ({ id: n, label: n, onPress: () => { closeAsk(); connect(...knobFor(bay, to, n), transforms, consent); } })),
+      { id: 'cancel', label: 'cancel', onPress: () => { closeAsk(); d.log('no knob made'); } },
+    ] });
+    chooser.replaceChildren(q, group.el);
+    chooser.hidden = false;
+    d.log(`${nodeOf(to)} takes ${names.join(', ')}: pick one for the knob`);
+  }
+  function closeAsk() { asked = null; chooser.replaceChildren(); chooser.hidden = true; }
+
+  let armed = null;
+  function pick(portId, e) {
+    const p = bay.port(portId);
+    if (!p) return;
+    if (p.dir === 'out') {
+      armed = armed === portId ? null : portId;
+      if (armed) d.log(`${portId} picked, now press an in port`);
+    } else if (!armed) {
+      d.log(`${portId} is an in port, so press an out port first`);
+    } else {
+      const from = armed;
+      armed = null;
+      connect(from, portId, [], e?.isTrusted === true);
+    }
+    lightArmed();
+  }
+  function lightArmed() {
+    for (const b of document.querySelectorAll('[data-port]')) b.setAttribute('aria-pressed', String(b.dataset.port === armed));
+  }
+
+  // ── drawing: linked nodes in the picture, the rest in the grid ───────────
+  const linkedNodes = () => new Set(bay.links().flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]));
+  const shown = {
+    nodes: () => { const s = linkedNodes(); return bay.nodes().filter((n) => s.has(n.id)); },
+    ports: () => { const s = linkedNodes(); return bay.ports().filter((p) => s.has(nodeOf(p.id))); },
+    links: () => bay.links(),
+  };
+  // The patchbay draws a relayed link through a `cf-relay:<room>` box. A link
+  // to the Pi rides the studio's room, so that is the box's name.
+  const pb = createPatchbay(shown, { room: 'studio-1' });
+  const pic = el('div', 'cn-pic');
+  pic.append(pb.el);
+  const empty = el('p', 'cn-empty', 'press an example, or an out port and then an in port');
+  pic.append(empty);
+
+  // The picture is the kit's and redraws itself on resize, so its ports and
+  // wires are made pressable after every draw rather than once.
+  const svgOf = () => pb.view.el.querySelector('svg');
+  function decorate() {
+    const svg = svgOf();
+    if (!svg || svg.querySelector('.cn-mark')) return;
+    const mark = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    mark.setAttribute('class', 'cn-mark');
+    svg.append(mark);
+    const boxes = [...svg.querySelectorAll('g.lv-box')].map((g) => {
+      const r = g.querySelector('rect');
+      return { id: g.querySelector('.lv-title')?.textContent, x: +r.getAttribute('x'), y: +r.getAttribute('y'), w: +r.getAttribute('width'), h: +r.getAttribute('height') };
+    });
+    for (const t of svg.querySelectorAll('text.lv-pname')) {
+      const x = +t.getAttribute('x'), y = +t.getAttribute('y');
+      const box = boxes.find((b) => x >= b.x - 1 && x <= b.x + b.w + 1 && y >= b.y - 1 && y <= b.y + b.h + 1);
+      const id = box && `${box.id}:${t.textContent}`;
+      if (!id || !bay.port(id)) continue;
+      t.dataset.port = id;
+      t.classList.add('cn-pick');
+      t.setAttribute('role', 'button');
+      t.setAttribute('tabindex', '0');
+      t.addEventListener('click', (e) => pick(id, e));
+      t.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(id, e); } });
+    }
+    for (const [key, path] of pb.view.wires) {
+      const real = linkFor(key);
+      if (!real) continue;
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hit.setAttribute('d', path.getAttribute('d'));
+      hit.setAttribute('class', 'cn-hit');
+      hit.dataset.link = real.id;
+      hit.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: `${printLink(real)}\npress to remove` }));
+      hit.addEventListener('click', () => removeLink(real.id));
+      svg.append(hit);
+    }
+    lightArmed();
+    markPicture();
+  }
+  // A wire's key is its printed form; a relayed link is two hops through the drawn relay box.
+  function linkFor(key) {
+    let w;
+    try { w = parseLink(key); } catch { return null; }
+    const hop = (id) => id.startsWith('cf-relay:studio-1:');
+    return bay.links().find((l) => (l.from === w.from || hop(w.from)) && (l.to === w.to || hop(w.to))
+      && (l.from === w.from || l.to === w.to));
+  }
+  new MutationObserver(() => decorate()).observe(pb.view.el, { childList: true, subtree: true });
+
+  // What a node is in this tab, then where else it runs.
+  const GROUPS = ['controls', 'engines', 'recorders', 'outputs', 'raspberry pi', 'cloudflare', 'external'];
+  function groupOf(n) {
+    const site = n.id.split(':')[0];
+    if (site === BOARD_SITE) return GROUPS[4];
+    if (site.startsWith('cf-')) return GROUPS[5];
+    if (site !== 'web') return GROUPS[6];
+    return { person: GROUPS[0], device: GROUPS[0], engine: GROUPS[1], store: GROUPS[2] }[n.kind] ?? GROUPS[3];
+  }
+
+  // Live layer: the Pi and each page in the room announce their graph. A box shows a
+  // green dot when heard inside STALE_MS, an empty ring once quiet, nothing if never.
+  // See lessons/page-connect.md#connect-6
+  const Q = new URLSearchParams(location.search);
+  const STALE = SELFCHECK && Number(Q.get('stale')) > 0 ? Number(Q.get('stale')) : STALE_MS;
+  // studio-1 is the owner's desk: only a person's own press listens there, and never a check.
+  const mayListen = (room, person) => ROOM_RE.test(room) && (room !== STUDIO_ROOM || (person && !SELFCHECK));
+  let listener = null, liveTimer = null, shape = '';
+  const said = new Set();
+  /** Every site heard, freshest per site, and every node's state by id. */
+  function liveNow() {
+    const sites = new Map(), state = new Map();
+    if (!listener) return { sites, state };
+    for (const e of listener.registry.graphs()) {
+      if (e.from === 'self') continue;
+      const was = sites.get(e.site);
+      if (!was || e.at > was.at) sites.set(e.site, e);
+    }
+    for (const e of sites.values()) {
+      if (e.stale) {
+        for (const n of e.graph.nodes) if (!state.has(n.id)) state.set(n.id, 'stale');
+        continue;
+      }
+      for (const n of e.graph.nodes) state.set(n.id, 'live');
+    }
+    return { sites, state };
+  }
+  let live = liveNow();
+  const dot = (on) => el('span', `pos-pres-dot cn-dot${on ? '' : ' cn-ring'}`);
+  const ago = (e) => Math.round((Date.now() - e.at) / 1000);
+  const siteSays = (e) => (e ? (e.stale ? `quiet for ${ago(e)} s` : `heard ${ago(e)} s ago`) : '');
+  const groupName = (e) => (e.graph.kind === 'board' ? `raspberry pi ${e.site}` : e.graph.kind === 'browser' ? `tab ${e.site}` : `${e.graph.kind || 'site'} ${e.site}`);
+
+  const roomField = createField({ label: 'room', value: roomFor({ slug: 'connect' }) });
+  let lastPressTrusted = false;
+  const listenBtns = createButtonGroup({ buttons: [
+    { id: 'listen', label: 'Listen', primary: true, onPress: () => listen(roomField.value().trim()) },
+    { id: 'stop', label: 'Stop', onPress: () => stopListening() },
+  ] });
+  listenBtns.button('listen').addEventListener('click', (e) => { lastPressTrusted = e.isTrusted; }, { capture: true });
+  listenBtns.enable('stop', false, 'not listening');
+  const liveSt = el('p', 'cn-live-st', 'Listen joins a room and marks what answers in it now');
+  const liveCtl = el('div', 'cn-live');
+  const liveRow = el('div', 'cn-live-row');
+  liveRow.append(roomField.el, listenBtns.el);
+  liveCtl.append(liveRow, liveSt);
+
+  function card(n, ports, { pressable = true, note = '' } = {}) {
+    const box = el('div', 'cn-box');
+    box.dataset.node = n.id;
+    const head = el('div', 'cn-head');
+    const id = el('span', 'cn-id', n.id);
+    if (INSTANCE.has(n.id)) id.title = `one box for the type: ${INSTANCE.get(n.id)}`;
+    const st = live.state.get(n.id);
+    if (st) {
+      box.dataset.live = st;
+      const dt = dot(st === 'live');
+      dt.title = st === 'live' ? `answering in ${listener?.room}` : `quiet for more than ${STALE / 1000} s`;
+      id.append(dt);
+    }
+    head.append(id, el('span', 'cn-label', [n.label || '', note].filter(Boolean).join(', ')));
+    const row = el('div', 'cn-ports'), ins = el('div'), outs = el('div');
+    for (const p of ports) {
+      const name = p.id.split(':')[2];
+      const b = pressable ? el('button', 'pos-linkbtn cn-port', name, { type: 'button', 'aria-pressed': 'false' }) : el('span', 'cn-port cn-inert', name);
+      b.style.setProperty('--c', `var(--md-${p.medium})`);
+      if (pressable) {
+        b.dataset.port = p.id;
+        b.title = p.dir === 'out' ? 'press, then press an in port' : 'press an out port first, then this';
+        b.addEventListener('click', (e) => pick(p.id, e));
+      } else b.title = 'announced, and no page here links to it yet';
+      (p.dir === 'out' ? outs : ins).append(b);
+    }
+    row.append(ins, outs);
+    box.append(head, row);
+    return box;
+  }
+  function section(title, e, cards, extra = null) {
+    const box = el('section', 'cn-site');
+    const h = el('h3', '', title);
+    if (e) { const t = el('span', 'cn-site-st', siteSays(e)); t.dataset.site = e.site; h.append(t); box.dataset.site = e.site; }
+    box.append(h);
+    if (extra) box.append(extra);
+    const grid = el('div', 'cn-grid');
+    grid.append(...cards);
+    if (cards.length) box.append(grid);
+    return box;
+  }
+  const groups = el('div');
+  function drawGrid() {
+    const inPic = linkedNodes();
+    const byGroup = new Map(GROUPS.map((g) => [g, []]));
+    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id) && !hiddenSpare(n.id)) byGroup.get(groupOf(n)).push(card(n, bay.ports().filter((q) => nodeOf(q.id) === n.id)));
+    const pi = live.sites.get(BOARD_SITE);
+    // What the Pi says it has and no page here draws: a box of its own, quietly marked.
+    for (const n of pi?.graph.nodes || []) {
+      if (bay.node(n.id)) continue;
+      byGroup.get(GROUPS[4]).push(card(n, pi.graph.ports.filter((p) => nodeOf(p.id) === n.id), { pressable: false, note: 'no page yet' }));
+    }
+    const out = [];
+    for (const [where, cards] of byGroup) {
+      if (where === GROUPS[4]) {
+        out.push(section(where, pi, cards, liveCtl));
+        // Every other site heard, a group each, after the Pi.
+        for (const e of live.sites.values()) {
+          if (e.site === BOARD_SITE) continue;
+          out.push(section(groupName(e), e, e.graph.nodes.map((n) => card(n, e.graph.ports.filter((p) => nodeOf(p.id) === n.id), { pressable: false }))));
+        }
+        continue;
+      }
+      if (cards.length) out.push(section(where, null, cards));
+    }
+    groups.replaceChildren(...out);
+    lightArmed();
+  }
+
+  /** Join `room` and collect what is said there. `person` is a press the browser made. */
+  function listen(room, person = lastPressTrusted) {
+    lastPressTrusted = false;
+    if (!mayListen(room, person)) {
+      d.log(!ROOM_RE.test(room) ? `${JSON.stringify(room)} is not a room name` : `${STUDIO_ROOM} is the studio's own room, so only a person's own press listens there`, 'warn');
+      return false;
+    }
+    stopListening();
+    listener = createBayNode({ room, graphs: [], registry: createRegistry({ staleMs: STALE }),
+      onGraph: () => drawLive(), onJoin: () => drawLive(), log: (m) => d.log(m) });
+    listener.join();
+    liveTimer = setInterval(drawLive, 1000);
+    listenBtns.enable('stop', true);
+    liveSt.textContent = `joining ${room}`;
+    return true;
+  }
+  function stopListening() {
+    if (!listener) return;
+    clearInterval(liveTimer); liveTimer = null;
+    listener.leave();
+    d.log(`left ${listener.room}`);
+    listener = null;
+    said.clear();
+    listenBtns.enable('stop', false, 'not listening');
+    liveSt.textContent = 'not listening';
+    drawLive();
+  }
+
+  // Redraws the grid only when what is heard changes; the ages tick in place.
+  function drawLive() {
+    live = liveNow();
+    const heard = [...live.sites.values()];
+    for (const e of heard) {
+      if (!said.has(e.from + e.site)) { said.add(e.from + e.site); d.log(`heard ${e.site}${e.graph.label ? ` (${e.graph.label})` : ''}, ${e.graph.nodes.length} nodes`); }
+    }
+    if (listener) {
+      const n = heard.filter((e) => !e.stale).length;
+      liveSt.textContent = !listener.joined() ? `joining ${listener.room}`
+        : !heard.length ? `listening in ${listener.room}, nothing heard yet` : `listening in ${listener.room}, ${n} of ${heard.length} sites answering`;
+    }
+    const next = JSON.stringify([...live.state], null) + heard.map((e) => e.site + JSON.stringify(e.graph)).join();
+    if (next !== shape) { shape = next; drawGrid(); markPicture(); }
+    for (const t of groups.querySelectorAll('.cn-site-st')) t.textContent = siteSays(live.sites.get(t.dataset.site));
+  }
+  // A green dot after the title of every box in the picture that is answering now.
+  function markPicture() {
+    const svg = svgOf();
+    if (!svg) return;
+    for (const m of svg.querySelectorAll('.cn-livemark')) m.remove();
+    for (const t of svg.querySelectorAll('text.lv-title')) {
+      if (live.state.get(t.textContent) !== 'live') continue;
+      const b = t.getBBox();
+      const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      c.setAttribute('class', 'cn-livemark');
+      c.setAttribute('cx', String(b.x + b.width + 8)); c.setAttribute('cy', String(b.y + b.height / 2)); c.setAttribute('r', '3.5');
+      c.dataset.live = t.textContent;
+      c.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: `answering in ${listener?.room}` }));
+      svg.append(c);
+    }
+  }
+
+  function redraw() {
+    if (armed && !bay.port(armed)) armed = null;
+    spares();
+    pic.classList.toggle('cn-pic-empty', bay.links().length === 0);
+    drawGrid();
+    pb.refresh();
+    decorate();
+    runtime.sync();
+  }
+
+  // ── the faces: what the linked nodes look like when they run ─────────────
+  // node-runtime.mjs makes a runtime per linked node; this block places their
+  // faces. One knob row for every knob, rebuilt only when the set of knobs changes.
+  const faces = el('div', 'cn-faces');
+  faces.hidden = true;
+  // One knob row per node the knobs turn, so two synths' cutoffs are told apart.
+  const knobRows = new Map();   // target node -> { key, grid }
+  const part = (title, face) => { const p = el('section', 'cn-face'); p.append(el('h3', 'pos-sec-h', title), face); return p; };
+  function drawFaces() {
+    const all = runtime.list().filter((x) => x.rt.face);
+    const knobs = all.filter((x) => x.rt.slot === 'knob');
+    const parts = all.filter((x) => x.rt.slot === 'picture').map((x) => part(x.id, x.rt.face));
+    parts.push(...all.filter((x) => x.rt.slot === 'panel').map((x) => part(x.id, x.rt.face)));
+    const turns = (id) => nodeOf(bay.links().find((l) => nodeOf(l.from) === id)?.to ?? '');
+    const byTarget = new Map();
+    for (const x of knobs) { const t = turns(x.id); if (!byTarget.has(t)) byTarget.set(t, []); byTarget.get(t).push(x); }
+    for (const t of [...knobRows.keys()]) if (!byTarget.has(t)) knobRows.delete(t);
+    for (const [t, list] of byTarget) {
+      const key = list.map((x) => x.id).join();
+      if (knobRows.get(t)?.key !== key) knobRows.set(t, { key, grid: createKnobGrid(list.map((x) => ({ name: x.rt.name, knob: x.rt.knob })), { row: true }) });
+      const title = byTarget.size > 1 ? `knobs on ${t}` : list.length === 1 ? list[0].id : 'knobs';
+      parts.push(part(title, knobRows.get(t).grid.el));
+    }
+    parts.push(...all.filter((x) => x.rt.slot === 'keys').map((x) => part(x.id, x.rt.face)));
+    faces.replaceChildren(...parts);
+    faces.hidden = !parts.length;
+  }
+  const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
+  window.__demo.runtime = runtime;
+
+  const say = el('div', 'cn-say');
+  say.append(exRow, props);
+  d.stack.add(say, faces, pic, chooser, groups);
+  redraw();
+  for (const f of failed) d.log(f, 'bad');
+
+  if (SELFCHECK) await check();
+  d.ready();
+
+  async function check() {
+    const A = d.assert;
+    const inGrid = (id) => !!groups.querySelector(`.cn-box[data-node="${id}"]`);
+    // what a reader sees: an empty picture hides the last drawing rather than redrawing nothing
+    const inPicture = (id) => !pic.classList.contains('cn-pic-empty') && [...(svgOf()?.querySelectorAll('.lv-title') || [])].some((t) => t.textContent === id);
+    const has = (from, to) => bay.links().some((l) => l.from === from && l.to === to);
+    const press = (id) => document.querySelector(`button[data-port="${id}"], text[data-port="${id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const runtimes = async () => { await runtime.idle(); await frame(); };
+
+    // Before anything is pressed: no runtime, no face, no sound device.
+    A('a visit opens no sound device and shows no face', contexts() === 0 && runtime.list().length === 0
+      && faces.hidden && getComputedStyle(faces).display === 'none', `contexts ${contexts()}, runtimes ${runtime.list().length}`);
+
+    A('a visit joins no room and opens no socket', OPENED.length === 0 && listener === null && !groups.querySelector('.cn-box[data-live]'),
+      OPENED.join(' ') || 'none opened');
+    A('a check never listens in the studio\'s room, even on a trusted press', !mayListen(STUDIO_ROOM, false) && !mayListen(STUDIO_ROOM, true)
+      && roomField.value() !== STUDIO_ROOM, `the field reads ${roomField.value()}`);
+
+    A('every node made it into the bay', failed.length === 0 && bay.nodes().length === EXPECTED,
+      `${bay.nodes().length} of ${EXPECTED}: ${Object.keys(CATALOGUE).length} catalogue types (${HOPS.length} of them hops), ${PI_KEPT} Pi`
+      + `${failed.length ? `, refused: ${failed.join('; ')}` : ''}`);
+    // Nothing imaginary: every box names a page that builds it, and every page
+    // it names is a concept page that exists.
+    const known = new Set([...CONCEPTS.map((c) => c.id), ...OFF_INDEX]);
+    const orphan = bay.nodes().filter((n) => !(PAGES.get(n.id) || []).length).map((n) => n.id);
+    const unknown = [...new Set([...PAGES.values()].flat())].filter((pg) => !known.has(pg));
+    A('every node names the pages that build it, and every one of those pages exists', !orphan.length && !unknown.length,
+      `no page: ${orphan.join(', ') || 'none'}; not a page: ${unknown.join(', ') || 'none'}`);
+    A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
+      bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
+    { const r = pic.getBoundingClientRect();
+      A('nothing is linked on a visit, and the picture\'s square room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && r.height >= r.width - 1, `${r.width.toFixed(0)} x ${r.height.toFixed(0)}`); }
+
+    // Every example's links can be made, each on a fresh bay so one cannot
+    // block another, and with the consent a person's press of Connect gives.
+    const cant = [];
+    for (const ex of EXAMPLES) {
+      const s = makeBay().bay;
+      for (const l of ex.links) {
+        const via = viaFor(l.from, l.to);
+        const r = s.link(l.from, l.to, l.transforms, { consent: true, ...(via ? { via } : {}) });
+        if (!r.ok) cant.push(`"${ex.say}": ${l.from} -> ${l.to}: ${r.why}`);
+      }
+    }
+    const lost = EXAMPLES.filter((e) => !known.has(e.page)).map((e) => `"${e.say}" on ${e.page}`);
+    A('every example is something a concept page already does', !lost.length, lost.join('; '));
+    const told = portsForModel();
+    A('the model is told few enough ports for the worker to take them', told.length <= MAX_PORTS && EXAMPLE_PORTS.size <= MAX_PORTS,
+      `${told.length} of ${MAX_PORTS}, ${EXAMPLE_PORTS.size} of them named by an example, out of ${bay.ports().length} in the bay`);
+    const toldIds = new Set(told.map((p) => p.id));
+    const unnamed = EXAMPLES.flatMap((e) => e.links.flatMap((l) => [l.from, l.to])).filter((id) => !toldIds.has(id));
+    A('every port an example needs is one the model is told about', unnamed.length === 0, [...new Set(unnamed)].join(', '));
+    A(`all ${EXAMPLES.length} examples can be linked in this bay`, cant.length === 0, cant.join('; '));
+
+    // Picking by pressing: an out port, then an in port of the same medium.
+    const SYNTH_IN = W('synth', 'midi-in'), SYNTH_OUT = W('synth', 'audio-out');
+    press(KEYS); press(SYNTH_IN);
+    await frame();
+    A('pressing keys midi-out then synth midi-in links them', has(KEYS, SYNTH_IN));
+    A('a linked node leaves the grid and is drawn in the picture',
+      !inGrid('web:synth') && inPicture('web:synth') && !inGrid('web:keys') && inPicture('web:keys') && inGrid('web:plaits'),
+      `synth in grid ${inGrid('web:synth')}, in picture ${inPicture('web:synth')}`);
+
+    // A port in the picture is pressable too, so a chain can be finished there.
+    press(SYNTH_OUT); press(SPK);
+    await frame();
+    A('a port drawn in the picture can be picked', has(SYNTH_OUT, SPK) && inPicture('web:speaker'));
+
+    const before = bay.links().length;
+    press(KEYS); press(SPK);
+    const logs = () => window.__demo.logs.map((x) => x.msg).join('\n');
+    A('a medium mismatch is refused in words', bay.links().length === before && /carries midi and .* takes audio/.test(logs()),
+      logs().split('\n').filter((x) => x.startsWith('refused')).pop());
+    // A press the browser did not make is not a person asking to listen.
+    press('err:station:audio-out'); press('cf-shout:relay:audio-in');
+    A('a link out of somebody else\'s server waits for a person\'s own press', bay.links().length === before && /somebody else's server/.test(logs()),
+      logs().split('\n').filter((x) => x.startsWith('refused')).pop());
+
+    // An example press builds its patch at once, replacing what was linked.
+    const ex = EXAMPLES[1];
+    const reached0 = reached;
+    [...exRow.children].find((b) => b.textContent === ex.say).click();
+    await frame();
+    A('an example press builds exactly its links, asks no model, and Plaits moves into the picture',
+      bay.links().length === ex.links.length && ex.links.every((l) => has(l.from, l.to))
+        && inPicture('web:plaits') && !inGrid('web:plaits') && reached === reached0,
+      `${bay.links().length} links`);
+
+    // A sentence nobody listed gets the stand-in with a broken transform.
+    ask('something else');
+    await frame(); await asking;
+    const broken = [...props.querySelectorAll('.cn-prop')].find((r) => /transpose/.test(r.dataset.line));
+    A('a proposal with a malformed transform is shown and cannot be connected',
+      !!broken && broken.querySelector('.pos-pri').disabled && /cannot be made/.test(broken.textContent));
+    for (const r of [...props.querySelectorAll('.cn-prop')]) r.querySelector('.pos-sm:not(.pos-pri)').click();
+
+    // Pressing a wire removes that link.
+    await frame();
+    const target = bay.links().find((l) => l.from === 'web:plaits:audio-out');
+    svgOf()?.querySelector(`.cn-hit[data-link="${target?.id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    A('pressing a wire removes that link', !!target && !bay.links().some((l) => l.id === target.id));
+    const midiLink = bay.links().find((l) => l.from === 'web:midi:midi-out');
+    removeLink(midiLink?.id);
+    A('a node with no links left goes back to the grid', inGrid('web:plaits') && inGrid('web:midi') && !inPicture('web:plaits'));
+    armed = null; lightArmed();
+
+    await runtimes();
+
+    // ── slice 1: the keys play the synth, through the speakers ──────────────
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const RT = (id) => runtime.get(id);
+    const keyboards = () => faces.querySelectorAll('.kbd').length;
+    [...exRow.children].find((b) => b.textContent === EXAMPLES[0].say).click();
+    await runtimes();
+    A('the example "let the keys play the synth" shows exactly one keyboard, runs the synth and the speaker, and opens no sound device yet',
+      keyboards() === 1 && !!RT('web:synth') && !!RT('web:speaker') && contexts() === 0,
+      `keyboards ${keyboards()}, runtimes ${runtime.list().map((x) => x.id).join(' ')}, contexts ${contexts()}`);
+    const kb = RT('web:keys').kb, synth = RT('web:synth'), speaker = RT('web:speaker');
+    const A3 = kb.keyOf(57);
+    const h0 = synth.heard();
+    kb.press(A3);   // the keyboard's own handler, which is the first press on a face (D4)
+    await sleep(300);
+    const loud = speaker.heard();
+    A('the first press on a face starts the one sound device, the key reaches the synth and the speakers get louder',
+      contexts() === 1 && runtime.context()?.state === 'running' && synth.heard() === h0 + 1 && loud > 0.01,
+      `context ${runtime.context()?.state}, synth heard ${synth.heard() - h0}, level at the speakers ${loud.toFixed(4)}`);
+    kb.release(A3);
+    await sleep(200);
+
+    // ── slice 3: a scope fed by the synth ───────────────────────────────────
+    const SCOPE_IN = W('scope', 'audio-in');
+    press(SYNTH_OUT); press(SCOPE_IN);
+    await runtimes();
+    const scope = RT('web:scope');
+    kb.press(A3);
+    await sleep(300);
+    const fed = scope?.heard() ?? 0;
+    A('a scope linked from the synth shows a picture, and its buffer moves while a key sounds',
+      !!scope && faces.contains(scope.face) && fed > 0.01, `peak ${fed.toFixed(4)}`);
+    kb.release(A3);
+    await sleep(400);
+    const still = scope?.heard() ?? 1;
+    A('NEGATIVE CONTROL: the same scope reads zero once nothing sounds', !!scope && still < 1e-4, `peak ${still.toExponential(2)}`);
+
+    // ── slice 2: one knob, for the parameter a person picks (decision D2) ────
+    const SYNTH_VAL = W('synth', 'value-in');
+    const NAMES = CATALOGUE.synth.ports['value-in'].shape.names;
+    const choose = (n) => chooser.querySelector(`button[data-id="${n}"]`)?.click();
+    const knobLinksNow = () => bay.links().filter((l) => /^web:knob/.test(l.from));
+    const rowOf = (t) => knobRows.get(t)?.grid;
+    press(KNOB); press(SYNTH_VAL);
+    await frame();
+    const offered = [...chooser.querySelectorAll('button')].map((b) => b.dataset.id);
+    A('pressing the knob box and then the synth\'s value-in asks which parameter, one button each, and makes no knob yet',
+      !chooser.hidden && offered.join() === [...NAMES, 'cancel'].join() && knobLinksNow().length === 0
+        && !bay.nodes().some((n) => isInstance(n.id)), `offered ${offered.join(' ')}, ${knobLinksNow().length} knob links`);
+    choose('cancel');
+    await runtimes();
+    A('NEGATIVE CONTROL: cancel makes no knob and links nothing', chooser.hidden && knobLinksNow().length === 0
+      && !runtime.list().some((x) => x.type === 'knob'));
+    press(KNOB); press(SYNTH_VAL);
+    choose('cutoff');
+    await runtimes();
+    const knobIds = () => runtime.list().filter((x) => x.type === 'knob').map((x) => x.id);
+    A('picking cutoff makes ONE knob instance, web:knob-cutoff, linked to the synth, in a row of its own',
+      chooser.hidden && knobIds().join() === 'web:knob-cutoff' && has('web:knob-cutoff:value-out', SYNTH_VAL) && !has(KNOB, SYNTH_VAL)
+        && rowOf('web:synth')?.knobs.length === 1 && faces.contains(rowOf('web:synth').el), knobIds().join(', '));
+    // A key is held while the knob turns: Chrome stops processing a filter with
+    // nothing sounding into it, and then its frequency never reads back the glide.
+    const cutoff = RT('web:knob-cutoff');
+    kb.press(A3);
+    cutoff?.knob.set(knobRaw('cutoff', 500));
+    await sleep(250);
+    const fq = synth.voice.filter()?.frequency.value ?? 0;
+    kb.release(A3);
+    await sleep(200);
+    A('turning the cutoff knob moves the synth cutoff, read back off the filter',
+      Math.abs(synth.param('cutoff') - 500) < 5 && Math.abs(fq - 500) < 25, `asked 500, the synth holds ${synth.param('cutoff')?.toFixed(1)}, the filter reads ${fq.toFixed(1)} Hz`);
+    press(KNOB); press(SYNTH_VAL); choose('q');
+    await runtimes();
+    const q = RT('web:knob-q'), q0 = synth.param('q');
+    A('a second pick adds a second knob to the same row', !!q && rowOf('web:synth')?.knobs.length === 2, knobIds().join(', '));
+    removeLink(bay.links().find((l) => l.from === 'web:knob-q:value-out')?.id);
+    await runtimes();
+    q?.knob.set(knobRaw('q', 9));
+    A('NEGATIVE CONTROL: an unlinked knob moves nothing, and its face is gone',
+      !!q && synth.param('q') === q0 && !faces.contains(q.face) && !RT('web:knob-q') && rowOf('web:synth')?.knobs.length === 1,
+      `q ${q0} then ${synth.param('q')}`);
+
+    // ── a second synth and a second scope, each its own instance (decision D6) ──
+    A('with the synth and the scope linked, the grid offers one free box of each: synth-2 and scope-2',
+      inGrid('web:synth-2') && inGrid('web:scope-2') && !inGrid('web:synth') && !inGrid('web:synth-3') && instancesOf('synth').length === 2,
+      `synths ${instancesOf('synth').join(' ')}, scopes ${instancesOf('scope').join(' ')}`);
+    const S2 = (p) => `web:synth-2:${p}`;
+    press(KEYS); press(S2('midi-in'));
+    press(S2('audio-out')); press('web:scope-2:audio-in');
+    await runtimes();
+    const synth2 = RT('web:synth-2'), scope2 = RT('web:scope-2');
+    A('the second synth and the second scope run as runtimes of their own, and each scope has its own face',
+      !!synth2 && synth2 !== synth && !!scope2 && scope2 !== scope && faces.contains(scope.face) && faces.contains(scope2.face)
+        && inGrid('web:synth-3') && inGrid('web:scope-3') && !inGrid('web:synth-2'),
+      `runtimes ${runtime.list().map((x) => x.id).join(' ')}`);
+    const n2 = synth2.heard();
+    kb.press(A3);
+    await sleep(300);
+    const h2 = [scope.heard(), scope2.heard(), synth2.heard() - n2];
+    kb.release(A3);
+    await sleep(400);
+    A('one key plays both synths, and each scope shows its own', h2[2] === 1 && h2[0] > 0.01 && h2[1] > 0.01,
+      `synth-2 heard ${h2[2]}, scopes ${h2.slice(0, 2).map((v) => v.toFixed(4)).join(' and ')}`);
+    press(KNOB); press(S2('value-in')); choose('cutoff');
+    await runtimes();
+    RT('web:knob-cutoff-2')?.knob.set(knobRaw('cutoff', 900));
+    A('the second synth\'s cutoff is a knob of its own, web:knob-cutoff-2, in a row of its own, and it moves that synth only',
+      has('web:knob-cutoff-2:value-out', S2('value-in')) && rowOf('web:synth-2')?.knobs.length === 1 && knobRows.size === 2
+        && Math.abs(synth2.param('cutoff') - 900) < 5 && Math.abs(synth.param('cutoff') - 500) < 5
+        && [...faces.querySelectorAll('.pos-sec-h')].some((h) => h.textContent === 'knobs on web:synth-2'),
+      `synth ${synth.param('cutoff')?.toFixed(0)}, synth-2 ${synth2.param('cutoff')?.toFixed(0)}`);
+    removeLink(bay.links().find((l) => l.from === KEYS && l.to === S2('midi-in'))?.id);
+    await runtimes();
+    kb.press(A3);
+    await sleep(300);
+    const cut = [scope.heard(), scope2.heard()];
+    kb.release(A3);
+    A('NEGATIVE CONTROL: with the keys taken off the second synth, its scope reads nothing while the first scope still shows the key',
+      !!RT('web:scope-2') && cut[1] < 1e-4 && cut[0] > 0.01, `scope ${cut[0].toFixed(4)}, scope-2 ${cut[1].toExponential(2)}`);
+    for (const l of [...bay.links()].filter((x) => [nodeOf(x.from), nodeOf(x.to)].some((n) => /^web:(synth-2|scope-2|knob-cutoff-2)$/.test(n)))) removeLink(l.id);
+    await runtimes();
+    A('unlinked again, the second synth\'s runtime and knob row go, and the grid offers one free synth, synth-2',
+      !RT('web:synth-2') && !knobRows.has('web:synth-2') && inGrid('web:synth-2') && !inGrid('web:synth-3') && !!RT('web:synth'));
+    await sleep(200);
+
+    // ── the negative control on the speakers ────────────────────────────────
+    removeLink(bay.links().find((l) => l.from === SYNTH_OUT && l.to === SPK)?.id);
+    await runtimes();
+    const h1 = synth.heard();
+    kb.press(A3);
+    await sleep(300);
+    const quiet = runtime.level(), meanwhile = scope?.heard() ?? 0;
+    A('NEGATIVE CONTROL: with the speaker unlinked the key still reaches the synth and sounds at the scope, and nothing reaches the speakers',
+      synth.heard() === h1 + 1 && meanwhile > 0.01 && quiet < 0.001 && !RT('web:speaker'),
+      `synth heard ${synth.heard() - h1}, scope ${meanwhile.toFixed(4)}, speakers ${quiet.toFixed(5)} against ${loud.toFixed(4)} linked`);
+    kb.release(A3);
+
+    removeLink(bay.links().find((l) => l.from === KEYS)?.id);
+    await runtimes();
+    A('unlinking the keys takes the keyboard away', keyboards() === 0 && !RT('web:keys') && !!RT('web:synth'));
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('with nothing linked every runtime is closed and the faces take no room', runtime.list().length === 0 && faces.hidden);
+
+    await checkRunners();
+    await checkExamples();
+
+    A('the self-check asked the wish worker nothing', reached === 0, `${reached} calls`);
+
+    await checkLive();
+  }
+
+  // The runtimes past slice 3, one example each, pressed as a person would and graded
+  // on the far side of the link.
+  // See lessons/page-connect.md#connect-7
+  async function checkRunners() {
+    const A = d.assert;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(50); return fn(); };
+    const RT = (id) => runtime.get(id);
+    const pressEx = async (say) => { [...exRow.children].find((b) => b.textContent === say).click(); await runtimes(); };
+    const shows = (id) => !!RT(id)?.face && faces.contains(RT(id).face);
+    const linkOf = (from, to) => bay.links().find((l) => l.from === from && l.to === to);
+    const logs = () => window.__demo.logs.map((x) => x.msg).join('\n');
+
+    // ── Plaits, from a MIDI keyboard ──
+    const asked0 = MIDI_ASKED.length;
+    await pressEx('play plaits from my midi keyboard');
+    const midi = RT('web:midi'), plaits = RT('web:plaits');
+    A('the MIDI keyboard and Plaits run, each with its face, and linking them asked the browser for no MIDI',
+      !!midi && !!plaits && !!RT('web:speaker') && shows('web:midi') && shows('web:plaits') && MIDI_ASKED.length === asked0
+        && plaits.knobs.size === 10, `runtimes ${runtime.list().map((x) => x.id).join(' ')}, asked ${MIDI_ASKED.length - asked0}`);
+    // A keyboard the check plugs in itself: an input that is not a device, handed to the runtime as a person's grant would be.
+    class FakeIn extends EventTarget { id = 'check-in-1'; name = 'check keyboard'; state = 'connected'; }
+    const fin = new FakeIn();
+    midi.attach({ inputs: new Map([[fin.id, fin]]), onstatechange: null });
+    const play = (b0, n, v) => { const e = new Event('midimessage'); e.data = new Uint8Array([b0, n, v]); fin.dispatchEvent(e); };
+    const p0 = plaits.heard();
+    runtime.wake();
+    await until(() => plaits.ready(), 8000);
+    play(0x90, 57, 100);
+    await sleep(500);
+    const plaitsLoud = runtime.level();
+    play(0x80, 57, 0);
+    A('a note from the plugged keyboard crosses web:midi -> web:plaits, and Plaits reaches the speakers',
+      plaits.ready() && plaits.heard() === p0 + 2 && plaitsLoud > 0.01 && midi.heard() === 2,
+      `ready ${plaits.ready()}, plaits heard ${plaits.heard() - p0}, speakers ${plaitsLoud.toFixed(4)}`);
+    removeLink(linkOf(W('midi', 'midi-out'), W('plaits', 'midi-in'))?.id);
+    await runtimes();
+    const p1 = plaits.heard();
+    play(0x90, 60, 100); play(0x80, 60, 0);
+    A('NEGATIVE CONTROL: with that link gone the keyboard still plays and Plaits hears nothing, and the MIDI box is closed',
+      plaits.heard() === p1 && !RT('web:midi'), `plaits heard ${plaits.heard() - p1}`);
+    await sleep(300);
+
+    // ── the drum machine ──
+    await pressEx('the drum machine plays its drums');
+    const seq = RT('web:sequencer'), drum = RT('web:drum');
+    A('the drum machine runs as two boxes, its grid the sequencer\'s face, and the drums have no face of their own',
+      !!seq && !!drum && shows('web:sequencer') && !!seq.face.querySelector('.tbar-toggle') && !drum.face,
+      `runtimes ${runtime.list().map((x) => x.id).join(' ')}`);
+    const d0 = drum.heard(), s0 = seq.heard();
+    seq.face.querySelector('.tbar-toggle')?.click();
+    await until(() => drum.heard() > d0 + 4, 8000);
+    await sleep(600);
+    const drumsLoud = runtime.level();
+    A('Play on its bar sends steps over web:sequencer -> web:drum, and the drums reach the speakers',
+      seq.heard() > s0 && drum.heard() > d0 + 4 && drumsLoud > 0.005,
+      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}`);
+    // A second link out of the sequencer keeps it running, so taking the drums' link away is the only change.
+    const KEYS_IN = W('keys', 'midi-in');
+    connect(W('sequencer', 'midi-out'), KEYS_IN);
+    removeLink(linkOf(W('sequencer', 'midi-out'), W('drum', 'midi-in'))?.id);
+    await runtimes();
+    const d1 = drum.heard(), s1 = seq.heard();
+    await sleep(500);
+    let drumsAfter = 0;
+    for (let i = 0; i < 25; i++) { drumsAfter = Math.max(drumsAfter, runtime.level()); await sleep(20); }
+    A('NEGATIVE CONTROL: with the sequencer\'s link to the drums gone it still plays its steps (into the keys), the drums hear none and the speakers are silent',
+      seq.heard() > s1 && drum.heard() === d1 && !!RT('web:sequencer') && drumsAfter < 0.001,
+      `sent ${seq.heard() - s1}, drums heard ${drum.heard() - d1}, speakers ${drumsAfter.toFixed(5)}`);
+    seq.stop();
+
+    // ── typing plays the typewriter ──
+    await pressEx('typing plays the typewriter');
+    const typing = RT('web:typing'), tw = RT('web:typewriter'), store = RT('cf-r2:typewriter-samples');
+    A('the paper, the typewriter and its samples run, and linking them read nothing from the bucket',
+      !!typing && !!tw && !!store && shows('web:typing') && store.heard() === 0 && !tw.loaded(),
+      `store reads ${store?.heard()}`);
+    const key = (ch) => {
+      const k = typing.paper.keys;
+      k.value += ch; k.setSelectionRange(k.value.length, k.value.length);
+      k.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ch, bubbles: true }));
+    };
+    const t0 = tw.heard();
+    key('a');
+    await until(() => tw.loaded(), 8000);
+    // A strike is a few tens of ms, so the loudest the speakers got over a short window.
+    let typeLoud = 0;
+    key('b'); key('c');
+    for (let i = 0; i < 30; i++) { typeLoud = Math.max(typeLoud, runtime.level()); await sleep(10); }
+    A('typing on the paper reaches the typewriter over its link, the first key reads the samples once, and it strikes at the speakers',
+      tw.heard() === t0 + 3 && store.heard() === 1 && tw.loaded() && tw.strikes() >= 2 && typeLoud > 0.005,
+      `heard ${tw.heard() - t0}, store reads ${store.heard()}, strikes ${tw.strikes()}, speakers ${typeLoud.toFixed(4)}`);
+    removeLink(linkOf(W('typing', 'value-out'), W('typewriter', 'value-in'))?.id);
+    await runtimes();
+    const t1 = tw.heard();
+    key('d');
+    A('NEGATIVE CONTROL: unlinked, a key on the paper reaches the typewriter no more', tw.heard() === t1, `heard ${tw.heard() - t1}`);
+
+    // ── the keys light up the Pico ──
+    await pressEx('the keys light up the pico');
+    const pico = RT('web:pico'), oled = RT('web:oled'), kb = RT('web:keys')?.kb;
+    A('the keys, the emulated Pico and its OLED run, each with a face, and nothing was fetched for the Pico yet',
+      !!pico && !!oled && !!kb && shows('web:pico') && shows('web:oled') && pico.pico.state() === 'off');
+    const C4 = kb.keyOf(60);
+    kb.press(C4);
+    await until(() => oled.heard() > 0 && oled.lit() > 0, 10000);
+    kb.release(C4);
+    A('a key boots the Pico, and the screens it draws arrive at the OLED over web:pico -> web:oled',
+      pico.heard() >= 1 && pico.pico.state() === 'running' && oled.heard() > 0 && oled.lit() > 0,
+      `pico heard ${pico.heard()}, state ${pico.pico.state()}, oled frames ${oled.heard()}, lit ${oled.lit()}`);
+    removeLink(linkOf(W('pico', 'video-out'), W('oled', 'video-in'))?.id);
+    await runtimes();
+    const f0 = pico.frames();
+    kb.press(kb.keyOf(64)); await sleep(150); kb.release(kb.keyOf(64));
+    await until(() => pico.frames() > f0, 3000);
+    A('NEGATIVE CONTROL: with the OLED unlinked the Pico still draws and no OLED is there to get it',
+      pico.frames() > f0 && !RT('web:oled'), `pico frames ${pico.frames() - f0}`);
+
+    // ── a knob opens SuperCollider's filter ──
+    await pressEx('a knob opens supercollider\'s filter');
+    const sc = RT('web:collide'), bright = RT('web:knob-bright');
+    A('the knob example makes one knob for bright, linked into SuperCollider, which shows its program, and its names are the program\'s',
+      !!sc && !!bright && shows('web:collide') && shows('web:knob-bright') && !!linkOf('web:knob-bright:value-out', W('collide', 'value-in'))
+        && sc.names.join() === PARAM_NAMES.collide.join() && bright.knob.value() === sc.param('bright'),
+      `names ${sc?.names.join(' ')}, knob ${bright?.knob.value()}, engine ${sc?.param('bright')}`);
+    bright.knob.set(0.9);
+    await sleep(50);
+    A('turning it sets bright on the engine, over the link', Math.abs(sc.param('bright') - 0.9) < 1e-6 && sc.params() >= 1, `bright ${sc.param('bright')}`);
+    connect(KEYS, W('collide', 'midi-in')); connect(W('collide', 'audio-out'), SPK);
+    await runtimes();
+    runtime.wake();
+    await until(() => !!sc.voice.engine(), 8000);
+    const kbc = RT('web:keys').kb;
+    kbc.press(kbc.keyOf(57));
+    // Its envelope falls to a quiet sustain, so the loudest over the attack.
+    let scLoud = 0;
+    for (let i = 0; i < 40; i++) { scLoud = Math.max(scLoud, runtime.level()); await sleep(10); }
+    kbc.release(kbc.keyOf(57));
+    A('with the keys and the speakers linked as well, a key sounds SuperCollider at the speakers',
+      !!sc.voice.engine() && sc.heard() >= 1 && scLoud > 0.005, `engine ${!!sc.voice.engine()}, heard ${sc.heard()}, speakers ${scLoud.toFixed(4)}`);
+    removeLink(linkOf('web:knob-bright:value-out', W('collide', 'value-in'))?.id);
+    await runtimes();
+    bright.knob.set(0.1);
+    A('NEGATIVE CONTROL: the knob unlinked moves nothing, and its face is gone', Math.abs(sc.param('bright') - 0.9) < 1e-6 && !shows('web:knob-bright'),
+      `bright ${sc.param('bright')}`);
+
+    // ── pictures: the mirror shader, and the camera through the dither ──
+    // Graded structurally (it drew, it is not a flat field), never by pixels
+    // across machines. With no WebGL2 the shaders say so, in the same asserts.
+    const noGl = !document.createElement('canvas').getContext('webgl2');
+    const spread = (cv) => {
+      const t = document.createElement('canvas'); t.width = 160; t.height = 90;
+      const g = t.getContext('2d'); g.drawImage(cv, 0, 0, 160, 90);
+      const px = g.getImageData(0, 0, 160, 90).data;
+      // The spread of the red channel: a flat field is about 0, a picture is not.
+      // Not r+g+b: the mirror's colour is three cosines 120 degrees apart, whose
+      // sum is constant by construction (positron-verify), so it varies in hue.
+      let s1 = 0, s2 = 0;
+      const n = px.length / 4;
+      for (let i = 0; i < px.length; i += 4) { const v = px[i]; s1 += v; s2 += v * v; }
+      return { sd: Math.sqrt(Math.max(0, s2 / n - (s1 / n) ** 2)) };
+    };
+    await pressEx('a knob bends the mirror shader');
+    const mirror = RT('web:shader'), screen = RT('web:screen'), seg = RT('web:knob-segments');
+    await until(() => (screen?.heard() ?? 0) > 5, 3000);
+    const ms = screen && spread(screen.canvas);
+    A('the mirror shader runs with its program in a code box; the knob sends its 8 over the link and the screen shows a picture',
+      !!mirror && !!seg && shows('web:shader') && shows('web:screen') && shows('web:knob-segments') && mirror.segments() === 8
+        && mirror.delivered() === 1 && (noGl ? /no WebGL2/.test(logs()) : mirror.heard() > 5 && ms.sd > 10),
+      noGl ? 'no WebGL2 here, said in the log' : `segments ${mirror?.segments()}, frames ${mirror?.heard()}, red spread ${ms?.sd.toFixed(1)}`);
+    seg.knob.set(3);
+    await sleep(50);
+    A('turning the knob sets segments over the link', mirror.segments() === 3 && mirror.delivered() === 2, `segments ${mirror.segments()}`);
+    removeLink(linkOf('web:knob-segments:value-out', W('shader', 'value-in'))?.id);
+    await runtimes();
+    seg.knob.set(12);
+    A('NEGATIVE CONTROL: unlinked, the knob sets nothing', mirror.segments() === 3 && mirror.delivered() === 2, `segments ${mirror.segments()}`);
+
+    const cam0 = CAMERA_ASKED.length;
+    await pressEx('camera through the dither shader');
+    const camRt = RT('web:camera'), dith = RT('web:shader-dither'), scr = RT('web:screen');
+    A('the camera, the dither and the screen run, and linking them opened no camera',
+      !!camRt && !!dith && !!scr && shows('web:camera') && shows('web:screen') && CAMERA_ASKED.length === cam0 && !camRt.camera.on());
+    camRt.face.querySelector('button[data-id="cam"]')?.click();
+    await until(() => camRt.camera.frames() > 5 && dith.heard() > 5, 6000);
+    const ds = spread(scr.canvas);
+    A('Start on the camera\'s face opens it, and its frames cross camera -> dither -> screen as a dithered picture',
+      CAMERA_ASKED.length === cam0 + 1 && camRt.camera.on() && camRt.camera.frames() > 5
+        && (noGl ? /no WebGL2/.test(logs()) : dith.heard() > 5 && scr.heard() > 5 && ds.sd > 10),
+      `camera frames ${camRt.camera.frames()}, dithered ${dith.heard()}, screen ${scr.heard()}, red spread ${ds.sd.toFixed(1)}`);
+    const tracks = camRt.camera.stream()?.getTracks() ?? [];
+    // A second screen on the camera keeps it linked, so taking the dither's link away is the only change.
+    connect(W('camera', 'video-out'), 'web:screen-2:video-in');
+    removeLink(linkOf(W('camera', 'video-out'), W('shader-dither', 'video-in'))?.id);
+    await runtimes();
+    const df = dith.heard(), cf = camRt.camera.frames(), scr2 = RT('web:screen-2');
+    await sleep(600);
+    A('NEGATIVE CONTROL: with camera -> dither unlinked the camera still runs into a second screen and the dither gets no picture',
+      dith.heard() === df && camRt.camera.frames() > cf && (scr2?.heard() ?? 0) > 0 && camRt.camera.on(),
+      `dithered ${dith.heard() - df}, camera frames ${camRt.camera.frames() - cf}, screen-2 ${scr2?.heard()}`);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('unlinked, the camera\'s box closes and every track is stopped', !RT('web:camera') && !camRt.camera.on()
+      && tracks.length > 0 && tracks.every((t) => t.readyState === 'ended'), `${tracks.length} tracks, ${tracks.map((t) => t.readyState).join(' ')}`);
+
+    // ── grain a radio recording ──
+    await pressEx('grain a radio recording');
+    const player = RT('web:player'), grains = RT('web:grains'), rec = RT('cf-r2:recording');
+    A('the recording, the player and the grain ring run, the player shows Play, and linking them fetched nothing',
+      !!player && !!grains && !!rec && shows('web:player') && rec.heard() === 0 && player.heard() === 0 && !grains.up(),
+      `store reads ${rec?.heard()}, opened ${player?.heard()}`);
+    player.face.querySelector('button[data-id="play"]')?.click();
+    await until(() => player.playing() && grains.up(), 15000);
+    // The ring has to hold some of the recording before a grain sounds like it.
+    let grainLoud = 0;
+    const tg = performance.now();
+    while (performance.now() - tg < 12000 && grainLoud < 0.003) { grainLoud = Math.max(grainLoud, runtime.level()); await sleep(100); }
+    A('Play reads the recording once from the linked store, the ring reports grains, and they reach the speakers',
+      rec.heard() === 1 && player.playing() && grains.up() && grains.heard() > 0 && grainLoud > 0.003,
+      `store reads ${rec.heard()}, playing ${player.playing()}, grains ${grains.heard()}, speakers ${grainLoud.toFixed(4)}`);
+    removeLink(linkOf(W('grains', 'audio-out'), SPK)?.id);
+    await runtimes();
+    await sleep(300);
+    const g0 = grains.heard();
+    let grainQuiet = 0;
+    for (let i = 0; i < 20; i++) { grainQuiet = Math.max(grainQuiet, runtime.level()); await sleep(25); }
+    A('NEGATIVE CONTROL: with the grains\' audio-out unlinked the ring still makes grains and nothing reaches the speakers',
+      grains.heard() > g0 && grainQuiet < 0.001, `grains ${grains.heard() - g0}, speakers ${grainQuiet.toFixed(5)}`);
+    player.stop();
+
+    // ── record what I play and play it back ──
+    await pressEx('record what i play and play it back');
+    const recRt = RT('web:rec'), syn = RT('web:synth'), kbr = RT('web:keys')?.kb;
+    A('the recorder runs with Record, Play and its table, and the keys reach it and not the synth',
+      !!recRt && !!syn && shows('web:rec') && !!recRt.face.querySelector('button[data-id="rec"]') && !linkOf(KEYS, W('synth', 'midi-in')));
+    recRt.face.querySelector('button[data-id="rec"]')?.click();
+    const sy0 = syn.heard();
+    for (const n of [60, 64]) { kbr.press(kbr.keyOf(n)); await sleep(120); kbr.release(kbr.keyOf(n)); await sleep(60); }
+    recRt.recorder.stop();
+    A('Record takes the two keys that cross keys -> rec, and the synth hears none of them while recording',
+      recRt.heard() === 2 && recRt.recorder.notes.every((r) => r.len != null) && syn.heard() === sy0,
+      `taken ${recRt.heard()}, synth heard ${syn.heard() - sy0}`);
+    runtime.wake();
+    recRt.face.querySelector('button[data-id="play"]')?.click();
+    let recLoud = 0;
+    const tr = performance.now();
+    while (performance.now() - tr < 600) { recLoud = Math.max(recLoud, runtime.level()); await sleep(15); }
+    A('Play sends the same notes out of rec:midi-out at their times, the synth plays them, and they reach the speakers',
+      recRt.sent() === 4 && syn.heard() === sy0 + 4 && recLoud > 0.01, `sent ${recRt.sent()}, synth heard ${syn.heard() - sy0}, speakers ${recLoud.toFixed(4)}`);
+    removeLink(linkOf(W('rec', 'midi-out'), W('synth', 'midi-in'))?.id);
+    await runtimes();
+    const sy1 = syn.heard(), rs = recRt.sent();
+    recRt.face.querySelector('button[data-id="play"]')?.click();
+    await sleep(600);
+    A('NEGATIVE CONTROL: with rec -> synth unlinked Play still sends the notes and the synth hears none',
+      recRt.sent() === rs + 4 && syn.heard() === sy1, `sent ${recRt.sent() - rs}, synth heard ${syn.heard() - sy1}`);
+
+    // ── the sampler, linked by hand: its example waits for the looper ──
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    connect(KEYS, W('sampler', 'midi-in')); connect(W('sampler', 'audio-out'), SPK);
+    await runtimes();
+    const smp = RT('web:sampler'), kbs = RT('web:keys').kb;
+    const loudFor = async (ms) => { let m = 0; const t = performance.now(); while (performance.now() - t < ms) { m = Math.max(m, runtime.level()); await sleep(20); } return m; };
+    runtime.wake();
+    kbs.press(kbs.keyOf(60));
+    const bare = await loudFor(800);
+    kbs.release(kbs.keyOf(60));
+    A('NEGATIVE CONTROL: with no samples linked into its file-in the sampler sounds nothing for a key, and says so',
+      !!smp && smp.heard() === 0 && bare < 0.001 && /no samples linked into its file-in/.test(logs()), `speakers ${bare.toFixed(5)}`);
+    connect('cf-r2:piano-samples:file-out', W('sampler', 'file-in'));
+    await runtimes();
+    const piano = RT('cf-r2:piano-samples');
+    await until(() => !!smp.sampler.ready(), 10000);
+    kbs.press(kbs.keyOf(60));
+    const pianoLoud = await loudFor(3000);
+    kbs.release(kbs.keyOf(60));
+    A('with the piano samples linked, a key (its on and its off) fetches its recording from our bucket and the sampler reaches the speakers',
+      smp.sampler.ready() && smp.heard() === 2 && piano?.heard() === 1 && pianoLoud > 0.005,
+      `engine ${smp.sampler.ready()}, heard ${smp.heard()}, store reads ${piano?.heard()}, speakers ${pianoLoud.toFixed(4)}`);
+
+    // ── a patch change for the Circuit, held off before Join ──
+    await pressEx('change the circuit\'s patch');
+    const patch = RT('web:patch'), circ = RT(`${BOARD_SITE}:circuit`);
+    const o0 = OPENED.length;
+    patch.pick(5);
+    A('a patch picked reaches the Circuit\'s box on the Pi, which sends nothing and joins nothing before Join',
+      !!patch && !!circ && shows('web:patch') && shows(`${BOARD_SITE}:circuit`) && patch.heard() === 1 && circ.heldOff() === 1
+        && !circ.joined() && !circ.board() && OPENED.length === o0, `held off ${circ?.heldOff()}, sockets ${OPENED.length - o0}`);
+  }
+
+  // ── every example: it runs, or its pill says why it does not ──────────────
+  async function checkExamples() {
+    const A = d.assert;
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    // What each example is, written down here rather than read off the code it
+    // grades, so a mark that goes missing or appears is a red assert, not a new one.
+    const EXPECT = {
+      'grains in time with the recording': ['web:tempo'],
+      'what key is the live radio in?': 'press',
+      'the dial tunes the radio': ['web:dial', 'web:tuner'],
+      'send the camera through stream and back': 'press',
+      'the camera plays the drums': ['web:pixelate'],
+      'loop what i play into the piano': ['web:looper'],
+    };
+    let ran = 0;
+    const skipped = [];
+    for (const [i, ex] of EXAMPLES.entries()) {
+      const pill = exRow.children[i];
+      const r = runsOf(ex), want = EXPECT[ex.say] ?? 'runs';
+      if (want === 'press' || r.press.length) {
+        A(`"${ex.say}" is marked as a person's press only`, want === 'press' && pill.dataset.runs === 'press' && /person's press only/.test(pill.title), pill.title);
+        skipped.push(`${ex.say} (${r.press.map((n) => PRESS_ONLY[n]).join(', ')})`);
+        continue;
+      }
+      if (Array.isArray(want) || r.missing.length) {
+        A(`"${ex.say}" is dimmed and its title names what does not run: ${Array.isArray(want) ? want.join(', ') : 'nothing'}`,
+          Array.isArray(want) && want.join() === r.missing.join() && pill.dataset.runs === 'marked' && getComputedStyle(pill).opacity < 1
+            && want.every((n) => pill.title.includes(n)), pill.title);
+        continue;
+      }
+      pill.click();
+      await runtimes();
+      // The nodes the press really linked: a knob into a named value-in is its own instance (web:knob-bright).
+      const nodes = [...new Set(bay.links().flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))];
+      const dead = nodes.filter((n) => !runtime.get(n));
+      const faceless = nodes.filter((n) => runtime.get(n) && (FACED.includes(typeOf(n)) || n.startsWith(`${BOARD_SITE}:`))
+        && !(runtime.get(n).face && faces.contains(runtime.get(n).face)));
+      A(`"${ex.say}" runs: all ${ex.links.length} links made, every node of its patch has a runtime, and a face where its type has one`,
+        pill.dataset.runs === 'runs' && bay.links().length === ex.links.length && !dead.length && !faceless.length,
+        `${bay.links().length} links; no runtime: ${dead.join(' ') || 'none'}; no face: ${faceless.join(' ') || 'none'}`);
+      ran++;
+    }
+    d.log(`${ran} of ${EXAMPLES.length} examples run here; left for a person's press: ${skipped.join('; ') || 'none'}`);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+  }
+
+  // Only with `?relay=` (demo/fake-relay.mjs) and a private room answered by
+  // demo/fake-board.mjs; otherwise left out, so a check never reaches the real relay.
+  // See lessons/page-connect.md#connect-8
+  async function checkLive() {
+    const A = d.assert;
+    const room = roomField.value();
+    if (RELAY_BASE === DEFAULT_RELAY || room === STUDIO_ROOM) {
+      d.log('left out: the live layer is checked only against a stand-in relay (?relay=ws://127.0.0.1:...) in a private room', 'dim');
+      return;
+    }
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(100); return fn(); };
+    const card = (id) => groups.querySelector(`.cn-box[data-node="${id}"]`);
+    const liveCard = (id) => card(id)?.dataset.live === 'live' && !!card(id).querySelector('.cn-dot:not(.cn-ring)');
+    const staleCard = (id) => card(id)?.dataset.live === 'stale' && !!card(id).querySelector('.cn-dot.cn-ring');
+    const group = (site) => groups.querySelector(`.cn-site[data-site="${site}"]`);
+    const markedInPicture = (id) => !!svgOf()?.querySelector(`.cn-livemark[data-live="${id}"]`);
+
+    // NEGATIVE CONTROL first: a room on the same stand-in relay where nobody is.
+    const quiet = `${room}-empty`;
+    listen(quiet);
+    await until(() => listener?.joined(), 4000);
+    await sleep(2500);
+    A('NEGATIVE CONTROL: listening where no stand-in answers, no box is marked and no group is added', listener?.joined()
+      && live.sites.size === 0 && !groups.querySelector('.cn-box[data-live]') && !groups.querySelector('.cn-site[data-site]'),
+      `${live.sites.size} sites heard in ${quiet}, joined ${listener?.joined()}`);
+
+    // The stand-in board, in the private room the runner started it in.
+    listen(room);
+    A('the room listened in is the private one, never the studio\'s', listener?.room === room && room !== STUDIO_ROOM
+      && OPENED.every((u) => !u.includes(`/room/${STUDIO_ROOM}/`)), `${listener?.room}`);
+    await until(() => live.sites.get(BOARD_SITE) && !live.sites.get(BOARD_SITE).stale, 8000);
+    const pi = live.sites.get(BOARD_SITE);
+    const piIds = (pi?.graph.nodes || []).map((n) => n.id);
+    const ofPi = (id) => !!group(BOARD_SITE)?.querySelector(`.cn-box[data-node="${id}"]`);
+    A('after Listen, the stand-in board\'s boxes in the raspberry pi group carry a live dot, and its heading says when it was heard',
+      !!pi && piIds.includes(`${BOARD_SITE}:circuit`) && ofPi(`${BOARD_SITE}:circuit`) && liveCard(`${BOARD_SITE}:circuit`)
+        && /heard \d+ s ago/.test(group(BOARD_SITE)?.querySelector('h3')?.textContent || ''),
+      pi ? `${piIds.join(' ')}; heading "${group(BOARD_SITE)?.querySelector('h3')?.textContent}"` : 'no pi-1 heard');
+    A('a box the Pi did not announce carries no dot', !!card(`${BOARD_SITE}:sampler`) && !piIds.includes(`${BOARD_SITE}:sampler`)
+      && !card(`${BOARD_SITE}:sampler`).dataset.live, `sampler announced ${piIds.includes(`${BOARD_SITE}:sampler`)}`);
+    const extra = piIds.filter((id) => !bay.node(id));
+    A('a node the Pi has and no page here draws is a box in its group, quietly "no page yet", never "not in the catalogue"',
+      extra.length > 0 && extra.every((id) => ofPi(id) && liveCard(id) && /no page yet/.test(card(id).querySelector('.cn-label').textContent))
+        && !/not in the catalogue/.test(groups.textContent),
+      extra.join(', ') || 'none extra');
+    // A Pi box in the picture is marked too.
+    [...exRow.children].find((b) => b.textContent === 'play the circuit in the studio').click();
+    await runtimes();
+    await until(() => markedInPicture(`${BOARD_SITE}:circuit`), 2000);
+    A('a live Pi box drawn in the picture carries the mark there', markedInPicture(`${BOARD_SITE}:circuit`) && !markedInPicture('web:keys'));
+
+    // A second tab: another socket in the room announcing a page's bay, as announce.mjs does.
+    const tab = createBay();
+    tab.addNode({ id: 'web:keys', kind: 'person', label: 'keyboard' });
+    tab.addPort({ id: 'web:keys:midi-out', dir: 'out', medium: 'midi', emits: ['note'] });
+    tab.addNode({ id: 'web:theremin', kind: 'person', label: 'theremin' });
+    tab.addPort({ id: 'web:theremin:midi-out', dir: 'out', medium: 'midi' });
+    const { graph } = pageGraph(tab, { label: 'a second tab' });
+    const other = await new Promise((resolve) => { const w = openWire(room, { by: 'tool', reconnect: false, onOpen: () => resolve(w) }); });
+    other.send({ type: 'graph.announce', graph });
+    other.close();
+    await until(() => !!group(graph.site), 4000);
+    A('a second tab\'s announce shows up as a group of its own, "tab <site>", with a live box per node',
+      !!group(graph.site) && group(graph.site).querySelector('h3').textContent.startsWith(`tab ${graph.site}`)
+        && graph.nodes.every((n) => liveCard(n.id)), `site ${graph.site}, ${graph.nodes.map((n) => `${n.id} ${card(n.id)?.dataset.live}`).join(', ')}`);
+
+    // It said it once and its socket is gone, so it ages out; the board beats on.
+    await until(() => live.sites.get(graph.site)?.stale, STALE + 3000);
+    await sleep(1100);
+    A(`a node goes stale after STALE_MS (${STALE} ms here): its dot turns to an empty ring, while the board stays live`,
+      graph.nodes.every((n) => staleCard(n.id)) && /quiet for \d+ s/.test(group(graph.site)?.querySelector('h3')?.textContent || '')
+        && live.state.get(`${BOARD_SITE}:circuit`) === 'live' && markedInPicture(`${BOARD_SITE}:circuit`),
+      `tab ${graph.nodes.map((n) => card(n.id)?.dataset.live).join(' ')}, board in picture ${markedInPicture(`${BOARD_SITE}:circuit`)}`);
+
+    stopListening();
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('Stop leaves the room, the heard groups and boxes go, and nothing is marked', !listener && live.sites.size === 0
+      && !groups.querySelector('.cn-box[data-live]') && !groups.querySelector('.cn-site[data-site]') && !svgOf()?.querySelector('.cn-livemark')
+      && !card(`${BOARD_SITE}:synth`));
+
+    await checkPi(room);
+  }
+
+  // The Pi joined from its own face against demo/fake-board.mjs, which counts what
+  // reached the Circuit's port. Never studio-1: the room is the check's own.
+  // See lessons/page-connect.md#connect-9
+  async function checkPi(room) {
+    const A = d.assert;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(100); return fn(); };
+    const loudest = async (ms) => { let m = 0; const t0 = performance.now(); while (performance.now() - t0 < ms) { m = Math.max(m, runtime.level()); await sleep(20); } return m; };
+    const pressEx = async (say) => { [...exRow.children].find((b) => b.textContent === say).click(); await runtimes(); };
+    const CIRC = `${BOARD_SITE}:circuit`, PIANO_ID = `${BOARD_SITE}:sampler`;
+
+    await pressEx('play the circuit in the studio');
+    const circ = runtime.get(CIRC), kb = runtime.get('web:keys')?.kb;
+    const o0 = OPENED.length;
+    kb.press(kb.keyOf(60)); kb.release(kb.keyOf(60));
+    A('a link to the Circuit opens nothing: no board and no socket before Join, and a key is held off',
+      !!circ && !circ.board() && !circ.joined() && OPENED.length === o0 && circ.heldOff() === 2 && circ.heard() === 0,
+      `sockets ${OPENED.length - o0}, held off ${circ?.heldOff()}`);
+    runtime.wake();
+    circ.face.querySelector('button[data-id="join"]')?.click();
+    await until(() => circ.joined(), 12000);
+    A('Join on the Circuit\'s face joins the check\'s own room, never the studio\'s, and holds the lease',
+      circ.joined() && circ.room === `${room}-circuit` && !circ.room.startsWith(STUDIO_ROOM)
+        && OPENED.every((u) => !u.includes(`/room/${STUDIO_ROOM}`)) && (circ.lease()?.renewals() ?? 0) >= 1,
+      `room ${circ.room}, joined ${circ.joined()}, renewals ${circ.lease()?.renewals()}`);
+    const outs = async () => (await circ.board().ask({ type: 'audio.status' }, 'audio.started', 4000))?.midi?.out ?? null;
+    const before = await outs();
+    kb.press(kb.keyOf(60)); await sleep(120); kb.release(kb.keyOf(60));
+    await sleep(500);
+    const after = await outs();
+    A('a key after Join reaches the stand-in board, counted on its side as written to the Circuit\'s port',
+      before !== null && after - before === 2 && circ.heard() === 2, `the board counts ${before} then ${after}, the box sent ${circ.heard()}`);
+    const piLoud = await loudest(1500);
+    A('the board\'s sound comes back into this page\'s one context and reaches the speakers', piLoud > 0.01, `speakers ${piLoud.toFixed(4)}`);
+    removeLink(bay.links().find((l) => l.from === `${CIRC}:audio-out`)?.id);
+    await runtimes();
+    await sleep(300);
+    const piQuiet = await loudest(600);
+    A('NEGATIVE CONTROL: with the Circuit\'s audio-out unlinked nothing reaches the speakers, and the Circuit stays joined',
+      piQuiet < 0.001 && circ.joined(), `speakers ${piQuiet.toFixed(5)}`);
+    const lease = circ.lease();
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('unlinked, the Circuit\'s box closes and leaves the room', !runtime.get(CIRC) && !circ.board() && !circ.joined(),
+      `renewals so far ${lease?.renewals() ?? 0}`);
+
+    // The sampler on the Pi: the stand-in has none, so Join says so and sends nothing.
+    await pressEx('play the piano on the pi');
+    const piano = runtime.get(PIANO_ID), kb2 = runtime.get('web:keys')?.kb;
+    piano.face.querySelector('button[data-id="join"]')?.click();
+    await until(() => /could not start/.test(piano.face.textContent), 12000);
+    kb2.press(kb2.keyOf(60)); kb2.release(kb2.keyOf(60));
+    A('NEGATIVE CONTROL: a board with no sampler is said on the piano\'s face, and a key sends it nothing',
+      /could not start the sampler/.test(piano.face.textContent) && !piano.joined() && piano.heard() === 0 && piano.room === room,
+      piano.face.querySelector('.cn-face-say')?.textContent);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+  }
+</script>

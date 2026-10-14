@@ -93,6 +93,7 @@ export const DEMO_CARDS = {
   // kit: its own heading, last.
   // why: lessons/kit-concept-list.md#kit
   kit: { group: 'kit', plain: true, title: 'Kit', say: 'Every part these pages are built from, one page per part.' },
+  connect: { group: 'kit', plain: true, title: 'Connect', say: 'Link the site\'s parts port to port. A part that can run here appears once it is linked.' },
   social: { group: 'kit', plain: true, title: 'Social', say: 'Pictures and reels the site makes of itself. Download one and post it.' },
   // concept like rows first, then use cases; archived rows are listed on /archive/.
   // why: lessons/kit-concept-list.md#archived-rows
