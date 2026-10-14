@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON connect</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  .cn-sites { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 24px 32px; }
+  .cn-site h3 { margin: 0 0 8px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
+  .cn-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .cn-id { font: 400 13px/1.4 var(--mono); color: var(--fg); }
+  .cn-label { font: 400 13px/1.4 var(--sans); color: var(--dim); }
+  .cn-ports { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 12px/1.4 var(--mono); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createBay } from '/shell/bay.mjs';
+  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
+
+  // The things the site already has, as nodes with their ports and nothing
+  // linked yet: the starting point for a patchbay you wire by saying what
+  // should play what, as /wish/ does on the desk.
+  const NODES = [
+    // in your hands
+    ['web:keys', 'person', 'on-screen keys', ['midi-out', 'midi-in']],
+    ['web:midi', 'device', 'a plugged-in MIDI keyboard', ['midi-out']],
+    ['web:knob', 'device', 'a knob', ['value-out']],
+    ['web:camera', 'device', 'camera', ['video-out']],
+    ['web:mic', 'device', 'microphone', ['audio-out']],
+    ['web:typewriter', 'person', 'typing', ['value-out']],
+    ['phone:touch', 'person', 'touch', ['midi-out']],
+    ['phone:tilt', 'device', 'tilt', ['value-out']],
+    ['pico-1:knob', 'device', 'a knob on a Pico', ['value-out']],
+    // sound made in this tab
+    ['web:sine', 'engine', 'sine synth', ['midi-in', 'audio-out']],
+    ['web:plaits', 'engine', 'Plaits', ['midi-in', 'value-in', 'audio-out']],
+    ['web:collide', 'engine', 'SuperCollider', ['midi-in', 'value-in', 'audio-out']],
+    ['web:faust', 'engine', 'Faust', ['midi-in', 'value-in', 'audio-out']],
+    ['web:piano', 'engine', 'piano and Rhodes', ['midi-in', 'audio-out']],
+    ['web:drums', 'engine', 'drum machine', ['clock-in', 'audio-out']],
+    ['web:grains', 'engine', 'granulator', ['audio-in', 'value-in', 'audio-out']],
+    ['web:looper', 'engine', 'looper', ['midi-in', 'midi-out']],
+    ['web:tempo', 'engine', 'tempo detector', ['audio-in', 'clock-out', 'value-out']],
+    ['web:key', 'engine', 'key detector', ['audio-in', 'value-out']],
+    ['web:shader', 'engine', 'shader', ['video-in', 'value-in', 'video-out']],
+    ['web:recorder', 'store', 'recorder', ['midi-in', 'file-out']],
+    // where it can be heard and seen
+    ['web:speaker', 'screen', 'speakers', ['audio-in']],
+    ['web:scope', 'screen', 'waveform', ['audio-in']],
+    ['web:screen', 'screen', 'this screen', ['video-in']],
+    ['phone:screen', 'screen', 'every phone watching', ['video-in']],
+    // the Pi in the studio
+    ['pi-1:circuit', 'device', 'Novation Circuit', ['midi-in', 'value-in', 'audio-out']],
+    ['pi-1:collide', 'engine', 'SuperCollider on the Pi', ['midi-in', 'value-in', 'audio-out']],
+    ['pi-1:piano', 'engine', 'Pi piano', ['midi-in', 'audio-out']],
+    ['pi-1:drums', 'engine', 'Pi drums', ['clock-in', 'audio-out']],
+    ['pi-1:gpu', 'engine', 'Pi GPU', ['value-in', 'video-in', 'video-out']],
+    // Cloudflare
+    ['cf-relay:room', 'external', 'Cloudflare relay', ['midi-in', 'midi-out', 'value-in', 'value-out', 'clock-in', 'clock-out']],
+    ['cf-stream:live', 'external', 'Cloudflare Stream', ['audio-in', 'video-in', 'audio-out', 'video-out']],
+    ['cf-r2:radio', 'store', 'our radio recordings', ['audio-out']],
+  ];
+  const SITES = { web: 'this tab', phone: 'a phone', 'pico-1': 'a Pico', 'pi-1': 'the Pi in the studio', 'cf-relay': 'Cloudflare', 'cf-stream': 'Cloudflare', 'cf-r2': 'Cloudflare' };
+
+  const bay = createBay();
+  const failed = [];
+  for (const [id, kind, label, ports] of NODES) {
+    try {
+      bay.addNode({ id, kind, label, place: id.startsWith('web:') ? 'browser' : 'remote' });
+      for (const p of ports) {
+        const [medium, dir] = p.split('-');
+        bay.addPort({ id: `${id}:${p}`, dir, medium });
+      }
+    } catch (e) { failed.push(`${id}: ${e.message}`); }
+  }
+
+  const d = mount({ name: 'connect', what: 'Everything the site can connect, laid out with nothing connected yet.', readout: null, index: '/', indexLabel: 'positron' });
+  useMediumColours();
+
+  // the picture, with no links
+  const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() });
+
+  // and the same as a list, by where it runs
+  const bySite = new Map();
+  for (const n of bay.nodes()) {
+    const site = n.id.split(':')[0];
+    if (!bySite.has(site)) bySite.set(site, []);
+    bySite.get(site).push(n);
+  }
+  const list = el('div', 'cn-sites');
+  for (const [site, nodes] of bySite) {
+    const box = el('section', 'cn-site');
+    box.append(el('h3', '', `${site}, ${SITES[site] || site}`));
+    for (const n of nodes) {
+      const row = el('div', 'cn-row');
+      const ports = el('div', 'cn-ports');
+      for (const p of bay.ports().filter((p) => p.id.startsWith(`${n.id}:`))) {
+        ports.append(el('span', `md-${p.medium}`, p.id.split(':')[2]));
+      }
+      row.append(el('span', 'cn-id', n.id.split(':')[1]), el('span', 'cn-label', n.label || ''), ports);
+      box.append(row);
+    }
+    list.append(box);
+  }
+  d.stack.add(pb.el, list);
+  for (const f of failed) d.log(f, 'bad');
+
+  if (SELFCHECK) {
+    d.assert('every node made it into the bay', failed.length === 0 && bay.nodes().length === NODES.length,
+      `${bay.nodes().length} of ${NODES.length}${failed.length ? `, refused: ${failed.join('; ')}` : ''}`);
+    d.assert('nothing is linked yet', bay.links().length === 0);
+  }
+  d.ready();
+</script>
