@@ -23,6 +23,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -66,23 +67,25 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:shader`, kind: 'engine', label: 'dither shader', place: 'browser' });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
-  bay.addNode({ id: `${S}:dither`, kind: 'screen', label: 'dithered', place: 'browser' });
-  for (const k of KNOBS) bay.addNode({ id: `${S}:knob-${k.name}`, kind: 'person', label: 'knob', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: SH_IN, label: 'shader:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: SH_OUT, label: 'shader:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: SH_VAL, label: 'shader:value-in', dir: 'in', medium: 'value',
-    shape: { of: 'param', names: KNOBS.map((k) => k.name) }, deliver: setParam });
-  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
-  bay.addPort({ id: FX, label: 'dithered', dir: 'in', medium: 'video' });
   // No `names` on a knob, as in /synth/patch-synth.mjs: one knob names one of the
   // shader's several, and the shader logs a name it does not have.
   const KNOB_OUT = (n) => `${S}:knob-${n}:value-out`;
-  for (const k of KNOBS) bay.addPort({ id: KNOB_OUT(k.name), label: `knob-${k.name}:value-out`, dir: 'out', medium: 'value', shape: { of: 'param' } });
+  addNodes(bay, S, ['camera', 'shader-dither', 'screen', { name: 'screen', as: 'dither', label: 'dithered' },
+    ...KNOBS.map((k) => `knob-${k.name}`)], {
+    deliver: { 'shader:value-in': setParam },
+    label: Object.fromEntries(KNOBS.map((k) => [`knob-${k.name}`, 'knob'])),
+    ports: {
+      'camera:video-out': { label: 'camera', transports: ['page'] },
+      'shader:video-in': { label: 'shader:video-in' },
+      'shader:video-out': { label: 'shader:video-out' },
+      'shader:value-in': { label: 'shader:value-in', shape: { of: 'param', names: KNOBS.map((k) => k.name) } },
+      'screen:video-in': { label: 'original' },
+      'dither:video-in': { label: 'dithered' },
+      ...Object.fromEntries(KNOBS.map((k) => [`knob-${k.name}:value-out`, { label: `knob-${k.name}:value-out` }])),
+    },
+  });
+  // Once on, the camera box takes the device's own name.
+  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b) {

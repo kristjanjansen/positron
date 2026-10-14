@@ -31,6 +31,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createIconButton } from '/shell/icon-button.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
@@ -84,21 +85,15 @@
   const REEL_DAY = `${S}:screen:value-in`, RADIO_DAY = `${S}:speaker:value-in`;
   const PICTURE_CLOCK = `${S}:screen:clock-out`, SPEAKER_CLOCK = `${S}:speaker:clock-in`;
   const bay = createBay();
-  bay.addNode({ id: 'err:newsreel', kind: 'external', label: 'newsreel', place: 'err', net: 'err' });
-  bay.addPort({ id: REEL_OUT, label: 'newsreel', dir: 'out', medium: 'video', transports: ['https'] });
-  bay.addNode({ id: 'err:radio', kind: 'external', label: 'radio', place: 'err', net: 'err' });
-  bay.addPort({ id: RADIO_OUT, label: 'radio', dir: 'out', medium: 'audio', transports: ['https'] });
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture', place: 'browser' });
-  bay.addPort({ id: SCREEN_IN, label: 'picture', dir: 'in', medium: 'video' });
-  bay.addNode({ id: `${S}:speaker`, kind: 'screen', label: 'speakers', place: 'browser' });
-  bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
-  bay.addNode({ id: `${S}:timeline`, kind: 'engine', label: 'timeline', place: 'browser' });
-  bay.addPort({ id: DAY_OUT, label: 'day', dir: 'out', medium: 'value' });
-  bay.addPort({ id: PLAYHEAD_IN, label: 'playhead', dir: 'in', medium: 'clock' });
-  bay.addPort({ id: REEL_DAY, label: 'day', dir: 'in', medium: 'value' });
-  bay.addPort({ id: RADIO_DAY, label: 'day', dir: 'in', medium: 'value' });
-  bay.addPort({ id: PICTURE_CLOCK, label: 'position', dir: 'out', medium: 'clock' });
-  bay.addPort({ id: SPEAKER_CLOCK, label: 'sync', dir: 'in', medium: 'clock' });
+  addNodes(bay, S, ['newsreel', 'err-radio', 'screen', 'speaker', 'timeline'], {
+    label: { screen: 'picture' },
+    ports: {
+      [REEL_OUT]: { label: 'newsreel' }, [RADIO_OUT]: { label: 'radio' },
+      [SCREEN_IN]: { label: 'picture' }, [REEL_DAY]: { label: 'day' }, [PICTURE_CLOCK]: { label: 'position' },
+      [SPEAKER_IN]: { label: 'speakers' }, [RADIO_DAY]: { label: 'day' }, [SPEAKER_CLOCK]: { label: 'sync' },
+      [DAY_OUT]: { label: 'day' }, [PLAYHEAD_IN]: { label: 'playhead' },
+    },
+  });
 
   const held = new Map();
   function hold(a, b, opts) {

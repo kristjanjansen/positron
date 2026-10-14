@@ -22,6 +22,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { fetchIceServers, camWhipPublish, camWhep, whepPlay, CAM_WHIP_PROXY } from '/shell/live.mjs';
@@ -78,16 +79,18 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   // The camera's video goes to Stream's WebRTC input by WHIP and comes back by WHEP.
   const bay = createBay();
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'original', place: 'browser' });
+  addNodes(bay, S, ['camera', 'screen'], {
+    ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
+  });
+  // not in nodes.mjs yet: the Stream hops are left out of the catalogue (plan, Not settled).
   bay.addNode({ id: 'cf-stream:live', kind: 'endpoint', label: 'Stream WebRTC input', place: 'cloudflare', net: 'cloudflare' });
-  bay.addNode({ id: `${S}:loopback`, kind: 'screen', label: 'WebRTC', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video' });
-  bay.addPort({ id: SCREEN, label: 'original', dir: 'in', medium: 'video' });
   bay.addPort({ id: LIVE_IN, label: 'video', dir: 'in', medium: 'video', transports: ['whip'] });
   bay.addPort({ id: LIVE_OUT, label: 'video', dir: 'out', medium: 'video', transports: ['whep'] });
-  bay.addPort({ id: LOOP, label: 'WebRTC', dir: 'in', medium: 'video', transports: ['whep'] });
+  addNodes(bay, S, [{ name: 'screen', as: 'loopback', label: 'WebRTC' }], {
+    ports: { 'loopback:video-in': { label: 'WebRTC', transports: ['whep'] } },
+  });
+  // Once on, the camera box takes the device's own name.
+  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b, via) {

@@ -39,6 +39,7 @@
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createWaveShape } from '/shell/synth-view.mjs';
   import { createBay, printLink, checkTransforms } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
   useMediumColours();
 
@@ -77,11 +78,6 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  for (const [n, kind, label] of [['keys', 'person', 'keyboard'], ['synth', 'engine', 'saw synth'],
-    ['fx', 'engine', 'low-pass filter'], ['rec', 'store', 'recorder'],
-    ['scope', 'screen', 'scope'], ['speaker', 'screen', 'speakers']]) {
-    bay.addNode({ id: `${S}:${n}`, kind, label, place: 'browser' });
-  }
 
   // ── sound: a sawtooth per held note (a low-pass is inaudible on a sine) ──
   let ctx = null, bus = null, filter = null, scopeIn = null;
@@ -145,20 +141,18 @@
   }
 
   // Every port has a label, because the agent reads it to know what a port is.
-  const PORTS = [
-    { id: `${S}:keys:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'keyboard, the notes I play' },
-    { id: `${S}:synth:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'synth, notes in',
-      deliver: (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)) },
-    { id: `${S}:synth:audio-out`, dir: 'out', medium: 'audio', label: 'synth, sound out' },
-    { id: `${S}:fx:audio-in`, dir: 'in', medium: 'audio', label: 'low-pass filter, sound in' },
-    { id: `${S}:fx:audio-out`, dir: 'out', medium: 'audio', label: 'low-pass filter, sound out' },
-    { id: `${S}:rec:midi-in`, dir: 'in', medium: 'midi', accepts: ['note'], label: 'recorder, notes to record',
-      deliver: record },
-    { id: `${S}:rec:midi-out`, dir: 'out', medium: 'midi', emits: ['note'], label: 'recorder, the notes it recorded' },
-    { id: `${S}:scope:audio-in`, dir: 'in', medium: 'audio', label: 'scope, shows the sound' },
-    { id: `${S}:speaker:audio-in`, dir: 'in', medium: 'audio', label: 'speakers' },
-  ];
-  for (const p of PORTS) bay.addPort(p);
+  const L = (label) => ({ label });
+  addNodes(bay, S, ['keys', 'synth', 'fx', 'rec', 'scope', 'speaker'], {
+    deliver: { 'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)), 'rec:midi-in': record },
+    label: { synth: 'saw synth', scope: 'scope' },
+    ports: {
+      'keys:midi-out': L('keyboard, the notes I play'),
+      'synth:midi-in': L('synth, notes in'), 'synth:audio-out': L('synth, sound out'),
+      'fx:audio-in': L('low-pass filter, sound in'), 'fx:audio-out': L('low-pass filter, sound out'),
+      'rec:midi-in': L('recorder, notes to record'), 'rec:midi-out': L('recorder, the notes it recorded'),
+      'scope:audio-in': L('scope, shows the sound'), 'speaker:audio-in': L('speakers'),
+    },
+  });
 
   const d = mount({ name: 'Patch from words', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('room/words');
@@ -178,7 +172,7 @@
 
   async function go(i) {
     const text = REQUESTS[i];
-    const ports = PORTS.map((p) => ({ id: p.id, label: p.label, dir: p.dir }));
+    const ports = bay.ports().map((p) => ({ id: p.id, label: p.label, dir: p.dir }));
     d.log(`asked: ${text}`);
     let out;
     try {

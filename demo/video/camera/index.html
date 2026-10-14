@@ -24,6 +24,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -45,11 +46,12 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'picture', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: SCREEN, label: 'picture', dir: 'in', medium: 'video' });
+  addNodes(bay, S, ['camera', 'screen'], {
+    label: { screen: 'picture' },
+    ports: { 'camera:video-out': { label: 'camera', transports: ['page'] }, 'screen:video-in': { label: 'picture' } },
+  });
+  // Once on, the camera box takes the device's own name.
+  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b) {

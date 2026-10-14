@@ -25,6 +25,7 @@
   import { conceptNav } from '/shell/concept-nav.mjs';
   import { mount, el, armVideo, recorderMime } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
+  import { addNodes } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
   import { createButtonGroup } from '/shell/button-group.mjs';
@@ -76,22 +77,19 @@
 
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
-  const camNode = (label) => bay.addNode({ id: `${S}:camera`, kind: 'device', label, place: 'browser' });
-  camNode('camera');
-  bay.addNode({ id: `${S}:screen`, kind: 'screen', label: 'camera', place: 'browser' });
-  bay.addNode({ id: `${S}:rec`, kind: 'engine', label: 'recorder', place: 'browser' });
-  bay.addNode({ id: `${S}:store`, kind: 'store', label: 'this browser', place: 'browser' });
-  bay.addNode({ id: `${S}:player`, kind: 'engine', label: 'player', place: 'browser' });
-  bay.addNode({ id: `${S}:playback`, kind: 'screen', label: 'playback', place: 'browser' });
-  bay.addPort({ id: CAM, label: 'camera', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: SCREEN, label: 'camera', dir: 'in', medium: 'video' });
-  bay.addPort({ id: REC_IN, label: 'rec:video-in', dir: 'in', medium: 'video' });
-  bay.addPort({ id: REC_OUT, label: 'rec:file-out', dir: 'out', medium: 'file' });
-  bay.addPort({ id: ST_IN, label: 'store:file-in', dir: 'in', medium: 'file' });
-  bay.addPort({ id: ST_OUT, label: 'store:file-out', dir: 'out', medium: 'file' });
-  bay.addPort({ id: PL_IN, label: 'player:file-in', dir: 'in', medium: 'file' });
-  bay.addPort({ id: PL_OUT, label: 'player:video-out', dir: 'out', medium: 'video', transports: ['page'] });
-  bay.addPort({ id: PLAYBACK, label: 'playback', dir: 'in', medium: 'video' });
+  addNodes(bay, S, ['camera', 'screen', 'rec-video', 'store', 'player-video', { name: 'screen', as: 'playback', label: 'playback' }], {
+    label: { screen: 'camera' },
+    ports: {
+      'camera:video-out': { label: 'camera', transports: ['page'] },
+      'screen:video-in': { label: 'camera' },
+      'rec:video-in': { label: 'rec:video-in' }, 'rec:file-out': { label: 'rec:file-out' },
+      'store:file-in': { label: 'store:file-in' }, 'store:file-out': { label: 'store:file-out' },
+      'player:file-in': { label: 'player:file-in' }, 'player:video-out': { label: 'player:video-out' },
+      'playback:video-in': { label: 'playback' },
+    },
+  });
+  // Once on, the camera box takes the device's own name.
+  const camNode = (label) => { bay.node(`${S}:camera`).label = label; };
 
   const held = new Map();          // "from to" -> link id
   function hold(a, b) {
