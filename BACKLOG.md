@@ -1,5 +1,9 @@
 ## Open
 
+- **Plaits on the Pi, route A: the native JACK client, board service and pi-1:plaits node** (2026-10-14). Asked: *"Move on"* after step 1 of plans/plan-plaits-on-pi.md. Code only on this machine; installing libjack-jackd2-dev and pushing to the Pi wait for the owner.
+
+- **/connect/: the drum machine is sometimes silent** (2026-10-14). Found by the harness: red in 3 of 6 runs, engine up, context running, 11 hits heard, 0 at the speakers. A visitor can hit it. Ruled out on 2026-10-14 by reading: a closed context (audio.mjs suspends, never closes), definitions not loaded (`eng` is set only after every /d_recv), the machine's internal links (laid once, never removed), late bundles (scsynth.mjs: a past time plays late, not dropped). NOT a finding: "inside the machine 0", because routeAudio (audio-router.mjs) disconnects every out before routing, which also cuts the drum machine's own meter (junction to `an`); that field was removed from the assert. Next: log routeAudio's edges at the moment of the red, and whether the drum runtime's start() ran its reroute.
+
 - ~~**Rename plai to plaits**~~ (2026-10-14, DONE: plaits.wasm rebuilt in Docker, emcc 6.0.10 as before, 200780 bytes; plaits_* exports, plaits_shim.cc, PROVENANCE-plaits.json; muta and connect green). Asked: *"Rename plai to plaits"*. The wasm, the shim, its `plai_*` exports, `build.sh`'s module name and the pages that load it.
 
 - ~~**The hero's "Connect" is a secret link to /connect/**~~ (2026-10-14, DONE). Asked: *"make connect header title into a link to connect page. "secret link" no visual hover/cursor erc"*. demo/shell/hero.mjs `head`.

@@ -1106,7 +1106,7 @@
     const drumsLoud = runtime.level();
     A('Play on its bar sends steps over web:sequencer -> web:drum, and the drums reach the speakers',
       seq.heard() > s0 && drum.heard() > d0 + 4 && drumsLoud > 0.005,
-      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}; inside the machine ${drum.level?.().toFixed?.(4)}, engine ${!!drum.machine.engine?.()}, context ${runtime.context()?.state}`);
+      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}; engine ${!!drum.machine.engine?.()}, context ${runtime.context()?.state}`);
     // A second link out of the sequencer keeps it running, so taking the drums' link away is the only change.
     const KEYS_IN = W('keys', 'midi-in');
     connect(W('sequencer', 'midi-out'), KEYS_IN);
