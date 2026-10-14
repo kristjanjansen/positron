@@ -1,5 +1,7 @@
 ## Open
 
+- **The Pi announces collide, drums and camera (and the shader question), so /connect/ and the live layer can see them** (2026-10-14, agent). Asked: *"Make pi announce"*. boardGraph() in graph-registry.mjs and rig/board; tested on fake-board; the push to the Pi is done by the session after.
+
 - **Catalogue decisions 2 to 5** (2026-10-14). Asked: *"Do 2-5"*. (2) merge duplicates into tempo, grains, player; (3) one default label per type, the most common, a sine stays sine, "waveform" and "picture" replace the variants (changes words on pages); (4) recorder is a store, the mix knob a person; (5) per-instance nodes on /connect/ (two of a type, the single knob picker). Starts when the page-move agent (nodes.mjs) and the announce agent (/connect/) land.
 
 - **Research: WebMCP, could positron use it** (2026-10-14, agent). Asked: *"Inevstigate webmcp could we ise it. Research"*. Output `research/webmcp-2026-10-14.md`.
