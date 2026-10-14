@@ -23,7 +23,7 @@ general; only the part list changes.
 ## The two base URLs, and they are interchangeable
 
 ```
-https://raw.githubusercontent.com/kristjanjansen/positron/main/<path>
+https://raw.githubusercontent.com/positron-studio/positron/main/<path>
 https://positron.studio/<path minus the leading demo/ or src/ stays as-is>
 ```
 
@@ -41,7 +41,7 @@ not what a fetch returns. `cmp` before concluding anything about a difference.
 ```sh
 mkdir -p src
 curl -fsSL -o src/<file> \
-  https://raw.githubusercontent.com/kristjanjansen/positron/main/<path>
+  https://raw.githubusercontent.com/positron-studio/positron/main/<path>
 ```
 
 `-f` matters: without it a 404 is written into the file as HTML and the failure
@@ -67,7 +67,7 @@ one.
 every exception. The ones that matter: **`demo/grains/` and `demo/patch/` are
 AGPL-3.0-or-later**, which means serving them over a network triggers the
 obligation, and several vendored binaries carry their own terms. Read
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/NOTICE.md` before
+`https://raw.githubusercontent.com/positron-studio/positron/main/NOTICE.md` before
 copying anything under `demo/`.
 ⚠️ **CHECKED 2026-10-14: `demo/grains/` NO LONGER HOLDS A PAGE**, only
 `defs/` (synth definitions), and the scsynth WebAssembly the AGPL line is about

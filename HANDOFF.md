@@ -1,5 +1,18 @@
 # Handoff, 2026-10-14, session 78: social reels, the review fixed, the repo made publishable
 
+## Evening: the repo moved and was scrubbed (this supersedes the GitHub lines below)
+
+- **GitHub: https://github.com/positron-studio/positron is the home, public, history scrubbed and force-pushed.** `main` at `b77ef0c5 build, as deployed`, `session-28-station-videoradio` at `15cb103f`. GitHub may still serve the old commits (old main `7564a0b6`) by hash until Support purges them.
+- **This checkout is a fresh clone of it.** The pre-scrub checkout is `~/personal/positron-old-history` (holds the old history, the ignored files, the `pro` remote); the mirror backup from before the rewrite is `~/personal/positron-backup-2026-10-14.git`; the scrubbed mirror is `~/personal/positron-scrub.git`. Every commit hash in the standing files is from before the rewrite and no longer resolves.
+- **The scrub** (git filter-repo on the mirror, not in place): LAN and public IPs, the work account and address, the home path, the pack repo name, three quoted private lines (two of them wrapped across lines, caught by a regex pass) replaced; `*.pem`, `*.so`, `*.pyc`, `*wrangler-account.json`, the moq binary, the moq spike JS and `proto/m2m/logs/` gone from all history. Every marker counted 0 across all refs. 2608 commits became 2607 (one touched only stripped paths). Authors unchanged. Tip tree identical to before except 36 logs, SDP files and archive docs. `run-tests.mjs` 57 passed, 5 skipped.
+- **A filter-repo started in the background hangs for ever** when `.git/filter-repo/already_ran` is over a day old: it asks a question on stdin. Give it `</dev/null` or answer it.
+- **Ignored files** (`.env`, `node_modules`, packs, certs, logs) were copied from the old checkout by the owner, or still need to be: `rsync` with `git ls-files --others --ignored --exclude-standard --directory` from the old one.
+- Repo URLs repointed: README, the positron-studio-start skill and PARTS, decks.mjs, fetch-salamander.mjs, two evals, CLAUDE.md's push section. The front page's GitHub button already pointed there.
+- The site is unchanged: BUILD `7592662d-154555-a627`. The dev server on :8890 was started from the old checkout.
+- Queued in BACKLOG: the 2 column showy patchbay for phones with a kit comparison page.
+- Open on /connect/: examples 10 (tempo ring), 16 (pixelate), 17 (looper) need lifts; 12 (tuner) needs a decision; 11 and 14 are press only.
+
+## Earlier in the day
 ## Where it is right now
 
 - **Site: BUILD `3a5398a5-102056-262e`**, confirmed on the edge, deployed from a clean worktree of HEAD as every deploy this session. Everything committed is live, including the radio reel https://positron.studio/social/radio/ and the Drums on the Pi lift.

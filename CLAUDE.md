@@ -85,7 +85,10 @@ moves every other control's harness press. When two apply, load both.
 
 🔴 **`git push` ANSWERS `Repository not found`, AND THAT IS AN AUTH FAILURE
 WEARING A 404.** Two accounts are logged in here: the work account, which is
-ACTIVE, and `kristjanjansen`, which owns `github.com/kristjanjansen/positron`.
+ACTIVE, and `kristjanjansen`, which can push to
+`github.com/positron-studio/positron` (the home since 2026-10-14: transferred
+from `kristjanjansen/positron`, public, history scrubbed and force-pushed; the
+pre-scrub checkout is `~/personal/positron-old-history`).
 GitHub returns 404 rather than 403 for a private repo the caller
 cannot see, so the message says the repository does not exist when what it means
 is that this token may not look at it. It cost most of a session, spread over

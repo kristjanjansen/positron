@@ -1,5 +1,7 @@
 ## Open
 
+- **Patchbay on a phone: a showy 2 column view beside the functional 1 column one, compared on a kit page** (2026-10-14). Asked: *"In bg work on alternative version of patchbay view on mobile with 2 cols and more showy while 1 col remains as functional one (more space for cables there). Shot kit comparison page. Will use it on ig, front etc"*. The 1 column bay-view stays as it is; the 2 column one is for show (Instagram, the front page). Touches bay-view / bay-svg in demo/shell/ and a new /kit/ part.
+
 - ~~**Front page social links open in a new window**~~ (2026-10-14, DONE, BUILD 218ecea0). Asked: *"add social links in new win"*.
 
 - ~~**/social/radio/: the real kit slider and station labels as on /radio/tuner/, and the patchbay under it, inside the reel frame**~~ (2026-10-14, DONE). Asked: *"social radio: use actual slider and labels like in demo and partchbay under it"*.
@@ -80,7 +82,7 @@
 
 - ~~**Skills distribution, the pre-transfer half: clean private lines, mark private skills internal, rename the public ones**~~ (2026-10-14, DONE; private originals in ~/personal/positron-private/). Asked: *"do these in bg"*, quoting the plan's "My part before the transfer".
 
-- **Skills distribution: move the repo to positron-studio/positron, clean it, publish skills from it** (2026-10-14). Asked: *"kristjanjansen/positron -> positron-studio/positron perhaps?"*, *"write to plan, will do later"*. Plan: `plans/plan-skills-distribution.md`. Waits on the owner (org, transfer).
+- **Skills distribution: move the repo to positron-studio/positron, clean it, publish skills from it** (2026-10-14; move and history scrub DONE 2026-10-14 evening, force-pushed as b77ef0c5; publishing the skills still open). Asked: *"kristjanjansen/positron -> positron-studio/positron perhaps?"*, *"write to plan, will do later"*. Plan: `plans/plan-skills-distribution.md`. Waits on the owner (org, transfer).
 
 - ~~**Docs consolidation, steps 2 and 3 of plans/plan-consolidate-docs-2026-10-14.md**~~ (2026-10-14, DONE, 91a2d824). Asked: *"do all"*. Five merges that break nothing, ten moves to archive/plans/ with stubs, indexes updated.
 

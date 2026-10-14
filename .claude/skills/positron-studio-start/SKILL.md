@@ -25,7 +25,7 @@ two of a push is serving the previous version. `cmp` before concluding a rule
 was ignored.
 ✅ **IF THE REVISION YOU ARE READING IS OLDER THAN A FEW MONTHS, SAY SO AND
 OFFER TO RE-FETCH IT:**
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/SKILL.md`
+`https://raw.githubusercontent.com/positron-studio/positron/main/.claude/skills/positron-studio-start/SKILL.md`
 
 
 🔴 **ASSUME THE PERSON READING THIS IS NOT A DEVELOPER.** They pasted a prompt
@@ -239,13 +239,13 @@ step.
 git --version      # check before you use it, it may not be there
 ```
 
-- **Git is there**: `git clone https://github.com/kristjanjansen/positron`.
+- **Git is there**: `git clone https://github.com/positron-studio/positron`.
 - **Git is missing, macOS**: `xcode-select --install` opens a GUI installer the
   person has to click. **Ask first**, and offer the zip instead, which installs
   nothing at all since `curl` and `unzip` ship with the system:
 
 ```sh
-curl -L -o positron.zip https://github.com/kristjanjansen/positron/archive/refs/heads/main.zip
+curl -L -o positron.zip https://github.com/positron-studio/positron/archive/refs/heads/main.zip
 unzip -q positron.zip     # unpacks as positron-main/
 ```
 
@@ -534,7 +534,7 @@ dashboard problems, not config problems.
 
 🔴 **THE STREAMING KNOWLEDGE IS IN A SKILL OF ITS OWN AND IS NOT REPEATED HERE.**
 Read it when the answer turns on a detail:
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-streaming/SKILL.md`
+`https://raw.githubusercontent.com/positron-studio/positron/main/.claude/skills/positron-streaming/SKILL.md`
 It carries the LL-HLS and `hls.js` tuning, what each knob actually changed, the
 relay, and the traps. Tuned values live beside the pages that use them, for
 example `liveSyncDurationCount: 3` with `maxBufferLength: 12` and
@@ -662,7 +662,7 @@ next to and can reload by hand when it sulks.
 file out of this repository is the same job whatever the file is, and writing it
 out once per subject is how four slightly different versions of one instruction
 get made. Read it before fetching anything:
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/PARTS.md`
+`https://raw.githubusercontent.com/positron-studio/positron/main/.claude/skills/positron-studio-start/PARTS.md`
 It carries the two base URLs, the `curl` form, the four checks that decide
 whether a file transfers at all, the table of parts that are known to, and the
 list of things that look reusable and are not.
@@ -1109,7 +1109,7 @@ worth taking and why. The mechanics of actually getting a file into somebody
 else's project, the two base URLs, the `curl` form, the four checks that decide
 whether a file transfers, and the table of parts that are known to, are one
 fetch away:
-`https://raw.githubusercontent.com/kristjanjansen/positron/main/.claude/skills/positron-studio-start/PARTS.md`
+`https://raw.githubusercontent.com/positron-studio/positron/main/.claude/skills/positron-studio-start/PARTS.md`
 ⚠️ **READ IT BEFORE COPYING ANY FILE OUT OF HERE**, including one this section
 recommends. A file that imports something else in this repository drags a tree
 behind it, and the failure shows up after they have built on it.
