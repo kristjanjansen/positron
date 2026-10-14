@@ -1,35 +1,7 @@
-// demo/shell/circuit-syx.mjs
-// A Novation Circuit SysEx stream, read: the 7 to 8 packing that carries whole
-// sessions over MIDI, and the command byte that says whether a file would write
-// flash.
-//
-// 🔴 NOTHING HERE SENDS ANYTHING ANYWHERE, AND NOTHING HERE PACKS. There is no
-// Web MIDI, no output port, no network call, and no function that turns bytes
-// INTO a SysEx stream. Reading one is safe. Building one is the first half of
-// sending one, so it does not exist. `circuit-syx-test.mjs` asserts the absence
-// over the exported names and over this file's own source text.
-//
-// 🔴 AND THE REASON THIS EXISTS IS A FILE THAT LIES ABOUT WHAT IT IS.
-// `on_the_run.circuitpack`, off archive.org, is NOT a zip. It is a bare SysEx
-// stream, and MEASURED it carries 64 patch messages whose command byte is `01`
-// on every one, at locations 0 through 63, all distinct. `01` is `Replace
-// Patch`, the one that writes FLASH, and those locations are every synth slot on
-// an instrument with no factory reset. `CLAUDE.md` says the 128 loose `.syx`
-// files in `purchased/` are safe because byte 6 is `00` on every one. That is
-// true of `purchased/` and it is NOT true of the wider archive.
-// ✅ SO `survey()` ANSWERS THE SAFETY QUESTION FIRST, before anything else about
-// the file, and a page that opens one of these should show that answer before it
-// shows a single patch name.
-//
-// ✅ THE SESSION TRANSPORT IS GRADED, NOT ASSUMED. Decoded this way, **66 of 66
-// sessions** out of `on_the_run.circuitpack` and `factory_16.syx` parse AND
-// round trip byte identical through `demo/shell/circuit-session.mjs`. Those are
-// 66 session images from two sources that have nothing to do with the owner's
-// instrument, which is a far harder grade than the owner's own 32.
-//
-// ⚠️ 33 SESSIONS PER FILE AND NOT 32, in both files measured. The Circuit has 32
-// slots. What the 33rd is, is NOT KNOWN. A scratch slot or the currently loaded
-// one are both readings and neither is measured.
+// demo/shell/circuit-syx.mjs: a Circuit SysEx stream, read: the 7 to 8 packing and the command byte
+// that says whether a file writes flash. Nothing here sends or packs. `survey()` answers safety first.
+// 66 of 66 sessions from two foreign files round trip; 33 per file, and what the 33rd is is not known.
+// why: lessons/kit-circuit-syx.md#header
 
 import { COMMANDS, PATCH_BYTES } from './circuit-patch.mjs';
 
@@ -50,10 +22,8 @@ export const CARRIERS_PER_SESSION = 208;
 export const GROUP = 8;
 
 /**
- * Every `F0 ... F7` message in a stream, as views into the input.
- * ⚠️ Bytes outside a message are skipped rather than refused, because these
- * files are concatenations and a stray byte between messages is not a reason to
- * refuse the 6,930 that parse.
+ * Every `F0 ... F7` message in a stream, as views into the input. Stray bytes between are skipped.
+ * why: lessons/kit-circuit-syx.md#messages
  */
 export function messages(buf) {
   const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
@@ -87,10 +57,9 @@ export function unpack7(payload) {
 }
 
 /**
- * The 53,248 byte session images a stream carries, in order.
- * ⚠️ A trailing partial session is DROPPED and counted rather than returned
- * half built, and `survey()` reports the count, because a short last session
- * returned silently is a wrong answer that looks like an empty one.
+ * The 53,248 byte session images a stream carries, in order. A trailing partial one is dropped
+ * and counted, never returned half built.
+ * why: lessons/kit-circuit-syx.md#sessionsin
  */
 export function sessionsIn(buf, sessionLength = 53248) {
   const carriers = messages(buf).filter((m) => m.length === CARRIER_BYTES);
@@ -147,7 +116,8 @@ export function survey(buf) {
     kinds[k] = (kinds[k] || 0) + 1;
   }
   return {
-    // 🔴 FIRST, AND IT IS FIRST ON PURPOSE.
+    // First on purpose.
+    // why: lessons/kit-circuit-syx.md#writesflash
     writesFlash: flash.length > 0,
     flashMessages: flash.length,
     flashLocations: [...new Set(flash.map((p) => p.location))].sort((a, b) => a - b),

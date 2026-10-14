@@ -1,31 +1,7 @@
-// demo/shell/board-video.mjs: the Raspberry Pi's picture, received and decoded.
-//
-// Taken out of /mirror/ on 2026-10-12 (BACKLOG, "shader/010 on the real Pi")
-// so that /shader/remote/ can show the board's real picture with the same
-// code /mirror/ has run since 2026-09-11, rather than a second copy of it.
-//
-// WHAT THE BOARD SENDS (rig/board/board.mjs, `sendFrame`). After `video.start`
-// on the board's own room, the board joins `<room>-video` (the `room` field of
-// its `video.started` reply) and sends one binary frame per H.264 access unit:
-//
-//   bytes 0..3   uint32 LE, the board's frame counter, 0 at `video.start`
-//   bytes 4..7   uint32 LE, flags; bit 0 set on a keyframe
-//   bytes 8..    the access unit, Annex B, baseline (`avc1.42E01E`)
-//
-// ⚠️ THE COUNTER IS THE ONLY WITNESS OF LOSS. The relay drops frames with no
-// error, no close and no backpressure (MEASURED: 101 of 361 at 8 Mbit/s), so a
-// jump in it is counted and handed to `onLost`.
-// ⚠️ A DECODER MUST START ON A KEYFRAME. Fed a delta frame first it reports an
-// error once and stays broken, so a joiner waits for bit 0, up to one GOP.
-//
-// The control messages (`video.start`, `video.params`, `video.shader`,
-// `video.status`, `video.stop`) go over whatever socket the page already holds
-// to the board; this module only needs `send` for `video.watching`, which tells
-// the board somebody is still looking so it can stop when nobody is.
-//
-//   const v = createBoardVideo({ canvas, send, onFrame, onSeq, onLost, onRate });
-//   v.open(reply.room, reply);   // reply = the board's `video.started`
-//   v.close();                   // answers { decoded, lost }
+// demo/shell/board-video.mjs: the Pi's picture, received and decoded. One binary frame per H.264
+// access unit on `<room>-video`: uint32 LE counter, uint32 LE flags (bit 0 keyframe), Annex B.
+// The counter is the only witness of loss (101 of 361 dropped at 8 Mbit/s); decode starts on a keyframe.
+// why: lessons/kit-board-video.md#header
 import { RELAY_BASE } from './wire.mjs';
 
 /** What /mirror/ asks the board for, and what every page here has asked so far. */
@@ -51,10 +27,9 @@ export function parseBoardFrame(buf) {
  * @param {function} [onRate]         `(kbit, fps)` once a second while frames arrive.
  * @param {function} [onClose]        the video socket closed, including by `close()`.
  * @param {function} [onError]        `(text)` a decode error or a refused chunk.
- * @param {function} [onText]         `(msg)` a text frame on the video socket, parsed as JSON. Since
- *                                    2026-10-13 for the Pi camera's keyed room (rig/board/camera.mjs),
- *                                    whose board speaks there; the shader picture's room is binary only.
+ * @param {function} [onText]         `(msg)` a JSON text frame on the video socket, for the Pi camera's keyed room.
  * @param {function} [onOpen]         the video socket opened.
+ * why: lessons/kit-board-video.md#createboardvideo
  */
 export function createBoardVideo({
   canvas, send = null, relay = RELAY_BASE,
@@ -64,9 +39,9 @@ export function createBoardVideo({
   const ctx = canvas.getContext('2d');
   let ws = null, decoder = null, decoded = 0, lost = 0, bytes = 0, fps = 0, kbit = null;
   let waitingForKey = true, last = -1, lastSeq = null, lastAt = 0;
-  // Whether binary frames on the socket are drawn. Off while the same frames
-  // arrive another way (`feed`, the Pi camera's direct link on
-  // /remote/circuit/, since 2026-10-13); the socket stays open for text.
+  // Whether binary frames on the socket are drawn. Off while the same frames arrive another way
+  // (`feed`, the Pi camera's direct link); the socket stays open for text.
+  // why: lessons/kit-board-video.md#fromsocket
   let fromSocket = true;
   let take = null;
   const watching = setInterval(() => {
@@ -105,10 +80,9 @@ export function createBoardVideo({
     const sock = ws = new WebSocket(`${relay}/room/${room}/ws`);
     sock.binaryType = 'arraybuffer';
     let tick = 0, at = performance.now();
-    // ⚠️ `hello` IS THE FIRST MESSAGE ON THE SOCKET, and the Pi camera's room
-    // needs it: the relay lets a socket in a keyed room hear nothing until its
-    // first message carries the key (workers/relay/src/index.js `CAM_ROOM`).
-    // In the message, not the URL, so the key is not in a request log.
+    // `hello` is the first message: a keyed room hears nothing until a first message carries the
+    // key (workers/relay/src/index.js `CAM_ROOM`). In the message, not the URL, to stay out of logs.
+    // why: lessons/kit-board-video.md#hello
     sock.onopen = () => {
       if (ws !== sock) return;
       if (hello) { try { sock.send(JSON.stringify(hello)); } catch { /* closing */ } }

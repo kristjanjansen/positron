@@ -1,12 +1,7 @@
-// demo/shell/instruments-test.mjs — the desk's taxonomy, with no browser.
-//
-//   node demo/shell/instruments-test.mjs
-//
-// 🔴 A LOOKUP TABLE IS THE SHAPE OF CODE THAT PASSES A NAIVE TEST BY ACCIDENT.
-// A `describe()` that returned the raw name for everything would satisfy any
-// check that only asks whether something came back, so the asserts below name
-// the exact maker, and the ones marked NEGATIVE CONTROL are written so that a
-// specific wrong implementation fails them.
+// demo/shell/instruments-test.mjs: the desk's taxonomy, with no browser.
+// `node demo/shell/instruments-test.mjs`. Asserts name the exact maker; negative controls fail a
+// specific wrong implementation, since a lookup table passes a naive test by accident.
+// why: lessons/kit-instruments.md#test-header
 import { DESK, KINDS, describe, alias, normalise, sounds, resolve, tokenise, reword } from './instruments.mjs';
 
 let pass = 0, fail = 0;
@@ -30,8 +25,8 @@ ok('every entry on the desk has a kind and it is one of KINDS',
   DESK.every((e) => KINDS.includes(e.kind)),
   DESK.map((e) => e.kind).join(', '));
 
-// 3. Each of the four kinds the owner named is actually on the desk.
-//    Asked as *"also keyboard drum machine mixer soundcard"*.
+// 3. Each of the four named kinds is actually on the desk.
+// why: lessons/kit-instruments.md#t3-kinds
 {
   const reachable = new Set(DESK.flatMap((e) => [e.kind, ...(e.also || [])]));
   const want = ['keyboard', 'drum machine', 'mixer', 'soundcard'];
@@ -82,10 +77,8 @@ ok('the virtual bus is the only entry nobody plays',
     `${c.full} against ${t.full}`);
 }
 
-// 8b. NEGATIVE CONTROL, AND IT IS THE ONE THE REAL DESK FOUND. Enriching both
-//     of the Model 12's port pairs to `TASCAM Model 12` gave `/bay/` two rows
-//     with the same name and nothing to tell them apart. A more specific entry
-//     has to win, which means order matters and `find` is order dependent.
+// 8b. NEGATIVE CONTROL: the Model 12's two port pairs must not share a name; order matters.
+// why: lessons/kit-instruments.md#t8b
 {
   const midi = describe('Model 12 MIDI IN');
   const daw = describe('Model 12 DAW Control IN');
@@ -143,14 +136,9 @@ ok('every note is one short sentence',
   DESK.every((e) => !e.note || (e.note.split(/\s+/).length <= 20 && !/\.\s/.test(e.note))),
   DESK.map((e) => e.note.split(/\s+/).length).join(', ') + ' words');
 
-// ── hearing a name wrong ──────────────────────────────────────────────────
-//
-// 🔴 EVERY NEGATIVE CONTROL BELOW IS A REAL FALSE MATCH FROM THE FIRST BUILD,
-// not an invented worry. `connect` matched Novation Circuit at one edit,
-// `machine from` matched the Model 12's DAW control, and `keyboard` matched the
-// M-Audio Fast Track Pro. Reported from the other side in the same minute:
-// *"circuit gets mistaken for secury"*. A matcher like this fails by being too
-// helpful, so the asserts that matter are the ones about silence.
+// Hearing a name wrong. Every negative control below is a real false match from the first build;
+// the asserts that matter are the ones about silence.
+// why: lessons/kit-instruments.md#t-hearing
 
 // 16. Spoken digits become a model number, which is what a person says out loud.
 ok('a spoken model number normalises to digits',
@@ -189,9 +177,8 @@ ok('tascam and task am reduce to the same sound',
     noisy.length ? `matched in: ${noisy.join(' | ')}` : `${quiet.length} sentences, all silent`);
 }
 
-// 20. NEGATIVE CONTROL, AND THE SHARPEST ONE. `connect` is one edit from
-//     `circuit` by sound and shares its first letter, so no threshold separates
-//     them. The stop list does, and this is the assert that says so.
+// 20. NEGATIVE CONTROL: `connect` is one edit from `circuit`; only the stop list separates them.
+// why: lessons/kit-instruments.md#t20
 ok('NEGATIVE CONTROL: the verb "connect" never resolves to the Circuit',
   !resolve('connect').length && !resolve('connect connect').length
   && resolve('circuit').some((h) => h.full === 'Novation Circuit'),
@@ -213,23 +200,9 @@ ok('NEGATIVE CONTROL: an instrument that is not on the desk is never resolved',
     h && h.how === 'exact' && h.cost === 0, h ? `${h.how} ${h.cost}` : 'no hit');
 }
 
-// ── what the real speech models actually said ─────────────────────────────
-//
-// 🔴 EVERYTHING ABOVE THIS LINE WAS GRADED ON MIS-HEARINGS SOMEBODY INVENTED,
-// AND THAT IS WHAT THESE ROWS REPLACE. Asked 2026-09-21: *"do a comprehensive
-// rig testing on get good lookups"*, on the grounds that the positives and the
-// negative controls were both made up. **48 instructions were synthesised with
-// `say` across six voices** (Daniel en_GB, Samantha en_US, Karen en_AU, Moira
-// en_IE, Tessa en_ZA, Rishi en_IN), converted to webm/opus, and put through
-// **three real Whisper models on Workers AI, once each, 144 calls**. Every
-// transcript below is a string a model returned, quoted exactly, including the
-// leading space `whisper-tiny-en` puts on everything.
-// `research/name-lookups-2026-09-21.md` has all 144 and the arithmetic.
-//
-// ⚠️ THE SUBSET HERE IS THE SOUND BRANCH'S WORK AND THE SILENCES. A transcript
-// the models got word for word is graded by the asserts above; what is worth
-// keeping is every row where the name arrived broken and every row where a
-// person named nothing.
+// What real speech models said: 48 instructions in six `say` voices through three Whisper models,
+// 144 transcripts quoted exactly. Kept: rows where the name arrived broken and rows naming nothing.
+// why: lessons/kit-instruments.md#t-heard
 
 /** [transcript as returned, models that returned it, what must be found] */
 const HEARD = [
@@ -271,10 +244,8 @@ const HEARD = [
     wrong.length === 0, wrong.length ? wrong.join(' | ') : `${HEARD.length} transcripts, ${HEARD.reduce((a, h) => a + h[2].length, 0)} instruments`);
 }
 
-// 🔴 THE OTHER HALF, AND IT IS THE HALF THIS MATCHER IS CALIBRATED FOR. Sixteen
-// of the forty eight instructions name nothing on this desk, and all three
-// models transcribed all sixteen. **48 of 48 resolve to nothing**, which is the
-// number that has to stay where it is.
+// Sixteen of the 48 instructions name nothing; 48 of 48 transcripts must resolve to nothing.
+// why: lessons/kit-instruments.md#t-silences
 {
   const quiet = [
     'Make it louder.', 'Stop everything.', 'Put the mod wheel on the filter',
@@ -294,13 +265,9 @@ const HEARD = [
       : `${quiet.length} transcripts, all silent`);
 }
 
-// 🔴 NEGATIVE CONTROL FOR THE FLOOR ON WHAT WAS SAID, WHICH IS A CHANGE MADE ON
-// THIS EVIDENCE. `card` and `chord` both reduce to `krt`, one edit from `kprt`
-// (keyboard) and one from `krkt` (Circuit). Before the floor applied to the
-// spoken side, *"The sound card is on channel 1."* found the keyboard and the
-// Circuit as well as the soundcard, and *"Play a chord and hold it down."* found
-// both of them having named nothing. Four of the thirteen measured false
-// positives, and it is the soundcard that must survive.
+// NEGATIVE CONTROL for the floor on what was said: `card` and `chord` reduce to `krt`, one edit from
+// keyboard and Circuit. The soundcard must survive.
+// why: lessons/kit-instruments.md#t-floor
 {
   const card = resolve('The sound card is on channel 1.').map((h) => h.full);
   const chord = resolve('Play a chord and hold it down.').map((h) => h.full);
@@ -309,11 +276,9 @@ const HEARD = [
     `card -> ${card.join(', ')}, chord -> ${chord.join(', ') || 'nothing'}`);
 }
 
-// 🔴 NEGATIVE CONTROL FOR `control` IN THE STOP LIST, ALL FOUR INFLECTIONS. It
-// was the last false positive standing against the real transcripts and it
-// stood on all three models. The positive half matters as much: `controller`
-// said properly still finds the keyboard, because the exact branch never reads
-// the stop list.
+// NEGATIVE CONTROL for `control` in the stop list, all four inflections; `controller` still finds
+// the keyboard through the exact branch.
+// why: lessons/kit-instruments.md#t-control
 {
   const daw = resolve('The Tascam Model 12 door control does nothing at all.').map((h) => h.full);
   const inflected = ['a controlled sound', 'controlling the level', 'the control room',
@@ -325,11 +290,9 @@ const HEARD = [
     `daw -> ${daw.join(', ')}, inflections ${inflected.join(' | ') || 'all silent'}`);
 }
 
-// 🔴 NEGATIVE CONTROL FOR THE EXACT BRANCH READING THE STOP LIST. `bus` is the
-// IAC Driver's kind and it is ordinary mixing English. The sound floor already
-// refused it, so only an exact hearing could reach it, and two did: `the master
-// bus` and `a bus compressor` both resolved to the Apple IAC Driver. The test is
-// the WHOLE alias, so `virtual bus` is untouched, and that is the positive half.
+// NEGATIVE CONTROL: `the master bus` and `a bus compressor` must not reach the IAC Driver;
+// `virtual bus` still does.
+// why: lessons/kit-instruments.md#t-bus
 {
   const mix = ['the master bus', 'a bus compressor', 'the mix bus', 'the aux bus']
     .filter((s) => resolve(s).length);
@@ -339,12 +302,9 @@ const HEARD = [
     `${mix.join(' | ') || 'four mixing phrases silent'}, virtual bus -> ${real.join(', ')}`);
 }
 
-// 🔴 NEGATIVE CONTROL FOR THE WINDOW RUNNING FROM ONE TOKEN. Widening it is the
-// one LOOSENING in this round, bought by `MK425C` arriving as a single token
-// from all three models. These five are the words that a narrower said-side
-// floor would have let in, so they are exactly where a wider window would show
-// up if it had opened anything. It changed the answer on none of 132 ordinary
-// studio phrases and these are five of them.
+// NEGATIVE CONTROL for the window running from one token: five ordinary words a wider window
+// could have let in. It changed none of 132 studio phrases.
+// why: lessons/kit-instruments.md#t-window
 {
   const loud = ['grab the fader', 'group the channels', 'the disk is full',
     'copper wire on the jack', 'a task for later', 'a grip on it', 'the tusk']
@@ -355,30 +315,23 @@ const HEARD = [
       : 'seven near misses silent');
 }
 
-// 🔴 NEGATIVE CONTROL FOR THE STOP TOKEN EXEMPTION, AND IT IS THE ONE THAT
-// PRICED THE OBVIOUS REPAIR. A stop word is ignored only when taking it out
-// leaves the sound key the SAME string, which proves it did not contribute. The
-// obvious version, dropping stop words and comparing the rest, resolves *"crack
-// the gate open"* to the Novation Circuit at distance 0, because `crack gate`
-// reduces to `krkt` and so does `circuit`. With the `the` in, the span reduces
-// to `krktkt`, a different string, and this refuses it.
+// NEGATIVE CONTROL for the stop token exemption: `crack the gate open` must not become the
+// Circuit, which the obvious repair does at distance 0.
+// why: lessons/kit-instruments.md#t-exemption
 {
   const gate = resolve('crack the gate open').map((h) => h.full);
   const machine = resolve('machine from').map((h) => h.full);
   const split = resolve('put the groove a box through the audio interface.').map((h) => h.full);
   ok('NEGATIVE CONTROL: an ignored stop word must change nothing, so "crack the gate" stays silent',
     gate.length === 0 && machine.length === 0 && split.includes('Novation Circuit'),
-    /* ⚠️ THE DETAIL NAMES ALL THREE HALVES, because this assert failed under the
-       window sabotage for the SPLIT half while its message showed only the two
-       silent ones, which sends a reader to the wrong change. */
+    // The detail names all three halves, so a failure points at the right one.
+    // why: lessons/kit-instruments.md#t-exemption-detail
     `crack the gate -> ${gate.join(', ') || 'nothing'}, machine from -> `
     + `${machine.join(', ') || 'nothing'}, groove a box -> ${split.join(', ') || 'nothing'}`);
 }
 
-// 🔴 NEGATIVE CONTROL FOR `Fast Track` ON THE DESK. The word `Pro` is the one a
-// speech model drops, four times across three models, so the line name is an
-// alias. The negative half is that the two ordinary words it is made of do not
-// reach it on their own or in the wrong company.
+// NEGATIVE CONTROL for `Fast Track`: its two ordinary words alone must not reach it.
+// why: lessons/kit-instruments.md#t-fast-track
 {
   const ftp = 'M-Audio Fast Track Pro';
   const found = ['Fast Track', 'The fast track row is the recording input.', ' Fast-trap.']
@@ -390,10 +343,8 @@ const HEARD = [
     loud.length ? loud.join(' | ') : 'three hearings found, six ordinary phrases silent');
 }
 
-// 🔴 THE CEILING, AND IT IS AN ASSERT RATHER THAN A PARAGRAPH. Three of the 144
-// transcripts lost the name entirely, and a matcher tuned until its table looked
-// good would have found something in them. An honest one finds nothing. If any
-// of these three ever starts resolving, something has been loosened too far.
+// The ceiling: three of 144 transcripts lost the name entirely, and must find nothing.
+// why: lessons/kit-instruments.md#t-ceiling
 {
   const gone = [
     ['Ask them.', 'turbo heard the whole word "tascam" as two others'],
@@ -406,15 +357,9 @@ const HEARD = [
       : gone.map(([s]) => JSON.stringify(s)).join(' and ') + ' both silent');
 }
 
-// ── where a name sits in the sentence, and what a page may do about it ──────
-//
-// 🔴 `tokenise()` AND `normalise()` MUST AGREE, AND THE WAY TO BE SURE IS NOT
-// TO READ THEM. A correction that lands in a textarea is placed by a character
-// offset, and an offset that is one token out rewrites the wrong word while
-// looking entirely plausible on screen. `normalise()` is written in terms of
-// `tokenise()` for that reason, so this asserts the property rather than the
-// two implementations: every token's own slice of the RAW string has to reduce
-// back to that token.
+// Where a name sits in the sentence. Every token's slice of the raw string must reduce back to that
+// token, so `tokenise()` and `normalise()` agree by property, not by reading them.
+// why: lessons/kit-instruments.md#t-tokenise
 {
   const strings = [
     '', ' ', '...', 'Play the MK425C into the circuit.', ' Play the MK425 C into the circuit.',
@@ -437,8 +382,8 @@ const HEARD = [
     bad.length === 0, bad.length ? bad.join(' | ') : `${strings.length} strings, offsets intact`);
 }
 
-// 🔴 THE SPANS ARE WHAT MAKES A CORRECTION PLACEABLE, so a hit has to point at
-// the words that matched and not merely report that something matched.
+// A hit points at the words that matched, which is what makes a correction placeable.
+// why: lessons/kit-instruments.md#t-spans
 {
   const s = 'Play the MK425C into the circuit.';
   const hits = resolve(s);
@@ -472,11 +417,8 @@ const onWish = { has: (f) => WISH.has(f) };
     bad.length === 0, bad.length ? bad.join(' | ') : `${cases.length} real transcripts repaired and reported`);
 }
 
-// 🔴 NEGATIVE CONTROL: AN EXACT HEARING IS NEVER REWRITTEN. This is the assert
-// that fails an implementation which simply replaces every hit with its full
-// name: `circuit` and `keyboard` are correct English for those instruments and
-// `Novation Circuit` is not an improvement on them, it is a page editing
-// somebody's sentence for nothing.
+// NEGATIVE CONTROL: an exact hearing is never rewritten.
+// why: lessons/kit-instruments.md#t-exact
 {
   const same = ['Connect the keyboard to the circuit and transpose it up one semitone.',
     'The desk needs DOM mode switched on.', 'Send the circuit to the model 12.'];
@@ -486,9 +428,8 @@ const onWish = { has: (f) => WISH.has(f) };
       : `${same.length} sentences unchanged`);
 }
 
-// 🔴 NEGATIVE CONTROL: NOTHING NAMED, NOTHING CHANGED. The twenty transcripts
-// above that resolve to nothing must also come back character for character,
-// because `reword` is the half a page hands to a person.
+// NEGATIVE CONTROL: nothing named, nothing changed, character for character.
+// why: lessons/kit-instruments.md#t-unchanged
 {
   const quiet = ['Make it louder.', 'Stop everything.', 'Put the mod wheel on the filter',
     'Turn the reverb down a little.', 'Play a chord and hold it down.', 'Set the tempo to 120.',
@@ -498,11 +439,8 @@ const onWish = { has: (f) => WISH.has(f) };
     moved.length === 0, moved.length ? moved.join(' | ') : `${quiet.length} instructions unchanged`);
 }
 
-// 🔴 NEGATIVE CONTROL: AN INSTRUMENT THE CALLER DOES NOT HAVE IS REPORTED AND
-// NEVER SUBSTITUTED. `/wish/` has no Fast Track Pro and no IAC Driver, so a
-// sentence naming one is a fact worth saying and never a word worth changing.
-// An implementation that rewrote on `resolve()` alone would fail this, and the
-// page would then answer *nothing on this desk* about a name it wrote itself.
+// NEGATIVE CONTROL: an instrument the caller does not have is reported, never substituted.
+// why: lessons/kit-instruments.md#t-absent
 {
   const away = [['The fast track row is the recording input.', 'M-Audio Fast Track Pro'],
     ['Apple Boss is echoing everything back.', 'Apple IAC Driver'],
@@ -519,13 +457,8 @@ const onWish = { has: (f) => WISH.has(f) };
       : away.map(([, n]) => n).join(', ') + ' each named and each left alone');
 }
 
-// 🔴 THE DECISION THAT WAS OPEN, AND IT IS GRADED HERE BECAUSE `/wish/` CANNOT
-// REACH IT. `HANDOFF.md` asked what a page does with two hits for one
-// instruction. Two shapes look alike and only one is an ambiguity.
-//
-// **A name inside a longer name is not two instruments.** `tascam model twelve
-// daw control` contains `tascam model twelve`, and somebody who said the long
-// one said the long one.
+// Two hits for one instruction: a name inside a longer name is one instrument, the longer one.
+// why: lessons/kit-instruments.md#t-inside
 {
   const s = 'The tascam model twelve daw control does nothing at all.';
   const names = reword(s).hits.map((h) => h.full);
@@ -533,15 +466,9 @@ const onWish = { has: (f) => WISH.has(f) };
     names.length === 1 && names[0] === 'TASCAM Model 12 DAW control', names.join(', ') || 'nothing');
 }
 
-// 🔴 NEGATIVE CONTROL: TWO INSTRUMENTS THE CALLER REALLY HAS, ON ONE SPAN, IS
-// NEVER REPAIRED. `audio interface` is an alias of the TASCAM Model 12 AND of
-// the M-Audio Fast Track Pro, both exact, both at distance 0, and no threshold
-// and no cleverer phonetic key can separate them. A page that picked one would
-// be printing a coin toss as a fact. Both names are reported, the words stand,
-// and a person fixes it by typing one of them.
-// ⚠️ IT IS GRADED WITH A DESK THAT HAS BOTH, on purpose: `/wish/` carries three
-// instruments and the ambiguity cannot arise there, so a check written against
-// that page would pass while measuring nothing.
+// NEGATIVE CONTROL: `audio interface` names two instruments the caller has; never repaired.
+// Graded with a desk that has both, since `/wish/` cannot raise the ambiguity.
+// why: lessons/kit-instruments.md#t-ambiguous
 {
   const both = { has: (f) => f === 'TASCAM Model 12' || f === 'M-Audio Fast Track Pro' };
   const s = 'Send it through the audio interface.';
@@ -553,14 +480,8 @@ const onWish = { has: (f) => WISH.has(f) };
     u ? `${JSON.stringify(u.was)} -> ${u.names.join(' or ')}, nothing rewritten` : 'no ambiguity reported');
 }
 
-// 🔴 AND THE SAME REFUSAL ON A MIS-HEARD SPAN, WHICH IS THE ONLY VERSION OF IT
-// THAT CAN BE GOT WRONG. FOUND BY SABOTAGE: dropping the `continue` after an
-// ambiguity is reported left the check above FULLY GREEN, because
-// `audio interface` is an exact hearing and nothing was ever going to be
-// rewritten there. The branch that matters is a span that WOULD have been
-// repaired had it named one thing, and there is a real transcript of it:
-// `whisper` returned *"Send the Novation to the taskam."*, and `taskam` reaches
-// the TASCAM Model 12 and its DAW control surface at the same distance.
+// The same refusal on a mis-heard span (`taskam`), the branch sabotage showed was ungraded.
+// why: lessons/kit-instruments.md#t-ambiguous-sound
 {
   const both = { has: (f) => f.startsWith('TASCAM') };
   const s = 'Send the Novation to the taskam.';
@@ -572,12 +493,8 @@ const onWish = { has: (f) => WISH.has(f) };
       : `no ambiguity reported, ${r.fixed.length} repaired`);
 }
 
-// 🔴 AND A REPAIR MUST NOT BE ABLE TO PRODUCE A NAME NOTHING DOWNSTREAM KNOWS.
-// Whatever `reword` writes into the box is read next by a language model whose
-// vocabulary is the caller's own alias list, so the two lists have to hold the
-// same strings. This is the two-derivations-of-one-fact rule: the check is that
-// a name `reword` can write is a name `describe()` gives for a port on the
-// desk, which is where the page builds its aliases from.
+// A name `reword` can write must be a name `describe()` gives for a port on the desk.
+// why: lessons/kit-instruments.md#t-vocabulary
 {
   const ports = ['MK-425C USB MIDI Keyboard', 'Circuit', 'Model 12 MIDI IN'];
   const known = new Set(ports.map((p) => describe(p).full));

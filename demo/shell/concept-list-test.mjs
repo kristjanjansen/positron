@@ -1,23 +1,7 @@
-// demo/shell/concept-list-test.mjs: every card description on the front page against the
-// card rule in .claude/skills/positron-describe/SKILL.md. No browser.
-//
-//   node demo/shell/concept-list-test.mjs
-//
-// Fails on a `say` (CONCEPTS or DEMO_CARDS) over 100 characters, or holding an
-// em dash, a middot or a semicolon, and prints each offender with its length.
-// Also on a backtick: until 2026-10-12 thirty demo cards carried the plan's
-// evidence column (`fau/index.html:356`) as their card text, and a code path
-// is never card text.
-// Asked 2026-10-12 on the WebRTC loopback card: *"too long. make a rule to
-// skill"*. 100 characters is about three lines on a card at 1280 and at 375.
-// And, since 2026-10-13 when the concepts became the front page at
-// /<group>/<slug>/ (*"rename all with group/slug, rm numbers"*), every row's id:
-// two segments, the folder one of CONCEPT_DIRS, no number for a segment, no id
-// twice, and a page on disk at demo/<id>/index.html. The slug is ONE plain
-// lowercase word since the same evening (*"Resolve clashes. Avoid dashes on
-// names."*): letters only, no hyphen, never the group's own name
-// (/granulator/granulator/ was the case), unique in its group. It is chosen from
-// the title, not spelled out of it, so the title is not compared.
+// demo/shell/concept-list-test.mjs: every card `say` against positron-describe's card rule (100 chars,
+// no em dash, middot, semicolon or backtick), and every id: two segments, a CONCEPT_DIRS folder, one
+// plain lowercase word, unique, not the group's name, with demo/<id>/index.html on disk. No browser.
+// why: lessons/kit-concept-list.md#test-header
 import { existsSync } from 'node:fs';
 import { CONCEPTS, DEMO_CARDS, CONCEPT_DIRS } from './concept-list.mjs';
 

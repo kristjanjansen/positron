@@ -1,41 +1,7 @@
-// demo/shell/bar-drill.mjs: the harness's transport drill, run by a page
-// against a bar it names.
-//
-// 🔴 WHY THIS EXISTS: `demo/verify.mjs` DRILLS ONE BAR PER PAGE AND A TABBED
-// PAGE HAS SEVERAL. The harness reads `__demo.transport` and nothing else, so a
-// bar built with `publish: false` is a bar the suite never presses. Decided
-// 2026-10-04, when the owner regrouped twenty demos into four tabbed pages:
-// `/time/` alone will carry five bars, and four of them would have lost the
-// drill in the merge (`plans/plan-demo-structure.md` §3.2 and §5 step 1). So a
-// page runs the same drill as page asserts, through `d.assert`, against each
-// bar it did not publish.
-//
-// 🔴 IT IS THE HARNESS'S OWN DRILL, AND THE TWO MUST STAY IN STEP. Every number
-// in `DRILL` is a number in `demo/verify.mjs`'s transport block (the sleeps,
-// the 1-unit hold, the `5` key landing at half the range within 2 per cent,
-// the 53-pixel stride and the 90 floor on the strip, three tries), and the
-// verdicts are the same expressions. `node demo/shell/bar-drill-test.mjs`
-// reads the harness's source and fails if any of them has moved there and not
-// here, because two copies of one measurement are a measurement that will
-// disagree. Change one, change the other, run the test.
-//
-// ⚠️ ONE DELIBERATE DIFFERENCE, AND IT IS WHERE THE KEY IS SENT. The harness
-// dispatches its `5` at `window`, which every bar on a page hears. This sends
-// it at the bar's own element, and `transport-bar.mjs` hands a key whose
-// target sits inside a bar to that bar only (2026-10-04, with this file). On a
-// page with five bars the window key would seek all five and the drill could
-// not say which one landed. A page with one published bar is drilled by the
-// harness exactly as before.
-//
-// ⚠️ THE PUBLISHED BAR IS THE HARNESS'S. Drilling it here as well presses its
-// toggle twice from two places, and the harness runs its own drill right after
-// `ready`, so `assertBar` refuses `__demo.transport` rather than racing it.
-//
-// ⚠️ A BAR IN A CLOSED TAB CANNOT BE DRILLED, BY DESIGN. Keys do not reach a
-// bar inside a `[data-own-keys][hidden]` panel (see `tab-page.mjs`), so its
-// seek would fail for a reason that is not the bar's. `createTabPage`'s check
-// pass opens each tab before running its checks; a hand-rolled caller must do
-// the same, and the seek row says so in its detail when it was not done.
+// demo/shell/bar-drill.mjs: the harness's transport drill, run by a page against a bar it did not publish.
+// Every number in `DRILL` must match demo/verify.mjs; bar-drill-test.mjs fails if they drift.
+// The key goes to the bar's own element, not window; a bar in a closed tab cannot be drilled.
+// why: lessons/kit-bar-drill.md#header
 
 /** Every number the harness's drill uses, in the harness's own units (ms). */
 export const DRILL = Object.freeze({
@@ -105,10 +71,8 @@ const nap = (ms) => new Promise((r) => setTimeout(r, ms));
 const twoFrames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
 /**
- * ⚠️ SAMPLE AFTER A FRAME, AND MORE THAN ONCE, which is the harness's reason
- * verbatim: `resize()` in strip.mjs assigns `canvas.width`, which clears the
- * canvas, and only then schedules a redraw. A retry, not a tolerance: a strip
- * that never draws still fails, because every try lands after a fresh frame.
+ * Sample after a frame, and retry: `resize()` in strip.mjs clears the canvas before it redraws.
+ * why: lessons/kit-bar-drill.md#inkof
  */
 async function inkOf(canvas) {
   let lit = 0, tries = 0;

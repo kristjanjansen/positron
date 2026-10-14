@@ -1,13 +1,7 @@
-// demo/shell/board-test.mjs: createBoard's teardown and audio start, with no
-// relay, no Pi and no browser.
-//
-//   node demo/shell/board-test.mjs
-//
-// The DOM, the socket and the AudioContext are fakes defined here. What is
-// graded is bookkeeping: a closed board leaves no timer running, two
-// startAudio() calls share one build, and a failed build is retried.
-// THREE OF THE 5 ARE NEGATIVE CONTROLS, written so the bug they name fails them.
-// Sound, the worklet and the board's protocol are graded on the remote pages.
+// demo/shell/board-test.mjs: createBoard's teardown and audio start, with no relay, no Pi and
+// no browser (`node demo/shell/board-test.mjs`). DOM, socket and AudioContext are fakes here;
+// 3 of the 5 asserts are negative controls.
+// why: lessons/kit-board.md#test-header
 
 let pass = 0, fail = 0, neg = 0;
 const ok = (name, cond, detail = '') => {

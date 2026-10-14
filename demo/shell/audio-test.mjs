@@ -1,30 +1,6 @@
-// demo/shell/audio-test.mjs, the shared AudioContext's owner arithmetic, with
-// no audio at all.
-//
-//   node demo/shell/audio-test.mjs
-//
-// `audio.mjs` is one context and one owner, and every way it can be wrong is a
-// question of who is told what and in which order: a context made twice, a
-// visit that makes one, an owner that is not stopped when another claims, a
-// release from somebody who no longer owns it suspending the one who does, a
-// tab going to the background with a note still sounding. None of that needs a
-// browser, so a hub is built over a fake context that records what was done to
-// it, and the arithmetic is graded here.
-//
-// 🔴 EIGHT OF THESE ARE NEGATIVE CONTROLS, named NEGATIVE below: written so that
-// the bug they name fails them, rather than so that today's code passes. A hub
-// that never suspends and one that suspends on every call both look green to a
-// check that only asks whether claiming works.
-// ✅ MEASURED 2026-10-06, five sabotages of a copy of `audio.mjs`, 25 ok before
-// each: the owner written AFTER the old owner's stop takes 2 red, a release
-// that does not check who is asking 3, a claim that stops nobody 1, suspend
-// replaced by close 5, and a background tab that stops the owner without
-// releasing it 1. Every one goes red on the check written for it.
-//
-// NOT GRADED HERE: a real AudioContext, its sample rate on a real device, and
-// whether a suspended context really stops the audio thread. Those need a
-// browser and are the `/fau/` page's (it runs on this module) and, later, the
-// SLIDES page's (`plans/plan-live-slides.md` section 7).
+// demo/shell/audio-test.mjs: the shared AudioContext's owner arithmetic over a fake context.
+// 8 negative controls, named NEGATIVE. A real context and device are graded on /fau/.
+// why: lessons/kit-audio.md#test-header
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -88,10 +64,8 @@ console.log('\n== the shared AudioContext ==');
   globalThis.AudioContext = before;
 }
 {
-  /* 🔴 NEGATIVE: a source claim, stripped of comments first, because the rule
-     the header states ("no window or document read on import") would be
-     matched by its own sentence otherwise. Anything at module top level that
-     touches `document` or `window` or builds a context breaks it. */
+  // Negative: a source claim, stripped of comments first so the header's own sentence cannot match.
+  // why: lessons/kit-audio.md#test-import
   const src = readFileSync(join(HERE, 'audio.mjs'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const top = src.split('\n').filter((l) => /^\S/.test(l) && !/^(export |function |let |const |\}|import )/.test(l));
@@ -140,9 +114,8 @@ console.log('\n== the shared AudioContext ==');
   ok('NEGATIVE: a second claim stops the first owner, once', A.stops === 1 && B.stops === 0,
     `A ${A.stops}, B ${B.stops}`);
   ok('and the second owner holds it', hub.owner() === B);
-  /* 🔴 THE ORDER CASE. A's stop() released A from inside the claim; had the
-     owner still been A at that moment, that release would have suspended the
-     context B is about to sound in. */
+  // The order case: A's release inside the claim must not suspend the context B is about to use.
+  // why: lessons/kit-audio.md#test-order
   ok('NEGATIVE: the old owner releasing itself inside the claim does not suspend the new one',
     ctx.state === 'running' && !ctx.calls.includes('suspend'), ctx.calls.join(' '));
   ok('NEGATIVE: a release from somebody who is not the owner does nothing',
@@ -195,19 +168,9 @@ console.log('\n== the shared AudioContext ==');
 
 // ── a suspend while a resume is in flight, the way Chrome really orders them ─
 
-/* 🔴 THE FAKE ABOVE FLIPS `state` THE MOMENT A VERB IS CALLED, AND A REAL
-   CHROME DOES NOT. MEASURED 2026-10-06 in headless Chrome with a probe of its
-   own (no positron page): `resume()` on a suspended context leaves `state`
-   reading `suspended` for about 1.5 to 3 ms while the audio thread starts, and
-   a `suspend()` called in that window is a no-op on `state` that still stops
-   the device. The resume then lands and `state` reads `running` with
-   `currentTime` frozen: 25 of 40 trials at 1.5 to 2.9 ms. A context in that
-   shape is WEDGED: `resume()` resolves at once and changes nothing (0 ms of
-   `currentTime` in 200 ms after it), and only a suspend then a resume brings
-   it back. On `/kit/slides/` that was a Start on a broken edit (the compile
-   fails in a couple of ms, so the release suspends inside the press's resume)
-   followed by every later Start on the page sounding silence.
-   This fake models exactly that, so the cases below grade the ORDER. */
+// A fake that keeps `state` stale for a moment after `resume()`, as Chrome does (1.5 to 3 ms),
+// so a suspend inside that window wedges the context; the cases below grade the order.
+// why: lessons/kit-audio.md#chromecontext
 function chromeContext() {
   const c = {
     sampleRate: 48000, state: 'suspended', rendering: false, calls: [], inFlight: 0,

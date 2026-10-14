@@ -1,50 +1,7 @@
-// demo/shell/code-lang-test.mjs: the highlighter's tables and its parameter
-// finder, with no browser.
-//
-//   node demo/shell/code-lang-test.mjs
-//
-// 🔴 GRADED AGAINST THE COMPILERS, NOT AGAINST ITSELF. Every current preset of
-// `/fau/`, `/collide/` and `/csound/` is read from the page or module that ships
-// it (never a copy here), and what the finder calls a parameter is compared
-// with what a compiler this file did not write reports:
-//   Faust          libfaust 2.89.2 out of `demo/fau/vendor/`, compiled in node,
-//                  and the labels in its UI JSON
-//   SuperCollider  `sclang-lite.mjs`'s `controls`
-//   Csound score   `timeline/csound.mjs`'s `csoundPart`, whose note rows carry
-//                  the line they came from, against the lines this table
-//                  colours an `i` statement on
-// ⚠️ libfaust's glue writes a temporary module NEXT TO the `.js` it is handed,
-// so the 157 kB `.js` is copied to the system temporary directory first and
-// `demo/fau/vendor/` is only ever read.
-//
-// 🔴 A NAMED PROPORTION ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL`,
-// written so the defect they name fails them. `CODE_LANG_MODULE=<path>` runs
-// this file against another copy of the module, which is how each was PROVED
-// able to fail rather than argued. MEASURED 2026-09-30, 45 ok on the real
-// module, then eleven sabotaged copies, each one line:
-//
-//   a plain run loses its last character before a token   13 red, every round trip
-//   the finder names every quoted string                   9 red
-//   `<` and `>` not escaped in the drawn HTML              7 red, every `<:` preset
-//   no metadata or path stripped off a Faust label         2 red
-//   a Faust call in a comment counted                      2 red
-//   a named control in a comment counted                   2 red
-//   a dead Faust match resumed AFTER itself, not one on    1 red, `real` lost
-//   the comma coloured as composition                      1 red
-//   a statement letter matched anywhere on the line        1 red, the label `e`
-//   a hue drawn on a parameter with no knob                1 red
-//   a vanished name keeps its hue                          1 red
-//
-// ⚠️ THE HUE AND THE STATEMENT LETTER SABOTAGES WERE GREEN ON THE FIRST
-// SABOTAGE RUN, and the tests were what was weak: the hue check matched only
-// a numeric `data-hue`, so `data-hue="null"` slipped past it, and nothing had
-// ever asked for a one-letter label. Both were tightened and re-run red.
-// ⚠️ AND THE FIRST STRING FIXTURE FOUND A REAL DEFECT: a dead match skipped by
-// resuming after it swallowed the real call beyond the string's closing quote.
-//
-// ⚠️ WHAT THIS CANNOT GRADE: where a glyph lands. That needs a document, and
-// `/kit/`'s CODE BOX block asserts it (drawn text equals the textarea's, the
-// metrics equal, a hue only on a knob parameter).
+// demo/shell/code-lang-test.mjs: the highlighter's tables and parameter finder against compilers it
+// did not write: libfaust 2.89.2, sclang-lite, csound.mjs. Negative controls are marked;
+// `CODE_LANG_MODULE=<path>` runs a sabotaged copy. Glyph placement is graded on /kit/.
+// why: lessons/kit-code-lang.md#test-header
 
 import { readFileSync, copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -66,16 +23,18 @@ const ok = (name, cond, detail = '') => {
 
 // ── the texts, read from what ships ─────────────────────────────────────────
 
-/** `/fau/`'s presets, imported from the module the page imports since
- *  2026-10-06. They were read out of the page with a regular expression until
- *  then. */
+/**
+ * `/fau/`'s presets, from the module the page imports.
+ * why: lessons/kit-code-lang.md#faupresets
+ */
 async function fauPresets() {
   const { PRESETS } = await import('../fau/presets.mjs');
   return PRESETS.map((p) => ({ id: p.id, code: p.code }));
 }
-/** `/csound/`'s one score, in its SCORE tab's module since the page got tabs
- *  (396ca4b), as an array joined with newlines. Read from the page before that
- *  and broken from then until 2026-10-05. */
+/**
+ * `/csound/`'s one score, from its SCORE tab's module, joined with newlines.
+ * why: lessons/kit-code-lang.md#undscore
+ */
 function undScore() {
   const html = readFileSync(join(HERE, '../csound/score.mjs'), 'utf8');
   const m = html.match(/const DEFAULT_SCORE = (\[[\s\S]*?\])\.join\('\\n'\);/);
@@ -147,8 +106,8 @@ const types = (src, lang) => {
     [...t.keys()].join(' '));
 }
 {
-  // 🔴 SECOND SOURCE: the notes `csoundPart` read, by the line they came from,
-  // against the lines this table colours an `i` on. `m` and `n` are not notes.
+  // Second source: the notes `csoundPart` read, by line, against lines coloured as `i`.
+  // why: lessons/kit-code-lang.md#test-notes
   const t = tokenize(UND, csoundSco);
   const lineOf = (i) => UND.slice(0, i).split('\n').length;
   const iLines = new Set(t.filter((x) => x.type === 'keyword' && UND[x.from] === 'i').map((x) => lineOf(x.from)));
@@ -169,9 +128,8 @@ const types = (src, lang) => {
 }
 
 {
-  // 🔴 LINE KINDS, so `/csound/` can draw a line in the colour of its lane. The
-  // second source is again `csound.mjs`: every line it read a note from is an
-  // event line, and nothing else is.
+  // Line kinds: every line csound.mjs read a note from is an event line, nothing else.
+  // why: lessons/kit-code-lang.md#test-line-kinds
   const { html } = render(UND, 'csound-sco');
   const lines = html.split('\n');
   const evLines = new Set(lines.map((l, n) => (l.includes('pos-ln-event') ? n + 1 : 0)).filter(Boolean));
@@ -193,9 +151,8 @@ const types = (src, lang) => {
 }
 
 {
-  // 🔴 THE BOUND VARIABLE WEARS THE KNOB'S HUE WHERE IT IS DEFINED AND WHERE
-  // IT IS USED (*"cutoff var should be blue"*), and nowhere it is not that
-  // variable.
+  // The bound variable wears the knob's hue where defined and used, and nowhere else.
+  // why: lessons/kit-code-lang.md#test-bound
   const hueOf = (n) => ({ cutoff: 205, rel: 330 }[n] ?? null);
   const pv = (html) => [...html.matchAll(/class="pos-tk-pvar" data-param="(\w+)"[^>]*>(\w+)</g)].map((m) => `${m[1]}:${m[2]}`);
   const f = pv(render('cutoff = hslider("cutoff", 8000, 100, 8000, 1) : si.smoo;\n// cutoff\ncutoffs = 1;\nc = min(cutoff, x);', 'faust', { hueOf }).html);
@@ -241,12 +198,9 @@ const same = (a, b) => { const A = [...new Set(a)].sort(), B = [...new Set(b)].s
 
 if (faustCompiler) {
   ok('the Faust compiler in node is the version the page pins', faustCompiler.version() === '2.89.2', faustCompiler.version());
-  // ⚠️ A CONTROL DECLARED INSIDE A LIBRARY HAS NO SNIPPET IN THE BOX.
-  // `pm.djembe_ui_MIDI` builds six sliders in `physmodels.lib` and the text
-  // holds none of them, so there is nothing there to colour. The grade is
-  // therefore two halves: every name found is a control libfaust built, and
-  // every control libfaust built that was NOT found has no quoted label
-  // anywhere in the program outside a comment.
+  // A control declared inside a library has no snippet in the box: every name found is a built
+  // control, and every one not found has no quoted label in the program.
+  // why: lessons/kit-code-lang.md#test-library
   for (const p of FAU) {
     const found = findParams(p.code, 'faust').map((x) => x.name);
     const said = await faustLabels(p.code);
@@ -278,8 +232,8 @@ for (const p of SC_PRESETS) {
     said && same(found, said), `found ${found.join(' ')}, sclang-lite ${said ? said.join(' ') : r.error}`);
 }
 {
-  // ⚠️ sclang-lite has no strings, so the compiler grades the comment case and
-  // the string case is graded on the finder alone, on the same program.
+  // sclang-lite has no strings: the string case is graded on the finder alone.
+  // why: lessons/kit-code-lang.md#test-strings
   const src = String.raw`// \ghost.kr(3) is only a comment
 { |freq = 220, amp = 0.1, gate = 1|
     /* and \ghost2.kr(3) in a block comment */

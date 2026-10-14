@@ -1,31 +1,7 @@
-// demo/shell/instrument.mjs — a cased panel with the instrument's name on it.
-//
-// 🔴 THIS IS A COMPOSITION, NOT A LAYOUT ENGINE, AND THAT IS THE WHOLE POINT.
-// `createPanelLayout` already owns the case, the fixed column and the one
-// scrolling strip; `createNameplate` already owns the plate and its four
-// placements (three horizontal, and `side` since 2026-09-25). What did not exist was the sentence that joins them, and five
-// pages had each written it themselves:
-//
-//   /tom/      createNameplate({ lines: ['POSITRON', 'TOM'], place: 'ends' })
-//              panel.el.prepend(plate.el)
-//   /circuit/  its own createNameplate call and its own placing
-//   /evo/      the same again
-//   /twelve/   createNameplate({ lines: ['MODEL 12'], place: 'end' })
-//   /kit/      two more, in its PANEL specimen
-//
-// `positron-ui` names this exactly: a control that exists in one page and
-// nowhere else is a component that has not been noticed yet. Here it was in
-// five, which is not a special case, it is a component with five copies of its
-// assembly instructions.
-//
-// ⚠️ NOTHING HERE REIMPLEMENTS EITHER PART. If a panel behaviour is wrong, it
-// is wrong in `panel-layout.mjs` and it is wrong for every page at once, which
-// is the property a second implementation would have destroyed.
-//
-// 🔴 AND THE PLATE GOES IN BY `prepend`, WHICH IS WHAT `/tom/` DISCOVERED AND
-// THE OTHERS DID DIFFERENTLY. A nameplate is not a row inside the scroller: it
-// belongs to the CASE, above the fixed column and the strip both, or it scrolls
-// away from the instrument it names.
+// demo/shell/instrument.mjs: a cased panel with the instrument's name on it. A composition of
+// `createPanelLayout` and `createNameplate`, reimplementing neither; the plate belongs to the case,
+// above the fixed column and the strip, or it scrolls away from what it names.
+// why: lessons/kit-instrument.md#header
 
 import { el } from './shell.mjs';
 import { createGlue } from './glue.mjs';
@@ -36,67 +12,26 @@ import { createPresence, createPresenceButton } from './presence.mjs';
 export const MAKER = 'POSITRON';
 
 /**
- * What the header's status control says in its two states.
- *
- * 🔴 THE WORDS ARE THE ONES IN THE ASK, AND THE COLOURS COME FROM THE KIT.
- * Asked 2026-09-22: *"left: online status button: enabled disabled
- * (green/gray)"*. `presence.mjs` already owns green for a thing that answered
- * and grey for one that has not, already reserves the badge's width off the
- * longest word it can say so it cannot twitch, and is already the settled
- * answer on eight pages. A second green dot here would be the hand-rolled
- * control defect arriving inside the kit.
- * ⚠️ TWO STATES, NOT FIVE, WHICH IS WHAT `can` IS FOR. A header is not asking
- * whether a board in another building is answering; it is saying whether this
- * instrument is switched into the chain, which has no `checking` and no
- * `coming`. Narrowing it also narrows the reserve to the longer of these two
- * words rather than to `coming online`.
+ * What the header's status control says in its two states. Colours and width come from
+ * `presence.mjs`; two states, not five, since a header says only whether it is in the chain.
+ * why: lessons/kit-instrument.md#header-says
  */
 /**
- * 🔴 THE WORD SAYS WHAT A PRESS DOES, NOT WHAT THE STATE IS, SINCE 2026-09-22:
- * *"online labels: 'turn on' 'turn off'"*. It read `enabled` and `disabled`.
- * ⚠️ AND IT IS ONE WORD, CORRECTED WITHIN THE HOUR TO *"*name* off / on"*. The
- * badge already prints the instrument's name in front of it, so `PLAITS turn
- * off` said the verb twice as far as a reader is concerned.
- * 🔴 **AND THEN REVERSED: *"reverse on / off names"*, SO THE WORD IS THE STATE
- * AFTER ALL.** `PLAITS on` means it IS on, and the dot agrees with it rather
- * than contradicting it. The first arrangement asked a reader to hold two
- * things at once, a green dot meaning running and a word meaning what a press
- * would do, and one of them had to be read backwards. Two channels saying one
- * fact beats two channels saying two.
- * ⚠️ **THE DOT STILL CARRIES THE STATE**, which is what makes this legible
- * rather than confusing: green with `turn off` is a thing that is on and a
- * press that would stop it. Two channels, one fact each, which is the rule this
- * project applies to every other control.
- * ⚠️ AND IT IS RIGHT ONLY BECAUSE THE CONTROL ACTS. A badge that reported and
- * could not be pressed would be labelled with an instruction nobody can
- * follow, so a caller that supplies no `press` still gets the states named as
- * states through `says`.
+ * One word, the state: `PLAITS on` means it is on, and the dot agrees with it.
+ * A caller with no `press` still gets the states named through `says`.
+ * why: lessons/kit-instrument.md#header-word
  */
 export const HEADER_SAYS = { online: 'on', offline: 'off' };
 /** The only two states a header's status control can reach. See `HEADER_SAYS`. */
 export const HEADER_STATES = ['online', 'offline'];
 
 /**
- * The plate's lines, and the placement they need.
- *
- * 🔴 PURE, AND SEPARATE, SO IT CAN BE GRADED WITH NO BROWSER. Everything else
- * in this file needs a `document`, and a rule that only a browser can check is
- * a rule that gets checked once. `node demo/shell/instrument-test.mjs` runs
- * this in a few milliseconds.
- * ⚠️ ONE LINE OR TWO, AND THE CALLER DOES NOT CHOOSE THE PLACEMENT FOR ONE.
- * A maker of `''` is how a page says *this thing carries no brand*, which is
- * what `/twelve/` means by `MODEL 12` alone, and `ends` is `space-between`,
- * which parks a lone child on the LEFT. `createNameplate` records that as the
- * reason `end` exists, so choosing it here rather than leaving it to a caller
- * is this function agreeing with that file.
+ * The plate's lines and the placement they need. Pure, so instrument-test.mjs grades it with no
+ * browser. A maker of `''` means no brand, and one line goes to `end`: `ends` parks it on the left.
+ * why: lessons/kit-instrument.md#platelines
  */
-/* 🔴 AND `side` SURVIVES A SINGLE LINE, WHICH THE RULE ABOVE WOULD OTHERWISE
-   HAVE THROWN AWAY. The downgrade exists because `ends` is `space-between` and
-   parks a lone child on the left, which is a horizontal argument about a
-   horizontal placement. A plate glued down the edge of the case has no such
-   problem: one line is the ordinary case for it, and `/shape/` is exactly that,
-   `shape` with no maker. Sending it to `end` would put the one page that asked
-   for a vertical plate back on a horizontal one, silently. */
+// `side` survives a single line: the left-parking argument is horizontal, and `/shape/` is one line.
+// why: lessons/kit-instrument.md#keeps-one-line
 const KEEPS_ONE_LINE = new Set(['side']);
 
 export function plateSpec(maker, name, place = 'ends') {
@@ -105,59 +40,22 @@ export function plateSpec(maker, name, place = 'ends') {
 }
 
 /**
- * The header row: a status control on the left, a patch selector optically
- * centred on the case, and the nameplate on the right.
- *
- * 🔴 **A THREE COLUMN GRID WITH EQUAL OUTER TRACKS, WHICH IS THE WHOLE ASK AND
- * IS SAID PRECISELY IN IT.** *"center patch selector (optically center to the
- * instrument)"*. Centred to the INSTRUMENT, not balanced between two unequal
- * neighbours: a flex row with a status on one side and a plate on the other
- * puts its middle child wherever the difference between those two leaves it,
- * which is a different place on every panel and moves the moment a patch name
- * gets longer. `1fr auto 1fr` puts the centre track on the container's own
- * centre whatever is in the outer two, and `.panel-case` is
- * `padding: 0 var(--panel-pad)`, the same both sides, so the header's centre is
- * the CASE's centre. That is what `/kit/` asserts, against the case's own box.
- *
- * 🔴 **THE STATUS CONTROL ACTS OR IT IS NOT A BUTTON, AND THAT IS DECIDED HERE
- * RATHER THAN LEFT TO A CALLER.** `positron-ui` calls a control whose only
- * honest behaviour is to do nothing *"the shape of control this project calls a
- * lie"*, and the ask wants one element that both reports a state and looks
- * pressable. So: a caller that hands over `press` gets a real button that calls
- * it, built by `createPresenceButton`, and a caller that hands over nothing
- * gets a BADGE, which is a span with no tab stop, no pointer cursor and no
- * handler. There is no third shape, and nothing here ever presses itself.
- * ⚠️ **A BADGE IS NOT A DEGRADED BUTTON, IT IS THE HONEST ANSWER FOR AN
- * INSTRUMENT THAT IS SIMPLY ON.** `/muta/`'s two firmwares are in the page and
- * cannot be unplugged; a header on one of those reports and does not pretend to
- * connect anything.
- *
- * ⚠️ **AND THE PLATE IN A HEADER IS `end`, NEVER `ends`.** `ends` is
- * `space-between`, which needs a box that SPANS something to put a gap in; in a
- * header's right cell, which is as wide as its content, it puts the maker and
- * the model hard against each other. `end` pushes both to the right edge, and
- * `shell.css` gives that placement a `column-gap` so two lines read as two.
+ * The header row: status left, patch selector centred, nameplate right. `1fr auto 1fr` puts the
+ * centre on the case's centre. With `press` the status is a real button, without it a badge.
+ * The plate in a header is `end`, never `ends`, which would butt maker and model together.
+ * why: lessons/kit-instrument.md#buildheader
  */
 function buildHeader({ name, maker, header }) {
   const { online = {}, patch = null } = header;
   const head = el('div', 'panel-head');
 
-  /* ⚠️ THE PLATE IS FIRST IN THE DOM AND THIRD IN THE PICTURE, and that is the
-     phone layout rather than an accident. Asked for as *"3 levels"*: the title,
-     then the enabled button at full width, then the patch at full width. A
-     single column grid lays its children out in source order, so this order IS
-     the phone. The desktop places all three by `grid-column` in `shell.css`,
-     which is visible in the stylesheet, rather than by a flex `order` nobody
-     can see in the markup. */
+  // The plate is first in the DOM and third in the picture: source order is the phone's one column;
+  // shell.css places all three on desktop by `grid-column`.
+  // why: lessons/kit-instrument.md#header-order
   /**
-   * 🔴 A HEADER MAY CARRY NO PLATE AT ALL, `plate: false`, ADDED 2026-09-22:
-   * *"rm nameplates"*. It is not a bare removal: the status control prints the
-   * instrument's name in front of its state, so a plate beside it is the name
-   * twice on one row, which is the doubled-channel objection this project keeps
-   * making about everything else.
-   * ⚠️ **THE DEFAULT KEEPS THE PLATE**, because a caller whose status control
-   * is a plain badge with no name has nothing else to say which instrument it
-   * is looking at.
+   * `plate: false` drops the plate, since the status control already prints the name.
+   * The default keeps it.
+   * why: lessons/kit-instrument.md#plate-false
    */
   const plate = header.plate === false
     ? null
@@ -168,28 +66,9 @@ function buildHeader({ name, maker, header }) {
   if (online !== false) {
     const { press = null, state = 'online', says = {}, of = name, ...rest } = online;
     /**
-     * 🔴 THE CONTROL SAYS `on` AND `off`, NEVER `FAU ON`. Asked 2026-09-25:
-     * *"on synth on offs do not add synt name to fau on / fau off: just ON
-     * OFF"*. `presence.mjs` paints the name and the state as ONE phrase when it
-     * has an `of`, which is right on `/keys/` where a badge in a transport bar
-     * is the only thing naming a Raspberry Pi in another building, and wrong
-     * here: **a header carries the nameplate on the same row.**
-     * ⚠️ AND THAT IS THIS FILE'S OWN ARGUMENT A THIRD TIME. `plate: false`
-     * exists because *"a plate beside it is the name twice on one row"*, and a
-     * status control naming the instrument again is the same doubled channel
-     * from the other side.
-     * 🔴 **IT CHANGES WHAT IS PAINTED, NOT WHAT THE CONTROL KNOWS ABOUT
-     * ITSELF.** `of` stays, and it has to: the aria label below is
-     * `switch ${of} on and off`, and *"switch on and off"* names nothing to
-     * somebody who cannot see the plate. **The eye reads the plate, a screen
-     * reader reads the label, and both are told which instrument this is.**
-     * ⚠️ IT COVERS THE BADGE AS WELL AS THE BUTTON, WHICH WAS CHECKED RATHER
-     * THAN ASSUMED. A header always sits on a case that names itself: with
-     * `plate: false` the bar gives its plate up and `barHasPlate` hands it back
-     * to the CASE, so there is no configuration where this drops the last thing
-     * saying which instrument a reader is looking at.
-     * ⚠️ AND IT IS BEFORE `...rest`, so a caller that really wants the name in
-     * the phrase passes `showName: true` and gets it.
+     * The control paints `on` and `off`, never the name, since the plate is on the same row.
+     * `of` stays for the aria label. Before `...rest`, so `showName: true` brings the name back.
+     * why: lessons/kit-instrument.md#on-off
      */
     const opts = {
       of,
@@ -215,26 +94,15 @@ function buildHeader({ name, maker, header }) {
 
 /**
  * A cased instrument panel with its name printed across the top.
- *
  * @param {object}  o
  * @param {string}  o.name            the model, printed at the right end
  * @param {string}  [o.maker=MAKER]   the maker, printed at the left end
  * @param {Element} [o.host]          append the case to this
  * @param {string}  [o.place='ends']  a `createNameplate` placement
  * @param {object}  [o.panel]         passed straight to `createPanelLayout`
- * @param {object}  [o.header]        build a header row across the top of the
- *   case. See `buildHeader`. `{ online, patch }`, where `online` takes a
- *   `press` to become a button and is `false` for no status control at all.
- *
- *   🔴 **IT IS AN OPTION AND THE DEFAULT IS OFF, WHICH IS A DECISION ABOUT
- *   OTHER PEOPLE'S PAGES RATHER THAN A HEDGE.** The plate sits in the case's
- *   top inset today and `/muta/` and `/kit/` both ASSERT it there, one of them
- *   by reading the case's first child. Moving it into a header for every caller
- *   would take those asserts red on pages nobody had touched, and this file
- *   already records a wrapper shipping a defect to a new page on the day it was
- *   written to prevent one. **With a header the plate moves into it; without
- *   one nothing about any existing case changes.**
+ * @param {object}  [o.header]        build a header row across the case, see `buildHeader`. `{ online, patch }`, where `online` takes a `press` to become a button and is `false` for no status control. Off by default, so existing cases and their asserts are unchanged.
  * @returns {{el, panel, plate, fixed, strip, flow, head, online, add, band, unband, seam, shown}}
+ * why: lessons/kit-instrument.md#createinstrument
  */
 export function createInstrument(o = {}) {
   const {
@@ -242,23 +110,14 @@ export function createInstrument(o = {}) {
     header = false,
     parts = null,
     /**
-     * 🔴 `caps: false` KEEPS THE NAME AS TYPED, ASKED FOR ON `/shape/`
-     * 2026-09-25 AS A LOWER CASE `shape`. `panel-layout.mjs` carries the whole
-     * argument beside the option: the uppercase rule is about a shelf of
-     * REPLICAS reading as one shelf, and this page is a replica of nothing. It
-     * is a DEPARTURE from every plate in the project today and it is written
-     * down as one rather than slipped in.
+     * `caps: false` keeps the name as typed (`/shape/`), a deliberate departure from every other plate.
+     * why: lessons/kit-instrument.md#caps
      */
     caps = true,
   } = o;
   /**
-   * 🔴 REFUSED WITHOUT A NAME, FOR THE REASON `knob.mjs` REFUSES WITHOUT A
-   * LABEL: the plate is the only thing on a case that says which instrument
-   * this is, and a case with an unnamed plate is furniture wearing a border.
-   * ⚠️ IT THROWS AT BUILD TIME, IN FRONT OF THE AUTHOR, rather than rendering
-   * an empty plate a visitor has to interpret. `createNameplate` already
-   * refuses a plate with no lines at all and this is the same refusal one
-   * argument earlier, where the caller can still see what they forgot.
+   * Refused without a name, at build time: the plate is the only thing saying which instrument this is.
+   * why: lessons/kit-instrument.md#no-name
    */
   if (!name) {
     throw new Error('an instrument needs a name: the plate is the only thing saying which one it is');
@@ -267,85 +126,40 @@ export function createInstrument(o = {}) {
   /* The lines and the placement are decided by `plateSpec`, which is pure and
      is graded without a browser. */
   const spec = { ...plateSpec(maker, name, place), caps };
-  /* 🔴 THE HEADER OWNS THE PLATE WHEN THERE IS ONE, AND THE PANEL OWNS IT WHEN
-     THERE IS NOT. Two plates would be two names on one case, and handing the
-     panel a plate it then places in the top inset while the header holds
-     another is exactly that. */
+  // The header owns the plate when there is one, the panel when there is not: never two plates.
+  // why: lessons/kit-instrument.md#plate-owner
   /**
-   * 🔴 THE HEADER IS A GLUED PART, NOT A ROW INSIDE THE CASE, SINCE
-   * 2026-09-22. Reported against a screenshot: *"this does not look like glued
-   * transport or smt. underline does not extend to sides, to much padding. make
-   * it a snd componetn or reuse one"*.
-   * 🔴 **AND EVERY WORD OF THAT WAS A SYMPTOM OF ONE CAUSE: IT WAS AN
-   * IMITATION.** A border drawn on a child of the case sits INSIDE the case's
-   * own padding, so it can never reach the sides; the padding was the case's
-   * plus the header's; and the whole thing was a second implementation of a
-   * seam `glue.mjs` already owns and `/pack/`, `/tom/` and `/wish/` already
-   * use. `positron-ui` opens with BUILD FROM `/kit/` for exactly this.
-   * ✅ `createGlue` gives the seam its full width, drops the doubled padding by
-   * making the children give up their own border and radius, and makes an
-   * instrument with a header the same object as a transport bar over the strip
-   * it drives.
+   * The header is a glued part, not a row inside the case: a border inside the case's padding can
+   * never reach the sides. `createGlue` gives the seam full width and drops the doubled padding.
+   * why: lessons/kit-instrument.md#glued-header
    */
   const head = header ? buildHeader({ name, maker, header }) : null;
   /**
-   * 🔴 THE PANEL PLACES THE PLATE, THIS FILE DOES NOT. It did
-   * `panel.el.prepend(plate.el)` for one day, which is exactly what the five
-   * pages before it were doing, and it inherited exactly what they were paying
-   * for: the case's padding is horizontal only, so a plate put in from outside
-   * sat on the top border. `/tom/` had fixed that in its OWN stylesheet and
-   * `/plai/` had no such rule, so this wrapper shipped the defect to a new page
-   * on the day it was written to prevent it.
-   * ⚠️ **CENTRALISING AN ASSEMBLY THAT DOES NOT OWN ITS OWN LAYOUT MOVES THE
-   * DUPLICATION RATHER THAN REMOVING IT.** `createPanelLayout` takes a `plate`
-   * now and owns the spacing, so no wrapper and no page can get it wrong.
+   * The panel places the plate, this file does not: a plate prepended from outside sat on the top
+   * border. `createPanelLayout` takes a `plate` and owns the spacing.
+   * why: lessons/kit-instrument.md#panel-places-plate
    */
   /**
-   * 🔴 THE CASE KEEPS ITS OWN PLATE WHENEVER THE BAR IS NOT CARRYING ONE.
-   * A header with `plate: false` used to leave the instrument with no plate
-   * anywhere, which was right while the status control printed the name beside
-   * it and wrong the moment the bar moved to the foot: a nameplate at the
-   * BOTTOM of a case names it after a reader has already read it.
-   * ⚠️ SO THE TEST IS WHO HAS THE PLATE, NOT WHETHER THERE IS A BAR. One plate,
-   * in one of two places, decided by the bar rather than by the caller having
-   * to remember to ask twice.
+   * The case keeps its own plate whenever the bar is not carrying one: the test is who has the plate.
+   * why: lessons/kit-instrument.md#barhasplate
    */
   const barHasPlate = !!head && header.plate !== false;
   const panel = createPanelLayout({ ...panelOpts, plate: barHasPlate ? null : spec });
   const plate = barHasPlate ? head.plate : panel.plate;
-  /* 🔴 THE HEADER GOES IN BY `prepend`, FOR THE REASON THE PLATE DOES: it
-     belongs to the CASE, above the fixed column and the strip both, or it
-     scrolls away from the instrument it names. `/tom/` found that with a plate.
-     ⚠️ AND THE SPACING IS `shell.css`'S, NOT THIS FILE'S. `.panel-case >
-     .panel-head` carries the same `padding-block` the plate's own rule does,
-     off the same `--panel-pad`. Centralising an assembly that does not own its
-     own layout moves the duplication rather than removing it, which is written
-     at length in `panel-layout.mjs` and was paid for on `/plai/`. */
-  /* 🔴 GLUED, NEVER PREPENDED, SINCE 2026-09-22. This put the header INSIDE the
-     case, where its underline sat within the case's own padding and could never
-     reach the sides, and where its padding was the case's plus its own. See the
-     note on `head` above. `createGlue` returns the single block unwrapped when
-     there is only one, so a case with no header gains no box and no edge. */
+  // The header belongs to the case, above the fixed column and the strip; its spacing is shell.css's
+  // `.panel-case > .panel-head`, off `--panel-pad`.
+  // why: lessons/kit-instrument.md#header-placement
+  // Glued, never prepended. `createGlue` returns a single block unwrapped, so no header adds no box.
+  // why: lessons/kit-instrument.md#glued
   /**
-   * 🔴 THE BAR SITS ABOVE OR BELOW, `header: { at: 'head' | 'foot' }`, ADDED
-   * 2026-09-22: *"make it revertable: move plaits/warps headers to footers and
-   * add nameplate to top right"*. **`head` is the default and nothing about it
-   * changed**, which is the whole of *revertable*: a caller moves one word back
-   * and gets exactly what it had, rather than a rewrite being undone by hand.
-   * ⚠️ AND `createGlue` TAKES THE PARTS IN ORDER, so this is an argument swap
-   * rather than a second assembly. The seam, the shared border and the children
-   * giving up their own edges are the same either way.
+   * `header: { at: 'head' | 'foot' }`, `head` by default; `createGlue` takes parts in order, so it is
+   * an argument swap rather than a second assembly.
+   * why: lessons/kit-instrument.md#at-foot
    */
   /**
-   * 🔴 A CALLER MAY GLUE ITS OWN PARTS IN, `parts: [el]`, ADDED 2026-09-22:
-   * *"move it to glued section on top of onoff/patchselector"*. They sit
-   * BETWEEN the case and the bar, which is the only place a part can go that is
-   * neither the instrument's controls nor its bar.
-   * ⚠️ **AND THEY ARE GLUE PARTS, NOT CASE CONTENTS.** `add()` puts something
-   * inside the case, where it scrolls with the panel and sits within the case's
-   * inset. A part is its own surface with the glue's seam either side of it,
-   * which is what a picture under an instrument wants: the same edge the bar
-   * has, at the same width.
+   * `parts: [el]` glues a caller's own parts between the case and the bar. They are glue parts with
+   * the seam either side, not case contents like `add()`.
+   * why: lessons/kit-instrument.md#parts
    */
   const atFoot = !!head && header.at === 'foot';
   const mid = (parts || []).filter(Boolean).map((b) => b.el || b);
@@ -378,14 +192,9 @@ export function createInstrument(o = {}) {
       return this;
     },
     /**
-     * Stack a block across the case, under whatever is already there, and the
-     * rule between two of them.
-     *
-     * 🔴 FORWARDED RATHER THAN WRAPPED, the way `fixed`, `strip` and `flow`
-     * already are, so everything `panel-layout.mjs` documents about where a
-     * seam may live stays true here. **A band is not `add()`**: `add()` puts a
-     * block in the SCROLLER, where it is as wide as the widest row and scrolls
-     * with it, and a band is a child of the case, across the whole of it.
+     * Stack a block across the case, under whatever is there, with the rule between two of them.
+     * Forwarded like `fixed`, `strip` and `flow`. Not `add()`, which puts a block in the scroller.
+     * why: lessons/kit-instrument.md#band
      */
     band: (block) => panel.band(block),
     unband: (block) => panel.unband(block),

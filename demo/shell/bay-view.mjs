@@ -1,11 +1,7 @@
-// demo/shell/bay-view.mjs: the bay drawn from its own data and nothing
-// else. A box is a node (`bay.nodes()`), its inlets and outlets are its ports
-// (`bay.ports()`, in on the left, out on the right), and a wire is a link
-// (`bay.links()`) from the outlet it names to the inlet it names, coloured by
-// the out port's medium, with no arrowhead: out is always the right or
-// bottom edge and in the left or top, as on a patch cable. No typed labels,
-// no notes: rename a port and the picture follows. Wide hosts chain left to right; a phone stacks top to
-// bottom with inlets on the top edge and outlets on the bottom.
+// demo/shell/bay-view.mjs: the bay drawn from its own nodes, ports and links and nothing else.
+// Out ports on the right or bottom, in ports left or top, wires coloured by medium, no arrowheads.
+// Wide hosts chain left to right; a phone stacks top to bottom.
+// why: lessons/kit-bay-view.md#header
 
 import { TIMING_NAMES, printOptions } from './link-options.mjs';
 import { BAY_GEOMETRY, ranks, rounded, nodeOf, portName, layoutBay, acrossWire } from './bay-layout.mjs';
@@ -23,12 +19,8 @@ const { FONT, TITLE, ROW, PAD, TGAP, DROW, PLANE } = BAY_GEOMETRY;
 export { BAY_GEOMETRY, ranks, rounded };
 
 export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infinity, detail = null } = {}) {
-  // stretch: boxes share the width and wires keep GAP; false keeps each box
-  // at its own width and gives the rest to the wires. sizeAs: n draws a box
-  // as wide as one in a row of n stretched boxes. maxWire caps the gap a
-  // wire crosses when stretch is false; the row then sits at the left.
-  // detail: (node) => [beside the title, under it left, under it right], each a
-  // string or { text, sans }, drawn grey. Without it a box is compact.
+  // stretch, sizeAs, maxWire and detail size the boxes and wires; see the lesson for each.
+  // why: lessons/kit-bay-view.md#options
   const el = document.createElement('div');
   el.className = 'lv';
   const svg = s('svg', { class: 'lv-svg' });
@@ -61,22 +53,12 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
     let laneX = () => 0;
     let H = L.H;
     if (!across) {
-      // A phone: full width cards, title top left with the first field under
-      // it, every port on the right edge one per row (ins, then outs), and every
-      // wire in a gutter to the right, one lane each, reused where their
-      // vertical spans do not overlap (plans/plan-links-view-phone.md).
-      /* 🔴 A TITLE THAT DOES NOT FIT BESIDE ITS PORTS GETS A LINE OF ITS OWN,
-         2026-10-11. The first port row shared the title's line on every card,
-         so on /typist/score/?n=6 at 375 px the gutter took 22 lanes, the
-         cards shrank to 159 px and `web:typewriter-k` was drawn over its own
-         `value-in` (40 overlapping labels, MEASURED). Each card now measures
-         its title (and the grey field under it) against the port names on the
-         same rows, and only a card that collides pushes its ports down a row
-         or two. That moves every span, so the lanes are worked out again, and
-         a narrower card can make another one collide: it settles in a few
-         passes because a card only ever gains rows. A card narrower than its
-         own longest name is not squeezed further: the picture widens and
-         scrolls inside its own box. */
+      // A phone: full width cards, ports on the right edge one per row, wires in a right gutter,
+      // one lane each, reused where their spans do not overlap.
+      // why: lessons/kit-bay-view.md#phone
+      // A title that collides with its ports gets a row of its own; that moves every span, so the
+      // lanes are worked out again until it settles (a card only gains rows).
+      // why: lessons/kit-bay-view.md#title-rows
       const off = new Map(order.map((n) => [n.id, 0]));
       const lay = () => {
         boxes.length = 0; at.clear(); laneOf.clear();
@@ -90,12 +72,9 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
           y += h + PAD;
         }
         H = y - PAD;
-        // ⚠️ A FAN SHARES ONE LANE, 2026-10-11: every wire out of one outlet
-        // (a sample store to six typewriters) or into one inlet (six fx boxes
-        // to one speaker) runs in one lane as a trunk with branches, which is
-        // how a patch bus is drawn. One lane per wire gave typist/040 at six
-        // papers 26 lanes, a gutter wider than its cards. Twins (same two
-        // ends) keep a lane each, so they still split, run and rejoin.
+        // A fan (one outlet to many, or many into one inlet) shares one lane as a trunk with
+        // branches; twins with the same two ends keep a lane each.
+        // why: lessons/kit-bay-view.md#fan-lane
         const live = links.filter((l) => at.has(l.from) && at.has(l.to));
         const count = (k) => live.filter((l) => l.from === k || l.to === k).length;
         const keyOf = (l) => (pairCount.get(`${l.from} ${l.to}`) > 1 ? l.id
@@ -195,13 +174,9 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
         const x = laneX(laneOf.get(l.id));
         d = rounded([[a.x, a.y], [x, a.y], [x, b.y], [b.x, b.y]], 5);
       } else ({ d } = acrossWire(a, b, o, j, L));
-      /* 🔴 A TIMED LINK SAYS SO ON ITS WIRE, SINCE 2026-10-12. `ahead` and
-         `follow` (link-options.mjs) change WHEN a message lands, which no
-         port name shows, so a wire carrying one is dashed and carries its
-         option in the link's own text form, `ahead 150`, at its middle, in the
-         medium's colour. The one typed label this view draws, and only the
-         timing ones: `w 640` on a video link changes what is asked for, not
-         when, and stays off the picture as before. */
+      // A timed link (`ahead`, `follow`) is dashed and carries its option text at its middle;
+      // the only typed label this view draws.
+      // why: lessons/kit-bay-view.md#timed-label
       const timed = printOptions(l.options, TIMING_NAMES);
       const path = s('path', { d, class: `lv-wire md-${medium}${timed ? ' lv-timed' : ''}` });
       wires.set(l.id, path);
@@ -210,13 +185,9 @@ export function createBayView(bay, { stretch = true, sizeAs = 0, maxWire = Infin
         path.append(s('title', {}, `${timed}: the receiver fires on the time the sender stamped`));
         let mid = null;
         try { const n = path.getTotalLength(); mid = path.getPointAtLength(n / 2); } catch { /* not laid out */ }
-        // ⚠️ NOT ON A PHONE. There the wire's middle is its lane in the right
-        // gutter, a few px from the screen edge, and the words ran off it
-        // (MEASURED at 375 on /concepts/clock/030/). The dash and the hover stay.
-        // It has to fit between the two boxes, or it lies on their port names
-        // (MEASURED on /concepts/clock/040/, `follow web-1:cam:video-out` over
-        // a 70 px gap). The full option, then the node it follows, then the
-        // option's name alone, then nothing but the dash and the hover.
+        // Not on a phone, where the middle is a few px from the screen edge. The words must fit
+        // between the two boxes, so it falls back to shorter forms, then the dash alone.
+        // why: lessons/kit-bay-view.md#timed-label-fit
         if (mid && across) {
           const room = Math.abs(b.x - a.x) + 12;   // it may lap the two box edges a little
           const t = s('text', { x: mid.x, y: mid.y - 6, 'text-anchor': 'middle', class: `lv-opt md-${medium}` }, timed);

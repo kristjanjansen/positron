@@ -1,37 +1,7 @@
-// demo/shell/board-collide.mjs: a SuperCollider program played on the board,
-// from a page. plans/plan-pi-supercollider-defs.md step 2 (2026-10-12).
-//
-// The board compiles the program TEXT itself with the same `sclang-lite.mjs`
-// this page uses (`rig/board/scollide.mjs`), so this module never sends a byte
-// of SynthDef and never sends OSC. It sends verbs and keeps the board's clock:
-//
-//   start()                    audio.start { source: 'collide' }
-//   load(name, text)           sc.load { name, text, sha }, `sha` this tab's own
-//                              SHA-256 of the same compile, so `same` in the
-//                              answer says whether both ends made one program
-//   hits([{ name, perfAt, args?, choke? }])
-//                              ONE sc.hit message, each `at` on the BOARD's clock
-//   noteOn / noteOff / panic   note.* { node: 'collide' }
-//   set(name, param, value)    sc.set
-//   stats()                    sc.stats
-//
-// 🔴 THE BOARD IS THE CLOCK WHILE IT IS IN THE ROOM (plan §2.2). `clock.ping`
-// in bursts, the sample with the smallest round trip kept and never an
-// average, with `skewSample` IMPORTED from `proto/looper/peer.mjs`, which is the
-// estimator `/concepts/clock/020/` was graded on (an injected 230 to 270 ms
-// skew found to within 2.4 ms). A hit's `at` is then this tab's moment plus the
-// offset, so the board only turns milliseconds into an OSC timetag.
-// ⚠️ A HIT BEFORE THE CLOCK IS KNOWN IS REFUSED HERE, not sent at offset 0: on a
-// board whose clock is 250 ms away that is every hit a quarter second out, and
-// the board would count it as somebody else's lateness.
-//
-// 🔴 HOW FAR AHEAD, PER PATH (plan §2.4): 250 ms on the relay, 150 direct.
-// `AHEAD` holds both; the page picks by `board.stats().via`.
-//
-// ⚠️ THE `board` IS ANYTHING WITH `ask(msg, type, ms)` AND `send(msg)`. On a page
-// it is `createBoard` from `board.mjs`, whose harness guard (`?selfcheck=1`
-// refuses every send) applies to all of this. In node it is a socket on a
-// loopback relay (`board-collide-test.mjs`), which is how step 2 is measured.
+// demo/shell/board-collide.mjs: a SuperCollider program played on the board, which compiles the
+// text itself, so this sends verbs and never SynthDef or OSC. The board is the clock (`skewSample`,
+// min round trip); a hit before the clock is known is refused. `AHEAD`: 250 ms relay, 150 direct.
+// why: lessons/kit-board-collide.md#header
 
 import { compile } from './sclang-lite.mjs';
 // Two levels up, so it resolves in the browser (/shell/ -> /proto/) and in node

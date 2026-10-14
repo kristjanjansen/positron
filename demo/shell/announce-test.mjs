@@ -1,11 +1,6 @@
-// demo/shell/announce-test.mjs: a page's announce, in the registry's shape,
-// with no socket, no browser and no studio.
-//
-//   node demo/shell/announce-test.mjs
-//
-// MOST OF THESE ARE NEGATIVE CONTROLS (9 of 21): an announce that sent the
-// whole bay, the Pi's nodes included, or sent before a socket was open, or
-// from a check run onto the real relay, would pass every positive check here.
+// demo/shell/announce-test.mjs: a page's announce, in the registry's shape, with no socket,
+// no browser and no studio. `node demo/shell/announce-test.mjs`. 9 of 21 are negative controls.
+// why: lessons/kit-announce.md#test-header
 
 import { pageGraph, announceOn, mayAnnounce } from './announce.mjs';
 import { graphProblem, createRegistry, BOARD_SITE } from './graph-registry.mjs';

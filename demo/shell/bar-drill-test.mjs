@@ -1,24 +1,6 @@
-// demo/shell/bar-drill-test.mjs: the drill's verdicts, and its agreement with
-// the harness it copies, with no browser at all.
-//
-//   node demo/shell/bar-drill-test.mjs
-//
-// Two halves. The first grades the six verdicts `bar-drill.mjs` makes, and a
-// named proportion of them are NEGATIVE CONTROLS: a bar that says it is playing
-// and has not moved, a pause that drifts by one unit, a seek that lands 3 per
-// cent out, a strip of dark pixels. Those are the bars the drill exists to
-// fail, so a verdict that passed everything would go red here.
-//
-// The second half is the reason this file exists. `bar-drill.mjs` is the
-// harness's drill re-run by a page, and two copies of one measurement are a
-// measurement that will disagree. So this reads `demo/verify.mjs`, strips its
-// comments (an absence or presence asserted over raw source grades the prose,
-// `positron-verify`), and requires every number in `DRILL` to be the number
-// the harness uses.
-//
-// NOT GRADED HERE: `drillBar` itself, which needs a document, a real bar and
-// real time. `/kit/`'s TAB PAGE block runs it against a live bar and against a
-// bar whose clock is frozen, which must fail exactly one row.
+// demo/shell/bar-drill-test.mjs: the drill's six verdicts, with negative controls, and that every
+// number in `DRILL` is the number demo/verify.mjs uses. `drillBar` itself needs a live bar (/kit/).
+// why: lessons/kit-bar-drill.md#test-header
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

@@ -1,25 +1,7 @@
-// demo/shell/board-collide-test.mjs: board-collide.mjs against the stand-in board.
-//
-//   node demo/shell/board-collide-test.mjs
-//
-// plans/plan-pi-supercollider-defs.md step 2. No browser and no Pi: the
-// stand-in (`demo/fake-board.mjs`) on a relay of its own on 127.0.0.1, its
-// clock pushed 230 to 270 ms away from this machine's, answering through the
-// board's own `rig/board/scollide.mjs` over a fake scsynth that counts, on its
-// side of the wire, how early each bundle arrived.
-//
-// WHAT IS MEASURED, and what would make each row go red:
-//   - the offset this module finds against the injected skew (clock/020 found
-//     one to within 2.4 ms; the bar here is 5 ms on a loopback relay);
-//   - a drum pattern at 120 bpm handed over at AHEAD 250, the hits handed over
-//     against the hits the stand-in started, and `late` and `droppedLate` 0;
-//   - SABOTAGE 1: AHEAD 10 makes the board count late or dropped hits;
-//   - SABOTAGE 2: the estimator's sign flipped puts every `at` about twice the
-//     skew out, and the board drops every hit as too old;
-//   - `same: true` for every program: this tab's WebCrypto hash against the
-//     board's node:crypto hash of its own compile.
-// ⚠️ A LOOPBACK RELAY IS ~1 ms, so this grades the arithmetic and the verbs,
-// never the relay's tail. Step 6 on the Pi is what reads `late` over 1000 hits.
+// demo/shell/board-collide-test.mjs: board-collide.mjs against the stand-in board on a loopback
+// relay with its clock skewed 230 to 270 ms. Offset within 5 ms, two sabotage rows, `same: true`.
+// A loopback relay is ~1 ms, so this grades arithmetic and verbs, never the relay's tail.
+// why: lessons/kit-board-collide.md#test-header
 
 import { startBoard } from '../fake-board.mjs';
 import { format, parse, randomId } from './wire.mjs';

@@ -1,30 +1,7 @@
-// demo/shell/bay-test.mjs — the patch bay's arithmetic, with no browser, no
-// socket and no instrument.
-//
+// demo/shell/bay-test.mjs: the patch bay's arithmetic, with no browser, socket or instrument.
 //   node demo/shell/bay-test.mjs
-//
-// The bay's whole job is to REFUSE things, and a validator is the one kind of
-// code that passes a naive test suite by accident: write only valid patches and
-// a function that returns `{ok: true}` unconditionally scores full marks.
-//
-// SO MOST OF THESE ARE NEGATIVE CONTROLS. Each one is a patch that must be
-// refused, and each asserts the REASON as well as the refusal, because a
-// validator that refuses everything for one reason is the same bug from the
-// other side.
-//
-// 🔴 THE UNIVERSAL MEDIA SECTIONS (A TO K, 2026-10-04) WERE PROVED BY BREAKING
-// `bay.mjs` ON A SCRATCH COPY, ONE FAULT AT A TIME, against 112 green:
-//
-//   sabotage                                        red
-//   consent check removed (`if (false)`)            4 of 112
-//   where always 'machine'                          5 of 112
-//   transforms allowed on non-MIDI links            3 of 112
-//   video on one network says 'round trip 12 ms'    2 of 112
-//   audio on one network says 'board round trip 3 ms'  2 of 112
-//
-// ⚠️ THE FOURTH ROW WAS 1 OF 112 THE FIRST TIME, AND THAT IS WHY IT IS HERE.
-// The check that no cell invents a number looked for bare digits, and `12`
-// is in the plan as `12 byte header`. It compares number and unit now.
+// Most are negative controls asserting the reason too; the sabotage table is in the lesson.
+// why: lessons/kit-bay.md#test-header
 
 import { createBay, apply, delivers, printLink, parseLink, printPatch, parsePatch,
   classOf, eventOf, isNoteOff, checkTransforms, CLASSES, MEDIA, STALE_MS, OP_NAMES, OP_HELP,
@@ -34,11 +11,8 @@ import { STALE_MS as REGISTRY_STALE_MS } from './graph-registry.mjs';
 import { decode } from './midi-decode.mjs';
 
 /**
- * 🔴 A REFUSAL IS TWO SENTENCES SINCE 2026-09-22, SO THE TWO HALVES ARE READ
- * SEPARATELY HERE. `checkTransforms` answers `''` or `{ why, fix }`: `why` is
- * the problem in words and `fix` is the thing a person can do. Every check
- * below that used to match one string matches `why`, and the claim behind it
- * did not move: a refusal still has to name the thing that is wrong.
+ * A refusal is `''` or `{ why, fix }`; checks below match `why`.
+ * why: lessons/kit-bay.md#test-why
  */
 const why = (t) => checkTransforms(t).why || '';
 const fix = (t) => checkTransforms(t).fix || '';
@@ -120,8 +94,8 @@ console.log('\n== the patch bay ==');
 // ── what it refuses, which is the point ────────────────────────────────────
 
 {
-  // 4. THE ONE THAT MATTERS ON THIS DESK. The Circuit has no factory reset and
-  //    one byte inside a SysEx message overwrites a patch.
+  // 4. The one that matters on this desk: one byte inside SysEx overwrites a Circuit patch.
+  // why: lessons/kit-bay.md#test-sysex
   const b = desk();
   b.addPort({ id: 'here:dump:out', label: 'dumper', dir: 'out', medium: 'midi',
     shape: { protocol: '1.0' }, emits: ['note', 'sysex'] });
@@ -172,8 +146,8 @@ console.log('\n== the patch bay ==');
 }
 
 {
-  // 9. A shape mismatch NAMES THE FIELD. "incompatible" is a refusal somebody
-  //    has to debug; a number against a number is one they can fix.
+  // 9. A shape mismatch names the field and both numbers.
+  // why: lessons/kit-bay.md#test-shape
   const b = desk();
   b.addPort({ id: 'here:board:out', label: 'board', dir: 'out', medium: 'audio',
     shape: { rate: 44100, channels: 2, frameMs: 20 }, emits: [] });
@@ -206,11 +180,9 @@ console.log('\n== the patch bay ==');
 }
 
 {
-  // 11. Transforms that leave NO class at all would make a link that looks
-  //     connected and carries nothing, which is this project's definition of a
-  //     lie. `mk425c:out` emits note, cc and bend, so keeping only sysex keeps
-  //     nothing. ⚠️ A DIFFERENT REFUSAL FROM 11c BELOW: here the SOURCE is left
-  //     with nothing, there the DESTINATION takes none of what arrives.
+  // 11. Transforms leaving the source no class are refused; different from 11c, where the
+  //     destination takes none of what arrives.
+  // why: lessons/kit-bay.md#test-nothing-left
   const b = desk();
   const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'only', cls: 'sysex' }]);
   ok('a link whose transforms leave no class at all is refused',
@@ -247,21 +219,15 @@ console.log('\n== the patch bay ==');
     other.d1 === 7 && other.ch === 2, `CC ${other.d1} on channel ${other.ch}`);
 }
 
-// ── a transform that is not well formed ────────────────────────────────────
-//
-// 🔴 THESE ARE NOT HYPOTHETICAL. MEASURED 2026-09-21: asked to turn *"connect
-// the keyboard to the circuit and transpose it up one semitone"* into a patch,
-// Workers AI returned `{ op: 'transpose', to: 1 }`, which is valid against the
-// JSON Schema it was generated under and is meaningless. `transpose` takes
-// `by`, and `ev.d1 + undefined` is `NaN`, which is neither a throw nor a drop.
+// -- a transform that is not well formed --
+// Measured: a model returned `{ op: 'transpose', to: 1 }`, schema valid and NaN in use.
+// why: lessons/kit-bay.md#test-malformed
 
 {
   const b = desk();
   const r = b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'transpose', to: 1 }]);
-  /* 🔴 `by` WAS THE WHOLE OF THIS CLAIM UNTIL 2026-09-22 AND IT IS A FIELD
-     NAME. What a reader needs is the thing that is missing, said in words, and
-     the object they could write instead. **The 1 was never wrong**, so the
-     solution carries it over rather than inventing a number. */
+  // The refusal names what is missing in words, and the fix carries the 1 over.
+  // why: lessons/kit-bay.md#test-wrong-key
   ok('a transform with its argument under the wrong key is refused, by name',
     !r.ok && r.why.includes('transpose')
     && r.why.includes('the number of semitones')
@@ -280,10 +246,8 @@ console.log('\n== the patch bay ==');
   ok('a class nobody has heard of is named in the refusal',
     why([{ op: 'only', cls: 'banana' }]).includes('banana'),
     why([{ op: 'only', cls: 'banana' }]));
-  /* ⚠️ `to` IS A FIELD NAME AND MAY NOT BE MATCHED ON ANY MORE, which is the
-     whole of the 2026-09-22 report. The claim is unchanged and is stronger
-     read this way: the refusal has to say WHICH HALF of the remap did not
-     arrive, in the words a person uses for it. */
+  // `to` is a field name and is not matched on; the refusal must name the missing half.
+  // why: lessons/kit-bay.md#test-half-cc
   ok('a half given cc remap says which half is missing',
     why([{ op: 'cc', from: 1 }]).includes('the controller it goes to'),
     why([{ op: 'cc', from: 1 }]));
@@ -331,10 +295,8 @@ console.log('\n== the patch bay ==');
 // ── counters ───────────────────────────────────────────────────────────────
 
 {
-  // 16. TWO COUNTERS AT TWO ENDS. `link.sent` is what this side queued and
-  //     `port.heard` is what the far side took. Reading one as the other is
-  //     `createMidiLane`'s bug, which counted what a page QUEUED while every
-  //     note was scheduled fifty six years out.
+  // 16. Two counters at two ends: `link.sent` queued here, `port.heard` taken there.
+  // why: lessons/kit-bay.md#test-counters
   heard = [];
   const b = desk();
   b.link('here:mk425c:out', 'here:circuit:in', [{ op: 'only', cls: 'note' }]);
@@ -366,22 +328,20 @@ console.log('\n== the patch bay ==');
     classOf(decode([0x80, 60, 0])) === 'note' && classOf(decode([0x90, 60, 0])) === 'note');
   ok('every class a port can name is in CLASSES',
     ['note', 'cc', 'bend', 'touch', 'program', 'clock', 'transport', 'sysex'].every((c) => CLASSES.includes(c)));
-  // ⚠️ NEGATIVE CONTROL: a start used to be `clock`, so a port taking tempo was started too.
+  // Negative control: start was once `clock`, so a port taking tempo got started.
+  // why: lessons/kit-bay.md#test-transport
   ok('start, stop and continue are transport and the clock tick is clock',
     [0xFA, 0xFB, 0xFC].every((s) => classOf(decode([s])) === 'transport') && classOf(decode([0xF8])) === 'clock');
   ok('a drop of transport keeps the clock running',
     !checkTransforms([{ op: 'drop', cls: 'transport' }]) && !!checkTransforms([{ op: 'drop', cls: 'tempo' }]));
-  /* ⚠️ EIGHT SINCE 2026-10-04 (plan-universal-routing §3), and the first three
-     are asserted IN ORDER because a page may index them by position. */
+  // Eight media, the first three asserted in order because pages index them by position.
+  // why: lessons/kit-bay.md#test-media
   ok('the media are the eight the plan names, the first three where they were',
     MEDIA.join(',') === 'midi,audio,clock,value,video,program,file,state', MEDIA.join(','));
 }
 
-// ── the three transforms added 2026-09-21, and the two traps in them ────────
-//
-// 🔴 A KEYBOARD SPLIT COULD NOT BE SAID IN THIS VOCABULARY AT ALL until `range`
-// existed. The owner asked for one in words and the model reached for `only`,
-// which filters by CLASS, because that was the nearest thing to a filter.
+// -- range, vrange and fixed, and the two traps in them --
+// why: lessons/kit-bay.md#test-ranges
 {
   const lower = [{ op: 'range', lo: 0, hi: 59 }, { op: 'channel', to: 1 }];
   const upper = [{ op: 'range', lo: 60, hi: 127 }, { op: 'channel', to: 2 }];
@@ -393,9 +353,8 @@ console.log('\n== the patch bay ==');
     apply(upper, note(72))?.ch === 2 && apply(lower, note(72)) === null,
     JSON.stringify(apply(upper, note(72))));
 
-  // 🔴 THE TRAP: A NOTE OFF IS THE SAME NOTE NUMBER, so a note the filter let
-  // through is always told to stop, and one it refused never started. A filter
-  // keyed on anything that DIFFERS between the on and the off stops notes.
+  // A note off has the same note number, so the split lets through exactly the offs it needs.
+  // why: lessons/kit-bay.md#test-split-off
   ok('a note off follows its own note through the split, so nothing can hang',
     apply(lower, note(48, 0))?.d1 === 48 && apply(upper, note(48, 0)) === null,
     'the off goes where the on went');
@@ -410,9 +369,8 @@ console.log('\n== the patch bay ==');
   ok('a velocity layer keeps a hard hit and drops a soft one',
     apply(hard, n(100))?.d2 === 100 && apply(hard, n(20)) === null,
     'layered');
-  // 🔴 THE TRAP THAT WOULD HANG A SYNTH IN ANOTHER BUILDING: a note off carries
-  // velocity 0, so a naive window drops every release and leaves the note that
-  // a hard hit let through sounding forever.
+  // A note off carries velocity 0; a naive window would drop every release.
+  // why: lessons/kit-bay.md#test-vrange-off
   ok('NEGATIVE CONTROL: a note off passes a velocity window it could never enter',
     apply(hard, n(0))?.d2 === 0,
     'velocity 0 is a release and always passes');
@@ -444,9 +402,8 @@ console.log('\n== the patch bay ==');
     'transpose spreads the event');
 }
 {
-  /* 🔴 THE NAME IS THE THING'S NAME AND NEVER ITS KEY SINCE 2026-09-22. This
-     read `fixed takes "to"`, which names the key the validator compared. What
-     a reader needs named is the loudness and the channel. */
+  // The refusal names the thing (loudness, channel), never its key.
+  // why: lessons/kit-bay.md#test-missing
   ok('a missing argument is refused by name',
     /fixed gives every note the same loudness/.test(why([{ op: 'fixed' }]))
     && /channel puts every message on one MIDI channel/.test(why([{ op: 'channel' }]))
@@ -455,11 +412,8 @@ console.log('\n== the patch bay ==');
     `${why([{ op: 'fixed' }])} / ${fix([{ op: 'fixed' }])}`);
 
   /**
-   * 🔴 ONE BOUND IS A WHOLE INSTRUCTION, AND THIS ASSERT SAID THE OPPOSITE
-   * UNTIL 2026-09-21. It read *`range` refuses a missing `hi`*, which made
-   * *everything above middle C* unsayable: the only legal way to write it named
-   * 127 as a decision when it is the end of the scale. Both bounds still work
-   * and neither is required on its own.
+   * One bound is a whole instruction; neither is required on its own.
+   * why: lessons/kit-bay.md#test-open-range
    */
   ok('a range may be open at either end',
     checkTransforms([{ op: 'range', lo: 60 }]) === ''
@@ -474,28 +428,22 @@ console.log('\n== the patch bay ==');
     && apply([{ op: 'range', hi: 7 }], noteAt(0)) !== null
     && apply([{ op: 'range', hi: 7 }], noteAt(8)) === null);
 
-  /* 🔴 NEGATIVE CONTROL, and it is the reason `oneOf` exists rather than two
-     optional arguments. A range with NO bound passes every note, which is a
-     filter that reads as working and does nothing at all. */
+  // Negative control: a range with no bound passes everything, so it is refused.
+  // why: lessons/kit-bay.md#test-no-bound
   ok('NEGATIVE CONTROL: a range with neither bound is refused rather than passing everything',
     /neither the lowest note nor the highest note was given/.test(why([{ op: 'range' }]))
     && /neither the softest hit nor the hardest hit was given/.test(why([{ op: 'vrange' }])),
     why([{ op: 'range' }]));
 
-  /* 🔴 AND BEING GIVEN THE WRONG THING IS NOT BEING GIVEN NOTHING. One
-     sentence covered both until 2026-09-22 and said `was given nothing` about
-     `{"op":"range","to":7}`, which plainly has a number in it. That object is
-     MEASURED rather than imagined: eleven runs of `llama-3.3-70b` out of
-     eleven. */
+  // Being given the wrong thing (`to: 7`, measured from a model) is not being given nothing.
+  // why: lessons/kit-bay.md#test-non-bound
   ok('NEGATIVE CONTROL: a range given something that is not a bound says so, not "nothing"',
     /nothing it was given is the lowest note or the highest note/.test(why([{ op: 'range', to: 7 }]))
     && why([{ op: 'range', to: 7 }]) !== why([{ op: 'range' }]),
     why([{ op: 'range', to: 7 }]));
 
-  /* 🔴 AND THE TEXT FORM HAS TO SURVIVE THE ABSENT BOUND, which is the defect
-     an open end would otherwise introduce quietly: `{ range, hi: 7 }` printed
-     as `range 7` reads back as `{ range, lo: 7 }`, the same words meaning the
-     opposite filter. */
+  // The text form survives an absent bound: `{ range, hi: 7 }` must not read back as `lo: 7`.
+  // why: lessons/kit-bay.md#test-open-roundtrip
   for (const t of [{ op: 'range', hi: 7 }, { op: 'range', lo: 60 },
                    { op: 'range', lo: 0, hi: 7 }, { op: 'vrange', hi: 63 }]) {
     const line = printLink({ from: 'a', to: 'b', transforms: [t] });
@@ -505,12 +453,9 @@ console.log('\n== the patch bay ==');
   }
 
   /**
-   * 🔴 TWO RANGES OPEN AT THE SAME END IS ALWAYS ONE RANGE WRITTEN WRONG, and
-   * it is what a language model produces every time it is asked for a row of
-   * buttons: eleven runs on 2026-09-21, always `{"op":"range","to":A}` then
-   * `{"op":"range","to":B}`. Composed, the narrower bound wins and the other
-   * transform is dead, so the link is well formed, allowed, and passes one note
-   * of eight. The refusal carries the correction as JSON the person can read.
+   * Two ranges open at the same end are one range written wrong: one note of eight passes.
+   * The refusal carries the correction as JSON.
+   * why: lessons/kit-bay.md#test-two-ranges
    */
   const two = checkTransforms([{ op: 'range', hi: 0 }, { op: 'range', hi: 7 }]);
   ok('two ranges open at the same end are refused, and the solution carries the right patch',
@@ -519,10 +464,8 @@ console.log('\n== the patch bay ==');
     `${two.why} / ${two.fix}`);
 
   /**
-   * 🔴 THE NEGATIVE CONTROL, AND IT IS THE HALF THAT STOPS THIS REFUSING REAL
-   * WORK. Two ranges open at OPPOSITE ends are a perfectly ordinary way to
-   * write a window, and a split is two ranges in two SEPARATE LINKS, which this
-   * check must never see as one list.
+   * Negative control: opposite open ends are a window, and a split's two links are never one list.
+   * why: lessons/kit-bay.md#test-window
    */
   ok('NEGATIVE CONTROL: two ranges closing opposite ends are a window and are allowed',
     checkTransforms([{ op: 'range', lo: 60 }, { op: 'range', hi: 72 }]) === ''
@@ -538,10 +481,8 @@ console.log('\n== the patch bay ==');
   /* A range that can never pass anything is a silent link, not a tight filter. */
   ok('a low bound above the high one is refused rather than passing nothing',
     /nothing can ever pass/.test(why([{ op: 'range', lo: 60, hi: 7 }]))
-    /* ⚠️ AND THE OFFER IS MADE TO A PERSON RATHER THAN TAKEN BY THE CODE. The
-       file refuses to merge two bounds because one run of eleven produced them
-       descending; showing the swapped object costs nothing and decides
-       nothing. */
+    // The swapped object is offered, never applied.
+    // why: lessons/kit-bay.md#test-lohi-offer
     && fix([{ op: 'range', lo: 60, hi: 7 }]).includes('{"op":"range","lo":7,"hi":60}'),
     `${why([{ op: 'range', lo: 60, hi: 7 }])} / ${fix([{ op: 'range', lo: 60, hi: 7 }])}`);
 
@@ -554,14 +495,8 @@ console.log('\n== the patch bay ==');
 }
 {
   /**
-   * 🔴 A TRANSFORM WITH NOTHING TO SAY ABOUT ITSELF IS A TRANSFORM NOBODY WILL
-   * BE TOLD ABOUT. 2026-09-21: `range`, `vrange` and `fixed` were added here and
-   * the operator table a language model reads was left listing the other six,
-   * so the code accepted nine words and the model was offered six. It asked for
-   * a filter with the only filter it had been shown, `only`, eight times in one
-   * patch, and the page refused all eight. `workers/wish/src/wish-test.mjs`
-   * generates that table from `OP_HELP` and asserts it is complete; this is the
-   * half that stops a new op being declared with no sentence to generate FROM.
+   * Every op needs a `help` sentence; wish-test.mjs generates the model's table from `OP_HELP`.
+   * why: lessons/kit-bay.md#test-help
    */
   const mute = OP_HELP.filter((o) => typeof o.help !== 'string' || o.help.trim().length < 12);
   ok('every transform carries a sentence a reader outside this file can use',
@@ -578,11 +513,8 @@ console.log('\n== the patch bay ==');
     JSON.stringify(sig));
 
   /**
-   * 🔴 THE EXAMPLE EVERY TRANSFORM CARRIES IS GRADED BY THE VALIDATOR IT IS AN
-   * EXAMPLE OF. It is put in front of a language model on every call, and a
-   * model copies an example rather than reading a sentence, which is measured
-   * twice over in `workers/wish/src/wish.mjs`. So an example this code would
-   * refuse is a defect being TAUGHT, and it would read as documentation.
+   * Every op's example must pass the validator: a model copies examples.
+   * why: lessons/kit-bay.md#test-examples
    */
   const refused = OP_HELP
     .map((o) => [o.op, checkTransforms([{ op: o.op, ...o.eg }])])
@@ -597,14 +529,8 @@ console.log('\n== the patch bay ==');
     thin.length === 0, thin.map((o) => o.op).join(', '));
 
   /**
-   * 🔴 NEGATIVE CONTROL: THE THING THE OWNER ACTUALLY SAW, TWICE, AND THE
-   * SECOND REPORT IS WHAT THIS LINE NOW GRADES. It read
-   * `/only takes "cls"/` until 2026-09-22, which passed happily on the
-   * sentence *only takes "cls" and was given "to"* that was reported as
-   * *"its not for humans, i do not know what to do"*. The claim behind it is
-   * unchanged: the refusal has to name the thing that is missing. What
-   * changed is that a KEY is not a name. The signature still carries `cls=`
-   * because a language model is choosing keys and a visitor is not.
+   * Negative control: the refusal names what is missing without naming a key.
+   * why: lessons/kit-bay.md#test-only-channel
    */
   ok('NEGATIVE CONTROL: `only` given a channel number names what is missing without naming a key',
     /nothing it was given is a kind of message/.test(why([{ op: 'only', to: 1 }]))
@@ -614,13 +540,8 @@ console.log('\n== the patch bay ==');
 }
 
 /**
- * 🔴 THE REFUSALS ARE READ BY A PERSON, AND UNTIL 2026-09-22 THEY WERE WRITTEN
- * IN FIELD NAMES. REPORTED against a real reply: *"only takes "cls" and was
- * given "to" - its not for humans, i do not know what to do"*, and in the next
- * breath *"can we have cooncrete problem -> soluton texts?"*. These four
- * checks are what stops that coming back, and they are graded over EVERY
- * refusal this module can produce rather than over the three that were
- * reported.
+ * Refusals are read by a person; these four checks run over every refusal the module makes.
+ * why: lessons/kit-bay.md#test-readable
  */
 {
   /* Every shape of bad patch there is, so the sweeps below are about the
@@ -641,18 +562,9 @@ console.log('\n== the patch bay ==');
     `${said.filter((s) => s.why && s.fix).length} of ${said.length} carry both`);
 
   /**
-   * 🔴 NO FIELD NAME IN ANYTHING A VISITOR READS, WHICH IS THE REPORT ITSELF.
-   * Every argument of every operator, hunted in both sentences. The JSON
-   * objects a solution may offer are cut out first, because a key inside
-   * `{"op":"transpose","by":1}` is DATA sitting beside the data it corrects,
-   * and the defect was a key printed as English prose.
-   * ⚠️ IT IS THE QUOTED FORM THAT IS HUNTED, AND THE FIRST WRITING OF THIS
-   * LINE WENT RED ON TWO SENTENCES THAT ARE PERFECTLY FINE. It also matched a
-   * bare word before ` is`, which catches *the controller it comes from is
-   * missing*: `from` and `to` are ordinary English as well as keys, and the
-   * reported defect was never a word, it was `only takes "cls"`. A check that
-   * refuses the English is a check that would push the words back towards the
-   * jargon.
+   * No quoted field name in either sentence. JSON a fix offers is cut out first, and only the
+   * quoted form is hunted, since `from` and `to` are also English.
+   * why: lessons/kit-bay.md#test-no-keys
    */
   const KEYS = [...new Set(OP_HELP.flatMap((o) => o.args))];
   const prose = (s) => `${s.why} ${s.fix}`.replace(/\{[^}]*\}/g, ' ');
@@ -661,28 +573,22 @@ console.log('\n== the patch bay ==');
     leaks.length === 0,
     leaks.length ? leaks.map((s) => prose(s)).join(' | ') : `${said.length} swept, ${KEYS.length} keys`);
 
-  /* ⚠️ AND THE SWEEP IS PROVED BY BREAKING IT, or `no field name` is a claim
-     about a regular expression. The sentence that was reported is put through
-     the same test and has to be caught. */
+  // The sweep is proved by breaking it: the reported sentence must be caught.
+  // why: lessons/kit-bay.md#test-sweep-control
   const OLD = { why: 'only takes "cls" and was given "to".', fix: 'Name one of note.' };
   ok('NEGATIVE CONTROL: and the sweep catches the sentence that was reported',
     KEYS.some((k) => prose(OLD).includes(`"${k}"`)), prose(OLD));
 
-  /* ⚠️ AND THE TWO LINES MAY NOT RESTATE EACH OTHER, which is the failure mode
-     of every problem-and-solution pair ever written. A solution that is the
-     problem with `do not` in front of it is one line, not two. */
+  // `why` and `fix` may not restate each other.
+  // why: lessons/kit-bay.md#test-echo
   const echo = said.filter((s) => s.why.toLowerCase().includes(s.fix.toLowerCase())
     || s.fix.toLowerCase().includes(s.why.toLowerCase()));
   ok('NEGATIVE CONTROL: no solution is its own problem said again',
     echo.length === 0, echo.map((s) => s.why).join(' | ') || `${said.length} pairs, none an echo`);
 
   /**
-   * 🔴 AND THE THREE CASES STAY TELLABLE APART, WHICH IS WHAT THE OLD WORDING
-   * BOUGHT AND THE NEW WORDING HAD TO KEEP. A key the operator does not have
-   * is a SWAP, a key it has with a required one absent is an OMISSION, and an
-   * empty object is neither: nothing arrived. Naming them alike is how
-   * `cc takes "from" and was given "to"` once accused a correct argument of
-   * being wrong.
+   * Swap, omission and empty object stay tellable apart.
+   * why: lessons/kit-bay.md#test-three
    */
   const swap = why([{ op: 'cc', by: 1 }]);
   const gap = why([{ op: 'cc', to: 80 }]);
@@ -695,10 +601,8 @@ console.log('\n== the patch bay ==');
     [swap, gap, bare].join(' | '));
 
   /**
-   * ⚠️ AND THE VOCABULARY IS GRADED WHOLE, the same guard `help` already has.
-   * A transform added with no words beside it would fall back to *what it
-   * needs*, which is the placeholder, and a placeholder in a refusal is the
-   * defect above arriving again with nobody noticing.
+   * The vocabulary is graded whole: no op falls back to the placeholder.
+   * why: lessons/kit-bay.md#test-vocab
    */
   const thin = OP_NAMES.filter((op) => {
     const s = OP_SAYS[op];
@@ -711,11 +615,9 @@ console.log('\n== the patch bay ==');
     `${thin.join(', ') || 'none'} silent, ${Object.keys(OP_SAYS).length} of ${OP_NAMES.length}`);
 }
 
-// ── the universal media, plan-universal-routing §3 to §8, 2026-10-04 ───────
-//
-// 🔴 EVERYTHING BELOW IS ARITHMETIC ABOUT A DESCRIPTION. No session is opened,
-// nothing is fetched, no transport code exists in `bay.mjs` to call. So a green
-// here says the bay NAMES the right session, never that one would work.
+// -- the universal media --
+// Arithmetic about a description: green says the bay names the right session, not that it works.
+// why: lessons/kit-bay.md#test-universal
 
 const SHAPE = { rate: 48000, channels: 2, frameMs: 20 };
 /** A small world with every distance in it, and the facts that decide them. */
@@ -789,12 +691,9 @@ function world() {
     t1.includes('smell') && t2.includes('moon'), `${t1} | ${t2}`);
 
   /**
-   * 🔴 NO CELL SAYS A NUMBER THE PLAN DOES NOT. Every number in every `says` is
-   * looked for in `plans/plan-universal-routing.md` WITH ITS UNIT, so a
-   * plausible figure typed into a cell nobody measured goes red here.
-   * ⚠️ THE UNIT IS THE CHECK, AND THE FIRST WRITING OF THIS LOOKED FOR BARE
-   * DIGITS AND MISSED THE SABOTAGE IT WAS WRITTEN FOR: `round trip 12 ms` passed
-   * because the plan says `12 byte header`. The plan's bold is stripped first.
+   * No cell says a number the plan does not: every number is looked for with its unit
+   * (bare digits missed `12 ms` against `12 byte header`).
+   * why: lessons/kit-bay.md#test-says
    */
   const { readFileSync } = await import('node:fs');
   const plan = readFileSync(new URL('../../plans/plan-universal-routing.md', import.meta.url), 'utf8')
@@ -1002,8 +901,8 @@ function world() {
     rec.ok && rec.session?.transport === 'ingest' && rec.session.where === 'internet-one'
       && rec.session.address === 'ingest.positron.studio', JSON.stringify(rec.session || rec.why));
   const play = b.link('r2:recordings:out', 'home:page:audio');
-  /* ⚠️ THIS SAID `read back through ingest` UNTIL 2026-10-06, and ingest is the
-     WRITE path. One reader of one stored object is one https read (`READS`). */
+  // One reader of one stored object is one https read, not ingest.
+  // why: lessons/kit-bay.md#test-store-read
   ok('and a sound out of a store to one reader is one https read of the object', play.ok && play.session?.transport === 'https'
     && play.session.address === 'archive.positron.studio', JSON.stringify(play.session || play.why));
   /* NEGATIVE CONTROL: the same sound to a page that is not a store keeps the
@@ -1013,13 +912,9 @@ function world() {
     page.ok && page.session?.transport === 'datachannel', JSON.stringify(page.session || page.why));
 }
 
-// ── step 0 of plans/plan-routing-migration.md, 2026-10-06 ─────────────────
-//
-// 🔴 THE RELAY'S REAL CAP, ONE STALE WINDOW, A READ ROW, A PORT'S OWN
-// TRANSPORTS, A LINK'S `via`, AND AN INPUT SOMEBODY HOLDS. Every one of them
-// refuses something, so most of what follows is a refusal with its reason and
-// the same case allowed beside it, which is what proves the refusal is the rule
-// and not a link that never matched.
+// -- relay cap, stale window, read row, port transports, `via`, held inputs --
+// Each refusal sits beside the same case allowed, which proves the refusal is the rule.
+// why: lessons/kit-bay.md#test-step0
 
 {
   /* M. The relay figure is the worker's, read from the worker's source, so
@@ -1171,9 +1066,8 @@ function V0() { return { codec: 'h264' }; }
 }
 
 {
-  /* R. A wire transport inside one site, 2026-10-09. `MACHINE_ONLY` stopped
-     `page` crossing a wire; nothing stopped `whep` being asked for inside one
-     tab, which answered `ok, whep, machine`. */
+  // R. A wire transport inside one site is refused.
+  // why: lessons/kit-bay.md#test-r
   const b = createBay();
   for (const n of [['web-ab12:webgl', 'engine', 'WebGL2'], ['web-ab12:left', 'screen', 'left picture'],
     ['web-cd34:left', 'screen', 'their left picture']]) b.addNode({ id: n[0], kind: n[1], label: n[2], place: 'browser' });
@@ -1203,8 +1097,8 @@ function V0() { return { codec: 'h264' }; }
 }
 
 {
-  /* S. A derived address is per site, 2026-10-09. Every tab is placed
-     `browser`, so `webgl:video` derived `browser-webgl-video` in all of them. */
+  // S. A derived address is per site.
+  // why: lessons/kit-bay.md#test-s
   const b = createBay();
   for (const s of ['web-ab12', 'web-cd34']) {
     b.addNode({ id: `${s}:webgl`, kind: 'engine', label: 'WebGL2', place: 'browser' });
@@ -1297,9 +1191,8 @@ function V0() { return { codec: 'h264' }; }
 }
 
 {
-  // A loop through a store is a replay, not feedback (2026-10-10). The shapes
-  // are concept 4's: a chat tab keeps each line in positron-store's history and
-  // hears the history back, which the cycle walk used to refuse.
+  // A loop through a store is a replay, not feedback.
+  // why: lessons/kit-bay.md#test-store-loop
   const b = createBay();
   b.addNode({ id: 'web-ab12:chat', kind: 'person', label: 'chat', place: 'browser' });
   b.addNode({ id: 'cf-store:history', kind: 'store', label: 'history', place: 'cloudflare', net: 'cloudflare' });
@@ -1350,7 +1243,8 @@ function V0() { return { codec: 'h264' }; }
     b.send('cf-store:history:value-out', { text: 'kept' }) === 1 && got[0] === 'kept', JSON.stringify(got));
 }
 
-// ── a light link between two sites names its wire (2026-10-11, sampler/035) ──
+// -- a light link between two sites names its wire --
+// why: lessons/kit-bay.md#test-light-via
 {
   const b = createBay();
   b.addNode({ id: 'web:keys', kind: 'person', label: 'keys', place: 'browser' });
@@ -1370,20 +1264,10 @@ function V0() { return { codec: 'h264' }; }
   ok('NEGATIVE CONTROL: a light link cannot ask for a media transport', !whep.ok, whep.why);
 }
 
-// ── timed links: `ahead` and `follow` (2026-10-12, plan-routing-time §4.3) ──
-/* SABOTAGES, MEASURED 2026-10-12 on a scratch copy of demo/shell, against 196
-   here and 47 in bay-node-test.mjs (whose section 8 grades the stamp):
-     timing ignored, every timed link delivered on arrival        8 red here
-     every verdict fired at once, wait or hold                    8 red here
-     a hold fired as if it were due                               4 red here
-     follow never checked against the ports it names              2 red here
-     follow dropped, scheduled on the peer clock only             2 red here
-     port.heard counted on queueing rather than delivery          1 red here
-     a wait slept to its due, never asked again                   1 red here
-     timing options taken off the light media (link-options)     13 red here, 3 there
-     emit stamps nothing                                          3 red there
-     emit stamps without adding ahead                             2 red there
-     emit stamps even with no shared clock                        3 red there */
+// -- timed links: `ahead` and `follow` --
+// why: lessons/kit-bay.md#test-timed
+// Sabotages against 196 here and 47 in bay-node-test.mjs are tabled in the lesson.
+// why: lessons/kit-bay.md#test-timed-sabotage
 /* A fake document clock and a fake timer, so every time below is exact and was
    worked by hand. `timebase.mjs` is the real one: the bay's job is to ask it and
    do what it says, and what it says is graded in `timebase-test.mjs`. */

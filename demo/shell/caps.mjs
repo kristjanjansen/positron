@@ -1,25 +1,12 @@
-// demo/shell/caps.mjs — what THIS browser can actually do, asked rather than
-// assumed, so the index can stop linking pages that cannot run here.
-//
-// ⚠️ CAPABILITY TEST, NEVER A BRAND CHECK, and this project has paid for the
-// other way twice. `canPlayType('application/vnd.apple.mpegurl')` answers
-// "maybe" in Chrome AND Safari, so gating on its truthiness put Chrome on a
-// path it cannot play. `@moq/net` blocks Safari by user agent, which is how a
-// real WebKit flow-control bug got reported as a missing API. And a headset
-// browser is Chromium wearing a Chromium user agent — research/quest-xr §1.7
-// measured that you cannot tell a Quest 3 from a 3S by user agent at all.
-//
-// So nothing in this file reads `navigator.userAgent`. Every answer comes from
-// asking the API whether it is there.
+// demo/shell/caps.mjs: what this browser can actually do, asked rather than assumed, so the index
+// stops linking pages that cannot run here. A capability test, never a brand check:
+// nothing here reads `navigator.userAgent`.
+// why: lessons/kit-caps.md#header
 
 /**
- * One probe per capability. Each returns true, false, or 'unknown' — and
- * 'unknown' is a real third answer, not a polite false.
- *
- * ⚠️ A CAPABILITY WE COULD NOT TEST MUST NEVER READ AS "MISSING". Dropping a
- * link because a probe threw is the index telling the reader a page is broken
- * when what happened is that we did not look. `unknown` keeps the link and
- * says so; only a hard `false` un-links anything.
+ * One probe per capability: true, false or 'unknown'. A capability we could not test never
+ * reads as missing: `unknown` keeps the link, only a hard `false` un-links.
+ * why: lessons/kit-caps.md#probes
  */
 export const PROBES = {
   webgl2: () => {
@@ -41,17 +28,9 @@ export const PROBES = {
   midi: () => 'requestMIDIAccess' in navigator,
 
   /**
-   * A camera that is actually present, not merely an API that exists.
-   *
-   * ⚠️ `navigator.mediaDevices.getUserMedia` is defined on machines with no
-   * camera at all, so its presence answers the wrong question — the same shape
-   * of mistake as reading `canPlayType`. `enumerateDevices()` reports KINDS
-   * before any permission is granted (labels are blank, kinds are not), which
-   * is the cheapest honest test and costs no permission prompt.
-   *
-   * Returns 'unknown' rather than false when enumeration is unavailable or
-   * refused: a headset that gates device enumeration behind a prompt must not
-   * have its camera pages struck off on that basis.
+   * A camera actually present: `getUserMedia` exists on machines with none. `enumerateDevices()`
+   * reports kinds before permission; 'unknown' when enumeration is unavailable or refused.
+   * why: lessons/kit-caps.md#camera
    */
   camera: async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return 'unknown';
@@ -72,21 +51,9 @@ export const PROBES = {
   },
 
   /**
-   * A headset, asked the only way that is honest.
-   *
-   * `navigator.xr.isSessionSupported('immersive-vr')` is the documented
-   * capability call and it needs no user gesture — the gesture is required to
-   * ENTER a session, not to ask about one. A desktop Chrome carrying the WebXR
-   * emulator answers true here, which is correct: it can present the layout
-   * this flag turns on, and the flag is about layout.
-   *
-   * ⚠️ THIS IS NOT THE PROBE A CONTROL USES, AND THE DIFFERENCE IS WORTH ONE
-   * LINE SO THAT NOBODY ADDS A THIRD. What is decided here is a LAYOUT flag on
-   * the index, so `false` costs a reader nothing and un-links nothing.
-   * `demo/shell/xr-caps.mjs` answers the same question for a BUTTON, where a
-   * browser with no WebXR at all has to be told apart from one that answered
-   * no: it carries that third state, the reason in words, and the subscription
-   * a control needs when the answer lands after the page is drawn.
+   * A headset: `isSessionSupported('immersive-vr')` needs no gesture. A layout flag only;
+   * a button uses `xr-caps.mjs`, which carries the third state and a reason.
+   * why: lessons/kit-caps.md#xr
    */
   xr: async () => {
     if (!navigator.xr?.isSessionSupported) return false;
@@ -106,14 +73,8 @@ export async function probe(names = Object.keys(PROBES)) {
 }
 
 /**
- * Which capability a manifest TAG implies.
- *
- * ⚠️ DERIVED FROM `tags`, WITH NO SECOND LIST TO KEEP IN STEP. manifest.mjs's
- * own header is about exactly this ("no second place to forget a row") and it
- * was aspirational once before: two copies of rowHTML existed and one printed
- * `undefined` over every demo name for an afternoon. A hand-kept `needs:` field
- * beside an existing `tags:` field is that bug with a new name, so a demo's
- * requirements are read off the tags it already declares.
+ * Which capability a manifest tag implies: derived from `tags`, with no second list to keep in step.
+ * why: lessons/kit-caps.md#tag-cap
  */
 export const TAG_CAP = {
   WebGL2: 'webgl2',
@@ -125,13 +86,9 @@ export const TAG_CAP = {
 };
 
 /**
- * Capabilities whose absence makes a page UNRUNNABLE rather than degraded.
- *
- * `midi` is deliberately not here: demo/instrument sets its own readout to
- * `unsupported` and keeps playing from the on-screen keyboard, so striking it
- * off would be the index inventing a failure the page does not have.
- * `mediarecorder` is not here either — the pages that record also need a
- * camera, and `camera` already carries them.
+ * Capabilities whose absence makes a page unrunnable rather than degraded. Not `midi`
+ * (pages keep playing on screen keys), not `mediarecorder` (`camera` carries those pages).
+ * why: lessons/kit-caps.md#hard
  */
 export const HARD = new Set(['webgl2', 'webcodecs', 'webtransport', 'camera']);
 
@@ -163,18 +120,9 @@ export const needsOf = (d) =>
   [...new Set((d.tags || []).map((t) => TAG_CAP[t]).filter(Boolean))];
 
 /**
- * Probe this browser once, then mark up an index that is ALREADY RENDERED.
- *
- * ⚠️ THE DEPLOYED INDEX IS BAKED AT BUILD TIME and the local one is rendered in
- * the page, so anything that needs a live browser to decide has to run after
- * both — otherwise there are two copies of this logic and one of them rots.
- * That has happened here before: `rowHTML` lived in two files and the copy
- * nobody fixed printed `undefined` over every demo name for an afternoon.
- *
- * Rows carry `data-needs`, written by `rowHTML` from the same TAG_CAP table
- * this file exports, so nothing is parsed out of visible text.
- *
- * Returns the probe result so a caller can show it.
+ * Probe once, then mark up an index that is already rendered (baked or local), so there is
+ * one copy of this logic. Rows carry `data-needs` from TAG_CAP. Returns the probe result.
+ * why: lessons/kit-caps.md#markindex
  */
 export async function markIndex(root = document) {
   const caps = await probe();
@@ -184,10 +132,8 @@ export async function markIndex(root = document) {
   root.documentElement?.classList.toggle('xr', caps.xr === true);
   if (caps.xr === true) offerHeadset(root);
 
-  // ⚠️ `[data-needs]`, NOT `.pos-row[data-needs]`. The front page is cards now
-  // and the sequence page is still rows; the capability logic is about the
-  // ATTRIBUTE, which both carry, and keying it to one markup is how the other
-  // one silently stops being marked at all.
+  // `[data-needs]`, not `.pos-row[data-needs]`: cards and rows both carry the attribute.
+  // why: lessons/kit-caps.md#data-needs
   for (const row of root.querySelectorAll('[data-needs]')) {
     const needs = row.dataset.needs.split(' ').filter(Boolean);
     const missing = needs.filter((c) => caps[c] === false);
@@ -198,11 +144,9 @@ export async function markIndex(root = document) {
       if (soft.length) addWhy(row, soft.map((c) => MISSING_SAYS[c]).join(' · '), 'soft');
       continue;
     }
-    // Un-link, and SAY WHY. A row that quietly vanished would tell the reader
-    // the demo does not exist, which is a different and false statement.
-    // A card IS the link; a row CONTAINS one. Ask the element about itself
-    // first, or a card keeps its href and stays pressable while saying it
-    // cannot run.
+    // Un-link and say why; a vanished row says the demo does not exist. A card is the link,
+    // a row contains one, so ask the element about itself first.
+    // why: lessons/kit-caps.md#un-link
     const a = row.matches('a') ? row : row.querySelector('a');
     if (a) { a.removeAttribute('href'); }
     row.classList.add('todo', 'blocked');
@@ -216,10 +160,8 @@ function addWhy(row, text, kind) {
   const meta = row.querySelector('.pos-meta, .pos-card-f');
   if (!meta || !text) return;
   const el = document.createElement('span');
-  // 🔴 A CARD'S WHY IS `.pos-card-why`, A ROW'S IS `.pos-why`. Until 2026-10-12
-  // this stamped the row's class on cards too, so a card's `no camera on this
-  // device` came out in the row chip's mono with a dashed border while
-  // `card.mjs` and `.pos-card-why` said Geist: the card rule was never reached.
+  // A card's why is `.pos-card-why`, a row's is `.pos-why`.
+  // why: lessons/kit-caps.md#why-class
   const base = row.classList.contains('pos-card') ? 'pos-card-why' : 'pos-why';
   el.className = kind === 'soft' ? `${base} soft` : base;
   el.textContent = text;
@@ -228,24 +170,10 @@ function addWhy(row, text, kind) {
 
 
 /**
- * In a headset, hand over the page that is worth being in rather than making
- * someone find it.
- *
- * ⚠️ THE REASON IS TYPING. A URL with a query string on a virtual keyboard, in
- * a headset, is enough friction that a measurement does not get taken — and
- * scrolling a 35-row list with a hand-ray to find one slug is not much better.
- * The list still has every row in it and nothing is hidden; this is one link
- * placed above it, and it only exists where it is useful.
- *
- * One copy, here, because the deployed index is baked by build.mjs and the
- * local one renders itself — two copies of a thing both index pages need is
- * precisely how `rowHTML` printed `undefined` over every demo name for an
- * afternoon.
+ * In a headset, offer the page worth being in: typing a URL there is enough friction to lose a
+ * measurement.
+ * why: lessons/kit-caps.md#offerheadset
  */
-// 🔴 REMOVED 2026-09-13 — `offerHeadset` used to insert a "you are in a
-// headset" card above the list, pointing at `scene`. It was the right answer
-// to a list where the two headset pages sat in the middle of thirty rows; they
-// are now the FIRST TWO ROWS on every index (see `byNewest`), so the card
-// repeated, in a bigger box, what the eye already lands on. A second way to
-// reach the same page is not emphasis, it is a duplicate.
+// Removed: the headset pages are the first two rows on every index, so the card repeated them.
+// why: lessons/kit-caps.md#offerheadset-removed
 function offerHeadset() { /* the list itself does this now */ }

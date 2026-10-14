@@ -1,15 +1,7 @@
-// demo/shell/camera.mjs: this tab's camera, started and stopped by a person.
-// Lifted 2026-10-14 from /video/camera/ and /video/shader/, which carried it
-// line for line, for /connect/ (plans/plan-connect-ui.md slice 4, the
-// convergence rule). /video/recorder/, /video/webrtc/, /video/llhls/,
-// /video/moq/ and /drums/camera/ still carry their own copy.
-//
-// 🔴 NOTHING OPENS UNTIL `start()`, WHICH IS A PERSON'S PRESS. The device list
-// is read after the first start, because labels are empty before the camera
-// has been allowed. Every track is stopped on `stop()`.
-//
-// A page keeps what is its own in `onOn` and `onOff`: its labels, its frame
-// loop, its patchbay. The element is `video`, what a screen or a shader reads.
+// demo/shell/camera.mjs: this tab's camera, started and stopped by a person. Nothing opens until
+// `start()`; the device list is read after it, since labels are empty before permission.
+// A page keeps its own labels, frame loop and patchbay in `onOn` and `onOff`.
+// why: lessons/kit-camera.md#header
 
 import { armVideo } from './shell.mjs';
 import { createButtonGroup } from './button-group.mjs';

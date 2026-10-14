@@ -1,26 +1,7 @@
-// demo/shell/circuit-sample-test.mjs
-// The sample half of the pack, against the real 64, with no browser.
-//
+// demo/shell/circuit-sample-test.mjs: the sample half of the pack, with no browser.
 //   node demo/shell/circuit-sample-test.mjs
-//
-// 🔴 IT READS `New Pack.circuitpack`, SOMEBODY'S ONLY BACKUP OF A DEVICE WITH NO
-// FACTORY RESET. Reading is free. Nothing here writes a file, touches a port or
-// modifies the pack, and the samples are pulled out of it IN MEMORY with
-// `unzip.mjs` rather than extracted to disk.
-//
-// 🔴 THE REAL CORPUS CANNOT GRADE THE CHUNK WALKER, WHICH IS WHY HALF THIS FILE
-// IS SYNTHETIC. All 64 samples are `fmt ` then `data` and nothing else, so the
-// audio starts at offset 44 in 64 of 64 and a reader that skipped 44 bytes and
-// called it a header would be green on every one of them. The fixtures below
-// carry a `LIST` chunk of odd length before the data and another chunk after
-// it, and they are the only thing in this repository that can tell the two
-// readers apart.
-//
-// 🔴 AND THE SABOTAGES ARE THE POINT. A parser is easy to write green: it reads
-// a file that is already correct. So a real sample is broken five ways here and
-// the number of structural claims that go red is the measurement. One of them
-// takes only 2 of 12 red and all ten survivors are RIGHT to survive, which is
-// reported rather than tuned away.
+// Reads in memory and writes nothing. Synthetic fixtures grade the chunk walker; sabotages count reds.
+// why: lessons/kit-circuit-sample.md#test-header
 import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
@@ -43,10 +24,8 @@ console.log('\n== the Circuit pack, sample side ==');
 
 // ---------------------------------------------------------- the fixtures
 
-// 🔴 THE TEST BUILDS WAV FILES AND THE MODULE DOES NOT, WHICH IS THE WHOLE
-// ARRANGEMENT. A writer in `circuit-sample.mjs` would be a function that turns
-// an intention into bytes aimed at an instrument, and the one in here cannot
-// leave this file.
+// The test builds WAV files and the module does not; a writer here cannot leave this file.
+// why: lessons/kit-circuit-sample.md#test-chunk
 function chunk(id, body) {
   const pad = body.length & 1;
   const out = new Uint8Array(8 + body.length + pad);
@@ -86,11 +65,9 @@ const int16 = (values) => {
   return out;
 };
 
-// 🔴 THREE BYTES LITTLE ENDIAN, WRITTEN BY HAND AND NOT BY A `DataView`, WHICH
-// IS THE POINT. There is no `setInt24`, so this is an INDEPENDENT second
-// implementation of the byte order the module reads: if both sides shared one
-// helper the test would be grading the helper. Negative values are written as
-// the two's complement in 24 bits, which is where the sign really lives.
+// 24 bit little endian written by hand, an independent implementation of the byte order the
+// module reads; negatives as two's complement in 24 bits.
+// why: lessons/kit-circuit-sample.md#test-int24
 const int24 = (values) => {
   const out = new Uint8Array(values.length * 3);
   values.forEach((v, i) => {
@@ -135,9 +112,9 @@ console.log('\n-- the container, on files whose every number is known by constru
     `peak ${c.peak}, clipped ${c.clipped}, lead ${c.leadingZeros}`);
 }
 
-// 🔴 THE CHECK THE REAL PACK CANNOT MAKE. An odd length `LIST` before the data
-// moves the audio to 58 and costs a pad byte, and a chunk after the data proves
-// the walker does not stop when it has what it wants.
+// An odd length `LIST` before the data moves the audio to 58 with a pad byte; a chunk after
+// the data proves the walker does not stop early.
+// why: lessons/kit-circuit-sample.md#test-odd-list
 {
   const info = chunk('LIST', new Uint8Array([0x49, 0x4e, 0x46, 0x4f, 0x21]));   // 'INFO!' , 5 bytes
   const f = wav({ pcm: int16([100, -100, 0, 0]), before: [info], after: [chunk('fact', new Uint8Array(4))] });
@@ -147,16 +124,16 @@ console.log('\n-- the container, on files whose every number is known by constru
     w.ok ? `data at ${w.dataAt}` : w.why);
   ok('and the walker finds all four chunks, including the one after the data',
     w.chunkIds.join(' ') === 'fmt  LIST data fact', w.ok ? w.chunkIds.join(' ') : w.why);
-  // ⚠️ THE CONTROL THAT MAKES THE ABOVE WORTH READING. A reader that assumed a
-  // 44 byte header would read this file's LIST text as audio and say so to
-  // nobody.
+  // Control: a 44 byte header reader would read this file's LIST text as audio.
+  // why: lessons/kit-circuit-sample.md#test-at44
   const at44 = new DataView(f.buffer, f.byteOffset).getInt16(44, true);
   const real = new DataView(f.buffer, f.byteOffset).getInt16(58, true);
   ok('a 44 byte assumption would have read this file as noise, which is why the chunks are walked',
     at44 !== 100 && real === 100, `offset 44 holds ${at44}, offset 58 holds ${real}`);
 }
 
-// 🔴 A SILENT FILE IS A FINDING, NOT A FAILURE, AND IT HAS TO READ AS ONE.
+// A silent file is a finding, not a failure.
+// why: lessons/kit-circuit-sample.md#test-silent
 {
   const w = W.readWave(wav({ pcm: new Uint8Array(200) }));
   const c = W.content(w);
@@ -164,9 +141,8 @@ console.log('\n-- the container, on files whose every number is known by constru
     w.ok && c.silent && c.peak === 0 && c.rms === 0
     && c.leadingZeros === 100 && c.trailingZeros === 0 && c.sound === 0,
     `${c.leadingZeros} leading of ${c.frames}`);
-  // ⚠️ AND AN EMPTY DATA CHUNK IS A THIRD THING AGAIN: NOT A REFUSAL, NOT
-  // SILENCE WITH A LENGTH. A pack slot holding one of these is a slot a page
-  // must show as 0.000 s rather than hide.
+  // An empty data chunk is neither a refusal nor silence with a length: it shows as 0.000 s.
+  // why: lessons/kit-circuit-sample.md#test-empty-data
   const e = W.readWave(wav());
   const ec = W.content(e);
   const em = W.toMono(e);
@@ -189,10 +165,8 @@ console.log('\n-- what it refuses, by name, as a value rather than a throw --');
     ['a WAVE with no fmt chunk', (() => {
       const f = wav({ pcm: int16([1, 2]) }); f.set([0x66, 0x6d, 0x74, 0x78], 12); return f;
     })(), 'no fmt chunk'],
-    // ⚠️ THE FIRST ATTEMPT AT THIS ONE WAS NOT A TEST OF ANYTHING. It passed
-    // `wav()` with no audio, which still writes a `data` chunk of length zero,
-    // and the reader accepted it correctly. An absent chunk and an empty one are
-    // different files and both are below.
+    // An absent data chunk and an empty one are different files; both are tested.
+    // why: lessons/kit-circuit-sample.md#test-absent-data
     ['a WAVE whose data chunk is named something else', (() => {
       const f = wav({ pcm: int16([1, 2]) }); f.set([0x64, 0x61, 0x74, 0x78], 36); return f;
     })(), 'no data chunk'],
@@ -224,15 +198,9 @@ console.log('\n-- what it refuses, by name, as a value rather than a throw --');
     W.readWave(new Uint8Array(8)).why);
 }
 
-// ═════════════════════════════════════ 24 bit, and the sign in the top byte ══
-//
-// 🔴 EVERY VALUE BELOW IS WRITTEN OUT BY HAND BEFORE THE MODULE IS ASKED
-// ANYTHING, WHICH IS THE ONLY WAY A DEPTH BRANCH IS GRADED RATHER THAN
-// EXERCISED. `DEPTHS` gained 24 on 2026-09-28 because 100 real files on this
-// disk are 24 bit, and a 24 bit reader that is subtly wrong does not throw and
-// does not look wrong: it produces audio at a strange amplitude or with the
-// sign of every loud sample inverted, which is the module's own definition of
-// the worst thing a decoder can hand a page.
+// 24 bit: every value is written by hand before the module is asked, so the depth branch is
+// graded, not just exercised.
+// why: lessons/kit-circuit-sample.md#test-24-bit
 
 console.log('\n-- 24 bit, three bytes little endian, the sign in the top one --');
 
@@ -252,26 +220,22 @@ console.log('\n-- 24 bit, three bytes little endian, the sign in the top one --'
     && m.samples[3] === 1 / 8388608 && m.samples[4] === -1 / 8388608 && m.samples[5] === 0.5,
     m.ok ? [...m.samples].join(', ') : m.why);
 
-  // 🔴 THE SABOTAGE THAT SAYS THE SIGN IS READ FROM THE TOP BYTE AND NOT FROM
-  // THE MIDDLE ONE. `0x00 0x00 0x80` is -8388608 and its low two bytes are
-  // `00 00`, which a 16 bit reader calls 0 and a reader taking the sign off
-  // byte 1 calls +8388608. Three answers, one file, and only one is right.
+  // Sabotage: `00 00 80` is -8388608; a 16 bit reader says 0, a byte 1 sign reader +8388608.
+  // why: lessons/kit-circuit-sample.md#test-24-sign
   const low = new DataView(w.data.buffer, w.data.byteOffset).getInt16(2 * 3, true);
   ok('SABOTAGE: reading the low two bytes of that full scale negative frame gives 0, not -1',
     low === 0 && m.samples[2] === -1,
     `the low 16 bits read ${low} and the frame is ${m.samples[2]}`);
 
-  // 🔴 AND THE ONE A BYTE ORDER MISTAKE PRODUCES, WHICH IS THE COMMON ONE.
-  // 0x123456 big endian is 0x563412, a completely different sample, and both
-  // are inside -1 to 1 so nothing downstream could tell them apart.
+  // Byte order: 0x123456 big endian is 0x563412, and both are in range.
+  // why: lessons/kit-circuit-sample.md#test-24-order
   const be = W.toMono(W.readWave(wav({ bits: 24, pcm: Uint8Array.from([0x56, 0x34, 0x12]) })));
   ok('SABOTAGE: the bytes 56 34 12 read as 0x123456 and not as 0x563412, so the order is little endian',
     Math.round(be.samples[0] * 8388608) === 0x123456,
     `${Math.round(be.samples[0] * 8388608).toString(16)} rather than 563412`);
 
-  // ⚠️ THE RAIL IS ONE STEP OF THE FILE'S OWN DEPTH. A sample at 0.99998 of
-  // full scale is 256 steps off the rail in 24 bit and would have counted as
-  // clipped under the old 16 bit constant.
+  // The rail is one step of the file's depth: 0.99998 is 256 steps off it in 24 bit.
+  // why: lessons/kit-circuit-sample.md#test-24-rail
   const near = W.content(W.readWave(wav({ bits: 24, pcm: int24([8388607, 8388352, 0]) })));
   ok('one step off full scale counts as clipped and 256 steps off does not, which is the 24 bit rail',
     near.clipped === 1 && near.peak === 8388607 / 8388608,
@@ -280,10 +244,8 @@ console.log('\n-- 24 bit, three bytes little endian, the sign in the top one --'
 
 console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
 
-// 🔴 THE MIXDOWN IS DOCUMENTED IN THE MODULE AND IT IS THE MEAN, so these
-// grade the mean AND grade that it is not one of the three things it could
-// have been. A sum, a left channel and a max all give a different answer to
-// at least one of the files below, which is what makes them a test.
+// The mixdown is the mean; these files also tell it from a sum, a left channel and a max.
+// why: lessons/kit-circuit-sample.md#test-mixdown
 {
   const L = [8000, 0, 16384, -32768];
   const R = [0, 8000, 16384, -32768];
@@ -298,10 +260,8 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
     && m.samples[2] === 16384 / 32768 && m.samples[3] === -1
     && m.mix === W.MIX,
     `${[...m.samples].map((v) => Math.round(v * 32768)).join(', ')}, mix "${m.mix}"`);
-  // 🔴 THE THREE IT IS NOT, EACH DISPROVED BY A NAMED FRAME. Without these the
-  // assert above is satisfied by any function that happens to agree on one row,
-  // and the three candidates the module's own comment weighs are exactly the
-  // three a reader would suspect.
+  // The three it is not, each disproved by a named frame.
+  // why: lessons/kit-circuit-sample.md#test-not-sum
   const sum0 = (L[0] + R[0]) / 32768;
   const left1 = L[1] / 32768;
   const max0 = Math.max(Math.abs(L[0]), Math.abs(R[0])) / 32768;
@@ -312,7 +272,8 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
     + `and a max says ${Math.round(max0 * 32768)}, and frame 1 is `
     + `${Math.round(m.samples[1] * 32768)} where the left channel alone says 0`);
 
-  // 🔴 PER CHANNEL PEAKS ARE A SECOND, INDEPENDENT READING AND THIS IS WHY.
+  // Per channel peaks are a second, independent reading.
+  // why: lessons/kit-circuit-sample.md#test-channel-peaks
   const c = W.content(w);
   ok('content reports the mixed peak AND each channel\'s own, because they are different numbers',
     c.peak === 1 && c.channelPeaks.length === 2
@@ -320,13 +281,9 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
     && c.channelPeak === 1 && c.channels === 2 && c.mixed === true,
     `mix ${c.peak}, channels ${c.channelPeaks.join(' and ')}`);
 
-  // 🔴 THE HARD PANNED CASE, WHERE THE TWO READINGS DISAGREE BY 6 dB. This is
-  // the shape the corpus has: the widest of 150 real stereo files reads 0.4664
-  // of its own loudest channel after the mix.
-  // ⚠️ FULL SCALE POSITIVE IS 32767/32768 AND NOT 1, WHICH IS WRITTEN OUT
-  // RATHER THAN ROUNDED TO, because the first version of the swap sabotage
-  // below asserted 1 and went red on a correct reading. The asymmetry is real:
-  // -32768 reaches exactly -1 and +32767 never reaches +1.
+  // Hard panned: the readings differ by 6 dB (the widest real file reads 0.4664).
+  // Full scale positive is 32767/32768, not 1: -32768 reaches -1 and +32767 never reaches +1.
+  // why: lessons/kit-circuit-sample.md#test-hard-panned
   const FS = 32767 / 32768;
   const panned = W.readWave(wav({ channels: 2, pcm: int16(interleave([32767, 0], [0, 0])) }));
   const pc = W.content(panned);
@@ -334,9 +291,8 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
     pc.peak === FS / 2 && pc.channelPeak === FS && pc.cancelled === false,
     `mixed ${pc.peak.toFixed(4)} against a channel peak of ${pc.channelPeak.toFixed(4)}`);
 
-  // 🔴 SABOTAGE: THE TWO CHANNELS SWAPPED. The mean is symmetric so it must NOT
-  // move, and the per channel peaks MUST. A reader taking the left channel
-  // alone fails the first half; one that reads channel 0 twice fails the second.
+  // Sabotage: channels swapped. The mean must not move and the per channel peaks must.
+  // why: lessons/kit-circuit-sample.md#test-swapped
   const swapped = W.readWave(wav({ channels: 2, pcm: int16(interleave(R, L)) }));
   const sm = W.toMono(swapped);
   const sc = W.content(swapped);
@@ -348,9 +304,8 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
     && pannedSwap.peak === pc.peak,
     `the mean is the same 4 values and the peaks went ${pc.channelPeaks.join('/')} to ${pannedSwap.channelPeaks.join('/')}`);
 
-  // 🔴 SABOTAGE: ONE CHANNEL INVERTED, WHICH IS THE ONE CASE THE MEAN LIES
-  // ABOUT. The mix is digital silence and the file is loud, and a bare zero
-  // there would read as an empty sample.
+  // Sabotage: one channel inverted, where the mean is silent on a loud file.
+  // why: lessons/kit-circuit-sample.md#test-anti-phase
   const anti = W.readWave(wav({ channels: 2, pcm: int16(interleave([20000, -9000], [-20000, 9000])) }));
   const ac = W.content(anti);
   ok('SABOTAGE: two channels in anti phase mix to silence, and it is reported as cancelled rather than empty',
@@ -375,11 +330,9 @@ console.log('\n-- stereo, and the mean that is chosen rather than assumed --');
 
 console.log('\n-- the depths and the shapes still refused, each one by name --');
 
-// 🔴 A WIDENED CONSTANT IS NOT THE JOB. What is NOT in `DEPTHS` is a decision
-// with a corpus behind it: there are zero 8 bit, zero 32 bit integer, zero IEEE
-// float and zero WAVE_FORMAT_EXTENSIBLE files among the 965 real `.wav` files
-// on this disk, counting one archive deeper. Each is refused with its name in
-// the sentence, and none of them throws.
+// Shapes outside `DEPTHS` are refused by name without throwing: zero 8 bit, 32 bit integer,
+// IEEE float or EXTENSIBLE files among 965 real WAVs.
+// why: lessons/kit-circuit-sample.md#test-refused
 {
   const eight = W.readWave(wav({ bits: 8, pcm: new Uint8Array([0, 128, 255]) }));
   const m8 = W.toMono(eight);
@@ -390,10 +343,8 @@ console.log('\n-- the depths and the shapes still refused, each one by name --')
   ok('and 32 bit integer the same way, with the depth named rather than a number printed',
     m32.ok === false && m32.why.includes('32 bit') && m32.why.includes('16 and 24'),
     m32.why);
-  // 🔴 IEEE FLOAT IS REFUSED AT THE FORMAT GATE AND NOT AT THE DEPTH GATE, and
-  // that ordering is the honest one: float is a different number line rather
-  // than a wider integer, it is allowed to run past 1.0, and `peak`, `clipped`
-  // and the rail all mean something else on it.
+  // IEEE float is refused at the format gate, not the depth gate: it is a different number line.
+  // why: lessons/kit-circuit-sample.md#test-float
   const flt = W.readWave(wav({ format: 3, bits: 32, pcm: new Uint8Array(8) }));
   ok('32 bit IEEE float is refused by NAME at the format gate, which is a decision and not an oversight',
     flt.ok === false && flt.why.includes('IEEE float') && flt.why.includes('PCM')
@@ -403,8 +354,8 @@ console.log('\n-- the depths and the shapes still refused, each one by name --')
   ok('and WAVE_FORMAT_EXTENSIBLE too, which is how most DAWs would have written these 24 bit files',
     ext.ok === false && ext.why.includes('EXTENSIBLE'),
     ext.why);
-  // ⚠️ AND THE REASON THAT REFUSAL COSTS NOTHING HERE IS A MEASUREMENT: every
-  // one of the 100 real 24 bit files declares format tag 1, plain PCM.
+  // All 100 real 24 bit files declare format tag 1, plain PCM.
+  // why: lessons/kit-circuit-sample.md#test-six
   const six = W.readWave(wav({ channels: 6, pcm: int16(new Array(12).fill(1000)) }));
   ok('more than two channels is refused by name, because a plain average is a guess about a surround set',
     six.ok && six.channels === 6 && W.toMono(six).ok === false
@@ -414,8 +365,8 @@ console.log('\n-- the depths and the shapes still refused, each one by name --')
     JSON.stringify(W.DEPTHS) === '[16,24]' && W.MIX_CHANNELS_MAX === 2
     && W.FULL_SCALE[16] === 32768 && W.FULL_SCALE[24] === 8388608,
     `${W.DEPTHS.join(' and ')} bit, up to ${W.MIX_CHANNELS_MAX} channels`);
-  // 🔴 AND NOT ONE OF THEM THROWS, WHICH IS THE PROPERTY THE WHOLE MODULE
-  // RESTS ON: a page opening a stranger's zip shows a sentence, never a stack.
+  // None of them throws: a page opening a stranger's zip shows a sentence, never a stack.
+  // why: lessons/kit-circuit-sample.md#test-no-throw
   const shapes = [
     wav({ bits: 8, pcm: new Uint8Array(3) }),
     wav({ bits: 32, pcm: new Uint8Array(8) }),
@@ -442,13 +393,9 @@ console.log('\n-- the depths and the shapes still refused, each one by name --')
 
 console.log('\n-- the block align that used to throw a RangeError out of three functions --');
 
-// 🔴 FOUND WHILE ADDING THE TWO SHAPES ABOVE, AND IT WAS LIVE ON A PAGE THAT
-// OPENS ANYBODY'S ZIP. `frames` comes from the DECLARED block align and the
-// reader steps by the DERIVED one, so a file declaring a block align SMALLER
-// than its own frame claimed more frames than there were bytes and `toMono`,
-// `content` and `summarise` all died inside a `DataView`. MEASURED before the
-// repair: 8 frames claimed over 8 bytes, 16 bytes asked for, three exported
-// functions throwing `RangeError: Offset is outside the bounds of the DataView`.
+// A block align smaller than the frame claimed more frames than bytes and threw `RangeError`
+// from `toMono`, `content` and `summarise` (8 frames over 8 bytes needing 16). Now clamped.
+// why: lessons/kit-circuit-sample.md#test-block-align
 {
   const w = W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 1 }));
   let threw = 0;
@@ -464,8 +411,8 @@ console.log('\n-- the block align that used to throw a RangeError out of three f
     && W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 4 })).framesClamped === false
     && W.readWave(wav({ pcm: int16([1, 2, 3, 4]), blockAlign: 4 })).frames === 2,
     'a block align that is too LARGE reports fewer frames and is not a clamp');
-  // ⚠️ THE SAME SHAPE ON A STEREO 24 BIT FILE, because the clamp has to be
-  // computed from the real frame size rather than from a constant.
+  // The same on stereo 24 bit: the clamp uses the real frame size.
+  // why: lessons/kit-circuit-sample.md#test-block-align-stereo
   const s = W.readWave(wav({ bits: 24, channels: 2, pcm: int24(new Array(8).fill(0)), blockAlign: 2 }));
   ok('and on a 24 bit stereo file the clamp counts six byte frames rather than two byte ones',
     s.ok && s.framesDeclared === 12 && s.frames === 4 && s.framesClamped === true
@@ -473,13 +420,9 @@ console.log('\n-- the block align that used to throw a RangeError out of three f
     `${s.framesDeclared} declared, ${s.frames} readable at ${s.channels * s.bits / 8} bytes a frame`);
 }
 
-// ═══════════════════════════════════════════ the other container ═════════
-//
-// 🔴 EVERYTHING FROM HERE TO THE REAL PACK RUNS WITH NO CORPUS AT ALL, and that
-// is on purpose: this block sits ABOVE the `New Pack.circuitpack` early exit, so
-// a clone with no `tmp/` still grades the stream reader, the checksum and the
-// slot walker. The real corpus is at the bottom of the file behind its own
-// existence check.
+// The other container. Runs above the pack's early exit, so a clone with no `tmp/` still
+// grades the stream reader, checksum and slot walker.
+// why: lessons/kit-circuit-sample.md#test-container
 
 console.log('\n-- one line reading byte 0, which is the whole of the routing --');
 
@@ -491,9 +434,8 @@ console.log('\n-- one line reading byte 0, which is the whole of the routing --'
     W.containerOf(zip).kind === W.CONTAINER.zip
     && W.containerOf(stream0).kind === W.CONTAINER.sysex,
     `${W.containerOf(zip).kind} and ${W.containerOf(stream0).kind}`);
-  // 🔴 THE THIRD ANSWER IS THE ONE THAT MATTERS ON THIS DISK. Two files in the
-  // archive download are a Windows executable and a Nintendo DS ROM, and a
-  // router with two branches would have to put them somewhere.
+  // The third answer: the archive holds a Windows executable and a Nintendo DS ROM.
+  // why: lessons/kit-circuit-sample.md#test-neither
   ok('anything else is neither, and the refusal quotes the two bytes it found',
     W.containerOf(exe).kind === W.CONTAINER.unknown
     && W.containerOf(exe).why.includes('4d 5a')
@@ -503,9 +445,8 @@ console.log('\n-- one line reading byte 0, which is the whole of the routing --'
     W.containerOf(new Uint8Array([0xf0])).kind === W.CONTAINER.unknown
     && W.containerOf(new Uint8Array(0)).kind === W.CONTAINER.unknown,
     W.containerOf(new Uint8Array([0xf0])).why);
-  // ⚠️ A PATCH MESSAGE STARTS `f0` TOO, so the byte 0 test says which READER to
-  // reach for and never what is in the file. That is the layering and it is the
-  // thing a one line test could get subtly wrong.
+  // A patch message starts `f0` too: byte 0 picks the reader, never what is in the file.
+  // why: lessons/kit-circuit-sample.md#test-patch-f0
   const patch = new Uint8Array(350);
   patch.set([0xf0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x00, 0x00], 0);
   patch[349] = 0xf7;
@@ -519,11 +460,8 @@ console.log('\n-- one line reading byte 0, which is the whole of the routing --'
 
 console.log('\n-- the checksum, against an oracle that is not this file --');
 
-// 🔴 A CRC GRADED AGAINST ITSELF IS `timeline/csound.mjs` AGAIN: 22 asserts green
-// for months with two real defects, because the check derived its answer from
-// the same formula the code implements. `node:zlib` has a CRC32 nobody here
-// wrote, so it is the oracle. The module cannot use it, because it runs in a
-// browser too.
+// The CRC is graded against `node:zlib`, an oracle nobody here wrote.
+// why: lessons/kit-circuit-sample.md#test-crc
 {
   const zlib = await import('node:zlib');
   const cases = [
@@ -544,15 +482,9 @@ console.log('\n-- the checksum, against an oracle that is not this file --');
     `0x${W.crc32(Uint8Array.from('123456789', (c) => c.charCodeAt(0))).toString(16)}`);
 }
 
-// ---------------------------------------------------- the synthetic streams
-//
-// 🔴 THE TEST PACKS AND THE MODULE DOES NOT, WHICH IS THE SAME ARRANGEMENT THE
-// WAV BUILDER ABOVE IS UNDER AND IT MATTERS MORE HERE. A complete bulk sample
-// transfer is the file that would replace every sample slot on an instrument
-// with no factory reset, and `research/dump-samples-2026-09-21.md` §8 says
-// whether one writes flash is UNSETTLED. So the packer lives in a node test that
-// writes nothing to disk, and the last block of this file asserts that no such
-// function exists in the module.
+// The synthetic streams. The test packs and the module does not: a full bulk transfer could
+// replace every sample slot, so the packer stays in a test that writes nothing.
+// why: lessons/kit-circuit-sample.md#test-streams
 
 /** MSB first 7 to 8, the inverse of `unpack7()`. Ten lines, and they stay here. */
 function pack7(plain) {
@@ -581,12 +513,9 @@ const F = (...parts) => Uint8Array.from([0xf0, 0x00, 0x20, 0x29, 0x00, ...parts.
  * One logical stream round a payload. Every field the reader checks is a
  * parameter, so a sabotage is a call rather than a byte edit.
  */
-// ⚠️ EACH CARRIER IS PACKED ON ITS OWN AND THE FIRST BUILD OF THIS PACKED THE
-// WHOLE PAYLOAD AND THEN CUT IT UP, WHICH LOST 59 BYTES. A real carrier holds
-// 293 packed bytes restoring to 256, and 293 is 36 groups of eight plus a
-// partial group of five. Cutting one packed run at a carrier boundary lands in
-// the middle of a group, so the mask and its data go to different messages. The
-// declared length caught it immediately, which is what that field is for.
+// Each carrier is packed on its own: 293 packed bytes restore 256, and cutting one packed run
+// at a carrier boundary splits a group from its mask (lost 59 bytes).
+// why: lessons/kit-circuit-sample.md#test-carriers
 function makeStream(plain, {
   declared = plain.length, region = W.REGION_SAMPLES, crc = null, end = true,
   per = 256,
@@ -646,9 +575,8 @@ console.log('\n-- a stream, split on 0x77 and 0x7a and checked against its own n
     `declared ${s.streams[0].declared}, region 0x${s.streams[0].region.toString(16)}, `
     + `crc 0x${s.streams[0].crc.toString(16)}`);
 
-  // 🔴 TWO STREAMS BACK TO BACK IS THE SHAPE ELEVEN FILES IN THE DOWNLOAD HAVE,
-  // and concatenating their carriers first is the measured defect this splitter
-  // exists to avoid.
+  // Two streams back to back, the shape eleven downloaded files have.
+  // why: lessons/kit-circuit-sample.md#test-two-streams
   const sessions = new Uint8Array(1024).fill(0x5a);
   const two = new Uint8Array(GOOD.length + makeStream(sessions, { region: W.REGION_SESSIONS }).length);
   two.set(makeStream(sessions, { region: W.REGION_SESSIONS }), 0);
@@ -693,9 +621,8 @@ console.log('\n-- the 64 slot walk --');
       return m.samples.every((v, k) => Math.round(v * 32768) === ((i + 1) * 100 + k) % 3000 - 1500);
     }),
     'every sample of every slot');
-  // 🔴 THE FIELDS A RIFF FILE HAS AND A SLOT DOES NOT ARE null, NEVER INVENTED.
-  // `riffSizeOk` is an agreement between two header fields and a slot has one of
-  // each, so a `true` there would be a check that never looked at anything.
+  // RIFF-only agreements on a slot are null, never invented.
+  // why: lessons/kit-circuit-sample.md#test-slot-nulls
   ok('a slot wave says where it came from and leaves every RIFF-only agreement null',
     waves[0].from === W.SLOT_SOURCE && waves[0].riffSizeOk === null
     && waves[0].byteRateOk === null && waves[0].blockAlignOk === null
@@ -710,10 +637,8 @@ console.log('\n-- the 64 slot walk --');
 
 console.log('\n-- the negative controls: what the walker finds in things that are not a sample table --');
 
-// 🔴 THIS IS THE HALF THAT STOPS A DECODER FINDING STRUCTURE THAT IS NOT THERE.
-// A walker that reported slots in noise would produce 64 rows of plausible audio
-// out of anything, and the CRC above would say nothing about it because the CRC
-// grades the TRANSPORT.
+// Refusals that stop the walker finding slots in noise; the CRC grades only the transport.
+// why: lessons/kit-circuit-sample.md#test-walker
 {
   const controls = [
     ['random bytes', Uint8Array.from({ length: 53248 }, () => Math.floor(Math.random() * 256))],
@@ -729,9 +654,8 @@ console.log('\n-- the negative controls: what the walker finds in things that ar
     got[1].r.why.includes('slot 0') && got[1].r.why.includes('0x00')
     && got[2].r.why.includes('0xff'),
     `zeros: "${got[1].r.why}"`);
-  // ⚠️ THE CONTROL ON THE CONTROLS. A walker that refused everything would pass
-  // every line above and be worthless, which is the `fake-err.mjs` lesson: a
-  // check that reports a boundary whatever it is shown has not found one.
+  // Control on the controls: a walker that refused everything would pass the lines above.
+  // why: lessons/kit-circuit-sample.md#test-walker-control
   ok('NEGATIVE CONTROL ON THE CONTROLS: the real image still walks to 64, so the refusals are the difference',
     W.slotsIn(IMAGE).read === 64);
 }
@@ -762,10 +686,8 @@ const SN = streamBattery(GOOD).length;
 ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 0,
   streamReds(GOOD).map((c) => c.name).join('; ') || 'nothing red');
 
-// 🔴 SABOTAGE A: ONE PAYLOAD BYTE, WHICH IS THE ONE THE CHECKSUM EXISTS FOR.
-// Everything about the file stays right: the message count, the carrier count,
-// the declared length, even the slot table. The audio is simply wrong by one
-// sample and only the CRC can say so.
+// Sabotage A: one payload byte. Everything structural stays right; only the CRC can tell.
+// why: lessons/kit-circuit-sample.md#test-sabotage-a
 {
   const bad = GOOD.slice();
   const at = bad.indexOf(0x79, 6) + 40;                     // deep inside a carrier
@@ -782,9 +704,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     s.ok === false && s.lengthOk === true
     && s.why.includes(s.crc.toString(16)) && s.why.includes(s.crcDeclared.toString(16)),
     s.why);
-  // ⚠️ AND THE PAGE-FACING FUNCTION REFUSES RATHER THAN RETURNING THE AUDIO IT
-  // HAS. The slot table still walks perfectly: a wrong byte in 21 kB of PCM
-  // changes nothing structural, which is exactly why this is the dangerous case.
+  // `sampleSetIn` refuses rather than returning audio, though the slot table walks.
+  // why: lessons/kit-circuit-sample.md#test-sabotage-a-page
   const set = W.sampleSetIn(bad);
   ok('NEGATIVE CONTROL: the slot table still walks, and sampleSetIn refuses the file anyway',
     W.slotsIn(W.streamsIn(bad).streams[0].plain).read === 64
@@ -793,7 +714,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     `"${set.why}"`);
 }
 
-// 🔴 SABOTAGE B: THE CHECKSUM ITSELF, which is the other side of the same claim.
+// Sabotage B: the checksum itself.
+// why: lessons/kit-circuit-sample.md#test-sabotage-b
 {
   const bad = makeStream(IMAGE, { crc: (W.crc32(IMAGE) ^ 0x10000) >>> 0 });
   const r = streamReds(bad);
@@ -803,13 +725,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     r.map((c) => c.name).join('; '));
 }
 
-// 🔴 SABOTAGE C: THE DECLARED LENGTH, AND THE CHECKSUM ASSERT SURVIVES IT,
-// WHICH IS NOT WHAT THIS BLOCK EXPECTED. It was written asserting 4 reds on the
-// reasoning that a stream failing anything fails everything, and the run said 3:
-// the payload is untouched, so `crcOk` is genuinely true and the only claim that
-// broke is the one about the length. Two independent fields, measured
-// independently, is the shape the whole module wants and it is reported rather
-// than tuned to the guess.
+// Sabotage C: the declared length. 3 reds, not 4: the payload is intact so `crcOk` stays true.
+// why: lessons/kit-circuit-sample.md#test-sabotage-c
 {
   const bad = makeStream(IMAGE, { declared: IMAGE.length + 16 });
   const r = streamReds(bad);
@@ -827,8 +744,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     `crc 0x${s.crc.toString(16)} is right and the stream is refused on its length`);
 }
 
-// 🔴 SABOTAGE D: THE STREAM NEVER ENDS. There is no checksum to check at all,
-// and a reader that only compared lengths would call this file perfect.
+// Sabotage D: the stream never ends, so there is no checksum to check.
+// why: lessons/kit-circuit-sample.md#test-sabotage-d
 {
   const bad = makeStream(IMAGE, { end: false });
   const r = streamReds(bad);
@@ -841,7 +758,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
   ok('and it is refused as a stream that never ends rather than as a bad checksum',
     s.ok === false && /never ends/.test(s.why), s.why);
 
-  // ⚠️ AND A TRUNCATION THAT TAKES CARRIERS WITH IT FAILS ON THE LENGTH FIRST.
+  // A truncation that takes carriers fails on the length first.
+  // why: lessons/kit-circuit-sample.md#test-truncation
   const cut = bad.slice(0, Math.floor(bad.length * 0.6));
   const cs = W.streamsIn(cut).streams[0];
   ok('a stream cut in half mid carrier is refused, with the bytes it has against the bytes it promised',
@@ -849,9 +767,8 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     cs.why);
 }
 
-// 🔴 SABOTAGE E: A SLOT HEADER, which the transport cannot see at all. The
-// checksum is recomputed over the damaged image, so the stream verifies
-// perfectly and the walk is the only thing left to notice.
+// Sabotage E: a slot header, with the CRC recomputed, so only the walk can notice.
+// why: lessons/kit-circuit-sample.md#test-sabotage-e
 {
   const broken = IMAGE.slice();
   broken[10 + LENGTHS[0] * 2 + 1] = 0x02;                   // slot 1's mark byte
@@ -887,20 +804,9 @@ ok(`a good stream passes all ${SN} of the battery`, streamReds(GOOD).length === 
     W.slotsIn(over).why);
 }
 
-// ═══════════════════════ every wav in every zip, which is what the job is ═══
-//
-// 🔴 THIS BLOCK SITS ABOVE THE `New Pack.circuitpack` EARLY EXIT ON PURPOSE,
-// the same way the stream and slot blocks do, because the pack left this
-// repository on 2026-09-24 and everything below that exit is unreachable on a
-// checkout that follows CLAUDE.md. A measurement behind a file nobody has is a
-// measurement nobody takes.
-//
-// 🔴 AND THIS IS THE CORPUS THE MODULE'S HEADER SAID DID NOT EXIST. It has said
-// since 2026-09-21 that all 64 samples in the pack are `fmt ` then `data` and
-// nothing else, so no real file here could grade the chunk walker and only the
-// synthetic fixtures above could. That stopped being true the day `/pack/`
-// started opening anybody's zip: these 901 files carry **18 distinct chunk
-// layouts** and **265 of them put the audio somewhere other than offset 44**.
+// Every WAV in every zip: above the pack's early exit, so it runs on any checkout.
+// 901 files, 18 chunk layouts, 265 with audio not at offset 44.
+// why: lessons/kit-circuit-sample.md#test-every-wav
 
 console.log('\n-- 901 real wavs out of six zips, which is what "any wavs in zip" means --');
 
@@ -908,12 +814,9 @@ if (!fs.existsSync(PACKS)) {
   note('tmp/packs is not on this machine, so the 901 file corpus is unmeasured here');
 } else {
   /**
-   * ⚠️ READ IN MEMORY, NOTHING EXTRACTED, NOTHING EXECUTED, and the resource
-   * forks counted rather than quietly skipped. A `.zip` made on a Mac carries a
-   * `__MACOSX/._name.wav` beside every real file: 88 of the 989 named `.wav`
-   * entries here are those, they are 4 KB of finder metadata rather than audio,
-   * and counting them as refused samples would put an 88 file hole in every
-   * figure below.
+   * Read in memory, nothing extracted or executed. Mac resource forks (88 of 989 named `.wav`)
+   * are counted, not treated as refused samples.
+   * why: lessons/kit-circuit-sample.md#test-forks
    */
   const FORK = (name) => /(^|\/)__MACOSX\//.test(name) || /^\._/.test(name.split('/').pop());
 
@@ -935,10 +838,8 @@ if (!fs.existsSync(PACKS)) {
     named === 989 && forks === 88 && files.length === 901,
     `${named} named, ${forks} forks, ${files.length} real`);
 
-  // 🔴 THE FOUR QUESTIONS THE REQUEST IS ABOUT, ASKED SEPARATELY BECAUSE A
-  // FILE THAT READS IS NOT A FILE THAT PLAYS. Before 2026-09-28 all 901 read
-  // and only 749 of them did anything else, so a page showed a full header row
-  // and four empty measured cells on 152 of them.
+  // Read, play, measure and draw are asked separately: a file that reads may not play.
+  // why: lessons/kit-circuit-sample.md#test-four-questions
   let read = 0, play = 0, measure = 0, draw = 0, threw = 0;
   const shapes = new Map();
   const layouts = new Map();
@@ -971,8 +872,8 @@ if (!fs.existsSync(PACKS)) {
     read === 901 && play === 901 && measure === 901 && draw === 901 && threw === 0,
     `${read} read, ${measure} measured, ${draw} drawable, ${play} play, ${threw} threw`);
 
-  // 🔴 THE SHAPE CENSUS, WHICH IS WHAT SAYS THE 152 WERE A REAL POPULATION AND
-  // NOT AN ODDITY. Two whole zips are nothing but 24 bit stereo.
+  // The shape census: two whole zips are nothing but 24 bit stereo.
+  // why: lessons/kit-circuit-sample.md#test-census
   ok('the shapes are 534 + 215 sixteen bit mono, 98 twenty four bit stereo, 52 sixteen bit stereo and 2 twenty four bit mono',
     shapes.get('44100 16 1') === 534 && shapes.get('48000 16 1') === 215
     && shapes.get('44100 24 2') === 98 && shapes.get('44100 16 2') === 52
@@ -983,25 +884,25 @@ if (!fs.existsSync(PACKS)) {
     && waves.filter((w) => w.bits === 24 || w.channels > 1).length === 152,
     `${deep24} at 24 bit, ${stereo} stereo, ${mixedRows} mixed down`);
 
-  // 🔴 AND THE CHUNK WALKER FINALLY HAS A REAL CORPUS, WHICH IS A CLAIM THIS
-  // MODULE'S HEADER HAS BEEN UNABLE TO MAKE SINCE IT WAS WRITTEN. `bext` is a
-  // broadcast metadata chunk 602 bytes long, and a reader that skipped 44 bytes
-  // would have played it as audio on 247 files.
+  // A real corpus for the chunk walker: `bext` is 602 bytes, read as audio on 247 files by a
+  // 44 byte skipper.
+  // why: lessons/kit-circuit-sample.md#test-layouts
   ok('18 distinct chunk layouts, and 265 of the 901 put their audio somewhere other than offset 44',
     layouts.size === 18 && notAt44 === 265 && deepest === 736
     && layouts.get('fmt  data') === 84
     && layouts.get('fmt  bext junk data') === 247
     && layouts.get('fmt  data LIST CDif CDif') === 515,
     `${layouts.size} layouts, deepest audio at byte ${deepest}, and only ${layouts.get('fmt  data')} are plain fmt-then-data`);
-  // ⚠️ THREE FILES PUT `bext` BEFORE `fmt `, so a reader that assumed the format
-  // chunk comes first would miss it on those. The walker does not assume.
+  // Three files put `bext` before `fmt `; the walker does not assume order.
+  // why: lessons/kit-circuit-sample.md#test-bext
   ok('and 11 of them put bext BEFORE fmt, which a reader expecting fmt first would read as no fmt at all',
     waves.filter((w) => w.chunkIds[0] !== 'fmt ').length === 11
     && waves.filter((w) => w.chunkIds[0] !== 'fmt ').every((w) => w.chunkIds[0] === 'bext')
     && waves.filter((w) => w.chunkIds[0] !== 'fmt ').every((w) => w.ok && w.frames > 0),
     `${waves.filter((w) => w.chunkIds[0] !== 'fmt ').length} files open on bext, all of them parsed`);
 
-  // 🔴 THE TOTALS A PAGE SHOWS, AND `mixed` IS THE ONE THAT WAS NOT THERE.
+  // The totals a page shows, including `mixed`.
+  // why: lessons/kit-circuit-sample.md#test-totals
   const all = W.summariseAll(waves);
   ok('summariseAll counts the whole corpus, 0 refused, and says how many had to be mixed down',
     all.count === 901 && all.parsed === 901 && all.refused === 0 && all.mixed === 150
@@ -1009,9 +910,8 @@ if (!fs.existsSync(PACKS)) {
     && all.channels.slice().sort((a, b) => a - b).join() === '1,2',
     `${all.parsed} parsed, ${all.mixed} mixed, ${(all.seconds / 60).toFixed(1)} minutes of audio`);
 
-  // 🔴 THE MIXDOWN AGAINST THE REAL STEREO FILES, WHICH IS THE NUMBER THE
-  // MODULE'S COMMENT QUOTES. If the mean were a sum this ratio would run above
-  // 1; if it were the left channel it would sit at 0 on a hard panned file.
+  // Mixed peak over loudest channel: a sum would exceed 1, a left channel read 0 when hard panned.
+  // why: lessons/kit-circuit-sample.md#test-ratio
   const ratios = [];
   let cancelled = 0, clamped = 0;
   for (const w of waves) {
@@ -1022,11 +922,8 @@ if (!fs.existsSync(PACKS)) {
     if (c.channelPeak > 0) ratios.push(c.peak / c.channelPeak);
   }
   ratios.sort((a, b) => a - b);
-  // ⚠️ THE MEDIAN IS 0.99996 AND THIS ASSERT SAID 1 UNTIL IT WENT RED. The
-  // survey that produced the figure printed four decimal places and `1.0000`
-  // was a ROUNDING rather than a reading, so the number went into the module's
-  // comment wrong before this line caught it. It is asserted to five places
-  // here for exactly that reason.
+  // The median is 0.99996, asserted to five places: `1.0000` was a rounding, not a reading.
+  // why: lessons/kit-circuit-sample.md#test-median
   ok('the mixed peak runs 0.46642 to exactly 1 of the loudest channel over the 150 stereo files, median 0.99996',
     ratios.length === 150
     && ratios[0].toFixed(5) === '0.46642'
@@ -1041,16 +938,9 @@ if (!fs.existsSync(PACKS)) {
     cancelled === 0 && clamped === 0,
     'the anti phase and block align fixtures above are the only subjects either has');
 
-  // ── the oracle, which is not this file and not this repository ──────────
-  //
-  // 🔴 A DEPTH BRANCH GRADED AGAINST ITSELF IS `timeline/csound.mjs` AGAIN:
-  // 22 asserts green for months with two real defects, because the check
-  // derived its answer from the formula the code implements. ffmpeg decodes
-  // these files with an implementation nobody here wrote, so it is the oracle.
-  // ⚠️ IT SKIPS CLEANLY WHERE FFMPEG IS NOT INSTALLED, the way
-  // `timeline/lab/csound-oracle.mjs` does, because a check nobody can run is a
-  // check nobody runs.
-  // ⚠️ AND THE BYTES GO DOWN A PIPE, so this file still writes nothing to disk.
+  // ffmpeg is the oracle for the depth branches, decoding through a pipe so nothing is written.
+  // Skips cleanly when ffmpeg is not installed.
+  // why: lessons/kit-circuit-sample.md#test-ffmpeg
   {
     const cp = await import('node:child_process');
     let have = true;
@@ -1096,11 +986,9 @@ if (!fs.existsSync(PACKS)) {
     }
   }
 
-  // 🔴 THE SABOTAGE ON REAL BYTES, WHICH IS THE ONE THAT MATTERS MOST. Every
-  // fixture above is built by this file; this one takes a 24 bit stereo file
-  // out of somebody's zip and tells it that it is 16 bit mono. Nothing about
-  // the file is unreadable afterwards: it parses, it decodes, every float is
-  // in range, and it is completely different audio.
+  // Sabotage on real bytes: a 24 bit stereo file told it is 16 bit mono parses, decodes in range,
+  // and is completely different audio.
+  // why: lessons/kit-circuit-sample.md#test-real-sabotage
   {
     const i = waves.findIndex((w) => w.bits === 24 && w.channels === 2);
     const good = waves[i];
@@ -1157,8 +1045,8 @@ ok('every one is 48 kHz, 16 bit, mono PCM, with a 16 byte fmt chunk',
 ok('and the header is internally consistent in all 64: RIFF size, byte rate, block align, whole frames',
   WAVES.every((w) => w.riffSizeOk && w.byteRateOk && w.blockAlignOk
     && w.partialFrameBytes === 0 && !w.truncated));
-// 🔴 THE MEASUREMENT THAT JUSTIFIES THE WALKER AND ALSO SHOWS WHY IT IS NEVER
-// EXERCISED HERE. Two chunks, in that order, in 64 of 64.
+// Two chunks, fmt then data, in 64 of 64: why the pack never exercises the walker.
+// why: lessons/kit-circuit-sample.md#test-pack-chunks
 ok('all 64 carry exactly two chunks, fmt then data, so the audio is at 44 in every one',
   uniq(WAVES.map((w) => w.chunkIds.join(' '))).join() === 'fmt  data'
   && uniq(WAVES.map((w) => w.dataAt)).join() === '44',
@@ -1166,9 +1054,8 @@ ok('all 64 carry exactly two chunks, fmt then data, so the audio is at 44 in eve
 
 console.log('\n-- the figures, against plans/plan-circuit-samples.md §2 --');
 
-// 🔴 EVERY LINE IN THIS BLOCK WAS PUBLISHED BEFORE THIS MODULE EXISTED, WHICH IS
-// WHAT MAKES REPRODUCING ONE WORTH ANYTHING. The plan read the headers with a
-// different tool on a different day and printed five numbers. All five hold.
+// Five numbers published by the plan with a different tool, reproduced here.
+// why: lessons/kit-circuit-sample.md#test-plan-numbers
 ok('shortest 0.12 s, which is 5,999 frames',
   TOTAL.shortest.toFixed(2) === '0.12' && Math.min(...WAVES.map((w) => w.frames)) === 5999,
   `${TOTAL.shortest.toFixed(6)} s`);
@@ -1187,10 +1074,9 @@ ok('5.13 MB on disk, of which 5,123,710 bytes are audio and 2,816 are container'
   && WAVES.reduce((n, w) => n + w.dataBytes, 0) === 5123710
   && TOTAL.bytes - WAVES.reduce((n, w) => n + w.dataBytes, 0) === 64 * 44,
   `${TOTAL.bytes} bytes, 64 headers of 44`);
-// ⚖️ THE PLAN'S OPEN QUESTION, RESTATED WITH THE NUMBER THIS MODULE MEASURES AND
-// NOT SETTLED. Whether the Circuit's pack budget is seconds or samples decides
-// whether 53.4 s at 48 kHz is nearly full or two thirds full, and the experiment
-// that would answer it writes to the instrument.
+// Open question, not settled: whether the pack budget is seconds or samples (53.4 s at 48 kHz).
+// Answering it writes to the instrument.
+// why: lessons/kit-circuit-sample.md#test-budget
 ok('MEASURED: 2,561,855 samples against the 2,646,000 that 60 s at 44.1 kHz would be, 96.8 per cent',
   (TOTAL.frames / (60 * 44100) * 100).toFixed(1) === '96.8',
   'whether the budget is seconds or samples is UNSETTLED and needs the device');
@@ -1207,8 +1093,8 @@ ok('peak runs 0.586 to 0.997 of full scale, so every one is normalised and none 
 ok('RMS runs 0.017 to 0.394, which is the column that separates a hat from a kick',
   Math.min(...CONTENT.map((c) => c.rms)).toFixed(3) === '0.017'
   && Math.max(...CONTENT.map((c) => c.rms)).toFixed(3) === '0.394');
-// 🔴 THE NUMBER A PAGE IS FOR: HOW MUCH OF A SAMPLE IS SOUND. 4 per cent of this
-// pack is zeros at one end or the other, and it is almost all at the END.
+// How much of a sample is sound: 4 per cent of this pack is zeros, almost all at the end.
+// why: lessons/kit-circuit-sample.md#test-silence-ends
 ok('27 of 64 start with silence and 57 end with it, at most 105 frames in and 9,118 out',
   CONTENT.filter((c) => c.leadingZeros > 0).length === 27
   && CONTENT.filter((c) => c.trailingZeros > 0).length === 57
@@ -1227,8 +1113,8 @@ console.log('\n-- the floats, which are what a page actually plays --');
     monos.every((m) => m.ok) && monos.every((m, i) => m.samples.length === WAVES[i].frames)
     && monos.every((m) => m.samples.every((v) => v >= -1 && v <= 1)),
     `${monos.reduce((n, m) => n + m.samples.length, 0)} floats`);
-  // 🔴 THE SCALING, GRADED AGAINST THE BYTES RATHER THAN AGAINST ITSELF. If the
-  // divisor were 32767 this would go red on every non-zero sample.
+  // Scaling graded against the bytes: a 32767 divisor goes red on every non-zero sample.
+  // why: lessons/kit-circuit-sample.md#test-scaling
   let wrong = 0;
   for (let i = 0; i < WAVES.length; i++) {
     const dv = new DataView(WAVES[i].data.buffer, WAVES[i].data.byteOffset, WAVES[i].data.byteLength);
@@ -1238,9 +1124,8 @@ console.log('\n-- the floats, which are what a page actually plays --');
   ok('and all 2,561,855 come back to the exact int16 they were, so the divisor is 32768 and not 32767',
     wrong === 0, `${wrong} wrong`);
 
-  // 🔴 THE PROOF THAT THE MODEL HOLDS COPIES. Parse, scribble over the buffer
-  // that was parsed, decode. If `readWave` had kept a view the audio would carry
-  // the scribble.
+  // The model holds copies: scribble over the parsed buffer, then decode.
+  // why: lessons/kit-circuit-sample.md#test-copies
   const scratch = RAW[0].slice();
   const parsed = W.readWave(scratch);
   scratch.fill(0x5a, 0, 4096);
@@ -1255,11 +1140,9 @@ console.log('\n-- the floats, which are what a page actually plays --');
 
 console.log('\n-- the one thing a second source can corroborate --');
 
-// ✅ WHICH FILE IS WHICH SLOT, AND NOTHING MORE. `index.json` was written by
-// Novation Components and the file names were read by `unzip.mjs`. They agree.
-// ⚖️ WHICH PAD PLAYS SLOT 37 IS NOT IN HERE AND IS NOT GUESSED. It is a property
-// of a session, not of a WAV, and nothing in this repository corroborates a
-// mapping.
+// Which file is which slot: `index.json` and the file names agree. Which pad plays a slot is a
+// session property and is not guessed.
+// why: lessons/kit-circuit-sample.md#test-slots
 {
   ok('index.json lists 64 samples, named Sample1 to Sample64, in file order',
     meta.samples.length === 64
@@ -1272,10 +1155,8 @@ console.log('\n-- the one thing a second source can corroborate --');
     rows.length === 64 && rows.every((r) => r.ok && r.name && r.seconds > 0 && r.peak > 0)
     && rows[0].chunks === 'fmt  data',
     JSON.stringify(rows[0]));
-  // ⚠️ HALF A MILLISECOND IS THE BOUND AND ONE ROW SITS EXACTLY ON IT. Sample 43
-  // is 0.3125 s, which rounds half up to 0.313, so a strict `< 0.0005` goes red
-  // on a correct row. The bound is inclusive and the float slop is named rather
-  // than papered over with a looser number.
+  // The 0.5 ms bound is inclusive: sample 43 is 0.3125 s, rounding half up to 0.313.
+  // why: lessons/kit-circuit-sample.md#test-duration-bound
   const off = rows.map((r, i) => Math.abs(r.seconds - WAVES[i].duration));
   ok('and the rounding in a row is for the cell, with the full precision still on the wave',
     rows[0].seconds === 1.5 && WAVES[0].duration === 1.5
@@ -1304,10 +1185,8 @@ if (!fs.existsSync(BOUGHT)) {
   ok('the two purchased packs hold 198 entries between them and not one .wav',
     packs.length === 2 && entries === 198 && wavs === 0,
     `${entries} entries, ${wavs} wav`);
-  // 🔴 AND THEIR index.json PROMISES 128 SAMPLES THAT ARE NOT IN THE FILE. That
-  // is the `User Session` lesson one layer along: a manifest is a label, the
-  // archive is the fact, and a page that built its table from `index.json`
-  // would show 64 rows of audio that does not exist.
+  // Their `index.json` lists 128 samples the archives do not hold: a manifest is a label.
+  // why: lessons/kit-circuit-sample.md#test-purchased
   ok('while their index.json lists 128 samples between them, every one with an empty name',
     promised === 128 && emptyNames === 128,
     'a manifest is a promise, the archive is the inventory');
@@ -1338,9 +1217,8 @@ function battery(u8) {
   add('block align is channels times bits over eight', () => W.readWave(u8).blockAlignOk);
   add('byte rate is the rate times the block align', () => W.readWave(u8).byteRateOk);
   add('the data is a whole number of frames', () => W.readWave(u8).partialFrameBytes === 0);
-  // ⚠️ THE CROSS CHECK BETWEEN THE TWO WAYS OF ASKING HOW LONG IT IS. One reads
-  // the data, the other believes the header. They agree in all 64 and a wrong
-  // block align pulls them apart.
+  // Length from the data against length from the byte rate: equal in 64, a wrong block align splits them.
+  // why: lessons/kit-circuit-sample.md#test-two-lengths
   add('the length from the data agrees with the length the byte rate claims', () => {
     const w = W.readWave(u8);
     return Math.abs(w.duration - w.dataBytes / w.byteRate) < 1e-9;
@@ -1369,14 +1247,9 @@ const N = battery(RAW[0]).length;
 ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
   reds(RAW[0]).map((c) => c.name).join('; ') || 'nothing red');
 
-// 🔴 SABOTAGE 1: THE DATA CHUNK TRUNCATED.
-// ⚠️ IT TAKES 2 OF 12 AND ALL TEN SURVIVORS ARE RIGHT TO SURVIVE, WHICH IS THE
-// REPORTABLE RESULT RATHER THAN A HOLE. Cut 1,024 bytes off a 16 bit mono file
-// and what is left is a shorter file that is correct in every other way: whole
-// frames, a consistent byte rate, floats in range. The ONLY thing that says it
-// was cut is that two headers still declare the old length, and those are the
-// two checks that go red. A reader that skipped 44 bytes and trusted what it
-// found would report 1.49 s and complain to nobody.
+// Sabotage 1: data truncated by 1,024 bytes takes 2 of 12, and the ten survivors are right:
+// only the two declared lengths still say it was cut.
+// why: lessons/kit-circuit-sample.md#test-sabotage-1
 {
   const cut = RAW[0].slice(0, RAW[0].length - 1024);
   const r = reds(cut);
@@ -1392,9 +1265,8 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
     && W.readWave(cut).dataDeclared === 144000,
     `${W.readWave(cut).dataBytes} present of ${W.readWave(cut).dataDeclared} declared`);
 
-  // 🔴 AND CUTTING AN ODD NUMBER OF BYTES TAKES MORE, WHICH IS NOT A BUG IN
-  // EITHER READING. A dangling half sample is a fact about the file that the
-  // even cut genuinely does not have.
+  // An odd cut takes more: a dangling half sample is a real fact about the file.
+  // why: lessons/kit-circuit-sample.md#test-odd-cut
   const odd = RAW[0].slice(0, RAW[0].length - 1025);
   const ro = reds(odd);
   ok(`cutting 1,025 instead takes ${ro.length} of ${N} red, the extra three all about the half frame left dangling`,
@@ -1402,8 +1274,8 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
     ro.map((c) => c.name).join('; '));
 }
 
-// 🔴 SABOTAGE 2: THE RIFF MAGIC CORRUPTED. One byte, and the reader refuses the
-// file rather than reading the audio that is undeniably still in it.
+// Sabotage 2: the RIFF magic, one byte, and the file is refused.
+// why: lessons/kit-circuit-sample.md#test-sabotage-2
 {
   const bad = RAW[0].slice();
   bad[1] = 0x58;                                    // RIFF becomes RXFF
@@ -1411,8 +1283,8 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
   ok(`one byte of the magic takes all ${N} of ${N} red, and the refusal quotes what it found`,
     r.length === N && W.readWave(bad).why.includes('"RXFF"'),
     W.readWave(bad).why);
-  // ⚠️ AND THE FORM IS A SEPARATE BYTE RANGE, SO IT IS A SEPARATE SABOTAGE.
-  // A file can say RIFF and be an AVI.
+  // The form is a separate byte range: a file can say RIFF and be an AVI.
+  // why: lessons/kit-circuit-sample.md#test-avi
   const avi = RAW[0].slice();
   avi.set([0x41, 0x56, 0x49, 0x20], 8);
   ok('and corrupting the form instead refuses it as a RIFF that is not a WAVE',
@@ -1420,10 +1292,8 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
     W.readWave(avi).why);
 }
 
-// 🔴 SABOTAGE 3: A BLOCK ALIGN THAT DISAGREES WITH CHANNELS TIMES BITS. The most
-// dangerous of the three, because nothing about the file looks wrong: it is
-// still RIFF, still WAVE, still 48 kHz 16 bit mono, still whole frames, and it
-// still decodes to floats in range. It is simply half as long as it is.
+// Sabotage 3: a block align disagreeing with channels times bits; nothing else looks wrong.
+// why: lessons/kit-circuit-sample.md#test-sabotage-3
 {
   const bad = RAW[0].slice();
   new DataView(bad.buffer, bad.byteOffset).setUint16(32, 4, true);    // blockAlign 2 -> 4
@@ -1440,9 +1310,8 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
     `${w.frames} frames claimed, ${w.dataBytes / 2} samples present`);
 }
 
-// 🔴 SABOTAGE 4: THE FORMAT TAG FLIPPED TO A COMPRESSED ONE. The bytes are
-// unchanged PCM and the reader must still refuse, because believing the audio
-// over the header is how a decoder produces confident noise.
+// Sabotage 4: a compressed format tag over unchanged PCM must still be refused.
+// why: lessons/kit-circuit-sample.md#test-sabotage-4
 {
   const bad = RAW[0].slice();
   new DataView(bad.buffer, bad.byteOffset).setUint16(20, 17, true);   // IMA ADPCM
@@ -1451,18 +1320,16 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
     W.readWave(bad).why);
 }
 
-// 🔴 SABOTAGE 5: THE data CHUNK RENAMED. There is 144,000 bytes of audio in the
-// file and no chunk claiming it, which is exactly the case a 44 byte assumption
-// cannot see.
+// Sabotage 5: the data chunk renamed, 144,000 bytes of audio no chunk claims.
+// why: lessons/kit-circuit-sample.md#test-sabotage-5
 {
   const bad = RAW[0].slice();
   bad.set([0x64, 0x61, 0x74, 0x78], 36);                              // 'data' -> 'datx'
   ok(`renaming the data chunk takes all ${N} of ${N} red, with 144,000 bytes of audio still in the file`,
     reds(bad).length === N && W.readWave(bad).why === 'no data chunk, so there is no audio in it',
     W.readWave(bad).why);
-  // 🔴 THE CONTROL ON THE CONTROLS. Every sabotage above is one edit to a copy
-  // of `sample_0.wav`, so the block is only worth anything if the untouched
-  // original is still green after all of it.
+  // Control on the controls: the untouched original is still green.
+  // why: lessons/kit-circuit-sample.md#test-sabotage-control
   ok('while the untouched sample is still green, so the sabotages are the difference',
     reds(RAW[0]).length === 0 && RAW[0][36] === 0x64);
 }
@@ -1471,22 +1338,20 @@ ok(`a real sample passes all ${N} of the battery`, reds(RAW[0]).length === 0,
 
 console.log('\n-- what this module must not be able to do --');
 
-// 🔴 THE EXPORT TEST, THE SAME ONE `circuit-session-test.mjs` RUNS.
+// The export test, the same one `circuit-session-test.mjs` runs.
+// why: lessons/kit-circuit-sample.md#test-exports
 {
   const makers = Object.keys(W).filter((k) => /write|send|encode|emit|sysex|bytes/i.test(k)
     && typeof W[k] === 'function');
   ok('no exported function is named for making or sending a message', makers.length === 0,
     makers.join() || `none of ${Object.keys(W).length} exports`);
 }
-// 🔴 AND THE SOURCE TEST, BECAUSE A NAME TEST CANNOT SEE A CALL INSIDE A
-// FUNCTION. `toMono()` returns an array of floats on purpose, so the export test
-// alone would not notice a line that handed those floats to a device.
+// The source test: a name test cannot see a call inside a function.
+// why: lessons/kit-circuit-sample.md#test-source
 {
   const src = fs.readFileSync(path.join(HERE, 'circuit-sample.mjs'), 'utf8');
-  // 🔴 THE COMMENTS COME OUT FIRST, AND THAT IS NOT TIDINESS. The module's own
-  // header says `requestMIDIAccess`, `AudioContext` and `decodeAudioData` in the
-  // sentences promising it calls none of them, so a check run over the raw text
-  // goes red on a correct file.
+  // Comments are stripped first: the module's prose names the calls it promises not to make.
+  // why: lessons/kit-circuit-sample.md#test-strip
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
@@ -1498,26 +1363,17 @@ console.log('\n-- what this module must not be able to do --');
   const found = banned.filter((b) => code.includes(b));
   ok('the code contains no MIDI, no port, no socket and no fetch',
     found.length === 0, found.join() || `${banned.length} patterns, none present`);
-  // 🔴 AND A SECOND LIST THIS MODULE NEEDS AND THE SESSION ONE DOES NOT. A
-  // sample decoder is the one place an `AudioContext` would look natural, and an
-  // audio device opened inside a decoder is a decoder that cannot be run in
-  // node, which is where every figure above was measured.
+  // No audio device in a decoder, so it runs in node where every figure was measured.
+  // why: lessons/kit-circuit-sample.md#test-audio-list
   const audio = ['AudioContext', 'decodeAudioData', 'AudioWorklet', 'createBufferSource', 'postMessage'];
   const heard = audio.filter((b) => code.includes(b));
   ok('and it opens no audio device either, so every number here was measured with no browser',
     heard.length === 0, heard.join() || `${audio.length} patterns, none present`);
   ok('the file does say so in its own header, so the next reader is told rather than left to notice',
     src.includes('NOTHING HERE SENDS ANYTHING ANYWHERE') && src.includes('OPENS NO AUDIO DEVICE'));
-  // 🔴 AND A THIRD LIST SINCE THE STREAM READER LANDED, WHICH IS THE ONE THIS
-  // WORK COULD HAVE BROKEN. `unpack7` has an inverse and the inverse is the
-  // first half of a complete bulk sample transfer, the file that would replace
-  // every sample slot on an instrument with no factory reset. `pack7` and
-  // `makeStream` are in THIS file and they may not move into that one.
-  // ⚠️ AND THESE ARE ANCHORED RATHER THAN SUBSTRINGS, WHICH THE FIRST RUN
-  // PROVED IT HAD TO BE: `'pack7'` matched inside `unpack7` and took this assert
-  // red on a correct module. That is the rule in CLAUDE.md about never guarding
-  // on `includes(<substring>)`, arriving inside the check written to enforce a
-  // different rule.
+  // No packer or stream builder may move into the module. Anchored patterns: `'pack7'` as a
+  // substring matched inside `unpack7`.
+  // why: lessons/kit-circuit-sample.md#test-making
   const making = [/\bpack7/, /function\s+makeStream/, /Uint8Array\.from\(\[0xf0/, /0xf7\]\)/];
   const built = making.filter((b) => b.test(code));
   ok('and there is no packer in it: no inverse of unpack7 and no function that assembles a stream',
@@ -1530,15 +1386,9 @@ console.log('\n-- what this module must not be able to do --');
     'the packer lives in the test and cannot leave it');
 }
 
-// ── the samples out of a pack, which is the half two pages share ──────────
-//
-// 🔴 `samplesIn` EXISTS BECAUSE A SECOND PAGE WAS ABOUT TO GROW A COPY OF IT.
-// Instructed 2026-09-21: *"use shared code to get samples"*. What it has to get
-// right beyond parsing is the ORDER, and that is the part a reader could never
-// catch by looking: `sample_10.wav` sorts before `sample_2.wav` as text, and the
-// pack's own `index.json` names `Sample1` to `Sample64` against `sample_0.wav`
-// to `sample_63.wav` in order, 64 of 64. A page showing slot 10 where slot 2
-// lives would be silently wrong on every row after the ninth.
+// The samples out of a pack, shared by two pages. Order is by slot number: `sample_10.wav` sorts
+// before `sample_2.wav` as text.
+// why: lessons/kit-circuit-sample.md#test-samplesin
 {
   const got = await W.samplesIn(list);
   ok('it finds all 64 samples in a real pack and every one of them parses',
@@ -1549,27 +1399,24 @@ console.log('\n-- what this module must not be able to do --');
     got.every((x, i) => x.name === `sample_${i}.wav`),
     `${got[0].name}, ${got[1].name}, ${got[2].name} ... ${got[63].name}`);
 
-  // 🔴 THE NEGATIVE CONTROL FOR THAT ORDER, AND WITHOUT IT THE ASSERT ABOVE IS
-  // SATISFIED BY THE ARCHIVE HAPPENING TO BE IN ORDER ALREADY. The entries are
-  // handed over shuffled here, so a function that returned them as it found
-  // them goes red.
+  // Negative control: entries handed over reversed, so returning them as found goes red.
+  // why: lessons/kit-circuit-sample.md#test-shuffled
   const shuffled = list.slice().reverse();
   const back = await W.samplesIn(shuffled);
   ok('NEGATIVE CONTROL: handed the entries backwards it still returns them in the pack\'s order',
     back.length === 64 && back.every((x, i) => x.name === `sample_${i}.wav`),
     `${back[0].name} then ${back[1].name}`);
 
-  // ⚠️ AN ARCHIVE WITH NO WAVS IS NOT AN ERROR, IT IS AN ANSWER, and it is the
-  // real shape of both packs in `purchased/`, whose index promises 128 samples
-  // that are not in either file.
+  // An archive with no WAVs is an answer, the real shape of both purchased packs.
+  // why: lessons/kit-circuit-sample.md#test-no-wavs
   ok('an archive with no samples in it comes back empty rather than throwing',
     (await W.samplesIn(list.filter((e) => !/\.wav$/i.test(e.name)))).length === 0
     && (await W.samplesIn([])).length === 0
     && (await W.samplesIn(null)).length === 0,
     'no wavs, an empty list and nothing at all all come back as no samples');
 
-  // 🔴 A FILE THAT WILL NOT PARSE KEEPS ITS PLACE AND CARRIES ITS REASON, which
-  // is what stops a pack looking smaller than it is.
+  // An unparsable file keeps its place and carries its reason.
+  // why: lessons/kit-circuit-sample.md#test-broken
   const broken = [{
     name: 'samples/sample_0.wav', size: 12,
     read: async () => new Uint8Array([0x52, 0x58, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]),
@@ -1582,12 +1429,9 @@ console.log('\n-- what this module must not be able to do --');
     `1 row saying "${bad[0].row.why}"`);
 }
 
-// ── a real session image is not a sample table ────────────────────────────
-//
-// 🔴 THE NEGATIVE CONTROL THE SYNTHETIC ONES CANNOT GIVE. Zeros, 0xFF and noise
-// are easy to refuse. A real 53,248 byte Circuit session is structured data from
-// the same instrument in the same family of formats, and it is the buffer a
-// sliced sample stream would be mistaken for.
+// A real session image is not a sample table: structured data from the same instrument, the
+// buffer a sliced sample stream would be mistaken for.
+// why: lessons/kit-circuit-sample.md#test-session-image
 {
   const sess = list.find((e) => e.name.endsWith('.circuitsession'));
   const bytes = await sess.read();
@@ -1596,8 +1440,8 @@ console.log('\n-- what this module must not be able to do --');
     bytes.length === 53248 && r.ok === false && r.read === 0
     && r.why.includes('slot 0') && /0x[0-9a-f]{2}/.test(r.why),
     `${sess.name}: ${r.why}`);
-  // ⚠️ AND THROUGH THE PAGE-FACING FUNCTION TOO, because a session file dropped
-  // on a sample page has to be told what it is rather than shown nothing.
+  // Through `sampleSetIn` too: a session dropped on a sample page is told what it is.
+  // why: lessons/kit-circuit-sample.md#test-session-page
   const set = W.sampleSetIn(bytes);
   ok('and dropped on the whole reader it is refused for what it is rather than for being empty',
     set.ok === false && set.samples.length === 0
@@ -1613,12 +1457,9 @@ if (!fs.existsSync(PACKS)) {
   note('tmp/packs is not on this machine, so the 4 stream files are unmeasured here');
 } else {
   /**
-   * ⚠️ EVERY FILE BELOW IS READ IN MEMORY AND NOTHING IS EXTRACTED TO DISK.
-   * `tmp/` is gitignored as a whole and one zip in that directory is a Windows
-   * executable and another a Nintendo DS ROM. Nothing here runs anything.
-   * ⚠️ AND THE TEN INSIDE `Future_Kawaii.rar` ARE NOT HERE. `unzip.mjs` reads
-   * zips and that file is a rar, so the ten `.circuitpack` files in it are
-   * measured in the research and not by this test.
+   * Every file is read in memory, nothing extracted or run. The ten `.circuitpack` files inside
+   * `Future_Kawaii.rar` are not here: `unzip.mjs` reads zips only.
+   * why: lessons/kit-circuit-sample.md#test-archive-corpus
    */
   const raw = (f) => new Uint8Array(fs.readFileSync(path.join(PACKS, f)));
   const inZip = async (f, ends) => {
@@ -1639,10 +1480,8 @@ if (!fs.existsSync(PACKS)) {
     { file: 'payton_carter_circuit_pack_210615.zip -> payton_carter_sessions.syx', bytes: await inZip('payton_carter_circuit_pack_210615.zip', 'payton_carter_sessions.syx'),
       streams: 1, tables: 0, filled: 0, empty: 0, seconds: 0 },
   ];
-  // 🔴 AND THE MISSING ONES ARE COUNTED RATHER THAN INDEXED INTO.
-  // `circuit-session-test.mjs` indexed an optional corpus unconditionally on
-  // 2026-09-21 and turned a clean skip into `Cannot read properties of
-  // undefined`, which reads as a broken decoder rather than an absent file.
+  // Missing files are counted, not indexed into: that turned a clean skip into a TypeError.
+  // why: lessons/kit-circuit-sample.md#test-missing
   const here = CORPUS.filter((c) => c.bytes);
   if (!here.length) {
     note('none of the five stream files are in tmp/packs, so nothing below ran');
@@ -1661,8 +1500,8 @@ if (!fs.existsSync(PACKS)) {
     ok(`all ${allStreams.length} streams in them verify: declared length and CRC32 both, 0 refused`,
       allStreams.every((s) => s.ok && s.lengthOk && s.crcOk),
       `${allStreams.filter((s) => s.ok).length} of ${allStreams.length}`);
-    // ✅ THE FIELD THAT SEPARATES THE TWO KINDS, REPRODUCED. ⚖️ What it MEANS is
-    // a reading and nothing here decides on it: the slot walker decides.
+    // The region field separates the two kinds; what it means stays a reading.
+    // why: lessons/kit-circuit-sample.md#test-regions
     const regions = allStreams.reduce((m, s) => ({ ...m, [s.region]: (m[s.region] || 0) + 1 }), {});
     ok('the six nibble field at bytes 8 to 13 is 0x23b000 on every sample stream and 0x2e000 on every session one',
       allStreams.filter((s) => s.region === W.REGION_SAMPLES).length
@@ -1693,8 +1532,8 @@ if (!fs.existsSync(PACKS)) {
         && one.split.streams[0].plain.length === 5763072
         && one.split.streams[0].carriers === 22512,
         `0x${one.split.streams[0].crc.toString(16)} over ${one.split.streams[0].plain.length.toLocaleString()} bytes`);
-      // 🔴 THE SABOTAGE THAT MATTERS MOST, BECAUSE IT IS ON REAL BYTES. One bit
-      // in 5,763,072 and nothing else in the file changes.
+      // Sabotage on real bytes: one bit in 5,763,072.
+      // why: lessons/kit-circuit-sample.md#test-one-bit
       const bad = one.bytes.slice();
       const at = 6 + 23 + 100;
       bad[at] = bad[at] ^ 0x01;
@@ -1706,9 +1545,8 @@ if (!fs.existsSync(PACKS)) {
         && W.sampleSetIn(bad).samples.length === 0,
         `0x${bs.crc.toString(16)} against a declared 0x${bs.crcDeclared.toString(16)}, `
         + 'and the 64 slot table still walks perfectly');
-      // ⚠️ THE TAIL IS ZERO FILL AND IT IS 70.3 BLOCKS OF 53,248, which is where
-      // the `141 sessions` in `research/dump-samples-2026-09-21.md` §7.3 comes
-      // from. It is reported and not refused.
+      // The zero tail is 70.3 blocks of 53,248 (the `141 sessions` misreading), reported not refused.
+      // why: lessons/kit-circuit-sample.md#test-tail
       const walk = W.slotsIn(one.split.streams[0].plain);
       ok('and 2,019,664 of its 5,763,072 bytes are used, with the other 3,743,408 zero to the last byte',
         walk.used === 2019664 && walk.tail === 3743408 && walk.tailNonZero === 0,

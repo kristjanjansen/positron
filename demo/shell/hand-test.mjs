@@ -1,31 +1,7 @@
-// demo/shell/hand-test.mjs — is the invisible hand a hand, with nobody in the room.
-//
-//   node demo/shell/hand-test.mjs
-//
-// 🔴 THE FIRST METRIC TRIED ON THIS FAILED ITS OWN NEGATIVE CONTROL, AND THAT
-// FAILURE IS WHY THIS FILE IS SHAPED THE WAY IT IS. The obvious measurement is
-// a whole lap: normalise time by the lap and value by the travel, take the peak
-// speed over the mean speed, and compare against a triangle's 1.000 and a
-// sine's 1.571. Fed a TRIANGLE carrying the hand's endpoint wander, tempo
-// wander, overshoot and pause, that metric read 1.708 against a true 1.000. It
-// was measuring dwell and overshoot rather than shape, because a whole lap
-// window swallows both, and on it a triangle with a pause on the end would have
-// shipped as a hand.
-//
-// The repair is to SEGMENT FIRST AND MEASURE SECOND, in three windows that
-// cannot borrow evidence from each other:
-//
-//   shape    on the reaches only, each normalised by its OWN time and travel
-//   turn     the milliseconds between one reach and the next
-//   variety  the values it turns at, and how long each lap took
-//
-// 🔴 AND IT GRADES THE GENERATOR, NEVER A SLIDER. Sampled through a 0..127 lane
-// every case reads crest 1.000, because a quantised curve is a staircase. See
-// the header of `hand.mjs`; the collapse is reproduced as a check below.
-//
-// FOUR OF THESE ARE NEGATIVE CONTROLS AND ONE IS A SABOTAGE. NC1 must FAIL, NC2
-// must PASS, NC3 must FAIL, the quantised stream must collapse, and setting
-// `b = a` must be caught by exactly ONE of the five thresholds.
+// demo/shell/hand-test.mjs: is the invisible hand a hand. Segment first, measure second, in three
+// windows (shape on reaches, turn, variety); a whole-lap metric read a drifting triangle as 1.708.
+// Grades the generator, never a slider. NC1 fails, NC2 passes, NC3 fails, `b = a` caught once.
+// why: lessons/kit-hand.md#test-header
 
 import { MOVES, MOVE_TURN, MOVE_GLYPH, MOVE_SAYS, MOVE_OFF, BARE, HARMONICS,
   betaY, sineY, warp, plan, positionAt, minSteps } from './hand.mjs';
@@ -120,14 +96,9 @@ function measure(v, dt) {
   const top = ends.filter((x) => x > mid), bot = ends.filter((x) => x <= mid);
   const spreadOf = (a) => (a.length > 1 ? Math.max(...a) - Math.min(...a) : 0);
   const endSpread = Math.max(spreadOf(top), spreadOf(bot)) / full;
-  // ⚠️ SIX DECIMALS, AND THE RESOLUTION IS LOAD-BEARING IN BOTH DIRECTIONS. At
-  // four it reports collisions that are not there: five wandering ends share a
-  // 3% range, so two of them landing within 1/10000 of each other is ordinary
-  // and reads as a sweep that turned twice at one place. At full float
-  // precision it reports differences that are not there either, because the
-  // last bits of an accumulated sample time differ from lap to lap. Six sits
-  // between: a bare sweep's ends agree to better than 1e-7, and a wandering
-  // one's disagree by about 6e-3.
+  // Six decimals: four reports collisions that are not there, full precision reports float noise.
+  // A bare sweep's ends agree to 1e-7, a wandering one's differ by about 6e-3.
+  // why: lessons/kit-hand.md#distinct
   const distinct = new Set(ends.map((x) => x.toFixed(6))).size;
   const mean = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
   const lapSpread = laps.length > 1 ? (Math.max(...laps) - Math.min(...laps)) / mean(laps) : 0;
@@ -191,10 +162,9 @@ console.log('\n== the invisible hand ==\n');
     `speed ${d1(3, 4, h).toExponential(1)} at the start, ${d1(3, 4, 1 - h).toExponential(1)} at the end`);
 }
 
-// 3. The four constants the whole plan rests on, integrated at 2000 points the
-//    way the plan says they were. A triangle is 1.000, a sine is π/2, minimum
-//    jerk is 1.875 and it peaks in the MIDDLE, and the hand is 2.074 and peaks
-//    at 0.400. That last pair is the entire claim about human feel.
+// 3. the four constants at 2000 points: triangle 1.000, sine π/2, minimum jerk 1.875 peaking in
+// the middle, the hand 2.074 peaking at 0.400.
+// why: lessons/kit-hand.md#t3
 {
   const profile = (f) => {
     const N = 2000;
@@ -224,9 +194,8 @@ console.log('\n== the invisible hand ==\n');
     `min jerk ${mj.at.toFixed(3)}, sine ${sin.at.toFixed(3)}, hand ${hd.at.toFixed(3)}`);
 }
 
-// 4. NEGATIVE CONTROL ON THE WOBBLE. It warps time, so it must not be able to
-//    move an end. If it could, `endJit` and `wobble` would both be moving the
-//    turning values and the variety window could not be graded on its own.
+// 4. negative control: the wobble warps time and must not move an end.
+// why: lessons/kit-hand.md#t4
 {
   const ph = [0.9, 2.7];
   const moved = Math.max(Math.abs(warp(0, 0.05, ph) - 0), Math.abs(warp(1, 0.05, ph) - 1));
@@ -289,9 +258,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     `${m.reaches} reaches, ${m.distinct} of ${m.ends} ends distinct`);
 }
 
-// 7. NC1, THE DRIFT DECOY, AND IT IS THE ONE THAT KILLED THE FIRST METRIC. A
-//    triangle carrying every wander the hand has. If it passes, the metric is
-//    reading drift rather than shape.
+// 7. NC1, the drift decoy: a triangle with every wander the hand has must fail.
+// why: lessons/kit-hand.md#t7
 {
   const m = cases['NC1 triangle + the jitter'];
   const g = grade(m);
@@ -303,9 +271,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     `turn ${Math.round(m.turnMs)} ms, ${m.distinct} ends, laps ${(m.lapSpread * 100).toFixed(1)}%`);
 }
 
-// 8. NC2, THE SHAPE DECOY. The hand with every wander switched OFF has to pass
-//    the two shape claims. If it fails, the metric needs the noise to see the
-//    shape, which means it is reading noise.
+// 8. NC2, the shape decoy: the hand with every wander off must pass both shape claims.
+// why: lessons/kit-hand.md#t8
 {
   const g = grade(cases['NC2 Beta(3,4), jitter off']);
   ok('NC2 the hand with every jitter off still PASSES both shape claims',
@@ -313,9 +280,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     `shape ok, and it fails turn, ends and laps as a bare sweep must`);
 }
 
-// 9. NC3, THE SINE DECOY: the thing the ask explicitly does not want. It fails
-//    both shape claims while passing every turn and variety claim, and that
-//    separation is the proof the claims are independent of each other.
+// 9. NC3, the sine decoy: fails both shape claims, passes every turn and variety claim.
+// why: lessons/kit-hand.md#t9
 {
   const m = cases['NC3 sine + the jitter'];
   const g = grade(m);
@@ -324,10 +290,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     `crest ${m.crest.toFixed(3)}, peak ${m.peakAt.toFixed(3)}`);
 }
 
-// 10. THE SABOTAGE. `b = a` makes the profile symmetric minimum jerk, which is a
-//     machine rather than a hand. It must be caught, and it must be caught by
-//     EXACTLY ONE check: a sabotage that takes everything red is a test with one
-//     assert wearing five names.
+// 10. the sabotage `b = a` (symmetric minimum jerk) must be caught by exactly one check.
+// why: lessons/kit-hand.md#t10
 {
   const m = cases['SABOTAGE Beta(3,3) + jitter'];
   const g = grade(m);
@@ -363,20 +327,16 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     ms.every((m) => Object.values(grade(m)).every(Boolean)),
     `crest ${Math.min(...ms.map((m) => m.crest)).toFixed(2)} to ${Math.max(...ms.map((m) => m.crest)).toFixed(2)}, `
     + `peak ${Math.min(...ms.map((m) => m.peakAt)).toFixed(2)} to ${Math.max(...ms.map((m) => m.peakAt)).toFixed(2)}`);
-  // ⚠️ THE ASYMMETRY THRESHOLD IS THE NARROWEST ONE ON THIS PAGE AND THE TEST
-  // SAYS SO RATHER THAN PASSING QUIETLY. The hand sits below 0.470 and the
-  // sabotage above it on every seed, which is what makes 0.470 a threshold, and
-  // the gap on the sabotage's side is a few hundredths rather than a tenth.
+  // The asymmetry threshold 0.470 is the narrowest here: the sabotage's margin is a few hundredths.
+  // why: lessons/kit-hand.md#asymmetry
   ok('the sabotage fails the asymmetry claim on every one of the same four seeds',
     sb.every((m) => m.peakAt > THRESH.peak) && ms.every((m) => m.peakAt < THRESH.peak),
     `the hand peaks ${Math.max(...ms.map((m) => m.peakAt)).toFixed(3)} at worst and the sabotage `
     + `${Math.min(...sb.map((m) => m.peakAt)).toFixed(3)} at best, either side of ${THRESH.peak}`);
 }
 
-// 13. 🔴 THE QUANTISATION COLLAPSE, WHICH IS WHY THIS FILE GRADES A NUMBER AND
-//     NOT A HANDLE. Through `/knobs/`'s own 0..127 lane the hand and a triangle
-//     read the same, so a check written against the slider would have shipped
-//     anything at all.
+// 13. the quantisation collapse: through /knobs/'s 0..127 lane the hand and a triangle read alike.
+// why: lessons/kit-hand.md#t13
 {
   const air = { h: run(SWEEP), t: run({ ...SWEEP, a: 1, b: 1 }), s: run({ ...SWEEP, b: 3 }) };
   const lane = { h: run(SWEEP, { steps: 127 }), t: run({ ...SWEEP, a: 1, b: 1 }, { steps: 127 }),
@@ -393,14 +353,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
     `hand ${lane.h.crest.toFixed(3)}, triangle ${lane.t.crest.toFixed(3)}, sabotage ${lane.s.crest.toFixed(3)}, `
     + `all under ${THRESH.crest}`);
   /**
-   * ⚠️ THE CLAIM IS THAT THE LANE CANNOT TELL THEM APART, AND SAYING THAT AS A
-   * DISTANCE WAS WRONG. This read `the separation collapses` and compared the
-   * two crest numbers, which went red the moment the lap got slower: at 7 s a
-   * lane-read triangle yields NO measurable reach at all, so its crest is 0 and
-   * the distance to the hand is as wide as it was in the air while meaning the
-   * opposite. The quantity in question is the VERDICT, not the gap between two
-   * numbers, so that is what is asserted: in the air the metric says hand and
-   * says not-a-hand, and through the lane it says not-a-hand about both.
+   * The claim is the verdict, not the gap: through the lane the metric says not-a-hand about both.
+   * why: lessons/kit-hand.md#verdict
    */
   const verdict = (r) => r.crest >= THRESH.crest;
   ok('in the air the metric separates them and through the lane it cannot',
@@ -412,9 +366,8 @@ ok('a bare sweep pauses for nothing and turns at one value per end, because noth
 // 14. And the floor that follows from it, stated as arithmetic: the end wander
 //     has to be at least one step or every lap turns at the same number.
 {
-  // ⚠️ AND THE VARIETY WINDOW GOES ON READING AS IF ALL WERE WELL, which is the
-  // trap: nine distinct ends on a staircase with no reach left in it. A page
-  // that graded only variety would call this a hand.
+  // And the variety window still reads fine: nine distinct ends on a staircase with no reach left.
+  // why: lessons/kit-hand.md#coarse
   const coarse = run(SWEEP, { steps: 8 });
   ok('a lane too coarse to show the wander has no reach left to measure, so the floor is 34 steps',
     minSteps(SWEEP) === 34 && coarse.graded === 0,

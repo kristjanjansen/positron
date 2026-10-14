@@ -66,12 +66,8 @@ export function ranks(nodes, links) {
  * `backs`, `pairCount`, `longest`, `HEAD`, `LANE`, `STEP`.
  */
 export function layoutBay({ nodes, ports, links }, { avail, stretch = true, sizeAs = 0, maxWire = Infinity, fieldsOf, width }) {
-  /* 🔴 A ROW THAT DOES NOT FIT FOLDS ITS LABELS FIRST, 2026-10-11. Asked:
-     *"adjust rendering so the connectors fit into w"*, when the relay box
-     (`cf-relay:<room>`, patchbay.mjs) made a three box chat 15 px wider than
-     the page and its return wire ran off the right edge. The grey field
-     beside a title moves under it, which narrows every box to its title or
-     its ports, before the row is allowed to scroll. */
+  // A row that does not fit folds the grey field under each title first, before it scrolls.
+  // why: lessons/kit-bay-layout.md#fold
   let folded = false;
   const fieldsR = (n) => { const f = fieldsOf(n); return folded && f[0] && !f[1] ? [null, f[0], f[2]] : f; };
   const portsOf = (n) => {
@@ -88,10 +84,8 @@ export function layoutBay({ nodes, ports, links }, { avail, stretch = true, size
   // Box width from what each box holds: its title, and its own longest in
   // label beside its own longest out label.
   const longest = (ps) => Math.max(0, ...ps.map((p) => width(portName(p.id), FONT)));
-  // One width per COLUMN, from the boxes in it, since 2026-10-11 (*"adjust
-  // rendering so the connectors fit into w"*): one width for every box made
-  // a four column chain as wide as four of its widest box, and Yoshimi's
-  // row ran off the page for one long knob name in the first column.
+  // One width per column, from the boxes in it, so one long name does not widen every box.
+  // why: lessons/kit-bay-layout.md#nodew
   const nodeW = (n) => {
     const { ins, outs } = portsOf(n);
     const [f1, f2, f3] = fieldsR(n), fw = (f) => (f ? width(f.text, FONT, true) : 0);
@@ -118,9 +112,8 @@ export function layoutBay({ nodes, ports, links }, { avail, stretch = true, size
     .map((l) => rank.get(nodeOf(l.from))));
   const extra = (g) => wide.size * Math.max(0, TWIN_GAP - g);
   const gapFor = (g) => boxesW() + (cols.length - 1) * g + extra(g) + 2 * M <= avail;
-  // Too wide even then: a wide host keeps the chain and scrolls sideways;
-  // only a phone stacks. Stacking on a desk was tried 2026-10-10 and
-  // refused: *"do not do vert layouts on desktop. overflow"*.
+  // Too wide even then: a wide host keeps the chain and scrolls sideways; only a phone stacks.
+  // why: lessons/kit-bay-layout.md#stack
   if (avail >= STACK_BELOW && !gapFor(MIN_GAP) && order.some((n) => fieldsOf(n)[0] && !fieldsOf(n)[1])) { folded = true; boxW = boxWidth(); colW = colWidths(); }
   const GAPX = gapFor(GAP) ? GAP : MIN_GAP;
   const need = boxesW() + (cols.length - 1) * GAPX + extra(GAPX) + 2 * M;

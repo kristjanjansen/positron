@@ -1,71 +1,33 @@
-// demo/shell/bay.mjs — a patch bay: what exists, what may reach what, and the
-// arithmetic that refuses the rest.
-//
-// 🔴 WHY THIS IS A MODULE AND NOT A PAGE. Everything here is pure. No socket,
-// no Web MIDI, no DOM, no clock. So `node demo/shell/bay-test.mjs` can grade
-// the validator against patches whose answers are known in advance, which is
-// the one thing a validator living inside a page can never have: what a desk
-// happens to be plugged into today is not a known answer.
-//
-// 🔴 THE DESIGN IS `plans/plan-patchbay.md` AND ITS ONE LOAD BEARING IDEA IS
-// THAT A PORT DECLARES TWO DIFFERENT THINGS.
-//   - `shape` is what the data IS. For audio, a rate, a channel count and a
-//     frame size. For MIDI, a protocol.
-//   - `accepts` is what the port CONSENTS TO, as a list of message classes.
-// They are not the same question and conflating them is how a studio gets
-// damaged: the Circuit's input is shaped for perfectly ordinary MIDI and must
-// nevertheless never be sent SysEx, because one byte inside a SysEx message
-// overwrites a patch, and a factory reset never brings back the owner's own.
-//
-// 🔴 AND A SHAPE IS DECLARED, NEVER INFERRED. This repository has the scar
-// already: 960 int16s is a valid 20 ms mono frame AND a valid 10 ms stereo one,
-// and guessing wrong plays an octave down, which sounds like a broken
-// instrument rather than a broken header. `board.mjs` solved it by making
-// senders declare `audioChannels` and `frameMs` and receivers check one against
-// the other. This checks the pair at CONNECT time instead of at play time.
+// demo/shell/bay.mjs: a patch bay: what exists, what may reach what, and the arithmetic that
+// refuses the rest. Pure (no socket, MIDI, DOM or clock) so bay-test.mjs grades it. A port's
+// `shape` is what the data is, `accepts` what it consents to; a shape is declared, never inferred.
+// why: lessons/kit-bay.md#header
 
 import { KINDS, kindOfDecoded } from './midi-kinds.mjs';
-/* 🔴 ONE STALE WINDOW FOR THE BAY AND THE REGISTRY, SINCE 2026-10-06
-   (plans/plan-routing-migration.md §3.3). This file said 30 s and the registry
-   15 s, so a port could be stale to the registry and fresh to the bay for
-   fifteen seconds. The registry's number wins because it is a fact about the
-   board (three missed five second beats), and the registry is import free on
-   purpose (the Pi ships it alone), so the bay imports it rather than the other
-   way round. */
+// One stale window for the bay and the registry; the registry owns it and is import free.
+// why: lessons/kit-bay.md#stale
 import { STALE_MS, jackRows } from './graph-registry.mjs';
 export { STALE_MS };
 // Link options (`{ w 640, h 360, fps 15 }` on a video link) are not transforms; see link-options.mjs.
 import { isOption, checkOptions, printOptions } from './link-options.mjs';
 
 /**
- * What a link can carry. `clock` is its own medium: see plan-patchbay, §3.4.
- * 🔴 EIGHT SINCE 2026-10-04, AND THE FIRST THREE KEEP THEIR PLACES IN ORDER.
- * The five that arrived are `plans/plan-universal-routing.md` §3: `value` is a
- * gesture, an envelope, a tilt or a fader; `video` is frames; `program` is code
- * that arrives whole (a shader, a Faust file, a Csound score); `file` is
- * something a store records or plays; `state` is a room used as a bus.
- * ⚠️ A PAGE THAT INDEXES THIS LIST BY POSITION READS THE SAME THREE AS BEFORE,
- * which is why the new ones went on the end rather than into a tidier order.
+ * What a link can carry. New media go on the end: pages index the first three by position.
+ * why: lessons/kit-bay.md#media
  */
 export const MEDIA = ['midi', 'audio', 'clock', 'value', 'video', 'program', 'file', 'state'];
 
 /**
- * 🔴 THE MEDIA A LINK CARRIES A SESSION FOR INSTEAD OF BYTES, which is plan
- * §4's whole idea: the router never copies a frame. A heavy link resolves to
- * `{ transport, address, shape, where, says }` and the two ends open it with
- * code they already have.
- * ⚠️ `program` IS LIGHT AND THAT IS NOT AN OVERSIGHT. A shader is one message
- * and arrives whole (`video.shader` on `/mirror/` is exactly that), so it rides
- * the router like a note does. A patch bay that opened a session for forty
- * lines of GLSL would be the mixer plan-patchbay §3.1 refuses to become.
+ * The media a link carries a session for instead of bytes. `program` is light: a shader
+ * arrives whole as one message.
+ * why: lessons/kit-bay.md#heavy
  */
 export const HEAVY = ['audio', 'video', 'file', 'state'];
 
 /**
- * What a node IS, plan §3's table. A node is optional: a port with no node
- * still works exactly as it did, and takes its place from its own id.
- * ⚠️ `external` IS THE ONE KIND THE VALIDATOR READS. A link out of it opens
- * somebody else's server, see `validate`.
+ * What a node is. Optional: a port with no node takes its place from its id.
+ * `external` is the one kind the validator reads.
+ * why: lessons/kit-bay.md#node-kinds
  */
 export const NODE_KINDS = ['device', 'engine', 'endpoint', 'store', 'external', 'screen', 'person'];
 
@@ -73,27 +35,10 @@ export const NODE_KINDS = ['device', 'engine', 'endpoint', 'store', 'external', 
 export const WHERE = ['machine', 'network', 'internet-one', 'internet-many'];
 
 /**
- * 🔴 PLAN §5 AS DATA: positron's own measurements choosing a transport, and the
- * table is the part of that plan nobody else has. Keyed by medium, then by how
- * far apart the ends are.
- * 🔴 `says` IS ONLY EVER A NUMBER THE PLAN QUOTES, AND NOTHING HERE WAS ROUNDED
- * TOWARDS A NICER ONE. Where the plan names a transport and gives no figure,
- * `says` says there is none, in those words. Where the plan says TO MEASURE,
- * `says` is exactly `'to measure'`, so a page can find every open question in
- * this table with one comparison. A plausible number typed into a cell nobody
- * measured is the confident sentence this project keeps paying for.
- * ⚠️ `or` IS THE PLAN'S SECOND CHOICE IN THE SAME CELL (*MoQ, or LL-HLS*). The
- * chooser always returns the first; the second is kept so it is not lost.
- * ⚠️ `state` IS NOT IN THE §5 TABLE. Plan §3 says a room carries it, as a bus,
- * so every distance gets the relay room, and the one number on it is the
- * relay's cap.
- * 🔴 THE RELAY'S CAP IS 1000 msg/s WITH A 2000 BURST, AND THIS TABLE SAID 60
- * UNTIL 2026-10-06. READ from `workers/relay/src/index.js` (`MSG_PER_SEC`,
- * `MSG_BURST`), and reported three times before it was fixed (HANDOFF
- * 2026-10-04, plan-xr-together §3, plan-routing-migration §3.2). The stale
- * figure was too SMALL, so every page that printed `says` told a visitor the
- * relay refuses what it accepts. `bay-test.mjs` reads the worker's source and
- * goes red when the two disagree.
+ * Measured transport choices by medium, then distance. `says` is only a number the plan quotes,
+ * or `'to measure'`; `or` is the second choice. Relay cap read from workers/relay/src/index.js,
+ * and bay-test.mjs goes red when they disagree.
+ * why: lessons/kit-bay.md#transports
  */
 export const RELAY = { msgPerSec: 1000, burst: 2000 };
 const RELAY_CAP = `cap ${RELAY.msgPerSec} msg/s, ${RELAY.burst} burst`;
@@ -126,13 +71,8 @@ export const TRANSPORTS = {
 };
 
 /**
- * 🔴 READING ONE STORED OBJECT IS ITS OWN ROW, SINCE 2026-10-06
- * (plan-routing-migration §3.2). A link OUT of a store used to ride the `file`
- * row, whose `internet-one` cell is `ingest`, and ingest is the WRITE path: a
- * playback was described as an upload. Reading one recording back is one https
- * GET of the object (`/patchbay/`'s play opener fetches it from
- * `archive.positron.studio`); many readers of one object is the `r2-hls` cell,
- * which the `file` row already had.
+ * Reading one stored object back is one https GET, its own row; the `file` row is the write path.
+ * why: lessons/kit-bay.md#reads
  */
 export const READS = {
   'machine':       { transport: 'indexeddb', says: 'IndexedDB, no number measured' },
@@ -142,29 +82,22 @@ export const READS = {
 };
 
 /** Every transport the two tables name, which is what `via` may ask for. */
-/* `whip` is a name a port may DECLARE (a camera publishing into Cloudflare) and the
-   table never chooses, so it is added here; without it `addPort` threw on any
-   graph announcing it, and every page in that room broke on `registry.fill`.
-   Found building /concepts/room/030/, 2026-10-09. */
+// `whip` is declared by ports but never chosen by the table; without it `addPort` throws.
+// why: lessons/kit-bay.md#transport-names
 export const TRANSPORT_NAMES = [...new Set([...Object.values(TRANSPORTS), READS]
   .flatMap((row) => Object.values(row)).flatMap((c) => [c.transport, c.or]).filter(Boolean).concat('whip', 'jack'))];
-/* `jack` is the other name the table never chooses, since 2026-10-11: two audio
-   ports on ONE board that both name their JACK ports ride the board's JACK
-   graph, which is decided by the ports in `sessionFor` and not by a cell. */
+// `jack` is chosen by the ports in `sessionFor`, never by a table cell.
+// why: lessons/kit-bay.md#machine-only
 /** The transports that never leave one machine, so `via` cannot ask for them across a wire. */
 export const MACHINE_ONLY = ['webaudio', 'page', 'indexeddb', 'jack'];
 /** What a light link between two sites may name as its wire: the relay room, or a board's direct WebRTC channel. */
 export const LIGHT_VIA = ['relay', 'datachannel'];
 
 /**
- * Which transport a heavy link rides, from plan §5's table.
- * ⚠️ `internet-one` WITH MORE THAN ONE RECEIVER IS `internet-many`. That is
- * the whole reason the column exists: a relay leg that suits one listener is
- * the wrong shape for twenty, and the count is what decides it.
- * 🔴 A LIGHT MEDIUM ANSWERS NULL, AND AN UNKNOWN ONE THROWS. A typo answering
- * null would read as *that medium is light*, which is a wrong fact rather than
- * a missing one.
+ * Which transport a heavy link rides. `internet-one` with more than one receiver is
+ * `internet-many`. A light medium answers null and an unknown one throws, so a typo is not light.
  * @returns {null|{transport:string, where:string, says:string, or?:string}}
+ * why: lessons/kit-bay.md#choosetransport
  */
 export function chooseTransport(medium, where, receivers = 1) {
   if (!MEDIA.includes(medium)) throw new Error(`bay: medium is one of ${MEDIA.join(', ')}, not ${medium}`);
@@ -175,21 +108,15 @@ export function chooseTransport(medium, where, receivers = 1) {
 }
 
 /**
- * The classes of MIDI message a port may consent to.
- * ⚠️ `sysex` IS IN THIS LIST SO THAT IT CAN BE REFUSED BY NAME. A class nobody
- * can name is a class nobody can exclude.
- * 🔴 IT IS `KINDS` FROM `midi-kinds.mjs` SINCE 2026-10-03, the one list the
- * board's ALSA patches and its input gate use too. That added `transport`:
- * start, stop, continue, song position and song select, which this file used
- * to call `clock`, so a port can take tempo without being started.
+ * The MIDI classes a port may consent to, `KINDS` from midi-kinds.mjs. `sysex` is listed
+ * so it can be refused by name.
+ * why: lessons/kit-bay.md#classes
  */
 export const CLASSES = KINDS;
 
 /**
- * A decoded message from `midi-decode.mjs`, as one of the classes above.
- * ⚠️ NOTE OFF IS A NOTE. A port that accepts notes and not note offs would hold
- * every key it was ever sent, which is this rig's measured MK-425C behaviour
- * wearing a different hat.
+ * A decoded message as one of the classes. A note off is a note, or keys would hang.
+ * why: lessons/kit-bay.md#classof
  */
 export function classOf(m) {
   return kindOfDecoded(m);
@@ -210,15 +137,10 @@ export function isNoteOff(ev) {
   return ev?.cls === 'note' && (ev.off === true || ev.d2 === 0);
 }
 
-// ── transforms ────────────────────────────────────────────────────────────
-//
-// 🔴 A TRANSFORM IS A PLAIN OBJECT, NOT A FUNCTION, and that is what makes the
-// text form in §4 of the plan possible: an object round trips to a line of text
-// and back, and a closure does not. It also means a patch can be saved, sent
-// over a wire and diffed.
-//
-// ⚠️ EVERY ONE OF THEM MAY DROP AN EVENT BY RETURNING NULL, and a filter is
-// simply a transform that drops rather than a separate concept.
+// -- transforms --
+// A transform is a plain object, not a function, so it round trips to text, can be saved and
+// diffed. Any may drop an event by returning null; a filter is one that drops.
+// why: lessons/kit-bay.md#transforms
 
 const OPS = {
   /** Put the event on one channel. The MK-425C's global channel is 2 and the
@@ -241,8 +163,8 @@ const OPS = {
     run: (ev, a) => {
       if (ev.cls !== 'note') return ev;
       const n = ev.d1 + a.by;
-      // ⚠️ OUT OF RANGE IS A DROP, NOT A CLAMP. A clamp turns the top of a
-      // keyboard into a pile of the same note, which sounds like a stuck key.
+      // Out of range is a drop, not a clamp: a clamp piles keys onto one note.
+      // why: lessons/kit-bay.md#transpose
       return (n < 0 || n > 127) ? null : { ...ev, d1: n };
     },
   },
@@ -275,37 +197,19 @@ const OPS = {
     run: (ev, a) => (ev.cls === a.cls ? null : ev),
   },
   /**
-   * Move one controller number to another, optionally onto another channel.
-   * 🔴 THIS IS THE SMALLEST TRANSFORM THAT PROVES THE `(channel, controller)`
-   * KEY, which `plans/plan-device-layouts.md` §5.3 argues and the Circuit proves:
-   * CC 80 is macro knob 1 on channel 1 and drum 4 pan on channel 10, in one
-   * instrument. A remap that only knew about controller numbers would send a
-   * mod wheel to both.
+   * Move one controller number to another, optionally onto another channel. Keyed on
+   * (channel, controller): CC 80 is a macro on channel 1 and drum pan on channel 10.
+   * why: lessons/kit-bay.md#cc
    */
   /**
-   * 🔴 A KEYBOARD SPLIT, WHICH COULD NOT BE SAID AT ALL UNTIL 2026-09-21. The
-   * owner asked for one in words: *"Split the keyboard into half. Lower part
-   * plays synth 1 in the circuit and upper part plays synth 2"*, and the model
-   * produced `{"op":"only","to":1}` twice, because `only` filters by CLASS and
-   * was the nearest thing in the whole vocabulary to a filter. **It was not
-   * wrong about the intent. There was no word for it.**
-   * ⚠️ A SPLIT IS TWO LINKS, NOT ONE OP. `link()` already allows two links
-   * between the same pair, so the lower half is one link with a range and a
-   * channel and the upper half is another. That is how a real one is built.
-   * 🔴 AND A NOTE OFF OUTSIDE THE RANGE IS DROPPED TOO, WHICH IS THE WHOLE
-   * SAFETY OF IT. The filter is on the NOTE NUMBER, which is the same for the
-   * on and the off, so a note that was never let through can never be left
-   * hanging. A filter keyed on anything that differs between them stops notes.
+   * A keyboard split by note number. A split is two links. A note off outside the range is
+   * dropped too, which is safe because on and off share the note number.
+   * why: lessons/kit-bay.md#range
    */
   /**
-   * 🔴 ONE BOUND IS ENOUGH, AND THAT IS NOT A CONCESSION TO A MODEL. *Everything
-   * above middle C* is how a person says a split out loud, and it was
-   * unsayable here: `range lo=60 hi=127` names a top that is not a decision,
-   * and the half that matters is buried beside a constant. An open end is the
-   * honest form, and the closed one is still available.
-   * ⚠️ **SO `need` IS EMPTY AND `oneOf` REPLACES IT.** A `range` with neither
-   * bound passes every note and is a transform that does nothing, which reads
-   * as a filter that is working. It is refused.
+   * One bound is enough (everything above middle C). `oneOf` replaces `need`; a range with
+   * neither bound does nothing and is refused.
+   * why: lessons/kit-bay.md#range-open
    */
   range: {
     args: ['lo', 'hi'], need: [], oneOf: ['lo', 'hi'],
@@ -320,13 +224,9 @@ const OPS = {
     },
   },
   /**
-   * 🔴 A VELOCITY LAYER: soft hits one instrument and hard hits another, which
-   * is how a real split-by-touch is built.
-   * 🔴 A NOTE OFF (`isNoteOff`, a velocity 0 or `off: true`) passes ALWAYS,
-   * whatever the window
-   * is: dropping it would mean a note let through by a hard hit is never told
-   * to stop, and a stuck note on a synth in another building is the worst thing
-   * in this file. The test asserts the off passes a window it could not enter.
+   * A velocity layer. A note off passes always, whatever the window, or a note let through
+   * is never stopped; the test asserts it.
+   * why: lessons/kit-bay.md#vrange
    */
   vrange: {
     args: ['lo', 'hi'], need: [], oneOf: ['lo', 'hi'],
@@ -341,13 +241,9 @@ const OPS = {
     },
   },
   /**
-   * 🔴 ONE VELOCITY FOR EVERY NOTE, WHICH THIS DESK'S OWN DRUMS ALREADY DO.
-   * ✅ MEASURED and written in `research/measured-devices-2026-09-20.md`: the Circuit's
-   * drum pads send notes 60, 62 and 64 at **velocity 96, fixed**. So this is
-   * not an effect, it is how one instrument here behaves, and a link that wants
-   * to feed it from a touch sensitive keyboard needs to say so.
-   * ⚠️ AND IT LEAVES A NOTE OFF ALONE, for the reason above: rewriting a 0 to
-   * 96 turns every release into a second note on.
+   * One velocity for every note, as the Circuit's drum pads send (velocity 96, measured).
+   * A note off is left alone, or every release becomes a note on.
+   * why: lessons/kit-bay.md#fixed
    */
   fixed: {
     args: ['to'], need: ['to'],
@@ -374,32 +270,10 @@ const OPS = {
 export const OP_NAMES = Object.keys(OPS);
 
 /**
- * 🔴 THE WORDS A PERSON READS, AND UNTIL 2026-09-22 THERE WERE NONE, SO THE
- * REFUSALS WERE WRITTEN IN FIELD NAMES. REPORTED against a real reply:
- * *"MK-425C USB MIDI Keyboard to Circuit { only } / only takes "cls" and was
- * given "to" - its not for humans, i do not know what to do"*. `cls` and `to`
- * are keys in this file's own schema, and a sentence made of two of them tells
- * a reader which keys the validator compared and nothing about what to do.
- * ⚠️ **AND THAT LINE HAD ALREADY BEEN REPAIRED ONCE THE SAME DAY**, for a
- * different fault: it read `cc takes "from" and was given "to"` and accused a
- * correct argument of being wrong. That repair made it TRUE. True and
- * unreadable are different problems and only the first one was fixed.
- * 🔴 **`help` COULD NOT BE REUSED AND THAT IS THE REASON THIS TABLE EXISTS.**
- * `help` is what a language model reads in `workers/wish/src/wish.mjs`, and
- * `cc`'s reads *move the controller numbered from onto the controller numbered
- * to*, which carries two field names on purpose because the model is choosing
- * keys. A visitor is not.
- * 🔴 **IT IS ONE TABLE RATHER THAN THREE FIELDS PER OP SO THAT IT CAN BE
- * GRADED WHOLE.** `bay-test.mjs` asserts that every operator has a `does` and
- * that every argument of every operator has both a `part` and an `ask`, which
- * is the same guard `help` already has and for the same reason: a new
- * transform with no words beside it is this defect arriving again with nobody
- * noticing.
- *   - `does` finishes the sentence `<op> ...`, so it is a verb phrase.
- *   - `part` names an argument as a thing rather than as a key. It is the
- *     half that replaces `"cls"` and `"to"`.
- *   - `ask` is the SOLUTION line: one imperative naming real values. It is
- *     never the problem with *do not* in front of it.
+ * The words a person reads about each op, separate from `help` (which a model reads).
+ * `does` finishes `<op> ...`, `part` names an argument as a thing, `ask` is one imperative
+ * naming real values. bay-test.mjs asserts every op and argument has them.
+ * why: lessons/kit-bay.md#says
  */
 const SAYS = {
   channel: {
@@ -423,8 +297,8 @@ const SAYS = {
     ask: { cls: '' },                       // filled from CLASSES below
   },
   drop: {
-    /* ⚠️ NOT `drops one kind of message`, or the sentence opens `drop drops`.
-       An operator's name is the first word of its own problem line. */
+    // Not `drops ...`: the op's name is the first word of its own problem line.
+    // why: lessons/kit-bay.md#says-drop
     does: 'throws away one kind of message and keeps the rest',
     part: { cls: 'a kind of message' },
     ask: { cls: '' },
@@ -461,10 +335,8 @@ const SAYS = {
     },
   },
 };
-/* ⚠️ DERIVED, NEVER TYPED. The list of kinds a link can carry is `CLASSES` and
-   it is the one place it is declared, so a class added there arrives in the
-   sentence that offers it without anybody remembering to come here. The
-   brief's own example of a readable solution is this string. */
+// Derived from `CLASSES`, never typed, so a new class arrives here by itself.
+// why: lessons/kit-bay.md#says-only
 SAYS.only.ask.cls = `Name one of ${CLASSES.join(', ')}.`;
 SAYS.drop.ask.cls = SAYS.only.ask.cls;
 
@@ -481,21 +353,9 @@ const PICK_AN_OP = () => `Name one of ${OP_NAMES.join(', ')}.`;
 export const OP_SAYS = SAYS;
 
 /**
- * 🔴 THE VOCABULARY, IN THE ONE PLACE THE VOCABULARY IS DECLARED, BECAUSE IT
- * HAS ALREADY BEEN WRITTEN DOWN IN FOUR PLACES AND THE ONE A MODEL READS WENT
- * STALE. 2026-09-21: `range`, `vrange` and `fixed` were added here and to
- * `schemaFor()`'s `enum` and to the page's prose, and NOT to the operator table
- * in `systemFor()`, which is the part of the prompt that defines the format. So
- * the model was choosing from six transforms while the code accepted nine, and
- * it reported `{"op":"only","to":N}` for the third time, which is what a model
- * says when it means *filter* and the only filter it has been shown is `only`.
- * ⚠️ **THE SIGNATURE IS DERIVED FROM `args`, NEVER TYPED**, so it cannot
- * disagree with what `checkTransforms` enforces. `cls` is the one argument that
- * is not a number and `scale` is the one that is not an integer, which is the
- * whole of the mapping.
- * ⚠️ AND `help` IS REQUIRED OF EVERY OP, asserted in `bay-test.mjs`, because a
- * new transform with no sentence beside it is exactly the defect above arriving
- * again with nobody noticing.
+ * The vocabulary, declared once. The signature is derived from `args`, never typed, so it
+ * cannot disagree with `checkTransforms`. Every op needs `help`, asserted in bay-test.mjs.
+ * why: lessons/kit-bay.md#vocabulary
  */
 const PLACE = { cls: 'C', scale: 'F' };
 
@@ -508,46 +368,19 @@ export const OP_HELP = OP_NAMES.map((op) => ({
   eg: { ...OPS[op].eg },
   sig: `${op} ${OPS[op].args.map((a) => `${a}=${PLACE[a] || 'N'}`).join(' ')}`,
   /**
-   * 🔴 THE LINE A MODEL COPIES. MEASURED TWICE on 2026-09-21 against
-   * `llama-3.3-70b`: shown `range lo=N hi=N` in a table and one worked example
-   * carrying `"to"`, it wrote `{"op":"range","to":7}` on every run. It had the
-   * argument names in front of it and copied the JSON instead, which is what
-   * this file already records happening to `transpose`. **A sentence is read
-   * and an example is copied**, so every transform now has one rather than the
-   * two that happened to be spelled out.
-   * ⚠️ AND THE EXAMPLE IS GRADED BY OUR OWN VALIDATOR, asserted in
-   * `bay-test.mjs`: an example `checkTransforms` would refuse is a defect being
-   * taught to a model on every call, and it would read as documentation.
+   * The line a model copies: a sentence is read and an example is copied. Every example
+   * must pass `checkTransforms`, asserted in bay-test.mjs.
+   * why: lessons/kit-bay.md#vocab-json
    */
   json: JSON.stringify({ op, ...OPS[op].eg }),
 }));
 
 /**
- * 🔴 A TRANSFORM WITH ITS ARGUMENT UNDER THE WRONG KEY IS THE DEFECT THIS
- * FUNCTION EXISTS FOR, AND IT WAS FOUND BY MEASUREMENT RATHER THAN BY READING.
- * 2026-09-21, asking Workers AI to turn a spoken sentence into a patch, the
- * model returned `{ op: 'transpose', to: 1 }`. **`transpose` takes `by`.** The
- * object was perfectly valid against the JSON Schema it was generated under,
- * because that schema listed every argument any op could take and required only
- * `op`, so `to` was allowed on a transform that has no `to`.
- * ⚠️ **AND `apply()` WOULD HAVE SAID NOTHING.** `ev.d1 + undefined` is `NaN`,
- * which is not a throw and not a drop: it is a note number that no longer exists
- * arriving at an instrument, from a page that reported the link as connected.
- * 🔴 **SO THE CHECK LIVES HERE RATHER THAN IN THE SCHEMA.** A schema constrains
- * the SHAPE of what a model may say and it cannot constrain the MEANING. That is
- * the same rule this project already has about a shape being declared rather
- * than inferred, arriving from the direction of a language model.
- *
- * 🔴 IT ANSWERS IN TWO SENTENCES SINCE 2026-09-22, ASKED FOR AS *"can we have
- * cooncrete problem -> soluton texts?"*. `why` is what is wrong, in words;
- * `fix` is the thing a person can do, naming real values. Neither one is ever
- * the other with *do not* in front of it, which is the failure mode of every
- * problem-and-solution pair ever written.
- * ⚠️ AND A REFUSAL'S SOLUTION IS SOMETIMES THAT THERE IS NONE, WHICH IS THE
- * TEXT RATHER THAN A MISSING ONE. A blank second line reads as a sentence that
- * failed to load, so *this link cannot be made* is written out.
- * @returns {''|{why: string, fix: string}} '' when every transform is well
- *          formed, or the problem and what to do about it.
+ * An argument under the wrong key (`transpose` with `to`) is schema valid and computes NaN,
+ * so meaning is checked here. Answers `why` (the problem) and `fix` (what to do, or that
+ * nothing can be done, in words).
+ * @returns {''|{why: string, fix: string}} '' when every transform is well formed, or the problem and what to do about it.
+ * why: lessons/kit-bay.md#checktransforms
  */
 export function checkTransforms(transforms) {
   for (const t of transforms || []) {
@@ -560,70 +393,31 @@ export function checkTransforms(transforms) {
     for (const k of op.need) {
       if (t[k] === undefined || t[k] === null) {
         /**
-         * 🔴 A FIELD NAME IS QUOTED, OR THE SENTENCE READS AS BROKEN GRAMMAR.
-         * This said `${t.op} needs ${k} and was given ${keys}`, which on the one
-         * failure it is written for came out as **`transpose needs by and was
-         * given to`** and was reported 2026-09-21 with the words *"what is
-         * it?"*. Both `by` and `to` are FIELD NAMES, and printed bare they are
-         * read as English, so a reader looks for the noun that is missing.
-         * ⚠️ THE CHECK ITSELF IS UNCHANGED AND MUST STAY UNCHANGED. That object
-         * is valid against the schema it was generated under, and without this
-         * the code computes `note + undefined`, which is `NaN`: a note number
-         * that does not exist arriving at an instrument down a link the page
-         * called connected.
+         * A field name is quoted, or `needs by and was given to` reads as broken English.
+         * The check itself must stay: without it a note becomes `note + undefined`.
+         * why: lessons/kit-bay.md#ct-quote
          */
         /**
-         * 🔴 TWO DIFFERENT FAULTS WORE ONE SENTENCE UNTIL 2026-09-22, AND ON
-         * THE SECOND OF THEM IT NAMED SOMETHING THAT WAS NOT WRONG.
-         * REPORTED against `{ op: 'cc', to: 80 }` with the words *"do not get
-         * this error"*, which came out as **`cc takes "from" and was given
-         * "to"`**. That reads as *cc takes from, NOT to*, and it is false:
-         * `cc` needs BOTH, it moves the controller numbered `from` onto the
-         * controller numbered `to`, and **`to: 80` was exactly right**, 80
-         * being the Circuit's first macro knob. The only fault was that
-         * `from` was absent.
-         * ✅ **SO THE SENTENCE SPLITS ON WHETHER THE GIVEN KEYS BELONG TO THIS
-         * OP AT ALL.** A key the op does not have is a SWAP, and naming both
-         * sides is the whole help: `transpose takes "by" and was given "to"`
-         * is right and stays exactly as it was. Keys that all belong, with a
-         * required one missing, is an OMISSION, and there the only useful
-         * sentence says what is needed and which part did not arrive.
-         * ⚠️ IT IS THE SAME LESSON THIS PROJECT KEEPS PAYING FOR, ARRIVING IN
-         * PROSE RATHER THAN IN AN ASSERT: a message that measures something
-         * NEXT TO the quantity in question sends a reader to the wrong place.
-         * Here it sent one to delete an argument that was correct.
+         * A key the op does not have is a swap and names both sides; all keys belonging with one
+         * missing is an omission and names what is needed. One sentence for both blamed a correct key.
+         * why: lessons/kit-bay.md#ct-swap
          */
         /**
-         * 🔴 AND THE THREE CASES SURVIVE THE REWRITE, BECAUSE THEY ARE THREE
-         * DIFFERENT THINGS A READER HAS TO DO. What changed on 2026-09-22 is
-         * the words, not the split: a swap, a partial omission and an empty
-         * object stay tellable apart, which `bay-test.mjs` grades directly.
+         * A swap, a partial omission and an empty object stay three cases; bay-test.mjs grades it.
+         * why: lessons/kit-bay.md#ct-three
          */
         const given = Object.keys(t).filter((x) => x !== 'op');
         const strange = given.filter((x) => !op.args.includes(x));
-        /* ⚠️ THREE CASES, NOT TWO, AND THE THIRD WAS FOUND BY `bay-test.mjs`
-           GOING RED IN ONE LINE. An empty object is neither a swap nor a
-           partial omission: nothing arrived, so there is no other argument to
-           point at and no half of the requirement to name. */
+        // An empty object is a third case: nothing arrived, so there is nothing to point at.
+        // why: lessons/kit-bay.md#ct-empty
         if (!given.length) {
           return { why: `${head(t.op)}, and it was given nothing at all.`, fix: ask(t.op, k) };
         }
         if (strange.length) {
           /**
-           * 🔴 THE SOLUTION IS THE REPAIRED OBJECT, WHICH IS THE ONE FORM THAT
-           * NEEDS NO FIELD NAME IN PROSE. The JSON is already on the page
-           * directly above this sentence, asked for as *"can it not be full
-           * json(l) message?"*, so a corrected object beside it is read by
-           * comparison rather than by parsing an English claim about two keys.
-           * ⚠️ THE VALUE THAT ARRIVED IS CARRIED OVER, AND THE OBJECT IS ONLY
-           * OFFERED WHEN IT CAN BE. The measured case is
-           * `{ op: 'transpose', to: 1 }`, where the **1 was never wrong** and
-           * only its name was, so `{"op":"transpose","by":1}` is a repair a
-           * reader can check against the JSON above it. `{ op: 'only', to: 1 }`
-           * is not: `1` is not a kind of message, so any object written here
-           * would carry a value this file INVENTED and print it as if somebody
-           * had asked for it. That one gets the list of real kinds instead,
-           * which is the offer the report itself suggested.
+           * The fix is the repaired object, carrying the value that arrived, and only offered when
+           * that value fits; otherwise the list of real kinds, never an invented value.
+           * why: lessons/kit-bay.md#ct-repair
            */
           const gaps = op.need.filter((n) => t[n] === undefined || t[n] === null);
           const spare = strange.map((x) => t[x]).find((v) => v !== undefined);
@@ -646,19 +440,12 @@ export function checkTransforms(transforms) {
       }
     }
     /**
-     * 🔴 AT LEAST ONE OF A PAIR, WHICH `need` CANNOT SAY. `range` takes a low
-     * bound, a high bound or both, because *everything above middle C* is a
-     * real instruction and naming 127 as its top is noise. A `range` with
-     * NEITHER passes every note, which is a filter that silently does nothing,
-     * so it is refused by name here rather than allowed as a no-op.
+     * At least one of a pair, which `need` cannot say. A `range` with neither bound is refused.
+     * why: lessons/kit-bay.md#ct-oneof
      */
     if (op.oneOf && op.oneOf.every((k) => t[k] === undefined || t[k] === null)) {
-      /* ⚠️ AND THE TWO WAYS IN ARE TOLD APART SINCE 2026-09-22. `{ op: 'range' }`
-         was given nothing; `{ op: 'range', to: 7 }` was given something that is
-         not a bound, and that second one is MEASURED rather than imagined: it
-         is what `llama-3.3-70b` wrote eleven runs out of eleven. One sentence
-         for both of them said `was given nothing` about an object that plainly
-         had a number in it. */
+      // Given nothing and given a non-bound (`range` with `to: 7`) get different sentences.
+      // why: lessons/kit-bay.md#ct-oneof-words
       const stray = Object.keys(t).some((x) => x !== 'op' && !op.args.includes(x));
       const [lo, hi] = op.oneOf;
       return {
@@ -669,12 +456,9 @@ export function checkTransforms(transforms) {
       };
     }
     /**
-     * 🔴 EVERY ARGUMENT THAT IS PRESENT IS TYPE CHECKED, NOT ONLY THE REQUIRED
-     * ONES. This loop used to run over `need`, so the moment an argument became
-     * optional it also became untyped: `{ op: 'range', lo: 36, hi: '47' }` would
-     * have passed, and `ev.d1 > '47'` compares a number against a string, which
-     * is not a throw and not a drop. That is the same `NaN` shape this whole
-     * function exists for, one optional argument along.
+     * Every present argument is type checked, not only required ones, or a string bound
+     * compares as a string.
+     * why: lessons/kit-bay.md#ct-types
      */
     for (const k of op.args) {
       if (t[k] === undefined || t[k] === null || k === 'cls') continue;
@@ -685,37 +469,21 @@ export function checkTransforms(transforms) {
       }
     }
     /**
-     * 🔴 A RANGE THAT CANNOT PASS ANYTHING IS A FILTER THAT READS AS WORKING.
-     * `lo` above `hi` drops every note on the link, the page draws the arrow,
-     * and the instrument is silent for a reason nothing on screen explains.
+     * `lo` above `hi` drops every note while the page draws the link; refused.
+     * why: lessons/kit-bay.md#ct-lohi
      */
     if (op.oneOf && t.lo !== undefined && t.hi !== undefined && t.lo > t.hi) {
-      /* ⚠️ THE OFFER IS MADE TO A PERSON AND IS NEVER TAKEN BY THE CODE, which
-         is the same line the two-bounds refusal below draws and for the same
-         reason: the far end is an instrument in another building. Showing the
-         swapped object is what lets somebody decide in one glance; swapping it
-         here would be a guess nobody was told about. */
+      // The swapped object is offered to a person, never applied by the code.
+      // why: lessons/kit-bay.md#ct-lohi-offer
       return { why: `${head(t.op)}, and ${part(t.op, 'lo')} ${t.lo} is above `
                     + `${part(t.op, 'hi')} ${t.hi}, so nothing can ever pass.`,
                fix: `Turn them round: ${JSON.stringify({ op: t.op, lo: t.hi, hi: t.lo })}.` };
     }
   }
   /**
-   * 🔴 TWO RANGES OPEN AT THE SAME END, WHICH IS ALWAYS ONE RANGE WRITTEN
-   * WRONG. MEASURED 2026-09-21, eleven runs of `llama-3.3-70b`: asked to play a
-   * row of buttons, it writes `{"op":"range","to":0}` then
-   * `{"op":"range","to":7}`, spelling *range 0 to 7* as two transforms because
-   * a link is `{"from": …, "to": …}` and that is the key in front of it.
-   * 🔴 **AND THE COMPOSED RESULT IS THE WORST KIND OF WRONG**: two high bounds
-   * in a row means the LOWER one wins, so the link passes notes up to 0 and the
-   * second range is dead. It is well formed, it is allowed, and one button of
-   * eight works. A refusal that names the correction is worth more than a patch
-   * that looks fine.
-   * ⚠️ **NOT MERGED, AND THAT IS DELIBERATE.** One run of the eleven produced
-   * the pair DESCENDING, 23 then 7, so reading the first as a low bound and the
-   * second as a high one is a guess that is sometimes backwards. A repair that
-   * is right most of the time is worse here than a refusal, because the thing
-   * on the far end is an instrument in another building.
+   * Two ranges open at the same end are one range written wrong: the lower bound wins and
+   * the second is dead. Refused, not merged, since the pair sometimes arrives descending.
+   * why: lessons/kit-bay.md#ct-two-ranges
    */
   for (const end of ['lo', 'hi']) {
     const same = (transforms || []).filter((t) => OPS[t?.op]?.oneOf
@@ -757,33 +525,16 @@ export function delivers(emits, transforms) {
   return set;
 }
 
-// ── the text form ─────────────────────────────────────────────────────────
-//
-// 🔴 IT IS A PROJECTION OF THE GRAPH AND NEVER A SECOND SOURCE OF TRUTH. Every
-// line round trips to a link and back, and `bay-test.mjs` asserts that it does.
-// The moment the text can say something the graph cannot, there are two models
-// and they will disagree, which is this project's most expensive defect class.
-//
-// ⚠️ `via` IS IN IT, SINCE 2026-10-06, as a last word: `a -> b via moq`. It is
-// a person's choice and not the table's, so it is the one part of a session the
-// line must carry, or a scene recalled from text would come back on a
-// different transport from the one it was saved with.
-// ⚠️ A HEAVY LINK PRINTS AS THE SAME `from -> to` LINE AND ITS SESSION IS NOT
-// IN IT. The session is derived from the two ends and the table, so writing it
-// down would be the second source of truth this paragraph forbids. Reading the
-// line back into a bay with the same nodes derives the same session, which
-// `bay-test.mjs` asserts. A consent is not in it either, on purpose.
+// -- the text form --
+// A projection of the graph, never a second source of truth; bay-test.mjs round trips it.
+// `via` is a person's choice so it is printed; a heavy link's session and a consent are not.
+// why: lessons/kit-bay.md#text-form
 
 /** One link as one line: `from -> to { op arg, op arg }` */
 /**
- * 🔴 AN ABSENT OPTIONAL ARGUMENT PRINTS AS `*`, AND WITHOUT IT THE ROUND TRIP
- * BREAKS SILENTLY. This used to drop every `undefined`, which was exact while
- * every argument was required. `range` gained an open end on 2026-09-21, and
- * `{ range, hi: 7 }` would have printed `range 7` and read back as
- * `{ range, lo: 7 }`: the same words meaning the opposite filter, with nothing
- * to catch it because both are well formed. `bay-test.mjs` round trips it.
- * ⚠️ A TRAILING absent argument is still dropped, so `cc 1 74` is unchanged and
- * so is every line anybody has written by hand.
+ * An absent optional argument prints as `*`, or `{ range, hi: 7 }` reads back as `lo: 7`.
+ * A trailing absent argument is still dropped.
+ * why: lessons/kit-bay.md#printlink
  */
 export function printLink(link) {
   const t = (link.transforms || []).map((x) => {
@@ -806,8 +557,8 @@ export function parseLink(line) {
   const m = /^\s*([^\s>]+)\s*->\s*([^\s{]+)\s*(?:\{(.*)\})?\s*(?:via\s+([A-Za-z0-9-]+))?\s*$/.exec(line);
   if (!m) throw new Error(`bay: cannot read "${line.trim()}". A link is "from -> to { op arg } via transport", the last two optional`);
   const [, from, to, body, via] = m;
-  /* `*` IS A WHOLE SITE SEGMENT OR NOTHING (plans/plan-site-names.md §4h).
-     `we*:chat:value-in` or `*:*:in` would read as a pattern nobody defined. */
+  // `*` is a whole site segment or nothing.
+  // why: lessons/kit-bay.md#parse-star
   for (const end of [from, to]) {
     if (end.includes('*') && !(end.startsWith('*:') && !end.slice(2).includes('*') && end.split(':').length === 3)) {
       throw new Error(`bay: cannot read "${end}". A * stands for a whole site, as in *:chat:value-in`);
@@ -864,34 +615,10 @@ export function parsePatch(text) {
    `STALE_MS` is the registry's, imported at the top of this file. */
 
 /**
- * 🔴 A LINK CARRYING `ahead` OR `follow` IS TIMED, SINCE 2026-10-12
- * (plans/plan-routing-time.md §4.3, link-options.mjs has the two options).
- * The sender stamps `at` beside the event (`bay-node.mjs` `emit`, on the
- * `bay.event` message, never inside the event), and the RECEIVING bay asks a
- * timebase when to hand it to the port: `ahead` fires when the shared clock
- * reads `at`, `follow` fires when the moment `at` reaches this glass on the
- * heavy link it names. Everything time related is injected, so the bay stays
- * pure and `bay-test.mjs` grades it with a fake clock and a fake timer.
- *
- *   createBay({ timing: { timebase, local, later, horizonMs, holdMs } })
- *     timebase   a `createTimebase()`, holding this place's peer offset and
- *                any heavy link `follow` names. Absent, every timed event holds.
- *     local      () => this document's ms, the timebase's `local` clock
- *     later      (fn, ms) => void, a timer. `setTimeout` by default.
- *     horizonMs  hand an event over this early, with its exact local time in
- *                `meta.timing.local`, so a page that plays sound can give the
- *                sound card the time in advance (clock/010's lesson). 0 fires
- *                on the moment, which is right for a light.
- *     holdMs     how long a held event is asked about again before it is
- *                counted missed and dropped. 3000.
- *
- * 🔴 CANNOT TELL HOLDS, IT NEVER FIRES, which is the timebase's rule carried
- * through: no peer clock, an unstamped event on a timed link, a follow link
- * with no observations yet. A held event is asked again every 25 ms and
- * dropped as `missed` after `holdMs`, counted on the link, never delivered
- * late as if on time.
- * ⚠️ A LINK WITH NEITHER OPTION NEVER READS ANY OF THIS: `send` takes the old
- * path, synchronous, unchanged, and `bay-test.mjs` asserts it stays so.
+ * A link with `ahead` or `follow` is timed: the sender stamps `at`, the receiving bay asks
+ * a timebase (injected via `createBay({ timing })`) when to deliver. Cannot tell holds and is
+ * retried every 25 ms, dropped as `missed` after `holdMs`. Untimed links stay synchronous.
+ * why: lessons/kit-bay.md#timing
  */
 const HOLD_RETRY_MS = 25;
 const RECHECK_MS = 50;
@@ -907,18 +634,15 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
 
   /**
    * A thing that owns ports: an instrument, an engine, a store, a page.
+   * Optional: a port with no node takes its place from its id, network unknown.
    * @param {object} n
-   * @param {string} n.id      `site:node`, the first two segments of its ports'
-   *                           ids, which is how a port finds its node.
+   * @param {string} n.id      `site:node`, the first two segments of its ports' ids, which is how a port finds its node.
    * @param {string} n.kind    one of NODE_KINDS
    * @param {string} [n.label] what a person reads
    * @param {string} [n.place] the MACHINE it runs on. Defaults to the site.
-   * @param {string} [n.net]   the NETWORK that machine is on. Unknown when left
-   *                           out, and unknown is never read as the same network.
-   * @param {boolean} [n.consent] links OUT of this node need a person to ask for
-   *                           them. Always true for `external`, see `validate`.
-   * 🔴 OPTIONAL, AND A PORT WITH NO NODE BEHAVES EXACTLY AS IT DID BEFORE
-   * 2026-10-04. Its place is its id's first segment and its network is unknown.
+   * @param {string} [n.net]   the NETWORK that machine is on. Unknown when left out, and unknown is never read as the same network.
+   * @param {boolean} [n.consent] links OUT of this node need a person to ask for them. Always true for `external`, see `validate`.
+   * why: lessons/kit-bay.md#addnode
    */
   function addNode(n) {
     const parts = String(n?.id || '').split(':');
@@ -939,19 +663,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   const netOf = (p) => nodeFor(p)?.net;
 
   /**
-   * How far apart two ports are, as one of WHERE.
-   * ⚠️ AN UNKNOWN NETWORK IS THE INTERNET, because that is the case every
-   * transport in the far columns survives. Guessing *same network* would pick a
-   * data channel that two machines in different buildings cannot open.
-   * 🔴 `internet-many` COUNTS THE RECEIVERS THAT ARE ALSO OVER THE INTERNET,
-   * NOT EVERY LINK OUT OF THE PORT. A page on the same machine listening as well
-   * does not make a relay leg into a broadcast, and plan §5's column is about
-   * how many receive across the internet.
-   * ⚠️ AND A LINK INTO A STORE IS NOT A RECEIVER, SINCE 2026-10-06. Its session
-   * describes the upload, and the sound reaches the recorder on the leg a
-   * listening link would use anyway: `/patchbay/` records and listens to one
-   * board input through ONE held source. Counting it made the listen link that
-   * follows a recording `internet-many`, a broadcast nobody was making.
+   * How far apart two ports are, as one of WHERE. An unknown network is the internet.
+   * `internet-many` counts only internet receivers, and a link into a store is not a receiver.
+   * why: lessons/kit-bay.md#whereof
    */
   function whereOf(a, b) {
     if (placeOf(a) === placeOf(b)) return { where: 'machine', receivers: 1 };
@@ -964,65 +678,42 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   }
 
   /**
-   * 🔴 THE ADDRESS IS DERIVED FROM THE LINK, NEVER CHOSEN, the way the Pi
-   * already derives `<room>-video` and `<room>-<input>` (plan §8): one port,
-   * one room. It is `${place of the source}-${source node name}-${port name}`,
-   * so `err:vikerraadio:audio` on a node placed at `err` is
-   * `err-vikerraadio-audio`, and the site goes in after the place whenever
-   * the two differ (see below). The Pi never relies on this: every stream port
-   * it announces DECLARES its address (`studio-1`, `studio-1-video`,
-   * `studio-1-circuit`), which is why its site could become `pi-1` on
-   * 2026-10-10 without one stream moving.
-   * ⚠️ IT IS AN ADDRESS AND NOT A RENDEZVOUS. Two links out of one port share
-   * it, which is what lets the second receiver join the first one's session
-   * rather than starting another. `stage-<rand6>` is the other kind and does
-   * not belong here.
+   * The address is derived, never chosen: `<place>-<node>-<port>`, with the site after the
+   * place when they differ. Two links out of one port share it. The Pi declares its own.
+   * why: lessons/kit-bay.md#addressof
    */
   function addressOf(a) {
     // A port that knows where its stream really lives says so, and that wins:
     // the board's input rooms are `<room>-<input>`, not a derivation of an id.
     if (typeof a.address === 'string' && a.address) return a.address;
     const [site, node = '', port = ''] = a.id.split(':');
-    /* 🔴 THE SITE IS IN IT WHEN IT IS NOT THE PLACE, SINCE 2026-10-09. Every
-       browser tab is placed `browser`, so `/mirror/`'s `webgl:video` derived
-       `browser-webgl-video` in EVERY tab, and two tabs would meet in one room
-       the moment such a port got a wire transport. Now it is
-       `browser-web-ab12-webgl-video`.
-       ⚠️ A SITE THAT IS ITS OWN PLACE IS UNCHANGED (`err-vikerraadio-audio`),
-       and the Pi declares every address it streams on, so nothing it sends moves. */
+    // The site is in it when it is not the place, or every browser tab derives the same room.
+    // why: lessons/kit-bay.md#addressof-site
     const place = placeOf(a);
     return [place, site !== place ? site : '', node, port].filter(Boolean).join('-');
   }
 
   /**
    * @param {object} p
-   * @param {string} p.id      `site:node:port`. An id, never a name: a name is
-   *                           what a replug changes, and CoreMIDI really does
-   *                           rename a port to `Circuit 2` when it is held.
+   * @param {string} p.id      `site:node:port`. An id, never a name: a name is what a replug changes, and CoreMIDI really does rename a port to `Circuit 2` when it is held.
    * @param {string} p.label   what a person reads. Allowed to change.
    * @param {'in'|'out'} p.dir
    * @param {string} p.medium  one of MEDIA
    * @param {object} p.shape   what the data IS
    * @param {string[]} [p.accepts] in-ports: the classes it consents to
-   * @param {string[]} [p.never]   in-ports: classes that make a link a HARD
-   *                               REFUSAL rather than a quiet drop. See below.
+   * @param {string[]} [p.never]   in-ports: classes that make a link a HARD REFUSAL rather than a quiet drop. See below.
    * @param {string[]} [p.emits]   out-ports: the classes it can produce
    * @param {Function} [p.deliver] in-ports: where a delivered event goes
-   * @param {string[]} [p.transports] the only transports this port's stream
-   *                               really travels by, from TRANSPORT_NAMES. A
-   *                               session the table would give it otherwise is
-   *                               refused in words. See `sessionFor`.
-   * @param {string} [p.heldBy]    in-ports: the site that holds this input.
-   *                               A link into it from any other site is refused
-   *                               in words. See `validate`.
+   * @param {string[]} [p.transports] the only transports this port's stream really travels by, from TRANSPORT_NAMES. A session the table would give it otherwise is refused in words. See `sessionFor`.
+   * @param {string} [p.heldBy]    in-ports: the site that holds this input. A link into it from any other site is refused in words. See `validate`.
+   * why: lessons/kit-bay.md#addport
    */
   function addPort(p) {
     if (!p.id) throw new Error('bay: a port needs an id');
     if (!MEDIA.includes(p.medium)) throw new Error(`bay: medium is one of ${MEDIA.join(', ')}, not ${p.medium}`);
     if (p.dir !== 'in' && p.dir !== 'out') throw new Error('bay: dir is "in" or "out"');
-    /* ⚠️ A RESTRICTION NAMING A TRANSPORT NOBODY HAS IS A TYPO THAT WOULD REFUSE
-       EVERY LINK, so it throws here, where the port is declared, rather than
-       reading later as a port that will not link to anything. */
+    // A restriction naming an unknown transport throws here, where the port is declared.
+    // why: lessons/kit-bay.md#addport-transports
     if (p.transports !== undefined) {
       const bad = Array.isArray(p.transports) ? p.transports.filter((t) => !TRANSPORT_NAMES.includes(t)) : ['not a list'];
       if (bad.length || !p.transports.length) {
@@ -1036,24 +727,14 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   function stale(p) { return now() - (p.seenAt ?? 0) > STALE_MS; }
 
   /**
-   * 🔴 THE VALIDATOR IS THE WHOLE POINT AND IT IS ORDINARY CODE. Every refusal
-   * carries a sentence, because a patch bay that answers "no" is a patch bay
-   * nobody can use. It is also the half that stays useful if every language
-   * model in §5 of the plan were deleted.
-   *
-   * 🔴 AND EVERY REFUSAL CARRIES A SECOND SENTENCE SINCE 2026-09-22: `fix` is
-   * the thing a person can do about it. Several of these have no repair, and
-   * saying so in words is what tells a reader to stop trying. A blank line
-   * would read as a sentence that failed to load.
+   * Every refusal carries `why` and `fix`; `fix` says so in words when there is no repair.
    * @returns {{ok:boolean, why:string, fix?:string, warn?:string}}
+   * why: lessons/kit-bay.md#validate
    */
   /**
-   * ⚠️ THE FOURTH ARGUMENT IS THE SAME `opts` THAT `link` TAKES, SINCE
-   * 2026-10-04, so a page can ask the question before making the link and get
-   * the same answer. `{ consent: true }` is the only key it reads.
-   * ✅ AND AN ALLOWED HEAVY LINK ANSWERS WITH THE SESSION IT WOULD OPEN, before
-   * the link exists, which is plan §6's *the validator prints it before the
-   * link exists*.
+   * `opts` is the same as `link` takes (`{ consent: true }`), so a page can ask first. An
+   * allowed heavy link answers with the session it would open.
+   * why: lessons/kit-bay.md#validate-opts
    */
   function validate(fromId, toId, transforms = [], opts = {}) {
     if (isAny(fromId) || isAny(toId)) return validateAny(fromId, toId, transforms, opts);
@@ -1079,15 +760,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     }
 
     /**
-     * 🔴 CONSENT ON THE SOURCE, WHICH IS NEW AND IS PLAN §6. A link out of an
-     * `external` node opens a connection to somebody else's server, and ERR said
-     * on 2026-09-16 that every one of ours lands in their listener statistics,
-     * which is what a broadcaster reports to its board. Stopping does not undo
-     * it. So only a person who is going to listen may make one: never a page
-     * load, never a harness, never `?selfcheck=1`.
-     * ⚠️ IT IS `=== true` AND NOTHING LOOSER. A truthy string from a query
-     * parameter or a form is exactly the road a check would arrive by.
-     * ⚠️ AND IT IS A PROPERTY OF THE NODE, so no page can forget to ask it.
+     * A link out of an `external` node opens somebody else's server and counts in their
+     * listener statistics, so it needs `consent === true` (nothing looser), a node property.
+     * why: lessons/kit-bay.md#consent-source
      */
     const src = nodeFor(a);
     if (src?.consent && opts?.consent !== true) {
@@ -1097,17 +772,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     }
 
     /**
-     * 🔴 AN INPUT SOMEBODY HOLDS TAKES LINKS FROM THAT SOMEBODY ONLY, SINCE
-     * 2026-10-06 (plan-universal-routing §6, plan-routing-migration §3.6 and
-     * §5.2). The Pi is one instrument with one JACK graph, and a second
-     * person's link into its synth takes the sound from whoever had it. A port
-     * carrying `heldBy: <site>` refuses a link INTO it from any other site, in
-     * words, with the holder named.
-     * ⚠️ THE ASKER IS `opts.site` WHEN A PAGE SAYS WHO IT IS, and the source's
-     * own site otherwise. A patchbay linking another page's lane into the board
-     * is the patchbay asking, not the lane.
-     * ⚠️ MODEL LEVEL ONLY. Nothing on the Pi sets or reads `heldBy` yet, so this
-     * refuses what a page describes and guards nothing a socket could send.
+     * A port with `heldBy: <site>` refuses a link into it from any other site, holder named.
+     * The asker is `opts.site` when given. Model level only: nothing on the Pi reads it yet.
+     * why: lessons/kit-bay.md#heldby
      */
     if (b.heldBy) {
       const asker = typeof opts?.site === 'string' && opts.site ? opts.site : a.id.split(':')[0];
@@ -1119,10 +786,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     }
 
     /**
-     * 🔴 TRANSFORMS ARE MIDI OPERATIONS, SO ON ANY OTHER MEDIUM THEY ARE
-     * REFUSED RATHER THAN IGNORED. `transpose` on a video link would be stored,
-     * printed in the text form and do nothing, which is a link that reads as
-     * configured and is not.
+     * Transforms are MIDI operations; on any other medium they are refused, not ignored.
+     * why: lessons/kit-bay.md#transforms-medium
      */
     if (a.medium !== 'midi' && (transforms || []).length) {
       const names = transforms.map((t) => t?.op).filter(Boolean);
@@ -1141,11 +806,10 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     const badF = followRefusal(opts?.options?.follow, a, b);
     if (badF) return { ok: false, ...badF };
 
-    // Shape. ⚠️ THE FIELD THAT DISAGREES IS NAMED. "incompatible" is a refusal
-    // somebody has to debug; "48000 against 44100" is one they can fix.
-    /* ⚠️ COMPARED BY VALUE SINCE 2026-10-04, because `value` declares a range
-       and a range is a pair: `[0, 1] !== [0, 1]` would refuse two identical
-       faders for being two arrays. */
+    // Shape. The field that disagrees is named: `48000 against 44100`.
+    // why: lessons/kit-bay.md#shape
+    // Compared by value: a range is a pair, and two arrays are never `===`.
+    // why: lessons/kit-bay.md#shape-value
     const same = (x, y) => x === y
       || (typeof x === 'object' && x !== null && JSON.stringify(x) === JSON.stringify(y));
     for (const k of Object.keys(b.shape || {})) {
@@ -1158,20 +822,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     }
 
     /**
-     * 🔴 CONSENT, AND IT IS TWO DIFFERENT QUESTIONS THAT THE FIRST BUILD
-     * ANSWERED AS ONE. It refused any link that could deliver a class the
-     * destination did not accept, and **that refused every real link on this
-     * desk**: a MIDI source emits six classes, the Circuit takes three, so a
-     * keyboard could never reach a synth at all. Found by `/wish/`, which put a
-     * real model's real proposal through it and got `Circuit does not accept
-     * touch` for a patch that was otherwise perfect.
-     * ✅ **A CLASS A PORT SIMPLY DOES NOT HANDLE IS DROPPED AND REPORTED.** The
-     * drop already happens at the destination in `send`, so nothing is sent
-     * either way; what changes is that the link exists and the reader is told
-     * what will not cross it.
-     * 🔴 **A CLASS A PORT `never` TAKES IS STILL A HARD REFUSAL**, and that is
-     * the list the Circuit's SysEx line lives on. The difference is between *I
-     * do not use that* and *that damages me*.
+     * Consent is two questions. A class the port does not handle is dropped and reported;
+     * a class in its `never` list is a hard refusal (the Circuit's SysEx).
+     * why: lessons/kit-bay.md#accepts-never
      */
     let could;
     try { could = delivers(a.emits, transforms); }
@@ -1179,25 +832,17 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     for (const c of could) {
       if (b.never.includes(c)) {
         /**
-         * 🔴 THIS ONE HAS A REPAIR AND IT IS THE PAGE'S OWN NEGATIVE CONTROL.
-         * `/bay/` already asserts *and the same pair is allowed once SysEx is
-         * dropped*, so the honest solution here is the transform that does it
-         * rather than *there is no fix*: the Circuit's refusal is about what
-         * reaches it, not about whether a keyboard may play it at all.
-         * ⚠️ WHAT HAS NO REPAIR IS THE RULE ITSELF, and nothing here offers to
-         * bend it. `never` is the list that carries an instrument's safety, and
-         * the only thing on offer is not sending it that class.
+         * The fix offered is the transform that drops the class; `never` itself is not bendable.
+         * why: lessons/kit-bay.md#never-fix
          */
         return { ok: false,
                  why: `${b.label} does not accept ${c}, and this link could deliver it.`,
                  fix: `Stop the link carrying ${c}: ${JSON.stringify({ op: 'drop', cls: c })}.` };
       }
     }
-    /* ⚠️ THE SOURCE BEING LEFT WITH NOTHING IS CHECKED BEFORE THE DESTINATION
-       TAKING NONE OF IT, because they are two different faults and the second
-       message is wrong about the first. Order matters here and a test caught
-       it reading `Circuit takes none of what this link carries` about a link
-       that carried nothing in the first place. */
+    // The source left with nothing is checked before the destination taking none, or the
+    // second message misdescribes the first fault.
+    // why: lessons/kit-bay.md#empty-source
     if (a.medium === 'midi' && could.size === 0) {
       const names = (transforms || []).map((t) => t.op);
       return { ok: false,
@@ -1216,13 +861,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     }
 
     // Cycles, at node level, because hardware THRU can close one outside our view.
-    /* ⚠️ A LOOP THROUGH A STORE IS NOT FEEDBACK (2026-10-10). A node of kind
-       `store` keeps what reaches it and plays it back only when somebody asks
-       (positron-store's history, workers/store/src/graph.js), so chat ->
-       history -> chat is a replay, not an echo. Until this, concept 4's
-       `cf-store:history:value-out -> <me>:chat:value-in` was refused as a loop
-       and its history never delivered. A store at either end, or anywhere on
-       the path back, breaks the cycle; a loop with no store in it is still one. */
+    // A loop through a store is a replay, not feedback; a store anywhere on the path breaks it.
+    // why: lessons/kit-bay.md#store-loop
     const isStore = (id) => nodes.get(id)?.kind === 'store';
     if (!isStore(nodeOf(a.id)) && !isStore(nodeOf(b.id))
         && reachesNode(nodeOf(b.id), nodeOf(a.id), a.medium, isStore)) {
@@ -1242,15 +882,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   }
 
   /**
-   * 🔴 A `*` LINK, plans/plan-site-names.md §4h. `a:chat:value-out -> *:chat:value-in` is a
-   * speaker and `*:chat:value-out -> a:chat:value-in` a listener. The pattern is checked
-   * here; every concrete pair it stands for is checked by the ordinary
-   * `validate`, now and again on every send, because sites come and go.
-   * ⚠️ ZERO MATCHES IS NOT A REFUSAL. A chat has to work with one person in it,
-   * so it answers ok with a warning.
-   * ⚠️ LIGHT MEDIA OTHER THAN MIDI ONLY. A heavy medium needs a session per
-   * receiver, which is an opener's job, and a MIDI `*` into every site with a
-   * thru is a loop at wire speed that the cycle walk cannot see.
+   * A `*` link: the pattern is checked here, each concrete pair by `validate` on every send.
+   * Zero matches answers ok with a warning. Light media other than MIDI only.
+   * why: lessons/kit-bay.md#star
    */
   /**
    * `follow` names the HEAVY link to wait for. Unknown is allowed, because a
@@ -1345,74 +979,30 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   }
 
   /**
-   * 🔴 WHAT A HEAVY LINK IS INSTEAD OF BYTES, plan §4: `{ transport, address,
-   * shape, where, says }`, and each end opens it with code it already has.
-   * Null for a light medium, whose link carries the bytes itself.
-   * ⚠️ DERIVED EVERY TIME AND NEVER WRITTEN DOWN IN THE TEXT FORM. A line that
-   * carried its own transport could disagree with the table, and the table is
-   * the measured half.
+   * What a heavy link is instead of bytes: `{ transport, address, shape, where, says }`.
+   * Null for light media. Derived every time, never written in the text form.
+   * why: lessons/kit-bay.md#sessionfor
    */
-  /* 🔴 A LINK WITH A STORE AT EITHER END RIDES THE `file` ROW, WHATEVER IT
-     CARRIES, plan §10 item 5 (*"record is a link to R2 or the store object"*),
-     2026-10-04. `circuit:audio -> r2:recordings:in` is a sound, and the audio
-     row would have called it a relay leg, which is not how a recording reaches
-     R2: the page that hears the sound records it and uploads it through ingest.
-     ⚠️ AND A RECORDING IS ONE WRITER. A store's in port never turns a link into
-     `internet-many`, because however many people listen to the same sound, the
-     recording is one upload; `r2-hls` is the row for many READING a store.
-     ⚠️ THE ADDRESS IS THE STORE'S, so the row says where the recording lives
-     rather than the room the sound came from. */
-  /* 🔴 A LINK OUT OF A STORE TO ONE READER IS AN HTTPS READ, SINCE 2026-10-06,
-     from `READS` rather than from the `file` row, whose `internet-one` cell is
-     the WRITE path. Many readers of one object are still `r2-hls`.
-
-     🔴 TWO WAYS A SESSION CAN DIFFER FROM THE TABLE, BOTH SINCE 2026-10-06
-     (plan-routing-migration §3.2, `plans/plan-stage-patchbay.md` F1), and both
-     refuse in words rather than quietly picking something else:
-       - a PORT may say `transports: [...]`, the only ways its stream really
-         travels. The cell's first choice and its `or` are tried in order and
-         the first the port allows wins, which is how the board's video, which
-         is relay H.264 and never WHEP, gets the `or` of the WHEP cell. A cell
-         with nothing the port allows is a refusal that names both lists. A
-         WHIP-only input asked for by a second receiver is told no, not LL-HLS.
-       - a LINK may say `{ via }`, a person asking for one transport by name,
-         which is what `/cam/` needs to show one source three ways. It must be
-         a transport the tables name, it must not be a one-machine transport
-         across a wire, and it must be one the port allows. Whether an opener
-         exists for it is the opener's question, not this file's.
-     ⚠️ THE RESTRICTION THAT APPLIES IS THE ONE ON THE LEG THE TRANSPORT IS. A
-     recording's `ingest` is the store's leg, so the source's `relay` list does
-     not refuse it; a playback's `https` is the store's out port's leg.
-     ⚠️ A `says` FOR A TRANSPORT THE CELL DID NOT CHOOSE QUOTES NO NUMBER. The
-     cell's number is about the cell's transport, and borrowing it for another
-     is the invented figure this table exists to refuse. */
+  // A link with a store at either end rides the `file` row, whatever it carries. A recording
+  // is one writer, never `internet-many`. The address is the store's.
+  // why: lessons/kit-bay.md#sessionfor-store
+  // A store to one reader is an https read. A port's `transports` and a link's `via` can
+  // narrow the table, refused in words when nothing fits. The restriction applies to its own leg;
+  // a `says` for a transport the cell did not choose quotes no number.
+  // why: lessons/kit-bay.md#sessionfor-via
   function sessionFor(a, b, opts = {}) {
     const via = typeof opts?.via === 'string' && opts.via ? opts.via : null;
     if (!HEAVY.includes(a.medium)) {
       if (!via) return { session: null };
-      /* 🔴 A LIGHT LINK BETWEEN TWO SITES MAY SAY WHICH WIRE CARRIES IT, SINCE
-         2026-10-11. Its bytes are inside the link, but between two machines
-         they still ride something: the relay room, or a WebRTC data channel
-         once a board's direct path is open (/concepts/sampler/035/). Asked:
-         *"webrtc shuld be link"*, after the patchbay drew a relay box under a
-         path the relay was not carrying. Only those two, only across sites,
-         and the page that opened the path says so, so the drawing reads the
-         wire rather than guessing it. */
+      // A light link between two sites may name its wire (relay or WebRTC), as the page opened it.
+      // why: lessons/kit-bay.md#light-via
       if (LIGHT_VIA.includes(via) && siteOf(a) !== siteOf(b)) return { session: null, via };
       return { refuse: { why: `${a.label} carries ${a.medium}, which travels inside the link itself, so there is no transport to ask for.`,
                          fix: `Make the link without via ${via}.` } };
     }
-    /* 🔴 JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §3 item 3). Two
-       audio ports on ONE site that both travel by `jack` and both name their
-       JACK ports are a link inside one board's graph, and nothing about it
-       crosses a wire. The session carries the JACK rows the one bay link
-       stands for (`jackRows`: same count one to one, many into one summed, one
-       into many spread), so a reader sees what one wire means before it is
-       made, and the board applies exactly those rows and reads them back.
-       ⚠️ THE SAME SITE, NOT THE SAME PLACE: a site is one board, and two boards
-       in one room are two JACK servers that no row can join.
-       ⚠️ A `via` OTHER THAN jack FALLS THROUGH to the ordinary rules, which
-       already refuse a wire transport between two ports of one site. */
+    // Two audio ports on one site that both travel by `jack` are a link inside one board's
+    // JACK graph; the session carries the `jackRows`. Same site, not same place.
+    // why: lessons/kit-bay.md#jack
     const jackable = (p) => Array.isArray(p.jack) && p.jack.length && (p.transports ?? []).includes('jack');
     if (a.medium === 'audio' && (!via || via === 'jack') && (jackable(a) || jackable(b) || via === 'jack')) {
       if (siteOf(a) === siteOf(b) && jackable(a) && jackable(b)) {
@@ -1455,16 +1045,8 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
         return { refuse: { why: `${via} never leaves one machine, and ${a.label} and ${b.label} are on two.`,
                            fix: `Leave via off and the link rides ${cell.find(allows) || t.transport}.` } };
       }
-      /* 🔴 AND THE REVERSE, SINCE 2026-10-09 (BACKLOG: *the bay accepts a wire
-         transport inside one tab*). `MACHINE_ONLY` stopped `page` crossing a
-         wire and nothing stopped `whep` being asked for between two ports of
-         ONE SITE: `/mirror/`'s own WebGL into its own left pane `via: 'whep'`
-         answered `ok, whep, machine`, a picture sent out to Cloudflare and back
-         into the tab that drew it. A site is one announcer (one tab, one
-         board), so both ends of such a link are already in the same process
-         or on the same machine.
-         ⚠️ SAME SITE, NOT SAME PLACE. Two tabs both placed `browser` are two
-         sites and may be two machines, so WHEP between them stays allowed. */
+      // A wire transport between two ports of one site is refused; same site, not same place.
+      // why: lessons/kit-bay.md#same-site
       if (!MACHINE_ONLY.includes(via) && t.where === 'machine' && siteOf(a) === siteOf(b)) {
         return { refuse: { why: `${a.label} and ${b.label} are both on ${siteOf(a)}, so ${via} would send it out over a wire and back to where it started.`,
                            fix: `Leave via off and the link rides ${cell.find(allows) || t.transport}.` } };
@@ -1490,20 +1072,12 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   }
 
   /**
-   * Can a signal standing at `startNode` reach `targetNode` through the links
-   * that already exist.
-   * 🔴 IT WALKS NODES, NOT PORTS, AND THE FIRST VERSION WALKED PORTS AND WAS
-   * ALWAYS FALSE. It started from the proposed destination, which is an INPUT,
-   * and then looked for links whose `from` was that port. No link ever starts
-   * at an input, so the walk ended immediately and every cycle was allowed.
-   * **The test caught it, which is what the test is for**: an arriving event is
-   * at a NODE, and it leaves again through any output that node has.
+   * Can a signal standing at `startNode` reach `targetNode` through existing links.
+   * It walks nodes, not ports: no link starts at an input.
+   * why: lessons/kit-bay.md#reachesnode
    */
-  /* 🔴 AND IT WALKS ONE MEDIUM SINCE 2026-10-04. A loop is an echo at wire
-     speed, and only a link of the same medium can echo: a phone sending `value`
-     to an engine and hearing its `audio` back is the most ordinary patch plan
-     §3 describes, and walking every medium refused it as a loop. With MIDI
-     alone on the desk the answer is unchanged. */
+  // One medium at a time: only a link of the same medium can echo.
+  // why: lessons/kit-bay.md#reaches-medium
   function reachesNode(startNode, targetNode, medium, through = () => false) {
     const seenNodes = new Set();
     const walk = (n) => {
@@ -1526,15 +1100,10 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   const nodeOf = (id) => id.split(':').slice(0, 2).join(':');
 
   /**
-   * @param {object} [opts] `{ consent }`, see `validate`. Never stored: a
-   *        consent is a person asking once, not a property of the link.
-   * ⚠️ `session` IS NULL ON A LIGHT LINK AND AN OBJECT ON A HEAVY ONE, on the
-   * stored link and on the answer alike, so a page can test it without knowing
-   * which media are heavy.
-   * ⚠️ AN EARLIER LINK KEEPS THE SESSION IT WAS MADE WITH. A second internet
-   * receiver makes the NEW link `internet-many`; the first one is already open
-   * and moving it is a decision for the code that opens sessions, which this
-   * file is not.
+   * @param {object} [opts] `{ consent }`, see `validate`. Never stored: a consent is a person asking once, not a property of the link.
+   * `session` is null on a light link and an object on a heavy one. An earlier link keeps
+   * the session it was made with.
+   * why: lessons/kit-bay.md#link
    */
   function link(fromId, toId, transforms = [], opts = {}) {
     const v = validate(fromId, toId, transforms, opts);
@@ -1548,23 +1117,13 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   function unlink(id) { return links.delete(id); }
 
   /**
-   * One event leaving one port.
-   * 🔴 THE COUNTERS ARE AT BOTH ENDS ON PURPOSE. `link.sent` is what this side
-   * queued and `port.heard` is what the far side took, and only the second one
-   * is evidence: `createMidiLane`'s `scheduled()` counted what a page QUEUED and
-   * read identically to delivery while every note was being scheduled fifty six
-   * years out.
+   * One event leaving one port. `link.sent` is what this side queued, `port.heard` what the
+   * far side took; only the second is evidence.
+   * why: lessons/kit-bay.md#send
    */
-  /* 🔴 SINCE 2026-10-09 (plans/plan-site-names.md §4h) `fromId` MAY BE ANOTHER
-     SITE'S PORT. A `bay.event` heard from the room is handed here, and it is
-     delivered only along a link this bay holds whose `from` matches it,
-     concretely or by `*`, into a port with a `deliver`, which only a page's own
-     in-ports have. Holding the link is the receiver's consent.
-     ⚠️ THE CLASS GUARD IS MIDI ONLY. `accepts` is a list of MIDI classes, so a
-     `value` event (a fader, a chat line) has no class and was dropped by this
-     line on every link, which nothing noticed because nothing sent one.
-     ⚠️ `meta` IS PASSED TO `deliver` AS ITS THIRD ARGUMENT with `from` and `to`,
-     so a page can draw who said it and when without a second channel. */
+  // `fromId` may be another site's port: delivered only along a link this bay holds into a port
+  // with `deliver`. The class guard is MIDI only. `meta` reaches `deliver` as its third argument.
+  // why: lessons/kit-bay.md#send-remote
   function send(fromId, ev, meta = {}) {
     seen(fromId);
     let out = 0;
@@ -1584,13 +1143,10 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
   }
 
   /**
-   * One event on a timed link: ask the timebase, then hand it over now, set a
-   * timer for it, or hold and ask again. `meta.timing` tells the port what was
-   * decided: `{ at, local, lateMs, why, option }`, `local` being the exact
-   * local ms it was due (earlier than now by up to `horizonMs`).
-   * ⚠️ `port.heard` COUNTS ON DELIVERY, NOT ON QUEUEING, because it is the
-   * far side's evidence (see `send`). `link.held` and `link.missed` count the
-   * rest, so a link that holds everything says so in numbers.
+   * One event on a timed link: deliver now, set a timer, or hold and ask again.
+   * `meta.timing` is `{ at, local, lateMs, why, option }`. `port.heard` counts on delivery;
+   * `link.held` and `link.missed` count the rest.
+   * why: lessons/kit-bay.md#schedule
    */
   function schedule(e, l, dst, meta) {
     const o = l.options;
@@ -1610,11 +1166,9 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
         : !T.timebase ? { act: 'hold', why: 'this bay was given no timebase' }
         : T.timebase.decide(tev, nowL, { horizonMs: T.horizonMs, pastWindowMs: T.holdMs });
       if (v.act === 'fire') return give(v);
-      /* ⚠️ A WAIT IS ASKED AGAIN EVERY RECHECK_MS, NOT SLEPT THROUGH. A
-         followed link's line STEPS (an LL-HLS drift-seek moves it 2 s
-         earlier at once), and a cue that slept to the old due fired 2 s after
-         its picture: MEASURED on /concepts/clock/040/ before this line, +2004
-         ms on every cue waiting across a step back. */
+      // A wait is asked again every RECHECK_MS, because a followed line steps: sleeping fired
+      // +2004 ms late on every cue across a 2 s step back (measured).
+      // why: lessons/kit-bay.md#recheck
       if (v.act === 'wait') { T.later(() => ask(false), Math.min(RECHECK_MS, Math.max(0, v.local - T.horizonMs - nowL))); return; }
       if (v.act === 'hold' && nowL - t0 < T.holdMs && tev) {
         if (first) l.held++;
@@ -1637,9 +1191,11 @@ export function createBay({ now = () => Date.now(), timing = null } = {}) {
     links: () => [...links.values()],
     stale,
     text: () => printPatch([...links.values()]),
-    /** Load a text patch. Returns every line that was refused, with its reason.
-     *  ⚠️ A CONSENT IS NEVER IN THE TEXT, so a line out of an `external` node is
-     *  refused here unless the person loading it passes `{ consent: true }`. */
+    /**
+     * Load a text patch. Returns every line that was refused, with its reason. A consent is
+     * never in the text: pass `{ consent: true }` for a line out of an `external` node.
+     * why: lessons/kit-bay.md#load
+     */
     load(text, opts = {}) {
       const bad = [];
       for (const l of parsePatch(text)) {

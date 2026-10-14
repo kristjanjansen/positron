@@ -1,20 +1,7 @@
-// demo/shell/bay-node-test.mjs: a page as a patchbay node, against a relay that
-// lives in this file, with no socket, no browser and no studio.
-//
+// demo/shell/bay-node-test.mjs: a page as a patchbay node against an in-file relay, no socket.
 //   node demo/shell/bay-node-test.mjs
-//
-// Step 1 of `plans/plan-routing-migration.md`. What is graded here is what the
-// three hand copies got wrong between them: which room, whether anything opens
-// before a press, which site, and who answers a `link.request`.
-//
-// MOST OF THESE ARE NEGATIVE CONTROLS, for the reason `bay-test.mjs` gives: a
-// node that joined on load and announced everywhere would pass every positive
-// check below. Each NEGATIVE CONTROL has to see something NOT happen: a socket
-// not opened, a room not reached, a request not answered.
-//
-// ⚠️ WHAT IS NOT GRADED HERE: the real relay (`openWire` is replaced by
-// `fakeRelay`), and whether a page calls `join()` only from a press. The pages
-// assert that themselves (`/patchbay/`, `/partitur/`: *building joined nothing*).
+// Most checks are negative controls. Not graded: the real relay, and `join()` only on a press.
+// why: lessons/kit-bay-node.md#test-header
 
 import { createBayNode, roomFor, randomSite, STUDIO_ROOM, REANNOUNCE_MS, ROOM_RE } from './bay-node.mjs';
 import { STALE_MS } from './graph-registry.mjs';
@@ -251,7 +238,8 @@ const graph = (site, ports = []) => ({ v: 1, site, place: 'browser', nodes: [{ i
 }
 
 {
-  // 8. A timed link is stamped at the source (2026-10-12, plan-routing-time §4.1).
+  // 8. A timed link is stamped at the source.
+  // why: lessons/kit-bay-node.md#test-timed
   const relay = fakeRelay();
   const K = (s) => `${s}:keys:midi-out`, SY = (s) => `${s}:synth:midi-in`;
   const g = (site) => ({ v: 1, site, place: 'browser', nodes: [{ id: `${site}:keys`, kind: 'person', place: 'browser' }, { id: `${site}:synth`, kind: 'engine', place: 'browser' }],

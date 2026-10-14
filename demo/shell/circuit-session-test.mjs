@@ -1,26 +1,7 @@
-// demo/shell/circuit-session-test.mjs
-// The session container, against the real pack, with no browser.
-//
+// demo/shell/circuit-session-test.mjs: the session container against the real pack, no browser.
 //   CIRCUIT_PACK=<path> node demo/shell/circuit-session-test.mjs
-//
-// 🔴 IT IS GRADED AGAINST AN IMPLEMENTATION THAT NO LONGER EXISTS, WHICH IS THE
-// ONLY GRADING WORTH HAVING HERE. Every figure in the first section was measured
-// in Python on a different day and published in
-// `research/circuit-session-format-2026-09-21.md` §1 before this module existed,
-// so reproducing one is two independent implementations agreeing about one real
-// artefact. Where they DISAGREE the disagreement is kept and named rather than
-// tuned away, and there is one of those: the 49 block map is true of `session_0`
-// and of 21 of the 32 sessions, not of all of them.
-//
-// 🔴 AND THE ROUND TRIP IS THE DELIVERABLE, SO IT IS SABOTAGED FOUR WAYS. A
-// `rebuild()` written as `return bytes` passes a round trip trivially and proves
-// nothing, so this file breaks the writer on purpose and counts what goes red.
-// One of those sabotages leaves the round trip GREEN, which is the honest answer
-// to what it can and cannot prove, and it is reported rather than hidden.
-//
-// 🔴 AND IT READS THE OWNER'S CIRCUIT PACK (CIRCUIT_PACK=<path>, from
-// the owner's private pack repository), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
-// and nothing here writes, sends or touches a port.
+// Figures reproduce an earlier independent implementation; the round trip is sabotaged four ways.
+// why: lessons/kit-circuit-session.md#test-header
 import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
@@ -71,9 +52,9 @@ ok('a 76 byte header, 16 slots of 1508, 32 of 720 and a final 6004',
   JSON.stringify(tally(S.SLOTS.map((s) => `${s.kind}:${s.size}`)))
   === JSON.stringify({ 'header:76': 1, 'wide:1508': 16, 'narrow:720': 32, 'tail:6004': 1 }),
   JSON.stringify(tally(S.SLOTS.map((s) => s.kind))));
-// 🔴 THE TWO ARITHMETIC FACTS THE 76 RESTS ON. 528 less 452 is 76, and 76 plus
-// sixteen strides of 1508 lands exactly on the offset where the 720 stride
-// begins. If either were off by one the grid would not close on 53,248.
+// 528 - 452 = 76, and 76 + 16 x 1508 lands where the 720 stride begins; off by one, the grid
+// would not close on 53,248.
+// why: lessons/kit-circuit-session.md#test-76
 ok('76 plus 16 x 1508 is 24,204 and that is where the 720 stride starts',
   S.NARROW_AT === 24204 && S.TAIL_AT === 47244 && S.TAIL_AT + S.TAIL_LEN === S.SESSION_BYTES,
   `${S.NARROW_AT} then ${S.TAIL_AT}`);
@@ -117,12 +98,9 @@ ok('the last pad ends exactly at the end of the file',
   r0.pads[48].at + r0.pads[48].length === 53248,
   `${r0.pads[48].at + r0.pads[48].length}`);
 
-// 🔴 THE FIGURE THAT LOOKED LIKE A DISAGREEMENT AND IS TWO DEFINITIONS OF ONE
-// WORD, WHICH IS THE SAME SHAPE AS THE `slot 15` ONE IN `circuit-patch-test.mjs`.
-// The research says "of the 9,180 non-0xFF bytes, 2 are above 0x7F". 9,180 is
-// the BLOCK TOTAL and the non-0xFF count is 9,179, because exactly one 0xFF byte
-// sits inside a block in a run too short to be padding. Both numbers are right
-// and they are not the same number, so both are asserted here.
+// 9,180 is the block total and the non-0xFF count is 9,179 (one 0xFF inside a block); both
+// are right and both are asserted.
+// why: lessons/kit-circuit-session.md#test-9180
 {
   let ff = 0, high = 0, highNotFf = 0;
   for (const b of r0.blocks) {
@@ -138,15 +116,13 @@ ok('the last pad ends exactly at the end of the file',
   ok('and 2 of them are above 0x7F, so the payload is seven bit',
     highNotFf === 2 && high === 3, `${highNotFf} above 0x7F, ${high} counting the 0xFF`);
 }
-// ⚠️ THE CORRECTION THE RESEARCH OPENS WITH, REPRODUCED, BECAUSE IT IS THE
-// DENOMINATOR LESSON AND NOT A DETAIL. Over the whole file the same count is
-// 44,071 and it measures the erasure.
+// Over the whole file the count is 44,071 and it measures the erasure: the denominator lesson.
+// why: lessons/kit-circuit-session.md#test-whole-file
 ok('over the whole file 44,071 bytes are above 0x7F, and that number measures the erasure',
   c0.highBytes === 44071, `${c0.highBytes}`);
 
-// 🔴 THE ONE PUBLISHED FIGURE THAT DOES NOT HOLD FOR ALL 32, AND IT IS A FINDING
-// RATHER THAN SOMETHING TO TUNE. The 49 block map is presented under a heading
-// about the container. It is a description of ONE file.
+// The 49 block map is true of `session_0` and 21 of 32, not all: a finding, not a tuning.
+// why: lessons/kit-circuit-session.md#test-49-blocks
 {
   const counts = all.map((u) => S.runs(u).blocks.length);
   ok('the 49 block map holds for 21 of the 32 and runs to 332 in the busiest',
@@ -173,10 +149,8 @@ ok('no synth region ever fills, and the drum regions run 32 to 720',
   && Math.max(...SESS.flatMap((s) => s.slots.slice(17, 49).map((x) => x.used))) === 720,
   `synth ${Math.max(...SESS.flatMap((s) => s.slots.slice(1, 17).map((x) => x.used)))} at most`);
 
-// 🔴 AN INDEPENDENT DERIVATION OF THE SAME STRIDES, POOLED OVER ALL 32 RATHER
-// THAN READ OFF ONE FILE. Take every offset where a run of 0xFF ends and data
-// begins, keep only the offsets where that is true in ALL 32, and look at the
-// gaps. If the grid were an artefact of `session_0` this would disagree.
+// An independent derivation: offsets where data begins in all 32, and their gaps.
+// why: lessons/kit-circuit-session.md#test-pooled
 {
   const always = [];
   for (let i = 1; i < 53248; i++) {
@@ -207,10 +181,8 @@ console.log('\n-- the round trip, which is the deliverable --');
   ok('and to the same length, checked apart because a digest can only say yes or no',
     outs.every((o, n) => o.length === all[n].length));
 
-  // 🔴 THE PROOF THAT IT IS A MODEL AND NOT A COPY. Parse, then scribble over
-  // the ORIGINAL buffer, then rebuild. If `rebuild` read the buffer at all the
-  // output would carry the scribble. It does not, because the model holds
-  // copies.
+  // Model, not copy: scribble over the original buffer, then rebuild.
+  // why: lessons/kit-circuit-session.md#test-model
   const scratch = all[0].slice();
   const parsed = S.readSession(scratch);
   scratch.fill(0x5a, 0, 4096);
@@ -229,9 +201,8 @@ console.log('\n-- the header, corroborated against a second source --');
 ok('the four byte tag splits 22 USER, 7 DEMO and 3 INIT, the same as the patch module reads',
   JSON.stringify(tally(SESS.map((s) => s.header.tag))) === JSON.stringify({ USER: 22, DEMO: 7, INIT: 3 }),
   JSON.stringify(tally(SESS.map((s) => s.header.tag))));
-// ✅ TWO INDEPENDENT SOURCES, WHICH IS THE ONLY REASON THIS ONE IS A FACT AND
-// NOT A READING. The name in the bytes was decoded here; the name in
-// `index.json` was written by Novation Components. They can disagree.
+// The name in the bytes against the name Components wrote in `index.json`.
+// why: lessons/kit-circuit-session.md#test-name
 {
   const agree = SESS.filter((s, n) => s.header.name === meta.sessions[n].name).length;
   ok('the 32 byte name field agrees with index.json in 32 of 32',
@@ -241,15 +212,9 @@ ok('the four byte tag splits 22 USER, 7 DEMO and 3 INIT, the same as the patch m
 }
 ok('offset 4 is DC BB in all 32', SESS.every((s) => s.header.magicOk));
 
-// ⚖️ INFERRED AND SAID TO BE, IN THE SAME BREATH AS THE MEASUREMENT. What is
-// MEASURED is that byte 48 takes ten values across the 32 sessions, all between
-// 69 and 158, with 120 in 23 of them, and byte 49 takes seven values between 50
-// and 60 with 50 in 25. What is INFERRED is that these are the tempo and the
-// swing: the Circuit's tempo runs 40 to 240 with 120 as its default and its
-// swing runs 20 to 80 with 50 as its default, both readings fit every value, and
-// the mode of each is its default. NOTHING CONFIRMS IT. The experiment that
-// would is one export, one tempo change on the instrument, a second export and a
-// diff, and it needs a person at the Circuit.
+// Measured: byte 48 is 69 to 158 (120 in 23), byte 49 is 50 to 60 (50 in 25). Inferred, not
+// confirmed: tempo and swing, each mode being the Circuit's default.
+// why: lessons/kit-circuit-session.md#test-tempo
 {
   const b48 = all.map((u) => u[48]), b49 = all.map((u) => u[49]);
   ok('MEASURED: byte 48 runs 69 to 158 with 120 in 23 of 32, byte 49 runs 50 to 60 with 50 in 25',
@@ -270,18 +235,15 @@ ok('two payloads per session, 340 bytes each, 340 apart, at 47,300 and 47,640',
 ok('every one of the 64 names is printable ascii and none is empty',
   PAY.flat().every((p) => printable(p.rawName) && p.name.length > 0),
   `${JSON.stringify(PAY[0].map((p) => p.name))}`);
-// 🔴 THE CHECK THAT SAYS THESE REALLY ARE PATCHES AND NOT A COINCIDENCE OF
-// ASCII. `circuit-patch-test.mjs` asserts of the 64 `.syx` payloads that
-// addresses 18 to 31 are zero and that no byte is above 0x7F. Both hold here
-// too, on bytes this module found by arithmetic rather than by looking.
+// Addresses 18 to 31 zero and no byte above 0x7F, as for the `.syx` payloads.
+// why: lessons/kit-circuit-session.md#test-reserved
 ok('all 64 have addresses 18 to 31 zero, the same reserved block a .syx has',
   PAY.flat().every((p) => [...p.data.subarray(18, 32)].every((b) => b === 0)));
 ok('and not one byte of the 21,760 is above 0x7F',
   PAY.flat().every((p) => p.data.every((b) => b <= 0x7f)),
   `${PAY.flat().length * 340} bytes`);
-// ✅ AND THE STRONGEST ONE: TEN OF THEM ARE BYTE IDENTICAL TO A PATCH FILE IN
-// THE SAME PACK. That is the container model and the patch module agreeing about
-// bytes neither of them was pointed at.
+// Ten are byte identical to a patch file in the same pack.
+// why: lessons/kit-circuit-session.md#test-identical
 {
   const eq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
   const exact = PAY.flat().filter((p) => PATCHES.some((q) => eq([...q.data], [...p.data]))).length;
@@ -298,17 +260,9 @@ ok('and not one byte of the 21,760 is above 0x7F',
 
 console.log('\n-- 29 sessions of work and 3 stock slots, from this pack alone --');
 
-// 🔴 `CLAUDE.md` SAYS `32 DISTINCT FINGERPRINTS OF 32, NOT ONE A COPY OF
-// ANOTHER` AND USES THAT TO SAY ALL 32 ARE REAL WORK. The count is true and the
-// conclusion does not follow, because a ONE BYTE delta produces a distinct
-// fingerprint. It is the third time this lesson has arrived: a name was not
-// evidence, then a four byte head was not evidence, and now a unique hash is not
-// evidence either.
-// ✅ AND `circuit-patch-test.mjs` SAYS THIS CANNOT BE SETTLED WITHOUT THE STOCK
-// TEMPLATE, WHICH IS NOT IN THIS REPOSITORY. IT CAN. Comparing the three INIT
-// slots against EACH OTHER needs no template at all, and the separation is
-// enormous: one byte between them, 415 bytes between the closest pair of the
-// other 29.
+// Distinct fingerprints do not prove real work: one byte makes a distinct hash. The three INIT
+// slots differ by one byte from each other, the closest of the other 29 by 415.
+// why: lessons/kit-circuit-session.md#test-init
 {
   const apart = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
   const init = all.map((u, i) => ({ i, u })).filter(({ i }) => SESS[i].header.tag === 'INIT');
@@ -326,8 +280,8 @@ console.log('\n-- 29 sessions of work and 3 stock slots, from this pack alone --
   ok('and all three pairs differ in exactly one byte, so they are one stock image',
     pairs.length === 3 && pairs.every((n) => n === 1), `${pairs.join(', ')} bytes apart`);
 
-  // 🔴 THE FLOOR, WHICH IS THE HALF THAT MAKES ONE BYTE MEAN ANYTHING. Without
-  // it, "one byte apart" is a number with nothing to be small compared to.
+  // The floor that makes one byte small by comparison.
+  // why: lessons/kit-circuit-session.md#test-closest
   let closest = Infinity;
   for (let x = 0; x < rest.length; x++) for (let y = x + 1; y < rest.length; y++) {
     closest = Math.min(closest, apart(rest[x].u, rest[y].u));
@@ -337,9 +291,8 @@ console.log('\n-- 29 sessions of work and 3 stock slots, from this pack alone --
   ok('while the closest pair among the other 29 is 415 bytes apart, and no INIT comes within 262 of one',
     closest === 415 && reach === 262, `${closest} and ${reach}`);
 
-  // 🔴 AND THE CONCLUSION THAT MUST TRAVEL WITH IT. The correction is 32 to 29.
-  // It is not `some of these are disposable`. The owner said `user sessions are
-  // mine. very important` and this pack is still the only backup of 29 of them.
+  // The correction is 32 to 29, and the pack is still the only backup of those 29.
+  // why: lessons/kit-circuit-session.md#test-29
   ok('so the pack holds 29 sessions of work and 3 stock slots, and is still the only backup',
     rest.length === 29 && init.length === 3, `${rest.length} and ${init.length}`);
 }
@@ -372,9 +325,8 @@ if (!fs.existsSync(BOUGHT)) {
   }
   ok('64 of them, every one 53,248 bytes, so the grid applies',
     blanks.length === 64 && blanks.every((b) => b.length === 53248), `${blanks.length}`);
-  // 🔴 AND THEY ARE PADDED WITH 0x00, NOT 0xFF, WHICH IS A FACT THE MODEL HAS TO
-  // SURVIVE RATHER THAN ASSUME. A blank holds 36 non-zero bytes: the four byte
-  // tag and 32 spaces where the name goes. Nothing else.
+  // Blanks are padded with 0x00, not 0xFF: 36 non-zero bytes, the tag and 32 spaces.
+  // why: lessons/kit-circuit-session.md#test-blanks
   ok('not one 0xFF byte anywhere in any of them, and exactly 36 non-zero bytes each',
     blanks.every((b) => !b.some((x) => x === 0xff))
     && blanks.every((b) => [...b].filter((x) => x).length === 36));
@@ -383,10 +335,8 @@ if (!fs.existsSync(BOUGHT)) {
       const s = S.readSession(b);
       return s.header.tag === 'INIT' && s.header.rawName === ' '.repeat(32);
     }));
-  // 🔴 A NEW DISCRIMINATOR, AND IT IS STRONGER THAN THE ONE THAT WAS PUBLISHED.
-  // `CLAUDE.md` and the research both offered the first four bytes, and
-  // `circuit-patch-test.mjs` already corrected that: INIT is on both sides.
-  // DC BB at offset 4 is on one side only, measured over 96 files.
+  // `DC BB` at offset 4 separates the packs over 96 files, where the four byte tag does not.
+  // why: lessons/kit-circuit-session.md#test-dcbb
   ok('DC BB at offset 4 is in all 32 of the owner\'s and in none of the 64 blanks',
     SESS.every((s) => s.header.magicOk) && blanks.every((b) => !S.readSession(b).header.magicOk));
   let rt = 0;
@@ -413,10 +363,8 @@ function battery(u8) {
   add('offset 4 is DC BB', () => S.readSession(u8).header.magicOk);
   add('the name field is printable ascii', () => printable(S.readSession(u8).header.rawName));
   add('the final region carries 848 bytes', () => S.readSession(u8).slots[49].used === 848);
-  // ⚠️ THE LENGTH GUARD IS NOT DECORATION. Without it this check reads GREEN on
-  // a truncated file, because `every` over an empty array is true. It was
-  // written without the guard, the truncation sabotage took 9 red instead of 10,
-  // and the missing one was this.
+  // The length guard matters: `every` over an empty array is true on a truncated file.
+  // why: lessons/kit-circuit-session.md#test-guard
   add('the erasure ending the file starts at 48,092',
     () => u8.length > 48092 && u8.subarray(48092).every((b) => b === 0xff));
   add('two payloads, both named in printable ascii', () => {
@@ -436,13 +384,8 @@ const N = battery(all[0]).length;
 ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
   reds(all[0]).map((c) => c.name).join('; ') || 'nothing red');
 
-// 🔴 SABOTAGE 1: A TRUNCATED FILE.
-// ⚠️ IT TAKES 9 OF 11 AND NOT 11, AND BOTH SURVIVORS ARE CORRECT TO SURVIVE,
-// WHICH IS WHY THEY ARE NAMED HERE RATHER THAN QUIETLY COUNTED. The 1,024 bytes
-// cut off the end were erasure, so the erasure still starts at 48,092 and four
-// fifths of what is left is still erasure. Both statements are true of the
-// truncated file. A check that went red on either would be measuring the length
-// and calling it a share.
+// Sabotage 1: truncated. 9 of 11 red; the two survivors are true of the truncated file.
+// why: lessons/kit-circuit-session.md#test-sabotage-1
 {
   const cut = all[0].slice(0, 53248 - 1024);
   const r = reds(cut);
@@ -454,8 +397,8 @@ ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
     `${threw(() => S.readSession(cut))}, still green: ${alive.join('; ')}`);
 }
 
-// 🔴 SABOTAGE 2: THE 0xFF RUNS REMOVED. Two readings of "removed" and both are
-// worth doing, because they take different things red.
+// Sabotage 2: the 0xFF runs removed, in two readings that take different things red.
+// why: lessons/kit-circuit-session.md#test-sabotage-2
 {
   const stripped = Uint8Array.from([...all[0]].filter((b) => b !== 0xff));
   const r1 = reds(stripped);
@@ -465,18 +408,15 @@ ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
   const flattened = all[0].slice();
   for (let i = 0; i < flattened.length; i++) if (flattened[i] === 0xff) flattened[i] = 0x00;
   const r2 = reds(flattened);
-  // 🔴 AND THIS IS THE ONE THAT MATTERS. Replacing the erasure rather than
-  // deleting it leaves the length, the grid, the header and THE ROUND TRIP
-  // green. It is not a hole to fix: any partition that stores data plus a count
-  // of regenerated padding rebuilds whatever it is given. It is the boundary of
-  // what a round trip can prove, and it is why the structural claims above exist.
+  // Replacing the erasure leaves the round trip green: the limit of what a round trip proves.
+  // why: lessons/kit-circuit-session.md#test-erasure-replaced
   ok(`replacing every 0xFF with 0x00 takes ${r2.length} of ${N} red and leaves the round trip GREEN`,
     r2.length === 3 && !r2.some((c) => c.name.includes('rebuild')),
     r2.map((c) => c.name).join('; '));
 }
 
-// 🔴 SABOTAGE 3: A BLOCK MUTATED. First in the model, which is the one that
-// grades the writer, then in the file, which grades the battery.
+// Sabotage 3: a block mutated, in the model (grades the writer) then the file (the battery).
+// why: lessons/kit-circuit-session.md#test-sabotage-3
 {
   const s = S.readSession(all[0]);
   const target = s.slots[20];                 // a drum region, 32 bytes of data
@@ -493,18 +433,15 @@ ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
     r.length === 1 && r[0].name.includes('printable'), r.map((c) => c.name).join('; '));
 }
 
-// 🔴 SABOTAGE 4: THE WRITER BROKEN FOUR WAYS. Each one is a different thing the
-// model could get wrong, and each has to come out as a different file.
+// Sabotage 4: the writer broken four ways, each a different file.
+// why: lessons/kit-circuit-session.md#test-sabotage-4
 {
   const fresh = () => S.readSession(all[0]);
   const shapes = [];
 
-  // 🔴 A REGION MOVED, AND THE FIRST ATTEMPT AT THIS WAS NOT A SABOTAGE AT ALL.
-  // It swapped drum regions 20 and 21 and the output came back IDENTICAL, which
-  // read as a broken writer and was nothing of the kind: most drum regions in
-  // `session_0` hold 32 zero bytes, so swapping two of them changes nothing.
-  // The pair is chosen by looking now, and the fact that they differ is asserted
-  // before the swap, which is the half that makes the result mean anything.
+  // A region moved: the pair is chosen by looking and asserted different first, since most
+  // narrow regions are identical zeros.
+  // why: lessons/kit-circuit-session.md#test-region-moved
   {
     const s = fresh();
     const eq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -544,9 +481,8 @@ ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
       !d.same && d.first === where, `first differs at ${d.first}, ${d.count} bytes apart`);
   }
 
-  // 🔴 AND THE CONTROL ON THE CONTROLS. A `rebuild` written as `return bytes`
-  // would pass every round trip above and fail every line in this block, so the
-  // block is only worth anything if a correct rebuild still passes.
+  // Control on the controls: an untouched model still rebuilds identically.
+  // why: lessons/kit-circuit-session.md#test-sabotage-control
   ok('while an untouched model still rebuilds identically, so the sabotages are the difference',
     S.compare(S.rebuild(fresh()), all[0]).same);
 }
@@ -555,25 +491,20 @@ ok(`a real session passes all ${N} of the battery`, reds(all[0]).length === 0,
 
 console.log('\n-- what this module must not be able to do --');
 
-// 🔴 THE EXPORT TEST, THE SAME ONE `circuit-patch-test.mjs` RUNS.
+// The export test, the same one `circuit-patch-test.mjs` runs.
+// why: lessons/kit-circuit-session.md#test-exports
 {
   const makers = Object.keys(S).filter((k) => /write|send|encode|emit|sysex|bytes/i.test(k)
     && typeof S[k] === 'function');
   ok('no exported function is named for making or sending a message', makers.length === 0,
     makers.join() || `none of ${Object.keys(S).length} exports`);
 }
-// 🔴 AND THE SOURCE TEST, BECAUSE A NAME TEST CANNOT SEE A CALL INSIDE A
-// FUNCTION. `rebuild()` returns bytes on purpose, so the export test alone would
-// not notice a line that handed those bytes to a port.
+// The source test: a name test cannot see a call inside a function.
+// why: lessons/kit-circuit-session.md#test-source
 {
   const src = fs.readFileSync(path.join(HERE, 'circuit-session.mjs'), 'utf8');
-  // 🔴 THE COMMENTS COME OUT FIRST, AND THAT IS NOT TIDINESS. Written without
-  // this the check went RED on a correct file, because the module's own header
-  // says the words `requestMIDIAccess` and `MIDIAccess` in the sentence
-  // promising it does not call them. That is `CLAUDE.md`'s
-  // `s.includes(<substring>)` rule arriving in a new costume, where `BUILD`
-  // matched inside `REBUILD`. A guard that cannot tell code from prose about
-  // code is not guarding anything.
+  // Comments are stripped first: the module's prose names the calls it promises not to make.
+  // why: lessons/kit-circuit-session.md#test-strip
   const code = src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
@@ -590,21 +521,16 @@ console.log('\n-- what this module must not be able to do --');
 }
 
 
-// ── the note data, which is the first thing this module can say a region HOLDS
-//
-// 🔴 EVERY FIGURE HERE IS REPRODUCED FROM A SECOND IMPLEMENTATION. The
-// derivation is in `research/circuit-session-notes-2026-09-21.md`; this file
-// grades the decoder that shipped from it, against the real pack and against
-// the blanks, which is the only pairing that means anything.
+// Note data, graded against the real pack and against the blanks.
+// why: lessons/kit-circuit-session.md#test-notes
 if (fs.existsSync(PACK)) {
   const notes = all.map((b) => S.notesIn(b));
   const total = notes.reduce((n, x) => n + x.length, 0);
   ok('5,095 note events come out of the owner\'s 32 sessions',
     total === 5095, `${total} events`);
 
-  // 🔴 THE CONTROL, AND IT IS THE ROW THAT SEPARATES THE TWO PACKS. The blanks
-  // pass the shape tests trivially because they are zero filled; the yield is
-  // the one number that cannot be faked by emptiness.
+  // The control: blanks pass shape tests by being zero; the yield cannot be faked by emptiness.
+  // why: lessons/kit-circuit-session.md#test-yield
   ok('and ZERO come out of all 64 purchased blanks, which is what the shape tests cannot tell you',
     blanks.length === 64 && blanks.every((b) => S.notesIn(b).length === 0),
     `${blanks.length} blank sessions, ${blanks.reduce((n, b) => n + S.notesIn(b).length, 0)} events`);
@@ -624,9 +550,8 @@ if (fs.existsSync(PACK)) {
   ok('no velocity is above 127, in 5,095 of 5,095',
     flat.every((e) => e.velocity <= 127),
     `${flat.filter((e) => e.velocity > 127).length} above it`);
-  // ⚠️ AND 105 NOTE BYTES ARE ABOVE THE MIDI RANGE AND ARE NOT EXPLAINED. Said
-  // out loud rather than filtered away: a decoder that clamped them would hide
-  // the one thing about this format nobody understands.
+  // 105 note bytes above 127, unexplained and not clamped.
+  // why: lessons/kit-circuit-session.md#test-above-127
   ok('105 note bytes ARE above 127, all in one session, and that is unexplained rather than hidden',
     flat.filter((e) => e.note > 127).length === 105
     && new Set(flat.filter((e) => e.note > 127).map((e, i) => notes.findIndex((x) => x.includes(flat.filter((y) => y.note > 127)[0])))).size === 1,
@@ -636,7 +561,8 @@ if (fs.existsSync(PACK)) {
     all.every((b) => S.stepGridLooksRight(b).share === 1),
     `${all.filter((b) => S.stepGridLooksRight(b).share === 1).length} of ${all.length} sessions at 256 of 256 records`);
 
-  // 🔴 THE VELOCITY MODE, AND THE SECOND SOURCE IS A FILE ON THIS DISK.
+  // The velocity mode, with a second source on this disk.
+  // why: lessons/kit-circuit-session.md#test-velocity
   const heads = new Map();
   for (const b of all) { const k = b[S.VELOCITY_AT]; heads.set(k, (heads.get(k) || 0) + 1); }
   ok('header byte 8 is a THIRD byte separating the two packs: FF 24 and 07 8 here, 00 on all 64 blanks',
@@ -644,8 +570,8 @@ if (fs.existsSync(PACK)) {
     && blanks.every((b) => b[S.VELOCITY_AT] === 0x00),
     [...heads].map(([k, v]) => `0x${k.toString(16)} x${v}`).join(', '));
 
-  // ⚠️ THE SABOTAGES. A decoder that found notes in anything would pass every
-  // line above, so each of these has to move exactly what it should.
+  // Sabotages: each must move exactly what it should.
+  // why: lessons/kit-circuit-session.md#test-note-sabotages
   const cut = all[0].slice();
   cut[80] = (cut[80] + 7) & 0x7f;
   ok('SABOTAGE: moving one note byte moves exactly that one event and nothing else',
@@ -662,14 +588,9 @@ if (fs.existsSync(PACK)) {
     && notes[0].filter((e) => e.region !== 0).length === S.notesIn(masked).length,
     `${notes[0].length} down to ${S.notesIn(masked).length}`);
 
-  // 🔴 THE NEGATIVE CONTROL THAT MATTERS MOST: a blank with one hand written
-  // record in it must read back exactly what was written, or the decoder is
-  // finding structure that is not there.
-  // ⚠️ GUARDED, BECAUSE EVERY OTHER USE OF `blanks` IN THIS FILE ALREADY WAS.
-  // The soundbank is optional and this file says so in three places and then
-  // indexed `blanks[0]` unconditionally here: moving that directory turned a
-  // clean skip into `Cannot read properties of undefined`, which reads as a
-  // broken decoder rather than as an absent file.
+  // A blank with one hand written record must read back exactly that. Guarded: the soundbank
+  // is optional and an unguarded `blanks[0]` turned a skip into a TypeError.
+  // why: lessons/kit-circuit-session.md#test-planted
   if (!blanks.length) note('the purchased soundbank is not here, so the planted record is unmeasured');
   const planted = blanks.length ? blanks[0].slice() : new Uint8Array(S.SESSION_BYTES);
   const at = S.HEADER_LEN;

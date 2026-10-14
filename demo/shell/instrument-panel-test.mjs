@@ -1,28 +1,7 @@
-// demo/shell/instrument-panel-test.mjs — the panel's ORDER, with no browser.
-//
-//   node demo/shell/instrument-panel-test.mjs
-//
-// 🔴 WHAT IS GRADED HERE IS THE ONE CLAIM THE COMPONENT MAKES THAT IS NOT
-// GEOMETRY: that the sketch's order survives however the caller builds it.
-// `addRow` called after the keyboard and the plate exist still lands above both,
-// and that is the thing most likely to break when somebody adds a fifth row
-// kind. Every claim about a PICTURE — the seam is 1 px, one border round the
-// lot, none inside it, each row paints its own ground, the plate spans its row —
-// is a rect and is graded on `/kit/`, which is the split `instrument-test.mjs`
-// already draws: *"createInstrument needs a `document`, so the assembly itself
-// is graded on /kit/"*.
-//
-// 🔴 AND THIS FILE STUBS A `document` RATHER THAN SKIPPING THE ASSEMBLY, WHICH
-// IS A RISK AND IS WORTH NAMING. A stub that drifts from a real DOM is a test
-// that lies, and a green stub is worth nothing on its own. What makes it safe
-// is that **every claim below is asserted a second time on `/kit/` against a
-// real browser**, so this file is the fast half of a pair rather than the only
-// witness. It is deliberately tiny: an element with a class, a dataset, a list
-// of children, and the four operations these two modules perform on one.
-//
-// ⚠️ AND IT IS A `-test.mjs` BESIDE ITS MODULE, which is this repository's
-// convention for a kit module with a pure part: `looper-test.mjs`,
-// `bay-test.mjs`, `local-remote-test.mjs` and thirty six others.
+// demo/shell/instrument-panel-test.mjs: the panel's order, with no browser. Geometry is graded on
+// /kit/. The stubbed `document` is tiny and every claim here is asserted again on /kit/ in a real
+// browser, so a drifting stub cannot be the only witness.
+// why: lessons/kit-instrument-panel.md#test-header
 
 /* ── the smallest document these two modules can be built against ─────────── */
 function stubDocument() {
@@ -119,8 +98,8 @@ ok('a row refuses one too, which is the half a caller reaches more often',
     r.children.length === 2, `${r.children.length} of 4 appended`);
 }
 
-// 4. 🔴 THE ONE THAT MATTERS. The sketch's order is the component's, not the
-//    caller's, however late a row is asked for.
+// 4. The sketch's order is the component's, not the caller's, however late a row is asked for.
+// why: lessons/kit-instrument-panel.md#t4
 {
   const panel = createInstrumentPanel({
     viz: document.createElement('canvas'),
@@ -187,11 +166,9 @@ ok('a row refuses one too, which is the half a caller reaches more often',
 ok('the four row kinds are named in the order the sketch draws them',
   ROW_KINDS.join(',') === 'viz,controls,keys,plate', ROW_KINDS.join(', '));
 
-// 9. Nothing either module names carries an em dash or a middot. CLAUDE.md, and
-//    it is checked in code because two formatters in this repository stamp them.
-//    ⚠️ THE CHARACTERS ARE BUILT FROM THEIR CODE POINTS so this file does not
-//    itself carry the two things it is checking for, which is the trap the
-//    comment in `local-remote-test.mjs` claims to avoid and does not.
+// 9. No em dash or middot in anything either module names; the characters are built from code
+// points so this file does not carry them itself.
+// why: lessons/kit-instrument-panel.md#t9
 {
   const EM = String.fromCharCode(0x2014), MID = String.fromCharCode(0xB7);
   const words = [...ROW_ALIGN, ...ROW_KINDS];
@@ -199,10 +176,9 @@ ok('the four row kinds are named in the order the sketch draws them',
     words.every((s) => !s.includes(EM) && !s.includes(MID)), `${words.length} words`);
 }
 
-// 10. The foot takes a control at each end, since 2026-09-26. The name keeps its
-//     plate, a status goes after it, a patch that is a control replaces the patch
-//     line, and text written into a control is refused. The text case is asserted
-//     again at the end so this cannot have moved it.
+// 10. The foot takes a control at each end; text written into a control is refused, and the text
+// case is asserted again at the end.
+// why: lessons/kit-instrument-panel.md#t10
 {
   const sw = document.createElement('button'), pk = document.createElement('div');
   const p = createInstrumentPanel({ keys: document.createElement('div'), plate: { name: 'FAU', status: sw, patch: { el: pk } } });
@@ -239,14 +215,9 @@ ok('the four row kinds are named in the order the sketch draws them',
     `${txt.plateRow.children.length} child, ${txt.plateRow.dataset.align}, ${txt.plate.lines.length} lines`);
 }
 
-// 11. 🔴 THE PATCH SELECTOR IS THE FAR END AND CARRIES NO LABEL, BY DEFAULT.
-//     Asked 2026-09-26: *"make rule for instumet panel that patch selector have
-//     no label and is in right"*. A picker is what `createPicker` builds: a
-//     `.pos-pick` wrap holding a `.pos-pick-l` caption when it was given one.
-//     Three claims, each with the wrong answer named: the picker lands LAST in
-//     the row (the order); its caption is gone from the DOM, not hidden (the
-//     label); and the same picker handed in as `status` is refused rather than
-//     drawn beside the name (the option shape `/fau/` shipped for a day).
+// 11. The patch picker lands last in the row, its caption gone from the DOM, and as `status` it is
+// refused.
+// why: lessons/kit-instrument-panel.md#t11
 {
   const picker = () => {
     const wrap = document.createElement('span'); wrap.className = 'pos-pick';

@@ -1,14 +1,6 @@
-// demo/shell/icy-test.mjs — node demo/shell/icy-test.mjs
-//
-// The demuxer was LIFTED out of `shout`'s page, and the audio branch was
-// rewritten on the way: the original kept every un-consumed audio byte in
-// `spare` and re-tested against a constant `need`; this one discards them and
-// decrements `need`. Equivalent in theory, 16 KB lighter, and exactly the kind
-// of "obviously the same" change that loses a title at a chunk boundary.
-//
-// So: a synthetic Icecast stream, fed at every chunk size from 1 byte upward,
-// checked against what was put in. A title that straddles a chunk is the case
-// that matters and is the case a naive parser drops.
+// demo/shell/icy-test.mjs: a synthetic Icecast stream fed at every chunk size from 1 byte up,
+// checked against what went in. A title straddling a chunk is the case a naive parser drops.
+// why: lessons/kit-icy.md#test-header
 import { icyDemuxer } from './icy.mjs';
 
 const METAINT = 64;
@@ -57,12 +49,9 @@ for (const size of SIZES) {
 }
 console.log(`chunk sizes: ${ran - bad}/${ran} reproduce the stream exactly`);
 
-// ── 🔴 THE AUDIO MUST COME BACK OUT, BYTE FOR BYTE ────────────────────────
-// `onAudio` is what `mp3-stream.mjs` decodes, so "the titles were right" says
-// nothing about whether the sound survived. The expected payload is every
-// `METAINT`-byte run with the text taken out; one byte of metadata left in it
-// is a click in the output, and one byte of audio dropped desynchronises the
-// MP3 frame scanner for ever after.
+// The audio must come back byte for byte: a metadata byte left in is a click, a dropped audio
+// byte desynchronises the MP3 frame scanner.
+// why: lessons/kit-icy.md#audio-out
 const expectAudio = new Uint8Array(TITLES.length * METAINT);
 for (let s2 = 0; s2 < TITLES.length; s2++) {
   for (let i = 0; i < METAINT; i++) expectAudio[s2 * METAINT + i] = i & 0xff;
@@ -79,9 +68,8 @@ for (const size of SIZES) {
 console.log(`audio out: ${SIZES.length - audioBad}/${SIZES.length} chunk sizes return the payload byte-identical`);
 if (audioBad) failed = true;
 
-// ⚠️ AND WITH NO `icy-metaint` EVERY BYTE IS AUDIO. This returned early before
-// `onAudio` existed — harmless while the only product was titles, and a
-// no-sound bug the moment somebody wanted the samples.
+// With no `icy-metaint` every byte is audio.
+// why: lessons/kit-icy.md#no-metaint-2
 let plain = 0;
 const eatPlain = icyDemuxer(0, { onAudio: (b) => { plain += b.length; } });
 eatPlain(stream);
@@ -94,8 +82,8 @@ const quiet = icyDemuxer(0, { onTitle: () => fired++, onSlot: () => fired++ });
 quiet(stream);
 console.log(fired === 0 ? 'no metaint: silent, as it must be' : `FAIL: fired ${fired} with no metaint`);
 
-// AND THE GUARD ITSELF: a deliberately broken demuxer must FAIL this test,
-// or the test is decoration. Feed it a stream built with the WRONG metaint.
+// The guard: a demuxer built with the wrong metaint must fail this test.
+// why: lessons/kit-icy.md#control
 const wrong = [];
 const mis = icyDemuxer(METAINT + 1, { onTitle: (t) => wrong.push(t) });
 for (let i = 0; i < stream.length; i += 100) mis(stream.subarray(i, i + 100));

@@ -1,11 +1,6 @@
-// demo/shell/control-grid-test.mjs — the lattice arithmetic, without a browser.
-//
-// 🔴 WHAT THIS FILE CANNOT SEE, SAID AT THE TOP. `createControlGrid` measures a
-// laid out cell, so the grid itself is graded on `/kit/`, where the check reads
-// the DIAL CENTRES and compares the distance across against the distance down.
-// That is the claim the component exists to make and it needs a layout.
-// What is graded here is `pitchFor`, which is where the arithmetic lives, and
-// the two refusals.
+// demo/shell/control-grid-test.mjs: `pitchFor` and the two refusals, without a browser.
+// The grid itself needs a layout and is graded on /kit/ by its dial centres.
+// why: lessons/kit-control-grid.md#test-header
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,11 +20,9 @@ const is = (what, cond, detail) => {
 
 {
   /**
-   * 🔴 THE LARGER OF THE TWO, NEVER THE AVERAGE, AND THIS IS THE ONE DECISION
-   * IN THE FILE. A knob is about 46 px of dial and about 100 px of dial plus
-   * value plus label plus sub, so a mean of 73 would clip the label on every
-   * cell while leaving the dial swimming. The lattice is as big as its biggest
-   * cell needs and the square comes from the pitch being ONE number.
+   * The larger of the two, never the mean: a knob is about 46 px wide and 100 px tall,
+   * and a mean of 73 would clip every label.
+   * why: lessons/kit-control-grid.md#test-larger
    */
   is('the pitch is the larger side, so nothing is clipped to make the square',
     pitchFor(46, 100) === 100 && pitchFor(120, 40) === 120,
@@ -65,11 +58,8 @@ const is = (what, cond, detail) => {
     'a container painting its own edges, which this project has shipped twice');
 
   /**
-   * 🔴 THE COLUMNS ARE A FIXED PITCH AND NEVER `1fr`, AND IT IS WORTH AN
-   * ASSERT BECAUSE `1fr` LOOKS RIGHT. A fractional track stretches with its
-   * container, so the lattice would be square at exactly one width and a
-   * rectangle at every other, which is the defect this component exists to fix
-   * arriving through the stylesheet instead.
+   * Fixed pitch tracks, never `1fr`, which is square at one container width only.
+   * why: lessons/kit-control-grid.md#test-fixed
    */
   is('the tracks are a fixed measured pitch, not a fraction of the container',
     /repeat\(\$\{cols\}, \$\{Math\.round\(pitch\)\}px\)/.test(src)

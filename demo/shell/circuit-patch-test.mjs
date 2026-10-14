@@ -1,20 +1,6 @@
-// demo/shell/circuit-patch-test.mjs — the patch decoder, against the real pack.
-//
-//   CIRCUIT_PACK=<path> node demo/shell/circuit-patch-test.mjs
-//
-// 🔴 IT IS GRADED AGAINST AN IMPLEMENTATION THAT NO LONGER EXISTS, WHICH IS THE
-// ONLY GRADING WORTH HAVING HERE. `research/circuit-soundbank-2026-09-21.md` and
-// `plans/plan-circuit-editor.md` published a census of this exact file, computed
-// by a decoder that lived in a scratchpad and is gone. Every figure below was
-// written down before this module existed, so reproducing one is two independent
-// implementations agreeing about one real artefact. That is the `csound.mjs`
-// lesson applied in advance: a test comparing a decoder against a number derived
-// from the same formula the decoder implements catches a typo and can never
-// catch a misreading.
-//
-// 🔴 AND IT READS THE OWNER'S CIRCUIT PACK (CIRCUIT_PACK=<path>, from
-// the owner's private pack repository), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
-// and nothing here writes.
+// demo/shell/circuit-patch-test.mjs: the patch decoder against the owner's pack (CIRCUIT_PACK=<path>),
+// graded on figures a separate, lost decoder published before this module existed. Reads only.
+// why: lessons/kit-circuit-patch.md#test-header
 import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
@@ -94,9 +80,8 @@ ok('no data byte is above 0x7F', high === 0, `${high}`);
 const printable = (s) => [...s].every((c) => c >= ' ' && c <= '~');
 ok('every patch name is printable ascii', P.every((p) => printable(p.rawName)));
 
-// 🔴 324 IS 340 DATA BYTES LESS THE 16 THE NAME TAKES. If the module's DATA_AT
-// or NAME_LEN were wrong by one this number moves, which is why it is here
-// rather than just the decoded fields.
+// 324 is 340 data bytes less the 16 of the name; off-by-one in DATA_AT or NAME_LEN moves it.
+// why: lessons/kit-circuit-patch.md#varying
 const paramVary = varying.filter((i) => i >= C.DATA_AT + C.NAME_LEN && i <= 348).length;
 ok('246 of the 324 parameter bytes differ between patches', paramVary === 246,
   `${paramVary} of ${349 - (C.DATA_AT + C.NAME_LEN)}`);
@@ -109,7 +94,8 @@ ok('category 2 and genre 3', p0.category === 2 && p0.genre === 3,
   `${p0.category} / ${p0.genre}`);
 ok('the reserved block 18 to 31 is zero in all 64',
   P.every((p) => [...p.data.subarray(18, 32)].every((b) => b === 0)));
-// 🔴 THE SAFETY READING, AND IT IS THE FIRST THING TO KNOW ABOUT ANY .syx.
+// The safety reading comes first for any .syx.
+// why: lessons/kit-circuit-patch.md#byte-6
 ok('byte 6 is a replace current patch, which lands in RAM',
   p0.command === 0 && p0.commandName === 'replace current patch'
   && p0.writesFlash === false && p0.slotName === 'synth 1',
@@ -133,11 +119,9 @@ ok('the median amp attack is 2 and the median release is 40',
   `${median(S.map((s) => s.attack))} / ${median(S.map((s) => s.release))}`);
 ok('4 of 64 hold a release above 80', n((s) => s.release > 80) === 4, `${n((s) => s.release > 80)}`);
 
-// ⚠️ "EQ MOVED OFF CENTRE" IS THE RESEARCH'S PHRASE AND IT HAS TWO READINGS.
-// The three LEVEL bytes off their default gives 21, which is the published
-// figure; counting the frequency bytes too gives 23. The ambiguity was resolved
-// by the number matching, so this one assert is weaker evidence than the rest
-// and says so rather than being quoted as if it were not.
+// EQ off centre has two readings: level bytes give the published 21, with frequencies 23.
+// Weaker evidence than the rest.
+// why: lessons/kit-circuit-patch.md#eq
 const eqLevels = P.filter((p) => ['Equaliser_BassLevel', 'Equaliser_MidLevel', 'Equaliser_TrebleLevel']
   .some((k) => p.value(k) !== 64)).length;
 ok('21 move an EQ level off centre', eqLevels === 21, `${eqLevels}, and counting frequencies too gives 23`);
@@ -158,13 +142,9 @@ ok('the commonest mod destination is the filter frequency', top(dest)[0] === 'fi
 ok('and the commonest source that is not direct is velocity, 31 times',
   top(src)[0] === 'velocity' && top(src)[1] === 31, top(src).join(' '));
 
-// 🔴 THE ONE FIGURE THAT LOOKED LIKE A DISAGREEMENT, AND IS NOT.
-// Research §4.2 says "the factory bank reaches slot 15". Under `used`, which is
-// a depth other than 64, the highest slot this bank reaches is 11. Both are
-// right: slot 15 carries a destination somebody set and a depth of 64, so it is
-// ADDRESSED and reaches nothing. The two definitions are kept apart here because
-// merging them is how a reader gets told an LFO is modulating something when its
-// depth is zero.
+// Slot 15 is addressed (depth 64) and reaches nothing; `used` tops out at 11. Kept apart so an LFO
+// with zero depth never reads as modulating something.
+// why: lessons/kit-circuit-patch.md#slots
 let hiUsed = 0, hiTouched = 0;
 const base = C.addressOf('ModMatrix1_Source1');
 for (const p of P) for (let i = 1; i <= C.MOD_SLOTS; i++) {
@@ -194,32 +174,14 @@ ok('session_0 has 9,179 bytes that are not erasure and 2,238 that are neither er
   stats[0].notErased === 9179 && stats[0].payload === 2238,
   `${stats[0].notErased} / ${stats[0].payload}`);
 
-// 🔴 THE CORRECTION. `CLAUDE.md`, `plans/plan-pack-page.md` §2.1 and
-// `research/circuit-soundbank-2026-09-21.md` all published the first four bytes
-// as a discriminator: `INIT` for a blank against the owner's `DEMO`. This file
-// says otherwise and it is the file.
+// The first four bytes are not a discriminator; this file shows it.
+// why: lessons/kit-circuit-patch.md#heads
 const heads = tally(stats.map((s) => s.head));
 ok('the owner\'s own sessions are USER 22, DEMO 7 and INIT 3',
   heads.USER === 22 && heads.DEMO === 7 && heads.INIT === 3, JSON.stringify(heads));
-// 🔴 THIS ASSERT'S CONDITION WAS RIGHT AND ITS SENTENCE WAS WRONG, WHICH IS THE
-// WORST COMBINATION THERE IS: it read `the three that say INIT are ordinary work
-// rather than blanks` and passed every time. They are not blanks, and they are
-// not work either. MEASURED 2026-09-21 against a stranger's pack off the public
-// archive: one of the three is BYTE IDENTICAL to a stock template that appears
-// ten times in that pack, and the other two differ from it at exactly one
-// byte, 0xBBAC. The owner's other 29 differ from it by 262 to 5,412
-// bytes, a median of 1,524. `index.json` names all three `Initial Session`.
-// ⚠️ SO THE CLAIM HERE IS NARROWED TO WHAT THIS FILE MEASURES: they are not
-// empty. Which one they are is graded in `circuit-session-test.mjs`.
-// 🔴 AND THE SENTENCE THAT USED TO SIT HERE WAS WRONG IN AN INSTRUCTIVE WAY. It
-// said the comparison needs the stock template and so could not be made from
-// this repository. **It needs no template.** MEASURED from the pack alone: the
-// three `Initial Session` slots differ FROM EACH OTHER by exactly one byte, all
-// three pairs; the closest pair among the other 29 is **415 bytes** apart; and
-// no INIT comes within **262 bytes** of any non-INIT. One against a floor of 262
-// is not ambiguous, and **the floor is the half that makes the one byte mean
-// anything**. Reaching for an outside source was the expensive answer to a
-// question the file in hand could settle.
+// The INIT sessions are not empty; which they are is graded in circuit-session-test.mjs. From the pack
+// alone: they differ from each other by 1 byte, and no INIT is within 262 bytes of any other.
+// why: lessons/kit-circuit-patch.md#init
 const initOnes = stats.filter((s) => s.head === 'INIT');
 ok('the three that say INIT are not blanks, whatever else they turn out to be',
   initOnes.every((s) => s.entropy > 0.8 && s.nonZero > 0.8)
@@ -252,11 +214,8 @@ if (!fs.existsSync(BOUGHT)) {
     blanks.every((s) => s.entropy < 0.02) && blanks.every((s) => s.nonZero < 0.001),
     `${Math.max(...blanks.map((s) => s.entropy)).toFixed(3)}, ${(Math.max(...blanks.map((s) => s.nonZero)) * 100).toFixed(2)}%`);
 
-  // 🔴 THE NEGATIVE CONTROL ON THE SAFETY CHECK ITSELF. A check that said the
-  // head separates them would pass every day the blanks happened to differ. It
-  // does not separate them: `INIT` is on BOTH sides. The three numbers that do
-  // separate them are two orders of magnitude apart, which is what the page
-  // rests on.
+  // Negative control on the safety check: `INIT` is on both sides, so the head must not separate them.
+  // why: lessons/kit-circuit-patch.md#blank-heads
   const blankHeads = new Set(blanks.map((s) => s.head));
   const ownHeads = new Set(stats.map((s) => s.head));
   ok('the first four bytes do NOT separate a backup from a blank, because INIT is on both sides',
@@ -284,10 +243,8 @@ ok('a message with no end of sysex is refused',
 ok('a command byte the reference does not define is refused',
   !!(await threw(() => { const b = raw[0].slice(); b[6] = 0x7f; return C.readPatch(b); })));
 
-// 🔴 THE ONE THAT MATTERS MOST. Flip byte 6 from 00 to 01 and the same 350 bytes
-// stop being a message that lands in RAM and become one that overwrites a patch
-// in flash. A reader that did not say so would let somebody open a file, see a
-// patch, and never learn that sending it is destructive.
+// Flip byte 6 from 00 to 01 and the reader must say the message overwrites a flash patch.
+// why: lessons/kit-circuit-patch.md#flip
 {
   const b = raw[0].slice();
   b[6] = 0x01; b[7] = 13;
@@ -297,10 +254,8 @@ ok('a command byte the reference does not define is refused',
     `${p.commandName}, ${p.slotName}`);
 }
 
-// 🔴 AND THE ABSENCE IS ASSERTED RATHER THAN INTENDED. `plans/plan-pack-page.md`
-// §2: the function that turns an intention into bytes does not exist at all, so
-// it cannot be called by mistake. This is the assert that keeps it that way when
-// somebody adds a convenience helper six months from now.
+// The absence of any byte-producing function is asserted, not intended.
+// why: lessons/kit-circuit-patch.md#no-encoder
 {
   const makers = Object.keys(C).filter((k) => /write|send|encode|emit|sysex|bytes/i.test(k)
     && typeof C[k] === 'function');

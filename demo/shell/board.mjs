@@ -1,36 +1,7 @@
-// demo/shell/board.mjs — the Raspberry Pi, from a browser.
-//
-// ⚠️ ONE PAGE USES THIS NOW. `/keys/` was retired on 2026-09-17 (`archive/keys/`)
-// and `/knobs/` moved onto this module the same day, which is the opposite order
-// from the one this header was written in. The reasoning below is kept because
-// it is about WHY the merge was worth making and which half won each argument,
-// and because the next page that plays a board should start here rather than
-// hand-rolling the same six things a third time.
-//
-// Two pages played the same board over the same relay: `/keys/` sent notes and
-// `/knobs/` sends controller values. Everything between the two of them was
-// written twice — joining the room, working out which socket in it is the
-// board, reading the 12-byte frame header, converting int16 to float, raising
-// the `pcm-playout` worklet, choosing a cushion, checking that a frame is the
-// shape the board says it is, and keeping a presence badge honest.
-//
-// 🔴 IT IS THE BETTER OF THE TWO HALVES, NEVER THE AVERAGE. Where the two pages
-// disagreed, the one that had thought about it wins, and each case is named
-// below. `/keys/` hand-rolled its WebSocket and as a result could not tell a
-// FULL ROOM from a DEAD RELAY — a browser cannot read the HTTP status of a
-// refused upgrade, so both arrive as the same silent close, and the relay
-// answers the seventeenth socket `503 room full (16)` with nobody able to hear
-// it. `openWire` asks `/stats` and says which it was. It also mints a new `from`
-// per connection, counts what it sent against what came back, and THROWS on a
-// payload field the envelope would overwrite. `/keys/` had none of that.
-// It also never checked a frame's shape and never learned which socket the
-// board was; both are here.
-//
-// 🔴 WHAT IT DOES NOT OWN. The page keeps its own instrument: which verbs it
-// sends, what its log calls things, what it does with a frame after the playout
-// has it. This is the wire, the sound coming back, and whether anybody is
-// there. CLAUDE.md: a control that exists in one page and nowhere else is a
-// component that has not been noticed yet.
+// demo/shell/board.mjs: the Raspberry Pi, from a browser. The wire, the sound coming back and
+// whether anybody is there; the page keeps its own instrument. `openWire` tells a full room
+// from a dead relay, which a hand-rolled socket cannot.
+// why: lessons/kit-board.md#header
 
 import { openWire, randomId } from './wire.mjs';
 import { createPresence } from './presence.mjs';
@@ -51,65 +22,31 @@ export const FRAME_HEADER_BYTES = 12;
 
 /**
  * Open a board.
- *
- * @param {string} room        the relay room. `studio-1` is the ADDRESS OF THE
- *                             RASPBERRY PI, not a rendezvous a page invented.
- * @param {string} [relay]     override the relay base, for a local worker. Left
- *                             out, `openWire` uses `RELAY_BASE`, which honours a
- *                             loopback `?relay=` (wire.mjs `relayOverride`), so
- *                             every board page reaches `demo/fake-board.mjs`
- *                             with no code of its own.
+ * @param {string} room        the relay room. `studio-1` is the address of the Raspberry Pi.
+ * @param {string} [relay]     override the relay base; left out, `openWire` uses `RELAY_BASE`,
+ *                             which honours a loopback `?relay=` (`demo/fake-board.mjs`).
  * @param {string} [of]        what the presence badge calls it.
- * @param {boolean} [showName] whether the badge PRINTS that name in front of
- *                             the word. Left alone it is today's behaviour,
- *                             which is to print it. See the note on it below.
- * @param {number} [cushionMs] the playout floor. See the note on it below.
+ * @param {boolean} [showName] whether the badge prints that name. See the note below.
+ * @param {number} [cushionMs] the playout floor. See the note below.
  * @param {number} [maxCushionMs]
- * @param {number} [everyMs]   the board's heartbeat, 5 s. The badge THROWS
- *                             without one rather than guessing: a short guess
- *                             calls a working board gone between beats and
- *                             sends somebody to look at hardware that is fine.
- * @param {number} [comingMs]  how long a cold start may take before the badge
- *                             stops saying "on its way".
+ * @param {number} [everyMs]   the board's heartbeat, 5 s. Required by the badge: a short guess
+ *                             calls a working board gone between beats.
+ * @param {number} [comingMs]  how long a cold start may take before the badge stops saying "on its way".
  * @param {function} [log]     `d.log`.
- * @param {function} [onPcm]   `(f32, { peak, seq, samples })` after the playout
- *                             has been given the frame. The page's own business.
+ * @param {function} [onPcm]   `(f32, { peak, seq, samples })` after the playout has the frame.
  * @param {function} [onMessage] every JSON message that is not this page's echo.
  * @param {function} [onOpen]  the socket opened.
+ * why: lessons/kit-board.md#createboard
  */
 export function createBoard({
   room,
   relay = undefined,
   of = 'Raspberry Pi',
   /**
-   * 🔴 WHETHER THE BADGE PRINTS THE NAME, AND THE DEFAULT IS UNCHANGED.
-   * `null` leaves `createPresence` to decide, which for a badge with an `of`
-   * means it prints it, which is what every caller has had since this module
-   * was written. `false` is the one new thing: the badge says `online` and the
-   * name lives only in the tooltip.
-   *
-   * 🔴 IT IS AN OPTION HERE RATHER THAN A RULE IN A PAGE'S STYLESHEET BECAUSE
-   * THE NAME IS PART OF A RESERVED WIDTH, NOT PART OF A STRING. `presence.mjs`
-   * measures `--pres-ch` over every phrase this badge can EVER say, so a badge
-   * that keeps its name reserves room for the longest one. MEASURED 2026-09-29
-   * on a board badge built with the defaults and on the same badge with
-   * `showName: false`: 26 ch and `min-width: 172.187px` against 13 ch and
-   * `min-width: 86.0933px`, which is `Raspberry Pi coming online` against
-   * `coming online`, and the badge round it 190.17 px against 104.08. Hiding
-   * the words with CSS would leave all 172 px of reserve standing and a badge
-   * holding air, and the reserve is the whole reason nothing in it moves while
-   * it redraws.
-   *
-   * ⚠️ AND THE NAME IS NOT LOST TO A SCREEN READER. `presence.mjs`'s `title()`
-   * is `${of} ${word}` whatever the badge shows, so the tooltip and the
-   * accessible name still carry it. CONFIRMED in the same measurement: the
-   * badge read `checking` and its `title` read `Raspberry Pi checking`.
-   *
-   * ⚠️ THE OPTION ALREADY EXISTED ONE LAYER DOWN AND ONLY THIS BUILDER COULD
-   * NOT REACH IT. `demo/kit/index.html` and `demo/shell/instrument.mjs` both
-   * pass `showName: false` to `createPresence` directly; `createBoard` handed
-   * it `of` and `busyWords` and nothing else, so a page using a board had no
-   * way to ask. That is the whole of this change.
+   * Whether the badge prints the name. `null` lets `createPresence` decide (it prints it);
+   * `false` keeps it to the tooltip. An option, not CSS, because the name is part of the
+   * reserved width: 172.187 px against 86.0933 px. The title still carries the name.
+   * why: lessons/kit-board.md#showname
    */
   showName = null,
   rate = BOARD_RATE,
@@ -124,40 +61,17 @@ export function createBoard({
   onMessage = () => {},
   onOpen = () => {},
   /**
-   * 🔴 WHETHER A HARNESS RUN MAY DRIVE THE BOARD. Default `'refuse'`.
-   *
-   * The board is a shared Raspberry Pi in another building, and `verify.mjs`
-   * presses every button in `.pos-controls` on every page on every run. So any
-   * control that reaches the board is a control a suite run works, and a suite
-   * run is dozens of Chromes. `/knobs/` has guarded itself with its own
-   * `MAY_PLAY` flag since it was built, and that is exactly the shape this
-   * moved here to fix: **a page-level guard protects the page that has one,
-   * which is never the page where the mistake gets made.** `/draw/` and
-   * `/grains/` build their own control rows and would not have carried it.
-   *
-   * ⚠️ IT REFUSES THE SEND, NOT THE SOCKET. A page under `?selfcheck=1` still
-   * joins the room, still hears the board, still reports presence and still
-   * grades everything that does not TOUCH the instrument. Refusing the
-   * connection would take those checks away and make the harness blind rather
-   * than polite.
-   *
-   * ⚠️ `?board=1` IS THE ESCAPE HATCH, the same shape as `DEMO_QUERY=base=…`
-   * for the stand-ins: somebody who has been asked to drive the real board
-   * passes it and the guard stands aside.
+   * Whether a harness run may drive the board. Default `'refuse'`: `verify.mjs` presses every
+   * control, and the board is a shared Pi. It refuses the send, not the socket, so checks
+   * still hear the board. `?board=1` is the escape hatch.
+   * why: lessons/kit-board.md#inselfcheck
    */
   inSelfcheck = 'refuse',
   /**
-   * 🔴 A DIRECT PATH TO THE BOARD, BESIDE THE RELAY, AND OFF UNLESS ASKED FOR.
-   * `plans/plan-away-webrtc.md`: the relay was ~72 of the 93 ms from a key
-   * press on `/away/` to its note arriving back. With this on, `goDirect()`
-   * offers two WebRTC data channels to the board through the relay room, and
-   * once they are open the audio arrives on `pcm` and every send leaves on
-   * `ctl`. The relay stays joined throughout, for presence, for signalling and
-   * as the fallback when no channel opens.
-   * MEASURED 2026-09-30, P0, headless Chrome to the Pi on one network: host to
-   * host over UDP, open in 158 ms, 200 of 200 frames echoed at p50 3.7 ms.
-   * ⚠️ AN OFFER IS A SEND, so under `?selfcheck=1` it is refused like any
-   * other: a harness never opens a peer on the board in another building.
+   * A direct WebRTC path beside the relay, off unless asked: `goDirect()` opens `pcm` and `ctl`
+   * channels, the relay stays for presence, signalling and fallback. Measured on one network:
+   * open in 158 ms, 200 of 200 frames echoed at p50 3.7 ms. An offer is a send, refused in a check.
+   * why: lessons/kit-board.md#direct
    */
   direct = false,
   /** The cushion once the direct path is open. The relay's jitter is what the
@@ -167,16 +81,10 @@ export function createBoard({
   directCushionMs = null,
   iceUrl = 'https://pub.positron.studio/ice',
   /**
-   * 🔴 THE PAGE'S OWN AudioContext, SO THE BOARD'S SOUND CAN MEET THE PAGE'S.
-   * Added 2026-10-12, plans/plan-pi-supercollider-defs.md §3.2. Left out, this
-   * module makes its own 48 kHz context as it always has, and every existing
-   * caller is unchanged. Given, the playout is built in THAT context, so a page
-   * can put the board's sound through its own scope, crossfader and meter: two
-   * contexts cannot share a node.
-   * ⚠️ IT MUST RUN AT THE BOARD'S RATE. Nothing in the chain resamples (see
-   * `startAudio`), so a context at any other rate is REFUSED with a line in the
-   * log and `startAudio()` answers null, rather than playing at the wrong pitch.
-   * A page makes its context with `{ sampleRate: 48000 }` on the first gesture.
+   * The page's own AudioContext, so the board's sound can meet the page's (two contexts cannot
+   * share a node). Left out, a 48 kHz context of its own. It must run at the board's rate:
+   * nothing resamples, so any other rate is refused and `startAudio()` answers null.
+   * why: lessons/kit-board.md#audiocontext
    */
   audioContext = null,
   /**
@@ -195,29 +103,18 @@ export function createBoard({
    *  does not change under a running page, and re-reading it per message would
    *  make the answer depend on when it was asked. */
   const q = new URLSearchParams(location.search);
-  // ⚠️ BOTH TIERS ARE A HARNESS (`selfcheck=1` ordinary, `selfcheck=2` deep, see
-  // `demo/shell/selfcheck.mjs`), and a deep run is NOT permission to drive the
-  // board: that is still `?board=1` and nothing else.
+  // Both tiers are a harness (`selfcheck=1` ordinary, `selfcheck=2` deep); only `?board=1`
+  // permits driving the board.
+  // why: lessons/kit-board.md#driving
   const driving = !['1', '2'].includes(q.get('selfcheck')) || q.get('board') === '1' || inSelfcheck === 'allow';
   let refused = 0;
 
   // ── the badge ─────────────────────────────────────────────────────────────
   /**
-   * 🔴 THE BADGE CARRIES A SECOND FACT: IS ANYBODY ELSE DRIVING THIS. Asked
-   * 2026-09-17 and answered in two steps, because the first answer was not good
-   * enough. *"one board per person, private room. - so do we need occupied
-   * status on online badge?"* — yes, because the room is not the unit of
-   * contention. The INSTRUMENT is, and your own second tab is another client.
-   * Then: *"what is 'you' me as user in single widow or the agent messing with
-   * verificiations etc. can we mark agent-messing specially so we can
-   * distinguish"* — which is why there are two words rather than one.
-   *
-   * MEASURED 2026-09-17 and this is what it is for: a parked tab restating
-   * `CC 7 = 22` every 500 ms held a shared synth at a fortieth of its level for
-   * hours. Nothing on any page said so, the counters all read correct, and it
-   * was hunted as a hardware fault. `under test` is the same fault wearing a
-   * harness: `demo/verify.mjs` drives a real page, and without the declaration
-   * in `wire.mjs` a suite run and a person sitting down are identical from here.
+   * The badge carries a second fact: is anybody else driving this, a person or under test.
+   * The instrument, not the room, is the unit of contention: a parked tab restating `CC 7 = 22`
+   * every 500 ms once held a shared synth at a fortieth of its level for hours.
+   * why: lessons/kit-board.md#busy
    */
   const pres = createPresence({
     of,
@@ -229,10 +126,8 @@ export function createBoard({
 
   /**
    * How long a client counts as still driving after its last message.
-   * ⚠️ LONGER THAN `RESTATE_MS`, WHICH IS 500. `cc-adapter.mjs` restates the
-   * whole console every half second with nothing moving, so a page parked on a
-   * slider sends at exactly that cadence; a window shorter than it would blink
-   * the badge on and off rather than reporting a held instrument.
+   * Longer than `RESTATE_MS` (500), or a parked page's restates blink the badge.
+   * why: lessons/kit-board.md#driving-ms
    */
   const DRIVING_MS = 1500;
   let droveAt = 0, droveBy = null, saidDriver = null;
@@ -241,7 +136,8 @@ export function createBoard({
   const DRIVES = new Set(['ctl.set', 'note.on', 'note.off', 'note.panic',
                           'voice.select', 'params.set', 'params.random',
                           'fx.pappus', 'source.set',
-                          // the collide engine's (rig/board/scollide.mjs), since 2026-10-12
+                          // the collide engine's (rig/board/scollide.mjs)
+                          // why: lessons/kit-board.md#drives-collide
                           'sc.load', 'sc.hit', 'sc.set']);
 
   function driverTick() {
@@ -260,19 +156,10 @@ export function createBoard({
   const driverTimer = setInterval(driverTick, 250);
 
   /**
-   * 🔴 ONLY THE BOARD COUNTS AS THE BOARD, AND ONE OF THESE PAGES GOT THIS
-   * WRONG FOR REAL. The relay is VERBATIM: everything in the room reaches
-   * everybody, so marking presence on any message that is not our own echo
-   * paints the badge green when another tab, another page, or a harness run is
-   * in the room while the Raspberry Pi is unplugged. A badge that somebody else
-   * can satisfy is worse than no badge, because it is wrong in precisely the
-   * case it exists for.
-   *
-   * The board is identified by the two messages only it sends — `board.hello`
-   * when it joins and `board.alive` every five seconds. Its `from` is per SOCKET,
-   * so it is learned rather than assumed, and learned again when it reconnects.
-   * ⚠️ AND AUDIO COUNTS TOO. Nothing else puts PCM into this room, and frames
-   * arrive fifty times a second against a heartbeat every five.
+   * Only the board counts as the board: the relay is verbatim, so any other message would paint
+   * the badge green with the Pi unplugged. Learned from `board.hello` and `board.alive` (its
+   * `from` is per socket), and from audio, which only the board sends.
+   * why: lessons/kit-board.md#boardfrom
    */
   let boardFrom = null;
 
@@ -305,54 +192,24 @@ export function createBoard({
       log(`this page's audio runs at ${audioContext.sampleRate} Hz and the board sends ${rate}. Nothing in the chain resamples, so the board's sound is not played into it`, 'bad');
       return null;
     }
-    // ⚠️ ASK FOR THE BOARD'S RATE, BECAUSE NOTHING IN THIS CHAIN RESAMPLES. The
-    // worklet writes the board's samples straight into a ring drained at the
-    // context's own rate: on an output running at 44.1 kHz the pitch is wrong
-    // by the ratio AND the ring fills faster than it drains, so the latency
-    // guard trims several times a second. Periodic clicking, and every readout
-    // green throughout, because frames per second is unaffected.
+    // Ask for the board's rate, because nothing resamples: at 44.1 kHz the pitch is wrong and the
+    // ring overfills, so the guard trims and clicks while every readout stays green.
+    // why: lessons/kit-board.md#rate
     ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)({ sampleRate: rate, latencyHint: 'interactive' });
-    // ⚠️ Fire and move on. `resume()` waits on a user gesture in a real browser
-    // and NEVER REJECTS, so awaiting it is a hang rather than an error.
+    // Fire and move on: `resume()` waits on a gesture and never rejects, so awaiting it hangs.
+    // why: lessons/kit-board.md#resume
     ctx.resume().catch(() => { /* a suspended context is allowed. Sound is late, not broken */ });
     /**
-     * 🔴 AND IF IT NEVER STARTS, THE PAGE SAYS SO. REPRODUCED 2026-09-17 while
-     * chasing *"Knobs is silent"*: with the browser's ordinary autoplay policy
-     * and no user activation, the context stays `suspended`, the worklet is
-     * built, frames keep arriving at fifty a second with a healthy peak, every
-     * counter reads correct, `buffer` sits at 0 ms and NOTHING PLAYS. MEASURED
-     * on the deployed page: arrived peak 0.136, output peak 0.000.
-     *
-     * That is the worst shape a fault can have here, and this module already
-     * carries the same lesson about the board streaming silence. A suspended
-     * context is a normal thing that happens to real people — a tab restored on
-     * load, a gesture that did not count, an iPhone deciding otherwise — and the
-     * only honest thing a page can do is name it, because no counter it displays
-     * can.
-     * ⚠️ IT IS NOT AN ERROR AND MUST NOT READ AS ONE while it is merely late.
-     * `resume()` is fired and not awaited, so a context is briefly suspended on
-     * every single start. The line waits a beat and speaks only if it is STILL
-     * not running, and `statechange` takes it back when it starts.
+     * If the context never starts, the page says so: suspended, frames arriving and nothing plays
+     * (measured: arrived peak 0.136, output peak 0.000). It waits a beat first, since every start
+     * is briefly suspended, and `statechange` takes the line back.
+     * why: lessons/kit-board.md#suspended
      */
     /**
-     * 🔴 ANY GESTURE RESUMES IT, AND THIS IS THE WHOLE BUG. PHOTOGRAPHED
-     * 2026-09-17 on an iPhone: `sound out 0.000`, `buffer 0 ms`, and the page's
-     * own log saying *"the audio is suspended. Press play again, or click
-     * anywhere on the page"*. Clicking anywhere did nothing, because nothing was
-     * listening: `resume()` was fired exactly once, inside `startAudio`, and if
-     * that call did not take there was no second chance for the rest of the
-     * page's life. The page printed instructions it could not honour.
-     *
-     * ⚠️ WEBKIT NEEDS THE CALL INSIDE A GESTURE HANDLER, not merely after one
-     * has happened, and it will not resume a context on its own however many
-     * times somebody taps. So every gesture the document sees gets one attempt
-     * while the context is not running, and the listeners take themselves off as
-     * soon as it is.
-     * ⚠️ `touchend` AS WELL AS `pointerdown`. iOS grants activation on some
-     * events and not others, and the cheap thing is to try on all of them rather
-     * than to be clever about which.
-     * ⚠️ AND THEY ARE PASSIVE AND CAPTURING, so they cannot block a scroll and
-     * cannot be swallowed by a control that stops propagation.
+     * Any gesture resumes it: WebKit needs the call inside a gesture handler, so every gesture gets
+     * one attempt until running. `touchend` as well as `pointerdown`; passive and capturing, so
+     * they cannot block a scroll or be swallowed.
+     * why: lessons/kit-board.md#gestures
      */
     const GESTURES = ['pointerdown', 'touchend', 'mousedown', 'keydown'];
     const offGestures = () => {
@@ -374,18 +231,15 @@ export function createBoard({
       }
       if (saidSuspended) return;
       saidSuspended = true;
-      // ⚠️ THE LINE PROMISES SOMETHING THE PAGE NOW DOES. It said "click
-      // anywhere" while nothing listened for a click, which is worse than saying
-      // nothing: it sent somebody tapping at a page that could not answer.
+      // The line promises only what the page does: a click anywhere now resumes it.
+      // why: lessons/kit-board.md#suspended-line
       log(`the sound is built and arriving but this browser has not let it start: the audio is ${ctx.state}. `
         + 'Tap anywhere on the page and it will start', 'bad');
     };
     ctx.addEventListener('statechange', watchState);
     setTimeout(watchState, 600);
-    // A REQUEST, not a guarantee: a browser may hand back its device rate
-    // anyway. No readout cell for it — a cell reading 48000 forever is a
-    // constant wearing a measurement's clothes. It speaks when it has something
-    // to say.
+    // A request, not a guarantee. No readout cell for it; it speaks only when the rate differs.
+    // why: lessons/kit-board.md#rate-check
     if (ctx.sampleRate !== rate) {
       log(`this browser runs audio at ${ctx.sampleRate} Hz and the board sends ${rate}. Nothing in the chain resamples, so the pitch will be off by ${(rate / ctx.sampleRate).toFixed(3)}x and you will hear clicks`, 'bad');
     }
@@ -394,31 +248,19 @@ export function createBoard({
       { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
     if (toDestination) playout.connect(ctx.destination);
     /**
-     * 🔴 A METER ON WHAT LEAVES, BECAUSE EVERY NUMBER THESE PAGES SHOW IS ABOUT
-     * WHAT ARRIVES. Frames, lost, cushion, and a peak computed from the bytes as
-     * they come in are all upstream of the speaker, and 2026-09-17 was spent
-     * inside that gap: a page reporting fifty frames a second, a healthy peak,
-     * `lost 0` and a full cushion, while nothing at all was audible. Three
-     * separate causes were found that day and each one presented identically.
-     *
-     * An analyser on the playout's OWN output answers the question a person is
-     * actually asking. It costs one node and no callback: `getFloatTimeDomainData`
-     * is pulled when somebody looks, rather than pushing anything.
-     * ⚠️ IT IS TAPPED IN PARALLEL, not inserted. An analyser passes audio through
-     * unchanged, but putting one in the path makes the sound depend on a
-     * measurement, and a meter that can break what it measures is worse than no
-     * meter.
+     * A meter on what leaves, because every other number is about what arrives, and a page once
+     * showed fifty frames a second and a healthy peak while nothing was audible. Tapped in
+     * parallel, not inserted, so a meter cannot break what it measures.
+     * why: lessons/kit-board.md#meter
      */
     meterNode = ctx.createAnalyser();
     meterNode.fftSize = 1024;
     playout.connect(meterNode);
     meterBuf = new Float32Array(meterNode.fftSize);
     /**
-     * 🔴 THE COUNTERS EXISTED ALL ALONG AND NO PAGE HAD EVER READ ONE. They are
-     * posted every 250 ms from inside the worklet; `/able/` sounded noisy for an
-     * hour while six separate measurements said its stream was perfect, because
-     * the defect was downstream of every quantity being measured. A statistic
-     * nobody displays is not instrumentation.
+     * The worklet posts its counters every 250 ms; a statistic nobody displays is not
+     * instrumentation.
+     * why: lessons/kit-board.md#playout-counters
      */
     playout.port.onmessage = (e) => {
       const st = e.data?.stats; if (!st) return;
@@ -435,34 +277,19 @@ export function createBoard({
       }
     };
     /**
-     * The cushion is OURS, not the browser's, which is the whole reason to
-     * carry the samples rather than use WebRTC.
-     *
-     * ⚠️ THE DEFAULT IS THE SMALLER ONE AND A PAGE MAY RAISE IT. MEASURED off
-     * this relay with a node client and no browser in the way: 992 frames in
-     * 20 s, nothing lost, mean gap exactly 20.0 ms, p90 29.5, p99 43.5, worst
-     * single gap 83.6 ms. A cushion has no restoring force, so the floor
-     * RATCHETS when it is proved too small rather than being chosen once.
+     * The cushion is ours, not the browser's. The default is the smaller one and a page may raise
+     * it; measured off this relay: mean gap 20.0 ms, p99 43.5, worst 83.6 ms. The floor ratchets.
+     * why: lessons/kit-board.md#cushion
      */
     playout.port.postMessage({ cmd: 'floor', ms: cushionMs, adaptive: true, maxMs: maxCushionMs });
     return ctx;
   }
 
   /**
-   * The shape of what arrived, checked rather than inferred.
-   *
-   * 🔴 A CHANNEL COUNT CANNOT BE READ OFF A PAYLOAD. 960 int16s is a valid
-   * 20 ms mono frame AND a valid 10 ms stereo one, and guessing wrong plays an
-   * octave down, which sounds like a broken instrument rather than a broken
-   * header. The studio Mac sends stereo and this board sends mono, and both are
-   * on this relay at once.
-   *
-   * ⚠️ THE BOARD ANNOUNCES IT IN `board.hello`, WHICH IT SENDS WHEN IT JOINS, SO
-   * A PAGE THAT JOINS LATER NEVER HEARS IT, and there is no verb that asks for
-   * it again. So the expectation is the board's PUBLISHED framing and the
-   * arriving frames are checked against it: `samples / channels / rate` has to
-   * come out at the frame length claimed. A live announcement overrides the
-   * expectation the moment one arrives.
+   * The shape of what arrived, checked rather than inferred: 960 int16s is 20 ms mono or 10 ms
+   * stereo, and a wrong guess plays an octave down. Checked against the board's published
+   * framing, since `board.hello` is missed by a page that joins later.
+   * why: lessons/kit-board.md#checkshape
    */
   function checkShape(samples) {
     if (shapeChecked) return;
@@ -480,10 +307,9 @@ export function createBoard({
 
   function onBinary(buf) {
     const s = new DataView(buf).getUint32(0, true);
-    // ⚠️ A COUNTER IS ONLY EVIDENCE ON THE FAR SIDE OF A BOUNDARY. This counts
-    // gaps in the BOARD's own sequence, so it measures what the relay dropped
-    // rather than what this page asked for. Byte 4 carries the board's own
-    // `performance.now()`.
+    // Gaps in the board's own sequence, so this measures what the relay dropped.
+    // Byte 4 carries the board's own `performance.now()`.
+    // why: lessons/kit-board.md#sequence
     pres.seen();
     pres.checking(false);
     if (lastSeq >= 0 && s > lastSeq + 1) lost += s - lastSeq - 1;
@@ -493,11 +319,8 @@ export function createBoard({
     const pcm = new Int16Array(buf, FRAME_HEADER_BYTES);
     checkShape(pcm.length);
     const f32 = new Float32Array(pcm.length);
-    // 🔴 THE LOUDEST SAMPLE, BECAUSE A FRAME COUNT CANNOT TELL SOUND FROM
-    // SILENCE. The board captures its JACK graph continuously, so frames arrive
-    // at fifty a second whether or not a note is sounding: `104 frames of audio`
-    // read green through a reported silence. A level is the quantity in
-    // question and a count is one adjacent to it.
+    // The loudest sample, because frames arrive at fifty a second whether or not a note sounds.
+    // why: lessons/kit-board.md#peak
     let hi = 0;
     for (let i = 0; i < pcm.length; i++) {
       f32[i] = pcm[i] / 32768;
@@ -505,9 +328,8 @@ export function createBoard({
       if (a > hi) hi = a;
     }
     if (hi > peak) peak = hi;
-    // ⚠️ THE PAGE IS TOLD BEFORE THE BUFFER IS TRANSFERRED, because posting it
-    // to the worklet DETACHES it. A page reading `f32` after the post would get
-    // a zero-length array and no error at all.
+    // The page is told before the transfer, which detaches the buffer to a zero-length array.
+    // why: lessons/kit-board.md#onpcm-order
     onPcm?.(f32, { peak: hi, seq: s, samples: pcm.length });
     playout?.port.postMessage({ pcm: f32 }, [f32.buffer]);
   }
@@ -524,10 +346,9 @@ export function createBoard({
       if (got.kind !== 'json') return;
       if (got.msg.from === wire.stats().from) return;    // our own line, echoed back
       /**
-       * ⚠️ NOT THE BOARD, AND NOT US. The board's own replies come back through
-       * here too and are not somebody driving it; neither is a page merely
-       * asking a question. `by` is the sender's own declaration of what kind of
-       * client it is, absent for an older page, which reads as `page`.
+       * Not the board and not us; a page merely asking is not driving. `by` is the sender's own
+       * declaration, absent for an older page, which reads as `page`.
+       * why: lessons/kit-board.md#busy-sender
        */
       if (DRIVES.has(got.msg.type) && got.msg.from && got.msg.from !== boardFrom) {
         droveAt = performance.now();
@@ -539,10 +360,9 @@ export function createBoard({
   });
 
   /**
-   * ⚠️ A QUESTION AND ITS ANSWER CARRY THE SAME `type` ON THIS RELAY. The relay
-   * is a broadcast, so another listener merely ASKING looks exactly like the
-   * board answering. The board stamps every answer with `re`, the id of the
-   * message it answers, which is the only thing that tells them apart.
+   * A question and its answer carry the same `type` on this broadcast relay; the board stamps
+   * every answer with `re`, the id it answers.
+   * why: lessons/kit-board.md#heard
    */
   function heard(m) {
     for (let i = waiters.length - 1; i >= 0; i--) {
@@ -578,10 +398,9 @@ export function createBoard({
    *  itself, or null if the roof refused it or the socket is not open. */
   function send(msg) {
     /**
-     * 🔴 THE GUARD, AND IT IS HERE RATHER THAN AT THE SOCKET. See
-     * `inSelfcheck` above. It says so ONCE rather than per message, because a
-     * page that sends a controller sixty times a second would otherwise bury
-     * its own log, and the count is on `refusedToBoard()` for a check to read.
+     * The guard, at the send rather than the socket (see `inSelfcheck`). It says so once;
+     * the count is on `refusedToBoard()`.
+     * why: lessons/kit-board.md#send-guard
      */
     if (!driving) {
       if (refused === 0) {
@@ -593,11 +412,9 @@ export function createBoard({
     }
     if (via !== 'relay' && dx?.ctl?.readyState === 'open') {
       const id = randomId();
-      // ⚠️ NUMBERED, because `ctl` is unordered: the board refuses a note older
-      // than the last one it applied to the same key (rig/board/rtc.mjs). Raw
-      // MIDI on an input's socket, and since 2026-10-11 `note.on` / `note.off`
-      // on the main socket too, or a note off that overtakes its note on
-      // leaves a note held on an instrument in another building.
+      // Numbered, because `ctl` is unordered: the board refuses a note older than the last on that
+      // key (rig/board/rtc.mjs), or a note off overtaking its note on leaves a note held.
+      // why: lessons/kit-board.md#numbered
       const out = { ...msg, id, ...(/^(midi\.send|note\.on|note\.off)$/.test(msg.type) ? { n: ++dxN } : {}) };
       try { dx.ctl.send(JSON.stringify(out)); } catch { return null; }
       return id;
@@ -621,11 +438,9 @@ export function createBoard({
   }
 
   /**
-   * 🔴 ASK ON THE DIRECT LINK OR NOT AT ALL. For a message that must never
-   * reach the relay room, which is tokenless and heard by everybody in it: the
-   * Pi camera's key (/remote/circuit/, 2026-10-13). `ask` falls back to the
-   * relay when `ctl` is not open, which is right for a note and wrong for a
-   * secret, so this answers null instead.
+   * Ask on the direct link or not at all, for a secret such as the Pi camera's key: `ask` falls
+   * back to the tokenless relay room, so this answers null instead.
+   * why: lessons/kit-board.md#askdirect
    */
   async function askDirect(msg, type, ms = 3000) {
     if (!driving || via === 'relay' || dx?.ctl?.readyState !== 'open') return null;
@@ -648,10 +463,9 @@ export function createBoard({
   // selected pair runs through a TURN server. Read from getStats, because a lag
   // measured over a TURN hop is not comparable with one measured direct.
   let via = 'relay', boardDirect = null, dx = null, dxN = 0, rttMs = null, rttTimer = null;
-  // The board's wall clock against this one, from `rtc.pong`'s `at` (since
-  // 2026-10-13): board minus here, in ms, at the round trip's middle. A
-  // property of the two clocks, not of the path, so a figure measured while
-  // direct still holds after a fall back to the relay. Null until measured.
+  // The board's wall clock against this one, from `rtc.pong`'s `at`: board minus here, in ms,
+  // at the round trip's middle. A property of the clocks, so it survives a fall back. Null until measured.
+  // why: lessons/kit-board.md#clock-offset
   let clockOffsetMs = null;
 
   function useRelay(why) {
@@ -793,10 +607,9 @@ export function createBoard({
     /** Offer the direct path; see `direct` above. */
     goDirect,
     /**
-     * Another data channel on the open direct link, or null while there is
-     * none. Since 2026-10-13, for the Pi camera's `cam` channel on
-     * /remote/circuit/: the board holds a listed label and sends nothing
-     * on it until it is asked over `ctl` (rig/board/rtc.mjs `channels`).
+     * Another data channel on the open direct link, or null while there is none; the board sends
+     * nothing on a listed label until asked over `ctl` (rig/board/rtc.mjs `channels`).
+     * why: lessons/kit-board.md#channel
      */
     channel(label, opts = {}) {
       if (via === 'relay' || !dx?.pc) return null;

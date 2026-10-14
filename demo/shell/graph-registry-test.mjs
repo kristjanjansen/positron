@@ -1,32 +1,7 @@
-// demo/shell/graph-registry-test.mjs: what a board says it is, and what a page
-// makes of hearing it, with no board, no socket and no browser.
-//
-//   node demo/shell/graph-registry-test.mjs
-//
-// Step 3 of `plans/plan-universal-routing.md`. `boardGraph` is the board's half
-// and `createRegistry` is the page's half, and both are pure, so the whole round
-// trip from the board's own state to a bay that refuses a bad link runs here.
-//
-// MOST OF THESE ARE NEGATIVE CONTROLS, for the reason `bay-test.mjs` gives: a
-// validator that returns '' unconditionally passes every positive check, and a
-// registry that keeps everything it hears passes every one too. 20 of the 46
-// asserts below are named NEGATIVE CONTROL and each one has to see something
-// refused, skipped or left out.
-//
-// 🔴 PROVED BY BREAKING `graph-registry.mjs` ON A SCRATCH COPY, ONE FAULT AT A
-// TIME, against 46 green (2026-10-04):
-//
-//   sabotage                                        red
-//   graphProblem skips the site check on nodes      1 of 46
-//   ingest answers true for a repeat of one graph   1 of 46
-//   an input's MIDI in has `never: []`              1 of 46
-//   an input's ALSA client described again          1 of 46
-//   the OLDEST announcement per site wins           2 of 46
-//
-// ⚠️ EVERY ROW IS RED BY ITS OWN NAMED ASSERT, and one is enough for the second
-// row because it is the one a page's redraw hangs off: a registry that says
-// *changed* every five seconds redraws `/graph/` on every beat and nobody sees
-// why.
+// demo/shell/graph-registry-test.mjs: what a board says it is and what a page makes of it, with no
+// board, socket or browser. 20 of 46 are negative controls; five sabotages of graph-registry.mjs
+// each go red by their own named assert.
+// why: lessons/kit-graph-registry.md#test-header
 
 import { boardGraph, graphProblem, createRegistry, GRAPH_V, STALE_MS, BOARD_TRANSPORTS, withBoardTransports, SITE_KINDS, BOARD_SITE, boardPort, jackRows, JACK_ENDS } from './graph-registry.mjs';
 import { createBay } from './bay.mjs';
@@ -206,8 +181,8 @@ console.log('\n== into a bay ==');
   ok('NEGATIVE CONTROL: audio into a MIDI in is refused, for the medium',
     !bad.ok && /audio/.test(bad.why) && /midi/.test(bad.why), bad.why);
   const good = b.link('pi-1:collide:audio-out', 'home:page:audio');
-  // A board synth's sound lives in the board's MAIN room (2026-10-04), so the
-  // session names that room, not a derivation of the port's id.
+  // A board synth's sound lives in the board's main room, so the session names that room.
+  // why: lessons/kit-graph-registry.md#session-room
   ok('a valid audio link is made, and carries a session in the board\'s own room',
     good.ok && good.session && good.session.address === 'studio-1', JSON.stringify(good.session));
   ok('and the session knows the two ends are on different machines',
@@ -218,9 +193,9 @@ console.log('\n== into a bay ==');
 }
 
 {
-  // 2026-10-04, step 4: a session has to name the room the stream REALLY lives
-  // in, or a page opening it joins an empty room. The board's inputs stream to
-  // `<room>-<input>` and its video to `<room>-video`.
+  // A session names the room the stream really lives in: inputs at `<room>-<input>`, video at
+  // `<room>-video`.
+  // why: lessons/kit-graph-registry.md#stream-rooms
   const g = boardGraph({ room: 'studio-1', inputs: [{ name: 'circuit', midi: null }], gpu: true });
   const reg = createRegistry();
   reg.ingest({ type: 'board.alive', from: 'b', graph: g });
@@ -240,7 +215,8 @@ console.log('\n== into a bay ==');
   ok('a port that declares nothing is still addressed by derivation', b2.link('x:n:out', 'y:m:in').session?.address === 'x-n-out');
 }
 
-// ── plans/plan-routing-migration.md steps 0 and 1, 2026-10-06 ─────────────
+// plans/plan-routing-migration.md steps 0 and 1
+// why: lessons/kit-graph-registry.md#migration
 
 {
   /* One socket may be two sites, and each is kept. */
@@ -275,7 +251,8 @@ console.log('\n== into a bay ==');
   const tx = (id) => g.ports.find((p) => p.id === id)?.transports?.join(',');
   ok('the board declares relay or a data channel for its sound and relay H.264 for its picture',
     tx('pi-1:synth:audio-out') === 'relay,datachannel' && tx('pi-1:circuit:audio-out') === 'relay,datachannel'
-      // and the main socket's direct `vid` channel since 2026-10-13 (board.mjs `videoDirect`)
+      // and the main socket's direct `vid` channel (board.mjs `videoDirect`)
+      // why: lessons/kit-graph-registry.md#vid-direct
       && tx('pi-1:shader:video-out') === 'relay-h264,datachannel', `${tx('pi-1:synth:audio-out')} | ${tx('pi-1:shader:video-out')}`);
   ok('NEGATIVE CONTROL: a MIDI in and a program in declare no transport, because they carry their own bytes',
     !g.ports.some((p) => p.dir === 'in' && p.transports));
@@ -302,9 +279,8 @@ console.log('\n== into a bay ==');
     v.ok && v.session?.transport === 'relay-h264', JSON.stringify(v.session || v.why));
 }
 
-/* A site says what it is (plans/plan-site-names.md, 2026-10-09). `kind` and
-   `label` are optional, the ids do not move, and an older board that sends
-   neither is still read. */
+// A site says what it is: `kind` and `label` are optional, ids do not move, an older board is read.
+// why: lessons/kit-graph-registry.md#site-kind
 {
   const g = boardGraph({ room: 'studio-1', instruments: { synth: true }, gpu: false });
   ok('a board graph says it is a board, named Raspberry Pi', g.kind === 'board' && g.label === 'Raspberry Pi', `${g.kind} ${g.label}`);
@@ -333,10 +309,8 @@ console.log('\n== into a bay ==');
   ok('NEGATIVE CONTROL: a graph with a bad kind is not heard at all', bad === false && !sites['web-zz']);
 }
 
-/* The Pi's site is `pi-1` and its port names are `<medium>-<dir>`, since
-   2026-10-10 (plans/plan-site-names.md §0, §4c). The room stays `studio-1`, so
-   every stream address is unchanged. Six of the eleven below are NEGATIVE
-   CONTROLS, written so the bug each names would take it red. */
+// The Pi's site is `pi-1`, ports `<medium>-<dir>`, room still `studio-1`. 6 of 11 negative controls.
+// why: lessons/kit-graph-registry.md#pi-1
 {
   const g = desk();
   const names = g.ports.map((p) => p.id.split(':')[2]);
@@ -370,12 +344,8 @@ console.log('\n== into a bay ==');
 console.log('\n== the JACK ends, and one bay link as JACK rows (2026-10-11) ==');
 
 {
-  // 🔴 THE BAY HALF OF THE JACK ARM (plans/plan-nodes-revisited.md §3 item 3).
-  // Twelve asserts, six of them NEGATIVE CONTROLS. Sabotaged 2026-10-11, one
-  // fault at a time, against 95 green: `jackRows` pairing by index whatever the
-  // counts takes 3 red; `boardGraph` defaulting `jack` on takes 4 (one of them
-  // here, three older ones that count nodes and transports); `bay.mjs` dropping
-  // its same-site test takes 1, the two-board control below.
+  // The bay half of the JACK arm: 12 asserts, 6 negative controls, each sabotage goes red.
+  // why: lessons/kit-graph-registry.md#jack
   const plain = desk();
   ok('NEGATIVE CONTROL: a board graph without jack announces no JACK end and no granulator node',
     !plain.ports.some((p) => p.jack) && !node(plain, 'pi-1:pappus') && !node(plain, 'pi-1:capture'));
@@ -439,12 +409,9 @@ console.log('\n== the sampler on the board (2026-10-11) ==');
 console.log('\n== the Pi nodes the concept pages play, under their catalogue names (2026-10-14) ==');
 
 {
-  // 🔴 ASKED 2026-10-14 (*"Make pi announce"*, then *"Perhaps shader is better
-  // than gpu? Should also match web:shader?"*). A node keeps its catalogue name
-  // (`demo/shell/nodes.mjs` NODES) on every site: `pi-1:collide`, `pi-1:drums`,
-  // `pi-1:shader`, `pi-1:camera`, each with the ports, in the order, that the
-  // page drawing it uses. One block per node, each with its NEGATIVE CONTROL:
-  // a board that cannot run that thing announces none of it.
+  // A node keeps its catalogue name on every site, ports in the page's order. Each node has a
+  // negative control: a board that cannot run it announces none of it.
+  // why: lessons/kit-graph-registry.md#catalogue-nodes
   const ids = (g, n) => g.ports.filter((p) => p.id.startsWith(`pi-1:${n}:`)).map((p) => p.id.split(':')[2]).join(',');
 
   const g = desk({ jack: true });

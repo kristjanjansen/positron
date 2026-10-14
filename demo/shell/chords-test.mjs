@@ -1,20 +1,7 @@
-// demo/shell/chords-test.mjs. The chord parser, with no browser at all.
-//
-//   node demo/shell/chords-test.mjs
-//
-// `parseChord` is a grammar and a table, and every bug it has had so far lived
-// in one of them: a case insensitive pass that read `CM` as C MINOR, a bare
-// number read as an octave rather than an extension, and a slash bass folded
-// into the chord so that `F/C` and `Fadd4` came out the same. None of those
-// needs a browser and none of them looks wrong from the outside, because every
-// one of them returns a perfectly good chord that is the wrong chord.
-//
-// THESE ARE MOSTLY NEGATIVE CONTROLS: written so that the bug they name would
-// fail them, rather than so that today's code passes. The count is not written
-// down here, because three comments in two files carried three different counts
-// for one command on 2026-09-23 and all three were true when written. Count it:
-//
-//   grep -c 'NEGATIVE CONTROL' demo/shell/chords-test.mjs
+// demo/shell/chords-test.mjs: the chord parser, with no browser. `node demo/shell/chords-test.mjs`.
+// Every past bug returned a good chord that was the wrong chord, so most are negative controls.
+// Count them: `grep -c 'NEGATIVE CONTROL' demo/shell/chords-test.mjs`.
+// why: lessons/kit-chords.md#test-header
 
 import { parseChord, parseChords, CHORD_GAP, roman, voiceChord, VOICINGS, QUALITIES, QUALITY_SAYS, noteName, ROOT_OCTAVE }
   from './chords.mjs';
@@ -39,17 +26,15 @@ ok('C9 is a dominant ninth, not C in octave 9',
 ok('F/C is F major over a C below it', notes('F/C') === '60,65,69,72', spell('F/C'));
 ok('Fm6/C is a minor sixth over a bass', notes('Fm6/C') === '60,65,68,72,74', spell('Fm6/C'));
 
-// 2. NEGATIVE CONTROL, AND IT IS THE READING THIS PARSER ALMOST SHIPPED. `c5`
-//    beside `cmaj` looks like a NOTE with an octave. `C9` proves it is not, so
-//    `c5` is the power chord and lighting one key here would be wrong.
+// 2. NEGATIVE CONTROL: `c5` is the power chord, not a note in octave 5.
+// why: lessons/kit-chords.md#t2
 ok('c5 is the power chord, root and fifth, not a note in octave 5',
   notes('c5') === '60,67', spell('c5'));
 
 // ── the one place case carries meaning ──────────────────────────────────────
 
-// 3. NEGATIVE CONTROL. MEASURED as a real bug: a case insensitive walk of the
-//    table reaches `m` before `M` and returns C MINOR for `CM`. A wrong chord,
-//    not a refused one, and none of the four examples would have caught it.
+// 3. NEGATIVE CONTROL: a case insensitive walk reads `CM` as C minor.
+// why: lessons/kit-chords.md#t3
 ok('CM is major and Cm is minor', notes('CM') === '60,64,67' && notes('Cm') === '60,63,67',
   `CM ${spell('CM')}, Cm ${spell('Cm')}`);
 
@@ -59,8 +44,8 @@ ok('CM7 is a major seventh and Cm7 is a minor seventh',
   notes('CM7') === '60,64,67,71' && notes('Cm7') === '60,63,67,70',
   `CM7 ${spell('CM7')}`);
 
-// 5. NEGATIVE CONTROL, THE OTHER WAY. Everything that is NOT `M` is case blind,
-//    or a parser that takes `Cmaj` and refuses `CMAJ` is one nobody can use.
+// 5. NEGATIVE CONTROL the other way: everything but `M` is case blind.
+// why: lessons/kit-chords.md#t5
 ok('every other spelling is case blind',
   notes('CMAJ') === notes('Cmaj') && notes('cMaJ') === notes('Cmaj')
   && notes('csus4') === notes('CSUS4'),
@@ -90,38 +75,30 @@ ok('the longest matching quality wins',
   notes('Cmaj7') === '60,64,67,71' && notes('Cm7b5') === '60,63,66,70',
   `Cmaj7 ${spell('Cmaj7')}, Cm7b5 ${spell('Cm7b5')}`);
 
-// ── `C2/E`, the chord this table refused ────────────────────────────────────
-//
-// Reported 2026-09-26 as *"chord or no chord"*, with `/nola/` refusing the
-// typed line `Cmaj7 C2/E` beside an Open Studio lesson playing that exact
-// chord with that exact caption. `demo/resources/chord-refused.mjs` measured
-// what else was being refused, over 2,076 charts and 159,644 written chords.
+// `C2/E`, the chord this table refused, and the counted spellings (159,644 chords).
+// why: lessons/kit-chords.md#t-c2e
 
-// 7a. 🔴 THE NOTE NUMBERS ARE WRITTEN OUT RATHER THAN DERIVED, so this can be
-//     checked against the video by ear rather than against a rule. E3 under
-//     C4 D4 G4: the second and the fifth, and the third underneath.
+// 7a. Note numbers written out, so they can be checked against the video by ear.
+// why: lessons/kit-chords.md#t7a
 ok('C2/E is E3 C4 D4 G4, note numbers 52 60 62 67',
   notes('C2/E') === '52,60,62,67' && spell('C2/E') === 'E3 C4 D4 G4',
   `${parseChord('C2/E').name}   ${spell('C2/E')}   ${notes('C2/E')}`);
 
-// 7b. NEGATIVE CONTROL, AND IT IS THE WHOLE INTERVAL DECISION. `[0, 2, 4, 7]`
-//     is the other defensible reading of the symbol and it makes the slash say
-//     nothing, because the third would already be in the stack. Give `2` a
-//     third and this goes red.
+// 7b. NEGATIVE CONTROL: give `2` a third and the slash says nothing, and this goes red.
+// why: lessons/kit-chords.md#t7b
 ok('a 2 chord has no third in it, which is what leaves the slash something to do',
   parseChord('C2').notes.every((n) => (n - 60) % 12 !== 4)
   && parseChord('C2/E').notes.filter((n) => ((n % 12) + 12) % 12 === 4).length === 1,
   spell('C2'));
 
-// 7c. And the name that comes back is the name that was typed, which is why
-//     `2` is the one row of 2026-09-26 with no `QUALITY_SAYS` entry.
+// 7c. The name that comes back is the one typed; `2` has no `QUALITY_SAYS` entry.
+// why: lessons/kit-chords.md#t7c
 ok('C2 reads back as C2 rather than as Csus2',
   parseChord('C2').name === 'C2' && parseChord('C2/E').name === 'C2/E',
   `${parseChord('C2').name} and ${parseChord('C2/E').name}`);
 
-// 7d. 🔴 AND THE DUPLICATE IS ASSERTED RATHER THAN HIDDEN. `2` and `sus2` are
-//     the same three notes under two real names, and a check that pretended
-//     otherwise would be the file lying about its own table.
+// 7d. `2` and `sus2` are the same three notes under two names, asserted rather than hidden.
+// why: lessons/kit-chords.md#t7d
 ok('2 and sus2 are the same three notes under two names',
   notes('C2') === notes('Csus2') && parseChord('C2').name !== parseChord('Csus2').name,
   `${parseChord('C2').name} ${spell('C2')} against ${parseChord('Csus2').name} ${spell('Csus2')}`);
@@ -140,15 +117,8 @@ ok('2 and sus2 are the same three notes under two names',
     wrong.map(([t]) => t).join(', ') || Object.keys(want).join(' '));
 }
 
-// 7f. 🔴 NEGATIVE CONTROL, AND IT IS ABOUT THREE ROWS THAT ARE NOT THERE. `^`,
-//     `^9` and `+` were counted too (62, 60 and 48 occurrences) and were left
-//     out, because `parseChords` splits a line on everything that is not a
-//     chord character and those three ARE the separator. So a row for one of
-//     them could never be reached from a typed line, which is the same defect
-//     as the `M` row `chords.mjs` removed: a row that cannot be reached reads
-//     as the thing handling the case. This walks the table against the
-//     splitter's own character class rather than against a list, so it refuses
-//     the next unreachable row too.
+// 7f. NEGATIVE CONTROL: no row is unreachable through the splitter's own character class.
+// why: lessons/kit-chords.md#t7f
 {
   /* The splitter's own class, read off the module rather than copied, so the
      two cannot drift. A row survives the split only if no character of it is a
@@ -159,10 +129,8 @@ ok('2 and sus2 are the same three notes under two names',
     unreachable.map((n) => JSON.stringify(n)).join(', ') || `${QUALITIES.length} rows`);
 }
 
-// 7g. 🔴 NEGATIVE CONTROL, AND IT IS THE DEFECT ITSELF: `C+` IS AN AUGMENTED
-//     TRIAD. Until 2026-09-30 the plus was the separator and `C+` came back as C
-//     major with nothing refused, a wrong chord a visitor could not see was wrong.
-//     Against that code this is red.
+// 7g. NEGATIVE CONTROL: `C+` is an augmented triad, not C major with nothing refused.
+// why: lessons/kit-chords.md#t7g
 {
   const r = parseChords('C+');
   ok('C+ reads as an augmented triad rather than as C major',
@@ -171,10 +139,8 @@ ok('2 and sus2 are the same three notes under two names',
     `${r.chords.map((c) => `${c.name} ${c.notes.join(',')}`).join(' ')}, ${r.bad.length} refused`);
 }
 
-// 7h. And a plus standing on its own is still a gap, so a line typed with one
-//     between chords is not suddenly a refusal. `C+7` is refused in words,
-//     because it is not a spelling this table holds, rather than read as
-//     something it is not.
+// 7h. A lone plus is still a gap; `C+7` is refused in words.
+// why: lessons/kit-chords.md#t7h
 {
   const a = parseChords('C + G');
   const b = parseChords('C+7');
@@ -184,9 +150,8 @@ ok('2 and sus2 are the same three notes under two names',
     `${a.chords.map((c) => c.name).join(' ')}, and C+7: ${b.bad[0]?.why}`);
 }
 
-// 7i. ⚠️ `^` IS STILL THE SEPARATOR AND THIS SAYS SO, so that widening it cannot
-//     happen quietly: `C^` is C major with nothing refused, the same lie `C+`
-//     told, left for its own decision because `^` means a major seventh in iRb.
+// 7i. `^` is still the separator, so widening it cannot happen quietly.
+// why: lessons/kit-chords.md#t7i
 {
   const r = parseChords('C^');
   ok('a caret is still eaten by the splitter, which is a known lie and not a fix',
@@ -196,9 +161,8 @@ ok('2 and sus2 are the same three notes under two names',
 
 // ── a slash is a bass, not a chord tone ─────────────────────────────────────
 
-// 8. NEGATIVE CONTROL, AND IT IS WHY THE BASS IS NOT FOLDED INTO THE STACK.
-//    Folding the C of F/C between the F and the A makes it an Fadd4, which is
-//    a different chord with the same notes in a different order.
+// 8. NEGATIVE CONTROL: the bass is not folded into the stack, or F/C becomes Fadd4.
+// why: lessons/kit-chords.md#t8
 ok('a bass sits below the root rather than inside the chord',
   parseChord('F/C').notes[0] < parseChord('F/C').notes[1]
   && parseChord('F/C').notes[0] === 60 && parseChord('F/C').notes[1] === 65,
@@ -238,9 +202,8 @@ ok('Cb wraps down to B', parseChord('Cb').root === 11, `root ${parseChord('Cb').
 
 // ── the separator is everything else ────────────────────────────────────────
 
-// 15. NEGATIVE CONTROL. Asked for as *"can be separated by anyhing"*, so this
-//     cannot be a list of separators. A parser that split on spaces would take
-//     `Cmaj,C9` as one token and refuse it.
+// 15. NEGATIVE CONTROL: any separator, so `Cmaj,C9` is two chords.
+// why: lessons/kit-chords.md#t15
 {
   const want = 'Cmaj,C9,F/C';
   const forms = ['Cmaj C9 F/C', 'Cmaj,C9,F/C', 'Cmaj | C9 | F/C', 'Cmaj->C9->F/C',
@@ -302,10 +265,8 @@ ok('a ninth is above the octave, not a second inside it',
 
 // ── the numeral, and the four frames that decided it ────────────────────────
 
-// 25. The reference was four frames of a piano video with no words on them:
-//     `Cmaj` I, `C9` I, `F/C` IV, `Fm6/C` iv. Between them they fix the key,
-//     the case, the dominant and the bass, which is more than a sentence would
-//     have.
+// 25. The reference is four frames of a piano video: `Cmaj` I, `C9` I, `F/C` IV, `Fm6/C` iv.
+// why: lessons/kit-chords.md#t25
 {
   const r = parseChords('Cmaj C9 F/C Fm6/C');
   ok('the four frames come back exactly as they were labelled',
@@ -313,8 +274,8 @@ ok('a ninth is above the octave, not a second inside it',
     r.chords.map((c) => `${c.text} ${c.roman}`).join(', '));
 }
 
-// 26. NEGATIVE CONTROL, AND IT IS THE WHOLE REASON A NUMERAL SAYS MORE THAN A
-//     NAME. The same root in the same key is IV or iv depending on its third.
+// 26. NEGATIVE CONTROL: the same root in the same key is IV or iv by its third.
+// why: lessons/kit-chords.md#t26
 {
   const r = parseChords('C F Fm');
   ok('case follows the third, so F is IV and Fm is iv',
@@ -401,11 +362,8 @@ ok('an empty line has no key', parseChords('').key === null);
     `${strings.length} strings`);
 }
 
-// ── the voicings, which are what makes a chord playable on 25 keys ─────────
-//
-// 🔴 EVERY ONE OF THESE IS A NEGATIVE CONTROL FOR ROOT POSITION, which is the
-// answer this module gave for a week and which `/nola/` could not fit: a chord
-// spelled upward from one octave is a SPELLING, and a hand needs a voicing.
+// The voicings. Each is a NEGATIVE CONTROL for root position, a spelling a hand cannot use.
+// why: lessons/kit-chords.md#t-voicings
 {
   const LO = 48, HI = 72;                       // the two octaves `/nola/` draws
   const span = (ns) => Math.max(...ns) - Math.min(...ns);
@@ -440,10 +398,8 @@ ok('an empty line has no key', parseChords('').key === null);
       { mode: 'lead', lo: LO, hi: HI, near: first }).notes;
     const plain = voiceChord(parseChord('F').notes, { mode: 'close', lo: LO, hi: HI }).notes;
     const move = (a, b) => a.reduce((s, n) => s + Math.min(...b.map((m) => Math.abs(m - n))), 0);
-    /* 🔴 MEASURED OVER A LINE RATHER THAN OVER ONE PAIR, because one chord
-       after another can tie by luck: `Cmaj` to `F` is 8 semitones of movement
-       either way. What leading is FOR is a progression, so the claim is about
-       the whole line and the number is the total the hand travels. */
+    // Measured over a line, not one pair, since one pair can tie (Cmaj to F is 8 semitones either way).
+    // why: lessons/kit-chords.md#t-line
     const LINE = ['Cmaj', 'F/C', 'G7', 'Am', 'Dm', 'G', 'Cmaj'];
     const walk = (mode) => {
       let prev = [], total = 0;
@@ -479,15 +435,8 @@ ok('an empty line has no key', parseChords('').key === null);
     }
   }
 
-  /* 5. 🔴 WHAT A VOICING ACTUALLY BUYS, AND THE FIRST VERSION OF THIS CHECK
-        CLAIMED THE WRONG THING AND WENT RED SAYING SO. It asserted that root
-        position does not FIT two octaves. It does: the widest of these is
-        fourteen semitones and the window is twenty four, so every one of them
-        fits and the negative control found nothing to report.
-        ✅ THE REAL CLAIM IS THE SPAN, AND IT IS ABOUT A HAND. A chord inside one
-        octave is a chord one hand can hold; `Fm6/C` in root position spans
-        FOURTEEN semitones, which is a stretch nobody makes. Fitting the screen
-        was never the problem. Reaching it was. */
+  // 5. The claim is the span, about a hand: `Fm6/C` in root position spans 14 semitones.
+  // why: lessons/kit-chords.md#t-span
   {
     const LINE = ['Cmaj', 'C9', 'F/C', 'Fm6/C', 'Bmaj7', 'Ab7', 'Dm'];
     const spanOf = (text, mode) => {
@@ -498,12 +447,8 @@ ok('an empty line has no key', parseChords('').key === null);
     };
     const closeSpans = LINE.map((t) => spanOf(t, 'close'));
     const rootSpans = LINE.map((t) => spanOf(t, 'root'));
-    /* 🔴 THE INVARIANT IS THAT IT NEVER WIDENS ONE, and stating it that way is
-       what caught the defect. `every close voicing is inside one octave` was
-       the first claim, it went red at twenty semitones, and the cause was real:
-       packing the BODY tight pulled it away from a slash bass that cannot move
-       with it. A chord with a bass under it cannot be one octave wide and
-       should not pretend to be. */
+    // The invariant is that close never widens a chord; a slash bass cannot be one octave wide.
+    // why: lessons/kit-chords.md#t-never-widens
     ok('a close voicing never widens a chord, bass and all',
       closeSpans.every((n, i) => n <= rootSpans[i]),
       closeSpans.map((n, i) => `${LINE[i]} ${rootSpans[i]}->${n}`).join(', '));
@@ -526,20 +471,9 @@ ok('an empty line has no key', parseChords('').key === null);
       outsideAny.length === 0, outsideAny.join(', ') || 'all of them inside 48 to 72');
   }
 
-  /* 6. \u{1F534} THE SPLIT VOICING, AND THE ONLY EVIDENCE THAT EXISTS FOR IT IS FOUR
-        CHORDS IN A PICTURE. Asked 2026-09-25 as *"what voicing? wanna this"*
-        beside a piano tutorial of `Cmaj7 Dm7 Em7 Fmaj7` on two staves: one bass
-        note per chord in the left hand, C D E F, and three notes in the right
-        that barely move. So the note numbers are WRITTEN OUT here rather than
-        computed from the same rule the module uses, because a reader with the
-        picture in front of them can check these four lines by eye and cannot
-        check a formula. That is the `csound.mjs` lesson: a check derived from
-        the code it grades catches a typo and can never catch a misreading.
-        \u2705 AND THE SABOTAGE COUNTS ARE MEASURED RATHER THAN CLAIMED, 2026-09-25,
-        which is the only reason to believe any of this grades anything. Leaving
-        the root in the hand takes 4 red, dropping it from a slash chord as well
-        takes 2, placing the hand by span instead of leading it takes 1, and
-        dropping the fifth instead of the root takes 5. */
+  // 6. Split voicing: `Cmaj7 Dm7 Em7 Fmaj7` written out from the picture, checkable by eye.
+  // Measured sabotage: root left in 4 red, dropped from slash 2, by span 1, fifth dropped 5.
+  // why: lessons/kit-chords.md#t-split
   {
     const splitOf = (line) => {
       let prev = [], out = [];
@@ -563,10 +497,8 @@ ok('an empty line has no key', parseChords('').key === null);
       got.map((n) => noteName(n[0])).join(' ') === 'C3 D3 E3 F3',
       got.map((n) => noteName(n[0])).join(' '));
 
-    /* \u{1F534} THE CLAIM IS ABOUT THE HAND ABOVE, SO THE HAND ABOVE IS WHAT IS
-       MEASURED. Every note of the right hand moves by a step and none of them
-       jumps, which is what *barely move* means on a stave and what a total in
-       semitones can say. */
+    // The claim is about the hand above, so the hand above is what is measured.
+    // why: lessons/kit-chords.md#t-split-hand
     const move = (a, b) => a.reduce((s, n) => s + Math.min(...b.map((m) => Math.abs(m - n))), 0);
     const hand = got.slice(1).reduce((s, n, i) => s + move(n.slice(1), got[i].slice(1)), 0);
     const worst = Math.max(...got.slice(1).map((n, i) =>
@@ -574,10 +506,8 @@ ok('an empty line has no key', parseChords('').key === null);
     ok('and the hand above barely moves, no note of it further than a whole tone',
       worst <= 2 && hand <= 16, `${hand} semitones over three changes, worst single move ${worst}`);
 
-    /* \u{1F534} ROOTLESS IS THE WHOLE POINT AND IT IS ASSERTED AS AN ABSENCE. A
-       mode that claimed to take the root out of the hand and left it there
-       would pass every structural check above: the notes would still be a
-       chord, still fit, still move little. */
+    // Rootless is asserted as an absence; a mode that left the root in would pass everything else.
+    // why: lessons/kit-chords.md#t-rootless
     const rootless = FOUR.every((text, i) => {
       const r = parseChord(text).root;
       return got[i].slice(1).every((n) => (((n % 12) + 12) % 12) !== r);
@@ -592,11 +522,8 @@ ok('an empty line has no key', parseChords('').key === null);
         return notes.some((n) => (((n % 12) + 12) % 12) === c.root);
       }), 'Cmaj7 keeps its C in root, close and lead');
 
-    /* \u{1F534} NOTHING IS LOST, WHICH IS WHY DROPPING A NOTE IS SAFE AT ALL. The
-       note that left the hand arrived underneath, so a split voicing holds
-       exactly the pitch classes of the spelling. This is the claim that has to
-       survive a triad, a power chord and a slash chord, and it is the one that
-       caught the first reading of what a slash chord should do. */
+    // Nothing is lost: a split voicing holds exactly the spelling's pitch classes.
+    // why: lessons/kit-chords.md#t-nothing-lost
     {
       const pcs = (ns) => [...new Set(ns.map((n) => ((n % 12) + 12) % 12))].sort((a, b) => a - b).join(',');
       const EVERY = ['Cmaj7', 'Dm7', 'Em7', 'Fmaj7', 'Cmaj', 'c5', 'Csus2', 'C13', 'F/C', 'Fm6/C'];
@@ -610,12 +537,8 @@ ok('an empty line has no key', parseChords('').key === null);
         lost.length === 0, lost.length ? `lost a note in ${lost.join(', ')}` : `all ${EVERY.length} of them`);
     }
 
-    /* \u{1F534} A TRIAD HAS NOTHING TO SPARE AND STILL LOSES ITS ROOT, WHICH IS A
-       DECISION RATHER THAN A CONSEQUENCE. Two notes in the right hand is the
-       answer: the alternative, dropping the fifth so that three are left, puts
-       the root back above a bass that already has it, which is the one thing
-       this mode exists to take away. The screenshots are all seventh chords, so
-       this case was unasked and is decided here. */
+    // A triad still loses its root, leaving two notes in the right hand: a decision.
+    // why: lessons/kit-chords.md#t-triad
     {
       const { notes } = voiceChord(parseChord('Cmaj').notes, { mode: 'split', lo: LO, hi: HI });
       ok('a triad is two notes in the right hand over its root, not three with the fifth gone',
@@ -627,12 +550,8 @@ ok('an empty line has no key', parseChords('').key === null);
         five.map(noteName).join(' ') === 'C3 G3', five.map(noteName).join(' '));
     }
 
-    /* \u{1F534} A SLASH CHORD KEEPS ITS ROOT, AND THE REASON IS THE PREMISE RATHER
-       THAN THE SHAPE. This mode's argument is that the note underneath already
-       has the root. `Fm6/C` names a different note underneath, the argument
-       stops being true about it, and taking the F out would delete a note the
-       symbol names. The first version of this dropped it and the check above
-       went red. */
+    // A slash chord keeps its root, because the note underneath is not the root.
+    // why: lessons/kit-chords.md#t-slash-root
     {
       const parsed = parseChord('Fm6/C');
       const { notes } = voiceChord(parsed.notes, { mode: 'split', lo: LO, hi: HI, bass: true });
@@ -643,11 +562,8 @@ ok('an empty line has no key', parseChords('').key === null);
         notes.map(noteName).join(' '));
     }
 
-    /* \u{1F534} NEGATIVE CONTROL FOR THE PLACEMENT, WHICH IS THE HALF A STRUCTURAL
-       CHECK CANNOT SEE. Every assert above would pass on a mode that dropped the
-       root and then put the hand wherever it liked. What says the hand is being
-       LED is that it moves less over a line than the same mode with nothing to
-       lead from, which is the span rule this falls back to on a first chord. */
+    // NEGATIVE CONTROL for placement: the hand must move less over a line than with nothing to lead from.
+    // why: lessons/kit-chords.md#t-placement
     {
       const LINE = ['Cmaj7', 'A7', 'Dm7', 'G7', 'Em7', 'A7', 'Dm7', 'G7'];
       const led = splitOf(LINE);

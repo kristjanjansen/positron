@@ -1,37 +1,7 @@
-// demo/shell/diagram-test.mjs — the diagram's arithmetic, with no browser.
-//
-//   node demo/shell/diagram-test.mjs
-//
-// Three things in `diagram.mjs` are invisible when they are wrong, which is
-// why they are pure functions and why this file exists:
-//
-//   - a column assignment that counted the return paths draws a round trip as
-//     a straight line of five boxes. It looks fine. It is a lie about the
-//     shape, which is the only thing the picture is for.
-//   - a wrap that drops a word looks like a shorter label.
-//   - two return paths at the same depth are ONE line on screen, and the
-//     second one is simply not there.
-//
-// ⚠️ THE RULER HERE IS MADE UP AND THAT IS THE POINT. `getComputedTextLength`
-// needs a live document; a fixed width per character needs nothing and makes
-// every expected number below exact rather than approximate. What it cannot
-// check is the real font — that is /kit/'s job, with real type in a real svg.
-//
-//   - a branch drawn straight through the box in its way looks like a path
-//     that does not exist, and it is the SECOND branch that breaks, so the
-//     first one still looks right.
-//   - a container whose height is a GUESS rather than a measurement looks
-//     right with one box in it and wrong with three, which nobody tries.
-//   - a bold run that toggles on every marker turns one typo into a sentence
-//     that is bold from the mistake to the full stop, and reads as a decision.
-//
-//   - a link drawn to the MACHINE a box sits inside looks exactly like a link
-//     drawn to the box: every arrow is present, the picture is complete, and
-//     each one arrives somewhere plausible and false. Four pages at once.
-//
-// Thirteen of these are NEGATIVE CONTROLS: a check that cannot fail is a check
-// that is decoration, so each of the claims above is also run against an input
-// that must break it.
+// demo/shell/diagram-test.mjs: the diagram's arithmetic, with no browser. Run with node.
+// A made-up ruler (fixed width per character) makes every expected number exact; the
+// real font is /kit/'s job. Thirteen checks are negative controls.
+// why: lessons/kit-diagram.md#test-header
 
 import { assignColumns, backLevels, wrapLines, layout, captionTexts, boldParts, checkEnds, METRICS }
   from './diagram.mjs';
@@ -62,11 +32,9 @@ const TRIP = {
   ],
 };
 
-// A BRANCH THAT REACHES PAST THE BOX IN ITS WAY, which is the shape every fork
-// takes: the second branch always skips whatever the first one landed on. Here
-// the settings go to Cloudflare AND straight on to the board, so `you -> pi`
-// has `cf` standing between its two ends — in the row layout by a column, in
-// the one-column layout by a row. One spec, both modes, one defect.
+// A branch that reaches past the box in its way: `you -> pi` has `cf` between its ends,
+// in both layouts.
+// why: lessons/kit-diagram.md#test-reach
 const REACH = {
   nodes: [
     { id: 'you', label: 'this page', kind: 'here' },
@@ -80,10 +48,9 @@ const REACH = {
   ],
 };
 
-// The fork that `grains` measured out: two copies of one thing, one here and
-// one on a board, fed the same settings. In a row the two copies share a
-// column and nothing is skipped; stacked in one column, `you -> cf` has the
-// copy in this page between its ends.
+// Two copies of one thing fed the same settings. Stacked, `you -> cf` has the page's
+// copy between its ends; in a row nothing is skipped.
+// why: lessons/kit-diagram.md#test-fork
 const FORK = {
   nodes: [
     { id: 'you', label: 'this page', sub: 'one copy here', kind: 'here' },
@@ -100,10 +67,9 @@ const FORK = {
   ],
 };
 
-// A MACHINE WITH TWO PROGRAMS ON IT, which is the case a `sub` under a name
-// draws as one thing. The note reaches ONE of the two programs and the OTHER
-// one answers, so a link that names a box inside a container has to be a real
-// link rather than a link to the container with a caption.
+// A machine with two programs: a link names one box inside a container and the other
+// answers, so it must be a real link to that box.
+// why: lessons/kit-diagram.md#test-nest
 const NEST = {
   nodes: [
     { id: 'you', label: 'your browser', sub: 'a key press', kind: 'here',
@@ -148,9 +114,9 @@ console.log('\n== columns: the longest forward path, and nothing else ==');
 }
 
 {
-  // 🔴 NEGATIVE CONTROL. The same four links with `back` dropped is a forward
-  // circle. If the check above were passing because the graph is simply short,
-  // this would also read 0/1/2; it must not.
+  // Negative control: the same links with `back` dropped form a forward circle and must
+  // not read 0/1/2.
+  // why: lessons/kit-diagram.md#test-circle-control
   const flat = TRIP.links.map((l) => ({ from: l.from, to: l.to }));
   const { col, cycle } = assignColumns(TRIP.nodes, flat);
   ok('dropping `back: true` is DETECTED, not drawn as if it were fine',
@@ -190,10 +156,8 @@ console.log('\n== return paths: never two on one line ==');
 }
 
 {
-  // 🔴 NEGATIVE CONTROL, and the reason this is not a distance table. Two
-  // returns of EXACTLY the same length that overlap would both be "depth 1"
-  // under a rule that reads the distance — one line on screen, the second
-  // silently absent. They must come out different.
+  // Negative control: two overlapping returns of the same length must get different depths.
+  // why: lessons/kit-diagram.md#test-equal-returns
   const levels = backLevels([[0, 200], [100, 300]]);
   ok('two returns of equal length that cross are still told apart',
      levels[0] !== levels[1], `levels ${levels.join(', ')}`);
@@ -268,11 +232,8 @@ console.log('\n== the two layouts, and where one becomes the other ==');
      y.you < y.relay && y.relay < y.box, `y ${y.you} · ${y.relay} · ${y.box}`);
   ok('the return paths route to the LEFT of the boxes, and have room',
      [...xs][0] > 0, `the column starts ${[...xs][0]} px in`);
-  // 🔴 THE GUTTER HOLDS TWO THINGS SIDE BY SIDE, NOT ONE ON TOP OF THE OTHER.
-  // This failed on screen first: `the sound` was drawn with a return path
-  // running straight through it, because the gutter had been sized to
-  // whichever of the lane and the name was wider. A name with a line through
-  // it reads as a name in the wrong place, which is exactly what it was.
+  // The gutter holds lane and name side by side, or a return path runs through its name.
+  // why: lessons/kit-diagram.md#test-gutter-side
   const named = L.links.filter((l) => l.back && l.lab.lines.length);
   ok('a return path never runs through its own name',
      named.length > 0 && named.every((l) => l.lx - ruler(l.lab.lines[0]) >= l.bx + 6),
@@ -280,9 +241,8 @@ console.log('\n== the two layouts, and where one becomes the other ==');
 }
 
 {
-  // ⚠️ THE SWITCH IS A CLIFF AND IT IS SUPPOSED TO BE. 560 px is the line;
-  // one pixel either side must give two different layouts, or the rule is
-  // being decided by something else.
+  // The switch at 560 px is a cliff: one pixel either side gives two layouts.
+  // why: lessons/kit-diagram.md#test-switch
   const a = layout(TRIP, { width: 559, measure });
   const b = layout(TRIP, { width: 560, measure });
   ok('559 px is one column and 560 px is a row',
@@ -311,10 +271,8 @@ console.log('\n== the two layouts, and where one becomes the other ==');
 console.log('\n== a branch: a link that reaches past the box in its way ==');
 
 {
-  // 🔴 THE ROW LAYOUT. A forward link was a straight line from one box's edge
-  // to the other's and routed around NOTHING, so a branch spanning two columns
-  // was drawn through the box in the middle of it — in and out again, with its
-  // name at the midpoint, i.e. under that box.
+  // Row layout: a branch spanning two columns must not be drawn through the box between.
+  // why: lessons/kit-diagram.md#test-row-skip
   const L = layout(REACH, { width: 660, measure });
   const reach = findLink(L, 'you', 'pi');
   const step = findLink(L, 'you', 'cf');
@@ -323,10 +281,8 @@ console.log('\n== a branch: a link that reaches past the box in its way ==');
      L.mode === 'row' && reach.depth !== undefined && reach.depth < top,
      `its lane is at y ${reach.depth}, and the boxes start at ${top}`);
 
-  // 🔴 NEGATIVE CONTROL. If everything were routed, the picture would be all
-  // detours and the check above would pass on a drawer that had learnt
-  // nothing. A step to the NEXT box along has nothing in the way and must
-  // still be the straight line it always was.
+  // Negative control: a step to the next box along is still a straight line.
+  // why: lessons/kit-diagram.md#test-straight-step
   ok('NEGATIVE CONTROL: a step to the next box along is still a straight line',
      step.depth === undefined && /^M[\d.]+ [\d.]+ L[\d.]+ [\d.]+$/.test(step.d),
      step.d);
@@ -341,11 +297,8 @@ console.log('\n== a branch: a link that reaches past the box in its way ==');
 }
 
 {
-  // 🔴 THE ONE-COLUMN LAYOUT, WHICH IS WHERE THIS WAS FOUND. Every box is
-  // stacked, a forward link was a straight vertical at its source's CENTRE,
-  // and a branch reaching past one row therefore ran behind that box and came
-  // out underneath it with an arrowhead into the next one — a phone read a
-  // path the page does not have.
+  // One-column layout: a branch reaching past one row must not run behind that box.
+  // why: lessons/kit-diagram.md#test-column-skip
   const L = layout(FORK, { width: 340, measure });
   const left = L.nodes[0].x, right = L.nodes[0].x + L.boxW;
   const branch = findLink(L, 'you', 'cf');
@@ -355,10 +308,8 @@ console.log('\n== a branch: a link that reaches past the box in its way ==');
      L.mode === 'column' && branch.bx !== undefined && branch.bx >= right,
      `its lane is at ${branch.bx} and the boxes end at ${right}`);
 
-  // ⚠️ THE RETURN PATHS ALREADY OWN THE LEFT-HAND GUTTER. Two kinds of routed
-  // line in one gutter is the overlap bug this file already has three checks
-  // for, in a new costume — so onward goes right, back goes left, and the
-  // boxes are between them.
+  // Onward goes right, back goes left: returns own the left-hand gutter.
+  // why: lessons/kit-diagram.md#test-gutters-apart
   ok('and it never meets the return paths, which have the left-hand gutter',
      backs.length > 0 && backs.every((l) => l.bx <= left) && branch.bx > left,
      `returns at ${backs.map((l) => l.bx).join(', ')} · the branch at ${branch.bx} · boxes ${left}..${right}`);
@@ -368,10 +319,8 @@ console.log('\n== a branch: a link that reaches past the box in its way ==');
        && branch.lx + ruler(branch.lab.lines[0]) <= branch.bx - 6,
      `"${branch.lab.lines[0]}" runs ${branch.lx}..${Math.round(branch.lx + ruler(branch.lab.lines[0]))}, its lane is at ${branch.bx}`);
 
-  // 🔴 NEGATIVE CONTROL: the OTHER branch of the same fork goes to the box
-  // directly under it, has nothing in the way, and must still be the straight
-  // vertical at the source's centre. Routing both would be a picture where
-  // nothing goes anywhere directly.
+  // Negative control: the branch to the box directly under it stays a straight drop.
+  // why: lessons/kit-diagram.md#test-straight-drop
   ok('NEGATIVE CONTROL: the branch to the box under it is still a straight drop',
      straight.bx === undefined && /^M([\d.]+) [\d.]+ L\1 [\d.]+$/.test(straight.d),
      straight.d);
@@ -380,13 +329,9 @@ console.log('\n== a branch: a link that reaches past the box in its way ==');
 console.log('\n== the line under the picture, and the height reserved for it ==');
 
 {
-  // 🔴 THE RESERVATION USED TO START FROM WHATEVER THE ELEMENT WAS SHOWING.
-  // That is the caption only while nothing is hovered — and a re-layout with
-  // the pointer on a box destroys the box that would have put the caption
-  // back, so the element is left holding a five-word sentence and the block is
-  // reserved for THAT. MEASURED: `min-height: 19px` under a 97 px caption, so
-  // the next un-hover grew the page by 78 px, which is the exact jump the
-  // reservation exists to prevent.
+  // The reservation is for the caption, not whatever the element shows; a re-layout under
+  // hover once reserved 19 px under a 97 px caption and the page grew 78 px.
+  // why: lessons/kit-diagram.md#test-caption-reservation
   const spec = { caption: 'a caption long enough to take three lines on a phone, '
                         + 'which is the tallest this line will ever be',
                  links: [{ from: 'a', to: 'b',
@@ -401,9 +346,8 @@ console.log('\n== the line under the picture, and the height reserved for it =='
   ok('and every box\'s own sentence, so hovering one cannot make it grow either',
      t.includes(nodes[0].note),
      t.slice(1).map((x) => `"${x}"`).join(' · '));
-  // 🔴 A LINK'S SENTENCE IS ONE OF THE STRINGS THIS LINE HOLDS, and the
-  // reservation never knew about them: a note longer than the caption grew the
-  // block on hover, which is the jump the whole mechanism exists to prevent.
+  // A link's sentence is one of the strings this line holds.
+  // why: lessons/kit-diagram.md#test-link-sentence
   ok('and an arrow\'s sentence too, which the reservation used to miss entirely',
      t.includes(spec.links[0].note),
      `${t.length} strings for 2 boxes and 1 arrow`);
@@ -421,10 +365,9 @@ const roomFor = (L, l, lanes) => {
 };
 
 {
-  // 🔴 A STEP'S NAME USED TO BE MEASURED AGAINST HALF A BOX. Between two
-  // stacked boxes is a gap that is empty right across the picture with one
-  // short arrow in it — MEASURED at 258 px in /kit/, that budget handed
-  // `settings` 41 px with 106 px of nothing beside it, and cut it.
+  // A step's name is measured against the empty row, not half a box: at 258 px that budget
+  // gave `settings` 41 px and cut it.
+  // why: lessons/kit-diagram.md#test-step-budget
   const L = layout(FORK, { width: 340, measure });
   const step = findLink(L, 'you', 'near');
   const lanes = PAD_GUESS + (L.links.filter((l) => l.back).length - 1) * 14 + 6;
@@ -437,10 +380,8 @@ const roomFor = (L, l, lanes) => {
 }
 
 {
-  // 🔴 NEGATIVE CONTROL, and the one that matters most here: a budget that
-  // grew until nothing was ever cut would be indistinguishable from a drawer
-  // that had silently stopped reporting. A name nobody could fit must still be
-  // cut, and must still be COUNTED.
+  // Negative control: a name nobody could fit must still be cut and counted.
+  // why: lessons/kit-diagram.md#test-unfittable
   const spec = {
     nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
     links: [{ from: 'a', to: 'b', label: 'a name for this arrow that will never fit' }],
@@ -453,17 +394,9 @@ const roomFor = (L, l, lanes) => {
 }
 
 {
-  // 🔴 A GUTTER IS SIZED BY WHAT ITS NAMES NEED, NOT BY A SHARE OF THE
-  // PICTURE. Under the old flat 30% the same two names would move the boxes to
-  // a different place on a wider page, for no reason anybody could point at —
-  // and, worse, the name was WRAPPED to that share and the widest result then
-  // sized the gutter, so a cut made the gutter smaller, which made the cut.
-  //
-  // ⚠️ AND THE TWO WIDTHS ARE CHOSEN SO THE OLD RULE WOULD FAIL IT. A name of
-  // 100 px is under 30% of 420 and over 30% of 300, so a share-of-the-picture
-  // budget cuts it at one width and not the other and the gutter comes out
-  // 60 px apart. Picked at 460 and 540 first, where 30% never bit either way
-  // and the check passed on the broken code — a test that cannot fail.
+  // A gutter is sized by its names, not a share of the picture. Widths 300 and 420 straddle
+  // a 100 px name at 30%, so the old rule fails here (460 and 540 never bit).
+  // why: lessons/kit-diagram.md#test-gutter-names
   const spec = {
     nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
     links: [{ from: 'a', to: 'b', label: '' },
@@ -479,9 +412,8 @@ const roomFor = (L, l, lanes) => {
 }
 
 {
-  // 🔴 WHEN IT WILL NOT ALL FIT, THE BOXES' OWN WORDS WIN. A picture that
-  // shortens the names of the things it is about is broken where a reader can
-  // see it; an arrow name that had to give way is reported instead.
+  // When it will not all fit, the boxes' own words win and arrow names are reported.
+  // why: lessons/kit-diagram.md#test-box-words
   const spec = {
     nodes: [
       { id: 'a', label: 'here', sub: 'a fairly long line here' },
@@ -500,9 +432,8 @@ const roomFor = (L, l, lanes) => {
 }
 
 {
-  // 🔴 NEGATIVE CONTROL: the side is CHOSEN, not swapped. With nothing routed
-  // in either gutter the boxes sit in the middle, the two sides are equal, and
-  // the name stays where it has always been.
+  // Negative control: with equal sides the name stays where it always was.
+  // why: lessons/kit-diagram.md#test-name-side
   const spec = {
     nodes: [{ id: 'a', label: 'here' }, { id: 'b', label: 'there' }],
     links: [{ from: 'a', to: 'b', label: 'onward' }],
@@ -517,18 +448,9 @@ const roomFor = (L, l, lanes) => {
 console.log('\n== and no name has its own arrow drawn through it ==');
 
 {
-  // 🔴 "SIX PIXELS ABOVE THE MIDDLE" ONLY CLEARS A HORIZONTAL ARROW. A fork's
-  // arrows are DIAGONAL, and MEASURED in /kit/ the line climbed 5.4 px through
-  // the middle of `settings`. The line here is rebuilt from the path string
-  // rather than from the drawer's own numbers, so this cannot pass by agreeing
-  // with the formula it is checking.
-  //
-  // ⚠️ AND IT IS MEASURED ACROSS THE NAME'S WHOLE WIDTH, NOT AT ITS MIDDLE.
-  // Written against the midpoint first, where a straight line is at the
-  // midpoint's own height whatever its slope — so a flat six pixels up scored
-  // exactly six and the check passed on the broken code. The clearance a
-  // reader sees is at the ENDS of the word, which is where the line reaches
-  // it; positive means the name is above its line and negative below.
+  // The line is rebuilt from the path string, and measured across the name's whole width,
+  // not its middle, where any slope scores the same. Positive means above its line.
+  // why: lessons/kit-diagram.md#test-name-clearance
   const L = layout(FORK, { width: 660, measure });
   const clear = (l) => {
     const [[x1, y1], [x2, y2]] = pathPoints(l.d);
@@ -547,20 +469,17 @@ console.log('\n== and no name has its own arrow drawn through it ==');
      `"${up.lab.lines[0]}" is ${Math.round(gapUp)} px off its line, ` +
      `"${down.lab.lines[0]}" is ${Math.round(gapDown)} px off its`);
 
-  // 🔴 AND THE SECOND-ORDER ONE, which lifting alone produced: two branches
-  // leaving one box open a WEDGE, and both names lifted above their own line
-  // put the lower one inside the upper one's path. MEASURED at 4.2 px in.
+  // A fork's two names must not fall into the wedge the branches open (once 4.2 px in).
+  // why: lessons/kit-diagram.md#test-fork-wedge
   ok('and a fork\'s two names sit on opposite sides, so the wedge stays empty',
      Math.sign(gapUp) !== Math.sign(gapDown) && gapUp !== 0 && gapDown !== 0,
      `the rising one is ${gapUp > 0 ? 'above' : 'below'} its line, the falling one is ${gapDown > 0 ? 'above' : 'below'} its`);
 }
 
 {
-  // 🔴 A BOX'S TWO ATTACHMENT POINTS ARE 12 PX APART AND A LINE OF THIS TYPE
-  // IS 11 PX TALL, so a name placed BETWEEN them cannot clear both — MEASURED
-  // in /kit/, the run leaving a box cut 2 px through the ascenders of the name
-  // belonging to the run arriving at it. It goes below both instead, which is
-  // where the row layout has always put a return's name.
+  // Attachment points are 12 px apart and a name 11 px tall, so a return's name goes below
+  // both runs.
+  // why: lessons/kit-diagram.md#test-return-name
   const L = layout(TRIP, { width: 320, measure });
   const back = L.links.find((l) => l.back && l.lab.lines.length);
   const t = L.nodes.find((n) => n.id === back.to);
@@ -583,12 +502,9 @@ console.log('\n== and no name has its own arrow drawn through it ==');
 console.log('\n== a box inside a box ==');
 
 {
-  // 🔴 A CONTAINER IS MEASURED FROM WHAT IS IN IT. Nothing here re-derives the
-  // drawer's own formula — that is the mistake `timeline/csound.mjs` made for
-  // months, where the check and the code shared a misreading. These are the
-  // things a READER sees: each box is inside its container on all four sides,
-  // the two do not overlap each other, and the container's own name is above
-  // the first of them.
+  // A container is measured from what is in it, checked as a reader sees it: boxes inside
+  // on all four sides, not overlapping, below the container's name.
+  // why: lessons/kit-diagram.md#test-container
   const L = layout(NEST, { width: 660, measure });
   const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth'), rec = boxOf(L, 'rec');
   ok('a box inside a container is drawn inside it, on all four sides',
@@ -603,10 +519,8 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 NEGATIVE CONTROL, and it is the one that matters: a container whose
-  // height was a GUESS — a constant, or the plain box height plus a number —
-  // would come out the same whatever was put in it. A third box in it must
-  // make it taller, and the picture with it must be taller still.
+  // Negative control: a third box must make the container and the picture taller.
+  // why: lessons/kit-diagram.md#test-container-grows
   const two = layout(NEST, { width: 660, measure });
   const three = layout({ ...NEST, nodes: [NEST.nodes[0],
     { ...NEST.nodes[1], children: [...NEST.nodes[1].children,
@@ -623,19 +537,9 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 EVERY LAYOUT THAT EXISTED BEFORE NESTING COMES OUT BYTE-IDENTICAL, and
-  // this is the cheap in-suite half of that claim: the same description with
-  // an EMPTY `children` on every box must be the same picture to the last
-  // decimal. If any of the new arithmetic ran unconditionally it would show
-  // up here as a diff. (The other half is every spec in this file and in
-  // /kit/ diffed against the version before the change, at 17 widths.)
-  //
-  // ⚠️ AND IT TAKES TWO ASSERTS, because the obvious one is an A/B where both
-  // arms share the bug: layout(spec) against layout(spec + `children: []`)
-  // comes out equal even when the nesting arithmetic runs unconditionally,
-  // since it then runs on BOTH. MEASURED by sabotage — forcing the container
-  // branch always on left this at 63/63 until the second line existed. So the
-  // result is also checked for any TRACE of nesting: no empty list, no key.
+  // Layouts without nesting come out identical with an empty `children`, and the result
+  // carries no trace of nesting: an A/B alone passes when both arms share the bug.
+  // why: lessons/kit-diagram.md#test-no-nesting
   const L = layout(TRIP, { width: 660, measure });
   const plain = JSON.stringify(L);
   const withKey = JSON.stringify(layout(
@@ -649,10 +553,8 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 LEFT TO RIGHT, AN ARROW REACHES THE BOX IT NAMES. The ground between a
-  // container's edge and a box inside it is empty sideways, so the arrowhead
-  // lands on the synthesiser rather than on the board — which is the whole
-  // reason a link may name a box inside a container at all.
+  // Left to right, an arrow lands on the box it names, not on the board around it.
+  // why: lessons/kit-diagram.md#test-row-reaches
   const L = layout(NEST, { width: 660, measure });
   const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth'), you = boxOf(L, 'you');
   const note = findLink(L, 'you', 'synth');
@@ -660,13 +562,9 @@ console.log('\n== a box inside a box ==');
   ok('left to right the arrow reaches the box it names, not the machine',
      end[0] > pi.x && end[0] <= synth.x, `it ends at x ${end[0]}, ` +
      `the machine's edge is ${pi.x} and the box inside it starts at ${synth.x}`);
-  // 🔴 AND ITS NAME IS MEASURED AGAINST THE GAP BETWEEN THE MACHINES, NOT
-  // AGAINST THE LINE. The line is longer, because it carries on past the
-  // container's edge to the box inside it — and the room beside that last
-  // stretch is not empty, it is the container. A name budgeted on the run
-  // would be written over the machine it is entering, which is the same defect
-  // as a name under a box, one layer in. So the budget is the shorter number
-  // and the name sits at the middle of the gap.
+  // The name is budgeted on the gap between the machines, not the longer line, and sits at
+  // the middle of the gap.
+  // why: lessons/kit-diagram.md#test-name-in-gap
   const run = Math.abs(end[0] - pathPoints(note.d)[0][0]);
   const gap = (pi.x - EDGE_OUT - 1) - (you.x + you.w + EDGE_OUT) - 1;
   const cut = L.cuts.find((c) => c.id === 'you to synth');
@@ -680,24 +578,9 @@ console.log('\n== a box inside a box ==');
 
 {
   /**
-   * 🔴 STACKED, THE SAME ARROW REACHES THE SAME BOX, AND IT GETS THERE DOWN
-   * THE CONTAINER'S PADDING.
-   *
-   * This used to assert the OPPOSITE — that in one column the line stops at
-   * the machine's edge — on a reason that is still true: a container's name is
-   * at the TOP of it, so a vertical run coming down the middle crosses the
-   * words `Raspberry Pi` on its way in, and every box stacked above the one it
-   * wants. What was wrong was the conclusion. PHOTOGRAPHED 2026-09-19 on four
-   * pages at once: `WebGL2 -> shader` drawn from the Browser's own edge,
-   * `store -> play` arriving beside `uploader`, `ffmpeg -> up` leaving the
-   * Raspberry Pi. An arrow that ends at the wrong box is a picture claiming a
-   * path the page does not have, which is the defect a refused link was
-   * already reported for.
-   *
-   * So the line turns out of the box's side and runs in a lane inside the
-   * container's own padding, which is the one strip in there that is empty
-   * from top to bottom. Both halves are asserted: it ARRIVES at the box, and
-   * nothing it draws inside the machine is anywhere near that machine's words.
+   * Stacked, the same arrow reaches the same box down the container's padding, and nothing
+   * it draws inside the machine is near the machine's words.
+   * why: lessons/kit-diagram.md#test-column-reaches
    */
   const L = layout(NEST, { width: 320, measure });
   const pi = boxOf(L, 'pi'), synth = boxOf(L, 'synth');
@@ -720,11 +603,8 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 TWO BOXES IN ONE CONTAINER ARE LINKED IN THE GAP THEY SHARE. This used
-  // to assert the opposite — that the link was dropped and reported — and
-  // /station/ is what changed it: grouping seven boxes into three machines
-  // killed three real arrows and left the plain ties standing where they had
-  // been, so the picture claimed a chain that does not exist.
+  // Two boxes in one container are linked in the gap they share.
+  // why: lessons/kit-diagram.md#test-sibling-link
   const L = layout({ ...NEST,
     links: [...NEST.links, { from: 'synth', to: 'rec', label: 'plays it' }] },
     { width: 660, measure });
@@ -738,11 +618,8 @@ console.log('\n== a box inside a box ==');
      pts[0][1] >= synth.y + synth.h && pts.at(-1)[1] <= rec.y
      && pts.every(([x]) => Math.abs(x - synth.cx) < 0.6),
      `y ${pts[0][1]} to ${pts.at(-1)[1]}, between ${synth.y + synth.h} and ${rec.y}, at x ${pts[0][0]}`);
-  // 🔴 AND IT CARRIES NO NAME. Sixteen pixels of gap, half a box wide: a name
-  // there runs under both boxes or shrinks past reading. The direction is the
-  // message; what travels goes in the link's `note`. A label written anyway is
-  // REPORTED, because a label that is nowhere on the picture and nowhere in a
-  // report is a label its author will keep believing is drawn.
+  // A sibling link carries no name; a label written anyway is reported.
+  // why: lessons/kit-diagram.md#test-sibling-no-name
   ok('and it carries no name, because the gap it runs in cannot hold one',
      step.lab.lines.length === 0 && step.lab.full === 'plays it',
      `"${step.lab.lines.join(' ')}" drawn, "${step.lab.full}" kept for the hover`);
@@ -750,10 +627,9 @@ console.log('\n== a box inside a box ==');
      L.cuts.some((c) => c.id === 'synth to rec' && /NOT DRAWN/.test(c.shown)
                      && /note/.test(c.shown)),
      L.cuts.filter((c) => c.id === 'synth to rec').map((c) => c.shown).join(' | ') || 'nothing reported');
-  // 🔴 NEGATIVE CONTROL, AND IT IS THE HALF THE OLD RULE GOT RIGHT: a box and
-  // the box it is INSIDE have no gap between them at all. Still refused, and
-  // now on `cuts` as well, because a console warning nobody reads is how the
-  // three missing arrows stayed missing.
+  // Negative control: a box and the box it is inside have no gap, so the link is refused
+  // and on `cuts`.
+  // why: lessons/kit-diagram.md#test-self-link
   const N = layout({ ...NEST,
     links: [...NEST.links, { from: 'pi', to: 'synth', label: 'inwards' }] },
     { width: 660, measure });
@@ -764,9 +640,8 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 AND ONE THAT REACHES PAST THE BOX BETWEEN THEM GETS A LANE. Down the
-  // middle it would pass straight through the box it never visits, which is
-  // the fork bug the lanes over and under the row already exist to stop.
+  // A sibling link that reaches past the box between gets a lane.
+  // why: lessons/kit-diagram.md#test-sibling-lane
   const spec = { ...NEST,
     nodes: [NEST.nodes[0], { ...NEST.nodes[1], children: [...NEST.nodes[1].children,
       { id: 'log', label: 'a log', sub: 'says what it did' }] }],
@@ -788,9 +663,8 @@ console.log('\n== a box inside a box ==');
 }
 
 {
-  // 🔴 A COLUMN IS A STATEMENT ABOUT THE MACHINES. A link naming a box inside
-  // one must be counted against the machine, or the program gets a column of
-  // its own and the picture says the signal visits a place it never leaves.
+  // A link naming a box inside a machine is counted against the machine for columns.
+  // why: lessons/kit-diagram.md#test-columns-machine
   const L = layout({
     nodes: [
       { id: 'you', label: 'here' },
@@ -808,11 +682,8 @@ console.log('\n== a box inside a box ==');
 console.log('\n== the line under the picture says what a box DOES ==');
 
 {
-  // 🔴 A BOX'S SENTENCE IS WHAT THE LINE WILL HOLD, SO IT IS WHAT THE HEIGHT
-  // IS RESERVED FOR. Reserving against the box's NAME while the pointer shows
-  // its sentence is the same defect as reserving against the box while the
-  // pointer shows the caption — one step further in, and it moves the page by
-  // the difference.
+  // A box's sentence is what the line holds, so the height is reserved for it.
+  // why: lessons/kit-diagram.md#test-box-sentence
   const L = layout(NEST, { width: 660, measure });
   const t = captionTexts({ caption: 'a caption', links: NEST.links }, L.nodes);
   ok('the reserved list holds a box\'s SENTENCE, not its name',
@@ -823,16 +694,8 @@ console.log('\n== the line under the picture says what a box DOES ==');
      `${t.length} strings for ${L.nodes.length} boxes, 2 inside one of them, `
      + `${NEST.links.length} arrows and the caption`);
   /**
-   * 🔴 A BOX WITH NO SENTENCE SAYS NOTHING, AND IT USED TO SAY ITS OWN NAME.
-   * The line under the picture read `n.note || n.title || n.label.full`, so
-   * pointing at a box with no note printed the words already drawn an inch
-   * above it. PHOTOGRAPHED on /mirror/: `Raspberry Pi` under a box labelled
-   * `Raspberry Pi`. Every CONTAINER has no note by rule, so every container
-   * did it, and on a phone there is no pointer to leave: whatever was last
-   * touched stays named.
-   * ⚠️ THE LIST STILL HOLDS AN ENTRY FOR IT. Saying nothing means the line
-   * keeps the CAPTION, which is already the first string here, so the height
-   * stays reserved and the block cannot collapse.
+   * A box with no sentence says nothing; the line keeps the caption, already first in the list.
+   * why: lessons/kit-diagram.md#test-no-echo
    */
   ok('a box with no sentence contributes NO name, so the line cannot echo the box',
      !t.includes(boxOf(L, 'pi').title) && !t.includes('Raspberry Pi')
@@ -860,10 +723,8 @@ console.log('\n== bold, and nothing else ==');
 }
 
 {
-  // 🔴 NEGATIVE CONTROL: the tempting implementation toggles on every marker
-  // it meets, which turns one typo into a sentence that is bold from the
-  // mistake to the full stop — a rendering bug that reads as a decision. An
-  // unpaired marker has to stay on the page as two asterisks.
+  // Negative control: an unpaired `**` stays on the page as two asterisks.
+  // why: lessons/kit-diagram.md#test-unpaired-bold
   const r = boldParts('a sentence with one ** in it and no closing pair');
   ok('NEGATIVE CONTROL: an unpaired marker is text, and nothing goes bold',
      r.length === 1 && !r[0].bold
@@ -878,20 +739,9 @@ console.log('\n== bold, and nothing else ==');
 console.log('\n== which box a line actually reached, and what it crossed to get there ==');
 
 /**
- * 🔴 NOTHING GRADED THIS AND FOUR PAGES WERE WRONG AT ONCE.
- *
- * `cuts` reports a link that was REFUSED, so a link routed to the WRONG END
- * reads clean through it: every arrow is drawn, the picture is complete, and
- * each one arrives somewhere plausible and false. PHOTOGRAPHED 2026-09-19 —
- * `/mirror/`'s `WebGL2 -> shader` leaving the Browser's own edge, `/floor/`'s
- * `films -> video` drawn machine to machine ON A WIDE SCREEN, `/crate/`'s
- * `store -> play` arriving beside `uploader`, `/knobs/`'s `ffmpeg -> up`
- * leaving the Raspberry Pi.
- *
- * The three machines below hold two boxes each and every link names a BOX, so
- * every one of them is a case the old code got wrong. Both modes, because the
- * two layouts were wrong for different reasons and `/floor/` proves a phone is
- * not the only place it shows.
+ * Every link names a box inside a machine of two, in both modes: a link routed to the
+ * wrong end reads clean on `cuts`, so this measures the ends.
+ * why: lessons/kit-diagram.md#test-dives
  */
 const DIVES = {
   nodes: [
@@ -940,10 +790,8 @@ const leaves = (L) => L.nodes.flatMap((n) => (n.kids && n.kids.length ? n.kids :
 for (const width of [1000, 390]) {
   const L = layout(DIVES, { width, measure });
   const drawn = L.links.filter((l) => !l.sib);
-  // ⚠️ MEASURED OFF THE PATH, NEVER OFF THE ROUTER'S INTENTION. The `d` string
-  // is the only thing a reader sees. A check reading the variable the router
-  // chose would agree with the router by construction, which is the
-  // two-numbers-from-one-field defect in CLAUDE.md.
+  // Measured off the `d` string, never the router's own variables.
+  // why: lessons/kit-diagram.md#test-ends-path
   const wrong = [];
   for (const l of drawn) {
     const p = pathPoints(l.d);
@@ -967,11 +815,8 @@ for (const width of [1000, 390]) {
       }
     }
   }
-  // 🔴 AND REACHING THE RIGHT BOX IS WORTH NOTHING IF IT IS DRAWN THROUGH
-  // ANOTHER ONE. That is the whole reason the old code attached to the machine:
-  // a vertical run into a box inside a container crosses the container's name
-  // and every box above the one it wants. The lane in the padding is what buys
-  // both halves, so both halves are asserted together.
+  // Reaching the right box counts only if no other box is crossed on the way.
+  // why: lessons/kit-diagram.md#test-not-through
   ok(`${L.mode}: and not one of them is drawn through a box it does not name`,
      !crossed.length, crossed.join(' · ') || `${L.links.length} lines, ${leaves(L).length} boxes`);
 
@@ -992,16 +837,9 @@ for (const width of [1000, 390]) {
 
 {
   /**
-   * 🔴 AND THE REPORT IS THE HALF THAT REACHES A PAGE. The two checks above
-   * run here and nowhere else; `layout` makes the same measurement itself and
-   * puts a mismatch on `cuts`, so every page that already asserts `cuts.length
-   * === 0` grades its own picture with no page edit at all.
-   *
-   * NEGATIVE CONTROL, and it is the whole point of this block: a report that
-   * fires whatever it is shown is not a report. The spec is sabotaged by
-   * naming a link end that is drawn nowhere near the box named — a container
-   * standing in for the box inside it, which is EXACTLY the defect that was
-   * photographed — and the count has to move.
+   * `layout` puts an end mismatch on `cuts`. Negative control: a sabotaged spec with a
+   * container standing in for its box must move the count.
+   * why: lessons/kit-diagram.md#test-ends-reported
    */
   for (const width of [1000, 390]) {
     const good = layout(DIVES, { width, measure });
@@ -1010,10 +848,8 @@ for (const width of [1000, 390]) {
        `${good.cuts.length} cuts: ${good.cuts.map((c) => c.id).join(', ') || 'none'}`);
   }
 
-  // The picture that was photographed, built by hand: one machine holding a
-  // box, another machine holding a box, and a line drawn from edge to edge
-  // between the two MACHINES while naming the two boxes. Every pixel of it is
-  // plausible and it is the exact shape of all four reports.
+  // Built by hand: a line drawn machine to machine while naming the boxes inside them.
+  // why: lessons/kit-diagram.md#test-wrong-ends
   const wrongEnds = {
     nodes: [
       { id: 'cf', x: 0, y: 0, w: 200, h: 120,
@@ -1044,19 +880,9 @@ console.log('\n== two arrows into one box sit as close as their names allow ==')
 
 {
   /**
-   * 🔴 RESERVING THE WORST CASE IS THE SAME MISTAKE AS RESERVING TOO LITTLE.
-   *
-   * Two arrivals at one box share out that box's edge so their names do not
-   * print over each other, and the room was reserved at the CAP: two lines of
-   * link type, every time, plus 18 px of air. Reported on `/station/` with a
-   * photograph — *"two connectors arriving at one box sit too far apart"* — and
-   * the arithmetic says why. Forty pixels on a box forty-eight tall puts one
-   * head at each corner, and it was forty whether the names were two lines,
-   * one line, or not written at all.
-   *
-   * ⚠️ THE AIR IS UNCHANGED AND THAT IS DELIBERATE. 18 px rather than 6 was
-   * asked for in writing: two two-line names 28 px apart do not overlap and
-   * read as one clump. What is fixed is the guess in front of it.
+   * Arrivals at one box are spread by what their names take, not the two-line cap
+   * (40 px on a 48 px box). The 18 px of air is unchanged.
+   * why: lessons/kit-diagram.md#test-arrival-spread
    */
   const two = (labels) => layout({
     nodes: [{ id: 'a', label: 'source A' }, { id: 'b', label: 'source B' },
@@ -1078,10 +904,8 @@ console.log('\n== two arrows into one box sit as close as their names allow ==')
      apart(['ok', 'no']) === Math.round(METRICS.linkLh) + 18,
      `${apart(['ok', 'no'])} px apart`);
   /**
-   * 🔴 NEGATIVE CONTROL, AND IT IS THE HALF THAT KEEPS THE OLD FIX ALIVE. A
-   * spread that simply got smaller would put two two-line names back through
-   * each other, which is the smear this mechanism was built for. Names long
-   * enough to wrap must still get two lines of room.
+   * Negative control: names long enough to wrap still get two lines of room.
+   * why: lessons/kit-diagram.md#test-wrapped-names
    */
   const long = ['playlist text', 'mp3 bytes and more'];
   const wrapped = two(long).links.filter((l) => !l.back && !l.sib);
@@ -1098,12 +922,8 @@ console.log('\n== a container is never empty ==');
 
 {
   /**
-   * 🔴 AN AUTHOR CANNOT SEE THEIR OWN MISSING BOX. CLAUDE.md, 2026-09-20: a
-   * container holds at least one box. An empty one takes a machine's worth of
-   * space and says a caption's worth of thing — every box in a picture is
-   * drawn to ONE height, taken from the tallest, so a machine with nothing in
-   * it beside a machine with three boxes is a tall empty slab. `/station/`'s
-   * own comment records exactly that, about a box it used to call `curl`.
+   * An empty container is reported when another one holds boxes.
+   * why: lessons/kit-diagram.md#test-empty-container
    */
   const L = layout({
     nodes: [
@@ -1117,7 +937,8 @@ console.log('\n== a container is never empty ==');
      empty.length === 1 && empty[0].id === 'cf' && /EMPTY/.test(empty[0].shown),
      empty.map((c) => c.id).join(', ') || 'nothing reported');
 
-  // 🔴 NEGATIVE CONTROL ONE: give it a box and the report goes.
+  // Negative control one: give it a box and the report goes.
+  // why: lessons/kit-diagram.md#test-filled
   const filled = layout({
     nodes: [
       { id: 'you', label: 'Browser', kind: 'here', children: [{ id: 'page', label: 'this page' }] },
@@ -1130,11 +951,8 @@ console.log('\n== a container is never empty ==');
      `${filled.cuts.length} cuts`);
 
   /**
-   * 🔴 NEGATIVE CONTROL TWO, AND IT IS THE ONE THAT KEEPS THE RULE HONEST. A
-   * picture where NOTHING nests has no slab in it: three machines the size of
-   * three boxes is what a diagram of three machines looks like. Reporting
-   * those would make the rule noise, and noise is how a report stops being
-   * read. `TRIP` is the plan's own three-box example.
+   * Negative control two: a picture where nothing nests reports nothing.
+   * why: lessons/kit-diagram.md#test-flat
    */
   const flat = layout(TRIP, { width: 660, measure });
   ok('NEGATIVE CONTROL: a picture where nothing nests is not three empty containers',
@@ -1143,10 +961,8 @@ console.log('\n== a container is never empty ==');
 }
 
 /**
- * 🔴 `align: 'left'`, ADDED 2026-09-22 FOR `/wish/`, WHERE A FIGURE IS NO
- * LONGER THE WHOLE BLOCK. Graded here rather than on the page because it is
- * pure arithmetic: `placeRow` picks one number and every x in the row follows
- * from it.
+ * `align: 'left'`, graded here because `placeRow` picks one number and every x follows.
+ * why: lessons/kit-diagram.md#test-align-left
  */
 {
   const wide = layout(TRIP, { width: 900, measure });
@@ -1156,14 +972,10 @@ console.log('\n== a container is never empty ==');
      firstX(left) < firstX(wide) && firstX(left) > 0,
      `left aligned starts at ${firstX(left)}, centred at ${firstX(wide)}, in 900 px`);
 
-  /* 🔴 THE NEGATIVE CONTROL, AND IT IS THE ONE THAT MATTERS: in a box exactly
-     as wide as the figure there is nothing to centre, so both must agree. A
-     test that only compared a wide box would pass on an `align` that did
-     something arbitrary rather than nothing. */
-  /* The inset a left aligned figure keeps off its own edge IS the number a
-     centred one falls back to when there is no room, so it is read from the
-     drawing rather than typed. Typing 24 here made the box 20 px too loose and
-     the check went red against a component doing exactly what it promises. */
+  // Negative control: in a box exactly as wide as the figure both alignments agree.
+  // why: lessons/kit-diagram.md#test-align-control
+  // The left inset is read from the drawing, not typed.
+  // why: lessons/kit-diagram.md#test-align-inset
   const pad = firstX(left);
   const tight = Math.round(wide.boxW * 3 + wide.gapX * 2 + pad * 2);
   const a = layout(TRIP, { width: tight, measure });

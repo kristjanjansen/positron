@@ -1,18 +1,7 @@
-// demo/shell/bay-traffic-test.mjs: `remove()` takes a wire's row out of the
-// traffic layer, against a fake DOM and a hand-driven animation frame.
-//
+// demo/shell/bay-traffic-test.mjs: `remove()` takes a wire's row out of the traffic layer.
 //   node demo/shell/bay-traffic-test.mjs
-//
-// THE LEAK THIS FILE EXISTS FOR. `patchbay.mjs`'s trace() added a row for
-// every link it ever saw and never took one away, so a page that relinks
-// read one more row every frame for each link it had dropped (hero.mjs had
-// the same growth). A row's `read` is asked once a frame, so a read that is
-// still asked after `remove()` is a row that is still there.
-//
-// FOUR OF THE 10 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL`: a remove
-// that took every row, or the wrong view's row, or nothing, fails them.
-// MEASURED 2026-10-14: `remove()` without its splice takes 4 red, and one
-// that matches on the link id alone, ignoring the view, takes 1 red.
+// Four of the 10 are negative controls: a remove that took all, the wrong view's or no row.
+// why: lessons/kit-bay-traffic.md#test-header
 
 let failed = 0, ok = 0, negative = 0;
 const check = (name, pass, detail = '') => {
