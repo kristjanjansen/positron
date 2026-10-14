@@ -9,6 +9,79 @@ The rule under most of this section is that a green suite can mean zero
 coverage, and that the only thing separating a check from a decoration is
 having broken it on purpose once.
 
+## What gets graded today, and where (checked 2026-10-14)
+
+The project is a patchbay now: every page is a patch of nodes on sites, joined
+by links that carry a medium (`MEDIA` in `demo/shell/bay.mjs`: midi, audio,
+clock, value, video, program, file, state). So most grading is about three
+questions, in this order, from cheapest to dearest: does the model refuse what
+it must, did something actually travel along a link, and does the page that
+draws it still parse and run.
+
+**1. The model, with no browser at all.** These are pure files and each one runs
+in a second with `node`:
+
+| test | grades |
+| --- | --- |
+| `node demo/shell/bay-test.mjs` | the bay's arithmetic: ports, `shape` and `accepts`, transforms, a link refused with its REASON |
+| `node demo/shell/bay-node-test.mjs` | a page as a node against a relay in the file: which room, nothing opened before a press, which site, who answers a `link.request` |
+| `node demo/shell/graph-registry-test.mjs` | the board's `boardGraph` and the page's `createRegistry`, the round trip from the Pi's state to a bay that refuses a bad link (20 of 46 asserts are named NEGATIVE CONTROL in its header) |
+| `node demo/shell/link-options-test.mjs` | a video link's size and rate, refused in words per medium (13 negative controls) |
+| `node demo/shell/midi-graph-test.mjs` | this browser's MIDI ports as nodes whose ids survive a replug, against a fake MIDIAccess |
+| `node demo/shell/concept-list-test.mjs` | every card `say` against the card rule, and every concept id as `<group>/<slug>`, one plain word |
+
+Every one of those headers says MOST OF THESE ARE NEGATIVE CONTROLS, for the
+reason in the last section of this file: a validator is the shape of code that
+passes a naive suite by accident.
+
+**2. What arrived along a link, not what a control was told.** A page grades
+the wire, because the wire is what the picture claims. MEASURED example,
+`demo/granulator/beat/index.html`: its tempo assert sums the `sent` count on
+the links into `web:grains:tempo-in` and requires it to be at least what the
+grains took (`sent >= readingsIn`), so a tempo set directly on the engine,
+behind the bay's back, fails. HANDOFF session 75 has the defect this guards
+against: *"A patchbay is only as true as the code that goes through it"*,
+when `/radio/key/` (then `radio/040`) lit its keys by calling the keyboard
+directly and the looper (then `sampler/020`, merged into `/code/piano/` on
+2026-10-12) folded the MIDI keyboard into the on-screen keys, so the picture
+showed neither. This is "a count is only evidence on the
+far side of the boundary" (below) in its patchbay form.
+
+**3. The room a run joins is never the owner's.** `roomFor()` in
+`demo/shell/bay-node.mjs` decides it for every page that joins as a node:
+`?room=` when given, else under `?selfcheck=1` a private `<slug>-test-<6
+chars>`, and only a person gets `studio-1`, the room the Raspberry Pi is in. A
+harness that forgets to pass a room still cannot reach the owner's desk.
+`bay-node-test.mjs` grades that as a negative control. `demo/verify.mjs` gives
+manifest pages the same `<demo>-test-<hash>` shape (see "A fixed room name"
+below).
+
+**4. The Pi side is a stand-in.** `demo/fake-board.mjs` answers in the board's
+place, in the board's rooms (`studio-1` and `studio-1-circuit`), built from the
+board's own `rig/board/beat.mjs` and `rig/board/inputs.mjs`, on
+`demo/fake-relay.mjs`, a relay room server on 127.0.0.1 that copies the real
+relay's limits so it is not more generous. `demo/verify.mjs` starts both for
+`BOARD_PAGES`, which is `['away']` today (`knobs` left 2026-10-13, archived
+with Yoshimi). By hand: `node demo/fake-board.mjs`, then
+`http://127.0.0.1:8890/away/?relay=ws://127.0.0.1:8897&board=1`.
+
+**5. The pages, and which harness reaches which.**
+- **`demo/verify.mjs` grades manifest rows only** (`DEMOS.filter((d) =>
+  d.built ...)`, line 54). COUNTED 2026-10-14: 56 rows, 55 built, and every
+  one but `kit` unlisted, so it grades the kit parts and the archived pages
+  that are still served (`archive/radio`, `tapes`, `stage`, `muta`, `away` and
+  the rest).
+- **The 42 concept pages at `/<group>/<slug>/` are NOT in the manifest, so no
+  harness grades them.** Their check is `node demo/check-html.mjs
+  demo/<group>/<slug>/index.html` and one look (positron-concepts: *"cut your
+  checks"*). Some carry their own `d.assert` checks behind `SELFCHECK`
+  (`demo/granulator/grain-rig.mjs`, `demo/radio/key/`, `demo/radio/live/`, the
+  remote pages), which run when the page is opened by hand with `?selfcheck=1`
+  and read off `window.__demo`.
+- `demo/verify-gl.mjs` for `gl: true` rows, `demo/verify-quest.mjs` for a
+  headset. `demo/verify-native.mjs` and `demo/verify-safari.mjs` refuse with
+  exit 2 since 2026-10-13 (see Retired).
+
 ## External sources, and the stand-ins that replace them
 
 🔴 **DO NOT RE-VERIFY `/archive/radio/` OR PROBE STATION HEALTH. ASKED TWICE.**
@@ -46,6 +119,14 @@ space"*. A secure public origin may not fetch a loopback address. It reads as
 `DEMO_BASE=… node demo/verify.mjs making items` is **61/61**, the same command
 with `radio` appended is **72/76**, and `node demo/verify.mjs radio` on its own
 is **14/14**.
+⚠️ **TODAY, 2026-10-14, THE LOCAL-ONLY LIST IS `archive/radio`, `tapes` AND
+`away`**: `radio` is the slug `archive/radio` since 2026-10-13, `now` and
+`flipper` are retired (`archive/demos/now-index.html`,
+`archive/demos/flipper-index.html`, `/flipper/` 404s), `items` was archived
+2026-10-01, and `away` is graded against `fake-board.mjs` on a loopback relay,
+which a deployed page should be refused for the same reason (INFERRED from the
+loopback rule above, not measured). The measurements above are dated and keep
+their old slugs.
 
 🔴 **AND IT IS NOT ONLY ERR. EVERY EXTERNAL SOURCE, 2026-09-16:** *"stil: super
 careful with external sources, better avoid"*, said in reply to
@@ -57,7 +138,8 @@ pulls twenty-four recordings off archive.org on every run was called safe.
 yet.**
 
 ✅ **AND `/tapes/` HAS ITS STAND-IN SINCE 2026-09-18, SO THIS RULE NO LONGER
-COSTS ANYBODY A PAGE.** `demo/fake-tapes.mjs` is an archive that is nobody's
+COSTS ANYBODY A PAGE.** (`/tapes/` was archived 2026-10-13, *"archive tapes
+and deck"*, and is still built, served at /tapes/ and graded.) `demo/fake-tapes.mjs` is an archive that is nobody's
 archive: it reads its paths off `corpus.json` rather than a list, so it cannot
 drift from the page, and it tiles one 8 s MP3 BY THE BYTE to any length (48 kHz
 at 64 kbit/s makes `144*bitrate/rate` whole, 24.000 ms and 192 bytes a frame, so
@@ -79,30 +161,21 @@ tell you a recording is 403ing out there.
 stand-in serving every recording at HALF its corpus length still reads 38/38,
 and one serving SILENCE reads 38/38 too. Both are in `BACKLOG.md`.
 
-✅ **AND `/now/` AND `/flipper/` HAVE THEIRS SINCE 2026-09-18, WHICH WAS THE
-LAST PAIR STILL POINTED AT A BROADCASTER.** `demo/fake-err.mjs` is an HLS live
-edge that is nobody's broadcaster: a master, a media playlist sliding with wall
-clock at 1.92 s a segment over a 2 h window (3750 of them), one
-`PROGRAM-DATE-TIME`, fMP4 behind one `#EXT-X-MAP` that really decodes, a
-`?id=` session the master mints and the variant insists on, Range, `#EXT-X-DISCONTINUITY` at the pool's one seam, the
-schedule endpoint and the five radio mounts. `demo/shell/err-live.mjs` gained
-`errUrl()` and a `?base=`, and `/flipper/` now imports `CHANNELS` from it rather
-than holding a fourth copy. **MEASURED, AND RE-RUN INDEPENDENTLY: `now` and
-`flipper` together 52/52 with the only hosts contacted being the dev server and
-the stand-in.** Cold build 55.4 s and 105 MB, cached in the system temporary
-directory. ⚠️ **IT REPRODUCES THE REFUSALS, NOT JUST THE STREAM**: 403 with no
-`access-control-allow-origin`, in the three shapes measured on 2026-09-06,
-verified by a 13-point sweep.
-🔴 **AND BOTH PAGES ARE BLIND TO THEM.** Switching the refusal off entirely
-leaves both fully green and changes only the harness's own summary line, `+33
-upstream refusals` becoming `+3`. Corroborated separately: **no assert in either
-page names a refusal, a 403 or a served segment.** So the boundary neither page
-can work without is graded by nothing, which is the same hole already recorded
-twice for `fake-tapes.mjs`. In `BACKLOG.md`.
-⚠️ **NO BURNED CLOCK IN THAT PICTURE, AND THE REASON IS ALREADY IN THIS FILE.**
-`ffmpegFilters()` needs `drawtext`, which needs libfreetype, and the ffmpeg on
-PATH here reports zero `drawtext` filters. `src/publish.sh` pins `ffmpeg@7` for
-exactly this and says so in a comment.
+✅ **`demo/fake-err.mjs` IS AN HLS LIVE EDGE THAT IS NOBODY'S BROADCASTER, AND
+SINCE 2026-10-12 NO HARNESS RUN STARTS IT.** Its pages, `/now/` and
+`/flipper/`, are retired (see Retired at the end, with the whole record).
+`demo/verify.mjs` keeps the wiring with `ERR_PAGES = []`, so the next ERR page
+needs one slug there and nothing else, and `archive/demos/README.md` says it
+is how `/archive/tv/` (the old concepts video/040) is tested by hand through
+`?base=`.
+
+✅ **AND THE NEWSREELS HAVE ONE: `demo/fake-arhiiv.mjs`**, an ERR archive that
+is nobody's archive: the content API shape `/history/newsreels/` and `/reel/`
+read, and two small HLS streams made once with ffmpeg. By hand only, nothing
+in `demo/verify.mjs` starts it: `node demo/fake-arhiiv.mjs` (:8903), then
+`http://127.0.0.1:8890/history/newsreels/?base=http://127.0.0.1:8903`. Its
+header says what it cannot grade: every slug gets the same twelve seconds, and
+its URLs are absolute http, so the page's `//` pinning is never exercised.
 
 🔴 **AND THE COST IS NOT OURS TO PAY. ERR SAID SO, 2026-09-16, RELAYED TO
 KRISTJAN:** *"(ERR's remark, kept private)"* —
@@ -117,6 +190,14 @@ appears in a public broadcaster's audience measurement, so open one only when a
 person is going to listen to it.** `/archive/radio/` and `/videoradio/` both rotate
 four ERR mounts; that covers every harness run, every `verify-gl.mjs videoradio`,
 every reload in a development loop, and every tab left open on a second monitor.
+⚠️ **2026-10-14: BOTH OF THOSE ARE ARCHIVED (2026-10-13) AND STILL SERVED, AND
+THE PAGES THAT REACH ERR NOW ARE CONCEPT PAGES.** `grep -rl 'err\.ee\|icecast'
+demo/radio demo/history` lists `/radio/blend/`, `/radio/tuner/`,
+`/radio/live/`, `/radio/key/` and `/history/newsreels/`. No harness runs them
+(they are not manifest rows), so the exposure is a person's tab and a dev
+loop's reloads. `/radio/live/` and `/radio/key/` open no live stream under
+`?selfcheck=1` (`if (SELFCHECK) { ... no live stream is opened ...; return; }`),
+and `/history/newsreels/` has `fake-arhiiv.mjs` (above).
 ⚠️ Two stations were REMOVED over this and ERR was not: `idaidaida.net` and
 `live.uuu.ee` are gone from the code and the relay 404s them. ERR is still in the
 rotation, which means the exposure is still live and the only thing holding it
@@ -150,7 +231,9 @@ missed entirely.
 
 
 ✅ **AND THE HOLE A STAND-IN LEAVES IS CLOSED BY SABOTAGING IT, NOT BY READING
-IT.** 2026-09-18, on `/now/` and `/flipper/`: both were FULLY GREEN against
+IT.** (The two pages below are retired since 2026-10-12; the lessons in this
+paragraph and the two after it are about every stand-in, `fake-board.mjs`
+included, and stay live.) 2026-09-18, on `/now/` and `/flipper/`: both were FULLY GREEN against
 `demo/fake-err.mjs` with its `serves()` forced to `return true`, because no
 assert in either page named a refusal, a 403 or a served segment. `/flipper/`
 had the blocked minutes in a READOUT CELL, and a cell is not an assert. Four
@@ -601,6 +684,10 @@ counts against the last known total after any change.
   identically to delivery — while every note was being scheduled fifty-six
   years out. Ask which side of the wire a counter is counted on before quoting
   it.
+- **On a patchbay page the far side is the link.** Count what a link
+  delivered (its `sent`, read from `bay.links()`) or what the receiving node
+  took, never what the sending control was told. Example at the top of this
+  file (`/granulator/beat/`).
 
 ## Before the harness opens a page at all: `demo/verify.mjs`
 
@@ -684,6 +771,14 @@ points it at nothing.
 ⚠️ **AND A DEVICE IS STILL EXCLUSIVE.** A private room does not give a second
 client its own Raspberry Pi. There is one JACK graph and one instrument, so
 board-bound demos still have to take turns. Rooms were never that problem.
+✅ **THE PATCHBAY PAGES GET THE SAME RULE FROM ONE PLACE, SINCE 2026-10-06.**
+`roomFor()` in `demo/shell/bay-node.mjs` makes the same `<slug>-test-<6
+chars>` under `?selfcheck=1` with no `?room=`, because `/patchbay/` had joined
+`studio-1` ON LOAD and ignored `?room=`, so *"every visit AND EVERY SUITE RUN
+put a `web` site on the owner's desk and asked the Pi `graph.ask`"* (that
+file's header). A rule in three hand copies held in two of them. The rows
+marked `room: 'fixed'` in the manifest today are `mirror` and `wire`, both
+archived and still served (COUNTED 2026-10-14).
 
 🔴 **`DEMO_HOSTS=1` IS THE INSTRUMENT FOR THE STANDING EXTERNAL-SOURCE RULE, AND
 UNTIL IT EXISTED THERE WAS NO WAY TO CHECK IT: a page pointed at a stand-in and
@@ -753,7 +848,16 @@ needs told apart. The buckets, with what each was measured to be:
   `PROBE_CEILING = 60`, and the number is derived rather than picked: `flipper`
   sweeps 8 points per probe twice, `now` sweeps 13 points across the window once
   and is capped at 30 in-page, plus hls.js's own retries on whatever comes back
-  refused.
+  refused. ⚠️ **IT IS 90 IN `demo/verify.mjs` TODAY (`grep -n PROBE_CEILING`,
+  2026-10-14)**: `now` merged into `flipper` on 2026-10-05 and the merged page
+  paid both pages' asking, MEASURED against the stand-in that day at 45
+  ordinary and 72 deep. No page reaches this bucket since `flipper` was
+  retired 2026-10-12.
+- ⚠️ **THE BUCKETS OUTLIVED SOME OF THEIR PAGES, 2026-10-14.** The code still
+  carries every one of them, and the pages that taught them are gone: `keep`
+  (retired 2026-10-04, `archive/demos/keep-index.html`), `tracks` (removed
+  2026-09-08), the `vain` demo (retired 2026-10-02 with `crate`,
+  `archive/vain/`), the `shout` demo (`archive/shout-demo/`, by 2026-09-15). The allowances stay correct for whatever asks next.
 - **`net::ERR_ABORTED` is what a media element's in-flight segment requests do
   when the page unloads.** It means WE navigated, not that the page failed.
   Every page that plays media produces these on teardown, so counting them made
@@ -1076,6 +1180,9 @@ that says what would flip it. A harness written from documentation says so.
 
 ## Harness plumbing that has read as broken code: `demo/verify-gl.mjs`, `demo/verify-native.mjs`, `demo/harness-profile.mjs`, `demo/verify-quest.mjs`
 
+(`demo/verify-native.mjs` refuses with exit 2 since 2026-10-13; the lessons
+learned on it below are about every harness and stay.)
+
 ⚠️ **CLEAR `DevToolsActivePort` BEFORE THE SPAWN, NEVER AFTER IT.** Chrome writes
 that file as it starts, so removing it afterwards **deletes the very thing being
 waited for.** (`demo/verify-gl.mjs`, `demo/verify-quest.mjs`.)
@@ -1121,36 +1228,10 @@ bind, and it is still better than a constant.**
 ## The second browser is not always Chrome: `demo/verify-safari.mjs`
 
 ⚠️ **RETIRED 2026-10-13: it drives /llhls/, whose input was deleted, and now
-refuses (exit 2) unless run with `--anyway`.** What follows is why it existed.
-
-**WHY IT EXISTS.** `verify.mjs` speaks CDP, which Safari does not, so the whole
-WebKit family was untested. **macOS Safari is the ONE platform with both a plain
-MediaSource AND native HLS, which makes it the only place the choice between the
-two engines is a real judgement rather than forced**, and it shares an engine
-family with the iPhone, so it catches WebKit-specific breakage without a phone in
-hand. WebDriver is plain HTTP and JSON, so there are no dependencies; Safari needs
-"Develop > Allow Remote Automation" once, and `safaridriver` answers `/status`
-with `{ready:true}` when it is on.
-
-🔴 **THE PORT WAS NEVER THE REAL LIMIT HERE, AND FIXING IT DOES NOT MAKE THIS
-CONCURRENT.** `safaridriver` drives the one Safari on this machine, and Remote
-Automation is a single global switch, **so two of these at once is still two
-harnesses fighting over one browser. It will just now fail somewhere honest
-instead of on a port collision that looked like a code fault.**
-
-🔴 **UNDER NATIVE HLS, `currentTime` DOES NOT SHARE A TIMELINE WITH `buffered`.**
-MEASURED in Safari: **currentTime 58.44 against buffered [[20,30]] while playing
-at 0.961x.** So the buffer report deliberately answers null, which is **"cannot
-tell", not "empty"**, and the harness skips that assert on the native engine:
-**demanding a number there would fail a healthy player.**
-
-⚠️ **ASK THE ELEMENT DIRECTLY, AND DUMP THE WHOLE PAGE LOG.** The first run
-reported an empty readout with no explanation, **because the native telemetry
-loop gated EVERYTHING behind `getStartDate()` being available**, and only the
-`bad` log lines were being printed, which hid WHY. It now prints `paused`,
-`readyState`, `networkState`, `currentTime`, `duration`, `buffered`,
-`seekableEnd`, `videoWidth`, `getStartDate` and any media error, plus the last 18
-log lines, before it asserts anything.
+refuses (exit 2) unless run with `--anyway`.** The whole section moved to
+Retired at the end of this file, 2026-10-14. What stays true here: CDP is not
+WebKit, so with this harness down **nothing on this desk grades Safari or the
+iPhone code path**, and that is the gap to say out loud after a player change.
 
 ## Parsing is not running, and it is the cheap check: `demo/check-html.mjs`
 
@@ -1160,6 +1241,8 @@ LITERAL AROUND IT.** That happened **seven times in one session on
 every time **the page died at parse: no log line, no assert, no picture, and an
 error in devtools pointing at a line hundreds below the one that broke it.**
 `node --check` finds it in about forty milliseconds and says where.
+✅ **AND IT IS THE CHECK FOR A CONCEPT PAGE**, since no harness grades those
+(top of this file): `node demo/check-html.mjs demo/<group>/<slug>/index.html`.
 ⚠️ **IT IS NOT A HARNESS AND IT OPENS NOTHING.** No Chrome, no profile, no relay,
 no stream off anybody else's server, **which is what makes it the right check to
 run after editing a page this repo has asked not to be re-verified.** It answers
@@ -1175,7 +1258,15 @@ blocks and pass, **which is the shape of green this repo minds most.** Only
 `type="module"` blocks are parsed; a classic `<script>` is not parsed as one and
 this repo has none in a page.
 
-## What a stand-in has to get right, or it grades itself: `demo/fake-station.mjs`, `demo/fake-tapes.mjs`, `demo/fake-err.mjs`
+## What a stand-in has to get right, or it grades itself: `demo/fake-station.mjs`, `demo/fake-tapes.mjs`, `demo/fake-err.mjs`, `demo/fake-board.mjs`, `demo/fake-relay.mjs`, `demo/fake-arhiiv.mjs`
+
+Six stand-ins on 2026-10-14 (`ls demo/fake-*.mjs`, plus `fake-board-test.mjs`).
+The three below were the first; `fake-board.mjs` and `fake-relay.mjs` are the
+Pi and the relay (top of this file) and say in their own headers that they
+follow the same rules: the board's tone is 220 Hz and 330 Hz a fifth apart
+with the 330 pulsing, *"THE SAME RULE AS THE OTHER THREE STAND-INS"*, and
+the relay copies the real one's roof and token buckets *"so a stand-in is not
+more generous than the relay"*.
 
 🔴 **NOT SILENCE AND NOT WHITE NOISE.** All three stand-ins generate two tones a
 fifth apart with one of them pulsing at 2 Hz. **A loop over silence passes every
@@ -1492,3 +1583,81 @@ decimation **by building four broken drawers and measuring which named claims ea
 one takes red, because a sine drawn either way looks like a sine and the
 difference only shows on a transient one sample wide, which is exactly what a drum
 sample is made of.**
+
+## Retired
+
+Moved here 2026-10-14, verbatim, when the skill was rewritten around the
+patchbay. Each rule below was true and paid for; what retired is the page or
+the tool it was about. Read it for the lesson, not for a command to run.
+
+### `/now/` and `/flipper/` against `demo/fake-err.mjs`
+
+Retired 2026-10-12: `/flipper/` was archived on *"archive flipper"*
+(`archive/demos/flipper-index.html`, the URL 404s), and `/now/` had been folded
+into it on 2026-10-05 (`archive/demos/now-index.html`). `demo/verify.mjs` keeps
+the stand-in wiring with `ERR_PAGES = []`. The general lessons this taught (a
+stand-in makes a page runnable without making it graded; a negative control;
+a counter beats a state) stay live in the stand-ins section above.
+
+✅ **AND `/now/` AND `/flipper/` HAVE THEIRS SINCE 2026-09-18, WHICH WAS THE
+LAST PAIR STILL POINTED AT A BROADCASTER.** `demo/fake-err.mjs` is an HLS live
+edge that is nobody's broadcaster: a master, a media playlist sliding with wall
+clock at 1.92 s a segment over a 2 h window (3750 of them), one
+`PROGRAM-DATE-TIME`, fMP4 behind one `#EXT-X-MAP` that really decodes, a
+`?id=` session the master mints and the variant insists on, Range, `#EXT-X-DISCONTINUITY` at the pool's one seam, the
+schedule endpoint and the five radio mounts. `demo/shell/err-live.mjs` gained
+`errUrl()` and a `?base=`, and `/flipper/` now imports `CHANNELS` from it rather
+than holding a fourth copy. **MEASURED, AND RE-RUN INDEPENDENTLY: `now` and
+`flipper` together 52/52 with the only hosts contacted being the dev server and
+the stand-in.** Cold build 55.4 s and 105 MB, cached in the system temporary
+directory. ⚠️ **IT REPRODUCES THE REFUSALS, NOT JUST THE STREAM**: 403 with no
+`access-control-allow-origin`, in the three shapes measured on 2026-09-06,
+verified by a 13-point sweep.
+🔴 **AND BOTH PAGES ARE BLIND TO THEM.** Switching the refusal off entirely
+leaves both fully green and changes only the harness's own summary line, `+33
+upstream refusals` becoming `+3`. Corroborated separately: **no assert in either
+page names a refusal, a 403 or a served segment.** So the boundary neither page
+can work without is graded by nothing, which is the same hole already recorded
+twice for `fake-tapes.mjs`. In `BACKLOG.md`.
+⚠️ **NO BURNED CLOCK IN THAT PICTURE, AND THE REASON IS ALREADY IN THIS FILE.**
+`ffmpegFilters()` needs `drawtext`, which needs libfreetype, and the ffmpeg on
+PATH here reports zero `drawtext` filters. `src/publish.sh` pins `ffmpeg@7` for
+exactly this and says so in a comment.
+
+### `demo/verify-safari.mjs`: why the second browser existed
+
+Retired 2026-10-13: it drove `/llhls/`, whose Stream input (`positron-demo`)
+was deleted that day, and it refuses (exit 2) unless run with `--anyway`
+(`demo/verify-safari.mjs` line 30). Re-pointing it and `verify-native.mjs` at a
+page with a stream is in `BACKLOG.md` (the live caller is `/video/llhls/`,
+which needs a camera and makes a Stream recording per run, so it is a deep
+tier change, not a URL swap).
+
+**WHY IT EXISTS.** `verify.mjs` speaks CDP, which Safari does not, so the whole
+WebKit family was untested. **macOS Safari is the ONE platform with both a plain
+MediaSource AND native HLS, which makes it the only place the choice between the
+two engines is a real judgement rather than forced**, and it shares an engine
+family with the iPhone, so it catches WebKit-specific breakage without a phone in
+hand. WebDriver is plain HTTP and JSON, so there are no dependencies; Safari needs
+"Develop > Allow Remote Automation" once, and `safaridriver` answers `/status`
+with `{ready:true}` when it is on.
+
+🔴 **THE PORT WAS NEVER THE REAL LIMIT HERE, AND FIXING IT DOES NOT MAKE THIS
+CONCURRENT.** `safaridriver` drives the one Safari on this machine, and Remote
+Automation is a single global switch, **so two of these at once is still two
+harnesses fighting over one browser. It will just now fail somewhere honest
+instead of on a port collision that looked like a code fault.**
+
+🔴 **UNDER NATIVE HLS, `currentTime` DOES NOT SHARE A TIMELINE WITH `buffered`.**
+MEASURED in Safari: **currentTime 58.44 against buffered [[20,30]] while playing
+at 0.961x.** So the buffer report deliberately answers null, which is **"cannot
+tell", not "empty"**, and the harness skips that assert on the native engine:
+**demanding a number there would fail a healthy player.**
+
+⚠️ **ASK THE ELEMENT DIRECTLY, AND DUMP THE WHOLE PAGE LOG.** The first run
+reported an empty readout with no explanation, **because the native telemetry
+loop gated EVERYTHING behind `getStartDate()` being available**, and only the
+`bad` log lines were being printed, which hid WHY. It now prints `paused`,
+`readyState`, `networkState`, `currentTime`, `duration`, `buffered`,
+`seekableEnd`, `videoWidth`, `getStartDate` and any media error, plus the last 18
+log lines, before it asserts anything.

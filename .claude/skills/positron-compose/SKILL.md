@@ -34,11 +34,64 @@ cheapest form"*. **Alignment is where both get reported.** Nobody ever reported
 *"the padding is on the wrong element"*; they reported *"these do not line up"*,
 *"there is a double border"*, *"its a mess"*.
 
+## P. A page is a patch, and the layout is the patch's parts in a column
+
+Checked against the files on 2026-10-14. The front page is THE HERO, LARGE
+(`demo/shell/hero.mjs`, `.pos-hero*` in `shell.css`) over the concept cards of
+`demo/shell/concept-list.mjs`, and every concept page is `/<group>/<slug>/`.
+Each of those pages is a small patch: nodes with ports, links between them, a
+medium on every wire. So the first composition question on any page is not
+"what padding" but "which part of the patch is this block".
+
+- 🔴 **THE COLUMN IS THE PATCH, IN ONE ORDER.** On a synth or shader concept page
+  the blocks stack as picture, knob row, code box, keys, and the patchbay at the
+  foot (`positron-concepts`, *"when there are code and knobs on concepts, move
+  knobs on top of code"*, 2026-10-12). Every part is full width where it sits;
+  only the knobs leave the line, in one boxed row that scrolls sideways and never
+  wraps (*"linear execpt knobs that are are independet in the knobs area, horiz
+  scrollable. no half col scope, scope is always full w"*, 2026-10-10). A
+  readout, where a page has one, goes on top (`joined: false`). The air between
+  these blocks is §1's rule: the parent's, never a block's own margin.
+- 🔴 **THE PATCHBAY BLOCK IS ONE KIT PART AND A PAGE DOES NOT LAY IT OUT.**
+  `createPatchbay` (`demo/shell/patchbay.mjs`) draws the `patchbay` heading as the
+  kit's `.pos-sec-h` with its `See details` link button beside it on one baseline
+  row (`.pb-head`), then the picture `createBayView` draws, then the links and
+  ports tables behind the button (`.pb-more`, 24 px gap). 50 page files call it
+  (`grep -ln createPatchbay demo/*/*/index.html`, 2026-10-14). A page that wants
+  the block to look different changes `patchbay.mjs`, by §9.
+- 🔴 **THE BAY PICTURE HAS ITS OWN GEOMETRY, AND IT IS ONE SET OF NUMBERS.**
+  `BAY_GEOMETRY` in `demo/shell/bay-view.mjs` (FONT 11, TITLE 13, ROW 20, PAD 10,
+  GAP 48, MIN_GAP 28, STACK_BELOW 480 and the rest) is read by `bay-svg.mjs` too,
+  which draws the same picture as an SVG string for the share cards. That is §1's
+  "one number, one place" applied to a drawing: do not type a box width or a wire
+  gap anywhere else. Box widths are per COLUMN, from the longest title or port
+  name in it. Wires are coloured by the out port's medium from `MEDIUM_COLOURS`
+  (`patchbay.mjs`), out on the right or bottom edge, in on the left or top, no
+  arrowheads.
+- 🔴 **ON A DESK THE CHAIN STAYS A ROW AND SCROLLS. ONLY A PHONE STACKS.** A host
+  of 480 px or more (`STACK_BELOW`) keeps boxes left to right. When the row does
+  not fit, the grey note beside each title folds under it first, and then the
+  row scrolls inside its own box (`overflowX = 'auto'`). Below 480 the boxes
+  stack top to bottom with inlets on the top edge and outlets on the bottom.
+  The owner, 2026-10-10, minutes after the view was switched to stack at every
+  width: *"do not do vert layouts on desktop. overflow"*. So a cut off box on a
+  desk is fixed inside the row (narrower boxes, a scroll affordance per §4's
+  closure rule), never by stacking.
+- ⚠️ **THE HERO'S BAY IS A DIFFERENT PATCH ON A PHONE, NOT THE DESK PATCH
+  SQUEEZED.** `hero.mjs` holds `DESK` (three columns) and a separate phone patch
+  (two columns), asked as *"Make mibile and dsrsktip patchbays different"*. When a
+  picture does not fit a phone, a smaller honest patch beats a scaled one.
+- ⚠️ `bay-svg.mjs` has no stacked layout and throws below `STACK_BELOW`; HANDOFF
+  2026-10-14 records it sat 3 px off the live view. It is not a phone renderer.
+
 ## 0. Before touching anything: look, then read the report for its verb
 
 🔴 **LOOK AT IT ON AN IPHONE MINI BEFORE SAYING IT IS DONE. THEN AT 1280.**
 `node demo/shot.mjs <slug> 375 1280` exists since 2026-09-26 and prints
-sideways overflow with every shot. **The phone is 375 by 812 at 3x**, instructed
+sideways overflow with every shot. For a concept page the slug is the path,
+`node demo/shot.mjs synth/keyboard 375 1280`, as CLAUDE.md does with
+`kit/devices`; with no widths it takes 375, 768 and 1280 (its header,
+2026-10-14). **The phone is 375 by 812 at 3x**, instructed
 the same day as *"use iphone mini size for mob testing"*: the narrowest current
 iPhone, so what fits it fits every iPhone. The measurements below that say 390
 were taken before that instruction, at the 12 through 16's width, and are kept
@@ -105,7 +158,8 @@ parent, you are in the wrong container."* The fix was a different slot, `parts:
 [el]`, a sibling of the case. **And it is impossible, not merely hard, from
 inside a scroller**: `scrollLeft` clamps at 0, so inline-start overflow inside
 `overflow-x: auto` is clipped for good. `/knobs/` measured a seam at **992 px
-against a 686 px case** trying.
+against a 686 px case** trying. (`/knobs/` is a 404 since 2026-10-13, archived
+with Yoshimi to `archive/demos/knobs-index.html`; the measurement stands.)
 ✅ **WHEN A COMPONENT GENUINELY MUST REACH ITS OWN BOX'S EDGE**, the escape is
 owned by the component and derived from the token it is escaping:
 `margin-inline: calc(-1 * var(--panel-pad))`. Never a typed `-20px`, which is
@@ -120,7 +174,9 @@ row gap, so *"four rows of the same eight channels drew four different column
 pitches"*. **A measurement two elements must agree about is one declaration at
 `:root`, read by both.** Prefer `calc` off an existing token to a new number.
 When two names for one number are unavoidable, write the assert that requires
-them equal, which `/kit/` does for `--rows-pad` against `.panel-case`.
+them equal, which `/kit/` does for `--rows-pad` against `.panel-case` (since the kit
+split into parts on 2026-10-06 that assert is on `/kit/devices/`,
+`demo/kit/devices/index.html`, checked 2026-10-14).
 ⚠️ **DECLARE IT WHERE IT CAN BE READ.** A custom property inherits DOWNWARD,
 never sideways and never from a class nothing above you wears: `--fdr-foot` on
 `.pos-fdr` was invisible to the column beside it; `--panel-pad` on `.panel-head`
@@ -144,6 +200,8 @@ test for how many steps: **once two adjacent steps are close enough that nobody
 can say when to use one over the other, the scale has stopped making decisions
 and started causing arguments.**
 ⚠️ **THIS PROJECT HAS 48 TOKENS AT `:root` AND NO SPACING SCALE AMONG THEM.**
+(52 custom properties in the first `:root` block on 2026-10-14, counted with
+awk; still no spacing scale.)
 `--pos-gap: 40px`, `--ctl-gap: 8px`, `--panel-gap: 16px`, `--panel-pad: 20px`,
 `--rows-pad: 20px`, `--rows-gap: 16px`, `--kbd-pad: 9px` are seven names for
 five numbers with no stated relationship between them. That is the next thing.
@@ -192,7 +250,8 @@ pads then grew one.
 ✅ **ONE GRID ON THE CONTAINER, OR ONE PUBLISHED CONTRACT ON THE COMPONENTS,
 AND THEN THE BROWSER DOES IT.** `--ctl-head`, `--ctl-foot` and `--ctl-step` at
 `:root` are that contract, and `.pos-crow` is plain `flex-end`. `/grains/`'s
-four sliders: *"Four rows line up only if they share one set of COLUMNS, which
+four sliders (that page is a 404 since 2026-10-13, archived to
+`archive/demos/grains-index.html`; the granulator today is `/granulator/grains/`): *"Four rows line up only if they share one set of COLUMNS, which
 nothing but a grid on the container can give them. Per-element spacing cannot
 fix an alignment problem."* After: label lefts all 16, lane lefts all 61, lane
 widths all 250 where one had been 96.
@@ -287,7 +346,8 @@ object's size that nothing had measured.** `.pos-rows` takes the same pair now.
 held inside it and scrolls its own rows rather than dragging the document.
 
 🔴 **TWO THINGS SIDE BY SIDE ARE CLEARLY THE SAME SIZE OR CLEARLY DIFFERENT,
-NEVER ALMOST THE SAME.** Reported 2026-09-26 on `/eccm/` with a crop: a 146 px
+NEVER ALMOST THE SAME.** Reported 2026-09-26 on `/eccm/` (which lives outside this repository since
+2026-09-27, `~/personal/eccm`, served at eccm.positron.studio) with a crop: a 146 px
 picture beside a text block of 170 to 200 px, in the owner's words *"image
 should be bigger to avoid awkard a-bit-longer text. gestat 101,
 just-a-bit-different sizes are nervous"*. A small difference reads as an
@@ -423,7 +483,7 @@ their shape (a toggle, a pad, a knob's hand, a tag) do not read these.
 🔴 **SO THE RULE IS NOW A PROHIBITION.** A new surface reads the three tokens
 or it is not a surface of this kit. **A `.pos-glue > X` patch that strips a
 border may not be written**; if one seems needed, the component is not reading
-`--edge`, and that is what to fix. `/kit/` measures every child of every glued
+`--edge`, and that is what to fix. `/kit/` (today `/kit/devices/`, checked 2026-10-14) measures every child of every glued
 row for its own left margin, its padding where it has no border, and its border
 where it is not a control, and requires zero; that assert found the keyboard,
 then the synth view, then the display, in one afternoon.
@@ -450,6 +510,8 @@ SCROLLABLE VALUE.** It makes the surface a scroll container, so `position:
 sticky` inside it sticks to the wrong thing and edge focus rings are cut.
 `overflow: clip` is not scrollable and Polaris ships exactly that on its Card.
 Open in `BACKLOG.md`.
+✅ **DONE, CHECKED 2026-10-14:** `.pos-glue` in `shell.css` reads `overflow: clip`
+today. The paragraph above is kept as why.
 
 🔴 **THE NESTED RADIUS FORMULA IS NORMATIVE CSS, AND IT DOES NOT APPLY TO A
 GLUED STACK.** CSS Backgrounds 3, corner shaping: *"The padding edge radius is
@@ -564,7 +626,9 @@ page column on a 1280 px screen is 600 px wide, and a viewport query would tell
 it it has room it does not have."* `local-remote.mjs` decides its arrangement in
 JavaScript for this reason. **`@container` is the CSS-native form of THAT
 half**, Baseline widely since 2025, and this stylesheet has 20 media queries and
-zero container queries.
+zero container queries. (2026-10-14: 21 `@media` blocks, still zero
+`@container`. `bay-view.mjs` decides across or stacked in JavaScript from its own
+`clientWidth` for the same reason `local-remote.mjs` does.)
 ⚠️ **AND IT IS NOT THE FORM OF THE OTHER HALF, WHICH THE FIRST DRAFT OF THIS
 FILE CLAIMED.** A `@container` block adds no specificity and is resolved by
 source order exactly like `@media`, so one placed above a plain rule of equal
@@ -647,7 +711,7 @@ TIME YOU SET `display`.** `[data-full]` matches an EMPTY attribute, so
 page's life. Any author `display` beats the browser's `[hidden]`; six
 components here have needed the identical `.x[hidden] { display: none }` patch.
 ⚠️ **AND A FLEX PROPERTY ON A NON-FLEX BOX IS NOT AN ERROR, IT IS SILENCE.**
-`/keys/`'s phone layout was written three times before it did anything; one
+`/keys/`'s phone layout (the page was retired 2026-09-17, `archive/keys/`) was written three times before it did anything; one
 version set `flex-direction`, `align-items` and `gap` but not `display`.
 
 🔴 **`@layer` IS THE SINGLE HIGHEST-VALUE CHANGE FOR THIS STYLESHEET, AND IT
@@ -662,7 +726,8 @@ widely since 2022. `research/cascade-cures-2026-09-26.md` measured the support
 table on the day and this file's own numbers: **841 selectors, 766 rules, max
 specificity (0,5,1), zero id selectors, 4 `!important`, 0 `@layer`, 0
 `@supports`**. By those numbers it is a healthy sheet with no ordering
-discipline.
+discipline. (2026-10-14: still 0 `@layer`; 2 `!important`, both inside
+reduced-motion rules; the file is 8080 lines.)
 ⚠️ **THREE TRAPS BEFORE ADOPTING IT.** Layer order is fixed by the FIRST
 declaration and a later statement does nothing. Unlayered styles beat every
 layer, which is the trap and also the gift: leave `[hidden] { display: none }`
@@ -750,7 +815,10 @@ shorthand padding: 5px` next to the winner, which is incident B made visible.
 The fourth research strand wrote and ran that script and an ancestor walker
 that prints every ancestor's padding and which one establishes a containing
 block, a stacking context and a BFC. Both are in the session scratchpad and are
-worth adopting into `demo/`, read first. In DevTools the **Computed** pane is
+worth adopting into `demo/`, read first. ✅ **ADOPTED, CHECKED 2026-10-14:**
+`node demo/which-rule-won.mjs <slug> '<selector>' <property>` and
+`node demo/ancestry.mjs <slug> '<selector>' <property> --width 375`, both in
+CLAUDE.md's run list. Reach for them before writing a third override. In DevTools the **Computed** pane is
 the adjudication tool, not the Styles pane: winner first, losers under it.
 
 ⚠️ **WHAT NO LINTER CATCHES, STATED PLAINLY.** A shorthand in one rule beating a
@@ -775,7 +843,7 @@ in as an error or those names get `@property` declarations first.
 
 🔴 **A PAGE-LOCAL REPAIR TO A SHARED COMPONENT IS HOW A DEFECT GETS PAID FOR
 TWICE.** `/tom/` fixed the nameplate's top padding privately, *"every page after
-it inherited the defect and not the fix"*, and it came back on `/plai/` as *"you
+it inherited the defect and not the fix"*, and it came back on `/plai/` (no page or git path of that name exists on 2026-10-14) as *"you
 failed afain on nameplate padding. after hrs work yesterday"* and on `/fau/` as
 *"add padding under nameplate"*. **Three pages, one line in one page.** And the
 sharpest words in the whole record are about this: *"in the life of me i don ot
@@ -802,7 +870,41 @@ and left the spacing exactly where it was.
 | every glued part paints its ground | `.pos-rows-r`, `.pos-glue > .pos-scope` |
 | empty paints nothing | `[hidden]` rules on six components, `blank()` in `table.mjs` |
 | look at the phone | `demo/shot.mjs` |
+| which rule won, and whose inset | `demo/which-rule-won.mjs`, `demo/ancestry.mjs` |
+| a concept page's column | `positron-concepts`, `demo/shell/concept-nav.mjs` (`CODE_ROWS`) |
+| the patchbay block | `createPatchbay` in `demo/shell/patchbay.mjs`, `.pb-head`, `.pb-more` |
+| the bay picture's geometry | `BAY_GEOMETRY` and `BAY_VIEW_CSS` in `demo/shell/bay-view.mjs`, shared with `bay-svg.mjs` |
+| desk row, phone stack | `STACK_BELOW` in `bay-view.mjs` |
+| the hero | `demo/shell/hero.mjs`, `.pos-hero*` in `shell.css` |
 
 ⚠️ **THIS TABLE GOES STALE THE WAY EVERY TABLE HERE DOES.** A rule that gains a
 second home is a rule that is about to disagree with itself, and the check is
 one `grep`.
+
+## 11. The pages this file names, and where they are today
+
+Checked 2026-10-14 against `demo/manifest.mjs`, `ls demo` and `ls archive/demos`.
+The measurements above were taken on these pages and stay true as measurements;
+only the address to go and look has changed. Many demos were archived on
+2026-10-12 and 2026-10-13: an archived manifest row (`unlisted: true`) is still
+served at its URL and listed on `/archive/`, and a page moved to
+`archive/demos/` is a 404.
+
+| page | today |
+| --- | --- |
+| `/circuit/`, `/twelve/`, `/evo/`, `/pack/`, `/tom/`, `/muta/`, `/fau/`, `/nola/`, `/mirror/` | archived, still served at the same URL, listed on `/archive/` |
+| `/archive/radio/` | the archived radio demo, moved there from `/radio/` 2026-10-13 |
+| `/knobs/` | 404 since 2026-10-13, `archive/demos/knobs-index.html` (retired with Yoshimi) |
+| `/grains/` | 404, `archive/demos/grains-index.html`; the live granulator is `/granulator/grains/` |
+| `/keys/` | 404 since 2026-09-17, `archive/keys/` |
+| `/eccm/` | outside this repository since 2026-09-27 |
+| `/plai/` | not found in the tree or in git history under that name; left as quoted |
+| `/kit/` | split into parts at `/kit/<part>/` since 2026-10-06; the glue asserts are on `/kit/devices/` |
+
+## Retired
+
+Nothing in this file was retired on 2026-10-14. Every rule here is about CSS and
+composition, and none depended on a page, worker or input that was taken away:
+where an example page is gone, the rule and its measurement stay and §11 says
+where the page went. One open item was found finished rather than retired
+(`.pos-glue` clips with `overflow: clip`, §5) and is marked in place.

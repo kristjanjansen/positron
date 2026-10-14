@@ -1,19 +1,63 @@
 ---
 name: positron-concepts
-description: The concept pages, small pages at /<group>/<slug>/ that each unpack one patchbay idea for a presentation, drawn as the front page's cards. Load before building or changing any concept page (demo/<group>/<slug>/, the folders in CONCEPT_DIRS), before adding a card to the front page, and before explaining a patchbay idea (site, room, node, port, link, medium, transport, a `*` link, an effect, a recorder) as a small page.
+description: The concept pages, small pages at /<group>/<slug>/ that each unpack one patchbay idea and are built as a patch (createBay nodes, ports and links, drawn by createPatchbay), shown as the front page's cards. Load before building or changing any concept page (demo/<group>/<slug>/, the folders in CONCEPT_DIRS), before adding a card to the front page, and before explaining a patchbay idea (site, room, node, port, link, medium, transport, a `*` link, an effect, a recorder) as a small page.
 ---
 
 # Concepts pages
 
-Written 2026-10-09 from the session that built `/concepts/misc/000/` to `/concepts/synth/010/`.
-Every claim below was checked against the files that day. The pages change fast,
-so check a page before quoting it.
+Written 2026-10-09 from the session that built `/concepts/misc/000/` to `/concepts/synth/010/`,
+and reordered around the patchbay on 2026-10-14, when every path and count below
+was checked again against the tree. The pages change fast, so check a page
+before quoting it.
+
+## A concept page is a patch
+
+Every concept page is the same thing underneath: **a bay of nodes, ports and
+links, a few controls that are ports of those nodes, and the bay drawn at the
+foot of the page.** `/synth/keyboard/` (`demo/synth/keyboard/index.html`) is the
+smallest whole one, and the pattern every other page grows from:
+
+1. `const bay = createBay()` (`demo/shell/bay.mjs`).
+2. `bay.addNode({ id: 'web:keys', kind: 'person', label: 'keyboard', place: 'browser' })`.
+   `id` is `site:node`, `kind` is one of `NODE_KINDS`: `device`, `engine`,
+   `endpoint`, `store`, `external`, `screen`, `person`.
+3. `bay.addPort({ id: 'web:keys:midi-out', dir: 'out', medium: 'midi', emits: ['note'] })`,
+   and an in-port with `accepts` and a `deliver(ev)`. `medium` is one of
+   `MEDIA`: `midi`, `audio`, `clock`, `value`, `video`, `program`, `file`,
+   `state`. `HEAVY` (`audio`, `video`, `file`, `state`) is negotiated as a
+   session and never carried by the bay; the rest are light and are delivered
+   by it.
+4. `bay.link(from, to, transforms, { site })` answers `{ ok, id }` or
+   `{ ok: false, why }`, and the page logs the `why`. `bay.unlink(id)` takes it
+   away. `bay.send(portId, ev)` puts an event on an out-port, and it arrives at
+   an in-port's `deliver` only along a link the bay holds.
+5. `createPatchbay({ nodes, ports, links }, { flowing })`
+   (`demo/shell/patchbay.mjs`) draws it with `createBayView` (`bay-view.mjs`) and
+   the wire traffic of `bay-traffic.mjs`, with the links and ports as tables
+   behind `See details`. Call `pb.refresh()` after the links change.
+6. A page that reaches another site joins a relay room with `createBayNode`
+   (`demo/shell/bay-node.mjs`) on a press, never on load.
+
+🔴 **EVERYTHING A PAGE SHOWS ARRIVES ON A LINK.** Learned 2026-10-11
+(`HANDOFF.md`, session 75): *"A patchbay is only as true as the code that goes
+through it."* `radio/040` (now `/radio/key/`) lit keys and drew rings by calling
+the keyboard directly, and `sampler/020` folded the MIDI keyboard into the
+on-screen keys, so the picture showed neither. The repair is the pattern above:
+the keys light from `keys:midi-in`, and a plugged in keyboard is a `device`
+node of its own with its own links.
+
+So a CONTROL is a port: a key row is `keys:midi-out` plus `keys:midi-in` for its
+lights, a knob is a `value-out` on a node, a camera is a `video-out`. A new
+control is a new port and a new link, and the picture follows without anybody
+drawing it.
 
 ## What they are for
 
 An R&D presentation in half a week. The owner asked for *"simple demo pages
 demo1 demo2 ... where we unpack concepts in a clear way"*, one idea per page,
-numbered, kept as cards in `/concepts/`.
+numbered, kept as cards in `/concepts/`. Since 2026-10-13 they are the front
+page, unnumbered (next section); 42 of them on 2026-10-14 (`node -e
+"import('./demo/shell/concept-list.mjs').then(m => console.log(m.CONCEPTS.length))"`).
 
 ## Addresses, since 2026-10-13: `/<group>/<slug>/`, no numbers
 
@@ -54,12 +98,16 @@ asked 2026-10-11 as *"/concepts/group/0x"*).
   `mount({ name })`, not in the pager. A row is `{ id, title, say, group? }`;
   `id` is `<group>/<slug>`, its position in `CONCEPTS` is its order, and
   `conceptNav(id)` walks that order.
-- **`← concepts` goes to `/`.** Every page mounts with
-  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'concepts' })`.
+- **`← positron` goes to `/`.** Every page mounts with
+  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'positron' })`.
+  It read `← concepts` (`indexLabel: 'concepts'`) until commit `f06642b1`,
+  2026-10-13; MEASURED 2026-10-14: all 43 `indexLabel`s under the concept
+  folders read `'positron'`.
 - **`/concepts/` answers 302 to `/`** (workers/view/src/index.js, and
   `demo/server.mjs` locally). Every old `/concepts/<group>/<nnn>/` is a 404, by the
   no forwarding rule below. The full old to new table is in `positron-history`.
-- **The shared modules live with their group** (`demo/rhythm/voices.mjs`,
+- **The shared modules live with their group** (`demo/drums/voices.mjs`, which
+  was `demo/rhythm/` until the group was renamed drums on 2026-10-13,
   `demo/granulator/grain-rig.mjs`, `demo/code/sampler.mjs`), the list and the
   pager in `demo/shell/` (`concept-list.mjs`, `concept-nav.mjs`), and the clock kit
   the archived clock pages use at `demo/archive/clock-kit.mjs`.
@@ -104,10 +152,12 @@ asked 2026-10-11 as *"/concepts/group/0x"*).
 - **Cards keep one size**: `.cc-card { min-height: 110px }`. Asked: *"keep card
   size"*. Do not let a long desc grow one card.
 - Every page mounts with
-  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'concepts' })`.
+  `mount({ name: '<Title>', what: '', readout: null, index: '/', indexLabel: 'positron' })`.
   Asked: *"each concept page needs link <- concepts not <- demos"*;
   `indexLabel` is the word after the arrow in `shell.mjs` and defaults to
-  `demos`.
+  `demos`. Since 2026-10-13 the word is `positron`, because the concepts are
+  the front page (archived demo pages still read `← demos`, an open question in
+  `HANDOFF.md`).
 - **A new page starts with `what: ''`.** The words come when the owner asks for
   them, in the card desc first.
 - Sections get a small heading, `el('h3', 'cc-h', 'links')`, with
@@ -146,7 +196,8 @@ asked 2026-10-11 as *"/concepts/group/0x"*).
 
 ## The port table
 
-Concepts 1, 3, 4, 5 and 6 draw the room's ports the same way. Copy it from
+Concepts 1, 3, 4, 5 and 6 (the numbered pages of 2026-10-09, since archived or
+merged into `/room/`) draw the room's ports the same way. Copy it from
 `archive/concepts/misc-000.md` (the page was archived 2026-10-12) rather than inventing a variant.
 
 | column | key | width | what |
@@ -158,8 +209,11 @@ Concepts 1, 3, 4, 5 and 6 draw the room's ports the same way. Copy it from
 | medium | `medium` | 72 | coloured by medium |
 | transport | `by` | 120 | `transports` joined with `, ` |
 
-- **Port names are SIMULATED as `<site>:<node>:<medium>-<dir>`** on screen
-  (decided in `plans/plan-site-names.md` §0 and §4c, not built on the wire).
+- **Port names are `<site>:<node>:<medium>-<dir>`.** They were SIMULATED on
+  screen first (decided in `plans/plan-site-names.md` §0 and §4c, not built on
+  the wire); since 2026-10-11 the Pi announces them that way too (`HANDOFF.md`
+  session 74, *"Site and ports renamed: `pi-1`, ports `<medium>-<dir>`"*), and
+  every concept page names its own ports so (`web:keys:midi-out`).
   The real id stays on hover. A second port with the same medium and dir gets
   `-2`, but two ports that differ in ROLE are two nodes (`left:video-in`,
   `right:video-in`), not a number.
@@ -184,9 +238,14 @@ Concepts 1, 3, 4, 5 and 6 draw the room's ports the same way. Copy it from
 
 ### Medium colours
 
-Defined per page as `--md-*` on `:root` and applied by adding `md-<medium>` to
-any body cell whose text is a medium name. Not in `shell.css` yet; if they
-stay they move there.
+🔴 **ONE PLACE SINCE THE PATCHBAY BLOCK: `MEDIUM_COLOURS` IN
+`demo/shell/patchbay.mjs`**, which writes `--md-<medium>` on `:root` and a
+`.md-<medium>` rule for each of `MEDIA`, so any body cell whose text is a medium
+name takes its colour by adding `md-<medium>`. `bay-svg.mjs` and `hero.mjs`
+import the same object. It was defined per page as `--md-*` on `:root` when this
+section was written (*"Not in `shell.css` yet; if they stay they move there"*);
+they moved to `patchbay.mjs`, not `shell.css` (`grep -n md- demo/shell/shell.css`
+finds nothing, 2026-10-14). Do not define them on a page again.
 
 | medium | colour |
 | --- | --- |
@@ -209,6 +268,10 @@ video are related, so they are one warm family, orange and coral.
   not jump and the frame is its own empty state (`table.mjs` drops the caption
   when `minRows` is set). The count is chosen per table and was asked for
   explicitly; do not pick one number for all of them.
+
+The `where` column is the 2026-10-09 page numbers (3 to 6 are the chat pages,
+now `/room/`; 10 to 12 are `/synth/keyboard/`, the archived effects page and
+`/synth/recorder/`).
 
 | table | minRows | where |
 | --- | --- | --- |
@@ -233,10 +296,11 @@ part of a site (`keys`, `synth`, `screen`). A PORT is one end on a node with a
 `dir` and a `medium`. A LINK is `from -> to`, held by a bay. A MEDIUM is what
 flows; a TRANSPORT is what carries it (`relay`, `whep`, `whip`, `https`).
 
-- **studio-1 is the room, and the Pi names its site after it** (`boardGraph`
-  sets `site = room`). That is why nothing said "this is the Pi". The decided
-  spec is `pi-1` with `kind`/`label` on the graph (§0, §3); `kind`/`label` are
-  in the tree, the rename is not.
+- **studio-1 is the room, and the Pi's site is `pi-1`.** When this was written
+  `boardGraph` set `site = room`, which is why nothing said "this is the Pi".
+  The decided spec was `pi-1` with `kind`/`label` on the graph (§0, §3), and it
+  is built: `BOARD_SITE = 'pi-1'` in `demo/shell/graph-registry.mjs` (checked
+  2026-10-14), and `STUDIO_ROOM = 'studio-1'` in `bay-node.mjs` is the room.
 - **A `*` link is one to many** (§4h): `*` is a whole site segment, one per
   link, never matches its own site, light media other than MIDI only. A chat
   tab holds a speaker `<me>:chat:value-out -> *:chat:value-in` and a listener
@@ -253,10 +317,6 @@ flows; a TRANSPORT is what carries it (`relay`, `whep`, `whip`, `https`).
   `admin:value-out` only on the admin tab (5, 6). ⚠️ **NOTHING PROVES THE ADMIN**:
   any tab can pick the admin tab, the bay checks that ports fit, not who holds
   them. That open gap is what the page asks.
-- **The broadcast** (6) is the admin's camera `video-out` by WHIP to
-  `cf-stream`, played by WHEP; on/off is a light `bay.event` on
-  `broadcast:value-out -> *:screen:value-in`, repeated every 10 s for late
-  tabs. It shares `/cam/`'s one WHIP input (409 while `/cam/` holds it).
 - **An on-screen keyboard is an OUT port** (`keys:midi-out`, what it plays
   leaves it) **and an IN for its lights** (`keys:midi-in`, what it shows
   arrives). Named from the bay's side, not the hand's.
@@ -299,7 +359,23 @@ scrollable. no half col scope, scope is always full w"*.
 - **Glyph buttons**: record `●` in red (`.cc-rec { color: var(--rec) }`, the one
   control that starts writing), stop `■`. ⚠️ `positron-ui` says `▶` U+25B6 has
   an emoji form and `►` U+25BA does not, so a play glyph is `►`.
-  `/synth/recorder/` uses U+25B6 today; that is a known defect, fix it when the
-  page is next touched.
+  `/synth/recorder/` used U+25B6 when this was written; it has since moved to
+  the transport bar's icons (`transport.setIcon('rec', ...)`), and
+  `grep -c` finds no U+25B6 in it (2026-10-14), so that defect is gone.
 - **Joining** happens on a press, never on load, and a store or camera wakes
   only on a press too (Join, Start). A concept page opens nothing on a visit.
+
+## Retired
+
+- **The camera broadcast concept, removed 2026-10-12** (room/030 Broadcast,
+  *"rm 030room"*; `concept-list.mjs` says *"video/030 keeps the WHIP and WHEP
+  round trip"*). Today's `/room/broadcast/` is the chat broadcast and has no
+  WHIP in it (`grep -n whip demo/room/broadcast/index.html` finds nothing,
+  2026-10-14). The lesson, kept verbatim: **The broadcast** (6) is the admin's camera `video-out` by WHIP to
+  `cf-stream`, played by WHEP; on/off is a light `bay.event` on
+  `broadcast:value-out -> *:screen:value-in`, repeated every 10 s for late
+  tabs. It shares `/cam/`'s one WHIP input (409 while `/cam/` holds it).
+  ⚠️ `/cam/` is archived (2026-10-13, still served) and its LL-HLS leg is
+  retired; pub's `/cam/whip` is kept and is what
+  https://positron.studio/video/webrtc/ publishes through
+  (`CAM_WHIP_PROXY` in `demo/shell/live.mjs`).

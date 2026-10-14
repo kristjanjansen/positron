@@ -1,11 +1,46 @@
 ---
 name: positron-diagram
-description: How a diagram on a demo page is written: what goes in a box, a label, a sub, a note and an arrow, and where the picture sits on the page. Load before drawing or editing any diagram with demo/shell/diagram.mjs.
+description: How a hand-written diagram (demo/shell/diagram.mjs) is written, and how it differs from the patchbay picture a concept page draws from its own bay. What goes in a box, a label, a sub, a note and an arrow, and where the picture sits. Load before drawing or editing any diagram with diagram.mjs, a slide's diagram in demo/slides/deck.mjs, or before choosing between a diagram and a patchbay picture for a page.
 ---
 
 # A diagram is written to a different rule from prose
 
 `demo/shell/diagram.mjs` draws it. What follows decides what goes in it.
+
+## First: on a concept page the patchbay IS the diagram
+
+Checked 2026-10-14: **no concept page calls `createDiagram`** (`grep -rl
+createDiagram demo/<every CONCEPT_DIRS folder>` finds nothing). A concept page
+draws its machinery with `createPatchbay` (`demo/shell/patchbay.mjs`), which
+draws `createBayView` (`bay-view.mjs`) from the page's own bay: a box is a node
+(`bay.nodes()`), its inlets and outlets are its ports (in on the left, out on
+the right; on a phone, in on the top edge and out on the bottom), a wire is a
+link coloured by the out port's medium, with no arrowhead. In that file's own
+words: *"No typed labels, no notes: rename a port and the picture follows."*
+
+So the choice is made by what the picture is OF:
+
+- **A patch that runs** (what reaches what on this page, now): the patchbay.
+  Nobody writes its boxes. A wrong picture is a wrong link, fixed in the bay,
+  never in a label. Its own rules are in `positron-concepts` (port names,
+  medium colours, `MEDIUM_COLOURS`) and `positron-compose` (where the block sits).
+- **An explanation drawn by hand** (machines and services nobody announces, a
+  slide, a kit specimen): `diagram.mjs`, and every rule below. Today that is
+  `/kit/diagram/`, the slide decks (`demo/slides/deck.mjs`) and the archived
+  demos that still carry their `How it works` picture (`weight`, `patchbay`,
+  `archive/radio`, `llhls`, `wish`, `pack`, `collide`, `cam`, `nola`, `stage`,
+  `floor`, `fau`, `webrtc`, `draw`, `moq`, `mirror`, and the tab modules of
+  `wire`, `time`, `sync`, `csound`).
+
+⚠️ **THE TWO VOCABULARIES MEET AT THE NAMES.** The rules below about what a
+box is CALLED (`Browser`, `Cloudflare`, name the thing that runs, no article in
+a label) are the same instinct as the bay's site and node names: in a bay the
+visitor's tab is site `web`, a Cloudflare service is a site of its own
+(`cf-relay:<room>`, `cf-stream:live`, `cf-store:history`), and the Pi is `pi-1`.
+A slide that draws a patch by hand should use the bay's names, not invent a
+third set.
+
+## The rules for a hand-written diagram
 
 - 🔴 **A DIAGRAM IS WRITTEN TO A DIFFERENT RULE FROM PROSE, AND HERE IT IS.**
   - 🔴 **THE VISITOR'S MACHINE IS CALLED `Browser`. ALWAYS THAT WORD.** Not
@@ -28,7 +63,8 @@ description: How a diagram on a demo page is written: what goes in a box, a labe
     words and a box has a name, a kind and a note.
     ⚠️ **NAME THE THING THAT RUNS, NOT THE SERVICE IT RUNS ON.** `Cloudflare`
     is a machine; what goes inside it is the worker (`workers/img`,
-    `workers/relay`, `workers/station`), a Durable Object, a bucket. The same
+    `workers/relay`, `workers/station`), a Durable Object, a bucket. (⚠️ 2026-10-14: `workers/img`
+    is no longer in `workers/`; `relay` and `station` are.) The same
     goes for `Browser`, which holds the elements, and for `Raspberry Pi`, which
     holds the programs.
     ⚠️ **AND IF THERE IS HONESTLY NOTHING INSIDE, IT IS NOT A CONTAINER**: draw
@@ -248,3 +284,25 @@ description: How a diagram on a demo page is written: what goes in a box, a labe
   - **Labels sit top-left** (`BOX_ALIGN` in `diagram.mjs`, one switch, so the
     whole project reverts together). Centred puts two boxes' names at two
     heights for a reason nobody can see.
+
+## The pages named above, where they are today (checked 2026-10-14)
+
+The rules were bought on these pages; the pages moved, the rules did not.
+
+| named above | today |
+| --- | --- |
+| `/floor/`, `/pack/`, `/weight/` | archived 2026-10-12/13, still served at their URL |
+| `/station/` | retired 2026-10-07, `archive/demos/station-index.html` (eccm removed its radio) |
+| `/crate/` | retired 2026-10-02, `archive/demos/crate-index.html` |
+| `/replay/` | retired, `archive/demos/replay-index.html` |
+| `/keys/` | retired 2026-09-17, `archive/keys/` (`positron-history`) |
+| `/blocks/` | archived 2026-09-24, a 404, `archive/demos/blocks-index.html` |
+| `/grains/` | a 404 since 2026-10-13, `archive/demos/grains-index.html` |
+| `items` | archived 2026-10-01, `archive/items/` |
+
+## Retired
+
+Nothing in this skill was retired: every rule is about `diagram.mjs`, which
+still draws on `/kit/diagram/`, in the slide decks and on the archived pages.
+What changed is how often it applies, which the first section says.
+

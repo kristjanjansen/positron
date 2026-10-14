@@ -1,6 +1,6 @@
 ---
 name: positron-ui
-description: Demo page furniture: the kit in demo/shell/, controls, readouts, tables, sliders, transport bars, CSS, spacing, phone layout and the prose a visitor reads. Load before building or changing any interface, any control, any readout cell or any stylesheet rule.
+description: Page furniture on a patchbay page: the kit in demo/shell/ and /kit/<part>/, the bay picture (createPatchbay, bay-view, medium colours), controls as node ports (a knob is a value-out, keys are midi-out plus midi-in), readouts, tables, sliders, transport bars, CSS, spacing, phone layout and the prose a visitor reads. Load before building or changing any interface, any control, any port a control stands for, any readout cell, the patchbay block on a page, or any stylesheet rule.
 ---
 
 # The kit, the page and everything a visitor looks at
@@ -8,6 +8,90 @@ description: Demo page furniture: the kit in demo/shell/, controls, readouts, ta
 🔴 **BUILD FROM `/kit/`.** Almost everything below exists because somebody
 hand-rolled a control that was already in `demo/shell/`, or wrote a rule that
 lost to another rule and read as correct for weeks.
+
+## A page is a patch: start from the bay
+
+Added 2026-10-14 when this skill was re-read against the patchbay model. Every
+claim here was checked against the files that day; check again before quoting.
+
+- **A live page is a small patch.** It builds a bay with `createBay()`
+  (`demo/shell/bay.mjs`), adds nodes with `bay.addNode({ id: '<site>:<node>',
+  kind, label })`, adds ports with `bay.addPort({ id:
+  '<site>:<node>:<medium>-<dir>', dir, medium, ... })`, and holds links with
+  `bay.link(from, to, transforms, { site })`. `demo/synth/keyboard/index.html`
+  is the smallest whole example. The vocabulary (site, room, node, port, link,
+  medium, transport) is defined in `positron-concepts`, and `MEDIA` in
+  `bay.mjs` is the list of media: `midi`, `audio`, `clock`, `value`, `video`,
+  `program`, `file`, `state`.
+- **The patch is drawn, never hand drawn.** `createPatchbay(bay, { flowing,
+  detail, ... })` in `demo/shell/patchbay.mjs` is the block: the uppercase
+  `patchbay` heading (`.pos-sec-h`), a `See details` link button, the picture
+  from `createBayView` (`bay-view.mjs`) and, behind the button, the links and
+  ports as tables. It reads `nodes()`, `ports()` and `links()` and nothing a
+  page types, so renaming a port renames it in the picture. Traffic on the
+  wires is `bay-traffic.mjs`: an event medium pulses once per event a link
+  delivered, a stream medium (`STREAMY`: audio, video, clock, file, state) is
+  lit while the page's `flowing(link, medium)` says so. 41 non archived files
+  under `demo/` call `createPatchbay` (counted 2026-10-14 with `grep -rl
+  createPatchbay demo | grep -v archive | wc -l`).
+- **A control is usually a node's port.** A knob is a node of its own with a
+  `value-out` port, linked to the `value-in` of the thing it changes:
+  `/shader/mirror/` has `web:knob-segments:value-out` to `web:shader:value-in`,
+  and the shader reads its uniform only off that in-port. An on-screen keyboard
+  is `keys:midi-out` (what it plays) AND `keys:midi-in` (its lights). A plugged
+  in MIDI keyboard is its own `device` node, not folded into the on-screen
+  keys. So adding a control usually means adding a node, a port and a link,
+  and the picture grows a box without anybody drawing it.
+- 🔴 **EVERYTHING A PAGE SHOWS SHOULD ARRIVE ON A LINK.** The lesson from
+  HANDOFF session 75 (2026-10-11), *"A patchbay is only as true as the code
+  that goes through it"*: `/radio/key/` lit keys and drew rings by calling the
+  keyboard directly, and the looper (`sampler/020`, merged into `/code/piano/` 2026-10-12)
+  folded the MIDI keyboard into the on-screen keys, so the picture showed neither. A control that changes something behind
+  the bay's back makes the patchbay block lie.
+- **Medium colours live in one place**: `MEDIUM_COLOURS` in `patchbay.mjs`
+  (midi `#6fb8e8`, audio `#ee9a4d`, clock `#c9ced6`, value `#9ad16b`, video
+  `#e07a5f`, program `#c39af0`, file `#d68fc6`, state `#8a9fc4`), published as
+  `--md-<medium>` and `.md-<medium>`. A page does not pick its own.
+- **A concept page's order** (from `positron-concepts`): picture, knob row
+  (`createKnobGrid`, one row that scrolls sideways, never wraps), code box,
+  keys, patchbay. A readout, when there is one, goes on top (`joined: false`).
+  Concept pages mount with `index: '/', indexLabel: 'positron'`, so the back
+  link reads `← positron` (the shell default `demos` is for archived demo
+  pages; `positron-concepts` still says `concepts` and is out of date on that
+  one word).
+- **The front page draws the same picture.** `demo/shell/hero.mjs` puts an
+  imaginary patch through `createBayView` and `createBayTraffic` above the
+  concept cards, and `demo/shell/bay-svg.mjs` draws it as an SVG string with no
+  DOM for the share cards. One geometry (`BAY_GEOMETRY` in `bay-view.mjs`), two
+  writers.
+
+## Where the pages this file names are today
+
+🔴 **MOST OF THE PAGES BELOW ARE ARCHIVED, AND ARCHIVED IS NOT GONE.** The rules
+were learned on demos that were archived on 2026-10-12 and 2026-10-13, and an
+archived demo stays served at its own URL with `unlisted: true` in
+`demo/manifest.mjs`, listed on https://positron.studio/archive/. So `/fau/`,
+`/tom/`, `/twelve/`, `/evo/`, `/circuit/`, `/pack/`, `/shape/`, `/muta/`,
+`/mirror/`, `/wish/`, `/stage/`, `/weight/`, `/held/`, `/making/`, `/tapes/`,
+`/floor/`, `/reel/`, `/videoradio/`, `/wire/`, `/time/`, `/sync/`, `/capture/`
+still answer and still carry the code each rule names. Checked 2026-10-14:
+`ls demo/<slug>` finds each folder, and the comments under `DEMO_CARDS` in
+`demo/shell/concept-list.mjs` record each archive with its quoted instruction.
+The rules stay because they are about the kit, which the live concept pages
+use.
+
+| named below | where it is, checked 2026-10-14 |
+| --- | --- |
+| `/radio/`, `/radio1965/` (the radio demo) | `/archive/radio/`, `demo/archive/radio/index.html` (radio1965 became radio 2026-09-16, radio moved 2026-10-13). `/radio/` is now the radio concept group |
+| `/keys/` | retired 2026-09-17, `archive/keys/`; `demo/keys` does not exist |
+| `/knobs/` | archived with Yoshimi 2026-10-13, `archive/demos/knobs-index.html`, `/knobs/` is a 404 |
+| `/blocks/` | archived 2026-09-24, `archive/demos/blocks-index.html`, a 404 |
+| `/items/` | archived 2026-10-01 with its worker, `archive/items/README.md` |
+| `/typist/` (the demo) | archived 2026-10-12, `archive/typist.md`; `/typist/<slug>/` is the concept group, `demo/typist/index.html` does not exist |
+| `/grains/` | `demo/grains/` still exists; the granulator concept pages are `/granulator/grains/` and `/granulator/beat/` |
+| `/plai/` | no `demo/plai/` today; its fate was not traced |
+| `/kit/` blocks | split into parts at `/kit/<part>/` on 2026-10-06: BUTTON GROUP and `.kit-out` are in `/kit/input/`, TAB PAGE and CARD GRID ON A PHONE in `/kit/layout/`, SLIDES in `/kit/slides/`, `.kit-pg` in `/kit/devices/`, the closed tab bar drill in `/kit/layout/` |
+| `/kit/frontpage/` | moved to the archive listing 2026-10-13 (commit `b02c2d39`), still served at `/kit/frontpage/`; `/frontpage` answers 302 there |
 
 ## When somebody reports a line, a gap or a doubled edge
 
@@ -264,7 +348,7 @@ is `--ctl-sm` tall, which is 26 and was typed in four places (`.kpad`, the
 small toggle, a stacked checkbox row, the feedback button) with no name between
 them until it was declared once at `:root`, and half a pill's `--pad-btn` of
 air rather than a fourth padding figure. It is shown at the top of `/kit/`'s
-BUTTON GROUP block as a word, a primary and a glyph square, and `/fau/`'s
+BUTTON GROUP block (in `/kit/input/` since the 2026-10-06 split) as a word, a primary and a glyph square, and `/fau/`'s
 Compile wears it, positioned by the field and inset by the rows' own tokens.
 
 ## /kit/ itself
@@ -292,6 +376,12 @@ kind only that page can make: a badge measuring the same width in all four of
 its states (spread 0.02 px), an animation that touches opacity and nothing that
 could move a neighbour, two greys told apart by ink rather than hue, an
 embedded dot laying out 8.0 px and still saying its state in words.
+⚠️ **THAT COUNT IS FROM BEFORE THE KIT WAS SPLIT, NOTED 2026-10-14.** Since
+2026-10-06 `/kit/` is an index of parts and each part is its own manifest row
+(`kit/input`, `kit/layout`, `kit/slides` and so on, all `unlisted`), so the
+asserts quoted here live in those parts now (the closed tab drill is in
+`demo/kit/layout/index.html`). Not re-counted: this rewrite ran no browser.
+Run `node demo/verify.mjs kit kit/layout` for today's numbers.
 ⚠️ **THE LESSON IS ABOUT THIS FILE RATHER THAN ABOUT THE PAGE.** A rule that
 tells an author their work cannot be graded is a rule that stops them trying,
 and this one outlived its own truth. A claim here about what a harness can do
@@ -308,7 +398,9 @@ is checkable in one command, so check it before repeating it.
   that was true but not theirs (no relay on this network). **A rename moves
   URLs that live in modules, harnesses and comments, none of which are
   type-checked — grep the OLD form everywhere.** The same rename left
-  `verify-native.mjs` pointed at a 404, which is the iPhone path.
+  `verify-native.mjs` pointed at a 404, which is the iPhone path. (That script
+  drove `/llhls/`, whose input was deleted 2026-10-13, and now refuses with exit
+  2; the lesson about renames stands.)
 - **What a demo REQUIRES is read off its `tags`, never listed twice.**
   `demo/shell/caps.mjs` maps a tag to a capability (`WebGL2` -> `webgl2`,
   `getUserMedia` -> `camera`), probes this browser once, and un-links rows the
@@ -337,6 +429,16 @@ is checkable in one command, so check it before repeating it.
   100° band on `--hi`. One `PAD` off every edge. A camera is CONTAINED, never
   covered or stretched: iOS ignores a resolution request and returns portrait,
   where stretching squashes a face and cover shows 32% of the frame.
+  ⚠️ **NOTED 2026-10-14: THE PUBLISHED HALF IS RETIRED, THE DRAWN HALF IS NOT.**
+  The Stream input `src/publish.sh` fed (`positron-demo`, /llhls/'s test
+  pattern) was deleted 2026-10-13, and HANDOFF says pub's container still
+  carries the copy as dead publish code, so "change the other" now only
+  matters if that code is revived. The picture itself is live: checked with
+  `grep -rl pattern.mjs demo | grep -v archive`, it is drawn by
+  `/video/camera/`, `/video/shader/`, `/video/recorder/`, `/video/moq/`,
+  `/drums/camera/` and `demo/video/loopback.mjs`, and `readBurned` is read back
+  by the loopback pages, so the burn to `readBurned` check still guards a
+  stream.
   ⚠️ **AND A FILM IS NOT A CAMERA: `drawCamera` TAKES `fit: 'cover'` SINCE
   2026-09-18**, asked for on `/stage/` as *"make 4:3 video win and crop"*. The
   rule above is unchanged and is still the DEFAULT; what it is about is a
@@ -406,7 +508,7 @@ is checkable in one command, so check it before repeating it.
 ✅ **ONE SLIDE FROM PLAIN DATA IS `createSlide(spec)` IN `demo/shell/slide.mjs`,
 2026-10-05**, with `slide.css` beside it and a small `createSlidePlayer(specs)`
 that puts several in a video panel. The six step type scale lives in `SCALE`
-in that module and nowhere else; `/kit/`'s SLIDES tab shows every step, every
+in that module and nowhere else; `/kit/`'s SLIDES tab (`/kit/slides/` since 2026-10-06) shows every step, every
 combination, five layouts and the kit's controls at slide scale, and grades
 them (`plans/plan-slides.md` section 13). Do not import `demo/slides/deck.mjs`
 into anything new: it is the archive's.
@@ -428,7 +530,13 @@ looper retires, no redrect, capture is fine"*: twenty demos become tabs of
 `demo/<page>/<tab>.mjs`, exporting `readout` and `build({ panel, report,
 assert, log, set })`, which returns `{ show, hide, check({ A }), bars: [{
 name, bar, strip }] }`. `demo/shell/tab-page.mjs` does the rest, and `/kit/`'s
-TAB PAGE block is the specimen.
+TAB PAGE block (`/kit/layout/` since 2026-10-06) is the specimen.
+⚠️ **ALL FOUR OF THOSE PAGES ARE ARCHIVED NOW, STILL SERVED.** `/sync/`,
+`/time/`, `/wire/` and `/capture/` went to the archive listing on 2026-10-12
+and 2026-10-13 (`DEMO_CARDS` comments in `demo/shell/concept-list.mjs`). The
+component is live and the rules below hold for any page that uses it; checked
+2026-10-14, `createTabPage` is called by `/kit/layout/`, `/stage/`,
+`/partitur/` and those four, and by no concept page.
 - **Nothing is built for a tab nobody opened.** `build` runs on the tab's first
   showing, and `build` itself opens nothing: a relay join, a fetch or a media
   element waits for the first press in its own tab. The check pass asserts that
@@ -470,7 +578,7 @@ in a closed tab"* red (294/294 to 293/294, 30000 -> 0) and nothing else.
 🔴 **THE SITE IS SET IN TWO FAMILIES SINCE 2026-10-12, AND A PAGE ADDS NO
 THIRD.** Decided as *"A is fine. Impelent font update everywhere"*, spec in
 `plans/plan-fonts-minimal.md`, shown live on `/kit/frontpage/` (THE RULE, IN
-USE).
+USE; that part moved to the archive listing 2026-10-13 and is still served).
 
 - **`var(--mono)` is JetBrains Mono, for everything that NAMES**: page and card
   titles, headings, eyebrows, buttons and every control, readout cells and
@@ -522,6 +630,11 @@ USE).
   **a shared measurement in two files is a measurement that will disagree**. It
   is `--sld-col` now.
 - 🔴 **THE LOOPER IS A KIT MODULE, AND BOTH PAGES WITH A LOOP USE IT.**
+  (Both pages, the radio demo now at `/archive/radio/` and `/tapes/`, were
+  archived 2026-10-13 and are still served. The module is live: checked
+  2026-10-14, `looper.mjs` is imported by `/tom/`, `/tapes/`, `/pack/` and kit
+  modules. `/code/piano/`'s MIDI looper is a different thing that shares the
+  word.)
   `demo/shell/looper.mjs`, 2026-09-16, asked for as *"make it use same looping
   ui as radio (make it global)"*. It owns what a loop IS: the ring that keeps
   the sound, the kept buffer, the mirrored copy, the one voice that reads a lap,
@@ -629,7 +742,10 @@ USE).
   web app flashes white). ⚠️ **`tabs.mjs` WAS IN NO PAGE AND IS NOW IN TWO**: `/making/`, which says in
   its own comment that it is the first shipped use, and `/stage/`. The line here
   said *"in `/kit/` and in NO page"* long after that stopped being true, and a
-  research agent repeated it back on 2026-09-21 because this file said so. What
+  research agent repeated it back on 2026-09-21 because this file said so.
+(Re-counted 2026-10-14 with `grep -rl createTabs demo | grep -v archive`:
+`/making/`, `/stage/`, `/shape/`, `/pack/`, `tab-page.mjs` and `/kit/layout/`,
+and no concept page.) What
   is still true is why it was removed from `/items/`: three names on a page
   holding one list and one form is furniture. 🔴 **`min-width: 0` or a scrolling row
   drags the PAGE sideways instead of scrolling**: `overflow-x` cannot shrink a
@@ -761,6 +877,15 @@ USE).
   and the check that a frame is the SHAPE the board publishes. A page owns which
   verbs it sends, what it does with a frame after the playout has it, and what
   its log calls things.
+  ⚠️ **"BOTH PAGES" IS NOW EVERY REMOTE INSTRUMENT, NOTED 2026-10-14.** The two
+  pages it was written for are gone (`/keys/` retired 2026-09-17, `/knobs/`
+  archived to a 404 with Yoshimi 2026-10-13). Checked with `grep -rl board.mjs
+  demo | grep -v archive`: `/remote/circuit/`, `/remote/collide/`,
+  `/remote/piano/`, `/drums/remote/` and `/shader/remote/` import it, plus the
+  archived `/away/` and `/shape/`. On those pages the Pi is a site (`pi-1`) and
+  its instrument a node on the bay, so what `board.mjs` carries is the far end
+  of a link the picture draws. The rule is unchanged: one module, and a page
+  owns only its verbs and its words.
   ⚠️ **IT IS THE BETTER OF THE TWO HALVES, NEVER THE AVERAGE, AND THAT IS THE
   GENERAL RULE FOR THIS KIND OF MERGE.** `/keys/` hand-rolled its WebSocket and
   so could not tell a FULL ROOM from a DEAD RELAY (a browser cannot read the
@@ -772,14 +897,15 @@ USE).
   which reports press to sound and pays for every millisecond of it; 160 on
   `/knobs/`, which holds one note under a filter sweep where a click is the
   thing a listener cannot ignore. Two trades, one component.
-- **Write for someone who does not work here.** Terse, but understandable —
-  those are not in tension, and the old rule ("no explanatory prose, one line
-  and a readout") produced pages that only their author could read. A demo page
-  carries two things: **ONE paragraph of three or four sentences** saying what
-  happens, how it is done and what the numbers mean — and a readout of real
-  numbers. It was a lead line plus a second `d.how()` paragraph until
-  2026-09-08; two blocks meant the lead said too little and the mechanism went
-  unread. `d.how()` is gone; put it all in `what`.
+  (Both pages are gone; the principle still has subjects: checked 2026-10-14,
+  `/remote/circuit/` passes `cushionMs: 80` and `/remote/piano/` passes 80 and
+  160 on its two paths.)
+- **Write for someone who does not work here.** The principle stands; the
+  size this bullet used to give a page's prose (one paragraph of three or four
+  sentences) was superseded by CLAUDE.md's one sentence rule on 2026-09-19 and
+  by two short card sentences on 2026-10-12, and concept pages start with
+  `what: ''`. The words a visitor reads are `positron-describe`'s now. The old
+  bullet is kept verbatim under Retired at the end of this file.
 - **No jargon in anything a visitor sees.** Not in `what`, not in `how`, not in
   a readout key, not in `manifest.mjs`'s `one` line. Banned unless the page
   defines it on the spot: lookahead, horizon, one-shot, tick, host, commit,
@@ -801,6 +927,9 @@ USE).
   instrument row offering `sampled`, `hexter` and `yoshimi`; two of the three
   left the board on 2026-09-16 and a choice of one is not a choice. See
   `archive/box-fluidsynth-hexter/`.
+  ⚠️ **AND YOSHIMI ITSELF LEFT THE BOARD 2026-10-13** (`archive/yoshimi/`,
+  `plans/plan-retire-yoshimi.md`). The decision still stands for the names on
+  live pages: `Circuit`, `Collide`, `Plaits`, `SuperCollider`, `Faust`.
 - **A constant belongs beside the thing it governs, not in a header.** `how()`
   took a spec line of real values (`looks 100 ms ahead · re-checks every 25 ms`)
   on the theory that constants beat prose. They do — when someone is looking for
@@ -819,6 +948,8 @@ USE).
   Instructions in a gutter crowd out the numbers, repeat the paragraph above,
   and do not fit. **Anything that truncates with an ellipsis is in the wrong
   place** — that is the signal, not a styling problem to widen your way out of.
+  (`how()` was removed 2026-09-08, see the prose bullet above; read "the
+  `how()` paragraph" here and in the tooltip rule below as the page's `what`.)
 - **A tooltip is two or three short lines, never a sentence.** It is drawn ON
   TOP of the thing it describes and is read every time you point at one, so a
   paragraph there covers the picture and gets re-read twenty times. Budget
@@ -886,7 +1017,7 @@ USE).
   ⚠️ **THE SELECTOR AND THE NUMBER WRITTEN HERE WERE BOTH STALE AND WERE
   CORRECTED 2026-09-20 BY READING THE STYLESHEET.** This said the rhythm was
   `.pos-body > * + * { margin-top: 22px }`. It is **`--pos-gap: 40px`**,
-  declared once at `shell.css:49`, applied by `.pos-stack` as a `margin-bottom`
+  declared once at `shell.css:49` (line 141 on 2026-10-14), applied by `.pos-stack` as a `margin-bottom`
   on every child but the last, with `margin-top: 0` forced on every child but
   the first. `shell.css`'s own comment says why the old one went: `.pos-body >
   * + *` reached ONE element's direct children and nothing else, it LOST to
@@ -914,8 +1045,8 @@ USE).
   was nothing else it could be, and the rule was written into `followTick` as
   `S.pos`. A tab watching a show being RECORDED has a newest fact and no
   playhead: nothing is playing, the deck sits at 0, and the strip stood still
-  while its own rows arrived. `followTarget` (option, or `setFollowTarget(fn)`)
-  names it; `armWall(0)` at the recorder's start makes `wallPos()` the write
+  while its own rows arrived. `followTarget` (option, or `setFollowTarget(fn)`, both in
+  `timeline/strip.mjs`) names it; `armWall(0)` at the recorder's start makes `wallPos()` the write
   head, and `() => wallPos()` is both cases written once, because `disarmWall()`
   hands back to the playhead by itself.
   ⚠️ **AND AN ARMED WALL MEANS THE PICTURE MOVES.** The strip repainted on
@@ -942,7 +1073,9 @@ USE).
   `/keys/` has none: a note sounds while a key is held, there is nothing to
   start or resume, and a toggle whose only honest behaviour is to do nothing is
   the shape of control this project calls a lie. What such a bar still carries
-  is the `chip`. On both board pages that is the presence badge, because the
+  is the `chip`. On both board pages (`/keys/` and `/knobs/`, both gone by
+2026-10-13; `toggle: false` is still used by `/code/piano/`, `/pack/`,
+`/stage/` and `/kit/timeline/`, checked 2026-10-14) that is the presence badge, because the
   fact worth having about an instrument in another building is whether it is
   answering. ⚠️ **IT DISARMS EVERYTHING THAT DEPENDED ON PLAYING** rather than
   leaving it to read false by luck: `api.playing` is forced false, the space bar
@@ -1181,6 +1314,8 @@ a cell that is 22 ch on a 360 px screen would push the row off the side.**
 ⚠️ **`ch` ON A MONOSPACE FACE IS EXACTLY CHARACTERS, which is why the unit is
 worth keeping: 22 ch fits `Vibraphone Soft 2` and `four seconds ago` whole,
 and the longest name in `/keys/`'s Yoshimi library with one to spare.**
+(Measured on a page and a library that are both gone, `/keys/` 2026-09-17 and
+Yoshimi 2026-10-13; the 22 ch value is still what `shell.css` sets.)
 
 🔴 **AND IT IS BALANCED, WHICH IS WHERE THIS PROJECT DRAWS THE LINE ON
 `text-wrap: balance` AND THE ARGUMENT FOR EVERY OTHER PLACE IT IS USED.
@@ -1434,7 +1569,8 @@ and it becomes correct again by itself when a stylesheet changes.**
 ⚠️ **AND IT WAITS FOR THE FONT. Measured against a fallback face the numbers
 describe a glyph nobody will see, so every measurement re-runs on
 `document.fonts.ready`, the same event `/radio1965/` uses to re-share its
-label column.**
+label column.** (`/radio1965/` is `/archive/radio/` today; checked 2026-10-14,
+`demo/archive/radio/index.html` still calls `document.fonts?.ready?.then(shareLabelColumn)`.)
 
 🔴 **IT EXISTS BECAUSE `host.textContent = ch` SILENTLY UNDOES THIS FILE.**
 `centreSymbol` puts the glyph in a `<span class="pos-sym">` and translates the
@@ -1984,3 +2120,25 @@ accent and is spent on what is CHOSEN or LIVE. A date is neither: it is the
 same fact for every tile on the floor, and painting it yellow made the one
 constant in the caption the loudest thing in the picture. Asked for
 2026-09-19: "move date field last and lose yellow".**
+
+
+## Retired
+
+Rules moved here verbatim, with the date and the reason. Do not apply them to
+new work; they explain old pages and old commits.
+
+### The size of a page's prose, superseded 2026-09-19 and 2026-10-12
+
+Superseded by CLAUDE.md's one sentence rule for `what` and `one` (2026-09-19)
+and by the two short sentence card rule (2026-10-12), both owned by
+`positron-describe`. Concept pages start with `what: ''` and say their line on
+the card. Moved here 2026-10-14; a pointer stays where it stood.
+
+- **Write for someone who does not work here.** Terse, but understandable —
+  those are not in tension, and the old rule ("no explanatory prose, one line
+  and a readout") produced pages that only their author could read. A demo page
+  carries two things: **ONE paragraph of three or four sentences** saying what
+  happens, how it is done and what the numbers mean — and a readout of real
+  numbers. It was a lead line plus a second `d.how()` paragraph until
+  2026-09-08; two blocks meant the lead said too little and the mechanism went
+  unread. `d.how()` is gone; put it all in `what`.

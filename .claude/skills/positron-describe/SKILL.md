@@ -1,6 +1,6 @@
 ---
 name: positron-describe
-description: How to write the words a visitor reads about a page, and how to decide what they say. Load before writing or changing any card description (a `say` in demo/shell/concept-list.mjs, CONCEPTS or DEMO_CARDS), a `one` line in demo/manifest.mjs, a page's `what` text, or a readout key a visitor reads, and before checking somebody's proposed copy against a page.
+description: How to write the words a visitor reads about a page, and how to decide what they say, checked against the page's code and its own patchbay links. Load before writing or changing any card description (a `say` in demo/shell/concept-list.mjs, CONCEPTS or DEMO_CARDS, or an archived card in demo/archive/index.html), a `one` line in demo/manifest.mjs, a page's `what` text, or a readout key a visitor reads, and before checking somebody's proposed copy against a page.
 ---
 
 # Describing a page
@@ -14,6 +14,34 @@ rewrites are proposed copy, not verified descriptions of the implementations.
 Check every claim against the source code and actual behavior ... When an
 example overstates the implementation, correct it rather than modifying the
 implementation to match the copy."*
+
+Reread 2026-10-14 for the patchbay era: the cards are the front page now
+(`demo/index.html`, from `demo/shell/concept-list.mjs`), not /concepts/, and the
+page numbers in the examples below are the 2026-10-12 ones. The table at the
+end of this file says where each named page is today.
+
+## Describing a patch
+
+Most pages a visitor reads about today are patches: a few nodes, their ports,
+the links between them, drawn as the bay at the foot of the page
+(`positron-concepts`). That makes the page's own patchbay the first evidence
+for a card.
+
+- **A claim about what reaches what is a claim about `bay.links()`.** *"Notes
+  travel from the keys to the synth"* is true when that link is held, and the
+  bay's `See details` table lists it. Read the page's `WANT` (or however it
+  names the links it makes) before writing a verb that joins two things.
+- **"Connect", "patch" and "wire" claim that the VISITOR makes the link.** On
+  most pages the page makes them and the visitor watches the patchbay draw
+  them; say *"while the patchbay holds the link from camera to screen"*
+  (`video/camera`'s card) rather than *"connect your camera"*.
+- **"Remote", "on the Pi", "in another building" claim a second site.** Count
+  the sites in the picture: `web` alone is one tab; `pi-1` or a `cf-relay` box
+  is somewhere else. A simulated site drawn as a box is still not a second
+  computer, and the card says which.
+- **Name what the visitor meets, not the model.** Site, node, port and medium
+  are words for the page's patchbay and its tables, not for a card, unless the
+  card is about the idea itself (a `*` link, a store as a site).
 
 This skill is the editorial half. The furniture rules (no jargon, a number in a
 readout cell not a sentence, a tooltip is two lines) are `positron-ui`; the
@@ -238,3 +266,26 @@ does is a change to what it says).
 Record each card as before, after, and the line or run that backs it. When the
 facts sit in someone else's file (a list another agent is editing), write the
 set to `plans/` and let the session apply it.
+
+## The pages named above, where they are today (checked 2026-10-14)
+
+Old ids from the 2026-10-12 drafts, resolved with `positron-history` and
+`ls demo/<group>/<slug>/`. An archived page is still served and its card is on
+https://positron.studio/archive/ (`demo/archive/index.html`), not in
+`concept-list.mjs`.
+
+| named above | today |
+| --- | --- |
+| synth/000 Keyboard | https://positron.studio/synth/keyboard/ (the MIDI lines cited as `123-176` are around line 123 of `demo/synth/keyboard/index.html` today) |
+| synth/040 Synth | gone from the index; its step picker (`modules.mjs`) lives on in the archived https://positron.studio/archive/tutorial-slide/ and `/archive/draw-xy/` |
+| synth/090 | https://positron.studio/code/collide/ |
+| synth/110 Plaits patches | archived, https://positron.studio/archive/plaits-patches/ |
+| sampler/000 | https://positron.studio/code/piano/ |
+| draw/000 XY filter | archived, https://positron.studio/archive/draw-xy/ |
+| clock/000 Scheduling | archived, https://positron.studio/archive/clock-scheduling/ |
+| clock/030 Shared clock | archived, https://positron.studio/archive/clock-shared/ |
+| video/030 WebRTC loopback | https://positron.studio/video/webrtc/ |
+| rhythm/050 Camera drums | https://positron.studio/drums/camera/ |
+| weight, partitur, reel, floor, resources, tapes, making, held, stage | archived demos, still served at `/<slug>/` |
+| the stations | the radio concepts, https://positron.studio/radio/blend/ and its group |
+

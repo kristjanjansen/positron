@@ -1,6 +1,6 @@
 ---
 name: positron-history
-description: What positron used to be called and where the retired pages went. Load before following a link, a slug or a path from an older file, before repeating a claim about a rename, or when a reference in a comment does not resolve.
+description: What positron used to be called, where the retired and archived pages went, and which workers, inputs and routes were retired. Load before following a link, a slug or a path from an older file (a /concepts/<group>/<nnn>/ address, a dashed slug, /rhythm/, /stations/, a demo slug), before repeating a claim about a rename, or when a reference in a comment does not resolve.
 ---
 
 # What moved, what was renamed, and what is gone
@@ -9,7 +9,47 @@ Every entry here was an instruction, and each one cost a sweep across the
 checkout. `archive/` is deliberately left spelling things the old way, because
 an archive records what was there.
 
-# positron
+## The shape of the history in one paragraph
+
+positron went through two eras, and an old reference belongs to one of them.
+**The demo era** (to 2026-10-12): one page per slug at `/<slug>/`, each a row
+in `DEMOS` in `demo/manifest.mjs`, graded by `demo/verify.mjs`, listed on a
+front page baked from the manifest. **The patchbay era** (from 2026-10-13, and
+built up in concept pages since 2026-10-09): every idea is a small page at
+`/<group>/<slug>/` that draws itself as a patch of sites, nodes, ports and
+links (`demo/shell/bay.mjs`, `patchbay.mjs`), listed as cards from
+`demo/shell/concept-list.mjs` on the front page under THE HERO, LARGE
+(`demo/shell/hero.mjs`). Most demos were archived on 2026-10-12 and 2026-10-13:
+**an archived demo is still served at its old URL** (`unlisted: true`, a card
+on https://positron.studio/archive/), so its address did not die, it just left
+the index. A concept page that moved is the opposite: **its old address is a
+404, never forwarded** (*"no old address forwarding"*, 2026-10-12).
+
+## Resolving an old reference, checked 2026-10-14
+
+1. A `/concepts/<group>/<nnn>/` address: the first table below, then the
+   one word table, then the drums and remote table. The last table wins.
+2. A `/<slug>/` demo address: `node -e "import('./demo/manifest.mjs').then(m =>
+   console.log(m.DEMOS.map(d => d.name).join(' ')))"`. If the slug is there it
+   is still served (archived or not); if not, `ls archive/demos/` (a page moved
+   there is a 404) and the dated sections below.
+3. A worker, a Stream input or a pub route: the 2026-10-13 retirement section
+   at the end of this file, and `ls workers/*/RETIRED.md`.
+4. Anything on the Raspberry Pi naming Yoshimi: retired 2026-10-13, see the end
+   of this file.
+
+MEASURED 2026-10-14, not remembered: **56 demo rows, 55 built, one listed**
+(`kit`); **42 concept pages** in `CONCEPT_DIRS` (`synth`, `code`, `granulator`,
+`remote`, `radio`, `video`, `shader`, `room`, `typist`, `drums`, `history`).
+Count again before quoting either.
+
+# positron, the demo era (a dated record, 2026-09)
+
+⚠️ **THIS SECTION IS A RECORD OF ITS DAYS, NOT TODAY.** Its counts (`57 shelled
+demos of 59 rows`) and its front page (*"ordered NEWEST FIRST"*, `byNewest()`)
+are of the demo era; the front page has been the concepts index since
+2026-10-13 and the count is the command above. Kept because the renames it
+records still explain old links.
 
 Live at **https://positron.studio**. 57 shelled demos of 59 rows
 (2026-09-24, counted from `DEMOS` rather than remembered). 🔴 **AND THE COUNT
@@ -81,6 +121,10 @@ sound demo to und"*, the letters confirmed by asking because the rename before
 it arrived as *"do ound"*). The deployed `/sound/` is GONE with no redirect,
 like `/vclick/` before it. The sweep matched `/sound/` and `demo/sound/`, never
 the word: `torvalds/linux/.../sound/usb/` and `ubu.com/sound/` are not ours.
+⚠️ **AND `und` IS NOW `csound`, 2026-10-05** (`git log -- demo/und`, commit
+`592108ab`, no redirect), and `csound` was archived 2026-10-12: still served at
+https://positron.studio/csound/, listed on /archive/. Likewise the `radio` this
+section names moved to https://positron.studio/archive/radio/ on 2026-10-13.
 🔴 **AND `held` IS NOW `weight`, RENAMED 2026-09-19 ON INSTRUCTION, AND THIS ONE
 IS NOT LIKE THE OTHER TWO.** *"name the demo held, rename old held to weight"*,
 because the NAME is being given to a different demo. So the old URL is not a
@@ -112,7 +156,9 @@ regression here: `now`'s asserts go red when ERR refuses its own live edge (one
 goes red when a leftover Chrome of mine is holding relay sockets — **run the
 failing demos ALONE before believing the suite**. `scene` is the first WebXR page;
 `node demo/verify-quest.mjs` drives it on a real Quest over adb, and
-`--self-test` proves its headset guard discriminates with no device attached. The front page is
+`--self-test` proves its headset guard discriminates with no device attached.
+(⚠️ 2026-10-14: neither `demo/now/` nor `demo/scene/` exists any more, and the
+sentence about the front page that follows is the demo era's.) The front page is
 ordered NEWEST FIRST — `DEMOS` is still the story order and `byNewest()` copies
 it, because the index answers "what is new here?" and the sequence answers
 "where do I start?". Read
@@ -124,7 +170,7 @@ not re-litigated.
 
 ## The concepts became the front page, 2026-10-13: /concepts/<group>/<number>/ to /<group>/<slug>/
 
-Instructed: *"when all is done, move concepts to frontpage. use http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE. rename all with group/slug, rm numbers"*, then *"keep same boxes style"*. The concepts index (`demo/concepts/index.html`) is the front page, `demo/index.html`, under THE HERO, LARGE (`demo/shell/hero.mjs`). `/concepts/` answers 302 to `/`. **Every old page address below is a 404 and was not forwarded**, by the concepts rule (*"no old address forwarding"*). The old front page (the manifest groups baked into `workers/view/menu.html`, and its dev twin `demo/index.html`) is in `archive/frontpage/`. The sweep rewrote paths, never verbatim quotations, never `git show <sha>:demo/concepts/...` history paths, and nothing under `archive/` or `plans/`. Two folders differ from their old group on purpose: `radio` is `stations` because `/radio/` is the archived radio demo and still served, and `archives` is `history`, the heading it shows.
+Instructed: *"when all is done, move concepts to frontpage. use http://127.0.0.1:8890/kit/frontpage/ on top THE HERO, LARGE. rename all with group/slug, rm numbers"*, then *"keep same boxes style"*. The concepts index (`demo/concepts/index.html`) is the front page, `demo/index.html`, under THE HERO, LARGE (`demo/shell/hero.mjs`). `/concepts/` answers 302 to `/`. **Every old page address below is a 404 and was not forwarded**, by the concepts rule (*"no old address forwarding"*). The old front page (the manifest groups baked into `workers/view/menu.html`, and its dev twin `demo/index.html`) is in `archive/frontpage/`. The sweep rewrote paths, never verbatim quotations, never `git show <sha>:demo/concepts/...` history paths, and nothing under `archive/` or `plans/`. Two folders differ from their old group on purpose: `radio` is `stations` because `/radio/` is the archived radio demo and still served, and `archives` is `history`, the heading it shows. ⚠️ The `stations` half of that sentence lasted one afternoon: the same night the demo moved to `/archive/radio/` and the concepts took `/radio/` (next section). The right column of this table is itself stale for every row the next two tables touch.
 
 | old address | new address |
 | --- | --- |
@@ -249,3 +295,85 @@ Unchanged: `/synth/keyboard/`, `/synth/recorder/`, `/synth/timeline/`, `/video/c
 | `demo/stations/tempo.mjs` | `demo/radio/tempo.mjs` |
 | `demo/typist/typewriters/fx.mjs` | `demo/typist/machines/fx.mjs` |
 | `demo/radio/index.html` | `demo/archive/radio/index.html` |
+
+## Drums, the remote pages and the chat, 2026-10-13 (late): the last moves of that night
+
+Written 2026-10-14 from the commits that made them (`git show --stat d85c4b57`,
+`f06642b1`, `ec764e8d`, `33595975`). Asked: *"Renamw rythm group into drums"*,
+*"Move drums on pi into remote drums"*, *"Move pi shader to remote shaders
+under shaders"*, *"Move chat ui wired to chat. Rm chat ui wired"*, *"move room
+into last group"* and *"Move held to archive"*. **Every address in the left
+column is a 404**, no forwarding. This table wins over the two above it.
+
+| old address | new address |
+| --- | --- |
+| `/rhythm/drums/` | `/drums/machine/` |
+| `/rhythm/knobs/` | `/drums/knobs/` |
+| `/rhythm/samples/` | `/drums/samples/` |
+| `/rhythm/camera/` | `/drums/camera/` |
+| `/remote/drums/` | `/drums/remote/` |
+| `/remote/shader/` | `/shader/remote/` |
+| `/room/window/` (Chat UI wired) | `/room/chat/` (the chat window page; the patchbay only chat that was at `/room/chat/` is gone) |
+
+| old module | new module |
+| --- | --- |
+| `demo/rhythm/voices.mjs` | `demo/drums/voices.mjs` |
+| `demo/rhythm/drum-machine.mjs` | `demo/drums/drum-machine.mjs` |
+| `demo/rhythm/sample-voices.mjs` | `demo/drums/sample-voices.mjs` |
+
+⚠️ So `demo/rhythm/`, `demo/stations/` and `demo/room/window/` do not exist
+(`ls` 2026-10-14). The concept back link reads `← positron` since `f06642b1`
+(`indexLabel: 'positron'`), not `← concepts`.
+
+## Archived 2026-10-12 and 2026-10-13: still served, off the index
+
+🔴 **ARCHIVED IS NOT REMOVED.** Each of these keeps its manifest row with
+`unlisted: true` and still answers at its URL, with a card on
+https://positron.studio/archive/ (`demo/archive/index.html`). The reasons are
+the owner's words in the `DEMO_CARDS` comments in `demo/shell/concept-list.mjs`.
+
+- **Demos, still at `/<slug>/`:** partitur, reel, floor, videoradio, tapes,
+  resources, weight, held, stage, making, wish, away, tom, nola, csound, wire,
+  draw, patchbay, time, sync, fau, collide, muta, mirror, llhls, webrtc, moq,
+  cam, capture, dump, circuit, evo, twelve, shape, pack. The radio demo is the
+  one that MOVED as it was archived: `/archive/radio/`. `/proto/deck/` is the
+  deck card. `/kit/frontpage/` is archived too, and `/frontpage` still answers
+  302 to it (`workers/view/src/index.js`).
+- **Concept pages moved under `/archive/<name>/`:** `tv`, `pico-router`,
+  `clock-midi`, `clock-drift`, `draw-xy`, `clock-shared`, `clock-scheduling`,
+  `clock-message-lag`, `clock-audio-cushion`, `plaits-patches`,
+  `clock-play-together`, `clock-replay`, `clock-follow`, `pappus`,
+  `tutorial-slide` (`ls demo/archive/`).
+- **Concept pages kept only as a note** (`archive/concepts/*.md`, read on
+  `/archive/note.html?f=...`): clock-040, effects, misc-000, misc-010,
+  remote-000 (Yoshimi), sampler-015.
+- **Gone, a 404:** `/knobs/` and `/grains/` (with Yoshimi,
+  `archive/demos/knobs-index.html`, `grains-index.html`), `/flipper/`
+  (`archive/demos/flipper-index.html`), and the typist front page demo
+  (`archive/typist.md`).
+
+# Retired 2026-10-13: workers, inputs, routes and Yoshimi
+
+Recorded here so an old reference resolves. The source is `HANDOFF.md`, *"Retired
+2026-10-13: the test pattern, /cam/'s RTMPS camera, six workers"*, checked
+against the tree 2026-10-14.
+
+- **Six workers deleted:** cues, instrument, moq-safari, osc, rtc, selfrec, each
+  with `workers/<name>/RETIRED.md` (and `workers/jam/RETIRED.md` from
+  2026-09-04). `cues.`, `instrument.`, `moq.`, `osc.`, `rtc.` and
+  `selfrec.positron.studio` no longer answer.
+- **Stream inputs deleted:** `positron-demo` (/llhls/'s test pattern),
+  `whep-rig` (/webrtc/ and capture ROUND TRIP), `positron-cam` (/cam/'s LL-HLS
+  leg). **pub answers 410** on `/watch`, `/status`, `/start`, `/stop`, `/whip`,
+  `wss /cam`, `/cam/status`; it keeps `/cam/whip` (https://positron.studio/video/webrtc/),
+  `/loop*` (https://positron.studio/video/llhls/), `/stage/*`, `/ice`, `/log`, `/logs`.
+- **Commands that refuse or moved:** `demo/check-whep.mjs` is
+  `archive/check-whep.mjs`; `demo/verify-native.mjs` and
+  `demo/verify-safari.mjs` refuse (exit 2); `src/provision-cam.sh` refuses.
+- **Yoshimi is off the Pi** (`archive/yoshimi/README.md`,
+  `plans/plan-retire-yoshimi.md`), asked *"discard yoshimi. with possiblity to
+  do dual setup in future (pi and browers, interlink). arhive demos using it"*.
+  The board has no JACK instrument by default: `audio.start` needs a named
+  source (`sampler`, `collide`, `synth`), and `rig/board/insert-test.mjs` and
+  `pappus-live.mjs` refuse (exit 2). The sentence above that says the board has
+  *"ONE instrument since 2026-09-16"* named Yoshimi; it is a record of that day.

@@ -1,7 +1,7 @@
 # positron
 
-Live at **https://positron.studio**. R&D, not a product. 57 demo rows of which
-56 are built, a Raspberry Pi in another building, a Novation Circuit on the
+Live at **https://positron.studio**. R&D, not a product. 56 demo rows of which
+55 are built (counted 2026-10-14), a Raspberry Pi in another building, a Novation Circuit on the
 desk, and a pile of measurements about streaming.
 
 ⚠️ **COUNT THE DEMOS, NEVER REMEMBER THEM.** This line said `47 of 49` one
@@ -24,7 +24,7 @@ The slug is ONE plain lowercase word, never its group's name (*"Resolve clashes.
 Avoid dashes on names."*, 2026-10-13): `/remote/circuit/`, not
 `/remote/circuit-on-pi/`, and a group name taken by an archived page is resolved
 by moving that page (the radio demo is `/archive/radio/`), not by renaming the group.
-The listed manifest rows (today only `held`) draw as use case cards from
+The listed manifest rows (today only `kit`, counted 2026-10-14) draw as use case cards from
 `DEMO_CARDS`, skipping `built: false` and `unlisted` rows. The paragraph below
 describes the manifest-baked front page, which is in `archive/frontpage/`; what
 it says about `built: false` and the deploy is still true.
@@ -65,16 +65,17 @@ somebody broke it.
 | load | before |
 | --- | --- |
 | `positron-compose` | deciding where anything goes, writing any padding, margin, gap, width, border or radius, or saying a layout is done. It is the composition and cascade half; `positron-ui` is the kit half, and a layout task loads both |
-| `positron-ui` | building or changing any interface, control, readout, table, transport bar or stylesheet rule |
-| `positron-diagram` | drawing or editing a diagram |
+| `positron-ui` | building or changing any interface, control (a control is usually a node's port), readout, table, transport bar, the patchbay block on a page, or a stylesheet rule |
+| `positron-diagram` | drawing or editing a hand-written diagram (`diagram.mjs`, a slide's picture), or choosing between one and the page's own patchbay picture |
 | `positron-verify` | running or changing a harness, adding or removing a control, believing a red run, reporting a measurement or an absence |
-| `positron-streaming` | anything under `workers/` or `src/`, any page that plays a stream, quoting a latency or a bill |
-| `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, full screen on a phone |
-| `positron-hardware` | anything under `rig/`, a page that plays real hardware, any claim about an instrument |
-| `positron-history` | following a link, slug or path out of an older file, or repeating a claim about a rename |
+| `positron-streaming` | anything under `workers/` or `src/`, any page that plays a stream or adds an audio, video, file or state link that leaves the machine (a heavy link and its transport), quoting a latency or a bill |
+| `positron-xr` | any `gl: true` or headset page, `verify-gl.mjs`, `verify-quest.mjs`, a full screen button on any page or full screen on a phone |
+| `positron-hardware` | anything under `rig/`, a page that plays real hardware (the remote concepts, the Pi as site `pi-1`), any claim about an instrument |
+| `positron-history` | following a link, slug or path out of an older file (a numbered or dashed concept address, `/rhythm/`, `/stations/`, an archived demo, a retired worker), or repeating a claim about a rename |
 | `positron-slides` | writing or revising any slide text, deck outline, speaker notes or playable lesson, including a deck in `demo/shell/decks.mjs`. It is the words half; drawing a slide is `positron-ui` |
-| `positron-concepts` | building or changing any concept page (`demo/<group>/<slug>/`, the folders in `CONCEPT_DIRS`) or a card on the front page, or explaining a patchbay idea as a small page |
+| `positron-concepts` | building or changing any concept page (`demo/<group>/<slug>/`, the folders in `CONCEPT_DIRS`, each a patch of nodes, ports and links) or a card on the front page, or explaining a patchbay idea as a small page |
 | `positron-describe` | writing or changing any card description (`say`), manifest `one` line, page `what` text or readout key a visitor reads, or checking somebody's proposed copy against a page |
+| `positron-start` | somebody wanting to stand up a positron-shaped site of their own on Cloudflare, before the first command |
 
 ⚠️ **AND THE TRIGGER IS THE WORK, NOT THE FILE.** Adding one button to a page
 is a `positron-ui` task AND a `positron-verify` task, because adding a control

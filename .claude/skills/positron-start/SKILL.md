@@ -5,11 +5,13 @@ description: Stand up a positron-shaped site of somebody's own on Cloudflare, fr
 
 # Standing up a positron of your own
 
-**positron-start, revision 2026-09-25.**
+**positron-start, revision 2026-10-14.** (2026-09-25 until the patchbay pass
+of 2026-10-14, which added the section below on what a positron-shaped thing
+is, and corrected the pages, workers and sizes that had moved since.)
 
 🔴 **SAY THAT REVISION OUT LOUD, ONCE, EARLY, IN A SENTENCE THEY CAN READ.**
 Something like *"I am following the positron setup guide, revision
-2026-09-25."* It costs one line and it is the only way anybody can tell whether
+2026-10-14."* It costs one line and it is the only way anybody can tell whether
 you are working from the current instructions or from a stale copy.
 ⚠️ **BECAUSE THERE ARE TWO DOORS INTO THIS FILE AND THEY DRIFT.** An agent told
 to READ THE URL gets whatever is on the `main` branch at that moment, which is
@@ -87,6 +89,67 @@ them something.
 
 ---
 
+## What a positron-shaped thing is, since the site became a patchbay
+
+Written 2026-10-14, checked against the files that day. **This is for YOU, so
+you know what you are standing up. It is not a lecture for them**; the plain
+words rule above holds, and a sentence like *"everything is a box with plugs,
+and the lines between the plugs are what you connect"* is all they need.
+
+Since 2026-10-13 the front page of https://positron.studio is the concepts
+index: THE HERO, LARGE (`demo/shell/hero.mjs`, the headline *"Connect anything
+to everything."*) over one card per concept page, each page at
+`/<group>/<slug>/` (https://positron.studio/synth/keyboard/). Nearly every
+concept page draws itself as a patchbay. So when somebody says *"something like
+positron"*, this is the shape they saw:
+
+- **A SITE** is one thing that speaks for itself: a browser tab (`web`), the
+  Raspberry Pi (`pi-1`), a Cloudflare service (`cf-relay`, `cf-stream`,
+  `cf-store`).
+- **A NODE** is a part of a site (`keys`, `synth`, `camera`, `screen`), a
+  **PORT** is one end on a node with a direction and a **MEDIUM**, and a **LINK**
+  is `from -> to`. A port id reads `<site>:<node>:<medium>-<dir>`, for example
+  `web:keys:midi-out`.
+- **The media are a fixed list**: `midi`, `audio`, `clock`, `value`, `video`,
+  `program`, `file`, `state` (`MEDIA` in `demo/shell/bay.mjs`). `value` carries
+  a knob, a tilt or a line of chat text.
+- **A ROOM** is one Durable Object on the relay (`workers/relay/src/index.js`).
+  A light event that has to reach another machine crosses the room once, as one
+  `bay.event`, and the receiver delivers it only along a link it holds.
+- 🔴 **THE PATCHBAY CARRIES CONTROL AND NEGOTIATES THE HEAVY MEDIA.** It moves a
+  note, a knob or a line of text; for audio, video, files and state (`HEAVY` in
+  `bay.mjs`) a link resolves to a session (a Stream input, a WebRTC leg, a
+  bucket) and the two ends open it themselves. `plans/plan-patchbay.md` §0:
+  *"Build a control plane, not a signal path"* and *"A patch bay that moves
+  everything is a mixer."*
+
+The parts that implement it, all present on 2026-10-14:
+
+| part | what it is |
+| --- | --- |
+| `demo/shell/bay.mjs` | `createBay()`: `addNode`, `addPort`, `link`, `unlink`, and the validator that refuses a link in words. Pure, graded by `node demo/shell/bay-test.mjs` |
+| `demo/shell/bay-node.mjs` | `createBayNode()`: a page as a node on a relay room, joined on a press (`join()`), never on load; `emit(source, ev)` puts one `bay.event` on the room |
+| `demo/shell/patchbay.mjs` | `createPatchbay()`: the picture (`bay-view.mjs`), traffic on the wires (`bay-traffic.mjs`), and the links and ports as tables behind a button |
+| `workers/relay/` | the room: one Worker, one Durable Object per room name |
+| `demo/room/chat/index.html` | the smallest page with all of it: a chat whose every line is a `bay.event` along a link (https://positron.studio/room/chat/) |
+
+✅ **SO THE SMALLEST POSITRON-SHAPED THING IS ONE PAGE WITH A BAY IN IT, DRAWN,
+AND ONE RELAY ROOM WHEN A SECOND MACHINE JOINS.** Everything else (a Pi, a
+Stream input, a store) is another site in the same picture.
+🔴 **AND EVERY WIRE IT DRAWS IS A LINK THE CODE ACTUALLY GOES THROUGH.** Learned
+2026-10-11 (HANDOFF, session 75): *"A patchbay is only as true as the code that
+goes through it."* A page lit keys by calling the keyboard directly while the
+picture showed a link, so the picture showed neither. If they build a picture
+of their wiring, the sound or the light has to arrive on the drawn link.
+⚠️ **THE IDEA TRANSFERS, THESE FILES MOSTLY DO NOT.** Checked 2026-10-14:
+`bay.mjs` imports `midi-kinds.mjs`, `graph-registry.mjs` and `link-options.mjs`;
+`bay-node.mjs` imports `wire.mjs` and `graph-registry.mjs`; `patchbay.mjs`
+imports the kit (`shell.mjs`, `table.mjs`) and five more. Only the relay and
+`wire.mjs` are standalone (`PARTS.md`). Build them a small bay of their own in
+their idiom, and read these for the rules in their comments.
+
+---
+
 ## Step 0. Cloudflare's own setup, first
 
 Fetch **https://developers.cloudflare.com/agent-setup/prompt.md** and follow it
@@ -146,8 +209,11 @@ grep -o "from '/[a-z-]*/" demo/stage/index.html | sort | uniq -c
 ```
 
 Almost all of it is `/shell/`, which is this site's kit, and the rest is
-`/timeline/`. There is **no `package.json` anywhere** and those are root-relative
-paths that resolve only because `demo/server.mjs` serves the repository root. So
+`/timeline/` (re-counted 2026-10-14: 19 from `/shell/`, 2 from `/timeline/`;
+`/stage/` was archived 2026-10-13 and is still served and listed on
+https://positron.studio/archive/, and a concept page such as
+`demo/synth/keyboard/index.html` is the same story).
+There is **no `package.json` anywhere** and those are root-relative paths that resolve only because `demo/server.mjs` serves the repository root. So
 "copy the stage demo" means dragging every one of those files plus everything
 they import, and reproducing the path layout, to get a page that looks like this
 site.
@@ -344,7 +410,11 @@ What is below is the SHAPE, which moves much more slowly than the prices.
 **These cost money, and you stop and ask before touching either:**
 
 - **Cloudflare Stream**, for live video. Prepaid storage plus a charge per
-  minute delivered, and **no free tier**. It is what `llhls` and `webrtc` play.
+  minute delivered, and **no free tier**. It is what
+  https://positron.studio/video/webrtc/ and https://positron.studio/video/llhls/
+  play (corrected 2026-10-14: this said `llhls` and `webrtc`, the old pages,
+  whose Stream inputs were deleted 2026-10-13; they are archived and answer
+  `this leg was retired 2026-10-13`).
 - **Containers**, which run ffmpeg beside a Worker in `workers/pub/`. Included
   in the Workers Paid plan and **not available on free at all**.
 
@@ -428,6 +498,10 @@ Then the four that this repository actually paid for:
    device log at `pub.`, a signalling relay at `rtc.` and a recorder at
    `selfrec.`, all on one domain. On `workers.dev` those are four unrelated
    strings that happen to share an account.
+   ⚠️ **CORRECTED 2026-10-14: `rtc.` AND `selfrec.` NO LONGER ANSWER.** Both
+   workers were deleted 2026-10-13 with four others (`workers/rtc/RETIRED.md`,
+   `workers/selfrec/RETIRED.md`). The point stands with the ones left, the pages
+   and `pub.` among them.
 3. **`workers.dev` is on the Public Suffix List**, so browsers treat every
    subdomain under it as a separate site.
 4. **A link is a thing you hand to a person.** `positron.studio/stage/` can be
@@ -464,7 +538,8 @@ Read it when the answer turns on a detail:
 It carries the LL-HLS and `hls.js` tuning, what each knob actually changed, the
 relay, and the traps. Tuned values live beside the pages that use them, for
 example `liveSyncDurationCount: 3` with `maxBufferLength: 12` and
-`backBufferLength: 4` on the multi-channel page. **Do not re-derive those from
+`backBufferLength: 4` on the multi-channel page (`demo/floor/index.html`,
+archived 2026-10-13 and still served). **Do not re-derive those from
 memory.**
 
 🔴 **AND IF WHAT THEY ARE BUILDING PLAYS LL-HLS, THE SINGLE MOST USEFUL THING IN
@@ -472,6 +547,11 @@ THIS REPOSITORY IS ONE FILE: `src/low-latency-player.js`. TAKE IT.** It is MIT,
 it is about a thousand lines, and it is `createLowLatencyPlayer(video, src,
 opts)`. `demo/llhls/index.html` is a ten-line caller of it and is the worked
 example to copy.
+⚠️ **CORRECTED 2026-10-14: `/llhls/` IS ARCHIVED AND ITS INPUT WAS DELETED
+2026-10-13**, so it no longer plays anything. The caller with a live input
+behind it is `demo/video/llhls/index.html` (https://positron.studio/video/llhls/,
+the import on line 35, `createLowLatencyPlayer` around line 270), a camera
+loopback where Stream is one site in the page's patchbay.
 ✅ **IT IS A WRAPPER, NOT A FORK, AND THAT IS WHY IT TRANSFERS.** MEASURED
 2026-09-25: both vendored copies of hls.js here are **byte identical to the
 official 1.7.1 dist**, 618,156 bytes, sha256 `6cfad701a61f…`. **Nothing is
@@ -682,6 +762,13 @@ product's, and it gives a recording of a WebRTC session that Stream will not
 give you. `demo/record/` ships segments as they are cut, `demo/capture/` does
 camera in and segments out, and `demo/crate/` puts a long file up in pieces and
 scrubs it back.
+⚠️ **CORRECTED 2026-10-14.** `/record/` and `/crate/` were retired 2026-10-04
+into `/capture/`'s tabs (`archive/demos/record-index.html`,
+`crate-index.html`), and `/capture/` was archived 2026-10-13: still served at
+https://positron.studio/capture/, its ROUND TRIP leg retired. The pieces to read
+are `demo/capture/segments.mjs` and `takes.mjs`. A current page that records in
+the browser is https://positron.studio/video/recorder/, which keeps the take in
+IndexedDB rather than in R2.
 ⚠️ It is more work than pressing record on Stream, and it is the honest answer
 when somebody wants the recording and does not want the bill.
 
@@ -783,6 +870,10 @@ answers, in the order to suggest them:
    LL-HLS input and a WHIP one feeding the WebRTC input, from the same source.
    That is the only way one source reaches both kinds of audience, and it is
    also the cheapest thing that can run to a schedule with nobody in the room.
+   ⚠️ *Did*, until 2026-10-13: that container's test pattern legs were retired
+   with the inputs they fed, and pub answers 410 on `/start`, `/stop` and
+   `/whip` (`workers/pub/worker.mjs` line 19). The container is still there and
+   the advice is unchanged; this repository just no longer runs the example.
    ⚠️ **Containers are Workers Paid only.**
 3. ⚠️ **OBS inside a container.** Measured here and it works, and it is the
    heaviest of the three: a 1.25 GB image, about 190 per cent of one core for
@@ -819,7 +910,8 @@ effort:
   viewer's own latency on its `latency` event. Delay the question by that
   number. It is one subtraction and it is right to within the accuracy of a
   figure the player is already computing.
-- ✅ **The exact one.** `src/timed-messages.js`, 228 lines and standalone. A cue
+- ✅ **The exact one.** `src/timed-messages.js`, 228 lines and standalone
+  (282 lines on 2026-10-14, still no imports). A cue
   is `{id, at, data}` where `at` is **epoch ms of the STREAM moment**, and it
   fires when THAT viewer's playhead reaches it, so everybody sees it at the same
   point in the show whatever their latency. It reads the wall clock that LL-HLS
@@ -855,8 +947,15 @@ a model called by every visitor and every crawler. Call it on a press.
 
 They already said something, and it is probably the name of a demo. **Open the
 LIVE PAGE first**, at `https://positron.studio/<slug>/`, because what they saw
-is what they are asking for. Read the source after, and read it as ONE ANSWER
-rather than as the answer.
+is what they are asking for.
+⚠️ **SINCE 2026-10-13 WHAT THEY SAW IS PROBABLY A CONCEPT PAGE**, at
+`https://positron.studio/<group>/<slug>/` (42 of them on 2026-10-14, in
+`demo/shell/concept-list.mjs`). Most demos at `/<slug>/` are archived: still
+served, listed on https://positron.studio/archive/. A concept page shows one
+idea and draws its wiring as a patchbay under it, so **read its picture first**:
+the boxes are the parts they need and the wires are what has to connect them.
+Then decompose as below.
+Read the source after, and read it as ONE ANSWER rather than as the answer.
 
 🔴 **ASK WHAT THEY WANT IT TO LOOK LIKE BEFORE YOU WRITE ANY INTERFACE.** They
 may want a framework, a component library, a house style, or nothing at all.
@@ -867,6 +966,10 @@ maintain.
 
 **Worked example, the one the README ships with: *"I want to build something
 like the stage demo."***
+
+(The README still ships this prompt on 2026-10-14. `/stage/` was archived
+2026-10-13 and is still served at https://positron.studio/stage/, so the
+example works as written.)
 
 `/stage/` puts a recorded performance in front of a room of people, asks them
 something, and keeps every answer on the recording's own timeline. Decomposed
@@ -1023,6 +1126,17 @@ grep -ho '"\(durable_objects\|r2_buckets\|containers\|ai\|assets\)"' workers/*/w
 
 Nearly every Worker binds a **Durable Object**; several add **R2**; exactly one
 uses **Containers** and one uses **Workers AI**. That distribution is the design.
+(Re-counted 2026-10-14: 13 `durable_objects`, 4 `r2_buckets`, 1 `containers`,
+1 `ai`, 2 `assets`. ⚠️ Seven of the directories in `workers/` carry a
+`RETIRED.md` and are no longer deployed: cues, instrument, jam, moq-safari, osc,
+rtc, selfrec. `ls workers/*/RETIRED.md` before counting.)
+
+✅ **IN PATCHBAY TERMS EACH OF THOSE WORKERS IS A SITE.** The relay is the room
+a page's light links cross (`cf-relay:<room>` in the picture), Stream is
+`cf-stream`, the store that keeps a room's history is `cf-store`. So the
+composition below is also the list of sites a positron-shaped project tends to
+have, and a new capability is a new site in the same picture, not a new kind of
+thing.
 
 1. **ONE WORKER PER CAPABILITY, NAMED FOR WHAT IT IS.** Not a monolith, not
    microservices with a service mesh: `view` serves the pages, `store` keeps
@@ -1070,6 +1184,12 @@ uses **Containers** and one uses **Workers AI**. That distribution is the design
     somebody's phone can be attributed to a build instead of argued about.
 11. **AN ALARM RATHER THAN A POLL** when something must happen at a time. The
     object that holds the state wakes itself; nothing runs in between.
+12. **THE WIRING IS DATA, AND THE PICTURE IS DRAWN FROM IT.** Added 2026-10-14.
+    A page declares nodes, ports and links (`createBay`), the bay refuses a
+    link whose ports do not fit and says why, and the patchbay picture reads
+    only `nodes()`, `ports()` and `links()`. So rename a port and the picture
+    follows, and what is drawn is what is connected. It is rules 6 and 9 again,
+    applied to the connections.
 
 ✅ **ONE IDEA PER THING, HOWEVER THEIR PROJECT IS ARRANGED.** This repository
 does that as one page per idea in one file each, and **that part is not a
@@ -1113,3 +1233,26 @@ pins, blocked binaries, corporate proxies, a managed laptop's rules: note them,
 work around them here, and **do not write them into what somebody else will
 run**. If a pin is genuinely needed, say in one line whose machine needs it and
 why, so the next person can delete it.
+
+---
+
+## Retired
+
+Facts this file stated that stopped being true, kept here with the date and the
+reason rather than deleted. The rules they illustrated are unchanged above.
+
+- **`rtc.positron.studio` and `selfrec.positron.studio`, retired 2026-10-13.**
+  Step 4 named them as related services on one domain. Both workers were deleted
+  in the cleanup asked as *"Clean up those"* (HANDOFF, *Retired 2026-10-13*),
+  with cues, instrument, moq-safari and osc. Evidence: `workers/rtc/RETIRED.md`,
+  `workers/selfrec/RETIRED.md`.
+- **`/llhls/` and `/webrtc/` as the pages Stream plays, and `demo/llhls/` as the
+  worked player example, retired 2026-10-13.** Their Stream inputs
+  (`positron-demo`, `whep-rig`) were deleted and the pages answer `this leg was
+  retired 2026-10-13`. Successors: https://positron.studio/video/llhls/ and
+  https://positron.studio/video/webrtc/.
+- **`/record/` and `/crate/` as R2 recording examples, retired 2026-10-04**
+  (commit `d2075b77`, *"sync and capture: four tabs each, seven old pages
+  retired"*), into `/capture/`, itself archived 2026-10-13.
+- **pub's container running two ffmpeg legs from one source**, retired
+  2026-10-13 with the test pattern; `/start`, `/stop`, `/whip` answer 410.

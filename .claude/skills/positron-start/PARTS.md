@@ -1,6 +1,8 @@
 # Taking a piece of this repository into somebody else's project
 
-**positron-start/PARTS.md, revision 2026-09-25.** Say it once, for the reason
+**positron-start/PARTS.md, revision 2026-10-14.** (2026-09-25 until the
+patchbay pass of 2026-10-14, which re-measured the sizes in the table and added
+the patchbay row to what is NOT a part.) Say it once, for the reason
 in `SKILL.md`: a clone of this repository serves a frozen copy and the URL
 serves the current one, and only a stated revision tells them apart.
 
@@ -67,6 +69,12 @@ AGPL-3.0-or-later**, which means serving them over a network triggers the
 obligation, and several vendored binaries carry their own terms. Read
 `https://raw.githubusercontent.com/kristjanjansen/positron/main/NOTICE.md` before
 copying anything under `demo/`.
+⚠️ **CHECKED 2026-10-14: `demo/grains/` NO LONGER HOLDS A PAGE**, only
+`defs/` (synth definitions), and the scsynth WebAssembly the AGPL line is about
+is loaded through `demo/shell/scsynth.mjs` by concept pages too (`demo/drums/`,
+`demo/code/collide/`, `demo/code/sc-sampler.mjs` among them, by grep). So read
+"a page that loads scsynth" where `NOTICE.md` says those two folders, and let
+`NOTICE.md` and its `LICENSE-*` files decide.
 
 🔴 **3. DOES IT POINT AT SOMEBODY ELSE'S SERVER?** Several pages here play a
 public broadcaster's live streams, and every connection appears in that
@@ -84,18 +92,21 @@ are not portable. Take the code and re-measure.
 
 Every row VERIFIED 2026-09-25: the URL answers 200, and the file has no
 repository-internal imports.
+⚠️ **RE-CHECKED 2026-10-14 FOR IMPORTS AND SIZE ONLY, ON THE DISK, NOT OVER
+THE URL** (no fetch was made). All nine still import nothing from this
+repository; four had grown and the sizes below carry both numbers.
 
 | what it solves | path | size | needs |
 | --- | --- | --- | --- |
 | LL-HLS that holds its latency and recovers from real live faults | `src/low-latency-player.js` | 1,070 lines | `window.Hls` loaded first, as a global build |
-| Cues beside a live stream, aligned by wall clock rather than in-band metadata | `src/timed-messages.js` | 228 lines | a player instance and a video element |
+| Cues beside a live stream, aligned by wall clock rather than in-band metadata | `src/timed-messages.js` | 228 lines (282 on 2026-10-14) | a player instance and a video element |
 | Creating a Cloudflare live input that is ACTUALLY low latency | `src/provision.sh` | 44 lines | `CF_API_TOKEN`, `CF_ACCOUNT_ID` |
 | ffmpeg publish arguments that LL-HLS accepts | `src/publish.sh` | 67 lines | ffmpeg |
 | A local Icecast that is nobody's radio | `demo/fake-station.mjs` | 240 lines | node only |
 | A local archive that is nobody's archive | `demo/fake-tapes.mjs` | 388 lines | node only |
-| A local live edge that is nobody's broadcaster | `demo/fake-err.mjs` | 560 lines | node only |
-| A relay for live messages between viewers: one Worker, one Durable Object | `workers/relay/src/index.js` | 287 lines | a DO binding and a SQLite migration |
-| The browser side of that relay, with reconnect and backpressure already thought about | `demo/shell/wire.mjs` | 317 lines | nothing |
+| A local live edge that is nobody's broadcaster | `demo/fake-err.mjs` | 560 lines (729 on 2026-10-14) | node only |
+| A relay for live messages between viewers: one Worker, one Durable Object | `workers/relay/src/index.js` | 287 lines (397 on 2026-10-14) | a DO binding and a SQLite migration |
+| The browser side of that relay, with reconnect and backpressure already thought about | `demo/shell/wire.mjs` | 317 lines (387 on 2026-10-14) | nothing |
 
 ✅ **THE RELAY PAIR IS WHAT MAKES "A STREAM WITH QUESTIONS ON IT" POSSIBLE AT
 ALL, AND BOTH HALVES ARE STANDALONE.** VERIFIED 2026-09-25: **neither file
@@ -106,6 +117,10 @@ is a small enough one to read in an afternoon. Its hard-won parts are the token
 bucket, the byte budget (fan-out multiplies egress by the number of sockets, so
 the limit is bytes per second rather than message size), and reclaiming idle
 sockets only when a room is full.
+✅ **AND IT IS THE ROOM OF THE PATCHBAY MODEL** (`SKILL.md`, *What a
+positron-shaped thing is*): every light link that crosses machines on this site
+crosses one of these rooms as a `bay.event`. Somebody building their own bay
+needs exactly this pair underneath it and nothing more.
 
 ✅ **THE THREE STAND-INS ARE THE UNDER-RATED ONES.** They let somebody develop
 and test against the SHAPE of a live radio stream, an archive and a live edge
@@ -127,6 +142,13 @@ directory of reusable-looking code here and it is the wrong thing to copy. Their
 project should have its own controls, in whatever framework or none they prefer.
 **The transferable idea is *a kit rather than a control hand-rolled per page*,
 not *this kit*.** Read it for the arguments in its comments.
+🔴 **AND THAT INCLUDES THE PATCHBAY MODULES**, checked 2026-10-14: `bay.mjs`
+imports `midi-kinds.mjs`, `graph-registry.mjs` and `link-options.mjs`;
+`bay-node.mjs` imports `wire.mjs` and `graph-registry.mjs`; `patchbay.mjs`
+imports `shell.mjs`, `table.mjs` and five more. They fail check 1. **What
+transfers is the model** (sites, nodes, ports with a medium and a direction,
+links that are refused in words, a picture drawn only from that data), and
+`plans/plan-patchbay.md` §2 is the shortest statement of it.
 🔴 **NOTHING UNDER `rig/` RUNS FOR ANYBODY ELSE.** It talks to one Raspberry Pi
 in one building and to MIDI devices on one desk. Worth reading, will not run.
 ⚠️ **AND A WHOLE DEMO PAGE IS RARELY THE ANSWER.** A page here is one idea

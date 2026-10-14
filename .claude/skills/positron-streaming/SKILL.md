@@ -1,9 +1,91 @@
 ---
 name: positron-streaming
-description: HLS, LL-HLS, MoQ, WHEP, Cloudflare Stream and Workers, the relay and its limits, ERR playlists and segments, Durable Objects. Load before changing anything under workers/ or src/, before any page that plays a stream, and before quoting a latency or a bill.
+description: A stream as a heavy patchbay link, and the transport it negotiates (TRANSPORTS and chooseTransport in demo/shell/bay.mjs): HLS, LL-HLS, MoQ, WHIP and WHEP, Cloudflare Stream and Workers, the relay room and its limits, ERR and somebody else's Icecast, Durable Objects, R2. Load before changing anything under workers/ or src/, before any page that plays a stream or adds an audio, video, file or state link that leaves the machine, and before quoting a latency or a bill.
 ---
 
 # Streaming, the relay, and what each provider actually does
+
+## Start here: a stream is a HEAVY link, and the bay never carries it
+
+Written 2026-10-14 from `demo/shell/bay.mjs`, `bay-node.mjs`,
+`plans/plan-patchbay.md` and `plans/plan-site-names.md`, each read that day.
+Everything below this section is older and was moved here verbatim; this
+section says where each of those rules sits in the patchbay.
+
+- **The design rule is plan-patchbay §0: *"Build a control plane, not a signal
+  path."*** Its own words: *"THE SINGLE MOST IMPORTANT DECISION IS THAT THE
+  PATCH BAY DOES NOT CARRY AUDIO."* It carries MIDI and other small messages
+  and NEGOTIATES the rest, *"because audio is 1536 kbit/s a stereo pair and a
+  router in the middle of it is a router that adds a buffer, a copy and a
+  failure mode to every stream on the desk."*
+- **The media are `MEDIA` in bay.mjs**: `midi`, `audio`, `clock`, `value`,
+  `video`, `program`, `file`, `state`. **`HEAVY` is `audio`, `video`, `file`,
+  `state`.** A heavy link resolves to a SESSION, `{ transport, address, shape,
+  where, says }`, and the two ends open it with code they already have. A light
+  link (`midi`, `value`, `clock`, `program`) rides the relay room as one
+  `{ type: 'bay.event', source, ev }` per event (`node.emit` in
+  `bay-node.mjs`, plan-site-names §4h), delivered by the receiving bay only
+  along a link it holds. `program` is light on purpose: a shader arrives whole
+  as one message.
+- **How far apart the ends are is `WHERE`**: `machine`, `network`,
+  `internet-one`, `internet-many`. An unknown network is the internet, never
+  the same network. `internet-one` with more than one receiver over the
+  internet is `internet-many`, and a link into a store is not a receiver.
+- **`chooseTransport(medium, where, receivers)` reads `TRANSPORTS`**, which is
+  plan §5 as data. A light medium answers `null`; an unknown one throws. The
+  table today, copied from `bay.mjs` on 2026-10-14:
+
+  | medium | machine | network | internet-one | internet-many |
+  | --- | --- | --- | --- | --- |
+  | audio | `webaudio` | `datachannel` (board round trip 4 ms) | `relay` (round trip p50 36 ms, cap 1000 msg/s, 2000 burst) | `moq`, or `llhls` (no number measured) |
+  | video | `page` | `datachannel` (to measure) | `whep`, or `relay-h264` (a VPN passes the WHEP handshake and drops the media, so count frames) | `llhls` (no number measured) |
+  | file | `indexeddb` | `ingest` | `ingest` | `r2-hls` |
+  | state | `room` | `room` | `room` | `room` (a relay room as a bus, at the relay's cap) |
+
+  Reading one stored object back is its own row, `READS`: `indexeddb` on the
+  machine, one `https` GET across a wire, `r2-hls` for many readers. `whip` and
+  `jack` are names a port may DECLARE and the table never chooses.
+  `MACHINE_ONLY` is `webaudio`, `page`, `indexeddb`, `jack`. **`LIGHT_VIA` is
+  `relay` and `datachannel`**: a light link between two sites rides the relay
+  room or a board's direct WebRTC channel (the `path` choice on the remote
+  pages, `demo/remote/path.mjs`, *"add direct option to all remote
+  instruments."*, 2026-10-13).
+- 🔴 **A `says` CELL IS ONLY A NUMBER THE PLAN QUOTES**, and `'to measure'`
+  where nobody has. The relay cell said 60 msg/s until 2026-10-06 and
+  `bay-test.mjs` now reads the worker's source and goes red when the two
+  disagree. That is the relay limits rule further down, arriving in the bay.
+- **The relay Durable Object IS the room.** It keeps nothing, so it is drawn as
+  the `relay` transport or as a box `cf-relay:<room>` (`createPatchbay`'s
+  `room` option), never as a store. **`studio-1` is the Pi's room**
+  (`STUDIO_ROOM` in bay-node.mjs), and `roomFor()` gives a harness run a
+  private room so a check never reaches the owner's desk.
+- **Cloudflare services are SITES with ports**, drawn on the page, never
+  announced (plan-site-names §4d, §4g). In the tree on 2026-10-14:
+  `cf-stream:live` (WHIP in, WHEP out, `demo/video/webrtc/index.html`),
+  `cf-stream:hls` (RTMPS in from the publisher, LL-HLS out,
+  `demo/video/llhls/index.html`), `cf-moq:relay` (`demo/video/moq/index.html`),
+  and the store as `cf-store:history:value-in/out`. A node with
+  `place: 'cloudflare', net: 'cloudflare'` and `kind: 'endpoint'`.
+- 🔴 **SOMEBODY ELSE'S SERVER IS AN `external` NODE, AND A LINK OUT OF IT NEEDS
+  `{ consent: true }`, `=== true` AND NOTHING LOOSER.** `validate` refuses it
+  otherwise, because *"a link out of an `external` node opens a connection to
+  somebody else's server, and ERR said on 2026-09-16 that every one of ours
+  lands in their listener statistics"*: never a page load, never a harness,
+  never `?selfcheck=1`. It is the ERR and Icecast rules below, enforced in the
+  data rather than remembered.
+- **The address of a heavy link is DERIVED, never chosen**:
+  `${place}-${node}-${port}`, so one port is one room. The Pi does not rely on
+  it and DECLARES every stream address it announces (`studio-1`,
+  `studio-1-video`, `studio-1-circuit`), which is why its site became `pi-1`
+  on 2026-10-10 without one stream moving.
+
+So, reading the rest of this file: **the player and Stream sections are what a
+heavy video or audio link's two ends open; the relay sections are the room every
+light link and the `relay` transport ride; the Durable Object, R2 and edge
+sections are the services drawn as `cf-*` sites; the ERR and Icecast sections
+are `external` nodes.**
+
+## What runs on Stream today, and what was retired 2026-10-13
 
 ⚠️ **RETIRED 2026-10-13, AND THE LESSONS BELOW STAND.** The test pattern
 (Stream inputs `positron-demo` and `whep-rig`, pub's `/watch`, `/status`,
@@ -18,10 +100,26 @@ on Stream: `/stage/`'s `positron-stage`, video/030's `positron-cam-whip`
 /llhls/, /webrtc/, /cam/ (LL-HLS leg) and capture ROUND TRIP answer a press
 with `this leg was retired 2026-10-13`. A measurement below that names one of
 them is a dated record, not a page to re-run.
+⚠️ **ADDRESSES CORRECTED 2026-10-14.** video/030 is
+https://positron.studio/video/webrtc/ (WebRTC loopback, `cf-stream:live`) and
+video/060 is https://positron.studio/video/llhls/ (LL-HLS loopback,
+`cf-stream:hls`), both sharing `demo/video/loopback.mjs`; the MoQ loopback is
+https://positron.studio/video/moq/ through Cloudflare's public relay. pub's
+`RETIRED` set in `workers/pub/worker.mjs` is exactly `/watch`, `/status`,
+`/start`, `/stop`, `/whip`, `/cam`, `/cam/status`, and its routes list reads
+`/stage/watch`, `/stage/status`, `/cam/whip`, `/loop`, `/loop/status`,
+`/loop/sweep`, `/ice`, `/log`, `/logs`. `stage`, `llhls`, `webrtc`, `moq`,
+`cam` and `capture` are manifest rows with `unlisted: true`, still built and
+served. `workers/jam/RETIRED.md` is older (2026-09-04) and is not one of the
+six.
 
 Measured on this account and these devices. Prices and limits move, so a claim
 here is worth re-checking before a plan is built on it.
 
+## Players: HLS, LL-HLS, MoQ and WHEP on WebKit and Chrome
+
+These are what the two ends of a heavy `video` or `audio` link open once the
+bay has named the transport.
 - **iOS 17.1 added `ManagedMediaSource`**, so `Hls.isSupported()` is now TRUE on
   iPhone. Any fallback written `if (!Hls.isSupported() && canPlayType(...))`
   silently stopped firing.
@@ -38,6 +136,10 @@ here is worth re-checking before a plan is built on it.
   ⚠️ `seek` IS RETIRED (2026-09-16) and is at `archive/demos/seek-index.html`.
   All three now gate on MMS (2026-09-06). Grep for `canPlayType` before trusting
   any HLS page.
+  ⚠️ **2026-10-14: ALL THREE ARE ARCHIVED** (`archive/demos/replay-index.html`,
+  `seek-index.html`, `flipper-index.html`, flipper on 2026-10-12), so none of
+  them is served. The HLS player in use is `src/low-latency-player.js`, imported
+  by https://positron.studio/video/llhls/.
 - **Safari can close a ManagedMediaSource under you.** Every buffer is dumped.
   MMS also gates loading via `startstreaming`/`endstreaming`.
 - **`video.buffered` on MSE is the INTERSECTION of the source buffers.** With
@@ -56,6 +158,9 @@ here is worth re-checking before a plan is built on it.
   hls.js) — the demuxed intersection problem `low-latency-player.js` exists to
   fight. `tracks` asserts the packaging from the playlists, so the claim
   needs no stopwatch.
+  ⚠️ **`tracks` WAS REMOVED 2026-09-08** (`d0f76f66`, *"rm tracks"*), so
+  nothing asserts that packaging today and the numbers above are its last
+  record. Re-read the playlists before building on them.
 - **Cloudflare WHEP refuses a single-track offer.** One recvonly transceiver —
   audio alone or video alone — is `HTTP 400`, both ways, while video+audio
   negotiates in the same second. So "is audio-only WHEP lower latency" has no
@@ -81,6 +186,9 @@ here is worth re-checking before a plan is built on it.
   flow-control window never refills, deadlocking after ~16 MiB or ~7,600
   streams. MoQ opens one stream per group, so that is about two minutes.
   Bypassing it (`08-moq/?transport=force`) is worse than the bug report implies.
+  (Demo 08 is the archived `/moq/` since 2026-10-13, still served; the comment in
+  `demo/shell/moq.mjs` still calls it *demo 08*. Today's MoQ page is
+  https://positron.studio/video/moq/.)
   Measured twice, 150 s each on desktop Safari: **6-8 frames total**, first
   stall at 20 s, and **a full page reload with a fresh WebTransport does not
   help** (7 frames then 8). The window refills at roughly one frame per minute
@@ -98,10 +206,28 @@ here is worth re-checking before a plan is built on it.
   source alternative) or `sourceopen` never fires. There is no published
   low-latency guidance for MMS — native HLS is the documented low-latency path
   on WebKit, which is why the player prefers it there.
+- **A remote `MediaStream` carries the SENDER's msid.** After a hop,
+  `remote.id === local.id` and the track ids match too, so "is this the received
+  stream or the source?" cannot be answered by id — it is answered by object
+  identity against `pc.getReceivers()[i].track`. An id comparison passes
+  vacuously in both directions.
+- **`candidate-pair` RTT is not media latency.** Quoting WHEP's 25 ms RTT
+  beside MoQ's 20 ms glass-to-glass flattered WHEP by ~3x. Measured the same
+  way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
+- **MediaRecorder output reports `duration: Infinity`**, which leaves a
+  transport bar with no range to scrub. Seek far past the end, let the browser
+  resolve the duration, then come back.
+
+## Cloudflare Stream: recording, billing and archiving
 
 - **Stream recording cannot be turned off — ON THE RTMPS PATH.** `mode: off`
   also disables HLS playback of a live input, and `preferLowLatency` requires
-  `automatic`, so 06 and 09 depend on it. **WHIP ingest is the opposite and the
+  `automatic`, so 06 and 09 depend on it. (06 and 09 are the numbered era's
+  names. On 2026-10-14 the page that depends on it is
+  https://positron.studio/video/llhls/, whose `cf-stream:hls` box reads
+  `RTMPS in from the publisher`; `workers/pub/loop.mjs` refuses a take above
+  `LOOP_CEIL` 600 storage minutes, and HANDOFF session 76 says every take is
+  deleted about 90 s after.) **WHIP ingest is the opposite and the
   unqualified rule has already misled a plan once: WHIP RECORDS NOTHING** —
   direct-tested, 183 s against a recording-ENABLED input, 26 polls, zero assets.
   Stream-WebRTC is delivery-only, so a WHIP source costs no storage minutes and
@@ -172,24 +298,21 @@ here is worth re-checking before a plan is built on it.
     which is the failure this file exists to stop.
     Until it ships, an archiver for a WebRTC source has to record client-side and
     ship the pieces itself, which is what `record`, `capture` and `crate` do into
-    R2.
-- **A Durable Object's OUTBOUND client WebSocket hands binary over as a
-  `Blob`**, not an `ArrayBuffer` — measured `Blob`, `size` 9, `byteLength`
-  undefined — and a `Uint8Array` binds to a SQLite `BLOB` column as an EMPTY
-  one, silently. So a recorder can look like it stored a frame while the row
-  reads back at 0 bytes with its hex head blank. `await data.arrayBuffer()`
-  first, and bind the ArrayBuffer. A BLOB also comes back OUT as an
-  ArrayBuffer, which has no useful `.slice()` and no iterator — wrap it before
-  reading it. (`workers/backlog`, 2026-09-09.)
-- **A DO's input gate does NOT cover a non-storage await.** Events are held back
-  across a `storage.get`, so handlers cannot interleave there — but
-  `blob.arrayBuffer()` is not storage, and two frames a millisecond apart will
-  race each other into a table in the wrong order. Where order IS the product,
-  serialise the handler through one promise chain.
+    R2. (2026-10-14: `record` is archived, `archive/demos/record-index.html`;
+    `crate` was retired 2026-10-02, `fdc5677a`, with `vain`; `capture` is
+    archived 2026-10-13 and still served, its ROUND TRIP leg retired. No page in
+    the concepts records a WebRTC source into R2 today: /video/recorder/ keeps
+    its takes in the browser.)
+
+## The relay room: its limits, a full room, and what the sender is not told
+
+The room every light link rides and the `relay` transport of the TRANSPORTS
+table. `workers/relay/src/index.js` is the source of every number here.
+
 - 🔴 **A full relay room is a silent outage, and a redeploy does NOT clear it.**
   `studio-1` sat at 16/16 and refused the board for hours — it logged
   `closed 1006`, which is what a browser reports for the relay's `503`, so it
-  read as a network fault on the Pi while `/keys/` was down for everyone. The
+  read as a network fault on the Pi while `/keys/` (retired 2026-09-17) was down for everyone. The
   room was full of **orphaned harness Chromes of mine** (four profile groups,
   118 processes); killing them took it 16 → 1 and the board rejoined unaided.
   Hibernated sockets are RESTORED across a restart, so deploying the worker
@@ -227,37 +350,23 @@ here is worth re-checking before a plan is built on it.
   session ids, per-segment/session/address caps enforced in a DO, 6-hour TTL
   with a cron sweep. `selfrec` was the token-gated one until its worker was
   deleted on 2026-10-13; if a gated write path returns, keep the two separate.
-- **MediaRecorder output reports `duration: Infinity`**, which leaves a
-  transport bar with no range to scrub. Seek far past the end, let the browser
-  resolve the duration, then come back.
-- **The same suite read 425/429 and then 429/429, forty minutes apart, with no
-  code between them.** All four failures were `now`, all downstream of frames
-  never arriving, and a single two-byte range GET on the live edge segment
-  answered **403 with no ACAO** while the playlists beside it were fine. So
-  before treating a red `now`/`flipper` as a regression, ASK ERR — one range
-  request separates "our code broke" from "the schedule moved", and they look
-  identical from the harness.
-- **ERR blocks live segments by PROGRAMME, not by age.** The playlists are open
-  (200 + `access-control-allow-origin: *`), the segments under `/live/hls/` can
-  be 403 with NO ACAO — which reaches a browser as a CORS failure, so hls.js
-  holds an empty buffer and the cell just stays black. Swept at 13 points
-  across each 2 h window on 2026-09-06: `etv` refused its newest ~45 min,
-  `etv2` refused its OLDEST ~78 min and served the edge, `etvpluss` served
-  everything. It moves with the schedule and it is not always at the edge, so
-  there is no offset to hard-code. A served segment honours Range, so a 2-byte
-  GET asks "will you serve this one?" — `flipper` sweeps back from the edge,
-  starts where ERR will serve, and puts the refused minutes in its readout.
-- **A remote `MediaStream` carries the SENDER's msid.** After a hop,
-  `remote.id === local.id` and the track ids match too, so "is this the received
-  stream or the source?" cannot be answered by id — it is answered by object
-  identity against `pc.getReceivers()[i].track`. An id comparison passes
-  vacuously in both directions.
-- **`candidate-pair` RTT is not media latency.** Quoting WHEP's 25 ms RTT
-  beside MoQ's 20 ms glass-to-glass flattered WHEP by ~3x. Measured the same
-  way: MoQ p50 26.2 ms, WHEP p50 67.0 ms, and WHEP wins p99.
 
 ## Durable Objects: alarms, hibernation, and what an object does not know about itself
 
+- **A Durable Object's OUTBOUND client WebSocket hands binary over as a
+  `Blob`**, not an `ArrayBuffer` — measured `Blob`, `size` 9, `byteLength`
+  undefined — and a `Uint8Array` binds to a SQLite `BLOB` column as an EMPTY
+  one, silently. So a recorder can look like it stored a frame while the row
+  reads back at 0 bytes with its hex head blank. `await data.arrayBuffer()`
+  first, and bind the ArrayBuffer. A BLOB also comes back OUT as an
+  ArrayBuffer, which has no useful `.slice()` and no iterator — wrap it before
+  reading it. (`workers/backlog`, 2026-09-09. That worker left the repository
+  on 2026-09-14, `b70aec99`, and is in git history only.)
+- **A DO's input gate does NOT cover a non-storage await.** Events are held back
+  across a `storage.get`, so handlers cannot interleave there — but
+  `blob.arrayBuffer()` is not storage, and two frames a millisecond apart will
+  race each other into a table in the wrong order. Where order IS the product,
+  serialise the handler through one promise chain.
 - **NOTHING SCHEDULES AN ALARM IN A DO CONSTRUCTOR.** The constructor runs
   BEFORE the handler on a cold wake, so a `setAlarm()` in it overwrites the
   alarm that is about to fire. Cloudflare documents the resulting livelock,
@@ -315,7 +424,8 @@ here is worth re-checking before a plan is built on it.
   `.jurisdiction('eu')`, and the code proves it rather than claiming it: the
   EU-pinned id DIFFERS from the unpinned one, so the object really lives in the
   jurisdiction-restricted namespace. The signaling Hub is a separate class and
-  deliberately untouched. (`workers/instrument/src/index.js`.)
+  deliberately untouched. (`workers/instrument/src/index.js`; the worker was
+  deleted from Cloudflare 2026-10-13 and the source is kept as the record.)
 - ⚠️ **A DO RESPONSE HAS IMMUTABLE HEADERS**, and `.set()` on one throws a
   TypeError rather than failing quietly. So does a response out of the Cache API
   or the asset binding. And a body-less status must not be given a body:
@@ -888,67 +998,25 @@ From `src/timed-messages.js`.
   in-band ID3: cues can be scheduled ahead, revised, cancelled, and delivered
   to viewers who joined late.
 
-## An HLS station assembled from R2 byte ranges
+## ERR's live HLS: somebody else's segments
 
-From `workers/station/worker.mjs`.
+An `external` node in the bay (see the first section). The do-not-probe
+rules in CLAUDE.md, *"What costs real money and somebody else's server"*,
+bind every line here.
 
-- 🔴 **THE PLAYLIST IS LIVE, NEVER VOD.** A `#EXT-X-PLAYLIST-TYPE:VOD`
-  byterange playlist made Safari fetch 90 ranges, 14.4 MB, 900 seconds of audio
-  in 463 ms before playing a note (MEASURED 2026-09-15 17:17Z). Same audio,
-  same ranges, one tag. There is no `#EXT-X-ENDLIST` anywhere in that file and
-  there must never be one: a starving playlist that ends is a station that is
-  over.
-- **A byterange segment has to start on a frame boundary.** A misaligned one
-  still plays (MEASURED, 1.000x, no audible click), but it decodes to slightly
-  less audio than its `#EXTINF` declares, and a wall-clock station turns
-  declared durations into positions, so the shortfall accumulates for as long
-  as the station is up.
-- 🔴 **`#EXT-X-MEDIA-SEQUENCE` MAY NEVER GO BACKWARDS**, which is why an expired
-  live chunk loses its BYTES and keeps its ENTRY: the flattened list's length
-  is the playlist's modulus and every segment's start time is the running sum
-  before it, so dropping a head entry would shorten `n` and move every start
-  time. It may never go below zero either. A looping station's window genuinely
-  reaches back into the previous loop, but before the first one has finished
-  there is no previous loop, and a negative media sequence is not a decimal
-  integer. A short window at startup is the honest shape.
-- **A join between two segments of unlike encodes needs
-  `#EXT-X-DISCONTINUITY`. A join between two of the same is free:** twelve
-  segments out of three matching files gave one contiguous buffered range
-  (MEASURED).
-- 🔴 **A LIVE SLOT'S EDGE IS THE LAST SEGMENT THAT EXISTS, NOT THE WALL CLOCK.**
-  A live show is a file that does not exist yet, and the recorder is by
-  construction behind the sound: a ten-second piece can only be written ten
-  seconds after it started. Locating the edge by clock would publish a segment
-  before the recorder had cut it, which is a 404 on the live edge on every
-  single reload.
-- **A cached playlist is a station that is stuck in the past.** The window moves
-  with the wall clock, so the playlist response is never cached.
-- **An epoch in the future is a station that has not started.** Left unclamped
-  it is a negative elapsed, a negative loop number, and a playlist whose window
-  bound sits below its first index, which emits a header and no segments.
-  MEASURED once, by typing a round epoch two minutes ahead.
-- 🔴 **A DURABLE OBJECT RATHER THAN KV, BECAUSE "A SCHEDULE CHANGE TAKES
-  EFFECT" HAS TO BE A NUMBER**, and KV's up-to-60-second propagation makes it
-  one you cannot measure.
-- 🔴 **A LIVE SHOW WRITES ONE R2 OBJECT EVERY TEN SECONDS AND NOTHING USED TO
-  DELETE THEM.** 360 objects an hour, 160 KB each: 57.6 MB an hour of chunks
-  that have already been heard and can never be in a playlist again, because
-  the playlist only ever emits the last WINDOW segments. This is a leak
-  measured in hours of uptime, not in bugs.
-- ⚠️ **AN ORPHAN SWEEP NEEDS AN AGE GUARD AND IT IS NOT TIDINESS.**
-  `/live/<key>/append` puts the object and THEN tells the Durable Object about
-  it; a sweep landing between those two lines would delete the chunk a recorder
-  had just uploaded, and the recorder would be told nothing. `ORPHAN_MIN_AGE`
-  is 60_000 ms, wider than that gap by three orders of magnitude.
-- ⚠️ **`wrangler r2 bucket info` REPORTS A COUNT THAT LAGS BY MINUTES.** It read
-  `object_count: 0` against a bucket holding six objects, which is why the
-  worker lists the bucket itself when the question is "prove it deletes": that
-  needs a number before and a number after. And a cleanup nobody is told about
-  cannot be told apart from a leak, so the sweep returns what it did in both
-  directions.
-- **A cron that can only be observed by waiting five minutes is one nobody
-  measures**, so the same function the cron runs is exposed on a token-gated
-  route.
+- **ERR blocks live segments by PROGRAMME, not by age.** The playlists are open
+  (200 + `access-control-allow-origin: *`), the segments under `/live/hls/` can
+  be 403 with NO ACAO — which reaches a browser as a CORS failure, so hls.js
+  holds an empty buffer and the cell just stays black. Swept at 13 points
+  across each 2 h window on 2026-09-06: `etv` refused its newest ~45 min,
+  `etv2` refused its OLDEST ~78 min and served the edge, `etvpluss` served
+  everything. It moves with the schedule and it is not always at the edge, so
+  there is no offset to hard-code. A served segment honours Range, so a 2-byte
+  GET asks "will you serve this one?" — `flipper` sweeps back from the edge,
+  starts where ERR will serve, and puts the refused minutes in its readout.
+  ⚠️ `flipper` was archived 2026-10-12 (`archive/demos/flipper-index.html`,
+  a 404), and that range GET is a probe of somebody else's server, which the
+  2026-09-16 rule in CLAUDE.md forbids for finding out whether it is up.
 
 ## Relaying somebody else's Icecast
 
@@ -1026,7 +1094,8 @@ From `workers/shout/worker.mjs`.
   the only backpressure signal there is here. Radio has no rewind, so a
   listener that far behind is dropped rather than buffered for.
 - 🔴 **A MOUNT ON PLAIN HTTP IS NOT A CORS PROBLEM, IT IS A MIXED-CONTENT
-  REFUSAL.** `radio1965` is Icecast 2.4.4 on port 8001 with no TLS and no
+  REFUSAL.** `radio1965` (the Radio 1965 mount, `icy-name: Radio 1965`; the demo
+  of that name is /archive/radio/ since 2026-10-13) is Icecast 2.4.4 on port 8001 with no TLS and no
   `access-control-allow-origin`, so an HTTPS page cannot play it at all, not
   "cannot measure it", cannot play it: the browser refuses the mixed-content
   load before any CORS question is asked. MEASURED DIRECT 2026-09-14:
@@ -1055,6 +1124,14 @@ From `workers/shout/worker.mjs`.
 
 From `workers/vain/worker.mjs`, `workers/ingest/worker.mjs`,
 `workers/selfrec/src/index.js`.
+⚠️ **2026-10-14: TWO OF THE THREE ARE GONE AND THE RULES STAND.** vain was
+retired 2026-10-02 (`fdc5677a`, *"eccm's uploads run their protocol now"*):
+its worker is at `archive/vain/worker.mjs` and `workers/vain/` holds only a
+`.wrangler` cache. selfrec was deleted from Cloudflare 2026-10-13 and its
+source stays in `workers/selfrec/`. `workers/ingest/` is the live write path,
+and the `ingest` cell of the TRANSPORTS table (`file` over a network or the
+internet) names it. Every `workers/vain/worker.mjs` below means
+`archive/vain/worker.mjs`.
 
 - 🔴 **R2 REFUSES A MULTIPART UPLOAD WHOSE NON-TRAILING PARTS ARE NOT ALL THE
   SAME SIZE** (error 10048, `InvalidPart`), and the refusal arrives at
@@ -1195,7 +1272,7 @@ From `workers/vain/worker.mjs`, `workers/ingest/worker.mjs`,
   (`workers/view/src/index.js`.)
 - **Cloudflare's edge 1010-blocks generic or default user agents** (measured,
   `proto/m2m`), so a server-to-server fetch out of a Worker has to send a real
-  one. (`workers/rtc/src/index.js`.)
+  one. (`workers/rtc/src/index.js`, deleted from Cloudflare 2026-10-13, source kept.)
 - ⚠️ **A CUSTOM REQUEST HEADER MUST BE LISTED IN
   `access-control-allow-headers` OR THE POST FAILS ITS PREFLIGHT AND THE
   BROWSER REPORTS A BARE "Failed to fetch"** (found the hard way with
@@ -1469,3 +1546,99 @@ From `workers/view/analytics.mjs` and `workers/wish/src/index.js`.
   throws a RangeError, and a throw inside a mail handler reaches the retry
   above. Fall back rather than throwing: a message in a charset nobody has
   heard of is worth showing imperfectly. (`workers/mail/src/body.mjs`.)
+
+## Retired
+
+Rules whose worker, page or route left this repository's live set. Moved here
+verbatim on 2026-10-14 with the date and the reason; the measurements are true
+records of their day, and a rule here still teaches anybody rebuilding the
+same thing.
+
+### Asking ERR one range request before believing a red `now` or `flipper`
+
+Retired 2026-10-14 for two reasons. `now` and `flipper` are archived
+(`archive/demos/now-index.html`, `archive/demos/flipper-index.html`; flipper on
+2026-10-12), so there is no red of theirs to explain. And the advice itself
+was overtaken on 2026-09-16 by the CLAUDE.md rule *"Never `curl` a mount, a
+health route or a live segment to find out whether somebody else's server is
+up"*, whose answer is: say both are possible and move on. Do not follow the
+last two sentences below.
+
+- **The same suite read 425/429 and then 429/429, forty minutes apart, with no
+  code between them.** All four failures were `now`, all downstream of frames
+  never arriving, and a single two-byte range GET on the live edge segment
+  answered **403 with no ACAO** while the playlists beside it were fine. So
+  before treating a red `now`/`flipper` as a regression, ASK ERR — one range
+  request separates "our code broke" from "the schedule moved", and they look
+  identical from the harness.
+
+### An HLS station assembled from R2 byte ranges
+
+Retired 2026-10-14 from this file because the code moved. On 2026-10-02
+(`0ada490f`, *"station moved to eccm"*) the station went to eccm, at
+`src/station/station.mjs` in https://github.com/kristjanjansen/eccm, and
+`workers/station/worker.mjs` here is 54 lines that only serve `GET /media/<key>`
+out of the bucket (the MIM videos and pictures, `kristjanjansen/`). Every
+citation of `workers/station/worker.mjs` below means the code in this
+repository's git history before `0ada490f`, or eccm's copy. The rules hold
+for any byterange HLS station.
+
+From `workers/station/worker.mjs`.
+
+- 🔴 **THE PLAYLIST IS LIVE, NEVER VOD.** A `#EXT-X-PLAYLIST-TYPE:VOD`
+  byterange playlist made Safari fetch 90 ranges, 14.4 MB, 900 seconds of audio
+  in 463 ms before playing a note (MEASURED 2026-09-15 17:17Z). Same audio,
+  same ranges, one tag. There is no `#EXT-X-ENDLIST` anywhere in that file and
+  there must never be one: a starving playlist that ends is a station that is
+  over.
+- **A byterange segment has to start on a frame boundary.** A misaligned one
+  still plays (MEASURED, 1.000x, no audible click), but it decodes to slightly
+  less audio than its `#EXTINF` declares, and a wall-clock station turns
+  declared durations into positions, so the shortfall accumulates for as long
+  as the station is up.
+- 🔴 **`#EXT-X-MEDIA-SEQUENCE` MAY NEVER GO BACKWARDS**, which is why an expired
+  live chunk loses its BYTES and keeps its ENTRY: the flattened list's length
+  is the playlist's modulus and every segment's start time is the running sum
+  before it, so dropping a head entry would shorten `n` and move every start
+  time. It may never go below zero either. A looping station's window genuinely
+  reaches back into the previous loop, but before the first one has finished
+  there is no previous loop, and a negative media sequence is not a decimal
+  integer. A short window at startup is the honest shape.
+- **A join between two segments of unlike encodes needs
+  `#EXT-X-DISCONTINUITY`. A join between two of the same is free:** twelve
+  segments out of three matching files gave one contiguous buffered range
+  (MEASURED).
+- 🔴 **A LIVE SLOT'S EDGE IS THE LAST SEGMENT THAT EXISTS, NOT THE WALL CLOCK.**
+  A live show is a file that does not exist yet, and the recorder is by
+  construction behind the sound: a ten-second piece can only be written ten
+  seconds after it started. Locating the edge by clock would publish a segment
+  before the recorder had cut it, which is a 404 on the live edge on every
+  single reload.
+- **A cached playlist is a station that is stuck in the past.** The window moves
+  with the wall clock, so the playlist response is never cached.
+- **An epoch in the future is a station that has not started.** Left unclamped
+  it is a negative elapsed, a negative loop number, and a playlist whose window
+  bound sits below its first index, which emits a header and no segments.
+  MEASURED once, by typing a round epoch two minutes ahead.
+- 🔴 **A DURABLE OBJECT RATHER THAN KV, BECAUSE "A SCHEDULE CHANGE TAKES
+  EFFECT" HAS TO BE A NUMBER**, and KV's up-to-60-second propagation makes it
+  one you cannot measure.
+- 🔴 **A LIVE SHOW WRITES ONE R2 OBJECT EVERY TEN SECONDS AND NOTHING USED TO
+  DELETE THEM.** 360 objects an hour, 160 KB each: 57.6 MB an hour of chunks
+  that have already been heard and can never be in a playlist again, because
+  the playlist only ever emits the last WINDOW segments. This is a leak
+  measured in hours of uptime, not in bugs.
+- ⚠️ **AN ORPHAN SWEEP NEEDS AN AGE GUARD AND IT IS NOT TIDINESS.**
+  `/live/<key>/append` puts the object and THEN tells the Durable Object about
+  it; a sweep landing between those two lines would delete the chunk a recorder
+  had just uploaded, and the recorder would be told nothing. `ORPHAN_MIN_AGE`
+  is 60_000 ms, wider than that gap by three orders of magnitude.
+- ⚠️ **`wrangler r2 bucket info` REPORTS A COUNT THAT LAGS BY MINUTES.** It read
+  `object_count: 0` against a bucket holding six objects, which is why the
+  worker lists the bucket itself when the question is "prove it deletes": that
+  needs a number before and a number after. And a cleanup nobody is told about
+  cannot be told apart from a leak, so the sweep returns what it did in both
+  directions.
+- **A cron that can only be observed by waiting five minutes is one nobody
+  measures**, so the same function the cron runs is exposed on a token-gated
+  route.

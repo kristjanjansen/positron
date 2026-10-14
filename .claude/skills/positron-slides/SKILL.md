@@ -1,6 +1,6 @@
 ---
 name: positron-slides
-description: Write, revise, critique and compress slide text, presentation outlines, speaker notes and playable lessons in the owner's plain explanatory voice. Load before writing or changing any deck in demo/shell/decks.mjs or a slide's words in demo/shell/slide.mjs data, before turning research, a plan or a blog post into slides, before writing an audience-specific version of a talk, and before removing AI slop, clever titles or generic pitch language from one. Ground claims in supplied material and use literal titles.
+description: Write, revise, critique and compress slide text, presentation outlines, speaker notes and playable lessons in the owner's plain explanatory voice, including talks that explain a patch (sites, nodes, ports, links) in the bay's own words. Load before writing or changing any deck in demo/shell/decks.mjs or a slide's words in demo/shell/slide.mjs data, before turning research, a plan or a blog post into slides, before writing an audience-specific version of a talk, and before removing AI slop, clever titles or generic pitch language from one. Ground claims in supplied material and use literal titles.
 ---
 
 # Slide writing
@@ -12,10 +12,41 @@ Write something the speaker understands and the audience can follow. Preserve th
 ## Where slides live in this repository
 
 - `demo/shell/slide.mjs` draws ONE slide from plain data. Its header lists the parts (`say`, `statement`, `big`, `text`, `list`, `stack`, `rows`, `cap`, `title`, `slot`) and the layouts. `say` is one sentence with no full stop, `list` is up to three lines. Write to those limits rather than around them.
-- `demo/shell/decks.mjs` holds the decks played on the front page and at `/slides/<name>/`. A deck is plain data, so writing a deck is editing that data.
+- `demo/shell/decks.mjs` holds the decks, played at `/slides/<name>/` (`deckPage`, today https://positron.studio/slides/synths/). A deck is plain data, so writing a deck is editing that data. ⚠️ Its header still says *"played on the front page"*: that was the manifest front page, which called `mountDecks` and is archived in `archive/frontpage/` since 2026-10-13. MEASURED 2026-10-14: no live page calls `mountDecks` (`grep -rln mountDecks demo` finds only `decks.mjs`, `manifest.mjs` and `slide.css`), so the concepts front page plays no deck.
 - `demo/shell/synth-steps.mjs` (`SYNTH_STEPS`) is the synths deck's content and the build reads its artefacts off it.
 - `demo/slides/` is the ARCHIVE of the older engine (`deck.mjs`), kept as it was. Do not write new decks there. `plans/plan-slides.md` section 13 has the record.
 - A slide with a demo in it is a page change too: a control on a slide is a control, so `positron-ui` and `positron-verify` apply, and a slide opens nothing on a visit (`decks.mjs` header).
+
+## Explaining a patch in slides
+
+positron is patchbay centric since 2026-10-13 (`positron-concepts`), so most
+talks about it explain a patch: sites, rooms, nodes, ports, links and the media
+that flow along them. The rules below apply unchanged; these are what they mean
+for that subject.
+
+- **Introduce a word through an operation, then keep it.** *"The keys are a
+  node. What they play leaves on a port called `midi-out`, and a link carries
+  it to the synth"* teaches node, port and link with one press. Once a term is
+  on a slide, do not rename it on the next (a `link` does not become a
+  `connection`, a `wire` and a `cable` over three slides).
+- **Use the bay's own names**, which are what the patchbay picture on every
+  concept page prints: `web` for the visitor's tab, `pi-1` for the Raspberry
+  Pi, `cf-relay:<room>`, `cf-stream:live` and `cf-store:history` for
+  Cloudflare services. A slide that invents a fourth set makes the page and the
+  talk disagree.
+- **Show the patch running, not a diagram of it.** A concept page draws its own
+  patchbay from the bay it runs (`createPatchbay`), so a live page or a
+  screenshot of one is evidence; a hand drawn picture of the same thing is a
+  claim. `positron-diagram` says when a hand drawn one is still right.
+- **The hero's words are the owner's and are quoted, not paraphrased.**
+  `HERO` in `demo/shell/hero.mjs`: *"Connect anything to everything."* and
+  *"Create playful, interactive worlds, from the web up to the cloud and down
+  to microcontrollers."* A deck that opens on the project uses them as written
+  (and the open question about its small line, *"agentic skills"* or *"agent
+  skills"*, is in `HANDOFF.md`).
+- **Separate what is built from what is decided from what is proposed.** The
+  patchbay plans (`plans/plan-patchbay.md`, `plan-site-names.md`,
+  `plan-nodes-revisited.md`) mix all three, and say so section by section.
 
 ## Establish the task
 

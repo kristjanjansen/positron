@@ -1,12 +1,43 @@
 ---
 name: positron-xr
-description: WebXR on a Quest, immersive sessions, passthrough, the way out of a headset page, and filling a screen on a phone. Load before any gl: true or headset page, before verify-gl.mjs or verify-quest.mjs, and before any claim about what a headset can do.
+description: WebXR on a Quest, immersive sessions, passthrough, the way out of a headset page, and filling a screen on a phone (fullscreen.mjs, used by concept pages). Load before any gl: true or headset page, before a full screen button on any page, before verify-gl.mjs or verify-quest.mjs, and before any claim about what a headset can do.
 ---
 
 # Headsets, immersive sessions and full screen
 
 Every number here was read off a real Quest 3 or a real phone. Nothing in this
 file was reasoned about from an API surface.
+
+## Where this applies today, checked 2026-10-14
+
+**Every headset page is an archived demo, still served.** `grep -rl gl: true
+demo` outside the harnesses finds `demo/videoradio/` and `/kit/status/`; the
+pages that import `xr-quit.mjs` are `weight` and `floor`; `mirror` hangs in a
+headset too. All four were archived 2026-10-12/13 and still answer at
+`/<slug>/` (`positron-history`). No concept page enters an immersive session.
+So the WebXR half of this file is the record of how those pages were built and
+the rules a new headset page must meet; it is not retired, because the pages
+run and `xr-quit-test.mjs` still guards them.
+
+**The full screen half is live on concept pages.** `demo/shell/fullscreen.mjs`
+(element fullscreen or a faux `position: fixed` cover on an iPhone, which has
+no element fullscreen) is used by https://positron.studio/history/newsreels/,
+and https://positron.studio/video/camera/ and
+https://positron.studio/drums/camera/ carry a full screen button (both pages say
+so in their comments). The rule below that the exit is mounted inside the
+element that went full, and fades without eating pointer events, applies to
+every one of them.
+
+**In patchbay terms**, a headset or a phone held up as a screen is a site whose
+`screen` node takes `video` (and `program`, a shader that arrives whole) on its
+in-ports, and whose controllers and tilt are `value-out` ports
+(`demo/shell/hero.mjs`'s phone patch draws tilt as the Circuit's filter and the
+shader's angle). None of the archived XR pages was rebuilt on a bay; when one
+is, the measurements below (90 fps held with audio, the `AudioContext`
+surviving, the dimmer as alpha) are what its links can count on.
+
+Pages named below that are gone: `scene` (no `demo/scene/`), `/blocks/`
+(archived 2026-09-24, a 404), `/earshot/` (`archive/demos/earshot-index.html`).
 
 - **WebXR, MEASURED on a Quest 3 (Browser 150.1 / Chromium 150, Adreno 740),
   2026-09-12.** The framebuffer is **3360x1760, two views, 1680x1760 per eye**,
