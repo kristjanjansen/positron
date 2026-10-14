@@ -1,5 +1,7 @@
 ## Open
 
+- **Research: WebMCP, could positron use it** (2026-10-14, agent). Asked: *"Inevstigate webmcp could we ise it. Research"*. Output `research/webmcp-2026-10-14.md`.
+
 - **Move the pages onto the lifted modules (synth/keyboard onto synth-voice, patch-synth onto audio-router and synth-params), and synth's value-in into the catalogue** (2026-10-14, agent). The plan's same-change rule, deferred while the catalogue pass ran.
 
 - ~~**/connect/ working UI, slices 0 to 3 of plans/plan-connect-ui.md (runtime, keys to synth to speaker, knobs, scope)**~~ (2026-10-14, DONE, local). Asked: *"Do working ui"*. Decisions taken as recommended: D1 composer on /connect/ only, D2 one knob per parameter, D3 concept pages not moved, D4 audio starts on the first press on a face, D5 lift one synth copy. The pages move onto the lifted modules after the catalogue pass lands.
