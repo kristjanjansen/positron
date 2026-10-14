@@ -2,10 +2,10 @@
 
 ## Where it is right now
 
-- **Site: BUILD `6f3e8dc0-094944-cad1`**, confirmed on the edge, deployed from a clean worktree of HEAD as every deploy this session.
-- **Committed, NOT deployed:** `ce6d3a66` (Drums on the Pi lift), `9bdae97c` and `c1acb5e1` (privacy pass 3). Deploy at the next coherent point.
+- **Site: BUILD `3a5398a5-102056-262e`**, confirmed on the edge, deployed from a clean worktree of HEAD as every deploy this session. Everything committed is live, including the radio reel https://positron.studio/social/radio/ and the Drums on the Pi lift.
 - **GitHub: 282 commits NOT pushed.** Do not push until the owner settles the public repo (`plans/plan-skills-distribution.md`): the repo is public, the plan moves it to `positron-studio/positron`, and history still holds everything removed this session.
-- **Two agents were running at handoff**, their files uncommitted in the tree: the **radio reel** (`demo/social/radio/`, `demo/shell/tuner-mix.mjs`, `demo/radio/tuner/index.html`, additions to `reel.mjs`/`reel-test.mjs`, the `social/radio` manifest row) and **review phase 5** (palette helper in `patchbay.mjs`, `concept.css`, `layoutAcross` for bay-svg/bay-view, `createMidiDevices`, `demo/radio/rig.mjs`, typist paper CSS, `workers/_lib` relay recorder, `bay-traffic` `remove()`; touched hero.mjs, kit/patchbay, room/words, synth/dots, archive/pico-router so far). Commit each by path when its report lands; nothing of theirs is verified by the session yet.
+- **The radio reel landed** (`3a5398a5`): a dial across our Raadio 2, Raadio 4 and Ida recordings with the tuner's noise and whistle, 14 s, verify 21/21; `tuner-mix.mjs` shared with /radio/tuner/; `reel.mjs` gained `sound.late`.
+- **One agent was running at handoff**, its files uncommitted in the tree: **review phase 5** (palette helper in `patchbay.mjs`, `concept.css`, `layoutAcross` for bay-svg/bay-view, `createMidiDevices`, `demo/radio/rig.mjs`, typist paper CSS, `workers/_lib` relay recorder, `bay-traffic` `remove()`; touched hero.mjs, kit/patchbay, room/words, synth/dots, archive/pico-router so far). Commit each by path when its report lands; nothing of theirs is verified by the session yet.
 - Counted 2026-10-14 evening: **59 demo rows, 58 built** (social, social/typist, social/radio added); **121 plans**. Two headless Chromes belong to the running agents.
 
 ## What landed (deployed unless marked)
