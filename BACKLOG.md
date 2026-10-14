@@ -12,7 +12,7 @@
 
 - **Plans and research: review, mark done, perhaps consolidate** (2026-10-14, a background agent). Asked: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. A status line on each, an index, and a consolidation proposal; moves and merges wait for a yes.
 
-- **Code review and simplification proposal** (2026-10-14, a background agent). Asked: *"In bg do comprehensive code revirew and simplification proposal"*. A plan in `plans/plan-code-review-2026-10-14.md`, no code changes.
+- ~~**Code review and simplification proposal**~~ (2026-10-14, DONE as a plan; every phase waits for a yes). Asked: *"In bg do comprehensive code revirew and simplification proposal"*. A plan in `plans/plan-code-review-2026-10-14.md`, no code changes.
 
 - ~~**Skills: review all of `.claude/skills/` and rewrite them around the patchbay**~~ (2026-10-14, DONE, commit 42f1aea3). Asked: *"In bg review skills and rewrite them to latest patchbay centric approach"*. 12 skills, 8352 lines. Keep measurements, dates and quoted reports (CLAUDE.md: move rules verbatim, never summarise); restructure around site/room/node/port/link and the concept pages.
 
