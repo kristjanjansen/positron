@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
   /* The reel is drawn at 1080 x 1920 and shown at a phone's size. */
-  .tw-stage { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .tw-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 48px; align-items: start; }
   @media (max-width: 640px) { .tw-stage { grid-template-columns: minmax(0, 1fr); } }
   .tw-cv { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 9 / 16; border-radius: var(--r, 4px); background: #0b0e14; border: 1px solid var(--line2); box-sizing: border-box; }
   .tw-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -46,9 +46,16 @@
   const W = 1080, H = 1920;
   // Instagram covers about 14% at the top and up to 35% at the bottom of a reel
   // (research/ui-video-capture-2026-10-14.md), so the words live between these.
-  const SAFE_TOP = 270, SAFE_BOTTOM = 1250, X = 96, TEXT_W = W - 2 * X;
+  const SAFE_TOP = 270, SAFE_BOTTOM = 1250, X = 72, TEXT_W = W - 2 * X;
   const C = { bg: '#0b0e14', fg: '#e6e6e6', dim: '#8b93a1', hi: '#ffd400' };
-  const SIZE = 88, LINE = 1.22;   // "Connect anything" fits one line at 88
+  const LINE = 1.22, MAX = 160, MIN = 64;
+  // The main type is as big as its widest written line allows, between MIN and MAX.
+  let SIZE = 88;
+  function fit(text) {
+    ctx.font = font(600, 100);
+    const widest = Math.max(1, ...text.split('\n').map((l) => ctx.measureText(l).width));
+    SIZE = Math.max(MIN, Math.min(MAX, Math.floor(100 * TEXT_W / widest)));
+  }
 
   const d = mount({
     name: 'social/typist',
@@ -81,11 +88,11 @@
   transport.enable('dl', false, 'record a take first');
   const dl = el('a');
   dlBtn.onclick = () => { if (dl.href) dl.click(); };
-  const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. Words stay clear of the top 14% and the bottom 35%.');
+  const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. The typed words stay clear of the top 14% and the bottom 35%; the lower line sits as low as the site name sits high.');
   const side = el('div', 'tw-side');
   side.append(main.wrap, lower.wrap, note);
   const stage = el('div', 'tw-stage');
-  stage.append(cv, side);
+  stage.append(side, cv);
   d.el.append(transport.el, stage);
 
   const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
@@ -130,12 +137,15 @@
     ctx.font = font(400, 34);
     ctx.letterSpacing = '4.8px';
     ctx.textBaseline = 'alphabetic';
+    // the site name's ink starts `pad` below the frame's top; the lower line ends as far above its bottom
+    const pad = SAFE_TOP + 40 - ctx.measureText('POSITRON').actualBoundingBoxAscent;
     let x = X;
     for (const [s, c] of [['POSITRON', C.dim], ['.', C.hi], ['STUDIO', C.dim]]) {
       ctx.fillStyle = c; ctx.fillText(s, x, SAFE_TOP + 40); x += ctx.measureText(s).width;
     }
     ctx.letterSpacing = '0px';
     // the typed text
+    fit(text);
     const shown = text.slice(0, typed);
     const lines = layout(shown);
     ctx.font = font(600, SIZE);
@@ -159,7 +169,9 @@
     if (lower.t.value.trim()) {
       ctx.font = font(400, 34);
       ctx.fillStyle = C.dim;
-      lower.t.value.trim().split('\n').forEach((ln, i, all) => ctx.fillText(ln, X, SAFE_BOTTOM - 40 - (all.length - 1 - i) * 46));
+      const ls = lower.t.value.trim().split('\n');
+      const base = H - pad - Math.max(...ls.map((l) => ctx.measureText(l).actualBoundingBoxDescent));
+      ls.forEach((ln, i) => ctx.fillText(ln, X, base - (ls.length - 1 - i) * 46));
     }
   }
 
@@ -249,6 +261,7 @@
   draw(ta.value, ta.value.length, 0, false);
 
   if (SELFCHECK) {
+    fit(ta.value);
     const lines = layout(ta.value);
     ctx.font = font(600, SIZE);
     const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
