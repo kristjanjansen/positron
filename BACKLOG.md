@@ -1,5 +1,9 @@
 ## Open
 
+- **/connect/: rethink the example use cases** (2026-10-14). Asked: *"rethink connect use cases. most to not make sense or are weak copies of demos"*. Every one of the 20 names the one concept page it copies (`EXAMPLES` in demo/connect/index.html). A plan in plans/, then the owner picks.
+
+- ~~**/connect/ on the site**~~ (2026-10-14, DONE: manifest row `connect` with bootMs 120000, a Connect card beside Kit and Social; verify 106/106 with DEMO_FAKE_CAMERA=1). Asked: *"add to site"*. A manifest row so the build deploys it.
+
 - ~~**/connect/: hold a square room for the patchbay**~~ (2026-10-14, DONE: `.cn-pic { aspect-ratio: 1 }`, 688 x 688 at 1280, the room assert reads the square). Asked: *"reserver ~ square room for the patchbay so controls and resto of groups stay away"*. `.cn-pic` in demo/connect/index.html.
 
 - ~~**/connect/: the MIDI keyboard box's button is a play icon button**~~ (2026-10-14, DONE: `icon: 'play'`, labelled Use a MIDI keyboard). Asked: *"use a midi keybaord: just use play iconbutton"*. demo/shell/rt-midi.mjs.
