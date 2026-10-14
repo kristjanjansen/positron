@@ -98,7 +98,7 @@
 
 - ~~**/social/ (named *"use social"*, over promo), a folder like /kit/, first page a simple typewriter reel you can download**~~ (2026-10-14, DONE: /social/ and /social/typewriter/; the reusable reel lib is next). Asked: *"implement simple typewriter for og reel downloadable. make a separate promo folder like kit, link from frontpage carrd next to kit -- reel.mjs. one test page, next we abstact into reusable lib"*. One test page now; the reusable `reel.mjs` lib is the next step.
 
-- **Cut comments to their essence; the history moves verbatim to `lessons/`** (2026-10-14). Asked: *"cut comments, perhaps to separare lessons md or smth. updaet claude.md for cutting down comments to essnece"*. Rule in CLAUDE.md (Conventions, "A comment says what the code cannot"). Runs AFTER the review fixes land, partitioned by directory.
+- ~~**Cut comments to their essence; the history moves verbatim to `lessons/`**~~ (2026-10-14, DONE in five commits; lessons/README.md is the index). Asked: *"cut comments, perhaps to separare lessons md or smth. updaet claude.md for cutting down comments to essnece"*. Rule in CLAUDE.md (Conventions, "A comment says what the code cannot"). Runs AFTER the review fixes land, partitioned by directory.
 
 - ~~**Fix the code review issues in parallel**~~ (2026-10-14, DONE in code: 1baa67d8, 9265e3a7, a4105307, 5009ecd3, 9f77dead, fcdbb6c7; the workers are NOT deployed, waiting on the owner's go and three secrets). Asked: *"fix the review issues in parallel"*. From `plans/plan-code-review-2026-10-14.md` phases 0 to 4: kit bugs, harness, workers, untracking and deletions. Phase 5 (consolidation) and the `@layer` half of phase 6 are not in this pass. Nothing pushed while the public repo question is open.
 
