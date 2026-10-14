@@ -1,0 +1,244 @@
+// demo/shell/node-runtime.mjs: what makes a node on /connect/ actually run.
+// plans/plan-connect-ui.md §2 and slice 0.
+//
+// A catalogue type (demo/shell/nodes.mjs) says what ports a node has. A
+// RUNTIME says what it does: a face a person sees, `deliver` functions for its
+// in-ports, WebAudio ends for its audio ports. A node gets its runtime while it
+// holds at least one link and loses it on its last unlink, so a face belongs to
+// a node and not to a link (two links out of the keys are one keyboard).
+//
+// Kept beside nodes.mjs and never inside it: nodes.mjs is pure and import free.
+// Every factory is loaded with `import()` when its first node is linked, so a
+// visit loads none of them, and nothing here touches a browser global until
+// `createRuntimes()` is called. node-runtime-test.mjs grades the pure parts.
+//
+// A runtime factory (`make(o)` in rt-<type>.mjs) returns, built with NO
+// AudioContext and NO fetch:
+//   face?, slot?        an element and where it goes ('picture', 'knob', 'keys')
+//   deliver?            { '<port>': fn }, bound onto the bay's ports here
+//   start?(ctx, dest)   on the first press on a face (decision D4)
+//   audio?              { out(port) -> AudioNode, in(port) -> AudioNode | AudioParam }
+//   heard()             what arrived at the far side, for asserts
+//   stop?(), close()    silence it; take it apart
+// and gets { id, type, bay, log, send(port, ev), wake(), peerParam(name), level() }.
+
+import { addNodes } from './nodes.mjs';
+import { PARAM_NAMES } from './synth-params.mjs';
+import { routeAudio } from './audio-router.mjs';
+
+export const RUNTIMES = {
+  keys: () => import('./rt-keys.mjs'),
+  synth: () => import('./rt-synth.mjs'),
+  speaker: () => import('./rt-speaker.mjs'),
+  knob: () => import('./rt-knob.mjs'),
+  scope: () => import('./rt-scope.mjs'),
+};
+
+// Every other catalogue type says why it does not run here yet, in words a
+// person reads in the log. The test requires every NODES key in one of the two.
+const why = (reason, names) => Object.fromEntries(names.map((n) => [n, reason]));
+export const NOT_YET = {
+  ...why('its control is a kit piece that is not bound to a runtime yet', ['fader', 'dial', 'patch', 'pick', 'machines',
+    'code', 'invert', 'scale', 'volume-knob']),
+  ...why('its face is the room\'s chat, which joins a relay room; not on this page yet', ['chat', 'admin', 'notice', 'history-store']),
+  ...why('the paper and the typing live in typist/paper.mjs, which needs an adapter first', ['typing', 'paper']),
+  midi: 'a plugged in keyboard asks for the browser\'s MIDI permission, a later slice',
+  ...why('the oscillator, filter, amp and lfo are one monolith in synth/patch-synth.mjs, to be split into module factories first',
+    ['osc', 'filter', 'amp', 'lfo']),
+  ...why('its engine makes its own AudioContext, so it cannot join this page\'s one context until it takes one',
+    ['plaits', 'sampler', 'sequencer', 'drum']),
+  ...why('its engine is a group module shaped for its own pages, which needs an adapter first', ['fau', 'collide', 'radio',
+    'player', 'player-video', 'level', 'grains', 'patch-values', 'bpm', 'tempo', 'fx-click', 'fx-typewriter', 'typewriter',
+    'timeline', 'rec-text', 'mix-knob', 'display']),
+  ...why('its engine is a kit piece that is not bound to a runtime yet', ['granulator', 'noise', 'tuner', 'pico',
+    'shader-landscape', 'wave', 'oled']),
+  ...why('its engine lives only inside one page and has to be lifted into demo/shell/ first', ['midi-state', 'shader',
+    'shader-dots', 'shader-dither', 'pixelate', 'key', 'fx', 'autoplay', 'bass', 'pad', 'mixer', 'xfade', 'blend-fader',
+    'mix', 'rec-video', 'rec', 'looper', 'store']),
+  ...why('pictures in this tab are slice 4 (the camera, a screen, a shader)', ['camera', 'screen']),
+  ...why('a read of our own bucket, made on a press with the engine that plays it, a later slice',
+    ['recording', 'piano-samples', 'rhodes-samples', 'typewriter-samples']),
+  ...why('somebody else\'s server, opened only by a person\'s own press and never by a check, a later slice',
+    ['station', 'newsreel', 'err-radio']),
+  ...why('a hop between sites, carried by a transport rather than run in this tab', ['shout', 'stream-live', 'stream-hls', 'moq-relay']),
+};
+
+/** Why a node with no runtime does not run, for a type outside the catalogue too (the Pi). */
+export function whyNot(type, nodeId = '') {
+  if (type && NOT_YET[type]) return NOT_YET[type];
+  if (/^pi-\d+:/.test(nodeId)) return 'it runs on the Raspberry Pi, which this page joins in a later slice (presence and Join)';
+  return 'no runtime is written for it';
+}
+
+// Ports a runtime has that the catalogue does not name yet. Kept here, not in
+// nodes.mjs, while another pass edits the catalogue; reported in the plan.
+export const EXTRA_PORTS = {
+  synth: { 'value-in': { dir: 'in', medium: 'value', shape: { of: 'param', names: [...PARAM_NAMES] } } },
+};
+
+const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
+
+/**
+ * Which runtimes to make and which to close. A node needs one while it holds
+ * at least one link, and only if `runs(nodeId)` says it has one.
+ * @returns {{ create: string[], close: string[] }} create in the order the links first name them
+ */
+export function plan(links, have, runs = () => true) {
+  const linked = [];
+  for (const l of links) for (const p of [l.from, l.to]) { const n = nodeOf(p); if (!linked.includes(n)) linked.push(n); }
+  const has = new Set(have);
+  return { create: linked.filter((n) => !has.has(n) && runs(n)), close: [...has].filter((n) => !linked.includes(n)) };
+}
+
+// The two transports that stay inside one tab (bay.mjs MACHINE_ONLY lists
+// `indexeddb` and `jack` too, which are not wired by a page's router).
+export const IN_TAB = { webaudio: 'audio', page: 'video' };
+
+/** The heavy links to wire inside this tab: `{ from, to, transport, medium }`. Light links have no session and are the bay's. */
+export function routes(links) {
+  return links.filter((l) => Object.hasOwn(IN_TAB, l.session?.transport ?? ''))
+    .map((l) => ({ from: l.from, to: l.to, transport: l.session.transport, medium: IN_TAB[l.session.transport] }));
+}
+
+/**
+ * Linking the `knob` type box to a value-in that lists its parameter names
+ * makes one knob node per name (decision D2) and links each. Returns the pairs
+ * to link, or null when this is not such a link.
+ */
+export function knobLinks(bay, from, to, site = 'web') {
+  if (from !== `${site}:knob:value-out`) return null;
+  const names = bay.port(to)?.shape?.names;
+  if (!Array.isArray(names) || !names.length) return null;
+  const pairs = [];
+  for (const name of names) {
+    const id = `${site}:knob-${name}`;
+    if (!bay.node(id)) addNodes(bay, site, [`knob-${name}`], { ports: { [`knob-${name}:value-out`]: { label: `${name} knob value-out` } } });
+    pairs.push([`${id}:value-out`, to]);
+  }
+  return pairs;
+}
+
+/**
+ * The runtimes of one page's bay.
+ * @param {object} o
+ * @param {object} o.bay
+ * @param {(nodeId: string) => (string | null)} o.typeOf  the catalogue name of a node
+ * @param {(line: string, level?: string) => void} [o.log]
+ * @param {() => void} [o.onChange]  after a sync made or closed a runtime, so the page redraws its faces
+ * @param {{ sharedAudio, claim, release }} o.audio  demo/shell/audio.mjs, handed in so this file imports no browser module
+ */
+export function createRuntimes({ bay, typeOf, log = () => {}, onChange = () => {}, audio }) {
+  const live = new Map();             // nodeId -> { type, rt, bound: [[port, prev]] }
+  const told = new Set();
+  let ctx = null, bus = null, tap = null, tapBuf = null;
+  let queue = Promise.resolve();
+  const owner = { stop() { for (const { rt } of live.values()) rt.stop?.(); } };
+
+  const runs = (id) => Object.hasOwn(RUNTIMES, typeOf(id) ?? '');
+
+  /** RMS of what reaches the speakers now, 0 before any sound. */
+  function level() {
+    if (!tap) return 0;
+    tap.getFloatTimeDomainData(tapBuf);
+    let s = 0;
+    for (const v of tapBuf) s += v * v;
+    return Math.sqrt(s / tapBuf.length);
+  }
+
+  function peerParam(id, name) {
+    for (const l of bay.links()) {
+      if (nodeOf(l.from) !== id) continue;
+      const v = live.get(nodeOf(l.to))?.rt.param?.(name);
+      if (v !== undefined) return v;
+    }
+    return undefined;
+  }
+
+  /** Start the sound: the page's one context, claimed once, every runtime started. On a press only. */
+  function wake() {
+    if (!ctx) {
+      ctx = audio.sharedAudio({ sampleRate: 48000 });
+      // One way out for every runtime, with a tap on it, so the level a check
+      // reads is what reaches the speakers and not what a link claims.
+      bus = ctx.createGain(); bus.connect(ctx.destination);
+      tap = ctx.createAnalyser(); tap.fftSize = 2048; tapBuf = new Float32Array(tap.fftSize);
+      const sink = ctx.createGain(); sink.gain.value = 0;
+      bus.connect(tap); tap.connect(sink); sink.connect(ctx.destination);
+      for (const { rt } of live.values()) rt.start?.(ctx, bus);
+      route();
+    } else audio.sharedAudio({ sampleRate: 48000 });
+    audio.claim(owner);
+    return ctx;
+  }
+
+  function route() {
+    if (!ctx) return [];
+    const end = (portId) => live.get(nodeOf(portId))?.rt.audio;
+    const port = (portId) => portId.split(':')[2];
+    return routeAudio({
+      edges: routes(bay.links()).filter((e) => e.medium === 'audio'),
+      out: (p) => end(p)?.out?.(port(p)),
+      input: (p) => end(p)?.in?.(port(p)),
+      outs: [...live.values()].map(({ rt }) => rt.audio?.out?.('audio-out')),
+    });
+  }
+
+  async function make(id, mod) {
+    const type = typeOf(id);
+    const rt = mod.make({
+      id, type, bay, log,
+      send: (p, ev) => bay.send(`${id}:${p}`, ev),
+      wake, level, peerParam: (name) => peerParam(id, name),
+    });
+    const bound = [];
+    for (const [p, fn] of Object.entries(rt.deliver || {})) {
+      const port = bay.port(`${id}:${p}`);
+      if (!port) continue;
+      bound.push([port, port.deliver]);
+      port.deliver = fn;
+    }
+    live.set(id, { type, rt, bound });
+    if (ctx) rt.start?.(ctx, bus);
+  }
+
+  function close(id) {
+    const e = live.get(id);
+    if (!e) return;
+    for (const [port, prev] of e.bound) { if (prev) port.deliver = prev; else delete port.deliver; }
+    e.rt.close?.();
+    live.delete(id);
+  }
+
+  async function step() {
+    const p = plan(bay.links(), [...live.keys()], runs);
+    for (const id of p.close) close(id);
+    for (const l of bay.links()) for (const n of [nodeOf(l.from), nodeOf(l.to)]) {
+      if (runs(n) || told.has(n)) continue;
+      told.add(n);
+      log(`${n} is drawn and does not run here yet: ${whyNot(typeOf(n), n)}`);
+    }
+    const mods = await Promise.all(p.create.map((id) => RUNTIMES[typeOf(id)]().then((m) => [id, m])));
+    // A link may have gone while the modules loaded.
+    const still = new Set(plan(bay.links(), [], runs).create);
+    for (const [id, m] of [...mods.filter(([, m]) => !m.after), ...mods.filter(([, m]) => m.after)]) {
+      if (still.has(id) && !live.has(id)) await make(id, m);
+    }
+    route();
+    if (p.close.length || p.create.length) onChange();
+    if (!live.size && ctx) audio.release(owner);
+  }
+
+  /** Bring the runtimes in line with the links. Calls queue, so two quick changes cannot interleave. */
+  function sync() {
+    queue = queue.then(step).catch((e) => log(`a runtime failed: ${e.message}`, 'bad'));
+    return queue;
+  }
+
+  return {
+    sync, wake, route, level,
+    idle: () => queue,
+    get: (id) => live.get(id)?.rt ?? null,
+    list: () => [...live].map(([id, { type, rt }]) => ({ id, type, rt })),
+    context: () => ctx,
+  };
+}

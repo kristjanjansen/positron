@@ -58,15 +58,25 @@
      and leaves a primary as written, which read `Connect` beside `DISMISS`. */
   .cn-prop-b > button.pos-sm { text-transform: none; }
   .cn-prop-n:empty { display: none; }
+
+  /* The faces of the linked nodes, in a concept page's order: pictures, the
+     knob row, the keys. Empty paints nothing. */
+  .cn-faces { display: flex; flex-direction: column; gap: 24px; }
+  .cn-faces[hidden] { display: none; }
+  .cn-face { min-width: 0; }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay, checkTransforms, printLink, parseLink } from '/shell/bay.mjs';
   import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
-  import { NODES as CATALOGUE, addNodes, portOf } from '/shell/nodes.mjs';
+  import { NODES as CATALOGUE, addNodes } from '/shell/nodes.mjs';
   import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { CONCEPTS } from '/shell/concept-list.mjs';
+  import { createRuntimes, EXTRA_PORTS, knobLinks } from '/shell/node-runtime.mjs';
+  import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
+  import { createKnobGrid } from '/shell/knob-grid.mjs';
+  import { knobRaw } from '/shell/synth-params.mjs';
 
   // ── what the site has, read rather than typed ───────────────────────────
   // Every node in the grid is one the site's own pages build, each shown ONCE
@@ -81,46 +91,48 @@
   //      Circuit on input 1, JACK, the GPU). Only the Pi nodes a concept page
   //      really plays are kept, and boardGraph has no `pages`, so PI_PAGES says
   //      which, read 2026-10-14 off the pages' own BOARD_SITE ids.
-  //   3. The Cloudflare hops a page declares itself and the catalogue leaves
-  //      out (STREAMS). cf-relay is not one: the patchbay draws it from a link.
+  //   3. The hops between sites, which are catalogue entries too (shout,
+  //      stream-live, stream-hls, moq-relay), drawn after the Pi as before.
+  //      cf-relay is not one: the patchbay draws it from a link.
   const PI = boardGraph({ room: 'studio-1', instruments: { synth: true, pappusFx: true, sampler: true }, jack: true, gpu: true,
     inputs: [{ name: 'circuit', channels: 2, jack: true, midi: { port: 'Circuit', channels: [1, 2, 10] } }] });
   const PI_PAGES = { circuit: ['remote/circuit'], sampler: ['remote/piano'] };
-  const STREAMS = [
-    { id: 'cf-shout:relay', kind: 'endpoint', label: 'radio relay', place: 'cf-shout', pages: ['radio/blend', 'radio/tuner', 'radio/live', 'radio/key'],
-      instance: 'one per station mount, cf-shout:<mount>', ports: { 'audio-in': ['https'], 'audio-out': ['https'] } },
-    { id: 'cf-stream:live', kind: 'endpoint', label: 'Stream WebRTC input', place: 'cloudflare', pages: ['video/webrtc'],
-      ports: { 'video-in': ['whip'], 'video-out': ['whep'] } },
-    { id: 'cf-stream:hls', kind: 'endpoint', label: 'Stream LL-HLS input', place: 'cloudflare', pages: ['video/llhls'],
-      ports: { 'video-in': [], 'video-out': ['llhls'] } },
-    { id: 'cf-moq:relay', kind: 'endpoint', label: 'MoQ relay', place: 'cloudflare', pages: ['video/moq'],
-      ports: { 'video-in': ['moq'], 'video-out': ['moq'] } },
-  ];
+  const HOPS = Object.keys(CATALOGUE).filter((n) => CATALOGUE[n].kind === 'endpoint');
+  // A box is `<site>:<name>`, except where the name is not what the pages draw:
+  // the hops, and the two knobs renamed so they cannot read as a knob instance.
+  const AS = { shout: 'relay', 'stream-live': 'live', 'stream-hls': 'hls', 'moq-relay': 'relay',
+    'volume-knob': 'knob-volume', 'mix-knob': 'knob-mix' };
   // A type whose catalogue label is a pattern (`<drum>, SuperCollider`) is
   // named for what it is; the instances are in the box's hover.
-  const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station' };
+  const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station', shout: 'radio relay' };
   // A station's site is its broadcaster's, so the one box is on ERR's.
   const siteOf = (name, e) => (name === 'station' ? 'err' : e.site ?? 'web');
   // room/words is built and served and kept off the index (concept-list.mjs).
   const OFF_INDEX = ['room/words'];
 
   const nodeOf = (portId) => portId.split(':').slice(0, 2).join(':');
-  const PAGES = new Map(), INSTANCE = new Map();
+  const PAGES = new Map(), INSTANCE = new Map(), TYPE = new Map();
+  // A knob made per parameter (`web:knob-cutoff`) is a knob; every other node is the type it was built as.
+  const typeOf = (id) => TYPE.get(id) ?? (/^web:knob-/.test(id) ? 'knob' : null);
+  const isInstance = (id) => !TYPE.has(id) && typeOf(id) === 'knob';
 
   function makeBay() {
     const b = createBay();
     const failed = [];
-    for (const [name, e] of Object.entries(CATALOGUE)) {
-      const site = siteOf(name, e), label = LABELS[name] ?? e.label;
+    const type = (name) => {
+      const e = CATALOGUE[name], site = siteOf(name, e), label = LABELS[name] ?? e.label, as = AS[name] ?? name;
       // Every port, the optional ones too: some page builds each of them.
       // A port has no label in the catalogue, and a refusal reads it.
-      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${name}:${p}`, { label: `${label} ${p}` }]));
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${p}` }]));
       try {
-        addNodes(b, site, [{ name, as: name, site, label }], { ports });
-        PAGES.set(`${site}:${name}`, e.pages);
-        if (e.instance) INSTANCE.set(`${site}:${name}`, e.instance);
+        addNodes(b, site, [{ name, as, site, label }], { ports });
+        for (const [p, f] of Object.entries(EXTRA_PORTS[name] || {})) b.addPort({ id: `${site}:${as}:${p}`, ...f, label: `${label} ${p}` });
+        TYPE.set(`${site}:${as}`, name);
+        PAGES.set(`${site}:${as}`, e.pages);
+        if (e.instance) INSTANCE.set(`${site}:${as}`, e.instance);
       } catch (x) { failed.push(`${name}: ${x.message}`); }
-    }
+    };
+    for (const name of Object.keys(CATALOGUE)) if (!HOPS.includes(name)) type(name);
     for (const n of PI.nodes) {
       const pages = PI_PAGES[n.id.split(':')[1]];
       if (!pages) continue;
@@ -130,21 +142,12 @@
         PAGES.set(n.id, pages);
       } catch (x) { failed.push(`${n.id}: ${x.message}`); }
     }
-    for (const s of STREAMS) {
-      try {
-        b.addNode({ id: s.id, kind: s.kind, label: s.label, place: s.place, ...(s.place === 'cloudflare' ? { net: 'cloudflare' } : {}) });
-        for (const [p, transports] of Object.entries(s.ports)) {
-          b.addPort({ id: `${s.id}:${p}`, ...portOf(p), label: `${s.label} ${p}`, ...(transports.length ? { transports } : {}) });
-        }
-        PAGES.set(s.id, s.pages);
-        if (s.instance) INSTANCE.set(s.id, s.instance);
-      } catch (x) { failed.push(`${s.id}: ${x.message}`); }
-    }
+    for (const name of HOPS) type(name);
     return { bay: b, failed };
   }
   const { bay, failed } = makeBay();
   const PI_KEPT = PI.nodes.filter((n) => PI_PAGES[n.id.split(':')[1]]).length;
-  const EXPECTED = Object.keys(CATALOGUE).length + PI_KEPT + STREAMS.length;
+  const EXPECTED = Object.keys(CATALOGUE).length + PI_KEPT;
 
   // A link to somebody else's server or a Stream input rides the one
   // transport its port names, as the pages that make it say (`via`).
@@ -305,6 +308,12 @@
   // ── linking, by press or by confirming a proposal ────────────────────────
   let last = { ok: true, why: '' };
   function connect(from, to, transforms = [], consent = false) {
+    // The knob type into a value-in that names its parameters is one knob per parameter.
+    const many = knobLinks(bay, from, to);
+    if (many) {
+      d.log(`one knob per parameter of ${nodeOf(to)}: ${many.map(([f]) => nodeOf(f).split(':')[1]).join(', ')}`);
+      return many.map(([f, t]) => connect(f, t, transforms, consent)).some(Boolean);
+    }
     bay.seen(from); bay.seen(to);
     // A link out of somebody else's server needs a person's own press (bay.mjs, consent).
     const via = viaFor(from, to);
@@ -428,7 +437,7 @@
   function drawGrid() {
     const inPic = linkedNodes();
     const byGroup = new Map(GROUPS.map((g) => [g, []]));
-    for (const n of bay.nodes()) if (!inPic.has(n.id)) byGroup.get(groupOf(n)).push(n);
+    for (const n of bay.nodes()) if (!inPic.has(n.id) && !isInstance(n.id)) byGroup.get(groupOf(n)).push(n);
     const out = [];
     for (const [where, nodes] of byGroup) {
       if (!nodes.length) continue;
@@ -467,11 +476,35 @@
     drawGrid();
     pb.refresh();
     decorate();
+    runtime.sync();
   }
+
+  // ── the faces: what the linked nodes look like when they run ─────────────
+  // node-runtime.mjs makes a runtime per linked node; this block places their
+  // faces. One knob row for every knob, rebuilt only when the set of knobs changes.
+  const faces = el('div', 'cn-faces');
+  faces.hidden = true;
+  let knobRow = null, knobKey = '';
+  const part = (title, face) => { const p = el('section', 'cn-face'); p.append(el('h3', 'pos-sec-h', title), face); return p; };
+  function drawFaces() {
+    const all = runtime.list().filter((x) => x.rt.face);
+    const knobs = all.filter((x) => x.rt.slot === 'knob');
+    const parts = all.filter((x) => x.rt.slot === 'picture').map((x) => part(x.id, x.rt.face));
+    if (knobs.length) {
+      const key = knobs.map((x) => x.id).join();
+      if (key !== knobKey) { knobRow = createKnobGrid(knobs.map((x) => ({ name: x.rt.name, knob: x.rt.knob })), { row: true }); knobKey = key; }
+      parts.push(part(knobs.length === 1 ? knobs[0].id : 'knobs', knobRow.el));
+    } else knobKey = '';
+    parts.push(...all.filter((x) => x.rt.slot === 'keys').map((x) => part(x.id, x.rt.face)));
+    faces.replaceChildren(...parts);
+    faces.hidden = !parts.length;
+  }
+  const runtime = createRuntimes({ bay, typeOf, log: (m, lv) => d.log(m, lv), onChange: drawFaces, audio: { sharedAudio, claim, release } });
+  window.__demo.runtime = runtime;
 
   const say = el('div', 'cn-say');
   say.append(exRow, props);
-  d.stack.add(say, pic, groups);
+  d.stack.add(say, faces, pic, groups);
   redraw();
   for (const f of failed) d.log(f, 'bad');
 
@@ -486,9 +519,14 @@
     const has = (from, to) => bay.links().some((l) => l.from === from && l.to === to);
     const press = (id) => document.querySelector(`button[data-port="${id}"], text[data-port="${id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
+    const runtimes = async () => { await runtime.idle(); await frame(); };
+
+    // Before anything is pressed: no runtime, no face, no sound device.
+    A('a visit opens no sound device and shows no face', contexts() === 0 && runtime.list().length === 0
+      && faces.hidden && getComputedStyle(faces).display === 'none', `contexts ${contexts()}, runtimes ${runtime.list().length}`);
 
     A('every node made it into the bay', failed.length === 0 && bay.nodes().length === EXPECTED,
-      `${bay.nodes().length} of ${EXPECTED}: ${Object.keys(CATALOGUE).length} catalogue types, ${PI_KEPT} Pi, ${STREAMS.length} streams`
+      `${bay.nodes().length} of ${EXPECTED}: ${Object.keys(CATALOGUE).length} catalogue types (${HOPS.length} of them hops), ${PI_KEPT} Pi`
       + `${failed.length ? `, refused: ${failed.join('; ')}` : ''}`);
     // Nothing imaginary: every box names a page that builds it, and every page
     // it names is a concept page that exists.
@@ -573,6 +611,91 @@
     removeLink(midiLink?.id);
     A('a node with no links left goes back to the grid', inGrid('web:plaits') && inGrid('web:midi') && !inPicture('web:plaits'));
     armed = null; lightArmed();
+
+    await runtimes();
+
+    // ── slice 1: the keys play the synth, through the speakers ──────────────
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const RT = (id) => runtime.get(id);
+    const keyboards = () => faces.querySelectorAll('.kbd').length;
+    [...exRow.children].find((b) => b.textContent === EXAMPLES[0].say).click();
+    await runtimes();
+    A('the example "let the keys play the synth" shows exactly one keyboard, runs the synth and the speaker, and opens no sound device yet',
+      keyboards() === 1 && !!RT('web:synth') && !!RT('web:speaker') && contexts() === 0,
+      `keyboards ${keyboards()}, runtimes ${runtime.list().map((x) => x.id).join(' ')}, contexts ${contexts()}`);
+    const kb = RT('web:keys').kb, synth = RT('web:synth'), speaker = RT('web:speaker');
+    const A3 = kb.keyOf(57);
+    const h0 = synth.heard();
+    kb.press(A3);   // the keyboard's own handler, which is the first press on a face (D4)
+    await sleep(300);
+    const loud = speaker.heard();
+    A('the first press on a face starts the one sound device, the key reaches the synth and the speakers get louder',
+      contexts() === 1 && runtime.context()?.state === 'running' && synth.heard() === h0 + 1 && loud > 0.01,
+      `context ${runtime.context()?.state}, synth heard ${synth.heard() - h0}, level at the speakers ${loud.toFixed(4)}`);
+    kb.release(A3);
+    await sleep(200);
+
+    // ── slice 3: a scope fed by the synth ───────────────────────────────────
+    const SCOPE_IN = W('scope', 'audio-in');
+    press(SYNTH_OUT); press(SCOPE_IN);
+    await runtimes();
+    const scope = RT('web:scope');
+    kb.press(A3);
+    await sleep(300);
+    const fed = scope?.heard() ?? 0;
+    A('a scope linked from the synth shows a picture, and its buffer moves while a key sounds',
+      !!scope && faces.contains(scope.face) && fed > 0.01, `peak ${fed.toFixed(4)}`);
+    kb.release(A3);
+    await sleep(400);
+    const still = scope?.heard() ?? 1;
+    A('NEGATIVE CONTROL: the same scope reads zero once nothing sounds', !!scope && still < 1e-4, `peak ${still.toExponential(2)}`);
+
+    // ── slice 2: one knob per parameter, into the synth's value-in ──────────
+    const SYNTH_VAL = W('synth', 'value-in');
+    press(KNOB); press(SYNTH_VAL);
+    await runtimes();
+    const knobIds = runtime.list().filter((x) => x.type === 'knob').map((x) => x.id);
+    A('linking the knob box to the synth makes one knob per parameter, in one row',
+      knobIds.length === 5 && knobRow?.knobs.length === 5 && faces.contains(knobRow.el) && !has(KNOB, SYNTH_VAL),
+      knobIds.join(', '));
+    // A key is held while the knob turns: Chrome stops processing a filter with
+    // nothing sounding into it, and then its frequency never reads back the glide.
+    const cutoff = RT('web:knob-cutoff');
+    kb.press(A3);
+    cutoff?.knob.set(knobRaw('cutoff', 500));
+    await sleep(250);
+    const fq = synth.voice.filter()?.frequency.value ?? 0;
+    kb.release(A3);
+    await sleep(200);
+    A('turning the cutoff knob moves the synth cutoff, read back off the filter',
+      Math.abs(synth.param('cutoff') - 500) < 5 && Math.abs(fq - 500) < 25, `asked 500, the synth holds ${synth.param('cutoff')?.toFixed(1)}, the filter reads ${fq.toFixed(1)} Hz`);
+    const q = RT('web:knob-q'), q0 = synth.param('q');
+    removeLink(bay.links().find((l) => l.from === 'web:knob-q:value-out')?.id);
+    await runtimes();
+    q?.knob.set(knobRaw('q', 9));
+    A('NEGATIVE CONTROL: an unlinked knob moves nothing, and its face is gone',
+      !!q && synth.param('q') === q0 && !faces.contains(q.face) && !RT('web:knob-q') && knobRow?.knobs.length === 4,
+      `q ${q0} then ${synth.param('q')}`);
+
+    // ── the negative control on the speakers ────────────────────────────────
+    removeLink(bay.links().find((l) => l.from === SYNTH_OUT && l.to === SPK)?.id);
+    await runtimes();
+    const h1 = synth.heard();
+    kb.press(A3);
+    await sleep(300);
+    const quiet = runtime.level(), meanwhile = scope?.heard() ?? 0;
+    A('NEGATIVE CONTROL: with the speaker unlinked the key still reaches the synth and sounds at the scope, and nothing reaches the speakers',
+      synth.heard() === h1 + 1 && meanwhile > 0.01 && quiet < 0.001 && !RT('web:speaker'),
+      `synth heard ${synth.heard() - h1}, scope ${meanwhile.toFixed(4)}, speakers ${quiet.toFixed(5)} against ${loud.toFixed(4)} linked`);
+    kb.release(A3);
+
+    removeLink(bay.links().find((l) => l.from === KEYS)?.id);
+    await runtimes();
+    A('unlinking the keys takes the keyboard away', keyboards() === 0 && !RT('web:keys') && !!RT('web:synth'));
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('with nothing linked every runtime is closed and the faces take no room', runtime.list().length === 0 && faces.hidden);
 
     A('the self-check asked the wish worker nothing', reached === 0, `${reached} calls`);
   }

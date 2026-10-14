@@ -599,3 +599,55 @@ that engine moves into a shared kit module and that page moves onto it in the
 same change; a page changes only when one of its engines is needed elsewhere.
 Archived demos are never touched. Whether a concept page becomes a saved patch
 opened in the composer is decided after slices 1 to 3 hold up.
+
+## Built, 2026-10-14: slices 0 to 3
+
+Local at http://127.0.0.1:8890/connect/. Not committed, not deployed.
+
+- **Slice 0.** `demo/shell/node-runtime.mjs`: `RUNTIMES` (five, each a lazy
+  `import()` of `rt-<type>.mjs`), `NOT_YET` (every other catalogue type with a
+  sentence), `whyNot()`, `EXTRA_PORTS`, the pure `plan()` and `routes()`,
+  `knobLinks()`, and `createRuntimes({ bay, typeOf, log, onChange, audio })` with
+  `sync()`, `wake()`, `level()`, `idle()`, `get()`, `list()`. Deliver is bound
+  by setting `bay.port(id).deliver` (U1 answered the cheap way, restored on
+  close). The router is `demo/shell/audio-router.mjs` (`routeAudio`), lifted from
+  `patch-synth.mjs` `route()`. `node-runtime-test.mjs` runs under `run-tests.mjs`.
+- **Slice 1.** `demo/shell/synth-voice.mjs`, the sine lifted from
+  /synth/keyboard/ with a lowpass at 8 kHz added for slice 2's knobs;
+  `rt-keys.mjs`, `rt-synth.mjs`, `rt-speaker.mjs`. One context from
+  `sharedAudio({ sampleRate: 48000 })`, made on the first press on a face (D4),
+  claimed once by the runtime set. Every runtime reaches the speakers through
+  one bus with an analyser on it, so the level a check reads is what reaches
+  the speakers.
+- **Slice 2.** `demo/shell/synth-params.mjs`, split out of `patch-synth.mjs`:
+  the pitch, the exponential travel and the readings for the synth's five
+  parameters (`wave`, `cutoff`, `q`, `attack`, `release`). `rt-knob.mjs`.
+  Linking the `knob` box to a value-in whose shape lists names makes one
+  `web:knob-<name>` node per name and links each (D2, all names at once; there
+  is no picker yet).
+- **Slice 3.** `rt-scope.mjs`: the kit wave shape over an AnalyserNode pulled
+  by a silent sink.
+
+**A catalogue field that does not exist**: `synth` has no `value-in` in
+`nodes.mjs`. It lives in `EXTRA_PORTS` in `node-runtime.mjs` until the
+catalogue pass lands, and `node-runtime-test.mjs` goes red the day the
+catalogue grows it, so it is moved rather than doubled.
+
+**Measured** in headless Chrome with `--autoplay-policy=no-user-gesture-required
+--mute-audio` (U2, answered for the check only by a scratch launcher on
+`demo/chrome.mjs`): the self-check went from 20/20 to 31/31; the level at the
+speakers read 0.11 RMS with the speaker linked and 0.00000 with it unlinked
+while the scope on the same synth read a 0.17 peak.
+
+## Pages to move onto the lifted modules, once the catalogue pass lands
+
+The plan's rule (*"its page moves onto the lifted copy in the same change"*) was
+deferred on 2026-10-14 because another agent was editing these pages. Each move
+is one page at a time, with its own check before and after.
+
+| lifted module | pages that still carry their own copy |
+| --- | --- |
+| `demo/shell/audio-router.mjs` (`routeAudio`) | `demo/synth/patch-synth.mjs` (`route()`, so /synth/sound/), then the other private routers: `demo/radio/blend/`, `demo/radio/tuner/`, `demo/radio/key/`, `demo/radio/rig.mjs`, `demo/granulator/grain-rig.mjs`, `demo/granulator/beat/`, `demo/drums/drum-machine.mjs`, `demo/drums/remote/`, `demo/code/collide/`, `demo/code/faust/`, `demo/code/plaits/`, `demo/remote/collide/`, `demo/shader/landscape/`, `demo/typist/machines/`, `demo/typist/score/`, `demo/video/camera/`, `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` (`grep -rlE "function route\(\|function audio\("`, not every one is an audio router) |
+| `demo/shell/synth-voice.mjs` | `demo/synth/keyboard/` (the copy it was lifted from, a direct swap); then the saw copies, which need `{ wave: 'sawtooth', level: 0.08 }`: `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` |
+| `demo/shell/synth-params.mjs` | `demo/synth/patch-synth.mjs` (`WAVES`, `hz`, `expo`, `hzText`, `sText`, and the `wave`, `cutoff`, `q`, `attack`, `release` rows of `KNOBS`; its own defaults stay its own) |
+| `demo/shell/rt-scope.mjs` (the window from the first rising zero crossing) | `demo/synth/module-page.mjs` `frame()` |
