@@ -163,6 +163,7 @@ export const CASE_GROUPS = ['archives', 'performances', 'stations', 'instruments
 export const DEMO_CARDS = {
   // kit listed 2026-10-13 (*"Bring kit card to frontpage"*): its own heading, last.
   kit: { group: 'kit', plain: true, title: 'Kit', say: 'Every part these pages are built from, one page per part.' },
+  social: { group: 'kit', plain: true, title: 'Social', say: 'Pictures and reels the site makes of itself. Download one and post it.' },
   // concept like: one mechanism or technology each
   // csound is on /archive/ since 2026-10-12, unlisted in the manifest and off this index.
   // fau, collide and muta archived 2026-10-13 (*"archve fau collide muta"*): still served, listed on /archive/.

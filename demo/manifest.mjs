@@ -949,6 +949,16 @@ export const DEMOS = [
     one: 'where every part of the kit lives now, and a way on from an old link to one of its blocks',
     tags: ['shell', 'no network'] },
 
+  // /social/, asked 2026-10-14 (*"make a separate promo folder like kit, link from
+  // frontpage carrd next to kit"*, named *"use social"*): pictures and reels the
+  // site makes of itself. Listed as a card beside the kit; its pages are rows below.
+  { name: 'social', group: 'kit', act: 0, created: '2026-10-14', built: true,
+    one: 'pictures and reels the site makes of itself, to download and post',
+    tags: ['shell', 'no network'] },
+  { name: 'social/typewriter', title: 'typewriter', group: 'kit', act: 0, created: '2026-10-14', built: true, unlisted: true,
+    one: 'a line types itself onto a story frame with a real typewriter, recorded to a file',
+    tags: ['shell', 'MediaRecorder'] },
+
   // 🔴 THE KIT, ONE PAGE PER PART, 2026-10-06 (plans/plan-kit-split.md). Each
   // row deploys `demo/kit/<part>/` to `/kit/<part>/` and is opened by
   // `verify.mjs` there, through code that already handles a slash in a name
