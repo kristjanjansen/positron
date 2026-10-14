@@ -1,14 +1,5 @@
-// rig/board/ask.mjs — a client, so the board can be driven from a terminal.
-//
-// The point of §8.7 is that a browser is one client among several, not the
-// interface. This is the proof: curl-shaped, no page, same room, same envelope.
-//
-//   node ask.mjs --room studio-1 ports.get
-//   node ask.mjs --room studio-1 patch.plan  '{"v":1,"links":[{"from":"circuit","to":"microfreak"}]}'
-//   node ask.mjs --room studio-1 patch.apply '{"v":1,"links":[{"from":"digitakt","to":"microfreak"}]}'
-//   node ask.mjs --room studio-1 jack.list
-//   node ask.mjs --room studio-1 jack.plan '{"v":1,"links":[{"from":"yoshimi:left","to":"posboard:input_1"}]}'
-//   node ask.mjs --room studio-1 listen 5            watch everything for 5 s
+// Drive the board from a terminal: node ask.mjs --room studio-1 <verb> ['<json>'], or `listen 5`.
+// why: lessons/rig-board-io.md#ask-header
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);
@@ -33,11 +24,8 @@ ws.onopen = () => {
   if (VERB === 'listen') { console.error(`listening on ${ROOM} for ${BODY ?? 5}s ...`); return; }
   let body;
   if (BODY) { try { body = JSON.parse(BODY); } catch (e) { console.error('body is not JSON:', e.message); process.exit(1); } }
-  // A patch verb takes a DOCUMENT and everything else takes FIELDS. Nesting
-  // both under `patch` meant `audio.start {"source":"yoshimi"}` arrived with
-  // no source at all and fell back to the built-in synth, reporting ok:true for
-  // an instrument nobody asked for, which is the worst kind of wrong.
-  // `jack.plan` and `jack.apply` take a document too (rig/board/jack.mjs).
+  // patch.* and jack.plan/apply take a DOCUMENT; every other verb takes fields at the top level.
+  // why: lessons/rig-board-io.md#ask-doc
   const takesDoc = VERB.startsWith('patch.') || VERB === 'jack.plan' || VERB === 'jack.apply';
   const wrap = body ? (takesDoc ? { patch: body } : body) : {};
   ws.send(format({ type: VERB, ...wrap }, { from: FROM, seq: seq++, by: 'tool' }));
@@ -50,9 +38,8 @@ ws.onmessage = (e) => {
   if (VERB === 'listen') { console.log(`${msg.type.padEnd(16)} ${msg.from}  ${JSON.stringify(msg).slice(0, 150)}`); return; }
   if (msg.type === 'board.hello' || msg.type === 'board.alive') return;   // ambient, not a reply
   clearTimeout(timeout);
-  // The envelope is stripped; `at`, if any, is the payload's own event time
-  // since 2026-10-04 and stays in the body. `parse()` has already turned an
-  // old board's envelope `at` into `sent`.
+  // Strip the envelope; `at` is the payload's own event time and stays in the body.
+  // why: lessons/rig-board-io.md#ask-envelope
   const { id, from, sent, seq: _s, re, ...body } = msg;
   console.log(JSON.stringify(body, null, 2));
   ws.close(); process.exit(0);

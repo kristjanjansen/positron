@@ -1,32 +1,6 @@
-// positron-pub: /stage/'s film publisher, the two loopbacks under
-// the /video/ concept pages, TURN credentials and the device log.
-//
-//   GET  /ice                          short lived TURN servers, 503 with no key
-//   POST /log                          a device reports what it saw
-//   GET  /logs[?format=text]           read those reports back
-//   POST /logs/clear                   drop them (x-pub-key)
-//   POST /cam/whip, DELETE /cam/whip/<id>  /video/webrtc/'s WebRTC
-//                                      loopback publish, onto its OWN WebRTC
-//                                      input (CAM_WHIP_URL, "positron-cam-whip")
-//   /stage/watch /stage/status         /stage/'s own instance: the MIM film on
-//   /stage/start /stop (x-pub-key)     WHIP while a viewer holds /stage/watch
-//   wss://pub.positron.studio/loop     /video/llhls/'s LL-HLS loopback: the
-//                                      camera rewrap on its own instance and its
-//                                      OWN input (LOOP_STREAM_KEY), every take deleted
-//   GET  /loop/status                  recordings on that input, account storage
-//   POST /loop/sweep                   the cron's clean, now (once a minute)
-//
-// RETIRED 2026-10-13, answering 410: /watch, /status, /start, /stop, /whip
-// (the test pattern on the inputs positron-demo and whep-rig, which fed the
-// archived /llhls/ and /webrtc/), and /cam, /cam/status (/cam/'s RTMPS camera
-// on the input positron-cam). All three inputs were deleted from Stream the
-// same day, with the secrets STREAM_KEY, WHIP_URL and CAM_STREAM_KEY.
-//
-// WHY REFERENCE COUNTING AND NOT sleepAfter ALONE: the Container base class
-// sleeps on REQUEST idleness, and ffmpeg publishing generates no incoming
-// requests at all — so sleepAfter would happily kill a stream somebody is
-// watching. The viewer count is the real signal; the alarm sweep renews
-// activity while anyone is connected and stops the publish once nobody is.
+// positron-pub: /stage/'s film, the /video/ loopbacks, /ice TURN credentials and device logs.
+// Viewers are reference counted, not left to sleepAfter: ffmpeg publishing makes no requests.
+// why: lessons/workers-pub.md#header
 
 import { Container, getContainer } from '@cloudflare/containers';
 import { DurableObject } from 'cloudflare:workers';
@@ -39,23 +13,23 @@ const ICE_PER_HOUR = 120;        // relay credentials minted per hour, overall
 const ICE_PER_ADDRESS_HOUR = 20; // and per address, so one caller cannot spend the hour
 const ICE_TTL_S = 4 * 3600;      // longer than a camera is left on; a credential cannot be refreshed mid-call here
 const GRACE_TICKS = 2;     // ~60 s of nobody watching before we stop
-// The main instance. Since 2026-10-13 it publishes nothing: it holds the
-// device log and the /ice rate limits, and keeps its name so the log survives.
+// The main instance publishes nothing: it holds the device log and the /ice rate limits.
+// why: lessons/workers-pub.md#main
 const NAME = 'p1';
 // /stage/'S OWN INSTANCE of the same class: the MIM film on its own WebRTC
 // input (STAGE_WHIP_URL), WHIP only, no clocks, no RTMPS. Routed by the /stage
 // prefix, so the test pattern instance above is untouched.
 const STAGE = 'stage';
 const STAGE_PATHS = new Set(['/watch', '/status', '/start', '/stop']);
-// The main instance's routes since 2026-10-13, and the ones retired that day.
+// The main instance's routes, and the retired ones that answer 410.
+// why: lessons/workers-pub.md#main-paths
 const MAIN_PATHS = new Set(['/ice', '/log', '/logs', '/logs/clear']);
 // No page calls these; they are the owner's, with `x-pub-key` matching the
 // PUB_KEY secret (`wrangler secret put PUB_KEY`). Unset refuses.
 const OWNER_PATHS = new Set(['/stage/start', '/stage/stop', '/logs/clear']);
 const RETIRED = new Set(['/watch', '/status', '/start', '/stop', '/whip', '/cam', '/cam/status']);
-// THE CAMERA INSTANCE, which since 2026-10-13 only proxies the WebRTC publish
-// (/cam/whip) onto "positron-cam-whip". Its RTMPS camera route, /cam, and that
-// input (positron-cam) are gone; the rewrap path it used lives on in `loop`.
+// The camera instance only proxies the WebRTC publish (/cam/whip) onto "positron-cam-whip".
+// why: lessons/workers-pub.md#cam
 const CAM = 'cam';
 // NEXT (PubNext, the durable_object runtime). The instance is pub's custom
 // size from wrangler.jsonc, spelled the new API's way (camelCase, in code):
@@ -74,26 +48,10 @@ const LOG_MAX_BODY = 2000;     // one report cannot flood the rest out
 const CAM_MAX_MS = 300_000;
 const CAM_IDLE_MS = 5_000;     // no chunk this long and the DO ends a loopback take
 const CAM_TICK_MS = 5_000;     // the alarm's cadence while a loopback take is live
-// /cam/'S WebRTC LEG HAS ITS OWN WebRTC INPUT TOO (CAM_WHIP_URL, "positron-cam-whip",
-// provisioned by src/provision-cam-whip.sh, recording off). It borrowed the test
-// pattern's WHIP input until 2026-09-30 and was refused with 409 whenever
-// somebody watched that pattern. One camera at a time. ⚠️ A SESSION HELD BY A TAB THAT DIED WITHOUT ITS DELETE
-// cannot be told apart from a live one: MEASURED 2026-09-30, `/lifecycle` on a
-// WebRTC input answers `live: true` with nothing publishing to it, so it is no
-// signal here. Such a session blocks the next camera for at most CAM_MAX_MS and
-// is then replaced.
-// /video/webrtc/'S LL-HLS LOOPBACK: the camera route above on an instance
-// of its own (`loop`) and an input of its own ("positron-hls-loopback",
-// LOOP_UID, src/provision-loop.sh), so a sweep can delete EVERYTHING on that
-// input. The page's 30 s run from when Stream says the input is live, which is
-// a few seconds after RTMPS opens (at most 15 s, the page's own wait), so
-// LL-HLS has time to settle (2026-10-12, *"extend to 30s"*). LOOP_MAX_MS is
-// the worker's own cap under a page that never stops, counted from when ffmpeg
-// opened RTMPS, because that is when Stream starts recording: a take is at
-// most 50 s of RTMPS whatever the page does, above the page's 30 + 15. LOOP_OPEN_MS bounds
-// a session whose publisher never opened (nothing recorded, but it holds the
-// input). Every take is deleted by this object LOOP_CLEAN_MS after it ends,
-// whoever ended it (loop.mjs).
+// /cam/whip has its own input, one camera at a time; a dead tab's session looks live, so it holds
+// for at most CAM_MAX_MS. `loop` is the LL-HLS loopback on its own input: LOOP_MAX_MS caps a take
+// at 50 s of RTMPS, LOOP_OPEN_MS a publisher that never opened.
+// why: lessons/workers-pub.md#cam-whip-loop
 const LOOP = 'loop';
 const LOOP_MAX_MS = 50_000;
 const LOOP_OPEN_MS = 60_000;
@@ -104,40 +62,26 @@ const LOOP_SWEEP_GAP_MS = 60_000; // the public sweep route, at most this often
 const LOOP_STATUS_TTL_MS = 5_000; // /loop/status asks Stream at most this often
 const CAM_WHIP_MISSING = 'the camera WebRTC input is not provisioned: the owner runs src/provision-cam-whip.sh, which stores CAM_WHIP_URL';
 
-/**
- * TWO RUNTIMES, ONE BODY. `Pub` is the legacy `@cloudflare/containers` class
- * on the `default` scheduling policy; `PubNext` is the same object on the
- * `durable_object` policy, a plain DurableObject driving `this.ctx.container`
- * (research/cf-containers-next-2026-10-07.md). Everything below is shared,
- * and the ONE place they differ is `#c()`, which is how either reaches the
- * container, plus the lifecycle lines marked NEXT.
- * ⚠️ A NEW CLASS AND NOT AN EDIT: Cloudflare's docs say `scheduling_policy`
- * "Cannot be changed after the application is created", so `Pub`'s container
- * application cannot be switched in place. `Pub` stays exported with its own
- * container entry so a rollback is redeploying the previous worker.mjs.
- */
+// Two runtimes, one body: `Pub` (legacy, `default` policy) and `PubNext` (`durable_object`),
+// differing in `#c()` and lines marked NEXT. A policy cannot change in place, so `Pub` stays
+// exported and a rollback is redeploying the previous file.
+// why: lessons/workers-pub.md#two-runtimes
 const pubOn = (Base, NEXT) => class extends Base {
   defaultPort = 8080;
   // A generous backstop only. The sweep below is what actually decides.
   // (Legacy only. NEXT's backstop is NEXT_IDLE_MS through setInactivityTimeout.)
   sleepAfter = '10m';
 
-  /**
-   * A worker var reaches the container only through `envVars` (legacy) or
-   * `ctx.container.start({ env })` (NEXT), both read when the container starts.
-   */
+  // A worker var reaches the container only through `envVars` or `start({ env })`, read at start.
+  // why: lessons/workers-pub.md#env
   constructor(ctx, env) {
     super(ctx, env);
     if (!NEXT) return;
-    // NEXT ONLY: a bigger UDP send buffer for the WHIP leg, see WHIP_SNDBUF in
-    // container/server.mjs. 4 MiB is the runtime's wmem_max, MEASURED on the
-    // test bed (wmem_default 212992, wmem_max 4194304).
+    // NEXT only: a 4 MiB UDP send buffer for the WHIP leg, the runtime's wmem_max (measured).
+    // why: lessons/workers-pub.md#sndbuf
     this.#pass = { PUB_WHIP_SNDBUF: String(NEXT_WHIP_SNDBUF) };
-    // ⚠️ A RESTARTED OBJECT HAS NO INACTIVITY TIMEOUT. The docs: "A Durable
-    // Object that restarts, for example after a deploy, starts without one",
-    // and without one "Cloudflare stops the container shortly after the
-    // Durable Object becomes inactive". So it is set again on every wake that
-    // finds the container up. Not awaited: no other route waits on it.
+    // A restarted object has no inactivity timeout, so set it again on every wake; not awaited.
+    // why: lessons/workers-pub.md#inactivity
     if (ctx.container?.running) ctx.container.setInactivityTimeout(NEXT_IDLE_MS).catch(() => { /* next wake */ });
   }
 
@@ -146,23 +90,17 @@ const pubOn = (Base, NEXT) => class extends Base {
   /** NEXT: how the container last exited, from monitor(), for /status. */
   #exit = null;
 
-  /**
-   * The one way to the container. Legacy: the base class starts it if needed
-   * and forwards. NEXT: start it if needed, wait until server.mjs answers,
-   * then forward on the TCP port. Either way a caller gets a Response or a
-   * throw, and every caller already treats a throw as "still waking".
-   */
+  // The one way to the container. Legacy forwards; NEXT starts it, waits for server.mjs, forwards.
+  // Callers treat a throw as still waking.
+  // why: lessons/workers-pub.md#c
   async #c(req) {
     if (!NEXT) return super.fetch(req);
     await this.#up();
     return this.ctx.container.getTcpPort(8080).fetch(req);
   }
 
-  /**
-   * NEXT: forward only to a container that is already up. A stop sent to a
-   * container that is gone has nothing to stop, and #c would START one to
-   * deliver it. Legacy: the same as #c, as before.
-   */
+  // NEXT: forward only to a running container; #c would start one just to stop it.
+  // why: lessons/workers-pub.md#c-if-up
   async #cIfUp(req) {
     if (NEXT && !this.ctx.container.running && !this.#booting) return null;
     return this.#c(req);
@@ -183,14 +121,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     return this.#booting;
   }
 
-  /**
-   * NEXT: `start()` "returns before the Container is ready to accept requests",
-   * so readiness is ours to poll. `/status` is the cheap route: it spawns
-   * nothing. MEASURED on the test bed the same day: ready about 0.83 s after
-   * start() on a warm host, about 10 s on the first start after an image push,
-   * during which a forward throws "The container is not listening in the TCP
-   * address 10.0.0.1:8080".
-   */
+  // NEXT: start() returns before the container listens, so poll /status (spawns nothing).
+  // Ready in about 0.83 s warm and about 10 s after an image push.
+  // why: lessons/workers-pub.md#boot
   async #boot() {
     const c = this.ctx.container;
     const t0 = Date.now();
@@ -216,11 +149,9 @@ const pubOn = (Base, NEXT) => class extends Base {
   }
 
   #idleTicks = 0;
-  /**
-   * 'stage', 'cam' or 'main'. ⚠️ TOLD, THEN REMEMBERED: the alarm fires with no
-   * request, and an object is not told its own name, so the entry worker stamps
-   * every request with x-pub-role and the object keeps the last one it saw.
-   */
+  // 'stage', 'cam' or 'main', told by the entry worker's x-pub-role header and remembered, since an
+  // alarm has no request and an object is not told its own name.
+  // why: lessons/workers-pub.md#role
   #role = null;
   async #getRole() {
     if (this.#role === null) {
@@ -230,10 +161,8 @@ const pubOn = (Base, NEXT) => class extends Base {
   }
   /** id -> resource URL of browser WHIP publishes */
   #whipRes = new Map();
-  /**
-   * Rate-limit stamps for the past hour, kept in storage so an eviction does
-   * not reset them: `whip` and `cam` are times, `ice` is { at, who }.
-   */
+  // Rate-limit stamps for the past hour, in storage so an eviction does not reset them.
+  // why: lessons/workers-pub.md#hits
   #hits = null;
   async #getHits(kind) {
     if (!this.#hits) {
@@ -252,14 +181,9 @@ const pubOn = (Base, NEXT) => class extends Base {
   #log = [];
   #hydrated = false;
 
-  /**
-   * Read the ring back after an eviction, once.
-   *
-   * ⚠️ LAZY, NOT IN THE CONSTRUCTOR. A DO constructor cannot await, and doing
-   * this in `blockConcurrencyWhile` would make every OTHER route on this
-   * object — the WebSocket upgrade, /status, /start — wait on a storage read
-   * they do not use. The log routes are the only ones that need it.
-   */
+  // Read the ring back after an eviction, lazily: the constructor cannot await, and other routes
+  // must not wait on a read they do not use.
+  // why: lessons/workers-pub.md#hydrate
   async #hydrate() {
     if (this.#hydrated) return;
     this.#hydrated = true;
@@ -268,15 +192,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     if (NEXT) await this.#adoptLegacyLog();
   }
 
-  /**
-   * NEXT: THE RING LIVED IN THE LEGACY `Pub` OBJECT'S STORAGE, and a new class
-   * is a new object with empty storage. So the first read of the ring on the
-   * main instance asks the legacy `p1` object for its lines, merges them by
-   * time with anything already here, and remembers that it did. No public
-   * import route: the copy happens inside this worker, object to object.
-   * ⚠️ The flag is written only after a copy that worked, so a failed one is
-   * tried again on the next read rather than leaving the old lines behind.
-   */
+  // NEXT: the first ring read on the main instance merges the legacy `p1` object's lines in, object
+  // to object; the flag is written only after a copy that worked.
+  // why: lessons/workers-pub.md#adopt
   async #adoptLegacyLog() {
     if ((await this.#getRole()) !== 'main' || !this.env.PUB) return;
     try {
@@ -293,13 +211,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     } catch { /* tried again on the next read */ }
   }
 
-  /**
-   * ⚠️ TRIMMED TO FIT, FROM THE FRONT. A DO storage value caps at 128 KiB and
-   * LOG_KEEP x LOG_MAX_BODY is 800 KB in the worst case — so a busy device
-   * could make every write throw, which would look exactly like the eviction
-   * bug this replaced. Drop the OLDEST lines until it fits; the newest report
-   * is the one somebody is waiting to read.
-   */
+  // Trimmed from the front: a DO value caps at 128 KiB and the ring can reach 800 KB. Keep the
+  // newest.
+  // why: lessons/workers-pub.md#persist
   async #persist() {
     let out = this.#log;
     while (out.length > 1 && JSON.stringify(out).length > 100000) out = out.slice(Math.ceil(out.length / 8));
@@ -316,7 +230,8 @@ const pubOn = (Base, NEXT) => class extends Base {
       try { await this.ctx.storage.put('role', told); } catch { /* re-told on the next request */ }
     }
 
-    // ── a viewer (/stage/watch only since 2026-10-13) ───────────────────────
+    // A viewer (/stage/watch only).
+    // why: lessons/workers-pub.md#watch
     if (url.pathname === '/watch') {
       if (request.headers.get('Upgrade') !== 'websocket') {
         return new Response('expected websocket', { status: 426 });
@@ -326,11 +241,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       this.ctx.acceptWebSocket(pair[1], ['watch']);   // hibernatable
       this.#idleTicks = 0;
       await this.#ensureAlarm();
-      // FIRE AND FORGET. Awaiting the publish here delayed the 101 by the
-      // container's cold start, so the viewer's own onopen did not fire until
-      // ffmpeg was already running — a connection blocking on a video encoder.
-      // The alarm sweep retries if this fails, so nothing is lost by not
-      // waiting for it.
+      // Fire and forget: awaiting the publish delayed the 101 by the container's cold start. The
+      // sweep retries.
+      // why: lessons/workers-pub.md#fire-forget
       if (this.viewers() === 1) this.#startPublish().catch(() => { /* sweep retries */ });
       try {
         pair[1].send(JSON.stringify({ t: 'hello', viewers: this.viewers() }));
@@ -338,20 +251,10 @@ const pubOn = (Base, NEXT) => class extends Base {
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
 
-    // ── the LL-HLS loopback's camera, onto its own input, on its own instance ─
-    //
-    // /video/llhls/ records its canvas with MediaRecorder and sends each
-    // chunk to /loop, which arrives here as /cam; this object POSTs them, in
-    // order, into its container's camera leg, which rewraps them to RTMPS on the
-    // loopback's OWN input (LOOP_STREAM_KEY). Only the `loop` instance answers
-    // this since 2026-10-13, when /cam/'s own RTMPS route was retired.
-    // plans/plan-cam-llhls.md is the design.
-    //
-    // 🔴 REFUSED IN BAND, NOT WITH A STATUS. A browser cannot read the HTTP
-    // status of a refused WebSocket upgrade, so a 409 there reaches the page as
-    // a bare close with no reason. The socket is accepted, told
-    // `{t:'busy', status: 409, error}` and closed with 4409, and the page can
-    // say why in words. A plain GET answers the same question with a real 409.
+    // The LL-HLS loopback camera: MediaRecorder chunks POSTed in order to the container, rewrapped
+    // to RTMPS on LOOP_STREAM_KEY. A refusal is in band (`{t:'busy'}`, close 4409): a browser
+    // cannot read a refused upgrade's status. plans/plan-cam-llhls.md.
+    // why: lessons/workers-pub.md#loop-cam
     const role = await this.#getRole();
     if (url.pathname === '/cam' && role === LOOP) {
       const busy = this.#camBusy();
@@ -400,10 +303,9 @@ const pubOn = (Base, NEXT) => class extends Base {
 
     if (url.pathname === '/status') {
       let container = null;
-      // NEXT: a status read does not START a container nobody is watching.
-      // The legacy base class did (any forward starts it), so a polling page
-      // kept a 3 GiB box up for sleepAfter with nothing in it. The shape is
-      // the one server.mjs answers with when idle, so a reader cannot tell.
+      // NEXT: a status read does not start a container; it answers with the idle shape server.mjs
+      // uses.
+      // why: lessons/workers-pub.md#status-idle
       if (NEXT && !this.ctx.container.running && !this.#booting) {
         container = { publishing: false, running: false, whip: { publishing: false }, cam: { publishing: false }, exit: this.#exit };
       } else {
@@ -424,20 +326,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       });
     }
 
-    // ── a device reporting what it actually saw ────────────────────────────
-    // A phone cannot be attached to a debugger from here, and the numbers that
-    // matter (buffer length, hole seeks) are only observable on the device. So
-    // the page posts them and this holds a ring buffer. Diagnostic only: no
-    // secrets, capped hard.
-    //
-    // 🔴 IT USED TO SAY "dropped when the DO goes away", AND THAT MADE THE
-    // WHOLE ENDPOINT A TRAP. MEASURED 2026-09-12: a line POSTed at 02:07:46
-    // read back immediately and was GONE by 02:08:32 — the DO had evicted and
-    // an in-memory array went with it. CLAUDE.md advertises this URL as the way
-    // to get a report off a phone or a headset, so the failure mode was: the
-    // device ships correctly, the reader sees "(nothing reported)", and the
-    // obvious conclusion is that the device never sent anything. Somebody then
-    // debugs the device. The ring is persisted now.
+    // A device posts what it saw (buffers, hole seeks) to a capped ring, persisted so an eviction
+    // cannot drop a report and make the device look silent. Diagnostic only, no secrets.
+    // why: lessons/workers-pub.md#log
     if (url.pathname === '/log' && request.method === 'POST') {
       const body = (await request.text()).slice(0, LOG_MAX_BODY);
       const ua = request.headers.get('user-agent') || '';
@@ -488,28 +379,10 @@ const pubOn = (Base, NEXT) => class extends Base {
       return json({ ok: true });
     }
 
-    // ── relay addresses for a network that drops UDP ──────────────────────
-    //
-    // 🔴 WHY THIS EXISTS, MEASURED 2026-09-30 ON A PHONE HOTSPOT. Stream's
-    // WHIP and WHEP answers are `a=ice-lite` with ONE candidate, UDP, and
-    // nothing over TCP. A TCP candidate munged into a real answer at the same
-    // address, and at 443, was applied by Chrome and ICE still failed, so
-    // Stream does not speak ICE-TCP. On a network that drops outbound UDP the
-    // handshake answers 201 and not one packet of media arrives.
-    // Cloudflare Realtime TURN over TLS on 443 is the way round: the browser
-    // reaches the relay over TCP and the relay reaches Stream over UDP from
-    // inside Cloudflare, and that leg is not billed.
-    //
-    // The TURN KEY must never reach a page, because it mints credentials
-    // without limit. It stays in two worker secrets and this route hands out
-    // short lived ICE servers minted from it:
-    //   TURN_KEY_ID          the key's id
-    //   TURN_KEY_API_TOKEN   the key's bearer token
-    // Absent, it answers 503 in words and a page carries on without a relay.
-    //
-    // ⚠️ RATE LIMITED LIKE /whip, IN THIS OBJECT, because a DO is the only place
-    // two requests cannot both pass a check. Per address AND overall: a bare
-    // overall cap lets one caller spend everybody's hour.
+    // Short-lived TURN credentials: Stream's WHIP/WHEP is ICE-lite UDP only, so a UDP-dropping
+    // network needs TURN over TLS on 443. TURN_KEY_ID and TURN_KEY_API_TOKEN never reach a page;
+    // 503 without them. Rate limited per address and overall, in this object.
+    // why: lessons/workers-pub.md#ice
     if (url.pathname === '/ice' && (request.method === 'GET' || request.method === 'HEAD')) {
       const keyId = this.env.TURN_KEY_ID, token = this.env.TURN_KEY_API_TOKEN;
       if (!keyId || !token) {
@@ -553,22 +426,10 @@ const pubOn = (Base, NEXT) => class extends Base {
       });
     }
 
-    // ── a browser publishes, and never sees the key ───────────────────────
-    //
-    // WHY THIS EXISTS. A browser can publish WHIP perfectly well —
-    // `rig/whep/publish.html` has done it from a canvas for months. What it
-    // cannot do is HOLD THE CREDENTIAL: Cloudflare's WHIP publish URL carries
-    // the stream key in its path, and a public page cannot keep a secret. That
-    // is the ONLY reason the ffmpeg container was in this path at all.
-    //
-    // WHIP to Cloudflare is single-shot SDP with no trickle (measured, see
-    // rig/whep/publish.html), so this is one POST of an offer and one answer.
-    // Media then flows browser <-> Cloudflare directly over ICE/DTLS/SRTP and
-    // NEVER crosses this worker. A worker cannot carry media and does not have
-    // to; it carries thirty lines of signalling.
-    //
-    // ONLY THE CAMERA INSTANCE SINCE 2026-10-13. The test pattern's /whip (on
-    // WHIP_URL, the input whep-rig) is retired with that input.
+    // A browser publishes WHIP without the key, which sits in the URL path: one offer, one answer
+    // (no
+    // trickle), and media goes browser to Cloudflare directly. The camera instance only.
+    // why: lessons/workers-pub.md#whip
     if (url.pathname === '/whip' && request.method === 'POST') {
       if ((await this.#getRole()) !== CAM) return json({ error: 'retired 2026-10-13' }, 410);
       const whip = this.env.CAM_WHIP_URL;
@@ -607,10 +468,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       }
       if (!up.ok) return json({ error: `whip upstream ${up.status}`, detail: (await up.text()).slice(0, 200) }, 502);
 
-      // THE `Location` IS ITSELF A CREDENTIAL on Cloudflare — it addresses this
-      // session under the same secret path. Handing it back would leak exactly
-      // what this endpoint exists to hide, so it is kept here behind an opaque
-      // id and DELETE is proxied.
+      // The WHIP `Location` is itself a credential, so it stays here behind an opaque id; DELETE is
+      // proxied.
+      // why: lessons/workers-pub.md#location
       const loc = up.headers.get('location');
       const id = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
       this.#whipRes = this.#whipRes || new Map();
@@ -641,24 +501,8 @@ const pubOn = (Base, NEXT) => class extends Base {
       if (rec.url) { try { await fetch(rec.url, { method: 'DELETE' }); } catch { /* gone */ } }
       return json({ ok: true }, 200);
     }
-    /**
-     * 🔴 THE PREFLIGHT HAS TO COVER `/whip/<id>` AND NOT ONLY `/whip`, AND IT
-     * DID NOT, SO THE SESSION TEARDOWN HAS NEVER WORKED FROM A BROWSER ON
-     * ANOTHER ORIGIN. MEASURED 2026-09-25 from `http://127.0.0.1:8890`:
-     *
-     *   Access to fetch at 'https://pub.positron.studio/whip/67b6344…' has been
-     *   blocked by CORS policy: Response to preflight request doesn't pass
-     *   access control check: It does not have HTTP ok status.
-     *
-     * `DELETE` is not a simple method, so a cross-origin one preflights, and
-     * the OPTIONS for the SESSION path fell through to the 404 below. The POST
-     * that opens a session was fine, because its path is exactly `/whip`.
-     * ⚠️ **IT SURVIVED BECAUSE THE PATH WAS NEVER DRIVEN.** `/stage/` defaulted
-     * to an in-page loopback, so the real publish and its teardown only ran
-     * behind a query parameter nobody's harness passed. Removing that default
-     * on 2026-09-25 ran this line for the first time and it failed immediately.
-     * **A route with no caller is a route with no evidence.**
-     */
+    // The preflight covers `/whip/<id>`, since a cross-origin DELETE preflights.
+    // why: lessons/workers-pub.md#preflight
     if (url.pathname.startsWith('/whip') && request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: {
         ...OPEN,
@@ -671,27 +515,17 @@ const pubOn = (Base, NEXT) => class extends Base {
     return json({ error: 'not a route on this instance' }, 404);
   }
 
-  /**
-   * 🔴 ONLY `watch` SOCKETS ARE VIEWERS. This was every socket the object
-   * held, so a camera socket would have counted as somebody watching and
-   * started both test pattern encodes (plans/plan-cam-llhls.md section 1).
-   * ⚠️ WRITTEN AS "ALL BUT THE CAMERA ONES", not as `getWebSockets('watch')`,
-   * because a viewer socket accepted before tags existed is restored untagged
-   * after a deploy, and it is still somebody watching.
-   */
-  /** A camera session's input: the loopback's, the only role that takes one. */
+  // Only `watch` sockets are viewers, written as all but camera sockets because an untagged viewer
+  // restored after a deploy is still watching. A camera session's input is the loopback's.
+  // why: lessons/workers-pub.md#viewers
   #camKey() { return this.#role === LOOP ? this.env.LOOP_STREAM_KEY : null; }
   #camMax() { return LOOP_MAX_MS; }
 
   async #loopPut(k, v) { try { await this.ctx.storage.put(k, v); } catch { /* the cron is the floor */ } }
   async #loopGet(k, d) { try { return (await this.ctx.storage.get(k)) ?? d; } catch { return d; } }
 
-  /**
-   * 🔴 A TAKE IS REFUSED WHEN THE ACCOUNT IS NEAR ITS CAP, so even a cleanup
-   * that failed every time cannot fill the 1000 minutes during a demo. And
-   * refused when the storage cannot be read, for the same reason: a take
-   * nobody can account for is the one this guard exists to stop.
-   */
+  // Refuse a take near the account cap, or when storage cannot be read.
+  // why: lessons/workers-pub.md#loop-guard
   async #loopGuard() {
     if (!loopReady(this.env)) return { error: 'the loopback input is not provisioned: the owner runs src/provision-loop.sh', status: 503 };
     let s;
@@ -704,12 +538,8 @@ const pubOn = (Base, NEXT) => class extends Base {
     return null;
   }
 
-  /**
-   * A take ended, however it ended (the page's stop, a closed tab, the idle
-   * check, the cap). Its clean is queued in STORAGE with the uid read off the
-   * lifecycle while it ran, and the alarm comes back LOOP_CLEAN_MS later. No
-   * page is involved from here on.
-   */
+  // A take ended, however: its clean is queued in storage with its uid; the alarm runs it later.
+  // why: lessons/workers-pub.md#loop-ended
   async #loopEnded(sid) {
     if ((await this.#getRole()) !== LOOP) return;
     const take = await this.#loopGet('loopTake', null);
@@ -838,10 +668,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     return this.#cam;
   }
 
-  /**
-   * End the camera session: tell the page why, close its socket, stop the
-   * container's leg. Every one of the three stops arrives here.
-   */
+  // End the camera session: tell the page why, close its socket, stop the leg. All three stops land
+  // here.
+  // why: lessons/workers-pub.md#end-cam
   async #endCam(t, why) {
     const c = this.#camState();
     this.#cam = null;
@@ -866,7 +695,8 @@ const pubOn = (Base, NEXT) => class extends Base {
 
   async #startPublish() {
     if ((await this.#getRole()) === STAGE) {
-      // ONE LEG AND NO ENCODE: the pre-transcoded film copied onto WHIP.
+      // One leg and no encode: the pre-transcoded film copied onto WHIP.
+      // why: lessons/workers-pub.md#stage-whip
       const url = this.env.STAGE_WHIP_URL;
       if (!url) return;
       try {
@@ -891,10 +721,8 @@ const pubOn = (Base, NEXT) => class extends Base {
   }
 
   async alarm() {
-    // The camera instance has one job here: the camera's two stops that need
-    // a clock, a socket that went quiet without closing and the length cap,
-    // checked every CAM_TICK_MS while a camera is live. It never runs the
-    // viewer sweep below, which is about the test pattern.
+    // The camera instance's alarm: a quiet socket and the length cap, every CAM_TICK_MS while live.
+    // why: lessons/workers-pub.md#cam-alarm
     if ((await this.#getRole()) === LOOP) return this.#loopAlarm();
     // The camera instance holds no sockets since /cam was retired, so an
     // alarm left over from then only retires a container that is still up.
@@ -902,12 +730,10 @@ const pubOn = (Base, NEXT) => class extends Base {
     const n = this.viewers();
     if (n > 0) {
       this.#idleTicks = 0;
-      // touching the container both checks health and renews its activity
-      // timeout, so sleepAfter cannot pull the stream out from under a viewer.
-      // NEXT: there is no request idleness to renew. What stops a container
-      // there is the object going inactive for NEXT_IDLE_MS, and this alarm
-      // wakes it every SWEEP_MS; the timeout is set again anyway, because a
-      // wake after an eviction starts without one.
+      // Touching the container checks health and renews its activity timeout. NEXT: the alarm wakes
+      // the
+      // object every SWEEP_MS and sets the timeout again.
+      // why: lessons/workers-pub.md#renew
       if (NEXT && this.ctx.container.running) {
         try { await this.ctx.container.setInactivityTimeout(NEXT_IDLE_MS); } catch { /* the constructor set it */ }
       }
@@ -928,9 +754,8 @@ const pubOn = (Base, NEXT) => class extends Base {
       await this.ctx.storage.setAlarm(Date.now() + SWEEP_MS);
       return;
     }
-    // NEXT: ONE MORE TICK, THEN THE CONTAINER IS DESTROYED. The publish is
-    // stopped first and the box goes a sweep later, so ffmpeg has a whole
-    // SWEEP_MS to close RTMPS cleanly before its container is taken away.
+    // NEXT: stop the publish, then destroy the box a sweep later so ffmpeg closes RTMPS cleanly.
+    // why: lessons/workers-pub.md#grace
     if (NEXT && this.#idleTicks > GRACE_TICKS) {
       await this.#retire();
       await this.ctx.storage.deleteAlarm();
@@ -946,25 +771,9 @@ const pubOn = (Base, NEXT) => class extends Base {
     this.#idleTicks = 0;
   }
 
-  /**
-   * NEXT: destroy the container once nothing needs it.
-   *
-   * 🔴 THE INACTIVITY TIMEOUT DOES NOT RUN WHILE monitor() IS PENDING, AND
-   * monitor() IS PENDING FOR THE CONTAINER'S WHOLE LIFE. MEASURED on the test
-   * bed 2026-10-07: with monitor() held, the object never left memory (one
-   * constructor run in 5.5 minutes) and its container was STILL RUNNING 102 s
-   * after the last alarm, against a 60 s timeout; without monitor() the object
-   * hibernated between every sweep (13 constructor runs) and the container was
-   * gone by the same check. The docs agree: a pending monitor() "prevents
-   * eviction for up to 15 minutes", and the timeout counts from eviction. So
-   * leaving it to the timeout would keep a 3 GiB box up for up to 25 minutes
-   * after the last viewer, where the legacy class's sleepAfter took 10. The
-   * sweep decides instead, as it always did; the timeout stays as the floor
-   * for a sweep that stopped.
-   * ⚠️ AND IT COSTS A VIEWER LITTLE: the publish was already stopped at the end
-   * of the grace, so a returning viewer waits on Stream either way, and a fresh
-   * start was MEASURED at about 0.83 s to listening on the test bed.
-   */
+  // NEXT: the sweep destroys the container, since a pending monitor() blocks the inactivity timeout
+  // for the container's life (a 3 GiB box up 25 minutes). A fresh start is about 0.83 s.
+  // why: lessons/workers-pub.md#retire
   async #retire() {
     if (!NEXT || !this.ctx.container.running) return;
     try { await this.ctx.container.destroy(); } catch { /* destroy may reject with the exit */ }
@@ -995,18 +804,14 @@ const pubOn = (Base, NEXT) => class extends Base {
   }
   async webSocketError(ws) { return this.webSocketClose(ws); }
 
-  /**
-   * A camera's messages. Text is control, binary is one MediaRecorder chunk.
-   * 🔴 THE CHUNKS GO THROUGH ONE PROMISE CHAIN. A DO's input gate does not
-   * cover a non-storage await, so two chunks a few ms apart would otherwise
-   * race each other into ffmpeg's stdin out of order, and a WebM stream with
-   * two clusters swapped is a broken stream.
-   */
+  // Text is control, binary is one MediaRecorder chunk, chained through one promise: the input gate
+  // does not cover a non-storage await, and two swapped WebM clusters break the stream.
+  // why: lessons/workers-pub.md#ws-message
   async webSocketMessage(ws, msg) {
     const a = ws.deserializeAttachment?.() || {};
     if (a.role !== 'cam') return;
-    // 🔴 THE ROLE DECIDES THE INPUT (#camKey), and a woken object has
-    // forgotten it: read it back before anything here can need it.
+    // The role decides the input, and a woken object has forgotten it: read it first.
+    // why: lessons/workers-pub.md#role-first
     await this.#getRole();
     const c = this.#camState();
     if (!c || c.sid !== a.sid) return;
@@ -1015,17 +820,10 @@ const pubOn = (Base, NEXT) => class extends Base {
       try { m = JSON.parse(msg); } catch { return; }
       if (m.t !== 'open' || c.open) return;
       try {
-        // ⚠️ A 503 HERE IS THE PLATFORM, NOT FFMPEG. MEASURED 2026-09-30 right
-        // after a deploy: `There is no Container instance available at this
-        // time`, and the same instance up 30 s later. So a 503 is asked again,
-        // four times 3 s apart, while the page is still there to want it.
-        // ⚠️ LEGACY ONLY IN PRACTICE. That 503 is written by the
-        // @cloudflare/containers forward, and server.mjs never answers 503 on
-        // /cam/open. On PubNext #c waits until the server answers before it
-        // forwards, and a container that is not listening THROWS ("The
-        // container is not listening in the TCP address 10.0.0.1:8080",
-        // MEASURED on the test bed) rather than answering 503, so there the
-        // loop runs once. Kept because Pub still runs this same body.
+        // A 503 here is the platform with no instance yet: retried four times 3 s apart. Legacy
+        // only in
+        // practice; on PubNext a container not listening throws instead.
+        // why: lessons/workers-pub.md#retry-503
         let r = null;
         for (let i = 0; i < 5; i++) {
           r = await this.#c(new Request('http://c/cam/open', {
@@ -1039,11 +837,9 @@ const pubOn = (Base, NEXT) => class extends Base {
       } catch (e) {
         return this.#endCam('stopped', `the publisher did not start: ${String(e.message || e).slice(0, 80)}`);
       }
-      // 🔴 ENDED WHILE THE CONTAINER WOKE. The page closed during a cold start
-      // (3.7 to 16 s), its close POSTed /cam/stop to a container that had no
-      // session yet, and the open went ahead anyway: an ffmpeg on the input
-      // with nobody sending to it. Stop it by sid now rather than leave it to
-      // the container's 5 s watchdog.
+      // Ended while the container woke: stop the orphan ffmpeg by sid now, not after its 5 s
+      // watchdog.
+      // why: lessons/workers-pub.md#ended-waking
       if (this.#cam !== c) {
         try {
           await this.#cIfUp(new Request('http://c/cam/stop', {
@@ -1095,12 +891,8 @@ async function shortHash(v) {
 }
 
 
-/**
- * Which runtime answers. `PUB_RT` in wrangler.jsonc is the default, and
- * `?rt=next` or `?rt=legacy` on any request overrides it, so either class can
- * be driven live without moving anybody's viewers. The three instance names
- * are the same on both.
- */
+// Which runtime answers: `PUB_RT` by default, `?rt=next` or `?rt=legacy` per request.
+// why: lessons/workers-pub.md#ns
 const ns = (env, url) => {
   const rt = url.searchParams.get('rt') || env.PUB_RT || 'legacy';
   return rt === 'next' && env.PUB_NEXT ? env.PUB_NEXT : env.PUB;
@@ -1165,14 +957,9 @@ export default {
     return getContainer(ns(env, url), NAME).fetch(req);
   },
 
-  /**
-   * THE LOOPBACK'S CRON, every 10 minutes (wrangler.jsonc): delete anything on
-   * the loopback input older than five minutes, whatever happened to the
-   * per-take clean. Run inside the loopback's object so the last sweep is
-   * readable at /loop/status, and logged for the dashboard.
-   * ⚠️ IT REACHES THE OBJECT ON THE NEW RUNTIME, as /loop does, and only the
-   * loop role's /sweep, which starts no container.
-   */
+  // The loopback cron (every 10 minutes): delete anything on its input older than five minutes,
+  // inside the loop object on the new runtime, which starts no container.
+  // why: lessons/workers-pub.md#scheduled
   async scheduled(_event, env, ctx) {
     const url = new URL('https://pub.positron.studio/sweep');
     const req = new Request(url, { method: 'POST', headers: { 'x-pub-role': LOOP, 'x-pub-cron': '1' } });

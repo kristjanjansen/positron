@@ -1,21 +1,12 @@
 #!/bin/sh
-# RETIRED 2026-10-13. The input this made (positron-cam, 157863305ec9...) was
-# deleted from Stream that day, the CAM_STREAM_KEY secret with it, and pub's
-# /cam route answers 410, so a new input would have nothing to publish to it.
-# Kept as the record of how it was made. It refuses to run unless
-# PROVISION_RETIRED=1 is set, so nobody recreates an input (and a recording on
-# the account's 1000 minute cap) by accident. The camera's LL-HLS publish lives
-# on as /video/ll-hls-loopback/'s loopback, on its own input: src/provision-loop.sh.
+# Retired: its input and CAM_STREAM_KEY are deleted and /cam answers 410. Kept as a record; runs
+# only
+# with PROVISION_RETIRED=1, so nobody makes a recording input by accident.
+# why: lessons/src.md#cam-retired
 [ "$PROVISION_RETIRED" = 1 ] || { echo "src/provision-cam.sh is retired (2026-10-13): see its header" >&2; exit 1; }
-# One RTMPS live input for /cam/'s own container, and its stream key stored as
-# the CAM_STREAM_KEY secret on positron-pub. Run 2026-09-30 on the owner's
-# explicit instruction; created input 157863305ec9583187dfbb1c66c031ea.
-# preferLowLatency and recording automatic, as src/provision.sh makes the
-# /llhls/ input: Stream serves LL-HLS from an RTMPS input only with both, and
-# recording cannot be turned off there, so every camera session is a recording
-# against the account's 1000 minute cap.
-# Prints the input UID, which is public (it is in every HLS play URL) and goes
-# into the code. Requires CF_API_TOKEN and CF_ACCOUNT_ID in ../.env.
+# One RTMPS input for the camera, key stored as CAM_STREAM_KEY. preferLowLatency and recording
+# automatic (LL-HLS needs both), so every session records against the 1000-minute cap.
+# why: lessons/src.md#cam
 set -e
 cd "$(dirname "$0")"
 . ../.env

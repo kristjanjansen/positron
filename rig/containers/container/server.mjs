@@ -1,16 +1,7 @@
 #!/usr/bin/env node
-// ============================================================================
-// CF Containers test workload — the repackage job (proto/selfrec/repackage.mjs)
-// transplanted into a container, MINUS the upload leg (writes nothing back to
-// R2 — keep the bucket clean). Endpoints:
-//   GET /health  -> boot time, uptime, cpu/mem/ffmpeg info (cold-start probe)
-//   GET /run     -> pulls the kept proof show's two participants from the R2
-//                   public URL, concats each, runs copy-remux on p1 (h264) and
-//                   transcode (-bf 0 law) on p2 (vp8), reports wall times.
-//   GET /sysinfo -> /proc details (what silicon did we land on)
-// Local parity: same ffmpeg args as repackage.mjs; sequential chunk download
-// (same as engine) so downloadMs is comparable.
-// ============================================================================
+// Containers test workload: the repackage job without its upload leg (writes nothing to R2).
+// GET /health (cold-start probe), /run (download, remux p1, transcode p2, wall times), /sysinfo.
+// why: lessons/rig-containers.md#legacy-server-header
 import http from "http";
 import fs from "fs";
 import os from "os";

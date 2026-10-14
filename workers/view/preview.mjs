@@ -1,26 +1,7 @@
-// workers/view/preview.mjs — build and upload a VERSION, without deploying it.
-//
-//   node workers/view/preview.mjs            alias from the current git branch
-//   node workers/view/preview.mjs staging    alias given by hand
-//
-// 🔴 WHAT THIS IS FOR, AND IT IS NOT "being careful". It answers one question
-// `deploy.mjs` cannot: *is what I am about to ship good, without shipping it
-// over somebody else's tree*. With two or three agents in one checkout,
-// `public/` is a shared mutable global and a deploy takes whatever is in
-// `demo/` at that instant. A version upload puts the same bytes on a URL
-// nobody's visitors are on, so the tree can be graded before production moves.
-//
-// ⚠️ IT DOES NOT TOUCH THE CUSTOM DOMAIN. `versions upload` publishes a version
-// and does not point any route at it; `wrangler deploy` is still what moves
-// positron.studio. That is the whole distinction and it is why this file exists
-// beside `deploy.mjs` rather than as a flag on it.
-//
-// ⚠️ THE ALIAS IS SET AT UPLOAD AND CANNOT BE CHANGED AFTERWARDS. Cloudflare
-// keeps the 1000 most recent versions.
-//
-// ⚠️ AND IT RUNS THE SAME BUILD AND THE SAME INTERLOCK AS A DEPLOY. A preview
-// built from a different tree than the one that gets deployed is a preview that
-// grades nothing, which is the failure `deploy.mjs`'s header is about.
+// node workers/view/preview.mjs [alias]: build and upload a version without moving positron.studio,
+// so a tree can be graded first. Same build and interlock as a deploy; the alias is set at upload
+// and cannot change, and Cloudflare keeps the 1000 most recent versions.
+// why: lessons/workers-view.md#preview
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -77,8 +58,8 @@ if (moved.length) {
 }
 console.log(`\nfingerprinted ${built.size} files · stamp ${stamp} · alias ${alias}`);
 
-// ⚠️ `.env` IN THE CWD SHADOWS MACHINE OAUTH (CLAUDE.md), and the documented
-// fix is to unset the two variables rather than to require a directory.
+// Unset the two token variables: a `.env` in the cwd shadows machine OAuth.
+// why: lessons/workers-view.md#env
 const env = { ...process.env };
 delete env.CF_API_TOKEN;
 delete env.CLOUDFLARE_API_TOKEN;

@@ -1,27 +1,8 @@
 #!/bin/sh
-# One RTMPS live input DEDICATED to /video/webrtc-loopback/'s LL-HLS loopback,
-# "positron-hls-loopback", and its stream key stored as LOOP_STREAM_KEY on
-# positron-pub. Run 2026-10-12, asked for through the session: *"A live input
-# DEDICATED to this loopback (its own id, its own name like
-# positron-hls-loopback), so a sweep can delete everything on it without
-# touching any other input or recording."*
-#
-# preferLowLatency and recording automatic, as src/provision-cam.sh: Stream
-# serves LL-HLS from an RTMPS input only with both, and recording cannot be
-# turned off there. So every take is a recording against the account's 1000
-# minute cap, and positron-pub deletes it (per take about 90 s after it ends,
-# and a cron every 10 minutes for anything older than 5).
-# timeoutSeconds 0: the recording closes the moment the publisher goes, which
-# is the earliest its video can be deleted.
-# deleteRecordingAfterDays 30, the platform's minimum: the last net under the
-# two above, never the plan.
-#
-# Also stores the Stream API token and the account id the worker deletes with
-# (STREAM_TOKEN, ACCOUNT_ID), the same pair positron-sweep holds.
-# Prints the input UID, which is public (it is in every HLS play URL) and goes
-# into the code. Requires CF_API_TOKEN and CF_ACCOUNT_ID in ../.env.
-# ⚠️ wrangler 4.148 (rig/containers-next): the npx one in this checkout cannot
-# read positron-pub's `durable_object` container entry.
+# A dedicated RTMPS input for the LL-HLS loopback; stores LOOP_STREAM_KEY, STREAM_TOKEN, ACCOUNT_ID
+# on positron-pub, which deletes every take. timeoutSeconds 0 closes a recording at once; the
+# 30-day deletion is a net. Needs wrangler 4.148 (rig/containers-next).
+# why: lessons/src.md#loop
 set -e
 cd "$(dirname "$0")"
 . ../.env

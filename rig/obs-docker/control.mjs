@@ -1,11 +1,6 @@
-// obs-websocket v5 client + generic CLI. Zero deps: node's built-in WebSocket
-// (undici) + node:crypto for the Hello/Identify auth handshake.
-//
-//   node control.mjs call GetVersion
-//   node control.mjs call SetCurrentProgramScene '{"sceneName":"A"}'
-//   node control.mjs rtt            # per-command RTT table, ~50 calls each
-//
-// Env: OBS_WS_URL (default ws://127.0.0.1:4455), OBS_WS_PASSWORD (default obsdock)
+// obs-websocket v5 client, zero deps: node control.mjs call <Request> ['<json>'] | rtt
+// Env: OBS_WS_URL (ws://127.0.0.1:4455), OBS_WS_PASSWORD (obsdock).
+// why: lessons/rig-obs.md#obs-control
 import crypto from "node:crypto";
 
 const now = () => performance.timeOrigin + performance.now();

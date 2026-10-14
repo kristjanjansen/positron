@@ -1,40 +1,8 @@
 #!/usr/bin/env node
-// demo/read-log.mjs — what a page SAID, where a session can read it.
-//
-// 🔴 THE POINT OF IT, AND IT IS `read-tap.mjs` ONE STEP ALONG. Asked for
-// 2026-09-21: *"build a way to get the logs and debug (like you did with
-// tap)"*. Every demo page has a log and every log line is on somebody's screen,
-// which is somewhere a session cannot look. An afternoon of this project was
-// spent with the person at the desk taking a screenshot of a log so that I
-// could read it back, one question at a time, which is exactly the round trip
-// `/_tap` was built to stop for MIDI.
-//
-//   node demo/server.mjs               # must be running; every page posts to it
-//   node demo/read-log.mjs             # the last run of every page
-//   node demo/read-log.mjs wish        # only pages whose url matches
-//   node demo/read-log.mjs --all       # every run, not just the last
-//   node demo/read-log.mjs --bad       # only the lines a page marked bad
-//   node demo/read-log.mjs --follow    # keep printing as they arrive
-//   node demo/read-log.mjs --clear     # start a fresh capture
-//
-// 🔴 AND FOR A PAGE THAT IS NOT ON THIS MACHINE, THE WORKER ALREADY EXISTS.
-// Open the page with `?logs=1` and read it back with
-//
-//   curl -s 'https://pub.positron.studio/logs?format=text'
-//
-// which is how a phone, a headset or `https://positron.studio/...` is read at
-// all. `shell.mjs` sends to both, and the Worker half is behind that flag on
-// purpose: a deployed page shipping every visitor's log by default would be a
-// page opening something on load.
-//
-// 🔴 IT READS A FILE THE DEV SERVER WROTE, AND NOTHING DEPLOYED CAN WRITE IT.
-// `shell.mjs` only posts when the page is on localhost, and there is no `/_log`
-// route in `workers/view/src/index.js`. Two guards, in that order, so a
-// visitor's browser never makes the request rather than making one that 404s.
-//
-// ⚠️ A PAGE WITH NOTHING LISTENING BEHAVES IDENTICALLY. The post is batched,
-// `keepalive`, and its failure is swallowed. A debugging aid that changes what
-// it is watching is worse than none.
+// node demo/read-log.mjs [match] [--all|--bad|--follow|--clear]: logs pages posted to /_log on the
+// dev server (localhost only). Off this machine, open the page with ?logs=1 and read
+// https://pub.positron.studio/logs?format=text.
+// why: lessons/harness.md#read-log
 
 import { readFileSync, writeFileSync, existsSync, watchFile } from 'node:fs';
 
@@ -64,13 +32,9 @@ function batches() {
   return out;
 }
 
-/**
- * 🔴 A RUN IS A PAGE PLUS A BUILD PLUS A RESTART OF ITS CLOCK, and the clock is
- * what finds a reload: `performance.now()` starts again at zero, so a line
- * whose time is EARLIER than the one before it on the same page is a new run.
- * Without this, five reloads of `/wish/` read as one run with the times going
- * backwards, which is the most confusing possible shape for a log.
- */
+// A run is a page plus a build plus a restart of its clock: a time earlier than the last is a
+// reload.
+// why: lessons/harness.md#runs
 function runs(list) {
   const out = [];
   let cur = null;

@@ -1,29 +1,7 @@
-// rig/board/inputs.mjs — hardware audio inputs, each streamed into a room of its own.
-//
-// Asked 2026-09-30: *"can we support both yoshimi and circuit? current setup
-// does not scale"*. Until then the board had ONE audio slot and ONE room, so
-// starting Yoshimi took the Circuit off the air and the other way round. The
-// single slot was right about one thing and it stays right: two sources
-// interleaved into ONE socket is corruption (board.mjs `startAudio` records
-// the 5,495 dropped frames). What this file changes is the unit. An input is
-// not a source in the instrument slot, it is a stream of its own, on a socket
-// of its own, in a room of its own: `<room>-<name>`, the same shape the video
-// already uses with `<room>-video`.
-//
-// 🔴 A PAGE ASKS FOR A NAME, NEVER A DEVICE. What `circuit` means on this
-// board is configuration (`BOARD_INPUTS` in /etc/default/positron-board), so
-// nothing that arrives over the relay can make this process open an arbitrary
-// ALSA device.
-//
-// 🔴 AN INPUT RUNS ONLY WHILE SOMEBODY IS ASKING FOR IT. The board cannot see a
-// listener: the relay forwards frames verbatim and never says who is there. So
-// a listening page renews a lease with `input.want`, and the capture stops
-// `LEASE_MS` after the last renewal. Streaming 50 frames a second into an empty
-// room all day costs relay time for nothing.
-//
-// ⚠️ THE ROOM IS JOINED FOR GOOD, THE DEVICE IS NOT. The socket stays open and
-// says `board.alive` every beat, so a page's presence badge reads `online`
-// before anything is playing; only `arecord` comes and goes with the lease.
+// Hardware audio inputs, each its own stream in its own room `<room>-<name>` (two sources on one
+// socket corrupt both). A page asks for a name, configured in BOARD_INPUTS, never a device. The
+// room is joined for good; the capture runs only under a lease renewed by `input.want`.
+// why: lessons/rig-board.md#inputs-header
 
 import { CIRCUIT_CC } from '../../demo/shell/circuit-cc.mjs';
 import { kindOf } from '../../demo/shell/midi-kinds.mjs';
@@ -33,43 +11,17 @@ import { constants as FS } from 'node:fs';
 
 export const LEASE_MS = 60_000;
 
-/**
- * 🔴 THE SYNTH CONTROLLERS, READ FROM THE ONE TABLE `/shape/` SENDS FROM, AND
- * ONLY ITS `1/2` ROWS. Asked 2026-09-30: *"make it work with pi circuit"*, so
- * the gate below widened from note on, note off and CC 123 to those plus the
- * 52 control changes Novation's Programmer's Reference documents for Synth 1
- * and Synth 2. Imported rather than copied, because a second list is a second
- * list that disagrees; `setup.sh` already carries every `../../demo/shell`
- * import onto the board.
- * 📄 READ, NOT MEASURED, AND THE SOURCE IS `plans/plan-circuit-patches.md` §5
- * and its list of what destroys work: the Circuit's whole published SysEx
- * surface is three messages and only `Replace Patch` writes flash; a program
- * change and a `Replace Current Patch` replace the sound in RAM; a control
- * change is on neither list. What it changes is the patch a synth is holding,
- * which reloading the session puts back.
- * ⚠️ AND THE DRUM AND SESSION ROWS STAY OUT ON PURPOSE. CC 8, 18, 44 and 50 on
- * channel 10 are `drum N patch select`, and channel 16 holds the session's
- * levels; neither was asked for, and a gate that grows with the table's other
- * rows grows by accident.
- */
+// The synth controllers from the table /shape/ sends from, its channel 1/2 rows only: a control
+// change
+// replaces nothing stored. Drum and session rows stay out.
+// why: lessons/rig-board.md#synth-cc
 export const SYNTH_CC = new Set(CIRCUIT_CC.filter((p) => p.ch === '1/2').map((p) => p.cc));
 export const SYNTH_CHANNELS = [1, 2];
 
-/**
- * 🔴 THE ONE SysEx THE GATE LETS OUT, SINCE 2026-10-11, AND IT IS A READ.
- * Asked as *"show initial patch name on selector"* for `/concepts/synth/070/`,
- * option 1 chosen verbatim. 📄 Circuit Programmer's Reference Guide 1.3, p13,
- * read off the table rather than the plans (which disagree, 9 against 10):
- *   F0 00 20 29 01 60 40 <00|01> F7, "9 bytes in total"
- * The Circuit answers with a 350 byte Replace Current Patch on its USB port,
- * which is a message FROM the instrument and is never written back to it.
- * ⚠️ MATCHED BYTE FOR BYTE AND BY LENGTH, NEVER BY PREFIX. A Replace Current
- * Patch (command 00) and a Replace Patch (01, which writes flash) share this
- * header and differ from the request in byte 6 and in length, so a prefix test
- * on the header is exactly the gate that lets the dangerous ones through.
- * `test.mjs` sabotages this and counts the reds.
- * Returns the location, 0 for Synth 1 and 1 for Synth 2, or null.
- */
+// The one SysEx read allowed: Current Patch Dump Request F0 00 20 29 01 60 40 <00|01> F7 (9 bytes,
+// Programmer's Reference 1.3 p13). Matched byte for byte and by length, never by prefix (a Replace
+// Patch shares the header). Returns 0 or 1 (Synth 1 or 2), or null.
+// why: lessons/rig-board.md#dump-request
 export const DUMP_REQUEST_HEAD = Object.freeze([0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40]);
 export function dumpRequestSynth(bytes) {
   if (!Array.isArray(bytes) || bytes.length !== 9) return null;
@@ -79,26 +31,17 @@ export function dumpRequestSynth(bytes) {
   return bytes[7];
 }
 
-/**
- * 🔴 AND THE SECOND, THE UNIVERSAL DEVICE INQUIRY, SINCE 2026-10-11. Asked
- * *"Add it and test"*, after the dump request went unanswered on this desk,
- * to learn whether this Circuit answers SysEx at all. 📄 MIDI 1.0 General
- * Information, Identity Request: F0 7E <device> 06 01 F7. Device 7F is the
- * all call, and nothing documented says the Circuit needs 00, so 7F only. It
- * asks a device to say who it is and changes nothing. Exact bytes, exact length:
- * 06 02 is the REPLY and must never leave this board.
- */
+// The universal Device Inquiry F0 7E 7F 06 01 F7, all-call only; it changes nothing. 06 02 is the
+// reply and never leaves the board.
+// why: lessons/rig-board.md#device-inquiry
 export const DEVICE_INQUIRY = Object.freeze([0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7]);
 export function isDeviceInquiry(bytes) {
   return Array.isArray(bytes) && bytes.length === DEVICE_INQUIRY.length && DEVICE_INQUIRY.every((b, i) => bytes[i] === b);
 }
-/**
- * An Identity Reply from Novation: F0 7E <device> 06 02 00 20 29, then family,
- * model and version, then F7. 📄 That is 17 bytes for a three byte manufacturer
- * id; a little slack either way is allowed, because the point of asking is to
- * learn what this unit sends, and a reply refused for its length would read as
- * no reply at all.
- */
+// A Novation Identity Reply (F0 7E <dev> 06 02 00 20 29 ...), with slack on length so a reply is
+// not
+// refused for its size.
+// why: lessons/rig-board.md#identity-reply
 export function isIdentityReply(msg) {
   if (!msg || msg.length < 15 || msg.length > 24) return false;
   const want = [0xF0, 0x7E, null, 0x06, 0x02, 0x00, 0x20, 0x29];
@@ -106,12 +49,9 @@ export function isIdentityReply(msg) {
   return msg[msg.length - 1] === 0xF7;
 }
 
-/**
- * The reply, recognised by its whole shape: 350 bytes, Novation's Circuit
- * header, command 00 (Replace Current Patch, which is what the Circuit sends
- * back), the location that was asked for, a reserved 00, 340 seven bit data
- * bytes and F7. Anything else the Circuit says is not passed on.
- */
+// The 350-byte Replace Current Patch the Circuit sends back for the asked location; nothing else
+// passes.
+// why: lessons/rig-board.md#patch-reply
 export function isPatchReply(msg, loc) {
   if (!msg || msg.length !== 350) return false;
   for (let i = 0; i < 6; i++) if (msg[i] !== DUMP_REQUEST_HEAD[i]) return false;
@@ -120,12 +60,9 @@ export function isPatchReply(msg, loc) {
   return true;
 }
 
-/**
- * SysEx messages out of a raw MIDI byte stream. Real time bytes (F8 to FF) may
- * sit anywhere, inside a SysEx too, and are dropped; any other status byte ends
- * a SysEx that never closed and it is thrown away. A message longer than `max`
- * is abandoned rather than grown, so the Circuit cannot fill this with clock.
- */
+// SysEx out of a raw byte stream: real-time bytes dropped, an unclosed SysEx discarded on the next
+// status, anything over `max` abandoned.
+// why: lessons/rig-board.md#sysex-catcher
 export function createSysexCatcher(max = 400) {
   let cur = null;
   return {
@@ -148,34 +85,14 @@ export function createSysexCatcher(max = 400) {
 /** How long the board listens for the Circuit's answer before saying none came. */
 export const DUMP_MS = 1000;
 
-/**
- * 🔴 WHAT A PAGE MAY SEND AN INSTRUMENT, AND IT IS AN ALLOWLIST.
- * Note on, note off and CC 123 all notes off, on the channels the config
- * names, and since 2026-09-30 the synth control changes in `SYNTH_CC` on
- * channels 1 and 2 only. Everything else is REFUSED, and the reason is the
- * instrument on the desk: a factory reset brings back none of the owner's sessions, a SysEx `Replace
- * Patch` writes flash, and a program change on channel 16 selects a session
- * over whatever is being worked on (CLAUDE.md, `plans/plan-circuit-patches.md`).
- * No SysEx, no bank select, no NRPN or RPN (CC 98 to 101 and data entry 6
- * and 38 are not in the table), no channel mode message but 123. A relay room
- * is reachable by anybody who knows its name, so what arrives over it is
- * decided here and not by the page that sent it.
- * ⚠️ AND SINCE 2026-09-30 ONE PROGRAM CHANGE: patches 0 to 63 on channels 1
- * and 2, asked for as a patch selector on `/away/` (*"ok go"*). 📄 The
- * Circuit's own table (`plans/plan-circuit-model12.md` §3.7): on 1 and 2 it
- * selects a synth patch, into RAM; on 16 it selects a SESSION, instantly from
- * 0 to 31 and queued from 64 to 95, over whatever is being worked on. So it is
- * the synth channels only and never 16, and 64 to 127 are refused as well,
- * because they are not patches on 1 and 2 and ARE sessions on 16.
- * ⚠️ AND SINCE 2026-10-11 TWO SysEx, both reads: the nine byte Current Patch
- * Dump Request (`dumpRequestSynth` above, a pass carries `dump`, the location)
- * and the six byte Device Inquiry (`isDeviceInquiry`, a pass carries
- * `identity`). Nothing else. The handler listens for the answer to either.
- */
+// What a page may send the instrument, an allowlist: note on/off and CC 123 on configured channels,
+// SYNTH_CC on 1 and 2, program change 0 to 63 on 1 and 2 only (on 16 it is a session), and the two
+// SysEx reads. Nothing else: the relay room is reachable by anyone who knows its name.
+// why: lessons/rig-board.md#midi-verdict
 export function midiVerdict(bytes, channels) {
   const v = verdict(bytes, channels);
-  // A refusal names its kind in the vocabulary `bay.mjs` and `alsa.mjs` use,
-  // so a log line and a patch talk about the same thing (2026-10-03).
+  // A refusal names its kind in bay.mjs and alsa.mjs's vocabulary.
+  // why: lessons/rig-board.md#refusal-kind
   return v.ok ? v : { ...v, kind: Array.isArray(bytes) ? kindOf(bytes) : 'other' };
 }
 
@@ -213,13 +130,9 @@ function verdict(bytes, channels) {
 export const BEAT_MS = 5_000;
 const NAME_RE = /^[a-z0-9]{1,24}$/;
 
-/**
- * `BOARD_INPUTS` is JSON: `{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1}}`.
- * JSON rather than a delimited string because an ALSA device name already
- * contains `:` and `,`, which is where a hand-rolled format goes wrong.
- * Returns every valid input and a reason for every refused one; a bad entry
- * never takes the good ones down with it.
- */
+// BOARD_INPUTS is JSON (ALSA names contain `:` and `,`); returns valid inputs and a reason per
+// refused one.
+// why: lessons/rig-board.md#parse-inputs
 export function parseInputs(text) {
   const inputs = new Map();
   const problems = [];
@@ -247,21 +160,15 @@ export function parseInputs(text) {
       }
       midi = { port, channels: mch };
     }
-    // 🔴 `via`, SINCE 2026-10-11: `arecord` (the default, and what every board
-    // provisioned before this does) or `jack`, which puts the input on the
-    // board's JACK graph as `<name>:capture_N` so a bay link can patch it
-    // inside the Pi. See `createInputs` for what changes and what does not.
+    // `via`: `arecord` (default) or `jack`, which puts the input on the graph as
+    // `<name>:capture_N`.
+    // why: lessons/rig-board.md#via
     const via = v.via ?? 'arecord';
     if (via !== 'arecord' && via !== 'jack') { problems.push(`${name}: via is arecord or jack, not ${JSON.stringify(via)}`); continue; }
-    // 🔴 `jackd`, SINCE 2026-10-11: this input's card is jackd's own device,
-    // so it is the clock and `alsa_in` is not used (`jacksynth.mjs`
-    // `ensureJackd` has the measurement). `true` or `{ period, periods }`.
-    // Only on `via: "jack"`, and only one input: there is one jackd.
-    // ⚠️ 512 x 3 BY DEFAULT, MEASURED 2026-10-11 on the Pi 4 (jackd is not
-    // realtime here): at 256 x 3 about ten xruns while sclang compiles and a
-    // few a minute with Yoshimi and the granulator playing; at 512 x 3 one at
-    // the compile and none in 100 s of the same load. 512 is 10.7 ms, the same
-    // as arecord's 480 frame period, so the Circuit is no later for it.
+    // `jackd`: this input's card is jackd's clock (one input only). 512 x 3 by default: 256 x 3
+    // gave
+    // xruns on the Pi 4; 512 frames (10.7 ms) matches arecord's 480-frame period.
+    // why: lessons/rig-board.md#jackd
     let jackd = null;
     if (v.jackd != null && v.jackd !== false) {
       if (via !== 'jack') { problems.push(`${name}: jackd needs via jack, the card cannot be both arecord's and jackd's`); continue; }
@@ -277,11 +184,9 @@ export function parseInputs(text) {
   return { inputs, problems };
 }
 
-/**
- * One channel out of an interleaved frame. `take` is 1-based.
- * ⚠️ Not a downmix: an input with nothing patched still has its gain up and
- * its own noise, and summing it in would put that under the instrument.
- */
+// One channel out of an interleaved frame, `take` 1-based; never a downmix of an unpatched input's
+// noise.
+// why: lessons/rig-board.md#take-channel
 export function takeChannel(all, channels, take, frame) {
   if (channels === 1) return all;
   const one = new Int16Array(frame);
@@ -289,20 +194,9 @@ export function takeChannel(all, channels, take, frame) {
   return one;
 }
 
-/**
- * How far the high byte moves from one sample to the next, read as the device
- * says (`le`) and byte swapped (`be`), summed over one interleaved block.
- *
- * 🔴 THE FAST TRACK PRO SENT BIG ENDIAN WHILE ALSA SAID S16_LE. MEASURED
- * 2026-09-30 on the Pi, with a bare `arecord` and no board code: every sample's
- * low byte was 0x00 or 0xFF, a quiet Circuit read -17 to -32 dBFS of hiss, and
- * the same bytes swapped read -65 to -80 dBFS with a peak of 18. It had been
- * little endian that morning, and a USB re-authorize did not bring it back.
- * ⚠️ WHY THE HIGH BYTE: in audio read the right way round it is the slow part
- * of a sample, so its steps are small at any level. Read the wrong way round it
- * is the fast part. Lag-1 correlation of the whole sample could not tell them
- * apart (0.986 both ways), because the sign byte dominates either reading.
- */
+// High-byte step sizes read as LE and swapped: the Fast Track Pro once sent big endian under S16_LE
+// (hiss at -17 to -32 dBFS). The high byte moves slowly when read the right way round.
+// why: lessons/rig-board.md#byte-order-steps
 export function byteOrderSteps(all, channels) {
   let le = 0, be = 0;
   for (let i = channels; i < all.length; i++) {
@@ -313,12 +207,8 @@ export function byteOrderSteps(all, channels) {
   return { le, be };
 }
 
-/**
- * Decides, and keeps deciding, whether a capture needs its bytes swapped. A
- * verdict needs a quarter second of evidence and one reading at least twice as
- * steady as the other, so digital silence and a close call change nothing.
- * `fix(all)` swaps in place when it has decided so, and says when it changes.
- */
+// Decides whether to swap bytes: a quarter second of evidence and one reading twice as steady.
+// why: lessons/rig-board.md#byte-order
 export function createByteOrder({ channels, windowSamples = 12_000, onChange = () => {} } = {}) {
   let swap = false, le = 0, be = 0, n = 0;
   return {
@@ -344,10 +234,8 @@ export function leaseExpired(lease, now) {
   return !(Number.isFinite(lease) && now < lease);
 }
 
-/**
- * The live half. Everything that touches a socket or a process comes in as an
- * argument, so a test can run it against fakes.
- */
+// The live half; sockets and processes come in as arguments, so tests run on fakes.
+// why: lessons/rig-board.md#create-inputs
 export function createInputs({
   inputs, room, relay, frame, rate, name: boardName, id: boardId,
   spawn, WebSocket, format, parse, randomId, log = () => {}, now = () => Date.now(), fs = null,
@@ -360,10 +248,9 @@ export function createInputs({
   // `{ ensure(), wire(doc, what) }` from `jacksynth.mjs`, or null on a board
   // with no JACK. Only an input configured `via: "jack"` uses it.
   jack = null, setTimer = setTimeout,
-  // The Pi camera's keyed room (camera.mjs `createCameraRoom`), or null. Since
-  // 2026-10-13 a page holding the camera key may have the camera's frames on
-  // its direct link to an input, on a third data channel `cam`, instead of
-  // through the relay. camera.mjs decides; this only hands it the channel.
+  // The Pi camera's keyed room, or null; camera.mjs decides whether frames go on a direct link's
+  // `cam`.
+  // why: lessons/rig-board.md#input-camera
   camera = null,
 }) {
   const live = new Map();
@@ -379,31 +266,10 @@ export function createInputs({
       bridge: null, bridgeAt: 0, bridgeBackoff: 2000, bridgeStarts: 0, fed: null, dump: null, onCard: false,
       back: null, backSaid: '', backSent: 0, backDirect: 0,
     };
-    // 🔴 AN INPUT ON JACK, SINCE 2026-10-11 (plans/plan-nodes-revisited.md §5
-    // item 9; the owner: *"Ciruit is on now, do via jack"*). Two processes
-    // instead of one:
-    //   alsa_in -j <name>     the device onto the graph as `<name>:capture_N`.
-    //                         ALWAYS ON while the board runs, because a bay link
-    //                         into the granulator has to work with nobody
-    //                         listening to the input's room. It costs 3.4 per
-    //                         cent of one core steady (MEASURED with `top` on the
-    //                         Pi 4) and no relay time at all.
-    //   ffmpeg -f jack        the room's stream, read back OFF the graph from
-    //                         `pos<name>:input_1`, which is fed `<name>:capture_N`
-    //                         through `jack.mjs`. LEASED exactly as `arecord` was,
-    //                         so a room nobody is in still costs nothing.
-    // 🔴 `plughw:`, NOT `hw:`, AND IT IS A MEASUREMENT. `alsa_in -d hw:CARD=Pro`
-    // on the Fast Track Pro read the input 48.2 dB HOT, which is a factor of 256:
-    // a floor of -48 dBFS where `arecord` reads -93.1 on the same card the same
-    // minute, and a Circuit note clipped flat at 32512. Through `plughw:` the
-    // floor is -93.1 with a peak of 1, the same as `arecord`. alsa_in's own S16
-    // path is the suspect and was not chased further.
-    // ⚠️ AND THE BYTE ORDER FIX DOES NOT RUN ON THIS PATH. `createByteOrder`
-    // repairs a device that sends big endian S16 under an S16_LE label, which
-    // this card did on 2026-09-30 and 2026-10-01. alsa_in resamples before
-    // anything here sees a sample, and a resampled swap cannot be swapped back.
-    // Not seen since 2026-10-01 in the journal; if it comes back, `via:
-    // "arecord"` is the one line that restores the repaired path.
+    // An input on JACK: `alsa_in` puts it on the graph, always on (3.4% of a core, no relay time),
+    // and ffmpeg -f jack reads it back for the room under the same lease. `plughw:`, not `hw:` (hw
+    // read 48 dB hot). No byte-order fix on this path; `via: "arecord"` restores it.
+    // why: lessons/rig-board.md#on-jack
     const onJack = cfg.via === 'jack' && !!jack;
     const reader = `pos${cfg.name}`;
     const jackPort = `${cfg.name}:capture_${cfg.take}`;
@@ -448,10 +314,8 @@ export function createInputs({
           setTimer(startBridge, s.bridgeBackoff); s.bridgeBackoff = Math.min(s.bridgeBackoff * 2, 60_000);
           return;
         }
-        // 🔴 jackd OWNS THIS CARD: the port is jackd's own `system:capture_N`,
-        // shown as `<name>:capture_N` by `jack.mjs`, so there is nothing to
-        // bridge and nothing to resample. An `alsa_in` here would only fail to
-        // open a card jackd holds.
+        // jackd owns this card: its own capture ports, nothing to bridge.
+        // why: lessons/rig-board.md#on-card
         s.onCard = j?.card === cfg.name;
         if (s.onCard) { log(`${cfg.name}: ${cfg.device} is jackd's own card, ${jackPort} with no alsa_in`); return; }
         const dev = cfg.device.replace(/^hw:/, 'plughw:');
@@ -485,18 +349,13 @@ export function createInputs({
     function startCapture() {
       if (s.proc) return;
       if (onJack) { startReader(); return; }
-      // 🔴 A SHORT PERIOD, OR THE AUDIO LEAVES IN 125 ms LUMPS. MEASURED
-      // 2026-09-30 on the Fast Track Pro: with no period asked for, ALSA gave
-      // arecord 6000 frames a period in a 24000 frame buffer, so a note waited
-      // up to 125 ms before this process saw it, the frames reached a browser
-      // in bursts (p90 gap 117 ms), and the page needed a 160 ms cushion to
-      // ride them. Press to arrival read 151 to 180 ms.
+      // A short period: ALSA's default 6000-frame period made audio leave in 125 ms lumps.
+      // why: lessons/rig-board.md#period
       const p = spawn('arecord', ['-D', cfg.device, '-f', 'S16_LE', '-r', String(rate),
         '-c', String(cfg.channels), '-t', 'raw', '-q',
         `--period-size=${periodFrames}`, `--buffer-size=${bufferFrames}`], { stdio: ['ignore', 'pipe', 'pipe'] });
-      // ⚠️ READ IN HALF FRAMES WHEN A FRAME HALVES. The direct path sends 10 ms
-      // as soon as 10 ms exists, which is the point of it; the relay still gets
-      // its 20 ms frame, at the same moment it always did, out of two halves.
+      // Read in half frames when the direct path wants 10 ms; the relay still gets 20 ms frames.
+      // why: lessons/rig-board.md#half-frames
       const IN = UNIT * 2 * cfg.channels;
       let carry = Buffer.alloc(0), halves = [];
       const order = createByteOrder({ channels: cfg.channels, onChange: (swapped, s) =>
@@ -572,10 +431,8 @@ export function createInputs({
       return true;
     }
 
-    // ── notes out, to the instrument's own raw MIDI port ────────────────────
-    // ⚠️ THE CARD IS RESOLVED BY NAME EVERY TIME IT IS OPENED. A card number is a
-    // position in a list that moves when anything is plugged in, which is the
-    // avfoundation-index lesson from rig/m1 in its ALSA costume.
+    // The raw MIDI card is resolved by name every open: card numbers move.
+    // why: lessons/rig-board.md#midi-dev
     function midiDev() {
       const card = fs.readlinkSync(`/proc/asound/${cfg.midi.port}`);   // 'card7'
       const n = /^card(\d+)$/.exec(card)?.[1];
@@ -585,14 +442,10 @@ export function createInputs({
     function midiOpen() {
       if (s.midiFd !== null) return s.midiFd;
       const n = midiDev();
-      // 🔴 NON-BLOCKING, MEASURED 2026-10-03 ON THIS BOARD: while any ALSA
-      // sequencer subscription into the Circuit exists, a plain open of its raw
-      // device for write does not fail, it WAITS, and a synchronous open here
-      // would freeze the whole board on its first note. With O_NONBLOCK a busy
-      // device is EBUSY at once, which the catch in `midiWrite` logs by name.
-      // ⚠️ It makes writes non-blocking too, so a full output buffer is EAGAIN
-      // and that message is dropped and logged rather than waited for. The
-      // buffer is 4 KB, about 1,300 note offs, so a panic still fits.
+      // Non-blocking open: while a sequencer subscription exists the open waits and would freeze
+      // the board.
+      // Writes are non-blocking too (EAGAIN logged); the 4 KB buffer fits about 1,300 note offs.
+      // why: lessons/rig-board.md#nonblock
       s.midiFd = fs.openSync(`/dev/snd/midiC${n}D0`, FS.O_WRONLY | FS.O_NONBLOCK);
       log(`${cfg.name}: notes go to /dev/snd/midiC${n}D0 (${cfg.midi.port})`);
       return s.midiFd;
@@ -606,26 +459,16 @@ export function createInputs({
       }
       const [st, a, b] = bytes, kind = st & 0xF0, key = `${st & 0x0F}:${a}`;
       if (kind === 0x90 && b > 0) s.held.add(key); else if (kind === 0x80 || kind === 0x90) s.held.delete(key);
-      // ⚠️ ONLY CC 123 LETS GO OF A CHANNEL'S NOTES. Every control change used
-      // to, which was harmless while 123 was the only one allowed; with the
-      // synth controls through, a filter sweep under a held note would have
-      // emptied this set and the lease's panic would have left the note on.
+      // Only CC 123 releases a channel's held notes, or a filter sweep would empty the set.
+      // why: lessons/rig-board.md#cc123
       else if (kind === 0xB0 && a === 123) for (const k of [...s.held]) if (k.startsWith(`${st & 0x0F}:`)) s.held.delete(k);
       s.notesOut++;
       return true;
     }
-    // ── the one thing read back: the patch a dump request asks for ──────────
-    // 🔴 THE INPUT IS OPENED ONLY WHILE AN ANSWER IS EXPECTED, AND BEFORE THE
-    // REQUEST IS WRITTEN, AND READ ONCE BEFORE IT TOO (see `askBack`). A raw
-    // MIDI input buffers nothing until it is open AND triggered by a read, so
-    // opening it after the write could miss an answer that came back fast; and
-    // holding it open between requests would keep a device somebody else may
-    // want. MEASURED 2026-10-11 on the board: `/proc/asound/Circuit/midi0`
-    // showed Input 0 with no owner and the Circuit sending (Rx 130,660 bytes,
-    // its clock), so the input is free and has to be filtered.
-    // ⚠️ NON-BLOCKING AND POLLED every 10 ms, for the same reason as the write
-    // side: a blocking read with nothing to read never returns, and a thread
-    // parked in one cannot be taken back.
+    // The input is opened only while an answer is expected, before the request is written, and
+    // polled
+    // non-blocking every 10 ms; it is not held between requests.
+    // why: lessons/rig-board.md#finish-dump
     function finishDump(d, body) {
       if (s.dump !== d) return;
       s.dump = null;
@@ -654,9 +497,9 @@ export function createInputs({
     }
     function pollDump(d) {
       if (s.dump !== d) return;
-      // ⚠️ WHILE THE MACRO LISTENER HOLDS THE INPUT, IT READS AND HANDS EVERY
-      // CHUNK TO `feedDump`, because a raw MIDI input opens once: a second open
-      // for the question would be EBUSY. This only keeps the clock.
+      // While the macro listener holds the input it feeds every chunk to feedDump (a second open is
+      // EBUSY).
+      // why: lessons/rig-board.md#shared-input
       if (d.fd !== null) {
         const chunk = Buffer.alloc(1024);
         for (;;) {
@@ -678,15 +521,10 @@ export function createInputs({
       setTimer(() => pollDump(d), 10);
     }
 
-    // ── the macro knobs, turned by hand on the instrument, told to the room ──
-    // 🔴 midi-back.mjs has the why and the allowlist. Open only while a page
-    // holds the lease, like the capture: nobody listening, nothing read.
-    // ⚠️ NON-BLOCKING AND POLLED, for the reason the dump's reader is: a
-    // blocking read with nothing to read never returns. Every 20 ms, which is
-    // under the 33 ms the limiter lets out per controller.
-    // ⚠️ A BUSY INPUT IS SAID ONCE AND RETRIED ON THE BEAT, never thrown: an
-    // ALSA sequencer subscription to the instrument holds it, and a page that
-    // cannot see hand turns still plays.
+    // Hand-turned macro knobs, read only under a lease (midi-back.mjs), polled every 20 ms; a busy
+    // input
+    // is said once and retried, never thrown.
+    // why: lessons/rig-board.md#macro-back
     const BACK_POLL_MS = 20;
     function backOpen() {
       if (s.back || !cfg.midi || !fs?.readSync) return;
@@ -702,8 +540,8 @@ export function createInputs({
       const limiter = createBackLimiter({ gapMs: GAP_MS, now, setTimer,
         emit: ({ ch, cc, v }) => {
           if (send({ type: 'midi.cc', input: cfg.name, ch, cc, v })) s.backSent++;
-          // And on every direct link, marked, so a page on one does not wait
-          // for the relay's copy and can drop it (remote/010, 2026-10-13).
+          // On every direct link too, marked, so a page can drop the relay's copy.
+          // why: lessons/rig-board.md#cc-direct
           if (s.rtc?.broadcast({ type: 'midi.cc', input: cfg.name, ch, cc, v, path: 'direct' })) s.backDirect++;
         } });
       s.back = { fd, parser: createMidiParser(), limiter, timer: null };
@@ -770,17 +608,10 @@ export function createInputs({
       }
       const d = { ...want, fd, reply, others: [], at: now(), until: now() + DUMP_MS, catcher: createSysexCatcher(), seen: 0, other: 0, realtime: 0, head: [] };
       s.dump = d;
-      // 🔴 READ ONCE BEFORE THE REQUEST IS WRITTEN, BECAUSE OPENING THE INPUT IS
-      // NOT ENOUGH. MEASURED 2026-10-11 on this board: snd-usb-audio runs its
-      // input URBs from probe and DROPS what arrives for a substream that is open
-      // but not yet triggered, and the trigger is the first read or poll. The
-      // Circuit answers the Device Inquiry faster than the first poll 10 ms
-      // later, so the reply was thrown away in the kernel and never even counted
-      // in `/proc/asound/Circuit/midi0` Rx, while the clock after it was. Same
-      // script, same minute: read first, 17 byte identity 2 of 2; write first,
-      // nothing 2 of 2. amidi does this too ("trigger reading"). A zero length
-      // read does not do it from node, which returns before the syscall. What
-      // this read drains came before the question, so it cannot be its answer.
+      // Read once before writing the request: snd-usb-audio drops input until the first read
+      // triggers it,
+      // and the Circuit's reply comes faster than the first 10 ms poll.
+      // why: lessons/rig-board.md#pre-read
       const pre = Buffer.alloc(1024);
       for (let i = 0; i < 64; i++) {
         let n = 0;
@@ -809,21 +640,14 @@ export function createInputs({
       return n;
     }
 
-    // ── the Pi camera on a direct link ──────────────────────────────────────
-    // 🔴 ONLY OVER `ctl`, AND camera.mjs DECIDES. `cam.direct` carries the
-    // camera key and the page's viewer name in the keyed camera room. Over the
-    // relay it is refused without a look, because this room is tokenless and a
-    // key sent here would be a key told to everybody in it. Over `ctl` the
-    // camera checks the key against BOARD_CAM_KEY AND that the viewer is one
-    // the relay let into `<room>-cam` (so the relay's own key check passed
-    // first); only then are frames sent on the peer's `cam` channel.
+    // The camera on a direct link only over `ctl`: the key is checked against BOARD_CAM_KEY and the
+    // viewer
+    // must be in `<room>-cam`. Over the tokenless relay it is refused.
+    // why: lessons/rig-board.md#cam-direct
     const camId = (peerId) => `${cfg.name}:${peerId}`;
-    // ⚠️ THE ASK CAN OVERTAKE ITS CHANNEL. MEASURED 2026-10-13 against the Pi:
-    // the page's `cam` channel was open on its side and `cam.direct` on `ctl`
-    // still reached this handler before node-datachannel had told rtc.mjs
-    // about the new channel, so the first ask was refused and the camera went
-    // direct only on the retry 1.5 s later. So a missing channel is waited for,
-    // 25 ms at a time for half a second, before it is refused.
+    // The ask can overtake its channel, so a missing `cam` channel is waited for (25 ms steps, 0.5
+    // s).
+    // why: lessons/rig-board.md#cam-wait
     function camDirect(msg, reply, peerId, waited = 0) {
       if (!peerId) return reply('cam.direct', { ok: false, why: 'the camera goes direct only over a direct link, never through this room' });
       if (!camera?.attachDirect) return reply('cam.direct', { ok: false, why: 'this board has no camera room' });

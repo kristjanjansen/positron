@@ -1,17 +1,7 @@
 #!/bin/bash
-# rig/board/setup.sh — run this ON the Pi, once, after the first ssh.
-#
-#   git clone <this repo> ~/positron && cd ~/positron/rig/board && sudo ./setup.sh
-#
-# What it does, and why each part is here rather than done by hand:
-#   - a current node, because the board uses the BUILT-IN WebSocket client (node
-#     22+) rather than an npm dependency. Debian Trixie ships node 20, where
-#     `WebSocket` is undefined — a failure that reads as "the relay is down".
-#   - alsa-utils, for `aconnect` and `arecord`, which ARE the board.
-#   - snd-virmidi and snd-aloop, loaded at boot: virtual MIDI ports and a
-#     loopback capture device, so the whole thing is testable with nothing
-#     plugged in. They cost nothing when real hardware is attached.
-#   - a systemd unit with Restart=always, because nobody is in that room.
+# Run ON the Pi once: sudo ./setup.sh. Installs node 22+ (built-in WebSocket), the packages,
+# snd-virmidi and snd-aloop at boot, and a systemd unit with Restart=always.
+# why: lessons/rig-board-io.md#setup-header
 set -euo pipefail
 
 [ "$(uname -s)" = "Linux" ] || { echo "this runs on the Pi, not on the laptop"; exit 1; }
@@ -24,13 +14,9 @@ DEST=/opt/positron-board
 # changed on every setup would be no id at all.
 BOARD_ID="${BOARD_ID:-$(hostname)-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
 BOXUSER="${SUDO_USER:-positron}"
-# 🔴 NO DEFAULT ROOM, AND THIS USED TO READ `${ROOM:-studio-1}`. That default
-# pointed EVERY board anybody installed at OUR room. The relay has no
-# authentication, no routing and no sender identity, so the room name is the
-# only isolation this stack has: two boards in one room flap `boardFrom` twice
-# a beat and interleave two `aseq` counters into a single playout ring. An
-# installer whose default is somebody else's studio is a footgun with a friendly
-# face, so this now REFUSES rather than guesses.
+# No default room: the room name is the relay's only isolation, so this refuses rather than
+# guesses.
+# why: lessons/rig-board-io.md#setup-room
 if [ -z "${ROOM:-}" ]; then
   echo "setup.sh needs a room: sudo ROOM=<name> ./setup.sh" >&2
   echo "  it used to default to studio-1, which is the studio board's own room." >&2
@@ -38,19 +24,10 @@ if [ -z "${ROOM:-}" ]; then
 fi
 
 echo "== packages"
-# 🔴 READ FROM `packages.txt`, NOT TYPED HERE. This line used to install
-# `alsa-utils curl git` and nothing else, so a board provisioned from this repo
-# came up with no jackd, no yoshimi, no SuperCollider, no csound and no ffmpeg:
-# **silent**, while `rig/audit.mjs` held the full list of twelve with reasons
-# and was a thing you ran by hand afterwards against a board you already had.
-# One list, read by the installer that needs it and by the audit that checks it.
-#
-# ⚠️ `awk` RATHER THAN node OR jq, because node is one of the things being
-# installed three lines down and jq is not on a fresh Pi. The file is tab
-# separated so that the `why` column can contain anything.
-#
-# ⚠️ `--no-install-recommends` ON EVERY ONE. csound's recommends pull tcl/tk
-# onto a headless board, and the same argument covers the rest.
+# Packages come from packages.txt (shared with rig/audit.mjs). awk, as node and jq are not there
+# yet.
+# --no-install-recommends keeps csound's tcl/tk off a headless board.
+# why: lessons/rig-board-io.md#setup-packages
 PKGS=$(awk -F'\t' '$0 !~ /^#/ && NF >= 3 && $3 == "apt" { printf "%s ", $1 }' "$SRC/packages.txt")
 [ -n "$PKGS" ] || { echo "packages.txt read as empty, refusing to provision a silent board" >&2; exit 4; }
 echo "   $PKGS"
@@ -84,24 +61,15 @@ echo "== audio group"
 usermod -aG audio "$BOXUSER" || true
 
 echo "== install to $DEST"
-# ⚠️ PRESERVE THE DEPTH. board.mjs imports '../../demo/shell/wire.mjs', so it must
-# sit two levels below $DEST or that resolves off the filesystem root —
-# ERR_MODULE_NOT_FOUND file:///demo/shell/wire.mjs, which is what a flattened
-# install produced. Checking the files exist at the SOURCE was not enough: what
-# matters is whether the import resolves from where it will actually run.
+# Keep the depth: board.mjs imports from two levels up, so it must sit two levels below $DEST.
+# why: lessons/rig-board-io.md#setup-depth
 BOXDIR="$DEST/rig/board"
 install -d "$BOXDIR" "$BOXDIR/fixtures" "$DEST/demo/shell"
 install -m 644 "$SRC"/*.mjs "$BOXDIR/"
 install -m 644 "$SRC"/fixtures/* "$BOXDIR/fixtures/"
-# Shared modules are IMPORTED from demo/shell rather than copied into rig/board —
-# one envelope, one Rhodes, one Moog, both ends. They must come along at the
-# exact paths board.mjs expects.
-#
-# Do not hand-maintain this list. It was wire.mjs alone until 2026-09-10, by
-# which time synth.mjs also imported rhodes.mjs and moog.mjs — so the service
-# would have installed cleanly and died on its first import, on a board in
-# another room. Read the imports out of the source, and REFUSE the install when
-# one has no file: the rule build.mjs already applies to the deployed site.
+# Shared modules are imported from demo/shell; the list is read from the source, and a missing
+# file refuses the install.
+# why: lessons/rig-board-io.md#setup-imports
 MISSING=0
 for rel in $(grep -ho "from '\.\./\.\./[^']*'" "$SRC"/*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u); do
   if [ -f "$SRC/../../$rel" ]; then
@@ -139,12 +107,8 @@ BOARD_AUDIO=default
 CFG
 
 echo "== journal"
-# 🔴 THE JOURNAL DID NOT SURVIVE A REBOOT AND IT TOOK REAL EVIDENCE WITH IT.
-# MEASURED 2026-09-20: /var/log/journal was empty, the journal lived in
-# /run/log/journal on tmpfs, `journalctl --list-boots` showed exactly one boot,
-# and every line from the day the output level collapsed was gone. board.mjs
-# says in a comment that the journal is the one record that survives a board
-# nobody can reach; on this board it did not.
+# Persistent journal: on tmpfs it kept one boot and lost the evidence of a failure.
+# why: lessons/rig-board-io.md#setup-journal
 mkdir -p /etc/systemd/journald.conf.d
 cat > /etc/systemd/journald.conf.d/positron.conf <<JRN
 [Journal]

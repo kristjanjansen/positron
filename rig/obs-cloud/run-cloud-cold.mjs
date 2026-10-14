@@ -1,9 +1,7 @@
-// RETIRED 2026-10-13: `moq.positron.studio` (workers/moq-safari) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-// Cloud cold-start → pixels, staged timestamps. Assumes the instance is DEAD
-// (/kill'ed). Wakes it with /health, polls obs-websocket readiness through the
-// Worker proxy, runs setup, starts a fresh-ns MoQ stream, then launches the
-// deployed player in headless Chrome and reports time-to-first-decoded-frame.
-//   node run-cloud-cold.mjs <workerBase> [playerSecs]
+// RETIRED: moq.positron.studio was deleted, so the player this calls no longer answers.
+// Cloud cold start to pixels from a killed instance, staged timestamps.
+// node run-cloud-cold.mjs <workerBase> [playerSecs]
+// why: lessons/rig-obs.md#cloud-cold-header
 import { spawn } from "node:child_process";
 import os from "node:os";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -51,7 +49,7 @@ for (;;) {
   try { (await c.call("GetSceneList")).data; break; }
   catch {
     await sleep(500);
-    if (c.closed) { // proxy dropped us (OBS mid-boot) — reconnect fresh
+    if (c.closed) { // proxy dropped us (OBS mid-boot): reconnect fresh; why: lessons/rig-obs.md#cloud-cold-reconnect
       try { c = new ObsClient({ url: WS }); await c.connect({ timeoutMs: 5000 }); } catch { c = { call: () => Promise.reject(new Error("dead")), closed: true, waitEvent: () => Promise.reject(new Error("dead")), close: () => {} }; }
     }
     if (now() - t0 > 180000) throw new Error("obs never ready");
@@ -59,7 +57,8 @@ for (;;) {
 }
 stamp("obs-ready");
 
-// 3. setup from zero (fresh disk every boot — scenes never persist)
+// 3. Setup from zero: a fresh disk every boot.
+// why: lessons/rig-obs.md#cloud-cold-setup
 const tS = now();
 await c.call("SetVideoSettings", { baseWidth: W, baseHeight: H, outputWidth: W, outputHeight: H, fpsNumerator: 30, fpsDenominator: 1 });
 const scenes = (await c.call("GetSceneList")).data.scenes.map((s) => s.sceneName);

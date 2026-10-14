@@ -39,12 +39,8 @@ OVERLAY = (
     "fontcolor=0x8fd4dd:x=(w-text_w)/2:y=h-120"
 )
 
-# Millisecond wall clock burned into every source leg: the ground truth for
-# perception-lag measurement travels in the pixels themselves.
-# %T.%3N = HH:MM:SS.mmm from ONE clock (localtime). The previous
-# %{localtime:%H:%M:%S}.%{eif:mod(t*1000,1000)} form was doubly broken:
-# over-escaped colons made localtime see 3 args -> drawtext rendered NOTHING,
-# and the eif ms field was stream-time, not wall-clock (±1 s bimodal error).
+# Millisecond wall clock burned into every leg, from one clock (%T.%3N), as perception-lag truth.
+# why: lessons/rig-misc.md#splicer-clock
 CLOCK = (
     f"drawtext=fontfile={FONT}:"
     r"text='%{localtime\:%T.%3N}':"
@@ -73,10 +69,8 @@ def rig_ready():
 
 
 def spawn_live(off):
-    # RTMP pull, not RTSP: ffmpeg's RTSP demuxer holds A+V output until it has
-    # RTCP sender reports for BOTH streams (~11.6 s measured against mediamtx),
-    # which outlives the 6 s warm-up grace — the live tier starve-looped and
-    # never engaged. RTMP carries per-message timestamps: first byte in 2.4 s.
+    # RTMP pull, not RTSP: RTSP held output ~11.6 s for sender reports, beyond the warm-up grace.
+    # why: lessons/rig-misc.md#splicer-rtmp
     return subprocess.Popen(
         [FF, "-hide_banner", "-loglevel", "error",
          "-i", "rtmp://localhost:1935/rig",
@@ -181,8 +175,8 @@ def stream(tier, proc, out, state):
         if ready:
             chunk = os.read(fd, PKT * 64)
             if not chunk:
-                # a webcam that dies fast OR never delivered a keyframe is
-                # benched — otherwise a dead camera is retried forever
+                # A webcam that dies fast or never sent a keyframe is benched, not retried forever.
+                # why: lessons/rig-misc.md#splicer-bench
                 if tier == "webcam" and (gated or now - start < 3.0):
                     Bench.fail()
                 log(f"{tier}: source EOF")
@@ -210,11 +204,8 @@ def stream(tier, proc, out, state):
                 out.write(block)
                 out.flush()
         elif now - last_data > STARVE_TIMEOUT and (not gated or now - start > 6.0):
-            # a fresh, still-gated source gets a 6 s warm-up before starvation
-            # applies (RTSP connect + first keyframe legitimately take ~3 s)
-            # connection open but no data: dead publisher behind a live socket.
-            # Absence of data is a switch trigger (measured: a starved RTSP
-            # session blocked the old blocking-read loop for 17 minutes).
+            # A fresh gated source gets a 6 s warm-up; after that, no data is a switch trigger.
+            # why: lessons/rig-misc.md#splicer-starve
             if tier == "webcam" and (gated or now - start < 3.0 + STARVE_TIMEOUT):
                 Bench.fail()
             log(f"{tier}: starved >{STARVE_TIMEOUT}s, switching")
@@ -230,11 +221,9 @@ def main():
     out = sys.stdout.buffer
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     spawners = {"live": spawn_live, "webcam": spawn_webcam, "slate": spawn_slate}
-    # One continuously ascending MEDIA timeline across every splice: each new
-    # leg starts just past the last PCR actually delivered. Wall-clock offsets
-    # are wrong under starvation (measured: a 17-minute starved source pushed
-    # the next leg ~1000 s ahead of the uplink -> discontinuity storm), and
-    # backward jumps are equally fatal. PCR is the ground truth.
+    # One ascending media timeline: each leg starts just past the last delivered PCR, never wall
+    # clock.
+    # why: lessons/rig-misc.md#splicer-pcr
     state = {"pcr": 0.0}
     while True:
         tier = pick()

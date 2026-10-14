@@ -1,28 +1,8 @@
 #!/usr/bin/env node
-// RETIRED 2026-10-13: `rtc.positron.studio` (workers/rtc) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-// timeline/lab/mobile-verify.mjs — the VIEWING surfaces, driven by a FINGER.
-//
-//   node timeline/lab/mobile-verify.mjs [surface…] [--shots]
-//
-// Every page in this repo was built and verified on a 1400x900 headless desktop
-// with a mouse. This harness is the other half: CDP device emulation
-// (Emulation.setDeviceMetricsOverride + setTouchEmulationEnabled) and REAL
-// touch streams (Input.dispatchTouchEvent) — never a resized window, because a
-// resized window still has a mouse, `hover:hover`, `pointer:fine`, dpr 1 and no
-// visual viewport, and it is exactly those four that break a phone.
-//
-// Devices: iPhone-class 390x844 @3x and small-Android 360x800 @2x, both
-// orientations. ONE Chrome, one tab, per-surface server on that surface's own
-// assigned port, killed on the way out.
-//
-// Asserts, per surface:
-//   M1  no horizontal PAGE overflow (scrollWidth <= clientWidth) in all 4 modes
-//   M2  every primary control is >= 44 px on its short axis
-//   M3  a real two-finger PINCH changes pxPerSecond about the MIDPOINT
-//       (the time under the midpoint must not move)
-//   M4  a one-finger DRAG pans the strip and does NOT scroll the page
-//   M5  a TAP seeks to the tapped time (px error, not ms error)
-//   M6  zero console errors / page exceptions
+// Retired (rtc.positron.studio is gone). node timeline/lab/mobile-verify.mjs [surface] [--shots]
+// Real CDP touches under emulation at 390x844 @3x and 360x800 @2x: no overflow, 44 px controls,
+// pinch about the midpoint, drag pans, tap seeks, no errors.
+// why: lessons/timeline-lab.md#mv-header
 import { spawn, execSync } from 'node:child_process';
 import os from "node:os";
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -42,10 +22,8 @@ const SHOTS = join(REPO, 'results', 'mobile');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sh = (c) => { try { return execSync(c, { encoding: 'utf8' }); } catch (e) { return (e.stdout || '') + ''; } };
 
-// ---------------------------------------------------------------------------
-// devices. `mobile:true` is what flips `pointer:coarse` / `hover:none` and the
-// visual-viewport model — a width override alone does none of that.
-// ---------------------------------------------------------------------------
+// `mobile: true` is what flips pointer:coarse, hover:none and the visual viewport.
+// why: lessons/timeline-lab.md#mv-devices
 const DEVICES = [
   { name: 'iphone-390x844@3',  width: 390, height: 844, dpr: 3, orient: 'portraitPrimary',  angle: 0 },
   { name: 'iphone-844x390@3',  width: 844, height: 390, dpr: 3, orient: 'landscapePrimary', angle: 90 },
@@ -60,8 +38,8 @@ const SURFACES = {
   // the shared COMPONENT, on its own bench (its two real clients are owned by
   // other machines and their page CSS is not ours to restyle)
   strip:       { port: 8887, static: REPO, path: '/timeline/lab/strip-touch.html', settle: 1400 },
-  // the real client, gestures only — proves the component behaves the same when
-  // it is mounted by somebody else's page
+  // the real client, gestures only
+  // why: lessons/timeline-lab.md#mv-paths
   paths:       { port: 8887, server: 'proto/paths/server.mjs', path: '/paths.html', settle: 3000, layout: false,
                  prep: `document.getElementById('synth').click()`, prepWait: 2000 },
   // the replay is loaded with the SAME archive artifacts the measured gate uses
@@ -92,10 +70,8 @@ function replayPath() {
 const wanted = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const LIST = wanted.length ? wanted : Object.keys(SURFACES).filter((k) => k !== 'paths');
 
-// ---------------------------------------------------------------------------
-// a static server with no deps, for the surfaces that have no server of their
-// own. Serves the repo root so `/timeline/*` resolves the shared library.
-// ---------------------------------------------------------------------------
+// A no-dependency static server serving the repo root, for surfaces with no server of their own.
+// why: lessons/timeline-lab.md#mv-static
 const STATIC_SRC = `
 import http from 'node:http'; import { readFile } from 'node:fs/promises';
 import { join, normalize, extname } from 'node:path';
@@ -114,11 +90,9 @@ http.createServer(async (req, res) => {
 }).listen(PORT, '127.0.0.1', () => console.log('static ' + PORT + ' ' + ROOT));
 `;
 
-// ---------------------------------------------------------------------------
-// touch primitives — REAL streams, not synthetic JS events. A synthesized
-// TouchEvent would bypass touch-action, hit-testing and pointer capture, which
-// are precisely the three things under test.
-// ---------------------------------------------------------------------------
+// Real touch streams via CDP: a synthesized TouchEvent bypasses touch-action, hit-testing and
+// capture.
+// why: lessons/timeline-lab.md#mv-touch
 const tp = (x, y, id) => ({ x: Math.round(x), y: Math.round(y), id, radiusX: 12, radiusY: 12, force: 1 });
 
 async function touchStart(cdp, pts) {
@@ -167,21 +141,17 @@ async function pinch(cdp, cx, cy, from, to, steps = 14) {
     await sleep(14);
   }
   await sleep(30);
-  // BOTH fingers lift in one event. CDP's contract is explicit — "TouchEnd and
-  // TouchCancel must not contain any touch points" — and a touchEnd carrying a
-  // point is silently dropped, which leaves that pointer id LIVE in the page's
-  // pointer map. The next one-finger drag then arrives as pointers.size === 2
-  // and is interpreted as a pinch with a stale anchor: the pan appears to do
-  // nothing at all. This was a harness bug that read exactly like a product bug.
+  // Both fingers lift in one touchEnd with no points; a touchEnd carrying a point is dropped and
+  // leaves a
+  // stale pointer, so the next drag reads as a pinch.
+  // why: lessons/timeline-lab.md#mv-touch-end
   await touchEnd(cdp);
   await sleep(120);
 }
 
-/** Chrome keeps ONE touch state machine per target, and it survives
- *  Page.navigate. After a gesture battery on page A, the first touchStart
- *  dispatched on page C is swallowed — the events are delivered, the page's
- *  listeners never run, and every assert reads "touch does nothing". Cycling
- *  touch emulation resets that machine; the throwaway contact proves it took. */
+// Chrome's touch state survives navigation and swallows the next touchStart; cycling touch
+// emulation resets it.
+// why: lessons/timeline-lab.md#mv-reset
 async function resetTouch(cdp, x, y) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] }).catch(() => {});
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
@@ -323,8 +293,8 @@ async function runSurface(key, cdp, opts) {
   await setDevice(cdp, DEVICES[0]);
   await sleep(300);
 
-  // the screenshot is the LANDING state — what a viewer sees on arrival — so it
-  // is taken before the gesture battery drags the view somewhere arbitrary.
+  // the landing state, before the gestures move the view
+  // why: lessons/timeline-lab.md#mv-shot
   const png = await cdp.screenshot();
   await writeFile(join(SHOTS, `${key}-390x844.png`), png);
   console.log(`  shot -> results/mobile/${key}-390x844.png`);
@@ -344,9 +314,8 @@ async function stripGestures(cdp, key) {
   const ready = await cdp.eval(`!!(window.__strips && window.__strips[0])`);
   if (!ready) { check(key, 'iphone', 'strip-handle', false, 'window.__strips missing'); return; }
 
-  // the canvas must be ON SCREEN before a finger can reach it — CDP dispatches
-  // at viewport coordinates, so an off-screen target silently swallows every
-  // gesture and every assert reads "nothing happened".
+  // The canvas must be on screen: CDP dispatches at viewport coordinates.
+  // why: lessons/timeline-lab.md#mv-on-screen
   await cdp.eval(`${H}.canvas.scrollIntoView({ block: 'center' })`);
   await sleep(400);
   await resetTouch(cdp, 4, 4);          // see resetTouch: touch state survives navigation
@@ -435,10 +404,8 @@ async function stripGestures(cdp, key) {
 // the megatimeline gesture battery (its own gesture.mjs, not the strip)
 // ---------------------------------------------------------------------------
 async function megaGestures(cdp, key) {
-  // WAIT FOR ready, do not guess with a sleep: the census fetch finishes with
-  // fitX(), which overwrites panX/zx wholesale. A gesture dispatched before that
-  // is real, lands correctly, and is then erased — which reads as "touch does
-  // nothing" and is the single most misleading failure this harness can produce.
+  // Wait for ready: the census fetch ends with fitX(), which erases an earlier gesture.
+  // why: lessons/timeline-lab.md#mv-ready
   let ok = false;
   for (let i = 0; i < 60; i++) {
     ok = await cdp.eval(`!!(window.__mt && window.__mt.viewport && window.__mt.ready)`);
@@ -450,11 +417,8 @@ async function megaGestures(cdp, key) {
   const W = await cdp.eval(`innerWidth`), Hh = await cdp.eval(`innerHeight`);
   const cx = W / 2, cy = Hh * 0.55;
 
-  // WHAT IS UNDER THE FINGER — asserted, not assumed. Every "touch does
-  // nothing" failure in this harness turned out to be either a stale pointer or
-  // a target that was not where the arithmetic said it was, and both are
-  // invisible unless you ask the page directly. Asking also costs a round trip,
-  // which is the settle the freshly-resized stage needed anyway.
+  // Assert what is under the finger; it also gives the resized stage its settle.
+  // why: lessons/timeline-lab.md#mv-hit
   const hitEl = await cdp.eval(`(() => { const e = document.elementFromPoint(${cx}, ${cy});
     return e ? (e.id || e.tagName.toLowerCase()) : 'none'; })()`);
   await resetTouch(cdp, cx, cy);
@@ -530,13 +494,9 @@ async function main() {
   const GEST = { strip: stripGestures, paths: stripGestures, megatimeline: megaGestures };
   for (const k of LIST) {
     if (!SURFACES[k]) continue;
-    // ONE TAB PER SURFACE. Chrome's input router lives on the render widget and
-    // it does not reliably follow a same-tab navigation: after a gesture
-    // battery on surface A, Input.dispatchTouchEvent on surface B is accepted
-    // and acknowledged and delivered NOWHERE — the page's own pointerdown
-    // listener counts zero, and every gesture assert reads as a product bug.
-    // about:blank between them is not enough; a fresh target is. Still one
-    // Chrome, and the tab is closed on the way out.
+    // One tab per surface: after a gesture battery, touches on a navigated tab are delivered
+    // nowhere.
+    // why: lessons/timeline-lab.md#mv-tab
     let tab = null, sess = null;
     try {
       tab = await (await fetch(`http://127.0.0.1:${DBG}/json/new?about:blank`, { method: 'PUT' })).json();

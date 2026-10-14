@@ -1,40 +1,7 @@
-// rig/board/scsampler.mjs: the board's sampler, `pi-1:sampler`, on SuperCollider.
-//
-// Asked 2026-10-11: *"do supercollider. rm fluidsynth"*, with option b) of
-// plans/plan-sampler-pi-pico.md §2.2: the sampler and Yoshimi both on JACK,
-// both summed into the one capture, so starting one never switches the other
-// off for somebody in another building.
-//
-// 🔴 ITS OWN scsynth, AND NO sclang WHILE IT PLAYS. The granulator's server is
-// raised by sclang only when `fx.pappus` asks, is killed by `stopPappus`, and
-// uses `SuperCollider:in_*`/`out_*` as the insert. Sharing it would tie a piano
-// to a granulator switch somebody else presses. So this is a second scsynth:
-//   - JACK client `possampler` (`-H default:possampler`), so `pappusFx`'s test
-//     for a running granulator (`jack_lsp` includes `SuperCollider`) can never
-//     mistake it;
-//   - UDP port 57130 (`SAMPLER_SC_PORT`), which `stopPappus` reads to leave it
-//     alone;
-//   - no inputs, two outputs, and SC_JACK_DEFAULT_* pointed at nothing, so it
-//     connects nowhere by itself; `wire()` puts out_1 and out_2 into the capture.
-// node drives it over OSC: voices, stealing, the pedal and program change are
-// decided here, where they can be graded with no board (`createSamplerCore`).
-// sclang runs only to WRITE the two SynthDefs (`norns/possampler-defs.scd`),
-// once, when the files are missing or older than the script.
-//
-// 🔴 THE MIDI PATH IS THE RELAY AND NOTHING ELSE. A page's note arrives as
-// `note.on {node: 'sampler'}` and becomes one `/s_new`. There is no ALSA client
-// for this engine at all, so nothing on the board (the Circuit included) can be
-// subscribed to it, by anybody or by itself.
-//
-// The rules a key is played by are the ones `demo/code/sampler.mjs`
-// has: the nearest recording, a tie to the lower one, rate 2^(shift/12), the
-// Rhodes layer from the author's crossfade table with his fallback over the
-// holes, a key struck again damps the voice it replaces, the oldest voice taken
-// past the cap, the damper a ramp (`demo/shell/pedal.mjs`, imported, not copied).
-// The piano (program 0) is the Salamander grand since 2026-10-11
-// (plans/plan-piano-samples.md): four velocity bands hard switched, level from
-// ONE constant for the set and 6 dB inside a band, and a key-off sample when
-// the damper lands. The FluidR3 piano is program 2, on /nola/'s (v/127)^1.5.
+// The sampler on its own scsynth (JACK `possampler`, UDP 57130, no inputs) summed beside
+// any instrument. node decides voices, stealing, pedal and program; sclang only writes the
+// defs. Notes come only over the relay; the key rules are demo/code/sampler.mjs's.
+// why: lessons/rig-board-io.md#scs-header
 import { spawn, execFileSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 /** How long scsynth gets to leave the JACK graph by itself after /quit. */
@@ -57,14 +24,13 @@ export const DEF_SCD = join(HERE, 'norns', 'possampler-defs.scd');
 export const VOICES = 32;
 /** One hard note lands here in the capture, as one does in the browser. */
 export const LOUDEST = 0.30;
-/** The loudest FluidR3 piano file, measured on /nola/ 2026-09-22 by decoding all thirty. */
+// The loudest FluidR3 piano file, measured on /nola/ by decoding all thirty.
+// why: lessons/rig-board-io.md#piano-peak
 export const PIANO_PEAK = 0.097;
-/**
- * The loudest Salamander v16 file, the browser's encode decoded back
- * (PROVENANCE-salamander.json `peak.web`). The SAME constant as the browser, so
- * a mono file here lands a little under a stereo one there, by what summing L
- * and R loses (0.6 to 1.7 dB, plan section 2.2), which a mono speaker loses too.
- */
+// The loudest Salamander v16 file as the browser decodes it, the browser's own constant; summing L
+// and R
+// here loses 0.6 to 1.7 dB, as a mono speaker does.
+// why: lessons/rig-board-io.md#salamander-peak
 export const SALAMANDER_PEAK = 0.9085;
 /** The loudest Rhodes file, from demo/nola/PROVENANCE-rhodes.json. */
 export const RHODES_PEAK = 0.9981;
@@ -130,11 +96,8 @@ export function rhodesLayerAt(note, layer) {
   return l;
 }
 
-/**
- * The sets, by program number. Buffer numbers are fixed per file and never
- * overlap: FluidR3 0 to 29, Rhodes 100 to 164, Salamander notes 300 to 419 and
- * its releases 500 to 587, all under scsynth's default of 1024 buffers.
- */
+// Sets by program number; fixed, non-overlapping buffer numbers under scsynth's 1024.
+// why: lessons/rig-board-io.md#sets
 export const SETS = Object.freeze({
   0: { id: 'piano', name: 'Piano', program: 0, notes: PIANO_NOTES, peak: SALAMANDER_PEAK, dir: SALAMANDER_DIR,
        gain: pianoGain, releaseGain,
@@ -161,14 +124,9 @@ export function scsynthArgs({ port = SC_PORT, client = SC_CLIENT } = {}) {
 /** What keeps scsynth from patching itself to the card: a pattern that names no port. */
 export const SC_ENV = Object.freeze({ SC_JACK_DEFAULT_INPUTS: 'posnothing:none', SC_JACK_DEFAULT_OUTPUTS: 'posnothing:none' });
 
-/**
- * 🔴 THE ONE-SOURCE RULE, WITH THE SAMPLER BESIDE IT. Pure, so it is graded.
- * Yoshimi (and the old pipe sources) are still one at a time: a second one
- * replaces the first, as `startAudio` has always done. The sampler is not in
- * that rule: starting it stops nothing, and starting anything else leaves it
- * running. `audio.stop` with no source stops the instrument and never the
- * sampler; `{source: 'sampler'}` stops the sampler and nothing else.
- */
+// One instrument at a time, the sampler beside it: starting it stops nothing; audio.stop with no
+// source stops the instrument, never the sampler. Pure, graded.
+// why: lessons/rig-board-io.md#start-plan
 export function startPlan(want, { running = null, sampler = false } = {}) {
   if (want === 'sampler') return { act: sampler ? 'already' : 'start-sampler', stopInst: false, stopSampler: false };
   if (running === want) return { act: 'already', stopInst: false, stopSampler: false };
@@ -181,22 +139,17 @@ export function stopPlan(source, { running = null, sampler = false } = {}) {
 /** Which engine a note, a controller or a program is for. Only `node: 'sampler'` is the sampler's. */
 export const isForSampler = (msg) => msg?.node === 'sampler';
 
-/**
- * Voices, the pedal and program change, with no server. `send(address, args)`
- * is the whole output; `loaded(program)` says whether a set's buffers are in.
- * Every decision about a note is here, so `test.mjs` drives it with a fake.
- */
+// Voices, pedal and program change with no server; send(address, args) is the output; graded with a
+// fake.
+// why: lessons/rig-board-io.md#sampler-core
 export function createSamplerCore({ send, voices: cap = VOICES, buffers = new Map(), log = () => {}, onProgram = () => {},
   now = () => Date.now() / 1000 } = {}) {
   let program = 0, nextId = 2000;
   const live = [];                // { id, note, damped, set, vel, at }, oldest first
   const stat = { started: 0, stolen: 0, dropped: 0, ended: 0, releases: 0, programs: [], last: null, peakVoices: 0 };
-  /**
-   * The damper falls on a key: its voices ramp out, and a Salamander string
-   * makes its key-off sound (only when a sounding voice was damped, never on a
-   * key up under the pedal, which pedal.mjs does not pass here). A release
-   * voice is not counted in `live`: it is under half a second and frees itself.
-   */
+  // The damper ramps a key's voices out, and a damped Salamander string plays its key-off sample.
+  // Release voices are not counted in `live` (under half a second, self-freeing).
+  // why: lessons/rig-board-io.md#release
   const release = (note, sec) => {
     let fell = null;
     for (const v of live) if (v.note === note && !v.damped) { damp(v, sec); fell ??= v; }
@@ -284,10 +237,8 @@ async function ensureDefs(onLog) {
   return { ok, compiled: true, ms: Date.now() - t0 };
 }
 
-/**
- * Raise the sampler: jackd, the defs, scsynth, the piano's buffers, the capture,
- * out_1 and out_2 into the capture. Answers the engine, or `{ ok: false, reason }`.
- */
+// Raise the sampler: jackd, defs, scsynth, the piano's buffers, the capture, outs into the capture.
+// why: lessons/rig-board-io.md#sampler-start
 export async function startScSampler({ onFrame, onLog, onState } = {}) {
   const t0 = Date.now();
   const marks = {};
@@ -344,12 +295,9 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   const dl = await ask('/d_loadDir', [DEF_DIR], (m) => m.addr === '/done' && m.args[0] === '/d_loadDir');
   if (!dl) { stop(); return { ok: false, reason: 'scsynth did not load the SynthDefs' }; }
 
-  /**
-   * Read one set's files into buffers, four at a time, and ask each its channel
-   * count. Four, not all at once: scsynth reads files one after another on its
-   * own thread, so 208 Salamander requests sent together would queue behind
-   * each other and the later ones would outlive their 8 s answer timeout.
-   */
+  // Read a set's files four at a time: scsynth reads serially, and 208 at once outlive the 8 s
+  // timeout.
+  // why: lessons/rig-board-io.md#load-set
   async function loadSet(set) {
     const t = Date.now();
     const pool = async (items, n, fn) => {
@@ -407,15 +355,10 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
   function stop() {
     stopping = true;
     setStandingRows('sampler', []);
-    // 🔴 /quit HAS TO LEAVE BEFORE THE SOCKET CLOSES, AND scsynth HAS TO BE
-    // GIVEN TIME TO TAKE ITSELF OFF THE JACK GRAPH. MEASURED 2026-10-12 on the
-    // Pi with Yoshimi running: this stop cost 1 to 2 jackd xruns every time
-    // (`possampler was not finished`), and the process was gone about 600 ms
-    // after the stop, which is the SIGKILL below. The same server sent /quit
-    // by hand exited by itself in 183 ms with no xrun at all. `udp.close()`
-    // straight after an async `send` can drop the datagram, so the kill landed
-    // on a client still running in the graph. So: close in the send callback,
-    // and kill only a process still there after QUIT_GRACE_MS.
+    // Send /quit and close the socket in the send callback, then kill only after QUIT_GRACE_MS: an
+    // early
+    // close dropped /quit and the kill cost jackd xruns (a clean quit takes 183 ms).
+    // why: lessons/rig-board-io.md#quit
     const quit = oscMessage('/quit');
     try { udp.send(quit, 0, quit.length, SC_PORT, '127.0.0.1', () => { try { udp.close(); } catch { /* closed */ } }); }
     catch { try { udp.close(); } catch { /* closed */ } }
@@ -432,15 +375,10 @@ export async function startScSampler({ onFrame, onLog, onState } = {}) {
     loadSet: (p) => ensureSet(p),
     panic: () => core.panic(),
     status, stop,
-    /**
-     * 🔴 THIS SERVER'S OSC, FOR `scollide.mjs` WHEN IT IS TOLD TO SHARE IT
-     * (`ENGINES.shared`). scsynth runs with `-l 1`, one client, and this socket
-     * is that client, so `/n_end` for a page's node arrives HERE and nowhere
-     * else: a second socket's `/notify` would be refused. `send` takes encoded
-     * bytes (a message or a bundle); `onReply(fn)` hears every decoded reply
-     * and answers the function that stops it. Nothing calls either while the
-     * collide engine has its own server, which is the default.
-     */
+    // This server's OSC for scollide.mjs on ENGINES.shared: with `-l 1` this socket is the only
+    // client,
+    // so replies arrive here. send(bytes); onReply(fn) returns its stop. Unused by default.
+    // why: lessons/rig-board-io.md#osc
     osc: {
       port: SC_PORT,
       send: (buf) => udp.send(buf, 0, buf.length, SC_PORT, '127.0.0.1'),

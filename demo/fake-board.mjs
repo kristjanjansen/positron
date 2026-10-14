@@ -1,67 +1,7 @@
-// demo/fake-board.mjs: a Raspberry Pi board that is nobody's board.
-//
-//   node demo/fake-board.mjs                                  # its own relay on :8897
-//   node demo/fake-board.mjs --relay ws://127.0.0.1:9101      # join one already running
-//   node demo/fake-board.mjs --listening                      # as if somebody else held the Circuit's lease
-//   node demo/fake-board.mjs --skew 250                       # its clock 250 ms ahead of this machine's
-//   node demo/fake-board.mjs --hand                           # a hand turns the Circuit's macro knobs, one every 3 s
-//
-// Then open a board page against it:
-//   http://127.0.0.1:8890/away/?relay=ws://127.0.0.1:8897&board=1
-//
-// 🔴 WHY THIS EXISTS. plans/plan-routing-migration.md §3.8: every page that
-// plays the board talks to one Raspberry Pi in another building, with one JACK
-// graph and maybe a listener, so `createBoard` refuses every send under a
-// harness and the suite grades nothing the page sends. This answers in the
-// board's place, in the board's rooms, with the board's verbs, on a relay on
-// this machine (`demo/fake-relay.mjs`), so a page can be driven for real.
-//
-// WHAT IT IS, AND WHERE EACH HALF COMES FROM:
-//   - the MAIN ROOM (`studio-1`): `board.hello` and `board.alive` built by the
-//     board's own `rig/board/beat.mjs`, so the graph a page draws is the graph
-//     `boardGraph` makes; `graph.ask` answered with a beat, as the board does;
-//     `audio.status`, `audio.start`, `audio.stop`, `note.on`, `note.off`,
-//     `note.panic`, `voice.select`, `voices.list`, `ctl.set`, `ctl.meter`,
-//     `cc` and `board.ping`, each answered in the name the board answers in.
-//   - the INPUT ROOM (`studio-1-circuit`): the board's own `createInputs` from
-//     `rig/board/inputs.mjs`, run with a fake `arecord` and a fake raw MIDI
-//     port. So the lease, `input.want`, `audio.status`, the `midi.send` gate
-//     (`midiVerdict`, which REFUSES SysEx, the `never` class on that port) and
-//     the status a page reads are the board's code rather than a copy of it.
-//
-// 🔴 NOT SILENCE AND NOT WHITE NOISE, THE SAME RULE AS THE OTHER THREE STAND-INS.
-// Every frame is 220 Hz and 330 Hz a fifth apart, the 330 gated on for the
-// first quarter second of every half second. A frame count passes on silence;
-// a peak does not, and the PULSE means a check can tell which way time runs.
-// `toneFrame` is pure and exported so a test grades the same samples a page hears.
-//
-// 🔴 A COUNT FROM THE FAR SIDE. Every `midi.send` the gate lets through is
-// WRITTEN to the fake port and counted there, and the board's own status
-// carries it back to a page as `midi.out` in `audio.started`. A page that
-// reads that number is reading the board's side of the boundary, never its own
-// queue (positron-verify, `createMidiLane`'s `scheduled()`).
-//
-// 🔴 THE COLLIDE VERBS, THROUGH THE BOARD'S OWN SERVICE (2026-10-12,
-// plans/plan-pi-supercollider-defs.md step 2). `sc.load`, `sc.hit`, `sc.set`,
-// `sc.stats`, `clock.ping` and the `collide` node's notes are answered by
-// `createCollideService` from `rig/board/scollide.mjs`, the code the Pi runs,
-// over a FAKE scsynth that decodes every bundle it is sent and counts, on its
-// own side, how early each one arrived. `skewMs` moves this board's clock away
-// from the machine's, so a page has a real offset to find.
-// ⚠️ The fake scsynth makes no sound of the program: `audio.start {source:
-// 'collide'}` starts the same tone as every other source, so a page's Pi scope
-// has something to read, and nothing about it follows the program.
-//
-// ⚠️ WHAT IT IS NOT: H.264 (no GPU node is announced, so no page is offered a
-// picture that cannot come), an instrument (the tone is fixed and a note
-// changes nothing in it; it announces `synth`, since Yoshimi left the board on
-// 2026-10-13), and the direct WebRTC path (`direct: false`, so a page never
-// fetches ICE for a board that cannot answer). A stand-in grades OUR code; a
-// page green here can still meet a board that is off.
-//
-// 🔴 LOOPBACK ONLY. It refuses to join any relay that is not on this machine,
-// because a fake board in the real `studio-1` would announce a Raspberry Pi
-// that does not exist onto the owner's patchbay.
+// node demo/fake-board.mjs [--relay ws://...] [--listening] [--skew ms] [--hand] The board's own
+// beat.mjs, inputs.mjs and scollide.mjs on a loopback relay, with fake arecord, MIDI port and
+// scsynth and a 220/330 Hz pulsing tone. Page: ?relay=ws://127.0.0.1:8897&board=1.
+// why: lessons/harness.md#fake-board
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -82,10 +22,8 @@ export const PULSE_S = 0.5, PULSE_ON_S = 0.25;
 const AMP = 0.3;                          // each tone, so the pair peaks near 0.6
 const RAMP_S = 0.004;                     // a 4 ms edge on the gate, so it does not click
 
-/**
- * The stand-in's signal at absolute sample `i`, as a float. Pure.
- * `silent` is the sabotage: the same frames, every sample zero.
- */
+// The signal at absolute sample `i`, pure. `silent` is the sabotage: every sample zero.
+// why: lessons/harness.md#tone-at
 export function toneAt(i, rate = RATE, { silent = false } = {}) {
   if (silent) return 0;
   const t = i / rate;
@@ -123,12 +61,8 @@ export function loopbackRelay(url) {
   } catch { return false; }
 }
 
-/**
- * A clock paced source: calls `onSamples(start, n)` with however many samples
- * are OWED since it started, every `tickMs`. Owed against the clock and not
- * per tick, because node's timers fire late and a stand-in that sends at the
- * timer's rate runs slow (positron-verify, `fake-station.mjs`).
- */
+// Calls onSamples(start, n) with the samples owed since start, every tickMs: timers fire late.
+// why: lessons/harness.md#board-paced
 function paced(rate, tickMs, onSamples, unit = 1) {
   const t0 = performance.now();
   let sent = 0;
@@ -139,10 +73,8 @@ function paced(rate, tickMs, onSamples, unit = 1) {
   return () => clearInterval(timer);
 }
 
-/**
- * A fake `arecord`: an object shaped like a child process whose stdout is S16LE
- * of the tone at the device's channel count, paced by the clock.
- */
+// A fake `arecord`: stdout is S16LE of the tone at the device's channel count, paced by the clock.
+// why: lessons/harness.md#fake-spawn
 function fakeSpawn(opts) {
   return (cmd, args) => {
     const p = new EventEmitter();
@@ -159,13 +91,9 @@ function fakeSpawn(opts) {
   };
 }
 
-/**
- * A fake ALSA raw MIDI port: every write is kept, so the count is the far side's.
- * And since 2026-10-13 it has an input too, the Circuit's MIDI out: `inbox`
- * holds byte chunks the instrument "sent", read back non-blocking exactly as
- * `inputs.mjs` reads `/dev/snd/midiC<n>D0`, EAGAIN when there is nothing.
- * One read open at a time, EBUSY on a second, as a raw MIDI input is.
- */
+// A fake raw MIDI port: writes are kept (the far side's count); `inbox` is the Circuit's MIDI out,
+// read non-blocking (EAGAIN when empty), one reader at a time (EBUSY).
+// why: lessons/harness.md#fake-fs
 function fakeFs(written, inbox) {
   let reading = false;
   return {
@@ -185,12 +113,9 @@ function fakeFs(written, inbox) {
   };
 }
 
-/**
- * A scsynth that is nobody's: it takes `/d_recv` at once, decodes every bundle
- * it is sent, and counts on its OWN side of the wire how early each timetag
- * arrived. A node it was told to start ends 300 ms after its time, with an
- * `/n_end`, as a short drum hit would. `now` is the board's (skewed) clock.
- */
+// Takes /d_recv at once, decodes every bundle, counts on its own side how early each timetag
+// arrived; a started node ends 300 ms after its time with /n_end. `now` is the skewed clock.
+// why: lessons/harness.md#fake-scsynth
 export function fakeScsynth({ now }) {
   const readers = new Set();
   const c = { bundles: 0, started: 0, timed: 0, immediate: 0, lateAtServer: 0, minLeadMs: null, maxLeadMs: null, recv: 0 };
@@ -232,28 +157,10 @@ export function fakeScsynth({ now }) {
   };
 }
 
-/**
- * Start a board.
- * @param {object} [o]
- * @param {string} [o.relay]      a loopback ws:// relay. Left out, one is started.
- * @param {number} [o.port]       the relay's port when one is started here
- * @param {string} [o.room]       the board's main room, `studio-1` like the Pi
- * @param {boolean} [o.listening] hold the Circuit's lease as another listener would
- * @param {boolean} [o.silent]    SABOTAGE: every frame zero
- * @param {boolean} [o.portGone]  SABOTAGE: the raw MIDI port refuses every write,
- *                               as an unplugged Circuit does, so nothing is counted
- * @param {boolean} [o.quiet]
- * @param {number} [o.beatMs]
- * @param {number} [o.skewMs]    this board's clock is the machine's plus this,
- *                               for `clock.ping` and every `at` it is sent
- * @param {boolean} [o.hand]     a hand on the Circuit: every 3 s one macro knob
- *                               (M1 to M8 in turn) is swept to a new value, as
- *                               CC 80 to 87 on channel 1 with clock between, the
- *                               way the real one sends a turn. Only while a
- *                               lease is held, because only then is it read.
- * Returns `{ relay, room, ready, stats(), close() }`; `ready` resolves when
- * both rooms are joined and the hellos are out.
- */
+// startBoard({ relay, port, room, listening, silent, portGone, quiet, beatMs, skewMs, hand })
+// -> { relay, room, ready, stats(), close() }. silent and portGone are sabotages; hand sweeps
+// M1 to M8 (CC 80 to 87) every 3 s while a lease is held.
+// why: lessons/harness.md#start-board
 export function startBoard({ relay = null, port = 8897, room = 'studio-1', listening = false,
   silent = false, portGone = false, quiet = false, beatMs = 5000, skewMs = 0, hand = false } = {}) {
   const say = (...a) => { if (!quiet) console.log('[fake-board]', ...a); };
@@ -334,7 +241,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
         return reply('audio.started', source ? { ok: true, source, jack: false, fx: false, standIn: true, inputs: inputs.status() }
           : { ok: false, reason: 'nothing playing', fx: false, standIn: true, inputs: inputs.status() });
       case 'audio.start': {
-        // As the board since 2026-10-13: no source is refused in words, there is no default.
+        // No source is refused in words; there is no default.
+        // why: lessons/harness.md#no-source
         if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "synth"}', standIn: true });
         const want = msg.source;
         if (want !== 'synth') return reply('audio.started', { ok: false, reason: `${want} is not installed on this board`, standIn: true });
@@ -345,7 +253,8 @@ export function startBoard({ relay = null, port = 8897, room = 'studio-1', liste
       }
       case 'audio.stop': return reply('audio.stopped', stopAudio());
       case 'note.on':
-        // As the board since 2026-10-13: a note to an idle board starts nothing.
+        // A note to an idle board starts nothing.
+        // why: lessons/harness.md#idle-note
         if (!source) return reply('note.ack', { note: msg.note, dropped: true, reason: 'nothing is playing on this board, send audio.start {source: "synth"} first' });
         counts.notesOn++;
         return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0, on: source });

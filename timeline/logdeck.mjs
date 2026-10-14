@@ -1,32 +1,14 @@
-// timeline/logdeck.mjs — the *flat capture log* front end for transport.mjs.
-//
-// Every client of this library so far stores its performance as one flat log of
-// rows stamped in EPOCH MICROSECONDS, and every one of them has had to write
-// the same eight lines to get from there to the library's {at ms} item domain:
-// find the origin, subtract it, divide by 1000, add a lead-in so position 0
-// sits strictly before the first event. proto/jam wrote it first
-// (proto/jam/jam-timeline.js `makeDeck`, the 39-line seam); the instrument
-// client needed it again — but with TWO note lanes and a media lane on ONE
-// timeline, which `makeDeck`'s single-`kind` signature cannot express.
-//
-// So the seam moves up here and grows a `lanes` array. `makeDeck({log, adapter,
-// kind})` is exactly `makeLogDeck({lanes: [{kind, rows: log, adapter}]})`.
-//
-// A lane may emit more than one item per row (`expand`) — a media-span row is a
-// start/end PAIR on the timeline, which is how proto/selfrec/replay-grid.html
-// schedules its tiles.
-//
-// Plain ESM, no deps, browser+node. Nothing here knows what a note is.
+// Flat capture logs in epoch microseconds to the library's ms items, for several lanes on one
+// timeline:
+// makeLogDeck({ lanes: [{ kind, rows, adapter, expand? }] }). Knows nothing of notes.
+// why: lessons/timeline-misc.md#logdeck
 
 import { createDeck } from './transport.mjs';
 
-/**
- * @param lanes   [{kind, rows:[{at µs,…}], adapter, expand?(row,i)->[{atUs|atMs,id?,payload?}]}]
- * @param originUs  explicit position-domain origin (default: earliest row)
- * @param leadInMs  position 0 sits this far BEFORE the origin, so seek(0)
- *                  replays the whole session instead of starting mid-note
- * everything else is handed straight to createDeck().
- */
+// lanes [{kind, rows [{at us}], adapter, expand?(row, i)}], originUs (default earliest row),
+// leadInMs
+// (position 0 sits before the origin); everything else goes to createDeck().
+// why: lessons/timeline-misc.md#make-log-deck
 export function makeLogDeck({
   lanes = [], originUs, leadInMs = 250, tailMs = 250, adapters = {}, items: extra = [], ...opts
 } = {}) {
@@ -48,16 +30,10 @@ export function makeLogDeck({
       for (const p of parts) {
         if (!p) continue;
         const at = p.atMs !== undefined ? p.atMs : toPos(p.atUs);
-        // CONTROL FIELDS ARE INJECTED **AFTER** THE SPREAD. This used to read
-        // `{ i, at, ...p.payload }`, and p.payload defaults to the raw capture
-        // ROW — whose own `at` is in EPOCH µs. The spread therefore silently
-        // overwrote the position-domain `at` the library had just computed, in
-        // the field the library itself injected: §2's law ("untrusted payloads
-        // must not spread over control fields") broken inside the library that
-        // records it. Reported by the first continuous client
-        // (proto/paths/NOTES.md S6), which had to carry an `expand()` whose
-        // payload avoided the key `at` entirely. Both control fields now win,
-        // and the row's own stamp stays reachable as `atUs`.
+        // Control fields are injected after the payload spread, or the row's own epoch-us `at`
+        // overwrites the
+        // computed one; the row's stamp stays reachable as `atUs`.
+        // why: lessons/timeline-misc.md#control-fields
         const { at: rowAt, ...rest } = p.payload || {};
         items.push({
           at, kind: ln.kind, id: p.id ?? `${ln.kind}-${i}`,
@@ -71,9 +47,8 @@ export function makeLogDeck({
   return Object.assign(deck, {
     originUs: origin, leadInMs, toPos, toAtUs,
     laneCount: (kind) => items.filter((it) => it.kind === kind).length,
-    /** the keys the reducer says should be asserted at posMs — C2's left-hand
-     *  side, for any reducer returning a Map or a Set (held notes, present
-     *  tiles, fired cue ids). */
+    // The keys the reducer asserts at posMs, for a reducer returning a Map or a Set.
+    // why: lessons/timeline-misc.md#reduced-keys
     reducedKeys(kind, posMs) {
       const s = deck.reduceAt(kind, posMs);
       if (!s) return [];

@@ -1,8 +1,7 @@
-// Resolution/framerate MATRIX measurement player (RUNBOOK §9). Same pipeline as
-// the deployed safari-play.js (catalog retry -> codec from catalog -> VideoDecoder
-// -> drawImage onto a 1280x720 canvas -> burned-row decode) but instrumented:
-// per-frame g2g deltas + per-second stats batched as JSONL to POST /jsonl/<name>.
-// Query params: ?ns= &relay= &name= &codec=
+// Matrix measurement player (RUNBOOK §9): safari-play.js's pipeline with per-frame g2g and
+// per-second
+// stats as JSONL to POST /jsonl/<name>. Params: ?ns= &relay= &name= &codec=
+// why: lessons/rig-moq.md#play-4k-header
 import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
@@ -12,8 +11,8 @@ const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.
 const NAME = params.get("name") ?? "dev";
 const CODEC_OVERRIDE = params.get("codec");
 
-// Burned row geometry — 1280x720 reference grid (frame is always drawn scaled
-// onto a 1280x720 canvas, so this works for any source resolution).
+// Row geometry on the 1280x720 reference grid, which every frame is scaled onto.
+// why: lessons/rig-moq.md#play-4k-row
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
 
 function log(...a) {

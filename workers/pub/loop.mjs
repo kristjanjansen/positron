@@ -1,23 +1,7 @@
-// The LL-HLS loopback's input, and everything that keeps it empty.
-//
-// /video/webrtc/ sends a camera through the `loop` instance onto ONE
-// RTMPS live input that nothing else uses ("positron-hls-loopback",
-// src/provision-loop.sh). Recording cannot be turned off on RTMPS
-// (positron-streaming), so every take is a Stream video counted against the
-// account's 1000 storage minutes, and a full cap blocks every new live stream.
-// So three things delete, none of them waiting on the page:
-//
-//   1. per take: LOOP_CLEAN_MS after the take ends, the worker deletes it
-//   2. a cron every 10 minutes: anything on the input older than LOOP_OLD_MS
-//   3. before a take: refused when the account's storage is at or over the
-//      ceiling, the LOOP_CEIL var (600 by default, loopCeil below)
-//
-// 🔴 THE INPUT IS DEDICATED, WHICH IS WHAT MAKES "DELETE EVERYTHING ON IT"
-// SAFE. Nothing here lists the account's videos and filters; it asks for the
-// videos of ONE input by uid, and deletes those. Any other input's recordings
-// are not in the answer at all.
-// ⚠️ NOTHING `live-inprogress` IS DELETED. That is the take still running; it
-// is deleted on the next pass, once it has become a recording.
+// The LL-HLS loopback's dedicated RTMPS input, kept empty: RTMPS always records, and a full
+// 1000-minute cap blocks every live stream. Deletes per take, by cron (LOOP_OLD_MS), and refuses
+// a take over LOOP_CEIL. Only this input's videos, by uid; never `live-inprogress`.
+// why: lessons/workers-pub.md#loop
 
 const API = 'https://api.cloudflare.com/client/v4/accounts';
 export const LOOP_CLEAN_MS = 90_000;   // the recording exists about 60 s after the end
@@ -25,12 +9,8 @@ export const LOOP_OLD_MS = 5 * 60_000; // the cron's age floor, past any take an
 export const LOOP_CEIL = 600;          // storage minutes above which a take is refused
 export const LOOP_CAP = 1000;          // the account's cap, read back from the API too
 
-/**
- * The ceiling in force: the `LOOP_CEIL` var when it is a number (wrangler.jsonc
- * says 600), else LOOP_CEIL. A var so the guard can be PROVED: set to 0 in a
- * test run, every take must be refused with 507 (2026-10-12). An empty or
- * unparsable var falls back to 600, never to "no ceiling".
- */
+// The ceiling: the LOOP_CEIL var when numeric (0 proves the 507 refusal), else 600, never none.
+// why: lessons/workers-pub.md#loop-ceil
 export function loopCeil(env) {
   const v = env?.LOOP_CEIL;
   const n = v == null || v === '' ? NaN : Number(v);
@@ -63,11 +43,8 @@ export async function loopVideos(env) {
   }));
 }
 
-/**
- * The input's current video, from the lifecycle URL Stream publishes for it.
- * `videoUID` is null whenever the input is not live, MEASURED 2026-10-12 on
- * positron-cam, so it is read DURING a take and remembered.
- */
+// The input's current video. `videoUID` is null when the input is not live, so read it mid-take.
+// why: lessons/workers-pub.md#lifecycle
 export async function lifecycle(env) {
   if (!env.STREAM_CUSTOMER || !env.LOOP_UID) return null;
   const r = await fetch(`https://${env.STREAM_CUSTOMER}.cloudflarestream.com/${env.LOOP_UID}/lifecycle`, { cache: 'no-store' });
@@ -80,15 +57,9 @@ async function del(env, uid) {
   return r.status;
 }
 
-/**
- * Delete what is on the input. `olderThanMs` keeps anything younger (the
- * cron's floor; 0 for a per-take clean), `uids` are deleted whatever the list
- * says (the take's own video, read off the lifecycle while it ran).
- * ⚠️ A video whose `liveInput` is not this input is never touched, even if
- * the API ever answered with one: the check is here, not trusted to the URL.
- * Returns what it did in both directions, because a cleanup nobody is told
- * about cannot be told apart from a leak.
- */
+// Deletes this input's videos older than `olderThanMs`, plus `uids`; checks `liveInput` itself.
+// Reports what it did both ways, since an unreported cleanup looks like a leak.
+// why: lessons/workers-pub.md#clean
 export async function clean(env, { olderThanMs = 0, uids = [], why = '' } = {}) {
   const now = Date.now();
   const at = new Date(now).toISOString();

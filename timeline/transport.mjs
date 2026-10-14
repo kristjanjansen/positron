@@ -1,225 +1,17 @@
-// timeline/transport.mjs — transport vector + wall-lane lookahead scheduler +
-// audio lane. Plain ESM, browser+node, no deps. Seeded by plan-timeline §1/§4
-// and the graveyard laws in research/timeline-own-prior-art-2026-08.md §2:
-//   - NO timers inside the vector; position(now) is pure math over {p0,t0,rate}.
-//   - Lookahead loop + committed-vs-pending with cancel (never per-event
-//     fan-out armed at play — that corpse is reproduced in
-//     createFanoutScheduler below, for measurement only).
-//   - Drift channel first-class: every fire logs {intendedT, firedT, deltaMs};
-//     position observable is separate from event callbacks.
-//   - Explicit catch-up policy per kind: 'burst' | 'drop' | {reduce}.
-//   - The log is immutable; cursor/status state lives here, never on stored
-//     payloads (statuses live on scheduler-private wrappers).
-// Measured defaults (tick 25 ms / horizon 100 ms) validated by timeline/lab.
-//
-// v0.2 — the six API seams the first two clients (proto/jam, proto/selfrec)
-// hit, all closed in-library (see proto/jam/NOTES.md C11 for the field report):
-//   1. registerAdapter(kind, {actuate, caps, reduce, assertState}) + dispatch —
-//      clients no longer filter onFire or wire setPolicy themselves.
-//   2. setRate() no longer doubles as play(); .targetRate exposes the resume
-//      rate so a PAUSED ui can display 0.5× instead of 0.00×.
-//   3. createScheduler defaults to the WORKER tick host — the lab VERDICT —
-//      with main/raf as explicit opt-ins (hostKind or an explicit host).
-//   4. caps.audio = {ctx, leadMs} gives actuate() a third `when` argument
-//      carrying the fire's instant in AudioContext seconds: sample-accurate
-//      voices scheduled straight from the wall lane.
-//   5. reduce() is handed the WHOLE ordered prefix (plus an explicit
-//      {from:{pos,state}, since} pair), not one scan's missed events — correct
-//      for non-commutative reducers.
-//   6. onDrift()/peekDrift() read the drift channel non-destructively (HUD and
-//      assert harness can coexist); drainDrift() stays for bounded memory.
-//   +  transport.sync(pos) slaves the vector to an external clock master (a
-//      media element) without seek semantics; createDeck() is the facade.
-//
-// v0.4 — CONTINUOUS KINDS are first-class. The first four clients were all
-// discrete (a note fires, a tile appears, a cue lands); proto/paths brought the
-// first kind whose state is defined BETWEEN samples and filed six seams
-// (proto/paths/NOTES.md §3). All six are closed here:
-//   C1. deck.sampleAt(kind, pos) — the interpolated value at ANY position,
-//       O(1) amortised through a per-kind CURSOR (binary search on seek, linear
-//       advance on play). Driving an interpolator from reduceAt() at 60 Hz would
-//       reproduce demo10's per-frame-recompute-over-an-unbounded-array defect
-//       inside the library; this is the read that does not.
-//   C2. deck.bracket(kind, pos) -> {prev, a, b, next, u, …} for clients that
-//       want the raw pair (and prevs/nexts for higher-order interpolators).
-//   C3. interpolate(a, b, u, ctx) with ctx = {prev, next, pos, dtMs, …}. A
-//       spline is NOT a function of two samples: the old 2-arg signature
-//       silently forced every C1 interpolator to degrade to linear.
-//       caps.neighbourhood = k asks for k extra samples EACH SIDE of the pair
-//       (0 = two-sample, 1 = one each side = Catmull-Rom, …).
-//   C4. info.next / info.nexts in reduce. PREFIX PURITY, SHARPENED: for a
-//       DISCRETE kind the reducer is a pure function of the prefix (SEAM 5,
-//       unchanged); for a CONTINUOUS kind the state at t is a function of the
-//       prefix PLUS THE SUCCESSOR — the sample straddling t on the right, which
-//       is by construction absent from the prefix. Without info.next an
-//       interpolated reduce is not expressible at all.
-//   C5. THE CAPS ARE ACTUALLY READ: continuous, interpolate, interpolators,
-//       neighbourhood and followsTransport. An adapter declaring
-//       caps.followsTransport gets adapter.transport({reason,playing,rate,…})
-//       on play/pause/rate (never on seek — seek is reduce+assertState — and
-//       never on sync — a correction must not cascade), which is the onState
-//       reason-filter three clients had each rewritten by hand.
-//   C6. DEGRADE HONESTLY, out loud: when a client asks for something the
-//       adapter's caps refuse, deck.request(kind, want) answers in nested.mjs's
-//       shape — {wanted, chose, degraded, reason} — and every implicit
-//       degradation is recorded in deck.degradations(kind).
-// NOT done, deliberately: the library does NOT own a render tick. Rendering
-// cadence belongs to the client; observePosition() already serves anyone who
-// wants a 60 Hz pull, and a library-owned rAF would be a second timer inside a
-// library whose first law is that the vector has no timers.
-//
-// v0.5 — THE EVIDENCE FIREWALL (plan-timeline §5b). v0.4 made a continuous kind
-// interpolate; §5b names what that IS: interpolation is the first tier of a
-// restoration spectrum (1 interpolation → 2 inpainting → 3 generative infill),
-// ONE mechanism at three declared tiers, and a system that serves restored
-// material without saying so is lying by omission. Four things close it:
-//   E1. PROVENANCE IS A FIELD, not a convention. A derived row carries
-//       {source: 'reconstructor-<name>', method, confidence, tier, refs, from};
-//       an ATTESTED row carries none of it, and `row.provenance === undefined`
-//       is therefore the definition of attested — distinguishable by
-//       construction, not by a flag someone can forget to set.
-//   E2. LANE PURITY + APPEND-ONLY. A reconstructor APPENDS a derived lane; it
-//       may never write into its evidence lane, and an attested row may never
-//       be appended to a derived lane (scheduleEvent throws both ways). The
-//       master trace is never rewritten, so DELETING A RESTORATION IS DROPPING
-//       ITS LANE — reversibility for free, and provable: the master's rows are
-//       the same objects in the same order before, during and after.
-//   E3. THE POLICY IS FORCED, NOT DEFAULTED. sampleAt / reduceAt / window /
-//       bracket take {evidence}: 'attested' | {restored:{maxTier:n}} | 'all'.
-//       Resolution is per-call → explicit deck policy (createDeck({evidence}))
-//       → THROW. There is no silent default; the only omission that is answered
-//       is one whose answer is provably identical under all three policies
-//       (policyMatters() below), which is not a default but a proof.
-//   E4. degradations() IS THE HONESTY LEDGER. Asking `attested` of a kind that
-//       can only answer by inventing returns the last ATTESTED sample plus a
-//       {wanted, chose, degraded, reason} report — the same shape C6 already
-//       used — and asking for a tier the deck does not hold, or querying a lane
-//       whose tier exceeds the policy, is reported the same way. A lane over
-//       the cap is EXCLUDED, never quietly down-mixed.
-// Tier 1 ships as a real reconstructor (registerReconstructor: the interpolator
-// sampleAt already is, appended as rows). Tiers 2 and 3 are UNIMPLEMENTED BY
-// DESIGN — they are the same seam, not the same code: a tier ≥ 2 registration
-// must bring its own derive(), and the library refuses to guess one.
-//
-// v0.6 — UNCERTAINTY AS POSITION (plan-timeline §7.4, §−1's founding ask: "a
-// smear, not a fake instant"; research/spatiotemporal-uncertainty-2026-08.md).
-// `at` does NOT become a distribution. It stays one scalar, and every hot loop
-// (insertInto, afterIdx, createCursor's bsearch, scan's `ev.at > horizonPos`
-// early exit, reconcile) is byte-for-byte unchanged. Four things close it:
-//   U1. THE ROW SHAPE. One optional frozen sibling `when = {verbatim, edtf,
-//       earliest, latest, innerFrom, innerTo, rule, kind, note}` (§8.1).
-//       ABSENCE OF `when` IS THE CRISP FAST PATH — exactly as absence of
-//       `provenance` is the definition of attested. TWO ABSENCES, TWO AXES:
-//       an uncertain ATTESTED row is tier 0 with a wide bracket, a precise
-//       RESTORED row is tier 1 with no bracket at all, and neither restriction
-//       may imply the other. `when` is normalized and FROZEN PER ROW, never
-//       interned (CRM: one shared Time-Span asserts simultaneity).
-//   U2. THE FIRING RULE: `at = when.earliest`, ALWAYS, resolved ONCE at ingest
-//       by a VERSIONED NAMED RULE recorded on the row (DarwinCore's
-//       `georeferenceProtocol`). It is one-sided sound — `earliest <= true
-//       position` is a theorem, not an estimate — and it gives the existing
-//       `ev.at <= pos` a true semantics: "POSSIBLY already occurred by pos",
-//       the *possible* half of Allen, for free. The anchoring is REPORTED, not
-//       silent: degradations() gains a fourth literal, 'anchored'.
-//   U3. THE QUERY KNOB. window(kind, a, b, {certainty:'possible'|'necessary'}).
-//       possible = the bracket OVERLAPS the range (Postgres &&); necessary =
-//       the range CONTAINS the row's certain extent — the INNER bracket
-//       (Y @> cert), because `Y @> outer` under-reports. Unlike the evidence
-//       policy this knob DEFAULTS rather than throws: silence here
-//       over-includes, it does not fabricate. Where 'necessary' genuinely
-//       cannot be decided (no inner bracket, outer not contained) the row is
-//       excluded AND the undecidability is reported ('unanswerable').
-//   U4. positionAccounting(kind?) — the position-axis twin of
-//       evidenceAccounting(), reported BY RULE, so "43 % of this lane is
-//       positioned by a padding artefact" is a number someone can see (NSSDA's
-//       discipline: publish the accuracy statement or declare it untested).
-// Also closed here, because they degraded QUIETLY and caps exist to prevent
-// exactly that:
-//   U5. caps.series(payload) — bracketing used to group by KIND, so a
-//       multi-controller lane's "straddling pair" could be two different
-//       controllers. sampleAt/bracket now ride a PER-SERIES sub-lane when the
-//       adapter declares one, and an omitted {series} on a lane that declares
-//       caps.series is reported instead of silently answering nonsense.
-//   U6. TWO-PHASE SEEK — JACK's slow-sync barrier. Opt-in per adapter
-//       (caps.slowSync), non-blocking (the locate happens immediately; only
-//       ROLLING waits), FAIL-OPEN on timeout (laggards catch up, and the
-//       timeout is on the record), re-armed by a locate mid-roll, and carrying
-//       Ardour's LocateTransportDisposition {MustRoll, MustStop,
-//       RollIfAppropriate} in the seek request.
-// DEFERRED, explicitly (research §8.6): space entirely; the trapezoid interior
-// (innerFrom/innerTo are STORED and read only by the necessary predicate and a
-// renderer's core/skirt split — no membership functions, no fuzzified Allen);
-// NON-CONTIGUOUS brackets (EDTF's `[1821,1822,1830..1832]` / `1984-X1` — a
-// `when` bracket is CONTIGUOUS and that is NOT a guarantee about the world);
-// Monte Carlo; competing authorities (one `when` per row); transaction time;
-// and `when` on spans (the span type does not exist yet).
-//
-// v0.7 — THE FIRE-SIDE FIREWALL and deck.assertState (plan-timeline §8.8's two
-// named seams). v0.5's firewall gates READS. It does not gate ACTUATION, so an
-// evidence-only PERFORMANCE — the thing a heritage institution would stand
-// behind — was the adapter's own job, i.e. unenforced. Measured on the shipped
-// code: under `evidence:'attested'` a tier-3 generative lane fired 3/3 of its
-// rows, and a seek pushed a state folded from those same rows into
-// `adapter.assertState()` while `deck.reduceAt()` for that lane returned null.
-// ONE LANE, TWO ANSWERS, decided by which door the query came through.
-//   G1. ACTUATION HAS TWO DOORS, and both are now gated: `fire()` (the
-//       scheduled actuation) and `applyReduce()`'s `assertState()` call (the
-//       seek/catch-up actuation). A lane whose tier exceeds the policy is
-//       REFUSED at both, exactly as `window()` EXCLUDES it.
-//   G2. UNCONDITIONAL, NOT `caps.evidenceGated`. An opt-in cap reproduces the
-//       `caps.series` failure with the sign flipped: the safe behaviour would
-//       depend on every adapter author remembering to declare it, and the
-//       guarantee an archive needs cannot rest on that. It is also unnecessary:
-//       the gate can only bite where the client ALREADY made §5b's forced
-//       choice (an unset policy is EV_UNSET, maxTier Infinity, nothing gated),
-//       so it never surprises a client who never chose. And it costs nothing:
-//       LANE PURITY means the gate is a per-LANE Set, so the hot path is
-//       `gatedKinds.size !== 0` — one integer compare for every deck that holds
-//       no restoration at all, which is every deck that existed before v0.5.
-//   G3. REFUSED, NEVER SILENT. A gated row takes a new terminal status
-//       'gated' — it is not fired, not dropped and not reduced — and the
-//       refusal surfaces three ways: `degradations()` in the same
-//       {wanted, chose, degraded, reason} shape, `gateAccounting()`, and the
-//       `onGate()` channel. It emits NO drift row, because drift is the record
-//       of what reached a transducer and a refusal did not; that absence is
-//       what makes the actuation trace of an 'attested' deck BIT-IDENTICAL to
-//       the trace of a deck from which the derived lanes were physically
-//       removed.
-//   G4. TIGHTENING MID-PLAY RE-ASSERTS. `setEvidence()` is a state change, not
-//       a filter: a lane that becomes gated is asked to go quiet
-//       (`caps.absentState:'silence'` → `silence({reason:'evidence-gated'})`;
-//       without the cap it HOLDS and says so), and a lane that becomes ungated
-//       is re-asserted at the playhead (reduce + assertState) so it catches up
-//       on the prefix it was refused. Committed one-shots on a newly gated lane
-//       are cancelled at the transition, so the tighten is immediate rather
-//       than one tick late.
-//   G5. deck.assertState(kind, state, info) — §7.5's DAW "MIDI chase" / ETC
-//       Eos "Assert", at the DECK level: push authoritative state IN without
-//       replaying a prefix (after an external sync, a media-master handover, a
-//       policy change, a loop wrap). It moves the reduce snapshot to
-//       {pos, state}, so a forward-folding reducer's `info.from`/`info.since`
-//       continue from the assertion. It writes NO drift row (an assert has no
-//       event and no intended instant; a synthetic row would poison every
-//       lateness statistic in the repo). Verification is OPT-IN
-//       (`{verify:true}`): checking costs exactly the fold assertState exists
-//       to avoid, and unlike the evidence policy, silence here cannot fabricate
-//       — the caller IS the authority. When asked, a disagreement with
-//       reduce(<= pos) is reported as 'asserted-over'.
+// Transport vector, lookahead scheduler and audio lane; ESM, browser and node, no deps. No timers
+// in the vector (position is math over {p0,t0,rate}); tick 25 ms, horizon 100 ms (timeline/lab).
+// Adapters, continuous kinds, the evidence firewall (reads and actuation), and `when` brackets.
+// why: lessons/timeline-transport.md#header
 
-// ---------------------------------------------------------------------------
-// Clocks. A ClockSource is {domain, now()} with now() in *milliseconds* float
-// (µs resolution preserved in the fraction). Wall = epoch-anchored monotonic
-// (steal #8: performance.timeOrigin + performance.now(), never Date.now()).
-// ---------------------------------------------------------------------------
+// A ClockSource is {domain, now()} in float ms. Wall is performance.timeOrigin + performance.now().
+// why: lessons/timeline-transport.md#clocks
 
 export function wallClock() {
   return { domain: 'wall', now: () => performance.timeOrigin + performance.now() };
 }
 
-/** Audio-domain clock over an AudioContext, with a wall<->audio anchor.
- *  now() returns wall-equivalent ms derived from ctx.currentTime, so a
- *  transport on this clock advances on the audio hardware clock.
- *  reanchor() re-samples the mapping (call sparingly; drift is the point). */
+// An AudioContext clock: now() is wall-equivalent ms from ctx.currentTime; reanchor() re-samples.
+// why: lessons/timeline-transport.md#audio-clock
 export function audioClock(ctx) {
   let anchor = sample();
   function sample() {
@@ -243,19 +35,10 @@ export function audioClock(ctx) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Transport vector. State is exactly {p0, t0, rate}; position is pure math.
-// rate === 0 means paused; play() restores the last nonzero rate.
-//
-// SEAM 2 (client feedback C11.2): setRate() used to double as play() — there
-// was no set-rate-while-paused and `lastRate` was private, so a paused UI could
-// only ever display 0.00×. Now:
-//   setRate(r)  sets the rate WITHOUT starting playback (paused stays paused);
-//               setRate(0) is still an explicit pause.
-//   play(r?)    is the only thing that starts motion (optionally at rate r).
-//   .rate       current effective rate (0 while paused) — unchanged.
-//   .targetRate the rate play() would resume at — what a paused UI displays.
-// ---------------------------------------------------------------------------
+// State is exactly {p0, t0, rate}; rate 0 is paused. setRate(r) never starts playback; play(r?)
+// does.
+// .rate is the current rate (0 paused), .targetRate what play() resumes at.
+// why: lessons/timeline-transport.md#transport
 
 export function createTransport({ clock = wallClock() } = {}) {
   let p0 = 0, t0 = clock.now(), rate = 0, lastRate = 1;
@@ -294,12 +77,10 @@ export function createTransport({ clock = wallClock() } = {}) {
     },
     pause() { if (rate !== 0) update(0, undefined, 'pause'); },
     seek(pos) { update(undefined, pos, 'seek'); },
-    /** Slave the vector to an EXTERNAL clock master (a media element, a remote
-     *  peer) — re-anchor {p0,t0} onto an observed position WITHOUT seek
-     *  semantics: no status reconcile, no re-assert, nothing re-fires; only
-     *  committed timers are re-armed against the new anchor. Corrections
-     *  smaller than toleranceMs are ignored (don't churn the lookahead).
-     *  Returns the correction actually applied, in ms. */
+    // Slave to an external clock master without seek semantics: nothing re-fires, only committed
+    // timers
+    // re-arm. Corrections under toleranceMs are ignored. Returns the correction in ms.
+    // why: lessons/timeline-transport.md#sync
     sync(pos, { toleranceMs = 0 } = {}) {
       const now = clock.now();
       const d = pos - position(now);
@@ -320,15 +101,12 @@ export function createTransport({ clock = wallClock() } = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tick hosts. A TickHost is {start(onTick, tickMs), stop(), setTimer(delayMs,
-// fn) -> cancelFn}. The scheduler only ever talks to time through its clock
-// and its host — which is what makes the virtual runtime (below) possible.
-// ---------------------------------------------------------------------------
+// A TickHost is {start(onTick, tickMs), stop(), setTimer(delayMs, fn) -> cancel}; time only arrives
+// through the clock and the host, which is what makes the virtual runtime possible.
+// why: lessons/timeline-transport.md#tick-hosts
 
-/** (a) main-thread setTimeout/setInterval host — tightest in the foreground
- *  (6.4 ms p95 measured) but dies to the 1 Hz clamp in a hidden tab; an
- *  explicit opt-in since v0.2 (SEAM 3). */
+// Main-thread timers: 6.4 ms p95 in the foreground, clamped to 1 Hz in a hidden tab. Opt-in.
+// why: lessons/timeline-transport.md#main-host
 export function mainTickHost() {
   let iv = null;
   return {
@@ -372,9 +150,8 @@ export function workerTickHost() {
   };
 }
 
-/** (c) rAF-driven host — the anti-pattern for background tabs, measured
- *  anyway. Ticks on every frame; "timers" fire on the first frame past their
- *  deadline (frame-quantized, dies entirely when the tab is hidden). */
+// rAF host: frame-quantized and dead in a hidden tab; measured, not recommended.
+// why: lessons/timeline-transport.md#raf-host
 export function rafTickHost() {
   let running = false, onTick = null, seq = 0;
   const armed = new Map(); // id -> {due, fn}
@@ -398,12 +175,9 @@ export function rafTickHost() {
   };
 }
 
-/** SEAM 3: the SHIPPING default host. The lab VERDICT is worker (the only host
- *  that survives a hidden tab: 8.5 ms p95 hidden vs main ~1 s, rAF 9.2 s), so
- *  the code default is worker wherever Worker exists, and main is an explicit
- *  opt-in (`host: mainTickHost()` or `hostKind: 'main'`) for foreground-
- *  critical precision (6.4 vs 15.3 ms p95, measured). Outside a browser there
- *  is no Worker — fall back to the main-thread host. */
+// The default is the worker host (8.5 ms p95 hidden, against about 1 s main and 9.2 s rAF);
+// main is opt-in for foreground precision. Outside a browser, the main-thread host.
+// why: lessons/timeline-transport.md#default-host
 export function defaultTickHost() {
   return typeof Worker === 'function' ? workerTickHost() : mainTickHost();
 }
@@ -414,19 +188,9 @@ export function tickHostByKind(kind) {
   return defaultTickHost();
 }
 
-// ---------------------------------------------------------------------------
-// THE CURSOR (v0.4, C1). "The pair of samples straddling pos" is the one read a
-// continuous kind makes constantly — once per rendered frame, per lane. Done by
-// rescanning it is O(n) per frame over an unbounded array: demo10's defect. Done
-// by a cursor it is O(1) amortised while playing forward (the index advances by
-// ~1 per frame), O(log n) on a seek, and it degrades to a binary search rather
-// than a walk on random access. The scheduler runs one of these per continuous
-// kind; it is exported because a client's OWN un-logged lanes (ground truth, an
-// analysis track) want exactly the same read and should not re-write it.
-//
-// `comparisons` counts every probe of a row's time — that is what makes
-// "this is not O(n)" an assertion in prop-test rather than a claim.
-// ---------------------------------------------------------------------------
+// The cursor: the pair straddling pos, O(1) amortised playing forward, O(log n) on a seek.
+// `comparisons` counts probes so prop-test can assert it is not O(n).
+// why: lessons/timeline-transport.md#cursor
 
 export function createCursor(rows, { key = (r) => r.at, linearWindow = 4 } = {}) {
   let i = 0, comparisons = 0, searches = 0, advances = 0, hits = 0;
@@ -462,10 +226,9 @@ export function createCursor(rows, { key = (r) => r.at, linearWindow = 4 } = {})
     rows,
     reset() { i = 0; },
     stats: () => ({ comparisons, searches, advances, hits, i }),
-    /** {i, u, pos, a, b, prev, next, prevs, nexts, aAt, bAt, dtMs} | null.
-     *  u is clamped to [0,1]: before the first sample and after the last one the
-     *  bracket degenerates to the terminal pair (u = 0 / u = 1), so a caller
-     *  never has to special-case the ends. */
+    // {i, u, pos, a, b, prev, next, prevs, nexts, aAt, bAt, dtMs} | null; u clamped to [0,1] at the
+    // ends.
+    // why: lessons/timeline-transport.md#bracket
     bracket(pos, nbr = 0) {
       const n = rows.length;
       if (!n) return null;
@@ -499,22 +262,9 @@ function nearestRate(wanted, allowed) {
   return { chose: best, degraded: true, reason: `caps.rates lattice [${allowed}] cannot express ${wanted}` };
 }
 
-// ---------------------------------------------------------------------------
-// THE EVIDENCE POLICY (v0.5, plan-timeline §5b). Three declared forms, one
-// canonical shape {mode, maxTier, label}:
-//
-//   'attested'                 nothing invented. maxTier 0 — and note that this
-//                              EXCLUDES interpolation, which is tier-1
-//                              restoration however cheap it looks.
-//   {restored:{maxTier: n}}    restoration up to tier n:
-//                              1 interpolation (bounded by evidence both sides)
-//                              2 inpainting     (context + priors)
-//                              3 generative     (detail never captured)
-//   'all'                      every tier, and unqualified interpolation too.
-//
-// There is deliberately NO fourth form and no boolean shorthand: a policy that
-// can be written `true` is a policy nobody reads.
-// ---------------------------------------------------------------------------
+// Evidence policy, canonical {mode, maxTier, label}: 'attested' (tier 0, no interpolation),
+// {restored: {maxTier}} (1 interpolation, 2 inpainting, 3 generative) or 'all'. No boolean form.
+// why: lessons/timeline-transport.md#evidence
 
 export function normalizeEvidence(p, where = 'evidence') {
   if (p === undefined || p === null) return null;
@@ -529,44 +279,10 @@ export function normalizeEvidence(p, where = 'evidence') {
   throw new Error(`${where}: unknown policy ${JSON.stringify(p)} — use 'attested' | {restored:{maxTier:n}} | 'all'`);
 }
 
-// ---------------------------------------------------------------------------
-// THE POSITION BRACKET (v0.6, U1 — research §8.1). Nine fields, no more:
-//
-//   verbatim   EXACTLY what the source said ('Esmaeeter 4. jaanuar 1965',
-//              '1965-07-15', 'sometime that spring'). Never normalised, never
-//              dropped — it is the evidence that the rule fired, and the only
-//              way to re-audit which rows we reinterpreted.
-//   edtf       the honest re-expression ('1965', '1971-21?'), or null.
-//   earliest   CLOSED-open transport ms. THE indexed bound, and the anchor.
-//   latest     the open upper bound, or null for an OPEN end (EDTF '..').
-//              open (still running) and unknown (we lost it) are different
-//              facts; null here means open, and `rule` carries which.
-//   innerFrom  CRM P81a — null when there is no known inner bound. CRM Issue
-//   innerTo    CRM P81b — 288: not instantiating P81 is CORRECT when nothing is
-//              known. innerFrom > innerTo is LEGAL, not a bug: it degenerates
-//              the trapezoid to a triangle, i.e. "no known inner bound".
-//   rule       the VERSIONED NAMED RULE that produced the bracket and the
-//              anchor — DarwinCore's `georeferenceProtocol`. Required.
-//              'err-july15-padding@1', 'wikidata-precision@1', 'edtf-l1@1'.
-//              Two reserved unversioned literals: 'hand' (a human typed it)
-//              and 'unknown' (genuinely unbounded). Everything else MUST carry
-//              @<int>, because when a heuristic changes the affected rows have
-//              to be one `WHERE rule = …` away.
-//   kind       'ignorance' (a fact of the matter exists and the catalogue lost
-//              it — narrowing is a REPAIR) | 'vagueness' (no fact of the matter
-//              — narrowing is a FALSIFICATION). Same bracket, opposite
-//              affordances; the transport treats them identically (a vague
-//              event still has to sort) and only the UI cares.
-//   note       DarwinCore's `georeferenceRemarks`: the assumption made.
-//
-// NOT here, deliberately: `confidence`. provenance.confidence is a number in
-// [0,1] about FABRICATION; position uncertainty is a bracket, not a scalar, and
-// no mature standard in the survey emits a confidence number for it.
-//
-// The returned object is a FRESH FROZEN COPY on every call. Never interned:
-// sharing one uncertainty object between two rows asserts they are simultaneous
-// (CIDOC E52 scope note), which is a claim no ingest ever means to make.
-// ---------------------------------------------------------------------------
+// The position bracket: verbatim, edtf, earliest (the anchor), latest (null = open), innerFrom,
+// innerTo (inverted is legal), rule (versioned, or 'hand'/'unknown'), kind (ignorance|vagueness),
+// note. No confidence. A fresh frozen copy per call, never interned (sharing asserts simultaneity).
+// why: lessons/timeline-transport.md#when
 
 export const WHEN_KINDS = ['ignorance', 'vagueness'];
 const RULE_RE = /^[A-Za-z0-9][A-Za-z0-9._/-]*@\d+$/;
@@ -592,9 +308,8 @@ export function normalizeWhen(w, where = 'when') {
       `A zero-width bracket is a crisp position — OMIT \`when\` entirely (absence of \`when\` IS the crisp fast path, §8.1 rule 1), ` +
       `exactly as DarwinCore refuses zero for coordinateUncertaintyInMeters. Use latest:null for an OPEN end.`);
   const innerFrom = num('innerFrom', false), innerTo = num('innerTo', false);
-  // CRM's four-date constraints — MINUS the one that is deliberately absent.
-  // P82a <= P81a, P82a <= P81b, P81a <= P82b, P81b <= P82b are real; asserting
-  // P81a <= P81b is a BUG, not a validation (§3).
+  // CRM's four-date constraints minus P81a <= P81b, which is deliberately absent.
+  // why: lessons/timeline-transport.md#crm
   for (const [k, v] of [['innerFrom', innerFrom], ['innerTo', innerTo]]) {
     if (v === null) continue;
     if (v < earliest) throw new Error(`${where}.${k} (${v}) precedes earliest (${earliest}) — CRM requires P82a <= P81a and P82a <= P81b`);
@@ -613,7 +328,8 @@ export function normalizeWhen(w, where = 'when') {
     throw new Error(`${where}.kind must be 'ignorance' (a fact of the matter exists and the catalogue lost it — narrowing is a repair) ` +
       `or 'vagueness' (no fact of the matter — narrowing is a falsification), got ${JSON.stringify(kind)}`);
   const str = (k) => (w[k] === undefined || w[k] === null ? null : String(w[k]));
-  // A FRESH object every call — never interned (§3's CRM trap).
+  // A fresh object every call, never interned.
+  // why: lessons/timeline-transport.md#fresh
   return Object.freeze({
     verbatim: str('verbatim'), edtf: str('edtf'),
     earliest, latest, innerFrom, innerTo,
@@ -621,11 +337,8 @@ export function normalizeWhen(w, where = 'when') {
   });
 }
 
-/** U3 — the certainty knob. Unlike the evidence policy this DEFAULTS instead of
- *  throwing: 'possible' never omits a row that really is in the window, so a
- *  silent default here over-includes; it cannot fabricate. The asymmetry is the
- *  point — forced choice where silence mixes in dreamed data, safe default
- *  where silence merely widens the net. */
+// Certainty defaults to 'possible' rather than throwing: silence here only widens the net.
+// why: lessons/timeline-transport.md#certainty
 export function normalizeCertainty(c, where = 'certainty') {
   if (c === undefined || c === null) return { mode: 'possible', label: 'possible', implicit: true };
   if (c === 'possible') return { mode: 'possible', label: 'possible', implicit: false };
@@ -633,36 +346,16 @@ export function normalizeCertainty(c, where = 'certainty') {
   throw new Error(`${where}: unknown certainty ${JSON.stringify(c)} — use 'possible' (bracket overlaps the range) | 'necessary' (the range contains the row's certain extent)`);
 }
 
-// ---------------------------------------------------------------------------
-// Wall-lane scheduler: lookahead loop, committed-vs-pending, per-kind catch-up
-// policies, first-class drift log, ADAPTER REGISTRY. Port of the timed-messages
-// crossing engine generalized per plan-timeline §1.
-//
-// SEAM 1 — adapter registry. Clients think in per-kind adapters; the library
-// used to offer only unfiltered onFire + setPolicy, so every client re-wrote
-// the same dispatch/filter/policy-wiring block. registerAdapter() now lives
-// here:
-//     sched.registerAdapter(kind, {
-//       caps,                       // {catchUp, audio, rates, continuous,
-//                                   //  interpolate, interpolators, neighbourhood,
-//                                   //  followsTransport, …} — declares behaviour
-//       actuate(payload, rec, when),// called ONLY for this kind
-//       reduce(payloads, pos, info),// catch-up + seek fold (whole prefix, SEAM 5;
-//                                   //  + info.next/info.nexts, C4)
-//       assertState(state, info),   // idempotent state assertion
-//       interpolate(a, b, u, ctx),  // CONTINUOUS kinds only (C1/C3)
-//       transport(state),           // caps.followsTransport only (C5)
-//     }) -> unregister
-// caps.catchUp ('burst' | 'drop' | 'reduce') selects the per-kind policy, so a
-// client never touches setPolicy either. onFire stays, for HUDs and harnesses
-// that want every kind.
-// ---------------------------------------------------------------------------
+// Lookahead loop, committed vs pending, per-kind catch-up, a drift log and the adapter registry:
+// registerAdapter(kind, { caps, actuate(payload, rec, when), reduce(payloads, pos, info),
+// assertState, interpolate, transport }) -> unregister. caps.catchUp: 'burst' | 'drop' | 'reduce'.
+// why: lessons/timeline-transport.md#scheduler
 
 export function createScheduler(transport, {
   tickMs = 25,
   horizonMs = 100,
   lateGraceMs = 150,   // late fires within grace are ordinary jitter, not a catch-up event
-  hostKind,            // 'worker' | 'main' | 'raf' — explicit opt-in shorthand
+  hostKind,            // 'worker' | 'main' | 'raf', an explicit opt-in shorthand; why: lessons/timeline-transport.md#host-kind
   host = tickHostByKind(hostKind),   // SEAM 3: worker by default (lab VERDICT)
   driftLimit = 20000,  // retained drift rows when nobody drains (SEAM 6)
   evidence,            // E3: the deck-level evidence policy, explicitly chosen
@@ -688,22 +381,18 @@ export function createScheduler(transport, {
   let driftTotal = 0, driftDropped = 0;
   let busyMs = 0;               // accumulated scheduler+fire callback self-time
   let lastTickAt = null, maxTickGapMs = 0;
-  // G1/G2 — THE FIRE-SIDE FIREWALL. `gatedKinds` is the set of lanes whose
-  // ACTUATION the current policy refuses. It is a per-LANE set and not a
-  // per-row test because of LANE PURITY (a lane is attested or derived, never
-  // both) — the same invariant that makes the read side O(1). The hot path in
-  // scan()/fire() is therefore `gatedKinds.size !== 0`: one integer compare for
-  // every deck that holds no restoration, which is every deck that existed
-  // before v0.5. Recomputed only when the lane set changes (a first derived row
-  // or a tier rise) or the policy changes — never per row, never per tick.
+  // The fire-side firewall: lanes whose actuation the policy refuses. Per lane (lane purity), so
+  // the
+  // hot path is `gatedKinds.size !== 0`; recomputed only on a lane-tier or policy change.
+  // why: lessons/timeline-transport.md#gated-kinds
   let gatedKinds = new Set();
   let gateGen = 0;
   let adapterGen = 0;
   const gateStats = { fires: 0, folds: 0, asserts: 0, silenced: 0, held: 0, reasserted: 0, byKind: new Map() };
   const gateLog = [];           // bounded transition log (policy changes only)
   const gateCbs = new Set();
-  // G5 — the assert channel. Deliberately NOT the drift channel: a drift row is
-  // {id, at, intendedUs, deltaMs} for one EVENT, and an assert has no event.
+  // The assert channel, separate from drift: an assert has no event.
+  // why: lessons/timeline-transport.md#assert-log
   const assertLog = [];
   let assertTotal = 0, assertDropped = 0;
 
@@ -739,13 +428,9 @@ export function createScheduler(transport, {
     if (!lp) laneProv.set(kind, lp = { kind, attested: 0, derived: 0, tier: 0, source: null, method: null, confN: 0, confSum: 0, confMin: null, confMax: null });
     return lp;
   }
-  /** U4 — the POSITION ledger, the exact twin of laneProv on the other axis.
-   *  Counters only (O(1) per row); medians are computed by scanning the lane at
-   *  report time, because positionAccounting() is a reporting call and a
-   *  parallel span array would double the deck's memory for a number nobody
-   *  reads at 60 Hz. `maxSpan` is load-bearing beyond reporting: it is how far
-   *  BACK a certainty query has to scan (the interval-index trick), and a lane
-   *  with maxSpan 0 — i.e. every lane that existed before v0.6 — costs nothing. */
+  // The position ledger: counters only, medians at report time. `maxSpan` bounds how far back a
+  // certainty query scans; 0 costs nothing.
+  // why: lessons/timeline-transport.md#pos-for
   function posFor(kind) {
     let pp = lanePos.get(kind);
     if (!pp) lanePos.set(kind, pp = { kind, crisp: 0, smeared: 0, maxSpan: 0, maxFinite: 0, open: 0, withInner: 0, ignorance: 0, vagueness: 0, byRule: new Map() });
@@ -790,26 +475,18 @@ export function createScheduler(transport, {
     return d;
   }
 
-  /** SEAM 6: drift is a CHANNEL, not a mailbox — subscribers see every row and
-   *  peekDrift() is non-destructive, so a HUD and an assert harness can both
-   *  observe the same fires. drainDrift() stays, for bounded memory; the
-   *  retained buffer is also capped at driftLimit so a peek-only client cannot
-   *  grow it without bound (drops are counted, never silent). */
+  // Drift is a channel: subscribers and peekDrift() see every row; drainDrift() bounds memory, and
+  // the buffer is capped at driftLimit with drops counted.
+  // why: lessons/timeline-transport.md#log-drift
   function logDrift(rec) {
     driftLog.push(rec); driftTotal++;
     if (driftLog.length > driftLimit) driftDropped += driftLog.splice(0, driftLog.length - driftLimit).length;
     for (const cb of driftCbs) cb(rec);
   }
 
-  /** SEAM 4: wall -> audio bridge. The wall lane hands actuate() an instant;
-   *  an adapter that declares caps.audio = {ctx, leadMs?} additionally gets a
-   *  `when` object carrying that instant in AudioContext seconds, so a
-   *  sample-accurate voice can be start()ed FROM THE WALL LANE. The conversion
-   *  is free: the drift record already knows how early/late this fire is
-   *  (deltaMs), and ctx.currentTime sampled at the same instant is the audio
-   *  domain's "now" — so intended-in-audio = ctx.currentTime - deltaMs/1000.
-   *  A negative delta (fired early, the normal lookahead case) leaves positive
-   *  headroom: `when.earlyMs`. Opt-in per adapter; nothing else pays for it. */
+  // With caps.audio = {ctx, leadMs?}, actuate gets a `when` in AudioContext seconds:
+  // ctx.currentTime - deltaMs/1000, with `earlyMs` headroom. Opt-in per adapter.
+  // why: lessons/timeline-transport.md#audio-when
   function audioWhen(ad, rec) {
     const cfg = ad && ad.caps && ad.caps.audio;
     if (!cfg || !cfg.ctx || rec.deltaMs === null) return null;
@@ -823,11 +500,8 @@ export function createScheduler(transport, {
   }
 
   function fire(ev, origin) {
-    // G1 — the first of actuation's two doors. One integer compare when nothing
-    // is gated; a Set hit otherwise. scan() refuses earlier still (so no timer
-    // is ever armed for a gated row), but this guard is load-bearing and not
-    // belt-and-braces: a committed one-shot armed BEFORE a mid-play tighten, and
-    // the overdub path in scheduleEvent(), both arrive here directly.
+    // The first actuation door: committed one-shots and the overdub path arrive here directly.
+    // why: lessons/timeline-transport.md#fire-gate
     if (gatedKinds.size !== 0 && gatedKinds.has(ev.kind)) return gateRefuse(ev, origin);
     const firedT = clock.now();
     const intended = transport.timeAt(ev.at);
@@ -853,13 +527,9 @@ export function createScheduler(transport, {
     for (const cb of fireCbs) cb(pub, rec);
     busyMs += clock.now() - t0;
   }
-  /** E1: an ATTESTED row has no `provenance` key AT ALL. That absence is the
-   *  definition of attested — not a flag, not `provenance: null`, nothing to
-   *  forget to set and nothing a payload can spoof (the key is injected by the
-   *  library, after the payload, and only when the row really is derived).
-   *  U1: `when` is the SECOND absence, on the OTHER axis. A crisp row has no
-   *  `when` key; a row may carry either, both or neither, and no query may
-   *  read one as evidence about the other. */
+  // An attested row has no `provenance` key at all; a crisp row no `when` key. Neither implies the
+  // other.
+  // why: lessons/timeline-transport.md#public-ev
   const publicEv = (ev) => {
     const o = ev.prov
       ? { id: ev.id, at: ev.at, kind: ev.kind, payload: ev.payload, provenance: ev.prov }
@@ -868,27 +538,16 @@ export function createScheduler(transport, {
     return o;
   };
 
-  /** E1/E2. The ONE place a row enters the log — and therefore the one place
-   *  LANE PURITY is enforced: a lane is attested or derived, never both. That
-   *  single invariant is what makes the firewall O(1) (a lane's tier is the
-   *  lane's, not a per-row scan) and what makes §5b's reversibility claim
-   *  *provable* rather than asserted: a restoration lives in its own lane, so
-   *  deleting it is dropping that lane, and the master trace's rows are the same
-   *  objects in the same order before, during and after. */
+  // The one place a row enters the log, so lane purity is enforced here: a lane is attested or
+  // derived, never both, which makes the firewall O(1) and a restoration removable by dropping its
+  // lane.
+  // why: lessons/timeline-transport.md#schedule-event
   function scheduleEvent({ at, kind = 'default', id, payload, provenance, when }) {
     const lp = provFor(kind);
-    // U2 — THE FIRING RULE, and it is the whole of it: `at = when.earliest`,
-    // resolved ONCE, here, by the named rule the row carries. One-sided sound
-    // (`earliest <= true position` is a theorem), so `ev.at <= pos` keeps a TRUE
-    // meaning — "possibly already occurred by pos" — instead of a fictional one.
-    // Rejected: a midpoint (that is the `07-15` disease with our name on it and
-    // it supports no inference), the inner bound (frequently absent, and a
-    // stronger claim than the outer bound), render-only-never-fire (prefixEvents
-    // folds every row with at <= pos, so a non-firing row hands a reducer a
-    // positionless payload AND vanishes from evidenceAccounting — silently
-    // shrinking the archive under exactly the query the firewall protects), and
-    // a per-kind caps policy (the transport has ONE ordering key; two lanes
-    // disagreeing about what `at <= pos` means makes window() ill-defined).
+    // `at = when.earliest`, resolved once by the row's named rule: one-sided sound, so `ev.at <=
+    // pos` means "possibly occurred by pos". Midpoints, inner bounds and per-kind policies were
+    // rejected.
+    // why: lessons/timeline-transport.md#firing-rule
     const w = normalizeWhen(when, `schedule({kind:'${kind}'}).when`);
     let atPos = at;
     if (w) {
@@ -944,10 +603,9 @@ export function createScheduler(transport, {
         lp.confMax = lp.confMax === null ? prov.confidence : Math.max(lp.confMax, prov.confidence);
       }
     } else lp.attested++;
-    // G2: the gated-lane set only ever changes when a lane BECOMES derived or
-    // its tier RISES — one recompute per lane over a whole restoration, not one
-    // per row. Must run before the overdub fire below, which goes through the
-    // gate like any other actuation.
+    // Recompute the gate only when a lane becomes derived or its tier rises, before the overdub
+    // fire.
+    // why: lessons/timeline-transport.md#lane-tier
     if (prov && (derivedBefore === 0 || lp.tier !== tierBefore)) recomputeGate('lane-tier');
     if (running && transport.rate > 0 && at <= transport.position()) fire(ev, 'overdub');
     return ev.id;
@@ -997,9 +655,8 @@ export function createScheduler(transport, {
       const ev = events[i];
       if (ev.at > horizonPos) break;
       if (ev.status !== 'pending') continue;
-      // G1 — refuse HERE rather than at the commit, so a gated lane never arms
-      // a timer at all. Strictly cheaper than firing: no drift row, no actuate,
-      // no fire callbacks, no one-shot.
+      // Refuse at scan so a gated lane never arms a timer.
+      // why: lessons/timeline-transport.md#scan-gate
       if (gating && gatedKinds.has(ev.kind)) { gateRefuse(ev, 'scan'); continue; }
       if (ev.at <= pos) {
         const lateMs = (pos - ev.at) / rate;
@@ -1026,40 +683,10 @@ export function createScheduler(transport, {
     for (const [kind, batch] of reduceBatches) applyReduce(kind, batch, pos, now, 'catch-up');
   }
 
-  // -------------------------------------------------------------------------
-  // SEAM 5 — the reduce policy's INPUT. It used to see only the events one scan
-  // happened to miss, which is fine for a commutative fold (held notes) and
-  // WRONG for a non-commutative one (a counter, a cue state machine): the
-  // reducer cannot know what came before the window.
-  //
-  // GUARANTEE NOW: a reducer is always handed the COMPLETE ORDERED PREFIX of
-  // its kind — every event with at <= pos in (at, seq) order — so `reduce` is a
-  // pure function of the prefix and `assertState` is an absolute (idempotent)
-  // assertion. That makes it exactly the C2 property in miniature:
-  //     assertState(reduce(prefix(<=t)))  ===  state after play(0 -> t)
-  // for ANY reducer, commutative or not. Reducers that prefer to fold forward
-  // get the explicit alternative in the same call: info.from = {pos, state}
-  // (the last reduce boundary and the state it returned) plus info.since (the
-  // events in (from.pos, pos]) — so `fold(info.from.state, info.since)` is
-  // equally available and equally correct. info.missed keeps the old one-scan
-  // batch for diagnostics.
-  //
-  // The raw setPolicy(kind, {reduce}) escape hatch keeps its historical
-  // signature reduce(missedBatch, info) — the enriched info carries prefix/
-  // since/from — so existing lab arms are untouched.
-  // -------------------------------------------------------------------------
-  //
-  // C4 — THE GUARANTEE, SHARPENED. For a DISCRETE kind everything above holds
-  // unchanged: the reducer is a pure function of the prefix. For a CONTINUOUS
-  // kind it cannot be — the state at t is defined by the samples STRADDLING t,
-  // and the right one has at > pos, so it is by construction absent from the
-  // prefix. So the contract now reads:
-  //     discrete kind    : state(t) = f(prefix(<= t))
-  //     continuous kind  : state(t) = f(prefix(<= t), successor(s) of t)
-  // and `info.next` (first event of this kind with at > pos) plus `info.nexts`
-  // (1 + caps.neighbourhood of them) are supplied on every reduce call. They are
-  // a bisect over a lane the scheduler already keeps sorted — the two lines
-  // without which an interpolated reduce is inexpressible.
+  // A reducer gets the complete ordered prefix (at <= pos), so assertState(reduce(prefix)) equals
+  // the state after playing to t; info.from and info.since allow a forward fold. A continuous kind
+  // also gets info.next and info.nexts, since its state at t depends on the successor.
+  // why: lessons/timeline-transport.md#prefix
   function prefixEvents(kind, pos) {
     const lane = byKind.get(kind);
     if (!lane || !lane.length) return [];
@@ -1073,24 +700,17 @@ export function createScheduler(transport, {
     return out;
   }
   function applyReduce(kind, missed, pos, now, reason) {
-    // G1 — ACTUATION'S SECOND DOOR, and the one that was invisible. This path
-    // ends in `ad.assertState(state, info)`, which is an actuation: it is how a
-    // seek puts held notes back. Before v0.7 it folded the WHOLE prefix of an
-    // over-cap derived lane and asserted it, while `reduceAt()` on the same lane
-    // and the same position returned null — one lane, two answers, decided by
-    // the door. Measured on the shipped code: a tier-3 lane under 'attested'
-    // asserted a state folded from three generative rows. It is EXCLUDED here
-    // for exactly the reason evExcludes() excludes it from a read.
+    // The second actuation door: a seek's assertState refuses an over-cap derived lane, as reads
+    // do.
+    // why: lessons/timeline-transport.md#reduce-gate
     if (gatedKinds.size !== 0 && gatedKinds.has(kind) && reason !== 'evidence-ungated')
       return gateRefuseFold(kind, pos, reason);
     const ad = adapters.get(kind), pol = policies.get(kind);
     const snap = snapshots.get(kind) || { pos: -Infinity, state: undefined };
     const prefix = prefixEvents(kind, pos).map(publicEv);
     const since = prefix.filter((e) => e.at > snap.pos);
-    // E3: the internal fold obeys the deck policy too, and WITHHOLDS the
-    // successor when the policy forbids restoration — which is what makes an
-    // interpolating reducer degrade to a hold without knowing the firewall
-    // exists (C4 read backwards: no successor, no interpolation).
+    // Internal folds obey the deck policy and withhold the successor when restoration is forbidden.
+    // why: lessons/timeline-transport.md#soft-evidence
     const ev = softEvidence(kind, 'reduce');
     const restrict = evRestrictsFold(kind, ev);
     const nexts = restrict ? [] : successorEvents(kind, pos, 1 + (((ad && ad.caps) || {}).neighbourhood || 0));
@@ -1125,29 +745,10 @@ export function createScheduler(transport, {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // E3/E4 — THE EVIDENCE FIREWALL. Everything below this line is the resolution
-  // of one question asked before every positional read: *is the caller willing
-  // to be told something that was invented?*
-  //
-  // THE FORCED-CHOICE RULE, in three steps:
-  //   1. the per-call {evidence} wins;
-  //   2. else the deck policy the client set EXPLICITLY at createDeck({evidence})
-  //      (or deck.setEvidence()) applies;
-  //   3. else the call THROWS (code: EVIDENCE_POLICY_REQUIRED) — unless the
-  //      answer is provably identical under all three policies, which is what
-  //      policyMatters() decides. That exemption is not a default: it is a proof
-  //      that the omission cannot mix anything. A discrete kind's sampleAt, a
-  //      bracket over an attested lane and a window over one are all in it; a
-  //      continuous kind that DECLARES caps.tier >= 1, and any derived lane, are
-  //      not, and must choose.
-  //
-  // Why an adapter's `caps.tier` is the trigger and not `caps.continuous`: tier
-  // is the adapter's own statement that what it returns BETWEEN samples is
-  // restoration on §5b's spectrum. An adapter that has not made that statement
-  // has not entered the spectrum, and the library will say so (registerAdapter
-  // records it) rather than retro-classify four shipped clients' semantics.
-  // -------------------------------------------------------------------------
+  // Per-call {evidence}, else the deck's explicit policy, else throw EVIDENCE_POLICY_REQUIRED,
+  // unless
+  // policyMatters() proves the answer identical under all three. `caps.tier` >= 1 is the trigger.
+  // why: lessons/timeline-transport.md#forced-choice
   const EV_UNSET = { mode: 'all', maxTier: Infinity, label: 'all', implicit: true };
   const laneIsDerived = (k) => { const lp = laneProv.get(k); return !!(lp && lp.derived > 0); };
   const laneTier = (k) => { const lp = laneProv.get(k); return lp ? lp.tier : 0; };
@@ -1181,10 +782,8 @@ export function createScheduler(transport, {
     throw e;
   }
 
-  /** The same resolution for the library's OWN internal folds (the seek and
-   *  catch-up paths), which run inside a transport listener where throwing would
-   *  blow up a click handler rather than the query that deserves it. An
-   *  unqualified internal fold is RECORDED in the ledger instead. */
+  // Internal folds record an unqualified policy in the ledger instead of throwing in a listener.
+  // why: lessons/timeline-transport.md#soft
   function softEvidence(kind, op) {
     if (evPolicy) return evPolicy;
     if (policyMatters(kind, op))
@@ -1211,33 +810,10 @@ export function createScheduler(transport, {
     return t >= 1 && t > ev.maxTier;
   }
 
-  // -------------------------------------------------------------------------
-  // G1–G4 — THE FIRE-SIDE FIREWALL.
-  //
-  // The read side asks "is the caller willing to be TOLD something invented?".
-  // This asks the other half of the same question: *is the caller willing for
-  // something invented to HAPPEN?* — which is what an evidence-only performance
-  // means, and what the read side alone could not deliver.
-  //
-  // WHY UNCONDITIONAL AND NOT `caps.evidenceGated` (the shape §8.8 asked for,
-  // refuted here):
-  //   · An opt-in cap makes the SAFE behaviour the one an adapter author has to
-  //     remember. That is `caps.series` with the sign flipped — declared and
-  //     unread produced "150, a value belonging to neither controller", in
-  //     silence; undeclared and unenforced produces a dreamed note in an
-  //     archival performance, in silence. The same failure, and this one is
-  //     the one an institution would be asked to stand behind.
-  //   · It cannot surprise anyone. The gate reads `evPolicy`, which is null
-  //     until the client makes §5b's FORCED choice; an unqualified deck is
-  //     EV_UNSET (maxTier Infinity) and nothing is ever gated. A client that
-  //     wrote `evidence:'attested'` has already said this in words.
-  //   · The cost argument for opt-in does not survive LANE PURITY: the gate is
-  //     one Set of kinds, so the price on the hot path is `size !== 0`.
-  //   · And it would be indefensible beside the read side, which excludes an
-  //     over-cap lane from window() without asking the adapter's permission.
-  // What the adapter DOES get a say in is not *whether* it is refused but what
-  // the refusal SOUNDS like: caps.absentState / silence(), below.
-  // -------------------------------------------------------------------------
+  // The fire-side firewall: is the caller willing for something invented to happen? Unconditional,
+  // not an opt-in cap: it bites only after the client chose a policy, and costs one Set check.
+  // The adapter decides only what the refusal sounds like (caps.absentState / silence()).
+  // why: lessons/timeline-transport.md#fire-firewall
   function gateStatOf(kind) {
     let g = gateStats.byKind.get(kind);
     if (!g) {
@@ -1247,14 +823,9 @@ export function createScheduler(transport, {
     }
     return g;
   }
-  /** MEMOIZED PER (lane, policy generation), and the memo is not a micro-
-   *  optimisation — it was measured. The first cut built this sentence on every
-   *  refused row and made REFUSING 37 % more expensive than FIRING (8000 tier-3
-   *  rows: 3.7 ms refused vs 2.7 ms fired), which is an absurd shape for a gate
-   *  whose whole job is to do less. The memo is sound because the string is a
-   *  function of exactly (kind, tier, source, method, policy) — and because
-   *  noteDegraded() already folds consecutive identical reports, so the rows
-   *  were sharing one report anyway; only the string was being rebuilt. */
+  // Memoized per (lane, policy generation): building the sentence per row made refusing 37% dearer
+  // than firing (8000 tier-3 rows: 3.7 ms vs 2.7 ms).
+  // why: lessons/timeline-transport.md#gate-why
   const gateWhy = (kind, pol) => {
     const g = gateStatOf(kind);
     if (g.whyGen === gateGen && g.why) return g.why;
@@ -1275,11 +846,9 @@ export function createScheduler(transport, {
     g.repGen = gateGen;
     return (g.rep = { wanted: `actuation under '${pol.label}'`, chose: 'not-actuated', degraded: true, reason: gateWhy(kind, pol) });
   }
-  /** G3: a scheduled row the policy refuses. Terminal status 'gated' — not
-   *  fired (nothing happened), not dropped (the transport was not late), not
-   *  reduced (nothing was folded). A backward seek puts it back to 'pending'
-   *  through the ordinary reconcile, so loosening the policy and replaying is
-   *  all it takes to hear it. */
+  // A refused row takes terminal status 'gated' (not fired, dropped or reduced); a backward seek
+  // puts it back to 'pending'.
+  // why: lessons/timeline-transport.md#gate-refuse
   function gateRefuse(ev, origin) {
     ev.cancel && ev.cancel(); ev.cancel = null;
     ev.status = 'gated';
@@ -1304,11 +873,9 @@ export function createScheduler(transport, {
     if (gateCbs.size) for (const cb of gateCbs) cb({ gate: 'fold', kind, pos, reason, policy: pol.label, tier: laneTier(kind) });
   }
 
-  /** Recompute the gated-lane set. Called ONLY when the lane set changes (a
-   *  lane's first derived row, or a tier rise, or a dropped restoration) or
-   *  when the policy changes — never per row and never per tick.
-   *  `transitions` runs G4's mid-play handlers; the lane-set path passes false
-   *  because a lane that has just come into existence holds nothing. */
+  // Recompute the gated set only on a lane-set or policy change; `transitions` runs the mid-play
+  // handlers.
+  // why: lessons/timeline-transport.md#recompute-gate
   function recomputeGate(reason, { transitions = false } = {}) {
     const pol = evPolicy || EV_UNSET;
     const next = new Set();
@@ -1335,12 +902,8 @@ export function createScheduler(transport, {
     return rec;
   };
 
-  /** G4 — THE POLICY TIGHTENED WHILE PLAYING. This is a state change, not a
-   *  filter: the lane may be holding a note the policy now forbids, and simply
-   *  refusing its FUTURE rows would leave the forbidden material ringing —
-   *  which is precisely the failure `caps.absentState` was invented for at a
-   *  quotation edge. Same mechanism, new reason. An adapter that cannot go
-   *  quiet HOLDS and says so; it is never guessed at. */
+  // Tightened mid-play: the lane goes quiet via caps.absentState 'silence', or holds and says so.
+  // why: lessons/timeline-transport.md#gate-tighten
   function gateTighten(kind, pol, pos, reason) {
     // cancel anything this lane already has committed, so the tighten is
     // immediate rather than one tick late (the one-shot would reach fire()'s
@@ -1367,12 +930,10 @@ export function createScheduler(transport, {
     return noteGate({ ...base, action: 'held' });
   }
 
-  /** G4 — THE POLICY LOOSENED. The lane was refused; its actuator has missed
-   *  everything up to `pos`. Rows AHEAD of the playhead that scan() already
-   *  marked 'gated' go back to 'pending' (nothing else would ever revisit
-   *  them), and the lane is re-asserted at the playhead so it catches up on the
-   *  prefix it was not allowed to see. A lane with no reduce()+assertState()
-   *  cannot be caught up — it resumes at its next row, and that is REPORTED. */
+  // Loosened: rows ahead marked 'gated' go back to 'pending', and the lane is re-asserted at the
+  // playhead;
+  // a lane without reduce+assertState resumes at its next row, reported.
+  // why: lessons/timeline-transport.md#gate-loosen
   function gateLoosen(kind, pol, pos, reason) {
     let rearmed = 0;
     for (const ev of laneOf(kind)) if (ev.status === 'gated' && ev.at > pos) { ev.status = 'pending'; rearmed++; }
@@ -1392,37 +953,10 @@ export function createScheduler(transport, {
     return noteGate({ ...base, action: 'resumes' });
   }
 
-  // -------------------------------------------------------------------------
-  // G5 — deck.assertState(kind, state, info). §7.5's honest positioning applies
-  // in full: this is DAW MIDI chase / ETC Eos "Assert", thirty-year-old shipped
-  // practice, and what was missing was not the idea but the DECK-LEVEL entry
-  // point. `assertAt(pos, kind)` folds AND asserts; a client that already KNOWS
-  // the state — after an external sync, a media-master handover, a policy
-  // change, a loop wrap that ended at `out` while the playhead sits at `in` —
-  // has no prefix to replay and no reason to pay for one.
-  //
-  // WHAT IT TOUCHES:
-  //   · adapter.assertState(state, info) — the actuation.
-  //   · the reduce SNAPSHOT, set to {pos, state}, so a forward-folding reducer's
-  //     info.from/info.since continue from the assertion rather than from a
-  //     boundary that no longer describes anything.
-  // WHAT IT DOES NOT TOUCH:
-  //   · THE DRIFT CHANNEL. A drift row is {id, at, intendedUs, firedUs,
-  //     deltaMs} for one EVENT. An assert has no event and no intended instant,
-  //     so a synthetic row would be a fabricated zero-lateness sample in every
-  //     p50/p95 in this repo. Asserts have their own channel (asserts(),
-  //     onGate is for the gate). Symmetric with the reason `sync()` is not
-  //     `seek()`: a correction is not an event.
-  //   · POSITION AND STATUSES. Asserting state is not seeking. Conflating them
-  //     is the distinction sync()/seek() already exists to keep.
-  // VERIFICATION IS OPT-IN, and that is a considered default, not laziness:
-  // checking the assertion means folding the prefix, which is exactly the cost
-  // assertState exists to avoid. The asymmetry with the evidence policy is the
-  // same one §7.9 already drew — silence that can FABRICATE throws (evidence),
-  // silence that merely trusts or widens defaults (certainty, and this). The
-  // caller IS the authority here by construction. Ask with {verify:true} and a
-  // disagreement with reduce(<= pos) lands in degradations() as 'asserted-over'.
-  // -------------------------------------------------------------------------
+  // deck.assertState: push known state without replaying a prefix. Moves the reduce snapshot;
+  // writes
+  // no drift row (an assert has no event) and does not seek. {verify: true} checks against reduce.
+  // why: lessons/timeline-transport.md#assert-state
   function sameValue(a, b) {
     if (a === b) return true;
     if (typeof a === 'number' && typeof b === 'number') return Number.isNaN(a) && Number.isNaN(b);
@@ -1497,23 +1031,9 @@ export function createScheduler(transport, {
     return out;
   }
 
-  // -------------------------------------------------------------------------
-  // U3 — THE CERTAINTY PREDICATE. Two integer comparisons per row, which is the
-  // whole of "possibly in 1965" vs "certainly in 1965".
-  //
-  //   POSSIBLY in [a,b]   <=>  the closed-open bracket OVERLAPS it   (PG `&&`)
-  //   NECESSARILY in [a,b]<=>  [a,b] CONTAINS the row's CERTAIN extent (PG `@>`)
-  //
-  // The certain extent is the INNER bracket (CRM P81, "ongoing throughout") when
-  // one exists. Where it does not — the common case, and CORRECT per CRM Issue
-  // 288 ("it is also correct not to instantiate P81") — outer containment is
-  // still a SOUND sufficient condition (a bracket wholly inside the window is
-  // certainly inside it), so it is tried; and where THAT fails the question is
-  // genuinely undecidable from what the row carries. Undecidable is not `false`:
-  // the row is excluded and the undecidability is REPORTED, because a query that
-  // silently answers "no" to a question it cannot answer is the failure mode
-  // every renderer in the survey shipped.
-  // -------------------------------------------------------------------------
+  // Possibly in [a,b]: the bracket overlaps it. Necessarily: [a,b] contains the inner bracket, else
+  // the outer one when wholly inside; otherwise undecidable, excluded and reported.
+  // why: lessons/timeline-transport.md#cert-accepts
   function certAccepts(ev, from, to, cert, kind) {
     const w = ev.when;
     if (!w) return ev.at >= from && ev.at <= to;            // crisp row = a point
@@ -1530,27 +1050,13 @@ export function createScheduler(transport, {
     return false;
   }
 
-  // -------------------------------------------------------------------------
-  // C1/C2/C3 — the CONTINUOUS reads. bracket() is the raw pair (plus its
-  // neighbourhood); sampleAt() is the interpolated value, which is what a
-  // renderer actually wants. Both go through the per-kind cursor: O(1) amortised
-  // playing forward, O(log n) on a seek. Neither is a render tick — the client
-  // calls them from whatever cadence it already runs (C-not-done).
-  // -------------------------------------------------------------------------
+  // bracket() is the raw pair, sampleAt() the interpolated value, both through the per-kind cursor.
+  // why: lessons/timeline-transport.md#continuous-reads
   const payOf = (ev) => (ev ? ev.payload : undefined);
 
-  // -------------------------------------------------------------------------
-  // U5 — caps.series. A lane is one KIND; a kind is not always one SIGNAL. A
-  // MIDI CC lane carries controller 1 and controller 74 interleaved, and
-  // "the pair of samples straddling pos" over the merged lane can be two
-  // different controllers — an interpolation between a modwheel value and a
-  // filter-cutoff value, which is not wrong by a little. The declared-and-unread
-  // `caps.series` closes it: `caps.series(payload, ev) -> key` splits the lane
-  // into per-series sub-lanes, each with its OWN cursor, and bracket/sampleAt
-  // ride the sub-lane named by `{series}`. Sub-lanes are built LAZILY (one scan
-  // of an already-sorted lane) and maintained incrementally on schedule, so a
-  // lane whose adapter declares no series never allocates and never pays.
-  // -------------------------------------------------------------------------
+  // caps.series(payload, ev) -> key splits a lane into per-series sub-lanes with their own cursors
+  // (a CC lane interleaves controllers); built lazily, nothing paid without the cap.
+  // why: lessons/timeline-transport.md#series
   function seriesFn(kind) {
     const ad = adapters.get(kind), f = ad && ad.caps && ad.caps.series;
     return typeof f === 'function' ? f : null;
@@ -1575,10 +1081,9 @@ export function createScheduler(transport, {
     seriesLanes.set(kind, m);
     return m;
   }
-  /** the rows bracket()/sampleAt() should ride for this call, plus the cursor
-   *  cache key. Falls back to the whole lane — and REPORTS — when a lane that
-   *  declares caps.series is read without naming one, which is the case that
-   *  used to answer nonsense in silence. */
+  // The rows for this read and the cursor key; a series lane read without naming one falls back,
+  // reported.
+  // why: lessons/timeline-transport.md#rows-for
   function rowsFor(kind, opts) {
     const lane = byKind.get(kind);
     const want = opts && opts.series;
@@ -1638,18 +1143,17 @@ export function createScheduler(transport, {
     const can = !!(ad && typeof ad.interpolate === 'function' && caps.continuous !== false && caps.interpolate !== false);
     const tier = adapterTier(kind);
     if (can && tier >= 1 && tier > ev.maxTier) {
-      // E4 — THE FIREWALL, at its sharpest. Interpolating between two attested
-      // samples IS restoration (§5b tier 1); under a policy that does not admit
-      // it the honest answer is the last ATTESTED sample, returned WITH the
-      // report rather than instead of one.
+      // Interpolating is tier-1 restoration: under a policy forbidding it, the last attested sample
+      // plus a report.
+      // why: lessons/timeline-transport.md#attested-hold
       const report = { wanted: ev.label, chose: 'attested-hold', degraded: true, pos,
         reason: `interpolation is tier-${tier} restoration (§5b); '${ev.label}' allows tier <= ${ev.maxTier}, so sampleAt returns the last ATTESTED sample (id ${br.ids[0]} at ${br.aAt}) rather than inventing one at ${pos}` };
       noteDegraded(kind, report);
       return { ...br.a, evidence: { policy: ev.label, attested: true, interpolated: false, tier: 0, at: br.aAt, id: br.ids[0], report } };
     }
     if (!can) {
-      // C6: a discrete kind sampled between two events is a zero-order HOLD —
-      // the honest answer, and the degradation is reported, not implied.
+      // A discrete kind between events is a zero-order hold, reported.
+      // why: lessons/timeline-transport.md#hold
       noteDegraded(kind, {
         wanted: 'sampleAt(interpolated)', chose: 'hold', degraded: true, pos,
         reason: !ad ? `no adapter registered for kind ${kind}`
@@ -1660,9 +1164,8 @@ export function createScheduler(transport, {
     }
     sampleCalls++;
     const t = clock.now();
-    // NOTE the ordering: caller opts spread FIRST, control fields injected
-    // AFTER. This is §2's law ("payloads must not spread over control fields")
-    // applied to the ctx object — the same law logdeck was breaking.
+    // Caller opts first, control fields after: payloads must not spread over control fields.
+    // why: lessons/timeline-transport.md#ctx-order
     const out = ad.interpolate(br.a, br.b, br.u, {
       ...(opts || {}),
       kind, pos, u: br.u, i: br.i, prev: br.prev, next: br.next,
@@ -1672,11 +1175,9 @@ export function createScheduler(transport, {
     return out;
   }
 
-  /** C6 — ASK, and be told honestly. Mirrors nested.mjs's rate report shape:
-   *  {wanted, chose, degraded, reason}. `want` keys understood specially:
-   *  interpolate (true | method name), neighbourhood (number), rate (number,
-   *  against caps.rates); anything else is treated as a boolean capability
-   *  claim and checked against caps[key]. */
+  // Ask and be told: {wanted, chose, degraded, reason}. `want`: interpolate, neighbourhood, rate,
+  // or any boolean capability checked against caps.
+  // why: lessons/timeline-transport.md#request
   function request(kind, want = {}) {
     const ad = adapters.get(kind), caps = (ad && ad.caps) || {};
     const per = {};
@@ -1720,9 +1221,8 @@ export function createScheduler(transport, {
           reason = `'${want.label}' asks for restoration, but kind '${kind}' has none to give (no derived lane, and its adapter declares no caps.tier)`;
         } else chose = want.label;
       } else if (k === 'actuate') {
-        // G3 — ASK THE FIRE-SIDE GATE, before a performance rather than after.
-        // request({evidence}) answers what this lane will SERVE; this answers
-        // whether it will HAPPEN, which the read-side answer never implied.
+        // Ask the fire-side gate before a performance: will this lane's rows happen?
+        // why: lessons/timeline-transport.md#actuate-gate
         const pol = normalizeEvidence(want.evidence, "request({actuate})") || evPolicy || EV_UNSET;
         const lt = laneIsDerived(kind) ? laneTier(kind) : 0;
         if (v === false || v === undefined || v === null) chose = false;
@@ -1744,12 +1244,8 @@ export function createScheduler(transport, {
       : { kind, degraded: any, per };
   }
 
-  /** C5 — caps.followsTransport. play/pause/rate are NOT seeks, so nothing
-   *  re-asserts on them (correctly: nothing should re-fire) — but a media
-   *  element still has to follow. Three clients had each written the same
-   *  onState reason-filter by hand; it lives here now. 'seek' is excluded (it
-   *  goes through reduce + assertState) and 'sync' is excluded on purpose: a
-   *  servo correction must never cascade. */
+  // caps.followsTransport gets adapter.transport() on play, pause and rate; never on seek or sync.
+  // why: lessons/timeline-transport.md#follow-transport
   function followTransport(st) {
     if (!adapters.size) return;
     const base = {
@@ -1769,35 +1265,10 @@ export function createScheduler(transport, {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // U6 — TWO-PHASE SEEK (JACK's slow-sync barrier + Ardour's locate
-  // disposition). The problem the transport already has: `seek()` moves the
-  // vector and re-asserts state in one synchronous step, but a real client —
-  // a media element that must finish a `currentTime` seek, a sampler that must
-  // reload a bank, a nested deck that must re-fold — is not ready at that
-  // instant, and today it just plays the wrong thing for a few hundred ms.
-  //
-  // JACK's answer, ported with its safety properties intact:
-  //   OPT-IN     per adapter (caps.slowSync + prepareSeek). A deck with no
-  //              slow-sync adapter takes the v0.5 path, byte for byte.
-  //   PHASE 1    the LOCATE happens immediately and unconditionally. The
-  //              position moves, reconcile + assertState run. Only ROLLING is
-  //              deferred — the transport parks at the new position.
-  //   NON-BLOCKING  seek() still returns the clamped position synchronously.
-  //              The barrier is observable (seekBarrier(), and a promise) and
-  //              nothing awaits it on the caller's behalf.
-  //   FAIL-OPEN  on timeout the barrier opens ANYWAY, every laggard is named
-  //              in degradations(), and the laggards catch up on their own
-  //              (they are not rewound, and the transport is not held hostage
-  //              by one slow client — the correctness bug JACK's own docs warn
-  //              about).
-  //   RE-ARMED   a locate mid-barrier supersedes the one in flight, and
-  //              inherits its TRUE rolling state, so a scrub that fires ten
-  //              locates does not lose the roll on the tenth.
-  //   DISPOSITION  Ardour's LocateTransportDisposition, carried in the request
-  //              and honoured at the barrier: MustRoll | MustStop |
-  //              RollIfAppropriate (default — roll iff it was rolling).
-  // -------------------------------------------------------------------------
+  // Two-phase seek (caps.slowSync + prepareSeek): the locate happens now, only rolling waits.
+  // Non-blocking, fails open on timeout (laggards named), re-armed by a new locate, with a
+  // disposition.
+  // why: lessons/timeline-transport.md#two-phase
   const LOCATE_DISPOSITIONS = ['MustRoll', 'MustStop', 'RollIfAppropriate'];
   let seekGen = 0, barrier = null;
   const slowSyncClients = () => [...adapters].filter(([, ad]) => ad.caps && ad.caps.slowSync === true);
@@ -1830,7 +1301,8 @@ export function createScheduler(transport, {
     const self = { report, promise, resolve, cancel: null };
     barrier = self;
 
-    // PHASE 1 — the locate. Unconditional, immediate, identical to v0.5.
+    // Phase 1, the locate: unconditional and immediate.
+    // why: lessons/timeline-transport.md#phase-1
     if (clients.length && transport.rate !== 0) transport.pause();
     transport.seek(pos);
     const shouldRoll = disposition === 'MustRoll' ? true : disposition === 'MustStop' ? false : wasRolling;
@@ -1847,8 +1319,8 @@ export function createScheduler(transport, {
     }
     if (!clients.length) return finish('no-slow-sync-clients'), self;
 
-    // PHASE 2 — the barrier. Armed BEFORE dispatch, so a synchronously-ready
-    // client cannot race the timer.
+    // Phase 2, the barrier, armed before dispatch so a ready client cannot race the timer.
+    // why: lessons/timeline-transport.md#phase-2
     let waiting = clients.length;
     const seen = new Set();
     const ready = (k) => {
@@ -1896,10 +1368,10 @@ export function createScheduler(transport, {
 
   return {
     hostName: host.name,
-    /** Add an event {at, kind, id?, payload?, provenance?}. During playback, an
-     *  event at or behind the playhead fires immediately (overdub law, steal
-     *  #11). `provenance` marks the row DERIVED (E1) and is normally supplied by
-     *  a reconstructor rather than by hand. */
+    // Add {at, kind, id?, payload?, provenance?}; at or behind the playhead during playback it
+    // fires now.
+    // `provenance` marks a derived row, normally from a reconstructor.
+    // why: lessons/timeline-transport.md#schedule
     schedule: scheduleEvent,
     /** SEAM 1: register a per-kind adapter. Returns unregister. The library
      *  filters onFire for you and derives the catch-up policy from caps. */
@@ -1929,9 +1401,8 @@ export function createScheduler(transport, {
       // U5: a lane whose rows were scheduled BEFORE the adapter arrives has to
       // forget any sub-lane split it built under the old (or absent) caps.
       seriesLanes.delete(kind);
-      // E3: an adapter that INVENTS between samples but declares no tier has not
-      // entered §5b's spectrum, so the firewall cannot police it. That is a fact
-      // about the adapter, recorded — not a reason to guess a tier for it.
+      // An adapter that interpolates with no declared tier is recorded, never assigned one.
+      // why: lessons/timeline-transport.md#no-tier
       if (caps.continuous === true && typeof adapter.interpolate === 'function' && caps.tier === undefined)
         noteDegraded(kind, { wanted: 'an evidence classification', chose: 'unqualified', degraded: true,
           reason: `adapter ${kind} interpolates between samples but declares no caps.tier — its between-sample values are unqualified restoration and the evidence firewall cannot gate them (§5b: declare caps.tier 1|2|3)` });
@@ -1944,18 +1415,14 @@ export function createScheduler(transport, {
         adapterGen++;
       };
     },
-    /** U6: the two-phase seek entry point. Returns {report, promise} — the
-     *  LOCATE has already happened when it returns; only the roll is deferred. */
+    // Two-phase seek entry: returns {report, promise}; the locate has already happened.
+    // why: lessons/timeline-transport.md#request-seek
     requestSeek,
     /** U6: the barrier in flight (or the last one). */
     seekBarrier() { return barrier ? { ...barrier.report, promise: barrier.promise } : null; },
     hasSlowSync,
-    /** How many times the adapter registry has changed. The same idea as
-     *  `rangeGen`, for the same reason: a client that derived something from
-     *  the registry (the transport bar derives its rate lattice) needs to know
-     *  cheaply that its derivation is stale. A nest registers its adapter on
-     *  the parent AFTER construction, so anything computed once at build time
-     *  describes a deck that does not exist yet. */
+    // Bumps on every registry change, since a nest registers on its parent after construction.
+    // why: lessons/timeline-transport.md#adapter-gen
     adapterGen() { return adapterGen; },
     adapterCaps(kind) {
       if (kind !== undefined) { const a = adapters.get(kind); return a ? a.caps || {} : null; }
@@ -1963,19 +1430,12 @@ export function createScheduler(transport, {
       for (const [k, a] of adapters) out[k] = a.caps || {};
       return out;
     },
-    /** Read accessor on the adapter registry. `deck.adapters` only ever held the
-     *  CONSTRUCTOR-registered ones, so anything registered later through
-     *  registerAdapter() was unreachable from outside — a nest could see the cap
-     *  and not the method. Read-only, additive. */
+    // Read access to the whole registry, including later registrations.
+    // why: lessons/timeline-transport.md#adapter
     adapter(kind) { return adapters.get(kind) || null; },
-    /** caps.absentState — the deck-level fan-out, so a caller never has to know
-     *  WHERE the registry lives. A quotation parked outside its span currently
-     *  holds whatever the cut left ringing; an adapter that declares
-     *  caps.absentState === 'silence' says how to go quiet, and this calls it.
-     *  The DEFAULT stays 'hold' (right for a video frame; wrong for a note), and
-     *  declaring the cap without implementing silence() is REPORTED, never
-     *  guessed at. `info.kind` narrows to one lane; omitted, it fans out.
-     *  -> {kinds, silenced, held, missing} */
+    // caps.absentState fan-out: 'silence' adapters go quiet, the default holds, a missing silence()
+    // is reported. `info.kind` narrows. -> {kinds, silenced, held, missing}
+    // why: lessons/timeline-transport.md#silence
     silence(info = {}) {
       const kinds = info.kind !== undefined
         ? (Array.isArray(info.kind) ? info.kind : [info.kind])
@@ -2001,23 +1461,19 @@ export function createScheduler(transport, {
     },
     /** Re-fold + re-assert reducible kinds at pos (seek does this for you). */
     assertAt,
-    /** G5: push AUTHORITATIVE state in, without replaying a prefix.
-     *  -> {kind, pos, chose, degraded, applied, verified, agreed, expected, from}
-     *  `info`: {pos?, reason?, source?, verify?} — everything else is passed
-     *  through to adapter.assertState(state, info). */
+    // Push authoritative state in without a prefix. info: {pos?, reason?, source?, verify?}.
+    // why: lessons/timeline-transport.md#assert-into
     assertState: assertStateInto,
     /** G5: the assert channel (deliberately NOT the drift channel). */
     asserts(fromTotal = 0) {
       const skip = Math.max(0, fromTotal - (assertTotal - assertLog.length));
       return { total: assertTotal, retained: assertLog.length, dropped: assertDropped, rows: assertLog.slice(skip) };
     },
-    /** the reduce boundary for a kind — {pos, state} — which assertState() moves
-     *  and a forward-folding reducer reads back as info.from. */
+    // The reduce boundary {pos, state}, moved by assertState and read back as info.from.
+    // why: lessons/timeline-transport.md#snapshot
     snapshotOf(kind) { const s = snapshots.get(kind); return s ? { pos: s.pos, state: s.state } : null; },
-    /** G3: the fire-side firewall's own accounting — the twin of
-     *  evidenceAccounting() on the ACTUATION axis. "How much of what you are
-     *  about to look at was invented" has a sibling: "how much of what was
-     *  about to happen was refused". */
+    // How much of what was about to happen was refused: evidenceAccounting's twin.
+    // why: lessons/timeline-transport.md#gate-accounting
     gateAccounting(kind) {
       const pol = evPolicy || EV_UNSET;
       const ks = kind === undefined ? [...gateStats.byKind.keys()] : (Array.isArray(kind) ? kind : [kind]);
@@ -2042,11 +1498,9 @@ export function createScheduler(transport, {
     onGate(cb) { gateCbs.add(cb); return () => gateCbs.delete(cb); },
     /** G1: is this lane's actuation currently refused? */
     isGated(kind) { return gatedKinds.has(kind); },
-    /** reduce(prefix <= pos) for one kind, without asserting — the expected
-     *  state a harness compares against (the C2 left-hand side). §5b's
-     *  `reduce()` with an evidence policy: under a policy that forbids
-     *  restoration the successor is WITHHELD, so an interpolating reducer
-     *  returns its own honest hold. */
+    // reduce(prefix <= pos) without asserting; the successor is withheld when restoration is
+    // forbidden.
+    // why: lessons/timeline-transport.md#reduce-at
     reduceAt(kind, pos, opts) {
       const ad = adapters.get(kind);
       if (!ad || typeof ad.reduce !== 'function') return null;
@@ -2065,22 +1519,10 @@ export function createScheduler(transport, {
         evidence: ev, attestedOnly: restrict,   // E3
       });
     },
-    /** §5b's `window()`: the ordered rows in [from, to] for one kind, a list of
-     *  kinds (merged in (at, seq) order) or every kind — filtered by the
-     *  evidence policy. A lane over the tier cap is EXCLUDED and reported.
-     *  Rows carry `provenance` iff they are derived (E1).
-     *
-     *  U3 — and, ORTHOGONALLY, by `{certainty}`. The two filters read disjoint
-     *  fields: the evidence filter reads only `laneTier(kind)`, the certainty
-     *  filter reads only `row.when`. Neither can imply the other, and that is
-     *  structural rather than disciplinary: a per-row `when` cannot reach
-     *  evExcludes even by a careless patch, and a lane tier is not a bracket.
-     *
-     *    certainty:'possible'   (DEFAULT) the row's bracket OVERLAPS [from, to]
-     *    certainty:'necessary'  [from, to] CONTAINS the row's certain extent
-     *
-     *  A crisp row is a POINT under both: [at, at]. A lane with no `when` row
-     *  at all takes exactly the v0.5 code path, scan bounds included. */
+    // Ordered rows in [from, to] for a kind, kinds or all, filtered by evidence (lane tier) and,
+    // independently, certainty (row.when): 'possible' overlaps, 'necessary' contains. A crisp row
+    // is a point.
+    // why: lessons/timeline-transport.md#window
     window(kind, from = -Infinity, to = Infinity, opts) {
       const ev = resolveEvidence(kind, 'window', opts);
       const cert = normalizeCertainty(opts && opts.certainty, 'window({certainty})');
@@ -2090,10 +1532,9 @@ export function createScheduler(transport, {
         if (evExcludes(k, ev, undefined, 'window')) continue;
         const lane = byKind.get(k);
         if (!lane) continue;
-        // The interval-index trick: a row whose bracket reaches into [from, to]
-        // may START before `from`, so the scan begins one maxSpan earlier. For
-        // every lane that has no bracket at all maxSpan is 0 and this is the
-        // identical `fromIdx(lane, from)` v0.5 used.
+        // Scan from one maxSpan before `from`, since a bracket may start earlier; 0 for crisp
+        // lanes.
+        // why: lessons/timeline-transport.md#interval-index
         const span = laneMaxSpan(k);
         const start = span > 0 ? (span === Infinity ? 0 : fromIdx(lane, from - span)) : fromIdx(lane, from);
         const plain = span === 0 && cert.mode === 'possible';
@@ -2104,13 +1545,9 @@ export function createScheduler(transport, {
       if (kinds.length > 1) picked.sort((a, b) => a.at - b.at || a.seq - b.seq);
       return picked.map(publicEv);
     },
-    /** U4 — the POSITION-axis twin of evidenceAccounting(), reported BY RULE.
-     *  "43 % of this lane is positioned by err-july15-padding@1" is the number
-     *  NSSDA's discipline demands: publish the accuracy statement, or declare
-     *  it untested. NEVER multiply this with the evidence numbers — a "trust"
-     *  score that folds tier and span is the exact collapse the whole design
-     *  exists to prevent, and it deletes the pre-1960 archive from any
-     *  attested-only view. */
+    // The position axis by rule (e.g. "43% by err-july15-padding@1"). Never multiplied with
+    // evidence.
+    // why: lessons/timeline-transport.md#position-accounting
     positionAccounting(kind) {
       const kinds = kind === undefined ? [...lanePos.keys()] : (Array.isArray(kind) ? kind : [kind]);
       const out = { crisp: 0, smeared: 0, total: 0, smearedFraction: 0, openEnded: 0, withInner: 0,
@@ -2162,8 +1599,8 @@ export function createScheduler(transport, {
       }
       return out;
     },
-    /** U5: the series keys a lane actually holds (null when the adapter
-     *  declares no caps.series — one kind, one series). */
+    // The series keys a lane holds, or null with no caps.series.
+    // why: lessons/timeline-transport.md#series-of
     seriesOf(kind) { const m = seriesMap(kind); return m ? [...m.keys()] : null; },
     /** C2: the raw straddling pair at pos, plus its neighbourhood.
      *  -> {prev, a, b, next, u, prevs, nexts, i, aAt, bAt, dtMs, ids} (payloads). */
@@ -2172,12 +1609,12 @@ export function createScheduler(transport, {
       if (evExcludes(kind, ev, pos, 'bracket')) return null;
       return bracketAt(kind, pos, opts);
     },
-    /** C1: the INTERPOLATED value at any position — O(1) amortised. E3: takes
-     *  {evidence}; under 'attested' it returns the last attested sample plus a
-     *  report instead of interpolating. */
+    // The interpolated value at any position; under 'attested', the last attested sample and a
+    // report.
+    // why: lessons/timeline-transport.md#sample-at
     sampleAt,
-    /** E3: the deck-level evidence policy — the explicit choice every omitting
-     *  query resolves to. null means the client never made one. */
+    // The deck's evidence policy, or null if the client never chose.
+    // why: lessons/timeline-transport.md#evidence-policy
     evidence() { return evPolicy ? { ...evPolicy } : null; },
     /** G4: a policy change is a STATE CHANGE, not a filter. Lanes that become
      *  gated are asked to go quiet; lanes that become ungated are re-asserted
@@ -2197,10 +1634,8 @@ export function createScheduler(transport, {
       if (kind !== undefined) { const lp = laneProv.get(kind); return lp ? one(lp) : null; }
       return [...laneProv.values()].map(one);
     },
-    /** E4: the firewall's own accounting — "how much of what you are about to
-     *  look at was invented", over one kind, a list of kinds, or the whole deck.
-     *  This is the number a tratteggio UI displays; it is not the client's to
-     *  compute. */
+    // How much of what you are about to look at was invented, per kind, kinds or deck.
+    // why: lessons/timeline-transport.md#evidence-accounting
     evidenceAccounting(kind) {
       const kinds = kind === undefined ? [...laneProv.keys()] : (Array.isArray(kind) ? kind : [kind]);
       const out = { attested: 0, restored: 0, total: 0, inventedFraction: 0, byTier: {}, lanes: [] };
@@ -2215,25 +1650,10 @@ export function createScheduler(transport, {
       out.inventedFraction = out.total ? out.restored / out.total : 0;
       return out;
     },
-    /** §5b's reconstructor-as-adapter, and the whole of it: a reconstructor
-     *  READS an evidence lane and APPENDS a derived lane carrying
-     *  {source, method, confidence, tier, refs}. It never touches the master.
-     *
-     *    const rc = deck.registerReconstructor('catmull', {
-     *      from: 'pointer',            // the evidence lane it reads
-     *      into: 'pointer~catmull',    // the derived lane it appends (default)
-     *      tier: 1, method: 'catmull-rom',
-     *      plan: ({a, b, aAt, bAt, dtMs, i}) => [positions…],   // WHERE to invent
-     *      derive: (pos, ctx) => payload,                       // WHAT to invent
-     *    });
-     *    rc.run();     // append (idempotent: a re-run drops and rebuilds)
-     *    rc.drop();    // delete the restoration — the master is bit-identical
-     *
-     *  TIER 1 IS THE ONLY ONE THE LIBRARY IMPLEMENTS, and it implements it by
-     *  reusing the interpolator sampleAt already is. Tiers 2 (inpainting) and 3
-     *  (generative) are UNIMPLEMENTED BY DESIGN: they register through this same
-     *  seam and must bring their own derive() — the library hosts a model, it
-     *  never guesses one. */
+    // registerReconstructor(name, { from, into, tier, method, plan, derive }) -> { run(), drop() }.
+    // It reads an evidence lane and appends a derived lane; drop() leaves the master untouched.
+    // Only tier 1 is implemented (the interpolator); tiers 2 and 3 must bring their own derive().
+    // why: lessons/timeline-transport.md#reconstructor
     registerReconstructor(name, spec = {}) {
       if (!name || reconstructors.has(name)) throw new Error(`reconstructor '${name}': name required and must be unique`);
       const from = spec.from;
@@ -2257,10 +1677,8 @@ export function createScheduler(transport, {
         for (let t = aAt + step; t < bAt - 1e-9; t += step) out.push(t);
         return out;
       });
-      // The DEFAULT tier-1 derive is the interpolator sampleAt already is —
-      // asked with {evidence:'all'} because a reconstructor is the one caller
-      // whose whole job is to invent. What makes that honest is not refusing to
-      // do it; it is that every row it emits says so.
+      // The default tier-1 derive is sampleAt with {evidence: 'all'}; every row it emits says so.
+      // why: lessons/timeline-transport.md#default-derive
       const derive = spec.derive || ((pos) => sampleAt(from, pos, { ...(spec.opts || {}), evidence: 'all' }));
       const confidence = typeof spec.confidence === 'function' ? spec.confidence
         : spec.confidence !== undefined ? () => spec.confidence
@@ -2375,19 +1793,14 @@ export function createScheduler(transport, {
       return driftLog.slice(skip);
     },
     driftStats() { return { total: driftTotal, retained: driftLog.length, dropped: driftDropped, limit: driftLimit }; },
-    /** Drain the drift channel (every fire's {intendedUs, firedUs, deltaMs}).
-     *  Destructive by design — the bounded-memory path. Observers should use
-     *  onDrift()/peekDrift() so draining does not blind them. */
+    // Destructive drain of the drift channel, for bounded memory; observers use onDrift/peekDrift.
+    // why: lessons/timeline-transport.md#drain-drift
     drainDrift() { return driftLog.splice(0); },
     stats() {
       const counts = { pending: 0, committed: 0, fired: 0, passed: 0, dropped: 0, reduced: 0, gated: 0 };
       for (const ev of events) counts[ev.status]++;
-      // E1: `total` counts every row in the deck; `attested` and `derived` split
-      // it, so a client asserting "my capture is intact" compares against
-      // `attested` and a restoration can never inflate it.
-      // U1: the SECOND split, on the other axis, and deliberately not multiplied
-      // into the first — `attested + derived` and `crisp + smeared` are two
-      // partitions of the same rows, never one score.
+      // `attested` and `derived` split `total`; crisp and smeared split it again, never one score.
+      // why: lessons/timeline-transport.md#counts
       return { counts, total: events.length, attested: events.length - derivedTotal, derived: derivedTotal,
                crisp: events.length - smearedTotal, smeared: smearedTotal,
                busyMs: +busyMs.toFixed(2), maxTickGapMs: +maxTickGapMs.toFixed(2) };
@@ -2403,12 +1816,9 @@ export function createScheduler(transport, {
   };
 }
 
-// ---------------------------------------------------------------------------
-// (d) THE GRAVEYARD ARM — per-event setTimeout fan-out, reproduced faithfully
-// for measurement (demo gen-3 / maria): play() arms one setTimeout per event;
-// there is NO cancellation path, so pause/seek/rate leave orphan timers and
-// clear() empties the model while armed timers keep ringing. DO NOT SHIP.
-// ---------------------------------------------------------------------------
+// The graveyard arm: one setTimeout per event and no cancel path, reproduced for measurement only.
+// Do not ship.
+// why: lessons/timeline-transport.md#fanout
 
 export function createFanoutScheduler(transport) {
   const clock = transport.clock;
@@ -2419,7 +1829,7 @@ export function createFanoutScheduler(transport) {
 
   function fire(ev) {
     const firedT = clock.now();
-    const intended = transport.timeAt(ev.at); // may be null (paused) or stale — that's the corpse
+    const intended = transport.timeAt(ev.at); // may be null (paused) or stale, which is the point; why: lessons/timeline-transport.md#corpse
     ev.fires++; ev.status = 'fired';
     driftLog.push({
       id: ev.id, kind: ev.kind, at: ev.at,
@@ -2461,10 +1871,8 @@ export function createFanoutScheduler(transport) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Position observable — the drift channel's second half (steal #6): a ~60 Hz
-// {pos, nowUs} stream for visualizers, separate from event callbacks.
-// ---------------------------------------------------------------------------
+// The position observable: a ~60 Hz {pos, nowUs} stream, separate from event callbacks.
+// why: lessons/timeline-transport.md#observe
 
 export function observePosition(transport, cb, { hz = 60, useRaf = typeof requestAnimationFrame === 'function' } = {}) {
   let live = true;
@@ -2481,27 +1889,13 @@ export function observePosition(transport, cb, { hz = 60, useRaf = typeof reques
   return () => { live = false; clearInterval(iv); };
 }
 
-// ---------------------------------------------------------------------------
-// createDeck — the batteries-included facade the first client had to write by
-// hand (proto/jam/jam-timeline.js). Transport + scheduler + adapter registry +
-// position observable + accumulated drift, one object, with the measured
-// defaults already applied. This is the whole of what a client needs:
-//
-//   const deck = createDeck({
-//     items: [{at, kind, id, payload}, …],
-//     adapters: { midi: {caps, actuate, reduce, assertState} },
-//     range: [0, durationMs], onPosition, onDrift,
-//   });
-//   deck.play(); deck.setRate(0.5); deck.seek(t); deck.pause();
-//
-// `range` is the seekable window in the position domain (absolute wall ms is
-// as legal as 0-based ms — replay-grid uses the former, jam the latter). Since
-// v0.5 it is NOT fixed at construction: `deck.setRange([min,max] | 'auto')`
-// moves it in place for a client whose item set grows at runtime.
-// ---------------------------------------------------------------------------
+// createDeck({ items, adapters, range, onPosition, onDrift, ... }): transport, scheduler, registry,
+// observable and drift with measured defaults. `range` may be absolute or 0-based; setRange moves
+// it.
+// why: lessons/timeline-transport.md#create-deck
 
 export function createDeck({
-  clock,                       // ClockSource — default wall
+  clock,                       // ClockSource, wall by default; why: lessons/timeline-transport.md#clock
   items = [],                  // [{at, kind, id?, payload}]
   adapters = {},               // kind -> adapter (SEAM 1)
   range,                       // [min, max] position window; default [0, lastAt + tailMs]
@@ -2518,12 +1912,9 @@ export function createDeck({
   for (const [kind, ad] of Object.entries(adapters)) sched.registerAdapter(kind, ad);
   for (const it of items) sched.schedule(it);
 
-  // `span` is MUTATED IN PLACE by setRange() so `deck.range` stays one stable
-  // reference every holder already has (nested.mjs reads it at add(), HUDs cache
-  // it). `lastAt` tracks the furthest item ever scheduled, which is what an
-  // 'auto' range is derived from.
-  // U2: an item may carry ONLY a `when` — the anchor is `when.earliest`, so
-  // that is the position the range has to see.
+  // `span` is mutated in place so `deck.range` stays one reference; `lastAt` feeds 'auto'.
+  // An item may carry only `when`; its anchor is when.earliest.
+  // why: lessons/timeline-transport.md#span
   const anchorOf = (i) => (i && i.when && Number.isFinite(Number(i.when.earliest)) ? Number(i.when.earliest) : i.at);
   let lastAt = items.length ? Math.max(...items.map(anchorOf)) : 0;
   const span = range && range.length === 2 ? [range[0], range[1]] : [0, lastAt + tailMs];
@@ -2548,44 +1939,17 @@ export function createDeck({
 
   const clamp = (p) => Math.max(span[0], Math.min(span[1], p));
 
-  // START INSIDE THE RANGE. `createTransport` opens at p0 = 0, and for a range
-  // beginning at 0 — every deck this library has ever had — that is right by
-  // accident rather than by construction. Give it a range that does not contain
-  // zero and the playhead begins OUTSIDE it: a deck built for 1965 opened at
-  // 1970-01-01, five years to the right of its own window, with `position()`
-  // outside `range` from the first frame.
-  //
-  // `setRange()` has always re-clamped; the constructor never did, so nothing
-  // caught it — no deck had been positioned anywhere but zero until an archive
-  // timeline needed negative epoch ms. Found by plan-archive-timeline §4 and
-  // measured before this line existed.
-  //
-  // `span[0]`, not `clamp(0)`. Clamping is what `setRange` does to a position it
-  // already has; here there is no position worth preserving, and clamping zero
-  // against a range that is entirely NEGATIVE returns `span[1]` — so a 1965 deck
-  // opened on 1966-01-01, at the far END of its window. Caught by testing the
-  // fix rather than by reading it.
+  // Start at span[0] when position 0 is outside the range (a 1965 deck); clamping would pick
+  // span[1]
+  // for an all-negative range.
+  // why: lessons/timeline-transport.md#start-inside
   if (transport.position() < span[0] || transport.position() > span[1]) {
     transport.seek(span[0]);
   }
   let rangeGen = 0;
-  /**
-   * 🔴 THE LOOP, PUBLISHED ON THE DECK SO THE PICTURE CAN DRAW IT. Asked for
-   * 2026-09-16: *"timeline global feature: draw loop boundaries (depends on
-   * loop cycle state) and add light transclucent shade on loop area on
-   * timeline"*.
-   *
-   * The loop itself belongs to the transport BAR, which is right: the bar owns
-   * the three presses, the wrap and the live window, and it keeps only two
-   * numbers. But a strip drawing the same deck had no way to learn about it,
-   * and every page with both was drawing a picture of time with the loop
-   * missing from it. The deck is the one object the two share, so the bar
-   * publishes here and anything drawing this deck can read it.
-   *
-   * ⚠️ IT IS A VIEW, NOT A MECHANISM. Nothing in this file acts on it: the deck
-   * does not wrap, does not seek and does not know what a lap is. Writing a
-   * loop here does not make one.
-   */
+  // The loop published on the deck by the transport bar, so a strip can draw it. A view, not a
+  // mechanism.
+  // why: lessons/timeline-transport.md#loop-view
   let loopView = null;
   return {
     transport, sched, items, adapters, range: span, hostName: host.name,
@@ -2601,30 +1965,13 @@ export function createDeck({
         : null;
       return loopView;
     },
-    /** how many times the range has moved — a positional reader (a cursor
-     *  client, a scrubber) can cheaply notice it must re-derive. */
+    // How many times the range has moved, so a positional reader can re-derive.
+    // why: lessons/timeline-transport.md#range-gen
     rangeGen: () => rangeGen,
-    /**
-     * RANGE IS NO LONGER FIXED AT CONSTRUCTION (v0.5). Every client whose item
-     * set grows at runtime — the remixer, every time a layer loads — had to
-     * `dispose()` and rebuild the whole deck just to widen the seekable window,
-     * throwing away the drift log, the adapters and the playhead with it.
-     *
-     *   deck.setRange([min, max])   explicit window in the position domain
-     *   deck.setRange('auto')       [span[0], furthest scheduled at + tailMs]
-     *
-     * Purely additive and invariant-preserving:
-     *  · `deck.range` keeps its identity (the array is mutated in place), so
-     *    nested.mjs spans and HUDs holding it stay correct;
-     *  · `durationMs` is a getter and follows;
-     *  · if the playhead is now OUTSIDE the window it is moved with a real
-     *    `seek()` — reduce + assertState — never a silent clamp, so the state
-     *    at the new position is re-folded exactly as any other seek;
-     *  · the scheduler's per-kind lanes and their CURSORS are untouched: range
-     *    is a *window on positions*, not a filter on events. The cursor stays
-     *    the only positional reader and it keeps riding the same lane array.
-     * @returns {[number, number]} the new range
-     */
+    // setRange([min, max] | 'auto'): `deck.range` keeps its identity, a playhead outside is moved
+    // with a
+    // real seek, and cursors are untouched. Returns the new range.
+    // why: lessons/timeline-transport.md#set-range
     setRange(r) {
       const want = (r === undefined || r === 'auto') ? [span[0], lastAt + tailMs] : r;
       if (!Array.isArray(want) || want.length !== 2 || !Number.isFinite(want[0]) || !Number.isFinite(want[1]))
@@ -2640,11 +1987,9 @@ export function createDeck({
     play(r) { transport.play(r); },
     pause() { transport.pause(); flush(); },
     setRate(r) { transport.setRate(r); },         // SEAM 2: does not start playback
-    /** seek(pos) is unchanged. seek(pos, {disposition, timeoutMs}) — or ANY
-     *  seek on a deck holding a caps.slowSync adapter — goes through U6's
-     *  two-phase barrier: the LOCATE still happens synchronously (and this
-     *  still returns the clamped position), only the ROLL waits, and it fails
-     *  open. deck.seekBarrier() is the report; .promise settles when it opens. */
+    // seek(pos, {disposition, timeoutMs}), or any seek with a slowSync adapter, uses the two-phase
+    // barrier.
+    // why: lessons/timeline-transport.md#seek
     seek(p, opts) {
       const q = clamp(p);
       if (opts !== undefined || sched.hasSlowSync()) sched.requestSeek(q, opts || {});
@@ -2666,25 +2011,25 @@ export function createDeck({
       return sched.schedule(item);
     },
     lastAt: () => lastAt,
-    /** every fire's {intendedUs, firedUs, deltaMs, origin} — the drift channel */
+    // every fire's {intendedUs, firedUs, deltaMs, origin}
+    // why: lessons/timeline-transport.md#drift
     drift: () => (flush(), drift.slice()),
     fireCount: () => flush(),
     resetDrift() { sched.drainDrift(); drift = []; pendingRows = []; },
     reduceAt: (kind, pos, opts) => sched.reduceAt(kind, pos, opts),
     assertAt: (pos, kind) => sched.assertAt(pos, kind),
-    /** v0.7 G5 — push AUTHORITATIVE state in without replaying a prefix (an
-     *  external sync, a media-master handover, a policy change, a loop wrap).
-     *  Moves the reduce snapshot; writes NO drift row; verification opt-in. */
+    // Push authoritative state in without replaying; no drift row; verification opt-in.
+    // why: lessons/timeline-transport.md#deck-assert
     assertState: (kind, state, info) => sched.assertState(kind, state, info),
     asserts: (from) => sched.asserts(from),
     snapshotOf: (kind) => sched.snapshotOf(kind),
-    /** v0.7 G3 — the fire-side firewall's accounting and its live channel. */
+    // The fire-side firewall's accounting and its live channel.
+    // why: lessons/timeline-transport.md#deck-gate
     gateAccounting: (kind) => sched.gateAccounting(kind),
     onGate: (cb) => sched.onGate(cb),
     isGated: (kind) => sched.isGated(kind),
-    /** v0.4 CONTINUOUS KINDS — the interpolated value at any position (C1), the
-     *  raw straddling pair (C2), honest capability negotiation (C6).
-     *  v0.5 THE EVIDENCE FIREWALL — all four take {evidence} (E3). */
+    // Continuous reads (sampleAt, bracket, request); all take {evidence}.
+    // why: lessons/timeline-transport.md#deck-sample
     sampleAt: (kind, pos, opts) => sched.sampleAt(kind, pos, opts),
     bracket: (kind, pos, opts) => sched.bracket(kind, pos, opts),
     window: (kind, from, to, opts) => sched.window(kind, from, to, opts),
@@ -2692,8 +2037,8 @@ export function createDeck({
     setEvidence: (p) => sched.setEvidence(p),
     provenanceOf: (kind) => sched.provenanceOf(kind),
     evidenceAccounting: (kind) => sched.evidenceAccounting(kind),
-    /** U4: the position-axis twin, reported BY RULE. Never multiply it with
-     *  evidenceAccounting() — two axes, two numbers, no score. */
+    // The position axis by rule; never multiplied with evidenceAccounting().
+    // why: lessons/timeline-transport.md#deck-position
     positionAccounting: (kind) => sched.positionAccounting(kind),
     /** U5: the series keys a lane holds (null if the adapter declares none). */
     seriesOf: (kind) => sched.seriesOf(kind),
@@ -2704,12 +2049,11 @@ export function createDeck({
     eventsOf: (kind) => sched.eventsOf(kind),
     cursorStats: (kind) => sched.cursorStats(kind),
     caps: (kind) => sched.adapterCaps(kind),
-    /** bumps whenever an adapter is registered or removed — a nest installs one
-     *  on its parent AFTER construction, so anything derived from the registry
-     *  at build time is describing a deck that does not exist yet */
+    // Bumps on every registry change.
+    // why: lessons/timeline-transport.md#deck-adapter-gen
     adapterGen: () => sched.adapterGen(),
-    /** the adapter registry, readable — including adapters registered AFTER
-     *  construction, which `deck.adapters` (the constructor object) never held. */
+    // The registry, including adapters registered after construction.
+    // why: lessons/timeline-transport.md#deck-adapter
     adapter: (kind) => sched.adapter(kind),
     /** caps.absentState fan-out: go quiet where an adapter says how, hold where
      *  it does not, and report where the cap was declared but not implemented. */
@@ -2720,14 +2064,9 @@ export function createDeck({
   };
 }
 
-// ---------------------------------------------------------------------------
-// Audio lane — Chris Wilson lookahead over an AudioContext: a coarse tick
-// (worker-hosted by preference) commits events inside the horizon as
-// sample-accurately start()ed nodes; committed nodes are held for cancel
-// (the cancellation path the oscillator-per-event corpse lacked).
-// Emits one-sample impulses into `bus` (a GainNode) by default; pass
-// makeNode(ctx, audioT, ev) to schedule arbitrary graphs.
-// ---------------------------------------------------------------------------
+// Audio lane: a lookahead tick commits events in the horizon as start()ed nodes, held for cancel.
+// One-sample impulses into `bus` by default; makeNode(ctx, audioT, ev) for any graph.
+// why: lessons/timeline-transport.md#audio-lane
 
 export function createAudioLane(transport, ctx, {
   tickMs = 25,
@@ -2803,31 +2142,9 @@ export function createAudioLane(transport, ctx, {
 
   const unsub = transport.onState((st) => {
     cancelCommitted();
-    /**
-     * 🔴 'rendered' IS RESET HERE TOO, AND LEAVING IT OUT MEANT THIS LANE COULD
-     * NOT LOOP. A node's `onended` is the only thing that writes 'rendered',
-     * so what stayed silent on a second lap was exactly the set of events that
-     * had SOUNDED on the first one.
-     *
-     * MEASURED 2026-09-21 in a real AudioContext with the audio thread doing
-     * the counting (demo/shell/impulse-worklet.js, the ear /lanes/ uses): four
-     * events at 300, 900, 1500 and 2100 over a 2400 ms lap, played out, then
-     * seek(0). Lap one 4 impulses heard, LAP TWO 0, stats {rendered: 4}.
-     * THE CONTROL, in the same run and the same lane: cut the lap at 1200
-     * instead, and the two events that had not sounded yet DID sound after the
-     * seek, at 1496 and 2097 ms. The anchor, the commit path and the ear are
-     * all fine across a seek; only the terminal status was wrong.
-     *
-     * ⚠️ IT IS WHAT THE OTHER TWO LANES IN THIS FILE ALREADY DO. The wall
-     * scheduler's reconcile() resets ANY event ahead of the playhead ('re-fire
-     * after a backward seek is correct replay'), and createMidiLane has no
-     * terminal status at all, so both of them loop. This was the odd one out.
-     * ⚠️ AND THE OFFLINE RENDER LAB COULD NOT HAVE CAUGHT IT: offline nothing
-     * sounds until startRendering(), so `onended` never fires while the
-     * commits are being made and 'rendered' never happens there. Two loop
-     * defects on one lane, and the arm that found the other one is blind to
-     * this one.
-     */
+    // 'rendered' resets on a seek too, or events that sounded on lap one stay silent on lap two
+    // (measured: 4 then 0). The other lanes already reset.
+    // why: lessons/timeline-transport.md#rendered-reset
     if (st.reason === 'seek') {
       for (const ev of events) {
         if (ev.at > st.p0 && (ev.status === 'passed' || ev.status === 'rendered')) ev.status = 'pending';
@@ -2855,45 +2172,10 @@ export function createAudioLane(transport, ctx, {
   };
 }
 
-/**
- * MIDI out is an AUDIO-SHAPED lane, not a timer-shaped one.
- *
- * `MIDIOutput.send(data, when)` takes a future DOMHighResTimeStamp and the port
- * delivers it there, so — exactly like the audio lane — nothing happens "at the
- * moment" and the accuracy is owned below JS. This is why the library needed a
- * third lane type rather than a `midi` adapter on the wall scheduler: an
- * adapter would fire at the moment and hand MIDI its worst case.
- *
- * Two differences from createAudioLane, both worth knowing:
- *
- *   · IT STILL NEEDS A DOMAIN CONVERSION, and the first version of this file
- *     got it wrong in the most silent way available. `MIDIOutput.send()` takes
- *     a `DOMHighResTimeStamp` — `performance.now()`'s domain — while the
- *     transport's default `wallClock()` is `performance.timeOrigin +
- *     performance.now()`, i.e. EPOCH ms. Handing `transport.timeAt()` straight
- *     to `send()` therefore scheduled every note about fifty-six years out.
- *     Nothing threw, nothing logged, and the lane's own `scheduled()` counter
- *     went up exactly as if it had worked — the counter counts what we QUEUED,
- *     not what the port accepted. The conversion below is a delta rather than
- *     `- performance.timeOrigin`, so it holds for any ClockSource, including
- *     the audio clock and the virtual runtime.
- *     The audio lane re-anchors best-of-five every tick because
- *     `AudioContext.currentTime` also DRIFTS against wall time; this one does
- *     not drift, both being the same underlying clock, so a fresh pair of
- *     readings per commit is enough.
- *   · CANCELLATION IS ALL-OR-NOTHING. There is no per-message cancel;
- *     `clear()` drops every pending message on the port. That is fine for a
- *     note whose note-on has not sounded yet, and leaves a HUNG NOTE for one
- *     that has — so cancelling also sends all-notes-off. The looper learned
- *     the same lesson from the other end: no-stuck-notes is a property of the
- *     cancel path, never of the callback that was supposed to run.
- *
- * UNVERIFIED ON HARDWARE. No MIDI device has ever been attached to this
- * project (HANDOFF: the macOS IAC toggle is still open), and headless Chrome
- * needs `Browser.grantPermissions` for midi before it can even enumerate a
- * port — so `verify.mjs` cannot reach this code. Treat the timing claim above
- * as the spec's, not as measured.
- */
+// MIDI out schedules ahead via send(data, when) in performance.now()'s domain, converted by a delta
+// from the transport clock (epoch ms would land notes decades out). Cancel clears the port and
+// sends all-notes-off. Unverified on hardware.
+// why: lessons/timeline-transport.md#midi-lane
 export function createMidiLane(transport, output, {
   tickMs = 25,
   horizonMs = 100,
@@ -2971,13 +2253,9 @@ export function createMidiLane(transport, output, {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Virtual runtime — a deterministic ClockSource + TickHost pair for CI. Time
-// advances only through advanceTo(); due timers and ticks fire in exact time
-// order with the clock set to their due moment. This is what makes the C2
-// property test (`reduce(events<=t) === play(0->t)`) runnable in plain node
-// with zero wall-clock flake.
-// ---------------------------------------------------------------------------
+// A deterministic ClockSource and TickHost for CI: time moves only through advanceTo(), so the C2
+// property test runs in node without flake.
+// why: lessons/timeline-transport.md#virtual
 
 export function createVirtualRuntime(startMs = 0) {
   let t = startMs, seq = 0;

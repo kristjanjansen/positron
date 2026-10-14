@@ -1,15 +1,7 @@
-// §12 CATALOG SHIM player: one browser player that consumes BOTH non-hang MoQ
-// catalog dialects through @moq/net, bridging the gap §7 identified:
-//   - mediamtx 1.20.1 (drafts 16-19): track ".catalog" = draft-ietf-moq-msf-00
-//     JSON, packaging "loc", video = raw AVCC access units (one frame per MoQ
-//     group, avc3 in-band params), audio = raw Opus packets (one per group).
-//   - IETF moq-pub / Cloudflare (draft-14): track ".catalog" = WARP moq-catalog
-//     v1 JSON, packaging "cmaf", video = moof+mdat fMP4 fragments (group per
-//     GOP), init segment in a separate track ("0.mp4").
-// Measurement: burned-ms binary row (video g2g) + 2 kHz 500 ms-boundary audio
-// ticks (aLat, A/V skew) — same rigs as §7-§10.
-// Params: ?url=<moq server/relay> &ns=<namespace> &dur=90 &fp=1 (fetch
-//   /fingerprint from page origin and pin it) &noaudio=1 &nomeasure=1
+// §12 catalog shim player: one player for mediamtx (msf-00 ".catalog", loc) and moq-pub/Cloudflare
+// (WARP catalog, cmaf) through @moq/net, measured with the burned row and audio ticks.
+// Params: ?url= &ns= &dur=90 &fp=1 &noaudio=1 &nomeasure=1
+// why: lessons/rig-moq.md#play-mtx-header
 import { Connection, Path } from "@moq/net";
 
 const P = new URLSearchParams(location.search);

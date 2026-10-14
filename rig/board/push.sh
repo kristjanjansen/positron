@@ -1,20 +1,7 @@
 #!/bin/bash
-# rig/board/push.sh — put THIS checkout on the board and restart the service.
-#
-#   ./push.sh                 find the board, ship, restart, show the log
-#   ./push.sh <pi>   skip the search
-#   ./push.sh --no-restart    ship only (a running instrument keeps playing)
-#
-# `provision.sh` is the first-run path: it installs packages, kernel modules and
-# the unit file. This is the loop you use fifty times after that, and it exists
-# because doing it by hand got the destination wrong.
-#
-# ⚠️ THE SERVICE RUNS FROM /opt/positron-board, NOT FROM ~/positron.
-# `provision.sh` unpacks into ~/positron and `setup.sh` copies that to /opt.
-# A file edited in ~/positron changes nothing, and the copy already on the board
-# there is stale — it has no pappus.mjs at all. So this writes to /opt directly
-# and prints the md5 of what landed, because "it deployed" and "it says it
-# deployed" have been different things here before.
+# ./push.sh [<pi>] [--no-restart]: ship this checkout to the board and restart the service.
+# The service runs from /opt/positron-board, not ~/positron, so this writes /opt and prints md5s.
+# why: lessons/rig-board-io.md#push-header
 set -uo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 USER_=${BOARD_USER:-positron}
@@ -29,10 +16,8 @@ for a in "$@"; do
   esac
 done
 
-# ── find it ──────────────────────────────────────────────────────────────────
-# Port 22, not mDNS and not ARP. `positron-board.local` does not resolve from this
-# sandbox (mDNS is multicast UDP) and guessing Raspberry Pi MAC prefixes in the
-# ARP cache missed the board entirely while it was sitting on the subnet.
+# Find the board on port 22: mDNS and ARP guesses both missed it.
+# why: lessons/rig-board-io.md#push-find
 if [ -z "$IP" ]; then
   base=$(ipconfig getifaddr en0 2>/dev/null | sed 's/\.[0-9]*$//')
   [ -n "$base" ] || { echo "no IPv4 on en0 — pass the address" >&2; exit 1; }
@@ -49,16 +34,9 @@ if [ -z "$IP" ]; then
 fi
 
 echo "== shipping to $IP:$DEST"
-# rig/board plus every module it imports from outside itself, at the paths the
-# imports expect. tar over ssh rather than rsync, which a fresh Pi OS Lite does
-# not have.
-# ⚠️ rig/vis GOES TOO. The renderer is a C program that has to be COMPILED on
-# the board, and it lived in /tmp there until 2026-09-11 — one reboot from
-# taking every number in plan-visuals §3 with it.
-# ⚠️ COPYFILE_DISABLE=1: macOS tar otherwise adds an AppleDouble `._name` beside
-# every file with extended attributes, and 18 of them were sitting in /opt on
-# the board on 2026-10-10 (harmless, but they make an md5 comparison of the two
-# trees read as 18 differences).
+# rig/board, rig/vis (compiled on the board) and every module rig/board imports from two levels up,
+# by tar over ssh. COPYFILE_DISABLE=1 keeps macOS `._` files out.
+# why: lessons/rig-board-io.md#push-tar
 ( cd "$SRC/../.." && COPYFILE_DISABLE=1 tar cf - --no-xattrs --exclude=node_modules --exclude='._*' \
     rig/board rig/vis \
     $(cd rig/board && grep -ho "from '\.\./\.\./[^']*'" ./*.mjs | sed "s|from '\.\./\.\./||; s|'$||" | sort -u) \
@@ -69,9 +47,8 @@ echo "== the one npm dependency, if package.json moved (rtc.mjs, node-datachanne
 # Never installed on the laptop, which SIGKILLs a native module it did not build.
 ssh "$USER_@$IP" "cd $DEST/rig/board && if [ ! -d node_modules/node-datachannel ] || [ package.json -nt node_modules/.package-lock.json ]; then npm install --omit=dev --no-audit --no-fund 2>&1 | tail -1; else echo '   unchanged'; fi"
 echo "== building the renderer, if its source changed"
-# Cheap and idempotent: gcc is fast on two small files, and a binary older than
-# its source is the failure this avoids — it would run the PREVIOUS shader and
-# report the new one's name.
+# Rebuild the renderer every push: a stale binary runs the previous shader under the new name.
+# why: lessons/rig-board-io.md#push-vis
 ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
   for t in v3dbench v3dpipe; do
     if [ ! -x "$t" ] || [ "$t.c" -nt "$t" ]; then
@@ -81,54 +58,23 @@ ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
   ls -la v3dpipe 2>/dev/null || echo "   no v3dpipe — visuals will report unavailable"
 }'
 
-# ⚠️ THE ENGINE HAS A SECOND HOME, AND sclang ONLY READS THAT ONE.
-#
-# `Engine_Pappus.sc` and `CroneEngine.sc` are SuperCollider CLASSES, so sclang
-# compiles them from its Extensions directory — /opt/positron-board is not on its
-# class path at all. Shipping the engine to /opt and restarting therefore
-# changes NOTHING, silently: the service comes up, the engine loads, every
-# command works, and it is the previous version of the file.
-#
-# MEASURED 2026-09-13: an added command read `CroneEngine: no command 'report'`
-# and `PAPPUS READY 106 commands` while the copy in /opt had the new one and
-# matched its md5. Two copies, two different md5s, and the md5 this script was
-# printing was the one nobody compiles. That is LESSONS #39 in a third costume —
-# ~/positron against /opt was the first, /opt against Extensions is this one.
-# ⚠️ NOT `$HOME`. This string is interpolated into an ssh command by the LOCAL
-# shell, so `$HOME` would expand to the Mac's home directory and every path
-# below would be built for the wrong machine — a copy that succeeds into
-# somewhere nothing reads, which is the exact failure this block exists to fix.
+# sclang reads classes only from its Extensions directory, so engine classes are copied there too.
+# `/home/$USER_`, not `$HOME`, which the local shell would expand.
+# why: lessons/rig-board-io.md#push-sc-ext
 SC_EXT="/home/$USER_/.local/share/SuperCollider/Extensions"
 echo "== the SuperCollider classes, to the path sclang actually compiles"
-# ⚠️ EVERY CLASS, NOT JUST THE ENGINE. `PosSource.sc` is a class too, so the
-# paragraph above applies to it word for word — and it is newer, so it is the
-# one most likely to be left behind. A missing class does not fail loudly:
-# sclang's compile stops at the first unknown name, `PAPPUS READY` never prints,
-# and `fx.pappus` reports "the engine came up but never reported READY".
+# Every class, PosSource.sc included: a missing class stops sclang's compile and READY never
+# prints.
+# why: lessons/rig-board-io.md#push-classes
 ssh "$USER_@$IP" "mkdir -p $SC_EXT/pappus/lib && \
   cp $DEST/rig/board/norns/Engine_Pappus.sc $SC_EXT/pappus/lib/Engine_Pappus.sc && \
   cp $DEST/rig/board/norns/PosSource.sc $SC_EXT/pappus/lib/PosSource.sc && \
   cp $DEST/rig/board/norns/CroneEngine.sc $SC_EXT/CroneEngine.sc && echo '   classes installed'"
 
 echo "== what landed, against what was sent"
-# Not "ok" — the md5 of the file that will actually execute. Printing a success
-# line is not evidence that a copy happened (CLAUDE.md).
-# ⚠️ THE ENGINE'S md5 IS THE ONE FROM THE EXTENSIONS PATH, not from $DEST — see
-# the block above. Printing $DEST's copy is printing a file nothing reads.
-# ⚠️ `jacksynth.mjs` IS IN THIS LIST SINCE 2026-09-18 AND WAS NOT BEFORE. It
-# holds the JACK graph: the chain, the insert's patching, the `jack.graph`
-# report and the `jack.rebuild` repair. A deploy that landed
-# board.mjs and not this one would answer the new verbs with `ReferenceError` on
-# a board nobody can ssh to. An md5 that covers one of two changed files is a
-# confirmation that can be true while the deploy is broken.
-# ⚠️ AND THE COLLIDE ENGINE'S FOUR, SINCE 2026-10-12 (plans/plan-pi-supercollider-defs.md):
-# `scollide.mjs`, its limiter script, and the compiler and SynthDef reader it
-# imports from demo/shell. The compiler is the one most likely to be stale on the
-# board, because a page compiles with the laptop's copy and `same` in `sc.loaded`
-# then compares two different files.
-# ⚠️ AND WHAT THE BOARD ANNOUNCES, SINCE 2026-10-14: `beat.mjs` and the
-# `graph-registry.mjs` it imports build the graph on every hello and beat, so a
-# stale copy announces the old node names (`gpu`) with nothing failing.
+# The md5s of the files that will execute (the engine from Extensions), covering every changed
+# module.
+# why: lessons/rig-board-io.md#push-md5
 ssh "$USER_@$IP" "md5sum $DEST/rig/board/board.mjs $DEST/rig/board/jacksynth.mjs $DEST/rig/board/pappus.mjs \
   $DEST/rig/board/scsampler.mjs $DEST/rig/board/sampler.mjs $DEST/rig/board/norns/possampler-defs.scd \
   $DEST/rig/board/norns/run-pappus.scd \

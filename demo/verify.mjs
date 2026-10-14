@@ -1,11 +1,6 @@
-// demo/verify.mjs — drives every BUILT demo through the __demo contract.
-//
-//   node demo/verify.mjs            # all built demos
-//   node demo/verify.mjs transport loops   # just these, by slug
-//
-// This file is what replaces the ~25 harness pages: it asserts on
-// window.__demo, never on DOM ids, so it does not care how any page is built.
-// Raw CDP over node's global WebSocket, no deps — house harness style.
+// node demo/verify.mjs [slug ...]: every built demo through the __demo contract, asserting on
+// window.__demo, never DOM ids. Raw CDP over node's WebSocket, no dependencies.
+// why: lessons/harness.md#verify
 
 import { execFileSync } from 'node:child_process';
 import { serve, PORT as HTTP_PORT } from './server.mjs';
@@ -22,12 +17,9 @@ import { startBoard } from './fake-board.mjs';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));   // `--deep` is a tier, not a slug
-// ⚠️ A `gl: true` DEMO IS NOT THIS HARNESS'S SUBJECT, AND FAILING IT HERE WOULD
-// BE A LIE. This file launches Chrome with `--disable-gpu` (see the flags
-// below), where `getContext('webgl2')` returns null — so a visual demo reports
-// `__demo.ready` false and the suite goes red for a page that is perfectly
-// fine. Hand them to demo/verify-gl.mjs and SAY SO, rather than counting a
-// subject this harness cannot reach as a failure.
+// `gl: true` demos go to demo/verify-gl.mjs: this harness runs with --disable-gpu, where WebGL2 is
+// null.
+// why: lessons/harness.md#gl
 const all = DEMOS.filter((d) => d.built && (!want.length || want.includes(d.name)));
 const handedOff = all.filter((d) => d.gl);
 const targets = all.filter((d) => !d.gl);
@@ -37,35 +29,18 @@ if (handedOff.length) {
 }
 if (!targets.length) { console.error('nothing for this harness to verify'); process.exit(handedOff.length ? 0 : 1); }
 
-// 🔴 COUNT THE OTHER BROWSERS BEFORE BLAMING THE CODE. Three runs in one
-// session read broken because of processes of MY OWN: a full suite went
-// 429/429, then 420/429 with nine failures, then 429/429 again with no code in
-// between, and all nine were in the demos that need something off this machine.
-// Today the same thing took the suite out entirely — a `cdp timeout` on
-// `replay`, which is 16/16 when run alone. CLAUDE.md has carried this as a rule
-// to remember since session 18, and a rule to remember is the weakest kind of
-// guard: it only fires if the person reading the red output happens to recall
-// it. This makes the harness SAY IT, at the moment the output is being read.
-//
-// ⚠️ `-f` IS REQUIRED HERE AND IT IS THE TRAP. The flags we are looking for are
-// on the command line, so an exact-name match cannot see them — but a `-f`
-// pattern also matches the process doing the asking, which is LESSONS #39's
-// shape (`pgrep -f h264_v4l2m2m` answering "still held" about itself). So our
-// OWN pid is excluded explicitly, and after launch our own debugging port is
-// too. Informational, NEVER fatal: a harness that refuses to run because
-// something else is open is worse than the problem it is guarding against.
+// Count other harness browsers and say so, since stray Chromes have turned runs red. `-f` matches
+// the
+// asker too, so our own pid and debugging port are excluded. Informational, never fatal.
+// why: lessons/harness.md#peers
 const peerBrowsers = (excludePort) => {
   try {
     return execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' })
       .split('\n')
       .filter((l) => /Google Chrome/.test(l) && /--remote-debugging-port=(\d+)/.test(l))
-      // ⚠️ ONE BROWSER IS ABOUT TEN PROCESSES. Chrome's renderer, GPU and
-      // utility helpers inherit the whole command line, `--user-data-dir` and
-      // `--remote-debugging-port` included, so a naive count of matching
-      // processes reported **19 other headless Chromes** for two — and a
-      // warning that overstates by 10x is worse than no warning, because the
-      // next reader learns to ignore it. The browser process is the one with no
-      // `--type=`; every helper has one.
+      // Count browser processes only (no `--type=`): helpers inherit the command line, about ten
+      // per browser.
+      // why: lessons/harness.md#one-browser
       .filter((l) => !/--type=/.test(l))
       .filter((l) => Number(l.trim().split(/\s+/)[0]) !== process.pid)
       .filter((l) => !(excludePort && l.includes(`--remote-debugging-port=${excludePort}`)))
@@ -87,51 +62,16 @@ if (peersAtStart.length) {
   console.log('   Run any failing demo ALONE before believing it: node demo/verify.mjs <slug>');
 }
 
-/**
- * 🔴 FOUR PAGES ARE GRADED AGAINST STAND-INS, NEVER AGAINST THE REAL THING, AND
- * THE HARNESS DOES IT RATHER THAN THE PERSON REMEMBERING TO.
- *
- * Every station `/archive/radio/` offers is an ERR mount, and ERR told us our listeners
- * were corrupting their audience figures: the standing rule is that a connection
- * to one is opened only when a PERSON is going to listen. That made the page's
- * own thirty-four checks unrunnable, so `node demo/verify.mjs archive/radio` either
- * never happened or happened at somebody else's expense. `demo/fake-station.mjs`
- * serves real MP3 frames with real ICY headers at the page's own `?base=`, so
- * the decode path, the loop and the whole self-check run against a mount that is
- * nobody's radio station.
- *
- * 🔴 AND `/tapes/` IS THE SAME PROBLEM WITHOUT THE BROADCASTER, WHICH IS WHY IT
- * WENT UNNOTICED FOR LONGER. It plays twenty-four recordings off archive.org,
- * and the argument that this was safe, *"it uses archive.org, not ERR"*, got
- * the reply *"stil: super careful with external sources, better avoid"*. The
- * rule is about whose server it is, not about which harm has been named yet. A
- * plain `node demo/verify.mjs` with no arguments pulled real recordings down,
- * which is the way it happens by accident. `demo/fake-tapes.mjs` serves the same
- * paths at the lengths `corpus.json` measured.
- *
- * 🔴 AND `/now/` AND `/flipper/` ARE THE SAME BROADCASTER AS `/archive/radio/`, WHICH
- * IS WHY THE LAST FULL SUITE SKIPPED BOTH IN WRITING. They sweep ERR's live HLS
- * two bytes at a time to find where the rights refusals start, which is thirty
- * probes on one page and eight per channel on the other, plus a ten minute
- * back-seek that pulls another stretch of the window down. `demo/fake-err.mjs`
- * serves the same playlists on the same sliding window, with the three refusal
- * shapes ERR was measured to have, so both pages can be run as often as
- * anybody likes.
- *
- * ⚠️ IT IS AUTOMATIC BECAUSE THE ALTERNATIVE IS A RULE SOMEBODY HAS TO
- * REMEMBER, and a rule that is only in a document is a rule that gets broken on
- * the day somebody is in a hurry. `DEMO_QUERY=base=…` still wins, because
- * `URLSearchParams.get` returns the first occurrence and `DEMO_QUERY` is put
- * first: that is the escape hatch for somebody who has been ASKED to check the
- * real relay or the real archive.
- */
-/** Pages that hold both ends of a WebRTC leg in this one browser. See the grant before `Page.navigate`. */
+// Pages on somebody else's server are graded against stand-ins automatically (fake-station,
+// fake-tapes, fake-err); DEMO_QUERY comes first, so `base=` can point a run elsewhere when asked.
+// PEER_IN_PAGE: pages holding both ends of a WebRTC leg in one browser (see the grant below).
+// why: lessons/harness.md#stand-ins
 const PEER_IN_PAGE = new Set(['capture', 'wire']);
 /** slug -> the `?base=` its page is pointed at, filled in as each one comes up. */
 const standIn = new Map();
 const standIns = [];
-// The archived radio demo is `archive/radio` since 2026-10-13 (*"Resolve clashes"*):
-// its folder is demo/archive/radio/ and /radio/ is the radio concepts' group.
+// The archived radio demo is `archive/radio` (folder demo/archive/radio/).
+// why: lessons/harness.md#archive-radio
 if (all.some((t) => t.name === 'archive/radio')) {
   const station = startStation({ port: 0, quiet: true });
   if (!station) {
@@ -156,11 +96,8 @@ if (all.some((t) => t.name === 'tapes')) {
     console.log(`stand-in archive ${standIn.get('tapes')} (nobody's archive)`);
   }
 }
-// ⚠️ NO PAGE ON THIS BROADCASTER SINCE 2026-10-12, when `/flipper/` (which
-// `/now/` had merged into on 2026-10-05) was archived. The list and the
-// stand-in wiring stay so the next ERR page needs one slug here and nothing
-// else; `errAt` is kept beside it because the refusal classifier below
-// recognises the stand-in by its own address.
+// No ERR page today; the list and stand-in wiring stay so the next one is one slug here.
+// why: lessons/harness.md#err-pages
 const ERR_PAGES = [];
 let errAt = null;
 if (all.some((t) => ERR_PAGES.includes(t.name))) {
@@ -171,43 +108,18 @@ if (all.some((t) => ERR_PAGES.includes(t.name))) {
   } else {
     await new Promise((r) => err.on('listening', r));
     errAt = `http://127.0.0.1:${err.address().port}`;
-    /**
-     * 🔴 `/wall` IS THE ARRANGEMENT ERR WAS MEASURED WEARING ON 2026-09-06, AND
-     * IT IS THE ONE WHERE CHANNEL 0 REFUSES ITS NEWEST MINUTES. That is the only
-     * way the page's start behind the boundary runs at all; the old `/now/` was
-     * pointed at the default arrangement because it had no such path, and the
-     * merged page has it from `err-live.mjs`'s `findServedEdge`.
-     */
+    // `/wall` is the arrangement where channel 0 refuses its newest minutes.
+    // why: lessons/harness.md#wall
     standIn.set('flipper', `${errAt}/wall`);
     standIns.push(err);
     console.log(`stand-in broadcaster ${errAt} (nobody's ERR)`);
   }
 }
 
-/**
- * 🔴 THE BOARD PAGES MEET A BOARD THAT IS NOBODY'S, AND THE RELAY GOES WITH IT.
- * plans/plan-routing-migration.md §3.8, step 4. `/away/` (and `/knobs/` until
- * 2026-10-13) are `room: 'fixed'`, so until this they joined the PRODUCTION relay's `studio-1`
- * rooms on every run, beside the Raspberry Pi and whoever was listening to it.
- * Now `demo/fake-board.mjs` starts its own `demo/fake-relay.mjs` on 127.0.0.1
- * and these pages get `?relay=` (wire.mjs `relayOverride`), so a run opens no
- * socket off this machine for them.
- * ⚠️ `listening: true` HOLDS THE CIRCUIT'S LEASE AS ANOTHER LISTENER WOULD. A
- * page under `?selfcheck=1` may not take one (`createBoard` refuses every send),
- * so without it the frames never come and the page's level checks never run.
- * A listener elsewhere is a state the real board is in every time somebody is
- * playing, so it is not a generosity the real thing lacks.
- * ⚠️ `board=1` IS NOT ADDED. The page's own guard asserts (a harness cannot
- * drive the board) stay graded; `DEMO_QUERY=board=1` drives the stand-in for
- * real. `DEMO_QUERY=relay=...` still comes first, but `relayOverride` takes a
- * loopback address only, so it can move a page that leaves its relay to
- * wire.mjs onto another stand-in and never back onto the production relay.
- * (`/away/` hands `createBoard` its own `q.get('relay')` unchecked, so that
- * page alone would follow any address it is given.)
- * ⚠️ ONE LINE PER PAGE TO ADD ONE. `patchbay` and `shape` also open
- * `createBoard` and are left out on purpose until their own agents move them.
- */
-// `knobs` left 2026-10-13, archived with Yoshimi (archive/yoshimi/README.md).
+// Board pages meet demo/fake-board.mjs and its own fake relay via `?relay=`, never studio-1.
+// `listening: true` holds the lease as another listener would; `board=1` is not added, so the
+// page's own guards stay graded. Add a page with one line here.
+// why: lessons/harness.md#board-pages
 const BOARD_PAGES = ['away'];
 if (all.some((t) => BOARD_PAGES.includes(t.name))) {
   const fb = startBoard({ port: 0, quiet: true, listening: true });
@@ -219,15 +131,12 @@ if (all.some((t) => BOARD_PAGES.includes(t.name))) {
 
 // DEMO_BASE=https://positron.studio node demo/verify.mjs  -> verify the DEPLOY
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
-// The port ACTUALLY bound, which may not be the one asked for — see
-// serve()'s comment about a dev server already holding it.
+// The port actually bound, which may not be the one asked for.
+// why: lessons/harness.md#bound-port
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
-// (`server` is null only when DEMO_BASE is set, and then it is not read.)
-// 🔴 TWO TIERS (demo/shell/selfcheck.mjs). The ordinary run is selfcheck=1 and
-// waits only a page's `lightSettleMs`; the deep run, `DEMO_DEEP=1` or
-// `--deep`, is selfcheck=2 and waits the full `settleMs` the long-running
-// checks need. A page that declares no `lightSettleMs` has not been split yet
-// and gets its full wait either way.
+// `server` is null only with DEMO_BASE. Two tiers: selfcheck=1 waits a page's `lightSettleMs`;
+// DEMO_DEEP=1 or --deep is selfcheck=2 and waits the full `settleMs`.
+// why: lessons/harness.md#tiers
 const DEEP = process.env.DEMO_DEEP === '1' || process.argv.includes('--deep');
 // A row with only `lightSettleMs` keeps it in the deep tier: deep never waits less.
 const settleOf = (t) => (DEEP ? (t.settleMs ?? t.lightSettleMs) : (t.lightSettleMs ?? t.settleMs));
@@ -260,54 +169,18 @@ let errors = [];
 let failedReqs = [];
 let abortedReqs = [];
 let edgeMisses = [];   // LL-HLS live-edge part 404s: expected churn, capped
-// Upstream refusals a demo asks for ON PURPOSE — today that is ERR's
-// rights-blocked segments, which `flipper` sweeps for. Counted and capped,
-// never ignored: the label has to name what they are, or the next reader
-// believes a refusal was a radio station.
-//
-// The WHEP single-track branch below is kept but has no caller since `tracks`
-// was removed on 2026-09-08. Cloudflare still refuses such an offer, so the
-// allowance stays correct for whatever asks next.
+// Upstream refusals a demo asks for on purpose: counted and capped, never ignored, and labelled.
+// why: lessons/harness.md#probed
 let probed = [];
 const reqUrl = new Map();   // requestId -> url, so a failure can be attributed
-/**
- * 🔴 WHOSE SERVERS A DEMO ACTUALLY TOUCHED, COUNTED. `DEMO_HOSTS=1`.
- *
- * The standing rule here is about whose server a run spends, and until this
- * existed there was no way to check it: a page pointed at a stand-in and a page
- * pointed at the real thing produce identical output. This is the instrument,
- * and it is `Network.requestWillBeSent`, which fires for every request the
- * renderer makes rather than for the ones a page remembered to log.
- *
- *   DEMO_HOSTS=1 node demo/verify.mjs tapes
- *
- * ⚠️ OFF BY DEFAULT AND PRINTED PER DEMO. Most demos here legitimately talk to
- * the relay, to Cloudflare or to ERR, so a line on every run would be noise
- * around the one run where it is the answer.
- */
+// DEMO_HOSTS=1 prints the hosts each demo touched, from Network.requestWillBeSent. Off by default.
+// why: lessons/harness.md#hosts
 const SHOW_HOSTS = process.env.DEMO_HOSTS === '1';
 let hostHits = new Map();
 
-/**
- * 🔴 A RIGHTS REFUSAL IS RECOGNISED BY WHERE IT CAME FROM, AND THERE ARE TWO
- * PLACES NOW. Both classifiers below used to test the URL for `live.err.ee`,
- * which was the whole address of the only thing that sent one. `fake-err.mjs`
- * sends the same 403 with the same missing `access-control-allow-origin` from
- * `127.0.0.1`, so the day the harness stopped pointing these pages at ERR,
- * every deliberate refusal became an unexplained console error and two pages
- * that were working read red.
- *
- * ⚠️ IT IS THE STAND-IN'S OWN ADDRESS PLUS THE SEGMENT PATH, NOT A LOOPBACK
- * TEST. Anything looser would swallow a real failure from the dev server, and
- * the whole value of this bucket is that it is narrow enough to be trusted.
- *
- * ⚠️ AND IT IS GIVEN THE WHOLE LOG LINE, NOT ONLY `entry.url`. Chrome files a
- * CORS violation with an EMPTY url and the address inside the message text, so
- * a version of this that only read the url classified the `loadingFailed`
- * events correctly and left the console entries for the same segments sitting
- * in `errors`. MEASURED: 22 refusals recognised and `no console errors` still
- * red, which reads as one bug and was two.
- */
+// A rights refusal is recognised by ERR's host or the stand-in's own address plus the segment
+// path, and from the whole log line: Chrome files CORS violations with an empty url.
+// why: lessons/harness.md#err-refusal
 const errRefusal = (s) => /live\.err\.ee/.test(s)
   || (errAt && s.includes(errAt)
       && /\/live\/[a-z0-9]+\/seg-\d+\.(?:ts|m4s)/.test(s));
@@ -330,132 +203,62 @@ cdp.on((m) => {
   }
   if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error') {
     const e = m.params.entry;
-    // A 404 on an LL-HLS PART is normal at the live edge — players request
-    // parts as they are born and hls.js retries; src/low-latency-player.js
-    // says so where it sets fragLoadingMaxRetry. Same treatment as
-    // ERR_ABORTED above: recorded separately, NOT ignored. The assert below
-    // still fails past a ceiling, because silence here would hide a real
-    // outage as "normal churn".
+    // A 404 on an LL-HLS part is normal at the live edge: recorded separately and capped.
+    // why: lessons/harness.md#part-404
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) {
       edgeMisses.push(e.url);
     } else if (/webRTC\/play/.test(e.url || '') && /\b409\b/.test(e.text || '')) {
-      // 🔴 A 409 ON A WHEP PLAY URL MEANS NOTHING IS PUBLISHING TO THAT INPUT,
-      // which is a fact about the rig being off rather than about the page.
-      // `demo/shell/live.mjs` records the same 409 for the same reason: an
-      // input has to be fed by WHIP before it can be played by WHEP.
-      // MEASURED 2026-09-15 against Cloudflare directly, outside any browser:
-      // a bare POST to that play URL answered 409 while `keep` read 13/14 run
-      // after run on an otherwise clear machine.
-      // ⚠️ RECORDED AND CAPPED, NEVER IGNORED, which is the whole difference.
-      // Silence here would turn "the studio rig is not running" into a green
-      // run, and the next person to look would have no way to tell that from a
-      // page that had stopped asking at all.
+      // A 409 on a WHEP play URL means nothing publishes to the input: recorded and capped, never
+      // ignored.
+      // why: lessons/harness.md#whep-409
       probed.push(e.url);
     } else if (/webRTC\/play/.test(e.url || '') && /\b400\b/.test(e.text || '')) {
-      // Cloudflare WHEP refuses a single-track offer with a 400, both ways.
-      // `tracks` used to assert on that refusal; it is gone, so nothing sends
-      // one today. Kept because the fact has not changed and the next page to
-      // probe it should not read as broken. Capped like the others.
+      // Cloudflare WHEP refuses a single-track offer with a 400; allowed and capped.
+      // why: lessons/harness.md#whep-400
       probed.push(e.url);
     } else if (/shout\.positron\.studio/.test(e.url || '') && /\b50[02]\b/.test(e.text || '')) {
-      // 🔴 A 502 FROM `shout` IS THE RELAY SAYING AN ORIGIN IS DOWN, and the
-      // page whose job is six radio stations handles it by falling back and
-      // saying so. MEASURED repeatedly today: four of eight mounts 502 while
-      // the other four answered 200 through the identical worker, and this
-      // laptop reached every one of them directly at `icecast.err.ee`. So the
-      // failure is upstream of us, it is not constant, and a demo that cycles
-      // stations meets it as a matter of course.
-      // ⚠️ CAPPED, NEVER IGNORED, AND THAT MATTERS MORE HERE THAN ELSEWHERE.
-      // Past the ceiling this stops being one flapping mount and becomes OUR
-      // relay being down, which is the opposite diagnosis and the one a reader
-      // of this suite most needs told apart. `shout.positron.studio/health`
-      // answers per station and is the thing to look at.
+      // A 502 from `shout` is an origin down upstream; capped, since past the ceiling it is our
+      // relay.
+      // why: lessons/harness.md#shout-502
       probed.push(e.url);
     } else if (/positron-vain\.[^/]+\.workers\.dev|vain\.positron\.studio/.test(e.url || '')
                && /\b(404|413|415)\b/.test(e.text || '')) {
-      // 🔴 `vain` ASKS ITS OWN ARCHIVE TO REFUSE, THREE TIMES, ON PURPOSE: a
-      // file over the cap (413), a JPEG named `.mp3` (415), and the sidecar
-      // before it exists (404). All three are asserted ON the page and none
-      // writes a byte, which is the point of asking.
-      // ⚠️ NO PAGE-SIDE CHANGE CAN REMOVE THESE. Chrome logs a resource error
-      // for any 4xx and does it identically for `fetch` and `XMLHttpRequest`,
-      // MEASURED both ways rather than reasoned about. A check that cannot be
-      // made without a console error is exactly what this allowance is for.
-      // Capped like the others, never ignored: past the ceiling these stop
-      // being three deliberate refusals and become an archive that is refusing
-      // everything.
+      // Deliberate refusals (413, 415, 404) asserted on the page; Chrome logs every 4xx. Capped.
+      // why: lessons/harness.md#vain
       probed.push(e.url);
     } else if (/pub\.positron\.studio\/ice/.test(e.url || '') && /\b(404|503)\b/.test(e.text || '')) {
-      // 🔴 `/ice` ANSWERS 503 WHEN THE WORKER HOLDS NO TURN KEY, AND 404 FROM A
-      // WORKER DEPLOYED BEFORE THE ROUTE EXISTED. Both mean "no relay for a
-      // network that blocks UDP", and `/cam/` asks once per Start press and
-      // carries on without one, saying so in its log. Written 2026-09-30 with
-      // the route, before any key existed.
-      // ⚠️ SCOPED TO THOSE TWO STATUSES. A 429 or a 502 there is a relay that
-      // was meant to work and did not, and must still go red.
-      // Capped like the others, never ignored: past the ceiling this is a page
-      // asking in a loop rather than once per press.
+      // `/ice` 503 (no TURN key) or 404 (an older worker) means no relay; a 429 or 502 still goes
+      // red.
+      // why: lessons/harness.md#ice
       probed.push(e.url);
     } else if (/\.archive\.org/.test(e.url || '') && /\b5\d\d\b/.test(e.text || '')) {
-      // 🔴 archive.org 5xx ON A METADATA PROBE IS THEIR SERVER, NOT THIS PAGE.
-      // `/tapes/` asks all 24 recordings how long they are so a bar can be as
-      // wide as its tape, four at a time, straight at whichever node
-      // archive.org hands out. MEASURED across ten runs: two of them drew a 500
-      // from `dn720304.ca.archive.org` on one probe, and the other eight drew
-      // none, with no code between them.
-      // ⚠️ CAPPED LIKE THE OTHERS AND NEVER IGNORED. Past the ceiling this stops
-      // being one flaky node and becomes an archive that is down, which is
-      // something a reader of this suite needs to be told rather than have
-      // folded into "expected churn".
+      // archive.org 5xx on a metadata probe is their node; capped, since past it the archive is
+      // down.
+      // why: lessons/harness.md#archive-5xx
       probed.push(e.url);
     } else if (/^blob:/.test(e.url || '')
                && /ERR_REQUEST_RANGE_NOT_SATISFIABLE/.test(e.text || '')) {
-      // 🔴 A RECORDING HAS TO BE ASKED ITS LENGTH, AND ASKING LOGS A 416.
-      // `resolveDuration` in `demo/shell/media.mjs` sets `currentTime = 1e6` to
-      // make a `MediaRecorder` blob admit a duration, because a file written by
-      // the recorder reports `Infinity` until something seeks it. Chrome serves
-      // the blob itself and answers that seek with a range request past the end,
-      // which it logs as a failed request on a `blob:` URL.
-      // ⚠️ NO PAGE-SIDE CHANGE REMOVES IT, WHICH IS WHAT THIS ALLOWANCE IS
-      // FOR, the same argument as `vain`'s three deliberate refusals above. The
-      // seek is the measurement, not a mistake, and the 416 is the browser
-      // answering the only question that produces a duration.
-      // ⚠️ AND IT IS NEW ONLY BECAUSE THE RECORDING NOW REALLY HAPPENS.
-      // MEASURED 2026-09-25: `/stage/`'s two start buttons were dead, passing
-      // `onPress` to a bar that binds `onClick`, so no show ran, nothing was
-      // recorded and nothing was ever asked its length. Fixing the button made
-      // this appear. A console error that shows up when a page starts working
-      // is evidence the page started working.
-      // ⚠️ SCOPED TO `blob:`, DELIBERATELY. A 416 on an http URL is a real
-      // range bug in the ingest path and must still go red, so this may not be
-      // widened to the error name alone.
-      // Capped like the others, never ignored: past the ceiling this stops being
-      // one duration probe per recording and becomes a page seeking in a loop.
+      // Asking a recording blob its duration seeks past the end and logs a 416. `blob:` only: a 416
+      // on
+      // http is a real range bug. Capped.
+      // why: lessons/harness.md#blob-416
       probed.push(e.url);
     } else if (errRefusal(`${e.url || ''} ${e.text || ''}`)
                && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) {
-      // A rights refusal is a 403 with no ACAO, so the browser reports CORS.
-      // `flipper` probes for this deliberately and says in its readout how much
-      // was refused, and `now` walks its playhead into it on purpose; the
-      // requests are expected from both. Capped, not ignored: past the ceiling
-      // this is an outage, not rights.
+      // A rights refusal is a 403 without ACAO, reported as CORS. Capped: past it, it is an outage.
+      // why: lessons/harness.md#rights
       probed.push(e.url);
     } else errors.push(e.url && !(e.text || "").includes(e.url) ? `${e.text} (${e.url})` : e.text);   // the address, or a 404 cannot be found
   }
   if (m.method === 'Network.loadingFailed') {
-    // ERR_ABORTED is what a media element's in-flight segment requests do
-    // when the page unloads — it means WE navigated, not that the page
-    // failed. Every page that plays media produces these on teardown, so
-    // counting them made a working demo look broken. Recorded separately
-    // rather than ignored.
+    // ERR_ABORTED is our own navigation tearing down media requests: recorded, not counted as
+    // failure.
+    // why: lessons/harness.md#aborted
     const url = reqUrl.get(m.params.requestId) || '';
     if (m.params.errorText === 'net::ERR_ABORTED') abortedReqs.push(m.params.errorText);
     else if (m.params.corsErrorStatus && errRefusal(url)) probed.push(url);
-    // The duration seek's 416 on a recording blob, the same request the
-    // Log.entryAdded branch above allows. Chrome reports it on BOTH channels,
-    // and until 2026-09-30 only the log side was allowed, so /stage/ went red
-    // on "no failed requests" for the very request that branch explains.
-    // Same scope: `blob:` only, capped through `probed`.
+    // The same blob 416 on the network channel; `blob:` only, capped through `probed`.
+    // why: lessons/harness.md#blob-416-net
     else if (/^blob:/.test(url) && m.params.errorText === 'net::ERR_REQUEST_RANGE_NOT_SATISFIABLE') probed.push(url);
     else failedReqs.push(`${m.params.errorText}${url ? ` ${url.slice(0, 70)}` : ''}`);
   }
@@ -467,34 +270,17 @@ async function ev(expr) {
   return r.result.value;
 }
 
-/**
- * Drag across every `[data-gesture]` element on the page, with real pointer
- * events. Returns how many surfaces were drawn on.
- *
- * THE PATH IS A LISSAJOUS, not a straight line, and the reason is measurement:
- * a straight drag is reconstructed exactly by every interpolator, so a page
- * comparing hold against linear against a spline would grade all three as
- * perfect and its whole subject would vanish into a tie. A curve separates
- * them.
- *
- * ⚠️ TIMESTAMPS ARE SUPPLIED. `Input.dispatchMouseEvent` takes one, and
- * without it every sample would be stamped when the round trip happened —
- * so the gesture's input rate would be a measurement of this harness's
- * latency rather than of anything on the page. `ev.timeStamp` in the page is
- * what a capture gate reads, so it has to be the honest one.
- */
+// Drag across every `[data-gesture]` element with real pointer events, on a Lissajous path
+// (a straight drag ties every interpolator). Timestamps are supplied, 16 ms apart.
+// why: lessons/harness.md#gesture
 async function gesture() {
   const n = await ev(`document.querySelectorAll('[data-gesture]').length`);
   if (!n) return 0;
   const STEPS = 200, STEP_MS = 16;          // 200 samples over 3.2 s
   for (let k = 0; k < n; k++) {
-    // ⚠️ SCROLL IT INTO VIEW FIRST, AND RE-READ THE RECTANGLE AFTER. Headless
-    // Chrome's default viewport is 800x600 and these pages are taller than
-    // that, so a canvas half way down the page has a bounding rectangle whose
-    // lower half is BELOW THE VIEWPORT — and an input event dispatched at a
-    // y past the viewport lands on nothing at all, silently. The first run of
-    // this helper read `page asserted something — 0` for exactly that, while
-    // the identical drag in a 900px window produced 200 moves and 5 asserts.
+    // Scroll into view and re-read the rectangle: an event below the 800x600 viewport lands on
+    // nothing.
+    // why: lessons/harness.md#scroll
     const b = await ev(`(() => {
       const e = document.querySelectorAll('[data-gesture]')[${k}];
       e.scrollIntoView({ block: 'center' });
@@ -530,29 +316,9 @@ async function gesture() {
   return n;
 }
 
-/**
- * Type into every `[data-typing]` element, with real key events.
- *
- * The twin of `gesture()` above, and it exists for the same reason: a page
- * whose subject is TYPING was a subject this harness could not reach, because
- * a click produces no `input` event and a drag produces no text. `typist`
- * found two real bugs the first time it was driven this way — a fold at
- * position 0 emptying the box the first letter had just gone into, and a strip
- * that fits itself once and so drew six of seventy-one edits — neither of
- * which any button press could have surfaced.
- *
- * The sequence is not a word, it is the three things five previous text
- * adapters got wrong: characters, a BACKSPACE (which never says what it
- * removed), and an ARROW KEY (which moves the caret with no input event at
- * all). A page that only ever sees appended characters is a page whose whole
- * argument goes untested.
- *
- * ⚠️ UNLIKE THE DRAG, THE TIMING HERE IS REAL. `Input.insertText` takes no
- * timestamp, so the recorded intervals are this harness's round trips. That is
- * acceptable because no claim on this page is about input RATE — but it would
- * not be on a page that measured one, and the difference is worth knowing
- * before reusing this.
- */
+// Type into every `[data-typing]` element with real keys: characters, a Backspace and an arrow key.
+// Timing here is the harness's round trips (insertText takes no timestamp).
+// why: lessons/harness.md#typing
 async function typing() {
   const n = await ev(`document.querySelectorAll('[data-typing]').length`);
   if (!n) return 0;
@@ -566,16 +332,9 @@ async function typing() {
   })()`);
   for (let k = 0; k < n; k++) {
     let ok = await focus(k);
-    // ⚠️ A PAGE MAY HAVE TO BE ARMED BEFORE IT CAN BE TYPED INTO, and the
-    // PRIMARY control is this shell's convention for the main path. `typist`
-    // starts on a shipped recording with the box read-only, and the control
-    // loop above leaves it there because the last button pressed put it back.
-    // So: if every field refuses focus, press the primary once and ask again.
-    //
-    // 🔴 AND THE COUNT REPORTED IS THE NUMBER ACTUALLY TYPED INTO, not the
-    // number found. The first version returned the number of elements and
-    // printed "typed into 1 field" about a read-only box it had skipped — a
-    // harness reporting work it did not do, which is worse than reporting none.
+    // If every field refuses focus, press the primary control once and try again. The count is
+    // fields actually typed into.
+    // why: lessons/harness.md#arm-first
     if (!ok) {
       await ev(`document.querySelector('.pos-controls button.pos-pri')?.click()`);
       await sleep(400);
@@ -612,11 +371,8 @@ async function typing() {
 
 // ── run ─────────────────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
-// ⚠️ `·` RATHER THAN AN EM DASH, AND THIS IS THE SOURCE OF EVERY ONE IN A SUITE
-// RUN. A sweep of 418 strings across 62 files could not reach it, because the
-// dash is not in any page: it is added here, to every line, as it is printed.
-// The rule is about anything a reader looks at, and a suite run is read more
-// often than most pages.
+// The separator every suite line is printed with.
+// why: lessons/harness.md#separator
 const ok = (label, cond, detail) => {
   if (cond) { pass++; console.log(`  ok    ${label}${detail !== undefined ? `  · ${detail}` : ''}`); }
   else { fail++; console.log(`  FAIL  ${label}${detail !== undefined ? `  · ${detail}` : ''}`); }
@@ -626,80 +382,21 @@ for (const t of targets) {
   console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
   hostHits = new Map();
-  // DEMO_QUERY appends to every page, so a BRANCH can be verified rather than
-  // only the default. Added when moq's publisher started PROBING for a codec:
-  // the probe picks AV1, every recorded MoQ number was taken on VP8, and a
-  // fallback the harness cannot select is a fallback nobody has run.
-  //   DEMO_QUERY='codec=vp8' node demo/verify.mjs moq
-  // 🔴 A FIXED ROOM NAME IS A SHARED MUTABLE GLOBAL, and this repo learned that
-  // about PORTS and never applied it to rooms. `serve()` takes the next free
-  // port and `verify-gl` reads back the CDP port it got, precisely because a
-  // fixed one meant a harness attached to the previous run's Chrome and
-  // reported that run's flags. Every demo here defaults to a NAMED room —
-  // `cues-demo`, `jam-demo`, `scene-demo`, `room-demo` — so two runs of the
-  // suite, or a run and a visitor, land in the same one and see each other's
-  // traffic. That is the same bug in the WebSocket layer.
-  //
-  // So a harness run gets a room of its own, per demo, per run. It costs one
-  // query parameter and it removes a whole class of "I was competing with
-  // myself", which this project has paid for twice: nine orphaned Chromes
-  // filled `studio-1` and took a live demo down (LESSONS #56), and a full run
-  // went 429 -> 420 -> 429 with no code between.
-  //
-  // ⚠️ TWO ROOMS ARE NOT LIKE THAT AND MUST NOT BE OVERRIDDEN. `room: 'fixed'`
-  // in the manifest means the name is not a rendezvous this page invented, it
-  // is the ADDRESS OF A MACHINE — `studio-1` is where the Raspberry Pi is and
-  // `m1-1` is where the studio Mac's agent is — or a room whose SUBJECT is the
-  // history it shares (`wire` reads its own backlog back). Renaming those does
-  // not isolate a run, it points it at nothing.
-  //
-  // ⚠️ AND A DEVICE IS STILL EXCLUSIVE. A private room does not give a second
-  // client its own Raspberry Pi: there is one JACK graph and one instrument, so
-  // board-bound demos still have to take turns. Rooms were never that problem;
-  // conflating the two is what made them look like one.
-  /**
-   * A private room per run, so two runs cannot see each other's rows and
-   * neither can see the real page's.
-   *
-   * ⚠️ `<demo>-test-<hash>`, NOT `v-<demo>-<hash>`. The `v` stood for verify and
-   * was obvious to nobody — asked, in those words: *"What is v- prefix?"*. A
-   * room name is read by somebody looking at a store wondering what all these
-   * rows are, and `items-test-4f2a` answers that where `v-items-4f2a` needs a
-   * footnote. It also cannot be mistaken for the real room by a rule that has to
-   * tell them apart: `workers/items` only announced from the room named
-   * `items` (archived 2026-10-01, `archive/items/README.md`), because one FCM
-   * topic means one room may use it — a harness room that reached real phones
-   * is exactly how this came up.
-   */
+  // DEMO_QUERY is added to every page (e.g. `DEMO_QUERY='codec=vp8' node demo/verify.mjs moq`).
+  // Each run gets a private room per demo, `<demo>-test-<hash>`, except `room: 'fixed'` rows, which
+  // name a machine (studio-1) or a shared history. A device is still exclusive.
+  // why: lessons/harness.md#own-room
   const own = t.room === 'fixed' ? '' : `room=${t.name.replace(/\//g, '-')}-test-${Math.random().toString(36).slice(2, 8)}`;
-  // 🔴 THE HARNESS SAYS SO, SO A PAGE CAN KEEP ITS DESTRUCTIVE CHECKS OUT OF A
-  // VISIT. `radio` proves a station button works by pressing another station
-  // and pressing back, and proves the transport stops by stopping it — on the
-  // decoded path both are a decoder teardown and rebuild, so both are a hole in
-  // the sound. They ran for every listener, three times, in the first seconds of
-  // a visit, and were REPORTED as such twice. A page that can only check itself
-  // by breaking itself needs to know whether anybody is collecting the answer.
-  //
-  // ⚠️ EVERY DEMO GETS IT AND ALMOST NONE READ IT, which is the point — the flag
-  // is a fact about the run, not a per-demo setting to keep in step. A page that
-  // needs it opts in by reading it.
+  // selfcheck tells a page it is being graded, so destructive checks stay out of a visit.
+  // why: lessons/harness.md#selfcheck
   const q = [process.env.DEMO_QUERY, own, DEEP ? 'selfcheck=2' : 'selfcheck=1',
     standIn.has(t.name) ? (typeof standIn.get(t.name) === 'object'
       ? `relay=${standIn.get(t.name).relay}` : `base=${standIn.get(t.name)}`) : ''].filter(Boolean).join('&');
   const query = q ? `?${q}` : '';
-  // 🔴 A PAGE WITH BOTH ENDS OF A WebRTC LEG IN ONE BROWSER NEEDS EVERY HOST
-  // INTERFACE, AND CHROME ONLY OFFERS ONE UNTIL A MICROPHONE IS ALLOWED.
-  // MEASURED 2026-10-05: with no capture permission Chrome gathers a single
-  // host candidate, on the interface that routes to 8.8.8.8. On this desk that
-  // is `utun4` (Check Point Endpoint Security VPN, 10.100.6.22), and UDP sent
-  // to that address never comes back to the same machine, so `/capture/`'s
-  // RECEIVER and `/wire/`'s far-end sound sat in `checking` for good. Granting
-  // audioCapture alone makes Chrome enumerate 127.0.0.1, en0 and the bridges,
-  // and the same two connections reach `connected` in about 100 ms.
-  // ⚠️ SCOPED TO THESE SLUGS AND AUDIO ONLY, ON PURPOSE. Video stays
-  // ungranted so no camera page publishes, and `/wish/` asks for the real
-  // microphone, which a run must never open. Reset first so a grant never
-  // outlives the page it was for.
+  // PEER_IN_PAGE pages get audioCapture only (reset first): without it Chrome offers one host
+  // candidate,
+  // which on a VPN routes nowhere, and an in-page WebRTC pair never connects.
+  // why: lessons/harness.md#audio-grant
   await send('Browser.resetPermissions').catch(() => {});
   if (PEER_IN_PAGE.has(t.name)) {
     await send('Browser.grantPermissions', { origin: new URL(BASE).origin, permissions: ['audioCapture'] });
@@ -707,17 +404,9 @@ for (const t of targets) {
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1400);
 
-  // ready, with a bounded wait — never a bare sleep
-  // 🔴 THE WAIT IS 7.4 s UNLESS THE PAGE DECLARES `bootMs`, AND ONE PAGE DOES.
-  // MEASURED 2026-09-26: /kit/ reaches `ready` at 7.3 s locally and 7.7 s on
-  // the edge with 231 asserts landed, because it builds and grades every
-  // specimen before it says ready, by design (a closed tab is laid out only
-  // inside its measuring window, so nothing there can be deferred). Locally it
-  // cleared this loop by 0.1 s; against the deploy it read 0/1 twice for a page
-  // that is 243/243. `bootMs` is declared per page in the manifest with the
-  // measurement beside it, the same shape as `settleMs`, and is not a knob for
-  // a page that is merely slow. `positron-verify`: a page that misses this wait
-  // is graded not at all, which is the worst face a harness has.
+  // Ready within 7.4 s unless the page declares `bootMs` in the manifest; an unready page is not
+  // graded.
+  // why: lessons/harness.md#boot-wait
   let ready = false;
   const bootTries = Math.max(40, Math.ceil(((t.bootMs || 0) - 1400) / 150));
   for (let i = 0; i < bootTries && !ready; i++) {
@@ -726,27 +415,14 @@ for (const t of targets) {
   }
   ok('__demo.ready', ready);
   if (!ready) {
-    /* 🔴 SAY WHETHER THE OBJECT IS THERE AT ALL, BECAUSE THE TWO CAUSES LOOK
-       IDENTICAL FROM HERE. `__demo` missing means the module never finished;
-       `__demo` present with `ready` falsy means the shell mounted and the page
-       did not get to the end. Both printed `failed: null` and `console:
-       nothing`, and 2026-09-22 was spent bisecting the difference by hand. */
+    // Print whether `__demo` exists at all: missing means the module never finished.
+    // why: lessons/harness.md#no-demo
     console.log(`        __demo: ${await ev('typeof window.__demo')}`
       + `, ready ${await ev('window.__demo ? typeof window.__demo.ready : "n/a"')}`
       + `, asserts ${await ev('(window.__demo && window.__demo.asserts && window.__demo.asserts.length) ?? "n/a"')}`);
     console.log(`        failed: ${await ev('window.__demo && window.__demo.failed')}`);
-    /**
-     * 🔴 AND WHAT THE CONSOLE SAID, BECAUSE THIS IS EXACTLY WHEN IT MATTERS.
-     * The `no console errors` check runs much later and this `continue` skips
-     * it, so a page that dies before `ready` reported ONE line — `failed: null`
-     * — and threw its actual reason away. MEASURED 2026-09-17: two separate
-     * dangling references on `/stage/`, each an ordinary ReferenceError sitting
-     * in the console, each taking a round of manual bisecting to find, because
-     * the harness knew and did not say.
-     * ⚠️ A page that never becomes ready is the one case where the console is
-     * the whole story: there are no asserts to read, no readout to inspect, and
-     * `failed` is only set by a page that got far enough to set it.
-     */
+    // Print the console here, since a page that never becomes ready skips the console check later.
+    // why: lessons/harness.md#console
     for (const e of errors.slice(0, 5)) console.log(`        console: ${String(e).split('\n')[0].slice(0, 160)}`);
     if (!errors.length) console.log('        console: nothing, so it is hanging rather than throwing');
     continue;
@@ -754,57 +430,26 @@ for (const t of targets) {
 
   const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), hasT: !!__demo.transport, readoutOptOut: !!__demo.readoutOptOut })');
   ok('identity matches manifest', meta.name === t.name, meta.name);
-  // ⚠️ A PAGE MAY DECLARE THAT IT HAS NOTHING TO PUT IN A READOUT, but it has
-  // to SAY SO — `readout: null` rather than an omitted field, so "this page's
-  // subject is visible rather than numeric" cannot be confused with "somebody
-  // forgot". `typist` is the case: the document IS the readout, and a row of
-  // cells repeating the letters and the cursor position was the same facts
-  // twice. An absent field is still a failure.
+  // A page with no readout must say `readout: null`; an absent field still fails.
+  // why: lessons/harness.md#readout
   ok(meta.readoutOptOut ? 'declares that it has no readout, on purpose' : 'declares a readout',
     meta.readoutOptOut || meta.keys.length > 0,
     meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
-  /**
-   * 🔴 THIS DRILL HAS A TWIN IN `demo/shell/bar-drill.mjs`, AND THE TWO MUST
-   * STAY IN STEP. A tabbed page carries several bars and this block reaches
-   * only the published one, so the page runs the same drill as page asserts
-   * against the rest (2026-10-04, `plans/plan-demo-structure.md` §5 step 1).
-   * Its `DRILL` constants are the sleeps and thresholds below, and
-   * `node demo/shell/bar-drill-test.mjs` reads THIS FILE and fails when a
-   * number here has moved without that one. Change both, then run the test.
-   */
+  // This drill has a twin in demo/shell/bar-drill.mjs; bar-drill-test.mjs reads this file and fails
+  // when a number moves here alone. Change both.
+  // why: lessons/harness.md#drill-twin
   if (meta.hasT) {
     const t0 = await ev('({ pos: __demo.transport.position, playing: __demo.transport.playing, seekable: __demo.transport.seekable, lattice: __demo.transport.lattice, rate: __demo.transport.rate, toggles: __demo.transport.toggles !== false })');
     ok('transport published', typeof t0.pos === 'number', `pos ${t0.pos}`);
     ok('rate lattice from caps', t0.lattice === null || Array.isArray(t0.lattice), JSON.stringify(t0.lattice));
 
-    /**
-     * 🔴 A BAR MAY HAVE NO PLAY BUTTON, AND THIS DRILL IS THE WHOLE REASON THAT
-     * OPTION HAD TO ANNOUNCE ITSELF. `transport-bar.mjs` takes `toggle: false`
-     * for a page whose sound has no position to start or resume — `/keys/`
-     * holds a note while a key is down and has nothing to play. Clicking a
-     * `.tbar-toggle` that was never appended throws on `null`, and asserting
-     * that the position advanced would fail on a page where nothing is wrong.
-     *
-     * ⚠️ `!== false` RATHER THAN A TRUTH TEST, so a bar built before the option
-     * existed — where the getter is `undefined` — still gets the drill. A new
-     * property must not silently switch checks off on every page that predates
-     * it, which is the shape of loss this suite has already had once: 27
-     * asserts became 17, every one of them green.
-     */
+    // A bar may have no play button (`toggle: false`); `!== false` so older bars keep the drill.
+    // why: lessons/harness.md#no-toggle
     if (!t0.toggles) console.log('        this bar has no play button, so the play/pause drill is skipped');
     else {
-    /**
-     * 🔴 THE TOGGLE OF THE BAR THIS DRILL IS GRADING, NOT THE FIRST ONE IN THE
-     * DOCUMENT. This read `document.querySelector(".tbar-toggle")` while every
-     * assert around it reads `__demo.transport`, which is the same element only
-     * while a page has exactly ONE bar. `/stage/` grew a second on 2026-09-18,
-     * and the two disagree by construction: the DOM query takes whichever comes
-     * first in document order, and `__demo.transport` is whichever was BUILT
-     * last, so on a tabbed page they are routinely different bars. The drill
-     * would have pressed one control and asserted about another, which fails
-     * while nothing is wrong and passes for the wrong reason just as easily.
-     */
+    // The toggle of the bar being graded (`__demo.transport`), not the first one in the document.
+    // why: lessons/harness.md#toggle
     const TOGGLE = '__demo.transport.el.querySelector(".tbar-toggle")';
     // play advances position
     await ev(`${TOGGLE}.click()`);
@@ -823,17 +468,9 @@ for (const t of targets) {
 
     // seek via the keyboard table the component owns
     if (t0.seekable) {
-      /**
-       * 🔴 A BAR IN A CLOSED TAB OF A TAB PAGE HEARS NO KEY, SO OPEN ITS TAB
-       * THE WAY A PERSON WOULD, AND PUT THE PAGE BACK AFTER. 2026-10-04:
-       * `tab-page.mjs` marks its panels `data-own-keys` and `transport-bar.mjs`
-       * ignores keys for a bar inside one that is hidden, because on `/time/`
-       * five bars would otherwise all seek at once. A page that opens on a
-       * different tab from the one holding its published bar would read red
-       * here for a reason that is not the bar's. Only `data-own-keys` panels:
-       * `/kit/`'s bar sits in a plain closed tab, still hears the key, and is
-       * not touched. Panels and tab buttons are index-aligned in `tabs.mjs`.
-       */
+      // A bar in a closed `data-own-keys` tab hears no key, so open its tab as a person would, then
+      // restore.
+      // why: lessons/harness.md#open-tab
       const opened = await ev(`(() => {
         const p = __demo.transport.el.closest('[data-own-keys][hidden]');
         if (!p) return false;
@@ -856,17 +493,9 @@ for (const t of targets) {
 
   const strip = await ev('!!document.querySelector("canvas.pos-strip")');
   if (strip) {
-    // SAMPLE AFTER A FRAME, and more than once. `resize()` in strip.mjs assigns
-    // canvas.width, which CLEARS the canvas, and only then schedules a redraw —
-    // so there is a real window in which a working strip is blank, and a
-    // ResizeObserver can open it at any time (a readout value getting wider, a
-    // log line wrapping). Sampling one instant caught that window about one run
-    // in ten and reported `0 lit samples`, which reads as a dead page.
-    //
-    // This is a retry, not a tolerance: a strip that never draws still fails,
-    // because every try lands after a fresh frame. The count is in the detail
-    // so a strip that needs several tries is visible rather than silently
-    // passing.
+    // Sample after a frame and retry: a strip resize clears the canvas before its redraw. Not a
+    // tolerance.
+    // why: lessons/harness.md#sample
     const sample = () => ev(`(async () => {
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       const c = document.querySelector('canvas.pos-strip');
@@ -881,201 +510,56 @@ for (const t of targets) {
     ok('strip has ink', ink > 0, `${ink} lit samples${tries > 1 ? ` (${tries} tries)` : ''}`);
   }
 
-  // exercise every control the demo declared, in order — a multi-step demo
-  // (arm, then measure) does not put its asserts behind the first button.
-  //
-  // `.tbar-x` too: a page may put a control INSIDE the transport bar when it is
-  // a transport verb rather than a side action (`take` puts Record there). A
-  // control the harness cannot press is a subject the suite cannot reach, which
-  // is how three pages stayed green while never playing a frame.
-  // ── a page whose input is a DRAG ────────────────────────────────────────
-  //
-  // 🔴 `element.click()` FIRES NO POINTER EVENTS, so a page that is drawn on
-  // rather than pressed was a subject this harness could not reach at all.
-  // `draw` carried a `Draw one for me` button purely so that something here
-  // had something to press — a page answering its own question, and the line
-  // it graded was not the line the page is about.
-  //
-  // Any element marked `data-gesture` gets a real drag instead: CDP mouse
-  // events, which Chrome turns into genuine pointerdown/move/up with
-  // `getCoalescedEvents` and all. The TIMESTAMPS are supplied explicitly and
-  // are 16 ms apart, so the page sees a gesture at a plausible input rate
-  // regardless of how fast the round trips happen to go — a drag paced by the
-  // CDP transport would be a measurement of the CDP transport.
+  // Press every control in order, `.tbar-x` too. Then `data-gesture` elements get a real CDP drag,
+  // since `element.click()` fires no pointer events.
+  // why: lessons/harness.md#controls
   const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
     await ev(`document.querySelectorAll(${JSON.stringify(SEL)})[${i}].click()`);
-    // A demo whose first control brings up LIVE infrastructure needs that to
-    // finish before the later controls mean anything. settleMs is declared per
-    // demo in the manifest rather than guessed here. Note it lands on control 0
-    // ONLY — and that it now does a second job further down, sizing the wait for
-    // a page's first assert. A demo whose slow control is not the first gets
-    // nothing from it here and is carried entirely by that second use.
+    // Control 0 waits `settleMs` from the manifest for live infrastructure; others 650 ms.
+    // why: lessons/harness.md#settle
     await sleep(i === 0 && settleOf(t) ? settleOf(t) : 650);
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
-  // 🔴 INPUT COMES AFTER THE CONTROLS, BOTH KINDS. A page that has to be ARMED
-  // before it will record has to be armed before it is drawn on — `draw` grew
-  // a record button and immediately reported `page asserted something — 0`,
-  // because the drag was still running first and the page dutifully recorded
-  // nothing. The drag used to go first for the opposite reason (draw's only
-  // control CLEARED the canvas), and that reason is gone.
+  // Input comes after the controls: a page may need arming before it is drawn on.
+  // why: lessons/harness.md#input-after
   const drawn = await gesture();
   if (drawn) console.log(`        (drew on ${drawn} surface${drawn > 1 ? 's' : ''})`);
   const typed = await typing();
   if (typed) console.log(`        (typed into ${typed} field${typed > 1 ? 's' : ''})`);
 
-  // 🔴 A PAGE WHOSE CONTROL IS STILL RUNNING HAS NOT FINISHED, AND THE HARNESS
-  // USED TO WALK OFF ANYWAY. The press loop sleeps a fixed 650 ms after each
-  // button and does not await the handler, so a control that takes longer was
-  // still working while the stabiliser below decided the page had nothing more
-  // to say. The case that found it was the retired `seek` page, kept at
-  // archive/demos/seek-index.html, whose sweep was five jumps at 700 ms
-  // apiece. It did not show
-  // up before because every such page carried a "Run the checks" BUTTON, which
-  // gave the checks a slot of their own; taking those buttons off the pages
-  // (they are harness machinery showing through, `shout` argues it) took the
-  // slot with them and eleven pages quietly lost their asserts.
-  //
-  // `shell.mjs` already marks a running control `data-busy="1"` — it is what
-  // draws the sweep across the button — so the answer was on the page the whole
-  // time. ⚠️ CAPPED: a handler that never settles must cost one demo a wait,
-  // not the run.
+  // Wait while a control is `data-busy`, capped: a running handler has not finished.
+  // why: lessons/harness.md#busy
   const busyCount = () =>
     ev(`document.querySelectorAll('.pos-controls button[data-busy="1"]').length`);
   let waited = 0;
   for (let i = 0; i < 100 && (await busyCount()) > 0; i++) { await sleep(400); waited += 400; }
   if (waited) console.log(`        (waited ${(waited / 1000).toFixed(1)} s for a control to finish)`);
 
-  // Some checks are async (`replay` fetches the manifest before asserting), so
-  // a fixed sleep either flakes or wastes time. Wait for the assert count to
-  // stop growing instead.
-  //
-  // BUT ZERO NEVER GROWS. The loop below used to exit the moment the count
-  // stopped changing, and a count of 0 stops changing immediately — so a demo
-  // whose FIRST assert sits behind a wait reported "asserted nothing", which
-  // reads as a broken page rather than a slow one. CLAUDE.md records the trap;
-  // the loop did not honour it. `take` made it concrete: recording runs to a
-  // 10 s cap and every assert is behind it.
-  //
-  // So there are two phases. While the count is still zero, wait — then fall
-  // back to the cheap "stop when it stops growing" once anything has landed.
-  //
-  // CAPPED, and not at `settleMs`. That number sizes a COLD CONTAINER (`tracks`
-  // declares 125 s), which is a control-0 concern and has already been waited
-  // out above. Reusing it here makes a page that will never assert — because
-  // its live leg is down — burn the whole budget a SECOND time, turning one
-  // demo into four minutes of a run. What this phase covers is a first assert
-  // sitting behind work the PAGE does (`take` records to a 10 s cap), which is
-  // a much smaller quantity, so it gets its own ceiling.
+  // Async checks: wait for the assert count to settle, with FIRST_ASSERT_CEIL for a page's first
+  // assert (not `settleMs`, already spent on control 0).
+  // why: lessons/harness.md#first-assert
   const FIRST_ASSERT_CEIL = 30000;
   const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
   let n = await countAsserts();
-  /**
-   * 🔴 THE WAIT IS ARMED BY `d.ready()`, NOT BY THE COUNT BEING ZERO, AND THAT
-   * DISTINCTION BLINDED THE SUITE.
-   *
-   * This loop used to run `while (n === 0)`, on the reasoning that once
-   * anything has landed the cheap growth loop below can take over. That held
-   * only while nothing asserted early. The moment the SHELL gained two asserts
-   * of its own, every page in the suite had a non-zero count at t+0, this phase
-   * fell through on its first test, and a page was left with 12 tries at 400 ms
-   * to produce everything it had.
-   *
-   * MEASURED the day it landed: `/archive/radio/` makes 34 asserts and the suite
-   * collected **2**, then reported **13/13 green**. That is this project's worst
-   * failure shape, a green suite with no coverage, and it hit 28 demos at once
-   * because 28 declare `settleMs`.
-   *
-   * ⚠️ `ready` IS THE RIGHT SIGNAL BECAUSE IT IS THE PAGE'S OWN CLAIM TO BE
-   * FINISHED. A count cannot distinguish "two asserts because the page has
-   * barely started" from "two asserts because that is all there are"; `ready`
-   * can, since a page calls it when its checks are done. The count is still the
-   * fallback for a page that never calls it, so nothing hangs.
-   */
+  // The wait is armed by the page's `ready`, not by a zero count: shell asserts land at t+0.
+  // why: lessons/harness.md#is-ready
   const isReady = () => ev('!!(window.__demo && window.__demo.ready)');
   const firstBudget = Math.ceil(Math.min(settleOf(t) || 0, FIRST_ASSERT_CEIL) / 400);
-  // ⚠️ ONE LOOP, NOT TWO. The old pair was a "wait while nothing has landed"
-  // phase followed by a "stop when it stops growing" phase, and the handover
-  // between them was the defect: the first fell through the instant ANY assert
-  // existed, so two asserts from the shell at t+0 handed every page straight to
-  // a loop that allows 4.8 s in total. A page is done when it says it is ready
-  // AND its count has stopped moving. Both conditions, or a page that calls
-  // `ready()` before driving its own checks (`/archive/radio/` does, from inside
-  // the granulator's boot) is cut off at the moment it starts working.
-  // ⚠️ "THE PAGE HAS NOT ASSERTED YET" IS NOT "THE COUNT IS ZERO". The shell
-  // makes two of its own at t+0 on every shelled page, so a zero test answered
-  // false immediately and this phase stopped running at all. `shellAsserts` is
-  // the shell saying how many of the rows are its, which is the only thing that
-  // separates a page that has barely started from one that is finished.
+  // One loop: done when ready and the count has stopped. `shellAsserts` says which rows are the
+  // shell's.
+  // why: lessons/harness.md#one-loop
   const shellN = await ev('(window.__demo && window.__demo.shellAsserts) || 0');
   for (let i = 0; i < firstBudget && n <= shellN; i++) {
     await sleep(400);
     n = await countAsserts();
   }
-  /**
-   * Then the cheap one: stop when it has stopped growing AND the page says it
-   * is ready.
-   *
-   * 🔴 `isReady` WAS DECLARED HERE AND NEVER CALLED, FOR AS LONG AS IT HAD
-   * EXISTED, WHICH MADE THE PARAGRAPH ABOVE A DESCRIPTION OF CODE NOBODY
-   * WROTE. It says in capitals that a page is done when it says it is ready
-   * AND its count has stopped moving, `Both conditions`, and only one of them
-   * was ever tested. A dead guard reads as finished work, which is this
-   * project's most expensive kind of defect.
-   *
-   * 🔴 AND THE HALF THAT ACTUALLY COST SOMETHING IS THE PATIENCE, NOT THE
-   * READY. A check block that waited longer than ONE 400 ms poll without
-   * asserting was cut off, and everything after it was lost in silence.
-   * MEASURED 2026-09-22 on `/muta/`, which grew a sustain check holding a note
-   * for 700 ms and its release for 900 ms: the count stood still across one
-   * poll, this loop exited, and **two asserts stopped running**, one of them a
-   * voice stealing check that had been there for a day. The suite read
-   * **40/40 green** before and after, because an assert that never runs cannot
-   * fail. Raising `settleMs` from 8 s to 14 s changed nothing, which is what
-   * said the settle window was not the cause.
-   *
-   * ⚠️ AND `ready` ALONE WOULD NOT HAVE SAVED IT, WHICH IS WHY BOTH ARE HERE.
-   * `/muta/` calls `ifSelfcheck(...)` WITHOUT awaiting it and then `d.ready()`
-   * on the next line, so `ready` is true a few milliseconds in and stays true
-   * through every check the page makes. The paragraph above already knew
-   * `/archive/radio/` does the same from inside the granulator's boot. A page's own
-   * claim to be finished is worth reading and is not worth trusting alone.
-   *
-   * ⚠️ AND `__demo.ready` IS A REAL BOOLEAN, WHICH WAS CHECKED AFTER GETTING IT
-   * WRONG. It was read here as *the method a page calls*, on the strength of
-   * `ready:` appearing twice in `shell.mjs`, and `shell.mjs` was changed to
-   * publish a separate flag. **The two `ready` keys are on two different
-   * objects**: `api`, which is what `window.__demo` is, carries the boolean,
-   * and the page-facing object returned by `mount()` carries the method that
-   * sets it. The change was reverted. A key name appearing twice in a file is
-   * not two declarations of one thing.
-   *
-   * ⚠️ IT COSTS TWO EXTRA POLLS ON A PAGE THAT REALLY HAS FINISHED, which is
-   * 800 ms a page and about 48 s across a full suite. That is the price of not
-   * silently dropping the tail of a check block, and this project's own rules
-   * already rank a green run with no coverage as the worse of the two.
-   */
-  // Three quiet polls, not one: a page may legitimately take a second between
-  // asserts, and 12 tries only ever allowed 4.8 s in total.
-  // ⚠️ FIVE AND NOT ONE, WHICH IS 2.0 s OF SILENCE TOLERATED AND COSTS 1.6 s A
-  // PAGE. A DSP page that holds a note, lets it go and measures the difference
-  // is quiet for over a second BY DESIGN, and that is the check rather than a
-  // delay in it. `/muta/` lost four asserts to a patience of one and two more
-  // to a patience of three, every time silently and every time still green.
-  // ⚠️ AND `ready` CANNOT REPLACE IT, WHICH WAS TRIED. Moving that page's
-  // `d.ready()` to the end of its checks made it fail the 7.4 s boot wait above
-  // and be graded not at all, because the same flag answers two questions: *is
-  // this page up* and *has it finished*. Splitting them is a change to the
-  // shell contract and to four harnesses, and is in BACKLOG.md.
-  // ⚠️ 60 TRIES IS A 24 s CEILING AND COSTS A FAST PAGE NOTHING, because the
-  // loop leaves the moment a page is quiet and ready. 30 was reached by
-  // `/muta/`, whose DSP checks hold notes, release them and wait for envelopes
-  // for about twelve seconds in total, and reaching the ceiling drops whatever
-  // has not asserted yet without a word. That is the same silent truncation as
-  // a patience of one, arriving from the other end of the same loop.
+  // Stop when the count has stopped growing for GROWTH_PATIENCE polls (2.0 s) and the page is
+  // ready.
+  // Pages hold notes and go quiet by design; 60 tries is a 24 s ceiling, free for a fast page.
+  // why: lessons/harness.md#growth
   const GROWTH_PATIENCE = 5, GROWTH_TRIES = 60;
   let prev = -1, quiet = 0, done = await isReady();
   for (let i = 0; i < GROWTH_TRIES && (quiet < GROWTH_PATIENCE || !done); i++) {
@@ -1094,20 +578,12 @@ for (const t of targets) {
   // assert would make the suite total vary run to run, and a shrinking total
   // is exactly how four asserts went missing unnoticed earlier.
   const EDGE_CEILING = 25;
-  // ONE DEMO ASKS ERR FOR SEGMENTS ON PURPOSE, and an unexplained ceiling is
-  // how the next reader mistakes a real outage for expected churn. `flipper`
-  // is the old `/flipper/` and `/now/` in one page since 2026-10-05, so it
-  // pays both pages' asking: up to 8 points at each open of a channel (three
-  // opens in a run, ETV, another, ETV again), 13 for the deep sweep, the deep
-  // survey of the other two, all capped at 40 per open in-page, plus hls.js's
-  // own retries on whatever comes back refused. MEASURED against the stand-in
-  // the day it merged: 45 ordinary, 72 deep. It was 60 while the two were
-  // separate pages, which each stayed under it.
+  // The flipper page asks ERR for segments on purpose: 45 ordinary, 72 deep, measured on the
+  // stand-in.
+  // why: lessons/harness.md#probe-ceiling
   const PROBE_CEILING = 90;
-  // ⚠️ AND THE LINE HAS TO SAY WHICH KIND, or a reader sees a number with no
-  // meaning. `keep` and `take` ask WHEP for an input the rig feeds; when the
-  // rig is off that is a 409 every time, and an unexplained ceiling is how the
-  // next reader mistakes a real outage for expected churn.
+  // Name the kind of miss: a WHEP 409 when the rig is off is not an outage.
+  // why: lessons/harness.md#edge
   const edgeOk = edgeMisses.length <= EDGE_CEILING;
   const probedOk = probed.length <= PROBE_CEILING;
   ok('no console errors', errors.length === 0 && edgeOk && probedOk,
@@ -1127,11 +603,8 @@ for (const t of targets) {
 }
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}`);
-// ⚠️ ASKED AGAIN AT THE END, not only at the start — a browser that appeared
-// halfway through is the one most likely to have caused the failure being read,
-// and it would not have been in the opening count. Printed only when something
-// FAILED, because on a green run it is noise about a problem that did not
-// happen.
+// Counted again at the end, and printed only on failure.
+// why: lessons/harness.md#peers-again
 if (fail) {
   const peersNow = peerBrowsers(cdpPort);
   const n = Math.max(peersAtStart.length, peersNow.length);

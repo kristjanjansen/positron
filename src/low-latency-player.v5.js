@@ -1,42 +1,6 @@
-/**
- * Low-latency HLS player for Cloudflare Stream.
- *
- * Wraps hls.js with the configuration and recovery behaviour a live player
- * needs against Cloudflare LL-HLS. Everything here exists because a specific
- * failure was observed in testing:
- *
- *  1. hls.js picks a live-edge position ONCE and, by default, has no recovery:
- *     `maxLiveSyncPlaybackRate` is 1 and `maxLatency` is Infinity. Any startup
- *     hiccup parks the player at an arbitrary latency forever. Measured on the
- *     same stream, same config: 7.6 s one run, 15.4 s the next.
- *
- *  2. Cloudflare mints a NEW video UID behind the live-input URL on every
- *     encoder reconnect — even a 2-second one. The playing level becomes a
- *     dead timeline: `liveSyncPosition` goes stale (it can even move
- *     backwards), and seeking can never help. Only a full reload recovers.
- *
- *  3. A page opened before the broadcast exists gets a fatal
- *     `manifestParsingError`. Patching up a live Hls instance afterwards
- *     (stopLoad/loadSource/startLoad) leaves it wedged: no errors, no loads,
- *     no recovery. The only reliable reset is destroying the instance and
- *     building a new one — the programmatic page-refresh.
- *
- * Recovery model:
- *   latency drift      -> nudge playbackRate (invisible), else seek (one skip)
- *   player stall       -> seek; after N failed seeks, full rebuild
- *   source stall       -> live edge stopped advancing: full rebuild
- *                         (seekable-end check from elektronstudio/v4)
- *   fatal hls error    -> media-error quick fixes, else full rebuild
- *   no stream yet      -> rebuild on a steady cadence until it exists
- *   tab became visible -> seek to live edge (hidden tabs always come back stale)
- *
- * Usage:
- *   const player = createLowLatencyPlayer(videoEl, manifestUrl, opts?);
- *   player.on('latency', ({latency, target}) => …)   // ~2/s while playing
- *   player.on('dimensions', ({width, height}) => …)  // before first frame
- *   player.on('rebuild', ({why, attempt}) => …)
- *   player.destroy();
- */
+// The player at v5, loaded by proto/m2m/composite-viewer.html and rig/resilience-v6.html: hls.js
+// plus recovery for drift, stall, source stall, fatal errors, no stream yet and a visible tab.
+// why: lessons/src.md#v5-header
 
 const DEFAULTS = {
   /** Seek instead of nudging once we are this far past target (seconds). */
@@ -117,12 +81,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     lastEdge = -1; lastEdgeMove = Date.now();
   }
 
-  /**
-   * Freeze the last decoded frame into the element's poster before teardown,
-   * so a rebuild shows a still image instead of flashing black. MSE-fed video
-   * does not taint the canvas (hls.js fetches media via CORS), so this is safe
-   * on the hls.js path; a tainted canvas (native src fallback) just skips.
-   */
+  // Freeze the last frame into the poster before teardown, so a rebuild shows a still, not black.
+  // why: lessons/src.md#v5-freeze
   function freezeFrame() {
     if (video.readyState < 2 || !video.videoWidth) return;
     try {
@@ -134,12 +94,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     } catch {}
   }
 
-  /**
-   * Tear the Hls instance down and build a fresh one. Deliberately blunt:
-   * every observed wedge (dead level after UID swap, instance stuck after
-   * manifestParsingError) recovers under a full rebuild and under nothing
-   * weaker. State that must survive lives outside boot().
-   */
+  // Tear down and build fresh: every observed wedge recovers under a full rebuild and nothing
+  // weaker.
+  // why: lessons/src.md#v5-rebuild
   let lastRebuildAt = 0;
   function rebuild(why) {
     if (destroyed) return;
@@ -174,11 +131,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       manifestLoadingMaxRetry: Infinity,
       manifestLoadingRetryDelay: cfg.manifestRetryDelay,
       manifestLoadingMaxRetryTimeout: 8000,
-      // Fragment retries: moderate. At the LL-HLS live edge a brief part 404
-      // is NORMAL (players request parts as they are born) — v4's fail-fast
-      // (1 retry) turned that churn into fatal->rebuild storms that crashed
-      // the tab. But v3's slow default backoff took 3-5 min to surface a real
-      // swap. Middle path: a few quick retries, tight timeout cap.
+      // A few quick fragment retries with a tight cap: a part 404 at the live edge is normal.
+      // why: lessons/src.md#v5-frag-retry
       levelLoadingMaxRetry: 4,
       levelLoadingRetryDelay: 1000,
       fragLoadingMaxRetry: 4,
@@ -191,9 +145,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     let mediaRecoveries = 0;
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-      // Dimensions live in the master manifest (#EXT-X-STREAM-INF RESOLUTION):
-      // available ~200 ms after loadSource, seconds before the first decoded
-      // frame sets videoWidth. Reserve layout now — no jump.
+      // Resolution from the master manifest reserves layout before the first frame.
+      // why: lessons/src.md#v5-dimensions
       const best = (data.levels || [])
         .filter((l) => l.width && l.height)
         .sort((a, b) => b.width - a.width)[0];
@@ -218,11 +171,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         hls.recoverMediaError();
         return;
       }
-      // Parsing errors (204 empty manifest — stream not started) are NOT
-      // covered by the native loading retry, and a wedged instance emits
-      // nothing further. Rebuild on a rising backoff: quick first retries for
-      // the common transient, easing off while the edge converges after a
-      // broadcast swap instead of hammering stale manifests.
+      // A 204 empty manifest wedges the instance; rebuild on a rising backoff.
+      // why: lessons/src.md#v5-parse-error
       consecutiveFailures++;
       const delay = Math.min(10000, cfg.bootstrapRetryDelay * Math.max(1, Math.ceil(consecutiveFailures / 3)));
       scheduleRebuild(data.details || data.type, delay);
@@ -263,9 +213,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   function tick() {
     if (destroyed || Date.now() < cooldownUntil) return;
 
-    // -- source watchdog: is new content still being produced? --------------
-    // Runs even while paused/stalled — currentTime advancing through the
-    // remaining buffer must not mask a dead origin.
+    // Source watchdog: runs while paused too, so draining the buffer cannot mask a dead origin.
+    // why: lessons/src.md#v5-source
     const edge = seekableEnd();
     if (edge != null && edge > lastEdge + 0.01) { lastEdge = edge; lastEdgeMove = Date.now(); }
     if (everPlayed && Date.now() - lastEdgeMove > cfg.sourceStallTimeout) {

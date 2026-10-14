@@ -1,13 +1,7 @@
-// timeline/lab/run-lab.mjs — measurement orchestrator for the transport core.
-//   node timeline/lab/run-lab.mjs [--only A,B,D,E,BG]
-// Arms:
-//   A  firing precision, mechanisms (main|worker|raf|fanout) x mixed densities
-//   B  seek/pause/rate/cancel correctness asserts per mechanism
-//   D  SIGSTOP 3 s freeze -> catch-up per policy (burst/drop/reduce) + fanout
-//   E  audio lane sample accuracy (AudioWorklet truth) incl. 500 ms main busy
-//   BG background-tab throttling probe (second tab activated via CDP)
-// Machine rules: port 8896, CDP 9321, chrome pattern tlab-udd; kills only own.
-// Raw rows -> timeline/lab/results/*.jsonl (gitignored); summary -> artifacts/.
+// node timeline/lab/run-lab.mjs [--only A,B,D,E,BG]: firing precision, seek correctness, freeze
+// catch-up, audio-lane sample accuracy and background throttling. Port 8896, CDP 9321; kills only
+// its own.
+// why: lessons/timeline-lab.md#rl-header
 
 import { spawn, execSync } from 'node:child_process';
 import os from "node:os";
@@ -91,9 +85,9 @@ async function main() {
   run('node', [join(LAB, 'server.mjs')], 'server');
   for (let i = 0; i < 40; i++) { try { await fetch(BASE + '/time-local'); break; } catch { await sleep(250); } }
 
-  // NOTE: deliberately NOT passing --disable-background-timer-throttling etc —
-  // the BG arm wants honest throttling; foreground arms are unaffected.
-  // No --mute-audio: jam lesson — headless audio output must stay real.
+  // No background-throttling flags (BG wants real throttling) and no --mute-audio (audio must stay
+  // real).
+  // why: lessons/timeline-lab.md#rl-flags
   chrome = run(CHROME, [
     '--headless=new', `--user-data-dir=${SCRATCH}/tlab-udd`, `--remote-debugging-port=${CDP_PORT}`,
     '--no-first-run', '--no-default-browser-check',

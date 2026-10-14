@@ -1,8 +1,6 @@
 #!/bin/sh
-# rig/pico/net/linux/build.sh: runs INSIDE the positron-pico-net image, never on
-# the Mac. Compiles mbedTLS (the SDK's submodule, our config) and the node into
-# /out/<name>. test.mjs calls it; extra CFLAGS select a variant, e.g.
-#   build.sh node-linux-in4k -DPOSITRON_TLS_IN=4096
+# Runs inside positron-pico-net only: mbedTLS and the node into /out/<name>; CFLAGS pick a variant.
+# why: lessons/rig-pico.md#net-linux-build
 set -e
 NAME=${1:-node-linux}; [ $# -gt 0 ] && shift
 EXTRA="$*"

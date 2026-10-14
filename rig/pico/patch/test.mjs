@@ -1,8 +1,6 @@
-// rig/pico/patch/test.mjs: boot patch.uf2 on rp2040js, play notes into UART0
-// RX, and check what comes out of UART0 TX and what the screen draws. Exits 1
-// on any FAIL.
-//
-//   rig/pico/patch/build.sh && node rig/pico/patch/test.mjs [--show]
+// rig/pico/patch/build.sh && node rig/pico/patch/test.mjs [--show]: notes into UART0, check TX and
+// the screen. Exits 1 on any FAIL.
+// why: lessons/rig-pico.md#patch-test
 import { readFileSync } from 'node:fs';
 import { createPico, parseUF2, readScreen, litCount, W, H } from '../../../demo/shell/pico.mjs';
 

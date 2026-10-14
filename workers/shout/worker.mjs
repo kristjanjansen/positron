@@ -1,75 +1,22 @@
-// positron-shout — an Icecast/SHOUTcast stream, relayed through Cloudflare.
-//
-// WHY A RELAY AT ALL. The origin (Icecast 2.4.4 at icecast.err.ee) sends NO
-// `access-control-allow-origin`, so a browser can put it in an <audio> element
-// and nothing else: no fetch, no WebAudio graph, no reading `icy-metaint`, no
-// measuring anything. `<audio src>` is a no-cors load — it plays and stays
-// opaque. The relay's entire job is to hand the same bytes back with CORS on
-// them, which is what turns a radio stream into something a page can measure.
-//
-// NOT AN OPEN PROXY. STATIONS is an allowlist; anything else is 404. An
-// unbounded URL parameter here would make this worker a bandwidth laundromat
-// for whoever finds it, and the account's egress is the project's.
-//
-// The body is passed through UNTOUCHED and UNBUFFERED: `new Response(up.body)`
-// hands Cloudflare the upstream ReadableStream, so bytes leave as they arrive.
-// Anything that reads the stream here (a TransformStream that inspects ICY
-// metadata, say) would add a hop of latency to every byte for no gain — the
-// metadata is already in the frames the client parses.
+// positron-shout: relays allowlisted Icecast mounts with CORS, so a page can read and measure them.
+// STATIONS is an allowlist, never a URL parameter: the account's egress is the project's.
+// The body passes through unbuffered; reading it here would add latency to every byte.
+// why: lessons/workers-shout.md#header
 
 import { OPEN } from '../_lib/http.mjs';
 
 const ERR = 'https://icecast.err.ee';
 
-/**
- * id -> the FULL upstream URL, allowlisted.
- *
- * ⚠️ THIS WAS `id -> path` AGAINST ONE `ORIGIN` CONSTANT, and that held exactly
- * as long as every station was ERR's. A single origin is a shared mutable
- * global of the same family as a fixed port: it is a property of the first
- * caller that gets silently imposed on the second. Full URLs cost one repeated
- * hostname and let a station live anywhere.
- *
- * 🔴 `radio` IS PLAIN HTTP ON PORT 8001, AND THAT IS WHY IT IS HERE.
- * Their Icecast sends no `access-control-allow-origin` AND terminates no TLS,
- * so an HTTPS page cannot play it at all — not "cannot measure it", cannot
- * play it: the browser refuses the mixed-content load before any CORS question
- * is asked. This relay is the only way that stream reaches a browser on
- * positron.studio. MEASURED DIRECT 2026-09-14: Icecast 2.4.4, `audio/mpeg`,
- * 128 kbit/s 44.1 kHz stereo, `icy-name: Radio 1965`, `icy-metaint: 16000`,
- * mean volume -20.4 dB against a synthesised-silence control at -91.0 dB.
- *
- * ⚠️ It is somebody else's stream on this account's egress, which is the thing
- * the allowlist above exists to bound. One named mount, added on purpose.
- */
+// id -> full upstream URL. `radio1965` is plain HTTP on port 8001 with no ACAO, so an https page
+// cannot play it at all without this relay. Somebody else's stream on our egress, added on purpose.
+// why: lessons/workers-shout.md#stations
 const IDA = 'https://broadcast.idaidaida.net/listen';
 
 const STATIONS = {
-  /**
-   * 🔴 RADIO 1965 IS BACK, 2026-09-16, ON INSTRUCTION AND ON THE SAME CONDITION
-   * AS IDA: *"bring back radio65 stream as last. we are single user
-   * connected?"*. The answer is yes, and it is read off the code below rather
-   * than remembered: `Mount` holds ONE upstream connection per station and
-   * copies it to every subscriber, so `upstreamConnections` is 1 however many
-   * people are listening. `GET /tee/radio1965` reports it.
-   *
-   * WHAT IT WAS REMOVED FOR, 2026-09-15: the operator of the uuu.ee server
-   * found roughly 100 concurrent clients against their limit, traced to
-   * positron.studio. Ours. THE LOAD WAS THE CHECKS, NOT THE VISITORS: every
-   * `verify.mjs radio` and every `verify-gl.mjs videoradio` opened a live mount,
-   * dozens of times in one evening. `demo/fake-station.mjs` ended that half of
-   * it: the suite now runs against a stand-in and opens nothing of anybody's.
-   *
-   * ⚠️ THE OPERATOR HAS NOT BEEN RE-ASKED, and that is worth saying rather than
-   * implying consent from a mechanism. What changed is the SIZE of the claim,
-   * not their permission.
-   * ⚠️ AND IT IS LAST IN THE PAGE'S LIST, which is the half that actually
-   * caused the damage: a page opens the first entry it finds, so being at the
-   * front is what put every visitor and every run on one volunteer's server.
-   * ⚠️ IT IS PLAIN HTTP ON PORT 8001 AND NEVER TLS. That is the whole reason
-   * this worker exists for this mount: a page on https cannot fetch it directly.
-   */
+  // Last in the page's list: a page opens the first entry, and the front is where the load lands.
+  // One upstream connection however many listen (`GET /tee/radio1965`). Plain HTTP, port 8001.
   // Estonian Centre of Contemporary Music's community station (uuu.ee).
+  // why: lessons/workers-shout.md#radio1965
   radio1965: 'http://live.uuu.ee:8001/radio1965',
   // ERR's five public radio streams, 128 kbps MP3.
   vikerraadio: `${ERR}/vikerraadio.mp3`,
@@ -77,32 +24,9 @@ const STATIONS = {
   klassikaraadio: `${ERR}/klassikaraadio.mp3`,
   raadio4: `${ERR}/raadio4.mp3`,
   raadiotallinn: `${ERR}/raadiotallinn.mp3`,
-  /**
-   * 🔴 IDA IS BACK, 2026-09-16, ON INSTRUCTION AND ON ONE CONDITION THE USER
-   * SET THEMSELVES: *"bring ida's back to radio (if single listener)"*.
-   *
-   * WHAT IT WAS REMOVED FOR, 2026-09-15: their operator reported roughly 100
-   * concurrent clients against their limit, traced to positron.studio. That was
-   * us. Two mounts had been moved to the FRONT of the station list an hour
-   * before, which made them the default every visitor and every harness run
-   * opens, and at 320 kbit/s they are 2.5x the weight of any other mount here.
-   *
-   * WHAT CHANGED: `Mount` below. This worker opened a fresh `fetch(upstream)`
-   * per request when that happened, so a hundred browsers were a hundred
-   * clients at the broadcaster. It now holds ONE connection per mount in a
-   * Durable Object addressed by `idFromName(station)` and copies the bytes to
-   * every subscriber, so the number the operator counts is one however many
-   * people are listening, plus one per harness run that overlaps it.
-   * `GET /tee/ida-tallinn` reports `upstreamConnections`, and it must read 1.
-   *
-   * ⚠️ THE OPERATOR HAS NOT BEEN RE-ASKED. That is worth saying plainly rather
-   * than implying consent from a mechanism: what has changed is the size of the
-   * claim, not their permission. `hello@idaidaida.net` still costs one email,
-   * and this file already recommends it further down.
-   * ⚠️ AND THEY GO AT THE BACK OF THE LIST, WHICH IS THE OTHER HALF. The damage
-   * was caused by defaulting to them, not by carrying them: a page opens the
-   * first entry it finds. Nothing here may move them forward.
-   */
+  // Ida's mounts, at the back of the list: 320 kbit/s, and a page opens the first entry it finds.
+  // Held through the tee, so `GET /tee/ida-tallinn` must read upstreamConnections 1.
+  // why: lessons/workers-shout.md#ida
   'ida-tallinn': `${IDA}/tallinn/stream`,
   'ida-helsinki': `${IDA}/helsinki/stream`,
 };
@@ -113,43 +37,16 @@ const STATIONS = {
 const EXPOSE = [
   'icy-name', 'icy-description', 'icy-genre', 'icy-br', 'icy-url', 'icy-pub',
   'icy-metaint', 'content-type', 'x-shout-ttfb', 'x-shout-station',
-  // ⚠️ THE RECORDINGS NEED THESE AND THE LIVE MOUNTS NEVER WILL. A stream has
-  // no length and no position; a recording has both, and a page that cannot
-  // read `content-length` or `content-range` cannot draw a scrub bar for one.
+  // Recordings need length and range headers for a scrub bar; live mounts never have them.
+  // why: lessons/workers-shout.md#rec-headers
   'content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag',
   'x-shout-recording',
 ].join(',');
 
-/**
- * Health answers, collapsed.
- *
- * ⚠️ PER ISOLATE, WHICH IS ENOUGH AND IS NOT A GUARANTEE. Workers isolates come
- * and go, so this does not bound the rate globally — what it does is collapse a
- * BURST, which is the shape the traffic actually had: a harness run and every
- * open tab asking within the same few seconds. A hard global bound would need a
- * Durable Object, and that is worth doing if this is not enough.
- */
-/**
- * 🔴 THE SAME STATION'S PAST, WHICH DID NOT EXIST UNTIL THIS WEEK. Their server
- * now records a broadcast when the broadcaster asks it to: Icecast's on-connect
- * hook starts `ffmpeg -c copy` against the mount, on-disconnect stops it and
- * rsyncs the mp3 to eccm.ee, and a `streamrecording` event replaces the
- * `livestream` one with an https URL. So a live station finally has a past, and
- * it is an ordinary file with byte ranges.
- *
- * ⚠️ AND IT HAS THE SAME DEFECT AS THE MOUNT: MEASURED 2026-09-15, a recording
- * answers 200 and honours a Range with a 206, and sends NO
- * `access-control-allow-origin`. A page can put one in an <audio> element and
- * read nothing about it, which is the whole reason this worker exists. Their
- * events API is fine on its own (`live.uuu.ee/radio/api/events` answers
- * with `allow-origin: *`), so only the audio needs carrying.
- *
- * 🔴 A PATTERN, NOT A PATH PARAMETER, and for the same reason `STATIONS` is an
- * allowlist. `/rec/?url=…` would make this an open proxy for anything on
- * eccm.ee; the names their hook writes are a slug of at most twenty characters
- * and a datestamp, so that is exactly what is accepted and nothing else. No
- * slashes, no dots beyond the one, no traversal to reason about.
- */
+// Health answers are collapsed per isolate: it absorbs a burst, it is not a global bound.
+// /rec/ carries eccm.ee recordings (200, Range 206, no ACAO). A name pattern, never a URL
+// parameter: a slug of at most 20 characters and a datestamp, no slashes, no traversal.
+// why: lessons/workers-shout.md#rec
 const REC_BASE = 'https://eccm.ee/radio/streams/';
 const REC_NAME = /^[a-z0-9-]{1,20}-\d{8}-\d{6}\.mp3$/;
 // A recording never changes once it is written, which is the opposite of the
@@ -167,10 +64,8 @@ const cors = (h = {}) => ({
 });
 
 export default {
-  // ⚠️ `env` IS TAKEN NOW, FOR THE DURABLE OBJECT BINDING. It was omitted while
-  // this worker had no state at all, and a handler that silently reads
-  // `undefined.MOUNT` is a 500 on every listen with nothing in the log saying
-  // which line.
+  // `env` carries the Durable Object binding; without it every listen is a 500.
+  // why: lessons/workers-shout.md#env
   async fetch(req, env) {
     const url = new URL(req.url);
 
@@ -185,50 +80,22 @@ export default {
     }
 
     if (url.pathname === '/' || url.pathname === '/stations') {
-      // The upstream HOST per station, not one `origin` — there is no longer a
-      // single one, and reporting a stale constant is worse than reporting none.
+      // The upstream host per station, since there is no single origin.
+      // why: lessons/workers-shout.md#hosts
       return Response.json({
         stations: Object.fromEntries(
           Object.entries(STATIONS).map(([k, v]) => [k, new URL(v).host])),
       }, { headers: cors() });
     }
 
-    /**
-     * 🔴 IS EACH STATION UP — ANSWERED WITH A 200 WHATEVER THE ANSWER IS.
-     *
-     * A page cannot ask this by fetching the mount, because a dead mount answers
-     * 502 and **the browser logs that to the console**. There is no way to
-     * suppress it from script, so a page that probes before it plays trips its
-     * own "no console errors" check, and a visitor watching a phone sees a red
-     * line about a station being down rather than the page handling it. The
-     * question belongs here anyway: this is the thing that knows.
-     *
-     * ⚠️ CANCEL EVERY BODY. These are ENDLESS streams — a probe that reads the
-     * status line and walks away leaves one socket per station open on the
-     * origin for as long as the runtime keeps this invocation, which turns a
-     * health check into a load generator against a volunteer's Icecast.
-     *
-     * ⚠️ IT SAID "NEVER CACHED" AND THAT WAS THE MISTAKE. The reasoning — a
-     * cached answer about a live stream is wrong in the confident direction —
-     * is true and was the wrong thing to optimise for. Twenty seconds of
-     * staleness about a station that has been up for hours costs nothing; six
-     * upstream connections per caller cost the broadcaster, and they stopped
-     * answering. Freshness is a preference; their bandwidth is not ours.
-     */
+    // Is each station up, answered 200 whatever the answer: a page fetching a dead mount gets a 502
+    // the browser logs to the console. Cancel every body (streams are endless); answers are cached.
+    // why: lessons/workers-shout.md#health
     if (url.pathname === '/health') {
-      // 🔴 THIS FANS OUT TO EVERY MOUNT, AND THAT MADE IT A LOAD GENERATOR.
-      // One innocuous-looking request opened SIX upstream connections, the page
-      // polled it every 30 s per open tab, and every harness run called it —
-      // forty runs in an afternoon. MEASURED afterwards: three ERR mounts began
-      // answering this Worker **502 in 9 ms** while the same mounts served a
-      // laptop 200, and nine milliseconds is too fast to have reached Estonia.
-      // That is a refusal at the first hop, and it was earned.
-      //
-      // LESSONS #50 is this exact shape — *"the heavy request had no `fetch` in
-      // it"* — and its rule applies: this is a public broadcaster, not a service
-      // we pay for. So: answers are CACHED for `HEALTH_TTL_MS`, a caller may ask
-      // about only the stations it needs, and a refusal is not answered with
-      // another request.
+      // This fans out to every mount, so it is cached for HEALTH_TTL_MS, takes `only`, and a
+      // refusal
+      // is never answered with another request. Polling it got ERR mounts answering us 502 in 9 ms.
+      // why: lessons/workers-shout.md#fan-out
       const only = (url.searchParams.get('only') || '')
         .split(',').map((x) => x.trim()).filter(Boolean);
       const wanted = Object.entries(STATIONS).filter(([k]) => !only.length || only.includes(k));
@@ -252,8 +119,9 @@ export default {
           try { await up.body?.cancel(); } catch { /* already gone */ }
           return [k, { up: live, status: up.status, ms: Date.now() - t }];
         } catch (e) {
-          // A throw here is the origin refusing or timing out, which is a
-          // station that is down — reported as such, not as an error page.
+          // A throw is the origin refusing or timing out: a station that is down, not an error
+          // page.
+          // why: lessons/workers-shout.md#down
           return [k, { up: false, status: 0, ms: Date.now() - t, why: String(e).slice(0, 80) }];
         }
       }));
@@ -269,11 +137,8 @@ export default {
       if (!REC_NAME.test(name)) {
         return new Response('no such recording', { status: 404, headers: cors() });
       }
-      // ⚠️ THE RANGE HEADER IS FORWARDED, AND THAT IS THE WHOLE POINT OF THIS
-      // BRANCH BEING SEPARATE. Seeking in an hour of audio is a Range request;
-      // swallowing it would turn every scrub into a fresh download from the
-      // beginning, which on a phone is the difference between a transport bar
-      // and a progress bar.
+      // Forward Range: seeking in an hour of audio is a Range request, not a fresh download.
+      // why: lessons/workers-shout.md#range
       const range = req.headers.get('range');
       const rt0 = Date.now();
       const up = await fetch(REC_BASE + name, {
@@ -283,9 +148,8 @@ export default {
           'user-agent': 'positron-shout/1 (+https://positron.studio)',
         },
       });
-      // 🔴 NOT `!up.ok`. A Range request answers 206, which is not `ok` on some
-      // readings and is exactly what a working seek looks like. Guarding on
-      // `ok` here would have made every scrub report the origin as broken.
+      // Not `!up.ok`: a Range request answers 206.
+      // why: lessons/workers-shout.md#206
       if (up.status >= 400) {
         return new Response(`origin ${up.status}`, { status: 502, headers: cors() });
       }
@@ -302,11 +166,8 @@ export default {
       return new Response(req.method === 'HEAD' ? null : up.body, { status: up.status, headers: h });
     }
 
-    /**
-     * `GET /tee/<id>` — what the tee is doing for one mount: how many listeners
-     * it is serving and how many connections it is holding upstream. The second
-     * number is the one that matters and it must be 1.
-     */
+    // `GET /tee/<id>`: listeners served and connections held upstream, which must be 1.
+    // why: lessons/workers-shout.md#tee
     if (url.pathname.startsWith('/tee/')) {
       const who = url.pathname.slice(5).replace(/\.mp3$/, '');
       if (!STATIONS[who]) return new Response('no such station', { status: 404, headers: cors() });
@@ -319,28 +180,13 @@ export default {
     const upstream = STATIONS[id];
     if (!upstream) return new Response('no such station', { status: 404, headers: cors() });
 
-    // `?bytes=N` closes the connection after N bytes. A radio stream never
-    // ends, so without a bound every probe — the demo's, the harness's — has to
-    // decide when to hang up, and a harness that forgets leaves a socket
-    // holding the origin open for the length of the run.
+    // `?bytes=N` hangs up after N bytes, because a radio stream never ends on its own.
+    // why: lessons/workers-shout.md#bytes
     const bytes = Math.min(Number(url.searchParams.get('bytes')) || 0, 4 << 20);
 
-    /**
-     * 🔴 THROUGH THE TEE, WHICH IS ONE CONNECTION TO THE BROADCASTER FOR ALL OF
-     * US. `idFromName(id)` is the whole mechanism: a Durable Object addressed
-     * by name is the same object everywhere, so every listener on every machine
-     * arrives at one place and that place holds one socket open. See `Mount`.
-     *
-     * ⚠️ A HEAD STILL GOES DIRECT. It is a health question, it wants the
-     * origin's own answer, and it hangs up before a frame of audio is paid for;
-     * putting it through the object would open a broadcast to answer a
-     * question about whether there is one. The `/rec/` recordings are files and
-     * were never in this path at all.
-     * ⚠️ AND `?direct=1` IS DELIBERATELY NOT OFFERED. An escape hatch back to a
-     * connection per client is the defect with a flag on it, and the one thing
-     * this object exists to make impossible is that somebody re-enables it in a
-     * hurry.
-     */
+    // Through the tee: `idFromName(id)` is one object everywhere, holding one upstream socket.
+    // A HEAD goes direct and hangs up before audio; /rec/ files never pass here. No `?direct=1`.
+    // why: lessons/workers-shout.md#through-tee
     if (req.method !== 'HEAD') {
       const room = env.MOUNT.get(env.MOUNT.idFromName(id));
       const q = new URLSearchParams({ u: upstream });
@@ -354,12 +200,8 @@ export default {
     }
 
     const t0 = Date.now();
-    // ALWAYS GET UPSTREAM, even for a HEAD. Icecast 2.4.4 answers HEAD with
-    // `400 Bad Request` — measured against every mount — so forwarding the
-    // method verbatim made the relay report a healthy station as a 502, and
-    // every uptime checker that HEADs a URL would have believed it. The relay
-    // does the GET, keeps the headers, and cancels the body before a frame of
-    // audio is paid for.
+    // Always GET upstream: Icecast 2.4.4 answers HEAD with 400. Keep the headers, cancel the body.
+    // why: lessons/workers-shout.md#get-upstream
     const up = await fetch(upstream, {
       method: 'GET',
       headers: {
@@ -369,8 +211,8 @@ export default {
         ...(req.headers.get('icy-metadata') === '1' ? { 'Icy-MetaData': '1' } : {}),
         'user-agent': 'positron-shout/1 (+https://positron.studio)',
       },
-      // The origin is Icecast: an infinite body, `Connection: Close`, HTTP/1.0.
-      // No cache, ever — a cached radio stream is a contradiction.
+      // The origin is Icecast (infinite body, HTTP/1.0); a cached radio stream is a contradiction.
+      // why: lessons/workers-shout.md#no-cache
       cf: { cacheEverything: false, cacheTtl: 0 },
     });
     const ttfb = Date.now() - t0;
@@ -379,13 +221,10 @@ export default {
       return new Response(`origin ${up.status}`, { status: 502, headers: cors() });
     }
 
-    // 🔴 THE CONTENT-TYPE IS FORWARDED, NEVER INVENTED. It used to fall back to
-    // `audio/mpeg`, which was harmless while every mount here was MP3 and is a
-    // trap now that two of them are AAC: the page reads its frame scanner off
-    // this header, and a scanner pointed at the wrong framing finds NOTHING
-    // rather than finding rubbish. A default would turn a missing header into a
-    // confident wrong answer, and the page handles an ABSENT one correctly by
-    // looking at the bytes.
+    // Forward the content-type, never invent one: the page picks its MP3 or AAC frame scanner from
+    // it,
+    // and it handles an absent header by looking at the bytes.
+    // why: lessons/workers-shout.md#content-type
     const upType = up.headers.get('content-type');
     const headers = cors({
       ...(upType ? { 'content-type': upType } : {}),
@@ -405,7 +244,8 @@ export default {
   },
 };
 
-/** Pass bytes through until `limit`, then close — the stream itself never will. */
+// Pass bytes through until `limit`, then close; the stream itself never will.
+// why: lessons/workers-shout.md#cap
 function cap(body, limit) {
   let sent = 0;
   return body.pipeThrough(new TransformStream({
@@ -420,36 +260,10 @@ function cap(body, limit) {
   }));
 }
 
-/**
- * 🔴 ONE UPSTREAM CONNECTION PER MOUNT, FANNED OUT TO EVERY LISTENER.
- *
- * THIS IS THE FIX FOR THE THING ERR REPORTED. Until 2026-09-16 this relay was a
- * pass-through: every request did its own `fetch(upstream)` and handed the body
- * straight back, so **N browsers were N listeners at the broadcaster**, plus one
- * per harness tab and one per orphaned Chrome. On 2026-09-15 that reached about
- * a hundred concurrent clients against one operator's limit, and on 2026-09-16
- * ERR said the same traffic was corrupting their public listener statistics,
- * which is a fact about their funding rather than about their bandwidth.
- *
- * A Durable Object is addressed by NAME, and `idFromName(station)` gives every
- * mount exactly one object in the world. That object opens the origin once and
- * copies the bytes to everybody. Ten listeners, a hundred listeners and a
- * harness are one listener upstream.
- *
- * ⚠️ THE ICY METADATA IS STRIPPED AND RE-INSERTED PER SUBSCRIBER, AND THAT IS
- * NOT A FLOURISH. Icecast interleaves a metadata block every `icy-metaint`
- * bytes COUNTED FROM THE FIRST BYTE THE CLIENT RECEIVED. A tee hands a late
- * joiner bytes from the middle of the origin's stream, so its byte 0 is not the
- * origin's byte 0 and every block it expects lands in the wrong place: it would
- * read audio as a length byte and then delete that many bytes of sound. So the
- * object parses the blocks out once, keeps the title, and writes fresh blocks
- * into each subscriber's own stream at that subscriber's own offset. Every
- * listener gets a well-formed ICY stream that begins where they began.
- *
- * ⚠️ A LATE JOINER STARTS MID-FRAME AND THAT IS FINE. An MP3 decoder scans for
- * the next sync word, which is what `demo/shell/mp3-frames.mjs` already does and
- * what every media element does. The first few milliseconds are discarded.
- */
+// One upstream connection per mount, fanned out: `idFromName(station)` is one object per mount.
+// ICY metadata counts from each client's first byte, so blocks are parsed out once and re-inserted
+// at each subscriber's own offset. A late joiner starting mid-frame is fine: decoders resync.
+// why: lessons/workers-shout.md#mount
 const METAINT = 16000;
 /** How long the origin is held after the last listener leaves. A reload is two
  *  seconds of nobody; hanging up and dialling again on every one of those is
@@ -484,10 +298,9 @@ export class Mount {
         listeners: this.subs.size, peak: this.peak, upstream: !!this.reader,
         title: this.title, pulled: this.pulled, served: this.served,
         dropped: this.dropped,
-        // 🔴 THE NUMBER THE WHOLE OBJECT EXISTS TO MAKE TRUE. One connection
-        // upstream however many are downstream; anything but 1 here with
-        // listeners on is the tee not working.
-        // Counted per dial and per pump end, so a duplicate dial shows as 2.
+        // Must be 1 with listeners on; counted per dial and per pump end, so a duplicate dial reads
+        // 2.
+        // why: lessons/workers-shout.md#upstreams
         upstreamConnections: this.upstreams,
         openFor: this.startedAt ? Date.now() - this.startedAt : 0,
       }), { headers: { 'content-type': 'application/json' } });
@@ -501,9 +314,9 @@ export class Mount {
     const opened = await this.open(origin);
     if (!opened || !this.reader) return new Response('origin refused', { status: 502 });
 
-    // ⚠️ EACH SUBSCRIBER COUNTS ITS OWN BYTES, because the metadata blocks are
-    // written at ITS offset and not at the origin's. `sent` is why a listener
-    // who joined a minute late still gets a block exactly 16000 bytes in.
+    // Each subscriber counts its own bytes, so its metadata blocks land at its own 16000-byte
+    // offsets.
+    // why: lessons/workers-shout.md#own-bytes
     const sub = { ctrl: null, sent: 0, behind: 0, cap, icy: wantIcy, said: '' };
     const self = this;
     const body = new ReadableStream({
@@ -533,11 +346,9 @@ export class Mount {
     const up = await fetch(origin, {
       method: 'GET',
       headers: {
-        // 🔴 ALWAYS ASKED FOR, WHATEVER THE CLIENT WANTED. There is one
-        // upstream for everybody now, so it cannot be tailored to the first
-        // caller: it is parsed out here and written back per subscriber. The
-        // old pass-through forwarded the client's own preference, which was
-        // correct exactly while each client had its own connection.
+        // Always asked for: one upstream serves everybody, and metadata is re-written per
+        // subscriber.
+        // why: lessons/workers-shout.md#icy-always
         'Icy-MetaData': '1',
         'user-agent': 'positron-shout/2 (+https://positron.studio)',
       },
@@ -561,12 +372,8 @@ export class Mount {
     return true;
   }
 
-  /**
-   * Read the origin forever and copy to everyone.
-   *
-   * ⚠️ NOT AWAITED BY `fetch`. A pump that the request awaited would hold the
-   * response open until the radio station ends, which it never does.
-   */
+  // Read the origin forever and copy to everyone. Not awaited by fetch: a radio never ends.
+  // why: lessons/workers-shout.md#pump
   async pump() {
     const reader = this.reader;
     let toMeta = this.metaint;          // bytes of audio until the next block
@@ -618,9 +425,8 @@ export class Mount {
     for (const p of parts) { buf.set(p, o); o += p.byteLength; }
     const s = new TextDecoder().decode(buf);
     const m = /StreamTitle='([^']*)'/.exec(s);
-    // ⚠️ AN EMPTY TITLE IS A TITLE THAT WENT AWAY, so it is recorded rather
-    // than ignored: a page that keeps showing the last song of the last
-    // programme is worse than one showing nothing.
+    // An empty title is recorded: a stale song title is worse than none.
+    // why: lessons/workers-shout.md#empty-title
     if (m) this.title = m[1];
   }
 
@@ -644,9 +450,9 @@ export class Mount {
             rest = rest.subarray(rest.byteLength);
           }
         }
-        // ⚠️ `desiredSize` GOES NEGATIVE WHEN A SOCKET IS NOT DRAINING, and it
-        // is the only backpressure signal there is here. Radio has no rewind,
-        // so a listener this far behind is dropped rather than buffered for.
+        // `desiredSize` going negative is the only backpressure signal; radio has no rewind, so
+        // drop.
+        // why: lessons/workers-shout.md#behind
         if (sub.ctrl.desiredSize !== null && sub.ctrl.desiredSize < -MAX_BEHIND) {
           this.dropped++; this.drop(sub);
         }
@@ -671,12 +477,9 @@ export class Mount {
   drop(sub) {
     if (!this.subs.delete(sub)) return;
     try { sub.ctrl.close(); } catch { /* already gone */ }
-    // 🔴 THE LAST LISTENER LEAVING MUST EVENTUALLY CLOSE THE ORIGIN, or the tee
-    // becomes a permanent listener nobody is hearing, which is WORSE than the
-    // pass-through it replaced: one connection held for ever against N held
-    // only while somebody was listening. The linger is because a page reload is
-    // two seconds of nobody, and hanging up on every one of those is more
-    // connections to the broadcaster rather than fewer.
+    // The last listener leaving must close the origin, after a linger so a 2 s reload does not
+    // redial.
+    // why: lessons/workers-shout.md#linger
     if (this.subs.size === 0 && this.reader && !this.linger) {
       this.linger = setTimeout(() => {
         this.linger = null;

@@ -1,37 +1,7 @@
-// demo/ancestry.mjs — WALK FROM AN ELEMENT TO THE ROOT AND PRINT, FOR EVERY
-// ANCESTOR, ONE PROPERTY'S VALUE, ITS RECT, AND WHICH KIND OF CONTEXT IT MAKES.
-//
-//   node demo/ancestry.mjs fau '.fau-src textarea' padding-left
-//   node demo/ancestry.mjs nola '.panel-plate' padding-top --width 375
-//
-// 🔴 IT EXISTS BECAUSE *"edge to edge"* WAS ANSWERED BY ZEROING THREE INSETS
-// AND ASKED AGAIN THE NEXT DAY BECAUSE THERE WERE FOUR. The fourth was
-// `.panel-case`'s own `padding: 0 var(--panel-pad)`, on the case, which no page
-// rule touched, and **a child cannot reach its way out of a parent's padding
-// however many of its own rules say 0.** `positron-ui` already gives the cure
-// in words: *"Walk from the element to the surface and print every ancestor's
-// padding, border and rect. It is one loop and it ends the argument."* This is
-// that loop, as a command, so it is run rather than remembered.
-//
-// ✅ **AND IT SAYS WHICH ANCESTOR ESTABLISHES WHAT**, because the three things
-// a positioned or overflowing child cares about are decided by three different
-// ancestors and nothing on screen says which: the nearest STACKING CONTEXT
-// (what a `z-index` is relative to), the nearest CONTAINING BLOCK (what an
-// `absolute` child is placed against), and the nearest BLOCK FORMATTING CONTEXT
-// (where margin collapsing stops). Each is printed with the reason it counts.
-// ⚠️ The containing-block answer is cross-checked against `el.offsetParent`,
-// which the browser computes independently; disagreement is this file's own
-// self-test failing and is printed as such.
-//
-// ⚠️ **TWO THINGS ON THE LISTS THAT SURPRISE PEOPLE.** `overflow: clip` does
-// NOT make a block formatting context while `overflow: hidden` does, so `clip`
-// is excluded from the BFC reasons on purpose. And `container-type` other than
-// `normal` DOES make one, silently, which is why adding a container query turns
-// margin collapsing off inside it.
-//
-// 🔴 **THE PORT IS READ BACK FROM THE PROFILE, NEVER GUESSED**, for the reason
-// `verify.mjs` records: a fixed port and `/json/list` attach to whatever Chrome
-// is already there. The draft this was adopted from did exactly that.
+// node demo/ancestry.mjs <slug> '<selector>' <property> [--width 375]
+// Every ancestor's value and rect, and which makes the stacking context, containing block (checked
+// against offsetParent) and BFC: `overflow: clip` makes none, a container-type does.
+// why: lessons/harness.md#ancestry
 
 import { launchChrome, connectCdp } from './chrome.mjs';
 
@@ -155,19 +125,15 @@ for (const r of o.rows) {
 
 const first = (k) => o.rows.slice(1).find((r) => r[k] && r[k].length);
 const cb = first('containing');
-/* ⚠️ `offsetParent` IS `body` WHEN NOTHING ABOVE IS POSITIONED. That is the
-   spec's own fallback and not a positioned ancestor, so it AGREES with a
-   `(none)` here. The first run of this file on `/nola/` flagged exactly that
-   case as a disagreement, which is a self-test crying wolf on the commonest
-   page shape there is. A real disagreement is a named ancestor on one side and
-   a different named one on the other. */
+// offsetParent is `body` when nothing is positioned; that agrees with `(none)` here.
+// why: lessons/harness.md#offset-body
 const opIsFallback = !o.offsetParent || /^(body|html)\b/.test(o.offsetParent);
 const disagree = cb ? (o.offsetParent && cb.el !== o.offsetParent && !opIsFallback) : !opIsFallback;
 console.log(`\nnearest ancestor making a stacking context : ${(first('stacking') || {}).el || '(none)'}`);
 console.log(`nearest ancestor that is a containing block : ${(cb || {}).el || '(none)'}   (offsetParent says ${o.offsetParent || '(none)'}${disagree ? '  <- DISAGREE, this file is wrong somewhere' : ''})`);
 console.log(`nearest ancestor making a formatting context: ${(first('bfc') || {}).el || '(none)'}`);
-// 🔴 THE LINE THAT ENDS THE "EDGE TO EDGE" ARGUMENT: how many boxes between the
-// element and the root are insetting it, and by how much on the left.
+// How many boxes between the element and the root inset it, and by how much on the left.
+// why: lessons/harness.md#insetting
 const insetting = o.rows.slice(1).filter((r) => r.pad[3] > 0 || r.border[3] > 0);
 console.log(`\n${insetting.length} ancestor(s) inset the left edge: ${insetting.map((r) => `${r.el} ${r.pad[3]}+${r.border[3]}`).join(', ') || '(none)'}`);
 

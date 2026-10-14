@@ -25,9 +25,8 @@ MTX_FP_URL = os.environ.get("MTX_FP_URL", "https://127.0.0.1:18892/moqmtx/finger
 
 
 def fingerprint():
-    # mediamtx's HTTP/3 (WebTransport) listener ALWAYS uses its own in-memory
-    # JIT ECDSA P-256 cert (14-day validity, rotated) — moqServerCert only
-    # covers the HTTP/2 side. So proxy the live fingerprint at request time.
+    # mediamtx's WebTransport listener uses its own rotating cert, so proxy the live fingerprint.
+    # why: lessons/rig-moq.md#playserver-fp
     return subprocess.run(
         ["curl", "-sk", MTX_FP_URL], capture_output=True, check=True
     ).stdout.decode().strip()

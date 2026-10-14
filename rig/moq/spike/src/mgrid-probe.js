@@ -1,11 +1,6 @@
-// MULTI-PUBLISHER grid: probe viewer (RUNBOOK §13). Subscribes to ALL publishers
-// in the local roster (polled every 1 s — the draft-14 discovery shim), decodes
-// every burned row, posts per-publisher JSONL samples to the :8887 collector.
-// Rows: {k:"f",pub,t,d} frame g2g | {k:"seen"/"cat"/"first",pub,t} discovery chain
-//       {k:"race",pub,phase,att} subscribe race | {k:"close",pub,t,err} track close
-//       {k:"silent",pub,t,gap} silence watchdog | {k:"ps",...} per-pub stats
-//       {k:"s",...} page stats
-// Params: ?name=<rung> &probe=<probe1> &relay= &rowless=1 (skip row decode)
+// Grid probe viewer (RUNBOOK §13): subscribes to every roster publisher, decodes rows, posts JSONL
+// to :8887 (row kinds: lessons/rig-moq.md). Params: ?name= &probe= &relay= &rowless=1
+// why: lessons/rig-moq.md#mgrid-probe-header
 import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 

@@ -1,14 +1,7 @@
-// RETIRED 2026-10-13: `moq.positron.studio` (workers/moq-safari) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-// obs-moq plugin drive: switch the OBS stream service between rtmp_custom and
-// moq_service, and verify playback via the deployed self-reporting player
-// (elektron-moq-safari) in headless Chrome, whose ?log= hook posts into our
-// :8890 collector. Namespace discipline: fresh obsdock-<ts> every start
-// (draft-14 same-name rejoin pre-GC bricks the namespace — RUNBOOK §13.4).
-//
-//   node run-moq.mjs moq <relayUrlOrEnvRef> [versionPin]   switch service to MoQ + StartStream
-//   node run-moq.mjs rtmp                                  restore RTMP service + StartStream
-//   node run-moq.mjs player <ns> [relay] [secs]            headless-chrome player, report g2g
-//   node run-moq.mjs outputs                               GetOutputList (dual-output question)
+// RETIRED: moq.positron.studio was deleted, so the player this calls no longer answers.
+// Switch OBS between rtmp_custom and moq_service; a fresh obsdock-<ts> namespace every start.
+// node run-moq.mjs moq <relay> [pin] | rtmp | player <ns> [relay] [secs] | outputs
+// why: lessons/rig-obs.md#run-moq-header
 import { spawn, execFile } from "node:child_process";
 import os from "node:os";
 import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
@@ -24,7 +17,8 @@ const scratch = (process.env.SCRATCH || os.tmpdir()).replace(/\/?$/, "/");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PLAYER = "https://moq.positron.studio/";
 
-// tokens live in .env (chmod 600, gitignored) — read, never print
+// Tokens live in .env (chmod 600, gitignored): read, never printed.
+// why: lessons/rig-obs.md#run-moq-token
 function envToken(name) {
   const env = readFileSync(fileURLToPath(new URL("../../.env", import.meta.url)), "utf8");
   const m = env.match(new RegExp(`^${name}=(.+)$`, "m"));

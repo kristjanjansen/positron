@@ -1,16 +1,8 @@
 #!/usr/bin/env node
-// RETIRED 2026-10-13: `cues.positron.studio` (workers/cues) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-/**
- * Measure Durable Object cue-relay latency. Two WebSocket clients in one
- * process (one clock — no sync error):
- *
- *   RTT        client -> DO -> same client        (ping/pong)
- *   one-way    publisher -> DO -> other client    (cue broadcast)
- *   DO clock   offset of the DO's Date.now() vs local (valid: local is
- *              NTP-synced to ~1 ms)
- *
- *   node rig/do-lag.mjs [wss://...] [n]
- */
+// RETIRED: cues.positron.studio was deleted, so this no longer answers.
+// DO cue-relay RTT, one-way and DO clock offset, two clients on one clock.
+// node rig/do-lag.mjs [wss://...] [n]
+// why: lessons/rig-misc.md#do-lag
 import { readFileSync } from 'fs';
 import path from "node:path";
 const cuesToken = () => {

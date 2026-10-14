@@ -1,8 +1,6 @@
-// Resolution/framerate MATRIX publisher (RUNBOOK §9). Parameterized clone of
-// pub-safari.js: canvas (reference 1280x720 geometry scaled up to WxH) -> WebCodecs
-// H.264 annexb -> hang legacy container -> @moq/net -> CF draft-14 relay.
-// Query params: ?ns= &relay= &codec= &w= &h= &fps= &bitrate= &statsms=
-// Reports hw/sw encoder mode, achieved capture fps, bytes/s, queue depth, drops.
+// Resolution/framerate matrix publisher (RUNBOOK §9), pub-safari.js scaled to WxH.
+// Params: ?ns= &relay= &codec= &w= &h= &fps= &bitrate= &statsms=
+// why: lessons/rig-moq.md#pub-4k-header
 import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
@@ -15,13 +13,12 @@ const H = parseInt(params.get("h") ?? "720", 10);
 const FPS = parseInt(params.get("fps") ?? "30", 10);
 const BITRATE = parseInt(params.get("bitrate") ?? "2500000", 10);
 const STATSMS = parseInt(params.get("statsms") ?? "5000", 10);
-const CBR = params.get("cbr") === "1"; // bitrateMode constant — force real bytes for bandwidth-gate runs
+const CBR = params.get("cbr") === "1"; // constant bitrate: real bytes for bandwidth-gate runs; why: lessons/rig-moq.md#pub-4k-cbr
 const NOISE = params.get("noise") === "1"; // incompressible bottom strip: the ONLY way to force real bitrate (VT won't pad)
 const GOP = FPS; // 1 s GOP always
 
-// Binary row geometry — 1280x720 REFERENCE grid (matches safari-play.js decode);
-// everything is drawn through a scale transform so the row lands at the same
-// place after the player downscales the frame onto its 1280x720 canvas.
+// Row geometry on the 1280x720 reference grid, drawn scaled so it lands in place after downscaling.
+// why: lessons/rig-moq.md#pub-4k-row
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
 const SX = W / 1280, SY = H / 720;
 

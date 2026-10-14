@@ -1,44 +1,14 @@
-// rig/board/beat.mjs: what the board says about itself, `board.hello` when it
-// joins and `board.alive` every five seconds, as two pure functions.
-//
-// They lived inline in `board.mjs` until 2026-10-04, where nothing could reach
-// them: that file dials the relay the moment it is imported. They moved here
-// when both messages started carrying `graph` (plans/plan-universal-routing.md
-// §11 step 3), because a field that a page draws the desk from is a field a
-// test has to be able to read, and `test.mjs` imports this file.
-//
-// ⚠️ THE FACTS ARE PASSED IN, NEVER LOOKED UP. Everything the board has to ask
-// the machine for (`aconnect -l`, `which yoshimi`, whether `/dev/video11`
-// exists) is asked in `board.mjs` and handed over, so this file runs the same
-// on a laptop and on the Pi.
-//
-// 🔴 `graph-registry.mjs` IS IMPORTED HERE, AND `push.sh` SHIPS IT FROM HERE.
-// Its grep reads every `rig/board/*.mjs` for an import that climbs two levels,
-// so a direct import from any file in this directory is enough. An import that
-// went through another `demo/shell/` file would not be followed, which is why
-// that file itself imports nothing.
-// ⚠️ THE GREP READS COMMENTS TOO. A comment here quoting the import pattern
-// with a placeholder path was matched as an import and handed to `tar` as a
-// file to ship, 2026-10-04, caught before any push. Never write that pattern
-// in a comment in this directory.
+// board.hello and board.alive as pure functions, so test.mjs can read the graph they carry. Facts
+// are passed in, never looked up. It imports graph-registry.mjs directly so push.sh ships it;
+// push.sh's grep reads comments too, so never write an import-from pattern in a comment here.
+// why: lessons/rig-board-io.md#beat-header
 
 import { boardGraph } from '../../demo/shell/graph-registry.mjs';
 
-/**
- * The board as a graph, from what the board knows.
- * @param {object} f
- * @param {string} f.room
- * @param {string} [f.site]         `BOARD_SITE`, `pi-1` when unset
- * @param {string} [f.net]          `BOARD_NET`, left out when unset
- * @param {object} f.instruments    the map `board.hello` sends: name -> available
- * @param {Map|Array} f.inputs      `parseInputs(...).inputs`, a Map, or its values
- * @param {Array} f.ports           `addressable()` rows, `state().ports`
- * @param {number} f.frameMs
- * @param {boolean} f.gpu           `videoAvailable()`, announced as the `shader` node
- * @param {boolean} [f.camera]     a camera key is set AND `findCamera()` found one (camera.mjs)
- * @param {function} [f.midiPresent] `(port) => boolean`, is that ALSA card there now
- * @param {boolean} [f.jack]         the board has a JACK graph, so its JACK ends are announced
- */
+// The board as a graph from what it knows: room, site, net, instruments, inputs, ports, frameMs,
+// gpu
+// (the `shader` node), camera, midiPresent(port), jack.
+// why: lessons/rig-board-io.md#graph-of
 const present = (f, port) => (typeof f.midiPresent === 'function'
   ? f.midiPresent(port)
   : (f.ports || []).some((p) => String(p.client).toLowerCase() === String(port).toLowerCase()));
@@ -47,14 +17,10 @@ export function graphOf(f) {
   const inputs = f.inputs instanceof Map ? [...f.inputs.values()] : (f.inputs || []);
   return boardGraph({
     room: f.room, ...(f.site ? { site: f.site } : {}), net: f.net || null, instruments: f.instruments || {},
-    // Only what the graph reads. `device` is an ALSA name on the board and
-    // means nothing to a page, so it does not ride on every beat.
-    // 🔴 AN INPUT'S MIDI IS ANNOUNCED ONLY WHILE ITS DEVICE IS THERE. MEASURED
-    // 2026-10-04: the Circuit was unplugged, the board went on announcing its
-    // MIDI input from the config, `/patchbay/` offered the link and every note
-    // failed with ENOENT on `/proc/asound/Circuit`. `midiPresent` is asked on
-    // every beat (one lookup), so a replug shows up within five seconds; with
-    // no answer to ask, the ALSA list from the last hello decides.
+    // Only what the graph reads (no ALSA device). An input's MIDI is announced only while its
+    // device is
+    // present, asked every beat, so a replug shows within five seconds.
+    // why: lessons/rig-board-io.md#inputs
     inputs: inputs.map((i) => ({ name: i.name, channels: i.channels,
       midi: i.midi && present(f, i.midi.port) ? i.midi : null,
       // An input on JACK announces its JACK port (graph-registry `inputJack`).
@@ -63,14 +29,10 @@ export function graphOf(f) {
   });
 }
 
-/**
- * `f.graphFacts` is what `graphOf` takes, and the hello is where the board
- * gathers it: the same object rides on every beat after it.
- * ⚠️ `audioChannels` is NOT a count of MIDI channels, which is 16 and
- * multitimbral. The board captures `arecord -c 1`, so it says
- * ONE, and `demo/able`'s Mac says two: both counts are on the relay at once
- * and no page is left inferring which it is holding.
- */
+// The hello gathers `graphFacts`, which ride on every beat. `audioChannels` is the capture's
+// channel
+// count (1), not MIDI channels.
+// why: lessons/rig-board-io.md#hello
 export function helloMsg(f) {
   return { type: 'board.hello', name: f.name, id: f.id, backend: f.backend, ports: f.ports.length, dry: f.dry,
            since: f.since, audioChannels: 1, frameMs: f.frameMs, instruments: f.instruments,
@@ -81,14 +43,9 @@ export function helloMsg(f) {
            graph: graphOf(f.graphFacts) };
 }
 
-/**
- * ⚠️ ONE SHAPE, ONE PLACE. `board.mjs` sends this from the heartbeat and from
- * `sweepInsert()`, so two copies of this object is how a field ends up on one
- * of them. `insert` is `insertState()`, spread so the fields stay top level
- * where every page already reads them.
- * ⚠️ `graph` IS LEFT OUT UNTIL THE FIRST HELLO, because the facts it is built from
- * are gathered there. A beat before the socket opens is not sent anyway.
- */
+// One shape in one place (heartbeat and sweepInsert); `insert` spread top level. No `graph` before
+// the first hello.
+// why: lessons/rig-board-io.md#alive
 export function aliveMsg(f) {
   return { type: 'board.alive', name: f.name, id: f.id, upSec: f.upSec,
            audio: f.audio, voices: f.voices, frames: f.frames, ...f.insert,

@@ -1,47 +1,7 @@
-// demo/verify-gl.mjs — THE HARNESS THAT CAN SEE A GPU.
-//
-//   node demo/verify-gl.mjs              every demo that declares `gl: true`
-//   node demo/verify-gl.mjs mirror       just this one
-//
-// ⚠️ WHY THIS EXISTS AT ALL, AND WHY IT IS A SEPARATE FILE.
-//
-// `verify.mjs` launches Chrome with `--disable-gpu`, and under that flag
-// `canvas.getContext('webgl2')` returns **null** — not slow, absent. Measured
-// on this machine, with verify.mjs's own flags:
-//
-//     webgl2 = false,  error = "no webgl2"
-//
-// So every assert in a visual demo would be unreachable, and per CLAUDE.md a
-// page whose first assert sits behind that reports "asserted nothing" — which
-// reads as broken — or asserts its own fallback and reads as fine. That is this
-// project's most expensive recurring failure: 261/261 while a demo was fatally
-// broken on iPhone; 291 asserts across three pages that had never played a
-// frame of HLS. Visuals would reproduce it exactly.
-//
-// ⚠️ AND THE OBVIOUS FIX IS WORSE THAN THE BUG. Adding
-// `--enable-unsafe-swiftshader` turns the suite green against a CPU rasteriser.
-// Measured, same shader, same page:
-//
-//     --disable-gpu                      no context at all
-//     --enable-unsafe-swiftshader        SwiftShader   170.7 Mpix/s
-//     GPU allowed                        ANGLE Metal  1392.1 Mpix/s
-//     (and the real Raspberry Pi GPU, §3.4)              50.3 Mpix/s
-//
-// The CPU rasteriser on a laptop is **3.4x faster than the real Pi GPU** and
-// **8.2x slower than the real laptop GPU**. A harness "fixed" that way prints
-// plausible numbers about a machine that does not exist: it would pass a page
-// that crawls on a phone and fail one that flies on a laptop. So this file
-// REFUSES to grade a run on a software rasteriser, and that refusal is the
-// first assert — the same rule as the BUILD stamp, for the same reason.
-// Without it every number below is unattributable.
-//
-// ⚠️ A GOLDEN IMAGE CANNOT BE THE ANSWER EITHER. The same shader with identical
-// fixed inputs summed 48,147,330 of red on ANGLE Metal and 68,001,881 on
-// SwiftShader — a 41% difference — because `fract(sin(dot(p,k)) * 43758.5453)`,
-// the standard GLSL hash, amplifies last-bit float differences into unrelated
-// noise. So "the picture is right" is asserted STRUCTURALLY by the page (it
-// drew, it moved, it is not a flat field), never by comparing pixels across
-// machines.
+// node demo/verify-gl.mjs [slug]: `gl: true` demos on the real GPU (--disable-gpu has no WebGL2). A
+// software rasteriser is refused first: SwiftShader is 3.4x a Pi GPU, 8.2x slower than this laptop.
+// Pictures are asserted structurally, never against golden images.
+// why: lessons/harness.md#verify-gl
 import { serve } from './server.mjs';
 import { DEMOS } from './manifest.mjs';
 import { launchChrome, connectCdp } from './chrome.mjs';
@@ -53,21 +13,16 @@ const HTTP_PORT = 8892;                     // not verify.mjs's 8890: both may r
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const server = process.env.DEMO_BASE ? null : await serve(HTTP_PORT);
-// The port ACTUALLY bound, which may not be the one asked for — see
-// serve()'s comment about a dev server already holding it.
+// The port actually bound, which may not be the one asked for.
+// why: lessons/harness.md#gl-bound-port
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
 // (`server` is null only when DEMO_BASE is set, and then it is not read.)
 
-// ⚠️ THE TARGET LIST IS CHECKED AFTER THE RENDERER, NOT BEFORE IT. Exiting
-// early on "no visual demos yet" meant this file could not answer the question
-// it exists for — CAN this machine grade a picture — and it read `0 green` on a
-// box with no GPU at all, which is the same thing it reads on a box with one.
+// The target list is checked after the renderer, so a GPU-less box cannot read `0 green`.
+// why: lessons/harness.md#gl-targets
 const want = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-// 🔴 TWO TIERS, the same switch `verify.mjs` reads (demo/shell/selfcheck.mjs):
-// `DEMO_DEEP=1` or `--deep` asks for `selfcheck=2` and waits the full
-// `settleMs`; an ordinary run asks for `selfcheck=1` and waits `lightSettleMs`
-// where a page declares one. `--deep` is a tier, not a slug, and the filter on
-// the line above already keeps it out of `want`.
+// Two tiers as in verify.mjs: DEMO_DEEP=1 or --deep is selfcheck=2 with the full settleMs.
+// why: lessons/harness.md#gl-tiers
 const DEEP = process.env.DEMO_DEEP === '1' || process.argv.includes('--deep');
 const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
 console.log(DEEP ? 'tier: DEEP, the long-running checks included'
@@ -75,16 +30,10 @@ console.log(DEEP ? 'tier: DEEP, the long-running checks included'
 const targets = DEMOS.filter((d) => d.built !== false && d.gl)
   .filter((d) => !want.length || want.includes(d.name));
 
-// 🔴 `videoradio` ROTATES ERR MOUNTS, SO IT GETS THE STAND-IN `verify.mjs`
-// GIVES `/archive/radio/`, STARTED HERE RATHER THAN REMEMBERED. Every connection this
-// repository opens to an ERR mount is counted in a public broadcaster's
-// listener statistics (CLAUDE.md), and until 2026-10-04 `node
-// demo/verify-gl.mjs videoradio` opened four of them. `demo/fake-station.mjs`
-// answers any mount name with real MP3 frames and ICY headers, and the page
-// takes `?base=` exactly as `/archive/radio/` does. ⚠️ `DEMO_QUERY=base=...` still wins
-// (it is first in the query, and `URLSearchParams.get` returns the first), and
-// a stand-in on 127.0.0.1 cannot be reached from a `DEMO_BASE` deploy, so none
-// is started then.
+// `videoradio` rotates ERR mounts, so it gets the fake-station stand-in; DEMO_QUERY base= still
+// wins,
+// and none is started against DEMO_BASE.
+// why: lessons/harness.md#gl-videoradio
 const standIn = new Map();
 if (!process.env.DEMO_BASE && targets.some((t) => t.name === 'videoradio')) {
   const station = startStation({ port: 0, quiet: true });
@@ -99,9 +48,8 @@ if (!process.env.DEMO_BASE && targets.some((t) => t.name === 'videoradio')) {
   }
 }
 
-// ⚠️ NO `--disable-gpu`, AND NO SWIFTSHADER FLAG. The point of this file is the
-// real device. `--headless=new` does use the GPU where one is available, which
-// is why the renderer is asserted rather than assumed.
+// No --disable-gpu and no SwiftShader: the renderer is asserted, not assumed.
+// why: lessons/harness.md#gl-no-disable-gpu
 const browser = await launchChrome({
   prefix: 'positron-verify-gl', clearCache: true,
   args: ['--autoplay-policy=no-user-gesture-required', '--mute-audio'],
@@ -121,9 +69,8 @@ await S('Runtime.enable');
 let pass = 0, fail = 0;
 const ok = (n, c, d = '') => { c ? pass++ : fail++; console.log(`  ${c ? 'ok   ' : 'FAIL '} ${n}${d ? `  — ${d}` : ''}`); };
 
-// ── THE FIRST ASSERT, BEFORE ANY PAGE ────────────────────────────────────────
-// Which renderer this run got. Everything after it is a claim about that
-// renderer and nothing else, so it is established once, loudly, up front.
+// The first assert, before any page: which renderer this run got.
+// why: lessons/harness.md#gl-renderer
 await S('Page.navigate', { url: `${BASE}/` });
 await sleep(800);
 const RENDER = await evalIn(`(() => {
@@ -155,9 +102,8 @@ if (RENDER.timers.length) console.log(`         GPU timing available: ${RENDER.t
 else console.log('         GPU timing: none available here — a page must say "cannot measure", not print a zero');
 
 if (!RENDER.webgl2 || isSoft) {
-  // ⚠️ REFUSE, do not carry on. A run graded on SwiftShader is a run about a
-  // machine nobody has. Reporting it as a pass is the failure this file exists
-  // to prevent, and reporting it as "1 failure among 40 passes" buries it.
+  // Refuse to grade the rest: a SwiftShader run is about a machine nobody has.
+  // why: lessons/harness.md#gl-refuse
   console.log(`\n  ⚠ REFUSING TO GRADE ANYTHING ELSE.`);
   console.log(`    ${isSoft ? 'This is a software rasteriser. Its numbers describe no real device:' : 'There is no GPU context here.'}`);
   if (isSoft) console.log('    it is ~3.4x faster than a real Raspberry Pi GPU and ~8.2x slower than a real laptop GPU.');
@@ -178,25 +124,16 @@ if (!targets.length) {
 
 for (const t of targets) {
   console.log(`\n[${t.name}]`);
-  // 🔴 `selfcheck=1`, THE SAME FLAG `verify.mjs` APPENDS, AND THIS FILE DID NOT.
-  // A self-check never runs for a visitor, so a page reads that flag and keeps
-  // anything that opens a file, makes a sound, presses a control or moves the
-  // picture behind it. Every gl demo was left out of that: `videoradio` already
-  // carried the gate and said so in its own comment — *"verify-gl.mjs appends no
-  // query of its own, which is a harness to fix rather than a reason to work a
-  // visitor's controls"* — and the gate meant its checks ran nowhere at all.
-  // ⚠️ AFTER `DEMO_QUERY`, because `URLSearchParams.get` returns the first
-  // occurrence and an override has to win, which is how verify.mjs orders it.
+  // selfcheck=1 like verify.mjs, after DEMO_QUERY so an override wins.
+  // why: lessons/harness.md#gl-selfcheck
   const q = [process.env.DEMO_QUERY, DEEP ? 'selfcheck=2' : 'selfcheck=1',
     standIn.has(t.name) ? `base=${standIn.get(t.name)}` : ''].filter(Boolean).join('&');
   const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
   await sleep(1500);
 
-  // The page must report its own renderer, always — a visitor on a software
-  // rasteriser is a real visitor and the page should say so rather than quietly
-  // being slow. And it must AGREE with what this harness found, or one of them
-  // is describing a different context.
+  // The page reports its renderer and it must agree with the harness's.
+  // why: lessons/harness.md#gl-page-renderer
   const said = await evalIn(`window.__demo?.gl?.renderer ?? null`);
   ok('the page reports which renderer it got', typeof said === 'string' && said.length > 0, said ?? 'it does not');
   if (typeof said === 'string') {
@@ -204,16 +141,8 @@ for (const t of targets) {
        said === RENDER.renderer ? said : `page says ${said}, harness saw ${RENDER.renderer}`);
   }
 
-  // Press every control, in order — the same contract as verify.mjs, and for
-  // the same stated reason: a control the harness cannot press is a subject the
-  // suite cannot reach.
-  // 🔴 AND A PAGE WHOSE ONLY CONTROL IS ITS TRANSPORT BAR'S PLAY GETS THAT
-  // PRESSED, AS `verify.mjs`'s drill does. `/videoradio/` moved its play onto
-  // `createTransportBar` and its row went empty, so this loop pressed nothing,
-  // the page sat at *"Press play."*, and every one of its checks went unrun
-  // behind `the page asserted something  2`, which is the shell's two. MEASURED
-  // 2026-10-04: 7/7 green with no page check run. Only when the row is empty,
-  // so a page that has controls is pressed exactly as before.
+  // Press every control; a page whose only control is its transport bar's play gets that pressed.
+  // why: lessons/harness.md#gl-controls
   const SEL = `'.pos-controls button'`;
   const n = await evalIn(`document.querySelectorAll(${SEL}).length`);
   const onlyBar = n === 0 && await evalIn(`!!document.querySelector('.tbar-toggle')`);
@@ -226,19 +155,14 @@ for (const t of targets) {
     await evalIn(`document.querySelectorAll(${SEL})[${i}].click()`);
     await sleep(i === 0 ? (settleOf(t) ?? 4000) : 1200);
   }
-  // ⚠️ AND A PAGE WITH NO CONTROLS MUST STILL BE WAITED FOR. `mirror` starts
-  // itself and runs its own checks, so there is nothing to press — pressing
-  // zero buttons and reading immediately would report "asserted nothing" about
-  // a page that was mid-check. Wait for `ready`, bounded, then read whatever is
-  // there and let the count speak.
+  // A page with no controls is still waited for (`ready`, bounded).
+  // why: lessons/harness.md#gl-no-controls
   for (let i = 0; i < 60; i++) {
     if (await evalIn(`!!window.__demo?.ready`)) break;
     await sleep(500);
   }
-  // ⚠️ A PAGE THAT NEVER SAID READY IS SAID SO, WITH ITS OWN LAST WORDS, because
-  // `the page asserted something  2` alone cannot tell a slow check from a hung
-  // one, and `verify.mjs` learned that on 2026-09-22. Printed, never asserted,
-  // so no page's total moves with it.
+  // A page that never said ready is reported with its last words, printed, not asserted.
+  // why: lessons/harness.md#gl-never-ready
   if (!(await evalIn(`!!window.__demo?.ready`))) {
     const tail = await evalIn(`JSON.stringify((window.__demo?.logs ?? []).slice(-8).map((l) => l.msg ?? String(l)))`);
     console.log(`         not ready after 30 s; its last log lines:\n           ${JSON.parse(tail || '[]').join('\n           ')}`);
@@ -246,7 +170,8 @@ for (const t of targets) {
   const asserts = await evalIn(`JSON.stringify(window.__demo?.asserts ?? [])`);
   const list = JSON.parse(asserts || '[]');
   ok('the page asserted something', list.length > 0, `${list.length}`);
-  // The shell's assert records are {label, pass, detail} — not {name, ok}.
+  // The shell's assert records are {label, pass, detail}, not {name, ok}.
+  // why: lessons/harness.md#gl-records
   for (const a of list) ok(`page: ${a.label}`, a.pass, a.detail ?? '');
 }
 

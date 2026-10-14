@@ -1,75 +1,25 @@
-/**
- * Timed messages synced to a live video stream.
- *
- * Cloudflare Stream's transcode strips all in-band metadata (ID3, SCTE-35,
- * DATERANGE, SEI — verified), so messages travel on a side channel and are
- * aligned to the video using the wall clock that LL-HLS embeds per segment
- * (EXT-X-PROGRAM-DATE-TIME → hls.playingDate).
- *
- * A cue is {id, at, data}: `at` is epoch ms of the STREAM moment it belongs
- * to. Each viewer's playhead lags live by their own amount; a cue fires when
- * *their playhead* reaches `at`, so every viewer sees it at the same point in
- * the video regardless of their individual latency. This beats in-band ID3:
- * cues can be scheduled ahead, revised, cancelled, and delivered to viewers
- * who joined late.
- *
- * Works with createLowLatencyPlayer (hls.js path and Safari native path).
- *
- * 🔴 AND SINCE 2026-09-25 IT WORKS ON WebRTC TOO, WHERE THERE IS NO PDT AND
- * THEREFORE NO PLAYHEAD CLOCK AT ALL. Before this, `playheadTime()` returned
- * null on a WHEP subscription and `tick()` returned early every single time,
- * so cues NEVER FIRED and nothing said so: no error, no warning, an empty
- * overlay and a queue that only grew. That is the worst shape a failure can
- * take in this repository's own words, and it is why `clock` is now explicit
- * rather than inferred.
- *
- *   clock: 'pdt'   (default, unchanged) the playhead's own wall clock. Every
- *                  viewer sees a cue at the same POINT IN THE VIDEO whatever
- *                  their latency. Needs EXT-X-PROGRAM-DATE-TIME, which exists
- *                  only because the input was made with preferLowLatency.
- *   clock: 'live'  fire on arrival. For WebRTC, where the viewer IS live:
- *                  measured p50 67 ms glass to glass, which is inside the
- *                  noise of a person noticing a question.
- *   clock: 'lag'   wall clock minus THIS viewer's own reported latency. The
- *                  cheap rule for an HLS stream with no usable PDT. One
- *                  subtraction against a figure the player already computes.
- *
- *   const cues = createTimedMessages(player, video, {
- *     onMessage: (cue, {lateMs}) => showOverlay(cue.data),
- *   });
- *   cues.add({ id: 'act2', at: Date.parse('...'), data: {...} });
- *   cues.connect('wss://your-worker.example/cues');   // optional transport
- *   cues.destroy();
- */
+// Cues {id, at, data} beside a live stream, fired when this viewer's playhead reaches `at`; Stream
+// strips in-band metadata. `clock`: 'pdt' (default), 'live' (on arrival, WebRTC has no PDT) or
+// 'lag' (wall clock minus this viewer's latency).
+// why: lessons/src.md#header
 
 const DEFAULTS = {
-  /** Poll cadence (ms). 100 ms ≈ 3 frames — tight enough for overlays. */
+  // Poll cadence in ms; 100 ms is about 3 frames.
+  // why: lessons/src.md#interval
   interval: 100,
-  /**
-   * Fire cues up to this many ms *behind* the playhead (late joiner, seek,
-   * rebuild). Older cues are surfaced through onMissed instead, so a late
-   * joiner can e.g. render past chat without replaying every animation.
-   */
+  // Fire cues up to this many ms behind the playhead; older ones go to onMissed.
+  // why: lessons/src.md#past-window
   pastWindow: 15000,
   /** WebSocket reconnect backoff bounds (ms). */
   wsRetryMin: 1000,
   wsRetryMax: 15000,
   /** Auth token appended to the WS URL (?token=…) when the URL lacks one. */
   token: null,
-  /**
-   * Which clock decides that a cue is due. See the header.
-   * 'pdt' | 'live' | 'lag'. Default 'pdt', which is what this file has always
-   * done, so nothing that already uses it changes behaviour.
-   */
+  // Which clock decides a cue is due: 'pdt' | 'live' | 'lag'.
+  // why: lessons/src.md#clock
   clock: 'pdt',
-  /**
-   * For clock:'lag' only. Reads this viewer's current latency in SECONDS.
-   * `createLowLatencyPlayer` reports exactly this on its 'latency' event, so
-   * the usual wiring is a closure over the last value seen there.
-   * Returning null means "cannot tell", which HOLDS the cue rather than firing
-   * it: a cue fired at the wrong moment cannot be taken back, and this project
-   * has already paid once for reading "cannot tell" as a number.
-   */
+  // clock 'lag' only: this viewer's latency in seconds; null holds the cue rather than firing it.
+  // why: lessons/src.md#latency-seconds
   latencySeconds: null,
 };
 
@@ -85,20 +35,19 @@ export function createTimedMessages(player, video, opts = {}) {
   let destroyed = false;
   let ws = null, wsTimer = null, wsDelay = cfg.wsRetryMin, pingTimer = null, pendingPingT0 = null;
 
-  /** Live transport telemetry: rtt from ping/pong (performance.now() based),
-   *  serverClockOffset from the DO's echoed Date.now() (coarse — Workers
-   *  freeze Date.now() during execution; treat as ±70 ms). */
+  // Transport telemetry: rtt from ping/pong; serverClockOffset is coarse (DO clocks freeze, about
+  // 70 ms).
+  // why: lessons/src.md#stats
   const stats = { rttMs: null, rttP50: null, serverClockOffsetMs: null, samples: [] };
 
   /** Wall-clock epoch ms at the current playhead, or null if unknowable. */
   function playheadTime() {
-    // ── clock:'live' — WebRTC. There is no playhead clock and there is no
-    // need for one: the viewer is live, so "now" is now. Returning the wall
-    // clock makes every cue whose `at` has passed due immediately, which is
-    // exactly the intended behaviour and keeps ONE code path in tick().
+    // clock 'live': the viewer is live, so now is now and every passed cue is due.
+    // why: lessons/src.md#live
     if (cfg.clock === 'live') return Date.now();
 
-    // ── clock:'lag' — wall clock minus this viewer's own latency.
+    // clock 'lag': wall clock minus this viewer's own latency.
+    // why: lessons/src.md#lag
     if (cfg.clock === 'lag') {
       const secs = typeof cfg.latencySeconds === 'function'
         ? cfg.latencySeconds()
@@ -109,8 +58,8 @@ export function createTimedMessages(player, video, opts = {}) {
       return Date.now() - secs * 1000;
     }
 
-    // ── clock:'pdt' — the original, and still the default.
-    // hls.js: fragment PROGRAM-DATE-TIME mapped to currentTime.
+    // clock 'pdt': hls.js maps fragment PROGRAM-DATE-TIME to currentTime.
+    // why: lessons/src.md#pdt
     const d = player.hls?.playingDate;
     if (d) return d.getTime();
     // Safari native: getStartDate() is the PDT at currentTime === 0.
@@ -147,17 +96,12 @@ export function createTimedMessages(player, video, opts = {}) {
   }
   const timer = setInterval(tick, cfg.interval);
 
-  /**
-   * Optional transport: a WebSocket delivering JSON frames.
-   *   {type:'cue',    cue:{id,at,data}}     schedule (or revise by id)
-   *   {type:'cues',   cues:[...]}           batch (e.g. backlog on join)
-   *   {type:'cancel', id}                   unschedule
-   * Reconnects with backoff forever — same philosophy as the player.
-   */
+  // Optional WebSocket transport of JSON frames: cue, cues (backlog), cancel. Reconnects forever.
+  // why: lessons/src.md#connect
   function connect(url) {
     if (destroyed) return;
-    // Guard double-connect: cancel any pending reconnect and close the old
-    // socket, whose handlers below no-op once it is no longer `ws`.
+    // Guard double-connect: cancel a pending reconnect and close the old socket.
+    // why: lessons/src.md#double
     clearTimeout(wsTimer);
     clearInterval(pingTimer);
     try { ws?.close(); } catch {}
@@ -170,9 +114,8 @@ export function createTimedMessages(player, video, opts = {}) {
       wsDelay = cfg.wsRetryMin;
       clearInterval(pingTimer);
       pingTimer = setInterval(() => {
-        // Bare "ping" hits the DO's auto-response: answered by the runtime
-        // without waking a hibernated object — free, and measures pure
-        // network RTT. t0 kept locally (one ping in flight at a time).
+        // A bare "ping" is answered by the runtime without waking the object: pure network RTT.
+        // why: lessons/src.md#ping
         try { pendingPingT0 = performance.now(); sock.send('ping'); } catch {}
       }, 5000);
     };
@@ -201,15 +144,9 @@ export function createTimedMessages(player, video, opts = {}) {
     ws.onerror = () => { try { sock.close(); } catch {} };
   }
 
-  /**
-   * Render cues that carry {data: {text}} as native subtitles. Uses the
-   * browser's own TextTrack pipeline (styling, positioning, the CC button on
-   * iOS), so no overlay DOM is needed. A cue's wall-clock `at`/`until` is
-   * mapped onto the media timeline at delivery time.
-   *
-   *   const track = cues.attachSubtitleTrack('et');
-   *   cues.add({ at: t, until: t + 4000, data: { text: 'Tere tulemast' } });
-   */
+  // Cues with {data: {text}} as native subtitles through a TextTrack; `at`/`until` map onto media
+  // time at delivery. Example: cues.attachSubtitleTrack('et').
+  // why: lessons/src.md#subtitles
   function attachSubtitleTrack(lang = 'en', label = 'Subtitles') {
     const track = video.addTextTrack('subtitles', label, lang);
     track.mode = 'showing';
@@ -229,17 +166,9 @@ export function createTimedMessages(player, video, opts = {}) {
     return track;
   }
 
-  /**
-   * Invisible timed events on the media clock. Same machinery as subtitles but
-   * kind='metadata' + mode='hidden': the browser schedules the cue and fires
-   * onCue at the exact media time, nothing ever renders. Use for anything
-   * that must happen at a stream moment without UI: lighting changes, scene
-   * switches, unlocking content, analytics markers.
-   *
-   * Note: plain onMessage already gives you invisible delivery at ~100 ms
-   * resolution and survives player rebuilds; this variant rides the browser's
-   * own cue scheduler for frame-accurate firing between polls.
-   */
+  // Invisible cues on the media clock (kind 'metadata', mode 'hidden'), fired by the browser's
+  // own scheduler, frame-accurate between polls.
+  // why: lessons/src.md#metadata
   function attachMetadataTrack(onCue) {
     const track = video.addTextTrack('metadata', 'events');
     track.mode = 'hidden';

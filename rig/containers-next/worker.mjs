@@ -1,15 +1,7 @@
-// Sibling of rig/containers/worker.mjs on the NEW Containers runtime:
-// scheduling_policy "durable_object", driven through this.ctx.container
-// (no @cloudflare/containers). Same image, same server.mjs, standard-1.
-// The Worker adds x-edge-ms exactly as the legacy test bed does; the DO adds
-// x-start-ms (ctx.container.start() call), x-ready-ms (start() to the first HTTP
-// answer from the container on :8080) and x-polls (readiness attempts),
-// x-proxy-ms (the forwarded request alone) and x-do-ms (DO fetch entry to
-// response headers, so edge minus do is the Worker to DO hop).
-//   /kill            destroy the container, wait until running is false
-//   /snap            take a filesystem snapshot of the running container
-//   /state           running + whether a snapshot is stored
-//   anything else    ensure running (from image, or ?from=snap), then proxy
+// rig/containers/worker.mjs on the durable_object runtime via this.ctx.container; adds x-edge-ms,
+// x-start-ms, x-ready-ms, x-polls, x-proxy-ms, x-do-ms. Routes /kill, /snap, /state, else proxy
+// (from image or ?from=snap).
+// why: lessons/rig-containers.md#next-worker-header
 import { DurableObject } from "cloudflare:workers";
 
 const PORT = 8080;
@@ -36,11 +28,9 @@ export class NextTest extends DurableObject {
     });
   }
 
-  // ── Phase 1: pub's lifecycle on this runtime ────────────────────────────
-  // A hibernatable socket held on the DO, an alarm sweep every WS_SWEEP_MS
-  // that renews the container and records what it saw, a grace of two ticks
-  // after the last socket leaves, then the alarm stops and the inactivity
-  // timeout is left to stop the container. ?mon=1 also holds monitor().
+  // Phase 1, pub's lifecycle: a hibernatable socket, an alarm sweep every WS_SWEEP_MS renewing the
+  // container, two ticks of grace, then the inactivity timeout stops it. ?mon=1 holds monitor().
+  // why: lessons/rig-containers.md#next-worker-ws
   async wsBoot() {
     const c = this.ctx.container;
     if (c.running) return;

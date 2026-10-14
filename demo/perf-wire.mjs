@@ -1,14 +1,11 @@
-// perf-wire.mjs — what the relay costs and how it scales. Writes to a file:
-// `node x.mjs | tail` buffers until exit and looks hung.
+// What the relay costs and how it scales. Writes to a file: piping through `tail` looks hung.
+// why: lessons/harness.md#perf-wire
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// ⚠️ THIS PATH USED TO BE A DEAD SESSION'S SCRATCHPAD — a hardcoded UUID under
-// `/private/tmp/claude-501/…/399cfe11-…//tmp/`, double slash and all. It still
-// "worked", because a write creates what it needs, so nothing ever said the
-// results were landing somewhere nobody would look. Second one of these in the
-// harnesses; `verify-native.mjs` had the other.
+// PERF_OUT, else a file in the system temp dir.
+// why: lessons/harness.md#perf-out
 const OUT = process.env.PERF_OUT || join(tmpdir(), `perf-wire-${process.pid}.txt`);
 const RELAY = 'wss://ws.positron.studio';
 // A fixed port for somebody else's dev server: overridable, so a second
@@ -96,7 +93,8 @@ for (const KiB of [1, 8, 64, 200, 256]) {
   ws.close();
 }
 
-// ── 4. where the rate cap bites — measured with the demo's own instrument ───
+// 4. Where the rate cap bites, measured with the demo's own instrument.
+// why: lessons/harness.md#rate-cap
 say('\n4. rate — the receiver counts the hole, which is what `seq` is for');
 for (const RATE of [30, 60, 120, 300]) {
   const R = room(); const ws = await open(R);
@@ -115,7 +113,8 @@ for (const RATE of [30, 60, 120, 300]) {
   await sleep(400);
 }
 
-// ── 5. the backlog (LOCAL wrangler dev — not an edge number) ────────────────
+// 5. The backlog on local wrangler dev, not an edge number.
+// why: lessons/harness.md#backlog
 say('\n5. backlog, local wrangler dev — write path and read path');
 {
   const R = room();

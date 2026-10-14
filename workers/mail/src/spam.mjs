@@ -1,76 +1,18 @@
-// workers/mail/src/spam.mjs — what a message's own headers say about whether a
-// person typed it. Pure: no network, no Worker API, no clock, no global.
-//
-//   node workers/mail/test.mjs
-//
-// 🔴 IT LABELS. IT DOES NOT DROP. A message that vanishes is unrecoverable and
-// says the wrong thing, because a missing row reads as "nobody wrote" rather
-// than "we threw it away". Every verdict here is a prefix on a note somebody
-// reads in a second. There is exactly one exception and it is the sender's own
-// instruction rather than ours: a DMARC failure on a domain that publishes
-// `p=reject` is that domain saying the mail is forged, and `reject` is the
-// answer it asked receivers to give.
-//
-// 🔴 AND IT NEVER GUESSES FROM THE SUBJECT OR THE BODY. Those heuristics are
-// language dependent, wrong in both directions, and they are the part somebody
-// has to maintain forever. Nothing in this file reads a word of what was
-// written.
-//
-// The signals, strongest first:
-//
-//   1. `Authentication-Results` / `ARC-Authentication-Results`, the stamp the
-//      receiving server writes before a Worker sees the message. Parsed per
-//      RFC 8601, comments and all. This is the only signal that can carry a
-//      verdict, and the only one that can reject.
-//   2. bulk markers: `List-Unsubscribe`, `List-Id`, `Precedence`,
-//      `Auto-Submitted`, a null `Return-Path`. They do not mean spam. They mean
-//      NOT A PERSON TYPING, which for a contact address is the distinction that
-//      matters.
-//   3. the envelope sender against the `From:` header. A mismatch is routine for
-//      a mailing list and odd from a stranger, so it is a note and never a
-//      verdict on its own.
-//
-// ⚠️ ONE SIGNAL WAS LOOKED AT AND LEFT OUT, SO IT IS NOT RE-OPENED.
-// A real Worker delivery carries `X-Cf-Spamh-Score`, reported in
-// cloudflare/workerd issue 6740 alongside the missing verdicts. It is not read
-// here: Cloudflare documents no scale, no direction and no threshold for it, and
-// a number whose meaning is guessed cannot be argued with when it is wrong. It
-// is worth revisiting once real mail has arrived and the values can be compared
-// against verdicts this file already computes, which is a measurement rather
-// than a guess.
-//
-// ⚠️ THE STAMP CAN BE ABSENT AND THAT IS NOT A VERDICT. It is absent in
-// `wrangler dev` (so a harness built only against local delivery grades
-// nothing), and cloudflare/workerd issue 6740 reports it absent from a real
-// Worker delivery too, with only `ARC-Authentication-Results: i=1;
-// mx.google.com; arc=none` standing in for it. Absence answers `unknown`, which
-// never rejects and never reads as clean. `demo/shell/caps.mjs` settled the same
-// question the same way: "we did not look" must not be reported as "it is
-// missing".
+// Whether a person typed it, from headers only (pure; never subject or body). Labels, never drops,
+// except DMARC failing under `p=reject`. Signals: trusted Authentication-Results, bulk markers,
+// envelope vs From. A missing stamp is `unknown`.
+// why: lessons/workers-mail.md#spam-header
 
-/**
- * 🔴 WHOSE STAMP IS BELIEVED. An `Authentication-Results` header is ordinary
- * text and a sender may write one saying whatever it likes, so the only ones
- * worth reading are the ones the receiving server wrote. RFC 8601 calls the
- * first field the authserv-id and says a consumer must recognise it.
- *
- * ⚠️ AND THE CHECK IS AN EXACT MATCH OR A DNS LABEL SUFFIX, NEVER A SUBSTRING.
- * CLAUDE.md bans `s.includes(...)` as a guard and this is the case that shows
- * why: a real project shipped `/cloudflare/i` against this field, which accepts
- * `notcloudflare.net`, `cloudflare.evil.tld` and `mx.cloudflare.net.attacker`
- * (reynhartono/cf-email-gateway issue 13). Each of those is a stranger's stamp
- * read as the receiving server's own.
- */
+// Only stamps the receiving server wrote are believed: exact authserv-id or a DNS label below it,
+// never a substring (`/cloudflare/i` accepts `notcloudflare.net`).
+// why: lessons/workers-mail.md#trusted
 export const TRUSTED_AUTHSERV = ['cloudflare.net'];
 
 /** Longest label this may hand a reader, brackets included. */
 export const LABEL_MAX = 72;
 
-/**
- * Worst first. Exported because the order is a claim the test grades rather
- * than a preference: `forged` must outrank `bulk`, or a spammer gets a quieter
- * label by adding a `List-Unsubscribe`.
- */
+// Worst first, and graded: `forged` must outrank `bulk`, or List-Unsubscribe buys a quieter label.
+// why: lessons/workers-mail.md#rank
 export const RANK = ['forged', 'suspect', 'unsigned', 'bulk', 'unknown', 'clean'];
 
 /** How bad an SPF or DKIM result is. Only the ordering matters. */
@@ -84,17 +26,9 @@ const severityOf = (r) => (r in SEVERITY ? SEVERITY[r] : 1);
 
 // ── reading the header block ────────────────────────────────────────────────
 
-/**
- * The header block of an RFC 5322 message, as `[name, value]` pairs with the
- * names lowercased and folded lines joined.
- *
- * 🔴 THIS EXISTS BECAUSE `Headers` CANNOT HAND BACK TWO HEADERS OF ONE NAME.
- * `headers.get('authentication-results')` joins every value with a comma, so a
- * stranger's forged stamp and the receiving server's real one arrive glued into
- * one string with one authserv-id at the front, which is the stranger's. Two
- * separate lines are the whole point, so they are read off the raw message
- * where they are still two lines.
- */
+// Header pairs off the raw text, names lowercased, folds joined: `Headers` glues two values of one
+// name with a comma, so a forged stamp and the real one would arrive as one.
+// why: lessons/workers-mail.md#header-block
 export function parseHeaderBlock(text) {
   const src = String(text ?? '');
   // The block ends at the first blank line. CRLF is the wire form; a fixture
@@ -104,10 +38,8 @@ export function parseHeaderBlock(text) {
   const out = [];
   let cur = null;
   for (const line of block.split(/\r?\n/)) {
-    // ⚠️ A CONTINUATION LINE BELONGS TO THE HEADER ABOVE IT. Every real
-    // `Authentication-Results` is folded across three or four lines, so a
-    // parser that reads lines independently sees the verdicts as junk and
-    // reports a stamp with nothing in it.
+    // A continuation line belongs to the header above; real stamps are folded over 3 or 4 lines.
+    // why: lessons/workers-mail.md#fold
     if (/^[ \t]/.test(line)) {
       if (cur) cur[1] += ` ${line.trim()}`;
       continue;
@@ -136,14 +68,8 @@ export function headerEntries(headers) {
 
 // ── RFC 8601 ────────────────────────────────────────────────────────────────
 
-/**
- * Split on the semicolons that separate results, and on no others.
- * ⚠️ A COMMENT CONTAINS SEMICOLONS AND SO DOES A QUOTED STRING. A real stamp
- * reads `spf=pass (mx.cloudflare.net: domain of joe@example.com designates
- * 2a00:1440:4824:20::32e as permitted sender) smtp.mailfrom=joe@example.com`,
- * and a plain `value.split(';')` cuts that comment in half and loses the
- * property that says which address the result is about.
- */
+// Split on result semicolons only: comments and quoted strings contain semicolons too.
+// why: lessons/workers-mail.md#split-top
 function splitTop(value) {
   const parts = [];
   let buf = '';
@@ -163,12 +89,8 @@ function splitTop(value) {
   return parts.map((s) => s.trim()).filter(Boolean);
 }
 
-/**
- * The text of one result with its comments lifted out, and the comments kept.
- * The comments are kept because the DMARC one carries the sending domain's
- * PUBLISHED POLICY, which is the single fact that decides whether a refusal is
- * ours or the sender's.
- */
+// Comments are lifted out and kept: the DMARC one carries the published policy.
+// why: lessons/workers-mail.md#comments
 function stripComments(s) {
   let out = '';
   let cur = '';
@@ -191,16 +113,14 @@ function stripComments(s) {
     }
     if (depth > 0) cur += c; else out += c;
   }
-  // ⚠️ A COMMENT MAY SIT BETWEEN A METHOD AND ITS `=`, so the spacing around
-  // every `=` is normalised before anything is tokenised.
+  // A comment may sit between a method and its `=`, so spacing around `=` is normalised first.
+  // why: lessons/workers-mail.md#equals
   return { text: out.replace(/\s*=\s*/g, '=').replace(/\s+/g, ' ').trim(), comments };
 }
 
-/**
- * One `Authentication-Results` or `ARC-Authentication-Results` value, parsed.
- * Returns `{ instance, authservId, version, results }` where each result is
- * `{ method, result, props, comment }`.
- */
+// Parses one (ARC-)Authentication-Results value into { instance, authservId, version, results },
+// each result { method, result, props, comment }.
+// why: lessons/workers-mail.md#parse-ar
 export function parseAuthResults(value) {
   const segs = splitTop(String(value ?? ''));
   if (!segs.length) return null;
@@ -237,10 +157,8 @@ export function parseAuthResults(value) {
   return { instance, authservId, version, results };
 }
 
-/**
- * Is this authserv-id one of ours? Exact, or a DNS label below it.
- * 🔴 NOT A SUBSTRING TEST. See the note on `TRUSTED_AUTHSERV`.
- */
+// Exact, or a DNS label below it; never a substring.
+// why: lessons/workers-mail.md#trusted-authserv
 export function trustedAuthserv(id, trusted = TRUSTED_AUTHSERV) {
   const host = String(id || '').toLowerCase().replace(/\.$/, '');
   if (!host) return false;
@@ -252,12 +170,8 @@ export function trustedAuthserv(id, trusted = TRUSTED_AUTHSERV) {
 
 // ── addresses ───────────────────────────────────────────────────────────────
 
-/**
- * The domain of an address, from a bare address or a full `From:` value.
- * ⚠️ THE LAST ANGLE PAIR, NOT THE FIRST, and quoted display names are removed
- * first. `"someone <a@bank.test>" <real@elsewhere.test>` is a legal mailbox and
- * reading the first `<...>` hands back the domain the sender WANTED read.
- */
+// The last angle pair, after quoted display names are removed: the first `<...>` can be a decoy.
+// why: lessons/workers-mail.md#address-domain
 export function addressDomain(s) {
   const noQuotes = String(s ?? '').replace(/"(?:\\.|[^"\\])*"/g, ' ');
   const angles = noQuotes.match(/<([^<>]*)>/g);
@@ -269,15 +183,9 @@ export function addressDomain(s) {
   return addr.slice(at + 1).toLowerCase().replace(/[\s>.,;]+$/, '');
 }
 
-/**
- * Do two domains belong together?
- * ⚠️ THIS IS AN APPROXIMATION AND IT NEVER DECIDES A REFUSAL. Real alignment
- * needs the organisational domain, which needs the Public Suffix List, which is
- * a megabyte that goes stale. Without it `a.co.uk` and `b.co.uk` look related
- * and they are not. So it is used for a note in a label and for nothing else,
- * and DMARC, which was computed by somebody who does have the list, is what
- * the verdict rests on.
- */
+// An approximation without the Public Suffix List (`a.co.uk` and `b.co.uk` look related), so it
+// only adds a note and never decides a refusal; DMARC decides.
+// why: lessons/workers-mail.md#related
 export function relatedDomains(a, b) {
   const x = String(a || '').toLowerCase();
   const y = String(b || '').toLowerCase();
@@ -287,15 +195,8 @@ export function relatedDomains(a, b) {
 
 // ── picking one answer out of several ───────────────────────────────────────
 
-/**
- * 🔴 A MESSAGE CARRIES TWO SPF RESULTS AND THE FIRST ONE IS THE WRONG ONE.
- * A real stamp reads `spf=none (... no SPF records for postmaster@example.com)
- * smtp.helo=smtp.example.com; spf=pass (...) smtp.mailfrom=joe@example.com`.
- * The HELO check is about the sending machine's own name and is routinely
- * `none` on servers whose mail is perfectly good. The one that answers "did
- * this domain authorise this machine" is the `smtp.mailfrom` one, so it is
- * chosen by its property rather than by its position.
- */
+// Two SPF results arrive: the HELO one is routinely `none`. Choose `smtp.mailfrom` by property.
+// why: lessons/workers-mail.md#pick-spf
 function pickSpf(results) {
   const spfs = results.filter((r) => r.method === 'spf');
   if (!spfs.length) return { result: '', scope: '', domain: '' };
@@ -336,22 +237,9 @@ function pickDkim(results, fromDomain) {
   };
 }
 
-/**
- * The sending domain's PUBLISHED policy, which is the only thing that can
- * license a refusal. It arrives two ways: as an RFC 8601 property
- * `policy.dmarc=reject`, or inside the comment as `(p=REJECT sp=NONE dis=NONE)`.
- *
- * 🔴 `sp=` IS NOT `p=` AND A SUBSTRING TEST CANNOT TELL THEM APART. `sp` is the
- * policy for SUBDOMAINS of the record's domain. A domain publishing
- * `p=none sp=reject` is asking receivers to deliver its own mail and refuse
- * mail from its subdomains, and reading `reject` out of that refuses mail the
- * sender asked to have delivered. The pattern requires the `p` to begin a
- * token.
- *
- * ⚠️ AND WHERE ONLY `sp=` IS AVAILABLE THIS ANSWERS NOTHING, on purpose.
- * Knowing whether `sp` governs means knowing which domain published the record,
- * which the header does not say. No policy means no refusal.
- */
+// The published policy, from `policy.dmarc=` or the `(p=... sp=...)` comment. `p` must begin a
+// token, since `sp=` (subdomains) is not `p=`. With only `sp=` known it answers nothing.
+// why: lessons/workers-mail.md#dmarc-policy
 export function dmarcPolicy(result) {
   if (!result) return '';
   const prop = result.props['policy.dmarc'];
@@ -362,15 +250,9 @@ export function dmarcPolicy(result) {
 
 // ── the verdict ─────────────────────────────────────────────────────────────
 
-/**
- * What the headers say. Pure, and every input is a string.
- *
- * @param {object} arg
- * @param {Array|Headers|object} arg.headers   header pairs, a `Headers`, or an object
- * @param {string} [arg.envelopeFrom]          `message.from`, what the sending server presented
- * @param {string[]} [arg.trusted]             authserv-ids whose stamps are believed
- * @returns {object} `{ verdict, label, chips, reject, rejectReason, auth, flags, reasons }`
- */
+// What the headers say; pure. Takes { headers (pairs, Headers or object), envelopeFrom, trusted }
+// and returns { verdict, label, chips, reject, rejectReason, auth, flags, reasons }.
+// why: lessons/workers-mail.md#classify
 export function classify({ headers, envelopeFrom = '', trusted = TRUSTED_AUTHSERV } = {}) {
   const entries = headerEntries(headers);
   const all = (name) => entries.filter(([k]) => k === name).map(([, v]) => v);
@@ -485,11 +367,8 @@ export function classify({ headers, envelopeFrom = '', trusted = TRUSTED_AUTHSER
     reasons.push(`the DKIM signature is ${dkim.domain || 'a third party'}, not ${fromDomain}`);
   }
 
-  // ── 4. the one refusal ────────────────────────────────────────────────────
-  // 🔴 NARROW ON PURPOSE. Not "this looks like spam": the sending domain's own
-  // published policy says a message failing DMARC is forged and asks receivers
-  // to refuse it. Refusing is following that instruction. Everything else on
-  // this page is a label.
+  // 4. The one refusal, narrow on purpose: the sending domain's own policy asks for it.
+  // why: lessons/workers-mail.md#refusal
   let reject = false;
   let rejectReason = '';
   if (verdict === 'forged' && auth.trusted) {
@@ -497,8 +376,8 @@ export function classify({ headers, envelopeFrom = '', trusted = TRUSTED_AUTHSER
       reject = true;
       rejectReason = `${fromDomain || 'the sending domain'} publishes a DMARC policy of reject and this message failed DMARC`;
     } else if (!policy) {
-      // ⚠️ SAY SO RATHER THAN GUESS. A DMARC failure with no published policy in
-      // the header is exactly the case the ask says not to refuse.
+      // A DMARC failure with no published policy in the header is not refused; say so.
+      // why: lessons/workers-mail.md#no-policy
       reasons.push('DMARC failed and the header does not say what policy the domain publishes, so this is labelled and delivered');
     } else {
       reasons.push(`DMARC failed and the domain publishes p=${policy}, which does not ask for a refusal`);
@@ -513,38 +392,17 @@ export function classify({ headers, envelopeFrom = '', trusted = TRUSTED_AUTHSER
 function chipsFor(verdict, auth, markers, mismatch, policy) {
   const out = [verdict === 'clean' ? 'ok' : verdict];
 
-  /**
-   * 🔴 WHICH SIGNAL DECIDED THIS, ON EVERY MESSAGE, BECAUSE THE ROOM COULD NOT
-   * ANSWER IT. Two real messages arrived 2026-09-17 and the second came out
-   * `[ok]`. Four characters are the same four whether a real
-   * `Authentication-Results` was read or a forwarded `ARC-Authentication-Results`
-   * was believed instead, so the one question anybody had about the first real
-   * mail this worker ever graded was the one question its own output could not
-   * answer. `auth.via` had held the answer the whole time and went only to the
-   * console, where nobody was looking.
-   *
-   * ⚠️ IT IS EMITTED ON THE ORDINARY CASE TOO, WHICH BREAKS THIS FILE'S OWN RULE
-   * ABOUT CHIPS ONLY WHERE THEY BEAR ON THE VERDICT, AND THAT IS DELIBERATE.
-   * The rule exists so a good message does not wear an alarm. This is not an
-   * alarm, it is a provenance, and the argument for saying it every time is the
-   * same one that put `[ok]` on ordinary mail in the first place: a chip that
-   * appears only in the interesting case cannot be told apart from a build that
-   * does not have the chip yet.
-   *
-   * ⚠️ AND IT MATTERS BECAUSE THE PRIMARY SIGNAL MAY SIMPLY NOT ARRIVE.
-   * `workerd#6740` reports `Authentication-Results` absent from a real Worker
-   * delivery with only an ARC set carrying `arc=none` in its place. `via ARC`
-   * says a PREVIOUS hop concluded this and we forwarded its word for it.
-   */
+  // Which signal decided, on every message, ordinary ones too: `via ARC` means a previous hop's
+  // word,
+  // and the primary stamp may not arrive at all (workerd 6740).
+  // why: lessons/workers-mail.md#via
   if (auth.via === 'ar') out.push('via Authentication-Results');
   else if (auth.via === 'arc') out.push('via ARC');
 
   if (verdict === 'unknown') {
-    // ⚠️ THREE DIFFERENT SILENCES AND THEY ARE NOT THE SAME SILENCE. No stamp
-    // at all is local delivery. A stamp from somebody we do not believe is a
-    // forwarding hop or a forgery. A trusted stamp carrying nothing is
-    // cloudflare/workerd 6740. Collapsing them sends a reader to the wrong
-    // place.
+    // Three silences: no stamp (local delivery), an untrusted stamp (forwarder or forgery), and a
+    // trusted stamp with nothing in it (workerd 6740).
+    // why: lessons/workers-mail.md#silences
     out.push(!auth.stamped ? 'no auth stamp'
       : !auth.trusted ? 'no trusted stamp'
         : 'stamp says nothing');
@@ -558,20 +416,16 @@ function chipsFor(verdict, auth, markers, mismatch, policy) {
   if (!auth.spf) out.push('no spf');
   if (auth.dkim && auth.dkim !== 'pass') out.push(`dkim ${auth.dkim}`);
   if (!auth.dkim) out.push('no dkim');
-  // ⚠️ ONLY WHERE IT BEARS ON THE VERDICT. A strict domain whose mail PASSED is
-  // the ordinary good case, and a `p=reject` chip on it reads as an alarm about
-  // a message that is fine.
+  // Only where it bears on the verdict; on mail that passed it reads as a false alarm.
+  // why: lessons/workers-mail.md#p-reject
   if (policy === 'reject' && verdict === 'forged') out.push('p=reject');
   if (markers.length && verdict !== 'bulk') out.push('bulk');
   if (mismatch) out.push('from mismatch');
   return out;
 }
 
-/**
- * The bracketed prefix a reader sees ahead of the subject.
- * ⚠️ IT IS CUT BY WHOLE CHIPS AND NEVER MID WORD. A label that ends `dkim fa`
- * is a fact that has become a different fact.
- */
+// Cut by whole chips, never mid word.
+// why: lessons/workers-mail.md#label-of
 export function labelOf(chips) {
   const kept = [];
   for (const c of chips) {
@@ -582,26 +436,16 @@ export function labelOf(chips) {
   return `[${(kept.length ? kept : [chips[0] ?? '?']).join(' · ')}]`;
 }
 
-/**
- * The prefix a reader sees ahead of the subject, including what the worker did
- * about it.
- *
- * ⚠️ `refused` GOES SECOND, NOT LAST, because the cap cuts from the end and the
- * one chip that must never be cut is the one saying the message was turned away.
- * A label ending `p=reject` reads as a message that was delivered and flagged,
- * which is the opposite of what happened.
- */
+// `refused` goes second, since the cap cuts from the end and that chip must survive.
+// why: lessons/workers-mail.md#prefix-for
 export function prefixFor(verdict, { refused = false } = {}) {
   const chips = verdict && Array.isArray(verdict.chips) ? verdict.chips : ['unknown'];
   if (!refused) return labelOf(chips);
   return labelOf([chips[0], 'refused', ...chips.slice(1)]);
 }
 
-/**
- * The same thing from a whole raw message, which is how the worker and the test
- * both reach it: the headers are read off the raw text rather than off a
- * `Headers`, so two stamps of one name stay two stamps.
- */
+// From a whole raw message, so two stamps of one name stay two.
+// why: lessons/workers-mail.md#classify-raw
 export function classifyRaw(raw, envelopeFrom = '', opts = {}) {
   return classify({ headers: parseHeaderBlock(raw), envelopeFrom, ...opts });
 }

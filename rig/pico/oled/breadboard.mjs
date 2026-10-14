@@ -1,36 +1,7 @@
-// rig/pico/oled/breadboard.mjs - draw the Pico 2 WH, the OLED module and the
-// hub power on an 830 hole breadboard, as breadboard.svg.
-//
-//   node rig/pico/oled/breadboard.mjs           # hub powered: breadboard.svg
-//   node rig/pico/oled/breadboard.mjs mb102     # MB102 power module: breadboard-mb102.svg
-//   node rig/pico/oled/breadboard.mjs 400       # 400 hole board, hub powered: breadboard-400.svg
-//
-// wiring.yml (WireViz) says WHICH pin goes to which; this says WHERE each wire
-// goes on the board, hole by hole, so the board can be built by copying it.
-// Pins are the Pico's physical numbers and the module's printed labels, the
-// same as wiring.yml. Plain SVG, no dependency, nothing native (ThreatLocker).
-//
-// THE BOARD. MB-102, 63 columns, rows a to e above the centre gap and f to j
-// below, a + and - rail along each long edge. Columns a-e are joined per
-// column, f-j likewise, and each rail is one strip along the board.
-// THE PICO straddles the gap at 0.7 inch, pins in row c and row h, USB to the
-// left. With USB left, pins 1 to 20 run along the BOTTOM (pin 1 by the USB)
-// and pins 40 to 21 along the TOP (pin 40 by the USB), so column n holds pin n
-// in row h and pin 41-n in row c.
-// THE OLED MODULE's 8 pin header sits in row f, columns 40 to 47, its body
-// lying over the empty top half: GND VCC SCL SDA K4 K3 K2 K1, as printed.
-// POWER, two ways. Default: a spare port of the powered hub through a USB-A
-// plug to screw terminal adapter, 5 V into VBUS (pin 40) and ground to the
-// rail. `mb102`: the breadboard power module on the right hand end, its top
-// jumper on 5 V (the top rails feed VBUS) and its bottom jumper on 3.3 V (the
-// bottom rails feed the OLED), so the Pico's own 3V3 out is wired to nothing.
-// ⚠️ The module's layout is the common MB102's, INFERRED: the shop page gives
-// only 6.5 to 12 V in, 3.3 V or 5 V out, 700 mA.
-// `400`: the half size board, 30 columns, hub powered like the default. The
-// Pico keeps columns 1 to 20, the OLED header moves to row f, columns 22 to
-// 29, and the module (15 holes wide) overhangs the board's right hand end.
-// Every wire still lands in rows g to j, never in a hole the module's own
-// header pins use.
+// node rig/pico/oled/breadboard.mjs [mb102|400]: where each wire of wiring.yml goes, hole by hole,
+// as SVG. Pico across the gap in rows c and h, USB left (column n: pin n in h, pin 41-n in c); OLED
+// in row f. Layout of the boards and power options: lessons/rig-pico.md#breadboard-header.
+// why: lessons/rig-pico.md#breadboard-header
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -103,14 +74,9 @@ for (const c of [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].filter((n) =>
   }
 }
 
-// the OLED module ON the board: header in row f, columns 40..47, body lying
-// flat over the centre gap, rows a to e and the top rails, which this build
-// leaves empty in those columns. Its wires plug into g to j of the same
-// columns, which the body does not cover, so none of them crosses the gap.
-// ⚠️ AT ITS REAL SIZE, about 37 by 27 mm (15 by 11 holes, INFERRED from the
-// shop photo, not measured). Screen on the far side, keys ^ v # * a column on
-// the right. If the picture reads upside down from where you sit, the SSD1306
-// flips in firmware; nothing about the wiring changes.
+// The OLED lies over rows a to e, its wires in g to j. Size about 15 by 11 holes, inferred from a
+// photo.
+// why: lessons/rig-pico.md#breadboard-oled
 const OLED = ['GND', 'VCC', 'SCL', 'SDA', 'K4', 'K3', 'K2', 'K1'];
 const OC = B400 ? 22 : 40;            // the OLED header's first column, its GND pin
 {
@@ -167,7 +133,8 @@ if (!MB102) {
 
 // wires: [from, to, colour, label]; a point is [x, y] or [row, col]
 const pt = (p) => (typeof p[0] === 'string' ? at(p[0], p[1]) : p);
-// column OC + k holds the module's k-th header pin, GND VCC SCL SDA K4 K3 K2 K1
+// Column OC + k holds the module's k-th header pin: GND VCC SCL SDA K4 K3 K2 K1.
+// why: lessons/rig-pico.md#breadboard-signals
 const SIGNALS = [
   [['i', 7], ['h', OC + 2], C.scl, 'GP5 SCL, pin 7'],
   [['j', 6], ['g', OC + 3], C.sda, 'GP4 SDA, pin 6'],
@@ -182,7 +149,8 @@ const WIRES = MB102 ? [
   [['i', 18], ['B-', 18], C.gnd, 'pin 18 GND to the bottom rail'],
   [['i', 40], ['B-', 37], C.gnd, 'OLED GND'],
   [['i', 41], ['B+', 36], C.v3, 'OLED VCC, 3.3 V'],
-  // ⚠️ only if the board's rails are split in the middle: bridge each one
+  // Only if the rails are split in the middle: bridge each one.
+  // why: lessons/rig-pico.md#breadboard-split
   ...['T+', 'T-', 'B-', 'B+'].map((r) => [[r, 29], [r, 35], r.endsWith('+') ? (r[0] === 'T' ? C.v5 : C.v3) : C.gnd,
     'only if the rail is split']),
   ...SIGNALS,

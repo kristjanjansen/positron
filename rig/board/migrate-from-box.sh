@@ -1,29 +1,8 @@
 #!/bin/bash
-# rig/board/migrate-from-box.sh — move a board from the `box` names to the
-# `board` names, once. 2026-09-20.
-#
-#   ./migrate-from-box.sh <pi>
-#
-# 🔴 WHY THIS IS NOT `push.sh`. That script ships code to a path that exists and
-# restarts a unit that is installed. This rename changes the NAME of all three:
-# the install path (`/opt/positron-box` -> `/opt/positron-board`), the systemd
-# unit (`positron-box.service` -> `positron-board.service`) and the config file
-# (`/etc/default/positron-box` -> `/etc/default/positron-board`). Running
-# `push.sh` before this would write into a directory nothing executes and then
-# restart a unit that does not exist, and both halves would report success.
-#
-# ⚠️ IT KEEPS THE OLD INSTALL. `/opt/positron-box` and the old unit file are
-# left on disk, disabled. Rolling back is `systemctl disable --now
-# positron-board && systemctl enable --now positron-box`, and that is worth more
-# than the 40 MB it costs.
-#
-# ⚠️ IT CARRIES THE OLD CONFIG FORWARD RATHER THAN DEFAULTING IT. `ROOM` and
-# `PAPPUS_TINY` are read off the existing file: this board is the studio board
-# and its room is `studio-1`, which is a fact about THIS machine and not a
-# default any installer should have. `setup.sh` now refuses to guess it.
-#
-# ⚠️ IT IS IDEMPOTENT. Run it twice and the second run mints no new id, because
-# an id that changes on every run is not an id.
+# ./migrate-from-box.sh <pi>: rename install path, unit and config from `box` to `board`, once.
+# Not push.sh, which would write a dir nothing runs. Keeps the old install for rollback,
+# carries ROOM and PAPPUS_TINY forward, and is idempotent.
+# why: lessons/rig-board-io.md#migrate-header
 set -uo pipefail
 
 IP="${1:-}"
@@ -84,11 +63,8 @@ ssh "$USER_@$IP" "
 "
 
 echo "== 2b. the renderer, rebuilt at the NEW path"
-# 🔴 THE FIRST RUN OF THIS SCRIPT MISSED THIS AND `rig/audit.mjs` FOUND IT.
-# `push.sh` compiles rig/vis on the board when its source is newer than the
-# binary, and the binary lives beside its source — so moving the tree to a new
-# path leaves no binary at the new one. The service came up fine and visuals
-# would have reported unavailable, which is the quiet kind of broken.
+# The rig/vis binary lives beside its source, so the moved tree needs it rebuilt.
+# why: lessons/rig-board-io.md#migrate-vis
 ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
   for t in v3dbench v3dpipe; do
     if [ ! -x "$t" ] || [ "$t.c" -nt "$t" ]; then
@@ -99,10 +75,8 @@ ssh "$USER_@$IP" 'cd /opt/positron-board/rig/vis 2>/dev/null && {
 }'
 
 echo "== 3. the journal, so the next fault leaves a record"
-# MEASURED 2026-09-20: /var/log/journal was empty, the journal lived on tmpfs,
-# `journalctl --list-boots` showed one boot, and every line from the day the
-# output level collapsed was gone. board.mjs says in a comment that the journal
-# is the one record that survives a board nobody can reach. It did not.
+# Persistent journal: on tmpfs it kept one boot and lost the evidence of a failure.
+# why: lessons/rig-board-io.md#migrate-journal
 ssh "$USER_@$IP" "
   sudo mkdir -p /etc/systemd/journald.conf.d /var/log/journal
   printf '%s\n' '[Journal]' 'Storage=persistent' 'SystemMaxUse=200M' \

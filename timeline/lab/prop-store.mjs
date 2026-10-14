@@ -1,21 +1,7 @@
-// timeline/lab/prop-store.mjs — the STORE property test. Standalone:
-//
-//     node timeline/lab/prop-store.mjs                 # full (builds a 1M-row fixture once)
-//     node timeline/lab/prop-store.mjs --quick         # 100k instead of 1M, no bench
-//     node timeline/lab/prop-store.mjs --no-do         # skip the network arm
-//     node --expose-gc timeline/lab/prop-store.mjs     # exact heap numbers
-//
-// Five arms, matching the five claims store.mjs makes:
-//   store-memory  the memory backend is BEHAVIOURALLY IDENTICAL to today's array
-//                 (same rows, same order, same brackets, same cursor trajectory)
-//   store-jsonl   1M rows: cmp/call ~constant, resident memory bounded,
-//                 seek-anywhere correct, and a COLD seek reports its miss policy
-//   store-do      the deployed elektron-instrument KEPT session, read-only:
-//                 same event count, same order
-//   store-append  3 appends MID-PLAYBACK land in order; the cursor stays valid
-//   bench         rows x backend x (open, cold seek, warm advance, memory)
-//
-// Exits nonzero on violation. MACHINE RULE: port 8892 only (bench-store.mjs).
+// node timeline/lab/prop-store.mjs [--quick] [--no-do] (node --expose-gc for exact heap). Arms:
+// memory equals today's array; jsonl 1M rows bounded and seek-correct; do read-only (instrument is
+// retired); append mid-playback; bench. Exits nonzero on violation. Port 8892 only.
+// why: lessons/timeline-lab.md#ps-header
 
 import { performance } from 'node:perf_hooks';
 import {
@@ -44,14 +30,8 @@ function check(arm, ok, msg, extra) {
 }
 const say = (s) => console.log(s);
 
-// ---------------------------------------------------------------------------
-// ARM 1 — store-memory: byte-compatible with today's array.
-//
-// "Today's array" here is literal: createCursor(rows) straight off a plain JS
-// array, which is exactly what transport.mjs's cursorFor(kind) builds over
-// byKind's lane. If the store's memory backend diverges from that in ANY probe,
-// every measured number in Checkpoint 7 stops meaning what it says.
-// ---------------------------------------------------------------------------
+// Arm 1: the memory backend must match createCursor over a plain array in every probe.
+// why: lessons/timeline-lab.md#ps-memory
 async function armMemory() {
   say('\n[store-memory] identical to today\'s array');
   const rand = mulberry32(1234);
@@ -123,13 +103,8 @@ async function armMemory() {
   await reader.close();
 }
 
-// ---------------------------------------------------------------------------
-// ARM 2 — store-jsonl: 1M rows over Range-fetched pages.
-//
-// The fixture's rows carry seq === their row index, so `bracket.a.seq === b.i`
-// is a total ground truth for the page arithmetic without ever holding 1M rows
-// in memory — which is the entire point of the exercise.
-// ---------------------------------------------------------------------------
+// Arm 2: 1M rows over Range pages; seq equals row index, so page arithmetic has ground truth.
+// why: lessons/timeline-lab.md#ps-jsonl
 async function armJsonl() {
   say(`\n[store-jsonl] ${BIG.toLocaleString()} rows, Range-fetched pages + index sidecar`);
   const t0 = performance.now();
@@ -165,7 +140,8 @@ async function armJsonl() {
     check('store-jsonl', br0.page === truePage,
       `cold bracket landed on page ${br0.page}; the true page for that position is ${truePage}`);
     offMiss();
-    // now REPAIR: ensure the window and re-read — same position, real rows
+    // repair: ensure the window and re-read, same position, real rows
+    // why: lessons/timeline-lab.md#ps-repair
     await cold.ensure(farPos, farPos + 1000);
     const br1 = cold.bracketAt(farPos);
     check('store-jsonl', br1 && br1.cold === false && br1.a.seq === br1.i && br1.b.seq === br1.i + 1,
@@ -232,9 +208,8 @@ async function armJsonl() {
   } finally { await srv.close(); }
 }
 
-// ---------------------------------------------------------------------------
-// ARM 3 — store-do: the deployed elektron-instrument KEPT session. READ-ONLY.
-// ---------------------------------------------------------------------------
+// Arm 3: the deployed instrument session, read-only.
+// why: lessons/timeline-lab.md#ps-do
 async function armDo() {
   say(`\n[store-do] ${DO_SESSION} @ ${DO_BASE} (read-only)`);
   let truth;
@@ -271,13 +246,9 @@ async function armDo() {
   await reader.close();
 }
 
-// ---------------------------------------------------------------------------
-// ARM 4 — store-append: the log grows UNDER the playhead.
-//
-// Real transport, virtual clock, rate 1. The reader is JSONL-backed (the hard
-// case: an immutable indexed prefix plus a live tail). Three appends land at
-// three different moments; the cursor is never reset and never re-seeks.
-// ---------------------------------------------------------------------------
+// Arm 4: three appends land under the playhead (JSONL prefix plus live tail); the cursor never
+// resets.
+// why: lessons/timeline-lab.md#ps-append
 async function armAppend() {
   say('\n[store-append] 3 appends mid-playback, cursor stays valid');
   const fx = await ensureFixture(10_000);
@@ -307,7 +278,8 @@ async function armAppend() {
       cursorIs.push(br.i);
       if (br.i !== lastI) { observed.push(br.a); lastI = br.i; }
     }
-    // THE LIVE APPENDS: 60 ms ahead of the playhead, one every 150 steps
+    // live appends 60 ms ahead of the playhead, one every 150 steps
+    // why: lessons/timeline-lab.md#ps-live
     if (injected < 3 && step > 0 && step % 150 === 0) {
       const row = { at: +(pos + 60).toFixed(3), kind: 'cue', seq: 1_000_000 + injected, payload: { live: injected } };
       const res = reader.appendBatch([row]);
@@ -339,8 +311,8 @@ async function armAppend() {
   check('store-append', observed.every((r, i) => i === 0 || r.at >= observed[i - 1].at),
     'the sequence the playhead walked is still sorted after three live appends');
 
-  // an OUT-OF-ORDER append is the one case that CAN move an index; it is taken,
-  // kept sorted, and REPORTED (never silent) — the DO's per-source rule in miniature
+  // An out-of-order append can move an index: it is kept sorted and reported.
+  // why: lessons/timeline-lab.md#ps-out-of-order
   const back = reader.appendBatch([{ at: reader.at(reader.count - 3).at - 1, kind: 'cue', seq: 2_000_000, payload: { late: true } }]);
   check('store-append', back.appended === 1 && back.reordered === 1,
     `an out-of-order append is inserted in sorted position and reported: reordered=${back.reordered}, cursorReset=${back.cursorReset}`);

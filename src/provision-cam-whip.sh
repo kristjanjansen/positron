@@ -1,10 +1,8 @@
 #!/bin/sh
-# One WebRTC live input for /cam/'s WebRTC leg, so it stops borrowing the input
-# that /llhls/'s viewers hold, and its WHIP URL stored as the CAM_WHIP_URL
-# secret on positron-pub. Run by the owner, because the WHIP URL carries the
-# input's key and an agent may not write secrets. Recording off, as for /stage/.
-# Prints the input UID, which is public (it is in every WHEP play URL) and goes
-# into the code. Requires CF_API_TOKEN and CF_ACCOUNT_ID in ../.env.
+# One WebRTC live input for the camera's WHIP leg, stored as CAM_WHIP_URL on positron-pub,
+# recording off. The owner runs it (the URL carries the key). Prints the public UID. Needs
+# CF_API_TOKEN, CF_ACCOUNT_ID.
+# why: lessons/src.md#cam-whip
 set -e
 cd "$(dirname "$0")"
 . ../.env

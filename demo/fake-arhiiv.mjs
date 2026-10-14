@@ -1,26 +1,7 @@
-// demo/fake-arhiiv.mjs: an ERR archive that is nobody's archive.
-//
-//   node demo/fake-arhiiv.mjs                  # :8903
-//   node demo/fake-arhiiv.mjs --port 9400
-//
-// Then open the page against it:
-//   http://127.0.0.1:8890/history/newsreels/?base=http://127.0.0.1:8903
-//
-// WHY THIS EXISTS. /reel/ and /history/newsreels/ ask arhiiv.err.ee for a
-// film's stream and then play it from vod.err.ee, and ERR has told us our
-// headless browsers corrupt their audience figures (CLAUDE.md, "What costs real
-// money and somebody else's server"). So a check that plays anything plays it
-// from here: the same content API shape the pages read
-// (`/api/v1/content/<video|audio>/<slug>` answering `data.media.src.hls`), and
-// two small HLS streams made once with ffmpeg, a picture with no sound for
-// every newsreel and a tone for every radio programme.
-//
-// IT GRADES OUR CODE AND NOTHING ELSE. Every slug gets the same twelve seconds,
-// so it cannot say a film is missing, slow, or longer than the shot list says,
-// and its URLs are absolute http rather than ERR's protocol relative ones, so
-// the page's `//` pinning is never exercised here.
-//
-// NEEDS ffmpeg, once; the segments are cached in the system temp directory.
+// node demo/fake-arhiiv.mjs [--port N] (:8903), then open a page with ?base=http://127.0.0.1:8903
+// An ERR archive that is nobody's: its content API shape and two small HLS streams (ffmpeg,
+// cached). Grades our code only: every slug is the same 12 s, and URLs are absolute http.
+// why: lessons/harness.md#fake-arhiiv
 
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';

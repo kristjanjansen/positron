@@ -1,52 +1,7 @@
-// timeline/lab/prop-render.mjs — THE DETERMINISM PROPERTY of the offline
-// render mode (timeline/render.mjs, v0.6).
-//
-//   node timeline/lab/prop-render.mjs                 # 30 seeds
-//   node timeline/lab/prop-render.mjs --seeds 100     # 100 seeds
-//   node timeline/lab/prop-render.mjs --verbose
-//
-// Runs in plain node; no browser, no wall-clock flake, no real-time waiting
-// (that IS one of the asserts). The audio half is proved here against a STUB
-// OfflineAudioContext — enough to prove the SEAM, since the seam is the shim's
-// `currentTime`; the real `OfflineAudioContext` buffer hash is measured in the
-// browser by timeline/lab/run-render.mjs.
-//
-// THE PROPERTIES:
-//   D1  two renders of the same deck produce a BYTE-IDENTICAL trace
-//   D2  the render trace equals real-time playback modulo timing jitter
-//       (same events, same order, same count) — against BOTH a real wall
-//       clock and an irregularly-advanced virtual one
-//   D3  every event in the window fires EXACTLY ONCE, in (at, seq) order
-//   D4  frame positions are exact — computed from the integer index, never
-//       accumulated
-//   D5  the render does not wait: faster-than-real-time by orders of magnitude
-//   D6  a deck on a WALL clock is REFUSED, not silently rendered
-//   D7  what cannot be deterministic is REPORTED — declared and suspected —
-//       and the heuristic's blind spot is itself asserted, so nobody mistakes
-//       a clean scan for a proof
-//   D8  seedRandom makes an Math.random-using adapter reproducible, and its
-//       absence is visible in the result
-//   A1  the audio lane's OfflineAudioContext seam works ONLY through the
-//       virtual-clock shim — with a NEGATIVE CONTROL on the bare context
-//
-// v0.7 — THE NEST (plan-timeline §8.8's last seam, "renderDeck cannot see a
-// nest"). Same bar as the flat renderer, one level up:
-//   N1  two renders of the same NEST are byte-identical — trace AND wrap set
-//   N2  the fragment/loop position map is exact at every frame, and a bounded
-//       loop renders byte-identically twice
-//   N3  the nested render EQUALS wall-clock playback of the same nest: same
-//       events, same per-deck order, same count, same final state
-//   N4  the wrap discipline is the SAME one playback uses (a committed one-shot
-//       on a TickHost) — with the POLLED arm as the negative control, which
-//       renders a DIFFERENT EVENT SET, reproducibly
-//   N5  the committed boundary alone carries the loop (`servo:false`)
-//   N6  an unbounded loop routes through renderBound() -> LOOP_UNBOUNDED
-//   N7  a degraded child rate is REPORTED, never overridden
-//   N8  caps.loopState 'rearm'/'carry' and adapter.loopWrap() are identical
-//       offline and in playback
-//   N9  a child on a wall clock is refused BY NAME
-//   N10 deep nesting: exactly-once holds through two levels
-//   N11 a FLAT render's trace bytes are unchanged by all of the above
+// node timeline/lab/prop-render.mjs [--seeds N] [--verbose]: offline-render determinism in plain
+// node (D1 to D8, A1 against a stub OfflineAudioContext) and the nest render (N1 to N11). The real
+// buffer hash is measured in a browser by run-render.mjs.
+// why: lessons/timeline-lab.md#pr-header
 import { createDeck, createTransport, createScheduler, createVirtualRuntime,
          createAudioLane, mainTickHost } from '../transport.mjs';
 import { createNest, nestOf } from '../nested.mjs';
@@ -74,11 +29,8 @@ function mulberry32(seed) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// A trace with BOTH kinds of lane — a discrete cue lane whose reducer is
-// non-commutative (so ordering bugs surface as a value, not just a count) and
-// a continuous lane read per frame. Same shape the property tests use.
-// ---------------------------------------------------------------------------
+// A trace with a non-commutative discrete lane and a continuous lane read per frame.
+// why: lessons/timeline-lab.md#pr-trace
 const SPAN = 12000;
 function genItems(rand) {
   const items = [];
@@ -124,9 +76,8 @@ function buildOffline(items, sink) {
   });
 }
 
-// ===========================================================================
-// D1/D3/D4 — determinism, exactly-once, exact frame grid, per seed
-// ===========================================================================
+// D1, D3, D4: determinism, exactly-once and an exact frame grid, per seed.
+// why: lessons/timeline-lab.md#pr-d1
 const FPSES = [24, 30, 60];
 for (let seed = 1; seed <= NSEEDS; seed++) {
   const rand = mulberry32(seed * 7919 + 13);
@@ -144,7 +95,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
     onFrame: ({ frameIndex, pos, state }) => frames2.push([frameIndex, pos, state.cue]),
     stateKinds: ['cue'] });
 
-  // D1 — THE DELIVERABLE.
+  // D1: two renders, byte-identical.
+  // why: lessons/timeline-lab.md#pr-deliverable
   check('render-det', seed, r1.traceText === r2.traceText,
     `two renders must produce a BYTE-IDENTICAL trace (${r1.traceText.length} vs ${r2.traceText.length} bytes, hash ${r1.traceHash} vs ${r2.traceHash})`);
   check('render-det', seed, r1.traceHash === r2.traceHash && r1.traceHash === hashText(r1.traceText),
@@ -154,7 +106,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   check('render-det', seed, s1.state === s2.state && s1.fired.length === s2.fired.length,
     `both renders must land on the same state (${s1.state} vs ${s2.state})`);
 
-  // D3 — every event in the window, exactly once, in order.
+  // D3: every event in the window, exactly once, in order.
+  // why: lessons/timeline-lab.md#pr-d3
   const fires = r1.trace.filter((r) => !String(r.id).startsWith('#'));
   const ids = fires.map((r) => r.id);
   check('render-once', seed, new Set(ids).size === ids.length,
@@ -166,7 +119,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   check('render-order', seed, fires.every((r, i) => i === 0 || fires[i - 1].at <= r.at),
     'fires must arrive in nondecreasing position order');
 
-  // D4 — the frame grid is exact and computed from the index, not accumulated.
+  // D4: the frame grid is computed from the index, not accumulated.
+  // why: lessons/timeline-lab.md#pr-d4
   const nExp = Math.round(SPAN * fps / 1000) + 1;
   check('render-frames', seed, r1.frames === nExp && frames1.length === nExp,
     `frame count must be round((to-from)*fps/1000)+1 = ${nExp} (got ${r1.frames})`);
@@ -176,11 +130,9 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   d1.dispose(); d2.dispose();
 }
 
-// ===========================================================================
-// D2 — the render trace equals real-time playback, modulo timing jitter.
-// Two controls: an irregularly-advanced virtual clock (jitter, no waiting) and
-// a GENUINE wall clock with the main tick host (short, so CI stays fast).
-// ===========================================================================
+// D2: the render equals playback modulo jitter, against an irregular virtual clock and a real wall
+// clock.
+// why: lessons/timeline-lab.md#pr-d2
 {
   const rand = mulberry32(4242);
   const items = genItems(rand);
@@ -211,9 +163,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
     `and land on the same state (${sR.state} vs ${sJ.state})`);
   dJ.dispose();
 
-  // (c) a GENUINE wall clock, main tick host, over a SHORT window — the proof
-  //     that the render matches what really happens, not just another virtual
-  //     run of the same code.
+  // (c) a genuine wall clock with the main tick host, over a short window
+  // why: lessons/timeline-lab.md#pr-wall
   const SHORT = 1500;
   const shortItems = items.filter((i) => i.at <= SHORT);
   const sW = newSink();
@@ -239,16 +190,13 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   dW.dispose();
 }
 
-// ===========================================================================
-// D5 — the render does not wait. This is the whole point of the mode: a
-// 90-minute archival remix must not take 90 minutes to export.
-// ===========================================================================
+// D5: the render does not wait.
+// why: lessons/timeline-lab.md#pr-d5
 {
   const LONG = 10 * 60 * 1000;                 // ten minutes of position time
   const items = [];
-  // note the `i + 1`: an event at EXACTLY `from` is passed by the opening seek,
-  // not fired (see the render-boundary check) — this arm is about speed, so it
-  // keeps clear of that boundary.
+  // `i + 1`: an event exactly at `from` is passed by the opening seek, not fired.
+  // why: lessons/timeline-lab.md#pr-plus-one
   for (let i = 0; i < 6000; i++) items.push({ at: ((i + 1) * LONG) / 6001, kind: 'cue', id: `L${i}`, payload: { op: 'add', v: 1 } });
   const sink = newSink();
   const deck = offlineDeck({ items, adapters: makeAdapters(sink), range: [0, LONG + 1000], autoStart: false });
@@ -263,13 +211,9 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   deck.dispose();
 }
 
-// ===========================================================================
-// THE WINDOW'S LEFT EDGE, stated as a check rather than discovered later. A
-// render opens with a real `seek(from)`, and the seek contract says an event at
-// or behind the playhead is PASSED (its effect belongs in the folded state, not
-// in a fire). So the render window is HALF-OPEN on the left, `(from, to]`,
-// exactly as a seek is — and the state at `from` is `reduce(<= from)`.
-// ===========================================================================
+// The render window is half-open on the left, (from, to], as a seek is; state at `from` is
+// reduce(<= from).
+// why: lessons/timeline-lab.md#pr-left-edge
 {
   const sink = newSink();
   const deck = offlineDeck({
@@ -287,10 +231,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   deck.dispose();
 }
 
-// ===========================================================================
-// D6 — a WALL-CLOCK deck is refused. Rendering it would reintroduce exactly
-// the failure the mode exists to remove.
-// ===========================================================================
+// D6: a wall-clock deck is refused.
+// why: lessons/timeline-lab.md#pr-d6
 {
   const deck = createDeck({ items: [{ at: 10, kind: 'cue', id: 'x', payload: { op: 'add', v: 1 } }],
     adapters: makeAdapters(newSink()), range: [0, 1000] });
@@ -311,10 +253,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   wrong.dispose();
 }
 
-// ===========================================================================
-// D7 — what cannot be made deterministic is REPORTED, and the report's own
-// blind spot is asserted so nobody reads a clean scan as a proof.
-// ===========================================================================
+// D7: nondeterminism is reported, and the scan's blind spot is asserted.
+// why: lessons/timeline-lab.md#pr-d7
 {
   const sink = newSink();
   const deck = offlineDeck({
@@ -350,10 +290,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
     `onNondeterministic:'throw' must be a usable CI gate (got ${thrown && thrown.code})`);
   deck.dispose();
 
-  // THE BLIND SPOT, asserted. A source-text scan cannot see through a closure,
-  // so a clean report is NOT a proof of determinism — and this check exists so
-  // that claim is a measured fact in the suite rather than a sentence in a
-  // comment nobody re-reads.
+  // A source scan cannot see through a closure, so a clean report is not proof.
+  // why: lessons/timeline-lab.md#pr-blind
   const hidden = (() => { const draw = Math.random; return () => draw(); })();
   const sneaky = offlineDeck({
     items: [{ at: 100, kind: 'sneaky', id: 'a', payload: {} }], range: [0, 1000], autoStart: false,
@@ -367,9 +305,8 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   sneaky.dispose();
 }
 
-// ===========================================================================
-// D8 — seedRandom: the one nondeterminism the mode can FIX rather than report.
-// ===========================================================================
+// D8: seedRandom, the one nondeterminism the mode can fix.
+// why: lessons/timeline-lab.md#pr-d8
 {
   const mk = (bag) => offlineDeck({
     items: [{ at: 100, kind: 'r', id: 'a', payload: {} }, { at: 200, kind: 'r', id: 'b', payload: {} }],
@@ -393,11 +330,9 @@ for (let seed = 1; seed <= NSEEDS; seed++) {
   for (const d of [d1, d2, d3, d4]) d.dispose();
 }
 
-// ===========================================================================
-// A1 — the audio seam. The lane is the SHIPPED createAudioLane, unmodified,
-// taking its context by argument. Proved against a stub OfflineAudioContext,
-// WITH the negative control that shows the shim is load-bearing.
-// ===========================================================================
+// A1: the shipped createAudioLane against a stub OfflineAudioContext, with the bare-context
+// negative control.
+// why: lessons/timeline-lab.md#pr-a1
 function stubOffline(sampleRate = 48000) {
   const started = [];
   const ctx = {
@@ -406,9 +341,8 @@ function stubOffline(sampleRate = 48000) {
     createBufferSource: () => ({ buffer: null, onended: null, connect() {}, disconnect() {},
       start(t) { started.push(+t.toFixed(9)); }, stop() {} }),
     createBuffer: (ch, len) => ({ getChannelData: () => new Float32Array(len) }),
-    // enough of a buffer for hashAudioBuffer(): the stub proves the SEAM (node
-    // times), never the PCM — the PCM is measured in a real browser by
-    // timeline/lab/run-render.mjs.
+    // The stub proves the seam (node times), never the PCM.
+    // why: lessons/timeline-lab.md#pr-stub
     startRendering: async () => { const d = new Float32Array(8);
       return { numberOfChannels: 1, length: d.length, sampleRate, getChannelData: () => d }; },
     started,
@@ -468,15 +402,12 @@ function stubOffline(sampleRate = 48000) {
     'CONTROL: createVirtualRuntime\'s single host loses the first callback when a second consumer starts — which is why createRenderRuntime exists');
 }
 
-// ===========================================================================
-// N — THE NEST. plan-timeline §8.8's last open seam. Everything below renders
-// a COMPOSITION (fragment quotation, loops, nested nests), not a flat deck.
-// ===========================================================================
+// N: the nest, rendering compositions.
+// why: lessons/timeline-lab.md#pr-nest
 
-// The rig, in both worlds. One factory, two clocks: `offline` builds every deck
-// on ONE render runtime (the composition's requirement), `wall` builds the same
-// arrangement on the real clock with mainTickHost() everywhere — including for
-// the nest's boundary, so the two arms differ ONLY in what a clock is.
+// One factory, two clocks: `offline` on one render runtime, `wall` on the real clock with
+// mainTickHost() everywhere, so the arms differ only in the clock.
+// why: lessons/timeline-lab.md#pr-rig
 const N_IN = 0, N_OUT = 1690, N_AT = 500;      // 1690 ms: NOT a frame multiple
 const N_CHILD_RANGE = [-10, 6000];             // room for the wrap's hair-lead
 const nItems = () => [
@@ -539,7 +470,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     check('nest-det', 0, JSON.stringify(posA) === JSON.stringify(posB),
       `${label}: the child's per-frame position must be identical on both runs`);
 
-    // N2 — the position map is the arithmetic §8.2 states, at EVERY frame.
+    // N2: the position map at every frame.
+    // why: lessons/timeline-lab.md#pr-n2
     const L = N_OUT - N_IN;
     const bad = [];
     for (let i = 0; i < posA.length; i++) {
@@ -569,8 +501,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     `4 passes of a 3-event fragment must fire 12 events in pass order (${ids.length}: ${ids.join(',')})`);
   check('nest-once', 0, r.nest.loops[0].wraps === 3 && r.nest.wraps === 3 && r.nest.wrapsByReason.boundary === 3,
     `N passes = N-1 wraps, all COMMITTED at the instant: ${JSON.stringify(r.nest.wrapsByReason)}`);
-  // §8.8's downbeat detail, offline: the wrap seeks a HAIR before `in`, so the
-  // event sitting exactly on `in` is pending and commits — 4 downbeats, not 3.
+  // The wrap seeks a hair before `in`, so the event on `in` commits: 4 downbeats, not 3.
+  // why: lessons/timeline-lab.md#pr-downbeat
   check('nest-once', 0, ids.filter((x) => x === 'DOWN').length === 4 && r.nest.loops[0].leadClamped === false,
     `the downbeat sitting exactly on \`in\` must fire on EVERY pass including the first (${ids.filter((x) => x === 'DOWN').length}/4)`);
   // …and the one case the library cannot fix is REPORTED, not hidden.
@@ -584,15 +516,15 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   check('nest-once', 0, rc.nest.loops[0].leadClamped === true &&
         rc.nest.loops[0].degradations.some((d) => /lost downbeat/.test(d.reason)),
     `\`in\` === the child's range start loses the hair-lead, and the render REPORTS it: ${JSON.stringify(rc.nest.loops[0].degradations.map((d) => d.wanted))}`);
-  // OFFLINE LATENESS IS ZERO. §8.8 measured wrap-adjacent firing lateness at
-  // p50 0.10 / p95 0.70 ms in playback; the render has no wall clock to be late
-  // against, so every fire lands on its intended microsecond exactly.
+  // Offline lateness is zero: every fire lands on its intended microsecond.
+  // why: lessons/timeline-lab.md#pr-lateness
   const lates = r.trace.filter((x) => !String(x.id).startsWith('#')).map((x) => x.d);
   check('nest-once', 0, lates.length > 0 && lates.every((d) => d === 0),
     `every fire in a nested render must have deltaMs === 0 (${lates.filter((d) => d !== 0).length}/${lates.length} nonzero)`);
 }
 
-// --- N3: THE RENDER EQUALS WALL-CLOCK PLAYBACK OF THE SAME NEST -------------
+// N3: the render equals wall-clock playback of the same nest.
+// why: lessons/timeline-lab.md#pr-n3
 {
   const SHORT_OUT = 400, PASSES = 4;
   const mkItems = () => [
@@ -610,10 +542,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     return { rt, parent, child, nest, sink };
   };
   const o = mkOffline();
-  // The window opens BEFORE the span, so the enter event FIRES rather than being
-  // folded by the opening seek (the flat suite's half-open left edge, one level
-  // up). That is deliberate: the entry is the interesting path — it is where the
-  // first pass's downbeat is won or lost — so both arms must play through it.
+  // The window opens before the span, so the enter fires and the first downbeat is exercised.
+  // why: lessons/timeline-lab.md#pr-window
   const WIN = { from: 0, to: 200 + PASSES * SHORT_OUT };
   const ro = renderNest(o.nest, { ...WIN, fps: 30 });
   const offChild = idsOf(ro, 'q');
@@ -648,10 +578,9 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     `…and the same number of wraps (${ro.nest.wraps} rendered, ${w.nest.loop('q').wraps} played)`);
   w.parent.dispose(); w.child.dispose();
 
-  // …and against an IRREGULARLY-advanced virtual clock, which is the jitter
-  // control the flat suite uses: same events, no waiting. (createVirtualRuntime
-  // cannot host three tick hosts — that limitation is asserted at the end of
-  // this file — so the jitter arm rides a render runtime it advances by hand.)
+  // The jitter arm rides a render runtime advanced by hand (createVirtualRuntime hosts one tick
+  // host).
+  // why: lessons/timeline-lab.md#pr-jitter
   const vr = createRenderRuntime(5_000_000);
   const sinkJ = newNSink();
   const childJ = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [-10, 3000], items: mkItems(), adapters: nAdapters(sinkJ) });
@@ -672,11 +601,11 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   parentJ.dispose(); childJ.dispose();
 }
 
-// --- N4: THE WRAP DISCIPLINE, and its negative control ----------------------
+// N4: the wrap discipline and its negative control.
+// why: lessons/timeline-lab.md#pr-n4
 {
-  // The discipline: the boundary is a COMMITTED ONE-SHOT on a TickHost, exactly
-  // as in playback (§8.8) — the render runtime supplies a deterministic one, so
-  // the offline path runs the SAME code, not an offline imitation of it.
+  // The boundary is a committed one-shot on the render runtime's host: the same code as playback.
+  // why: lessons/timeline-lab.md#pr-host
   const c = nRigOffline({ repeat: 4, host: true });
   const rc = renderNest(c.nest, { fps: 30 });
   const p = nRigOffline({ repeat: 4, host: false });
@@ -685,17 +614,14 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     `offlineNest() commits the boundary; a bare createNest() polls it, and the render says which: ${rc.nest.loops[0].boundary} vs ${rp.nest.loops[0].boundary}`);
   check('nest-wrap', 0, rc.nest.wraps === rp.nest.wraps && rp.nest.wrapsByReason.polled === 3,
     `both take the same NUMBER of wraps — the difference is not the count: ${rc.nest.wraps} vs ${rp.nest.wraps}`);
-  // THE NEGATIVE CONTROL, and it inverts §8.8's playback finding. Polling in
-  // PLAYBACK lost a downbeat (2100/2400 onsets) because the head of the pass was
-  // folded. Polling OFFLINE loses nothing — `wrapSpan` seeks to the top of the
-  // pass, so the downbeat still fires — it LEAKS instead: the child free-runs
-  // past `out` for up to one frame, and material outside the quotation sounds.
+  // Negative control: polling offline loses no downbeat but leaks past `out` for up to a frame.
+  // why: lessons/timeline-lab.md#pr-leak
   check('nest-wrap', 0, rp.nest.events > rc.nest.events && p.sink.fired.includes('TAIL') && !c.sink.fired.includes('TAIL'),
     `a POLLED boundary renders a DIFFERENT EVENT SET — ${rc.nest.events} committed vs ${rp.nest.events} polled, and the extra events are material past \`out\` (${p.sink.fired.filter((x) => x === 'TAIL').length} TAIL leaks)`);
   check('nest-wrap', 0, rp.notes.some((n) => /LOOP BOUNDARY POLLED/.test(n)) && rp.nest.polled.join() === 'q',
     `…and the render REPORTS it rather than letting a reproducible-but-wrong render pass as clean: ${JSON.stringify(rp.nest.polled)}`);
-  // both are still DETERMINISTIC — being wrong reproducibly is the trap this
-  // report exists to catch.
+  // both still deterministic: wrong reproducibly is the trap
+  // why: lessons/timeline-lab.md#pr-reproducible
   const p2 = nRigOffline({ repeat: 4, host: false });
   const rp2 = renderNest(p2.nest, { fps: 30 });
   check('nest-wrap', 0, rp.traceText === rp2.traceText,
@@ -713,9 +639,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
     `and the servo makes ZERO corrections offline: parent and child ride one clock, so the position error is exactly 0 (${ra.nest.servo.corrections} corrections in ${ra.nest.servo.calls} calls)`);
   check('nest-servo', 0, rb.notes.some((n) => /servo:false/.test(n)),
     'servo:false is a reported render condition, not a silent one');
-  // THE FOURTH CELL. The 2x2 is the whole discipline in one table:
-  //   host+servo -> 3 wraps, correct        host, no servo -> 3 wraps, IDENTICAL
-  //   no host+servo -> 3 wraps, LEAKS       no host, no servo -> 0 wraps, NO LOOP
+  // host+servo correct; host alone identical; servo alone leaks; neither, no loop.
+  // why: lessons/timeline-lab.md#pr-2x2
   const c = nRigOffline({ repeat: 4, host: false });
   const rc = renderNest(c.nest, { fps: 30, servo: false });
   check('nest-servo', 0, rc.nest.wraps === 0,
@@ -773,8 +698,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   const lanes = r.nest.loops[0].lanes;
   check('nest-loopstate', 0, lanes.carry.join() === 'cc' && lanes.rearm.join() === 'note',
     `the render must report which lanes CARRY and which RE-ARM: ${JSON.stringify(lanes)}`);
-  // the CC is set at child 1200 (inside the pass) and must still be set at the
-  // top of the NEXT pass — that is what 'carry' means.
+  // The CC set inside a pass must still be set at the top of the next: 'carry'.
+  // why: lessons/timeline-lab.md#pr-carry
   const atWrap = [];
   for (let i = 1; i < ccPerFrame.length; i++) if (ccPerFrame[i][0] !== ccPerFrame[i - 1][0]) atWrap.push(ccPerFrame[i][1]);
   check('nest-loopstate', 0, atWrap.length === 3 && atWrap.every((v) => v === 74),
@@ -806,7 +731,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   wallChild.dispose(); parent.dispose();
 }
 
-// --- N10: two levels deep — exactly-once still holds -------------------------
+// N10: two levels deep, exactly-once still holds.
+// why: lessons/timeline-lab.md#pr-n10
 {
   const build = () => {
     const rt = createRenderRuntime(0);
@@ -911,7 +837,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   parent.dispose(); child.dispose();
 }
 
-// --- N13: nested audio — a loop repeats its AUDIO, at exact offsets ---------
+// N13: nested audio, a loop repeats its audio at exact offsets.
+// why: lessons/timeline-lab.md#pr-n13
 {
   const { renderDeckAudio } = await import('../render.mjs');
   const mk = async () => {
@@ -936,19 +863,14 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
   check('nest-audio', 0, a.r.audio.children.length === 1 && a.r.audio.children[0].expanded === 6 &&
         a.r.audio.children[0].mode === 'expand',
     `the child lane is reported separately, with how many nodes the loop EXPANDED to: ${JSON.stringify(a.r.audio.children.map((c) => [c.label, c.mode, c.expanded]))}`);
-  // EXPANSION IS EXACT, and that is a difference from the replay path worth
-  // stating: the wrap's hair-before-`in` lead (1e-6 ms) is a property of
-  // RE-SEEKING, so an expanded loop does not carry it. The event lanes still
-  // do — the trace shows the lead, the samples do not.
+  // Expanded loops carry no 1e-6 ms lead (that belongs to re-seeking); event lanes still do.
+  // why: lessons/timeline-lab.md#pr-exact
   check('nest-audio', 0, a.started[0] === 0.1 && a.started.every((x) => Number.isFinite(x)),
     `an expanded loop lands on the score's own numbers, with no wrap lead: first click at ${a.started[0]} (exactly 0.1)`);
   check('nest-audio', 0, String(a.started) === String(b.started) && a.r.renderHash === b.r.renderHash,
     'two nested audio renders must schedule identical node times and the identical render hash');
-  // DOCUMENTED LIMIT, asserted so nobody trusts the node arm too far: a STUB
-  // context cannot see the bug that made this function exist. `cancelCommitted`
-  // calls node.stop()/disconnect(), and the stub has already recorded the start
-  // time by then — so the 'lane' mode scores 7/7 here and 1/7 in a real
-  // OfflineAudioContext (measured, timeline/lab/run-render.mjs).
+  // Documented limit: the stub cannot see the 'lane' bug (7/7 here, 1/7 in a real context).
+  // why: lessons/timeline-lab.md#pr-stub-limit
   const rtL = createRenderRuntime(0);
   const sinkL = newNSink();
   const childL = offlineDeck({ runtime: rtL, range: [-10, 3000],
@@ -966,10 +888,8 @@ const idsOf = (r, s) => r.trace.filter((x) => x.s === s && !String(x.id).startsW
 
 // --- N14: a nest does not cost real time either -----------------------------
 {
-  // The flat arm renders 10 minutes in ~10 ms. A COMPOSITION has N+1 schedulers,
-  // a servo call per frame and a committed boundary per wrap — so the question
-  // "does folding a nest reintroduce real time?" has to be answered with a
-  // number, not an assurance.
+  // Does folding a nest reintroduce real time? Answered with a number.
+  // why: lessons/timeline-lab.md#pr-speed
   const rt = createRenderRuntime(0);
   const sink = newNSink();
   const child = offlineDeck({ runtime: rt, range: [-10, 2000],

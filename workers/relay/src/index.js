@@ -1,123 +1,30 @@
-/**
- * positron-ws — the TOKENLESS verbatim WS relay. ws.positron.studio
- *
- * elektron-jam does the same job but is token-gated, and a token pasted into a
- * public page is a published token — which is exactly why the looper's
- * cross-device rooms have been a deliberate gap. This worker closes it by
- * removing the secret rather than publishing one, and paying for that with
- * limits instead.
- *
- *   wss://ws.positron.studio/room/<name>/ws
- *   GET  https://ws.positron.studio/room/<name>/stats
- *
- * What it keeps from elektron-jam, because these are load-bearing:
- *   · VERBATIM. No parse, no storage, no envelope. Text or binary, relayed as
- *     received to EVERY socket in the room INCLUDING the sender — that echo is
- *     the loopback-through-server ordering point, not an accident.
- *   · NEVER RE-STAMP. Sender stamps live inside the payload. A relay's idea of
- *     "now" measured +/-50 ms of bias, which at a 2 s loop is 2.5 % of the
- *     circle and an audible flam.
- *   · ping -> pong via hibernation autoresponse, so an RTT probe never wakes
- *     the DO and measures pure network. Verified: a peer in the same room never
- *     sees the ping, because the runtime answers it and the DO stays asleep.
- *
- * What it adds, because there is no longer a token in front of it:
- *   · a 256 KiB message roof and a BYTES-PER-SECOND budget (fan-out is the cost)
- *   · at most MAX_SOCKETS in a room
- *   · a per-socket token bucket; a socket that keeps overrunning is closed
- *   · room names constrained, so the DO namespace cannot be sprayed with junk
- *
- * Residual risk, stated rather than hidden: nothing here caps how many DISTINCT
- * rooms one client can open, so a determined bot can still create rooms. That
- * needs an account-wide limiter DO or Cloudflare rate-limiting rules in front,
- * and is deliberately not pretended-to here.
- */
+// positron-ws, the tokenless relay: wss://ws.positron.studio/room/<name>/ws and GET .../stats.
+// Every message goes verbatim to every socket, sender included; never parsed, stored or re-stamped.
+// No token, so limits instead: a message roof, byte and message buckets, MAX_SOCKETS, room names.
+// why: lessons/workers-relay.md#header
 
-// A 4 KiB roof was inherited from elektron-jam, where it was right: jam relayed
-// tiny latency probes. It is WRONG here. peer.mjs publishes a committed layer as
-// ONE message carrying the material — every note row of every layer, ~98 bytes
-// each. Measured: 2 layers x 16 notes is ~7 KB, 8 x 32 is ~52 KB. A 4 KiB roof
-// passes the tiny live-note plane and silently eats the loop plane, which is the
-// one thing cross-device looping needs.
-//
-// The real cost is not message size, it is FAN-OUT AMPLIFICATION: one message
-// goes to every socket in the room, so N sockets multiply egress by N. So the
-// budget is bytes-per-second, and the per-message cap only has to sit under the
-// platform's 1 MiB WebSocket message limit with room to spare.
-// 🔴 RAISED 2026-09-13, AND THE OLD NUMBERS WERE GUESSES DEFENDED AS LIMITS.
-//
-// They were picked before any of this had been run in anger, against a
-// production this project does not have and a public it has never had. What
-// they actually produced was a day of hand-serialising work — refusing to run
-// a measurement because a demo was open, treating one relay as a thing to take
-// turns on — and every one of those refusals was enforcing a number somebody
-// made up rather than one anybody measured.
-//
-// What IS measured, and is why the old ceiling was visible at all: at both 120
-// and 300 msg/s the relay delivered exactly 298 messages in three seconds —
-// `MSG_BURST` 120 plus 3 s at 60/s — and THE SENDER WAS TOLD NOTHING. No
-// error, no close, no backpressure. That property is worth keeping and it has
-// nothing to do with the size of the number.
-//
-// So the numbers open up and the honesty stays. The real constraints are the
-// platform's (a 1 MiB WebSocket message) and the device's (one Raspberry Pi,
-// one JACK graph, and no cap here makes that two). When something actually
-// breaks, the break will be a measurement, which is worth more than a guess
-// that prevented it.
-//
-// ⚠️ A LIVE DURABLE OBJECT KEEPS ITS CODE. Deploying does not change a room
-// that has a socket in it — the board holds `studio-1` awake — so these
-// numbers arrive there when the object next restarts, and in a fresh room
-// immediately. `/room/<name>/stats` reports what the OBJECT thinks, which is
-// how to tell the two apart.
-//
-// ⚠️ `demo/wire/` reads these off `/stats` rather than assuming them, so it
-// follows whatever they are — but its recorded 298-in-three-seconds belongs to
-// the old values and is history now.
+// Budget is bytes per second: fan-out multiplies egress by room size. A looper layer is 7 to 52 KB.
+// An overrun drops silently: the sender gets no error, no close and no backpressure.
+// A live Durable Object keeps its code until it restarts; /stats reports what the object holds.
+// why: lessons/workers-relay.md#limits
 import { json, OPEN, keyMatches } from '../../_lib/http.mjs';
 
-const MAX_BYTES = 1000 * 1024;            // per message — just under the platform's 1 MiB
-const MAX_SOCKETS = 128;                  // was 16, which a handful of browser tabs could fill
+const MAX_BYTES = 1000 * 1024;            // per message, just under the platform's 1 MiB; why: lessons/workers-relay.md#max-bytes
+const MAX_SOCKETS = 128;                  // a handful of browser tabs could fill 16; why: lessons/workers-relay.md#max-sockets
 const BYTES_PER_SEC = 8 * 1024 * 1024;    // per socket, steady
 const BYTE_BURST = 16 * 1024 * 1024;
-const MSG_PER_SEC = 1000;                 // was 60 — one knob turn is ~60/s on its own
+const MSG_PER_SEC = 1000;                 // one knob turn is about 60/s on its own; why: lessons/workers-relay.md#msg-per-sec
 const MSG_BURST = 2000;
 const STRIKES = 50;                       // overruns tolerated before the socket is closed
-// 🔴 A FULL ROOM IS A SILENT OUTAGE, AND A DEPLOY DOES NOT CLEAR IT. MEASURED
-// 2026-09-12: `studio-1` sat at 16/16 and refused the box for hours — the board
-// dialled every 30 s and logged `closed 1006`, which reads as a network fault
-// on the board rather than a full room. Hibernated sockets are RESTORED across
-// a restart (that is the point of hibernation), so redeploying the worker does
-// not drop them: nothing outside the object can close a socket, so the object
-// has to do it.
-//
-// ⚠️ Liveness cannot come from "did it send recently" alone — a page that is
-// only LISTENING to audio sends nothing for minutes and is perfectly alive.
-// `getWebSocketAutoResponseTimestamp` is the signal that survives hibernation:
-// `wire.mjs` clients send 'ping' and the RUNTIME answers without waking this
-// object, so the timestamp is maintained for free. In-memory message times
-// cover the agents, which do not ping but do send constantly.
+// A full room refuses everyone and a redeploy does not clear it: only this object can close
+// a socket. Liveness is the ping/pong time, which survives hibernation, or a message time.
+// why: lessons/workers-relay.md#idle
 const IDLE_MS = 10 * 60 * 1000;           // silent this long, and only if the room is full
 
-// 🔴 ONE KIND OF ROOM HERE IS NOT TOKENLESS: A ROOM WHOSE NAME ENDS `-cam`.
-// Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
-// url secret parameter to enable (key in cf secrets)"*. `studio-1-cam` carries
-// the picture from the Raspberry Pi's own camera, and the Pi starts that camera
-// for whoever speaks in the room (rig/board/camera.mjs), so who may speak there
-// is who may turn a camera on in somebody's room.
-// ⚠️ THE KEY ARRIVES IN THE FIRST MESSAGE, NOT IN THE URL OR A HEADER. Workers
-// Logs records every request's URL and headers (observability is on, below in
-// wrangler.jsonc), so a key in either would be written into a log on every
-// join. A message body is not. Until a socket's first message is
-// `{"type":"cam.key","key":...}` with the key that matches the secret
-// `PI_CAM_KEY`, it hears nothing and what it sends is dropped; a wrong key is
-// closed with 4003.
-// ⚠️ AND THE 403 A PERSON CAN SEE IS `POST /room/<name>-cam/key`, with the key
-// as the body: 204 when it matches, 403 when it does not. The page asks it
-// before it opens the room, because a browser cannot read why a WebSocket closed
-// before it opened.
-// ⚠️ NO SECRET SET MEANS NOBODY GETS IN, never everybody: the comparison is
-// against the secret, and a missing one matches nothing.
+// A room ending `-cam` is keyed, because the Pi starts its camera for whoever speaks there.
+// The key comes in the first message (`cam.key`), never the URL or a header, which logs record.
+// POST /room/<name>-cam/key answers 204 or 403; with no secret set nobody gets in.
+// why: lessons/workers-relay.md#cam-room
 const CAM_ROOM = /-cam$/;
 const CAM_AUTH_MS = 10_000;               // a socket that has not proved the key by then is closed
 // Wrong keys an address may try in an hour, counted in the room's storage so
@@ -145,8 +52,9 @@ export class Relay {
     /** in-memory only. Hibernation resets it, which is fine: a room that has
      *  been idle long enough to hibernate is not mid-abuse. */
     this.buckets = new WeakMap();
-    /** last message time per socket, in memory only — lost on hibernation,
-     *  which is why it is only ever the OPTIMISTIC half of a liveness check. */
+    // Last message time per socket, in memory only (lost on hibernation): the optimistic half of
+    // liveness.
+    // why: lessons/workers-relay.md#seen
     this.seen = new WeakMap();
     this.evicted = 0;
     this.relayed = 0;
@@ -190,10 +98,8 @@ export class Relay {
     if (url.pathname.endsWith('/stats') && CAM_ROOM.test(name)) return new Response('keyed room', { status: 403, headers: CORS });
 
     if (url.pathname.endsWith('/stats')) {
-      // HIBERNATION IS KEPT ON PURPOSE (it is what makes an idle room free, and
-      // setWebSocketAutoResponse only exists on the hibernatable API). The cost
-      // is that these counters live in DO memory and reset on wake — so they are
-      // reported as sinceWake rather than dressed up as lifetime totals.
+      // Hibernation stays (an idle room is free), so these counters reset on wake: sinceWake.
+      // why: lessons/workers-relay.md#since-wake
       return json({
         sockets: this.state.getWebSockets().length,
         sinceWakeMs: Date.now() - this.wokeAt,
@@ -221,23 +127,20 @@ export class Relay {
 
     const pair = new WebSocketPair();
     this.state.acceptWebSocket(pair[1]);
-    // A socket that has just arrived and not yet spoken is alive, obviously —
-    // without this it looks exactly like one whose owner left.
+    // A socket that has just arrived and not yet spoken is alive.
+    // why: lessons/workers-relay.md#arrived
     this.seen.set(pair[1], Date.now());
-    // 🔴 AND THE SAME FACT AGAIN, DURABLY. The in-memory line above is lost on
-    // hibernation, and dating a restored socket from the object's WAKE instead
-    // makes it permanently un-evictable: every restart resets its apparent age,
-    // so a room full of dead sockets stays full forever — measured, that is
-    // exactly what `studio-1` did. ONE write per connection, never per message.
+    // Durable connect time, one write per socket: dating from the object's wake makes a dead socket
+    // un-evictable, and a full room stays full.
+    // why: lessons/workers-relay.md#connected-at
     const gated = CAM_ROOM.test(url.pathname.split('/')[2] || '');
     const who = gated ? await addressTag(request) : '';
     try { pair[1].serializeAttachment(gated ? { at: Date.now(), gated: true, ok: false, who } : { at: Date.now() }); } catch { /* nothing to lose */ }
     if (gated) {
       this.cam.set(pair[1], { gated: true, ok: false });
-      // A socket that never proves the key is not left holding a place. Two
-      // ways, because neither is enough alone: a timer, which a hibernating
-      // object drops (MEASURED 2026-10-13, a silent socket was still open at
-      // 11 s), and a sweep on every join, which needs no timer at all.
+      // Two ways out for a socket that never proves the key: a timer, which a hibernating
+      // object drops (a silent socket was still open at 11 s), and a sweep on every join.
+      // why: lessons/workers-relay.md#key-deadline
       const ws = pair[1];
       setTimeout(() => { if (!this.#camOf(ws).ok) { try { ws.close(4003, 'no key'); } catch { /* gone */ } } }, CAM_AUTH_MS);
       const now = Date.now();
@@ -251,19 +154,16 @@ export class Relay {
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
-  /**
-   * How long since this socket last gave any sign of life. The runtime's
-   * ping/pong timestamp survives hibernation and costs nothing; the in-memory
-   * message time does not survive but covers senders that never ping.
-   */
+  // How long since this socket last gave a sign of life: the ping/pong time survives hibernation;
+  // the in-memory message time covers senders that never ping.
+  // why: lessons/workers-relay.md#idle-ms
   #idleMs(ws, now) {
     const auto = this.state.getWebSocketAutoResponseTimestamp(ws);
     let last = Math.max(auto ? auto.getTime() : 0, this.seen.get(ws) || 0);
     if (!last) {
-      // Never pinged, nothing sent since this object woke. Fall back to WHEN IT
-      // CONNECTED, which survives hibernation. A socket with no attachment at
-      // all predates this code, so it has been sitting there at least since the
-      // deploy — old by definition, and the only way the stuck rooms clear.
+      // Never pinged and silent since wake: use the connect time.
+      // A socket with no attachment predates this code, so it counts as old.
+      // why: lessons/workers-relay.md#no-attachment
       let at = 0;
       try { at = ws.deserializeAttachment()?.at || 0; } catch { /* old socket */ }
       last = at;
@@ -271,11 +171,8 @@ export class Relay {
     return last ? now - last : Infinity;
   }
 
-  /**
-   * Close sockets that have been silent past IDLE_MS. Called ONLY when the room
-   * is full — an idle socket in a room with space costs nothing and evicting it
-   * would be a policy nobody asked for.
-   */
+  // Close sockets silent past IDLE_MS, only when the room is full.
+  // why: lessons/workers-relay.md#reclaim
   #reclaim() {
     const now = Date.now();
     for (const ws of this.state.getWebSockets()) {
@@ -285,12 +182,10 @@ export class Relay {
     }
   }
 
-  /**
-   * TWO buckets, both refilled by elapsed time:
-   *   bytes — the one that matters, because fan-out multiplies it by room size
-   *   msgs  — so a flood of 10-byte messages still costs something
-   * Either running dry drops the message; persistent overrun closes the socket.
-   */
+  // Two buckets refilled by elapsed time: bytes (fan-out multiplies it) and messages. Either
+  // running
+  // dry drops the message; persistent overrun closes the socket.
+  // why: lessons/workers-relay.md#allow
   #allow(ws, size) {
     const now = Date.now();
     let b = this.buckets.get(ws);
@@ -322,16 +217,12 @@ export class Relay {
   }
 
   async webSocketMessage(ws, msg) {
-    // ⚠️ Before any cap or bucket check — a socket that is being rate-limited is
-    // very much alive, and marking liveness only on ACCEPTED messages would
-    // make the busiest client look like the deadest one.
+    // Mark liveness before any cap or bucket check, or the busiest client looks like the deadest.
+    // why: lessons/workers-relay.md#alive-first
     this.seen.set(ws, Date.now());
-    // A TRUE BYTE ROOF. `msg.byteLength` is undefined on a string, so the naive
-    // `msg.byteLength > MAX_BYTES` never fires for text at all; and
-    // `String.length` counts UTF-16 CODE UNITS, so 4000 units of emoji is 8000
-    // UTF-8 bytes and slipped through a length check. Measured, not assumed.
-    // UTF-8 bytes >= code units always, so the length test is a safe fast
-    // reject before the encode.
+    // Count UTF-8 bytes: `byteLength` is undefined on a string, `String.length` counts UTF-16
+    // units. The length test is a safe fast reject first: UTF-8 bytes are never fewer than units.
+    // why: lessons/workers-relay.md#byte-roof
     const size = typeof msg === 'string'
       ? (msg.length > MAX_BYTES ? msg.length : new TextEncoder().encode(msg).byteLength)
       : msg.byteLength;
@@ -368,11 +259,9 @@ export class Relay {
     }
     if (!verdict) { this.dropped++; return; }
 
-    // VERBATIM, to everyone, sender included. Never parsed, never re-stamped.
-    // ⚠️ IN A KEYED ROOM, only to sockets that proved the key, and a BINARY
-    // frame is not echoed to its sender: the Pi sends the camera there at about
-    // 1.5 Mbit/s and has no use for its own picture coming back down a link in
-    // another building.
+    // Verbatim to everyone, sender included. In a keyed room only to sockets that proved the key,
+    // and a binary frame is not echoed to its sender.
+    // why: lessons/workers-relay.md#fan-out
     if (me.gated) {
       const binary = typeof msg !== 'string';
       for (const s of this.state.getWebSockets()) {

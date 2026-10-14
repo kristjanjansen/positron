@@ -1,19 +1,6 @@
-// rig/board/synth.mjs — the board makes its own sound.
-//
-// The synth is `demo/shell/rhodes.mjs`, IMPORTED, not ported. That module was
-// written as pure per-sample arithmetic for exactly this move: the same maths
-// that runs in an AudioWorklet at /carry/ runs here in plain node, so the board
-// and the browser cannot drift into two instruments that merely sound similar.
-//
-// Measured before it was written: 8 voices render at 41x realtime on an M1.
-// A Cortex-A72 runs this kind of JS roughly 8-12x slower, which puts a Pi 4 at
-// 3-4x realtime — about a third of one core, three cores spare. (The 8-12x is
-// an ESTIMATE from the class of chip, not a measurement; `node bench.mjs` on
-// the board settles it in ten seconds and that number replaces this sentence.)
-//
-// The consequence is the interesting part: with this file, a bare Pi is a
-// complete instrument. No Circuit, no audio interface, no soundcard — notes
-// arrive over the relay, sound leaves over the relay.
+// The board's own synth: demo/shell/rhodes.mjs imported, so board and browser are one instrument.
+// 8 voices render at 41x realtime on an M1; `node bench.mjs` measures the Pi.
+// why: lessons/rig-board-synth.md#synth-header
 import { rhodesVoice, mixVoices } from '../../demo/shell/rhodes.mjs';
 import { moogVoice, PATCHES } from '../../demo/shell/moog.mjs';
 
@@ -41,8 +28,8 @@ export function createSynth({ maxVoices = 16 } = {}) {
       // is 6 dB louder and reads as a stuck key.
       for (const x of voices) if (x.note === note && x.rel === undefined) x.rel = now();
       voices.push({ v: rhodesVoice(freq, vel), t0: now(), note, rel: undefined });
-      // Oldest first, so a held pedal-chord loses its quietest rather than its
-      // newest — dropping what was just played is the audible failure.
+      // Steal the oldest, not the newest: dropping what was just played is the audible failure.
+      // why: lessons/rig-board-synth.md#synth-steal
       if (voices.length > maxVoices) voices.shift();
     },
 
@@ -74,21 +61,16 @@ export function createSynth({ maxVoices = 16 } = {}) {
       return out;
     },
 
-    /**
-     * Realtime clock. A plain setInterval(20) DRIFTS — timers fire late, the
-     * error accumulates, and the stream slowly runs short, which sounds like
-     * dropouts and reads as network loss. So render against elapsed time and
-     * catch up: the sample counter is the truth, the timer is only a nudge.
-     */
+    // Render against elapsed time and catch up: setInterval drifts and the stream runs short.
+    // why: lessons/rig-board-synth.md#synth-clock
     startRealtime(onFrame, { tickMs = 10 } = {}) {
       const t0 = performance.now();
       const timer = setInterval(() => {
         const want = Math.floor(((performance.now() - t0) / 1000) * RATE);
         let guard = 0;
         while (n + FRAME <= want && guard++ < 25) onFrame(this.render(FRAME));
-        // guard: if the process was suspended (a lid closing, a long GC), do not
-        // try to emit ten seconds of backlog at once — that would trip the
-        // relay's 60 msg/s cap, which drops SILENTLY.
+        // After a suspend, do not emit the backlog at once: the relay's rate cap drops silently.
+        // why: lessons/rig-board-synth.md#synth-guard
         if (guard >= 25) n = want;
       }, tickMs);
       return () => clearInterval(timer);
@@ -96,16 +78,9 @@ export function createSynth({ maxVoices = 16 } = {}) {
   };
 }
 
-/**
- * Notes from ALSA, on the board. `aseqdump` creates its own sequencer port, so
- * the synth is patchable by the SAME patchbay as any hardware:
- *   aconnect circuit aseqdump
- *
- * ⚠️ `stdbuf -oL`. aseqdump writes text, and stdio BLOCK-buffers when its
- * output is a pipe rather than a terminal — 4 KiB of note events would arrive
- * in one burst seconds late. It would look like network latency and it would be
- * a libc default. Line buffering is not optional here.
- */
+// Notes from aseqdump, which makes its own sequencer port (aconnect circuit aseqdump).
+// `stdbuf -oL`: piped stdio block-buffers, delivering note events in late bursts.
+// why: lessons/rig-board-synth.md#synth-alsa
 export function alsaNotes(spawn, onNote, { port } = {}) {
   const args = ['-oL', 'aseqdump', ...(port ? ['-p', port] : [])];
   const p = spawn('stdbuf', args, { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -125,15 +100,8 @@ export function alsaNotes(spawn, onNote, { port } = {}) {
 }
 
 
-/**
- * A subtractive instrument, same clock, different voice.
- *
- * It is a separate factory rather than a parameter on createSynth because the
- * two voices are shaped differently and always will be: a Rhodes voice is a
- * pure function of time since onset, while this one carries filter state and
- * must be stepped in order. Pretending they are the same thing behind a flag
- * would be two components in a trenchcoat.
- */
+// A separate factory: this voice carries filter state and is stepped in order, unlike the Rhodes.
+// why: lessons/rig-board-synth.md#synth-moog
 export function createMoogSynth({ maxVoices = 8, patch = 'bass' } = {}) {
   let voices = [];
   let n = 0;

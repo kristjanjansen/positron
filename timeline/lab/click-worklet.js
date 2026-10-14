@@ -1,8 +1,6 @@
-// timeline/lab/click-worklet.js — timestamps threshold crossings on its own
-// render thread with sample resolution. The lane under test feeds one-sample
-// impulses into this node; detection time = (currentFrame + i) / sampleRate,
-// i.e. the exact context time the sample was RENDERED at — independent of the
-// main thread. 20 ms refractory (clicks are 100 ms apart).
+// Timestamps threshold crossings on the render thread: (currentFrame + i) / sampleRate, the exact
+// time a sample rendered. 20 ms refractory (clicks are 100 ms apart).
+// why: lessons/timeline-lab.md#cw-header
 class ClickDetect extends AudioWorkletProcessor {
   constructor() {
     super();

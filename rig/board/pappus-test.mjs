@@ -1,11 +1,6 @@
-// rig/board/pappus-test.mjs — the roll and the drift, with no board, no JACK and
-// no sound card. Both are pure functions, which is why they can be checked at
-// all; the parts that talk to sclang are checked on the board by ear and by the
-// frame rate, not here.
-//
-// Two of these are NEGATIVE CONTROLS — they run the OLD formulas and require
-// the check to REJECT them. A check nobody has seen fail is a check you do not
-// know you have.
+// The roll and the drift, pure, with no board. Two negative controls run the OLD formulas
+// and require the check to reject them.
+// why: lessons/rig-board-tests.md#pappus-test-header
 import { rollPappus, driftValues, driftTarget, mulberry32, PARAMS, MODES, DRIFT, CHARACTERS, CHARACTER_NAMES }
   from './pappus.mjs';
 
@@ -55,8 +50,8 @@ console.log('\n== the roll ==');
   ok('500 rolls, every value inside the engine\'s own range', bad.length === 0, bad.slice(0, 3).join(' · ') || '0 bad');
 }
 
-// 3b. NEGATIVE CONTROL — the OLD roll, verbatim, must be rejected by the check
-//     above. Without this the check could be vacuous.
+// 3b. NEGATIVE CONTROL: the old roll must be rejected by the check above.
+// why: lessons/rig-board-tests.md#pappus-test-3b
 {
   const oldScanmode = () => Math.floor(Math.random() * 3);      // was: 0..2
   const oldContour  = () => 1 + Math.floor(Math.random() * 8);  // was: 1..8
@@ -97,7 +92,8 @@ console.log('\n== the roll ==');
   ok('the two granulators never draw the same character', same === 0, `${same}/300 collided`);
 }
 
-// 6. A character actually constrains — drone is slow, shatter is not.
+// 6. A character constrains: drone is slow, shatter is not.
+// why: lessons/rig-board-tests.md#pappus-test-6
 {
   let droneMax = 0, shatterMin = Infinity, nd = 0, ns = 0;
   for (let s = 0; s < 800; s++) {
@@ -111,8 +107,8 @@ console.log('\n== the roll ==');
      `drone max ${droneMax}/s (n=${nd}) · shatter min ${shatterMin}/s (n=${ns})`);
 }
 
-// 7. The rest of the chain is rolled too — dropping it to gain characters
-//    would have been a regression, so it is asserted rather than assumed.
+// 7. The rest of the chain is rolled too.
+// why: lessons/rig-board-tests.md#pappus-test-7
 {
   const r = rollPappus(31);
   const has = (o, ks) => ks.every((k) => o[k] !== undefined);
@@ -125,8 +121,8 @@ console.log('\n== the roll ==');
      '48 resonators · 8 taps · 16 euclid steps · colour · reverb · routing');
 }
 
-// 8. NEGATIVE CONTROL — the chord selector the old roll used is always true, so
-//    one of its two chords could never be chosen. Run it and show it.
+// 8. NEGATIVE CONTROL: the old chord selector is always true, so one chord is never chosen.
+// why: lessons/rig-board-tests.md#pappus-test-8
 {
   let major = 0;
   for (let k = 0; k < 200; k++) {
@@ -164,8 +160,8 @@ console.log('\n== the roll ==');
      `crushmode ${lo(seen.crushmode)}-${hi(seen.crushmode)} · noisetype ${lo(seen.noisetype)}-${hi(seen.noisetype)} (4+ are the loop files) · pgraintype ${lo(seen.pgraintype)}-${hi(seen.pgraintype)}`);
 }
 
-// 11. The voices are rolled — but they are a separate block, so a caller with a
-//     keyboard attached can decline them without declining the rest.
+// 11. The voices are a separate block, so a caller with a keyboard can decline them.
+// why: lessons/rig-board-tests.md#pappus-test-11
 {
   const r = rollPappus(5);
   ok('the grain voices are a block of their own, so a keyboard can keep them',
@@ -241,12 +237,8 @@ const base = rollPappus(7).m;
      Math.abs(mean - base.scan) < 0.05, `roll set scan ${base.scan}, mean over an hour ${mean.toFixed(3)}`);
 }
 
-// ── the centre the drift circles ─────────────────────────────────────────────
-//
-// A page that sets its sound directly instead of rolling a die still needs the
-// slow movement to have something to move AROUND. `driftTarget` is the pure
-// half of that: which raw engine commands name a parameter the drift moves.
-// The socket half is checked on the board, by the nudge count climbing.
+// The centre the drift circles: `driftTarget` names which raw commands set a drifted parameter.
+// why: lessons/rig-board-tests.md#pappus-test-centre
 console.log('\n== the centre the drift circles ==');
 
 // 13. Both sides of both spellings, and every drifting name.
@@ -279,9 +271,8 @@ console.log('\n== the centre the drift circles ==');
      `scan ${a.scan} -> ${b.scan}, ${DRIFT.length - 1} others unchanged`);
 }
 
-// 16. A centre of one parameter is a legal centre — a page sets `mscan` before
-//     it has set anything else, and the drift must move that and say nothing
-//     about the five it has never been told.
+// 16. A one-parameter centre is legal: the drift moves that one and leaves the rest alone.
+// why: lessons/rig-board-tests.md#pappus-test-16
 {
   const v = driftValues({ scan: 0.5 }, 123.4, 0);
   ok('a partial centre drifts what it has and invents nothing',
@@ -289,17 +280,7 @@ console.log('\n== the centre the drift circles ==');
      `keys: ${Object.keys(v).join(',') || 'none'}`);
 }
 
-// 🔴 A SECTION CALLED "GENTLE WITH THE ARCHIVE" STOOD HERE AND LEFT ON
-// 2026-09-16, WITH THE THING IT WAS GENTLE WITH. It counted requests against a
-// stubbed `fetch` and proved three real properties of the ERR path: the 1965
-// search was read from disk rather than re-asked, an excerpt already cut was
-// not cut again, and a refusal produced a backoff rather than another request.
-// All three were bought after ERR blocked this board on 2026-09-11.
-//
-// The whole path went instead of the tests. `archive/box-pappus/pappus-err.js`
-// has the code those checks were about, and the checks themselves are in
-// `git show 141d7f3^:rig/board/pappus-test.mjs`. If anything here ever talks to
-// somebody else's archive again, take them back out of there first.
+// why: lessons/rig-board-tests.md#pappus-test-archive
 
 console.log(`\n${pass}/${pass + fail} green${fail ? `  (${fail} FAILED)` : ''}\n`);
 process.exit(fail ? 1 : 0);

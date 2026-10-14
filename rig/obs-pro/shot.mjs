@@ -1,11 +1,5 @@
-// Read the burned clock back out of OBS's own composited frame.
-//
-// This is the check that the encoder is drawing a READABLE picture before any
-// network is involved: OBS screenshot -> ffmpeg crops the one sample line ->
-// the same decode readBurned() does. A green "streaming" light says nothing
-// about whether the row survived; this does.
-//
-//   node shot.mjs [source]        default: the whole program output
+// node shot.mjs [source]: read the burned clock from OBS's own frame, before any network.
+// why: lessons/rig-obs.md#obs-shot
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { ObsClient } from '../obs-docker/control.mjs';
@@ -35,7 +29,8 @@ const src = process.argv[2];
 const obs = new ObsClient({ eventSubscriptions: 0 });
 await obs.connect();
 
-// call() resolves { data, tResp, rttMs } — tResp is epoch ms at the response.
+// call() resolves { data, tResp, rttMs }; tResp is epoch ms at the response.
+// why: lessons/rig-obs.md#obs-shot-call
 const req = src ? { sourceName: src }
   : { sourceName: (await obs.call('GetSceneList')).data.currentProgramSceneName };
 const r = await obs.call('GetSourceScreenshot', { ...req, imageFormat: 'png', imageWidth: 1280, imageHeight: 720 });

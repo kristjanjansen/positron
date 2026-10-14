@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-# MULTI-PUBLISHER grid rig server (RUNBOOK §13). Port 8887 (this agent's port).
-# - static files from www/
-# - POST /log            -> append logs/moq-mgrid.log (+ stdout)
-# - POST /jsonl/<name>   -> append results/moq-mgrid-<name>.jsonl (repo results/)
-# - GET  /roster         -> {"pubs":[ns,...],"v":N}  (the draft-14 discovery shim:
-#                           no SUBSCRIBE_NAMESPACE on CF -> local registry; production
-#                           discovery would ride the RtcRoom DO)
-# - POST /roster         -> {"action":"add"|"remove"|"clear","ns":...}
-# - GET  /cmd?id=X       -> latest command for X or {}
-# - POST /cmd            -> {"id":X, ...} stored (server adds tSrv ms)
+# Multi-publisher grid server (RUNBOOK §13) on 8887: static www/, POST /log and /jsonl/<name>,
+# GET/POST /roster (the draft-14 discovery shim) and GET/POST /cmd.
+# why: lessons/rig-moq.md#mgridserver
 import http.server, socketserver, sys, os, json, threading, time
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8887

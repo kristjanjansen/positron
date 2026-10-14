@@ -1,69 +1,15 @@
-// rig/board/jack.mjs: the JACK audio graph, as a value.
-//
-// The ALSA half of this board's patchbay has been a document since session 17
-// (`alsa.mjs`): `aconnect -l` parsed, a patch planned before anything changes,
-// a half application refused. The JACK half was shell strings in
-// `jacksynth.mjs`, 21 of them by 2026-10-11, and nothing could say what a
-// re-patch was going to do before it did it. This file is that missing half,
-// in the same shape (plans/plan-nodes.md §5.4, plans/plan-nodes-revisited.md §3
-// item 3).
-//
-// 🔴 THE TWO ARMS DO NOT SHARE A VOCABULARY, AND THIS FILE DOES NOT PRETEND
-// THEY DO. Written down rather than flattened:
-//
-//   ALSA (alsa.mjs)                      JACK (this file)
-//   a port is `20:0`, found by name      a port is `client:port`, EXACT, no fuzzy match
-//   one subscription carries every       one connection carries ONE channel of
-//     message class, `carry` subsets       one type; there are no classes, so a
-//     are refused because aconnect         `carry` field is refused by name
-//     cannot filter
-//   stereo does not exist                left and right are two links, and a
-//                                          link per channel is the whole point
-//   two sources into one port merge      two sources into one input SUM, which is
-//     streams                              how this board's capture is mono-sum
-//   a plan only adds                     a plan may OWN an input: every source
-//                                          feeding it that the document does not
-//                                          name is disconnected (`own`)
-//   any port may go anywhere             direction and type are checked: an
-//                                          output into an input, audio into audio
-//
-// ⚠️ A WRONG JACK PATCH IS SILENT, LIKE A WRONG MIDI ONE, AND IT IS WORSE:
-// a missing right channel still sounds like a working instrument (MEASURED,
-// 2026-09-13: mono-left read a note at 1661 Hz where mono-sum read 2029 Hz).
-// So `apply` answers with the graph READ BACK, never with the commands having
-// run. `jack_connect` exits 1 both when it fails and when the link already
-// existed (MEASURED on the board 2026-10-11, both with the text on stderr), so
-// an exit status cannot be the verdict.
-//
-// 🔴 A PORT IS NOT A READY ENGINE. `fx.pappus` once answered ok the moment
-// `SuperCollider:out_1` appeared, about seven seconds before the engine had
-// compiled, and every command sent in the gap vanished (session 18). This file
-// checks the WIRE and nothing behind it: an applied link to a client that is
-// still loading reads as connected and carries silence. Waiting for an engine
-// is the caller's job and stays there (`pappusFx` waits for `PAPPUS READY`
-// before it patches anything).
+// The JACK graph as a value, alsa.mjs's twin: exact `client:port`, one channel per link,
+// inputs sum, a plan may own an input, direction and type checked. `apply` answers with the
+// graph read back (jack_connect exits 1 for "already" too). A port is not a ready engine.
+// why: lessons/rig-board-io.md#jack-header
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 export const JACK_DOC_V = 1;
 
-/**
- * `jack_lsp -c`, optionally with `-p` and `-t`, as rows. Pure, so it is graded
- * against text captured off the board (`fixtures/jack-lsp-c-pi.txt`,
- * `fixtures/jack-lsp-cpt-pi.txt`, both 2026-10-11).
- *
- * The format, read off the Pi rather than off a manual:
- *   yoshimi:left                         a port, at column 0
- *      posboard:input_1                  a connection, three spaces
- *   \tproperties: output,                `-p`, one tab
- *   \t32 bit float mono audio            `-t`, one tab
- *
- * ⚠️ A CONNECTION IS LISTED FROM BOTH ENDS, so a sink's list is everything
- * feeding it. ⚠️ jackd's own complaint (`Cannot lock down 107350048 byte memory
- * area`) goes to STDERR on this board, but a caller that merged the streams
- * would hand it in as a port, so a column-0 line with no colon is not a port
- * and is kept in `noise` rather than dropped or invented into a row.
- */
+// `jack_lsp -c` (with -p, -t) as rows, pure, graded on text captured off the Pi. Connections appear
+// from both ends; a column-0 line with no colon (jackd's stderr) goes to `noise`.
+// why: lessons/rig-board-io.md#parse-lsp
 export function parseJackLsp(text) {
   const rows = [];
   const noise = [];
@@ -107,18 +53,9 @@ const sh = (bin, args) => {
 const clean = (s) => String(s).split('\n').map((l) => l.trim())
   .filter((l) => l && !/^Cannot lock down \d+ byte memory area/.test(l)).join(' ') || null;
 
-/**
- * 🔴 PORT NAMES, WHEN jackd OWNS A CARD, SINCE 2026-10-11. With `jackd -d alsa`
- * on the Fast Track Pro the Circuit is `system:capture_1`, not the
- * `circuit:capture_1` that `alsa_in -j circuit` registered and that every bay
- * link, `graph-registry.mjs` `inputJack` and `jack-bay-live.mjs` name. JACK
- * cannot rename its driver's client, so the board renames at this ONE
- * boundary: every listing reads the real name as the input's name, and every
- * connect or disconnect turns it back. Everything above this file keeps
- * saying `circuit:capture_1` and never learns which bridge is under it.
- * ⚠️ An exact map, never a prefix: `system:capture_1` is not
- * `system:capture_10`. An empty map is the dummy driver and changes nothing.
- */
+// When jackd owns the card, `system:capture_N` is renamed `<input>:capture_N` here and back on
+// every connect, exact map only, so everything above never learns which bridge is in use.
+// why: lessons/rig-board-io.md#names
 let NAMES = new Map(), REAL = new Map();
 export function setPortNames(map = {}) {
   NAMES = new Map(Object.entries(map ?? {}));
@@ -135,19 +72,15 @@ const renameRows = (rows) => {
   return rows;
 };
 
-/**
- * The graph as it is now. `{ backend, rows, error }`.
- * ⚠️ AN EMPTY LIST MEANS NO SERVER, NOT NO PORTS: a running jackd always has
- * at least its driver's ports. That is `jacksynth.mjs`'s established reading
- * and it is kept, as `error`, so "jackd is down" never reads as a quiet graph.
- */
+// The graph now: { backend, rows, error }. An empty list means no server, reported as `error`.
+// why: lessons/rig-board-io.md#list
 export function listJack({ from, text } = {}) {
   if (text != null) return { backend: 'fake', rows: renameRows(parseJackLsp(text)), error: null };
   if (from) return { backend: 'fake', rows: renameRows(parseJackLsp(readFileSync(from, 'utf8'))), error: null };
   const r = sh('jack_lsp', ['-c', '-p', '-t']);
   if (r.code !== 0 && !r.out.trim()) {
-    // The useful sentence is jack_lsp's LAST line; the five above it are
-    // libjack's shared memory bookkeeping (read off the board 2026-10-11).
+    // jack_lsp's last line is the useful one; the rest is libjack bookkeeping.
+    // why: lessons/rig-board-io.md#last-line
     const last = String(r.err).trim().split('\n').map((x) => x.trim()).filter(Boolean).at(-1);
     return { backend: 'jack', rows: [], error: /ENOENT/.test(r.err) ? 'jack_lsp is not installed on this board'
       : /server is not running/.test(r.err) ? 'jackd is not running, so there is no graph' : (last ?? 'jack_lsp failed') };
@@ -156,11 +89,8 @@ export function listJack({ from, text } = {}) {
   return { backend: 'jack', rows, error: rows.length ? null : 'jack_lsp lists no ports at all, so there is no server' };
 }
 
-/**
- * A document in canonical form: links deduplicated and sorted, `own` sorted,
- * nothing else kept. Two documents that mean the same thing print the same,
- * which is plans/plan-nodes.md §4.1 rule 3.
- */
+// Canonical form: links deduplicated and sorted, `own` sorted, nothing else.
+// why: lessons/rig-board-io.md#canonical
 export function canonical(doc) {
   const key = (l) => `${l.from}\u0000${l.to}`;
   const links = uniqLinks(doc).sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
@@ -181,29 +111,10 @@ const uniqLinks = (doc) => {
 };
 const uniqOwn = (doc) => [...new Set(Array.isArray(doc?.own) ? doc.own : [])];
 
-/**
- * Turn a document into steps WITHOUT touching the graph.
- *
- *   { v: 1,
- *     links: [ { from: 'yoshimi:left', to: 'posboard:input_1' }, ... ],
- *     own:   [ 'posboard:input_1' ] }        optional
- *
- * `links` must be there afterwards. `own` names inputs whose WHOLE feed this
- * document decides, so anything else feeding one of them is disconnected; an
- * input not owned is only ever added to. An owned input that is not on the
- * graph has nothing feeding it and is skipped, not refused.
- *
- * Refused, by name, and then NOTHING is planned: an unknown `v`, a port that is
- * not on the graph, a name with no colon, an input as a source or an output as
- * a destination, audio into MIDI, a port to itself, and any `carry`.
- * Direction and type are checked only when the listing carried them (`-p -t`);
- * `checked` says which were, so a plan made from bare `-c` text does not claim
- * a check it could not make.
- *
- * ⚠️ STEPS DISCONNECT FIRST, THEN CONNECT, which is the order `pappusFx` has
- * always used: a few milliseconds of gap rather than a moment with the wrong
- * source and the right one both summed into the capture.
- */
+// A document to steps without touching the graph: {v: 1, links, own?}. Refused by name, planning
+// nothing: bad v, missing or colonless ports, wrong direction or type, self links, any `carry`.
+// `checked` says which checks the listing allowed. Disconnect first, then connect.
+// why: lessons/rig-board-io.md#plan
 export function plan(doc, rows) {
   const problems = [], steps = [];
   if (!doc || typeof doc !== 'object') return { ok: false, steps, problems: ['patch is not an object'] };
@@ -222,9 +133,9 @@ export function plan(doc, rows) {
     if (!n) return { ok: false, reason: 'empty port name' };
     const hit = byName.get(n);
     if (hit) return { ok: true, row: hit };
-    // ⚠️ NO FUZZY MATCH. `yoshimi` meaning `yoshimi:left` is exactly how a
-    // patch ends up with one channel of a stereo instrument and sounds fine.
-    // The candidates are offered so a person can pick, never picked for them.
+    // No fuzzy match: `yoshimi` for `yoshimi:left` is how one stereo channel gets lost; candidates
+    // are offered.
+    // why: lessons/rig-board-io.md#no-fuzzy
     const client = n.includes(':') ? n.slice(0, n.indexOf(':')) : n;
     const candidates = rows.filter((r) => r.port.startsWith(`${client}:`)).map((r) => r.port);
     return { ok: false, reason: n.includes(':') ? `${n} is not on the graph` : `${n} is a client, not a port; JACK links one channel at a time`,
@@ -263,11 +174,8 @@ export function plan(doc, rows) {
 
 const step = (act, from, to) => ({ act, from, to, cmd: `jack_${act} "${from}" "${to}"` });
 
-/**
- * What a document and a graph disagree about, with no steps: the same reading
- * `plan` makes, for a REPORT. `missing` is a named link that is not there,
- * `extra` a source feeding an owned input that the document did not name.
- */
+// What a document and the graph disagree about, for a report: `missing` and `extra`.
+// why: lessons/rig-board-io.md#diff
 export function diff(doc, rows) {
   const byName = new Map(rows.map((r) => [r.port, r]));
   const links = uniqLinks(doc);
@@ -288,19 +196,9 @@ export function runStep(s) {
   return clean(`${r.out}\n${r.err}`);
 }
 
-/**
- * Apply a plan, then READ THE GRAPH BACK and answer from that.
- *
- * Refuses outright unless the plan is clean: there is no "apply the parts that
- * worked", because a half applied patch is a graph whose state nobody wrote
- * down. `run` and `read` are injectable so the whole of this is gradeable on a
- * laptop (`test.mjs`); on the board they are `jack_connect`/`jack_disconnect`
- * and `jack_lsp -c -p -t`.
- *
- * `ok` is the READ BACK: every named link present and nothing unnamed feeding
- * an owned input. A step whose command printed something is kept with its text
- * in `said`, and is not by itself a failure.
- */
+// Apply a clean plan only, then read the graph back; run and read are injectable for tests. `ok` is
+// the read-back; a step's output text is kept in `said`, not a failure by itself.
+// why: lessons/rig-board-io.md#apply
 export function apply(planned, { dry = false, run = runStep, read = () => listJack().rows } = {}) {
   if (!planned?.ok) return { ok: false, ran: [], reason: 'plan has problems; nothing applied', problems: planned?.problems ?? [] };
   if (dry) return { ok: true, dry: true, ran: planned.steps.map((s) => ({ ...s, result: 'dry' })) };

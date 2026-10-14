@@ -1,13 +1,7 @@
-// MULTI-PUBLISHER grid: lightweight publisher page (RUNBOOK §13).
-// Co-tenancy: ONE page runs K publisher pipelines (?ids=p1,p2,p3,p4,p5) — each
-// pipeline has its OWN Connection (own WebTransport/QUIC session, so relay
-// fan-in semantics = one session per publisher), own namespace
-// positron-mgrid-p{N}, own 320x180@15 canvas (id + burned-ms row), H.264
-// baseline annexb ~300 kbps, catalog republish every 2 s (§7.1 trap 1).
-// Self-registers each ns into the local roster (draft-14 has no
-// SUBSCRIBE_NAMESPACE -> discovery shim). headless=new rejects multiple URLs
-// ("Multiple targets are not supported") — hence in-page co-tenancy.
-// Params: ?ids= &relay= &fps= &bitrate= &statsms= &noroster=1
+// Grid publisher page (RUNBOOK §13): K pipelines per page, each its own Connection and namespace,
+// 320x180@15 H.264 ~300 kbps; self-registers in the roster. Params: ?ids= &relay= &fps= &bitrate=
+// &statsms= &noroster=1
+// why: lessons/rig-moq.md#mgrid-pub-header
 import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 

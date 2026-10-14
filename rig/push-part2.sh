@@ -1,12 +1,7 @@
 #!/bin/zsh
-# part2-mystery encoder: same encode teed to (a) Cloudflare RTMPS and (b) a local
-# FLV-parsing tap that timestamps when each frame's bytes leave the muxer.
-# Derived from push-llhls.sh; knobs via env:
-#   GOP   (default 60)      keyframe interval in frames @30fps
-#   TUNE  (default zerolatency; "none" drops -tune → default lookahead/mbtree/frame-threads)
-#   TAP   (default 127.0.0.1:8898; "none" disables the tap leg)
-#   AUDIO (default on; "off" → no audio stream)
-#   KEYFILE (default $SCRATCH/p2_key.txt)
+# One encode teed to Cloudflare RTMPS and a local FLV tap timing each frame leaving the muxer.
+# Env: GOP (60), TUNE (zerolatency or none), TAP (127.0.0.1:8898 or none), AUDIO, KEYFILE.
+# why: lessons/rig-misc.md#push-part2
 set -e
 FF=${FF:-/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg}
 SCRATCH=${SCRATCH:-${TMPDIR:-/tmp}/positron-scratch}

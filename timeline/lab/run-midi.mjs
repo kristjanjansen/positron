@@ -1,8 +1,6 @@
-// timeline/lab/run-midi.mjs — arm F: Web MIDI timestamped send -> node virtual
-// port, arrival stamped on the truth clock. Two modes: 'queue' (browser MIDI
-// stack does the timing from one batch of timestamped sends) vs 'fire'
-// (setTimeout-per-event immediate sends — the JS-timer baseline).
-// Run AFTER run-lab.mjs (reuses port 8896 + CDP 9321, tlab patterns).
+// Arm F: Web MIDI timestamped sends into a node virtual port, 'queue' (the browser times a batch)
+// against 'fire' (setTimeout per event). Run after run-lab.mjs (port 8896, CDP 9321).
+// why: lessons/timeline-lab.md#rm-header
 import { spawn, execSync } from 'node:child_process';
 import os from "node:os";
 import { readFile, writeFile, mkdir } from 'node:fs/promises';

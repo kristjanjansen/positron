@@ -1,42 +1,7 @@
-// demo/fake-relay.mjs: a relay room server that is nobody's relay.
-//
-//   node demo/fake-relay.mjs                  # :8897
-//   node demo/fake-relay.mjs --port 9101
-//
-// It speaks what `workers/relay/src/index.js` speaks and nothing more:
-//
-//   ws://127.0.0.1:<port>/room/<name>/ws      join a room
-//   GET  /room/<name>/stats                   the relay's own stats shape
-//
-// and a page reaches it through wire.mjs's `?relay=`:
-//
-//   http://127.0.0.1:8890/away/?relay=ws://127.0.0.1:8897
-//
-// 🔴 WHY THIS EXISTS. plans/plan-routing-migration.md §3.8: every opener that
-// matters talks to the Raspberry Pi in another building through the production
-// relay, so a harness either drove shared hardware or graded nothing. This and
-// `demo/fake-board.mjs` together are a room and a board on this machine.
-//
-// ⚠️ WHAT IT COPIES, BECAUSE A PAGE CAN SEE IT:
-//   - VERBATIM to every socket in the room, THE SENDER INCLUDED. `wire.mjs`
-//     counts its own echo, and a relay that skipped the sender would read as a
-//     relay dropping every message.
-//   - the text frame `ping` is answered `pong` to that socket only and reaches
-//     nobody else, which is what the runtime's autoresponse does there.
-//   - the same message roof, the same two token buckets and the same strikes,
-//     so a stand-in is not more generous than the relay. A dropped message is
-//     dropped silently and counted only here, which is the relay's behaviour
-//     and the reason `seq` exists.
-//   - a full room refuses the upgrade with the relay's `503 room full (N)`,
-//     and `/stats` says so, which is how `openWire` tells a full room from a
-//     dead relay. ANY ROOM WHOSE NAME ENDS `-full` IS FULL HERE, so a page can
-//     be pointed at a refusal by its own `?room=`.
-// ⚠️ WHAT IT DOES NOT: hibernation, idle reclaim and the per-socket attachment.
-// Nothing here lives long enough for them to matter, and they are said rather
-// than pretended.
-//
-// 🔴 LOOPBACK ONLY. It listens on 127.0.0.1, because a room server reachable
-// from the network is a tokenless relay somebody else can use.
+// node demo/fake-relay.mjs [--port N] (:8897): a loopback-only relay, joined with ?relay=ws://...
+// It copies what a page can see: verbatim to all incl. the sender, ping/pong, the same roof,
+// buckets and strikes, 503 when full (any room ending `-full`). No hibernation or idle reclaim.
+// why: lessons/harness.md#fake-relay
 
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
@@ -70,11 +35,9 @@ export function encodeFrame(data, opcode) {
   return Buffer.concat([head, body]);
 }
 
-/**
- * Reads frames off a byte stream. Fragmented messages are joined; control
- * frames come out on their own. `onFrame(opcode, payload)` gets whole messages.
- * Returns `{ push(chunk) }`.
- */
+// Reads frames off a byte stream, joining fragments; onFrame(opcode, payload). Returns {
+// push(chunk) }.
+// why: lessons/harness.md#frames
 export function createFrameReader(onFrame) {
   let buf = Buffer.alloc(0);
   let frag = null, fragOp = 0;
@@ -104,15 +67,9 @@ export function createFrameReader(onFrame) {
   };
 }
 
-/**
- * Start a room server. Returns the `http.Server`, already listening (wait for
- * `listening` before reading `address()`), with `stats()` for a test.
- * @param {object} [o]
- * @param {number} [o.port]         0 lets the OS choose, which a harness wants
- * @param {boolean} [o.quiet]
- * @param {number} [o.maxSockets]   per room, the relay's 128 unless a test asks
- * @param {(room: string) => boolean} [o.full] rooms that refuse every upgrade
- */
+// startRelay({ port, quiet, maxSockets, full }) -> a listening http.Server with stats().
+// port 0 lets the OS choose; wait for `listening` before reading address().
+// why: lessons/harness.md#relay-start
 export function startRelay({ port = 8897, quiet = false, maxSockets = LIMITS.maxSockets,
   full = (room) => room.endsWith('-full') } = {}) {
   const say = (...a) => { if (!quiet) console.log('[fake-relay]', ...a); };

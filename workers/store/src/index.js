@@ -1,40 +1,7 @@
-/**
- * positron-store — the history the relay refuses to keep. plan-ws §3.
- *
- * The relay's whole value is that it does not parse: no envelope, no storage,
- * text or binary relayed as-is, and a `ping` answered by the runtime's
- * hibernation autoresponse so an RTT probe never even wakes it. Putting
- * history inside it would make every message a parse and every room a write.
- *
- * So the backlog sits BESIDE it, and fills the only way that keeps that true:
- *
- *   THE RECORDER JOINS THE ROOM AS AN ORDINARY SOCKET.
- *
- * It costs one of the relay's sixteen slots, it sees exactly the order every
- * other member sees — the echo is the ordering point — and it is allowed to
- * parse because it is not the relay. It is also the one place `store: true`
- * can be honoured, which is why that flag lives in the envelope rather than in
- * a query string.
- *
- * The cost, stated rather than hidden: a recorded room is a Durable Object
- * kept awake. Recording is therefore something you turn ON for a room, with an
- * idle stop, not a property every room has.
- *
- *   POST /room/<name>/record   {cap?}   -> starts it; returns when the socket is open
- *   GET  /room/<name>/history?last=|since=|from=&to=|type=   -> NDJSON, oldest first
- *   GET  /room/<name>/stats
- *   POST /room/<name>/clear       one room, from one of this project's pages (Origin)
- *   POST /clear-all               every room the index knows of, needs x-store-key
- *
- * `clear-all` needs a list of rooms, and a DO namespace cannot be enumerated —
- * so one reserved instance, `__index`, keeps the names as they start recording.
- * ⚠️ It therefore knows only what was recorded SINCE it existed: rooms from
- * before are unreachable by name and keep up to `cap` rows until something
- * writes to them again, because the prune runs on write. At demo scale that is
- * a handful of rows; if it ever matters, prune on the idle-stop alarm.
- * The public room route refuses any name beginning `__`, so nothing outside
- * this file can address it.
- */
+// positron-store: the history the relay will not keep. The recorder joins a room as an ordinary
+// socket, so it sees the relay's order; recording is turned on per room, with an idle stop.
+// POST /room/<n>/record, GET .../history, .../stats, POST .../clear; POST /clear-all needs a key.
+// why: lessons/workers-store.md#header
 
 import { STORE_GRAPH } from './graph.js';
 import { json as baseJson, OPEN, preflight, ourOrigin, keyMatches } from '../../_lib/http.mjs';
@@ -136,11 +103,8 @@ export class Store extends RelayRecorder {
     this.ws = null;
   }
 
-  /**
-   * `graph.announce` in wire.mjs's envelope. ⚠️ NO `store: true`, so the
-   * store never keeps its own announcement, nor anybody else's `graph.*`,
-   * when the relay echoes them back to it.
-   */
+  // `graph.announce` with no `store: true`, so the store never keeps its own or anybody's graph.*.
+  // why: lessons/workers-store.md#announce
   #announce() {
     if (!this.ws || this.ws.readyState !== WebSocket.READY_STATE_OPEN) return;
     try {
@@ -151,16 +115,9 @@ export class Store extends RelayRecorder {
     } catch { /* closing; the close handler stops the beat */ }
   }
 
-  /**
-   * `store: true` is elektron's, and it is right: the sender knows which
-   * messages are worth keeping. Without it a room carrying cues at 60/s fills
-   * a 1,000-message cap in seventeen seconds and buries the one line somebody
-   * wanted to read back.
-   *
-   * A binary frame cannot carry the flag — it has no fields — so it is kept
-   * whenever recording is on. That asymmetry is real and the page prints it
-   * rather than pretending the two paths are the same.
-   */
+  // Keep only `store: true` text: a room of cues at 60/s fills a 1,000-row cap in 17 s.
+  // A binary frame has no fields to flag, so it is kept whenever recording is on.
+  // why: lessons/workers-store.md#store-flag
   async onMessage(data) {
     const meta = await this.#meta();
     meta.seen++;
@@ -173,11 +130,8 @@ export class Store extends RelayRecorder {
       if (m?.type === 'graph.ask' && m.from !== this.from) this.#announce();
       if (m && typeof m === 'object' && m.store) {
         row = {
-          // The column is called `at` and holds the SEND STAMP. The envelope
-          // renamed that stamp to `sent` on 2026-10-04 (`at` is an event's own
-          // time now); an old sender still writes `at`. The column keeps its
-          // name rather than migrating a Durable Object table, so read
-          // `sent` first and fall back to the old envelope field.
+          // Column `at` holds the send stamp: read `sent`, fall back to `at` from an older sender.
+          // why: lessons/workers-store.md#sent-column
           at: Number(m.sent ?? m.at) || Date.now(),
           sender: String(m.from ?? ''),
           seq: Number.isFinite(m.seq) ? m.seq : null,
@@ -188,11 +142,9 @@ export class Store extends RelayRecorder {
         };
       }
     } else {
-      // A DO's OUTBOUND client socket hands binary over as a **Blob**, not an
-      // ArrayBuffer (measured: `Blob`, size 9, byteLength undefined) — and the
-      // SQL bind takes a Uint8Array without complaining and stores an EMPTY
-      // blob, so the row reads back at 0 bytes with the frame apparently
-      // recorded. Convert, then bind an ArrayBuffer.
+      // An outbound DO socket hands binary over as a Blob, and binding a Uint8Array stores an empty
+      // BLOB. Convert, then bind the ArrayBuffer.
+      // why: lessons/workers-store.md#blob
       const buf = typeof data.arrayBuffer === 'function' ? await data.arrayBuffer() : data;
       row = {
         at: Date.now(), sender: '', seq: null, type: 'binary',
@@ -313,8 +265,8 @@ export class Store extends RelayRecorder {
             type: 'binary', sent: r.at, bytes: r.raw?.byteLength ?? 0,
             head: hex(r.raw, 8),
           }))).join('\n');
-      // (a BLOB comes back as an ArrayBuffer, which has no .slice() worth
-      //  having and no iterator — hex() wraps it before reading)
+      // (a BLOB comes back as an ArrayBuffer with no useful .slice() or iterator; hex() wraps it)
+      // why: lessons/workers-store.md#blob-out
       return new Response(lines ? `${lines}\n` : '', {
         headers: {
           'content-type': 'application/x-ndjson; charset=utf-8',
@@ -368,11 +320,9 @@ export default {
 
     const index = () => env.STORE.get(env.STORE.idFromName('__index'));
 
-    // Blunt on purpose, and the button says so: this is demo history, and a
-    // page that keeps a room per visitor leaves rooms nobody will ever name
-    // again. Clearing one room at a time would never reach them.
-    // Every room at once has no page behind it, so it takes the operator's key:
-    // `wrangler secret put STORE_KEY`, sent as `x-store-key`. Unset refuses.
+    // Every room at once, because per-visitor rooms are never named again. No page is behind it,
+    // so it takes STORE_KEY as `x-store-key`; unset refuses.
+    // why: lessons/workers-store.md#clear-all
     if (url.pathname === '/clear-all' && request.method === 'POST') {
       if (!await keyMatches(request.headers.get('x-store-key'), env.STORE_KEY)) {
         return json({ error: 'clearing every room needs the x-store-key header' }, 403);

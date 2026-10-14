@@ -1,10 +1,6 @@
-// demo/server.mjs — static files for every demo. Port 8890.
-//
-//   node demo/server.mjs   ->  http://127.0.0.1:8890/demo/
-//
-// Serves the REPO ROOT so `/timeline/*.mjs` resolves from any page: the demos
-// import the shipped library, never a copy. Exists only because a browser will
-// not load ES modules from a file:// path.
+// node demo/server.mjs -> http://127.0.0.1:8890/demo/. Serves the repo root so /timeline/*.mjs
+// resolves from any page; it exists because browsers will not load modules from file://.
+// why: lessons/harness.md#server
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -26,35 +22,19 @@ const MIME = {
   '.wasm': 'application/wasm',
   // the markdown notes /archive/ links to, as the deploy's _headers serves them
   '.md': 'text/plain; charset=utf-8',
-  // ⚠️ A FONT IS SERVED BY THIS TOO, and the deploy's static assets set the type
-  // from the extension by themselves — so a missing entry here shows up ONLY on
-  // the dev server and only as a browser being fussy, which is the shape of bug
-  // that gets blamed on the page. (`.glb` is absent on purpose: the controller
-  // models have always been served as octet-stream and browsers do not check.)
+  // Fonts too: the deploy types assets by extension itself, so a gap here shows only on the dev
+  // server.
+  // `.glb` is absent on purpose; browsers do not check it.
+  // why: lessons/harness.md#font-types
   '.woff2': 'font/woff2',
-  /**
-   * 🔴 MEDIA, ADDED 2026-09-18. `/stage/`'s film was served from here as
-   * `application/octet-stream`, which is the bug the comment above predicts: the
-   * deploy sets the type from the extension by itself, so a missing entry is
-   * invisible until somebody develops against this server, and then it looks
-   * like a browser being fussy about a page.
-   * ⚠️ IT IS NOT CREDITED WITH A FIX. The stall that led here was a HIDDEN TAB
-   * deferring media, not the content type, and the honest claim for this line is
-   * the narrow one: serving an mp4 as a byte stream is wrong on its own terms.
-   */
+  // Media types, since serving an mp4 as a byte stream is wrong on its own terms.
+  // why: lessons/harness.md#media-types
   '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg',
 };
 
-/**
- * ⚠️ IF THE PORT IS TAKEN, TAKE THE NEXT ONE.
- *
- * A dev server left running on 8890 made every `node demo/verify.mjs` die with
- * an unhandled EADDRINUSE — three times in one session, each time reading as a
- * broken harness rather than as a port that was busy. The harness does not care
- * which port it gets; it only cares that it has one. Callers that need to know
- * read `server.address().port`, and `serve()` logs when it had to move.
- */
-/** Pages the deploy copies in from outside demo/, by their served path. */
+// If the port is taken, take the next one; callers read `server.address().port`. Below: pages the
+// deploy copies in from outside demo/, by their served path.
+// why: lessons/harness.md#port
 const EXTRA = new Map((await import('./manifest.mjs')).extraPages().map(([src, dst]) => [dst, src]));
 
 // A browser sends a cross-site POST without asking first, so the Origin header
@@ -79,61 +59,10 @@ export function serve(port = PORT) {
     catch { res.writeHead(400, { 'content-type': 'text/plain' }).end('malformed URL'); return; }
     rel = normalize(rel).replace(/^([/\\])+/, '');
     if (rel.includes('..')) { res.writeHead(400).end('no'); return; }
-    // ── /err-img — the same route the deployed Worker serves ───────────────
-    //
-    // 🔴 LOCAL == DEPLOYED IS A RULE, NOT AN ASPIRATION, and this is where it
-    // bit. `/floor/` asks its OWN ORIGIN for archive thumbnails because the
-    // archive's image hosts send no `access-control-allow-origin` and a texture
-    // upload may not read a cross-origin image. That route lives in
-    // `workers/view/src/index.js` — so on the deploy the floor fills, and here
-    // every request 404'd, every tile marked its picture dead, and the page drew
-    // an empty rectangle while its checks all passed. A page that only works
-    // deployed is a page nobody can develop.
-    //
-    // ⚠️ THE VALIDATION IS THE SAME SHAPE ON PURPOSE. If this one were looser,
-    // a path that works here would be refused in production — which is the same
-    // class of bug as the 404, wearing the opposite costume.
-    /**
-     * ── /_tap — what a plugged-in instrument sent, written where a session can
-     * read it ──────────────────────────────────────────────────────────────
-     *
-     * 🔴 WHY THIS EXISTS. `/dump/` reads MIDI in a browser, and a browser is
-     * somewhere a person is sitting rather than somewhere a session can look.
-     * Getting four measurements off a real desk on 2026-09-20 meant driving a
-     * second Chrome through an extension and reading its console back one
-     * question at a time, which the person at the desk called ridiculous and
-     * was right about: every reading cost a round trip, and a press that landed
-     * between two of them was simply lost.
-     *
-     * ⚠️ IT IS THE DEV SERVER ONLY AND IT MUST STAY THAT WAY. There is no such
-     * route in `workers/view/src/index.js`, deliberately, so a deployed
-     * `/dump/` posts nowhere and a visitor's instrument is never written to
-     * anybody's disk. That breaks this project's own LOCAL == DEPLOYED rule on
-     * purpose, and the reason is that the rule exists so a page cannot work in
-     * one place and fail in the other. **This is not a page feature.** It is a
-     * wire between a desk and a session, and the page works identically with
-     * nobody listening.
-     *
-     * ⚠️ APPEND, NEVER REPLACE. A capture is a recording of something that
-     * happened once and cannot be repeated by asking again, which is exactly
-     * the property that made the round trips expensive.
-     */
-    /**
-     * ── /_log — what a page SAID, written where a session can read it ────────
-     *
-     * 🔴 IT IS `/_tap` ONE STEP ALONG AND IT EXISTS FOR THE SAME REASON. Asked
-     * for 2026-09-21: *"build a way to get the logs and debug (like you did with
-     * tap)"*, after an afternoon in which every question about what a page was
-     * doing was answered by the owner taking a screenshot and me reading it.
-     * A log line is on somebody's screen; this puts it in a file.
-     * ⚠️ DEV SERVER ONLY, EXACTLY LIKE `/_tap`. There is no such route in
-     * `workers/view/src/index.js` and there must never be one, so a deployed
-     * page posts nowhere and nobody's log is written to anybody's disk. The
-     * page behaves identically with nothing listening, which is what keeps
-     * LOCAL == DEPLOYED true where it matters.
-     * ⚠️ AND IT IS PER PAGE, because two pages open at once is the normal state
-     * of this project and one interleaved file would be unreadable.
-     */
+    // /err-img mirrors the deployed Worker's route with the same validation (local == deployed).
+    // /_tap and /_log are dev-server only, never deployed: they append a page's MIDI capture or log
+    // lines to a file per page so a session can read them; the page behaves the same without them.
+    // why: lessons/harness.md#dev-routes
     if (rel === '_log' && req.method === 'POST') {
       const cors = localOnly(req, res);
       if (!cors) return;
@@ -207,9 +136,8 @@ export function serve(port = PORT) {
       return;
     }
 
-    // /concepts/ forwards to the front page, as workers/view/src/index.js does on
-    // the deploy (2026-10-13, the concepts index IS the front page). Only the
-    // index: an old /concepts/<group>/<number>/ page is a 404 on both ends.
+    // /concepts/ forwards to the front page, as the deploy does; old concept addresses 404 on both.
+    // why: lessons/harness.md#concepts
     if (rel === 'concepts' || rel === 'concepts/') {
       const q = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
       res.writeHead(302, { location: `/${q}` }).end();
@@ -224,18 +152,10 @@ export function serve(port = PORT) {
       res.writeHead(301, { location: `/${rel}/${q}` }).end();
       return;
     }
-    // LOCAL == DEPLOYED. On the worker, demo/<x> is served at /<x>, so a page
-    // asking for /shell/shell.css or /llhls/ must resolve here too — try the
-    // repo root first, then inside demo/.
-    //
-    // Some pages are under neither root: the build copies them in from
-    // elsewhere (the box's listener from rig/, the component sandbox). They
-    // declare their own `src` in demo/manifest.mjs and BOTH ends read it, so
-    // this rewrite and the build's copy list cannot disagree.
-    //
-    // ⚠️ Mapped rather than served out of workers/view/public/, which is BUILD
-    // OUTPUT — serving that would test a copy and read green on a page the
-    // build had not refreshed.
+    // demo/<x> is served at /<x> as on the deploy: try the repo root, then demo/. Pages from
+    // outside
+    // demo/ use their manifest `src`, as the build does; never serve public/ (build output).
+    // why: lessons/harness.md#local-deployed
     if (EXTRA.has(rel)) rel = EXTRA.get(rel);
     let file = join(ROOT, rel);
     try {
@@ -266,13 +186,8 @@ export function serve(port = PORT) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  /* 🔴 THE LINE A READER CLICKS HAS TO BE THE PORT IT GOT, NOT THE PORT IT
-     ASKED FOR. MEASURED 2026-09-21: with 8890 already held, this printed
-     `(port 8890 was busy, so this is on 8893)` on stderr and then
-     `demo server http://127.0.0.1:8890/demo/` on stdout, so the two lines
-     disagreed and the one that looks like the answer was the wrong one. The
-     harnesses already read `server.address().port` back for exactly this
-     reason, and the boot line was the one place still trusting the constant. */
+  // Print the port it got, not the one it asked for.
+  // why: lessons/harness.md#boot-line
   const s = await serve();
   console.log(`demo server  http://127.0.0.1:${s.address().port}/demo/`);
 }

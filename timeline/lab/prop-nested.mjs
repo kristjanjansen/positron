@@ -1,21 +1,8 @@
 #!/usr/bin/env node
-// timeline/lab/prop-nested.mjs — property arms for v0.5:
-//
-//   suite 6  FRAGMENT QUOTATION   nested.mjs rule 7 (`nest.add({… in, out})`)
-//   suite 7  deck.setRange()      transport.mjs v0.5, incl. the CURSOR arm
-//
-// A SEPARATE FILE from prop-test.mjs on purpose: prop-test.mjs is owned by a
-// sibling agent this cycle, so these arms live beside it rather than inside it.
-// Same virtual runtime, same determinism, same exit code.
-//
-//   node timeline/lab/prop-nested.mjs [--verbose]
-//   node timeline/lab/prop-nested.mjs --seeds 100    (accepted; these arms are
-//                                                     exhaustive, not sampled)
-//
-// The motivating sentence, from plan-timeline §−1 / C10: *a new work is a score
-// that QUOTES archive timelines*. Nobody quotes a whole broadcast. Before this
-// suite a nested span could only play the child's WHOLE range, which is the one
-// thing a quotation never is.
+// node timeline/lab/prop-nested.mjs [--verbose]: property arms for fragment quotation (suite 6),
+// setRange (7), mediaMaster (8, 9), score values (10), marks (11), silence (12), provenance (13),
+// loops (14).
+// why: lessons/timeline-lab.md#pn-header
 
 import { createDeck, createVirtualRuntime, createCursor } from '../transport.mjs';
 import { createNest } from '../nested.mjs';
@@ -61,9 +48,8 @@ function sharedVR(startMs = 1_000_000) {
   return vr;
 }
 
-// A child worth quoting: five overlapping notes across 4 s, so every fragment
-// boundary lands INSIDE at least one held note — the case where "seek to `in`
-// and assert" is not the same as "start from silence".
+// Five overlapping notes across 4 s, so every fragment boundary lands inside a held note.
+// why: lessons/timeline-lab.md#pn-notes
 const NOTES = [
   { n: 60, on: 100, off: 400 }, { n: 62, on: 500, off: 1200 },
   { n: 64, on: 900, off: 2500 }, { n: 67, on: 1500, off: 3800 },
@@ -111,10 +97,8 @@ function makeChild(vr, sink, range = [0, CHILD_END], { shift = 0, marks = null, 
 const newSink = () => ({ live: new Set(), asserts: [], fires: 0, firedAt: [] });
 const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
 
-// ===========================================================================
-// suite 6a — the fragment IS the span: length, entry edge, exit edge, exact
-//            seek anywhere inside.
-// ===========================================================================
+// Suite 6a: the fragment is the span: length, entry edge, exit edge, exact seek anywhere inside.
+// why: lessons/timeline-lab.md#pn-6a
 {
   const vr = sharedVR();
   const sink = newSink();
@@ -125,7 +109,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   const AT = 5000, IN = 700, OUT = 2800, RATE = 1;
   const sp = nest.add({ id: 'q', at: AT, rate: RATE, deck: child, in: IN, out: OUT });
 
-  // 7a — the span occupies (out - in) / rate of PARENT time
+  // 7a: the span occupies (out - in) / rate of parent time.
+  // why: lessons/timeline-lab.md#pn-7a
   check('frag-span', 0, Math.abs(sp.parentDur - (OUT - IN) / RATE) < 1e-9,
     `parentDur ${sp.parentDur} !== (out-in)/rate ${(OUT - IN) / RATE}`);
   check('frag-span', 0, String(nest.fragment('q')) === String([IN, OUT]) && sp.in === IN && sp.out === OUT,
@@ -133,22 +118,20 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   check('frag-span', 0, nest.trim('q').fragment === true && nest.trim('q').clamped === false &&
     String(nest.trim('q').deckRange) === String([0, CHILD_END]),
     `trim report wrong: ${JSON.stringify(nest.trim('q'))}`);
-  // 7g — TRIM DOES NOT MUTATE THE CHILD
+  // 7g: trim does not mutate the child.
+  // why: lessons/timeline-lab.md#pn-7g
   check('frag-span', 0, String(child.range) === String([0, CHILD_END]),
     `trim mutated the child's range: ${child.range}`);
   check('frag-span', 0, Math.abs(nest.trim('q').quotedFraction - (OUT - IN) / CHILD_END) < 1e-6,
     `quotedFraction ${nest.trim('q').quotedFraction}`);
 
-  // 7b — ENTRY asserts at `in`, and `in` is inside a held note, so the reducer
-  //      must state that edge (not silence).
+  // 7b: entry asserts at `in`, inside a held note, so the reducer must state that edge.
+  // why: lessons/timeline-lab.md#pn-7b
   parent.seek(AT - 1);
   check('frag-entry', 0, child.position() === IN,
     `absent-before must park the child at IN=${IN}, got ${child.position()}`);
-  // NOTE (rule 7b/7c, consequence): absence parks at the FRAGMENT edge, so a
-  // quotation whose `in` cuts a held event is parked HOLDING it — that is what
-  // "this quotation opens on a ringing chord" means, and it is the same state
-  // the quotation will open with. Silence-while-absent is only free when the
-  // fragment boundary is a silent one.
+  // Absence parks at the fragment edge, so a quotation cutting a held note is parked holding it.
+  // why: lessons/timeline-lab.md#pn-park
   check('frag-entry', 0, String(heldNow(sink)) === String(heldAt(IN)),
     `parked at IN the child must state IN's edge: [${heldNow(sink)}] !== [${heldAt(IN)}]`);
   sink.asserts.length = 0;
@@ -160,7 +143,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   check('frag-entry', 0, sink.asserts.some((a) => a.reason === 'seek' && Math.abs(a.pos - IN) < 1e-9),
     `no reduce-on-seek ran IN THE CHILD at IN (${JSON.stringify(sink.asserts)})`);
 
-  // 7d — a parent seek ANYWHERE inside maps to in + (parentPos - at)*rate, exact
+  // 7d: a parent seek anywhere inside maps to in + (parentPos - at) * rate, exactly.
+  // why: lessons/timeline-lab.md#pn-7d
   let worst = 0;
   for (const u of [0, 1, 137.5, 700, 1301.25, (OUT - IN) - 1e-3, OUT - IN]) {
     sink.asserts.length = 0;
@@ -176,10 +160,10 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   }
   if (VERBOSE) console.log(`      worst fragment seek error ${worst}`);
 
-  // 7c — `out` behaves as the child's END: absent past it, asserted AT out.
-  //      OUT=2800 sits inside notes 67 and 72, so a WRONG implementation that
-  //      parked at the deck's end (4000, silence) would still show "nothing
-  //      held" — this asserts the position, and that the child does not run on.
+  // 7c: `out` is the child's end: absent past it, asserted at `out` (inside held notes, so a park
+  // at
+  // the deck end would be caught).
+  // why: lessons/timeline-lab.md#pn-7c
   parent.seek(AT + (OUT - IN) + 500);
   check('frag-exit', 0, nest.present('q') === false && !child.playing(),
     'past `out` the child must be absent and paused');
@@ -207,9 +191,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
-// ===========================================================================
-// suite 6b — clamping degrades OUT LOUD; in >= out is rejected at add()
-// ===========================================================================
+// Suite 6b: clamping degrades out loud; in >= out is rejected at add().
+// why: lessons/timeline-lab.md#pn-6b
 {
   const vr = sharedVR();
   const sink = newSink();
@@ -234,7 +217,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   check('frag-clamp', 1, String(nest.fragment('half')) === String([3000, CHILD_END]) && nest.trim('half').clamped,
     `one-sided clamp wrong: ${nest.fragment('half')}`);
 
-  // 7f — in >= out rejected AT add()
+  // 7f: in >= out rejected at add().
+  // why: lessons/timeline-lab.md#pn-7f
   check('frag-reject', 0, /strictly before/.test(throws(() => nest.add({ id: 'x1', at: 0, deck: child, in: 2000, out: 2000 })) || ''),
     'in === out must be rejected at add()');
   check('frag-reject', 0, /strictly before/.test(throws(() => nest.add({ id: 'x2', at: 0, deck: child, in: 3000, out: 1000 })) || ''),
@@ -251,11 +235,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
-// ===========================================================================
-// suite 6c — THE POINT OF THE WHOLE THING: the SAME deck quoted TWICE at two
-//            different fragments in one arrangement. Timelines referencing
-//            timelines: one stored session, two quotations, both correct.
-// ===========================================================================
+// Suite 6c: the same deck quoted twice at two fragments in one arrangement, both correct.
+// why: lessons/timeline-lab.md#pn-6c
 {
   const vr = sharedVR();
   const sink = newSink();
@@ -290,9 +271,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
     }
   }
 
-  // BOTH PLAY CORRECTLY — the regression a naive "absence parks the child"
-  // implementation fails: entering B makes A absent, and A's exit would drag
-  // the shared child back to A's `out` and pause it.
+  // Both play: entering B makes A absent, and A's exit must not drag the shared child back.
+  // why: lessons/timeline-lab.md#pn-both
   for (const [id, Q] of [['A', A], ['B', B]]) {
     sink.fires = 0; sink.firedAt.length = 0;
     parent.seek(Q.at);
@@ -312,7 +292,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
     parent.pause();
   }
 
-  // between the two quotations the child IS absent — parked at A's `out`
+  // between the two quotations the child is absent, parked at A's `out`
+  // why: lessons/timeline-lab.md#pn-between
   parent.seek(6000);
   check('frag-twice', 'gap', nest.present('A') === false && nest.present('B') === false && !child.playing(),
     'between two quotations the child must be absent');
@@ -334,10 +315,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
-// ===========================================================================
-// suite 7 — deck.setRange(): additive, and it must not disturb the CURSOR,
-//           which is now the only positional reader in the library.
-// ===========================================================================
+// Suite 7: deck.setRange() is additive and must not disturb the cursor.
+// why: lessons/timeline-lab.md#pn-7
 {
   const vr = sharedVR();
   const sink = newSink();
@@ -363,7 +342,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   check('setrange', 1, sink.asserts.some((a) => a.reason === 'seek'),
     'the clamp must be a real seek (reduce + assertState), not a silent position patch');
 
-  // items scheduled at runtime + setRange('auto') — the remixer's actual case
+  // items scheduled at runtime plus setRange('auto'), the remixer's case
+  // why: lessons/timeline-lab.md#pn-auto
   deck.setRange([0, 9000]);
   deck.schedule({ at: 7200, kind: 'note', id: 'late-on', payload: { raw: [144, 40, 90] } });
   deck.schedule({ at: 7600, kind: 'note', id: 'late-off', payload: { raw: [128, 40, 0] } });
@@ -431,11 +411,9 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   deck.dispose();
 }
 
-// ===========================================================================
-// suite 8 — mediaMaster(): the media-element clock-master law, with the
-//           NEGATIVE CONTROL that makes the replay-grid bug a measured fact
-//           rather than a claim. Same virtual runtime; the element is faked.
-// ===========================================================================
+// Suite 8: mediaMaster with a faked element, and the negative control for the old sync-on-jump
+// block.
+// why: lessons/timeline-lab.md#pn-8
 function fakeMedia(t0 = 0) {
   const o = { currentTime: t0, paused: false, ended: false, readyState: 4, seeking: false,
               rateWrites: 0, listeners: {} };
@@ -463,9 +441,9 @@ function burstDeck(vr, fired, folded) {
 {
   const vr = sharedVR();
 
-  // --- NEGATIVE CONTROL: the block replay-grid used to run. A discontinuity
-  //     answered with sync() leaves every skipped cue `pending`, and a
-  //     catchUp:'burst' lane fires ALL of them on the next tick.
+  // Negative control: a jump answered with sync() leaves skipped cues pending, and 'burst' fires
+  // them all.
+  // why: lessons/timeline-lab.md#pn-negative
   const firedA = [], foldedA = {};
   const deckA = burstDeck(vr, firedA, foldedA);
   deckA.seek(500); deckA.play();
@@ -534,7 +512,8 @@ function burstDeck(vr, fired, folded) {
   check('media-master', 'L4', (el.listeners.timeupdate || []).length === 0, 'dispose must detach the backstop');
   deckB.dispose();
 
-  // --- L3 'release': N tiles — give the role up instead of holding
+  // L3 'release': give the role up instead of holding.
+  // why: lessons/timeline-lab.md#pn-release
   const firedD = [], foldedD = {};
   const deckD = burstDeck(vr, firedD, foldedD);
   const el2 = fakeMedia(1.0);
@@ -552,25 +531,16 @@ function burstDeck(vr, fired, folded) {
   mm2.dispose(); deckD.pause(); deckD.dispose();
 }
 
-// ===========================================================================
-// suite 9 — L4b: requestVideoFrameCallback.mediaTime as the servo's SENSOR.
-//
-// The measured reason this law is shaped the way it is (timeline/lab/
-// run-sensor.mjs, real headless playback): read as a BARE NUMBER, `mediaTime`
-// sits 0.22-0.90 frame AHEAD of `currentTime` — that is display latency, not
-// error, and swapping sensors tick-by-tick on it made the servo strictly WORSE
-// (corrections 9 -> 380 at a 20 ms band). Carried onto `now` through
-// `expectedDisplayTime` — which is what the spec ships the pair for — the same
-// playback corrects 365 -> 18 times at a 5 ms band. So the law is: CARRY IT,
-// and fall back to currentTime whenever the frame sample cannot be trusted.
-// ===========================================================================
+// Suite 9: rVFC mediaTime as the sensor. Bare, it sits 0.22 to 0.90 frame ahead (display latency)
+// and
+// made the servo worse; carried through expectedDisplayTime it cut corrections 365 to 18 at 5 ms.
+// why: lessons/timeline-lab.md#pn-9
 function fakeVideo(t0 = 0) {
   const o = fakeMedia(t0);
   o.frameCbs = [];
   o.requestVideoFrameCallback = (cb) => { o.frameCbs.push(cb); return o.frameCbs.length; };
-  /** deliver one presented frame: mediaTime seconds, shown at `edtOffset` ms
-   *  from now in the performance.now() timebase (rVFC's expectedDisplayTime is
-   *  in the FUTURE when the callback runs — that is the whole point). */
+  // Deliver one presented frame: mediaTime seconds, shown `edtOffset` ms from now.
+  // why: lessons/timeline-lab.md#pn-present
   o.presentFrame = (mediaTime, edtOffset = 0) => {
     const cbs = o.frameCbs.splice(0);
     const now = performance.now();
@@ -583,7 +553,8 @@ function fakeVideo(t0 = 0) {
   const vr = sharedVR();
   const anchor = 0;
 
-  // --- N1: NO rVFC (Firefox < 132, every <audio>) — nothing changes at all
+  // N1: no rVFC (Firefox < 132, every <audio>): nothing changes.
+  // why: lessons/timeline-lab.md#pn-n1
   {
     const fired = [], folded = {};
     const deck = burstDeck(vr, fired, folded);
@@ -641,8 +612,8 @@ function fakeVideo(t0 = 0) {
     mm.dispose(); deck.dispose();
   }
 
-  // --- N4: a frame sample from BEFORE a discontinuity must never be carried
-  //     across it — otherwise the sensor could change which branch L2 takes.
+  // N4: a frame sample from before a discontinuity is never carried across it.
+  // why: lessons/timeline-lab.md#pn-n4
   {
     const fired = [], folded = {};
     const deck = burstDeck(vr, fired, folded);
@@ -678,25 +649,18 @@ function fakeVideo(t0 = 0) {
   }
 }
 
-// ===========================================================================
-// suite 10 — A QUOTATION IS A VALUE, and a SCORE ROUND-TRIPS. The C10 property:
-//            an arrangement, serialised to JSON, reloaded in a FRESH RUNTIME
-//            that has only the bytes and a resolver, plays IDENTICALLY.
-//
-// "Identically" is not a vibe: the trace below records, at every step of a
-// fixed script, the parent position, both children's positions, both children's
-// held-note sets, and the full ordered list of every event either child fired.
-// Two traces are compared as strings.
-// ===========================================================================
+// Suite 10: a score round-trips. The arrangement, as JSON, reloaded in a fresh runtime with only a
+// resolver, plays identically: traces of positions, held notes and fired events compared as
+// strings.
+// why: lessons/timeline-lab.md#pn-10
 const MARKS_DEF = [
   { id: 'chorus-3', at: 900, label: 'Chorus 3' },
   { id: 'chorus-4', at: 2500, label: 'Chorus 4' },
   { id: 'coda', at: 3600, label: 'Coda' },
 ];
 
-/** the fixed script both runtimes run — seeks in and out of every span, plays
- *  across boundaries, and ends by scrubbing backwards (the case that found the
- *  park bug in rule 7c). */
+// The fixed script: seeks in and out of every span, plays across boundaries, scrubs backwards.
+// why: lessons/timeline-lab.md#pn-script
 const SCRIPT = [
   { seek: 0 }, { seek: 1500 }, { seek: 2000 }, { seek: 2600 }, { play: 900 },
   { seek: 12000 }, { seek: 12400 }, { play: 1200 }, { seek: 30000 },
@@ -821,12 +785,8 @@ function arrangement(make) {
   A.dispose(); B.dispose();
 }
 
-// ===========================================================================
-// suite 11 — MARKS: content addressing, and the case that is the whole reason
-//            for it — A MARK THAT MOVED. The source is re-cut (600 ms of
-//            restored leader spliced in front); the score still lands on the
-//            music. The numbers it would otherwise have stored do not.
-// ===========================================================================
+// Suite 11: a mark that moved. 600 ms of leader spliced in; the score still lands on the music.
+// why: lessons/timeline-lab.md#pn-11
 {
   const SHIFT = 600;
   const vr = sharedVR();
@@ -889,12 +849,8 @@ function arrangement(make) {
   n1.dispose(); p1.dispose(); v1.dispose(); n2.dispose(); p2.dispose(); v2.dispose();
 }
 
-// ===========================================================================
-// suite 12 — RULE 9: caps.absentState / silence(). A quotation parked at its
-//            edge asserts whatever `in`/`out` cut, so a MIDI actuator holds an
-//            edge note for the whole time the span is absent. An adapter may
-//            declare how to be silent; the nest never learns what a note is.
-// ===========================================================================
+// Suite 12: rule 9, caps.absentState / silence(); the nest never learns what a note is.
+// why: lessons/timeline-lab.md#pn-12
 {
   const IN = 700, OUT = 2800, AT = 5000;            // both edges cut held notes
   const mk = (opts) => {
@@ -977,10 +933,8 @@ function arrangement(make) {
   weird.dispose();
 }
 
-// ===========================================================================
-// suite 13 — PROVENANCE THAT SURVIVES THE DOOR: three carriers, validated
-//            against published field names.
-// ===========================================================================
+// Suite 13: provenance on three carriers, validated against published field names.
+// why: lessons/timeline-lab.md#pn-13
 {
   const vr = sharedVR();
   const sink = newSink();
@@ -1086,7 +1040,8 @@ function arrangement(make) {
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
-// --- suite 13b: a DECK subject — "these seconds were reconstructed" ---------
+// Suite 13b: a deck subject, "these seconds were reconstructed".
+// why: lessons/timeline-lab.md#pn-13b
 {
   const vr = sharedVR();
   const items = [];
@@ -1114,26 +1069,13 @@ function arrangement(make) {
   deck.dispose();
 }
 
-// ===========================================================================
-// suite 14 — LOOPS (plan-timeline §8; nested.mjs rule 10).
-//
-// A loop is a QUOTATION WITH REPETITION, so every arm below is the fragment
-// suite's arm with `repeat` added and nothing else changed. That is the claim
-// being tested: §8.2 says the mechanism already exists and a loop is the same
-// affine map with MODULO instead of CLAMP. If any of these needed new
-// machinery, the claim was wrong.
-//
-// The archaeology (research/loops-prior-art-2026-08.md) supplies three of the
-// arms directly: the wrap is opt-in (14i), the stop must be exact or `repeat:n`
-// lies (14e), and a blur must collapse rather than burst (14f).
-// ===========================================================================
+// Suite 14: loops, the fragment arms with `repeat` added and nothing else; the wrap is opt-in
+// (14i),
+// the stop exact (14e), a blur collapses (14f).
+// why: lessons/timeline-lab.md#pn-14
 
-// a child with THREE kinds, because the whole of §8.3 is that they behave
-// differently at the wrap:
-//   `note`  EDGE-valued  — re-arms per iteration (caps.valued:'edge')
-//   `cc`    LEVEL-valued — carries across the wrap (caps.valued:'level')
-//   `ping`  fire-and-forget, NO reducer — tracker's case: nothing to leak, so
-//           the wrap does not touch it and it rings across the boundary
+// Three kinds: `note` (edge, re-arms), `cc` (level, carries), `ping` (no reducer, rings across).
+// why: lessons/timeline-lab.md#pn-lnotes
 const LNOTES = [{ n: 60, on: 100, off: 400 }, { n: 62, on: 800, off: 1200 }, { n: 64, on: 1500, off: 3800 }];
 function makeLoopChild(vr, sink, { absentState, silence, ccLoopState, wrapHeard } = {}) {
   const items = [];
@@ -1180,7 +1122,8 @@ function loopRig(opts = {}) {
 /** run the virtual clock forward `ms` of PARENT time, servoing like a client */
 function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { vr.advanceTo(vr.now() + step); nest.servo(); } }
 
-// --- 14a — `repeat` IS A FIELD OF THE VALUE ---------------------------------
+// 14a: `repeat` is a field of the value.
+// why: lessons/timeline-lab.md#pn-14a
 {
   const cases = [
     ['count', 7, 7], ['until', { untilMs: 5000 }, { untilMs: 5000 }], ['infinite', 'infinite', 'infinite'],
@@ -1190,7 +1133,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     const q = quotation({ ref: 'tape', at: 5000, in: 700, out: 2700, rate: 1, repeat: given });
     check('repeat-value', 0, JSON.stringify(q.repeat) === JSON.stringify(want),
       `${label}: repeat normalised to ${JSON.stringify(q.repeat)}, wanted ${JSON.stringify(want)}`);
-    // THE ROUND TRIP, byte-identical — the same guarantee every other field has
+    // the round trip, byte-identical
+    // why: lessons/timeline-lab.md#pn-roundtrip
     const j = JSON.stringify(q);
     const back = quotation(JSON.parse(j));
     check('repeat-value', 0, JSON.stringify(back) === j && quotationEquals(back, q),
@@ -1200,7 +1144,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     check('repeat-value', 0, scoreToJSON(parseScore(sj)) === sj,
       `${label}: score -> JSON -> parseScore is not byte-identical`);
   }
-  // `repeat: 1` and no repeat are THE SAME VALUE — a loop of one is not a loop
+  // `repeat: 1` and no repeat are the same value
+  // why: lessons/timeline-lab.md#pn-repeat-1
   check('repeat-value', 0, quotationEquals(quotation({ ref: 'a', repeat: 1 }), quotation({ ref: 'a' })),
     'repeat:1 must normalise away — "played once" is the absence of a loop');
   // and the rejections name the field
@@ -1220,7 +1165,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `infinite geometry wrong: ${JSON.stringify(g3)}`);
 }
 
-// --- 14b — THE MAP: modulo instead of clamp, exact ---------------------------
+// 14b: the map, modulo instead of clamp, exact.
+// why: lessons/timeline-lab.md#pn-14b
 {
   const { vr, child, parent, nest } = loopRig();
   const AT = 5000, IN = 700, OUT = 2700, L = OUT - IN, N = 50;
@@ -1229,11 +1175,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-map', 0, nest.loop('q').iterations === N && nest.loop('q').lengthMs === L,
     `nest.loop() must report the geometry: ${JSON.stringify(nest.loop('q'))}`);
 
-  // THE ANALYTIC EXPECTATION. Not "what the code did" — what §8.2's formula says.
-  // The one deliberate exception is the WRAP LEAD: landing exactly on a
-  // boundary parks the child a hair (1e-6 ms) BEFORE `in`, so the event sitting
-  // exactly on `in` is still pending and fires instead of being folded. Every
-  // other position is exact to the float.
+  // The analytic expectation; the one exception is the wrap lead, 1e-6 ms before `in`.
+  // why: lessons/timeline-lab.md#pn-lead
   const LEAD = 1e-6;
   const analytic = (pos) => IN + ((pos - AT) % L);
   for (const k of [0, 1, 2, 6, 7, 49]) {
@@ -1266,7 +1209,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `past the last repetition the span is ABSENT and parked at OUT: pos=${child.position()} present=${nest.present('q')}`);
   parent.seek(AT - 1);
   check('loop-map', 0, child.position() === IN, `before the loop the child parks at IN: ${child.position()}`);
-  // loopPhase is the one definition — the nest may not have its own
+  // loopPhase is the one definition
+  // why: lessons/timeline-lab.md#pn-one-def
   for (const k of [0, 1, 2, 7, 50]) {
     const ph = loopPhase(k * L, L, N * L);
     const wantIter = k >= N ? N - 1 : k, wantOff = k >= N ? L : 0;
@@ -1291,7 +1235,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `at parent+2500 with rate 2 the child is 5000 child-ms in = repetition 2, offset 1000: got ${c3.position()} rep ${n3.iteration('r')}`);
 }
 
-// --- 14c/14d — THE WRAP: re-seek, edges re-arm, levels carry ----------------
+// 14c/14d: the wrap re-seeks, edges re-arm, levels carry.
+// why: lessons/timeline-lab.md#pn-14c
 {
   const { vr, sink, child, parent, nest } = loopRig();
   const AT = 1000, IN = 700, OUT = 2700, L = 2000, N = 55;
@@ -1302,8 +1247,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `§8.3: cc is level-valued and CARRIES, note is edge-valued and RE-ARMS: ${JSON.stringify(nest.loop('q').lanes)}`);
 
   parent.seek(AT); parent.play(1);
-  // note 64 is on at child 1500 and off at 3800 — i.e. it is STILL HELD at
-  // `out`. That is the stuck-note generator: without a re-arm it accumulates.
+  // note 64 is still held at `out`: without a re-arm it accumulates.
+  // why: lessons/timeline-lab.md#pn-stuck
   const held = [], ccAt = [];
   let maxHeld = 0, everStuckFrom = null;
   const perIterFires = [];
@@ -1322,8 +1267,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-wrap', 0, seen.every((w) => Math.abs(w.childPos - IN) <= 1e-6 + 1e-9 && w.in === IN && w.out === OUT && w.joint === 'cut'),
     `a wrap lands at IN (less the wrap lead), names the fragment, and declares a HARD CUT: ${JSON.stringify(seen[0])}`);
 
-  // NO STUCK NOTES, EVER, ACROSS 50+ WRAPS. The child holds at most the notes
-  // the reducer says are held at that position — never an accumulation.
+  // No stuck notes across 50+ wraps: the child holds at most what the reducer says.
+  // why: lessons/timeline-lab.md#pn-no-stuck
   check('loop-stuck', 0, maxHeld <= 2 && everStuckFrom === null,
     `held-note count peaked at ${maxHeld} across ${N - 1} wraps (first over-hold in repetition ${everStuckFrom}) — ` +
     'a note-on from an earlier repetition is being retained across the boundary');
@@ -1369,7 +1314,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   }
 }
 
-// --- 14e — THE EXACT STOP (the archaeology's ~1.6 s tail) -------------------
+// 14e: the exact stop.
+// why: lessons/timeline-lab.md#pn-14e
 {
   // "repeat was only ever infinite in the entire lineage; the one hard datum
   // about stopping is that it left a ~1.6 s audio tail because committed events
@@ -1391,7 +1337,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   runFor(r.vr, r.nest, 5000);
   check('loop-stop', 0, r.sink.fires === before,
     `and nothing fires afterwards: ${r.sink.fires - before} events escaped past the end of the loop`);
-  // the default (no absentState) HOLDS the edge — rule 9 is unchanged by loops
+  // the default (no absentState) holds the edge
+  // why: lessons/timeline-lab.md#pn-hold
   const h = loopRig({ ref: 'tape-hold' });
   h.nest.add({ id: 'q', at: AT, rate: 1, deck: h.child, in: IN, out: OUT, repeat: N });
   h.parent.seek(AT); h.parent.play(1);
@@ -1400,12 +1347,11 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `the DEFAULT still holds whatever \`out\` cut (rule 9's 'hold'), loop or not: ${[...h.sink.live]}`);
 }
 
-// --- 14f — the blur collapses, it does not burst ----------------------------
+// 14f: a blur collapses, it does not burst.
+// why: lessons/timeline-lab.md#pn-14f
 {
-  // wrap-artefact catalogue: "tab-blur burst is unbounded under an infinite
-  // loop". It cannot happen here, because the iteration index is a pure
-  // function of the parent's position and nothing counts wraps to know where
-  // it is. A 30 s stall under a 2 s loop is ONE re-seek.
+  // The iteration index is a function of position, so a 30 s stall under a 2 s loop is one re-seek.
+  // why: lessons/timeline-lab.md#pn-blur
   const r = loopRig({ ref: 'tape-blur' });
   const AT = 0, IN = 0, OUT = 2000, L = 2000;
   r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 'infinite' });
@@ -1422,7 +1368,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-blur', 0, r.sink.live.size <= 2, `…with nothing left ringing from the fifteen passes nobody heard: ${[...r.sink.live]}`);
 }
 
-// --- 14g — THE RENDERER refuses an unbounded loop ---------------------------
+// 14g: the renderer refuses an unbounded loop.
+// why: lessons/timeline-lab.md#pn-14g
 {
   const r = loopRig({ ref: 'tape-render' });
   r.nest.add({ id: 'bounded', at: 0, deck: r.child, in: 0, out: 2000, repeat: 4 });
@@ -1448,11 +1395,11 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-render', 0, m && /finite/.test(m), `renderDeck must refuse a non-finite window: ${m}`);
   od.dispose();
 
-  // A BOUNDED loop must still RENDER, and render REPRODUCIBLY — a loop may not
-  // cost determinism. Two renders of the same looped arrangement, byte-identical.
+  // A bounded loop renders reproducibly: two renders, byte-identical.
+  // why: lessons/timeline-lab.md#pn-render
   const hashes = [];
   for (let pass = 0; pass < 2; pass++) {
-  const rt = createRenderRuntime(0);      // a FRESH runtime per pass — a render
+  const rt = createRenderRuntime(0);      // a fresh runtime per pass; why: lessons/timeline-lab.md#pn-fresh
                                           // is reproducible from time zero, not
                                           // from wherever the last one stopped
   const mkChild = () => createDeck({ clock: rt.clock, tickHost: rt.newHost(), range: [0, 2000],
@@ -1475,13 +1422,11 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `a bounded loop must render byte-identically twice: ${hashes[0]} vs ${hashes[1]}`);
 }
 
-// --- 14h — THE STORE: a loop is a BOUNDED WINDOW QUERY ----------------------
+// 14h: the store, a loop as a bounded window query.
+// why: lessons/timeline-lab.md#pn-14h
 {
-  // §8.7 feared an infinite loop would pin pages forever. It cannot: a loop
-  // re-seeks a FIXED fragment, so the window it asks for is the same window
-  // every pass. What has to be measured is that the loop resolves to a bounded
-  // WINDOW QUERY and never a full scan — the resident set is then constant
-  // whatever `repeat` says.
+  // A loop re-seeks a fixed fragment, so it asks the same window every pass: never a full scan.
+  // why: lessons/timeline-lab.md#pn-window
   const rows = [];
   for (let i = 0; i < 40000; i++) rows.push({ at: i * 10, kind: 'n', id: `e${i}`, payload: { i } });
   const tmp = join(tmpdir(), `loop-store-${process.pid}.jsonl`);
@@ -1515,12 +1460,11 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   reader.close(); unlinkSync(tmp);
 }
 
-// --- 14i — the wrap is OPT-IN (the archaeology's headline) ------------------
+// 14i: the wrap is opt-in.
+// why: lessons/timeline-lab.md#pn-14i
 {
-  // tracker schedules `(((beat - startBeat) % len) + len) % len` and has NO
-  // wrap handler: nothing is reset, re-armed, silenced or faded at pos 0, and
-  // notes ring across the boundary ON PURPOSE. A lane with no held state must
-  // not be given a boundary it never asked for.
+  // A lane with no held state must not get a boundary it never asked for (tracker rings across).
+  // why: lessons/timeline-lab.md#pn-optin
   const r = loopRig({ ref: 'tape-optin', wrapHeard: true });
   const AT = 0, IN = 0, OUT = 2000, L = 2000;
   r.nest.add({ id: 'q', at: AT, rate: 1, deck: r.child, in: IN, out: OUT, repeat: 6 });
@@ -1530,8 +1474,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `only the lane that IMPLEMENTS loopWrap() hears the boundary: ${JSON.stringify(r.sink.wraps.map((w) => w.kind))}`);
   check('loop-optin', 0, r.nest.loop('q').lastWrap.heard.join() === 'note',
     `…and the wrap report names exactly who heard it: ${JSON.stringify(r.nest.loop('q').lastWrap.heard)}`);
-  // `ping` has no reduce/assertState at all — transport's assertAt skips it, so
-  // the re-seek never touches it and it behaves exactly as tracker's does.
+  // `ping` has no reducer, so the re-seek never touches it.
+  // why: lessons/timeline-lab.md#pn-ping
   check('loop-optin', 0, r.sink.pings === 6,
     `a fire-and-forget lane fires once per repetition and is otherwise untouched by the wrap: ${r.sink.pings}`);
 
@@ -1551,7 +1495,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   bad.dispose();
 }
 
-// --- 14j — a loop SURVIVES THE DOOR (score round trip, live) ----------------
+// 14j: a loop survives the score round trip, live.
+// why: lessons/timeline-lab.md#pn-14j
 {
   const r = loopRig({ ref: 'tape-score' });
   r.nest.add({ id: 'q', at: 3000, rate: 1, deck: r.child, in: 700, out: 2700, repeat: 9 });
@@ -1599,19 +1544,13 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     `an unbounded quotation reports ONE pass and flags itself, rather than inventing an end: ${JSON.stringify(ur[0])}`);
 }
 
-// --- 14k — TWO BUGS THE OFFLINE RENDERER FOUND (2026-08-30) -----------------
-// Both were invisible to every arm above, and both were invisible for the same
-// reason: a virtual clock fires a committed one-shot at EXACTLY its due instant,
-// so `deltaMs === 0` and every "is this the top of the pass?" test that compares
-// floats for equality passes. Rendering a nest is what put a second, differently
-// timed observer on the same code.
+// 14k: two bugs the offline renderer found, invisible on a virtual clock where one-shots fire
+// exactly.
+// why: lessons/timeline-lab.md#pn-14k
 {
-  // (1) THE ENTRY DOWNBEAT. `assertSpan` took the hair-before-`in` lead only
-  // when `phaseOf(pos).off === 0` — true on a virtual clock, false in wall-clock
-  // playback where the enter event fires a few ms late. Result: pass 1, and only
-  // pass 1, folded its downbeat. Measured as 8 onsets rendered vs 7 played.
-  // The test therefore has to introduce LATENESS deliberately, which on a
-  // virtual clock means entering at a position that is not exactly `at`.
+  // (1) The entry downbeat: pass 1 folded its downbeat in wall-clock playback; the test enters late
+  // on purpose.
+  // why: lessons/timeline-lab.md#pn-entry
   const AT = 3000, IN = 800, OUT = 2700;      // IN === a note-on in LNOTES
   for (const [label, jog] of [['arrive exactly', 0], ['arrive 7 ms late', 7]]) {
     const r = loopRig({ ref: `tape-entry-${label.replace(/\W+/g, '')}` });
@@ -1620,12 +1559,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
     const off = r.child.sched.onFire((ev) => { if (ev.at === IN) downs.push(ev.id); });
     r.parent.seek(AT - 500); r.parent.play(1);
     runFor(r.vr, r.nest, 400);
-    // MANUFACTURE THE LATENESS. A virtual runtime fires a committed one-shot at
-    // EXACTLY its due instant, so `parent.position() === at` and the old
-    // `off === 0` test passed — which is the entire reason this bug survived
-    // 389 green checks. Stopping the scheduler across `at` and restarting it
-    // makes the enter arrive through `scan()` as 'tick-late', deltaMs > 0,
-    // exactly as a real 25 ms tick delivers it in playback.
+    // Manufacture lateness: stop the scheduler across `at` so the enter arrives 'tick-late'.
+    // why: lessons/timeline-lab.md#pn-jog
     if (jog) {
       r.parent.sched.stop();
       r.vr.advanceTo(r.vr.now() + 100 + jog);
@@ -1645,13 +1580,8 @@ function runFor(vr, nest, ms, step = 5) { for (let t = 0; t < ms; t += step) { v
   check('loop-entry', 0, Math.abs(s.child.position() - (IN + 5)) < 1e-6,
     `a SEEK 5 ms into pass 1 lands at in+5 and folds — it does not rewind to the downbeat (child at ${s.child.position()})`);
 
-  // (2) A SPAN THE PLAYHEAD HAS NOT ENTERED MUST NOT BE STARTED. Found by
-  // rendering a NEST INSIDE A NEST: an outer wrap seeks the middle deck to
-  // `in − 1e-6`, which is inside an inner span's window by the eps tolerance but
-  // BEFORE its enter event — so `adapter.transport` started a child that was
-  // still parked at `c0`, an event sitting exactly on `c0` fired 'tick-late',
-  // and then fired AGAIN when the enter actuated and re-seeked a hair earlier.
-  // Two fires of one event: exactly-once, broken, two levels down.
+  // (2) A span not yet entered must not start: a nest in a nest fired one event twice.
+  // why: lessons/timeline-lab.md#pn-not-entered
   const vr = sharedVR(9_000_000);
   const grandFires = [];
   const grand = createDeck({ clock: vr.clock, tickHost: vr.newHost(), range: [-10, 2000],

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Draft-16 auth semantics test — runs INSIDE moq-dev container.
-# Env: MOQ_TOKEN_PUBSUB, MOQ_TOKEN_SUB (never printed; output redacted).
+# Draft-16 auth semantics, inside moq-dev. Tokens from env, never printed.
+# why: lessons/rig-moq.md#test-d16-auth
 BIN=/target/release
 BASE="https://draft-16.cloudflare.mediaoverquic.com"
 

@@ -1,21 +1,7 @@
-// rig/board/camera-test.mjs: camera.mjs on a laptop, no camera, no Pi, no relay.
-//
-//   node rig/board/camera-test.mjs
-//
-// What it grades: the two listings are read right (and a Pi's own codec nodes
-// are never taken for a camera), the splitter cuts real encoder output into one
-// unit per frame with the keyframes marked, and the room logic starts the
-// camera only for a keyed viewer, only after the relay took the board's key,
-// and stops it on the last bye and on silence.
-// NEGATIVE CONTROLS, named so the bug they catch would fail them: a splitter
-// that cut only at SPS (video.mjs's rule) makes one unit per GOP; a room that
-// acted before `cam.key.ok` would start the camera for a message the relay
-// never vouched for; a room that counted its own echo as a viewer would never
-// stop.
-// NOT GRADED HERE: that rpicam-vid on the real board makes this stream, that
-// the board has a camera at all, and that the relay drops an unkeyed socket's
-// messages (that one is graded against the deployed relay by the session's
-// gate check, not here).
+// node rig/board/camera-test.mjs: listings, the per-frame splitter and the room logic, no camera.
+// Negative controls: an SPS-only splitter, acting before `cam.key.ok`, counting our own echo.
+// Not graded: rpicam-vid on the real board, and the relay dropping unkeyed messages.
+// why: lessons/rig-board-tests.md#camera-test-header
 import { spawnSync } from 'node:child_process';
 import { parseRpicamList, parseV4l2Devices, pickCaptureDevice, findCamera, cameraCommand,
   createAccessUnitSplitter, createCameraRoom, framePieces, sameKey, DIRECT_PIECE } from './camera.mjs';
@@ -170,11 +156,9 @@ ws.close();
 ok(!room.running(), 'room: losing the room stops the camera');
 room.stop();
 
-// ── the direct path, 2026-10-13 ─────────────────────────────────────────
-// NEGATIVE CONTROLS: a gate that checked only the key would attach a page the
-// relay never let into the room; one that checked only the viewer would attach
-// whoever learned a viewer's name; a board that kept sending through the relay
-// to a viewer it serves direct would pay the relay for frames nobody reads.
+// The direct path. Negative controls: a gate checking only the key or only the viewer, and a board
+// still sending via the relay to a viewer it serves direct.
+// why: lessons/rig-board-tests.md#camera-test-direct
 {
   const big = new Uint8Array(DIRECT_PIECE * 2 + 5).map((_, i) => i & 255);
   const ps = framePieces(7, true, big);

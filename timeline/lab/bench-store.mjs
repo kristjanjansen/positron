@@ -1,13 +1,7 @@
-// RETIRED 2026-10-13: `instrument.positron.studio` (workers/instrument) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-// timeline/lab/bench-store.mjs — the store bench: rows x backend x (open, cold
-// seek, warm advance, memory). Also owns the synthetic-log fixtures, so
-// prop-store.mjs and the bench measure THE SAME BYTES.
-//
-//   node timeline/lab/bench-store.mjs [--rows 1000000] [--no-do] [--no-http]
-//
-// Fixtures live outside the repo (STORE_FIXTURES or $TMPDIR/positron-store-fx)
-// and are CACHED: a 1M-row log is ~58 MB and takes ~20 s to make once.
-// MACHINE RULE: this file's HTTP server binds 8892 (mine), nothing else.
+// node timeline/lab/bench-store.mjs [--rows N] [--no-do] [--no-http]; the instrument arm is
+// retired. Owns the fixtures prop-store uses, cached outside the repo (1M rows ~58 MB, ~20 s once).
+// Port 8892.
+// why: lessons/timeline-lab.md#bs-header
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -40,8 +34,8 @@ export function synthRow(i, at, rand) {
   return { at, kind: kinds[i % 3], seq: i, payload: { n: 36 + ((i * 7) % 60), v: 1 + ((i * 13) % 126) } };
 }
 
-/** Deterministic ascending trace. Same generator for every n, so a 10k log is a
- *  PREFIX of a 1M log in shape (not in values — the gaps differ by seed). */
+// Deterministic ascending trace, the same generator for every n.
+// why: lessons/timeline-lab.md#bs-gen
 export function genRows(n, seed = 7) {
   const rand = mulberry32(seed);
   const rows = new Array(n);

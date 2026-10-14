@@ -1,17 +1,6 @@
-// rig/board/measure.mjs — what tells two sounds apart, on captured frames.
-//
-// Extracted so the patch stepper and the granulator grade themselves the same
-// way. A second copy of a MEASUREMENT is worse than a second copy of a feature:
-// two rigs that disagree about what "different" means cannot be compared, and
-// the disagreement is invisible because both print numbers.
-//
-// ── what tells two instruments apart ─────────────────────────────────────────
-// Two axes, because one can coincide. The ENVELOPE (how much of the peak is
-// still there at the end) separates a struck sound from a held one; the
-// SPECTRAL CENTROID separates a dull one from a bright one. Both are measured
-// from the ONSET rather than from frame zero: the first frames of every capture
-// here are still silence, because the note had to cross the internet to get
-// there, and indexing a fixed frame compares pre-note silence against a note.
+// What tells two sounds apart, shared by the patch stepper and the granulator so both grade alike.
+// Two axes from the ONSET (captures start with silence): envelope (struck vs held) and centroid.
+// why: lessons/rig-board-synth.md#measure-header
 export const RATE = 48000;
 const N = 4096;
 function fft(re, im) {
@@ -41,10 +30,9 @@ export function measure(captured) {
   const tail = per.slice(-6).reduce((a, b) => a + b, 0) / 6;
   const samples = [];
   for (const f of captured) for (let i = 0; i < f.length; i++) samples.push(f[i] / 32768);
-  // Four windows starting 50 ms after the onset — about 340 ms of the note's
-  // body. One window right at the peak moved by half an octave between two
-  // takes of the SAME patch, because an FM electric piano's brightness falls
-  // fast; averaging four is steady to a few hundredths.
+  // Four windows from 50 ms after onset (about 340 ms): one window moved half an octave between
+  // takes.
+  // why: lessons/rig-board-synth.md#measure-windows
   const start = Math.max(0, (onset < 0 ? 0 : onset) * 960 + RATE * 0.05);
   const mag = new Float64Array(N / 2);
   let blocks = 0;
@@ -61,12 +49,8 @@ export function measure(captured) {
   for (let k = 1; k < N / 2; k++) { numer += mag[k] * (k * RATE / N); denom += mag[k]; }
   return { peak, tail, ratio: peak > 0 ? tail / peak : 0, centroid: denom > 0 ? numer / denom : 0, onset, blocks, n: captured.length };
 }
-/**
- * How far apart two takes are, on both axes. `env` is the difference in how
- * much of the peak survives to the end; `oct` is the distance in octaves
- * between their brightness. Both have to move for a verdict of "a different
- * instrument", so a loudness wobble on its own cannot produce one.
- */
+// `env` and `oct` must both move for "a different instrument"; loudness alone cannot.
+// why: lessons/rig-board-synth.md#measure-distance
 export const distance = (a, b) => ({
   env: Math.abs(a.ratio - b.ratio),
   oct: a.centroid > 0 && b.centroid > 0 ? Math.abs(Math.log2(a.centroid / b.centroid)) : 0,
@@ -74,25 +58,9 @@ export const distance = (a, b) => ({
 
 const med = (xs) => { const s = [...xs].sort((x, y) => x - y); return s[s.length >> 1]; };
 
-/**
- * ⚠️ ONE TAKE OF A STOCHASTIC INSTRUMENT IS NOT A MEASUREMENT.
- *
- * Pappus fires grains against a per-voice probability and a euclidean gate, so
- * two captures of the IDENTICAL setting differ — and by how much is not a
- * constant. `pappus-live.mjs` read 14, 16 and 16 of 17 across three consecutive
- * runs with DIFFERENT checks failing each time, and its own same-seed noise
- * floor moved between 0.045 and 0.126 envelope across those runs. Every
- * threshold in it was therefore being compared against a number that was itself
- * a die roll.
- *
- * The fix is not a wider threshold — that only makes the test unable to fail.
- * It is to measure the spread instead of assuming it: repeat each condition,
- * take the MEDIAN as the condition's value, and take the spread WITHIN a
- * condition as the floor that any between-condition difference has to clear.
- *
- * Returns the median take plus `spread`, the median distance from that median —
- * how far this instrument moves when nothing changed at all.
- */
+// One take of a stochastic instrument is not a measurement: repeat, take the median, and report
+// `spread` (median distance from it) as the floor a difference must clear.
+// why: lessons/rig-board-synth.md#measure-summarise
 export function summarise(takes) {
   const good = takes.filter((t) => t && t.n > 0);
   if (!good.length) return null;
@@ -110,14 +78,9 @@ export function summarise(takes) {
   };
 }
 
-/**
- * Is B different from A by more than either of them moves on its own?
- *
- * The floor is the LARGER of the two spreads, times a margin — comparing
- * against one condition's spread alone would call a difference real whenever
- * the quieter of the two happened to be steady. An axis with no spread
- * measured cannot vote, because a floor of zero makes everything significant.
- */
+// B differs from A when it clears the LARGER spread times `margin`; an axis with zero spread cannot
+// vote.
+// why: lessons/rig-board-synth.md#measure-separated
 export function separated(a, b, margin = 2) {
   const d = distance(a, b);
   const axes = {};

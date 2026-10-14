@@ -1,9 +1,6 @@
-// Separate the relay's two costs.
-//   ping -> pong  is answered by the WORKER RUNTIME's hibernation autoresponse.
-//                 It never wakes the Durable Object, so it is pure network:
-//                 this machine to Cloudflare's edge and back.
-//   echo          goes through the room's Durable Object and back.
-// The difference is the DO. Everything else is geography.
+// ping/pong is the runtime's autoresponse (no Durable Object), echo goes through the DO.
+// The difference is the DO.
+// why: lessons/rig-m1.md#edge-rtt
 const URL_ = 'wss://ws.positron.studio/room/rttprobe/ws';
 const N = 60;
 const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))]; };

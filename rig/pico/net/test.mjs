@@ -1,26 +1,7 @@
-// rig/pico/net/test.mjs: the Pico's network code, on Linux in Docker, against
-// the real relay, checked from this Mac through demo/shell/wire.mjs and
-// demo/shell/graph-registry.mjs.
-//
-//   node rig/pico/net/test.mjs            build, self test, then wss, ws, and wss with a 4 KB TLS record buffer
-//   node rig/pico/net/test.mjs --no-build reuse the binaries already in the Docker volume
-//
-// 🔴 NOTHING NATIVE RUNS ON THE MAC. The C is compiled and run in the image
-// `positron-pico-net:2.2.0`; the binaries live in the Docker volume
-// `positron-pico-net-bin`, never in this checkout. Only node runs here.
-//
-// ⚠️ OUR RELAY ONLY, AND NEVER studio-1. Every run makes its own room,
-// `pico-test-<6 hex>`, and every site is `pico-<6 hex>` drawn fresh, so nothing
-// here is heard by a page, a board or a person.
-//
-// Each variant checks, and exits 1 on any FAIL:
-//   1. the C node's graph.announce arrives, graphProblem() is '' and
-//      createRegistry().ingest() takes it, with the three ports
-//   2. graph.ask brings another announce
-//   3. light.set to <site>:led:light is logged by the C side as LIGHT #ff8800 ...
-//   4. 100 node.ping -> node.pong round trips, p50/p99/max, Mac to relay to container and back
-//   5. the container's own 100 relay pings and 100 room echoes (test.probe)
-//   6. a 20 KB message in the room, then one more node.ping: does the link survive
+// node rig/pico/net/test.mjs [--no-build]: the Pico network code on Linux in Docker against the
+// real relay; only node runs on the Mac. Fresh `pico-test-<hex>` room and site, never studio-1.
+// Checks announce, ask, light.set, ping round trips, container probes and a 20 KB message.
+// why: lessons/rig-pico.md#pico-net-test
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { dirname } from 'node:path';

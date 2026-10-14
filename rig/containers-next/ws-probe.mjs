@@ -1,10 +1,7 @@
 #!/usr/bin/env node
-// Phase 1 of the pub port (2026-10-07): pub's WebSocket lifecycle on the new
-// runtime. Two DOs at once, one holding monitor() and one not. Each: open a
-// hibernatable socket, send text and binary (binary is forwarded into the
-// container), hold SILENT for HOLD_MS so the DO can hibernate between alarm
-// sweeps, ask again, close, then leave the DO alone past the inactivity
-// timeout and ask only whether the container is still running.
+// Pub's WebSocket lifecycle on the new runtime, two DOs (with and without monitor()): send, hold
+// silent past alarm sweeps, ask, close, then check the container stopped after the timeout.
+// why: lessons/rig-containers.md#ws-probe
 import fs from "fs";
 const BASE = "https://positron-cnt-next.kristjan-jansen.workers.dev";
 const HOLD_MS = Number(process.env.HOLD_MS || 270_000);

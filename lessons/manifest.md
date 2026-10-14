@@ -1,0 +1,1824 @@
+# manifest
+
+Comments cut from the code on 2026-10-14 and kept here verbatim, so the code can say in one to three lines what it cannot say itself. Each `why:` pointer in the code names one heading below.
+
+## `demo/manifest.mjs`
+
+### fields
+
+Above `// The requirement table lives in demo/shell/caps.mjs, beside the probes that`, lines 1 to 46 before the cut.
+
+~~~js
+// demo/manifest.mjs — the story order and what each demo is, once.
+//
+// Both index pages and workers/view/build.mjs render from this, so there is no
+// second place to forget a row.
+//
+//   built — a shelled demo under /demo/<name>/; demo/verify.mjs runs these
+//
+// THE ARRAY ORDER IS THE STORY ORDER, and a demo's identity is its SLUG. There
+// used to be an `n` on every row, in the directory name, in the URL and hard
+// coded inside each page's own mount() — five places to keep in step, which is
+// four too many. Moving a demo now means moving a line in this array; nothing
+// is renamed and no link changes meaning.
+//   page  — explicit target for a page that exists but is not shelled yet
+//   src   — for a `page` row, WHERE THAT FILE LIVES. Both the deploy and the
+//           dev server read it, so a page outside demo/ is declared once here
+//           rather than hand-written into build.mjs's copy list AND
+//           demo/server.mjs's rewrite. There were two such pages and four such
+//           edits; the third would have been another two, in two files, with
+//           nothing to notice if only one was made.
+//   one   — one line: what it does
+//   tags  — the tech it actually uses; demo/shell/caps.mjs reads REQUIREMENTS
+//           off these, so there is no second `needs:` list to forget
+//   why   — for a row with no target: why it is not clickable
+//
+//   room  — 'fixed' means DO NOT give this demo a private room per harness
+//           run. Every other page's room name is a rendezvous it invented, and
+//           a fixed one is a shared mutable global in the WebSocket layer —
+//           two runs of the suite land in the same room and watch each other's
+//           traffic. These four are different: `studio-1` is the ADDRESS OF
+//           THE RASPBERRY PI, which `mirror`, `grains` and `knobs` all name,
+//           and `wire`'s whole subject is the history its room already holds.
+//           Renaming those does not isolate a run, it points it at nothing.
+//           ⚠️ AND `m1-1`, THE STUDIO MAC'S AGENT, IS NAMED BY NO ROW HERE
+//           SINCE 2026-09-25, because `able` was the only page that addressed
+//           it and it is archived. `demo/verify.mjs` and `rig/m1/` both still
+//           explain that name, and the rule about a fixed room being an
+//           address rather than a rendezvous is unchanged.
+//           ⚠️ It does not make them safe to run in parallel either — there is
+//           one Pi with one JACK graph. A room was never that constraint.
+//
+//   created — the day the page first landed, and it is WRITTEN DOWN rather
+//           than derived. A creation date is immutable, so a literal here can
+//           never go stale — while `git log` would answer differently the
+//           moment a file is moved, and this repo has already renamed every
+//           demo directory once (`10f6b3b`, slugs replacing numbers), which
+//           flattened sixteen of these dates to the rename's own day.
+~~~
+
+### caps
+
+Above `import { needsOf } from './shell/caps.mjs';`, lines 48 to 50 before the cut.
+
+~~~js
+// The requirement table lives in demo/shell/caps.mjs, beside the probes that
+// test for it — one table, read here at render time, so a row's `data-needs`
+// and the browser's answer can never disagree about what a name means.
+~~~
+
+### acts
+
+Above `export const ACTS = new Map([`, lines 54 to 59 before the cut.
+
+~~~js
+// ⚠️ NO ARTICLE IN AN ACT TITLE, AND IT IS THE SAME RULE THE DIAGRAMS ALREADY
+// FOLLOW. Five of these seven were already bare and two were not, so the front
+// page read `the substrate` over `one stream` over `many people`: a list where
+// two members are phrases and five are names. Asked for in one line, *"rm 'the'
+// from the titles"*, and the argument is in CLAUDE.md under labels: a title is a
+// NAME, and names do not take articles.
+~~~
+
+### csound
+
+Above `{ name: 'csound', group: 'technologies', act: 0, created: '2026-09-07', built: t`..., lines 71 to 73 before the cut.
+
+~~~js
+// `und` until 2026-10-05, renamed on "rename und to csound", no redirect.
+// `unlisted: true` since 2026-10-12 (*"make "/arhive" page and move csound and
+// tutotial slide there"*): still built and deployed at /csound/, listed on /archive/.
+~~~
+
+### click
+
+Above `// 'unlisted: true' since 2026-10-13 (*"arhcive mirror, streamin group (kill / s`..., lines 77 to 78 before the cut.
+
+~~~js
+// `click` was its own page 2026-09-14 and is the CLICK tab of /csound/ since
+// 2026-10-05, no redirect.
+~~~
+
+### llhls
+
+Above `{ name: 'llhls', group: 'streaming', act: 1, created: '2026-09-04', built: true,`..., lines 80 to 81 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /llhls/, listed on /archive/ with the other retired pages.
+~~~
+
+### llhls-settle
+
+Above `lightSettleMs: 1000 },`, lines 85 to 87 before the cut.
+
+~~~js
+// settleMs 75000 covered a cold container, ffmpeg and Stream ingest. The
+// input and pub's /watch were retired 2026-10-13 and a press now answers at
+// once, in every tier, so the wait went with them.
+~~~
+
+### webrtc
+
+Above `{ name: 'webrtc', group: 'streaming', act: 1, created: '2026-09-04', built: true`..., lines 89 to 90 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /webrtc/, listed on /archive/ with the other retired pages.
+~~~
+
+### webrtc-settle
+
+Above `lightSettleMs: 1000 },`, lines 94 to 95 before the cut.
+
+~~~js
+// settleMs 75000 went with the input whep-rig and pub's /watch, retired
+// 2026-10-13: a press answers at once in every tier.
+~~~
+
+### moq
+
+Above `{ name: 'moq', group: 'streaming', act: 1, created: '2026-09-05', built: true, u`..., lines 97 to 98 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /moq/, listed on /archive/ with the other retired pages.
+~~~
+
+### cam
+
+Above `{ name: 'cam', group: 'streaming', act: 1, created: '2026-09-30', built: true, u`..., lines 102 to 108 before the cut.
+
+~~~js
+// One press starts every leg: getUserMedia, a WHIP publish through the pub
+// worker, a WHEP play back and a MoQ loopback. The 409 retries on WHEP and
+// the relay session together take seconds, and the checks then wait for 30
+// timed frames on each leg, so the first page asserts land well after the
+// harness's default settle.
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /cam/, listed on /archive/ with the other retired pages.
+~~~
+
+### cam-llhls
+
+Above `one: 'one webcam next to what comes back over WebRTC and MoQ',`, lines 110 to 111 before the cut.
+
+~~~js
+// Its LL-HLS leg (the input positron-cam, pub's /cam) was retired
+// 2026-10-13; the panel stays and its footer says so.
+~~~
+
+### room-items
+
+Above `// The demo ABOUT the socket, rather than one that happens to use it: the`, lines 115 to 122 before the cut.
+
+~~~js
+// `room` was a demo (open this page twice and each window shows the other,
+// WebRTC peer to peer with the relay only introducing) and is archived at
+// archive/demos/room-index.html, removed 2026-10-05 on *"arvhice it"* after
+// *"what is the point of room demo?"*. No redirect.
+// `items` was a demo and is archived at archive/items/README.md, removed
+// 2026-10-01 on instruction. It wrote an item, let a Durable Object alarm
+// publish it at the moment named, and told installed phones over FCM. Its
+// store and its push moved to the eccm repository, as plain Web Push.
+~~~
+
+### mirror
+
+Above `{ name: 'mirror', group: 'th', act: 0, created: '2026-09-11', built: true, unlis`..., lines 124 to 133 before the cut.
+
+~~~js
+// The demo ABOUT the socket, rather than one that happens to use it: the
+// message shape written down, the exact bytes shown both ways, and the
+// history the relay refuses to keep. settleMs covers asking the recorder to
+// join the room before anything is sent — every assert here sits behind that.
+// The picture, drawn twice. `gl: true` is what puts it in demo/verify-gl.mjs
+// rather than demo/verify.mjs — the ordinary harness runs Chrome with
+// --disable-gpu, where getContext('webgl2') returns null and every assert
+// here would be unreachable.
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /mirror/, listed on /archive/ with the other retired pages.
+~~~
+
+### weight
+
+Above `{ name: 'weight', group: 'th', act: 0, created: '2026-09-15', built: true, unlis`..., lines 139 to 147 before the cut.
+
+~~~js
+// Typography with a position rather than a place on a page. `gl: true` and
+// `xr: true` for the reason mirror, blocks and floor carry them: verify.mjs
+// runs --disable-gpu, where getContext('webgl2') is null.
+// ⚠️ `settleMs` COVERS A DISTANCE TRANSFORM PER WORD, AND THE CHECKS RENDER.
+// Six fields are computed in JavaScript at load, measured around 25 ms each
+// on this machine, and the asserts then draw every word off-screen twice to
+// read its size out of the pixels. The first assert sits behind all of it.
+// `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+// /weight/, listed on /archive/ with the other retired pages.
+~~~
+
+### sound-xr
+
+Above `// BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); it`..., lines 152 to 192 before the cut.
+
+~~~js
+// 🔴 THE ONE XR ROW WITH NO `gl: true`, AND THAT IS THE POINT OF IT. Its
+// subject is SOUND, so everything it can answer without a headset it answers
+// in the ordinary harness: the window baselines, the decode path, the
+// main-thread callback rate, and the headset guard broken on purpose three
+// ways. It draws one small panel through demo/shell/xr-panel.mjs, and that
+// module builds no graphics context until somebody presses Enter VR, so
+// --disable-gpu costs this page nothing.
+// ⚠️ IT TOUCHES NO THIRD-PARTY MOUNT, WHICH IS WHY IT EXISTS AT ALL. The
+// questions it asks were asked of /videoradio/ first, and that page plays
+// ERR mounts whose operator told us on 2026-09-16 that our connections
+// corrupt their listener statistics. This one reads from our own R2 worker,
+// so "the headset went silent" and "somebody else's station was down" can
+// never be the same observation.
+// `settleMs` covers control 0: a watch window, the gate shut on purpose for
+// half a second, and a second watch window after it reopens.
+/**
+ * 🔴 `earshot` WAS A DEMO FOR ONE EVENING AND IT IS ARCHIVED AT
+ * `archive/demos/earshot-index.html`. IT ASKED FOUR QUESTIONS AND GOT FOUR
+ * ANSWERS, WHICH IS WHY IT IS GONE RATHER THAN IN SPITE OF IT.
+ *
+ * An instrument built to settle one thing is furniture once that thing is
+ * settled: nobody opens it twice, and a row on the front page is a promise
+ * that there is something to look at. What it MEASURED is in CLAUDE.md under
+ * WebXR, on a Quest, 2026-09-16, 68 s and 3322 frames:
+ *
+ *   the AudioContext survives an immersive session and is never suspended;
+ *   48000 Hz, base 4.00 ms, out 24.00 ms in the window and IDENTICAL inside;
+ *   AudioDecoder decodes mp3 in there with 0 errors, 140 ms against 998;
+ *   a main-thread ScriptProcessorNode holds 11.9/s of 11.72 nominal;
+ *   90.0 fps throughout with all of it running at once.
+ *
+ * ⚠️ AND THE LEVEL METER WAS PROVED TO BE A METER INSIDE THE SESSION, which
+ * is what makes the rest of those numbers mean anything: shutting the gate
+ * took the far side to 0.0000 while the near side held at 0.7050. Without
+ * that, a zero in there is indistinguishable from a page that had stopped
+ * measuring.
+ *
+ * So: nothing about audio is a reason not to build a headset page here. If
+ * the question ever reopens, the page is in `archive/demos/` and it touched
+ * no third-party mount: it decoded from our own station Worker.
+ */
+~~~
+
+### wire
+
+Above `{ name: 'wire', group: 'technologies', act: 2, created: '2026-09-10', built: tru`..., lines 194 to 197 before the cut.
+
+~~~js
+// BYTES and NOTES tabs since 2026-10-04 (plans/plan-demo-structure.md §3.3); its
+// checks run before ready, so the boot wait is the check pass, MEASURED 3.8 s.
+// `unlisted: true` since 2026-10-12 (*"archive wire and patchbay"*): still built and
+// deployed at /wire/, listed on /archive/ with the other retired pages.
+~~~
+
+### replay
+
+Above `// The archival horizon and the timeline library, meeting for the first time:`, lines 202 to 229 before the cut.
+
+~~~js
+// The only network-free row in Act 3, and the act's simplest complete
+// instance: make a recording yourself, then scrub it. Everything after this
+// adds exactly one thing — `record` adds disk economics, `replay` adds a
+// pre-existing show, `show` adds a real WebRTC hop.
+//
+// settleMs does TWO jobs here and only the second one matters. The harness
+// gives it to control 0 (`Use the camera`), which needs none of it; what
+// earns the 13 s is that the same number sizes the wait for the FIRST
+// assert, and every assert on this page sits behind a recording that runs to
+// a 10 s cap. Shrink it and the suite reads zero asserts and calls a working
+// page broken.
+// The round trip a browser can make on its own: publish out through a worker
+// that holds the key, subscribe back, and record the copy that came back.
+// settleMs covers the WHIP handshake, the WHEP handshake and one take.
+// 🔴 `settleMs` HERE IS NOT FOR A SLOW CONTROL, BECAUSE THIS PAGE HAS NO
+// CONTROLS. The Load button was removed on instruction and the transport's
+// own ▸ does the loading, so the page's checks hang off a press the harness
+// makes before the control loop rather than inside it. `verify.mjs` uses this
+// number twice, and the second use is what is wanted: the wait for a page's
+// FIRST assert. Replay's first assert is the loop check, which has to let the
+// shared transport checks finish, then play two laps of a real picture and
+// watch where it gets to.
+// `seek` was a demo and is archived at archive/demos/seek-index.html, removed
+// 2026-09-16 on instruction. It played this same show and asked the timeline
+// which cues had happened by any position, 24 asks around the eight cues plus
+// a five-stop jump sweep, and it counted a cue firing more than 1.5 s after
+// its own moment as a retroactive burst. The loop button it graded is still
+// graded: `replay`, `radio` and `tapes` all press it and assert on the wrap.
+~~~
+
+### reel
+
+Above `{ name: 'reel', group: 'err', act: 5, created: '2026-09-08', built: true, unlist`..., lines 232 to 236 before the cut.
+
+~~~js
+// The archival horizon and the timeline library, meeting for the first time:
+// a deck positioned in 1965, which is a NEGATIVE epoch. Catalogue metadata is
+// committed; the media streams from ERR and nothing is stored here.
+// `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+// /reel/, listed on /archive/ with the other retired pages.
+~~~
+
+### floor
+
+Above `{ name: 'floor', group: 'err', act: 5, created: '2026-09-14', built: true, unlis`..., lines 240 to 249 before the cut.
+
+~~~js
+// `now` (one ERR television channel on a line whose right-hand end is the
+// present moment) merged into `flipper` 2026-10-05 on *"you promised to merge
+// flipper and now"*. The old page is archive/demos/now-index.html. No redirect.
+// `flipper` itself was archived 2026-10-12, below.
+// `gl: true` and `xr: true` for the same reason mirror and blocks carry them:
+// `verify.mjs` runs --disable-gpu, where getContext('webgl2') returns null, so
+// a GPU page graded there reports a defect that belongs to the harness.
+// `node demo/verify-gl.mjs` is the grader.
+// `unlisted: true` since 2026-10-13 (*"archive reel and floor"*): still built and deployed at
+// /floor/, listed on /archive/ with the other retired pages.
+~~~
+
+### resources
+
+Above `{ name: 'resources', group: 'kurenniemi', act: 5, created: '2026-09-14', built: `..., lines 256 to 266 before the cut.
+
+~~~js
+// `flipper` was here until 2026-10-12: ETV and ETV2 live, each over a line whose right end is the
+// present moment. Archived on *"archive flipper"*; the page is archive/demos/flipper-index.html
+// (archive/demos/README.md says why). No redirect.
+// Everything that could be reached about one artist, before anything is
+// played: 122 rows out of fourteen archives, saying when it is from, who
+// holds it, what it is, whether there is a file and what its licence allows.
+// Refs only — nothing is copied here. `demo/resources/build-corpus.mjs`
+// gathers it and folds in the shorter list `aikajana` plays from, and the
+// page re-checks that fold from the other end so the two cannot disagree.
+// `unlisted: true` since 2026-10-13 (*"archvie resourves"*): still built and deployed at
+// /resources/, listed on /archive/ with the other retired pages.
+~~~
+
+### tapes
+
+Above `{ name: 'tapes', group: 'kurenniemi', act: 5, created: '2026-09-15', built: true`..., lines 270 to 274 before the cut.
+
+~~~js
+// The same corpus as the row above, on an axis instead of in a table: one
+// mark per record, as wide as its date is vague, and the twenty-six a browser
+// can open are pressable. Named for the thing you can hear, because that is
+// the reason it exists rather than the table.
+// `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+~~~
+
+### making
+
+Above `{ name: 'making', group: 'th', act: 5, created: '2026-09-19', built: true, unlis`..., lines 278 to 284 before the cut.
+
+~~~js
+// The other archive, and it is the opposite kind of thing from the two rows
+// above. Those point at what fourteen institutions hold; this one points at
+// files WE hold, because mimproject.org has been down long enough that two
+// video sites were the last copies anybody could reach. Its corpus is a
+// separate file for exactly that reason — see `build-mimproject.mjs`.
+// `unlisted: true` since 2026-10-13 (*"archive making"*): still built and deployed at
+// /making/, listed on /archive/ with the other retired pages.
+~~~
+
+### held
+
+Above `{ name: 'held', group: 'th', act: 6, created: '2026-09-19', built: true, unliste`..., lines 288 to 311 before the cut.
+
+~~~js
+// 🔴 THE FIRST ROW IN ACT 6, `composition`, AND IT SITS HERE IN THE ARRAY
+// BECAUSE THE TWO QUESTIONS ARE DIFFERENT. The act is what the page teaches:
+// a score is a composition rather than an archive, which is why it is not act
+// 5 with the three rows above it. The POSITION is the story order, and the
+// story wants it beside the other pages that read somebody else's documents
+// and draw them. Acts have never run strictly down this array: there are act
+// 4 rows below act 5 ones already.
+// ⚠️ THE GROUP IS `timeline` BECAUSE THAT IS WHAT A VISITOR GETS: a picture
+// of a piece on a line. The piece belongs to Liis Vares and Taavet Jansen and
+// is elektron.art's; a section named after them would be a section of one,
+// and the page is ours rather than theirs.
+// ⚠️ THE SLUG WAS FREED ON 2026-09-19, when the headset text page that held it
+// was renamed to `weight`. The deployed `/held/` is gone and no redirect was
+// written, so this row is what answers that address now.
+// 🔴 AND `veil` IS GONE FROM THIS LIST, 2026-09-20, FOLDED INTO THE ROW
+// BELOW. It was a second page off the same score file, sitting directly
+// after this one, drawing what one visit LOOKS like against what the
+// structure IS. Asked for as *"rm veil demo and integrate it into held
+// begore timeljne"*, so the picture is now a 16:9 panel above `held`'s own
+// line. ⚠️ THE DEPLOYED `/veil/` DIES WITH THE ROW and no redirect has been
+// written, the same as `radio1965`, `box` and `keys` before it. It was live
+// for less than a day.
+// `unlisted: true` since 2026-10-13 (*"Move held to archive"*): still built and deployed at
+// /held/, listed on /archive/ with the other retired pages.
+~~~
+
+### held-one
+
+Above `one: 'Held in Human, played back from its own score',`, lines 316 to 322 before the cut.
+
+~~~js
+// ⚠️ THE NAMES CAME OUT OF THE DESCRIPTION ON 2026-09-20: *"rm by Liis
+// Vares and Taavet Jansen,"*. **The attribution itself is untouched** and
+// is two lines above, in the comment, and in
+// `demo/resources/build-held-in-human.mjs`, which opens by saying the piece
+// is somebody else's work. What went is a credit standing inside a one
+// sentence description, where it spends half the sentence and pushes out
+// what the page DOES.
+~~~
+
+### deck
+
+Above `{ name: 'deck', group: 'kurenniemi', act: 5, created: '2026-08-28', built: false`..., lines 325 to 327 before the cut.
+
+~~~js
+// The deck that gathered it, under its own name since 2026-09-14 — it was
+// called `kurenniemi` until the row above took that slug.
+// `unlisted: true` since 2026-10-13 (*"archive tapes and deck"*): off the index, listed on /archive/.
+~~~
+
+### megatimeline
+
+Above `// ⚠️ 'studio' IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never`, lines 331 to 344 before the cut.
+
+~~~js
+// ⚠️ `megatimeline` IS OFF THE MENU AND STILL ON THE EDGE. The row is gone;
+// the page, its viewport module, its gesture module and the committed census
+// are all still built and still answer at <https://positron.studio/proto/megatimeline/>,
+// because taking a row off a list and deleting a deployed page are different
+// acts and only the first was asked for. Moving the files into `archive/` is
+// a second, larger step — four entries out of the build's allowlist and a URL
+// that starts 404ing — and it is decided on purpose rather than as a side
+// effect of tidying the front page.
+// `remixer` (stack archive recordings from any year on one playhead) was
+// ARCHIVED 2026-10-05 on *"archvie remixer demo"*: the page is in
+// archive/remixer/ and /proto/remixer/ no longer answers. ⚠️ EXCEPT
+// `proto/remixer/hls.min.js`, which stays put and stays built, because seven
+// pages load hls.js from that path (reel, llhls, flipper, cam, station,
+// floor, sync). Moving it is a separate change across those seven.
+~~~
+
+### capture
+
+Above `{ name: 'capture', group: 'capture', act: 4, created: '2026-09-05', built: true,`..., lines 346 to 360 before the cut.
+
+~~~js
+// ⚠️ `studio` IS GONE FROM THE LIST AND THERE WAS NOTHING TO ARCHIVE. It never
+// had a page: the row was a placeholder carrying `why: 'consumes 10 through
+// 14'`, which is a promise rather than a demo, and it had sat on the front
+// page unbuilt since 2026-08-26. `plans/plan-studio.md` still holds the argument
+// for it, which is where a proposal belongs. A row for a page that does not
+// exist makes the list longer and the reader's odds worse.
+// TAKES, SEGMENTS, ROUND TRIP, FAR END since 2026-10-04 (plan-demo-structure
+// §3.5). Its checks run before ready, MEASURED about 20 s ordinary and 33 s
+// deep; bootMs is a ceiling and costs a working page nothing.
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /capture/, listed on /archive/ with the other retired pages.
+// ⚠️ ROUND TRIP's leg (pub's /whip, the input whep-rig) was retired
+// 2026-10-13, so a DEEP run reads that tab's leg asserts red with the reason
+// `this leg was retired 2026-10-13`. Those reds are expected; an ordinary run
+// never reaches them.
+~~~
+
+### shout
+
+Above `// Act 5 with shout, and deliberately NOT a second copy of it: same relay,`, lines 367 to 376 before the cut.
+
+~~~js
+// 26 is Act 5 with 19: both are ERR's live output, one television and one
+// radio, and both are here because the archive work needs the live end of the
+// same pipe. `built` flips the moment positron-shout answers.
+// ⚠️ `shout` IS OFF THE LIST AND ITS WORKER IS UNTOUCHED. The demo page was a
+// measurement OF the relay — status, CORS, bitrate, burst, underruns — and
+// `/archive/radio/` now makes the same relay do something you can hear, which is
+// the better demonstration of the same fact. 🔴 `workers/shout/` STAYS AND
+// MUST: it is the thing that carries the station's plain-HTTP mount to a
+// secure page, and deleting it takes `/archive/radio/` and `/grains/` with it.
+// The page's own source is under `archive/`.
+~~~
+
+### archive-radio
+
+Above `{ name: 'archive/radio', rank: 0, group: 'vain', act: 5, created: '2026-09-14', `..., lines 378 to 397 before the cut.
+
+~~~js
+// Act 5 with shout, and deliberately NOT a second copy of it: same relay,
+// different subject. `shout` asks what Cloudflare costs in front of an
+// Icecast stream; this one is a station somebody actually runs, and it is
+// here because their mount is plain HTTP on port 8001 — which a page on
+// positron.studio may not load at all. The relay is the difference between a
+// page that works and a page that cannot, rather than between a page that
+// measures and one that does not.
+// ⚠️ `settleMs` HERE IS CARRIED ENTIRELY BY ITS SECOND JOB, AND THAT HAS GONE
+// BACK AND FORTH TWICE. The harness applies it to control 0 and to the
+// first-assert budget. This page declared no controls, then declared
+// `Automate` on 2026-09-16, then had it removed the same day — so control 0 is
+// once again the transport's loop-way `.tbar-x`, which returns instantly and
+// takes nothing from the sleep. The number is sized by the second use and has
+// not moved through any of it: a wasm scsynth boot, 31 buffer allocations, a
+// definition, an eight-second ring fill, a 2.5 s level, two 700 ms ink
+// samples and a 1.2 s deafness control before the page says anything at all.
+// `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built, listed on
+// /archive/ with the other retired pages. And `archive/radio`, in demo/archive/radio/, since the
+// same evening (*"Resolve clashes"*): /radio/ is the radio concepts' group now, so the old
+// /radio/ address is a 404 (no forwarding), like the kit's `kit/<part>` rows a name with a slash.
+~~~
+
+### videoradio
+
+Above `{ name: 'videoradio', group: 'vain', act: 5, created: '2026-09-15', built: true,`..., lines 401 to 429 before the cut.
+
+~~~js
+// The same machine as the row above with the instrument panel taken off: it
+// walks its own twelve sounds, moves its own blend, changes station on its own
+// and loops itself in time, and the only picture is a shader of what the
+// granulator is doing rather than of what it sounds like. It imports the
+// stations, the sounds and the lanes from `demo/shell/radio-gran.mjs`.
+// ⚠️ AND IT IS THE ONLY PAGE THAT DOES, SINCE 2026-09-16. `/archive/radio/` imported
+// the same module while it had a tour of its own; the tour was removed on
+// instruction and those were its only imports, so the two pages now share the
+// module's subject and none of its code. See `archive/radio-automate/`.
+// ⚠️ `gl: true` PUTS IT IN `demo/verify-gl.mjs` RATHER THAN `demo/verify.mjs`:
+// the ordinary harness runs Chrome with --disable-gpu, where
+// getContext('webgl2') returns null and every assert here would be
+// unreachable, which reads as green.
+// ⚠️ AND `settleMs` COVERS A WHOLE BOOT BEFORE THE PAGE SAYS ANYTHING. Play is
+// control 0, and behind it sit a relay health call, a decoder, a wasm scsynth,
+// 31 buffer allocations, a definition, an eight-second ring fill and then a
+// burst of checks that drives a morph, a loop and a station change.
+// 🔴 BACK UNDER `väin`, ON INSTRUCTION 2026-09-16: *"move videoradio to vain
+// group"*. It moved to the headset group earlier the same day, on the
+// argument that a group should say what a visitor will GET rather than what
+// the page grew out of. The headset half has since been archived on
+// instruction — *"arvhice videoradio vr, it did not worked out"* — so what a
+// visitor gets is a picture in a window, made of the radio next to it, and
+// `väin` is where that belongs.
+// ⚠️ `xr` AND THE `WebXR` TAG WENT WITH IT. There is no Run in VR control to
+// scroll under a thumb any more, and a tag naming an API the page no longer
+// calls is a description that has drifted from the thing it describes.
+// `unlisted: true` since 2026-10-13 (*"archvie videoradio"*): still built and deployed at
+// /videoradio/, listed on /archive/ with the other retired pages.
+~~~
+
+### crate-station
+
+Above `// Act 0 with 04 score: this is library machinery with a picture on it, not a`, lines 434 to 439 before the cut.
+
+~~~js
+// `crate` was here until 2026-10-02: one long recording into R2 in pieces of 16 MiB through
+// positron-vain. Its protocol now runs eccm's uploads (workers/files in kristjanjansen/eccm), and the
+// page and the Worker are in archive/ (archive/demos/README.md says why).
+// `station` was here until 2026-10-08: a running order played as one stream. It moved to eccm on
+// 2026-10-02 and eccm removed its radio on 2026-10-07, so the row linked to a 404; the page is in
+// archive/ (archive/demos/README.md says why).
+~~~
+
+### circuit
+
+Above `{ name: 'circuit', group: 'instruments', act: 4, created: '2026-09-21', built: t`..., lines 442 to 477 before the cut.
+
+~~~js
+// Act 0 with 04 score: this is library machinery with a picture on it, not a
+// network demo — it touches nothing outside the page.
+// The studio Mac as an instrument: the same page as /keys/, pointed at a
+// different machine. What crosses the relay is a note NUMBER, so neither end
+// knows what kind of computer the other one is.
+//
+// ⚠️ NO LOOPBACK DEVICE. A Core Audio process tap takes a copy of what Live
+// renders while that audio carries on to the speakers — so BlackHole, the
+// Multi-Output Device and Live's own output setting are all out of the path.
+// MEASURED over the relay: silence 0.00000, keys down -5.3 dBFS.
+/**
+ * 🔴 THE HARDWARE ON THE DESK, ON SCREEN. It was called `rack` for one day.
+ * The Ableton page gave that name up on 2026-09-20 — *"rename old rack demo
+ * to able, make new rack demo with out hw layouts. start with model 12
+ * single strip (1)"* — and this page gave it up again on 2026-09-21:
+ * *"rename rack to model"*.
+ * ✅ **SO `/rack/` 404s AND THAT IS THE GOOD OUTCOME.** For one day a kept
+ * link to it opened a DIFFERENT page and said nothing about it, which is the
+ * `/held/` situation and the one failure mode worse than a dead link. A 404
+ * says no. Nothing points at `/rack/` any more.
+ * ⚠️ AND EVERY NUMBER IN IT IS MEASURED. TASCAM publishes no note numbers and
+ * no controller numbers for Mackie Control at any firmware revision, so the
+ * page is built on `research/measured-devices-2026-09-20.md` and would otherwise be
+ * guesswork.
+ */
+/**
+ * 🔴 THE SECOND HARDWARE PANEL, AND IT WAS BUILT THE OTHER WAY ROUND FROM
+ * `model`. That one was laid out from reasoning and corrected twice by
+ * somebody looking at the mixer; this one starts from Novation's own artwork,
+ * read at 800 dpi, with the MIDI bindings kept as a separate source.
+ * ⚠️ **MOST OF THIS PANEL IS BOUND TO NOTHING AND SAYS SO.** Twenty two
+ * buttons have never sent a byte anybody has captured, so they are drawn and
+ * marked rather than wired by guess.
+ */
+// `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+// still built and deployed at /circuit/, listed on /archive/ under devices.
+~~~
+
+### wish
+
+Above `{ name: 'wish', group: 'instruments', act: 4, created: '2026-09-21', built: true`..., lines 482 to 509 before the cut.
+
+~~~js
+/**
+ * 🔴 SAY WHAT YOU WANT AND THE DESK PROPOSES A PATCH. Asked 2026-09-21:
+ * *"Can we have a demo called Wish? Where I can input voice uh, commands and
+ * you are translating them to a batch pay via the models from Cloudflare,
+ * maybe even try out different models."*
+ * 🔴 **IT PROPOSES AND A PERSON CONNECTS, AND THE SECOND HALF IS A
+ * MEASUREMENT RATHER THAN CAUTION.** Run against the real models on the day it
+ * was built: asked to put the mod wheel on the master filter, the 70B returned
+ * a perfectly valid patch pointed at the WRONG INSTRUMENT. No validator can
+ * catch that. A person reading one line can.
+ * 🔴 **AND THIS LINE READ `IT PROPOSES AND NEVER CONNECTS` UNTIL
+ * 2026-09-25**, when the rows were made live on the ask *"when connections
+ * (diagram rows) are there, enable them"*. A switch then appeared on every
+ * ALLOWED row and nothing crossed until somebody pressed it.
+ * 🔴 **AND THE SWITCH IS GONE SINCE 2026-09-28.** Asked, verbatim: *"rm on
+ * button on wish, just keep x button"*. **A ROW THAT EXISTS IS CONNECTED
+ * NOW**, and the `×` takes the link down, quietens the instrument and clears
+ * the row in one gesture. **The gate did not move, only the gesture that
+ * opens it**: an answer lands only out of a press on `Interpret`, on a
+ * prepared row, or on a release of `Hold to talk`, a page load lays no rows
+ * at all, and `requestMIDIAccess` is still behind a person's press and is
+ * still never reached under `?selfcheck=1`.
+ * ⚠️ IT NEEDS `node demo/wish-local.mjs` RUNNING, because a browser cannot
+ * hold a Cloudflare credential. Nothing reaches Cloudflare on a visit or under
+ * the harness.
+ */
+// `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
+// /wish/, listed on /archive/ with the other retired pages.
+~~~
+
+### patchbay
+
+Above `{ name: 'patchbay', group: 'instruments', act: 4, created: '2026-10-04', built: `..., lines 513 to 516 before the cut.
+
+~~~js
+// `wall` was its own unlisted page 2026-10-04 and is the WALL tab of
+// /partitur/ since 2026-10-05, no redirect.
+// `unlisted: true` since 2026-10-12 (*"archive wire and patchbay"*): still built and
+// deployed at /patchbay/, listed on /archive/ with the other retired pages.
+~~~
+
+### partitur
+
+Above `{ name: 'partitur', group: 'bauhaus', act: 4, created: '2026-10-04', built: true`..., lines 520 to 521 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-13 (*"sorry, archvie partitur again"*): still built and deployed at
+// /partitur/, listed on /archive/ with the other retired pages.
+~~~
+
+### time
+
+Above `{ name: 'time', group: 'technologies', act: 0, created: '2026-10-04', built: tru`..., lines 525 to 530 before the cut.
+
+~~~js
+// /time/: the timeline pages as tabs (plans/plan-demo-structure.md §3.2),
+// SCHEDULE, BEAT, LOOPS, SCORE, DATES from transport, lanes, loops, score and
+// strip. Its checks and four bar drills run before ready: MEASURED 6.3 to 6.6 s
+// locally against the 7.4 s default, so it declares its own wait.
+// `unlisted: true` since 2026-10-12 (*"archive time and sync demos"*): still built and
+// deployed at /time/, listed on /archive/ with the other retired pages.
+~~~
+
+### sync
+
+Above `{ name: 'sync', group: 'technologies', act: 4, created: '2026-10-04', built: tru`..., lines 534 to 537 before the cut.
+
+~~~js
+// ARRIVAL, AHEAD, FOLLOW, AFTER since 2026-10-04 (plan-demo-structure §3.1).
+// The check pass runs before ready, MEASURED 8.3 to 9.0 s locally.
+// `unlisted: true` since 2026-10-12 (*"archive time and sync demos"*): still built and
+// deployed at /sync/, listed on /archive/ with the other retired pages.
+~~~
+
+### bay
+
+Above `/**`, lines 542 to 550 before the cut.
+
+~~~js
+// `bay` was a demo and is archived at archive/demos/bay-index.html, removed
+// 2026-09-25 on instruction. It was the first page here that SENT to an
+// instrument rather than listening, and the one line worth keeping is why it
+// could: the Circuit's input refuses SysEx, because that device has no
+// factory reset and one byte inside a SysEx message overwrites a patch.
+// 🔴 THE MODEL AND THE VALIDATOR WERE NEVER IN THE PAGE AND DID NOT GO WITH
+// IT. `demo/shell/bay.mjs` is pure, `node demo/shell/bay-test.mjs` grades it
+// in no browser at all, and `/wish/` and `workers/wish/src/wish.mjs` both
+// import it. The page is archived; what it demonstrated is in service.
+~~~
+
+### shape
+
+Above `{ name: 'shape', group: 'instruments', act: 4, created: '2026-09-21', built: tru`..., lines 552 to 576 before the cut.
+
+~~~js
+/**
+ * 🔴 THE FIRST EDITOR, AND THE ANSWER TO *"can it play back real time on
+ * circuit?"* IS YES AND WAS ALREADY MEASURED. Asked 2026-09-21: *"based on
+ * your research what you've done in sound editing in circuit can you build a
+ * demo for sound editing using our invisible hand sliders and experience what
+ * we had so far."*. `demo/shell/circuit-cc.mjs` holds **98 control change
+ * parameters** read out of Novation's Circuit Programmer's Reference Guide
+ * v1.1, and a control change moves a parameter on the LIVE voice under a note
+ * that is already sounding.
+ * 🔴 **NO SysEx, WHICH IS THE WHOLE SAFETY STORY.**
+ * `plans/plan-circuit-editor.md` §1 records that `Replace Current Patch` and
+ * `Replace Patch` differ by ONE BYTE, and the second overwrites a patch on a
+ * device with no factory reset whose only backup is `New Pack.circuitpack` in
+ * this repository. One function turns an intention into bytes here, it can
+ * express a control change and nothing else, and it is asserted both ways.
+ * ⚠️ IT CANNOT READ THE INSTRUMENT, so a handle says where this page left a
+ * parameter and never what the patch holds. The button is `put back` rather
+ * than `reset` for that reason, and the real undo is reloading the session on
+ * the Circuit, which control changes never touch.
+ * ⚠️ `settleMs` IS FOR THE HAND. A sweep is 7000 ms end to end on a gentle
+ * curve, so the first step of a 127 step lane lands about half a second in,
+ * and that measurement is the first thing the checks make.
+ */
+// `unlisted: true` since 2026-10-12 (*"archiev shape"*): still built and deployed at
+// /shape/, listed on /archive/ under devices.
+~~~
+
+### pack
+
+Above `{ name: 'pack', group: 'instruments', act: 4, created: '2026-09-21', built: true`..., lines 581 to 599 before the cut.
+
+~~~js
+/**
+ * 🔴 THE OTHER HALF OF THE CIRCUIT, AND THE TWO PAGES ARE DELIBERATELY NOT
+ * ONE. `/shape/` sends and cannot read; this one reads and cannot send. Merging
+ * them would put a send path on the page that opens somebody's only backup,
+ * and `plans/plan-pack-page.md` §5 refuses it for exactly that reason.
+ * ⚠️ IT SENDS NOTHING AND THE PAGE ASSERTS IT over a counter on
+ * `requestMIDIAccess` rather than over a reading of its own source. `Replace
+ * Current Patch` and `Replace Patch` differ by one byte at offset 6, the
+ * second writes flash on an instrument with no factory reset, and nothing here
+ * can build either message: `circuit-patch.mjs` exports no encoder at all.
+ * ⚠️ `New Pack.circuitpack` IS NOT PUBLISHED AND THIS ROW DOES NOT CHANGE
+ * THAT. It holds 32 of somebody's real sessions and is their only backup, so
+ * the button that reads it works on a checkout and says so plainly on the
+ * deploy, where the way in is a file from the reader's own machine.
+ * ⚠️ `settleMs` IS FOR THE READING. 3.3 MiB unzipped, 64 patches decoded and
+ * 32 sessions fingerprinted with SHA-256 is about a second and a half here.
+ */
+// `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+// still built and deployed at /pack/, listed on /archive/ under devices.
+~~~
+
+### tom
+
+Above `{ name: 'tom', group: 'instruments', act: 4, created: '2026-09-21', built: true,`..., lines 603 to 616 before the cut.
+
+~~~js
+/**
+ * 🔴 THE GRID, AND ITS ROWS ARE WHATEVER A READER OPENS. Asked 2026-09-21:
+ * *"in bg make a tom demo, a 8x64 grid with transport on top. have
+ * circuitpack uploader on top (as many rows as there are samples)"*, then
+ * *"use webauudito transport code we have"* and *"use shared code to get
+ * samples"*. It is `/pack/`'s file read for its audio rather than its bytes.
+ * ⚠️ `8x64` IS READ AS ROWS BY STEPS, WHICH IS ONE OF TWO READINGS AND IS
+ * SAID ON THE PAGE RATHER THAN CHOSEN IN SILENCE. `BACKLOG.md` carries both.
+ * ⚠️ NO `settleMs`. `verify.mjs` waits for `__demo.ready` before it touches
+ * the transport, and this page is ready 770 ms after load with the whole pack
+ * unzipped, all 64 samples decoded and every check run.
+ */
+// `unlisted: true` since 2026-10-13 (*"archvie tom"*): still built and deployed at
+// /tom/, listed on /archive/ with the other retired pages.
+~~~
+
+### evo-panel
+
+Above `// 'unlisted: true' since 2026-10-12 (*"arvhice circuit pack evo twelev to their`..., lines 621 to 632 before the cut.
+
+~~~js
+/**
+ * 🔴 THE THIRD HARDWARE PANEL, AND ITS LAYOUT IS THE WEAKEST OF THE THREE.
+ * Asked 2026-09-21: *"do evolution mk425c demo named evo"*, *"demo: hw
+ * layout"*. `/circuit/` was drawn from Novation's own artwork at 800 dpi and
+ * the Model 12 was corrected twice by somebody looking at the mixer. Evolution
+ * Electronics no longer exists, there is no artwork, and the manual gives a
+ * NUMBERED LIST rather than a picture — so the counts are documented and the
+ * ARRANGEMENT is this page's own arithmetic, which it says on its face.
+ * ⚠️ WHAT IT SENDS IS MEASURED: global channel 2, keys 47 to 71 (a semitone
+ * flat), every release a note on at velocity 0, a seven bit pitch wheel in a
+ * fourteen bit message, and six controller numbers for eight knobs.
+ */
+~~~
+
+### evo
+
+Above `{ name: 'evo', group: 'instruments', act: 4, created: '2026-09-21', built: true,`..., lines 634 to 635 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+// still built and deployed at /evo/, listed on /archive/ under devices.
+~~~
+
+### twelve
+
+Above `{ name: 'twelve', group: 'instruments', act: 4, created: '2026-09-20', built: tr`..., lines 640 to 652 before the cut.
+
+~~~js
+/**
+ * 🔴 THE SLUG IS `twelve` AND THIS IS THE PAGE'S SECOND RENAME IN TWO DAYS.
+ * Asked 2026-09-21: *"Rename to twelve"*, after *"rename rack to model"* the
+ * day before. So `/rack/` and `/model/` are both dead URLs for one page and
+ * neither has a redirect, which is the cost and is recorded rather than
+ * discovered later.
+ * ⚠️ THE SWEEP MATCHED THE URL FORM AND THE SLUG, NEVER THE WORD. `model` is
+ * ordinary English AND this repository's own word for a data layer, so
+ * `bay.mjs`'s prose, `xr-room.mjs`'s controller models and `/wish/`'s model
+ * pickers are all untouched.
+ */
+// `unlisted: true` since 2026-10-12 (*"arvhice circuit pack evo twelev to their own group"*):
+// still built and deployed at /twelve/, listed on /archive/ under devices.
+~~~
+
+### nola
+
+Above `{ name: 'nola', group: 'instruments', act: 4, created: '2026-09-22', built: true`..., lines 657 to 688 before the cut.
+
+~~~js
+/**
+ * 🔴 A PIANO, AND THE PEDAL IS THE POINT RATHER THAN A FEATURE OF IT. Asked
+ * 2026-09-22 as *"what drives it, sc? plain webmidi?"* about a proposed slug
+ * `nola`, and answered at length in `plans/plan-nola.md`: plain Web Audio,
+ * one buffer source per note, `demo/shell/midi.mjs` for the keys and a new
+ * `demo/shell/pedal.mjs` for the foot. Not scsynth, not a worklet, not a
+ * physical model.
+ * ⚠️ THE PIANO IS THE PLAN'S PHASE ZERO AND IT IS FINISHED RATHER THAN
+ * PARTIAL. Every part of the shipping machinery is here; what is phase zero
+ * is the piano's RECORDINGS, 30 notes at one velocity layer out of FluidR3
+ * where the Salamander pack will be 30 at three with releases beside them.
+ * 🔴 THE RHODES IS NOT PHASE ZERO AND IS THE FIRST REAL PACK ON THIS PAGE.
+ * Asked 2026-09-23 as *"get that rhodes"*. Jeff Learman's jRhodes3d, the mono
+ * set, 15 notes and five velocity layers of his own 1977 Rhodes Mark I Stage
+ * 73, under CC BY-NC-SA 4.0 with the attribution on the face of the page.
+ * `research/rhodes-packs-2026-09-23.md` surveyed every free Rhodes there is.
+ * ⚠️ AND A SECOND INSTRUMENT IS NOT THE SECOND ENGINE §6.1 ITEM 6 ASKS FOR.
+ * Both are recordings played by one sampler, and `demo/shell/rhodes.mjs`,
+ * which is arithmetic rather than a recording, is still in nothing.
+ * ⚠️ NO `settleMs`. The page has no control row at all, so its checks run at
+ * load behind `SELFCHECK` and `verify.mjs` waits on the assert count.
+ * 🔴 AND THE ROLL LEARNS SINCE 2026-09-23. Asked as *"implement nola learning
+ * mode"*, after *"idea is to have alt mode in nola where i play chords and the
+ * ones i keep returning to add them to piano roll. then when have at least 2,
+ * suggest 3rd and 4th somehow"*, and specified at 1,174 lines in
+ * `research/chord-learning-2026-09-23.md`. `demo/shell/name.mjs` names what is
+ * held, and `name-test.mjs` grades it with 648 generated voicings and no
+ * browser at all, on one claim the whole thing rests on: at a margin of 1.0 it
+ * is never wrong.
+ */
+// `unlisted: true` since 2026-10-13 (*"arvhice nola"*): still built and deployed at
+// /nola/, listed on /archive/ with the other retired pages.
+~~~
+
+### fau
+
+Above `{ name: 'fau', group: 'instruments', act: 4, created: '2026-09-23', built: true,`..., lines 694 to 710 before the cut.
+
+~~~js
+/**
+ * 🔴 THE ONE PAGE HERE WHERE THE VISITOR WRITES THE INSTRUMENT. Asked
+ * 2026-09-22 as *"in bg do faust research. demo called fau"*, answered in
+ * `plans/plan-fau.md` at 1,419 lines, and built to its §9.4 order of work.
+ * `/grains/` ships a SynthDef compiled on the Raspberry Pi and `/muta/` ships
+ * two fixed wasm modules: both are binaries somebody made earlier. This one
+ * makes the binary while you watch, out of ten lines of text.
+ * ⚠️ AND THE HEADLINE THE ASK ASSUMED DOES NOT HOLD, which the plan measured:
+ * the browser build of libfaust has three backends and C++ is not one of
+ * them, so the tab cannot emit the code a Raspberry Pi would compile. The
+ * claim that survives is one SOURCE and two compilers, and the board half is
+ * not built, so no board is drawn.
+ * ⚠️ NO `settleMs`. Every control is an async handler, so `verify.mjs` waits
+ * for `data-busy` to clear rather than for a number somebody guessed.
+ */
+// `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+// deployed at /fau/, listed on /archive/ with the other retired pages.
+~~~
+
+### collide
+
+Above `{ name: 'collide', group: 'instruments', act: 4, created: '2026-09-30', built: t`..., lines 715 to 716 before the cut.
+
+~~~js
+// `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+// deployed at /collide/, listed on /archive/ with the other retired pages.
+~~~
+
+### able
+
+Above `// 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to`, lines 722 to 732 before the cut.
+
+~~~js
+// `able` was a demo and is archived at archive/demos/able-index.html, removed
+// 2026-09-25 on instruction. It played Ableton Live on a studio Mac from a
+// browser with no virtual audio cable, and it held the slug `rack` gave up on
+// 2026-09-20, so archive/demos/ now has two files that were both `/able/`:
+// rack-index.html is the page BEFORE this one.
+// 🔴 THE AGENT ON THAT MAC IS NOT ARCHIVED AND NOTHING HERE TOUCHED IT.
+// `room: 'fixed'` meant `m1-1` is the ADDRESS of the studio Mac's agent
+// rather than a rendezvous the page invented, and rig/m1/ still holds
+// live-agent.mjs, pace-agent.mjs and the README that runs them. What left is
+// the page, so there is no longer a positron URL that drives that agent and
+// rig/m1/README.md still prints one.
+~~~
+
+### draw
+
+Above `{ name: 'draw', group: 'technologies', act: 0, created: '2026-09-13', built: tru`..., lines 735 to 750 before the cut.
+
+~~~js
+// 🔴 THE GRANULATOR, ON ITS OWN PAGE, and the split is the point. It used to
+// be an INSERT on /keys/ wrapping the instruments — and a grain cloud has no
+// note-off, so releasing a key swapped one drone for another and every
+// instrument's envelope, attack and patch character were washed out before
+// you heard them. The patch selector and the die both stopped doing anything
+// audible. The engine is not at fault; wrapping an instrument in it was.
+// Here, being droney is the point rather than a defect.
+// The same subject as `grains`, on this machine instead of on the Pi — and it
+// exists because the board's granulator could not be shown to respond to any
+// of its own parameters, while this one reports every grain it fires.
+// Promoted from proto/paths/, which was finished and measured and had never
+// been given a page — hold 24.19 px against Catmull-Rom 0.036, and 93.4% of
+// the drawn line invented. The adapter was the asset; its hand-rolled UI is
+// what the kit replaces.
+// `unlisted: true` since 2026-10-12 (*"Revert xy changes, archive cy and draw"*): still built
+// and deployed at /draw/, listed on /archive/ with the other retired pages.
+~~~
+
+### stage
+
+Above `{ name: 'stage', group: 'th', act: 4, created: '2026-09-17', built: true, unlist`..., lines 754 to 798 before the cut.
+
+~~~js
+// The last of the protos to be given a page, promoted from proto/text/: the
+// text recorder this lineage failed to write five times. Every earlier one
+// listened to `keydown` and rebuilt the cursor by hand, so every one refused
+// arrow keys and the newest regressed to append-only. This writes down what
+// each change DID to the document, which is what makes a seek a fold rather
+// than a replay — 73 edits captured through a real browser, rebuilt to the
+// browser's own text character for character.
+// `typist` was here until 2026-10-12, archived on *"archive/mdfy typist"*:
+// archive/typist.md, and /typist/playback/ shows the same idea. /typist/ is a 404.
+// `grains` and `knobs` were here until 2026-10-13, archived with Yoshimi on
+// *"discard yoshimi ... arhive demos using it"*: archive/demos/grains-index.html,
+// archive/demos/knobs-index.html and archive/yoshimi/README.md. /grains/ and
+// /knobs/ are 404s; demo/grains/defs/ stays because /archive/radio/, /videoradio/ and
+// /archive/pappus/ (the old concepts sampler/050) load it.
+/**
+ * 🔴 THE FIRST PAGE TO USE `tabs.mjs`, WHICH HAS EXISTED WITH NO CALLER. It
+ * was on `/items/` for one commit and taken off, because three names over one
+ * list and one form is furniture. Three genuinely different views of one show
+ * is the case it was written for, and a component with no user is a component
+ * nothing grades.
+ */
+// ⚠️ `capture`, NOT `video`. There is no `video` group and `byGroup` THREW
+// rather than quietly dropping the row, which is the whole reason that check
+// exists: an ungrouped demo still renders a complete-looking front page and
+// the only way to notice is to count. Caught by the build on the first run.
+// ⚠️ `settleMs` SIZES THE WAIT FOR THIS PAGE'S FIRST ASSERT, not a control-0
+// press: it has no controls row on purpose. Its checks drive the whole live
+// pipeline (publish, record, stop, store, play back, seek) and hold every
+// assert until that is done, because `verify.mjs` stops collecting the moment
+// the count is unchanged for one 400 ms tick.
+// 🔴 AND SINCE 2026-09-25 IT DOES A SECOND JOB THAT IS THE REAL REASON IT IS
+// 75 s: IT KEEPS THE HARNESS'S OTHER PRESSES OUT OF THE PAGE'S OWN DRILL.
+// This page's `START HLS` and `START WEBRTC` are `.tbar-x`, so the harness
+// presses them, and each one is its own STOP. `settleMs` lands after control
+// 0 only, so it is the whole gap between that press and the next: at 75 s the
+// second press arrives after the drill has finished, and the button it finds
+// reads `STOP WEBRTC`, which releases the publisher rather than starting
+// another show. A smaller number puts a stop press in the middle of the
+// drill, which is the failure recorded in this page's own check block as
+// twelve asserts red.
+// ⚠️ IT IS NOT SIZING THE CONTAINER WAKE ANY MORE. The check waits for the
+// publisher itself (`waitForWhip`) before it presses, so the wake is paid
+// against the asserts before the press rather than against this number.
+// `unlisted: true` since 2026-10-13 (*"archive weight stage"*): still built and deployed at
+// /stage/, listed on /archive/ with the other retired pages.
+~~~
+
+### stage-one
+
+Above `one: 'a church scene from a 2011 MIMproject performance, broadcast live from the`..., lines 800 to 804 before the cut.
+
+~~~js
+// \ud83d\udd34 THE TWO PRESSES CHANGED WHAT THEY MEAN, SO THIS SENTENCE HAD TO. It
+// read *"two presses, one for the picture and one for the show"*, which the
+// 2026-09-25 transport rework made false twice over: the two presses are
+// now WHICH TRANSPORT carries the show, and the film lost its play button
+// in the same change, so there is no press for the picture at all.
+~~~
+
+### away
+
+Above `{ name: 'away', group: 'instruments', act: 4, created: '2026-09-30', built: true`..., lines 808 to 811 before the cut.
+
+~~~js
+// Listens only. The Circuit's left output into a Fast Track Pro on the Pi,
+// captured by `rig/board/board.mjs` and streamed into the Pi's own room.
+// `unlisted: true` since 2026-10-13 (*"archive wish, away, radio."*): still built and deployed at
+// /away/, listed on /archive/ with the other retired pages.
+~~~
+
+### muta
+
+Above `{ name: 'muta', group: 'instruments', act: 4, created: '2026-09-22', built: true`..., lines 816 to 857 before the cut.
+
+~~~js
+/**
+ * 🔴 SOMEBODY ELSE'S FIRMWARE, COMPILED RATHER THAN REWRITTEN, AND THAT IS
+ * THE WHOLE CLAIM. `LESSONS.md` #81: `/grains/` said *"the same granulator in
+ * this page and on a Raspberry Pi"* and it was false, because the page ran a
+ * REIMPLEMENTATION. This page runs `plaits/dsp/voice.cc` from a pinned commit
+ * with no line of it changed, and the wasm carries its own digest over its own
+ * source set, so a second build elsewhere can be compared to it by something
+ * other than two people agreeing it sounds right.
+ * ⚠️ THAT COMPARISON HAS NOT BEEN MADE. Nothing has been built on the board,
+ * so what exists today is one end and the hook for the other.
+ * 🔴 AND IT WAS TWO FIRMWARES UNTIL 2026-09-28, WHICH IS WHY THIS BLOCK USED
+ * TO READ THE OTHER WAY. Asked, verbatim: *"muta: arhive/rmwarps and rm all
+ * routing code around it"*. Warps is out of the page and out of the worklet,
+ * and three paragraphs left with it: one headed *"TWO UNEDITED FIRMWARES IN
+ * ONE GRAPH IS THE THING THIS PAGE SHOWS AND ONE ON ITS OWN COULD NOT"*, one
+ * about half of Warps sitting an octave down at 48 kHz because its filter bank
+ * coefficients are baked at 96,000, and a count of two files under 280 KB.
+ * ⚠️ `demo/muta/vendor/warp.wasm` AND `build/warp_shim.cc` ARE STILL ON DISK
+ * AND NOTHING FETCHES THEM. `build/build.sh` compiles that shim into that
+ * artefact and there is no emscripten on this machine, so removing them is a
+ * build script change somebody able to run it has to verify.
+ * ⚠️ NO `room` AND NO `settleMs` OVER 8 s. This page opens no socket, reaches
+ * no relay and touches nothing outside the deploy: 196.0 KB of one artefact
+ * and an AudioWorklet. `plans/plan-vcv-modules.md` §12.4 is the
+ * experiment, and `plans/plan-two-more-modules.md` is where Warps was picked
+ * over the four other modules that were priced.
+ * ⚠️ THE POLYPHONY IS THE HOST'S AND NOT THE FIRMWARE'S. Plaits in hardware
+ * is one module with one voice in it; the shim runs eight copies of
+ * `plaits::Voice` against one `Patch`, which is what Rack's adapter does with
+ * sixteen. No line of `plaits/` was changed to allow it.
+ */
+/**
+ * ⚠️ `hardware`, NOT `instruments`, ASKED FOR 2026-09-22 AS *"move muta to
+ * hardware group"*. Both readings are defensible and the ask settles it: the
+ * page IS an instrument you play, and what it is ABOUT is a piece of eurorack
+ * hardware reproduced exactly. The group it now sits in holds `/circuit/`,
+ * `/twelve/`, `/evo/` and `/dump/`, which are all pages about a real device
+ * rather than pages that make a sound of their own, and that is the company
+ * this one keeps.
+ */
+// `unlisted: true` since 2026-10-13 (*"archve fau collide muta"*): still built and
+// deployed at /muta/, listed on /archive/ with the other retired pages.
+~~~
+
+### webmidi-soft
+
+Above `tags: ['WebAssembly', 'AudioWorklet', 'WebAudio', 'WebMIDI'] },`, lines 860 to 867 before the cut.
+
+~~~js
+/* ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so a browser with no MIDI
+   keeps this row linked and the page says why rather than the row vanishing,
+   which would read as the demo not existing. The page plays from its own
+   Test tone button and knobs without a keyboard.
+   ⚠️ IT READ *"plays perfectly from its own knobs"* UNTIL 2026-09-25,
+   when the automatic drone went on the ask *"no automatic drone"*. A knob
+   alone makes no sound now, because a knob shapes a voice and nothing was
+   asking for one. */
+~~~
+
+### dump
+
+Above `{ name: 'dump', group: 'instruments', act: 4, created: '2026-09-20', built: true`..., lines 870 to 884 before the cut.
+
+~~~js
+/**
+ * 🔴 THE INSTRUMENT FOR EVERY OTHER PAGE IN THIS GROUP, AND FOR THREE PLAN
+ * DOCUMENTS. Four devices sit on the desk this was written at, and the plans
+ * describing them are written almost entirely from documentation because
+ * several of their central facts are in no document: TASCAM publishes no
+ * controller numbers for the Model 12 in Mackie Control mode at any firmware
+ * revision, and Novation never wrote down whether the Circuit's NRPN rides
+ * the usual convention. Both are four seconds of turning a knob in front of
+ * this page.
+ * ⚠️ `WebMIDI` IS A SOFT CAPABILITY in `caps.mjs`, so this row stays linked on
+ * a browser with no MIDI at all. It has a known stream written into it and
+ * every check runs off that, so the page is worth opening on a phone.
+ */
+// `unlisted: true` since 2026-10-13 (*"arhcive mirror, streamin group (kill / stop their workers not needed), dump"*): still built and
+// deployed at /dump/, listed on /archive/ with the other retired pages.
+~~~
+
+### patch
+
+Above `// Not a demo of anything — a page where every reusable control is present and`, lines 889 to 924 before the cut.
+
+~~~js
+// 🔴 THE INSTRUMENT IS THE FILE. `plan-visuals` §1.2 says a fragment shader is
+// a DOCUMENT — "~2 KB of GLSL plus ~200 bytes of parameters reproduces it at
+// any resolution" — and works out when generated code may cross a wire. This
+// is the sound half of that argument, which had never been written down: a
+// SuperCollider synth definition is a few hundred bytes that completely
+// describe an instrument, they survive the relay unchanged, and at the far
+// end TWO different engines read the same ones.
+//
+// ⚠️ NOT THE QUESTION research §5 ANSWERED. That one priced shipping scsynth
+// as a demo's sound engine — 1,701,983 B against a 6,659 B worklet, correctly
+// no. The engine here is a reader fetched once and only when asked; the
+// subject is the asset that travels.
+//
+// settleMs covers a 1.7 MB fetch, the engine boot (~630 ms measured), three
+// round trips over the relay and six loudness windows. Every assert on this
+// page sits behind control 0.
+//
+// ⚠️ THREE OF ITS TWENTY ASSERTS ARE ABOUT SOMEBODY ELSE'S NETWORK, so a red
+// run here is not automatically a regression — the same caveat CLAUDE.md
+// already carries for `now` and `carry`. MEASURED by taking the relay away
+// (`--host-resolver-rules=MAP ws.positron.studio 127.0.0.1:1`): 17 of 20,
+// the three round-trip asserts saying `nothing came back`, and nothing hung.
+// 🔴 `patch` IS OFF THE SITE — asked for, and it has already served its
+// purpose. It existed to ask whether a synth definition can travel as a
+// message the way a shader does; the answer is yes, and it is now a fact
+// rather than a page. What it proved is in
+// `research/supercollider-browser-2026-09.md` §10 and in the commits, and the
+// thing it proved is being built INTO `grains`, where two granulators can run
+// the same definition instead of one page demonstrating that they could.
+//
+// ⚠️ THE FILES STAY ON DISK AND ARE NOT DEAD. `demo/patch/vendor/` holds the
+// vendored, licensed SuperSonic engine and `engine.mjs` boots, meters and
+// collects OSC from it — that is the infrastructure the `grains` rewire runs
+// on. Removing the ROW takes the page off the deploy; deleting the directory
+// would take the engine with it. When `grains` has moved what it needs to a
+// shared home, the leftovers can go.
+~~~
+
+### kit
+
+Above `{ name: 'kit', group: 'kit', act: 0, created: '2026-09-12', // 🔴 'true' NOW, AN`..., lines 926 to 939 before the cut.
+
+~~~js
+// Not a demo of anything — a page where every reusable control is present and
+// wired to nothing, so one can be looked at and pushed around without a board,
+// a relay or a stream. `built: false` because it publishes no `__demo` and
+// asserts nothing: it is a mirror for the components, not a claim about them.
+// 🔴 `bootMs: 12000` SINCE 2026-09-26, MEASURED: /kit/ says ready at 7.3 s
+// locally and 7.7 s on the edge with 231 asserts landed, against the harness's
+// fixed 7.4 s, because it builds and grades every specimen before ready and
+// its measuring window forbids deferring any of them. Re-measure before
+// raising this again; a page past 12 s has a build problem, not a budget one.
+// ✅ AND IT WENT, 2026-10-06, WITH THE PAGE IT WAS FOR (step 4 of
+// plans/plan-kit-split.md). `/kit/` is the forwarder now: an old `#block`
+// address goes to the part page holding the block, and anything else reads
+// a list of the parts. The monolith moved with `git mv` to `/kit/slides/`.
+// Listed again 2026-10-13 (*"Bring kit card to frontpage"*): a card at the foot of the front page.
+~~~
+
+### kit-built
+
+Trailing comment on line 940 before the cut.
+
+~~~js
+{ name: 'kit', group: 'kit', act: 0, created: '2026-09-12', // 🔴 `true` NOW, AND THE FLAG MEANT TWO THINGS. `built: false` was doing
+~~~
+
+### kit-built-why
+
+Above `built: true, page: '/kit/',`, lines 941 to 946 before the cut.
+
+~~~js
+// double duty: hide this from the index, and skip it in `verify.mjs`, which
+// filters on the same field. So the one page whose entire job is to make
+// component drift visible was the one page the suite could not look at, and
+// CLAUDE.md recorded that as open work without noticing the flag was the
+// cause. It carries `mount()` and eight asserts now, so it is a page the
+// harness grades like any other.
+~~~
+
+### social
+
+Above `{ name: 'social', group: 'kit', act: 0, created: '2026-10-14', built: true,`, lines 952 to 954 before the cut.
+
+~~~js
+// /social/, asked 2026-10-14 (*"make a separate promo folder like kit, link from
+// frontpage carrd next to kit"*, named *"use social"*): pictures and reels the
+// site makes of itself. Listed as a card beside the kit; its pages are rows below.
+~~~
+
+### kit-parts
+
+Above `{ name: 'kit/input', title: 'input', group: 'kit', act: 0, created: '2026-10-06'`..., lines 965 to 982 before the cut.
+
+~~~js
+// 🔴 THE KIT, ONE PAGE PER PART, 2026-10-06 (plans/plan-kit-split.md). Each
+// row deploys `demo/kit/<part>/` to `/kit/<part>/` and is opened by
+// `verify.mjs` there, through code that already handles a slash in a name
+// (the plan's section 2.3 reads every consumer). In the tab order `/kit/`
+// had, with one `created`, so `byNewest()` keeps that order by array position.
+// ✅ LISTED 2026-10-06 (step 3 of the plan, asked as *"go"*); the `kit` row
+// below went unlisted the same moment, so the front page shows seven cards
+// and `/kit/` stays reachable at its address until SLIDES moves (step 4).
+// ✅ AND SLIDES JOINED THEM THE SAME DAY (step 4): `kit/slides` is the old
+// `/kit/` file itself, moved with `git mv` and cut down to that part.
+// 🔴 THE CARDS SAY THE PART ALONE, ASKED 2026-10-06: *"no need to "kit/..." in
+// titles"*. `title` is the part and `name` stays `kit/<part>`, which is the
+// address and what `verify.mjs` checks the page against.
+// ⚠️ NO `bootMs` ON ANY OF THEM. The monolith needed 12 s because two of
+// INPUT's timed checks and LAYOUT's tab page pass ran before `ready`; on
+// their own pages INPUT's run after it and LAYOUT's fits the default wait.
+// 🔴 OFF THE FRONT PAGE SINCE 2026-10-10: *"make a separate kit page (rm from
+// frontpage) /kit"*. Every part is `unlisted` and `/kit/` draws them as cards.
+~~~
+
+### kit-logo
+
+Above `{ name: 'kit/patchbay', title: 'patchbay', group: 'kit', act: 0, created: '2026-`..., lines 1007 to 1011 before the cut.
+
+~~~js
+// 🔴 THE NINTH PART, 2026-10-06: *"add kit/logo page and use individual slides
+// from the brand slides. rm brand slids after it"*. The front page's `brand`
+// deck, one block per slide; the deck itself is gone from shell/decks.mjs.
+// The tenth part, 2026-10-10: *"move 21 to kit, patchbay card"*, what was
+// `/concepts/21/`.
+~~~
+
+### kit-icons
+
+Above `{ name: 'kit/icons', title: 'icons', group: 'kit', act: 0, created: '2026-10-10'`..., lines 1018 to 1019 before the cut.
+
+~~~js
+// The eleventh part, 2026-10-10: *"see ../eccm icon system. We need one from
+// icones. Make a sample sheet in one of kit pages called icons."*
+~~~
+
+### kit-chat
+
+Above `{ name: 'kit/chat', title: 'chat', group: 'kit', act: 0, created: '2026-10-11', `..., lines 1023 to 1024 before the cut.
+
+~~~js
+// The twelfth part, 2026-10-11: *"make it a kit page too and keep it update
+// while we work on chat for chat components"*.
+~~~
+
+### kit-frontpage
+
+Above `{ name: 'kit/frontpage', title: 'frontpage', group: 'kit', act: 0, created: '202`..., lines 1028 to 1029 before the cut.
+
+~~~js
+// The thirteenth part, 2026-10-12: *"add new kit card / page. name it
+// fronpage. lets work on it. first do typograpy sampler"*.
+~~~
+
+### kit-share
+
+Above `{ name: 'kit/share', title: 'share', group: 'kit', act: 0, created: '2026-10-13'`..., lines 1033 to 1034 before the cut.
+
+~~~js
+// The fourteenth part, 2026-10-13: *"Build frontpage og card and apply to all
+// pages"*, drawn with no browser (*"What headless chrome?!!? See ../eccm etc"*).
+~~~
+
+### slides-pages
+
+Above `{ name: 'slides/synths', title: 'synths', group: 'slides', act: 0, created: '202`..., lines 1039 to 1046 before the cut.
+
+~~~js
+// 🔴 A PAGE PER DECK, 2026-10-06: *"add slides/(slug) page on each slode deck.
+// title is on footer on 1/2 w it replaces page count and becomes link to
+// slides/(slug) page"*. UNLISTED because the deck's card on the front page is
+// its half width player, whose footer links here. `slides/<deck>` deploys
+// `demo/slides/<deck>/` to `/slides/<deck>/`; the archive row `slides` below
+// copies only the flat files of `demo/slides/`, so the two do not meet.
+// the frames are drawn in THIS order, so `DECKS` alone would not move them.
+// `slides/positron` was first here until 2026-10-08, parked on *"rm 9 things slides for now"*
+~~~
+
+### unlisted
+
+Above `{ name: 'slides', group: 'kit', act: 0, created: '2026-10-05', built: true, unli`..., lines 1051 to 1064 before the cut.
+
+~~~js
+// 🔴 `unlisted` IS A THIRD STATE AND THE TWO THAT EXISTED COULD NOT SAY THIS.
+// `built: true` deploys a page, runs it in `verify.mjs` AND puts a card on the
+// front page; `built: false` takes it out of the suite. What was wanted here
+// is a page that is deployed and graded and NOT advertised: the box beside
+// every demo title collects what visitors write, and a link to the pile of it
+// on the front page invites a reader to treat other people's notes as part of
+// the work. `byGroup()` drops it, so both index renderers drop it — there is
+// one of those now and it is in this file.
+// ⚠️ UNLISTED IS NOT SECRET, and the page says so on itself. Anything else
+// would be a token, and a token pasted into a public page is a published one.
+// A build sheet for the Pico router, unlisted, asked 2026-10-05 (*"write into
+// not-in-index positron page"*): the Oomipood list, the breadboard drawings
+// from rig/pico/oled/breadboard.mjs and the power notes. Opens nothing.
+// talk: archived 2026-10-05 on "There is no need for a talk slide", archive/demos/talk-index.html, no redirect.
+~~~
+
+### settle-9000
+
+Above `settleMs: 9000,`, lines 1072 to 1074 before the cut.
+
+~~~js
+// Its first assert sits behind an arm, a socket, an echo and a read back,
+// and `verify.mjs` walks off 400 ms after a count stops growing — which for
+// a count still at zero is immediately. This is the budget for that phase.
+~~~
+
+### not-shelled
+
+Above `/**`, lines 1079 to 1083 before the cut.
+
+~~~js
+// ── pages that are not shelled demos, but are the point of the whole rig ──
+//
+// Both live outside demo/, so `built` stays false — it means "a shelled page
+// under demo/<name>/ that demo/verify.mjs runs", and neither is that. `page`
+// is what makes a row clickable anyway.
+~~~
+
+### keys
+
+Above `// A CHECKUP, not a player — and that is what makes it shippable. The playing`, lines 1085 to 1100 before the cut.
+
+~~~js
+/**
+ * 🔴 `keys` IS RETIRED, 2026-09-17: *"keys seems to be dead. bring keyboard to
+ * knobs and archive keys"*. The page is at `archive/keys/`, its keyboard is on
+ * `/knobs/`, and the deployed `/keys/` is gone with no redirect written — the
+ * same as `radio1965` and `box` before it.
+ *
+ * ⚠️ IT WAS `box` UNTIL 2026-09-16 and `rig/board/` keeps its name, because the
+ * BOARD is still the box: `board.mjs`, `board.hello`, `board.alive`. What left
+ * `rig/board/` is one HTML file; everything `push.sh` ships to the Raspberry Pi
+ * is untouched.
+ * ⚠️ AND IT NEVER HAD A HARNESS. `node demo/verify.mjs keys` answered `nothing
+ * for this harness to verify` for its whole life, because it was not a built
+ * demo — which is how it could be silent for a visitor while every counter it
+ * displayed read correct. `archive/keys/README.md` has what was and was not
+ * proved about that silence.
+ */
+~~~
+
+### rack
+
+Above `];`, lines 1103 to 1127 before the cut.
+
+~~~js
+// A CHECKUP, not a player — and that is what makes it shippable. The playing
+// page (rig/m1/play.html) needs a peer with Ableton open, so it
+// is a dead link for a visitor; asking whether the rig is set up is a real
+// answer in BOTH states, and the interesting one is usually "it is not".
+//
+// MEASURED 2026-09-11, the whole chain end to end: the studio's own output
+// recorded at -91.0 dB with nothing sent and 0.0 dB peak with a chord held —
+// 91 dB apart, so the separation is not ambient noise. That run also found
+// the output clipping at full scale, which nothing else had noticed.
+//
+// For the record, from 2026-09-10 and not what this page shows: playing it
+// costs 6.00 ms typical over a direct peer link against 68.90 ms via the
+// relay, and presses over 100 ms go 0 of 100 against 4 of 100.
+// `rack` was a demo and is archived at archive/demos/rack-index.html, pulled
+// before the M1 <-> Live side is rearchitected rather than left pointing at a
+// design that is about to change. What it proved is worth keeping here: the
+// chain runs end to end — midisend -> IAC -> Live -> Arturia Stage-73 V2 ->
+// BlackHole — with a held chord reading -29.1 dB peak against a -91.0 dB
+// silence baseline, 61.9 dB of separation, and its checkup found the output
+// clipping at full scale when nothing else had. rig/m1/ and plans/plan-rack.md hold
+// the rest.
+// ⚠️ AND THE PAGE THAT TOOK THAT SLUG IS ALSO ARCHIVED, SINCE 2026-09-25.
+// Reading this note on its own would put a reader on `/able/`, which is a
+// 404. Both files are in archive/demos/: rack-index.html is the checkup
+// described above and able-index.html is the player that replaced it.
+~~~
+
+### notes
+
+Above `export const NOTES = [];`, lines 1130 to 1139 before the cut.
+
+~~~js
+/** Written notes, rendered by /notes/ from markdown. */
+/**
+ * 🔴 EMPTY, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT. It carried two
+ * essays, `positron and U:` and `an instrument in a box`, on a front page whose
+ * question is "what is here to open". A document that argues is not something
+ * to open and it does not belong in a list of things that are; both have moved
+ * to `research/`, which is where writing that REPORTS or ARGUES lives.
+ * `noteHTML` and `groupHTML` still handle a populated list, so putting one back
+ * is adding a row here.
+ */
+~~~
+
+### extra-pages
+
+Above `export const extraPages = () =>`, lines 1144 to 1150 before the cut.
+
+~~~js
+/**
+ * Pages that live outside demo/ and are copied in: [source, destination].
+ *
+ * ⚠️ `built: true` demos are ENUMERATED by build.mjs from the directory and are
+ * not in here. This is only the exceptions — the box's listener, which lives in
+ * rig/, and the component sandbox, which is not a demo.
+ */
+~~~
+
+### target-of
+
+Above `export const targetOf = (d) => {`, lines 1155 to 1172 before the cut.
+
+~~~js
+/** the link target for a row, or null when it has none */
+/**
+ * The link target for a row.
+ *
+ * ⚠️ `?xr=1` ON THE HEADSET ROWS, AND IT CANNOT START THE SESSION ITSELF.
+ * WebXR needs a TRANSIENT USER ACTIVATION, so no link can enter VR — the page
+ * still needs one press. What the flag buys is that the press is the first
+ * thing under your hand: the page scrolls its own Run-in-VR control into view
+ * and focuses it, so from the index it is link, tap, in.
+ */
+/**
+ * ⚠️ `query` IS A ROW'S OWN EXTRA PARAMETERS, AND IT MERGES WITH `?xr=1`.
+ * `earshot` needs `report=1` to beacon from a machine that is not a headset,
+ * and it also wants the headset offer under the visitor's thumb, so the two
+ * cannot be a choice between them. Written once here rather than as a link
+ * somebody types into the front page by hand, which is the second place this
+ * project keeps learning not to have.
+ */
+~~~
+
+### by-newest
+
+Above `export function byNewest(list = DEMOS) {`, lines 1179 to 1190 before the cut.
+
+~~~js
+/**
+ * Newest first, and the array is left alone.
+ *
+ * ⚠️ THE ARRAY ORDER IS STILL THE STORY ORDER — this returns a COPY. The build
+ * and every other reader keep reading `DEMOS` in acts; only the front page
+ * sorts, because the front page answers a different question ("what is new
+ * here?") from the one the sequence answers ("where do I start?").
+ *
+ * Ties are broken by position in DEMOS rather than by name, so a day that
+ * landed six demos at once still reads in the order they were meant to be
+ * read, and the sort is stable across runs.
+ */
+~~~
+
+### xr-first
+
+Above `.sort((a, b) => (b[0].xr ? 1 : 0) - (a[0].xr ? 1 : 0)`, lines 1194 to 1201 before the cut.
+
+~~~js
+// 🔴 THE HEADSET PAGES FIRST, then newest. They are the newest thing this
+// project can do and the only two that need a device to be seen at all, so
+// a visitor with one in their hands should not have to scroll past
+// everything else to find them. ⚠️ `xr` is a FLAG, not a tag — a `WebXR`
+// tag would reach `caps.mjs`, which turns tags into REQUIREMENTS, and both
+// of these pages work perfectly well in an ordinary browser. Marking them
+// as needing a headset would un-link them for everybody who has not got
+// one, which is the opposite of the point.
+~~~
+
+### groups
+
+Above `export const GROUPS = new Map([`, lines 1215 to 1280 before the cut.
+
+~~~js
+/**
+ * ONE renderer for an index row, because there were two.
+ *
+ * `demo/index.html` and `workers/view/build.mjs` each carried their own copy of
+ * this function. Dropping the `n` field fixed the build's copy and left the
+ * local one printing `undefined` over every demo name — the exact failure this
+ * file's own header claims cannot happen ("no second place to forget a row").
+ * The header was aspirational; now it is true.
+ *
+ * The first column used to be the row's POSITION. It is now the day the page
+ * landed, because the front page sorts by that: a rank number that renumbers
+ * itself whenever the sort changes is a column that cannot be quoted, while a
+ * date is the same fact wherever the row appears.
+ *
+ * `opt.missing` is a list of capability names this browser answered NO to —
+ * `demo/shell/caps.mjs` produces it. When `opt.blocked` is set the row is drawn
+ * unlinked WITH ITS REASON IN WORDS, never simply dropped: a missing row and a
+ * row that cannot run here are different facts, and hiding one as the other is
+ * the same defect as a blank cell that collapses "we did not look" into "we
+ * looked and it was fine".
+ */
+/**
+ * The front page's sections, in the order they are read.
+ *
+ * 🔴 A SECOND AXIS, ON PURPOSE, AND IT IS NOT THE ACTS. `ACTS` is the STORY —
+ * the order to walk the demos in to be taught something, and it is what the
+ * sequence is for. A visitor arriving at the front page is not being taught;
+ * they are looking for a THING, and the thing has a subject: a headset, a
+ * radio station, one man's archive, ERR's. Sorting that list by recency
+ * answered a question nobody asked ("what changed?") and sorting it by act
+ * answered one they cannot have yet ("where does this fit in the argument?").
+ *
+ * ⚠️ NEITHER AXIS REPLACES THE OTHER and neither is derived from the other.
+ * `weight` is act 0 because it teaches how a picture is drawn, and it is in the
+ * headset group because that is where you would go looking for it.
+ */
+/**
+ * 🔴 A SECTION NAMED AFTER A BROADCASTER IS BACK, AND THE INSTRUCTION IT
+ * REVERSES IS KEPT HERE RATHER THAN DELETED. What stood in this place from
+ * 2026-09-16 was *"hide the ERR archive from frontpage"* and *"no err refs"*,
+ * asked the same evening they told us our connections were corrupting their
+ * listener statistics (CLAUDE.md), on the argument that a heading advertising
+ * whose streams this site pulls is the first thing they would be shown. Asked
+ * again 2026-09-24: *"second group err, move floor to err and the one what had
+ * err audio and video side by side"*. So `err` is the second section.
+ * ⚠️ WHAT THAT DECISION WAS ABOUT IS UNCHANGED AND IS NOT WEAKENED BY THIS
+ * ONE. The rule in CLAUDE.md is about CONNECTIONS rather than about a heading:
+ * every connection this repository opens to an ERR mount appears in a public
+ * broadcaster's audience measurement, and naming a section opens none. Neither
+ * page in it fetches anything until somebody presses something.
+ * ⚠️ AND IT IS TWO PAGES, NOT EVERY ERR PAGE. `floor` and `reel` were
+ * named; `now` and `flipper` were not, and both stay in `streaming` where a
+ * live channel belongs.
+ * 🔴 THE FIRST ANSWER TO *"the one what had err audio and video side by
+ * side"* WAS `flipper` AND IT WAS WRONG. `flipper` is the only page here
+ * holding ERR television and ERR radio at once, so a search for the SOURCE
+ * finds it and nothing else. The ask was about the LAYOUT: `reel` draws one
+ * column per medium, the newsreel on the left and the same day's radio on the
+ * right, and it plays the ARCHIVE rather than the live mounts, so no search for
+ * a live mount could ever have reached it.
+ *
+ * ⚠️ AND NO ARTICLES. Asked 2026-09-16, *"rm 'the' from the titles"*.
+ * Five of these were bare and three were not, so the column read `the timeline`
+ * over `instruments` over `capture`: a list where some members are names and
+ * some are phrases. Same rule as the diagram labels in CLAUDE.md.
+ */
+~~~
+
+### slides
+
+Above `['slides', 'slides'],`, lines 1282 to 1286 before the cut.
+
+~~~js
+// Decks, asked 2026-10-06: *"add grpup to frontpage: Slides (2 col)"* and
+// *"use 2col slidedck here. no separate page"*. It holds no demo rows: the
+// section is a holder that shell/decks.mjs fills with one player per deck.
+// FIRST since the same day, on the owner's word: *"move slides above kit in
+// index page"*.
+~~~
+
+### th
+
+Above `['streaming', 'streaming'],`, lines 1288 to 1311 before the cut.
+
+~~~js
+/**
+ * 🔴 `TH` IS FIRST, ASKED 2026-09-24: *"move headset group first in
+ * index. rename to 'TH'"*, with *"move making to TH"* and *"move typist to
+ * th"* in the same message. The title is the two letters as they were quoted.
+ * ⚠️ IT IS NO LONGER A GROUP ABOUT A DEVICE, WHICH IS WHAT LETS THE NAME
+ * CHANGE AT ALL. It read `headset` (and `in a headset` before that, changed
+ * 2026-09-21 on *"in a headset -> headset"*) while every row in it was a page
+ * you put a headset on for. `making` is an archive on two tabs and `typist`
+ * is text on a line, so a name describing the hardware would now be wrong
+ * about two of its five rows.
+ * ⚠️ AND IT LOST `reel` AND `floor` TO `err` IN THE SAME MESSAGE, which
+ * is the two 1965 newsreel pages leaving together.
+ * ⚠️ `stage` JOINED 2026-09-24 ON *"move stage to th"*, out of `capture`.
+ * It puts a church scene from a 2011 MIMproject performance in front of an
+ * audience, so it lands beside `making`, which is that project's archive.
+ * 🔴 AND THE ID IS `th` NOW, NOT `xr`. It was `xr` from the day this was
+ * the headset group, and three of its six rows have nothing to do with a
+ * headset, so the key was about to teach the next reader something false.
+ * The `xr: true` FLAG on a row is a different thing and did not move: it is
+ * what `caps.mjs` reads to offer a headset page, and `mirror`, `weight` and
+ * `floor` still carry it, one of them from another section entirely.
+ */
+// 🔴 FIRST ON THE PAGE SINCE 2026-09-29, AND IT HOLDS ONE ROW. The note above
+// `messages` has the ask and names the six rows that left it.
+~~~
+
+### instruments
+
+Above `['instruments', 'instruments'],`, lines 1315 to 1335 before the cut.
+
+~~~js
+/**
+ * 🔴 `instruments` IS EVERY PAGE THAT PLAYS A REAL THING, AND THE NAME
+ * CHANGED HANDS 2026-09-24: *"rename hardware to instruments, move knobs able
+ * grains there. looper instrument jam moves to ithers"*. The ID moved with the
+ * title, so there is one `instruments` rather than an id reading `hardware`
+ * under a heading that does not.
+ * ⚠️ IT REVERSES THE LAST LINE OF THE COMMENT THAT MADE THIS GROUP, kept
+ * here because that line was right about its own reasoning. `hardware` was
+ * created 2026-09-21 on *"make new group hardware on top if index, move all
+ * latest demos strting from dump there"*, and what separated it from the old
+ * `instruments` was whether a REAL OBJECT IS IN THE ROOM: a Novation Circuit,
+ * a TASCAM Model 12, an Evolution MK-425C, and the pages that route, edit,
+ * describe or dump them. `knobs`, `able` and `grains` were named there as
+ * arguable (a Raspberry Pi in another building, Ableton Live on a studio Mac,
+ * a granulator running in both at once) and left out because sweeping them in
+ * would have been an INFERENCE. An instruction is the thing an inference was
+ * not, so all three moved.
+ * ⚠️ AND THE OLD `instruments` GROUP IS GONE RATHER THAN RENAMED. `looper`,
+ * `instrument` and `jam` were asked out in the same breath, which emptied it
+ * and freed the name for this one.
+ */
+~~~
+
+### vain
+
+Above `['vain', 'u:'],`, lines 1337 to 1348 before the cut.
+
+~~~js
+/**
+ * 🔴 `u:`, NOT `väin`, ASKED 2026-09-24: *"rename vain to u:, move clic
+ * and vclick there"*.
+ * ⚠️ THE ID STAYS `vain` AND ONLY THE TITLE MOVED. An id is an address
+ * every row in the array carries; the title is the word a visitor reads, and
+ * this file has already run an id and a title apart on purpose (`transports`
+ * was titled `technologies` for a week).
+ * ⚠️ AND IT GAINED THE TWO CSOUND PAGES. `click` is U:'s wireless click
+ * track and `sound` (`vclick` until 2026-09-24) is a score compiled to a
+ * timeline, so both sat in `timeline` on a technical reading while their
+ * subject is the ensemble the rest of this group is about.
+ */
+~~~
+
+### bauhaus
+
+Above `['bauhaus', 'bauhaus'],`, lines 1351 to 1352 before the cut.
+
+~~~js
+// 🔴 `bauhaus`, ASKED 2026-10-05: *"bauhaus: partitur"*, Moholy-Nagy's score
+// on its own heading beside the other archival subject, kurenniemi.
+~~~
+
+### mim
+
+Above `['capture', 'capture'],`, lines 1354 to 1357 before the cut.
+
+~~~js
+// `mim` IS GONE, EMPTIED 2026-09-24 BY *"move making to TH"*: `making` was its
+// only row. `byGroup` drops a section with no rows, so leaving the id here
+// would have rendered nothing and been invisible. It is removed because a
+// group nothing is in is a name waiting to catch a typo in a row.
+~~~
+
+### technologies
+
+Above `['technologies', 'technologies'],`, lines 1359 to 1406 before the cut.
+
+~~~js
+/**
+ * 🔴 `timeline` IS THE FOUR PAGES THAT ARE THE TIMELINE ITSELF. Asked
+ * 2026-09-24: *"timeline: leave ones who have timeline component. the rest
+ * merge with technologies"*.
+ * ⚠️ THE COMPONENT TEST WAS MEASURED AND IT SEPARATED NOTHING. All nine
+ * rows here called `createStripView` from `demo/shell/strip.mjs`, and so did
+ * the six left after `click`, `sound` and `typist` moved out, so on that test
+ * the group does not shrink at all. Settled by asking rather than by picking
+ * a reading: the four that stay are the ones whose SUBJECT is the timeline,
+ * and `strip` and `draw` went to `technologies`.
+ */
+// `timeline` WAS A GROUP HERE until 2026-10-05, folded into `technologies`
+// with `messages`: *"tehnologies: timelines + messages + technologies"*.
+/**
+ * 🔴 `transports` BECAME THREE SECTIONS, ASKED 2026-09-24: *"split onto
+ * streamig (who steam smth) and messages (relyng messages etc but not
+ * streaming) and rest is techologeis"*.
+ * ⚠️ THE CUT WAS WHAT GOES OVER THE WIRE, NOT WHICH API IS IN THE PAGE.
+ * `streaming` was the pages that open a stream and play it: `llhls`,
+ * `webrtc` and `moq` on an input this site starts and stops, `room` on a
+ * camera peer to peer, `now` and `flipper` on a live channel, `remixer` on
+ * the archive.
+ * 🔴 AND SINCE 2026-09-29 `streaming` IS ONE ROW, `llhls`, AND IT IS THE
+ * FIRST SECTION ON THE PAGE. Asked: *"Merge streaming and technologies"*
+ * and *"Make a new streaming section to fronpage as first and put only llms
+ * there"*, with `llms` read as `llhls`. The other six went to
+ * `technologies`, and the map entry sits above `th` because insertion order
+ * is page order.
+ * `messages` is a relay whose MESSAGES are the subject: `cues` fires one act
+ * to every open copy of the page, `wire` shows the exact bytes going and
+ * coming back, `jam` puts two browsers on one pulse with the sound made at
+ * each end, and `instrument` plays a keyboard on a machine somewhere else.
+ * Those ride the same Durable Object and the same socket as half of
+ * `streaming`, which is why the API cannot be the test.
+ * ⚠️ THIS READ `with no media in it at all` UNTIL 2026-09-24, AND
+ * `instrument` BROKE IT the moment it arrived: the far machine's audio comes
+ * back over the same connection, so it carries a stream too. It is here
+ * rather than in `streaming` because its readout is two LATENCIES, how late a
+ * note from the other player is and how long a press takes to come back as
+ * sound, and the audio is what makes a late message audible. It is the
+ * arguable row in this section and it is named rather than hidden.
+ * ⚠️ `technologies` KEPT THE NAME AND NONE OF ITS ORIGINAL ROWS. It is
+ * `strip` and `draw` out of the old `timeline` group, since 2026-09-24
+ * `looper`, a keyboard into a WebAudio synth with a loop pedal on it and
+ * nothing on a wire at all, which had nowhere else to go when the old
+ * `instruments` group was emptied, and since 2026-09-29 the six streaming
+ * pages that are not `llhls`.
+ */
+~~~
+
+### kit-last
+
+Above `['kit', 'kit'],`, lines 1408 to 1410 before the cut.
+
+~~~js
+// The kit LAST since 2026-10-07, asked as *"move kit to last on the index
+// page"*. It was first from 2026-10-04 (*"move kit to first group in index
+// page"*) and second from 2026-10-06, under the slides.
+~~~
+
+### by-group
+
+Above `export function byGroup(list = DEMOS) {`, lines 1414 to 1422 before the cut.
+
+~~~js
+/**
+ * The demos in sections, newest first inside each.
+ *
+ * 🔴 IT REFUSES AN UNGROUPED ROW rather than dropping it. A demo with no
+ * `group` would simply not appear on the front page — the worst shape a
+ * failure can take here, because the page still renders, still looks complete,
+ * and the only way to notice is to count. Same argument as `mount()` throwing
+ * on an odd readout.
+ */
+~~~
+
+### unlisted-here
+
+Above `list = list.filter((d) => !d.unlisted);`, lines 1424 to 1427 before the cut.
+
+~~~js
+// ⚠️ DROPPED HERE RATHER THAN IN EACH RENDERER, because there are two index
+// renderers (this file's own and the build's, which both call this) and a row
+// that has to be hidden in two places is a row that will show up in one. See
+// `unlisted` on the `feedback` row for what it is for.
+~~~
+
+### rank
+
+Above `return [...GROUPS].map(([id, title]) => ({`, lines 1434 to 1438 before the cut.
+
+~~~js
+// ⚠️ `rank` PUTS ONE ROW AT THE FRONT OF ITS GROUP and everything else stays
+// newest first. A group's leading card is the one somebody should open, which
+// is an editorial fact and not a date — `radio` is what väin IS, and it
+// happens to share a creation day with the page beside it, so recency could
+// not even break the tie consistently.
+~~~
+
+### empty-group
+
+Above `})).filter((g) => g.rows.length);`, lines 1443 to 1444 before the cut.
+
+~~~js
+// A deck group used to show with no listed rows; since 2026-10-10 it does not
+// (*"rm slide from frontpage"*), so a group with nothing listed is gone.
+~~~
+
+### demo-card
+
+Above `export function demoCardHTML(d) {`, lines 1452 to 1459 before the cut.
+
+~~~js
+/**
+ * One demo as a card.
+ *
+ * ⚠️ THE MARKUP IS `card.mjs`'s AND NOT THIS FILE'S. That module holds the one
+ * renderer both the build and the browser use; this function only decides what
+ * a DEMO puts in one. The `data-needs` goes through untouched because
+ * `caps.mjs` reads it in the browser afterwards, on whatever markup it finds.
+ */
+~~~
+
+### title
+
+Above `title: d.title || d.name,`, lines 1464 to 1472 before the cut.
+
+~~~js
+// ⚠️ `title` OVERRIDES THE SHOWN NAME AND `name` IS STILL THE IDENTITY. It is
+// unused today — `kurenniemi` became `resources` and `aikajana` became
+// `deck` as REAL renames, directory and URL and all, which is the right way
+// round: a card that says one thing while its address says another is two
+// names for one page. The hook stays for the case where a slug must not
+// move (an address somebody has written down) and the label must.
+// ⚠️ OVERRULED FOR THE KIT, 2026-10-06, by the owner: *"no need to "kit/..."
+// in titles"*. The eight `kit/<part>` rows carry `title: '<part>'`, so their
+// cards read the part alone while the address keeps the `kit/` in it.
+~~~
+
+### no-act
+
+Above `for (const t of d.tags || []) bits.push('<span class="pos-tag">${t}</span>');`, lines 1503 to 1507 before the cut.
+
+~~~js
+// ⚠️ NO ACT PILL. Every row carried the name of its act in a yellow pill —
+// `the substrate`, `one stream`, `many people` — which is the loudest ink on
+// a row whose subject is the demo, and it repeated down the column because
+// neighbours share an act. The act is still the story order and still groups
+// the sequence page; it is not a label each row has to wear.
+~~~

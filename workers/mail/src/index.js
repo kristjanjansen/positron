@@ -1,38 +1,7 @@
-/**
- * positron-mail — mail arriving at positron@positron.studio becomes a note in
- * the feedback room.
- *
- * 🔴 WHY THE FEEDBACK ROOM AND NOT A STORE OF ITS OWN. The ask was *"an email
- * address people can contact ... and the agent should be reading it"*. The
- * reading half is the constraint: `feedback.positron.studio` is already read on
- * a schedule and already acted on, so putting mail anywhere else would create a
- * second place to remember, and a second place to forget.
- *
- * 🔴 IT SPEAKS THE PAGE'S SHAPE, over the relay, exactly as
- * `demo/shell/feedback.mjs` does. `positron-feedback` is unchanged by this file
- * existing: no new endpoint, no shared secret, and its standing rule that the
- * room is never chosen by a caller's parameter is untouched, because this is a
- * relay client rather than an HTTP caller.
- *
- * 🔴 NOTHING RAW IS KEPT. The body is read, trimmed to a bounded summary and
- * dropped. No attachment is stored or forwarded, no IP address is seen, and the
- * raw message never leaves this handler. That matches what the feedback room
- * already promises about what it does not keep.
- *
- * 🔴 SPAM IS LABELLED, NOT DROPPED. `src/spam.mjs` reads the headers and hands
- * back a short verdict, and the verdict goes on the FRONT of the note, ahead of
- * the subject, where somebody scanning the room reads it in a glance. A dropped
- * message is invisible and unrecoverable; a labelled one costs a reader nothing.
- * The same rule this repo already keeps about a vanished row: a missing thing
- * reads as a thing that was never sent, which is a different and false
- * statement.
- *
- * ⚠️ THERE IS ONE REFUSAL AND IT IS THE SENDER'S OWN INSTRUCTION. A message
- * failing DMARC from a domain that publishes `p=reject` has been declared forged
- * by the domain in its own From line, and `reject` is the answer that domain
- * asked receivers to give. Even then the note is spoken FIRST, so a refusal is
- * recorded rather than silent.
- */
+// positron-mail: mail to positron@positron.studio becomes a note in the feedback room, spoken over
+// the relay in the page's shape. Nothing raw is kept. Spam is labelled at the front, not dropped;
+// the one refusal is DMARC failing under `p=reject`, and the note is spoken first even then.
+// why: lessons/workers-mail.md#index-header
 
 import { firstText, decodeWords } from './body.mjs';
 import {
@@ -41,10 +10,8 @@ import {
 
 const RELAY = 'wss://ws.positron.studio';
 const ROOM = 'feedback';
-// ⚠️ THE ORIGIN THE RECORDER DEMANDS. It refuses a note into the live room whose
-// `origin` is not exactly this, which is deliberate: a write has to say where it
-// came from rather than slip in while a visitor holds the room open. This worker
-// is a first-party sender and says so.
+// The live room's recorder demands exactly this origin; this worker is a first-party sender.
+// why: lessons/workers-mail.md#origin
 const ORIGIN = 'https://positron.studio';
 
 // The recorder caps text at 4000 UTF-8 bytes and names at its own limit; stay
@@ -53,31 +20,9 @@ const MAX_BODY = 2000;
 const MAX_SUBJECT = 160;
 const MAX_NAME = 60;
 
-/**
- * 🔴 `new Response(raw).text()` LOSES BYTES ON AN 8-BIT BODY AND SAYS NOTHING.
- * So the size is checked rather than assumed, and a mismatch is reported in the
- * note instead of being swallowed. The sibling project at ../trip reads its mail
- * exactly the lossy way.
- *
- * 🔴 AND THE CHECK THAT USED TO STAND HERE WAS WRONG IN BOTH DIRECTIONS.
- * It compared `raw.length`, which counts UTF-16 units, against `rawSize`, which
- * counts BYTES. MEASURED 2026-09-17, three messages through a real `Response`:
- *
- *   pure ASCII, nothing lost      rawSize  22 · .length 22 · re-encoded 22
- *   valid UTF-8, nothing lost     rawSize  48 · .length 44 · re-encoded 48
- *   two invalid 8-bit bytes       rawSize  18 · .length 18 · re-encoded 22
- *
- * The middle row is a FALSE ALARM on every message containing an accented
- * letter, which in this part of the world is most of them. The last row is a
- * MISS on the exact case the check exists for: two invalid bytes each became one
- * replacement character, so the unit count matched while four bytes of content
- * changed. A guard that passes on the case it was written for is worse than no
- * guard, because it is believed.
- *
- * Re-encoding answers both. A message that survived intact re-encodes to exactly
- * the bytes that arrived; a replacement character is three bytes where the
- * original was one or two, so a loss cannot come back to the same length.
- */
+// `new Response(raw).text()` loses bytes on an 8-bit body silently. Check loss by re-encoding and
+// comparing to rawSize: comparing `.length` (UTF-16 units) to bytes is wrong both ways.
+// why: lessons/workers-mail.md#read-raw
 async function readRaw(message) {
   const raw = await new Response(message.raw).text();
   const declared = Number(message.rawSize) || 0;
@@ -85,39 +30,20 @@ async function readRaw(message) {
   return { raw, declared, bytes: back, lost: !!declared && back !== declared };
 }
 
-/**
- * A header, decoded.
- *
- * ⚠️ THIS USED TO SAY "undecoded" AND DEFEND IT. The defence was that a
- * half-implemented decoder produces mojibake that reads as a broken sender,
- * which is true and was the wrong trade: the undecoded form reads as a broken
- * sender TOO, and it reads that way to every writer of Estonian, who is the
- * person this mailbox exists for. `decodeWords` is the whole of RFC 2047 rather
- * than half of it, and it is graded on fixtures.
- */
+// A header with RFC 2047 words decoded.
+// why: lessons/workers-mail.md#header
 const header = (message, name) => decodeWords(message.headers.get(name) || '');
 
 function randomId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-/**
- * Send one note into the room and wait for the socket to close.
- * ⚠️ A WORKER'S OUTBOUND WEBSOCKET NEEDS `waitUntil` OR THE MESSAGE CAN BE CUT
- * OFF when the handler returns. The email handler awaits this directly, which
- * is simpler and is fine: a mail delivery is allowed to take a second.
- */
+// Send one note and wait for the socket to close; an outbound socket needs the handler awaited.
+// why: lessons/workers-mail.md#say
 async function sayIntoRoom(note, env = {}) {
-  /**
-   * 🔴 ARM FIRST, OR THE NOTE IS SIMPLY LOST. The recorder holds its socket only
-   * while it has been woken and lets go after fifteen idle minutes, so a note
-   * spoken into a room nobody is recording goes nowhere and reports nothing.
-   * MEASURED 2026-09-17 before this line existed: the note was sent, the relay
-   * carried it, the socket echoed it back, and `GET /feedback` never saw it.
-   * A page does this too, which is why nothing about the recorder changes here.
-   * ⚠️ THE ORIGIN HEADER IS WHAT PICKS THE ROOM, never a parameter, and this is
-   * the only place this worker has to be a first-party caller.
-   */
+  // Arm the recorder first, or a note spoken into an unrecorded room is lost without a trace.
+  // The Origin header picks the room, never a parameter.
+  // why: lessons/workers-mail.md#arm
   const armed = await fetch('https://feedback.positron.studio/arm', {
     method: 'POST',
     // The key, when this worker has it, lifts the per-address arm limit that
@@ -155,25 +81,10 @@ async function sayIntoRoom(note, env = {}) {
   try { ws.close(1000, 'said'); } catch { /* already gone */ }
 }
 
-/**
- * What the headers say, and never a reason for the handler to fail.
- *
- * 🔴 THE HEADERS ARE READ OFF THE RAW MESSAGE, NOT OFF `message.headers`.
- * A `Headers` joins two headers of one name into one comma separated value, so
- * a stranger's forged `Authentication-Results` and the receiving server's real
- * one would arrive glued together under the STRANGER's authserv-id, which is
- * precisely the one that must not be believed. Read off the raw text they stay
- * two lines and the real one is picked by its name.
- *
- * ⚠️ THE FALLBACK FAILS SAFE. If the raw read gave nothing usable, the `Headers`
- * are used and a joined value parses as one stamp with a nonsense authserv-id,
- * which fails the trust check and answers `unknown`. Unknown labels and never
- * refuses, so the wrong answer in that path is the harmless one.
- *
- * ⚠️ AND A THROW IN HERE WOULD COST THREE INVOCATIONS AND BOUNCE THE SENDER,
- * because Cloudflare retries a failing handler three times before giving up. It
- * is wrapped, and a failure to grade is reported as a failure to grade.
- */
+// Headers are read off the raw text: `Headers` joins two of one name, gluing a forged
+// Authentication-Results onto the real one. The fallback fails safe to `unknown`; wrapped, never
+// throws.
+// why: lessons/workers-mail.md#label
 function label(message, raw) {
   try {
     const entries = parseHeaderBlock(raw);
@@ -204,27 +115,18 @@ export default {
 
     const verdict = label(message, raw);
 
-    /**
-     * ⚠️ THE SENDER GOES IN THE NAME, AND IT IS THE ENVELOPE SENDER RATHER THAN
-     * THE `From:` HEADER. A header can say anything; `message.from` is what the
-     * sending server actually presented. Neither is proof of identity and the
-     * note does not pretend it is.
-     */
+    // The envelope sender (what the server presented), not the From header; neither proves
+    // identity.
+    // why: lessons/workers-mail.md#sender
     const name = String(message.from || 'somebody').slice(0, MAX_NAME);
 
-    /**
-     * 🔴 THE LABEL GOES FIRST, AHEAD OF THE SUBJECT. The feedback room is a list
-     * somebody scans, and a verdict at the end of a line is a verdict nobody
-     * reads. `[ok]` on ordinary mail is four characters and it is deliberate: an
-     * empty prefix cannot be told apart from a build that has no labelling in it.
-     */
+    // The label goes ahead of the subject, and `[ok]` is explicit so labelling is visibly running.
+    // why: lessons/workers-mail.md#label-first
     const refused = verdict.reject;
     const face = prefixFor(verdict, { refused });
 
-    // ⚠️ THE FOOT IS BUILT SEPARATELY RATHER THAN JOINED WITH EMPTY STRINGS. A
-    // conditional entry that is `''` still contributes its separator, so a
-    // message with nothing to add grew a trailing blank line and one with
-    // something to add grew three.
+    // Built as an array: an empty conditional entry would still add its separator.
+    // why: lessons/workers-mail.md#foot
     const foot = [
       lost ? '[the raw message did not read back at its declared size]' : '',
       refused ? `[refused at the door: ${verdict.rejectReason}]` : '',
@@ -241,12 +143,8 @@ export default {
     // note rather than a second one. The recorder inserts OR IGNORE on it.
     const id = messageId || `mail-${Date.now()}-${randomId()}`;
 
-    /**
-     * ⚠️ THE DOMAIN, NEVER THE ADDRESS, AND NEVER THE BODY. A stranger's address
-     * is theirs, and CLAUDE.md's rule about redacting at the point of capture is
-     * the same discipline. The subject is cut to eighty characters because a log
-     * line is a trace rather than a copy.
-     */
+    // Log the domain, never the address or body; subject cut to 80 characters.
+    // why: lessons/workers-mail.md#log
     console.log(JSON.stringify({
       evt: 'mail',
       from: addressDomain(message.from),
@@ -261,9 +159,8 @@ export default {
       subject: subject.slice(0, 80),
     }));
 
-    // 🔴 SPEAK FIRST, REFUSE SECOND. A refusal that leaves no trace is a message
-    // nobody can ever find out about, and the whole point of labelling instead
-    // of dropping is that a decision stays visible. The note lands either way.
+    // Speak first, refuse second, so a refused message still leaves a visible note.
+    // why: lessons/workers-mail.md#speak-first
     await sayIntoRoom({ id, name, text }, env);
 
     if (refused) message.setReject(verdict.rejectReason);

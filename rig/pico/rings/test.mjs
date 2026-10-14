@@ -1,7 +1,5 @@
-// rig/pico/rings/test.mjs: boot rings.uf2 on rp2040js, play notes into UART0 RX,
-// and check the screen has rings on it. Exits 1 on any FAIL.
-//
-//   rig/pico/rings/build.sh && node rig/pico/rings/test.mjs [--show]
+// rig/pico/rings/build.sh && node rig/pico/rings/test.mjs [--show]: rings on screen after notes.
+// why: lessons/rig-pico.md#rings-test
 import { readFileSync } from 'node:fs';
 import { createPico, parseUF2, litCount, W, H } from '../../../demo/shell/pico.mjs';
 

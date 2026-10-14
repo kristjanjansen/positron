@@ -1,9 +1,10 @@
-// Worker shell for the Part-1 QUIC probe — same pattern as rig/containers.
+// Worker shell for the QUIC probe, as in rig/containers.
+// why: lessons/rig-obs.md#quic-worker
 import { Container, getContainer } from "@cloudflare/containers";
 
 export class QuicTest extends Container {
   defaultPort = 8080;
-  sleepAfter = "5m"; // not trusted (livelock) — /kill explicitly when done
+  sleepAfter = "5m"; // not trusted (livelock): /kill explicitly when done; why: lessons/rig-obs.md#quic-worker-sleep
   async fetch(request) {
     const p = new URL(request.url).pathname;
     if (p === "/stop") { await this.stop(); return Response.json({ stopped: true }); }

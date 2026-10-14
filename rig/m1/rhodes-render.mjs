@@ -1,13 +1,6 @@
-// Render the FM Rhodes to a WAV and measure what it costs per sample.
-//
-//   node rhodes-render.mjs [out.wav]
-//
-// The cost number is the point: it decides whether a SINGLE-core board can carry
-// the synth and the network at once, which is the difference between an ESP32-C6
-// in a Tallinn shop today and an S3 ordered from abroad. Measured here as a
-// realtime factor on this machine, then scaled to the microcontroller — and the
-// scaling is an ESTIMATE, labelled as one, because a 240 MHz Xtensa is not a
-// slower M-series and no benchmark here has ever run on that chip.
+// node rhodes-render.mjs [out.wav]: render the FM Rhodes and its realtime factor here.
+// Scaling that to a microcontroller is an estimate.
+// why: lessons/rig-m1.md#rhodes-render
 import { writeFileSync } from 'node:fs';
 import { rhodesVoice, mixVoices } from '../../demo/shell/rhodes.mjs';
 

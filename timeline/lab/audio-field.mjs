@@ -1,79 +1,7 @@
-// timeline/lab/audio-field.mjs: what the three signals in plan-audio-shader
-// actually produce at runtime, measured on the real page.
-//
-//   node timeline/lab/audio-field.mjs                      # local server, 60 s
-//   node timeline/lab/audio-field.mjs --seconds 90
-//   BASE=https://positron.studio node timeline/lab/audio-field.mjs
-//   node timeline/lab/audio-field.mjs --json out.json      # keep the raw numbers
-//
-// It SKIPS CLEANLY when Chrome is absent, when the relay has no station up, or
-// when the granulator never boots. Skipping prints why and exits 0. A check nobody
-// can run is a check nobody runs (`csound-oracle.mjs`, same rule).
-//
-// ── WHY THIS EXISTS, AND WHY IT IS NOT A SHADER ────────────────────────────
-//
-// `plans/plan-audio-shader.md` §8 makes a measurement the first commit, and §2.3
-// says why:
-//
-//   "The parameter row is on the NEAR side of the wire and the grain row is on
-//    the FAR side, and a good-looking field will hide the difference. If the
-//    shader shows `size` moving, that proves `setInterval` ran, not that
-//    scsynth heard anything."
-//
-// That is `createMidiLane`'s `scheduled()` in a new medium: it counted what the
-// page QUEUED and read identically to delivery while every note was being
-// scheduled fifty-six years out. So every number below is labelled by WHICH
-// SIDE OF THE WIRE it was counted on, and §4 exists only to make the two
-// disagree on purpose.
-//
-// ── THE FOUR TAPS, AND WHERE EACH SITS ─────────────────────────────────────
-//
-//   1. `/pgrain`          FAR.  A second listener on the engine's own `in`
-//                         event. The page's `onReply` consumes `/pgrain` from
-//                         the reply ring, but SuperSonic's emitter holds a SET
-//                         of listeners and calls all of them, so ours sees the
-//                         raw message the page saw: `[addr, nodeID, replyID,
-//                         pos, dur, voice, half]`.
-//   2. `eng.send`         NEAR. Wrapped, so every `/n_set` and `/n_setn` the
-//                         page writes is timestamped as it leaves. This is
-//                         exactly what the plan's row 2 would draw.
-//   3. `scope.feed`       NEAR of the audio boundary. `meterTick` calls it with
-//                         the SAME `Float32Array` it just read off the page's
-//                         analyser, as its last act, so wrapping it gives the
-//                         frame clock and the exact samples with no second
-//                         timer and no second analysis.
-//   4. `/s_get` replies   FAR. Our own listener timestamps them on arrival.
-//                         ⚠️ NOT `eng.sendAndWait`, whose `waitFor` polls the
-//                         reply array every 10 ms. That quantum is larger than
-//                         the thing being measured, and it would have been
-//                         reported as the answer.
-//
-// ⚠️ WE DO NOT EDIT THE PAGE. The analyser capture is installed with
-// `Page.addScriptToEvaluateOnNewDocument`, which patches
-// `AudioContext.prototype.createAnalyser` before any page script runs; the rest
-// is monkey-patching after load. So this measures `/archive/radio/` as deployed,
-// which is the only version worth measuring.
-//
-// ── TWO THINGS THE ENGINE SOURCE GIVES US FOR FREE ─────────────────────────
-//
-// READ `rig/board/norns/Engine_Pappus.sc:849`:
-//     SendReply.ar(vtrig * report, '/pgrain', [pos, dur, i, half]);
-// and `:682`:
-//     dur = Lag.kr(msize, lagt).clip(0.002, 8).min(winspansec);
-//
-// 🔴 So `/pgrain`'s `dur` is `msize` AFTER the 20 ms one-pole and after two
-// clips. It is not a copy of what the page sent; it is what the audio used.
-// That makes the grain row a far-side echo of one parameter, already on the
-// wire, with no new plumbing. It is the sharpest near/far instrument this page
-// has. §4 uses it alongside `/s_get`, because the two see different
-// things: `/s_get` reads the control BEFORE the lag at millisecond resolution,
-// `dur` reads it AFTER the lag at the grain rate.
-//
-// ⚠️ AND `/s_get` CANNOT SEE THE LAG AT ALL. It answers with the control value
-// scsynth holds, which is the input to `Lag.kr(…, 0.02)` and not its output. A
-// latency measured through it is a floor: the audio is a further ~60 ms behind
-// (three time constants), INFERRED, and §4 prints it as such rather than
-// folding it into a measured number.
+// node timeline/lab/audio-field.mjs [--seconds 90] [--json out.json] (BASE= for the deploy): the
+// audio-shader signals measured on /archive/radio/, each labelled near or far side of the wire.
+// Taps: /pgrain (far), eng.send (near), scope.feed (near), /s_get replies (far). Skips cleanly.
+// why: lessons/timeline-lab.md#af-header
 
 import { spawn, execFileSync } from 'node:child_process';
 import { readFile, writeFile, rm } from 'node:fs/promises';
@@ -102,16 +30,9 @@ const SECONDS = Math.max(10, Number(arg('seconds', 60)) || 60);
 const JSON_OUT = arg('json', null);
 const SWEEP = !argv.includes('--no-sweep');
 
-// ══ 0 · the lanes, read from the page rather than typed here ═══════════════
-//
-// 🔴 A SHARED MEASUREMENT IN TWO FILES IS A MEASUREMENT THAT WILL DISAGREE
-// (CLAUDE.md, `--sld-col`). The spec table that decides what a modulation MEANS
-// lives inside `startModulator`'s closure in `demo/archive/radio/index.html` and is
-// not exported, so it is extracted from the source by brace matching rather
-// than copied. If the block moves or stops being a plain literal this says so
-// and the report falls back to engine units. It never quietly substitutes a
-// table of its own, because a lane table that has drifted would make every
-// "fraction of its lane" number below wrong in a way nothing could see.
+// 0. The lane table is extracted from the page's source by brace matching, never copied; if it
+// cannot be, the report falls back to engine units.
+// why: lessons/timeline-lab.md#af-lanes
 async function readLanes() {
   const path = `${REPO}/demo/archive/radio/index.html`;
   try {
@@ -150,7 +71,8 @@ const { specs: LANES, cmd: MOD_CMD, why: LANE_WHY } = await readLanes();
 const LANE = LANES ? Object.fromEntries(Object.entries(LANES).map(([k, v]) => [k, { ...specOf(v), n: v.n || 0, quant: v.quant || 0 }])) : null;
 const engineName = (dest) => (MOD_CMD && MOD_CMD[dest]) || `m${dest}`;
 
-// ══ 0b · preflight ═════════════════════════════════════════════════════════
+// 0b. Preflight.
+// why: lessons/timeline-lab.md#af-preflight
 if (!existsSync(CHROME)) skip(`no Chrome at ${CHROME}`);
 
 const RELAY = 'https://shout.positron.studio';
@@ -162,9 +84,8 @@ try {
 } catch (e) { skip(`the relay did not answer /health (${e.message}). This page has nothing to granulate.`); }
 if (!stationsUp.length) skip('no station on the relay is up. The page would boot no granulator.');
 
-// 🔴 COUNT THE OTHER BROWSERS BEFORE BLAMING THE NUMBERS. Same rule
-// `verify.mjs` prints: a second Chrome of your own competes for bandwidth and
-// for relay sockets, and the result reads as a finding about the page.
+// Count other browsers first: a second Chrome reads as a finding about the page.
+// why: lessons/timeline-lab.md#af-peers
 const peers = (() => {
   try {
     return execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' }).split('\n')
@@ -173,7 +94,8 @@ const peers = (() => {
   } catch { return 0; }
 })();
 
-// ══ 0c · a server, unless we are told to use the deploy ════════════════════
+// 0c. A server, unless told to use the deploy.
+// why: lessons/timeline-lab.md#af-server
 let server = null;
 let BASE = process.env.BASE || null;
 if (!BASE) {
@@ -184,10 +106,8 @@ if (!BASE) {
   } catch (e) { skip(`could not start the demo server (${e.message}); try BASE=https://positron.studio`); }
 }
 
-// ══ 0d · Chrome, on a port and a profile the OS chose ══════════════════════
-//
-// A fixed port is a shared mutable global and so is a shared profile (CLAUDE.md
-// twice over), so both are per-run and the port is read back from the profile.
+// 0d. Chrome on an OS-chosen port and a per-run profile; the port is read back.
+// why: lessons/timeline-lab.md#af-chrome
 let PROFILE; let SWEPT = 0;
 try {
   const { claimProfile } = await import(`${REPO}/demo/harness-profile.mjs`);
@@ -199,9 +119,8 @@ await rm(`${PROFILE}/Default/Cache`, { recursive: true, force: true }).catch(() 
 const chrome = spawn(CHROME, [
   '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${PROFILE}`,
   '--no-first-run', '--no-default-browser-check', '--disable-gpu',
-  // NEVER LET SOUND GATE THE WORK: `AudioContext.resume()` and `play()` both
-  // wait on a gesture in a real browser and NEITHER REJECTS, so a headless run
-  // without this hangs rather than failing (CLAUDE.md).
+  // Autoplay allowed: resume() and play() wait on a gesture without rejecting, so a run would hang.
+  // why: lessons/timeline-lab.md#af-autoplay
   '--autoplay-policy=no-user-gesture-required', '--mute-audio',
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 chrome.stderr.on('data', () => {});
@@ -254,13 +173,8 @@ async function ev(expr, awaitPromise = true) {
   return r.result.value;
 }
 
-// ══ 1 · the analyser capture, before any page script runs ══════════════════
-//
-// The page never hands its analyser to anything a probe can reach, and the six
-// followers are computed from it. Patching the constructor is the only way in
-// that does not edit the page. And which analyser is WHICH is then settled by
-// MEASUREMENT rather than by creation order (§2 below), because an order is a
-// fact about today's source and the file is being edited by somebody else.
+// 1. The analyser capture, patched before any page script; which analyser is which is measured.
+// why: lessons/timeline-lab.md#af-capture
 await S('Page.addScriptToEvaluateOnNewDocument', {
   source: `(() => {
     const store = (window.__probeAnalysers = []);
@@ -280,21 +194,13 @@ await S('Page.addScriptToEvaluateOnNewDocument', {
 
 await S('Page.navigate', { url: `${BASE}/archive/radio/` });
 
-// The page starts listening from the transport bar's own click and from nowhere
-// else. `startListening` is wired into the bar in the capture phase. ⚠️ AND
-// THE BAR IS NOT THERE AT LOAD: this page builds its controls only once the
-// station probe has answered, so a fixed wait is a race that reports "no
-// control" about a page that is still coming up. Poll for it.
+// The bar appears only after the station probe answers, so poll for it.
+// why: lessons/timeline-lab.md#af-bar
 let pressed = null;
 for (let i = 0; i < 60 && !pressed; i++) {
   await sleep(500);
-  // ⚠️ `.tbar-toggle` FIRST, AND THE NAME IS NOT THE ONE `verify.mjs` USES.
-  // That harness presses `.pos-controls button, .tbar-x`; `tbar-x` is the class
-  // for an EXTRA button a page adds to the bar (READ
-  // demo/shell/transport-bar.mjs:136), and the play/pause control is
-  // `tbar-toggle` (READ :115). This page declares no controls at all, so on
-  // 2026-09-15 `.tbar-x` matched nothing and the run reported "no transport
-  // control" about a page that was up and fine.
+  // `.tbar-toggle` is the play control (`.tbar-x` is an extra button), so press that first.
+  // why: lessons/timeline-lab.md#af-toggle
   pressed = await ev(`(() => {
     const b = document.querySelector('.tbar-toggle')
       || document.querySelector('.tbar-x') || document.querySelector('.pos-controls button');
@@ -305,12 +211,8 @@ for (let i = 0; i < 60 && !pressed; i++) {
 }
 if (!pressed) { await bail('no transport control to press after 30 s'); }
 
-// ── wait for the engine, and for the page to finish grading itself ─────────
-//
-// ⚠️ `finish()` PRESSES ITS OWN BUTTONS. The page's self-check holds the
-// modulator, clicks `›` and `‹`, and reads a dozen controls back. So a
-// measurement started before it lands is measuring a page that is exercising
-// itself. Wait for the assert burst to stop growing.
+// Wait for the page's own self-check (which presses buttons) to stop before measuring.
+// why: lessons/timeline-lab.md#af-wait
 let engUp = false;
 for (let i = 0; i < 240 && !engUp; i++) {
   await sleep(500);
@@ -322,14 +224,8 @@ for (let i = 0; i < 240 && !engUp; i++) {
 }
 if (!engUp) await bail('the granulator never booted within 120 s');
 
-// 🔴 PAST THE SHELL'S OWN ASSERTS, NOT PAST THE FIRST ONE. `mount()` lands two
-// asserts at t+0 on EVERY shelled page and publishes the count as
-// `__demo.shellAsserts` (READ demo/shell/shell.mjs:272). A wait for "some
-// asserts, then quiet" is satisfied by those two in the first second. So the
-// first version of this file started measuring forty seconds before the page's
-// own `finish()` ran, and `finish()` CALLS `modulator.hold(true)` and clicks the
-// patch buttons. The whole parameter row would have been measured on a page that
-// was deliberately holding still, and it would have read as a finding.
+// Wait past `__demo.shellAsserts` (two at t+0), not past the first assert.
+// why: lessons/timeline-lab.md#af-shell
 const shellN = await ev(`window.__demo?.shellAsserts ?? 0`).catch(() => 0);
 let lastN = -1; let stable = 0;
 for (let i = 0; i < 300 && stable < 5; i++) {
@@ -349,9 +245,8 @@ if (selfCheck.n <= selfCheck.shell) {
 // and give the self-check's `hold(false)` a moment to land
 await sleep(1500);
 
-// ⚠️ `__demo.logs` HOLDS OBJECTS, NOT STRINGS. They are `{ t, msg, kind }`, so a regex run
-// straight over the array matches nothing and returns null, which reads as "the
-// page never said" rather than as "we looked in the wrong shape".
+// `__demo.logs` holds {t, msg, kind} objects, not strings.
+// why: lessons/timeline-lab.md#af-logs
 const station = await ev(`(() => {
   const L = (window.__demo?.logs || []).map((l) => (typeof l === 'string' ? l : l.msg || ''));
   const relay = L.find((l) => /relay /.test(l)) || '';
@@ -359,12 +254,8 @@ const station = await ev(`(() => {
   return m ? String(m[1]).split('/').pop() : null;
 })()`).catch(() => null);
 
-// ── 1b · the frame rate BEFORE anything of ours is in the frame ────────────
-//
-// plan §6.3: "Nobody has measured the headroom", and §8 makes it step 0b. The
-// tap below runs INSIDE `meterTick`, so a rate measured after it is installed
-// is a rate this script is part of. Measure it first, with a loop that does
-// nothing but write a timestamp.
+// 1b. The frame rate before any tap is in the frame (the tap runs inside meterTick).
+// why: lessons/timeline-lab.md#af-frames
 const PRE_FRAMES = await ev(`new Promise((ok) => {
   const t = [];
   const t0 = performance.now();
@@ -372,7 +263,8 @@ const PRE_FRAMES = await ev(`new Promise((ok) => {
   requestAnimationFrame(step);
 })`).catch(() => []);
 
-// ══ 2 · the taps ═══════════════════════════════════════════════════════════
+// 2. The taps.
+// why: lessons/timeline-lab.md#af-taps
 const TAPS = String.raw`(() => {
   if (window.__F) return 'already';
   const eng = window.__eng, scope = window.__scope;
@@ -649,7 +541,8 @@ const TAPS = String.raw`(() => {
 const tapped = await ev(TAPS);
 if (tapped !== 'ok' && tapped !== 'already') await bail(`the taps did not install (${tapped})`);
 
-// ══ 3 · phase A, a free run on whatever patch the page came up on ═══════════
+// 3. Phase A, a free run on the current patch.
+// why: lessons/timeline-lab.md#af-phase-a
 const patchName = await ev(`(() => {
   const s = document.querySelector('.pos-pick select');
   if (s && s.options[s.selectedIndex]) return s.options[s.selectedIndex].text;
@@ -665,10 +558,8 @@ if (SWEPT) console.log(`  (swept ${SWEPT} profile dir(s) left by killed runs)`);
 if (LANE_WHY) console.log(`  ⚠️  the lane table could not be read (${LANE_WHY}); lane fractions are omitted below`);
 console.log(`\n  collecting ${SECONDS} s …`);
 
-// 🔴 THE NEAR SIDE'S OWN CLAIM, READ OFF THE PAGE. `moving` is a count of
-// ROUTINGS the modulator holds (READ demo/archive/radio/index.html, `d.set('moving',
-// modulator.moving().length)`), which is a fact about what the page intends.
-// §2 puts it beside a count of what actually crossed the wire.
+// The page's own claim: `moving` counts routings it intends, set beside what crossed the wire.
+// why: lessons/timeline-lab.md#af-moving
 const readoutMoving = await ev(`window.__demo?.readout?.moving ?? null`).catch(() => null);
 
 await ev(`window.__F.reset()`);
@@ -677,10 +568,8 @@ await sleep(SECONDS * 1000);
 const A = await ev(`JSON.stringify(window.__F.dump())`).then(JSON.parse);
 const A_SEC = (Date.now() - A_T0) / 1000;
 
-// ══ 4 · phase C, near against far ═════════════════════════════════════════
-//
-// Four separate questions, and the instrument is checked before any of them is
-// believed (CLAUDE.md: a partial result that is too tidy is a broken collector).
+// 4. Phase C, near against far; the instrument is checked before any answer is believed.
+// why: lessons/timeline-lab.md#af-phase-c
 const NEARFAR = String.raw`(async () => {
   const F = window.__F, out = { };
   const ask = F.askRaw;
@@ -826,10 +715,8 @@ const NEARFAR = String.raw`(async () => {
   return out;
 })()`;
 
-// The probe list is built HERE, from the page's own lane table, so the value
-// written to each control is inside the range that control declares. A probe
-// outside a lane would be clipped by the engine and read back as "not held"
-// about a control that is perfectly fine.
+// Probes are built from the page's lane table, so each value is inside its control's range.
+// why: lessons/timeline-lab.md#af-probes
 const PROBES = LANES
   ? Object.entries(LANES).filter(([, v]) => !v.n).map(([dest, v]) => {
     const sp = specOf(v);
@@ -843,22 +730,14 @@ console.log('  near against far …');
 const C = await ev(`(() => { const PROBES = ${JSON.stringify(PROBES)}; return ${NEARFAR}; })()`)
   .catch((e) => ({ error: String(e.message).slice(0, 300) }));
 
-// ══ 5 · phase B, the patch sweep ══════════════════════════
-//
-// "Which of the 22 numbers actually MOVE" cannot be answered on one patch: the
-// patch is the thing that decides. So press the page's own next button twelve
-// times and watch the wire. ⚠️ PRESS THE BUTTON, NEVER CALL `applyPatch`. The
-// page's own self-check carries that rule and the reason with it (`/floor/`
-// spent five rounds on a handler called directly, which steps straight over the
-// wiring the check is about).
+// 5. Phase B: press the page's own next button twelve times; never call applyPatch.
+// why: lessons/timeline-lab.md#af-phase-b
 const PATCH_SECS = 6;
 let SWEEP_OUT = [];
 const FWD = `[...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === '\u203a')`;
 if (SWEEP) {
-  // ⚠️ EXACTLY ONE OF THEM, OR PRESS NONE. There is one `createPicker` on this
-  // page today and the station row is a `createChoice`, but a second picker
-  // would make `[0]` a different control and the sweep would be a measurement
-  // of the wrong row with nothing on screen saying so.
+  // Exactly one picker, or press none: a second would make [0] another control.
+  // why: lessons/timeline-lab.md#af-one-picker
   const nFwd = await ev(`${FWD}.length`);
   if (nFwd !== 1) {
     console.log(`  (patch sweep skipped: found ${nFwd} "next" buttons, wanted exactly 1)`);
@@ -906,7 +785,8 @@ if (SWEEP) {
   }
 }
 
-// ══ 6 · report ═════════════════════════════════════════════════════════════
+// 6. Report.
+// why: lessons/timeline-lab.md#af-report
 const pct = (h, p) => {
   // p10/p50/p90 out of a histogram, by walking the bins
   const want = h.n * p;
@@ -924,9 +804,8 @@ const quant = (xs, p) => {
   const a = xs.slice().sort((x, y) => x - y);
   return a[Math.min(a.length - 1, Math.floor(a.length * p))];
 };
-// ⚠️ NOT `Math.min(...xs)`. A spread of sixty thousand grains is a RangeError,
-// and it would arrive as "the collector failed" rather than as "the array was
-// long". Reduce instead.
+// Not Math.min(...xs): spreading sixty thousand values is a RangeError.
+// why: lessons/timeline-lab.md#af-min
 const mn = (xs) => xs.reduce((a, b) => (b < a ? b : a), Infinity);
 const mx = (xs) => xs.reduce((a, b) => (b > a ? b : a), -Infinity);
 
@@ -1267,11 +1146,8 @@ if (JSON_OUT) {
 
 await done(0);
 
-// ── shutdown ───────────────────────────────────────────────────────────────
-//
-// ⚠️ `kill()` ASKS; IT DOES NOT STOP. CLAUDE.md: a still-shutting-down Chrome
-// recreates the profile directory the handler has just deleted, which is a
-// cleanup that runs, reports nothing and does nothing. SIGKILL and await exit.
+// Shutdown: kill() only asks, so SIGKILL and await exit before removing the profile.
+// why: lessons/timeline-lab.md#af-shutdown
 async function done(code) {
   try { ws.close(); } catch { /* already gone */ }
   const bye = new Promise((r) => chrome.once('exit', r));

@@ -1,9 +1,7 @@
 #!/bin/bash
-# Bundle the §12 shim player + post-bundle patch:
-# mediamtx 1.20.1 rejects ANY SUBSCRIBE parameter except AuthorizationToken
-# ("unsupported parameter type: 16" = FORWARD 0x10) and closes the session —
-# so strip @moq/net's v15+ SUBSCRIBE params (priority/order/forward/filter).
-# draft-14 (CF bonus) uses fixed fields, not params -> unaffected.
+# Bundle the §12 shim player, then strip @moq/net's v15+ SUBSCRIBE params: mediamtx 1.20.1 accepts
+# only AuthorizationToken and closes the session otherwise. draft-14 is unaffected.
+# why: lessons/rig-moq.md#build-shim
 set -e
 cd "$(dirname "$0")/../spike"
 docker run --rm -v "$PWD":/s -w /s node:20-alpine sh -c \

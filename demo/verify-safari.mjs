@@ -1,56 +1,28 @@
-// demo/verify-safari.mjs — drive DESKTOP SAFARI over WebDriver.
-//
-//   node demo/verify-safari.mjs               # both engines (starts its own server)
-//   node demo/verify-safari.mjs native        # just one
-//   DEMO_BASE=https://positron.studio node demo/verify-safari.mjs
-//
-// WHY THIS EXISTS. demo/verify.mjs speaks CDP, which Safari does not, so the
-// whole WebKit family was untested — and macOS Safari is the ONE platform with
-// both a plain MediaSource AND native HLS, which means it is the only place the
-// choice between the two engines is a real judgement rather than forced. It also
-// shares an engine family with the iPhone, so it catches WebKit-specific
-// breakage without a phone in hand.
-//
-// Requires "Develop > Allow Remote Automation" in Safari, once. safaridriver
-// answers /status with {ready:true} when it is on.
-//
-// No dependencies: WebDriver is plain HTTP+JSON.
+// node demo/verify-safari.mjs [native|hlsjs]: desktop Safari over WebDriver (plain HTTP, no deps),
+// the only engine with both MSE and native HLS. Needs Develop > Allow Remote Automation once.
+// why: lessons/harness.md#safari
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { serve } from './server.mjs';
 
-// 🔴 RETIRED 2026-10-13, AND IT WOULD NOW PASS ABOUT NOTHING. This harness
-// drives /llhls/, whose live input (positron-demo) and publisher (pub's /watch)
-// were deleted that day. /llhls/ now answers a press with "this leg was retired
-// 2026-10-13" and builds no player, so the native branch of
-// src/low-latency-player.js never runs and a run here would read PASS with zero
-// coverage. It refuses instead. The player's one live caller left is
-// /video/llhls/ (LL-HLS loopback, a camera on its own input), which this
-// file does not drive; re-pointing it there is open in BACKLOG.md.
+// Retired: it drove /llhls/, whose input is deleted, so it would pass about nothing; it refuses.
+// why: lessons/harness.md#safari-retired
 if (!process.argv.includes('--anyway')) {
   console.log('demo/verify-safari.mjs is retired (2026-10-13): /llhls/ has no stream behind it, so nothing would be graded. See the header.');
   process.exit(2);
 }
 
-/** A port the OS picked, released immediately — lifted from verify-quest.mjs,
- *  where its comment is also the honest one: there is a race between the close
- *  and safaridriver's bind, and it is still better than a constant. */
+// A port the OS picked, released at once; racy against safaridriver's bind, still better than a
+// constant.
+// why: lessons/harness.md#free-port
 const freePort = () => new Promise((resolve, reject) => {
   const s = createServer();
   s.on('error', reject);
   s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); });
 });
 
-// ⚠️ THE PORT WAS 4577 AND THE SERVER WAS ASSUMED TO BE ON 8890. Both are the
-// shared-mutable-global rule this repo already applies three files over: a
-// second run of this harness died on the bind, and the base URL pointed at
-// whatever happened to be on 8890 once `serve()` learned to move.
-//
-// 🔴 BUT THE PORT WAS NEVER THE REAL LIMIT HERE, AND FIXING IT DOES NOT MAKE
-// THIS CONCURRENT. `safaridriver` drives the one Safari on this machine, and
-// Remote Automation is a single global switch, so two of these at once is still
-// two harnesses fighting over one browser — it will just now fail somewhere
-// honest instead of on a port collision that looked like a code fault.
+// Ports are picked, but this is still not concurrent: safaridriver drives the one Safari.
+// why: lessons/harness.md#one-safari
 const PORT = await freePort();
 const server = process.env.DEMO_BASE ? null : await serve(8895);
 const BASE = process.env.DEMO_BASE || `http://127.0.0.1:${server.address().port}`;
@@ -192,10 +164,9 @@ for (const engine of ENGINES) {
     const adv = num('advance');
     ok('playhead keeps up with wall time', adv != null && adv > 0.9,
       adv == null ? 'no advance sample' : `${adv}x`);
-    // Under native HLS, currentTime does not share a timeline with buffered
-    // (Safari: currentTime 58.44 against buffered [[20,30]] while playing at
-    // 0.961x), so bufferReport deliberately reports null — "cannot tell", not
-    // "empty". Demanding a number there would fail a healthy player.
+    // Native HLS: currentTime does not share a timeline with buffered, so null (cannot tell) is
+    // correct.
+    // why: lessons/harness.md#null-buffer
     const buf = num('buffer');
     const nativeEngine = /engine native/.test(engineLine?.[2] || '');
     ok('buffer stays ahead', nativeEngine ? true : (buf != null && buf > 0.5),

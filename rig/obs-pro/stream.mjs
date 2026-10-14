@@ -1,29 +1,13 @@
-// One driver for the M1's OBS across all three transports.
-//
-//   node stream.mjs hls  [secs]    RTMPS -> Cloudflare live input -> LL-HLS
-//   node stream.mjs whip [secs]    WHIP  -> Cloudflare live input -> WHEP
-//   node stream.mjs moq  [secs]    obs-moq -> Cloudflare draft-14 relay
-//   node stream.mjs off
-//
-// ONE STREAM-SERVICE SLOT. OBS has exactly one, and rtmp_custom, whip_custom
-// and moq_service all want it — so no two of these run at the same instant
-// through this path. (obs-moq also registers a standalone moq_output, which is
-// the door to a genuine simultaneous run; not wired here.)
-//
-// WHIP AND WHEP MUST BE USED TOGETHER. Cloudflare does not support playing an
-// RTMP/SRT input over WHEP — it answers 409 — so the WHIP leg targets a
-// DIFFERENT live input from the HLS leg. See demo/shell/live.mjs.
-//
-// Secrets (RTMPS key, WHIP bearer) are read from the Cloudflare API at run time
-// and NEVER printed. Do not add a call that dumps the service settings.
+// node stream.mjs hls|whip|moq [secs] | off: the M1's OBS over one transport at a time (one service
+// slot). WHIP needs its own input: Cloudflare answers 409 to WHEP of an RTMP input.
+// Secrets come from the Cloudflare API at run time and are never printed.
+// why: lessons/rig-obs.md#obs-stream-header
 import { readFileSync } from 'node:fs';
 import { ObsClient } from '../obs-docker/control.mjs';
 
-// RETIRED 2026-10-13 for `hls` and `whip`: both inputs below were DELETED from
-// Stream that day, so those modes have no input to publish to. They refuse
-// (exit 2) rather than ask the API for a key that is not there. `moq` publishes
-// to Cloudflare's public draft-14 relay, not to an input of ours, and `off`
-// only stops OBS, so those two still run.
+// RETIRED for `hls` and `whip`: both inputs were deleted, so those modes exit 2. `moq` and `off`
+// run.
+// why: lessons/rig-obs.md#obs-stream-retired
 const HLS_UID  = '0e390aa48b55d49a57284e6c2c535477';   // "positron-demo", deleted
 const WHEP_UID = '224558e8993d5a5efd234d9d3a320f87';   // "whep-rig", deleted
 const RELAY    = 'https://draft-14.cloudflare.mediaoverquic.com';

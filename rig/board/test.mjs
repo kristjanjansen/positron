@@ -1,10 +1,6 @@
-// rig/board/test.mjs — the patchbay's checks, against a fixture, no hardware.
-//
-// Everything the board does BEFORE it touches a rig — parse, name, validate — is
-// pure, so it is checkable on a laptop. What is left needing the board is
-// exactly: real ports, real sound, unattended boot. Those are named in the
-// README rather than faked here, because a fake that passes is worse than a
-// gap that is written down.
+// node rig/board/test.mjs: everything the board does before touching a rig, against fixtures; real
+// ports, real sound and boot are named in the README rather than faked.
+// why: lessons/rig-board-tests.md#t-header
 import { parseAconnect, addressable, resolve, plan, apply, listPorts, CARRY, sourcesOf } from './alsa.mjs';
 import { parseJackLsp, jackChain, jackRebuild , setBayRows, jackdArgs, cardPortNames, jackdOwns, countXruns, JACKD_ENV, strayMidiSources } from './jacksynth.mjs';
 import * as jack from './jack.mjs';
@@ -56,8 +52,8 @@ is('by client name', resolve('circuit', ports).port?.addr, '20:0');
 is('case does not matter', resolve('MICROFREAK', ports).port?.addr, '24:0');
 is('by explicit address', resolve('28:0', ports).port?.addr, '28:0');
 is('address that does not exist', resolve('99:0', ports).ok, false);
-// Two VirMIDI clients match "virtual" — the whole point is that this REPORTS
-// rather than picks, because picking wrong is silent.
+// Two VirMIDI clients match "virtual": reported, never picked.
+// why: lessons/rig-board-tests.md#t-ambiguity
 is('ambiguity is refused', resolve('virtual', ports).ok, false);
 ok('ambiguity lists the candidates', (resolve('virtual', ports).candidates ?? []).length === 2);
 is('unknown name', resolve('juno', ports).ok, false);
@@ -84,8 +80,8 @@ is('a subset is refused, not approximated', plan(full('circuit', 'digitakt', ['n
 ok('and it says why', /cannot filter/.test(plan(full('circuit', 'digitakt', ['note']), ports).problems[0] ?? ''));
 is('unknown carry name is a problem', plan(full('circuit', 'digitakt', ['notes']), ports).ok, false);
 is('every carry name is known', CARRY.filter((c) => typeof c !== 'string').length, 0);
-// 2026-10-03: one kind list with bay.mjs. The old spellings must still be
-// UNDERSTOOD (a saved patch), which a rename alone would have broken silently.
+// One kind list with bay.mjs; old spellings must still be understood.
+// why: lessons/rig-board-tests.md#t-carry
 is('carry is the bay vocabulary', CARRY.join(','), 'note,cc,bend,touch,program,clock,transport,sysex');
 ok('an old spelling is still a known kind, refused only for needing a filter',
   /cannot filter/.test(plan(full('circuit', 'digitakt', ['pitchbend']), ports).problems[0] ?? ''));
@@ -97,10 +93,9 @@ is('a broken plan applies nothing', apply(plan(full('juno', 'microfreak'), ports
 is('a clean plan is dry-runnable', apply(plan(full('digitakt', 'microfreak'), ports), { dry: true }).ran[0].result, 'dry');
 
 console.log('backend');
-// Explicitly the fixture. Reading the LIVE backend here crashed this suite on
-// arm64 Linux, where `aconnect` exists but the sequencer does not — the tests
-// must not need a working sound stack to check code that has nothing to do
-// with one.
+// Explicitly the fixture: the live backend crashed this suite where aconnect exists without a
+// sequencer.
+// why: lessons/rig-board-tests.md#t-fixture
 const fixed = listPorts({ fixture: true });
 is('fixture backend', fixed.backend, 'fake');
 is('fixture has no error', fixed.error, null);
@@ -117,18 +112,11 @@ if (live.backend === 'alsa' && live.error) {
   ok('live backend did not throw', true, live.error ? live.error : `${live.clients.length} clients`);
 }
 
-// The Yoshimi section (the bank map reader, yoshimi.mjs) left on 2026-10-13 and
-// is in archive/yoshimi/test-half.mjs with the module it grades.
+// The JACK audio graph (the Yoshimi section is in archive/yoshimi/test-half.mjs).
+// why: lessons/rig-board-tests.md#t-jack-banner
 
-// ── the JACK audio graph ─────────────────────────────────────────────────────
-//
-// 🔴 THE PART OF THE RECOVERY VERBS A LAPTOP CAN GRADE, AND THE REST IS NAMED
-// AS UNVERIFIED IN THE README. `jack.graph` and `jack.rebuild` were written
-// 2026-09-18 against a board that does not answer ssh from here, so nothing
-// below has met a JACK server. What it does check is the half where the bugs
-// would be silent: a parser that drops a line reports a healthy graph about a
-// broken one, and a chain that calls a drifted graph intact is a recovery verb
-// that does nothing and says it worked.
+// The parser and the chain, graded here: a dropped line reads as a healthy graph.
+// why: lessons/rig-board-tests.md#t-jack
 console.log('jack: the connection list');
 const jackText = readFileSync(new URL('./fixtures/jack-lsp-c.txt', import.meta.url), 'utf8');
 const jackRows = parseJackLsp(jackText);
@@ -166,11 +154,8 @@ is('a capture that has gone is reported', jackChain({ ...yosh, graph: { graph: g
 is('nothing playing is not intact either', jackChain({ graph }).intact, false);
 
 console.log('jack: a bay link is part of what the board believes (2026-10-11)');
-// `setBayRows` is what `jack.link` hands over. The same stray as above, made
-// on purpose from a page, is wanted rather than cut, so `jack.rebuild` and
-// `fx.pappus` keep it. Four asserts, two NEGATIVE CONTROLS.
-// A real graph lists the stray as a port of its own as well, which is what the
-// bay's "is it on the graph" test reads.
+// A bay link through setBayRows is wanted rather than cut; four asserts, two negative controls.
+// why: lessons/rig-board-tests.md#t-ghost
 const ghostRows = parseJackLsp(`ghost:out_1\n   posboard:input_1\n${jackText.replace('posboard:input_1\n   yoshimi:left',
                                                 'posboard:input_1\n   ghost:out_1\n   yoshimi:left')}`);
 setBayRows([{ from: 'ghost:out_1', to: 'posboard:input_1' }]);
@@ -192,11 +177,8 @@ const ins = jackChain({ ...yosh, insert: true, graph });
 is('the insert wants four links', ins.want.length, 4);
 is('and the direct pair now reads as extra', ins.extra,
    [['yoshimi:left', 'posboard:input_1'], ['yoshimi:right', 'posboard:input_1']]);
-// 🔴 THE ONE A REBUILD COULD SILENTLY UNDO. `/grains/` unplugs the instrument
-// from the granulator on purpose, because scsynth sums its input bus with the
-// generated material. A rebuild that put it back would restore a third sound
-// neither end can describe, and every readout would go on saying the two were
-// comparable.
+// A rebuild must not plug the instrument back in under generated material.
+// why: lessons/rig-board-tests.md#t-made
 const made = jackChain({ ...yosh, insert: true, source: true, graph });
 is('generated material leaves the instrument unplugged', made.want.length, 2);
 ok('and never asks for it back',
@@ -221,13 +203,8 @@ is('with no instrument there is nothing to rebuild', jackRebuild({ plan: true, g
 is('a missing capture says which verbs raise it',
    /audio\.stop then audio\.start/.test(jackRebuild({ ...yosh, plan: true, graph: { graph: goneRows } }).reason ?? ''), true);
 
-// ── jack.mjs: the JACK arm of the patchbay ──────────────────────────────────
-//
-// Graded against text read off the Pi on 2026-10-11 (`jack_lsp -c` and
-// `jack_lsp -c -p -t`), not against the hand-written fixture above, which is a
-// graph that never existed. NEGATIVE CONTROLS are marked: each is written so
-// the bug it names would fail it, because a plan that always answers ok and an
-// apply that always says it worked would pass every positive check here.
+// jack.mjs against jack_lsp text read off the Pi; negative controls marked.
+// why: lessons/rig-board-tests.md#t-jack-mjs
 console.log('jack.mjs: the real board, parsed');
 const piC = readFileSync(new URL('./fixtures/jack-lsp-c-pi.txt', import.meta.url), 'utf8');
 const piCPT = readFileSync(new URL('./fixtures/jack-lsp-cpt-pi.txt', import.meta.url), 'utf8');
@@ -370,9 +347,8 @@ console.log('inputs: a name, a room and a lease');
   ok('and never sums the open input in', takeChannel(inter, 2, 1, 3)[0] === 100);
   is('the other channel is reachable too', [...takeChannel(inter, 2, 2, 3)], [7, 7, 7]);
 
-  // The Fast Track Pro sent big endian under an S16_LE label (2026-09-30).
-  // Stereo tones at the levels measured that day: a quiet Circuit (peak 18,
-  // with a little noise), a loud one, and the open input beside it.
+  // Stereo tones at the levels the Fast Track Pro sent big endian under S16_LE.
+  // why: lessons/rig-board-tests.md#t-tone
   const tone = (amp, secs = 0.5) => {
     const n = 48000 * secs, a = new Int16Array(n * 2);
     let seed = 1;
@@ -440,7 +416,8 @@ console.log('inputs: a name, a room and a lease');
   is('asking starts arecord', spawned.length, 1);
   is('on the configured device, whatever the page sent', spawned[0].args[spawned[0].args.indexOf('-D') + 1], 'hw:CARD=Pro,DEV=0');
   is('at the configured channel count', spawned[0].args[spawned[0].args.indexOf('-c') + 1], '2');
-  // negative control: ALSA's own default here was 6000 frames, 125 ms of lump
+  // negative control: ALSA's default was 6000 frames, 125 ms lumps
+  // why: lessons/rig-board-tests.md#t-period
   is('with a 10 ms period, never the 125 ms default', spawned[0].args.includes('--period-size=480'), true);
   c.handle({ type: 'input.want', id: 'w2' });
   is('asking again renews rather than starting a second', spawned.length, 1);
@@ -458,10 +435,9 @@ console.log('inputs: a name, a room and a lease');
   is('status in the input room says what is playing', [st.type, st.ok, st.source], ['audio.started', false, 'circuit']);
   hw.close();
 
-  // ── an input on JACK, 2026-10-11 (inputs.mjs `via: "jack"`) ───────────────
-  // Fourteen asserts, five NEGATIVE CONTROLS. What is graded is the order of
-  // things and what each process is asked for; whether alsa_in really puts the
-  // Circuit on the graph at the right level is measured on the Pi, not here.
+  // An input on JACK: 14 asserts, 5 negative controls, on order and arguments; levels are measured
+  // on the Pi.
+  // why: lessons/rig-board-tests.md#t-input-jack
   const jc = parseInputs(JSON.stringify({ circuit: { device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, via: 'jack' } }));
   is('via jack is read', jc.inputs.get('circuit')?.via, 'jack');
   is('NEGATIVE CONTROL: any other via is refused by name',
@@ -507,12 +483,9 @@ console.log('inputs: a name, a room and a lease');
 
 console.log('jackd on the card: the Circuit IS the clock, nothing resamples');
 {
-  // ── 2026-10-11, the owner: *"what is goin on with jack?"*. alsa_in bridged a
-  // card on its own clock into a jackd on the Pi's timer and resampled the
-  // difference; the floor went from -80 to -19 dBFS over minutes. With jackd
-  // ON the card there is one clock. Graded here: the config, the server's
-  // arguments, the port names and the input's bridge. Whether it is CLEAN is
-  // measured on the Pi over ten minutes, never here.
+  // jackd on the card: config, server arguments, port names, bridge; cleanliness is measured on the
+  // Pi.
+  // why: lessons/rig-board-tests.md#t-jackd-card
   const one = parseInputs(JSON.stringify({ circuit: { device: 'hw:CARD=Pro,DEV=0', channels: 2, take: 1, via: 'jack', jackd: true } }));
   is('jackd: true is read with its defaults, the period measured clean under load', one.inputs.get('circuit')?.jackd, { period: 512, periods: 3 });
   is('jackd with a period is read as given',
@@ -547,10 +520,12 @@ console.log('jackd on the card: the Circuit IS the clock, nothing resamples');
     countXruns('JackEngine::XRun: client = yoshimi was not finished, state = Triggered\nJack: **** alsa_pcm: xrun of at least 2.1 msecs\nCannot lock down 1 byte memory area'), 2);
   is('NEGATIVE CONTROL: ordinary chatter is not an xrun', countXruns('JackAlsaDriver::Open\nconfiguring for 48000Hz, period = 256 frames'), 0);
 
-  // Yoshimi's instance edits and command line left on 2026-10-13: archive/yoshimi/test-half.mjs.
+  // Yoshimi's instance edits are in archive/yoshimi/test-half.mjs.
+  // why: lessons/rig-board-tests.md#t-yoshimi
 
-  // Who feeds Yoshimi, off `aconnect -l`. The second listing is the shape of
-  // the 2026-10-11 defect: Search had subscribed it to the Circuit (44:0).
+  // Who feeds a client, off `aconnect -l`; the second listing is a Search subscription to the
+  // Circuit.
+  // why: lessons/rig-board-tests.md#t-seq
   const seqHead = "client 0: 'System' [type=kernel]\n    0 'Timer           '\n    1 'Announce        '\nclient 14: 'Midi Through' [type=kernel]\n    0 'Midi Through Port-0'\n"
     + "client 16: 'Virtual Raw MIDI 0-0' [type=kernel,card=0]\n    0 'VirMIDI 0-0     '\n\tConnecting To: 128:0\n"
     + "client 40: 'FastTrack Pro' [type=kernel,card=6]\n    0 'FastTrack Pro MIDI 1'\n"
@@ -618,10 +593,8 @@ console.log('inputs: what a page may send the Circuit');
   is('four bytes is refused', midiVerdict([0x90, 60, 100, 0], CH).ok, false);
   is('and the refusal says why', /channel 16/.test(midiVerdict([0x9F, 60, 100], CH).why), true);
 
-  // ── the synth control changes, widened 2026-09-30 for /shape/ ──────────────
-  // Graded against the table /shape/ sends from, row by row, so a gate that
-  // lost a controller the page can move goes red here rather than as a silent
-  // slider in another building.
+  // Graded row by row against /shape/'s table, so a lost controller goes red here.
+  // why: lessons/rig-board-tests.md#t-synth-cc
   const synthRows = CIRCUIT_CC.filter((p) => p.ch === '1/2');
   is('the synth allowlist is the 52 synth rows of the reference, no more', SYNTH_CC.size, 52);
   is('every synth control change /shape/ can send passes on channel 1 and on channel 2',
@@ -655,10 +628,9 @@ console.log('inputs: what a page may send the Circuit');
   is('a pass carries no kind field, so nothing reads one as a refusal', midiVerdict([0x90, 60, 100], CH).kind, undefined);
   is('and a synth controller refusal on the drums says why', /not a synth/.test(midiVerdict([0xB9, 74, 64], CH).why), true);
 
-  // ── ONE SysEx, the Current Patch Dump Request, since 2026-10-11 ─────────────
-  // 📄 Programmer's Reference Guide 1.3 p13: F0 00 20 29 01 60 40 <00|01> F7,
-  // "9 bytes in total". Matched byte for byte, never by prefix. Every negative
-  // control below is a shape that differs from it in one place.
+  // The Current Patch Dump Request, matched byte for byte; each negative control differs in one
+  // place.
+  // why: lessons/rig-board-tests.md#t-dump-request
   const REQ = (loc) => [0xF0, 0x00, 0x20, 0x29, 0x01, 0x60, 0x40, loc, 0xF7];
   is('the dump request for synth 1 passes, and says which synth', midiVerdict(REQ(0), CH), { ok: true, dump: 0 });
   is('the dump request for synth 2 passes', midiVerdict(REQ(1), CH), { ok: true, dump: 1 });
@@ -684,9 +656,8 @@ console.log('inputs: what a page may send the Circuit');
   is('NEGATIVE: no end of sysex is refused', midiVerdict([...REQ(0).slice(0, 8), 0x00], CH).ok, false);
   is('NEGATIVE: a request whose synth channel this input does not play is refused', midiVerdict(REQ(1), [1, 10]).ok, false);
   is('NEGATIVE: another universal SysEx, GM System On, is still refused', midiVerdict([0xF0, 0x7E, 0x7F, 0x09, 0x01, 0xF7], CH).ok, false);
-  // ── and the SECOND one, the universal Device Inquiry, since 2026-10-11 ─────
-  // Asked *"Add it and test"*, to learn whether this Circuit answers SysEx at
-  // all. Device id 7F (all call) only.
+  // The Device Inquiry, all call (7F) only.
+  // why: lessons/rig-board-tests.md#t-inquiry
   const INQ = [0xF0, 0x7E, 0x7F, 0x06, 0x01, 0xF7];
   is('the Device Inquiry passes, and says so', midiVerdict(INQ, CH), { ok: true, identity: true });
   is('NEGATIVE: five bytes of it, the F7 missing, is refused', midiVerdict(INQ.slice(0, 5), CH).ok, false);
@@ -718,9 +689,8 @@ console.log('inputs: what a page may send the Circuit');
   c.handle({ type: 'midi.send', id: 'a', bytes: [0x90, 60, 100] });
   is('a note reaches the port the card name resolves to', opened, ['/dev/snd/midiC7D0']);
   is('with exactly the bytes sent', writes, [[0x90, 60, 100]]);
-  // MEASURED on the board 2026-10-03: a blocking open waits forever while a
-  // sequencer subscription holds the Circuit. Asserted on the flags, not the
-  // name of a mode string, so a revert to 'w' goes red here.
+  // Asserted on the open flags, so a revert to a blocking 'w' goes red.
+  // why: lessons/rig-board-tests.md#t-nonblock
   is('the raw device is opened write only and non-blocking', flags[0], FS_C.O_WRONLY | FS_C.O_NONBLOCK);
   c.handle({ type: 'midi.send', id: 'b', bytes: [0xF0, 0x7E, 0x7F] });
   is('SysEx never reaches the port', writes.length, 1);
@@ -731,8 +701,8 @@ console.log('inputs: what a page may send the Circuit');
   is('when the lease runs out, a note left held is released', writes.at(-1), [0x80, 60, 0]);
   is('and nothing is left held', c.s.held.size, 0);
   {
-    // ⚠️ NEGATIVE CONTROL: a busy device is a logged failure, never a throw
-    // out of the handler and never a hang.
+    // Negative control: a busy device is a logged failure, never a throw or a hang.
+    // why: lessons/rig-board-tests.md#t-busy
     const lines = [];
     const busyFs = { readlinkSync: () => 'card7', openSync: () => { const e = new Error('EBUSY: resource busy or locked'); e.code = 'EBUSY'; throw e; },
       writeSync: () => { throw new Error('never reached'); }, closeSync: () => {} };
@@ -848,12 +818,9 @@ console.log('inputs: what a page may send the Circuit');
     hw3.close();
   }
 
-  // ── a fake that behaves like snd-usb-audio, and a Circuit that answers fast ──
-  // MEASURED 2026-10-11 on the board: bytes reaching an input that is open but
-  // not yet triggered by a read are DROPPED in the kernel, and the Circuit's
-  // identity arrives before a poll 10 ms after the write. So this fake answers
-  // AT the write and drops the answer unless the input has been read since it
-  // was opened. Taking the pre-write read out of `askBack` turns these red.
+  // A fake that drops input until it is read, as snd-usb-audio does; without the pre-read these go
+  // red.
+  // why: lessons/rig-board-tests.md#t-trigger
   {
     let t4 = 0, triggered = false;
     const inbox = [], timers = [], out = [];
@@ -989,7 +956,8 @@ console.log('\nrtc: the direct path, against a fake peer');
   is('input.want over ctl starts the capture', spawned.length, 1);
   is('and answers on ctl', ctl.out.at(-1).type, 'input.wanted');
 
-  // ── the Pi camera on the same link, 2026-10-13 (camera.mjs attachDirect) ──
+  // The Pi camera on the same link.
+  // why: lessons/rig-board-tests.md#t-camera
   ctl.recv(JSON.stringify({ type: 'rtc.ping', id: 'pp', t: 5 }));
   is('a pong carries the board\'s wall clock, for the page\'s clock offset', [ctl.out.at(-1).type, typeof ctl.out.at(-1).at], ['rtc.pong', 'number']);
   const relayBefore = relayOut(ws).length;
@@ -1011,7 +979,8 @@ console.log('\nrtc: the direct path, against a fake peer');
   is('the sink the camera gets writes on the cam channel', cam.out.length, 1);
   cam.closedCb();
   is('the cam channel closing detaches it', camGone.at(-1)?.[0], 'circuit:page1');
-  // MEASURED 2026-10-13 on the Pi: the ask arrived before the channel did.
+  // The ask arrived before the channel did, on the Pi.
+  // why: lessons/rig-board-tests.md#t-overtake
   ctl.recv(JSON.stringify({ type: 'cam.direct', id: 'c2', key: 'K', viewer: 'v1' }));
   const cam2 = new FakeDC('cam');
   setTimeout(() => pcs[0].dcf(cam2), 60);
@@ -1063,8 +1032,8 @@ console.log('\nrtc: the direct path, against a fake peer');
 
 console.log('\nrtc: the MAIN socket\'s direct path (studio-1, the synth capture)');
 {
-  // Found 2026-10-11: /concepts/sampler/035/ offered in studio-1 and the main
-  // socket had no handler, so it waited 3 s for nothing. These are that socket.
+  // The main socket's direct path, which once had no handler.
+  // why: lessons/rig-board-tests.md#t-main
   is('a main socket note is keyed by node, channel and note', noteKey({ type: 'note.on', node: 'sampler', note: 60 }), 'sampler:0:60');
   is('a Yoshimi note has no node', noteKey({ type: 'note.off', channel: 2, note: 61 }), ':2:61');
   is('anything else has no key', noteKey({ type: 'voice.select', program: 1 }), null);
@@ -1174,11 +1143,8 @@ console.log('\nrtc: the MAIN socket\'s direct path (studio-1, the synth capture)
   is('closing the board closes every peer', pcs.every((p) => p.closed), true);
 }
 
-// ── what the board says about itself ────────────────────────────────────────
-// `board.hello` and `board.alive` carry `graph` since 2026-10-04 (plans/
-// plan-universal-routing.md §11 step 3). Built from the board's own facts: the
-// aconnect fixture above, the BOARD_INPUTS in HANDOFF.md, and the instrument
-// map the hello sends.
+// board.hello and board.alive carry `graph`, built from the board's own facts.
+// why: lessons/rig-board-tests.md#t-beat
 console.log('\nbeat: the graph on the hello and on every beat');
 {
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
@@ -1206,15 +1172,15 @@ console.log('\nbeat: the graph on the hello and on every beat');
   is('the virtual clients are not in it', hello.graph.nodes.some((n) => /Virtual/.test(n.label)), false);
   is('no BOARD_NET means no net', 'net' in hello.graph, false);
   is('BOARD_NET set is carried', graphOf({ ...graphFacts, net: 'studio-lan' }).net, 'studio-lan');
-  // 2026-10-04: an unplugged Circuit was still offered as a MIDI input. The
-  // input's sound stays (the audio interface is there); its MIDI in goes.
+  // An unplugged Circuit keeps its sound input and loses its MIDI in.
+  // why: lessons/rig-board-tests.md#t-unplugged
   const gone = graphOf({ ...graphFacts, midiPresent: () => false });
   const there = graphOf({ ...graphFacts, midiPresent: () => true });
   is('an input whose MIDI device is unplugged announces no MIDI in', gone.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), false);
   is('and still announces its sound', gone.ports.some((p) => p.id === 'pi-1:circuit:audio-out'), true);
   is('NEGATIVE CONTROL: plugged in, the MIDI in is back', there.ports.some((p) => p.id === 'pi-1:circuit:midi-in'), true);
-  // The GPU's node is `shader` since 2026-10-14 (the catalogue's name), so the
-  // check asks for the id the board announces and its positive control beside it.
+  // The GPU's node is `shader`; positive control beside it.
+  // why: lessons/rig-board-tests.md#t-shader
   is('no video path means no shader node', graphOf({ ...graphFacts, gpu: false }).nodes.some((n) => n.id === 'pi-1:shader'), false);
   is('NEGATIVE CONTROL: with a video path the shader is there, and never under its old id gpu',
     [graphOf({ ...graphFacts, gpu: true }).nodes.some((n) => n.id === 'pi-1:shader'), graphOf({ ...graphFacts, gpu: true }).nodes.some((n) => n.id === 'pi-1:gpu')],
@@ -1238,13 +1204,13 @@ console.log('\nbeat: the graph on the hello and on every beat');
   const reg = createRegistry({ now: () => 0 });
   is('a page registry takes the hello, and the beat after it changes nothing',
     [reg.ingest({ ...hello, from: 'board-sock' }), reg.ingest({ ...alive, from: 'board-sock' })], [true, false]);
-  // 🔴 THE RELAY CARRIES THIS EVERY FIVE SECONDS, so its size is a number to
-  // watch. MEASURED 2026-10-04 on this fixture: see the line printed below.
+  // The relay carries this every five seconds, so its size is printed.
+  // why: lessons/rig-board-tests.md#t-size
   const bytes = Buffer.byteLength(JSON.stringify(alive));
   console.log(`         board.alive is ${bytes} bytes with the graph, ${Buffer.byteLength(JSON.stringify({ ...alive, graph: undefined }))} without`);
   ok('the beat stays under 4 KB', bytes < 4096, `${bytes} bytes`);
-  // 2026-10-11: the JACK ends add the granulator, the capture and a `jack` list
-  // on Yoshimi and on the Circuit, and the beat carries all of it.
+  // The JACK ends add the granulator, the capture and `jack` lists.
+  // why: lessons/rig-board-tests.md#t-jack-facts
   const jackFacts = { ...graphFacts, jack: true,
     inputs: [...(graphFacts.inputs instanceof Map ? graphFacts.inputs.values() : graphFacts.inputs)].map((i) => ({ ...i, via: 'jack' })) };
   const jackAlive = aliveMsg({ ...alive, graphFacts: jackFacts });
@@ -1253,11 +1219,8 @@ console.log('\nbeat: the graph on the hello and on every beat');
     jbytes < 4096 && jackAlive.graph.ports.some((p) => p.id === 'pi-1:circuit:audio-out' && p.jack?.[0] === 'circuit:capture_1'), `${jbytes} bytes`);
 }
 
-// ── the sampler's piano (sampler.mjs): the sfz writer and the fetch ─────────
-// The browser pages and the Pi must play one key from one recording, so the
-// rule (nearest, tie goes lower) is graded by brute force against a key-by-key
-// nearest search, which is a second implementation rather than the same
-// arithmetic restated.
+// The sfz writer and fetch; nearest-recording graded by brute force against a key-by-key search.
+// why: lessons/rig-board-tests.md#t-sampler
 {
   const nearest = (notes, k) => notes.reduce((b, n) => (Math.abs(n - k) < Math.abs(b - k) ? n : b), notes[0]);
   const owner = (ranges, k) => ranges.filter((r) => k >= r.lo && k <= r.hi).map((r) => r.note);
@@ -1305,10 +1268,8 @@ console.log('\nbeat: the graph on the hello and on every beat');
   rmSync(dir, { recursive: true, force: true });
 }
 
-// ── the SuperCollider sampler (scsampler.mjs), option b ─────────────────────
-//
-// What decides whose sound stops, and every rule a key is played by, with a
-// fake scsynth. 27 asserts below, 11 of them NEGATIVE CONTROLS.
+// The SuperCollider sampler with a fake scsynth: 27 asserts, 11 negative controls.
+// why: lessons/rig-board-tests.md#t-scsampler
 {
   console.log('sampler: the one-source rule, with the sampler beside it');
   is('starting the sampler beside Yoshimi stops nothing',
@@ -1488,15 +1449,8 @@ console.log('\nbeat: the graph on the hello and on every beat');
   rmSync(sdir, { recursive: true, force: true });
 }
 
-// ── the collide engine (scollide.mjs), plans/plan-pi-supercollider-defs.md step 1 ──
-// Pure: no scsynth, no board. Every refusal the plan names, the timetag against
-// a fixture worked by hand, and the keep list.
-// SABOTAGE, MEASURED 2026-10-12 on a scratch copy of the tree, one guard broken
-// at a time, reds out of 549: any block class 1 (it was 0 until the PlayBuf
-// row below existed, because the compiler cannot emit a foreign class), any
-// name 6, the choke dropped 1, a keep list of one port 1, no ahead window 1, no
-// late window 3, no Out bus check 1, no text cap 1, no 16 name cap 1, no node
-// cap 3, no freesItself check 1, the timetag fraction off by 1000 2.
+// The collide engine, pure. Sabotaged one guard at a time on a scratch tree, every guard went red.
+// why: lessons/rig-board-tests.md#t-collide
 {
   const C = await import('./scollide.mjs');
   const { compile: scCompile, UGENS: SC_UGENS } = await import('../../demo/shell/sclang-lite.mjs');

@@ -1,45 +1,13 @@
-// rig/audit.mjs — what these machines need, why, and whether they still have it.
-//
-//   node rig/audit.mjs              every machine
-//   node rig/audit.mjs box          just the Pi
-//   node rig/audit.mjs pro --fix    print the commands that would close the gap
-//
-// 🔴 WHY THIS EXISTS. `setup.sh` installs `alsa-utils curl git` and node. That
-// is all it has ever installed. Every instrument on the board — JACK, Yoshimi,
-// SuperCollider, its sc3-plugins, ffmpeg — was put
-// there BY HAND at some point and written down nowhere, so a fresh Pi would
-// come up with the service running and every instrument reporting
-// "unavailable", which reads as a code fault.
-//
-// The drift is not historical. Csound went on this board by hand at 06:00 on
-// 2026-09-12, by me, an hour before this file was written, for the reverb
-// insert. That is the whole argument: a machine that is set up by typing is a
-// machine nobody can rebuild.
-//
-// ⚠️ A LIST IS NOT A CHECK. A document saying what should be installed rots the
-// first time somebody installs something else, and nothing says so. This is
-// runnable: it asks each machine what it actually has and prints the
-// difference, so the record cannot quietly stop being true.
-//
-// ⚠️ AND IT DOES NOT PIN VERSIONS. `seen` is what was there on a day it worked,
-// reported as drift rather than enforced as a requirement — pinning Debian
-// point releases would make this fail on every routine upgrade and teach
-// everyone to ignore it. A version that moved is worth a line, not a refusal.
+// node rig/audit.mjs [machine] [--fix]: what each machine needs, why, and whether it has it.
+// Runnable rather than a list, so drift shows. `seen` versions are reported, never enforced.
+// why: lessons/rig-misc.md#audit-header
 
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 const run = promisify(execFile);
 
-export /**
- * The package list, parsed from the one file that holds it.
- *
- * ⚠️ TAB SEPARATED, and the `why` column may contain anything including commas
- * and colons, which is why it is not CSV and not `:`-delimited.
- * ⚠️ `nodesource` ROWS ARE KEPT. This audit checks what is INSTALLED, and node
- * is installed whatever route it came by; only `setup.sh` cares about the
- * difference, because only it has to do the installing.
- */
+export // The package list from packages.txt (tab separated); `nodesource` rows are kept; why: lessons/rig-misc.md#audit-packages
 function readPackages() {
   const raw = readFileSync(new URL('./board/packages.txt', import.meta.url), 'utf8');
   const rows = raw.split('\n')
@@ -57,18 +25,8 @@ const MACHINES = {
     // The login is read from the environment and never written here:
     // PI_HOST=<user>@<pi> (BOARD_SSH is the older name and still read).
     ssh: process.env.PI_HOST || process.env.BOARD_SSH || null,
-    // ⚠️ Ask port 22, not mDNS — `positron-board.local` does not resolve from
-    // this sandbox. CLAUDE.md has the sweep.
-    // 🔴 READ FROM `rig/board/packages.txt`, NOT LISTED HERE. This was a
-    // hand-kept array of twelve packages with versions and reasons, and
-    // `setup.sh` installed four — so the list that knew what a board needs and
-    // the script that builds one had never agreed, and a board provisioned from
-    // this repo came up silent. **One file, two readers**: the installer parses
-    // it with `awk` on a fresh Pi where node does not exist yet, and this parses
-    // it to check a board that already exists.
-    // ⚠️ IT THROWS ON AN EMPTY PARSE rather than reporting a clean audit. A
-    // regex that stopped matching would otherwise mean "no packages to check",
-    // which reads exactly like "nothing is missing".
+    // Read from rig/board/packages.txt (setup.sh reads it too). Throws on an empty parse.
+    // why: lessons/rig-misc.md#audit-apt
     apt: readPackages(),
     // Not packages: things this repo puts there, or that are built on arrival.
     files: [
@@ -85,14 +43,11 @@ const MACHINES = {
   m1: {
     what: 'the M1 Pro MacBook that runs Ableton Live — PARKED, see rig/m1/README.md',
     ssh: process.env.M1_SSH || 'mbp',
-    // ⚠️ `m1`, NOT `pro`. BOTH Macs here are "Pro" — MEASURED: the studio one is
-    // an Apple M1 Pro (MacBookPro18,3) and the machine this repo is edited on is
-    // an Apple M2 Pro. "the Pro" named neither of them unambiguously and was
-    // used for both.
+    // `m1`, not `pro`: both Macs here are Pros (M1 Pro studio, M2 Pro editing).
+    // why: lessons/rig-misc.md#audit-m1
     mac: true,
-    // ⚠️ NOT RESTORABLE FROM THIS REPO, and that is the point of listing them.
-    // Four of these are Preferences clicks with no API at all, which is why
-    // that rig is parked rather than automated.
+    // Not restorable from this repo: Preferences clicks with no API.
+    // why: lessons/rig-misc.md#audit-manual
     manual: [
       ['Ableton Live 11',          'the instrument. Not installable from here'],
       ['AbletonOSC',               'a Remote Script, in ~/Music/Ableton/User Library/Remote Scripts/ — and it must be SELECTED as a Control Surface in Preferences, which installing does not do'],
@@ -119,12 +74,9 @@ const sh = async (ssh, cmd, mac = false) => {
 
 async function auditBox(m, fix) {
   const rows = [];
-  // ⚠️ `|| true`, AND IT IS NOT COSMETIC. `dpkg-query` exits non-zero when ANY
-  // name it is given is unknown, and the unknown ones are exactly the case this
-  // tool exists to find — so without this, one missing package made the query
-  // fail, the map come back empty, and EVERY package report MISSING. Caught by
-  // breaking it on purpose: adding one bogus name turned sixteen ok rows red.
-  // A checker whose false-alarm mode is that broad is one people stop reading.
+  // `|| true`: dpkg-query exits non-zero on any unknown name, which would mark every package
+  // missing.
+  // why: lessons/rig-misc.md#audit-dpkg
   const q = await sh(m.ssh, `dpkg-query -W -f='\${Package} \${Version} \${Status}\\n' ${m.apt.map((a) => a[0]).join(' ')} 2>/dev/null || true`);
   const have = new Map();
   for (const line of (q || '').split('\n')) {
@@ -156,11 +108,8 @@ async function auditPro(m) {
     const ok = await sh(m.ssh, `test -e ${path.replace('~', '$HOME')} && echo y`);
     rows.push([ok ? 'ok' : 'MISSING', path, ok ? '' : why, null]);
   }
-  // ⚠️ EVERY `manual` ITEM IS REPORTED AS UNCHECKABLE RATHER THAN AS PRESENT.
-  // A Preferences setting cannot be read over ssh, and a row that guessed would
-  // be worse than a row that says it did not look — that is the difference
-  // between "we checked and it is fine" and "we did not check", which this
-  // project has a rule about.
+  // `manual` items are reported as unchecked, never as present.
+  // why: lessons/rig-misc.md#audit-unchecked
   for (const [what, why] of m.manual) rows.push(['by hand', what, why, null]);
   return rows;
 }

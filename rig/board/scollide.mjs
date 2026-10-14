@@ -1,49 +1,7 @@
-// rig/board/scollide.mjs: programs a page typed, played on the board's scsynth.
-//
-// plans/plan-pi-supercollider-defs.md, steps 1 to 3 (asked 2026-10-12, "start").
-// A page sends program TEXT, the board compiles it here with the very same
-// `demo/shell/sclang-lite.mjs` the tab uses, and plays timestamped hits and
-// notes that it turns into OSC bundles itself. No OSC from a browser, ever:
-// every address and every argument list below is built by the board.
-//
-// THE VERBS (answered on the path they came in on, refusing with a reason):
-//   audio.start { source: 'collide' }   raise the engine (own server, or attach to the sampler's)
-//   audio.stop  { source: 'collide' }   stop it, and nothing else
-//   sc.load  { name, text, sha? }       -> sc.loaded { ok, name, def, bytes, ugens, controls, ... same }
-//   sc.hit   { hits: [{ name, at, args?, choke? }] }   no answer; counted in sc.stats
-//   note.on / note.off / note.panic { node: 'collide', name, note, vel, at? }  -> note.ack
-//   sc.set   { name, param, value }     -> sc.set { ok, nodes }
-//   sc.stats                            -> sc.stats { defs, live, started, ended, late, droppedLate, ... }
-//   clock.ping { t0 }                   -> clock.pong { t0, t1 }, t1 the board's epoch ms
-//
-// 🔴 WHICH scsynth IS A PARAMETER, AND THE DEFAULT IS THE PLAN'S OWN SERVER.
-// Asked 2026-10-12: *"A third SuperCollider engine on the Pi, -- do we need 3?"*
-// The engine choice is NOT settled. `ENGINE` below is the one line that decides
-// it, so step 4 on the Pi can choose by measured CPU and RAM:
-//   ENGINES.own     a scsynth of its own on UDP 57131, JACK client `poscollide`,
-//                   started and stopped here, killable without the piano.
-//   ENGINES.shared  the sampler's scsynth on 57130: page nodes in a group of
-//                   their own (`PAGE_GROUP`), started only while the sampler is
-//                   up, and replies read off the sampler's one socket (`-l 1`).
-// IN BOTH, the page's programs are compiled to write to a PRIVATE bus pair
-// (`PAGE_BUS`), and the board's own `posCollideOut` reads that pair, limits it
-// and writes the result to the outputs. So the limiter is on the page group
-// ONLY, whichever server holds it: the piano on a shared server writes to the
-// outputs directly and never passes through it.
-//
-// 🔴 THE PUSH TRAP, AND WHY `synthdef.mjs` IS IMPORTED HERE DIRECTLY.
-// `push.sh` and `setup.sh` copy only the `../../` modules that files in
-// `rig/board` import DIRECTLY (both grep rig/board's own files for imports from two levels up).
-// `sclang-lite.mjs` imports `./synthdef.mjs`, which nothing else in rig/board
-// imported before this file, so a board module that imported only the compiler
-// would install cleanly and die on its first import. `readSynthDef` is used
-// below, AND the line is what puts the file on the board.
-//
-// 🔴 THE CORE IS PURE. `createCollideCore` decides everything about a load, a
-// hit and a note with no server and no clock of its own, so `test.mjs` grades
-// it, with sabotage controls, on a laptop. The server half (`startScCollide`)
-// is the only part that needs the board, and it is NOT RUN anywhere yet: step 4
-// of the plan runs it on the Pi.
+// Programs a page typed, compiled here by demo/shell/sclang-lite.mjs, played on scsynth;
+// no OSC from a browser. Verbs: audio.start/stop, sc.load, sc.hit, note.*, sc.set, sc.stats,
+// clock.ping. ENGINE picks its own scsynth (57131) or the sampler's; PAGE_BUS is limited.
+// why: lessons/rig-board-io.md#scollide-header
 
 import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
@@ -51,7 +9,9 @@ import { createSocket } from 'node:dgram';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { compile } from '../../demo/shell/sclang-lite.mjs';
-// 🔴 DIRECT, ON PURPOSE: see the push trap above. Do not fold into the compiler's import.
+// Imported directly so push.sh and setup.sh copy synthdef.mjs (they follow rig/board's own
+// imports).
+// why: lessons/rig-board-io.md#synthdef-import
 import { readSynthDef } from '../../demo/shell/synthdef.mjs';
 import { JACK_ENDS, jackRows } from '../../demo/shell/graph-registry.mjs';
 import { oscMessage, oscBundle, ntpTimetag, ensureJackd, ensureCapture, releaseCapture, setStandingRows, wire,
@@ -65,7 +25,8 @@ export const ENGINES = Object.freeze({
   own: Object.freeze({ mode: 'own', port: COLLIDE_SC_PORT, client: 'poscollide', starts: true }),
   shared: Object.freeze({ mode: 'shared', port: SAMPLER_SC_PORT, client: 'possampler', starts: false }),
 });
-/** 🔴 THE ONE-LINE SWITCH. `ENGINES.shared` puts page programs on the sampler's server. */
+// The one-line switch: ENGINES.shared puts page programs on the sampler's server.
+// why: lessons/rig-board-io.md#engine
 export const ENGINE = ENGINES.own;
 
 // ── the numbers, each one the plan's (§1.2, §1.5) ───────────────────────────
@@ -75,44 +36,29 @@ export const PAGE_GROUP = 900;
 /** The board's limiter, added after the group. */
 export const LIMITER_NODE = 901;
 export const LIMITER_DEF = 'posCollideOut';
-/**
- * The private bus pair every page program writes to. Past the outputs and
- * inputs of either server (`-i 0 -o 2`, so private buses start at 2), and far
- * enough past them that a server given more channels later still has room.
- */
+// The private bus pair page programs write to, past either server's ins and outs.
+// why: lessons/rig-board-io.md#page-bus
 export const PAGE_BUS = 64;
-/**
- * 🔴 THE FOLD. The capture SUMS out_1 and out_2 into one JACK input, while a
- * page's analyser and its speakers AVERAGE a stereo node to mono (Web Audio's
- * `speakers` downmix, (L+R)/2). Every program `sclang-lite.mjs` compiles has
- * two channels (a mono last line is written to both), so without this the Pi
- * read the same note 2x (6 dB) louder than the tab. MEASURED 2026-10-12 on
- * synth/100, one note, max RMS here -33.2 against the Pi -28.4 dBFS.
- */
+// The capture sums out_1 and out_2 while a page averages them, so 0.5 matches the tab (6 dB louder
+// before).
+// why: lessons/rig-board-io.md#fold
 export const FOLD = 0.5;
-/**
- * Per channel, AFTER the fold, so the capture tops out at twice this: 0.98, a
- * guard against the s16 capture clipping, not a loudness policy. It was
- * `LOUDEST / 2` (0.15), which squashed every drum: MEASURED 2026-10-12 on
- * rhythm/030 the kick read -5.9 dBFS RMS here and -19.3 on the Pi, 13 dB down,
- * with the Pi's 90th percentile 1 dB under its peak. A page is now exactly as
- * loud on the Pi as in the tab, which is what both pages compare.
- */
+// Per channel after the fold, so the capture tops out at 0.98: a clip guard, not loudness.
+// why: lessons/rig-board-io.md#limit
 export const LIMIT_LEVEL = 0.49;
-/**
- * Node ids for page programs start here. The sampler allocates from 2000 up on
- * the same counter forever, so on a shared server the two cannot meet before
- * the sampler has played ten million notes.
- */
+// Page node ids start here; the sampler counts up from 2000 and cannot reach it.
+// why: lessons/rig-board-io.md#first-node
 export const FIRST_NODE = 10_000_000;
 export const PREFIX = 'pg_';
 /** `params.set`'s pattern for an OSC command name (board.mjs). */
 export const NAME_RE = /^[a-z][a-z0-9_]{0,23}$/;
-/** 4.6 times the largest program the two pages play (864 B, MEASURED §1.3). */
+// 4.6 times the largest program the pages play (864 B).
+// why: lessons/rig-board-io.md#text-cap
 export const TEXT_CAP = 4000;
 export const MAX_DEFS = 16;
 export const MAX_NODES = 48;
-/** Blocks in one definition. MEASURED largest today: 31. */
+// Blocks in one definition; the largest today is 31.
+// why: lessons/rig-board-io.md#block-cap
 export const BLOCK_CAP = 64;
 export const MAX_HITS = 16;
 export const MAX_ARGS = 16;
@@ -128,29 +74,19 @@ export const STEAL_FREE_MS = 50;
 export const QUIET_MS = 15000;
 /** Above this average CPU, new hits and notes are refused. */
 export const CPU_REFUSE = 70;
-/**
- * 🔴 EVERY CLASS `sclang-lite.mjs` CAN EMIT, WRITTEN OUT BY HAND. Not derived
- * from its `UGENS`: this check guards against a FUTURE change to the compiler,
- * so a class the compiler learns has to be added here on purpose, and
- * `test.mjs` goes red until it is.
- */
+// Every class the compiler can emit, by hand, so a new one must be added on purpose (test.mjs goes
+// red).
+// why: lessons/rig-board-io.md#structural
 export const STRUCTURAL = Object.freeze(['Control', 'LagControl', 'BinaryOpUGen', 'UnaryOpUGen', 'Out']);
-// ⚠️ THE SECOND ROW ARRIVED 2026-10-13, when the compiler learned them for the
-// grain ring (now /archive/grain-ring/). Every one is a core scsynth plugin
-// class (GrainBuf in GrainUGens, the rest in BufIO, Trig, InOut, Noise and
-// Osc), so the board's real scsynth loads them. `.sin` and `.cos` need no row:
-// they are UnaryOpUGen, already structural.
+// Core scsynth plugin classes for the grain ring; .sin and .cos are UnaryOpUGen.
+// why: lessons/rig-board-io.md#allowed
 export const ALLOWED_CLASSES = Object.freeze(new Set([...STRUCTURAL,
   'SinOsc', 'Saw', 'Pulse', 'LFSaw', 'LFTri', 'LFNoise1', 'WhiteNoise', 'LPF', 'HPF', 'RLPF', 'Pan2', 'EnvGen',
   'GrainBuf', 'BufWr', 'Phasor', 'SendReply', 'Impulse', 'Dust', 'TRand', 'In', 'BufFrames', 'BufDur',
   'DelayC', 'LocalIn', 'LocalOut']));
-/**
- * 🔴 BufWr WRITES INTO A BUFFER, AND ON THE SAMPLER'S SERVER THE BUFFERS ARE
- * THE PIANO. On `ENGINES.own` nothing allocates a buffer for a page (there is
- * no verb for it), so a BufWr there writes into nothing and is inert. On
- * `ENGINES.shared` the same program could overwrite the sampler's recordings
- * for everybody in the room, so that engine refuses the class by name.
- */
+// BufWr is refused on the shared engine, where the buffers are the piano; on `own` it writes
+// nothing.
+// why: lessons/rig-board-io.md#shared-refused
 export const SHARED_REFUSED = Object.freeze(['BufWr']);
 export const ALLOWED_SHARED = Object.freeze(new Set([...ALLOWED_CLASSES].filter((c) => !SHARED_REFUSED.includes(c))));
 
@@ -162,12 +98,9 @@ export const epochNow = () => performance.timeOrigin + performance.now();
 const mtof = (n) => 440 * 2 ** ((n - 69) / 12);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-/**
- * Re-read the board's OWN bytes and check every block. Belt and braces: the
- * text came through the compiler, so this guards against a future change to
- * the compiler rather than against the page.
- * @returns {{ok: true, blocks: number, classes: string[]} | {ok: false, reason: string}}
- */
+// Re-read the board's own bytes and check every block, guarding against a future compiler change.
+// Returns {ok, blocks, classes} or {ok: false, reason}.
+// why: lessons/rig-board-io.md#check-def
 export function checkDef(bytes, { name, bus, allowed = ALLOWED_CLASSES, cap = BLOCK_CAP } = {}) {
   let r;
   try { r = readSynthDef(bytes); } catch (e) { return { ok: false, reason: `the compiled bytes do not read back: ${e.message}` }; }
@@ -191,22 +124,13 @@ export function checkDef(bytes, { name, bus, allowed = ALLOWED_CLASSES, cap = BL
 /** One answer to `clock.ping`. `t1` is the board's epoch ms. */
 export const clockPong = (msg, now = epochNow) => (Number.isFinite(msg?.t0) ? { t0: msg.t0, t1: now() } : null);
 
-/**
- * Turn a packet the core emits into bytes. `{ tt: null }` is "immediately";
- * every packet is a bundle, so a hit and its choke share one timetag.
- */
+// A core packet to bytes; every packet is a bundle (tt null is immediately).
+// why: lessons/rig-board-io.md#encode-packet
 export const encodePacket = (p) => oscBundle(p.tt ?? [0, 1], p.msgs);
 
-/**
- * Everything about loads, hits and notes, with no server and no clock.
- * @param {object} o
- * @param {(packet: {tt: [number, number] | null, msgs: any[][]}) => void} o.send
- * @param {() => number} [o.now]   the board's epoch ms
- * @param {number} [o.bus]         where page programs write
- * @param {Set<string>} [o.allowed] block classes allowed (a test sabotages it)
- * @param {(n: string) => boolean} [o.nameOk] the name rule (a test sabotages it)
- * @param {boolean} [o.choke]     false drops the choke (a test sabotages it)
- */
+// Loads, hits and notes with no server or clock. o: send(packet), now, bus, allowed, nameOk, choke
+// (the last three are sabotage hooks for tests).
+// why: lessons/rig-board-io.md#core
 export function createCollideCore({ send, now = epochNow, bus = PAGE_BUS, group = PAGE_GROUP, firstNode = FIRST_NODE,
   allowed = ALLOWED_CLASSES, nameOk: nameRule = nameOk, choke: chokeOn = true, log = () => {} } = {}) {
   /** name -> { name, def, sha, bytes, controls: Map, values: Map, gateUsed, freesItself, ampDefault } */
@@ -484,12 +408,9 @@ export function isForCollide(msg) {
   return /^note\.(on|off|panic)$/.test(msg.type) && msg.node === 'collide';
 }
 
-/**
- * The verbs over a server. `start({ engine, onLog, sampler })` answers a server
- * object or `{ ok: false, reason }`; `demo/fake-board.mjs` passes a fake one, so
- * the dispatch below runs on the laptop exactly as it will on the board.
- * A server is `{ ok, mode, port, bus, send(buf), recv(bytes), onReply(fn), cpu(), stop(), status() }`.
- */
+// The verbs over a server from start({ engine, onLog, sampler }); fake-board.mjs passes a fake.
+// A server is { ok, mode, port, bus, send, recv, onReply, cpu, stop, status }.
+// why: lessons/rig-board-io.md#service
 export function createCollideService({ engine = ENGINE, start = startScCollide, now = epochNow, log = () => {},
   sampler = () => null, onFrame = null, sweepMs = 250, cpuMs = 2000 } = {}) {
   let server = null, core = null, starting = null, timers = [], offReply = null, missedCpu = 0, restarts = 0;
@@ -623,7 +544,8 @@ export function createCollideService({ engine = ENGINE, start = startScCollide, 
   };
 }
 
-// ── the server, on the board (NOT RUN YET: step 4 of the plan) ─────────────
+// The server, on the board.
+// why: lessons/rig-board-io.md#server-banner
 
 const HERE = new URL('.', import.meta.url).pathname;
 export const COLLIDE_SCD = join(HERE, 'norns', 'poscollide-defs.scd');
@@ -652,10 +574,8 @@ async function ensureLimiterDef(onLog) {
   return { ok, file, compiled: true };
 }
 
-/**
- * Raise the engine the switch names, and put the page group and the limiter on
- * it. Answers a server for `createCollideService`, or `{ ok: false, reason }`.
- */
+// Raise the chosen engine with the page group and the limiter; a server or {ok: false, reason}.
+// why: lessons/rig-board-io.md#start
 export async function startScCollide({ engine = ENGINE, onLog, onFrame, sampler = null } = {}) {
   const t0 = Date.now();
   if (engine.mode === 'shared' && !sampler?.osc) {

@@ -1,78 +1,7 @@
-// demo/fake-err.mjs: an HLS live edge that is nobody's broadcaster.
-//
-//   node demo/fake-err.mjs                     # :8902, three channels
-//   node demo/fake-err.mjs --port 9300
-//   node demo/fake-err.mjs --radio             # and the radio channels over HLS, for /station/'s relay slot
-//
-// Then open either page against it:
-//   http://127.0.0.1:8890/now/?base=http://127.0.0.1:8902
-//   http://127.0.0.1:8890/flipper/?base=http://127.0.0.1:8902/wall
-//
-// 🔴 WHY THIS EXISTS, AND IT IS THE FIRST RULE IN CLAUDE.MD RATHER THAN A
-// CONVENIENCE. `/now/` and `/flipper/` both point at ERR's live HLS, and ERR
-// told us our listeners were corrupting their audience figures. The standing
-// rule is that a connection to one of their mounts is opened only when a PERSON
-// is going to watch it. `/now/`'s self-check alone asks for thirty two-byte
-// range probes and pulls a ten minute back-seek off their servers; `/flipper/`
-// sweeps eight points per channel every time a cell is opened. So the two pages
-// with the most machinery in them were the two nobody could run, and the last
-// full suite skipped both in writing.
-//
-// This is the same answer `demo/fake-station.mjs` gave `/archive/radio/` and
-// `demo/fake-tapes.mjs` gave `/tapes/`. A real master playlist, a real sliding
-// media playlist with a real PROGRAM-DATE-TIME and a real MEDIA-SEQUENCE, real
-// MPEG-TS segments that really decode, real Range replies, and a real schedule
-// endpoint, all from a port on this machine.
-//
-// 🔴 THE REFUSAL IS THE PART THAT MATTERS, NOT THE STREAM. ERR blocks live
-// segments BY PROGRAMME, and a refusal is a 403 carrying NO
-// `access-control-allow-origin`, which reaches a browser as a CORS failure
-// rather than as a status code. Measured 2026-09-06 by sweeping each 2 h window
-// at 13 points (`.` = served, `#` = refused, oldest on the left):
-//
-//     etv       ........#####     the newest ~45 min refused
-//     etv2      #########....     the OLDEST ~78 min refused, the edge fine
-//     etvpluss  .............     everything served
-//
-// All three shapes are reproduced, because finding that boundary is most of
-// what these two pages ARE: `/now/` lands its back-seek on the newest instant
-// that was served, and `/flipper/` starts its picture behind the wall and
-// stops loading when it reaches it. A stand-in that served everything would
-// leave both of those grading nothing.
-//
-// ⚠️ THE BOUNDARY SLIDES HERE AND JUMPS AT ERR. Theirs is a programme edge, so
-// it sits still for half an hour and then moves by however long that programme
-// was. This one is a fixed distance from the live edge, which is deterministic
-// and therefore gradeable. It is the one behaviour in this file deliberately
-// unlike the thing it stands in for, and the trade is the usual one: a harness
-// cannot assert against a quantity that moves for reasons it cannot see.
-//
-// ⚠️ IT GRADES OUR CODE AND NOTHING ELSE. It cannot tell you that ERR's
-// boundary has moved, that a channel has gone off air, that their playlists
-// have changed shape, or that the schedule API has been rewritten. A page that
-// is green here can still meet all four out there.
-//
-// ⚠️ NO BURNED CLOCK IN THE PICTURE, AND THE REASON IS THE TOOLCHAIN RATHER
-// THAN THE DESIGN. `demo/shell/pattern.mjs`'s `ffmpegFilters()` would burn a
-// readable wall clock into every frame, which would let `/now/`'s "a frame from
-// the asked-for instant was actually shown" read the instant off the glass
-// instead of trusting a timestamp. It needs `drawtext`, `drawtext` needs
-// libfreetype, and the ffmpeg on this machine (Homebrew 9.0.1) is built without
-// it: `ffmpeg -filters | grep drawtext` returns nothing at all. CLAUDE.md
-// already records that `src/publish.sh` pins `ffmpeg@7` for exactly this
-// reason. A pool generated with a filter chain that silently draws nothing
-// would be worse than no clock, so there is no clock. `testsrc2` still moves
-// and counts, so one frame is distinguishable from the next.
-//
-// ⚠️ IT NEEDS ffmpeg, ONCE. Two hours of picture is generated the first time
-// and cached in the system temporary directory: a repository is the wrong place
-// for a hundred megabytes of test card. MEASURED on this machine, cold: 55.4 s
-// wall for 3600 segments, 97 MB of segment bytes, 105 MB on disk once the
-// filesystem has rounded 3600 small files up to whole blocks. Quote the second
-// number to anybody worrying about a disk, because it is the one `du` agrees
-// with. With no ffmpeg it says so and returns null, because
-// a harness that cannot run has to say why rather than serve something that
-// reads as a broken page.
+// node demo/fake-err.mjs [--port N] [--radio] (:8902); a page takes ?base=http://127.0.0.1:8902
+// ERR's live HLS shape and its three refusal shapes (403, no ACAO; /wall is the measured day).
+// The boundary slides here rather than jumping per programme. Needs ffmpeg once.
+// why: lessons/harness.md#fake-err
 
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
@@ -82,27 +11,13 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-/**
- * 🔴 1.92 SECONDS A SEGMENT AND 3750 OF THEM, BECAUSE THAT IS WHAT WAS MEASURED.
- * This said two seconds and 3600 until 2026-10-05, under a heading claiming
- * the number was read off ERR. It was not: `research/err-live-feeds-2026-08.md`
- * and `plans/plan-live-timeline.md` both MEASURED `#EXTINF:1.92` on every one
- * of 3750 segments, 7200.00 s exactly, on TV and radio alike, and the radio
- * half of this file already used 1920 ms. A stand-in on a round number lets a
- * page get away with assuming one.
- * 1.92 s is 48 frames at ERR's 25 fps and 90 AAC frames at 48 kHz, so every
- * segment cuts on a keyframe and on an audio frame boundary.
- */
+// 1.92 s segments, 3750 to a 2 h window, as measured at ERR: 48 frames at 25 fps, 90 AAC frames.
+// why: lessons/harness.md#err-seg-ms
 const SEG_MS = 1920;
 const SEG_S = SEG_MS / 1000;
 const WINDOW_N = 3750;                    // 2 h exactly, measured
-/**
- * 🔴 THE POOL IS AS LONG AS THE WINDOW, WHICH BUYS EXACTLY ONE SEAM.
- * Segment `sn` is served from pool file `sn % WINDOW_N`, so a playlist of
- * WINDOW_N consecutive sequence numbers contains exactly one wrap, wherever it
- * happens to fall. A shorter pool would be cheaper and would put a
- * discontinuity every few minutes across a window a page seeks around inside.
- */
+// The pool is as long as the window, so a window holds exactly one wrap.
+// why: lessons/harness.md#err-pool
 const POOL_N = WINDOW_N;
 const FPS = 25;                           // ERR's frame rate, measured
 const GOP = Math.round((FPS * SEG_MS) / 1000);   // 48
@@ -113,51 +28,16 @@ const TONE = join(CACHE, 'tone-128.mp3');
 
 const IDS = ['etv', 'etv2', 'etvpluss'];
 
-/**
- * 🔴 WHAT ERR WAS MEASURED DOING, 2026-09-06, one sweep of thirteen points
- * across each two hour window. `/flipper/` draws it in its own comment:
- *
- *     etv       ........#####     the newest ~45 min refused
- *     etv2      #########....     the OLDEST ~78 min refused, the edge fine
- *     etvpluss  .............     everything served
- *
- * The third row is as load-bearing as the other two: a stand-in where every
- * channel refused something would make "nothing is served anywhere" look
- * identical to "every fetch from this page is failing".
- */
+// ERR's three measured shapes: newest ~45 min refused, oldest ~78 min refused, all served.
+// why: lessons/harness.md#err-measured
 const MEASURED = {
   etv: { refuse: 'newest', minutes: 45 },
   etv2: { refuse: 'oldest', minutes: 78 },
   etvpluss: { refuse: 'none', minutes: 0 },
 };
 
-/**
- * 🔴 AND THE SAME THREE SHAPES WITH THE FIRST TWO SWAPPED, WHICH IS THE
- * DEFAULT, AND THE REASON IS A HOLE IN `/now/` RATHER THAN A PREFERENCE.
- *
- * Both pages open channel 0. `/flipper/` handles a refused live edge: it sweeps
- * back from the edge, finds the boundary, and starts the picture ninety seconds
- * behind it. `/now/` has no such path. Point it at a channel whose newest
- * 45 minutes are refused and hls.js 403s on every fragment at the live edge,
- * the wall handler stops loading, and the page shows black with one log line:
- * MEASURED here, six of its asserts red, all of them downstream of a clock that
- * never starts.
- *
- * ⚠️ WHICH CHANNEL WEARS WHICH SHAPE IS NOT A MEASUREMENT AND MOVES ANYWAY.
- * The block is per PROGRAMME and follows the schedule, so the sweep above is
- * one day at one instant. `/now/`'s own calibration is the evidence: it bands
- * its live gap green between 5 and 10 seconds and its `what` describes a
- * playing picture, neither of which could have been written against a channel
- * that refuses its own edge. So the default gives channel 0 an edge that plays
- * and puts the newest-end shape on channel 1, where a person clicking a cell
- * meets it.
- *
- * ⚠️ `/wall` IS THE MEASURED DAY AND THE HARNESS POINTS `/flipper/` AT IT.
- * `<base>/wall/live/etv.m3u8` is the arrangement above; it is the only way
- * `servedStart` runs its interesting branch, and it is how the question "what
- * does `/now/` do when its edge is refused" gets asked on purpose instead of
- * by accident.
- */
+// The default swaps the first two so channel 0's edge plays; `/wall` is the measured arrangement.
+// why: lessons/harness.md#err-open-edge
 const OPEN_EDGE = {
   etv: { refuse: 'oldest', minutes: 78 },
   etv2: { refuse: 'newest', minutes: 45 },
@@ -169,30 +49,9 @@ const MOUNTS = ['vikerraadio', 'raadio2', 'klassikaraadio', 'raadio4', 'raadiota
 
 // ── the picture ────────────────────────────────────────────────────────────
 
-/**
- * Two hours of segmented fMP4, generated once and kept.
- *
- * 🔴 fMP4, NOT MPEG-TS, BECAUSE ERR's TELEVISION IS fMP4. MEASURED twice
- * (`research/err-live-feeds-2026-08.md`, `plans/plan-live-timeline.md`):
- * CMAF `.m4s` segments behind one `#EXT-X-MAP` init segment. hls.js takes a
- * different path for each (it transmuxes TS and passes fMP4 through), so a TS
- * stand-in graded a path ERR's picture never takes. This was TS until
- * 2026-10-05.
- *
- * 🔴 EVERY SEGMENT IS EXACTLY 1.92 s, WHICH IS WHAT MAKES A SEQUENCE NUMBER
- * A CLOCK. `-g 48` at 25 fps puts a keyframe on every 1.92 s boundary and
- * `-sc_threshold 0` stops the encoder inserting its own, so `-hls_time 1.92`
- * cuts where it is told. The build refuses a pool whose playlist carries any
- * other `#EXTINF` value.
- * Without that, segment `sn` would not start at `sn * 2000` and the sliding
- * window's arithmetic would drift against wall time by a few milliseconds per
- * segment, which over a two hour window is minutes.
- *
- * 🔴 IT IS BUILT INTO A TEMPORARY DIRECTORY AND RENAMED INTO PLACE. A run that
- * is Ctrl-C'd halfway through leaves a partial pool, and a partial pool is a
- * stand-in that 403s a random stretch of the window for a reason nobody wrote
- * down. The rename is the commit.
- */
+// Two hours of fMP4 (ERR's TV is CMAF), generated once; `-g 48 -sc_threshold 0` makes every segment
+// exactly 1.92 s so a sequence number is a clock. Built in a temp directory and renamed in.
+// why: lessons/harness.md#err-make-pool
 function makePool(say) {
   const count = (d) => readdirSync(d).filter((f) => f.endsWith('.m4s')).length;
   if (existsSync(POOL) && count(POOL) === POOL_N && existsSync(join(POOL, 'init.mp4'))) return true;
@@ -216,19 +75,15 @@ function makePool(say) {
       '-hls_segment_filename', join(tmp, 'seg-%05d.m4s'), join(tmp, 'pool.m3u8')],
       { timeout: 10 * 60 * 1000 });
   } catch (e) {
-    // ⚠️ IT SAYS WHY AND RETURNS FALSE RATHER THAN EXITING, the same as the
-    // other two stand-ins. A harness importing this has to be able to report
-    // "the stand-in could not be built" as the reason a page was not graded,
-    // which is a different sentence from a page that failed.
+    // Says why and returns false, so the stand-in, not the page, is reported.
+    // why: lessons/harness.md#err-no-ffmpeg
     console.error('this needs ffmpeg to make its picture, and ffmpeg did not run:');
     console.error(`  ${String(e.message).split('\n')[0]}`);
     rmSync(tmp, { recursive: true, force: true });
     return false;
   }
-  // 🔴 REFUSE A SHORT POOL RATHER THAN SERVING IT. ffmpeg exiting 0 having
-  // written fewer segments than asked would give a window with a hole in it
-  // that answers exactly like a rights refusal, which is the one thing this
-  // file exists to be able to tell apart.
+  // Refuse a short pool: a hole would answer exactly like a rights refusal.
+  // why: lessons/harness.md#err-short-pool
   const got = count(tmp);
   if (got !== POOL_N || !existsSync(join(tmp, 'init.mp4'))) {
     rmSync(tmp, { recursive: true, force: true });
@@ -248,12 +103,8 @@ function makePool(say) {
   return true;
 }
 
-/**
- * Thirty seconds of something with a shape to it, for the five radio cells.
- * The same two tones a fifth apart `fake-station.mjs` makes, and for the same
- * reason written there: a check that counts frames passes over silence and a
- * check that measures a level does not.
- */
+// Thirty seconds of two tones a fifth apart for the radio cells (a level must be measurable).
+// why: lessons/harness.md#err-tone
 function makeTone() {
   if (existsSync(TONE)) return readFileSync(TONE);
   mkdirSync(CACHE, { recursive: true });
@@ -271,21 +122,9 @@ function makeTone() {
 
 // ── the radio channels as live.err.ee serves them ──────────────────────────
 
-/**
- * 🔴 AUDIO-ONLY HLS, THE SHAPE ERR'S RADIO HAS ON live.err.ee, FOR THE STATION'S
- * RELAY SLOT. `research/err-live-feeds-2026-08.md` measured it: a master per
- * channel that mints a session `?id=` and lists AAC rungs at 70, 130 and 260
- * kbit/s, a variant that answers 400 without that id, MPEG-TS segments of
- * exactly 1.92 s (90 AAC frames at 48 kHz) and a two hour window, 3750 of them.
- * All of that is reproduced so `workers/station`'s relay can be built and run
- * with zero requests to ERR.
- *
- * ⚠️ OFF UNLESS ASKED FOR (`--radio`, or `startErr({ radio: true })`). It is a
- * second pool, about half a minute to build once, and `/now/` and `/flipper/`
- * do not need it, so their harness runs do not pay for it.
- * ⚠️ IT GRADES OUR CODE AND NOTHING ELSE, the same as everything in this file.
- * Every rung is the same pool at 32 kbit/s mono; only the BANDWIDTH labels differ.
- */
+// Audio-only HLS as ERR's radio: per-channel master minting `?id=`, AAC rungs, 1.92 s TS segments.
+// Only with --radio. Every rung is the same pool at 32 kbit/s mono.
+// why: lessons/harness.md#err-radio
 const RADIO_SEG_MS = 1920;
 const RADIO_N = 3750;                      // 2 h, which is what ERR advertises
 const RADIO_POOL = join(CACHE, `radio-1920ms-${RADIO_N}`);
@@ -359,27 +198,16 @@ function radioMedia(now = Date.now()) {
 
 // ── where the live edge is, right now ──────────────────────────────────────
 
-/**
- * The newest COMPLETE segment, and the oldest one still in the window.
- *
- * Segment `sn` covers `[sn * 2000, sn * 2000 + 2000)` in wall milliseconds, so
- * the sequence number IS the clock and nothing has to be remembered between
- * requests. The edge is one segment behind the present because a segment that
- * is still being written is not offered by anybody.
- */
+// The newest complete segment and the oldest in the window: segment `sn` covers sn * SEG_MS, so
+// the sequence number is the clock. The edge is one behind the present.
+// why: lessons/harness.md#err-edge
 function edge(atMs = Date.now()) {
   const latest = Math.floor(atMs / SEG_MS) - 1;
   return { latest, first: latest - WINDOW_N + 1 };
 }
 
-/**
- * Will this channel hand this segment over?
- *
- * Two ways to be refused and they are indistinguishable from outside, which is
- * `err-live.mjs`'s fact 2 and is reproduced on purpose: a segment that has
- * fallen off the back of the window answers exactly like a rights refusal. That
- * is why both pages only ever probe segments they just read out of a playlist.
- */
+// Out of the window and refused answer the same, as at ERR, so pages probe only listed segments.
+// why: lessons/harness.md#err-serves
 function serves(arrangement, id, sn, now = Date.now()) {
   const { first, latest } = edge(now);
   if (sn < first || sn > latest) return false;
@@ -392,15 +220,8 @@ function serves(arrangement, id, sn, now = Date.now()) {
 
 // ── what a browser is allowed to read ──────────────────────────────────────
 
-/**
- * 🔴 `date` HAS TO BE EXPOSED OR `readPlaylist` READS NOTHING. It is not a
- * CORS-safelisted response header, so a cross-origin page cannot see it without
- * being told it may, and `readPlaylist` uses it as the server's own clock.
- * ⚠️ WHETHER ERR EXPOSES IT IS NOT KNOWN HERE and was not checked, because
- * checking means asking them. Nothing on either page asserts against
- * `serverDate`, so the difference cannot make a check pass here that would fail
- * there; if one is ever written, that is the first thing to confirm.
- */
+// `date` must be exposed for readPlaylist to read it; whether ERR exposes it is not known here.
+// why: lessons/harness.md#err-cors
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'range',
@@ -425,17 +246,8 @@ function parseRange(header, total) {
 
 const iso = (ms) => new Date(ms).toISOString().replace('Z', '+00:00');
 
-/**
- * 🔴 A FRESH SESSION ON EVERY READ OF THE MASTER, AND A VARIANT THAT REFUSES TO
- * ANSWER WITHOUT ONE IT MINTED. MEASURED (`research/err-live-feeds-2026-08.md`):
- * the master mints `?id=<15 digits>`, a bare variant answers 400, and a stale
- * or foreign id answers `Failed to set session: not found`. Until 2026-10-05 the
- * television half of this file had no session at all, so a page that re-read
- * the master every second, opening a new session at ERR each time, looked
- * exactly like one that opened one.
- * ⚠️ SESSIONS HERE NEVER EXPIRE. How long ERR keeps one is NOT measured, so a
- * page's recovery from an expired session is not graded by this file.
- */
+// A fresh `?id=` per master read; a variant without one answers 400. Sessions never expire here.
+// why: lessons/harness.md#err-sessions
 const SESSIONS = new Set();
 const SESSION_CAP = 10000;
 function mint() {
@@ -454,18 +266,9 @@ function masterPlaylist(id) {
     `${id}/index.m3u8?id=${mint()}`, ''].join('\n');
 }
 
-/**
- * The sliding window, built fresh on every ask.
- *
- * ONE `#EXT-X-PROGRAM-DATE-TIME`, on the first segment, which is what ERR sends
- * and what makes an absolute wall-clock position domain possible at all: the
- * rest is `pdt + Σ EXTINF`. A PDT on every segment would let a page be sloppy
- * about that accumulation and still look correct here.
- *
- * The wrap seam carries `#EXT-X-DISCONTINUITY`, because the pool's timestamps
- * run backwards there. Without it a player reads a two hour jump backwards in
- * PTS as a broken stream rather than as a new stretch of material.
- */
+// The sliding window, fresh per ask: one PDT on the first segment (as ERR), a DISCONTINUITY at the
+// wrap.
+// why: lessons/harness.md#err-media-playlist
 function mediaPlaylist(id, now = Date.now()) {
   const { first, latest } = edge(now);
   const out = ['#EXTM3U',
@@ -486,21 +289,9 @@ function mediaPlaylist(id, now = Date.now()) {
 
 // ── what was on ────────────────────────────────────────────────────────────
 
-/**
- * A day of programmes on a half hour grid, in the shape
- * `www.err.ee/api/tvSchedule/getTimelineSchedule` answers: a flat array whose
- * entries carry `startTime` in epoch SECONDS.
- *
- * 🔴 CONTIGUOUS ACROSS MIDNIGHT, WHICH IS THE ONLY HARD PART. `/now/` asks for
- * two days when its window reaches back past midnight, flattens both, and
- * asserts that every programme starts exactly where the previous one ended. A
- * grid that stopped at 23:30 and started again at 00:30 would fail that, on a
- * page that is working.
- *
- * ⚠️ THE NAMES SAY WHAT THEY ARE. A reader looking at the schedule row of a
- * page pointed at this should be able to tell in one glance that they are not
- * looking at Estonian television.
- */
+// A day on a half-hour grid in ERR's getTimelineSchedule shape (startTime in epoch seconds),
+// contiguous across midnight; names that are obviously not Estonian television.
+// why: lessons/harness.md#err-schedule
 function schedule(dayDate) {
   const day = new Date(dayDate);
   day.setHours(0, 0, 0, 0);
@@ -520,20 +311,13 @@ function schedule(dayDate) {
 
 // ── the server ─────────────────────────────────────────────────────────────
 
-/**
- * Start it. `port: 0` lets the OS choose, which is what a harness should do: a
- * fixed port is a shared mutable global, and this repo has paid for that twice.
- *
- * Returns the server, or `null` when there is no picture to serve.
- */
+// startErr({ port, quiet, radio }); port 0 lets the OS choose. Returns the server, or null.
+// why: lessons/harness.md#err-start
 export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
   const say = (...a) => { if (!quiet) console.log(...a); };
   const radioHls = radio && makeRadioPool(console.log);
-  // ⚠️ THE BUILD NOTICE IGNORES `quiet`, AND THAT IS NOT AN OVERSIGHT. Making
-  // the pool blocks for about a minute the first time on a machine, and a
-  // harness that goes silent for a minute before Chrome even starts is
-  // indistinguishable from a harness that has hung. Everything after it is
-  // ordinary chatter and stays quiet.
+  // The build notice ignores `quiet`: a minute of silence reads as a hang.
+  // why: lessons/harness.md#err-notice
   if (!makePool(console.log)) return null;
   const poolSize = readdirSync(POOL).filter((f) => f.endsWith('.m4s'))
     .reduce((n, f) => n + statSync(join(POOL, f)).size, 0);
@@ -547,10 +331,8 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
 
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
-    // ⚠️ THE ARRANGEMENT IS A LEADING PATH SEGMENT, SO NOTHING IN A PAGE HAS
-    // TO KNOW ABOUT IT. `?base=http://127.0.0.1:PORT/wall` reaches `errUrl` as
-    // an ordinary prefix, and every URL below it is relative, so the master
-    // playlist's variant and the variant's segments follow without a word.
+    // The arrangement is a leading path segment, so every relative URL below follows it.
+    // why: lessons/harness.md#err-arrangement
     const pre = /^\/(wall)(\/.*)$/.exec(url.pathname);
     const arrangement = pre ? pre[1] : '';
     const path = pre ? pre[2] : url.pathname;
@@ -561,20 +343,8 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
       const [, id, snText] = seg;
       const sn = Number(snText);
       if (!serves(arrangement, id, sn)) {
-        /**
-         * 🔴 403 AND NOT ONE CORS HEADER, WHICH IS THE WHOLE POINT OF THE
-         * REFUSAL. In a browser this is not a status code at all: the fetch
-         * rejects and hls.js reports a fragment load error with nothing in it
-         * that names a 403. `probeSegment` catches exactly this and calls it
-         * refused; a 403 that DID carry `access-control-allow-origin` would be
-         * readable, `r.ok` would be false, and the page would take the other of
-         * its two paths. Both mean refused and both are reproduced by not
-         * writing the header.
-         *
-         * ⚠️ NO `access-control-allow-origin` MEANS OPTIONS TOO. Answering a
-         * preflight for a segment that is then refused would let a page learn
-         * something about the refusal that ERR does not tell it.
-         */
+        // 403 with no CORS header, OPTIONS included: in a browser it is a fetch failure, as at ERR.
+        // why: lessons/harness.md#err-403
         res.writeHead(403, { 'content-type': 'text/plain' });
         return res.end('rights\n');
       }
@@ -582,8 +352,8 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
       if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
       return serveFile(req, res, file, 'video/mp4');
     }
-    // The one init segment every `.m4s` decodes against. ⚠️ Whether ERR ever
-    // refuses its init segment is NOT measured; here it is always served.
+    // The init segment is always served; whether ERR refuses one is not measured.
+    // why: lessons/harness.md#err-init
     const init = /^\/live\/([a-z0-9]+)\/init\.mp4$/.exec(path);
     if (init && IDS.includes(init[1])) return serveFile(req, res, join(POOL, 'init.mp4'), 'video/mp4');
 
@@ -640,11 +410,8 @@ export function startErr({ port = 8902, quiet = false, radio = false } = {}) {
     const mount = /^\/([a-z0-9]+)\.mp3$/.exec(path);
     if (mount && MOUNTS.includes(mount[1])) return serveMount(req, res, tone, say);
 
-    // ⚠️ IT SAYS WHAT IT DOES NOT HAVE. A bare 404 from a stand-in reads as the
-    // channel being off air, which is a claim this file is not entitled to make
-    // about anybody's broadcaster. And this path is never a refusal: a refusal
-    // here is a 403 with no CORS, and answering a typo the same way would make
-    // a wrong URL indistinguishable from rights.
+    // A 404 says what it does not have; a refusal is a 403 without CORS, never a 404.
+    // why: lessons/harness.md#err-not-have
     res.writeHead(404, { ...CORS, 'content-type': 'text/plain' });
     return res.end(`no such channel or path here: ${path}\n`);
   });
@@ -682,14 +449,8 @@ function serveFile(req, res, file, type) {
   createReadStream(file, { start: from, end: to }).pipe(res);
 }
 
-/**
- * A radio mount, paced against the clock rather than against the timer.
- *
- * The short version of what `fake-station.mjs` writes at length: sending a
- * fixed chunk per `setInterval` tick sends at the rate node's timers actually
- * fire, which measured 2.3 % slow from inside a page. Bytes owed since the
- * connection opened is the quantity that cannot drift.
- */
+// A radio mount paced on bytes owed since connect, not on timer ticks.
+// why: lessons/harness.md#err-mount
 function serveMount(req, res, tone, say) {
   if (!tone) { res.writeHead(503, { 'content-type': 'text/plain' }); return res.end('no audio\n'); }
   const BYTES_PER_S = (128 * 1000) / 8;

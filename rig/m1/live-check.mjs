@@ -1,31 +1,14 @@
-// live-check.mjs — is the Ableton Live rig actually set up, or does it only
-// look like it?
-//
-//   node rig/m1/live-check.mjs                 # against mbp
-//   LIVE_HOST=… M1_SSH=… node rig/m1/live-check.mjs
-//   node rig/m1/live-check.mjs --json          # for the relay agent
-//
-// Every link in the chain gets its own line, with the value it read. A chain
-// where eight of nine links report "fine" and the ninth is never tested is the
-// shape of failure this rig has already produced twice: a deaf capture read as
-// "Live is silent", and a missing plugin folder read as "Arturia is
-// unlicensed". Both were wrong, both were confident, and both were retracted.
-//
-// 🔴 THE LAST CHECK IS THE ONLY ONE THAT MATTERS, and it is the only one that
-// crosses the whole chain: hold a chord, capture the audio device, and compare
-// it against a silence baseline taken the same way seconds earlier. Everything
-// above it is diagnosis for when that one fails.
+// node rig/m1/live-check.mjs [--json]: every link of the Live rig on its own line, with its value.
+// The last check is the one that matters: a held chord captured against a silence baseline.
+// why: lessons/rig-m1.md#live-check-header
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ask } from './live-osc.mjs';
 
 const run = promisify(execFile);
-// `M1_SSH=local` means "you are already ON the studio machine" — which is how
-// rack-agent.mjs runs, and it must not ssh to itself. That is not a tidiness
-// point: `ssh localhost` needs Remote Login to accept a key for this user, and
-// when it does not the check reports "the studio machine answers: no ssh" about
-// the machine it is running on. MEASURED, first run of the agent.
+// `M1_SSH=local` when already on the studio machine (rack-agent.mjs): never ssh to itself.
+// why: lessons/rig-m1.md#live-check-local
 const SSH = process.env.M1_SSH || 'mbp';
 const LOCAL = SSH === 'local' || SSH === 'localhost';
 const TRACK = Number(process.env.LIVE_TRACK || 0);
@@ -44,20 +27,11 @@ const sh = async (cmd, timeout = 15000) => {
   } catch { return null; }
 };
 
-/**
- * Run something in the user's LOGIN session rather than in this ssh session.
- *
- * ⚠️ A CAPTURE STARTED OVER SSH IS DEAF — measured, the same device and the
- * same ffmpeg reading -91.0 dB over ssh and a real room in the session. The
- * trick is not to START something in the session but to ASK SOMETHING ALREADY
- * IN IT: an AppleEvent to the terminal the user already has open. That is why
- * iTerm2 is a dependency of this check and says so when it is missing.
- */
+// Run in the user's login session by AppleEvent to iTerm2: a capture started over ssh is deaf.
+// why: lessons/rig-m1.md#live-check-session
 const inSession = async (cmd) => {
-  // Already in the session: run it, and do not go round by AppleEvent. That
-  // also drops the iTerm2 dependency entirely for the agent, which is the
-  // difference between "needs a terminal window open" and "needs to be started
-  // once from one".
+  // Already in the session: run directly, with no iTerm2 dependency.
+  // why: lessons/rig-m1.md#live-check-local-run
   if (LOCAL) { await sh(cmd, 30000); return; }
   const esc = cmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   await sh(`osascript -e 'tell application "iTerm2" to tell current window to tell current session to write text "${esc}"' >/dev/null 2>&1`);
@@ -75,11 +49,8 @@ if (host) ok('the studio machine answers', host);
 else { bad('the studio machine answers', `no ssh to ${SSH}`, `check the Mac is awake and on the network`);
        report(); }
 
-// ── 2. Live itself ────────────────────────────────────────────────────────
-// -x would miss it: the binary is "Live" inside an .app, so the pattern has to
-// be the path. -f is right HERE and wrong for ffmpeg, where it matches its own
-// ssh command line — the two rules are not in conflict, they are about
-// different patterns.
+// 2. Live: `pgrep -f` on the path, since the binary is "Live" inside an .app.
+// why: lessons/rig-m1.md#live-check-live
 const livePid = await sh(`pgrep -f 'Ableton Live.*MacOS/Live' | head -1`);
 if (livePid) ok('Ableton Live is running', `pid ${livePid}`);
 else bad('Ableton Live is running', 'no process', 'open Ableton Live on the studio Mac');
@@ -99,9 +70,8 @@ if (names) {
   else bad('the track carries an instrument', 'none',
            `node rig/m1/live-setup.mjs "Stage-73 V2" ${TRACK}`);
 
-  // "All Ins" is a superset of IAC and is what a fresh track has, so it PASSES
-  // — refusing it would fail a rig that works. Named explicitly is better only
-  // because it cannot be stolen by another device plugging in.
+  // "All Ins" passes: it is a superset of IAC and what a fresh track has.
+  // why: lessons/rig-m1.md#live-check-input
   const inType = await one('/live/track/get/input_routing_type');
   if (inType === 'All Ins') ok('the track will hear the IAC bus', `input "All Ins" — a superset, so IAC reaches it`);
   else if (/IAC/i.test(String(inType))) ok('the track will hear the IAC bus', `input "${inType}"`);
@@ -121,12 +91,8 @@ if (names) {
   else bad('not muted, and the fader is up', `muted ${muted}, volume ${vol}`, 'unmute and raise the track fader');
 }
 
-// ── 8. the audio devices, BY NAME ─────────────────────────────────────────
-// 🔴 NEVER BY INDEX. This check exists because `-i ":0"` meant the microphone
-// when the README was written and means BlackHole today — the same reading,
-// -91.0 dB, once proved "the capture is deaf" and once proved "nothing is
-// playing", which are opposite conclusions from an identical number. A device
-// index is a shared mutable global exactly like a fixed port.
+// 8. Audio devices by NAME, never by index: an index means a different device over time.
+// why: lessons/rig-m1.md#live-check-devices
 await sh('rm -f /tmp/pc-dev.txt');
 await inSession('ffmpeg -hide_banner -nostdin -f avfoundation -list_devices true -i "" 2>/tmp/pc-dev.txt; echo DONE >> /tmp/pc-dev.txt');
 let devText = '';
@@ -157,10 +123,8 @@ if (!Object.keys(audio).length) {
   ok('the audio devices resolve by name', Object.entries(audio).map(([n, i]) => `${i}:${n}`).join(' · '));
 }
 
-// ── 9. the deafness control, on the RIGHT device ──────────────────────────
-// ⚠️ THE MICROPHONE, BECAUSE IT CANNOT BE DIGITALLY SILENT IN A ROOM. If this
-// reads -91.0 the capture is deaf and every level below it is meaningless —
-// which is the one thing a silent BlackHole reading cannot tell you on its own.
+// 9. The deafness control on the microphone, which cannot be digitally silent in a room.
+// why: lessons/rig-m1.md#live-check-mic
 if (mic !== null) {
   await sh('rm -f /tmp/pc-mic.txt');
   await inSession(`ffmpeg -hide_banner -nostdin -f avfoundation -i ":${mic}" -t 2 -af volumedetect -f null - 2>/tmp/pc-mic.txt; echo DONE >> /tmp/pc-mic.txt`);
@@ -185,8 +149,8 @@ if (blackhole !== null) {
     bad('a note reaches Live and comes back as sound', 'midisend would not build',
         'needs the Command Line Tools: xcode-select --install');
   } else {
-    // Baseline first, same device, same ffmpeg, seconds apart — the only way a
-    // level means anything. A number with no control is not a measurement.
+    // Baseline first, same device and ffmpeg, seconds apart: a level needs a control.
+    // why: lessons/rig-m1.md#live-check-baseline
     await sh('rm -f /tmp/pc-silence.txt /tmp/pc-note.txt /tmp/pc-done');
     await sh(`cat > /tmp/pc-note.sh <<'SH'
 #!/bin/zsh

@@ -1,12 +1,6 @@
-// Put Live into a state where it can be played remotely — no clicking.
-//
-//   LIVE_HOST=<mbp> node live-setup.mjs [instrument] [track]
-//
-// Everything here is reachable over OSC, including loading the instrument, which
-// AbletonOSC alone cannot do (abletonosc-ext/browser.py adds it). The ONE thing
-// that is not reachable is Live's audio OUTPUT device: the Live Object Model has
-// no audio-device API, so BlackHole has to be selected by hand in
-// Preferences > Audio. See the README.
+// LIVE_HOST=<mbp> node live-setup.mjs [instrument] [track]: ready Live for remote play over OSC.
+// Live's audio output device has no LOM API and is set by hand in Preferences.
+// why: lessons/rig-m1.md#live-setup
 import { ask } from './live-osc.mjs';
 
 const INSTRUMENT = process.argv[2] || 'Drift';

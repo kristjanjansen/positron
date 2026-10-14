@@ -1,25 +1,10 @@
-// rack-agent.mjs — answer "is the studio instrument set up?" over the relay, so
-// a browser anywhere can ask without ssh, without OSC and without being on the
-// LAN.
-//
-//   node rig/m1/rack-agent.mjs --room pro-1
-//
-// ⚠️ RUN IT FROM A TERMINAL ON THE STUDIO MAC, not over ssh. live-check.mjs's
-// last two arms capture audio, and a capture started over ssh is deaf — the
-// same device and the same ffmpeg read -91.0 dB over ssh and a real room in the
-// login session. The agent reaches the session by AppleEvent to iTerm2, which
-// only works when there is a session to reach.
-//
-// ⚠️ AND IT DOES NOT RE-RUN THE CHECK ON EVERY ASK. The full check takes ~25 s
-// because two of its arms are real 2-3 second recordings, and a page that asked
-// for it would sit there looking broken. `rack.status` answers instantly from
-// the last run and SAYS HOW OLD IT IS; `rack.check` starts a fresh one. A
-// cached answer presented as a live one is the defect this repo keeps naming —
-// so the age is part of the payload, never omitted.
+// node rig/m1/rack-agent.mjs --room pro-1, from a terminal on the studio Mac (ssh captures are
+// deaf).
+// `rack.status` answers from the last run with its age; `rack.check` runs a fresh one (~25 s).
+// why: lessons/rig-m1.md#rack-agent-header
 
-// Node's own WebSocket — no `ws` dependency, the same choice rig/board/board.mjs
-// made. This repo has no build step and adding one module to run one socket is
-// not the way to start having one.
+// Node's own WebSocket, no `ws` dependency.
+// why: lessons/rig-m1.md#rack-agent-ws
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -50,9 +35,8 @@ function check() {
     execFile('node', [join(HERE, 'live-check.mjs'), '--json'],
       { timeout: 120000, maxBuffer: 1 << 20, env: { ...process.env, LIVE_HOST: process.env.LIVE_HOST || '127.0.0.1' } },
       (err, stdout) => {
-        // ⚠️ A NON-ZERO EXIT IS A RESULT, NOT AN ERROR. live-check exits 1 when
-        // any link fails, which is the most interesting case there is — reading
-        // that as "the check crashed" would throw away every useful answer.
+        // A non-zero exit is a result: live-check exits 1 when any link fails.
+        // why: lessons/rig-m1.md#rack-agent-exit
         let parsed = null;
         try { parsed = JSON.parse(stdout); } catch { /* genuinely broken */ }
         if (parsed) { last = parsed; lastAt = Date.now(); }

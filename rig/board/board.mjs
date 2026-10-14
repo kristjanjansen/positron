@@ -1,21 +1,7 @@
-// rig/board/board.mjs — the instrument in a board, as a SERVICE.
-//
-// plan-hardware §8.7: the board is not a peer. It dials OUT to the relay and does
-// its job whether or not anyone is watching; a browser, `curl` and a phone are
-// all equally clients of it. Nothing here opens a listening port, so there is no
-// inbound firewall hole and it works from any network that allows outbound TLS.
-//
-// No browser on the board. Every permission failure this month — a grant that
-// expired with its CDP client, a GUI app with no GUI session, a crash-recovery
-// dialog nobody could click — came from running a browser unattended. This is a
-// node process reading two ordinary Linux tools.
-//
-//   node board.mjs --room studio-1
-//   node board.mjs --room studio-1 --dry        plan, never apply
-//   node board.mjs --once                       join, say hello, report, leave
-//
-// The envelope is `demo/shell/wire.mjs`, imported rather than copied: the same
-// file the pages use, so a change to the shape cannot reach only one end.
+// The board as a service: it dials out to the relay (no listening port, no browser) and answers
+// anyone in its room. node board.mjs --room studio-1 [--dry plan only] [--once].
+// The envelope is demo/shell/wire.mjs, imported so both ends share one shape.
+// why: lessons/rig-board.md#header
 import { format, parse, randomId, RELAY_BASE, LIMITS } from '../../demo/shell/wire.mjs';
 import { listPorts, addressable, plan, apply, clearAll, backend } from './alsa.mjs';
 import { createSynth, createMoogSynth, MOOG_PATCHES, alsaNotes, FRAME, RATE } from './synth.mjs';
@@ -46,47 +32,26 @@ const flag = (k) => process.argv.includes(`--${k}`);
 
 const ROOM = arg('room', 'board-dev');
 const NAME = arg('name', process.env.BOARD_NAME || 'positron-board');
-/**
- * 🔴 THE ONE NAME THAT IS THIS BOARD AND NO OTHER. `setup.sh` mints it once at
- * install and writes it to `/etc/default/positron-board`; it is not regenerated,
- * because an id that changes is not an id.
- *
- * ⚠️ IT EXISTS BECAUSE THE OTHER THREE NAMES CANNOT DO THIS JOB. `NAME` is
- * `hostname`, which is `raspberrypi` on every fresh Pi OS, so two boards
- * introduce themselves with the same word. `FROM` is per SOCKET and changes on
- * every reconnect. `ROOM` is a place, not a thing in it. The relay has no
- * authentication, no routing and no sender identity, so **the room name is the
- * only isolation this stack has** — and the moment two boards share one, they
- * flap `boardFrom` twice a beat and interleave two `aseq` counters into a single
- * playout ring. This is what a listener tells them apart by.
- *
- * ⚠️ `unset` RATHER THAN A MADE-UP DEFAULT, so a board provisioned before this
- * existed says so instead of claiming an identity it was never given.
- */
+// The one name that is this board, minted once by setup.sh into /etc/default/positron-board.
+// `hostname`, `from` and the room cannot tell two boards apart. `unset` if never provisioned.
+// why: lessons/rig-board.md#board-id
 const BOARD_ID = arg('id', process.env.BOARD_ID || null);
-/**
- * The network this board is on, as `bay.mjs` reads a node's `net`: two nodes
- * with the same one are on one LAN, and an unknown one is never read as the
- * same. Unset by default, because a guess here would let a page choose a
- * transport that two buildings cannot open. `/etc/default/positron-board`.
- */
+// This board's network, as bay.mjs reads `net`; unset by default, since a guess could pick a
+// transport two buildings cannot open.
+// why: lessons/rig-board.md#net
 const NET = arg('net', process.env.BOARD_NET || null);
-/**
- * This board's SITE in the patchbay, the first part of every port id it
- * announces. `pi-1` by default (graph-registry.mjs `BOARD_SITE`), a second
- * board is `pi-2`. Not the room: the room is where the socket lives, the site
- * is what a reader is told the thing is (plans/plan-site-names.md §0).
- */
+// This board's patchbay site, the first part of every port id: `pi-1` by default, `pi-2` for a
+// second.
+// Not the room.
+// why: lessons/rig-board.md#site
 const SITE = arg('site', process.env.BOARD_SITE || null);
 const DRY = flag('dry');
 const ONCE = flag('once');
 const AUDIO_DEV = arg('audio', process.env.BOARD_AUDIO || 'default');
-// ⚠️ A `hw:` DEVICE OPENS AT ITS OWN CHANNEL COUNT OR NOT AT ALL. MEASURED
-// 2026-09-30 on the Fast Track Pro: `arecord -D hw:CARD=Pro,DEV=0 -c 1` answers
-// `Channels count non available`, because its capture is stereo only. So the
-// device is opened at BOARD_AUDIO_CHANNELS and ONE of them, BOARD_AUDIO_TAKE
-// (1-based), is kept. Not a `plughw` downmix: input 2 has nothing patched and
-// its own noise would be summed into the Circuit.
+// A `hw:` device opens at its own channel count or not at all (the Fast Track Pro is stereo only),
+// so
+// it opens at BOARD_AUDIO_CHANNELS and keeps one, BOARD_AUDIO_TAKE (1-based); no downmix of noise.
+// why: lessons/rig-board.md#audio-ch
 const AUDIO_CH = Number(arg('audio-channels', process.env.BOARD_AUDIO_CHANNELS || 1));
 const AUDIO_TAKE = Number(arg('audio-take', process.env.BOARD_AUDIO_TAKE || 1));
 // Which relay is a PARAMETER, not a constant. A hop over the LAN and a hop
@@ -100,96 +65,36 @@ let seq = 0, ws = null, audio = null, since = Date.now();
 // What `graph` on the hello and on every beat is built from: gathered at each
 // hello, the port list refreshed by every `state()`. Null until the first one.
 let graphFacts = null;
-// ONE variable for whatever is making sound. There used to be two — one for a
-// pipe path and one for the JACK ones — and fourteen sites branched on which
-// was set, so every new source meant remembering both halves and every reviewer
-// had to check both. They are two implementations of one interface now;
-// `inst.jack` is the only thing anyone downstream actually needs to know,
-// because the granular insert can only wrap what is on the JACK graph.
+// One variable for whatever makes sound; `inst.jack` is what downstream needs (the insert wraps
+// only JACK).
+// why: lessons/rig-board.md#inst
 let synth = null, stopSynth = null, midiIn = null, inst = null;
-// ⚠️ Set BEFORE any await in startAudio. Raising a JACK chain takes ~13 s,
-// and during that window `inst` is still null — so a note.on arriving mid-start
-// saw 'nothing running' and started a SECOND instrument alongside it. Two
-// instruments, interleaved samples, 100 msg/s into a 60 msg/s relay. Measured
-// twice.
+// Set before any await: a chain takes about 13 s, and a note mid-start would start a second
+// instrument.
+// why: lessons/rig-board.md#starting
 let starting = null;
-/**
- * 🔴 THE SAMPLER IS NOT `inst`, SINCE 2026-10-11 (option b of
- * plans/plan-sampler-pi-pico.md §2.2). It sounds BESIDE whatever `inst` is,
- * summed into the same capture, so `startAudio` for Yoshimi leaves it alone and
- * `audio.start {source: 'sampler'}` leaves Yoshimi alone. `scsampler.mjs`
- * `startPlan` is the rule, graded in `test.mjs`.
- */
+// The sampler is not `inst`: it sounds beside it into the same capture (scsampler.mjs `startPlan`).
+// why: lessons/rig-board.md#sampler
 let samp = null, sampStarting = null;
-/**
- * Programs a page typed, on the board's scsynth (`scollide.mjs`,
- * plans/plan-pi-supercollider-defs.md). Which scsynth is `ENGINE` there, one
- * line. It answers `sc.*`, `clock.ping` and the `collide` node's notes and
- * nothing else, and starts nothing until `audio.start {source: 'collide'}`.
- */
+// Programs a page typed, on the board's scsynth (scollide.mjs); answers sc.*, clock.ping and the
+// `collide` node's notes, and starts nothing until audio.start {source: 'collide'}.
+// why: lessons/rig-board.md#collide
 const collide = createCollideService({ onFrame: (f) => sendPcm(f), log: (l) => log('collide:', l), sampler: () => samp });
 let fxOn = false;          // pappus inserted between the instrument and the capture
 // The bay's JACK links, `"<from id> -> <to id>"` to the JACK rows it was
 // applied as. See `jack.link`.
 const bayLinks = new Map();
 
-/**
- * 🔴 WHO ASKED FOR THE INSERT, AND WHEN — because two pages fight over one
- * Raspberry Pi and until 2026-09-14 neither of them could see it happening.
- *
- * `/grains/` switches the granulator ON, because the granulator is its entire
- * subject. `/keys/` used to switch it OFF on load, so whichever page you opened
- * last won, SILENTLY, and the other one went on drawing a picture that was no
- * longer true.
- *
- * ⚠️ `/keys/` SENDS NOTHING ABOUT THE INSERT SINCE 2026-09-16 and has no
- * granulator on it at all. What its message was protecting against is real. An
- * insert left in by a `grains` tab that was simply CLOSED goes on wrapping
- * whatever the next page plays and feeds its own delay, MEASURED 2026-09-12 at
- * a steady -6.1 dBFS subsonic drone while `board.alive` reported `voices: 0`.
- * `sweepInsert()` below is where that guarantee lives now. ⚠️ That is the worst shape there
- * is, and it is the reason the first half of this is REPORTING rather than
- * arbitration: arbitration that hides a conflict converts a visible problem
- * into an invisible one. The board knows the truth about its own insert; the
- * pages were guessing. Now it says so — in `fx.pappus`, in `audio.status` and
- * in the five-second `board.alive`, so a page learns about a change it did not
- * make without polling for it.
- *
- * ⚠️ A CLIENT ID IS PER CONNECTION (`openWire` mints a new `from` every time),
- * so this is never a claim that outlives the tab that made it.
- */
-let fxAsked = null;        // { by, at, on } — the last client to change it
+// Who switched the insert, and when, reported in fx.pappus, audio.status and board.alive, so a page
+// sees a change it did not make. A client id is per connection.
+// why: lessons/rig-board.md#fx-asked
+let fxAsked = null;        // { by, at, on }, the last client to change it; why: lessons/rig-board.md#fx-asked-shape
 
-/**
- * When each client was last heard from, so "is anybody still there" can be
- * answered without a lease.
- *
- * 🔴 NO TTL, NO RELEASE, NOTHING TO LEAK. A lease nobody can clear is how
- * `studio-1` sat full for hours (CLAUDE.md). The relay solves the same problem
- * by DATING each socket — `getWebSocketAutoResponseTimestamp` — and reclaiming
- * the idle ones; this is that idea in a smaller costume, on the only evidence
- * the board actually has: a client that is still there keeps talking. `/grains/`
- * asks `params.state` and re-asks `grain.report` every four seconds, so a live
- * tab is three messages inside this window and a closed one is zero.
- */
+// When each client was last heard from: liveness with no lease to leak. A live tab polls.
+// why: lessons/rig-board.md#client-seen
 const clientSeen = new Map();          // from -> ms
-/**
- * How long a client may be silent before the board stops counting it as there.
- *
- * 🔴 CHECKED AGAINST `/grains/` RATHER THAN CHOSEN. That page has ONE
- * `setInterval(…, 4000)` and the first thing in it is `hello()`, which sends
- * `params.state` unconditionally whenever the socket is open. So a tab that is
- * merely sitting there with nobody touching it is a message every 4 s. With
- * the insert in it also re-sends `grain.report {on:true}` on the same tick, and
- * `source.set` until the board has answered once. So a live tab is at least 3
- * and usually 7 messages inside this window and a CLOSED one is exactly zero,
- * which is the only difference this board can actually see.
- *
- * 15 s is 3.75 of those polls. One poll lost to the relay's own caps therefore
- * costs nothing, and two do not either. ⚠️ The margin is what the number is
- * FOR: a window of 4 or 5 s would be arithmetically enough and would drop the
- * insert out from under a live page the first time a poll went missing.
- */
+// 15 s is 3.75 of /grains/'s 4 s polls, so a lost poll or two never drops a live page's insert.
+// why: lessons/rig-board.md#insert-held
 const INSERT_HELD_MS = 15000;          // 3.75 of `/grains/`'s 4 s polls
 const stillHere = (who) => !!who && (Date.now() - (clientSeen.get(who) ?? 0)) < INSERT_HELD_MS;
 /** What the board will say about its own insert, to anybody who asks or listens. */
@@ -203,37 +108,10 @@ function insertState() {
   };
 }
 
-/**
- * 🔴 THE BOARD CLEANS UP AFTER ITSELF, BECAUSE SINCE 2026-09-16 NOTHING ELSE
- * DOES.
- *
- * `/keys/` used to send `fx.pappus {on:false, onlyIfIdle:true}` on connect, and
- * that one message was the whole guarantee: an insert left behind by a
- * `/grains/` tab that was simply CLOSED goes on wrapping whatever the next page
- * plays and feeds its own delay. MEASURED 2026-09-12, a steady -6.1 dBFS
- * subsonic drone while `board.alive` reported `voices: 0`, true about notes and
- * false about sound. The page has no granulator on it at all now, so it no
- * longer sends that message, and a guarantee that depended on somebody opening
- * a second page was never a guarantee anyway: nobody had to open one.
- *
- * ⚠️ AND THERE IS NO "A PEER LEFT" SIGNAL TO PREFER TO A TIMER. Looked for
- * rather than assumed: `workers/relay/src/index.js` forwards every frame
- * VERBATIM and never parses one, so the Durable Object does not know any
- * client's `from`; its `webSocketClose()` is an empty method and emits nothing;
- * and `openWire` in `demo/shell/wire.mjs` sends no farewell on unload. The
- * relay's `/room/<name>/stats` does report a per-socket idle time, but the
- * array is anonymous and sorted, so it cannot say WHICH socket stopped. Making
- * the relay announce a departure means teaching it to read messages, which is
- * the one thing that file refuses to do.
- *
- * So it is an idle rule, on the only evidence the board has: a client that is
- * still there keeps talking. See `INSERT_HELD_MS` for where 15 s comes from.
- *
- * ⚠️ IT NEVER FIGHTS A LIVE PAGE. A granulator nobody is talking to is still
- * one somebody is listening to, and `/grains/` polls every 4 s whether or not
- * anyone touches it, so a page that is open and quiet is indistinguishable from
- * one being played, which is correct.
- */
+// The board drops an insert nobody is talking to (an orphan kept a -6.1 dBFS drone going). The
+// relay
+// has no "peer left" signal, so it is an idle rule; an open page polls, so it is never swept.
+// why: lessons/rig-board.md#sweep
 let sweeping = false;
 async function sweepInsert(why) {
   if (!fxOn || sweeping) return null;
@@ -245,59 +123,33 @@ async function sweepInsert(why) {
     const r = await pappusFx(false, { instrumentPort: inst?.port, instrumentPortR: inst?.portR,
                                       onLog: (l) => log('pappus:', l) });
     if (!r.ok) { log(`the insert would not come out: ${r.reason}`); return null; }
-    // ⚠️ THE SAME THREE ASSIGNMENTS AS THE `fx.pappus` HANDLER'S OFF PATH, and
-    // they have to stay the same three. A sweep that cleared the patching and
-    // left `fxOn` true would put the insert straight back on the next
-    // instrument change, which is the failure wearing a new hat.
+    // The same three assignments as fx.pappus's off path, or the insert comes back on the next
+    // change.
+    // why: lessons/rig-board.md#sweep-off
     fxOn = false;
     fxAsked = null;
     madeSource = null;
     log(`insert dropped: ${by ?? 'nobody'} ${quietMs === null ? 'never spoke' : `went quiet ${Math.round(quietMs / 1000)} s ago`}`
       + `. the board waits ${INSERT_HELD_MS / 1000} s. ${why}`);
-    // 🔴 SAID ON THE HEARTBEAT, NOT ON A VERB OF ITS OWN. Every page in this
-    // room already reads `board.alive` for exactly this, because it carries
-    // `insertState()`, and a new message type would be a second authority on
-    // one fact. Sending the beat NOW rather than waiting up to 5 s for the next
-    // one is the whole difference.
+    // Said on the heartbeat (board.alive carries insertState()), sent now rather than in up to 5 s.
+    // why: lessons/rig-board.md#sweep-beat
     send(alive());
     return r;
   } finally { sweeping = false; }
 }
 
-/**
- * The generated material, when a page has asked for one.
- *
- * A sound BUILT on the board, right now, from the same description a browser is
- * building it from (plan-twins §4a). `/grains/` sends the spec and both ends
- * make the same sines, which is the whole comparison that page exists for.
- *
- * ⚠️ THERE USED TO BE A SECOND THING CALLED A SOURCE HERE, and it was a minute
- * of ERR's 1965 archive pulled to disk and written into the grain buffers. It
- * left on 2026-09-16 with the rest of the archive path; `archive/box-pappus/`
- * has it. Two things called "source" in one file is how a rename costs an
- * afternoon, so the one that is left says what it is.
- */
+// The generated material a page asked for: the same sines a browser builds from the same spec.
+// why: lessons/rig-board.md#made-source
 let madeSource = null;     // { spec, partials, top } while PosSource is feeding pappus
 let lastHeard = Date.now();
-// The granulator's own surface — the die, the drift and the grain buffers. Its
-// OSC socket is opened once and kept, separately from `pappusFx`'s patching,
-// because the engine keeps running while it is bypassed and a drift that
-// stopped when the insert was switched off would be a drift you could hear stop.
+// The granulator's own OSC socket, kept while bypassed so the drift does not audibly stop.
+// why: lessons/rig-board.md#pap
 let pap = null;
 const pappus = () => (pap ||= openPappus({ onLog: (l) => log('pappus:', l) }));
 
-// ── the picture, on its own socket ───────────────────────────────────────────
-//
-// ⚠️ A SECOND SOCKET, AND IT IS FORCED BY A MEASUREMENT RATHER THAN CHOSEN. The
-// relay allows 60 messages a second PER SOCKET and the audio stream is already
-// 50 of them. Thirty video frames on the same socket is 80 against a cap of 60,
-// and the bucket drops the excess silently — no error, no close, no
-// backpressure. A picture sharing the audio socket would quietly cost a quarter
-// of both. It also keeps the binary framing unambiguous: every page here treats
-// an incoming binary frame as PCM.
-//
-// Room `<room>-video`, so a page that wants the picture opens a second socket
-// to a name it can derive, and a page that does not is unaffected.
+// The picture on its own socket, room `<room>-video`: video would push the audio socket over the
+// relay's per-socket cap, and every page treats a binary frame on the main room as PCM.
+// why: lessons/rig-board.md#video
 let video = null, vws = null, vseq = 0, vsent = 0;
 const VIDEO_ROOM = `${ROOM}-video`;
 
@@ -306,15 +158,14 @@ function videoShape() {
   const st = video?.stats() ?? {};
   return {
     w: video?.w, h: video?.h, fps: video?.fps, bitrate: video?.bitrate, gop: video?.gop,
-    codec: 'avc1.42E01E',        // baseline 3.0 — what h264_v4l2m2m emits here
+    codec: 'avc1.42E01E',        // baseline 3.0, what h264_v4l2m2m emits here; why: lessons/rig-board.md#codec
     mirrors: video?.params().seg, grain: video?.params().scale, hue: video?.params().hue,
     // What actually drew it, read off the renderer rather than declared here.
     renderer: st.renderer ?? null,
-    // ⚠️ SENT, not delivered. This is the near side of the wire and the relay
-    // drops silently, so a client MUST compare it against the counter in the
-    // payload. A number counted here is not evidence about the far end.
-    // `framesSent`, not `sent`: since 2026-10-04 `sent` is the wire envelope's
-    // send stamp and `format()` throws on a payload field of that name.
+    // Sent, not delivered: compare with the counter in the payload. `framesSent` because `sent` is
+    // an
+    // envelope field.
+    // why: lessons/rig-board.md#frames-sent
     framesSent: vsent, ...st,
   };
 }
@@ -328,17 +179,9 @@ function videoConnect() {
   vws.onerror = () => { /* close follows; one report is enough */ };
 }
 
-/**
- * One frame out.
- *
- * ⚠️ THE SEQUENCE NUMBER GOES IN THE PAYLOAD. A binary frame carries no
- * envelope, so `wire.mjs`'s `seq` cannot ride along — and the relay's caps drop
- * frames with no error at all, which is exactly what a counter exists to see.
- * MEASURED: at 8 Mbit/s the relay lost 101 of 361 frames and NOTHING else on
- * the path reported it. 8 bytes: a uint32 counter and a uint32 flag word whose
- * low bit says this frame is a keyframe, so a joiner knows what to wait for
- * without parsing NAL types.
- */
+// One frame out with an 8-byte header: a uint32 counter (the relay drops silently; 101 of 361 lost
+// at 8 Mbit/s) and a flag word whose low bit marks a keyframe.
+// why: lessons/rig-board.md#send-frame
 function sendFrame(unit, key) {
   // The direct viewers first (`video.direct` below), then the relay room. The
   // counter rises once per frame whoever it reaches, so a viewer switching
@@ -354,18 +197,9 @@ function sendFrame(unit, key) {
   vsent++;
 }
 
-// ── the picture on a direct link, since 2026-10-13 ───────────────────────────
-// Asked: *"add direct option to all remote instruments"*, which includes
-// /remote/shader-on-pi/ Shader on Pi. The same arrangement as the Pi camera on
-// remote/010 (camera.mjs `attachDirect`, inputs.mjs `camDirect`): a third data
-// channel `vid` on the page's direct link to this main socket, ORDERED and
-// RELIABLE (a decoder fed a frame with a hole is broken to the next keyframe),
-// each frame cut into 16 KB pieces by `framePieces`. Nothing is sent on `vid`
-// until the page asks `video.direct` over `ctl`; `video.relay` or a closed
-// channel stops it. The relay room keeps its frames for every other viewer.
-// ⚠️ NO KEY HERE, UNLIKE THE CAMERA: the shader picture is already open to
-// anybody in `<room>-video`, so the direct link carries nothing the relay
-// would not.
+// The picture on a direct link: a third data channel `vid`, ordered and reliable, frames cut into
+// 16 KB pieces, sent only after `video.direct`. No key: the relay room is already open.
+// why: lessons/rig-board.md#video-direct
 const videoDirects = new Map();   // peer -> { sink, waitKey, sent, dropped }
 const VIDEO_DIRECT_BACKLOG = 1024 * 1024;
 function sendVideoDirect(at, unit, key) {
@@ -393,23 +227,9 @@ function videoDirect(reply, peer, waited = 0) {
   return reply('video.direct', { ok: true, running: !!video });
 }
 
-/**
- * 🔴 THE ARCHIVE SOURCE THIS IDLE STOP WAS WRITTEN FOR IS GONE, 2026-09-16.
- *
- * It played ERR's 1965 radio archive into the JACK graph on `-stream_loop -1`,
- * so it never ended, and this stopped it once the room had been empty for five
- * minutes: about 28 MB an hour, continuously, out of a public broadcaster, for
- * nobody. The whole path went instead. `archive/box-pappus/` has it and says
- * why. The picture's idle stop below is the same idea and is still live.
- */
-// ⚠️ THE PICTURE NEEDS THIS MORE THAN THE ARCHIVE DID, and it did not have it.
-// The mirror page asks the board to draw AS SOON AS IT LOADS, so one visit leaves
-// the renderer and the hardware encoder running for ever — measured: 25% of the
-// machine and 2 Mbit/s into an empty room, hours after the last viewer closed
-// the tab. The same reasoning was written out in full for ERR's archive this
-// morning and not applied one file over. Shorter here because nobody is
-// listening to a picture nobody is watching, where a broadcast might reasonably
-// play on.
+// Stop the renderer when nobody watches: one visit used to leave 25% CPU and 2 Mbit/s running for
+// hours.
+// why: lessons/rig-board.md#video-idle
 const VIDEO_IDLE_MS = 2 * 60e3;
 let videoWatch = null, videoAloneSince = null;
 
@@ -422,23 +242,9 @@ async function roomSockets(room) {
   } catch { return null; }
 }
 
-/**
- * ⚠️ A SOCKET IS NOT A VIEWER, AND COUNTING SOCKETS DOES NOT WORK.
- *
- * The first version of this asked the relay how many sockets were in the video
- * room and treated anything above one as somebody watching. MEASURED: the room
- * reported SEVEN while nothing on earth was watching — stale connections left
- * by test runs that exited without a clean close. The guard could never fire,
- * and the renderer ran for 231,300 frames, about two and a quarter hours, for
- * nobody.
- *
- * That is this repo's own rule, ignored one more time: a count is only evidence
- * on the far side of the boundary. The relay's socket count is a PROXY for a
- * viewer. The quantity in question is whether anyone is watching, and the only
- * thing that knows is the page — so it says so, every ten seconds, and a viewer
- * that has stopped saying it has stopped watching. It also, for free, covers
- * the case a socket count never could: a tab that is open but hidden.
- */
+// Viewers say `video.watching` every ten seconds; socket counts are not viewers (stale sockets read
+// 7).
+// why: lessons/rig-board.md#watching
 let lastWatchAt = 0;
 
 function watchVideoViewers() {
@@ -461,12 +267,8 @@ function watchVideoViewers() {
 }
 function stopVideoWatch() { if (videoWatch) { clearInterval(videoWatch); videoWatch = null; videoAloneSince = null; } }
 
-/**
- * Which controller selects a bank. 32 is the MIDI standard (bank select LSB).
- * Until 2026-10-13 Yoshimi's was read from its own bank map here (`yoshimiList`,
- * now in archive/yoshimi/board-half.mjs); no instrument left on the board
- * reads it from anywhere else.
- */
+// Which controller selects a bank: 32, the MIDI standard.
+// why: lessons/rig-board.md#bank-cc
 const bankCC = () => 32;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
@@ -476,18 +278,9 @@ const send = (msg) => { if (ws?.readyState === 1) { ws.send(format(msg, { from: 
 // bottom of this file once node-datachannel has been asked for. Null until then.
 let mainDirect = null;
 
-// ── shipping the grains ──────────────────────────────────────────────────────
-//
-// FOUR A SECOND, WHATEVER THE GRAIN RATE. sclang already batches at 250 ms;
-// this matches that cadence rather than inventing a second one, because two
-// buffers at different rates is a queue with a delay nobody chose.
-//
-// ⚠️ THE RELAY DROPS EVERYTHING PAST 60 msg/s AND TELLS THE SENDER NOTHING —
-// measured, twice, exactly 298 messages delivered in three seconds at both 120
-// and 300 msg/s. One message per grain would arrive as a sparse cloud that
-// reads as a quiet granulator rather than as a dropped message, so the count of
-// grains in the window travels WITH the list and a reader can tell the two
-// apart.
+// Grains shipped four times a second, sclang's own batch, with the count in the window so a dropped
+// message is not mistaken for a quiet granulator.
+// why: lessons/rig-board.md#grains-shipping
 const GRAIN_TTL = 30000;        // how long one `grain.report` keeps it shipping
 let grainUntil = 0, grainPump = null;
 function startGrainPump() {
@@ -496,13 +289,8 @@ function startGrainPump() {
     if (Date.now() > grainUntil) { stopGrainPump(); pap?.report(false); return; }
     const g = pap?.takeGrains?.();
     if (!g || (!g.list.length && !g.seen)) return;
-    // ⚠️ `heardAt`, NOT `at`. `at` WAS an envelope field until 2026-10-04 (it is
-    // `sent` now, and a payload may carry `at` again) and `format()` THREW
-    // on the collision — which it did, here, and took the whole board down with
-    // it until systemd restarted it. That throw is LESSONS #45: `at` once ate
-    // a payload field silently and ffmpeg was asked to seek to second
-    // 1,789,103,743,118, so session 18 made the collision loud on purpose. It
-    // worked exactly as intended on the first person to hit it since.
+    // `heardAt`, since `format()` throws on a payload field named like the envelope's.
+    // why: lessons/rig-board.md#heard-at
     send({ type: 'grain.marks', seen: g.seen, marks: g.list, heardAt: g.at });
   }, 250);
   grainPump.unref?.();
@@ -510,10 +298,9 @@ function startGrainPump() {
 function stopGrainPump() { if (grainPump) { clearInterval(grainPump); grainPump = null; } }
 
 const state = () => {
-  // `error` and `hint` ride along rather than being logged and dropped: the board
-  // is in another room, so "ALSA is not working, and here is what to do" has to
-  // be sayable OVER THE RELAY. Zero ports on its own cannot distinguish a
-  // broken sequencer from an empty rig.
+  // `error` and `hint` go over the relay: zero ports alone cannot tell a broken sequencer from an
+  // empty rig.
+  // why: lessons/rig-board.md#ports-error
   const { backend: be, clients, error, hint } = listPorts();
   const ports = addressable(clients);
   // The graph on the beat reads the last list asked for rather than asking
@@ -523,16 +310,9 @@ const state = () => {
   return { backend: be, ports, error: error ?? null, hint: hint ?? null };
 };
 
-// ---------------------------------------------------------------- audio out
-//
-// Two sources, and the difference is the whole hardware story.
-//
-//   synth    the board makes the sound itself, from demo/shell/rhodes.mjs. Needs
-//            NOTHING plugged in: no instrument, no interface, no soundcard.
-//   capture  `arecord` reads a real device. Needs the board and an input.
-//
-// Both leave by the same 12-byte header and the same 20 ms framing as
-// demo/carry, so the browser that plays this already exists and is deployed.
+// Audio out, same 12-byte header and 20 ms framing as demo/carry: `synth` makes the sound itself,
+// `capture` reads a device through arecord.
+// why: lessons/rig-board.md#audio-out
 const BYTES = FRAME * 2;
 let aseq = 0, sentFrames = 0;
 
@@ -554,36 +334,21 @@ function pcmOut(int16) {
 }
 
 async function startAudio(source = 'synth', msg = null) {
-  // ⚠️ REPLACE, do not refuse. This used to return {already:true} when
-  // anything was running, so picking a second instrument left the first one
-  // ALSO streaming: two sources into one socket at 50 msg/s each, interleaved
-  // samples, and 100 msg/s against the relay's 60 — measured 60 frames/s
-  // arriving and 5,495 dropped at the relay. It sounds like corruption and it
-  // is two instruments talking over each other.
+  // Replace, do not refuse: two sources on one socket interleave samples and overrun the relay.
+  // why: lessons/rig-board.md#replace
   if (source === 'sampler') return startSampler();
-  // ⚠️ A PIPE SOURCE BESIDE THE SAMPLER WOULD BE TWO STREAMS INTERLEAVED INTO ONE
-  // SOCKET, the exact fault `REPLACE, do not refuse` above was written about.
-  // Only a JACK instrument can sum with it.
+  // A pipe source beside the sampler would interleave two streams; only a JACK instrument can sum
+  // with it.
+  // why: lessons/rig-board.md#pipe-beside
   if (samp && !JACK_SYNTHS[source]) return { ok: false, reason: `the sampler is sounding through the JACK capture, and ${source} writes its own frames, so the two would interleave. Stop the sampler first` };
   if (starting) return { ok: false, reason: `already starting ${starting}`, starting };
-  // 🔴 A NEW INSTRUMENT DOES NOT INHERIT AN INSERT NOBODY IS HOLDING. The line
-  // further down re-patches a switched-on insert onto whatever comes up, which
-  // is right for the page that asked for it and wrong for everyone else: it is
-  // how a granulator left behind by a closed tab ends up wrapping the next
-  // person's yoshimi. The heartbeat's sweep would catch it within five seconds
-  // anyway; doing it HERE means those five seconds are not audible.
-  // ⚠️ IT DROPS A STALE INSERT, NEVER A LIVE ONE. A `/grains/` tab that is open
-  // and quiet keeps its insert across an instrument change somebody else
-  // started, which is the stomp `onlyIfIdle` exists to prevent. The board says
-  // so in this call's own reply, in `fx` and `fxBy`.
+  // A new instrument does not inherit an insert nobody is holding; a live page's insert stays.
+  // why: lessons/rig-board.md#new-instrument
   await sweepInsert('an instrument was asked for');
   const running = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
   if (running) {
-    // ⚠️ AND SAY WHAT IT IS PLAYING. This early return used to answer
-    // `{ok, already, source}` and nothing else, so a client that asked to start
-    // something already running got a reply with no port and no title — which
-    // reads as "started, and playing nothing". A reply about a running source
-    // must describe it as fully as the reply that started it.
+    // An already-running source is described as fully as a fresh start.
+    // why: lessons/rig-board.md#already
     if (running === source) {
       return { ok: true, already: true, source: running, jack: !!inst?.jack, port: inst?.port ?? null,
                ...insertState() };
@@ -593,10 +358,9 @@ async function startAudio(source = 'synth', msg = null) {
     await new Promise((r) => setTimeout(r, 600));   // let the old one actually die
   }
 
-  // The JACK-client instrument: yoshimi. It cannot write to a pipe, so
-  // jacksynth.mjs raises jackd, the synth and an ffmpeg capture, and plays it
-  // by writing raw MIDI bytes to a snd-virmidi device that aconnect routes to
-  // its sequencer port.
+  // A JACK instrument: jacksynth.mjs raises jackd, the synth and a capture, and plays via
+  // snd-virmidi.
+  // why: lessons/rig-board.md#jack-synth
   if (JACK_SYNTHS[source]) {
     if (!jackSynthAvailable(source)) return { ok: false, reason: `${source} is not installed on this board` };
     starting = source;
@@ -610,41 +374,21 @@ async function startAudio(source = 'synth', msg = null) {
     // An instrument change re-patches the graph, so a switched-on insert has to
     // be put back or it silently drops out from under the new instrument.
     if (fxOn) await pappusFx(true, { instrumentPort: r.port, instrumentPortR: r.portR, onLog: (l) => log('pappus:', l) });
-    // ⚠️ AND THE GENERATED MATERIAL, for the same reason and it is not
-    // automatic: `pappusFx(true)` patches the NEW instrument into the
-    // granulator's input, which is the one thing a generated source needs not
-    // to happen. Without this, choosing an instrument silently puts it back in
-    // the buffer beside the sines, and the two panes stop being comparable
-    // while every readout still says they are.
+    // Re-feed the generated material after a new instrument, or pappusFx patches the instrument
+    // back in.
+    // why: lessons/rig-board.md#source-feed
     if (fxOn && madeSource) sourceFeed(true, { instrumentPort: r.port, instrumentPortR: r.portR, onLog: (l) => log('source:', l) });
     return { ok: true, source, jack: true, port: r.port, midi: r.midi, rate: r.rate, msgPerSec: r.msgPerSec,
              channels: r.channels, ...insertState() };
   }
 
 
-  // 🔴 THE SAMPLED INSTRUMENT AND THE DX7 LEFT ON 2026-09-16, and the board is
-  // one instrument now. `archive/box-fluidsynth-hexter/` has the code and the
-  // argument; the short form is that this board has ONE jackd, ONE capture and
-  // ONE room, so a second instrument is a way to take the sound away from
-  // somebody in another building who is listening to the first.
-  //
-  // ⚠️ THE ONE MEASUREMENT WORTH KEEPING OUT OF THAT PATH, because it is about
-  // the container rather than about FluidSynth: in a `debian:trixie` arm64
-  // container with no /dev/snd at all and `ulimit -r` 0, `jackd -r -d dummy`
-  // came up, a synth registered left and right, the ffmpeg capture attached,
-  // and three seconds of the graph came back as 144,021 samples at peak 0.1096.
-  // Real audio, not silence. jackd's dummy driver is pure software timing, so
-  // this whole module runs where there is no sound hardware in existence.
+  // One jackd, one capture, one room: one instrument. A dummy jackd runs with no sound hardware at
+  // all.
+  // why: lessons/rig-board.md#one-instrument
 
-  // ⚠️ 'synth' (the FM Rhodes) and 'moog' are NO LONGER OFFERED as instruments.
-  // Both were written to find out what a board can do with plain arithmetic, and
-  // both were beaten by things already packaged: a real DX7 under a plugin
-  // host, and SuperCollider's MoogFF, which is a correct ladder where this
-  // one's resonance measurably does nothing (loop gain 0.001 at fc 900).
-  // The code stays in demo/shell for /carry/ and for the microcontroller path
-  // where no plugin can follow — see README, "the two we wrote and removed".
-  // Kept reachable with an explicit source name so the measurements can be
-  // reproduced; not listed, not the default, not on the page.
+  // 'synth' and 'moog' are reachable only by name, kept to reproduce measurements; never offered.
+  // why: lessons/rig-board.md#moog
   if (source === 'moog') {
     synth = createMoogSynth({ patch: msg?.patch ?? 'bass' });
     stopSynth = synth.startRealtime(pcmOut);
@@ -656,9 +400,8 @@ async function startAudio(source = 'synth', msg = null) {
   if (source === 'synth') {
     synth = createSynth();
     stopSynth = synth.startRealtime(pcmOut);
-    // On the board, a real keyboard patched in with `aconnect` plays it too —
-    // the synth is just another sequencer port, so the patchbay needs no
-    // special case for it.
+    // A real keyboard patched with aconnect plays it too.
+    // why: lessons/rig-board.md#aconnect
     if (backend() === 'alsa') {
       try {
         midiIn = alsaNotes(spawn, (kind, note, vel) => kind === 'on' ? synth.noteOn(note, vel) : synth.noteOff(note));
@@ -670,15 +413,8 @@ async function startAudio(source = 'synth', msg = null) {
              midi: !!midiIn, needs: 'nothing plugged in' };
   }
 
-  // ⚠️ CAPTURE IS ASKED FOR BY NAME, NOT FALLEN INTO. Everything that did not
-  // match above used to arrive here and become a MICROPHONE — so a typo, or a
-  // source removed from the table, started `arecord` and answered
-  // `{ok: true, source: 'capture'}`. It even made sound, because a capture
-  // device usually has something on it. Measured after a source was deleted:
-  // asking for it still "worked", peak 0.0391, which is the deletion silently
-  // not taking effect. A name nobody recognises is an error, not a default.
-  // ⚠️ THIS IS WHAT A PAGE ASKING FOR `fluidsynth` OR `hexter` NOW GETS, and it
-  // is the right answer: `known` lists what this board actually has.
+  // Capture is asked for by name; an unknown source is an error, never a microphone.
+  // why: lessons/rig-board.md#capture-by-name
   if (source !== 'capture') {
     return { ok: false, reason: `unknown source ${JSON.stringify(source)}`,
              known: [...Object.keys(JACK_SYNTHS), 'synth', 'moog', 'capture', 'sampler', 'collide'] };
@@ -738,9 +474,8 @@ function stopSampler() {
 
 function stopAudio() {
   const was = inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null;
-  // ⚠️ THE SEQUENCE RESTARTS ONLY WITH THE CAPTURE. With the sampler holding
-  // it, frames go on flowing after Yoshimi stops, and a counter jumping back to
-  // 0 mid stream reads as a reorder at every listener.
+  // The sequence restarts only with the capture, or listeners see a reorder.
+  // why: lessons/rig-board.md#aseq
   if (!captureHolders().filter((h) => h !== was).length) aseq = 0;
   if (inst) { inst.stop(); inst = null; }
   if (stopSynth) { stopSynth(); stopSynth = null; synth = null; }
@@ -749,39 +484,14 @@ function stopAudio() {
   return { ok: true, was, frames: sentFrames };
 }
 
-// ------------------------------------------------------------- control plane
-//
-// 🔴 COALESCE, DO NOT QUEUE. A backlog of note messages has to be played out,
-// because every one of them is an event that happened. A backlog of CONTROLLER
-// messages is a stack of statements about where one knob is, and all but the
-// last are already wrong. Queueing them would walk the filter through positions
-// the hand has left, late, which is worse than skipping them.
-//
-// The drain is a timer rather than a write per message so that a burst arriving
-// in one tick costs ONE MIDI write per controller. `DRAIN_MS` is well under the
-// 20 ms audio frame, so a value that matters is never held long enough to be
-// heard as lateness.
+// Coalesce controller messages, do not queue them: only the last value is true. The drain is a
+// timer
+// (DRAIN_MS, well under the 20 ms frame) so a burst costs one write per controller.
+// why: lessons/rig-board.md#coalesce
 const DRAIN_MS = 5;
-/**
- * 🔴 `last` IS WHAT THIS BOARD IS ACTUALLY SET TO, AND ITS ABSENCE COST THREE
- * SESSIONS. The output level collapsed to 0.0010-0.0035 of full scale on
- * 2026-09-17 and stayed unexplained until 2026-09-20, when driving CC 7 down
- * over the relay reproduced both ends of that range to two digits: 32 gives
- * 0.00330, 4 gives 0.00113. **A part volume left at 8 was invisible to every
- * client**, because `ctlMeter` counted messages and named no controller, no
- * value and no sender. Three counters that all read healthy while the one fact
- * that mattered was not on the wire at all.
- *
- * ⚠️ IT RECORDS WHAT WAS WRITTEN, NOT WHAT ARRIVED. A value that was folded
- * away was overtaken before it reached the instrument, so reporting it would be
- * reporting a knob position the hand had already left. `out` counts the writes
- * and `last` is where they left each controller.
- *
- * ⚠️ AND IT NAMES THE SENDER, because "who turned this down" is the other half
- * of the question and a shared board has more than one hand on it. `from` is
- * the relay's per-socket id, which changes on reconnect, so it answers "was
- * that me" rather than "who is that person".
- */
+// `last` is what each controller was written to, with the sender: an unseen CC 7 at 8 once left the
+// output at 0.003 of full scale for days. Folded values are never reported as written.
+// why: lessons/rig-board.md#ctl
 const ctl = { pending: new Map(), last: new Map(), by: new Map(), timer: null, ch: 0,
               in: 0, out: 0, folded: 0, since: Date.now() };
 
@@ -790,9 +500,8 @@ function ctlDrain() {
   ctl.timer = setTimeout(() => {
     ctl.timer = null;
     if (!ctl.pending.size) return;
-    // ⚠️ NO INSTRUMENT IS NOT AN ERROR AND IS NOT A BACKLOG EITHER. Holding
-    // values for an instrument that may never start is how a knob turned before
-    // `audio.start` arrives at the synth ten minutes later.
+    // No instrument: drop pending values, or a knob turned now arrives minutes later.
+    // why: lessons/rig-board.md#no-inst
     if (!inst) { ctl.pending.clear(); return; }
     for (const [c, v] of ctl.pending) {
       inst.cc(ctl.ch, c, v);
@@ -810,15 +519,9 @@ function ctlDrain() {
 function ctlMeter() {
   const forMs = Date.now() - ctl.since;
   const now = Date.now();
-  /**
-   * 🔴 THE CONTROLLERS THIS BOARD IS SET TO, BY NUMBER, NEWEST FIRST. Sorted by
-   * when rather than by controller, because the question being asked is almost
-   * always "what did I just change" or "what did somebody else change".
-   * ⚠️ `name` IS ONLY FILLED WHERE IT IS KNOWN TO BE TRUE ON THIS INSTRUMENT.
-   * CLAUDE.md records that Yoshimi does NOT use the General MIDI map: 76 and 77
-   * are FM amplitude and resonance centre here, not vibrato rate and depth, and
-   * a confident wrong label is worse than none.
-   */
+  // The controllers this board is set to, newest first. `name` only where measured on this
+  // instrument.
+  // why: lessons/rig-board.md#ctl-set
   const set = [...ctl.last.entries()]
     .map(([c, r]) => ({ ctrl: c, value: r.v, agoMs: now - r.at, by: r.by,
                         name: CTL_NAMES[c] ?? null }))
@@ -826,34 +529,21 @@ function ctlMeter() {
   return { in: ctl.in, out: ctl.out, folded: ctl.folded, forMs,
            on: inst ? inst.source : null, channel: ctl.ch,
            set,
-           // 🔴 THE ONE THAT IS ALWAYS WORTH LOOKING AT FIRST. Volume is the
-           // controller that makes an instrument sound broken rather than
-           // different, and it is the one nobody thinks to check. `null` means
-           // this board has not been told a volume since it started, which is
-           // NOT the same as 127 and must not read as it.
+           // Volume first; `null` means never told, which is not 127.
+           // why: lessons/rig-board.md#volume
            volume: ctl.last.has(7) ? ctl.last.get(7).v : null };
 }
 
-/**
- * Controller numbers whose meaning is MEASURED on this instrument, not assumed.
- * 🔴 YOSHIMI DOES NOT USE THE GENERAL MIDI MAP and this table exists to stop
- * anybody writing one from memory: 76 and 77 are FM amplitude and resonance
- * centre in the ZynAddSubFX family, not vibrato rate and depth, and measuring
- * them showed 0.2 cents of movement at every value, which is the tracker's own
- * noise. Anything not listed here is reported by NUMBER, with no name.
- */
+// Controller meanings measured on this instrument; anything else is reported by number.
+// why: lessons/rig-board.md#ctl-names
 const CTL_NAMES = {
   7: 'volume', 11: 'expression', 71: 'filter Q', 74: 'filter cutoff',
   75: 'bandwidth', 76: 'FM amplitude', 77: 'resonance centre', 78: 'resonance bandwidth',
 };
 
-// ---------------------------------------------------------------- requests
-//
-// Every verb that changes the rig has a PLAN twin that changes nothing, so a
-// client can always ask "what would this do" first. A wrong MIDI patch is
-// silent; a plan is not.
-// `replyVia` is the direct path's `ctl` channel (rtc.mjs), so an answer goes
-// back the way its question came. Absent, the answer goes into the room.
+// Every verb that changes the rig has a plan twin. `replyVia` is the direct path's ctl channel, so
+// an answer returns the way its question came.
+// why: lessons/rig-board.md#handle
 async function handle(msg, replyVia = null) {
   const reply = replyVia || ((type, body) => send({ type, re: msg.id, ...body }));
   // The collide engine's own verbs first, so `audio.start {source: 'collide'}`
@@ -886,37 +576,30 @@ async function handle(msg, replyVia = null) {
       log('clearing every subscription');
       return reply('patch.cleared', clearAll({ dry: DRY }));
     case 'audio.start':
-      // 🔴 NO DEFAULT SINCE 2026-10-13. A bare `audio.start` meant Yoshimi, and
-      // Yoshimi left the board (archive/yoshimi/README.md), so it is refused in
-      // words rather than quietly turned into another instrument.
+      // No default instrument: a bare audio.start is refused in words.
+      // why: lessons/rig-board.md#no-default
       if (!msg.source) return reply('audio.started', { ok: false, reason: 'say which instrument to start: audio.start {source: "sampler"}, "collide" or "synth"; there is no default since Yoshimi left this board on 2026-10-13' });
       startAudio(msg.source, msg).then((r) => reply('audio.started', r));
       return true;
     // Notes from anywhere: a browser keyboard, a phone, `ask.mjs`. The board does
     // not care which, and does not need one to exist.
     case 'note.on':
-      // 🔴 `node: 'sampler'` IS THE SAMPLER'S, and it never starts anything:
-      // a note for an engine that is not running is dropped and said, not
-      // turned into Yoshimi.
+      // `node: 'sampler'` notes go to the sampler; never starts anything.
+      // why: lessons/rig-board.md#sampler-node
       if (isForSampler(msg)) {
         if (!samp) return reply('note.ack', { note: msg.note, node: 'sampler', dropped: true, reason: 'the sampler is not running, send audio.start {source: "sampler"}' });
         return reply('note.ack', { node: 'sampler', ...samp.noteOn(msg.note, msg.vel ?? 100) });
       }
-      // Whichever instrument is running takes the note.
-      // If something is mid-start, do NOT start a second instrument — drop the
-      // note. One missed note is nothing; two instruments is a broken stream.
+      // Mid-start, a note is dropped rather than starting a second instrument.
+      // why: lessons/rig-board.md#mid-start
       if (starting) return reply('note.ack', { note: msg.note, dropped: true, starting });
-      // 🔴 A NOTE TO AN IDLE BOARD STARTS NOTHING, SINCE 2026-10-13. It used to
-      // raise Yoshimi, 300 MB for 13 to 40 s, on any stray note; now it is
-      // dropped and said, as the sampler branch above already did.
+      // A note to an idle board starts nothing.
+      // why: lessons/rig-board.md#idle-note
       if (!synth && !inst) return reply('note.ack', { note: msg.note, dropped: true, reason: 'nothing is playing on this board, send audio.start {source: ...} first' });
       if (inst) inst.noteOn(msg.channel ?? 0, msg.note, msg.vel ?? 100);
       else synth?.noteOn(msg.note, msg.vel ?? 100);
-      // ⚠️ A KEY NO LONGER PITCHES A GRAIN VOICE, AND THAT WENT WITH THE
-      // ARCHIVE. It did so only with material LOADED into the buffers, which
-      // was the ERR excerpt path and nothing else: with the granulator merely
-      // recording its input, a key press is one sound already. The voices are
-      // still there and `params.set gates` still opens them.
+      // A key does not pitch a grain voice; `params.set gates` opens the voices.
+      // why: lessons/rig-board.md#note-ack
       return reply('note.ack', { note: msg.note, channel: msg.channel ?? 0,
         on: inst ? inst.source : 'synth' });
     case 'note.off':
@@ -929,27 +612,19 @@ async function handle(msg, replyVia = null) {
       if (isForSampler(msg)) { samp?.panic(); return reply('note.ack', { panic: true, node: 'sampler' }); }
       if (inst) inst.panic();
       if (synth) synth.allOff();
-      // An insert keeps sounding after every note has stopped — a captured
-      // ring buffer, eight delay taps and a reverb tail. Silence it too, or
-      // "all notes off" is only true of the instrument.
+      // An insert keeps sounding after notes stop, so it is silenced too.
+      // why: lessons/rig-board.md#panic
       if (fxOn) pappusPanic();
       // ...and close the grain voices, or eight gates stay open and the buffer
       // keeps sounding through a panic that said it had stopped everything.
       if (pap) pap.notes.panic();
       return reply('note.ack', { panic: true, fx: fxOn ? 'pappus cleared' : null });
-    // What patches this board HAS, read off the board rather than guessed in a
-    // browser. Which instruments exist is a property of the machine the synth
-    // runs on — a page cannot see /usr/share/yoshimi/banks and should not
-    // pretend to — so the board enumerates and the page renders what it is told.
+    // What patches this board has, read off the board.
+    // why: lessons/rig-board.md#voices-list
     case 'voices.list': {
       const src = msg.source ?? inst?.source ?? null;
-      // The Yoshimi branch (its bank map as `voices.listed`) left on 2026-10-13
-      // and is in archive/yoshimi/board-half.mjs.
-      // ⚠️ THIS BRANCH IS NOT DEAD, THOUGH YOSHIMI IS THE ONLY INSTRUMENT.
-      // `nothing is playing` is the ordinary answer on a cold board, and it has
-      // to be told apart from a library that failed to read. `fixed` is that
-      // difference: a client that cannot tell them apart has to log both, and
-      // then it logs a non-event every time an instrument starts.
+      // `fixed` tells "nothing is playing" from a library that failed to read.
+      // why: lessons/rig-board.md#voices-fixed
       return reply('voices.listed', {
         source: src, ok: false, fixed: !!src, banks: [], count: 0,
         reason: src ? `${src}'s programs are a fixed table, not a library on this board` : 'nothing is playing',
@@ -967,28 +642,19 @@ async function handle(msg, replyVia = null) {
         const load = r.ok ? await samp.loadSet(msg.program) : null;
         return reply('voice.selected', { node: 'sampler', ...r, load });
       }
-      // 🔴 A PROGRAM NUMBER, NEVER A NAME. `{voice:'rhodes'}` used to resolve
-      // through a General MIDI table in fluid.mjs, and General MIDI was
-      // FluidSynth's meaning for a program number and nobody else's: Yoshimi's
-      // index its current bank, which the board enumerates and sends as
-      // `voices.listed`. With FluidSynth gone the name had nothing left to
-      // resolve against, so a page that sent one would have been answered with
-      // a table for an instrument that is not there.
-      // `archive/box-fluidsynth-hexter/` has the table and the old branch.
+      // A program number, never a name: a name only meant something in a table for a removed
+      // instrument.
+      // why: lessons/rig-board.md#program
       if (inst) {
         const prog = msg.program;
         if (!Number.isInteger(prog)) {
           return reply('voice.selected',
             { ok: false, reason: 'send {program:<0-127>}, and {bank:<n>} with it to change bank', on: inst.source });
         }
-        // ⚠️ BANK SELECT IS CC 32, AND THE NUMBER IS READ FROM YOSHIMI'S OWN
-        // CONFIG (`midi_bank_C`), never typed here. CC 0 is `midi_bank_root`:
-        // sending a bank on it moves Yoshimi's ROOT DIRECTORY instead, at which
-        // point every program change afterwards lands nowhere. One wrong guess
-        // about this cost an hour.
-        //
-        // Bank and program go out back to back on ONE byte stream, so they
-        // cannot arrive out of order and no delay is needed between them.
+        // Bank select is CC 32 from the instrument's own config, never CC 0 (the root directory);
+        // bank and
+        // program go out back to back on one byte stream.
+        // why: lessons/rig-board.md#bank
         const bank = Number.isInteger(msg.bank) ? msg.bank : null;
         if (bank !== null) inst.cc(msg.channel ?? 0, bankCC(inst.source), bank);
         inst.program(msg.channel ?? 0, prog);
@@ -997,27 +663,10 @@ async function handle(msg, replyVia = null) {
       }
       return reply('voice.selected', { ok: false, reason: 'no instrument running' });
     }
-    /**
-     * 🔴 THE CONTROL PLANE, WHICH IS A DIFFERENT KIND OF TRAFFIC FROM `cc`.
-     *
-     * `cc` below is EDGE-shaped in practice: one verb, one write, one ack, and
-     * a page that sends fifty of them a second gets fifty acks back. A hand on
-     * a slider is LEVEL-shaped: every message is a complete statement of where
-     * the controller is, the last one is the only one that stays true, and an
-     * ack per value is fifty messages a second spent telling a page something
-     * it can see by listening.
-     *
-     * So this verb takes a BATCH, folds it, and writes at most one value per
-     * controller per drain. `folded` is the number that was overtaken on the
-     * way, and it is reported rather than hidden: a control plane that silently
-     * drops is the shape every failure here takes.
-     *
-     * ⚠️ THE EXISTING `cc` VERB IS UNTOUCHED, so `/keys/` cannot regress. Two
-     * verbs, two disciplines, one instrument.
-     * ⚠️ AND THE LAST VALUE SENT IS THE LAST VALUE WRITTEN. A fold that kept
-     * the FIRST of a burst would leave the filter behind the finger for as long
-     * as the burst lasted, which is the bug that reads as latency.
-     */
+    // ctl.set takes a batch, folds it and writes at most one value per controller per drain,
+    // reporting
+    // `folded`; the last value sent is the one written. `cc` stays as it was.
+    // why: lessons/rig-board.md#ctl-set-verb
     case 'ctl.set': {
       if (!Array.isArray(msg.set)) return reply('ctl.ack', { ok: false, reason: 'ctl.set wants set: [[controller, value], ...]' });
       ctl.ch = msg.channel ?? ctl.ch;
@@ -1030,7 +679,8 @@ async function handle(msg, replyVia = null) {
         ctl.by.set(c, msg.from ?? null);           // whose hand was last on it
       }
       ctlDrain();
-      // NO ACK PER VALUE. `ctl.meter` says what happened, once a second.
+      // No ack per value; ctl.meter reports once a second.
+      // why: lessons/rig-board.md#no-ack
       return;
     }
     case 'ctl.meter':
@@ -1056,82 +706,41 @@ async function handle(msg, replyVia = null) {
       return reply('audio.stopped', { ...(sp.stopInst || stopSynth || audio ? stopAudio() : { ok: true, was: null }),
                                       sampler: samp ? 'still running' : null });
     }
-    // ⚠️ `sf.list` STOOD HERE AND LEFT ON 2026-09-16 with the sampled
-    // instrument. It walked the board's soundfont directories so a page could
-    // offer a choice of them; with nothing on this board that can read one, a
-    // reply would have been a list of files nobody can play.
-    // `archive/box-fluidsynth-hexter/board-half.js` has it.
-    // ⚠️ A PAGE STILL SENDING IT FALLS THROUGH TO `default` BELOW, which returns
-    // false and says nothing. That is correct on a relay that broadcasts
-    // verbatim: an unknown verb is usually somebody else's traffic.
-    // What is sounding RIGHT NOW. A page that joins mid-session has clicked
-    // nothing, so without this it shows no selection while the board plays on —
-    // a readout that contradicts the thing it is describing.
-    // Roll the granular parameters. A program change means nothing to Pappus —
-    // it has no patches, it has 106 knobs — so "random" has to mean something
-    // different here, and this is it.
-    // Pappus is an INSERT, not an instrument: it wraps whatever is playing.
-    // It only reaches what is on the JACK graph, which is worth saying rather
-    // than failing quietly.
+    // Pappus is an insert, not an instrument: it wraps what is on the JACK graph. An unknown verb
+    // falls through to `default` (it is usually somebody else's traffic).
+    // why: lessons/rig-board.md#fx-pappus
     case 'fx.pappus': {
       const want = msg.on !== false;
-      // ⚠️ THE GATE IS `inst.jack`, NOT AN INSTRUMENT NAME. It used to read
-      // `!jsyn`, which meant "is it one of the JACK ones" by which variable
-      // happened to be set — so adding a source meant remembering this line.
-      // The insert can wrap anything on the JACK graph, and that is a property
-      // the source reports about itself.
+      // The gate is `inst.jack`, a property the source reports about itself.
+      // why: lessons/rig-board.md#jack-gate
       if (want && !inst?.jack) return reply('fx.pappus', {
         ok: false,
         ...insertState(),
         reason: inst ? `${inst.source} writes to a pipe, not to JACK — the insert can only wrap what is on the JACK graph`
                       : 'nothing is playing for an insert to wrap',
       });
-      // 🔴 `onlyIfIdle` — "take it out, UNLESS somebody is still using it".
-      //
-      // ⚠️ NOTHING IN THIS REPO SENDS IT ANY MORE. `/keys/` did, on load, and
-      // that page has no granulator on it since 2026-09-16; `sweepInsert()`
-      // applies the same liveness rule on the board's own clock, so the message
-      // is no longer how an orphaned insert gets cleared. It is kept because it
-      // is still a correct thing for a person or another program to ask, and
-      // because it reads the liveness verdict OUT LOUD, which the sweep cannot
-      // do for a caller that wants an answer now.
-      //
-      // ⚠️ IT REFUSES OUT LOUD. `ok: true, on: true, kept: true` with the
-      // holder and the ages in the reply, so the page can say "another tab
-      // asked for this 4 s ago" rather than quietly showing the wrong picture.
-      // An arbitration nobody can see is worse than none.
-      //
-      // ⚠️ AND IT IS OPT-IN. A caller that does not send it gets the old
-      // behaviour exactly, which is what keeps `fx.pappus {on:false}` a thing a
-      // person can type to fix a wedged board.
+      // `onlyIfIdle`: take it out unless a client is still holding it; refuses out loud with the
+      // holder and
+      // ages. Opt in; plain fx.pappus {on: false} still forces it, to fix a wedged board.
+      // why: lessons/rig-board.md#only-if-idle
       if (!want && msg.onlyIfIdle === true && fxOn && fxAsked?.on
           && fxAsked.by !== msg.from && stillHere(fxAsked.by)) {
         const heldFor = Math.round((Date.now() - fxAsked.at) / 1000);
         const heardAgo = Math.round((Date.now() - clientSeen.get(fxAsked.by)) / 1000);
         return reply('fx.pappus', {
-          // ⚠️ `on: true` EXPLICITLY. Every page reads `m.on` off this reply to
-          // set its own idea of the insert, and `insertState()` reports `fx`
-          // rather than `on` — so a refusal without this would answer "ok" and
-          // then tell the page the granulator is off, which is the silent wrong
-          // picture this whole change exists to stop.
+          // `on: true` explicitly: pages read `m.on` and insertState() reports `fx`.
+          // why: lessons/rig-board.md#on-true
           ok: true, on: true, kept: true, ...insertState(), instrument: inst?.source ?? null,
           reason: `another page asked for the granulator ${heldFor} s ago and was heard from ${heardAgo} s ago`,
         });
       }
       const r = await pappusFx(want, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog: (l) => log('pappus:', l) });
-      // ⚠️ RECORDED ONLY WHEN IT ACTUALLY CHANGED. A request that failed leaves
-      // the previous holder in place, or the page that got a refusal would be
-      // recorded as the owner of an insert it never raised.
+      // Recorded only when it changed, so a refused request does not become the holder.
+      // why: lessons/rig-board.md#recorded
       if (r.ok) { fxOn = want; fxAsked = { by: msg.from ?? null, at: Date.now(), on: want }; }
-      // ⚠️ `pappusFx(true)` RE-PATCHES THE INSTRUMENT INTO THE GRANULATOR, which
-      // is right for every other caller and is exactly what a generated source
-      // had disconnected. Put it back the way the source wants it, in the one
-      // place that knows both.
-      // And when there is no source: ask sclang to drop any synth it is still
-      // holding. sclang OUTLIVES this process — `pappusFx` adopts a running one
-      // rather than compiling a 2,030-line class again — so a restarted board can
-      // inherit a source synth it never started, playing into a granulator that
-      // now has the instrument patched in as well.
+      // Restore the generated source's patching after pappusFx(true); with no source, tell sclang
+      // (which outlives this process) to drop any source synth it still holds.
+      // why: lessons/rig-board.md#re-patch
       if (r.ok && want) {
         if (madeSource) sourceFeed(true, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog: (l) => log('source:', l) });
         else pappus().sourceOff();
@@ -1144,84 +753,35 @@ async function handle(msg, replyVia = null) {
 
     // ── the reverb, as an insert ─────────────────────────────────────────
 
-    // A SEEDED roll, in one of six named characters.
-    //
-    // The old roll drew nine parameters uniformly and independently, which
-    // lands in the middle of all nine nearly every time — one sound wearing
-    // different numbers — and threw the numbers away, so a roll that landed on
-    // something good could not be got back. Both are fixed in `pappus.mjs`:
-    // the character is drawn first and narrows the ranges, and the seed comes
-    // back with the roll so the same roll can be asked for again.
+    // A seeded roll in one of six characters, the seed returned so a good roll can be asked for
+    // again.
+    // why: lessons/rig-board.md#params-random
     case 'params.random': {
       if (!fxOn) return reply('params.rolled', { ok: false, reason: 'pappus is not switched on' });
       // With material loaded the keyboard owns the eight grain voices, so the
       // roll leaves `pitches`/`gates` alone rather than pulling the instrument
       // out from under whoever is playing it.
       const r = pappus().roll(Number.isInteger(msg.seed) ? msg.seed : undefined, { voices: true });
-      // Movement is on by default once there is something to move. It is not a
-      // control the page offers — see `params.drift` for why it exists at all.
-      //
-      // ⚠️ SO `params.drift {on:false}` FOLLOWED BY A ROLL IS A NO-OP, and that
-      // cost a whole measurement run. `pappus-live.mjs` switched the drift off,
-      // rolled ten seeds, and took every capture believing nothing was moving
-      // while `DRIFT` walked scan · spray · swarm · tilt · size · sos at 8 Hz
-      // underneath — which is why two DIFFERENT seeds measured ten times closer
-      // together than one seed measured to itself.
-      //
-      // It is deliberate and it stays: a page that rolls wants the movement.
-      // The reply below carries `drift: driftStats()` so a caller can SEE it
-      // came back on, and anything measuring must switch it off AFTER the roll,
-      // not before. The harness does that in one place now.
+      // A roll switches the drift back on (the reply carries driftStats()); measuring must turn it
+      // off after.
+      // why: lessons/rig-board.md#drift-on
       pappus().startDrift();
       log(`rolled ${r.character.m}/${r.character.n} · seed ${r.seed} · ${r.m.rate}/${r.n.rate} grains per second`);
       return reply('params.rolled', { ok: true, on: 'pappus', ...r, characters: CHARACTER_NAMES, drift: pappus().driftStats() });
     }
-    // The slow movement, which has no slider on purpose.
-    //
-    // It lives in the board rather than in the page because the board is an OBJECT
-    // and not a SESSION: the sound goes on moving with nobody connected, which
-    // is the whole of plan-hardware §8.7. The page can turn it off; it cannot
-    // steer it, because a steerable drift is just a slider with extra steps.
+    // The slow movement lives on the board, so the sound moves with nobody connected; pages can
+    // stop it.
+    // why: lessons/rig-board.md#params-drift
     case 'params.drift': {
       if (!fxOn) return reply('params.drifted', { ok: false, reason: 'pappus is not switched on' });
       const want = msg.on !== false;
       const changed = want ? pappus().startDrift(msg.hz) : pappus().stopDrift();
       return reply('params.drifted', { ok: true, on: want, changed, ...pappus().driftStats() });
     }
-    // ── the grains, as they fire ──────────────────────────────────────────
-    //
-    // 🔴 THE ONE THING AUDIO CANNOT CARRY. A page drawing this granulator
-    // beside one in a browser can mark every grain on the browser's side and
-    // none on this one, because a bump in an envelope might be a note, a delay
-    // tap or a reverb swell. The engine reports each grain as `GrainBuf` is
-    // triggered; this is the door it leaves by.
-    //
-    // ⚠️ ASKED FOR, AND IT STOPS ASKING ITSELF. Reporting costs the engine
-    // sixteen live SendReply UGens and this room four messages a second, and a
-    // page that is closed cannot tell anybody. So a request expires: the board
-    // keeps shipping for GRAIN_TTL after the last `grain.report`, and a page
-    // that wants the picture re-asks while it is open. A board still shouting
-    // at an empty room a week later is the shape of failure this avoids.
-    // ── the material, built here from the page's own description ─────────
-    //
-    // 🔴 THE POINT OF THE WHOLE PATH (plan-twins §4a). `grains` draws this
-    // granulator beside one in a browser and calls them comparable. They were
-    // not, and the biggest reason by a distance was not the granulator: the
-    // page chewed a table of sine partials and this board chewed whatever
-    // instrument happened to be running. One spec, expanded by ONE function
-    // (`partialsOf`, imported by both ends), rendered here by `PosSource.sc`.
-    //
-    // ⚠️ THIS ONE GENERATES. There used to be a second verb here that wrote a
-    // minute of ERR's 1965 archive into the grain buffer from disk; it left on
-    // 2026-09-16 and this is the only material path now.
-    //
-    // ⚠️ AND THE INSTRUMENT COMES OUT OF THE INPUT, RATHER THAN BEING STOPPED.
-    // scsynth fills its input bus from JACK before any synth runs, so an
-    // instrument still patched to `SuperCollider:in_1` is summed with the
-    // generated material and the granulator chews a third thing neither end can
-    // describe. Stopping it is not the fix: `posboard`, the capture whose frames
-    // are the audio a page HEARS, is raised as part of the instrument's own
-    // chain, so `audio.stop` would take the result away with the material.
+    // The engine reports each grain as GrainBuf fires; a request expires after GRAIN_TTL so a
+    // closed page stops it. source.set builds material from the page's spec (partialsOf,
+    // PosSource.sc), and takes the instrument out of scsynth's input rather than stopping it.
+    // why: lessons/rig-board.md#source-set
     case 'source.set': {
       const onLog = (l) => log('source:', l);
       if (msg.on === false) {
@@ -1235,18 +795,12 @@ async function handle(msg, replyVia = null) {
       if (!r.ok) return reply('source.applied', { ok: false, on: !!madeSource, reason: r.reason });
       madeSource = { spec: r.spec, partials: r.partials, top: r.top };
       const feed = sourceFeed(true, { instrumentPort: inst?.port, instrumentPortR: inst?.portR, onLog });
-      // 🔴 `ok` MEANS THE ENGINE HAS IT, not that this process sent it, and
-      // this handler failed that standard on its first run. scsynth answers `/s_get` only for a node that
-      // really exists, with the value it really holds, so the wait is for THAT
-      // and the reply carries it. Three seconds because a first `/s_new` after
-      // a def load is the slow case and a fixed one-beat sleep answered before
-      // the server had spoken.
+      // `ok` means scsynth answers /s_get for a real node (3 s wait), not that a message was sent.
+      // why: lessons/rig-board.md#engine-has-it
       let st = pappus().sourceState();
       for (let i = 0; i < 30 && !st.on; i++) { await wait(100); st = pappus().sourceState(); }
-      // ⚠️ AND THE VALUES ARE COMPARED, not merely present. A node that exists
-      // holding the def's DEFAULTS is a node that never received the spec, and
-      // it would sound almost right — `hz` within a tenth of a hertz and the
-      // voice count exact is what says the table arrived with it.
+      // Values are compared: a node holding the def's defaults never received the spec.
+      // why: lessons/rig-board.md#holds
       const holds = st.on && st.voices === r.spec.chord.length && Math.abs(st.hz - r.spec.hz) < 0.1;
       if (!holds) {
         log(`source: the engine did not confirm it — node ${st.node}, ${st.voices} voices, ${st.hz} Hz`);
@@ -1277,32 +831,18 @@ async function handle(msg, replyVia = null) {
     case 'params.state':
       return reply('params.state', {
         ok: fxOn, roll: pap?.current() ?? null, drift: pap?.driftStats() ?? null,
-        // 🔴 WHAT IT IS CHEWING, for a page that joined after somebody else set
-        // it. ⚠️ There used to be a second answer beside this one, `source`,
-        // which was the minute of ERR's archive loaded into the buffers. That
-        // path left on 2026-09-16, so `made` is now the only material the board
-        // can be given and the ambiguity is gone with it.
+        // What it is chewing, for a page that joined later.
+        // why: lessons/rig-board.md#made
         made: madeSource ? { ...madeSource, engine: pap?.sourceState() ?? null } : null,
-        // Which voice slots are open and at what interval. ⚠️ This is what the
-        // board SENT, not what the engine did with it — a count on this side of
-        // the wire is not evidence about the far side (CLAUDE.md). It is here
-        // so a sweep can tell "the board never sent it" apart from "the engine
-        // took it and made no sound", which are opposite bugs.
+        // What the board sent, not what the engine did: tells "never sent" from "took it and made
+        // no sound".
+        // why: lessons/rig-board.md#notes-sent
         notes: pap?.notes.state() ?? null,
       });
-    // One named engine command, forwarded. Pappus has 106 of them and the roll
-    // reaches a chosen subset, so without this the only way to ask the engine a
-    // question is to edit the board and redeploy it — which is how an afternoon
-    // went on a question that takes four seconds to answer.
-    //
-    // This is the MEASUREMENT surface, not a control surface: it is what lets a
-    // harness sweep one parameter and grade the sound, which is the only way to
-    // tell "the engine ignores this" from "the capture cannot see it".
-    //
-    // Same posture as every other verb here: the relay is tokenless, so anyone
-    // in the room can send it. The blast radius is one granulator's parameters
-    // on one board — strictly smaller than `patch.apply` or `audio.start`,
-    // which have been open all along.
+    // One named engine command forwarded: the measurement surface, so a harness can sweep a
+    // parameter.
+    // Its blast radius is one granulator's parameters.
+    // why: lessons/rig-board.md#params-set
     case 'params.set': {
       if (!fxOn) return reply('params.set', { ok: false, reason: 'pappus is not switched on' });
       // A command NAME, not arbitrary text: this becomes an OSC address on a
@@ -1314,34 +854,19 @@ async function handle(msg, replyVia = null) {
       // 48 because the resonator bank takes 48 frequencies in one message, and
       // nothing here takes more.
       if (!args.length || args.length > 48) return reply('params.set', { ok: false, reason: 'args must be 1..48 finite numbers' });
-      // ⚠️ `.set`, NOT `.send`. A parameter a person chose becomes the centre
-      // the slow movement circles, so a page that sets its sound directly —
-      // `grains` has six named patches and no die — has something for the
-      // drift to move around. `.send` is the raw door and stays raw, because
-      // the drift's own nudges go out through it.
+      // `.set`, not `.send`: a chosen value becomes the centre the drift circles.
+      // why: lessons/rig-board.md#set-centre
       const centred = pappus().set(cmd, ...args);
-      // 🔴 AND IF IT WAS THE VOICE GATES, THE KEYBOARD'S MIRROR FOLLOWS IT.
-      // `notes.gate` in `params.state` is what a page reads to find out whether
-      // this granulator can fire at all — and it was the KEYBOARD's model, so a
-      // page that opened the gates through this raw door left the board
-      // reporting every voice shut about a granulator making grains. One
-      // authority, and this is the line that keeps it one.
+      // Opening the voice gates updates the keyboard's mirror, so `notes.gate` stays one authority.
+      // why: lessons/rig-board.md#gates-mirror
       if (cmd === 'gates') pappus().notes.adopt(args);
-      // It does NOT switch the movement on. `params.set` is the MEASUREMENT
-      // surface: a sweep that turned the drift on under itself would be
-      // grading a moving target, and `pappus-live.mjs` opens by turning it off
-      // for exactly that reason. Movement is asked for, by `params.drift`.
+      // params.set never switches the drift on: a sweep must not grade a moving target.
+      // why: lessons/rig-board.md#no-drift
       return reply('params.set', { ok: true, cmd, args, centred: centred ? centred.join(' ') : null });
     }
 
-    // 🔴 THE THREE VERBS THAT PUT ERR'S 1965 ARCHIVE IN THE GRAIN BUFFERS
-    // LEFT ON 2026-09-16: `source.search`, `source.load`, `source.clear`.
-    // No page in `demo/` sent any of them, and every connection this repo opens
-    // to ERR appears in a public broadcaster's audience measurement, so an
-    // unused path to their archive from a board nobody is watching was exposure
-    // with no benefit. `archive/box-pappus/` has the code and the reasoning.
-    // ⚠️ `source.set` BELOW IS NOT THAT and did not go: it is the sound BUILT
-    // on the board from a spec, which is what `/grains/` feeds the granulator.
+    // The picture. source.set builds sound from a spec; nothing here touches ERR's archive.
+    // why: lessons/rig-board.md#picture
 
     // ── the picture ──────────────────────────────────────────────────────
     case 'video.start': {
@@ -1353,9 +878,8 @@ async function handle(msg, replyVia = null) {
       const r = startVideo({
         w: Math.min(msg.w ?? 1280, 1920), h: Math.min(msg.h ?? 720, 1080),
         fps: Math.min(msg.fps ?? 30, 60),
-        // ⚠️ CAPPED AT 4 Mbit/s, MEASURED. 2 and 4 arrive byte-identical
-        // through the relay; 8 loses 28% of frames silently. Letting a client
-        // ask for 8 would hand it a stream that looks like it is working.
+        // Capped at 4 Mbit/s: 2 and 4 arrive intact, 8 loses 28% of frames silently.
+        // why: lessons/rig-board.md#bitrate
         bitrate: Math.min(msg.bitrate ?? 2_000_000, 4_000_000),
         gop: Math.min(msg.gop ?? 30, 120),
         passes: Math.min(msg.passes ?? 1, 4),
@@ -1368,11 +892,9 @@ async function handle(msg, replyVia = null) {
       log(`video up · ${r.w}x${r.h} @${r.fps} · ${(r.bitrate / 1e6).toFixed(1)} Mbit/s · room ${VIDEO_ROOM}`);
       return reply('video.started', { ok: true, room: VIDEO_ROOM, ...videoShape() });
     }
-    // The two knobs the picture has. Named rather than numbered, because a
-    // client should not have to know that the mirror count is a uniform.
-    // The same shader body the page just compiled for itself, compiled here as
-    // 310 es. That is the whole of "the same shader on two GPUs" — one text,
-    // two compilers, rather than two copies kept in step by hand.
+    // The picture's knobs, named; the page's shader body is compiled here as 310 es: one text, two
+    // GPUs.
+    // why: lessons/rig-board.md#video-shader
     case 'video.shader': {
       if (!video) return reply('video.shader.applied', { ok: false, reason: 'no picture running' });
       const r = await video.shader(msg.body);
@@ -1381,10 +903,8 @@ async function handle(msg, replyVia = null) {
     }
     case 'video.params': {
       if (!video) return reply('video.params', { ok: false, reason: 'no picture running' });
-      // The page's names on the left, the renderer's uniforms on the right — a
-      // client should not have to know that `grain` is a noise frequency.
-      // `segments` is the same uniform as `mirrors`, under the name the board's
-      // graph announces on `pi-1:shader:value-in` (the catalogue's, since 2026-10-14).
+      // Page names to renderer uniforms; `segments` is the same uniform as `mirrors`.
+      // why: lessons/rig-board.md#uniform-map
       const MAP = { mirrors: ['seg', 2, 64], segments: ['seg', 2, 64], grain: ['scale', 0.5, 40], hue: ['hue', 0, 3] };
       let n = 0;
       for (const [name, [key, lo, hi]] of Object.entries(MAP)) {
@@ -1393,15 +913,12 @@ async function handle(msg, replyVia = null) {
       }
       const p = video.params();
       log(`video params: ${p.seg} mirrors · grain ${p.scale} · hue ${p.hue}`);
-      // ⚠️ REPORTED AS SENT, NOT AS APPLIED. The control channel is one-way —
-      // the renderer has no way to answer — so this is what went down the pipe.
-      // `paramsSent`, not `sent`, which is an envelope field since 2026-10-04.
+      // Reported as sent, not applied: the renderer cannot answer. `paramsSent`, not `sent`.
+      // why: lessons/rig-board.md#params-sent
       return reply('video.params', { ok: n > 0, paramsSent: n, mirrors: p.seg, grain: p.scale, hue: p.hue });
     }
-    // ⚠️ A VIEWER SAYING IT IS WATCHING. Cheap on purpose: no reply, so a room
-    // of viewers costs the relay one message each per ten seconds and nothing
-    // comes back. Without this the board cannot tell a watched picture from an
-    // abandoned one — see `watchVideoViewers`.
+    // A viewer saying it is watching: no reply, one message per viewer per ten seconds.
+    // why: lessons/rig-board.md#video-watching
     case 'video.watching':
       lastWatchAt = Date.now();
       return true;
@@ -1420,11 +937,8 @@ async function handle(msg, replyVia = null) {
         ? { ok: true, room: VIDEO_ROOM, ...videoShape() }
         : { ok: false, reason: 'no picture running', available: videoAvailable(), renderer: V3DPIPE });
 
-    // ⚠️ `insertState()` RATHER THAN `fx:` ALONE, AND IT WAS THE THIRD PLACE
-    // THIS LINE IS WRITTEN. Two pages share this board and neither could see
-    // the other change the insert; a page that asks what is playing is asking
-    // the question the answer belongs to, so it gets the holder and the ages
-    // here as well as in `fx.pappus` and the heartbeat.
+    // insertState() here too, so a page asking what plays sees who holds the insert.
+    // why: lessons/rig-board.md#audio-status
     case 'audio.status':
       // `inputs` rides along: each hardware input streams in a room of its
       // own (inputs.mjs), so this room's slot says nothing about them.
@@ -1438,47 +952,22 @@ async function handle(msg, replyVia = null) {
         direct: mainDirect ? mainDirect.status() : null });
     case 'sampler.cpu':
       return reply('sampler.cpu', samp ? { ok: true, ...(await samp.cpu()), voices: samp.status().voices } : { ok: false, reason: 'the sampler is not running' });
-    // 🔴 `pongAt`, NOT `at`, AND THIS VERB HAD REPLIED TO NOBODY SINCE IT WAS
-    // WRITTEN. `at` WAS an envelope field (`wire.mjs`, `sent` since 2026-10-04),
-    // `format()` throws on the collision by design, the throw was caught by the handler wrapper below and
-    // answered as `board.error`. So the obvious round trip verb on this board
-    // answered an error to every caller, and `/keys/` timed it into a variable
-    // no cell showed. Found 2026-09-16, fixed 2026-09-18. It is the same
-    // collision `grain.marks` names two hundred lines up, which is the one
-    // place in this file that got the rename right.
-    // ⚠️ NOTHING READS THE FIELD AND NOTHING SHOULD. `live-test.mjs`,
-    // `relay-compare.mjs` and `yoshimi-test.mjs` all time the round trip in
-    // THEIR OWN clock, which is the only clock that can measure it: this
-    // process's `Date.now()` and a caller's share no origin, so subtracting
-    // them is meaningless. It is sent because a reply carrying nothing but its
-    // own type is hard to tell from an echo.
+    // `pongAt`, not `at` (an envelope field once, and format() throws). Callers time the round trip
+    // on
+    // their own clock; the field only makes the reply more than an echo.
+    // why: lessons/rig-board.md#board-ping
     case 'board.ping':    return reply('board.pong', { pongAt: Date.now() });
 
-    // ── looking at the board, and putting its graph back ──────────────────
-    //
-    // 🔴 THE REPORT COMES FIRST, AND IT IS THE IMPORTANT ONE. A verb that
-    // CHANGES the board before anybody can SEE the board turns a diagnosis into
-    // a second fault, and on a board with one jackd, one capture and one room
-    // the second fault is heard by whoever is listening in another building.
-    // So `jack.graph` reads and writes nothing, and `jack.rebuild` carries the
-    // graph from before and after itself, so pressing it is a diff rather than
-    // a leap.
-    //
-    // 🔴 EACH ANSWERS IN ITS OWN NAME. `audio.status` answers `audio.started`,
-    // and that cost nine seconds and a wrong conclusion: a caller waiting on the
-    // obvious reply name waited out its timeout and reported that no board was
-    // in the room, about a board that had answered immediately. `ctl.meter`,
-    // `fx.pappus` and `video.params` already answer in their own names, and
-    // these two do the same.
+    // jack.graph reads and writes nothing; jack.rebuild returns the graph before and after, so it
+    // is a
+    // diff. Each answers in its own name.
+    // why: lessons/rig-board.md#jack-graph
     case 'jack.graph': {
       const g = jackGraph();
       const chain = jackChain({ instrumentPort: inst?.port, instrumentPortR: inst?.portR,
                                 insert: fxOn, source: !!madeSource, graph: g });
-      // 🔴 WHAT THE BOARD BELIEVES, BESIDE WHAT THE GRAPH SAYS. The pairing is
-      // the diagnosis and neither half is one on its own: the level collapse of
-      // 2026-09-17 is a board reporting a healthy instrument while the audio a
-      // page hears is 40x down, which is two statements that disagree. Only one
-      // of them was ever visible from outside the building.
+      // What the board believes beside what the graph says: the pairing is the diagnosis.
+      // why: lessons/rig-board.md#believes
       return reply('jack.graph', {
         ...g,
         believes: { source: inst?.source ?? null, port: inst?.port ?? null, portR: inst?.portR ?? null,
@@ -1487,40 +976,17 @@ async function handle(msg, replyVia = null) {
       });
     }
     case 'jack.rebuild': {
-      // 🔴 WHO ELSE IS ON THIS BOARD, AND WHAT THIS DOES ABOUT IT. WRITTEN
-      // DOWN BECAUSE IT IS A DECISION RATHER THAN AN IMPLEMENTATION DETAIL.
-      //
-      // The board cannot see a listener. `workers/relay` forwards every frame
-      // verbatim and never parses one, its `webSocketClose()` is empty, and a
-      // page holding a PCM stream says nothing. That is the same absence
-      // `sweepInsert()` is written around, looked for there rather than
-      // assumed. So asking permission is not available, and a verb that
-      // pretended to ask would be worse than one that does not.
-      //
-      // Three things instead, and the first two are what make the third rare.
-      // It is a DIFF: a graph that is already right runs zero commands, so the
-      // ordinary case of somebody pressing recover on a healthy board is
-      // inaudible. It KILLS NOTHING: no process is restarted under a listener,
-      // only links are patched. And when it does have to cut a link it says so
-      // out loud, with who asked and who else the board has heard from inside
-      // the same 15 s window the insert uses. An arbitration nobody
-      // can see is worse than none, which this board settled once already in
-      // `fx.pappus`.
-      //
-      // ⚠️ AND A SERVICE RESTART IS DELIBERATELY NOT A VERB HERE. A process
-      // that kills itself over the relay cannot report what happened, systemd
-      // restarts it anyway (`Restart=always`), and the recovery actually asked
-      // for is the graph. `audio.stop` then `audio.start` already rebuilds the
-      // whole chain including the capture, at the cost of about thirteen
-      // seconds of silence for everybody in the room.
+      // The board cannot see listeners, so jack.rebuild is a diff (a healthy graph runs nothing),
+      // kills
+      // nothing, and says who asked and who else was heard in 15 s. No service-restart verb.
+      // why: lessons/rig-board.md#rebuild
       const wantPlan = msg.plan === true || DRY;
       const others = [...clientSeen.entries()]
         .filter(([who, t]) => who !== msg.from && Date.now() - t < INSERT_HELD_MS)
         .map(([who, t]) => ({ by: who, heardAgoSec: Math.round((Date.now() - t) / 1000) }));
-      // ⚠️ `ok: true, kept: true`, THE SAME REFUSAL SHAPE AS `fx.pappus`, and
-      // a caller has to read `kept`. A refusal is not an error: the board is
-      // fine, it declined on the caller's own instruction, and answering
-      // `ok: false` would read as a board that could not do it.
+      // `ok: true, kept: true`, as fx.pappus refuses: a refusal on the caller's instruction is not
+      // an error.
+      // why: lessons/rig-board.md#kept
       if (!wantPlan && msg.onlyIfIdle === true && others.length) {
         return reply('jack.rebuild', {
           ok: true, kept: true, changed: 0, steps: [], others,
@@ -1533,32 +999,17 @@ async function handle(msg, replyVia = null) {
       const r = jackRebuild({ instrumentPort: inst?.port, instrumentPortR: inst?.portR,
                               insert: fxOn, source: !!madeSource, plan: wantPlan,
                               onLog: (l) => log('jack:', l) });
-      // The journal is the one record that survives a board nobody can reach.
-      // Say what was asked, by whom, how many links moved and who else was in
-      // the room, in one line, so a person reading `journalctl` afterwards can
-      // attribute an interruption somebody reported by ear.
+      // One journal line: who asked, how many links moved, who else was in the room.
+      // why: lessons/rig-board.md#journal
       log(`jack.rebuild${wantPlan ? ' (plan)' : ''} by ${msg.from ?? 'nobody'}: `
         + `${r.changed} link${r.changed === 1 ? '' : 's'} moved, ${others.length} other client(s) in the room`
         + `${r.reason ? `. ${r.reason}` : ''}`);
       return reply('jack.rebuild', { ...r, others, dry: DRY });
     }
-    // ── the JACK arm of the patchbay, the twin of patch.plan / patch.apply ──
-    //
-    // `jack.list` is the graph with every port's direction and type and every
-    // connection (`jack_lsp -c -p -t`). `jack.plan` takes `{ patch }`, a
-    // `jack.mjs` document, and answers the steps and the refusals without
-    // touching anything. `jack.apply` applies it and answers the graph READ
-    // BACK, because `jack_connect` exits 1 for "already connected" and for a
-    // failure alike.
-    // ⚠️ THE BOARD'S OWN CHAIN STILL WINS. `jack.apply` patches what it is
-    // told; it does not change what the board believes is playing, so a
-    // document that cuts the capture shows up in `jack.graph` as `extra` or
-    // `missing`, and `jack.rebuild` puts the board's chain back. That is on
-    // purpose: one source of truth about the instrument, and this verb a way to
-    // patch around it in the open.
-    // ⚠️ TOKENLESS, LIKE EVERY VERB ON THE RELAY. Its blast radius is the one
-    // jackd on this board, the same as `jack.rebuild` and `audio.stop`, so it
-    // carries the same `onlyIfIdle` refusal and the same journal line.
+    // jack.list (jack_lsp -c -p -t), jack.plan (steps and refusals, no change) and jack.apply
+    // (graph read back, since jack_connect exits 1 for "already" and for failure). The board's
+    // chain still wins.
+    // why: lessons/rig-board.md#jack-list
     case 'jack.list': {
       const g = listJack();
       return reply('jack.list', { ok: !g.error, ...g });
@@ -1585,31 +1036,15 @@ async function handle(msg, replyVia = null) {
         + `, read back ${r.ok ? 'agrees' : 'DISAGREES'}, ${others.length} other client(s) in the room`);
       return reply('jack.applied', { ...r, applied: !DRY, steps: planned.steps, doc: jackCanonical(msg.patch), others });
     }
-    // ── the bay half of the JACK arm, 2026-10-11 ──────────────────────────
-    //
-    // 🔴 A BAY LINK BETWEEN TWO OF THIS BOARD'S AUDIO PORTS, BY ITS BAY IDS.
-    // `jack.link { link: "<from> -> <to>" }` with ids this board ANNOUNCES
-    // (`pi-1:circuit:audio-out -> pi-1:pappus:audio-in`). The board resolves
-    // them to JACK ports from its own announcement, never from the page's
-    // copy, turns the one link into its rows (`jackRows`: one to one, summed,
-    // or spread), plans them against the live graph, applies, and answers the
-    // graph READ BACK. `jack.unlink` takes the same line. `jack.links` lists
-    // what is held, each with whether its rows are on the graph now.
-    // 🔴 A BAY LINK IS KEPT, AND THE BOARD'S OWN RE-PATCHES KEEP IT (§5 item 6,
-    // decided here): `setBayRows` hands every held row to `jacksynth.mjs`, whose
-    // `wire()` adds them to every document and whose `jackChain` counts them as
-    // wanted, so `fx.pappus` and `jack.rebuild` no longer undo a page's link.
-    // ⚠️ AN UNLINK CUTS ONLY WHAT NOTHING ELSE WANTS. `yoshimi -> capture` as a
-    // bay link is the same two rows as the board's own chain, and unlinking it
-    // must not silence the room; a row the chain or another bay link still
-    // wants stays.
-    // ⚠️ TOKENLESS, LIKE `jack.apply` (the owner, §5 item 8: *"No owner"*).
-    // Every applied change is a journal line with who asked.
+    // jack.link / jack.unlink "<from> -> <to>" by announced ids, resolved into jackRows, applied,
+    // read back. Held links survive re-patches; an unlink cuts only rows nothing else wants;
+    // jack.links lists.
+    // why: lessons/rig-board.md#jack-link
     case 'jack.link':
     case 'jack.unlink': {
       const unlink = msg.type === 'jack.unlink';
-      // ⚠️ `link: "<from> -> <to>"`, NEVER `from` AND `to` AS FIELDS: `from` is
-      // the envelope's sender (wire.mjs), and `format()` throws on the collision.
+      // `link: "<from> -> <to>"`, never `from`/`to` fields: `from` is the envelope's sender.
+      // why: lessons/rig-board.md#link-field
       const [fromId, toId] = String(msg.link ?? '').split(/\s*->\s*/);
       const answer = (body) => reply(unlink ? 'jack.unlinked' : 'jack.linked', { link: `${fromId} -> ${toId}`, ...body });
       const g = graphFacts ? graphOf(graphFacts) : null;
@@ -1679,11 +1114,8 @@ async function handle(msg, replyVia = null) {
   }
 }
 
-// ---------------------------------------------------------------- the socket
-//
-// Reconnect forever. Nobody is in that room, so "it gave up after five tries"
-// is the same as "it is dead" — but a tight retry loop against an edge that is
-// down is a self-inflicted outage, so back off and cap.
+// Reconnect forever, backing off with a cap.
+// why: lessons/rig-board.md#backoff
 let backoff = 500;
 function connect() {
   log(`dialing ${URL_} as ${FROM}`);
@@ -1705,10 +1137,9 @@ function connect() {
                           // The page programs' scsynth (scollide.mjs), announced as
                           // `collide` and `drums` (graph-registry.mjs `boardGraph`).
                           collide: collideAvailable() };
-    // `jack`: this board has a JACK graph, so its JACK ends are announced
-    // (graph-registry.mjs `boardGraph`). The sampler installed (it plays into the
-    // JACK capture) or an input on JACK; it read `jackSynthAvailable('yoshimi')`
-    // until Yoshimi left on 2026-10-13.
+    // `jack`: this board has a JACK graph (the sampler, or an input on JACK), so its JACK ends are
+    // announced.
+    // why: lessons/rig-board.md#jack-announce
     const jack = samplerAvailable() || [...inputsCfg.inputs.values()].some((i) => i.via === 'jack');
     graphFacts = { room: ROOM, site: SITE, net: NET, instruments, inputs: inputsCfg.inputs, ports: s.ports, jack,
                    midiPresent: (port) => fsMod.existsSync(`/proc/asound/${port}`),
@@ -1723,10 +1154,8 @@ function connect() {
     if (typeof e.data !== 'string') return;               // audio is ours, outbound only
     const { kind, msg } = parse(e.data);
     if (kind !== 'json' || msg.from === FROM) return;      // never answer yourself
-    // ⚠️ EVERY MESSAGE, NOT JUST THE ONES WITH A HANDLER. This is the only
-    // evidence the board has that a client is still at the other end, and a page
-    // that is merely LISTENING still polls. Dating it here rather than inside
-    // `handle()` means a verb nobody implements still proves somebody is there.
+    // Date every message, handled or not: it is the only evidence a client is still there.
+    // why: lessons/rig-board.md#every-message
     if (typeof msg.from === 'string') {
       clientSeen.set(msg.from, Date.now());
       // Bounded, so a long-lived board does not accumulate every tab that ever
@@ -1736,17 +1165,16 @@ function connect() {
         for (const [k, t] of clientSeen) if (t < cut) clientSeen.delete(k);
       }
     }
-    // Signalling for the direct path arrives here and ONLY here, answered or
-    // refused out loud: a page waiting on an offer nobody reads waits three
-    // seconds in silence, which is what /concepts/sampler/035/ did until
-    // 2026-10-11. A `ctl` channel cannot open another peer (rtc.mjs).
+    // Direct-path signalling arrives here only, answered or refused out loud; a ctl channel cannot
+    // open a peer.
+    // why: lessons/rig-board.md#rtc
     if (msg.type === 'rtc.offer' || msg.type === 'rtc.candidate') {
       if (mainDirect) mainDirect.signalling(msg);
       else if (msg.type === 'rtc.offer') send({ type: 'rtc.refused', peer: msg.peer, why: 'this board has not finished starting, use the relay' });
       return;
     }
-    // handle() is async now (raising a JACK chain takes seconds), so a throw
-    // arrives as a rejection — an unhandled one would take the service down.
+    // handle() is async, so a throw is a rejection; an unhandled one would take the service down.
+    // why: lessons/rig-board.md#rejection
     Promise.resolve().then(() => handle(msg)).catch((err) => {
       log('handler threw:', err.message);
       send({ type: 'board.error', re: msg.id, error: err.message });
@@ -1764,18 +1192,10 @@ function connect() {
   // reconnects and halve the backoff.
   ws.onerror = () => {};
 
-  /**
-   * A DEAD SOCKET DOES NOT ALWAYS CLOSE. Measured 2026-09-10: the Durable
-   * Object hibernated, the relay reported `sockets: 0`, and this process
-   * carried on with `readyState === 1` sending into nothing. No error, no
-   * close, no reconnect -- the board looked healthy and answered nobody, which
-   * is the exact failure mode a service in another room cannot afford.
-   *
-   * The fix uses a property the relay documents: it echoes every message back
-   * to the SENDER too. So the 5 s heartbeat is self-addressed proof of life --
-   * if it has not come back for three beats the socket is gone whatever it
-   * claims, and we reconnect rather than believe it.
-   */
+  // A dead socket does not always close: the relay echoes every message, so three missing
+  // heartbeats
+  // mean reconnect, whatever readyState says.
+  // why: lessons/rig-board.md#watchdog
   ws.__watchdog = setInterval(() => {
     if (ws.readyState !== 1) return;
     if (Date.now() - lastHeard < 16000) return;
@@ -1785,18 +1205,9 @@ function connect() {
   ws.__watchdog.unref?.();
 }
 
-// Alive before you need it: a heartbeat means "the board is fine, the question is
-// elsewhere" can be answered without going to the room.
-// ⚠️ AND IT CARRIES THE INSERT NOW. Two pages share this board and neither
-// could see the other change it; a heartbeat that already says what is playing
-// is the cheapest place to say who the granulator belongs to, because a page
-// learns about a change it did not make without asking for anything.
-// ⚠️ ONE SHAPE, ONE PLACE. `sweepInsert()` sends this too, the moment it drops
-// an insert, so a page does not wait up to five seconds to be told. Two copies
-// of this object is how a field ends up on one of them.
-// ✅ AND THE GRAPH SINCE 2026-10-04, so a page that joins between two hellos
-// can draw this board within one beat (plans/plan-universal-routing.md §11).
-// The shape itself is `beat.mjs`'s `aliveMsg`, where a test can read it.
+// The heartbeat carries the insert and the graph (beat.mjs `aliveMsg`); sweepInsert sends the same
+// object, one shape in one place.
+// why: lessons/rig-board.md#alive
 function alive() {
   return aliveMsg({ name: NAME, id: BOARD_ID, upSec: Math.round((Date.now() - since) / 1000),
                     audio: inst ? inst.source : stopSynth ? 'synth' : audio ? 'capture' : null,
@@ -1804,24 +1215,17 @@ function alive() {
                     direct: !!mainDirect?.direct });
 }
 setInterval(() => {
-  // 🔴 SWEEP BEFORE THE BEAT, NOT AFTER IT. `sweepInsert` is async and sends
-  // its own beat when it drops something, so ordering it first means the room
-  // never gets a heartbeat announcing an insert the board has already decided
-  // is orphaned. It returns immediately when there is nothing to do, which is
-  // every beat but one.
-  // ⚠️ `.catch` IS NOT DECORATION HERE. This one is not awaited, so a throw out
-  // of `pappusFx` would be an UNHANDLED rejection on a timer, and an unhandled
-  // rejection takes the whole service down. Same reason `handle()` is wrapped.
+  // Sweep before the beat, so no heartbeat announces an orphaned insert. `.catch` because it is not
+  // awaited.
+  // why: lessons/rig-board.md#sweep-first
   sweepInsert('the page that asked for it stopped talking')
     .catch((e) => log('the insert sweep threw:', e.message));
   mainDirect?.sweep();
   send(alive());
 }, 5000).unref?.();
 
-// The control plane's own report, once a second and ONLY while something is
-// moving. A page can hear the filter and cannot see what the board wrote, so
-// `in` against `out` is the only place a fold is visible from the outside, and
-// a report on a silent plane is a message a second spent saying nothing.
+// The control plane's report, once a second and only while something moves.
+// why: lessons/rig-board.md#ctl-said
 let ctlSaid = { in: 0, out: 0 };
 setInterval(() => {
   if (ctl.in === ctlSaid.in && ctl.out === ctlSaid.out) return;
@@ -1829,52 +1233,27 @@ setInterval(() => {
   send({ type: 'ctl.meter', ...ctlMeter() });
 }, 1000).unref?.();
 
-/**
- * ⚠️ Sweep orphans at startup. Audio children (jackd, a synth, an ffmpeg
- * capture) outlive a restarted service — systemd replaces the node process but
- * nothing reaps what it spawned. They then collide with the new chain: a stale
- * scsynth holding 33% of a core, two jack-dssi-hosts, and a capture whose jackd
- * somebody else killed, which presents as a board that answers pings and makes no
- * sound. Measured on the board twice.
- *
- * pkill -x, NEVER -f: the -f pattern would match this process's own command
- * line and kill the service being started.
- */
+// Sweep orphaned audio children at startup (they survive a service restart and collide with the new
+// chain). `pkill -x`, never `-f`, which would match this process.
+// why: lessons/rig-board.md#sweep-orphans
 function sweepOrphans() {
-  // ⚠️ `csound` STAYS IN THIS LIST THOUGH NOTHING HERE STARTS ONE ANY MORE. The
-  // reverb insert was a Csound process and was removed on 2026-09-17; a board
-  // that has not been rebooted since can still be holding one, and an orphan
-  // that survives a service restart keeps its JACK ports, so the next thing
-  // wanting those names patches into a process nobody is talking to. Audible,
-  // uncontrollable, and indistinguishable from the new one having failed. Same
-  // reasoning as `fluidsynth` below.
-  // ⚠️ `fluidsynth` AND `jack-dssi-host` STAY IN THIS LIST THOUGH NOTHING HERE
-  // SPAWNS THEM ANY MORE. The sweep runs at startup, and the run it has to
-  // survive is the one where the service restarts onto a NEW build while an old
-  // build's instrument is still holding the JACK graph. Removing them would
-  // strand exactly that board, and this list costs one `pkill` that finds
-  // nothing. See `archive/box-fluidsynth-hexter/`.
-  // `alsa_in` since 2026-10-11: an input on JACK (`inputs.mjs`) holds its
-  // device for as long as it runs, so one left by an old build would hold the
-  // Fast Track Pro and the new bridge would fail to open it.
+  // Names nothing here starts any more stay listed: an old build's process can still hold JACK or a
+  // device after a restart. `alsa_in` holds its card while it runs.
+  // why: lessons/rig-board.md#orphan-names
   for (const name of ['fluidsynth', 'jack-dssi-host', 'yoshimi', 'sclang', 'scsynth', 'csound', 'ffmpeg', 'alsa_in', 'jackd']) {
     try { execFileSync('pkill', ['-9', '-x', name], { stdio: 'pipe' }); log(`swept a stray ${name}`); }
     catch { /* nothing of that name, which is the normal case */ }
   }
 }
 if (backend() === 'alsa') sweepOrphans();
-// ⚠️ AND THE VIDEO ENCODER, WHICH `sweepOrphans` CANNOT SAFELY REACH LATER.
-// It runs `pkill -9 -x ffmpeg`, which at startup is fine because nothing is
-// running — but the board's own audio capture is also an ffmpeg, so the same
-// sweep during operation would silence the instrument. The video encoder is
-// told apart by reading raw frames on stdin. An orphan here holds an exclusive
-// device and makes the picture permanently unavailable.
+// Stray video encoders are swept separately: `pkill -x ffmpeg` later would kill the audio capture
+// too.
+// why: lessons/rig-board.md#encoders
 sweepStrayEncoders((l) => log('video:', l));
 
-// ── the Pi camera, for holders of a key only ─────────────────────────────────
-// camera.mjs has the why. It joins `<room>-cam` with BOARD_CAM_KEY and starts
-// the camera only for a viewer the relay let into that room, never for a verb in
-// this board's own tokenless room. With no key set it joins nothing.
+// The Pi camera, joined in `<room>-cam` with BOARD_CAM_KEY, started only for a viewer the relay
+// admitted.
+// why: lessons/rig-board.md#camera
 const camera = (DRY || ONCE) ? null : createCameraRoom({
   relay: RELAY, room: `${ROOM}-cam`, key: process.env.BOARD_CAM_KEY || '',
   log: (l) => log(l), encoderBusy: () => !!video,
@@ -1886,45 +1265,33 @@ const camera = (DRY || ONCE) ? null : createCameraRoom({
   },
 });
 
-// Whether the board announces `pi-1:camera` (graph-registry.mjs `boardGraph`):
-// a key set AND a camera found. Asked ONCE here, because `findCamera` spawns
-// `rpicam-hello` synchronously and the hello must not block on it; a camera
-// plugged in later shows up at the next service restart. `camera.mjs` asks again
-// on every start, so this decides only what is announced, never what runs.
+// Announce `pi-1:camera` only with a key and a camera found, asked once (findCamera spawns
+// synchronously).
+// why: lessons/rig-board.md#camera-found
 const cameraFound = !!camera?.enabled && findCamera().ok === true;
 if (camera?.enabled) log(`camera: ${cameraFound ? 'found, announced as camera' : 'none found, so none is announced'}`);
 
-// ── hardware inputs, each in a room of its own ───────────────────────────────
-// inputs.mjs has the why. Configured in /etc/default/positron-board as
-// BOARD_INPUTS, and a bad entry is reported here and skipped rather than
-// taking the board down.
+// Hardware inputs, each in its own room, from BOARD_INPUTS; a bad entry is reported and skipped.
+// why: lessons/rig-board.md#inputs
 const inputsCfg = parseInputs(process.env.BOARD_INPUTS || '');
 for (const p of inputsCfg.problems) log('inputs:', p);
-// 🔴 jackd ON AN INPUT'S CARD, SINCE 2026-10-11: set BEFORE anything can raise
-// jackd, so the first server is already the right one (jacksynth.mjs
-// `ensureJackd` has the measurement that asked for it).
+// jackd on an input's card, set before anything can raise jackd.
+// why: lessons/rig-board.md#jackd-card
 {
   const c = [...inputsCfg.inputs.values()].find((i) => i.jackd);
   setJackCard(c ? { name: c.name, device: c.device, channels: c.channels, ...c.jackd } : null);
   if (c) log(`inputs: jackd runs on ${c.device}, so ${c.name} is the clock`);
 }
-// 🔴 THE DIRECT PATH IS OPTIONAL, AND ITS ABSENCE IS NOT A FAULT. node-datachannel
-// is this board's first npm dependency (rig/board/package.json, installed by
-// push.sh and setup.sh), and a board without it runs exactly as before with the
-// relay only. rtc.mjs has the why and the P0 measurement.
-// ⚠️ ASKED FOR WHETHER OR NOT THERE ARE INPUTS, SINCE 2026-10-11: the main
-// socket has the direct path too (below), and it was only loaded for inputs.
+// The direct path is optional (node-datachannel); without it the board runs on the relay only.
+// why: lessons/rig-board.md#peer
 let PeerConnection = null;
 try { PeerConnection = (await import('node-datachannel')).default.PeerConnection; log('direct path available (node-datachannel)'); }
 catch (e) { log('no direct path, node-datachannel is not installed:', e.code || e.message); }
 
-// 🔴 THE MAIN SOCKET'S DIRECT PATH, SINCE 2026-10-11. Until then only the input
-// rooms (`<room>-<input>`, inputs.mjs) answered an offer, so a page in this room
-// (`/concepts/sampler/035/`) offered into a socket that had no handler for it
-// and waited three seconds in silence. The same handler as the relay, so a note
-// over `ctl` for node `sampler` or for Yoshimi does what it does over the relay;
-// the answer goes back on `ctl`. A ctl message has no `from`, so it is given
-// one per peer and dated in `clientSeen` exactly as a relay message is.
+// The main socket answers offers too, with the same handler as the relay; each ctl peer gets a
+// `from`
+// and is dated in clientSeen.
+// why: lessons/rig-board.md#main-direct
 mainDirect = createMainDirect({
   PeerConnection, signal: send, frame: FRAME, rate: RATE, log: (...a) => log('direct:', ...a),
   handle: (m, reply, peer) => {
@@ -1943,8 +1310,9 @@ setCaptureUnit((u) => mainDirect.unit(u));
 const hwInputs = createInputs({
   inputs: inputsCfg.inputs, room: ROOM, relay: RELAY, frame: FRAME, rate: RATE, name: NAME, id: BOARD_ID,
   spawn, WebSocket, format, parse, randomId, fs: fsMod, log: (...a) => log('input', ...a), PeerConnection,
-  // The camera's frames may ride a page's direct link to an input, behind the
-  // camera's own two gates (camera.mjs `attachDirect`), since 2026-10-13.
+  // The camera's frames may ride a page's direct link to an input, behind the camera's own two
+  // gates.
+  // why: lessons/rig-board.md#camera-direct
   camera,
   // Only an input configured `via: "jack"` touches this (inputs.mjs).
   jack: { ensure: () => ensureJackd({ onLog: (l) => log('input', l) }),

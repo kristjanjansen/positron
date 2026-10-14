@@ -1,102 +1,7 @@
-// demo/verify-quest.mjs — drives the META QUEST BROWSER on a real headset,
-// over adb + CDP, the way demo/verify.mjs drives desktop Chrome.
-//
-//   node demo/verify-quest.mjs                # every built demo tagged `WebXR`
-//                                             # in demo/manifest.mjs — the tag
-//                                             # IS the list; there is no second one
-//   node demo/verify-quest.mjs weight         # just this one, by slug
-//   node demo/verify-quest.mjs --all          # every built demo, on the headset
-//   node demo/verify-quest.mjs --self-test    # the negative control; NO DEVICE NEEDED
-//   DEMO_BASE=https://positron.studio node demo/verify-quest.mjs
-//
-// It skips cleanly — exit 0, with instructions — when there is no `adb` and
-// when no device is attached. A check nobody can run is a check nobody runs.
-//
-// ⚠️ WHY THIS EXISTS. `verify.mjs` runs desktop Chrome. Measured on this Mac
-// 2026-09-11, Chrome 152 headless, on a secure `http://127.0.0.1:<port>` origin:
-//
-//     navigator.xr                       present, a NATIVE XRSystem
-//     isSessionSupported('inline')       true
-//     isSessionSupported('immersive-vr') FALSE
-//     isSessionSupported('immersive-ar') FALSE
-//     (and on a fresh about:blank target, isSecureContext is false and
-//      navigator.xr is absent entirely — so WHERE you ask changes the answer)
-//
-// So a headset demo's immersive branch is unreachable there, and per CLAUDE.md a
-// page whose first assert sits behind that reports "asserted nothing" — which
-// reads as broken — or asserts its own fallback and reads as fine. That is this
-// project's most expensive recurring failure: 261/261 green while a demo was
-// fatally broken on iPhone; 291 asserts across three pages that had never played
-// a frame of HLS. XR would reproduce it exactly.
-//
-// ⚠️ AND THE CHEAP FIX IS THE SAME TRAP IN A NEW ACCENT. Meta ships the
-// Immersive Web Emulator (a Chrome extension, and the runtime behind their MCP
-// tooling) and says its coverage is "on par with the WebXR support in the Meta
-// Quest Browser". That is a marketing claim, not a measurement — it is "desktop
-// Chrome covers the iPhone path" with a different logo. The emulator supplies a
-// FAKE XR device: no compositor, no real reprojection, no real frame budget, no
-// real hand tracking. A suite graded on it is green about a machine nobody
-// wears. So the first thing this file does is refuse to grade anything until it
-// has established, four independent ways, that it is talking to real hardware
-// — exactly the shape of verify-gl.mjs's SwiftShader refusal, for the same
-// reason: without it every number below is unattributable.
-//
-// HOW IT SEPARATES A HEADSET FROM THE EMULATOR — four channels, two of them
-// outside the browser entirely. ⚠️ THE TWO IN-PAGE ONES EACH CATCH EXACTLY WHAT
-// THE OTHER CANNOT, which is why neither is used alone:
-//
-//   1. DEVICE IDENTITY, read over adb with `getprop`. A Chrome extension on a
-//      laptop cannot put an Oculus/Meta hardware identity on the far end of an
-//      adb connection. This is the far side of the boundary, and it is the one
-//      that cannot be faked from page script. (CLAUDE.md: "a count is only
-//      evidence on the far side of the boundary".)
-//   2. THE XR OBJECT IS NATIVE, not a polyfill. Every method on `navigator.xr`'s
-//      prototype must stringify as `[native code]`, `navigator` must not own the
-//      property, and it must be an accessor on `Navigator.prototype`. IWER
-//      installs a JavaScript XRSystem; JavaScript methods stringify to their
-//      source. → catches a FAKE DEVICE. Passed by any real browser, headset or
-//      not, so it cannot say "headset" on its own.
-//   3. `isSessionSupported('immersive-vr')` IS TRUE. → catches a REAL BROWSER
-//      WITH NO HEADSET (desktop Chrome answers false, measured above). Defeated
-//      by a fake device, which answers true to everything — which is the whole
-//      reason 2 exists. Neither gate is sufficient; together they are.
-//   4. THE COMPOSITOR, via `adb logcat -s VrApi`, which prints `FPS=` and
-//      `Stale=` once a second from OUTSIDE the page while a session presents.
-//      An emulator has no compositor to print them.
-//
-// ⚠️ 2 AND 3 WERE ONE CHECK IN THE FIRST DRAFT, AND THAT WAS THE BUG THIS FILE
-// IS ABOUT. "Is it a headset" was being answered by "is the XR object real",
-// which is a question next to it and not it — CLAUDE.md's first rule. The
-// negative control below is what caught it, on a machine with no headset in the
-// building, which is the only reason it is not still in here.
-//
-// What it deliberately does NOT claim: **which Quest this is.** §1.7 of
-// research/quest-xr-2026-09.md measured that a Quest 3S reports the user-agent
-// device token `Quest 3`, same as a Quest 3 and same as the Xbox Edition. The
-// model is PRINTED, from `getprop`, and never asserted on — and no line here
-// says "Quest 3" on the strength of a user agent.
-//
-// Five adaptations somebody else already paid for (research §3.3):
-//   · Do not create a tab. Quest Browser keeps launched intents around
-//     aggressively; belowjs's harness refuses to add tabs. This attaches to an
-//     EXISTING page target and navigates it.
-//   · `Page.bringToFront` before anything XR — WebXR needs the page visible.
-//   · `Runtime.evaluate` with `userGesture: true` for every control press;
-//     `immersive-vr` needs a transient user activation.
-//   · `Page.captureScreenshot` cannot see the immersive view, only the 2D panel.
-//     Nothing here looks at ink, so that costs us nothing.
-//   · The devtools socket name is NOT stable — three are in the wild. Discover
-//     it from /proc/net/unix; never hard-code it.
-//
-// NOT DONE ON PURPOSE: Meta's Scriptable Testing Services can hold the device
-// awake for an unattended run
-// (`adb shell content call --uri content://com.oculus.rc --method SET_PROPERTY
-// --extra … disable_autosleep`). Leaving that on drains the battery and risks
-// burn-in — Meta says so. If you want it, set it by hand and restore it by
-// hand; a harness that can crash is the wrong owner for that flag.
-//
-// Raw CDP over node's global WebSocket, no deps — house harness style, same as
-// verify.mjs.
+// node demo/verify-quest.mjs [slug | --all | --self-test]: the Meta Quest Browser over adb and CDP,
+// `WebXR`-tagged demos. Refuses to grade until real hardware is shown four ways (getprop, a native
+// navigator.xr, immersive-vr supported, VrApi logcat); no emulator. Skips cleanly with no device.
+// why: lessons/harness.md#quest
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -105,9 +10,8 @@ import { DEMOS } from './manifest.mjs';
 import { launchChrome } from './chrome.mjs';
 
 const ADB = process.env.ADB || 'adb';
-// ⚠️ NOT verify.mjs's 8890 and not verify-gl.mjs's 8892: all three may be
-// running. serve() takes the next free port anyway and says so, and the port
-// ACTUALLY bound is read back below — a fixed port is a shared mutable global.
+// Not 8890 or 8892, since all three harnesses may run; the bound port is read back anyway.
+// why: lessons/harness.md#quest-port
 const HTTP_PORT = 8894;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -115,22 +19,14 @@ const argv = process.argv.slice(2);
 const SELF_TEST = argv.includes('--self-test');
 const RUN_ALL = argv.includes('--all');
 const want = argv.filter((a) => !a.startsWith('--'));
-// 🔴 TWO TIERS, the same switch `verify.mjs` reads (demo/shell/selfcheck.mjs):
-// `DEMO_DEEP=1` or `--deep` asks for `selfcheck=2` and waits the full
-// `settleMs`; an ordinary run asks for `selfcheck=1` and waits `lightSettleMs`
-// where a page declares one. `--deep` is a tier, not a slug: `want` above
-// already drops every `--` argument.
+// Two tiers as in verify.mjs: DEMO_DEEP=1 or --deep is selfcheck=2 with the full settleMs.
+// why: lessons/harness.md#quest-tiers
 const DEEP = process.env.DEMO_DEEP === '1' || argv.includes('--deep');
 const settleOf = (t) => (DEEP || t.lightSettleMs == null ? t.settleMs : t.lightSettleMs);
 
-// ── the probe, defined ONCE ─────────────────────────────────────────────────
-// Parameterised over the property name so the self-test below can run the very
-// same source against a property whose nativeness is already known. A guard
-// tested by a paraphrase of itself is not tested.
-//
-// It reads descriptors rather than values: touching an accessor on a prototype
-// with the prototype as receiver throws "Illegal invocation" in Chromium, and a
-// probe that throws reports "absent" about something that is present.
+// The probe, defined once and parameterised so the self-test runs the same source. It reads
+// descriptors: reading a prototype accessor on the prototype throws "Illegal invocation".
+// why: lessons/harness.md#native-probe
 const NATIVE_PROBE = (prop) => `(() => {
   const name = ${JSON.stringify(prop)};
   const own = Object.prototype.hasOwnProperty.call(navigator, name);
@@ -161,17 +57,9 @@ const NATIVE_PROBE = (prop) => `(() => {
   };
 })()`;
 
-/**
- * Is this object supplied by the BROWSER, or installed by script?
- *
- * Every clause is a thing a JavaScript polyfill cannot have and a compiled-in
- * Web IDL attribute always has. `jsSourced` is the load-bearing one: IWER's
- * XRSystem is a JavaScript class, and a JavaScript method stringifies to its
- * own source.
- *
- * Returns { real, why } — `why` is printed either way, so a pass says what
- * convinced it rather than just saying yes.
- */
+// Is this object the browser's or script's? A JavaScript method stringifies to its own source.
+// Returns { real, why }; `why` is printed either way.
+// why: lessons/harness.md#native-verdict
 function nativeVerdict(p) {
   if (!p.present) {
     return {
@@ -203,14 +91,9 @@ function nativeVerdict(p) {
   };
 }
 
-/**
- * Is a HEADSET on the other end of this browser?
- *
- * Two gates, and `gate` names which one refused — because "the XR object is
- * fake" and "the XR object is real and there is no headset behind it" are
- * different findings with different fixes, and a single boolean collapses them
- * into one message that is wrong half the time.
- */
+// Is a headset behind this browser? Two gates, and `gate` names which refused: a fake object and a
+// real one with no headset are different findings.
+// why: lessons/harness.md#headset-verdict
 function headsetVerdict(native, vrSupported) {
   if (!native.real) return { real: false, gate: 'native', why: native.why };
   if (vrSupported !== true) {
@@ -231,32 +114,10 @@ const ok = (label, cond, detail) => {
   else { fail++; console.log(`  FAIL  ${label}${detail !== undefined ? `  — ${detail}` : ''}`); }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// THE NEGATIVE CONTROL
-//
-// ⚠️ PROVE A GUARD FIRES. The refusal above is the whole value of this file, and
-// a refusal nobody has seen refuse is a hope. `--self-test` breaks it on purpose
-// in a real browser, against the same NATIVE_PROBE source and the same
-// nativeVerdict/headsetVerdict the real run uses — not a paraphrase of them.
-//
-//   A1  desktop Chrome's own navigator.xr   -> nativeVerdict must ACCEPT
-//   A2  ...and the same browser             -> headsetVerdict must REFUSE, at
-//                                              the `device` gate
-//   B   an IWER-shaped JavaScript xr that
-//       CLAIMS immersive-vr                 -> headsetVerdict must REFUSE, at
-//                                              the `native` gate
-//
-// A1 is the positive control, and it is on the property actually in question
-// rather than a stand-in: a guard that refuses everything would pass A2 and B
-// and be worthless. A2 and B are the two halves that each catch what the other
-// misses — B's fake answers `immersive-vr: true`, so gate 3 alone would wave it
-// through; A2's browser is entirely genuine, so gate 2 alone would too.
-//
-// VERIFIED: run today, no headset in the building. The FIRST version of this
-// self-test FAILED its own case A, and it was right to — the guard was asking
-// "is the XR object real" where the question was "is there a headset". That is
-// how these three cases came to exist in this shape.
-// ─────────────────────────────────────────────────────────────────────────────
+// --self-test proves the guard fires, no device needed: desktop Chrome's xr must pass as native
+// (A1)
+// and fail the headset gate (A2); an IWER-shaped JS xr claiming immersive-vr must fail native (B).
+// why: lessons/harness.md#self-test
 if (SELF_TEST) {
   const server = await serve(HTTP_PORT);
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -283,7 +144,8 @@ if (SELF_TEST) {
   console.log(`  browser  ${(await ev('navigator.userAgent')).replace(/^Mozilla\/5\.0 /, '')}`);
   console.log(`  origin   ${await ev('location.origin')}  secure=${await ev('!!self.isSecureContext')}`);
 
-  // ── A · a genuine browser with no headset behind it ───────────────────────
+  // A: a genuine browser with no headset behind it.
+  // why: lessons/harness.md#case-a
   const aNative = nativeVerdict(await ev(NATIVE_PROBE('xr')));
   const aVr = await ev(`navigator.xr ? navigator.xr.isSessionSupported('immersive-vr').catch(() => null) : null`);
   const a = headsetVerdict(aNative, aVr);
@@ -291,10 +153,8 @@ if (SELF_TEST) {
   ok('A2 · ...and the browser is still REFUSED as a headset, at the device gate',
      a.real === false && a.gate === 'device', a.why);
 
-  // ── B · an IWER-shaped injection that says all the right things ───────────
-  // A JavaScript XRSystem defined straight onto the navigator instance,
-  // answering isSessionSupported('immersive-vr') with TRUE. That last part is
-  // the whole point: it is a liar, and gate 3 believes it.
+  // B: a JavaScript XRSystem on the navigator answering immersive-vr true, which gate 3 believes.
+  // why: lessons/harness.md#case-b
   await ev(`(() => {
     class XRSystem extends EventTarget {
       async isSessionSupported(mode) { return mode === 'immersive-vr' || mode === 'immersive-ar'; }
@@ -314,9 +174,8 @@ if (SELF_TEST) {
   process.exit(fail ? 1 : 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// THE REAL RUN
-// ─────────────────────────────────────────────────────────────────────────────
+// The real run.
+// why: lessons/harness.md#real-run
 
 /** adb, with the exit status handed back rather than thrown. */
 function adb(args) {
@@ -417,15 +276,8 @@ function cleanup() {
 process.on('exit', cleanup);
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanup(); process.exit(130); });
 
-// ── ASSERT 1, BEFORE ANY PAGE: is this real hardware? ───────────────────────
-// Read off the DEVICE, not out of the browser. A Chrome extension on a laptop
-// cannot put an Oculus hardware identity on the far end of an adb connection,
-// which is the whole reason this check is here and not in page script.
-//
-// One `getprop` with no argument returns the entire table, so there is no
-// guessing which property name this build happens to carry — a guessed name
-// that is absent reads as "not a Quest", which is a broken instrument reported
-// as a finding.
+// Assert 1, before any page: real hardware, read off the device with one full `getprop`.
+// why: lessons/harness.md#assert-1
 const props = new Map();
 for (const line of adb(['shell', 'getprop']).out.split('\n')) {
   const m = /^\[([^\]]+)\]:\s*\[(.*)\]\s*$/.exec(line.trim());
@@ -446,20 +298,16 @@ ok('this is Quest hardware, read off the device and not out of a user agent',
    isHeadset
      ? `${prop('ro.product.manufacturer') || '?'} · ${oculusProps.length} ro.oculus/ro.vros properties · com.oculus.browser ${hasBrowser ? 'installed' : 'ABSENT'}`
      : `manufacturer "${prop('ro.product.manufacturer')}", model "${prop('ro.product.model')}", no Oculus properties, no com.oculus.browser`);
-// ⚠️ PRINTED, NEVER ASSERTED ON. §1.7: a Quest 3S reports the user-agent device
-// token `Quest 3`, same as a Quest 3 and same as the Xbox Edition — so nothing
-// here may say which one this is on the strength of a string. `getprop` MAY be
-// more specific than the user agent; that is UNCONFIRMED and it is reported raw
-// either way rather than interpreted.
+// Printed, never asserted: a Quest 3S reports the user-agent token `Quest 3`.
+// why: lessons/harness.md#model
 console.log(`  model    ${prop('ro.product.model') || '(unset)'}   device ${prop('ro.product.device') || '(unset)'}`);
 console.log(`  os       Horizon ${prop('ro.vros.build.version') || '(no ro.vros.build.version)'} · on Android ${prop('ro.build.version.release') || '?'} · build ${prop('ro.build.id') || prop('ro.build.version.incremental') || '?'}`);
 console.log('  (the model string is reported, not asserted on: a Quest 3S and a Quest 3');
 console.log('   are not distinguishable by user agent, so no line here claims which it is)');
 
 if (!isHeadset) {
-  // ⚠️ REFUSE, do not carry on — verify-gl.mjs's rule. A run graded on
-  // something that is not the headset is a run about a machine nobody wears,
-  // and burying that as "1 failure among 40 passes" is how it gets missed.
+  // Refuse to grade the rest: a run on anything but the headset is about a machine nobody wears.
+  // why: lessons/harness.md#quest-refuse
   console.log('\n  ⚠ REFUSING TO GRADE ANYTHING ELSE.');
   console.log('    Whatever is on the other end of this adb connection is not a Quest.');
   console.log('    This harness exists to reach the real compositor; nothing else it could');
@@ -472,11 +320,9 @@ if (!hasBrowser) {
   process.exit(1);
 }
 
-// ── the local server, reversed onto the device ──────────────────────────────
-// `adb reverse` binds the listener on the DEVICE's loopback, so the page's
-// origin really is http://localhost:<port> — which Meta blesses explicitly:
-// "Browser allows WebXR on localhost servers without a secure connection or SSL
-// certificate". A LAN IP is NOT a secure context and will not run WebXR.
+// `adb reverse` makes the page's origin http://localhost:<port>, where WebXR runs without TLS.
+// A LAN IP is not a secure context.
+// why: lessons/harness.md#reverse
 let BASE = process.env.DEMO_BASE || null;
 if (!BASE) {
   server = await serve(HTTP_PORT);
@@ -501,19 +347,9 @@ if (!BASE) {
 console.log(DEEP ? 'tier: DEEP, the long-running checks included'
   : 'tier: ordinary (DEMO_DEEP=1 node demo/verify-quest.mjs ... adds the long-running checks)');
 
-// ── ASSERT 2: reach the Quest Browser's devtools socket ─────────────────────
-// ⚠️ THE SOCKET NAME IS NOT STABLE. Three are in the wild:
-//   com.oculus.browser_devtools_remote   Quest Browser's own
-//   chrome_devtools_remote               the Android default
-//   weblayer_devtools_remote_<pid>       when the system WebLayer took the URL
-// IsaacTeleop forces `-p com.oculus.browser` specifically because WebLayer
-// "does not fully plumb controller input sources through". So: discover the
-// name, prefer the Browser's, and SAY which one was used.
-//
-// The grep is done here rather than on the device: BusyBox's `grep -o` is not
-// the same tool everywhere, and shell quoting through `adb shell` is one more
-// thing that can silently return nothing (LESSONS: a partial result that is too
-// tidy is a broken collector, not a finding).
+// Assert 2: the devtools socket, discovered from /proc/net/unix (three names exist), preferring
+// com.oculus.browser's, and said which. Grepped here, not on the device.
+// why: lessons/harness.md#sockets
 function findSockets() {
   const unix = adb(['shell', 'cat', '/proc/net/unix']).out;
   const names = new Set();
@@ -528,8 +364,8 @@ function rankSocket(n) {
 
 let sockets = findSockets();
 if (!sockets.length) {
-  // The Browser is not running, or not running debuggable. Start it ON the page
-  // we want — this is also how you open a URL without wearing the headset.
+  // Start the Browser on the page we want; also how to open a URL without wearing the headset.
+  // why: lessons/harness.md#start-browser
   console.log('  no devtools socket yet — starting com.oculus.browser');
   adb(['shell', 'am', 'start', '-a', 'android.intent.action.VIEW',
        '-d', `${BASE}/`, '-p', 'com.oculus.browser']);
@@ -551,9 +387,8 @@ if (rankSocket(socket) === 2) {
   console.log('    input assert here may be about WebLayer and not about Quest Browser.');
 }
 
-// ⚠️ AND LET THE OS CHOOSE THE LOCAL PORT. A fixed one is a shared mutable
-// global: verify-gl.mjs attached to a Chrome left over from the previous run and
-// reported that run's flags. `adb forward tcp:0` prints the port it took.
+// Let the OS choose the local port: `adb forward tcp:0` prints it.
+// why: lessons/harness.md#local-port
 let localPort = null;
 const fwd = adb(['forward', 'tcp:0', `localabstract:${socket}`]);
 if (fwd.ok && /^\d+$/.test(fwd.out)) localPort = Number(fwd.out);
@@ -574,10 +409,8 @@ if (!version?.webSocketDebuggerUrl) {
   console.log('\n  ⚠ the forwarded port never answered /json/version.\n');
   process.exit(1);
 }
-// The Browser BUILD, from the browser itself. §1.7: the token is still
-// `OculusBrowser/`, there is no `MetaQuestBrowser/`, and since the re-base the
-// OculusBrowser major has equalled the Chrome major — OBSERVED, never
-// announced, so both are printed and neither is derived from the other.
+// The Browser build from the browser itself; OculusBrowser and Chrome versions both printed.
+// why: lessons/harness.md#build
 const uaLine = version['User-Agent'] || '';
 const browserBuild = /OculusBrowser\/([\d.]+)/.exec(uaLine)?.[1] || null;
 const chromeBuild = /Chrome\/([\d.]+)/.exec(uaLine)?.[1] || version.Browser || '?';
@@ -589,10 +422,8 @@ if (!browserBuild) {
   process.exit(1);
 }
 
-// ── attach to an EXISTING page; never create one ────────────────────────────
-// Quest Browser keeps launched intents around aggressively, and belowjs's
-// harness refuses to add tabs for that reason. verify.mjs's
-// `Target.createTarget` is exactly the wrong move here.
+// Attach to an existing page target and navigate it; never create a tab.
+// why: lessons/harness.md#targets
 async function pageTargets() {
   const list = await (await fetch(`http://127.0.0.1:${localPort}/json/list`)).json();
   return list.filter((t) => t.type === 'page' && !/^devtools:|^chrome:/.test(t.url || ''));
@@ -619,11 +450,9 @@ await S('Page.enable'); await S('Runtime.enable'); await S('Log.enable'); await 
 // is asked for, not after a session request has already been refused.
 await S('Page.bringToFront').catch(() => {});
 
-// `userGesture` matters for every control press: immersive-vr needs a transient
-// user activation. Our shell uses plain addEventListener('click'), so this
-// should be enough on its own — ESTIMATED; IsaacTeleop needed a synthetic
-// Input.dispatchMouseEvent as well, but only because React's onClick ignores
-// the synthesised activation on Quest's touch-first routing.
+// `userGesture` on every press: immersive-vr needs a transient activation (enough for plain
+// listeners).
+// why: lessons/harness.md#quest-gesture
 async function ev(expr, { gesture = false } = {}) {
   const r = await S('Runtime.evaluate', {
     expression: expr, awaitPromise: true, returnByValue: true, userGesture: gesture,
@@ -632,9 +461,8 @@ async function ev(expr, { gesture = false } = {}) {
   return r.result.value;
 }
 
-// ── ASSERTS 3 AND 4: a real XR object, and a real device behind it ──────────
-// This runs on a page from BASE, so the origin is the one the demos will use —
-// asking on about:blank would answer about a different security context.
+// Asserts 3 and 4 on a page from BASE: about:blank is a different security context.
+// why: lessons/harness.md#assert-3
 await S('Page.navigate', { url: `${BASE}/` });
 await sleep(1200);
 const xrProbe = await ev(NATIVE_PROBE('xr'));
@@ -652,8 +480,8 @@ const headset = headsetVerdict(xr, vrSupported);
 
 console.log('\n[webxr]');
 console.log(`  origin   ${xrProbe.origin}  secure=${xrProbe.secure}`);
-// Two asserts, never one. They fail for different reasons and the reasons have
-// different fixes — see headsetVerdict.
+// Two asserts, never one: they fail for different reasons with different fixes.
+// why: lessons/harness.md#two-asserts
 ok('navigator.xr is the BROWSER\'S, not an emulator polyfill', xr.real, xr.why);
 ok('immersive-vr is supported — something is actually on your head', vrSupported === true,
    xr.real ? `immersive-vr ${vrSupported} · immersive-ar ${arSupported}` : 'not asked: there is no genuine navigator.xr to ask');
@@ -676,11 +504,8 @@ if (!headset.real) {
   process.exit(1);
 }
 
-// ── the compositor channel, from OUTSIDE the page ───────────────────────────
-// `adb logcat -s VrApi` prints FPS= and Stale= once a second, from the
-// compositor. That is the far side of the boundary: the page's own opinion of
-// its frame rate and this number disagreeing is exactly the kind of thing this
-// project exists to notice — and an emulator has no compositor to print them.
+// The compositor's FPS= and Stale= from `adb logcat -s VrApi`, outside the page.
+// why: lessons/harness.md#vrapi
 const vrapi = [];                       // { t, fps, stale }
 adb(['logcat', '-c']);
 logcat = spawn(ADB, ['logcat', '-s', 'VrApi'], { stdio: ['ignore', 'pipe', 'ignore'] });
@@ -712,11 +537,8 @@ cdp.listeners.push((m) => {
   }
   if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error') {
     const e = m.params.entry;
-    // A 404 on an LL-HLS PART is normal at the live edge; ERR refuses segments
-    // by programme rights with a 403 that reaches the page as CORS. Both are
-    // recorded separately and CAPPED, never ignored — silence here would hide a
-    // real outage as "normal churn". Same table as verify.mjs so a number means
-    // the same thing in both.
+    // LL-HLS part 404s and ERR rights 403s are recorded separately and capped, as in verify.mjs.
+    // why: lessons/harness.md#edge-404
     if (/seg_\d+_part|_part_all\.mp4|\.m4s(\?|$)/.test(e.url || '') && /\b404\b/.test(e.text || '')) edgeMisses.push(e.url);
     else if (/live\.err\.ee/.test(`${e.url || ''} ${e.text || ''}`) && /\b403\b|CORS|ERR_FAILED/.test(e.text || '')) probed.push(e.url);
     else errors.push(e.text);
@@ -729,16 +551,8 @@ cdp.listeners.push((m) => {
   }
 });
 
-// ── which demos ─────────────────────────────────────────────────────────────
-// ⚠️ CHECKED AFTER THE HEADSET, NOT BEFORE IT — verify-gl.mjs's rule. Exiting
-// early on "no XR demos yet" would mean this file could not answer the question
-// it exists for, and it would read `0 green` on a desk with no headset on it,
-// which is what it reads on a desk with one.
-// ⚠️ SELECTED BY THE MANIFEST'S OWN `tags`, NOT BY A SECOND LIST. manifest.mjs
-// already says `tags — the tech it actually uses; demo/shell/caps.mjs reads
-// REQUIREMENTS off these, so there is no second needs: list to forget`. A
-// `quest: true` flag alongside it would be exactly that second list, and this
-// repo has already paid for keeping one identity in five places.
+// Checked after the headset; selected by the manifest's own `WebXR` tag, not a second list.
+// why: lessons/harness.md#which-demos
 const isXr = (d) => (d.tags || []).includes('WebXR');
 const built = DEMOS.filter((d) => d.built);
 const targets = want.length
@@ -761,10 +575,8 @@ for (const t of targets) {
   console.log(`\n[${t.name}]`);
   errors = []; failedReqs = []; abortedReqs = []; edgeMisses = []; probed = []; reqUrl.clear();
   const sinceT = Date.now();
-  // `selfcheck=1` for the same reason verify.mjs appends it: a page keeps
-  // anything that opens a file, makes a sound, presses a control or moves the
-  // picture behind that flag, so a harness that does not set it grades a page
-  // with its checks switched off. ⚠️ DEMO_QUERY goes first, so an override wins.
+  // selfcheck=1 as in verify.mjs; DEMO_QUERY first so an override wins.
+  // why: lessons/harness.md#quest-selfcheck
   const q = [process.env.DEMO_QUERY, DEEP ? 'selfcheck=2' : 'selfcheck=1'].filter(Boolean).join('&');
   const query = `?${q}`;
   await S('Page.navigate', { url: `${BASE}/${t.name}/${query}` });
@@ -783,23 +595,14 @@ for (const t of targets) {
 
   const meta = await ev('({ name: __demo.name, keys: Object.keys(__demo.readout), readoutOptOut: !!__demo.readoutOptOut })');
   ok('identity matches manifest', meta.name === t.name, meta.name);
-  // ⚠️ THE SAME OPT-OUT `demo/verify.mjs` HAS, AND THIS FILE DID NOT GROW IT.
-  // A page may declare that it has nothing to put in a readout, and it says so
-  // with `readout: null` rather than by omitting the field, so "this page's
-  // subject is visible rather than numeric" cannot be confused with somebody
-  // forgetting. `verify.mjs` has read that flag since `/typist/` shipped; this
-  // harness went on asserting a readout, so `/floor/` dropping its four cells
-  // on 2026-09-19 would have taken this file red on a page where nothing is
-  // wrong. Two harnesses grading one rule two ways is the defect, not the page.
+  // The same `readout: null` opt-out verify.mjs reads.
+  // why: lessons/harness.md#quest-readout
   ok(meta.readoutOptOut ? 'declares that it has no readout, on purpose' : 'declares a readout',
     meta.readoutOptOut || meta.keys.length > 0,
     meta.readoutOptOut ? 'the page itself is the readout' : meta.keys.join(','));
 
-  // Every control, in order, WITH A USER GESTURE — a multi-step demo does not
-  // put its asserts behind the first button, and an XR demo cannot enter a
-  // session without an activation. `.tbar-x` too: a page may put a control
-  // inside the transport bar, and a control the harness cannot press is a
-  // subject the suite cannot reach.
+  // Every control in order with a user gesture, `.tbar-x` too.
+  // why: lessons/harness.md#quest-controls
   const SEL = '.pos-controls button, .tbar-x';
   const labels = await ev(`[...document.querySelectorAll(${JSON.stringify(SEL)})].map(b => b.textContent)`);
   for (let i = 0; i < (labels || []).length; i++) {
@@ -808,10 +611,8 @@ for (const t of targets) {
   }
   if (labels?.length) console.log(`        (pressed ${labels.map((l) => JSON.stringify(l)).join(', ')})`);
 
-  // ⚠️ ZERO NEVER GROWS. Wait while the count is still 0 (a demo whose FIRST
-  // assert sits behind work would otherwise report "asserted nothing", which
-  // reads as broken rather than slow), then fall back to "stop when it stops
-  // growing". Capped separately from settleMs, which sizes control 0.
+  // Wait while the count is zero, capped separately, then stop when it stops growing.
+  // why: lessons/harness.md#quest-first-assert
   const FIRST_ASSERT_CEIL = 30000;
   const countAsserts = () => ev('(window.__demo && __demo.asserts.length) || 0');
   let n = await countAsserts();
@@ -824,16 +625,9 @@ for (const t of targets) {
   ok('page asserted something', (asserts || []).length > 0, String((asserts || []).length));
   for (const a of asserts || []) ok(`page: ${a.label}`, a.pass, a.detail ?? undefined);
 
-  // ── the compositor, for a page that says it presented ────────────────────
-  // ⚠️ A LANE WITH NOTHING TO SAY MUST SAY SO IN WORDS. A page that does not
-  // publish `__demo.xr` gets a sentence, not a zero: a blank cell collapses "we
-  // did not look" and "we looked and it was fine", and a zero here would look
-  // like a dropped-frame finding.
-  //
-  // FORWARD CONTRACT for an XR demo: publish
-  //   __demo.xr = { presenting: <bool>, mode: 'immersive-vr', frames: <n> }
-  // and this reads it. `frames` is the PAGE's count; `vrapi` below is the
-  // compositor's. They are meant to be compared, not averaged.
+  // A page that does not publish `__demo.xr` gets a sentence, not a zero. Contract:
+  // __demo.xr = { presenting, mode: 'immersive-vr', frames }; compare `frames` with VrApi's.
+  // why: lessons/harness.md#page-xr
   const pageXr = await ev('window.__demo && window.__demo.xr ? __demo.xr : null');
   const seen = vrapi.filter((s) => s.t >= sinceT);
   const fpsList = seen.map((s) => s.fps).sort((a, b) => a - b);
@@ -902,8 +696,8 @@ async function connect(url) {
   };
 }
 
-/** A port the OS picked, released immediately. Only used where `tcp:0` was not
- *  honoured — there is a race here, and it is still better than a constant. */
+// A port the OS picked, only where `tcp:0` was not honoured; racy, still better than a constant.
+// why: lessons/harness.md#quest-free-port
 function freePort() {
   return new Promise((resolve, reject) => {
     const s = createServer();
@@ -915,44 +709,6 @@ function freePort() {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// WHAT IS UNCONFIRMED IN THIS FILE, because no headset was attached when it was
-// written (2026-09-11). Everything below is reasoned or read out of
-// research/quest-xr-2026-09.md, and NONE of it has been run against hardware:
-//
-//   · that a real Quest Browser's `navigator.xr` reads native by the test in
-//     nativeVerdict(). It was verified against desktop Chrome 152's OWN native
-//     XRSystem — the same class, on a secure origin — which is as close as this
-//     gets without hardware. Quest Browser is Chromium and builds Web IDL
-//     attributes the same way, but that is an argument, not a measurement. If a
-//     genuine headset is REFUSED at the `native` gate, this line is why.
-//   · that the Immersive Web Emulator's injection is caught. The self-test
-//     catches an IWER-SHAPED stub written here; the real extension was never
-//     installed and run against it. If IWER ever shadows `toString`, the
-//     `native` gate is defeated and the adb `getprop` gate is what is left —
-//     which is the reason that one is first and is read off the device.
-//   · that `isSessionSupported('immersive-vr')` is true on a Quest whose wearer
-//     has taken it off. §1.8 says a doff does not end or hide a session, so it
-//     probably is — but nothing here depends on it, and the refusal message says
-//     what to check rather than asserting a cause.
-//   · `adb reverse tcp:0` printing the allocated device port. Documented for
-//     `adb forward`; assumed for `reverse`, with a fallback either way.
-//   · the exact `getprop` keys on Horizon OS. Nothing depends on one key — the
-//     whole table is read and the test is "any ro.oculus/ro.vros property, or
-//     an Oculus/Meta manufacturer, or com.oculus.browser installed".
-//   · whether `getprop ro.product.model` distinguishes a 3 from a 3S. The user
-//     agent does not (§1.7, measured). The model is printed raw and never
-//     interpreted, so this cannot become a wrong claim.
-//   · `adb logcat -s VrApi` line format. `FPS=` and `Stale=` are what §3.3
-//     records; the parser takes them anywhere in the line and reports "no way
-//     to check" rather than 0 when it finds none.
-//   · that `userGesture: true` alone grants activation for `requestSession`.
-//     Enough for belowjs; IsaacTeleop needed a synthetic mouse event too, but
-//     for a React-specific reason our shell does not have.
-//
-// One layout note that is NOT a harness problem but will look like one: Quest
-// Browser's default window is 1280 x 670 CSS pixels and `<meta viewport>` is
-// ignored, so a demo's paragraph, readout, controls and log will not be on
-// screen together for a human. Nothing here reads the DOM for numbers — every
-// assert is on `window.__demo` — so the suite is unaffected either way.
-// ─────────────────────────────────────────────────────────────────────────────
+// Written with no headset attached; what is unconfirmed (native gate on a real Quest, IWER's real
+// extension, getprop keys, VrApi format, reverse tcp:0) is listed in the lessons.
+// why: lessons/harness.md#unconfirmed

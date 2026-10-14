@@ -1,44 +1,13 @@
-// demo/verify-native.mjs — exercise the NATIVE-HLS branch of the player.
-//
-//   node demo/verify-native.mjs       # exits 1 on any scope/init error
-//   DEMO_BASE=https://positron.studio node demo/verify-native.mjs
-//
-// It starts its own server. It used to require `node demo/server.mjs &` on
-// :8890 and then hardcode that number — which stopped being true the moment
-// `serve()` learned to take the next free port, because then the URL points at
-// whatever else is on 8890, or at nothing.
-//
-// WHY THIS EXISTS. demo/verify.mjs reported 261/261 green while 06 was
-// completely broken on an iPhone: the native branch threw "Cannot access
-// 'lastAdvT' before initialization" on every tick and the page showed nothing.
-// The suite could not see it, because desktop Chrome resolves useNative to
-// false and never enters that branch — so a whole code path had zero coverage
-// while appearing fully tested.
-//
-// Chrome cannot PLAY native HLS (canPlayType returns ''), so ?player=native
-// forces the branch and playback does not work. That is fine and deliberate:
-// what is asserted here is "this path runs without throwing", not "video
-// plays". A TDZ, a typo or a missing hoist all surface anyway.
-//
-// Run it after ANY change to src/low-latency-player.js. The iPhone takes a path
-// the main suite cannot reach.
-// Chrome cannot PLAY native HLS, so playback will not work — but the branch
-// still executes, and executing it is what catches a TDZ or a typo. This is the
-// gap that let "Cannot access 'lastAdvT' before initialization" reach a phone:
-// verify only ever ran the hls.js path, because desktop Chrome never picks
-// native. What is asserted here is "the code path runs without throwing", not
-// "video plays".
+// node demo/verify-native.mjs: forces the player's native-HLS branch (?player=native) in Chrome,
+// which
+// cannot play it; asserts the path runs without throwing (a TDZ once broke every iPhone tick).
+// why: lessons/harness.md#native
 import { serve } from './server.mjs';
 import { launchChrome } from './chrome.mjs';
 
-// 🔴 RETIRED 2026-10-13, AND IT WOULD NOW PASS ABOUT NOTHING. This harness
-// drives /llhls/, whose live input (positron-demo) and publisher (pub's /watch)
-// were deleted that day. /llhls/ now answers a press with "this leg was retired
-// 2026-10-13" and builds no player, so the native branch of
-// src/low-latency-player.js never runs and a run here would read PASS with zero
-// coverage. It refuses instead. The player's one live caller left is
-// /video/llhls/ (LL-HLS loopback, a camera on its own input), which this
-// file does not drive; re-pointing it there is open in BACKLOG.md.
+// Retired: it drove /llhls/, whose input is deleted, so it would pass about nothing; it refuses.
+// Re-pointing it at /video/llhls/ is open in BACKLOG.md.
+// why: lessons/harness.md#retired
 if (!process.argv.includes('--anyway')) {
   console.log('demo/verify-native.mjs is retired (2026-10-13): /llhls/ has no stream behind it, so nothing would be graded. See the header.');
   process.exit(2);

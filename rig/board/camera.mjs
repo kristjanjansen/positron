@@ -1,38 +1,7 @@
-// rig/board/camera.mjs: the Pi's own camera, sent only to holders of a key.
-//
-// Asked 2026-10-13: *"add pi camera to https://positron.studio/concepts/remote/010/.
-// url secret parameter to enable (key in cf secrets)"*. The picture of the
-// Circuit, from a camera on the Raspberry Pi it is plugged into, shown on the
-// Circuit page only when the page's URL carries the key.
-//
-// WHO CAN TURN THE CAMERA ON. Only somebody in the room `<room>-cam` on the
-// relay, and the relay lets a socket in that room speak or hear nothing until
-// its first message carries the key that matches the Cloudflare secret
-// `PI_CAM_KEY` (workers/relay/src/index.js, `CAM_ROOM`). The board joins that
-// room with the same key from its own environment (`BOARD_CAM_KEY` in
-// /etc/default/positron-board) and starts the camera only on a `cam.watching`
-// heard there. Nothing on the board's ordinary room can start it: there is no
-// camera verb in board.mjs's `handle()`, on purpose, because that room is
-// tokenless and anybody can speak in it.
-//
-// WHEN IT STOPS. Every viewer says `cam.watching` every ten seconds while its
-// tab is visible, and `cam.bye` when it stops or leaves. The camera stops on the
-// last `cam.bye`, or `CAM_IDLE_MS` after the last `cam.watching` from anybody,
-// whichever comes first, and when the board loses the room. A socket count is
-// not used, for the reason board.mjs gives at `watchVideoViewers`: the relay
-// reported seven sockets in a room nobody was watching.
-//
-// WHAT IS SENT. The same frame the shader picture uses (demo/shell/board-video.mjs):
-// a uint32 LE counter, a uint32 LE flag word with bit 0 on a keyframe, then one
-// H.264 access unit in Annex B. So the page decodes it with `createBoardVideo`.
-// Text in the room is plain JSON: `cam.started`, `cam.refused`, `cam.stopped`,
-// `cam.tick` (the counter and the board's clock once a second, for a delay
-// estimate) and `cam.pong`.
-//
-// ⚠️ THE HARDWARE ENCODER IS SHARED WITH THE SHADER PICTURE. On a Pi 4
-// `rpicam-vid` encodes on /dev/video11, which is the device `video.mjs` holds for
-// /remote/shader-on-pi/. Two users of it do not fail, they block (video.mjs
-// says so at length), so each refuses while the other runs.
+// The Pi camera, for key holders only: the board joins `<room>-cam` with BOARD_CAM_KEY and
+// starts on `cam.watching` there, stopping on the last `cam.bye` or after CAM_IDLE_MS.
+// It shares /dev/video11 with the shader picture, so each refuses while the other runs.
+// why: lessons/rig-board-io.md#camera-header
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
@@ -44,24 +13,10 @@ export const CAM_CODEC = 'avc1.42E01F';
 /** Over this many bytes queued on the socket, delta frames are dropped until the next keyframe. */
 const BACKLOG_BYTES = 2 << 20;
 
-// ── the direct path, since 2026-10-13 ───────────────────────────────────────
-// Asked: *"can https://positron.studio/concepts/remote/010/?cam= go direct
-// too?"*. The frames can leave on a page's direct WebRTC link to the Circuit's
-// input (rtc.mjs, inputs.mjs), on a third data channel `cam` beside `pcm` and
-// `ctl`, instead of through the relay. The keyed room stays the control: the
-// key check, `cam.watching`, `cam.bye` and the start and stop all still happen
-// there, and only the frames and the clock ticks move.
-// 🔴 TWO GATES, BOTH REQUIRED. `attachDirect` takes the key (compared with this
-// board's BOARD_CAM_KEY) AND the page's viewer name, which must be one this
-// room heard `cam.watching` from, which the relay delivers only from a socket
-// whose key it took. So a direct link alone opens nothing, and neither does a
-// key alone.
-// ⚠️ IN PIECES OF 16 KB, ORDERED AND RELIABLE. A keyframe is tens of KB and
-// 16 KB is the message size every SCTP stack takes; in order and reliable,
-// because a decoder fed a frame with a hole in it is broken until the next
-// keyframe, and the relay was a TCP stream too. Piece header: uint32 counter,
-// uint32 flags (bit 0 keyframe, bit 1 more pieces follow), then the bytes.
-/** Bytes of picture per piece on the `cam` channel. */
+// Frames may ride a page's direct link on channel `cam`; control stays in the keyed room. Two
+// gates: the key and a viewer this room heard. 16 KB ordered reliable pieces: uint32 counter,
+// uint32 flags (bit 0 keyframe, bit 1 more pieces), bytes. Bytes of picture per piece below.
+// why: lessons/rig-board-io.md#direct-piece
 export const DIRECT_PIECE = 16 * 1024 - 8;
 /** At most this many direct viewers; past it a page stays on the relay. */
 export const MAX_DIRECT = 4;
@@ -97,11 +52,8 @@ const run = (cmd, args, timeout = 6000) => {
   } catch (e) { return { ok: false, out: '', why: String(e.message) }; }
 };
 
-/**
- * `rpicam-hello --list-cameras`, read. A line per camera:
- *   `0 : imx708 [4608x2592 10-bit RGGB] (/base/soc/i2c0mux/i2c@1/imx708@1a)`
- * and `No cameras available!` when there is none.
- */
+// `rpicam-hello --list-cameras` read: one line per camera, or `No cameras available!`.
+// why: lessons/rig-board-io.md#rpicam-list
 export function parseRpicamList(text) {
   const out = [];
   for (const line of String(text).split('\n')) {
@@ -111,10 +63,8 @@ export function parseRpicamList(text) {
   return out;
 }
 
-/**
- * `v4l2-ctl --list-devices`, read: a name line ending in a colon, then the
- * device nodes indented under it.
- */
+// `v4l2-ctl --list-devices` read: a name line ending in a colon, device nodes indented under it.
+// why: lessons/rig-board-io.md#v4l2-devices
 export function parseV4l2Devices(text) {
   const blocks = [];
   let cur = null;
@@ -126,11 +76,8 @@ export function parseV4l2Devices(text) {
   return blocks;
 }
 
-/**
- * The Pi's own codec, ISP and CSI receiver nodes are video devices too, and
- * none of them is a camera you can open with `-f v4l2`. A USB camera is the
- * block left when they are taken out.
- */
+// The Pi's codec, ISP and CSI receiver nodes are video devices but not cameras.
+// why: lessons/rig-board-io.md#not-a-camera
 const NOT_A_CAMERA = /bcm2835-codec|bcm2835-isp|rpi-hevc|hevc-dec|pispbe|rp1-cfe|unicam|rpivid|platform:bcm2835/i;
 export function pickCaptureDevice(blocks) {
   for (const b of blocks) {
@@ -141,12 +88,9 @@ export function pickCaptureDevice(blocks) {
   return null;
 }
 
-/**
- * Which camera this board has, asked of the machine every time rather than
- * remembered: a CSI camera through libcamera first, then a USB one through
- * V4L2. `BOARD_CAM_SOURCE=test` is a stand-in picture made by ffmpeg, so the
- * whole path can run on a laptop with no camera and nobody's picture in it.
- */
+// Asked of the machine each time: CSI through libcamera, then USB through V4L2.
+// BOARD_CAM_SOURCE=test is an ffmpeg stand-in picture.
+// why: lessons/rig-board-io.md#find-camera
 export function findCamera({ source = process.env.BOARD_CAM_SOURCE || '', runner = run } = {}) {
   if (source === 'test') return { ok: true, kind: 'test', name: 'a test picture (BOARD_CAM_SOURCE=test)' };
   const tried = [];
@@ -198,23 +142,10 @@ export function cameraCommand(cam, { w, h, fps, bitrate, gop, hw = existsSync('/
   throw new Error(`camera: no command for a source of kind ${cam.kind}`);
 }
 
-/**
- * Cut Annex B into one access unit per frame, for an encoder that does NOT
- * repeat SPS and PPS on every frame.
- *
- * ⚠️ `video.mjs`'s splitter cuts at each SPS, which is right for
- * `h264_v4l2m2m` (MEASURED there: parameter sets before every frame) and wrong
- * here: `rpicam-vid --inline` and libx264 with `dump_extra` put them before a
- * keyframe only, so cutting at SPS would make each unit a whole second of
- * frames. A frame begins at an access unit delimiter, at a parameter set or SEI
- * not already inside a frame's header, or at the FIRST slice of a picture that
- * no header precedes.
- * ⚠️ FIRST SLICE, NOT ANY SLICE. MEASURED 2026-10-13 on libx264 with
- * `-tune zerolatency`: three slices per frame (sliced threads), so cutting at
- * every slice made 270 units of 90 frames. A slice whose `first_mb_in_slice` is
- * 0 starts a picture, and that field is the first Exp-Golomb code after the NAL
- * header byte, so it is 0 exactly when the top bit of the next byte is set.
- */
+// Annex B to access units, for encoders sending SPS/PPS only at keyframes: a frame starts at
+// an AUD, a header outside a frame header, or a picture's first slice (first_mb_in_slice 0).
+// Cutting at every slice made 270 units of 90 frames.
+// why: lessons/rig-board-io.md#au-splitter
 export function createAccessUnitSplitter(onUnit) {
   let buf = Buffer.alloc(0);
   const HEAD = new Set([9, 7, 8, 6]);
@@ -312,15 +243,9 @@ export function startCamera(cam, { w = 1280, h = 720, fps = 30, bitrate = 1_500_
   };
 }
 
-/**
- * The board's side of the keyed room. Joins it, proves the key, and runs the
- * camera while a keyed viewer is watching.
- *
- * @param {string} relay       wss base, as board.mjs has it
- * @param {string} room        `<room>-cam`
- * @param {string} key         BOARD_CAM_KEY; empty means the feature is off and nothing is joined
- * @param {function} encoderBusy  true while the shader picture holds the hardware encoder
- */
+// The board's side of the keyed room: joins, proves the key, runs the camera while a keyed viewer
+// watches. relay, room `<room>-cam`, key (empty: off), encoderBusy (the shader holds the encoder).
+// why: lessons/rig-board-io.md#camera-room
 export function createCameraRoom({ relay, room, key, log = () => {}, encoderBusy = () => false,
   find = findCamera, start = startCamera, WS = globalThis.WebSocket, idleMs = CAM_IDLE_MS,
   size = {}, now = () => Date.now() } = {}) {

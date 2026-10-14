@@ -1,21 +1,6 @@
-// rig/shout/measure.mjs — what a SHOUTcast/Icecast listen actually costs,
-// direct against the origin and through the Cloudflare relay, at the same time.
-//
-//   node rig/shout/measure.mjs 60 https://icecast.err.ee/raadiotallinn.mp3 https://shout.positron.studio/raadiotallinn.mp3
-//   node rig/shout/measure.mjs 60 --out results/shout-2026-09-06.json <url> <url>
-//
-// THE ONE MEASUREMENT WORTH THE TROUBLE is the last one: how much later the
-// SAME AUDIO BYTE arrives through Cloudflare. TTFB says nothing about it (a
-// burst-on-connect can make the slower path look faster), and playing both and
-// listening says nothing you can write down. Icecast hands every listener the
-// same MP3 frames, and the relay does not transcode, so the two byte streams
-// are identical apart from where each connection happened to start. Take a
-// needle out of one, find it in the other, and the difference between the two
-// arrival timestamps of that exact byte IS the added latency — no clock sync,
-// no correlation window, no assumptions about the encoder.
-//
-// Everything else here is the context that number needs to be honest in:
-// a burst that hides a stall, a mean bitrate that hides a gap.
+// node rig/shout/measure.mjs <secs> [--out f.json] <direct-url> <relay-url>: added latency is when
+// the SAME byte arrives on each path (identical MP3 frames), so no clock sync is needed.
+// why: lessons/rig-misc.md#shout-measure
 
 const args = process.argv.slice(2);
 let out = null;
@@ -113,9 +98,8 @@ for (const rec of recs) {
     kbps: r2((rec.bytes * 8) / 1000 / (secs || 1)),
     gapP50: r2(pct(rec.gaps, 0.5)), gapP95: r2(pct(rec.gaps, 0.95)), gapMax: r2(pct(rec.gaps, 1)),
     underruns: rec.gaps.filter((g) => g > UNDERRUN_MS).length,
-    // Icecast sends FASTER than realtime on connect to prime the listener's
-    // buffer. This is how much audio you are holding beyond what has actually
-    // elapsed — the reason a stream can read 152 kbps at a nominal 128.
+    // Icecast bursts faster than realtime on connect; this is the audio held beyond elapsed time.
+    // why: lessons/rig-misc.md#shout-ahead
     aheadOfRealtimeS: r2(rec.bytes / (NOMINAL_BPS) - secs),
   });
 }
@@ -140,10 +124,8 @@ for (let i = 1; i < recs.length; i++) {
       // answer" and "the relay carries audio late", which have different fixes.
       pair.ttfbDeltaMs = r2(b.ttfbMs - a.ttfbMs);
       pair.carriedMs = r2((tb - ta) - (b.ttfbMs - a.ttfbMs));
-      // How far apart the two connections started in the stream. Icecast bursts
-      // a few seconds of already-encoded audio on connect, and two listeners
-      // rarely get the same amount, so this is NOT latency — it is where each
-      // one was handed the microphone. Reported so nobody reads it as latency.
+      // Where each connection started in the stream (burst sizes differ). Not latency.
+      // why: lessons/rig-misc.md#shout-skew
       pair.startSkewBytes = found - at;
     }
   }

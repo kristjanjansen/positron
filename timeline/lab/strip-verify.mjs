@@ -1,33 +1,7 @@
-// timeline/lab/strip-verify.mjs — ONE headless Chrome, one pass, hard asserts,
-// screenshots. The proof standard in this repo for a RENDERING claim is a
-// NUMBER, not a picture (proto/paths' ink probe: "294 px under 'all', 0 px under
-// 'attested'"), so every visual claim below is closed by strip.inkOf().
-//
-//   node timeline/lab/strip-verify.mjs        (serves the repo root on :8897)
-//
-// A — AMBIGUATION, the three answers of `necessary`, and when.kind edges
-//   A1  the strip's whenState() agrees ROW FOR ROW with the transport's own
-//       certAccepts(), asked as deck.window(..., {certainty:'necessary'})
-//   A2  the four states paint FOUR DIFFERENT pictures — and in particular the
-//       shipped bug is closed: 'outer' (a wholly unknown position) no longer
-//       renders with the same ink as 'crisp' (an attested duration)
-//   A3  the state tally MOVES WITH ZOOM on the real corpus: sound-but-incomplete
-//       at one zoom, undecidable at another. The epistemics are a property of
-//       the question, and on a zoomable axis the wheel asks it
-//   A4  ignorance vs vagueness on IDENTICAL brackets differ in ink
-//   A5  the empty core is drawn as a STATEMENT: 22/22 Kurenniemi rows have no
-//       inner bracket and the lane still paints a distinguishable mark
-// B — THE AORISTIC AGGREGATE
-//   B1  one fully visible span sums to exactly 1; points count; open spans
-//       contribute 0 and are REPORTED rather than filtered
-//   B2  Ratcliffe's 1/(b−a) and aoristAAR's period_correction are the SAME
-//       operation once the bin is a pixel column — measured, not assumed
-//   B3  the old megatimeline formula vs this one, on the same rows
-// C — DEEP TIME
-//   C1  13.8 Gyr fits, in 14 major ticks, labelled in Ga — where the old ladder
-//       asked the axis loop for 138,000,000 ticks
-//   C2  the zoom ceiling is derived from the float and REPORTED when it bites
-//   C3  the ms position domain's measured ceiling (node-side arithmetic)
+// node timeline/lab/strip-verify.mjs (serves the repo root on :8897): one headless Chrome, every
+// visual claim closed by strip.inkOf() numbers. A: ambiguation states and when.kind edges;
+// B: the aoristic aggregate; C: deep time; D: what the honesty costs.
+// why: lessons/timeline-lab.md#sv-header
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -131,7 +105,8 @@ console.log('\nB — the aoristic aggregate (node arithmetic)');
   const withOpen = aoristic([{ from: 0, to: 500 }, { from: 100, to: Infinity, open: true }, { from: 700, point: true, to: null }], 0, 1000, cols);
   ok('B1', withOpen.open === 1 && withOpen.points === 1 && Math.abs(withOpen.total - 2) < 1e-9,
     `open spans contribute 0 (mass 1/inf is 0, that is the arithmetic and not a policy) and are REPORTED: open=${withOpen.open}. Points are COUNTED, mass 1 in their own column — the first implementation dropped them via Number.isFinite(s.to), which made a crisp archive read as empty beside a smeared one. total=${withOpen.total.toFixed(6)} over 2 contributing items.`);
-  // B3 — the shipped megatimeline formula against this one
+  // B3: the shipped megatimeline formula against this one.
+  // why: lessons/timeline-lab.md#sv-b3
   const years = [1, 2, 5, 20, 60];
   const oldAlpha = years.map((n) => Math.min(0.4, 0.05 + 0.02 * n));
   facts.B3 = { years, oldAlpha };
@@ -192,7 +167,8 @@ ok('boot', errors.length === 0, `no page exceptions${errors.length ? ': ' + erro
 
 console.log('\nA — ambiguation and the three states (browser, real corpus)');
 
-// A1 — the strip's classifier vs the transport's predicate, row for row
+// A1: the strip's classifier against the transport's predicate, row for row.
+// why: lessons/timeline-lab.md#sv-a1
 const a1 = await evalJs(`(() => {
   const S = window.__su.strips.real, D = window.__su.decks.real;
   const out = [];
@@ -224,7 +200,8 @@ ok('A1', a1 && a1.length === 3 && a1total === 0,
   `the strip's whenState() agrees with the transport's certAccepts() on ${(a1 || []).reduce((a, r) => a + r.agree, 0)}/${(a1 || []).reduce((a, r) => a + r.agree + r.disagree, 0)} rows across 3 windows, 0 disagreements. The render path is a TRANSCRIPTION of the query predicate, and a test fails if they drift.`);
 facts.A1 = a1;
 
-// A3 — the tally moves with zoom
+// A3: the tally moves with zoom.
+// why: lessons/timeline-lab.md#sv-a3
 const a3 = await evalJs(`(() => {
   const S = window.__su.strips.real;
   const out = [];
@@ -249,7 +226,8 @@ facts.A3 = a3;
     `and the hard case is confirmed on the shipped data: core = 0 in EVERY window, smeared = ${wide.smeared}/${wide.n}. Two-tone ambiguation's saturated core is empty for the entire archive.`);
 }
 
-// A2 + A4 + A5 — ink
+// A2, A4, A5: ink.
+// why: lessons/timeline-lab.md#sv-ink
 const ink = await evalJs(`(() => {
   const S = window.__su.strips.synth, K = window.__su.strips.kind, R = window.__su.strips.real;
   S.draw(); K.draw(); R.draw();
@@ -275,7 +253,8 @@ facts.ink = ink;
     `the empty core is a STATEMENT, not an absence: the real 22-row lane paints ${ink.tape.count} px / mass ${ink.tape.sum}, of which the error bars are the mark carrying "bounds known, extent unrecorded".`);
 }
 
-// A5b — the affordance is data, not decoration; and it is ignorance-only
+// A5b: the narrowing affordance is data, and ignorance only.
+// why: lessons/timeline-lab.md#sv-a5b
 const narrow = await evalJs(`(() => {
   const R = window.__su.strips.real, K = window.__su.strips.kind;
   return { tape: R.narrowable('tape').slice(0,3), tapeN: R.narrowable('tape').length,
@@ -326,7 +305,8 @@ ok('C2', deep.deepest.zoom && deep.deepest.zoom.clamped,
 ok('C1', deep.states && (deep.states.core + deep.states.outer + deep.states.unanswerable) === deep.states.n,
   `and the same three states classify deep time: core ${deep.states.core} (the Cambrian row, the only one with an inner bracket) / outer ${deep.states.outer} / undecidable ${deep.states.unanswerable} over n=${deep.states.n}.`);
 
-// ─── D — what the honesty COSTS ─────────────────────────────────────────────
+// D: what the honesty costs.
+// why: lessons/timeline-lab.md#sv-d
 console.log('\nD — the cost of drawing what we do not know');
 const cost = await evalJs(`(async () => {
   const { createStrip } = await import('/timeline/strip.mjs');

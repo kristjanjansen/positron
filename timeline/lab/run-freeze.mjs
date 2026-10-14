@@ -1,23 +1,8 @@
 #!/usr/bin/env node
-// ============================================================================
-// CHROME 133 ENERGY-SAVER FREEZE — the risk flagged in
-// research/browser-av-editors-2026-08.md §3, tested at 5-MINUTE SCALE.
-//
-//   node timeline/lab/run-freeze.mjs [--freeze 300] [--keepalive]
-//
-// Chrome freezes a hidden, silent, CPU-intensive tab after >5 min on Energy
-// Saver; the exemption list does NOT include a worker tick. This runner puts
-// the page into the SAME Page-Lifecycle FROZEN state via CDP
-// (Page.setWebLifecycleState) — the worst case, held for real minutes — and
-// measures what comes back:
-//   · did the DEDICATED WORKER's own timer keep running while the page was
-//     frozen? (a probe worker logs into its own memory and dumps afterwards)
-//   · does catchUp:'reduce' land on the correct non-commutative state, and how
-//     long after resume?
-//   · what do 'burst' and 'drop' do over the same gap?
-//
-// House rules: port 8894, one Chrome, tl-freeze-udd pattern, plain node ESM.
-// ============================================================================
+// node timeline/lab/run-freeze.mjs [--freeze 300] [--keepalive] [--natural]: Chrome 133's Energy
+// Saver freeze at 5-minute scale: does the worker tick survive, and what do reduce, burst and drop
+// land on afterwards. Port 8894, one Chrome.
+// why: lessons/timeline-lab.md#rf-header
 import { createRequire } from 'module';
 import os from "node:os";
 const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
@@ -35,11 +20,10 @@ const PORT = 8894;
 const args = process.argv.slice(2);
 const FREEZE_S = +(args.includes('--freeze') ? args[args.indexOf('--freeze') + 1] : 300);
 const KEEPALIVE = args.includes('--keepalive');
-// --natural: do NOT SIGSTOP. Ask CHROME to freeze the tab on its own, the way
-// Energy Saver does, and see whether a held Web Lock actually exempts it.
-// The tab is hidden the way timeline/lab/run-lab.mjs's arm BG hid it — a
-// BROWSER-level Target.createTarget + Target.activateTarget, which Playwright's
-// newPage() cannot do (each newPage is its own window and stays 'visible').
+// --natural: let Chrome freeze the tab itself, hidden via Target.createTarget + activateTarget, to
+// see
+// whether a held Web Lock exempts it.
+// why: lessons/timeline-lab.md#rf-natural
 const NATURAL = args.includes('--natural');
 const DBG_PORT = 9322;
 const OUT = `${ROOT}/timeline/lab/results/freeze-chrome133.json`;
@@ -97,24 +81,16 @@ const say = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
     const before = await page.evaluate('window.__report()');
     say(`baseline: pos ${before.pos} reduce=${before.state.reduce} correct=${before.correct} burst=${before.fires.burst} host=${before.hostName}`);
 
-    // Hide the tab (a freeze only happens to a hidden page), then FREEZE it.
-    // TWO mechanisms, because one of them turned out not to bite:
-    //  (a) Page.setWebLifecycleState 'frozen' — the same state Chrome puts a
-    //      page into. In headless it accepted the call and CHANGED NOTHING:
-    //      the main thread kept beating and the probe worker kept ticking
-    //      (measured, run 1 at 20 s: 0 gaps). Reported, not relied on.
-    //  (b) SIGSTOP on the RENDERER PROCESS — unambiguous, and the right model:
-    //      a dedicated worker lives in its page's renderer, so stopping that
-    //      process stops the main thread AND the worker tick together, which
-    //      is exactly what a freeze does and exactly the case our hidden-tab
-    //      measurement never covered.
+    // Hide the tab, then freeze. Page.setWebLifecycleState 'frozen' changed nothing in headless, so
+    // the renderer is SIGSTOPped: that stops the main thread and the worker tick, as a real freeze
+    // does.
+    // why: lessons/timeline-lab.md#rf-freeze
     let frozenMs = 0;
     if (NATURAL) {
-      // Chrome's OWN freezing path. Preconditions per
-      // https://developer.chrome.com/blog/freezing-on-energy-saver :
-      // hidden > 5 min, silent, CPU-intensive, Energy Saver on (forced here by
-      // FreezingOnEnergySaverTesting). Exempt if ... a HELD WEB LOCK — which is
-      // exactly what --keepalive holds, so the two arms are the experiment.
+      // Chrome's own path (hidden > 5 min, silent, CPU-intensive, FreezingOnEnergySaverTesting); a
+      // held Web
+      // Lock exempts it, which is what --keepalive holds.
+      // why: lessons/timeline-lab.md#rf-own-path
       const bcdp = new CDP();
       await bcdp.connectBrowser(DBG_PORT);
       const blank = await bcdp.send('Target.createTarget', { url: 'about:blank' });

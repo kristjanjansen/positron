@@ -10,7 +10,8 @@ const CODEC = params.get("codec") ?? "vp8";
 const FPS = 30;
 const GOP = 30; // 1 s
 
-// Binary row geometry — matches rig/whep/publish.html exactly (1280x720 reference grid).
+// Binary row geometry: matches rig/whep/publish.html (1280x720 reference grid).
+// why: lessons/rig-moq.md#pub-row
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
 
 function log(...a) {

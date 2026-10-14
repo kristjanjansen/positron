@@ -1,23 +1,7 @@
 #!/usr/bin/env node
-// demo/read-tap.mjs — what the instruments on the desk actually sent.
-//
-// 🔴 THE POINT OF IT. `/dump/` reads MIDI in a browser and posts what it sees
-// to the dev server's `/_tap`, which appends to `.tap/midi.jsonl`. This reads
-// that file and says what each control IS, using the same `midi-decode.mjs`
-// the page uses, so a reading here and a reading on screen cannot drift.
-//
-//   node demo/server.mjs            # must be running; /dump/ posts to it
-//   node demo/read-tap.mjs          # summarise everything captured
-//   node demo/read-tap.mjs --raw    # every message, in order
-//   node demo/read-tap.mjs --clear  # start a fresh capture
-//
-// 🔴 WHY IT EXISTS. The first real measurements off this desk were taken by
-// driving a second Chrome through an extension and reading its console back one
-// question at a time. Every reading cost a round trip, and a press that landed
-// between two of them was simply lost. Now the presses land in a file.
-//
-// ⚠️ IT IS A DEV SERVER FILE AND NOTHING DEPLOYED WRITES IT. See the comment on
-// `/_tap` in `demo/server.mjs`.
+// node demo/read-tap.mjs [--raw | --clear]: what /dump/ posted to the dev server's /_tap
+// (.tap/midi.jsonl), decoded with the page's own midi-decode.mjs. Dev server only.
+// why: lessons/harness.md#read-tap
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { classifyEncoder, classifyBend, ccName, noteName } from './shell/midi-decode.mjs';
@@ -38,9 +22,8 @@ if (!existsSync(FILE)) {
 const rows = [];
 for (const line of readFileSync(FILE, 'utf8').split('\n')) {
   if (!line.trim()) continue;
-  // ⚠️ A HALF WRITTEN LINE IS NORMAL AND IS NOT AN ERROR. The page appends while
-  // this runs, so the last line can be incomplete. Skipping it loses one batch
-  // and reading it would throw away the whole capture.
+  // A half-written last line is normal while the page appends; skip it.
+  // why: lessons/harness.md#half-line
   try { rows.push(...(JSON.parse(line).rows || [])); } catch { /* still arriving */ }
 }
 if (!rows.length) { console.log('the file is there and holds nothing.'); process.exit(0); }
@@ -80,10 +63,8 @@ for (const e of [...by.values()].sort((a, b) => b.n - a.n)) {
     Number.isNaN(cc) ? '' : (ccName(cc) || 'no standard meaning')]));
 }
 
-// 🔴 THE VERDICTS GO UNDER THE TABLE, NOT IN A COLUMN. A verdict carries its
-// reasoning and its counts, and this project already has a rule that anything
-// truncating with an ellipsis is in the wrong place rather than in need of a
-// wider box.
+// Verdicts go under the table, not in a column: they carry reasoning and counts.
+// why: lessons/harness.md#verdicts
 console.log('');
 console.log('what each control IS');
 console.log(rule());

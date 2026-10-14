@@ -1,11 +1,7 @@
 #!/usr/bin/env node
-// Cold start of the legacy Container class against the new durable_object
-// runtime, same image, same server.mjs, standard-1, same client, same hour.
-// Cycles are INTERLEAVED (legacy, new, legacy, new...) so both runtimes see
-// the same network and the same time of day.
-//   node measure.mjs [N_COLD=10] [N_WARM=20] [N_SNAP=10] [N_FRESH=5]
-// Writes results-<iso>.json beside this file. Ends with both containers
-// destroyed.
+// node measure.mjs [N_COLD] [N_WARM] [N_SNAP] [N_FRESH]: legacy against durable_object cold start,
+// interleaved. Writes results-<iso>.json and destroys both containers at the end.
+// why: lessons/rig-containers.md#next-measure
 import fs from "fs";
 
 const LEGACY = "https://positron-cnt-test.kristjan-jansen.workers.dev";

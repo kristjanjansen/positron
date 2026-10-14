@@ -1,13 +1,7 @@
 #!/bin/bash
-# rig/board/provision.sh — find the board on the LAN and set it up, from here.
-#
-#   ./provision.sh              sweep the subnet for it
-#   ./provision.sh <pi> go straight to it
-#
-# Why a sweep rather than `positron-board.local`: mDNS is multicast UDP and does
-# not survive every sandbox — a `.local` lookup here returns "Unknown host"
-# while plain IPs on the same subnet answer fine. Rather than depend on name
-# resolution that may or may not exist, ask every address whether it is the board.
+# ./provision.sh [<pi>]: find the board on the LAN (or go to <pi>) and set it up.
+# A subnet sweep, because mDNS `.local` does not resolve from every sandbox.
+# why: lessons/rig-board-io.md#provision-header
 set -uo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
 USER_=${BOARD_USER:-positron}
@@ -46,9 +40,8 @@ echo "== copying the board"
 ) | ssh "$USER_@$IP" 'rm -rf ~/positron && mkdir -p ~/positron && tar xf - -C ~/positron && echo "   unpacked"'
 
 echo "== setup (needs sudo on the board)"
-# ⚠️ THE ROOM COMES FROM THE CALLER AND HAS NO DEFAULT. It used to read
-# `${ROOM:-studio-1}`, which pointed every board anybody provisioned at the
-# studio board's own room. `setup.sh` refuses without one.
+# The room comes from the caller and has no default; setup.sh refuses without one.
+# why: lessons/rig-board-io.md#provision-room
 [ -n "${ROOM:-}" ] || { echo "provision.sh needs a room: ROOM=<name> ./provision.sh" >&2; exit 2; }
 ssh -t "$USER_@$IP" "cd ~/positron/rig/board && sudo ROOM='$ROOM' ./setup.sh"
 

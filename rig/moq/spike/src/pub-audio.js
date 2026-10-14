@@ -1,18 +1,7 @@
-// AUDIO SPIKE publisher (RUNBOOK §10): video (720p30 H.264, burned-ms row — same
-// geometry as pub-safari.js) PLUS WebAudio-synthesized audio -> AudioEncoder
-// (Opus 48k stereo, AAC fallback) -> hang legacy container -> @moq/net -> CF
-// draft-14 relay. Namespace positron-audio-test (own namespace — never the
-// sibling-owned positron-safari-test). NO getUserMedia anywhere: audio samples
-// are synthesized directly into AudioData objects.
-//
-// Audio signal (so the player can measure latency + A/V sync from content alone):
-//   - background: 4-note tone sequence (330/392/440/494 Hz), 250 ms/note, amp 0.08
-//   - TICK: 6 ms 2 kHz burst at amp 0.9 whenever wall-clock ms crosses a multiple
-//     of 500. Audio timestamps are wall-anchored µs (timeOrigin+performance.now()),
-//     advanced by exact sample count, so a tick's media timestamp IS its true wall
-//     time — the player rounds the detected tick to the nearest 500 ms boundary
-//     and gets the publisher wall time exactly (same one-clock trick as the
-//     burned-ms video row).
+// Audio spike publisher (RUNBOOK §10), namespace positron-audio-test: 720p30 H.264 with the burned
+// row plus synthesized Opus. A 6 ms 2 kHz tick at every 500 ms wall boundary, timestamps
+// wall-anchored, so the player recovers publisher wall time from content. No getUserMedia.
+// why: lessons/rig-moq.md#pub-audio-header
 import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 

@@ -1,14 +1,10 @@
-// Worker shell for OBS-in-a-CF-Container. Routes:
-//   /obsws       -> container :4455 (obs-websocket v5; WS upgrade passthrough,
-//                   path rewritten to "/" so obs-websocket sees a clean upgrade)
-//   /stop /kill  -> DO lifecycle controls (sleepAfter is not trusted)
-//   /*           -> container :8890 (serve-cloud.mjs: /clock.html /now /cpu
-//                   /top /health /beacons)
+// OBS in a CF Container: /obsws to :4455 (path rewritten to "/"), /stop and /kill, else :8890.
+// why: lessons/rig-obs.md#obs-worker-header
 import { Container, getContainer } from "@cloudflare/containers";
 
 export class ObsCloud extends Container {
   defaultPort = 8890;
-  sleepAfter = "10m"; // not trusted (livelock) — /kill explicitly when done
+  sleepAfter = "10m"; // not trusted (livelock): /kill explicitly when done; why: lessons/rig-obs.md#obs-worker-sleep
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/stop") { await this.stop(); return Response.json({ stopped: true }); }

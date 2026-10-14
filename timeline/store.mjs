@@ -1,99 +1,7 @@
-// timeline/store.mjs — THE STORE LAYER. plan-timeline §3 promised the v0 library
-// as "Event type + store (memory/DO/JSONL-R2 backends) + transport…"; the store
-// half was never built, and the library's log is an in-memory array. Decades of
-// ERR archive is not a JS array.
-//
-// WHAT MADE THIS TRACTABLE NOW (NOTES.md Checkpoint 7): since v0.4 the CURSOR is
-// the ONLY positional reader in the library. `sampleAt`/`bracket` go through it,
-// `prefixEvents` bisects a per-kind lane, and `createCursor(rows)` is exported.
-// So a backend does not have to satisfy "the transport"; it has to satisfy ONE
-// tiny structural contract:
-//
-//     rows.length            -> a number
-//     rows[k]                -> a row whose key(row) is NON-DECREASING in k
-//
-// That is the whole interface. Everything below exists to serve those two lines
-// out of something that is not resident in memory.
-//
-// ---------------------------------------------------------------------------
-// THE ONE INTERFACE
-// ---------------------------------------------------------------------------
-//   const reader = await store.open(query);
-//   reader.count                       rows currently addressable (indexed + tail)
-//   reader.at(i)                       row i — SYNC, always returns something
-//   reader.slice(from, to)             rows [from, to) — SYNC, ghosts flagged
-//   reader.bracketAt(pos, nbr)         the straddling pair — SYNC, cursor-backed
-//   reader.ensure(fromPos, toPos)      PREFETCH BY WINDOW — async, horizon-driven
-//   reader.residentFor(fromPos, toPos) SYNC fast path: is that window resident?
-//   reader.appendBatch(rows)           live growth under the playhead
-//   reader.rows                        the cursor-shaped view (pass to createCursor)
-//   reader.resident() / .stats() / .misses() / .onMiss(cb)
-//   reader.close()
-//
-// SYNC-OR-ASYNC. `open()` is async (an index has to be read). Every read after
-// that is SYNCHRONOUS, because a lookahead scheduler cannot await inside its
-// tick — the tick is the thing that keeps the vector honest. The async half is
-// pushed entirely into `ensure(fromPos, toPos)`, which the client drives from
-// the SAME horizon the scheduler already computes:
-//
-//     pos + horizonMs * rate       (transport.mjs scan(), line ~536)
-//
-// so prefetch is not a new concept, it is the existing lookahead extended one
-// level down the stack. A window that is resident costs a Map lookup.
-//
-// ---------------------------------------------------------------------------
-// THE MISS POLICY — the honest decision, stated out loud
-// ---------------------------------------------------------------------------
-// A synchronous read into a non-resident page is the one genuinely new failure
-// mode a store adds to this library. Three options were on the table:
-//
-//   (a) STALL THE LANE. Rejected. The library's first law is that the vector has
-//       no timers and position(now) is pure math over {p0,t0,rate}. There is no
-//       "stall" that is not a pause(), and a pause is a user-visible transport
-//       state change (it emits 'pause', it runs followTransport, a HUD shows
-//       0.00x). A STORE MUST NOT MOVE THE TRANSPORT BEHIND THE CLIENT'S BACK.
-//       Available as `missPolicy:'stall'` — which reports the miss with
-//       action:'stall' and lets the CLIENT call pause(). The store reports; the
-//       client decides.
-//
-//   (b) SKIP WITH A REPORTED GAP. Rejected as the default. It breaks SEAM 5's
-//       guarantee — the reducer is handed the COMPLETE ORDERED PREFIX — and it
-//       breaks it INVISIBLY for exactly the reducers that care: a hole in the
-//       prefix makes a non-commutative fold (a counter, a cue state machine)
-//       silently wrong. Available as `missPolicy:'skip'`; slice() then omits the
-//       ghosts and reports `gaps`, so a client that genuinely wants holes gets
-//       them labelled.
-//
-//   (c) FIRE LATE WITH A DRIFT RECORD.  *** THE DEFAULT ***
-//       Because it is not a new failure mode at all — it is the one the library
-//       already models. Every fire logs {intendedUs, firedUs, deltaMs, origin};
-//       a store miss is the same record with a larger delta and origin
-//       'store-miss'. Reuse buys three things for free:
-//         · a HUD that already draws drift draws store misses with no new code;
-//         · `lateGraceMs` and the per-kind catch-up policy ('burst'|'drop'|
-//           'reduce') ALREADY decide what a late batch means — the client's
-//           declared policy, not the store's guess;
-//         · the prefix stays COMPLETE. Only actuation is late. C2 still holds.
-//
-// THE GHOST ROW is the mechanism all three share. A miss cannot return undefined
-// (the cursor would probe key(undefined) and throw) and must not return a stale
-// key (the binary search would diverge). So it returns a GHOST: a synthetic row
-// carrying a key INTERPOLATED INSIDE ITS PAGE'S KNOWN [firstAt, lastAt] bounds.
-// Page bounds are monotone, so ghost keys are monotone across the whole log:
-// the bisect still converges on the right page, and once that page lands the
-// real row is served. A ghost is flagged `__ghost` on every path, is never
-// handed to an actuator, and every one is counted.
-//
-// ---------------------------------------------------------------------------
-// WINDOWING — bounded memory for an unbounded log
-// ---------------------------------------------------------------------------
-// Pages are ROW-INDEX ranges (default 4096 rows), never byte ranges, so at(i) is
-// page arithmetic. The sidecar index holds one entry per page — {i0,n,off,len,
-// firstAt,lastAt} — so a 1M-row log has 245 index entries, not 1M. Resident
-// pages are an LRU of `maxPages` (default 8). CEILING = maxPages*pageRows rows
-// + the live tail, and `resident()` reports it rather than claiming it.
-//
-// Plain ESM, no deps, browser + node (node-only paths are dynamic imports).
+// A backend only has to be cursor-shaped: rows.length, and rows[k] with a non-decreasing key.
+// open() is async, every later read sync; ensure(from, to) prefetches the scheduler's horizon.
+// A miss fires late with a drift record (default; 'stall', 'skip' opt in), via flagged ghost rows.
+// why: lessons/timeline-store.md#header
 
 import { createCursor } from './transport.mjs';
 
@@ -104,14 +12,8 @@ export const MISS_POLICIES = ['late', 'skip', 'stall'];
 const isGhost = (r) => !!(r && r.__ghost);
 export { isGhost };
 
-// ---------------------------------------------------------------------------
-// LRU over page index -> rows[]
-// ---------------------------------------------------------------------------
-// PINNING is not an optimisation, it is a correctness requirement. A cold
-// bisect probes O(log pageCount) pages and each probe kicks off a background
-// repair load; without a pin those repairs land later and evict the very window
-// ensure() just paid for, so an ensured read could still come back cold. The
-// window the client asked for is pinned until the next ensure() replaces it.
+// LRU of page index to rows. The ensured window is pinned, or cold-bisect repairs evict it.
+// why: lessons/timeline-store.md#lru
 function lru(max) {
   const m = new Map();
   let pinned = new Set();
@@ -153,13 +55,9 @@ function upperBound(n, probe, pos) {
   return lo;
 }
 
-// ---------------------------------------------------------------------------
-// THE PAGED READER — one implementation, three sources.
-//
-// A `source` supplies:
-//   {name, pageRows, total(), pageCount(), pageMeta(p) -> {i0,n,firstAt,lastAt},
-//    loadPage(p) -> Promise<rows[]>, warm() -> Promise<void>, close()}
-// ---------------------------------------------------------------------------
+// One paged reader, three sources. A source supplies {name, pageRows, total(), pageCount(),
+// pageMeta(p), loadPage(p), warm(), close()}.
+// why: lessons/timeline-store.md#paged-reader
 function createPagedReader(source, {
   key = (r) => r.at,
   maxPages = DEFAULT_MAX_PAGES,
@@ -172,7 +70,7 @@ function createPagedReader(source, {
   const pageRows = source.pageRows;
   const pages = lru(maxPages);
   const inflight = new Map();          // p -> Promise
-  const tail = [];                     // live appends — RESIDENT ALWAYS, never evicted
+  const tail = [];                     // live appends, always resident, never evicted; why: lessons/timeline-store.md#tail
   const missCbs = new Set();
   const missLog = [];
   const st = {
@@ -245,9 +143,8 @@ function createPagedReader(source, {
     const pg = pages.get(p);
     if (pg !== undefined) { st.hits++; return pg[i - p * pageRows]; }
     noteMiss(i, p);
-    // Repair in the background — but a COLD BISECT probes O(log pageCount)
-    // pages and we are not going to fetch seventeen of them to answer one
-    // synchronous read. Two concurrent repairs; the rest is ensure()'s job.
+    // At most two background repairs; the rest is ensure()'s job.
+    // why: lessons/timeline-store.md#repairs
     if (inflight.size < maxRepairs) loadPage(p).catch(() => {});
     return ghost(i, p);
   }
@@ -270,11 +167,8 @@ function createPagedReader(source, {
     return out;
   }
 
-  // -------------------------------------------------------------------------
-  // THE CURSOR VIEW. This is the whole point: a Proxy whose only job is to be
-  // `{length, [k]}` so createCursor() — the library's one positional reader —
-  // rides an unbounded log without knowing it.
-  // -------------------------------------------------------------------------
+  // The cursor view: a Proxy that is `{length, [k]}`, so createCursor rides an unbounded log.
+  // why: lessons/timeline-store.md#rows-view
   const rows = new Proxy(Object.create(null), {
     get(t, k) {
       if (k === 'length') return count();
@@ -301,8 +195,8 @@ function createPagedReader(source, {
     return cursor;
   }
 
-  /** SYNC. The straddling pair at pos, plus {cold, ghosts} — the C6 law applied
-   *  to residency: a cold read degrades, and says so, rather than lying. */
+  // Sync straddling pair plus {cold, ghosts}: a cold read degrades and says so.
+  // why: lessons/timeline-store.md#bracket-at
   function bracketAt(pos, nbr = 0) {
     const br = cur().bracket(pos, nbr);
     if (!br) return null;
@@ -310,12 +204,9 @@ function createPagedReader(source, {
     return { ...br, cold: ghosts > 0, ghosts, page: pageOf(br.i) };
   }
 
-  // -------------------------------------------------------------------------
-  // PREFETCH BY WINDOW. Driven by the scheduler's own horizon:
-  //     reader.ensure(pos, pos + horizonMs * rate)
-  // Returns {fast, pages, loaded} — `fast:true` means it was already resident
-  // and NOTHING was awaited (the common case at 40 Hz).
-  // -------------------------------------------------------------------------
+  // Prefetch by window: reader.ensure(pos, pos + horizonMs * rate) -> {fast, pages, loaded};
+  // `fast` means already resident, nothing awaited.
+  // why: lessons/timeline-store.md#window
   function pagesForWindow(fromPos, toPos) {
     const n = source.pageCount();
     if (!n) return [];
@@ -364,21 +255,9 @@ function createPagedReader(source, {
     return { fast: false, pages: want, loaded: missing };
   }
 
-  // -------------------------------------------------------------------------
-  // APPEND-LIVE. The live-show case: the log grows UNDER the playhead.
-  //
-  // Appends land in `tail`, which is (a) always resident, (b) never evicted, and
-  // (c) addressed at indices >= indexed. Growing an array at the END cannot move
-  // any index the cursor is holding, so THE CURSOR STAYS VALID BY CONSTRUCTION —
-  // no invalidation, no reset, no re-seek. That is the whole guarantee.
-  //
-  // An out-of-order append (at < the tail's last at) WOULD move indices. The DO
-  // already answers this: it rejects a non-monotonic seq per source, INDIVIDUALLY,
-  // so a retried batch is idempotent instead of fatal. Same rule here — the row
-  // is inserted in sorted position (the log must stay sorted or the cursor is
-  // meaningless), and if that position sits at or before the cursor's index the
-  // cursor is reset and the reset is REPORTED. Never silent.
-  // -------------------------------------------------------------------------
+  // Appends go to `tail` at indices past the indexed rows, so a cursor stays valid. An out-of-order
+  // row is inserted in place, and a cursor at or past it is reset and the reset reported.
+  // why: lessons/timeline-store.md#append
   function appendBatch(batch) {
     const res = { appended: 0, rejected: 0, reordered: 0, cursorReset: false, count: count() };
     if (!batch || !batch.length) return res;
@@ -434,23 +313,17 @@ function createPagedReader(source, {
         cmpPerBracket: cursor && st.bracketCalls ? null : undefined,
       };
     },
-    /** rows in the position domain the deck uses — for logdeck-style clients. */
+    // rows in the position domain the deck uses
+    // why: lessons/timeline-store.md#index
     index() { return source.index ? source.index() : null; },
     meta() { return source.meta ? source.meta() : null; },
     close() { closed = true; pages.clear(); inflight.clear(); return source.close && source.close(); },
   };
 }
 
-// ---------------------------------------------------------------------------
-// (1) memoryStore — BYTE-COMPATIBLE WITH TODAY'S ARRAY.
-//
-// Deliberately NOT the paged reader. The array IS the resident set; wrapping it
-// in a Proxy would add a per-probe indirection to the exact read v0.4 measured
-// at 3.67 comparisons/call, for nothing. `reader.rows` is the SAME array object
-// (identity, not a copy), so a deck holding it and this reader are the same
-// storage — which is what makes appendBatch visible to an already-running deck
-// and what makes "nothing regresses" a fact rather than a hope.
-// ---------------------------------------------------------------------------
+// memoryStore: the array itself, no paging (no Proxy on the hot read); `reader.rows` is the same
+// array, so appends are visible to a running deck.
+// why: lessons/timeline-store.md#memory
 export function memoryStore(rows = [], { key = (r) => r.at } = {}) {
   return {
     kind: 'memory',
@@ -470,7 +343,7 @@ function openMemoryReader(arr, key) {
     get tailCount() { return 0; },
     get pageRows() { return Infinity; },
     missPolicy: 'none',
-    rows: arr,                                   // IDENTITY — the same array
+    rows: arr,                                   // the same array, by identity; why: lessons/timeline-store.md#identity
     cursor: cur,
     at(i) { st.reads++; st.hits++; return arr[i]; },
     slice(from, to) { const s = arr.slice(from, to); s.gaps = []; return s; },
@@ -510,19 +383,9 @@ function openMemoryReader(arr, key) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// (2) jsonlStore — Range-fetched pages + an index sidecar. THE ARCHIVE CASE.
-//
-// This is proto/selfrec's manifest shape one level down: masters are truth, the
-// sidecar is derived and regenerable (postshow.mjs's `derived/index.json` rule).
-// Layout:
-//     <name>.jsonl        one JSON row per line, sorted by key
-//     <name>.idx.json     {v, key, rows, pageRows, bytes,
-//                          pages:[{i0,n,off,len,firstAt,lastAt}], …}
-// ONE index entry per PAGE, so the sidecar is O(rows/pageRows) — 245 entries for
-// a 1M-row log, not 1M. Reads are HTTP Range (R2/r2.dev serve them) or a
-// positional fs read; both hand back exactly `len` bytes of whole lines.
-// ---------------------------------------------------------------------------
+// jsonlStore: <name>.jsonl sorted by key, plus a <name>.idx.json sidecar with one entry per page
+// ({i0, n, off, len, firstAt, lastAt}); pages read by HTTP Range or a positional fs read.
+// why: lessons/timeline-store.md#jsonl
 
 /** Build the sidecar. Streams the file once; never holds it in memory. */
 export async function buildJsonlIndex(path, { pageRows = DEFAULT_PAGE_ROWS, key = (r) => r.at, out } = {}) {
@@ -570,13 +433,10 @@ export function jsonlStore({
       const pr = pageRows || idx.pageRows || DEFAULT_PAGE_ROWS;
       if (pr !== idx.pageRows) throw new Error(`jsonlStore: pageRows ${pr} != index pageRows ${idx.pageRows}`);
 
-      // THE SIDECAR IS DERIVED, AND DERIVED DATA GOES STALE. Page offsets are
-      // BYTE offsets: an index built before a C6 redaction compaction will Range
-      // into the middle of a line and hand back garbage that parses. So the
-      // index is bound to the log's byte length, and the binding is CHECKED —
-      // at open for a path, and against the first 206's content-range for a URL.
-      // (postshow.mjs's rule, one level down: masters are truth, derived is
-      // regenerable — but only if you can tell that it needs regenerating.)
+      // The sidecar is bound to the log's byte length and checked (at open, or by the first 206),
+      // since
+      // stale byte offsets would read garbage that parses.
+      // why: lessons/timeline-store.md#stale-sidecar
       let fh = null, sizeChecked = false;
       if (path) {
         const fsp2 = await import('node:fs/promises');
@@ -641,26 +501,9 @@ export function jsonlStore({
   };
 }
 
-// ---------------------------------------------------------------------------
-// (3) doStore — paged reads against the DEPLOYED elektron-instrument session API.
-//
-//     GET {base}/session/<id>?from=&limit=   -> {session, lanes, from, limit,
-//                                                count, total, events[]}
-// ordered by (at, seq); `from` is a ROW OFFSET, which is exactly the page
-// addressing above with no translation at all. That is not luck: workers/
-// instrument/src/index.js stores notes as SQLite ROWS (plan-timeline C4 — rows,
-// NEVER one JSON value), and "rows + an offset + a limit" is the same shape a
-// paged store wants. A session log kept as one 128 KiB JSON value could not
-// serve a page at all.
-//
-// READ-ONLY. No writes, no new CF resources, no token needed for reads (the
-// session API's reads are open; a token is only sent if you hand one in).
-//
-// PAGE BOUNDS. The API has no positional query, so firstAt/lastAt per page are
-// PROBED with limit=1 at each page start — pageCount+1 tiny requests, cached for
-// the reader's life. For a 392-row session at pageRows 4096 that is one probe.
-// (What a decades-scale archive needs instead is in NOTES-store.md.)
-// ---------------------------------------------------------------------------
+// doStore: read-only pages from the instrument session API (GET {base}/session/<id>?from=&limit=,
+// `from` a row offset). Page bounds are probed with limit=1 per page and cached.
+// why: lessons/timeline-store.md#do-store
 export function doStore({
   base, session, token,
   pageRows = 2000, maxPages = DEFAULT_MAX_PAGES,
@@ -693,7 +536,8 @@ export function doStore({
         pageMeta: (p) => bounds[p],
         index: () => ({ rows: total, pageRows, pageCount, probes: requests }),
         meta: () => ({ session: probe.session, lanes: probe.lanes, total }),
-        /** probe page boundaries — the positional index the API does not serve. */
+        // probe page boundaries, which the API does not serve
+        // why: lessons/timeline-store.md#warm
         async warm() {
           if (warmed) return;
           const firsts = await Promise.all(
@@ -724,12 +568,8 @@ export function doStore({
   };
 }
 
-// ---------------------------------------------------------------------------
-// openStore — one entry point, so a client writes ONE line to change backend.
-//   openStore({kind:'memory', rows})
-//   openStore({kind:'jsonl', url|path})
-//   openStore({kind:'do', base, session})
-// ---------------------------------------------------------------------------
+// openStore({ kind: 'memory' | 'jsonl' | 'do', ... }): one line to change backend.
+// why: lessons/timeline-store.md#open-store
 export function openStore(spec = {}) {
   const k = spec.kind || (spec.rows ? 'memory' : spec.session ? 'do' : 'jsonl');
   if (k === 'memory') return memoryStore(spec.rows || [], spec).open();
@@ -738,14 +578,9 @@ export function openStore(spec = {}) {
   throw new Error(`openStore: unknown kind ${k}`);
 }
 
-// ---------------------------------------------------------------------------
-// storeLane — the shim that makes a reader look like ONE per-kind lane, which is
-// what transport.mjs's byKind map holds. It filters by kind over the reader's
-// index space, so `lane.length` / `lane[k]` still satisfy the cursor contract.
-// Cheap only when the store is single-kind or the pages are resident; for a
-// multi-kind archive the RIGHT answer is one reader per kind (one sidecar per
-// lane) — see NOTES-store.md, "what ERR still needs".
-// ---------------------------------------------------------------------------
+// One per-kind lane over a reader. Cheap single-kind or resident; a multi-kind archive wants one
+// reader per kind.
+// why: lessons/timeline-store.md#store-lane
 export function storeLane(reader, kind) {
   if (!kind) return reader.rows;
   let map = null, mapCount = -1;
@@ -766,13 +601,8 @@ export function storeLane(reader, kind) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// driveStore — the horizon -> ensure() pump. This is the ONE line of glue a
-// client (or, later, the scheduler) needs: prefetch the window the lookahead is
-// about to walk into, from the same numbers the lookahead already has. It is NOT
-// a timer inside the library's vector — it is the CLIENT's cadence, per the
-// "the library does not own a render tick" law, and it is opt-in.
-// ---------------------------------------------------------------------------
+// The horizon-to-ensure() pump, on the client's cadence and opt-in.
+// why: lessons/timeline-store.md#drive
 export function driveStore(reader, transport, { horizonMs = 100, leadFactor = 8, everyMs = 250 } = {}) {
   let live = true, busy = false;
   const pump = async () => {

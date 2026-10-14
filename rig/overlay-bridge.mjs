@@ -1,19 +1,8 @@
 #!/usr/bin/env node
-// RETIRED 2026-10-13: `cues.positron.studio` (workers/cues) was deleted from Cloudflare on 2026-10-13 (workers/*/RETIRED.md), so what this calls there no longer answers.
-/**
- * DO cue room -> text file -> ffmpeg drawtext burn-in.
- *
- * Subscribes to the cue relay and keeps /tmp/overlay.txt holding the latest
- * message. Any ffmpeg with
- *   drawtext=textfile=/tmp/overlay.txt:reload=30:...
- * burns it into the outgoing video: visible to every viewer on every player,
- * synced with the picture by construction (it travels *in* the picture).
- *
- * Cue convention: {at, until?, data:{burn:"text"}} — only cues with data.burn
- * are burned; `until` clears the overlay when it passes.
- *
- *   node rig/overlay-bridge.mjs [room] [file]
- */
+// RETIRED: cues.positron.studio was deleted, so this no longer answers.
+// Cue room to /tmp/overlay.txt for ffmpeg drawtext; only cues with data.burn are burned.
+// node rig/overlay-bridge.mjs [room] [file]
+// why: lessons/rig-misc.md#overlay-bridge
 import { writeFileSync, readFileSync } from 'node:fs';
 import path from "node:path";
 

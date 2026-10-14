@@ -1,12 +1,6 @@
-// obsdock measurement orchestrator. Zero deps; local ffmpeg for frame grabs.
-//
-//   node run-measure.mjs setup            remote-configure OBS from zero (proof of full remote drive)
-//   node run-measure.mjs screenshot <src> GetSourceScreenshot -> decode burned row (no VNC needed)
-//   node run-measure.mjs pipeline [nFrames]   browser-source end-to-end latency (burned row vs wall)
-//   node run-measure.mjs scenes [n]       SetCurrentProgramScene -> first new-scene frame, n switches
-//   node run-measure.mjs resil-sink       kill+restart mediamtx mid-stream; OBS auto-reconnect?
-//   node run-measure.mjs resil-cycle      StopStream/StartStream cycle timing
-//   node run-measure.mjs resil-restart    docker restart -> time back to pixels at the sink
+// obsdock measurement orchestrator, zero deps: node run-measure.mjs setup | screenshot <src> |
+// pipeline [n] | scenes [n] | resil-sink | resil-cycle | resil-restart
+// why: lessons/rig-obs.md#run-measure-header
 import { spawn, execFile } from "node:child_process";
 import os from "node:os";
 import { appendFileSync, writeFileSync, readFileSync } from "node:fs";
@@ -88,8 +82,8 @@ function spawnGrabber(onFrame, url = RTMP_READ) {
 }
 
 async function waitFirstFrame(url = RTMP_READ, timeoutMs = 30000) {
-  // The stream may not exist yet (sink restarting, OBS reconnecting): ffmpeg
-  // then exits with "Input/output error" — respawn until a frame or deadline.
+  // The stream may not exist yet: respawn ffmpeg until a frame or the deadline.
+  // why: lessons/rig-obs.md#run-measure-respawn
   const deadline = now() + timeoutMs;
   while (now() < deadline) {
     const t = await new Promise((resolve) => {
@@ -289,8 +283,8 @@ async function resilRestart() {
     try { c2 = new ObsClient(); await c2.connect({ timeoutMs: 2000 }); tWs = now(); break; }
     catch { await sleep(500); if (now() - t0 > 120000) throw new Error("ws never came back"); }
   }
-  // ws answers before OBS is fully loaded: requests return code 207 (NotReady)
-  // for a beat — poll until real answers come back.
+  // OBS answers 207 (NotReady) for a beat after the socket opens: poll until real answers.
+  // why: lessons/rig-obs.md#run-measure-ready
   let scenesList = null, tReady = null;
   for (;;) {
     try { scenesList = (await c2.call("GetSceneList")).data.scenes.map((s) => s.sceneName); tReady = now(); break; }

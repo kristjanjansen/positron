@@ -1,15 +1,10 @@
-// A Durable Object that keeps a relay room by joining it as an ordinary socket,
-// the shape positron-store and positron-feedback share. Bundled into each
-// worker by wrangler, like http.mjs. A subclass supplies `onMessage(data)` and
-// `recorderMeta()` (its stored meta with `lastUse`, and anything it must write
-// on the alarm), and may override `opened()` and `gone()`.
+// A Durable Object that keeps a relay room by joining it as an ordinary socket (store, feedback).
+// A subclass supplies onMessage(data) and recorderMeta(), and may override opened() and gone().
+// why: lessons/workers-lib.md#recorder
 
 export class RelayRecorder {
-  /**
-   * @param {object} state  the DO's state
-   * @param {object} env
-   * @param {{ relay: string, alarmMs: number, idleStopMs: number }} o
-   */
+  // state, env, and { relay, alarmMs, idleStopMs }.
+  // why: lessons/workers-lib.md#ctor
   constructor(state, env, { relay, alarmMs, idleStopMs }) {
     this.state = state;
     this.env = env;
@@ -19,10 +14,9 @@ export class RelayRecorder {
     this.idleStopMs = idleStopMs;
     this.ws = null;
     this.room = null;
-    // ORDER IS THE PRODUCT, so handling is serialised through one chain. A DO's
-    // input gate holds events back across a STORAGE await and not across
-    // `blob.arrayBuffer()`, so two frames a millisecond apart would otherwise
-    // race each other into the table in the wrong order.
+    // Order is the product, so handling runs through one chain: the input gate holds events across
+    // a storage await but not across `blob.arrayBuffer()`, so two frames could race into the table.
+    // why: lessons/workers-lib.md#order
     this.chain = Promise.resolve();
   }
 

@@ -1,10 +1,7 @@
 #!/bin/zsh
-# Launch one multi-publisher ladder rung (RUNBOOK §13).
-# Usage: mgrid-rung.sh <N> <rungname> <idprefix> [pubs_per_page]
-# Kills ONLY moq-mgrid-* Chromes, clears the roster, launches probes first,
-# then ceil(N/K) publisher pages of K co-tenant pipelines each.
-# idprefix MUST be fresh per rung: CF draft-14 pins a namespace to the FIRST
-# announce; after an unclean kill the name is dead for minutes (§13 finding).
+# mgrid-rung.sh <N> <rungname> <idprefix> [pubs_per_page] (RUNBOOK §13): probes first, then pages.
+# idprefix must be fresh per rung: CF draft-14 pins a namespace to the first announce.
+# why: lessons/rig-moq.md#mgrid-rung
 set -e
 N=$1; RUNG=$2; PFX=$3; K=${4:-5}
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

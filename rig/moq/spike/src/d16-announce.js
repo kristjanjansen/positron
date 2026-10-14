@@ -1,7 +1,6 @@
-// Draft-16 SUBSCRIBE_NAMESPACE headline test (§14.4): subscribe to a namespace PREFIX
-// BEFORE any publisher exists; when a publisher appears, measure announce->track-available.
-// Also logs announce-withdrawal (active=false) timing for the death re-check.
-// Params: ?relay= (token URL, redacted in logs) &prefix= &dur=seconds
+// Draft-16 SUBSCRIBE_NAMESPACE test (§14.4): subscribe to a prefix before any publisher, time
+// announce to track-available and withdrawal. Params: ?relay= &prefix= &dur=
+// why: lessons/rig-moq.md#d16-announce
 import { Connection, Path } from "@moq/net";
 
 const params = new URLSearchParams(location.search);
@@ -95,7 +94,8 @@ async function watch(conn, fullPath) {
 		const ann = conn.announced(prefixPath);
 		log("ANN_SUB_SENT", `prefix=${PREFIX}`);
 		const handled = new Set();
-		// NB: no Promise.race with ann.next() — an orphaned next() eats events.
+		// No Promise.race with ann.next(): an orphaned next() eats events.
+		// why: lessons/rig-moq.md#d16-announce-race
 		setTimeout(() => { log("DUR_END"); ann.close(); }, DUR * 1000);
 		for (;;) {
 			const ev = await ann.next();

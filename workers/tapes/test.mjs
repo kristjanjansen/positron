@@ -1,34 +1,11 @@
-// workers/tapes/test.mjs: the proxy's two gates, with no network and no worker.
-//
-//   node workers/tapes/test.mjs
-//
-// 🔴 WHAT IT GRADES IS THE SCOPING, WHICH IS THE ONE CLAIM IN THAT FILE WORTH
-// DOUBTING. "It caches" can be read off the source; "it is not an open relay"
-// is a claim about every input anybody can send, and a proxy that answered for
-// one URL it should have refused would be a bandwidth laundromat for whoever
-// found it, on this account's egress.
-//
-// 🔴 A NAMED PROPORTION OF THIS FILE IS NEGATIVE CONTROLS, which is the
-// convention in `demo/shell/*-test.mjs` and the reason to believe any of it.
-// THIRTEEN of the nineteen are written so that a gate which had been removed
-// would fail them, COUNTED rather than claimed. A validator that refuses
-// everything is the same bug from the other side, so five of the other six are
-// positive controls on inputs that must be accepted, and the REASON is asserted
-// as well as the refusal.
-//
-// ⚠️ WHAT IT DOES NOT GRADE, SAID HERE RATHER THAN DISCOVERED LATER: nothing in
-// this file opens a socket, so it says nothing about whether the cache really
-// holds, whether Cloudflare honours `cacheTtl`, whether archive.org answers a
-// Range, or whether a media element is happy with what comes back. Those need
-// the worker deployed and a recording fetched, and the second half of that is
-// the thing the standing external-source rule says not to do on a whim.
+// node workers/tapes/test.mjs: the proxy's two gates, no network. Thirteen of 19 asserts are
+// negative controls; it does not grade the cache, Range support or archive.org.
+// why: lessons/workers-tapes.md#test-header
 
 import { resolveTape, rangeKey, originOk } from './worker.mjs';
 
-// ⚠️ NO MIDDOT IN THE JOIN, WHICH IS CLAUDE.md'S RULE ABOUT THE CHARACTER THAT
-// REPLACED THE EM DASH. `pedal-test.mjs` already prints its detail on plain
-// spaces; `looper-test.mjs` does not, and this is a new file rather than a
-// sweep of an old one.
+// Detail is joined on plain spaces.
+// why: lessons/workers-tapes.md#join
 let pass = 0, fail = 0;
 const ok = (what, cond, detail = '') => {
   if (cond) { pass++; console.log(`  ok    ${what}${detail ? `   ${detail}` : ''}`); }
@@ -67,12 +44,8 @@ console.log('[the corpus gate]');
     got.why || got.url);
 }
 
-// 🔴 THE SUBSTRING TRAP, AND IT IS THE REASON THIS FILE EXISTS AT ALL.
-// `"Saharan uni II".includes("Saharan uni I")` is TRUE, and `Saharan uni I` was
-// removed from the corpus on 2026-09-25 while `Saharan uni II` stayed. A
-// resolver written on `includes` would hand out the SECOND recording for the
-// id of the first, which is not an error anywhere: a working proxy, a playable
-// file, and the wrong piece of music.
+// A resolver on `includes` would hand `Saharan uni II` out for the id `Saharan uni I`.
+// why: lessons/workers-tapes.md#substring
 {
   const got = resolveTape(ROWS, I);
   ok('an id that is a PREFIX of a real id resolves to nothing',
@@ -96,9 +69,8 @@ for (const [id, what] of [
   ok(`${what} is refused`, !!got.why && !got.url, got.why || `it answered ${got.url}`);
 }
 
-// ⚠️ THE REASON IS ASSERTED, NOT ONLY THE REFUSAL. `bay-test.mjs` does the same
-// and for the same reason: a resolver that answered "no" to everything with one
-// message would pass every line above.
+// The reason is asserted too: a resolver refusing everything with one message passes the rest.
+// why: lessons/workers-tapes.md#reason
 {
   const a = resolveTape(ROWS, 'nothing at all').why;
   const b = resolveTape(ROWS, 'fng:unpublished-series').why;
@@ -116,9 +88,8 @@ ok('two spellings of the same open range are one key',
   `${rangeKey('bytes=0-')} / ${rangeKey('BYTES=0-')} / ${rangeKey(' bytes=-')}`);
 ok('two different ranges are two keys', rangeKey('bytes=0-99') !== rangeKey('bytes=100-199'),
   `${rangeKey('bytes=0-99')} vs ${rangeKey('bytes=100-199')}`);
-// ⚠️ A MULTIPART RANGE IS NOT CACHED RATHER THAN CACHED WRONG. `null` is the
-// worker's signal to go straight upstream and skip the cache entirely, which is
-// a slower answer and never a wrong one.
+// A multipart range gets no key (null), so it goes upstream uncached rather than cached wrong.
+// why: lessons/workers-tapes.md#multipart
 ok('a range shape this does not understand refuses a key rather than inventing one',
   rangeKey('bytes=0-99,200-299') === null && rangeKey('items=1-2') === null,
   'both null');
@@ -127,9 +98,8 @@ console.log('[the origin echo]');
 ok('the site is echoed', originOk('https://positron.studio') === 'https://positron.studio');
 ok('a development server is echoed', originOk('http://127.0.0.1:8890') === 'http://127.0.0.1:8890');
 ok('somebody else is not', originOk('https://example.com') === null);
-// 🔴 THE SUBSTRING TRAP AGAIN, ONE LAYER DOWN. `endsWith('.positron.studio')`
-// is the test rather than `includes('positron.studio')`, because
-// `https://positron.studio.example.com` contains the site's name and is not it.
+// `endsWith('.positron.studio')`, since `positron.studio.example.com` contains the name.
+// why: lessons/workers-tapes.md#suffix
 ok('a hostname that merely CONTAINS the site is not the site',
   originOk('https://positron.studio.example.com') === null
   && originOk('https://notpositron.studio') === null,

@@ -1,16 +1,6 @@
-// demo/fake-board-test.mjs: the stand-in relay and board, graded with no browser.
-//
-//   node demo/fake-board-test.mjs
-//
-// Opens nothing off this machine: every socket is to a relay it starts on
-// 127.0.0.1 with a port the OS picks.
-//
-// NEGATIVE CONTROLS, 9 of them, written so the bug they name fails them:
-//   - `relayOverride` refuses a public host, an http URL, a path, and nothing
-//   - a SILENT board's frames fail the same pulse test a working one passes
-//   - a board whose MIDI port is gone counts nothing and says why
-//   - B never sees A's `ping`, and a third socket is refused at maxSockets
-//   - a `-full` room never opens and its stats say full
+// node demo/fake-board-test.mjs: the stand-in relay and board, no browser, only 127.0.0.1 on an
+// OS-picked port. Nine negative controls, each written so the bug it names fails it.
+// why: lessons/harness.md#fake-board-test
 
 import { relayOverride } from './shell/wire.mjs';
 import { startRelay } from './fake-relay.mjs';

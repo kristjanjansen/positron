@@ -1,15 +1,8 @@
 #!/bin/bash
-# rig/pico/net/build.sh: build the Pico 2 W network node, inside Docker.
-#
-#   rig/pico/net/build.sh              wss:// to studio-1 (the default)
-#   rig/pico/net/build.sh -DRELAY_TLS=0 -DRELAY_ROOM=pico-test-abc123
-#
-# Writes build-pico2_w/net.uf2, net.elf and net.map beside this file (all
-# ignored by git). The map file is what the RAM estimate is read from.
-# Wifi credentials come from pico/wifi_secrets.h, which is NOT committed; with
-# no such file the UF2 still builds and links and joins nothing.
-#
-# 🔴 NOTHING NATIVE RUNS ON THE MAC. The compiler is in the image.
+# rig/pico/net/build.sh [-DRELAY_TLS=0 -DRELAY_ROOM=...]: build the Pico 2 W node in Docker.
+# Writes build-pico2_w/net.uf2, .elf, .map (RAM estimate). Wifi from uncommitted
+# pico/wifi_secrets.h.
+# why: lessons/rig-pico.md#net-build
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RIG="$(cd "$HERE/../.." && pwd)"

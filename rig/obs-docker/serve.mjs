@@ -1,7 +1,5 @@
-// Page server + collector on :8890. Zero deps.
-//   /clock.html   the burned-clock page (fed to the OBS browser source)
-//   /now          host Date.now() (page clock sync — kills VM clock skew)
-//   /collect      POST beacons -> results/obs-docker-beacons.jsonl
+// Page server and collector on :8890: /clock.html, /now (host clock), /collect.
+// why: lessons/rig-obs.md#obs-docker-serve
 import http from "node:http";
 import { readFileSync, appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

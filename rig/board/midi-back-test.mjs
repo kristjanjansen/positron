@@ -1,12 +1,6 @@
-// rig/board/midi-back-test.mjs: the Circuit's macro knobs, read back and told
-// to the room, graded with no board, no ALSA and no relay.
-//
-//   node rig/board/midi-back-test.mjs
-//
-// Negative controls are marked NEGATIVE: each is written so the bug it names
-// would fail it. What is NOT graded here: that the Pi's raw MIDI input really
-// carries the Circuit's hand turns (measured on the Mac through Web MIDI only,
-// research/measured-devices-2026-09-20.md), and the real relay.
+// node rig/board/midi-back-test.mjs: macro knobs read back and told to the room, no board or relay.
+// Not graded: that the Pi's raw MIDI input carries the hand turns (measured on the Mac only).
+// why: lessons/rig-board-tests.md#midi-back-test-header
 
 import { EventEmitter } from 'node:events';
 import { constants as FS_C } from 'node:fs';
@@ -131,9 +125,8 @@ const is = (name, got, want) => {
   hw.close();
 }
 
-// ── on a direct link too, 2026-10-13 (remote/010 direct) ────────────────────
-// A page on the direct path hears a hand turned macro on its own `ctl`, marked
-// `path: 'direct'`, so it need not wait for the relay's copy and can drop it.
+// On the direct path the page hears the macro on its own `ctl`, marked `path: 'direct'`.
+// why: lessons/rig-board-tests.md#midi-back-test-direct
 {
   const cfg = parseInputs('{"circuit":{"device":"hw:CARD=Pro,DEV=0","channels":2,"take":1,"midi":{"port":"Circuit","channels":[1,2,10]}}}');
   let t = 0; const timers = [], inbox = [];

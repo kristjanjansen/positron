@@ -1,12 +1,6 @@
-// Talk to Ableton Live over AbletonOSC. Runs ON the machine Live is on.
-//
-//   node live-osc.mjs status              what Live has, and whether it can hear us
-//   node live-osc.mjs get <addr> [args]   one query
-//
-// OSC IS UDP AND A REPLY CAN SIMPLY NOT ARRIVE -- measured once in session 15,
-// one unanswered `current_song_time` killed a run while a second run lost 0 of
-// 111. So every ask retries rather than failing on a single packet. Never put
-// this in the timing path: it arms and reads, and the numbers come from audio.
+// Talk to Live over AbletonOSC, on Live's machine: node live-osc.mjs status | get <addr> [args].
+// OSC is UDP, so every ask retries. Never in the timing path.
+// why: lessons/rig-m1.md#live-osc-header
 import dgram from 'node:dgram';
 
 const HOST = process.env.LIVE_HOST || '127.0.0.1';
@@ -61,10 +55,8 @@ export function ask(addr, args = [], tries = 4) {
   });
 }
 
-// ONLY act as a CLI when RUN, not when IMPORTED. live-setup.mjs imports ask()
-// from here, and this block used to execute on import -- status report, then
-// process.exit(0), so the importer's own code never ran at all and its output
-// looked like this file's.
+// Act as a CLI only when run, not when imported (live-setup.mjs imports ask()).
+// why: lessons/rig-m1.md#live-osc-main
 const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
 if (!isMain) { /* imported: expose ask() and do nothing else */ }
 else {

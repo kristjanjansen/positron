@@ -1,9 +1,7 @@
 #!/bin/zsh
-# Drive ONE viewer->publisher flip (RUNBOOK §13 phase 2).
-# Usage: mgrid-flipdrive.sh <flipId>   e.g. f1
-# Launches a fresh flip viewer Chrome, waits for it to be steady-viewing,
-# POSTs the publish command (timestamped), waits for probes to decode it,
-# then tears the flip page down and removes its namespace from the roster.
+# mgrid-flipdrive.sh <flipId> (RUNBOOK §13 phase 2): launch a flip viewer, POST publish, wait for
+# the probes to decode it, then tear it down and remove it from the roster.
+# why: lessons/rig-moq.md#mgrid-flipdrive
 set -e
 FID=$1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"

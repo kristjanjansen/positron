@@ -1,16 +1,6 @@
-// Delete every Cloudflare Stream recording. Storage is the lever HANDOFF item 5
-// names: recording cannot be turned off on the RTMPS path (mode:off also kills
-// HLS playback of a live input, and preferLowLatency requires "automatic"),
-// deleteRecordingAfterDays bottoms out at 30, and the 1000-minute cap BLOCKS
-// NEW LIVE STREAMS when it fills — so this is an outage risk, not a bill.
-//
-// Checked before this was written: none of the 59 recordings is referenced
-// anywhere in the repo, and replay/seek play from R2
-// (archive.positron.studio/shows/archive-test/), not from Stream. So clearing
-// Stream costs no demo.
-//
-//   node clear-recordings.mjs           list only, deletes nothing
-//   node clear-recordings.mjs --delete  actually delete
+// node clear-recordings.mjs [--delete]: list, or delete, every Stream recording. Recording cannot
+// be turned off on RTMPS and the 1000-minute cap blocks new live streams when full.
+// why: lessons/rig-obs.md#clear-recordings
 import { readFileSync } from 'node:fs';
 
 const env = Object.fromEntries(readFileSync(new URL('../../.env', import.meta.url), 'utf8')

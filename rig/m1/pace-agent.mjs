@@ -1,41 +1,7 @@
-// pace-agent.mjs — a rack agent with no network in it, so "the sound is bad"
-// can be told from "the PATH to the sound is bad".
-//
-//   node rig/m1/pace-agent.mjs                    perfect 20 ms pacing
-//   node rig/m1/pace-agent.mjs --jitter 25        the relay's jitter, reproduced
-//   node rig/m1/pace-agent.mjs --channels 2       dual-mono stereo, like Live's
-//
-// then open  http://127.0.0.1:8890/able/?relay=ws://127.0.0.1:8899
-//
-// 🔴 WHY THIS EXISTS. `rack` sounded noisy, six measurements said the stream was
-// perfect, and the defect turned out to be a cushion downstream of every one of
-// them (LESSONS #52). The cushion was resized from a measurement of the real
-// path — p50 20.4 / p95 32.6 / p99 45.0 ms apart, worst gap 108.6 ms — and the
-// report came back noisy again. At that point there are two live hypotheses
-// with opposite fixes:
-//
-//   the ARRIVAL TRAIN is still too rough  -> a bigger cushion, or a better path
-//   something AFTER the socket is wrong   -> a bigger cushion changes nothing
-//
-// and they are indistinguishable from inside the page. This is the instrument
-// that separates them. It sends a tone this file generates, at exactly one
-// frame every 20 ms, over a socket on loopback: no relay, no edge, no Wi-Fi, no
-// Core Audio tap, no Ableton. If the page still sounds wrong here, nothing left
-// in the chain is the network.
-//
-// ⚠️ AND IT HAS A NEGATIVE CONTROL, which is the half that makes it evidence.
-// `--jitter N` delays each send by a random 0..N ms, reproducing what the relay
-// does. Run it at 0 and at 40: if 0 is clean and 40 is not, jitter is
-// sufficient to explain the complaint. If 0 is ALSO bad, it is not the network
-// and the cushion was never the whole story. A test that can only pass tells
-// you nothing — see LESSONS #27 and the `--self-test` in verify-quest.mjs.
-//
-// ⚠️ NO DEPENDENCIES. Node has no WebSocket *server*, and this repo has no
-// package.json — the handshake and a text/binary frame writer are about sixty
-// lines and are house style already (demo/verify.mjs speaks raw CDP the same
-// way). Only what a browser client actually needs is implemented: server ->
-// client frames are never masked, and the one client frame this cares about is
-// a small masked text frame.
+// node rig/m1/pace-agent.mjs [--jitter N] [--channels 2]: a tone at exactly one frame per 20 ms
+// over loopback, to tell a bad sound from a bad path. `--jitter` is the negative control.
+// A dependency-free WebSocket server: unmasked server frames, small masked client text frames.
+// why: lessons/rig-m1.md#pace-agent-header
 
 import { createServer } from 'node:http';
 import { createHash, randomInt } from 'node:crypto';
@@ -50,10 +16,8 @@ const FRAME_MS = 1000 * FRAME / RATE;
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
-// ── the tone ──────────────────────────────────────────────────────────────
-// A steady sine at the note being held, because a STEADY source is the one that
-// makes a discontinuity audible. A pad or a noise source hides exactly the
-// defect this is looking for.
+// A steady sine, the source that makes a discontinuity audible.
+// why: lessons/rig-m1.md#pace-agent-tone
 let hz = 0, phase = 0, held = new Set();
 const noteHz = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -62,8 +26,8 @@ function frame() {
   out.writeUInt32LE(seq++, 0);
   out.writeDoubleLE(performance.now(), 4);
   for (let i = 0; i < FRAME; i++) {
-    // A gentle fade to and from silence, so switching notes is not a step —
-    // a step is a click, and a click is the thing being hunted.
+    // Fade between notes: a step is a click, the thing being hunted.
+    // why: lessons/rig-m1.md#pace-agent-fade
     const target = hz ? 0.25 : 0;
     amp += (target - amp) * 0.0008;
     const v = hz ? Math.sin(phase) * amp : 0;
@@ -150,11 +114,8 @@ function onMessage(sock, m) {
   }
 }
 
-// ── the pacing ────────────────────────────────────────────────────────────
-// 🔴 A DRIFT-FREE SCHEDULER, NOT `setInterval(fn, 20)`. setInterval accumulates
-// its own lateness, so a "20 ms" tick drifts against the sample clock and the
-// listener's cushion slowly empties or fills — which would be this instrument
-// producing the very defect it is meant to rule out.
+// A drift-free scheduler, not setInterval, which accumulates lateness against the sample clock.
+// why: lessons/rig-m1.md#pace-agent-pacing
 let due = performance.now();
 function tick() {
   const now = performance.now();

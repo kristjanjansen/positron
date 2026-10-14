@@ -1,13 +1,6 @@
-// timeline/lab/csound-test.mjs — the compiler, and the claim it exists to make.
-//
-//   node timeline/lab/csound-test.mjs
-//
-// The claim (demo/notes/uuu-positron.md §3) is not "we can parse Csound". It is
-// that a vClick score compiled into rows gains the two things the format does
-// not have: a repeat that is a REFERENCE, and a fold at any position — so
-// "start at bar 47" is a computation rather than a rehearsal discipline.
-// The last two tests are that claim; the ones before it are the arithmetic it
-// stands on, and the ramp is the one that would fail silently.
+// node timeline/lab/csound-test.mjs: the compiler. The last two tests are the claim (a repeat is a
+// reference; a fold at any position); the rest is the arithmetic, the ramp being the silent one.
+// why: lessons/timeline-lab.md#ct-header
 
 import { compileCsound, csoundPart, tempoMap, parseCsoundScore, repeatsAsQuotations, DEFAULT_BPM } from '../csound.mjs';
 import { createDeck } from '../transport.mjs';
@@ -38,15 +31,10 @@ console.log('\ncsound compiler');
   ok('120 bpm puts beat 4 at 2 s', near(c.items[0].at, 2000, 1e-9), `${c.items[0].at} ms`);
 }
 
-// ── 3. THE RAMP. Seconds-per-beat is linear in beat ⇒ time is a TRAPEZOID. ──
-// MEASURED against csound 6.18, not derived. `t 0 120 30 90` puts beat 30 at
-// 17.500 s. Three models disagree and only one is Csound's:
-//     trapezoid on 60/tempo   17.500 s   <- Csound
-//     linear-in-tempo (log)   17.261 s   <- what this file shipped until 09-09
-//     mean tempo              17.143 s
-// The old comment warned that the mean-tempo shortcut lands notes "118 ms
-// early". That 118 ms was the gap between two WRONG answers; the real error was
-// 239 ms, and on `t 0 60 20 180` it was 2.35 s by beat 20.
+// 3. The ramp: seconds per beat linear in beat, so time is a trapezoid. `t 0 120 30 90` puts beat
+// 30
+// at 17.500 s (csound 6.18); linear-in-tempo says 17.261, mean tempo 17.143.
+// why: lessons/timeline-lab.md#ct-3
 {
   const t = tempoMap([[0, 120], [30, 90]]);
   const CSOUND_BEAT30 = 17.5;                       // csound 6.18, measured
@@ -59,8 +47,8 @@ console.log('\ncsound compiler');
   ok('and is NOT the linear-in-tempo log integral', !near(t.secondsAt(30), logFormWrong, 1e-6),
     `${t.secondsAt(30).toFixed(6)} s vs the log form ${logFormWrong.toFixed(6)} s`);
 
-  // A steeper ramp, chosen because the three models predict 13.333 / 10.986 /
-  // 10.000 — so one run separates them.
+  // A steeper ramp where the three models predict 13.333, 10.986 and 10.000.
+  // why: lessons/timeline-lab.md#ct-steep
   const t2 = tempoMap([[0, 60], [20, 180]]);
   ok('a steep ramp matches Csound', near(t2.secondsAt(20), 20 * (1 + 1 / 3) / 2, 1e-9),
     `${t2.secondsAt(20).toFixed(9)} s`);
@@ -81,14 +69,10 @@ console.log('\ncsound compiler');
     `${t.beatAt(t.secondsAt(17.5)).toFixed(9)}`);
 }
 
-// ── 4. carry and the p2 shorthands ─────────────────────────────
-// Every number here is csound 6.18's answer for this exact score, and the point
-// is that the three shorthands do NOT share a reference note:
-//     +    the previous note OF THIS INSTRUMENT, its end
-//     .    the same p-field of the previous note OF THIS INSTRUMENT
-//     ^+x  the IMMEDIATELY PRECEDING STATEMENT's start, any instrument
-// Selected by p5 rather than by index, because the rows are sorted by time and
-// an index assert silently follows whichever note moved.
+// 4. Carry and p2 shorthands, csound's answers: `+` this instrument's previous end, `.` its
+// previous
+// p-field, `^+x` the previous statement's start. Rows selected by p5, not index.
+// why: lessons/timeline-lab.md#ct-4
 {
   const c = compileCsound([
     'i 1 0 1 8000 440',
@@ -107,12 +91,8 @@ console.log('\ncsound compiler');
     `${byP5(220).at} ms, dur ${byP5(220).payload.p[2]}`);
 }
 
-// ── 5. SECTIONS. `s` is a new clock, not just a new zero. ──────────────────
-// Every number below is csound 6.18's own answer for that exact score, read
-// off `timeline/lab/csound-oracle.mjs`. The defect these replace was two
-// seconds wide and shipped green for months, because one global tempo map
-// across a score that resets its tempo is wrong in a way no self-consistent
-// test can see.
+// 5. Sections: `s` is a new clock. Every number is csound 6.18's, from csound-oracle.mjs.
+// why: lessons/timeline-lab.md#ct-5
 {
   const c = compileCsound('i 1 0 2\ni 1 2 2\ns\ni 1 0 1');
   ok('a section restarts p2 at its own zero', c.items[2].at === 4000, `${c.items[2].at} ms`);
@@ -129,7 +109,8 @@ console.log('\ncsound compiler');
     near(r.sections[1].startMs, 2500, 1e-9) && r.sections[1].points[0][1] === DEFAULT_BPM,
     `starts at ${r.sections[1].startMs} ms, at ${r.sections[1].points[0][1]} bpm`);
 
-  // A LATER tempo does not reach back either — section 1 stays at 60.
+  // A later tempo does not reach back; section 1 stays at 60.
+  // why: lessons/timeline-lab.md#ct-later
   const back = compileCsound('i 1 0 1\ni 1 4 1\ns\nt 0 240\ni 1 0 1\ni 1 4 1');
   ok('a later section\'s tempo does not leak backwards',
     [0, 4000, 5000, 6000].every((ms, i) => near(back.items[i].at, ms, 1e-9)),
@@ -144,12 +125,13 @@ console.log('\ncsound compiler');
   ok('and says so', t4.warnings.some((w) => /must start at beat 0/.test(w)),
     t4.warnings[0] || 'no warning');
 
-  // A section is as long as its longest note ENDS, in warped seconds — 4 s at
-  // 120 bpm for eight beats, not 8, and not the 0.5 s where its last note starts.
+  // A section lasts until its longest note ends, warped: 4 s at 120 bpm for eight beats.
+  // why: lessons/timeline-lab.md#ct-length
   const len = compileCsound('t 0 120\ni 1 0 8\ni 1 1 0.25\ns\ni 1 0 1');
   ok('a section runs until its longest note ends, in warped seconds',
     near(len.items[2].at, 4000, 1e-9), `${len.items[2].at} ms`);
-  // and an `f` holds it open past that — `b` shifting the f as well as the note
+  // an `f` holds it open past that, `b` shifting the f too
+  // why: lessons/timeline-lab.md#ct-f
   const held = compileCsound('b 5\ni 1 0 1\nf 0 10\ns\ni 1 0 1');
   ok('an f holds its section open, and b shifts the f too',
     near(held.items[1].at, 15000, 1e-9), `${held.items[1].at} ms`);
@@ -166,15 +148,16 @@ console.log('\ncsound compiler');
   const pm = compileCsound('i 1 0 2 111\ns\ni 1 + . 333\ni 1 ^+1 .');
   ok("but '+' and '^' do not", near(pm.items[1].at, 2000, 1e-9) && near(pm.items[2].at, 3000, 1e-9),
     pm.items.map((i) => i.at.toFixed(1)).join(', '));
-  // a p-field simply left off the end is carried too — but only within a section
+  // a p-field left off the end is carried, within a section only
+  // why: lessons/timeline-lab.md#ct-tail
   const tail = compileCsound('i 1 0 1 777 888\ni 1 2 1\ns\ni 1 4 1');
   ok('a p-field left off the end is carried, and stops at the section',
     tail.items[1].payload.p[3] === 777 && tail.items[2].payload.p[3] === undefined,
     `p4 ${tail.items[1].payload.p[3]} then ${tail.items[2].payload.p[3]}`);
 }
 
-// ── 5b. THE SECTION CLOCK, and the one axis a document has ────────────────
-// Three sections, two ramps, a base and an f. Csound's answer at every onset.
+// 5b. The section clock on a document's one beat axis: three sections, two ramps, a base and an f.
+// why: lessons/timeline-lab.md#ct-5b
 {
   const SCORE = ['t 0 120 4 60', 'i 1 0 1', 'i 1 2 1', 'i 1 4 1',
     's', 'i 1 0 1', 'i 1 3 1',
@@ -185,11 +168,8 @@ console.log('\ncsound compiler');
     c.items.length === CSOUND.length && CSOUND.every((ms, i) => near(c.items[i].at, ms, 1e-6)),
     c.items.map((i) => i.at.toFixed(3)).join(', '));
 
-  // THE MECHANISM, not a downstream effect: a score document carries ONE beat
-  // axis and one tempo map, and csound's sections each start again at beat 0.
-  // `csoundPart` lays them end to end and spells each boundary as two points at
-  // the same beat. If that is wrong, `partItems` puts the rows somewhere else —
-  // so assert THAT, rather than re-reading the numbers above.
+  // csoundPart spells each boundary as two points at one beat; assert partItems lands the rows.
+  // why: lessons/timeline-lab.md#ct-mechanism
   const cp = csoundPart(SCORE);
   const doc = scoreDoc({ id: 'sections', tempo: cp.tempo, parts: { tune: cp.part }, uses: [] });
   const back = partItems(doc, 'tune', { tempoMap });
@@ -237,11 +217,8 @@ console.log('\ncsound compiler');
     scoreToJSON(back) === scoreToJSON(s), `${scoreToJSON(s).length} bytes`);
 }
 
-// ── 8. THE FOLD. Seek-from-anywhere, on a compiled score. ──────────────────
-// This is the one the note argues for: the score itself carries no state, so
-// "what is in force at bar 47" is unanswerable from the file. Compiled into
-// rows, it is deck.reduceAt(kind, pos) — and it is exact at every probe, not
-// only where a cue happens to sit.
+// 8. The fold: deck.reduceAt(kind, pos) on a compiled score, exact at every probe.
+// why: lessons/timeline-lab.md#ct-8
 {
   const c = compileCsound('t 0 120\n' + Array.from({ length: 16 }, (_, i) => `i 1 ${i} 0.5 8000 ${400 + i}`).join('\n'));
   const deck = createDeck({

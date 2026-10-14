@@ -1,13 +1,6 @@
-// AUDIO SPIKE measurement player (RUNBOOK §10): subscribes positron-audio-test,
-// decodes BOTH tracks (VideoDecoder -> canvas + burned-row read; AudioDecoder ->
-// WebAudio jitter-buffered playback), and measures:
-//   aLat      = audio "glass-to-glass" analog: decode-output wall - tick wall time
-//   aPlayLat  = tick wall -> the moment the tick emerges from the WebAudio graph
-//               (scheduled ctx time mapped back to wall; excludes device output latency,
-//               reported separately as ctx.outputLatency)
-//   skew      = aLat - rolling-median video g2g (positive = audio behind video)
-//   underruns = late/dropped audio chunks + total gap ms
-// One JSONL row per detected tick -> POST /jsonl on the local server.
+// Audio spike player (RUNBOOK §10): decodes video and audio of positron-audio-test, measures aLat,
+// aPlayLat, A/V skew and underruns per tick, one JSONL row each to POST /jsonl.
+// why: lessons/rig-moq.md#play-audio-header
 import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
@@ -142,10 +135,9 @@ const wallNow = () => performance.timeOrigin + performance.now();
 	let lastTickMediaMs = -1e12;
 	const aLats = [], playLats = [], skews = [];
 
-	// Chromium's AudioDecoder regenerates output timestamps by accumulating
-	// sample counts from the first chunk — a content skip at join becomes a
-	// permanent timestamp offset. Opus 20ms-in/20ms-out is 1:1, so map encoded
-	// chunk timestamps through a FIFO and use THOSE as media time.
+	// AudioDecoder regenerates timestamps from sample counts; Opus 20 ms is 1:1, so map through a
+	// FIFO.
+	// why: lessons/rig-moq.md#play-audio-ts
 	const inTsQ = [];
 	let tsFixLogged = false;
 	const aDec = new AudioDecoder({
@@ -164,7 +156,8 @@ const wallNow = () => performance.timeOrigin + performance.now();
 			if (dLiveWin.length > 250) dLiveWin.shift();
 			const dLive = Math.min(...dLiveWin);
 
-			// pull samples (mono is enough — channels are identical)
+			// Mono is enough: the channels are identical.
+			// why: lessons/rig-moq.md#play-audio-mono
 			const pcm = new Float32Array(ad.numberOfFrames);
 			try {
 				ad.copyTo(pcm, { planeIndex: 0, format: "f32-planar" });

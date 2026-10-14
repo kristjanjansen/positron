@@ -1,27 +1,7 @@
-// workers/mail/test.mjs — what the spam labeller says about twenty real
-// header blocks, with no browser, no network and no message from anybody.
-//
-//   node workers/mail/test.mjs
-//
-// `classify` is pure: it holds no socket, no clock and no Worker API, so the
-// whole of the labelling decision is gradable here. That matters more than
-// usual for this subject, because THE SIGNAL IT READS CANNOT BE PRODUCED
-// LOCALLY. `wrangler dev` delivers a message with no `Authentication-Results`
-// header at all, so a harness built on local delivery exercises exactly one of
-// the cases below (`14-no-stamp.eml`) and grades nothing else. The fixtures are
-// the only way to reach the other nineteen.
-//
-// ⚠️ THE FIXTURES ARE SHAPED LIKE REAL MAIL, NOT LIKE CONVENIENT INPUT. Every
-// `Authentication-Results` here is folded across lines with a tab, carries
-// comments with colons and semicolons inside them, and arrives CRLF, because
-// each of those has its own way of breaking a parser and a fixture that avoids
-// them grades a parser that would fail in production.
-//
-// NINE OF THESE ARE NEGATIVE CONTROLS: they are written so that the bug they
-// name would fail them, rather than so that today's code passes. Six of the
-// twenty fixtures are ordinary mail from a person and MUST come out clean,
-// which is the control on the whole idea: a labeller that says "suspicious"
-// about everything is useless and would take this suite red.
+// node workers/mail/test.mjs: the labeller on twenty real-shaped header blocks (folded, commented,
+// CRLF), no network. `wrangler dev` sends no Authentication-Results, so fixtures are the only way.
+// Nine are negative controls; six are ordinary mail that must come out clean.
+// why: lessons/workers-mail.md#test-header
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -58,11 +38,8 @@ console.log('\n== the header block ==');
     `${arc.length} characters on one line`);
 }
 
-// 2. NEGATIVE CONTROL, AND IT IS THE REASON THIS FILE PARSES RAW TEXT AT ALL.
-//    A `Headers` joins two headers of one name into one comma separated string,
-//    so a stranger's forged stamp and the receiving server's real one would
-//    arrive glued together under the stranger's authserv-id. Read off the raw
-//    message they stay two.
+// 2. Negative control: two stamps of one name must stay two, read off the raw text.
+// why: lessons/workers-mail.md#t2
 {
   const h = parseHeaderBlock(read('10-spoofed-plus-real.eml'));
   const stamps = h.filter(([k]) => k === 'authentication-results');
@@ -106,9 +83,8 @@ console.log('\n== the stamp ==');
 
 console.log('\n== whose stamp is believed ==');
 
-// 6. NEGATIVE CONTROL, AND IT IS A BUG A REAL PROJECT SHIPPED. Guarding this on
-//    the substring `cloudflare` accepts all three of the spoofs below, which is
-//    a stranger's stamp read as the receiving server's own.
+// 6. Negative control: a substring guard on `cloudflare` would accept all three spoofs below.
+// why: lessons/workers-mail.md#t6
 {
   const yes = ['cloudflare.net', 'mx.cloudflare.net', 'MX.CLOUDFLARE.NET', 'route2.mx.cloudflare.net'];
   const no = ['notcloudflare.net', 'cloudflare.evil.tld', 'mx.cloudflare.net.evil-mx.example',
@@ -126,10 +102,8 @@ console.log('\n== whose stamp is believed ==');
 
 console.log('\n== the published policy ==');
 
-// 7. 🔴 NEGATIVE CONTROL, AND IT IS THE `s.includes` BUG IN ONE LINE. `sp=` is
-//    the policy for SUBDOMAINS. The string `sp=reject` CONTAINS the substring
-//    `p=reject`, so a guard written that way refuses mail from a domain whose
-//    own policy is `p=none` and which asked for it to be delivered.
+// 7. Negative control: `sp=reject` contains `p=reject`; a substring guard refuses wanted mail.
+// why: lessons/workers-mail.md#t7
 {
   const only = parseAuthResults('mx.cloudflare.net; dmarc=fail (p=none sp=reject dis=none) header.from=x.example');
   const got = dmarcPolicy(only.results[0]);
@@ -178,10 +152,9 @@ ok('mail.example is related to example and notexample is not',
 
 console.log('\n== twenty messages ==');
 
-// file, envelope sender (what the sending server presented), verdict, refuse?
-// ⚠️ THE ENVELOPE SENDER IS NOT IN THE FILE. It is `message.from` on the Worker
-// API, which travels in the SMTP conversation rather than in the message, so it
-// is supplied here the way the platform supplies it.
+// file, envelope sender, verdict, refuse? The envelope sender is `message.from`, from SMTP, not the
+// file.
+// why: lessons/workers-mail.md#corpus
 const CORPUS = [
   ['01-person-clean.eml', 'maarja@gmail.com', 'clean', false,
     'a person on Gmail, everything passing. THE CONTROL ON THE WHOLE IDEA'],
@@ -238,18 +211,16 @@ for (const [file, env, want, wantReject, why] of CORPUS) {
 
 console.log('\n== what the corpus proves about the labeller ==');
 
-// 12. 🔴 THE CONTROL ON EVERYTHING ABOVE. A labeller stuck on one answer passes
-//     any single assert you like. Six of twenty fixtures are ordinary mail from
-//     a person and must come out clean, so "always suspicious" fails here.
+// 12. Six of twenty must come out clean, so a labeller stuck on one answer fails.
+// why: lessons/workers-mail.md#t12
 {
   const clean = seen.filter((v) => v.verdict === 'clean').length;
   ok('six messages from a person come out clean', clean === 6,
     `${clean} clean of ${seen.length}`);
 }
 
-// 13. AND EVERY RUNG OF THE LADDER IS REACHED. A branch no fixture exercises is
-//     a branch nobody has checked, and this assert is what caught `suspect` and
-//     `unsigned` going ungraded through the first eighteen fixtures.
+// 13. Every rung of the ladder is reached by some fixture.
+// why: lessons/workers-mail.md#t13
 {
   const kinds = new Set(seen.map((v) => v.verdict));
   const missing = RANK.filter((r) => !kinds.has(r));
@@ -259,9 +230,8 @@ console.log('\n== what the corpus proves about the labeller ==');
       : RANK.map((r) => `${r} ${seen.filter((v) => v.verdict === r).length}`).join(' · '));
 }
 
-// 13. NEGATIVE CONTROL ON THE REFUSAL ITSELF. Exactly three fixtures may be
-//     refused and all three are a DMARC failure against a published p=reject.
-//     Nothing else on this page may ever set it.
+// 13. Negative control: only the three DMARC-against-p=reject fixtures may be refused.
+// why: lessons/workers-mail.md#t13b
 {
   const refused = seen.filter((v) => v.reject);
   ok('only a DMARC failure against a published p=reject is refused',
@@ -289,10 +259,8 @@ ok('every refusal carries a reason',
     RANK.join(' > '));
 }
 
-// 16. NEGATIVE CONTROL. The strongest signal wins even when it is the only one
-//     that is bad: a message whose SPF and DKIM both pass and whose DMARC fails
-//     is forged, because DMARC is the check that asks whether the passes belong
-//     to the domain in the From line.
+// 16. Negative control: DMARC failing makes it forged even when SPF and DKIM pass.
+// why: lessons/workers-mail.md#t16
 {
   const v = classify({
     headers: [['authentication-results',
@@ -331,22 +299,16 @@ console.log('\n== the label ==');
     strings.every((s) => !s.includes('—')), `${strings.length} strings`);
 }
 
-// 19. A clean message from a person says so, because the alternative is an empty
-//     prefix, which cannot be told apart from a build that has no labelling in
-//     it. It now also says WHICH stamp decided, for the same reason one step on:
-//     a label that names its source only in the interesting case cannot be told
-//     apart from a build that does not name it at all.
+// 19. A clean message says so, and names which stamp decided.
+// why: lessons/workers-mail.md#t19
 {
   const v = classifyRaw(read('01-person-clean.eml'), 'maarja@gmail.com');
   ok('a clean message is labelled, not left blank',
     v.label === '[ok · via Authentication-Results]', v.label);
 }
 
-// 19b. 🔴 THE PROVENANCE CHIP, WITH THE NEGATIVE CONTROL THAT GIVES IT MEANING.
-//      The question this answers is whether a verdict was read off a real
-//      `Authentication-Results` or off a forwarded ARC set, and it is only worth
-//      a chip if the two fixtures come out DIFFERENT. A message whose only stamp
-//      is ARC must say so; one with the real header must not.
+// 19b. The provenance chip: ARC-only and real-header fixtures must come out different.
+// why: lessons/workers-mail.md#t19b
 {
   const real = classifyRaw(read('01-person-clean.eml'), 'maarja@gmail.com');
   const arc = classifyRaw(read('15-arc-cloudflare-full.eml'), 'joe@example.com');
@@ -364,10 +326,8 @@ console.log('\n== the label ==');
     !none.chips.some((c) => c.startsWith('via ')), none.label);
 }
 
-// 20. 🔴 NEGATIVE CONTROL ON THE CAP AND THE REFUSAL TOGETHER. The longest label
-//     in the corpus is one chip under the limit, so appending `refused` to the
-//     END of it would be cut off by the cap and the label would read as a
-//     message that was delivered and flagged. It goes second.
+// 20. Negative control: `refused` goes second, or the cap would cut it from the longest label.
+// why: lessons/workers-mail.md#t20
 {
   const v = classifyRaw(read('06-dmarc-reject-property.eml'), 'bounce@evil-mx.example');
   const p = prefixFor(v, { refused: true });
@@ -391,14 +351,9 @@ console.log('\n== the label ==');
 
 // ── the module keeps its promise ────────────────────────────────────────────
 
-// ── the words a person wrote ────────────────────────────────────────────────
-//
-// 🔴 THIS SECTION EXISTS BECAUSE THERE WAS NONE. `firstText` lived inside
-// `index.js` where nothing could import it, so the parser had ZERO asserts while
-// the classifier beside it had fifty-one, and the first real message ever to
-// arrive put its HTML half in the feedback room while this suite was green. The
-// two fixtures at the top of the table are that message and the one two minutes
-// after it, captured from the sender's own mailbox rather than reconstructed.
+// The words a person wrote: the two fixtures at the top are a real Gmail message that leaked its
+// HTML half, and one two minutes later that came out right.
+// why: lessons/workers-mail.md#words
 
 console.log('\n== the words a person wrote ==');
 
@@ -429,10 +384,8 @@ for (const [file, want, why] of BODIES) {
   ok(`${file}: ${why}`, got === want, got === want ? `${got.length} characters` : `got ${JSON.stringify(got)}`);
 }
 
-// 🔴 THE SWEEP THAT WOULD HAVE CAUGHT THE ORIGINAL BUG ON ITS OWN. Not one
-// reader ever wants to see a boundary, a `Content-Type` line or a tag: those are
-// the envelope, and every way this parser has failed has been by handing part of
-// the envelope back as the message.
+// A reader never wants a boundary, a Content-Type line or a tag in the words.
+// why: lessons/workers-mail.md#envelope
 {
   const leaks = BODIES.map(([f]) => [f, firstText(readBody(f))])
     .filter(([, out]) => /Content-Type:|Content-Transfer-Encoding:|^--|<div/im.test(out));
@@ -440,10 +393,8 @@ for (const [file, want, why] of BODIES) {
     leaks.length === 0, leaks.length ? leaks.map(([f]) => f).join(' ') : `${BODIES.length} messages`);
 }
 
-// NEGATIVE CONTROL, AND IT IS THE WHOLE POINT OF THE PAIR AT THE TOP. The defect
-// that was actually shipped is put back here in miniature: keeping every part
-// rather than the first. If that reads as PASSING, this suite cannot see the bug
-// it was written for.
+// Negative control: keeping every part rather than the first must fail.
+// why: lessons/workers-mail.md#shipped-bug
 {
   const raw = readBody('01-gmail-real-html-half.eml');
   const keepingEveryPart = raw.split(/\r?\n\r?\n/).slice(1).join('\n\n')
@@ -472,10 +423,8 @@ for (const [raw, want, why] of WORDS) {
   ok(`${why}`, got === want, got === want ? JSON.stringify(got) : `got ${JSON.stringify(got)} want ${JSON.stringify(want)}`);
 }
 
-// 🔴 A SUBJECT IS THE FIRST LINE OF A NOTE WHOSE OTHER LINES ARE THE BODY, so a
-// decoded newline would let a sender write a line of our own output. This is the
-// only place in this worker where text from a stranger reaches a structured
-// format.
+// A decoded newline in a subject could forge a line of our own note.
+// why: lessons/workers-mail.md#subject-line
 {
   const forged = decodeWords('=?utf-8?B?' + Buffer.from('ok\n[ok] a line I did not write').toString('base64') + '?=');
   ok('a newline smuggled through an encoded word cannot forge a line',
@@ -504,21 +453,12 @@ for (const [raw, want, why] of WORDS) {
 
 console.log('\n== pure ==');
 
-// 20. The claim in this file's first paragraph, checked rather than repeated.
-//     A smoke test on the source rather than a proof, and it fires on the one
-//     thing that would actually happen: somebody reaching for the network to
-//     look a domain up.
+// 20. The no-network claim, checked as a smoke test on the source.
+// why: lessons/workers-mail.md#t20b
 {
-  /**
-   * ⚠️ THE COMMENTS COME OUT FIRST, AND THAT IS NOT A LOOSENING. This check read
-   * the whole file including its prose, so `body.mjs` failed it for the word
-   * WebSocket inside a sentence EXPLAINING that the parser was moved out of the
-   * file which holds one. A guard that fires on an accurate comment teaches its
-   * author to write a worse comment, and the next author quietly stops writing
-   * them. What is being asserted is about the CODE.
-   * ⚠️ AND A STRIPPER IS A THING THAT CAN BE WRONG, so the control below plants
-   * a real call and requires this to catch it.
-   */
+  // Comments come out first: the assertion is about code, and a guard that fires on an accurate
+  // comment teaches worse comments. The control below proves the stripper still catches a call.
+  // why: lessons/workers-mail.md#decomment
   const decomment = (t) => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
   const src = decomment(readFileSync(join(HERE, 'src', 'spam.mjs'), 'utf8'));
   const banned = [/\bfetch\s*\(/, /\bWebSocket\b/, /\bcaches\b/, /^import\s/m,
@@ -535,9 +475,8 @@ console.log('\n== pure ==');
   ok('the parser reaches for no network, no clock and no import',
     bodyHits.length === 0, bodyHits.length ? bodyHits.join(' ') : `${body.length} characters read`);
 
-  // 🔴 THE GUARD, BROKEN ON PURPOSE. A check that only ever prints `ok` is not
-  // evidence that it can print anything else. One real call planted in code, and
-  // the same words planted in a comment, must come out as a hit and a miss.
+  // The guard broken on purpose: a planted call must hit and the same words in a comment must not.
+  // why: lessons/workers-mail.md#planted
   const planted = decomment(`${body}\nawait fetch('https://example.com');`);
   const inProse = decomment(`${body}\n// this file must never call fetch( or hold a WebSocket\n`);
   ok('the purity guard fires on a planted call and not on prose about one',

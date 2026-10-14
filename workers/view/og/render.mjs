@@ -1,17 +1,7 @@
-// workers/view/og/render.mjs: SVG to PNG in Node, through resvg compiled to
-// wasm, with the site's two faces as TTFs and no system fonts. eccm's
-// src/og/render.mjs (itself trip's renderer) moved to build time: the same
-// @resvg/resvg-wasm 2.6.2, the same `fontBuffers` and `loadSystemFonts: false`,
-// initialised once per process because a second initWasm throws.
-//
-// ⚠️ NO BROWSER ANYWHERE IN THIS PATH, asked 2026-10-13: *"What headless
-// chrome?!!?"*. The SVG is written by demo/shell/share-card.mjs and
-// demo/shell/bay-svg.mjs from data and font metrics; this file only rasterises.
-// ⚠️ THE WASM IS VENDORED, NOT INSTALLED. vendor/resvg-wasm/ is index.mjs,
-// index_bg.wasm and package.json copied byte for byte from the npm package
-// @resvg/resvg-wasm 2.6.2 (MPL-2.0, its package.json beside it). It lives here
-// and not under demo/ so the build never deploys 2.48 MB nobody fetches.
-// ⚠️ THE FACES ARE fonts/*.ttf, made by og-fonts.py from demo/shell/vendor/.
+// SVG to PNG in Node through vendored @resvg/resvg-wasm 2.6.2, no browser, no system fonts.
+// initWasm runs once per process (a second call throws). The SVG comes from share-card.mjs and
+// bay-svg.mjs; faces are fonts/*.ttf from og-fonts.py. Vendored here so the build skips 2.48 MB.
+// why: lessons/workers-view.md#og-render
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,16 +1,7 @@
 #!/usr/bin/env node
-// ============================================================================
-// CF Containers test workload — the repackage job (proto/selfrec/repackage.mjs)
-// transplanted into a container, MINUS the upload leg (writes nothing back to
-// R2 — keep the bucket clean). Endpoints:
-//   GET /health  -> boot time, uptime, cpu/mem/ffmpeg info (cold-start probe)
-//   GET /run     -> pulls the kept proof show's two participants from the R2
-//                   public URL, concats each, runs copy-remux on p1 (h264) and
-//                   transcode (-bf 0 law) on p2 (vp8), reports wall times.
-//   GET /sysinfo -> /proc details (what silicon did we land on)
-// Local parity: same ffmpeg args as repackage.mjs; sequential chunk download
-// (same as engine) so downloadMs is comparable.
-// ============================================================================
+// Containers test workload: the repackage job without its upload leg (writes nothing to R2).
+// GET /health (cold-start probe), /run (download, remux p1, transcode p2, wall times), /sysinfo.
+// why: lessons/rig-containers.md#next-server-header
 import http from "http";
 import fs from "fs";
 import os from "os";
@@ -153,9 +144,8 @@ const server = http.createServer(async (req, res) => {
         cgroupMemMax: read("/sys/fs/cgroup/memory.max"),
         df: spawnSync("df", ["-h", "/tmp"], { encoding: "utf8" }).stdout });
     } else if (url.pathname === "/enc/start") {
-      // Phase 1 of the WebSocket test (2026-10-07): a pub-shaped long encode,
-      // testsrc2 720p30 x264 paced with -re, to /dev/null, in the BACKGROUND so
-      // the server keeps answering while it runs.
+      // WebSocket test phase 1: a pub-shaped 720p30 x264 encode to /dev/null, in the background.
+      // why: lessons/rig-containers.md#next-server-encode
       if (!enc || enc.exitCode !== null) {
         const { spawn } = await import("child_process");
         encAt = Date.now();
@@ -169,11 +159,10 @@ const server = http.createServer(async (req, res) => {
       if (enc && enc.exitCode === null) enc.kill("SIGTERM");
       send(200, { ok: true });
     } else if (url.pathname === "/udp") {
-      // Phase 2 diagnosis (2026-10-07): ffmpeg's WHIP leg dies with EAGAIN on
-      // this runtime. One STUN binding request to Cloudflare's STUN server,
-      // then a burst of N 1200 byte datagrams (STUN binding requests, so the
-      // far end can answer them) sent as fast as sendto allows, counting
-      // send errors and replies. Cloudflare-owned target only.
+      // WebSocket test phase 2: ffmpeg's WHIP leg dies with EAGAIN here. One STUN request then a
+      // burst of
+      // 1200 byte STUN datagrams, counting send errors and replies. Cloudflare's STUN only.
+      // why: lessons/rig-containers.md#next-server-udp
       const dgram = await import("dgram");
       const dns = await import("dns");
       const n = Math.min(Number(url.searchParams.get("n") || 300), 2000);

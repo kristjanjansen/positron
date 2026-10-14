@@ -1,21 +1,7 @@
 #!/bin/zsh
-# Perception-lag loop (open item 8): how stale is the newest frame Cloudflare
-# will hand a client right now?
-#
-#   N x { t0 = now
-#         grab one live-edge frame  (-live_start_index -1)
-#         OCR the millisecond wall clock the splicer burned into the pixels
-#         lag = time-of-day(t0) - time-of-day(burned) }
-#
-# Reports p50/p95. Runs fully headless off the webcam/slate leg of the gapless
-# relay (splicer.py burns %{localtime:%T.%3N} into every source-leg frame).
-#
-# Clock validity: burner and reader are THE SAME MACHINE, so absolute clock
-# error cancels exactly — do not correct for it, just note it in the report.
-# Player-side perceived lag = THIS pipeline lag + player.latency (2.5-4.0 s
-# measured for the tuned hls.js arm).
-#
-# Usage:  loop-lag.sh [N] [sleep_s]      (defaults: 20 iterations, 2 s apart)
+# loop-lag.sh [N] [sleep_s]: grab a live-edge frame, OCR the burned wall clock, report p50/p95 lag.
+# Burner and reader are the same machine, so clock error cancels.
+# why: lessons/rig-misc.md#loop-lag-header
 set -u
 cd "$(dirname "$0")"
 FF7=/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg

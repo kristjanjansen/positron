@@ -1,14 +1,7 @@
 #!/usr/bin/env node
-// Part-1 probe: does a REAL MoQ/QUIC session work from inside a CF Container?
-// Wraps moq-clock-ietf (amd64, draft-14) in an HTTP server the Worker proxies.
-//   GET /health            boot info
-//   GET /quic?dur=20       self-contained pub+sub through the d14 public relay:
-//                          spawn publisher (fresh ns), wait 3 s, spawn internal
-//                          subscriber; return handshake evidence + matched ticks
-//   GET /pubstart?dur=60   background publisher (for a LOCAL Mac subscriber to
-//                          verify objects escape CF); returns ns immediately
-//   GET /pubstatus         stderr/stdout tails of the background publisher
-//   GET /net               UDP control probe (DNS to 1.1.1.1/8.8.8.8)
+// Does a real MoQ/QUIC session work from a CF Container? moq-clock-ietf behind HTTP:
+// /health, /quic?dur=20 (pub and sub via the d14 relay), /pubstart, /pubstatus, /net (UDP control).
+// why: lessons/rig-obs.md#quic-test-header
 import http from "http";
 import os from "os";
 import dgram from "dgram";
@@ -59,9 +52,9 @@ const server = http.createServer(async (req, res) => {
       collect(sub, "sub", store);
       await new Promise((r) => setTimeout(r, (dur - 3) * 1000));
       pub.kill("SIGKILL"); sub.kill("SIGKILL");
-      // match pub-printed ticks to sub-received ticks (same VM clock).
-      // Tick lines are exactly "YYYY-MM-DD HH:MM:SS"; tracing INFO lines (also
-      // stdout — the RUNBOOK stdout trap) are filtered out by shape.
+      // Match published to received ticks (same VM clock); tick lines are "YYYY-MM-DD HH:MM:SS"
+      // exactly.
+      // why: lessons/rig-obs.md#quic-test-ticks
       const isTick = (l) => /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(l);
       const conn = (s) => s.out.concat(s.err).filter((e) => /connect|SETUP|session|error|failed/i.test(e.l) && !isTick(e.l)).slice(0, 10);
       const pubTicks = new Map(store.pub.out.filter((e) => isTick(e.l)).map((e) => [e.l, e.t]));

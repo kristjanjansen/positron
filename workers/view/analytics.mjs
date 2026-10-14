@@ -1,104 +1,7 @@
-// workers/view/analytics.mjs — which demos does anybody actually open.
-//
-//   node workers/view/analytics.mjs                    the last 24 hours
-//   node workers/view/analytics.mjs --days 7           merge seven days, one query each
-//   node workers/view/analytics.mjs --since 2026-09-10 from that date to now
-//   node workers/view/analytics.mjs --no-sweeps        drop clients that walked the index
-//   node workers/view/analytics.mjs --without 1.2.3.4  drop a client, usually yours
-//   node workers/view/analytics.mjs --json             the same numbers, machine readable
-//
-// A day is one round trip and about a second. Seven days is seven of them.
-//
-// NODE ONLY, READ ONLY. It asks Cloudflare's GraphQL Analytics API about the
-// `positron.studio` zone and prints. It changes no setting, adds no rule and
-// purges nothing. It is not a demo page and has no `mount()`; `verify.mjs` does
-// not see it.
-//
-// 🔴 IT LIVES HERE BECAUSE `workers/view` IS WHAT SERVES THAT ZONE. LAYOUT.md's
-// rule is that a directory says WHO RUNS IT, and this runs on the laptop rather
-// than on Cloudflare. So does `deploy.mjs`, and so does `build.mjs`: the
-// standing pattern is that laptop-side tooling for a worker lives beside the
-// worker it acts on. ⚠️ THE ZONE IS WIDER THAN THIS WORKER. `pub`, `shout`,
-// `items`, `backlog`, `relay` and the rest are all hosts on `positron.studio`,
-// so the zone totals cover them too. Everything that rolls up BY SLUG is
-// filtered to `positron.studio` and `www.positron.studio` first, which is the
-// site this worker serves.
-//
-// ── WHAT THE NUMBERS DO NOT MEAN ────────────────────────────────────────────
-//
-// 🔴 A REQUEST COUNT IS NOT A PERSON, AND ON THIS ZONE MOST OF IT IS US.
-// MEASURED 2026-09-16 over 24 hours: the single busiest user agent was a
-// desktop Chrome on one Estonian address, the second was a Quest 3, and the
-// third was `HeadlessChrome`. Those are this repo's owner, this repo's headset
-// and this repo's own `verify.mjs`. A "visitors" figure taken off the top of
-// this data and quoted anywhere would be mostly a measurement of us working.
-// That is why every table here splits four ways rather than printing one total.
-//
-// 🔴 AND THE BOT SHARE IS A FLOOR, NEVER A TOTAL. Three layers are readable on
-// a Free zone and each one sees something different:
-//   · `verifiedBotCategory` is Cloudflare's own verification, so it is the only
-//     layer that cannot be faked. It caught 58 requests of 13,350 in that same
-//     day, which is not the bot share, it is the HONEST bot share.
-//   · the user agent string, which catches a crawler that says what it is
-//     (Baiduspider, OAI-SearchBot, a LeakIX vulnerability scanner) and catches
-//     nothing at all from one that does not.
-//   · headless and command-line clients, which on this site are overwhelmingly
-//     our own harnesses.
-// A headless crawler wearing an ordinary Chrome user agent is INVISIBLE here.
-// `botScore`, `botManagementDecision` and `jsDetectionPassed` are the fields
-// that would see it and all three are refused on this plan by name, MEASURED,
-// not assumed. The floor is the accepted price of a Free zone. Say "at least",
-// never "only".
-//
-// ⚠️ THERE IS NO REFERRER ON THIS PLAN. `clientRefererHost` and
-// `clientRequestReferer` are both refused for this zone, so "where did they
-// come from" is answerable as a COUNTRY and not as a link. Do not quote an
-// empty referrer table as evidence that nobody links here.
-//
-// ⚠️ A PAGE OPEN IS COUNTED AS AN HTML RESPONSE, NOT AS A SESSION. A reload is
-// a second open, a page kept in a tab for an hour is one, and a page opened
-// from the browser's back-forward cache is none. `clients` is distinct client
-// addresses, which merges a household behind one address and splits one phone
-// that changed network.
-//
-// ── WHAT IT ASKS FOR, AND WHY THOSE DATASETS ────────────────────────────────
-//
-// `httpRequests1dGroups` for the day table. It is pre-aggregated rather than
-// sampled, it carries Cloudflare's own `uniques`, and MEASURED it reaches 365
-// days back on this zone. It cannot break a day down by path.
-//
-// `httpRequestsAdaptiveGroups` for everything per slug, because it is the only
-// dataset with `clientRequestPath` on it. Two measured limits shape the code:
-//   🔴 ONE QUERY MAY SPAN AT MOST ONE DAY on this zone, so a week is seven
-//      queries merged here rather than one query with a wider filter. The
-//      refusal is an error inside a 200 response, which is the failure shape
-//      the whole API has.
-//   🔴 `count` IS ALREADY THE ESTIMATE. The dataset is sampled and carries
-//      `avg.sampleInterval`, so the obvious move is to multiply. PROVED WRONG
-//      on 2026-09-15, a whole UTC day: `count` with `requestSource: eyeball`
-//      read 22,672 where the unsampled `httpRequests1dGroups` read 22,732,
-//      which is 0.26% apart, while `count` times the 1.54 average interval
-//      would have read about 35,000. Multiplying would inflate every figure on
-//      this page by half.
-// `requestSource: "eyeball"` is what makes those two agree: the zone also
-// carries `edgeWorkerFetch`, the worker's own subrequests, which are real
-// traffic and are not a visitor.
-//
-// ── AUTHENTICATION ──────────────────────────────────────────────────────────
-//
-// 🔴 THE MACHINE'S WRANGLER OAUTH TOKEN IS ENOUGH. No API token has to be
-// minted; `zone:read` and `account:read` in the OAuth grant carry the whole
-// query. It is read out of wrangler's own config file rather than from an
-// environment variable, so there is nothing to export and nothing to rotate.
-// ⚠️ IT EXPIRES ABOUT HOURLY. When it has, this shells out to
-// `npx wrangler whoami`, which refreshes it in place, and reads the file again.
-// ⚠️ `.env` IN THE CWD SHADOWS MACHINE OAUTH (CLAUDE.md), and the repo root
-// holds one with live secrets. Both spawns unset `CF_API_TOKEN` and
-// `CLOUDFLARE_API_TOKEN` and run from this directory, which is the same fix
-// `deploy.mjs` uses and the one nobody has to remember.
-// 🔴 THE TOKEN NEVER REACHES A LOG. It is never printed, never interpolated
-// into a message, and never put on a command line. An error from the API is
-// reported by its own text, which carries no credential.
+// node workers/view/analytics.mjs [--days N | --since DATE] [--no-sweeps] [--without IP] [--json]
+// Read-only GraphQL Analytics on the positron.studio zone with wrangler's OAuth token; one query a
+// day. Most requests are us, the bot share is a floor, there is no referrer on this plan.
+// why: lessons/workers-view.md#analytics-header
 
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
@@ -114,35 +17,23 @@ const ZONE_NAME = 'positron.studio';
 const SITE_HOSTS = new Set(['positron.studio', 'www.positron.studio']);
 const GRAPHQL = 'https://api.cloudflare.com/client/v4/graphql';
 const API = 'https://api.cloudflare.com/client/v4';
-// MEASURED on this zone: a wider filter is refused by name. See the header.
+// A wider filter is refused by name on this zone.
+// why: lessons/workers-view.md#span
 const MAX_SPAN_HOURS = 24;
 
-/**
- * 🔴 HOW MANY DIFFERENT SLUGS ONE ADDRESS HAS TO TOUCH BEFORE IT IS A SWEEP
- * RATHER THAN A VISIT. This is the one thing that sees the crawler a free zone
- * cannot: MEASURED over seven days, four addresses in one OVH range opened
- * forty-odd different demos each with an ordinary Windows Chrome user agent,
- * four requests apart, and every layer above classed them as a browser.
- * Nobody reads forty demos in a week. A person who does is rare enough that
- * losing them from one table is the cheaper mistake.
- * ⚠️ IT IS A HEURISTIC AND IT IS LABELLED AS ONE EVERYWHERE IT IS PRINTED. It
- * is never subtracted silently, and `--no-sweeps` has to be typed.
- */
+// An address touching this many slugs is a sweep, not a visit; a labelled heuristic, opt-in.
+// why: lessons/workers-view.md#sweep
 const SWEEP_SLUGS = 10;
 
-// ── who is asking ───────────────────────────────────────────────────────────
-//
-// Order matters and it is not alphabetical. `HeadlessChrome` contains
-// "headless", which the crawler pattern also matches, so ours is tested first
-// or every harness run is reported as somebody else's crawler.
+// Who is asking. Order matters: `HeadlessChrome` contains "headless", so ours is tested first.
+// why: lessons/workers-view.md#who
 
 /** Our own harnesses and command-line tools. */
 const OURS = /HeadlessChrome|^curl\/|^node$|wrangler|undici|positron-corpus/i;
 
-/** A client that says it is a crawler, a scanner, or not a browser at all.
- *  The first half is lifted from the sibling project's `bot.ts`, which is the
- *  same list Cloudflare's own free AI Crawl Control matches on. The second half
- *  is what actually turned up in this zone's logs. */
+// A client that says it is a crawler, scanner or non-browser: the sibling project's `bot.ts`
+// list (as AI Crawl Control matches), then what turned up in this zone's logs.
+// why: lessons/workers-view.md#named-bot
 const NAMED_BOT = new RegExp([
   'bot|crawl|spider|scrape|preview|fetch|monitor|lighthouse|headless',
   'gptbot|perplexity|bytespider|ccbot|amazonbot|meta-external|externalhit',
@@ -173,13 +64,8 @@ export function classify({ verifiedBotCategory, userAgent }) {
   return BROWSER;
 }
 
-/**
- * The slug a path belongs to. `/` is the index, `/videoradio/` is a demo,
- * `/proto/deck/` keeps both segments because that is where those pages live.
- * ⚠️ It returns the path unchanged when it does not recognise the shape, so a
- * scanner probing `/wp-config.php` shows up as itself rather than as a slug
- * that does not exist.
- */
+// The slug a path belongs to (/proto/deck/ keeps two segments); an unknown shape returns the path.
+// why: lessons/workers-view.md#slug-of
 export function slugOf(path) {
   if (path === '/' || path === '/index.html') return '/';
   const m = /^\/((?:proto\/)?[a-z0-9][a-z0-9-]*)\/(?:index\.html)?$/.exec(path);
@@ -207,14 +93,8 @@ async function readGrant() {
   return null;
 }
 
-/**
- * A live OAuth token, refreshing it through wrangler if it has expired.
- *
- * ⚠️ THE REFRESH IS WRANGLER'S, NOT OURS. `wrangler whoami` exchanges the
- * refresh token and rewrites the config in place; doing that by hand here would
- * mean a second implementation of a credential rotation, and a bug in it would
- * log the user out of every other tool on this machine.
- */
+// A live OAuth token, refreshed through `wrangler whoami` when expired, never by hand.
+// why: lessons/workers-view.md#live-token
 async function liveToken() {
   let grant = await readGrant();
   if (!grant) {
@@ -227,9 +107,8 @@ async function liveToken() {
   // seven-day merge, which reads as a broken dataset rather than a stale login.
   const stale = grant.expires && grant.expires.getTime() - Date.now() < 60_000;
   if (stale) {
-    // ⚠️ stderr, NOT stdout. MEASURED: as a `console.log` this line landed on
-    // top of `--json` output and made it unparseable, roughly once an hour and
-    // never twice in a row, which is the shape of a bug nobody can reproduce.
+    // stderr, not stdout, or the line lands inside `--json` output.
+    // why: lessons/workers-view.md#stderr
     console.error('wrangler OAuth token has expired. Refreshing through `wrangler whoami`.');
     const env = { ...process.env };
     delete env.CF_API_TOKEN;
@@ -247,12 +126,8 @@ async function liveToken() {
 
 // ── the API ─────────────────────────────────────────────────────────────────
 
-/**
- * 🔴 A GRAPHQL FAILURE ARRIVES AS HTTP 200 WITH AN `errors` ARRAY AND A NULL
- * `data`. Nothing about the response status says anything went wrong, so a
- * caller that only checks `r.ok` prints an empty table and calls it a quiet
- * week. Both halves are checked here and the API's own words are shown.
- */
+// A GraphQL failure is HTTP 200 with `errors` and null `data`; check both and show its words.
+// why: lessons/workers-view.md#gql
 async function gql(token, query, variables) {
   const r = await fetch(GRAPHQL, {
     method: 'POST',
@@ -269,27 +144,14 @@ async function gql(token, query, variables) {
   return zone;
 }
 
-/**
- * Every slug this repo publishes, so a page nobody opened can be NAMED. Half
- * the question "which demos does anybody open" is the list that never appears
- * in the table, and a table can only show what has a row.
- *
- * ⚠️ IT READS THE CHECKOUT AND THE CHECKOUT CAN DISAGREE WITH THE DEPLOY. A
- * page added since the last deploy has no traffic because it is not live yet,
- * which is not the same finding as a live page nobody wants. Both the heading
- * and this comment say so rather than implying a verdict.
- * ⚠️ AND IT IS ALLOWED TO FAIL. `manifest.mjs` is edited constantly and may be
- * half-written when this runs. A broken import costs this one section and
- * nothing else, which is why it is caught here instead of at the top.
- */
+// Every slug the checkout publishes, so an unopened page can be named. The checkout can differ
+// from the deploy, and a broken manifest import costs only this section.
+// why: lessons/workers-view.md#published
 async function publishedSlugs() {
   try {
     const m = await import(new URL('../../demo/manifest.mjs', import.meta.url).href);
-    // ⚠️ `targetOf` RETURNS A LINK, NOT A PATH. Four rows read `/mirror/?xr=1`,
-    // and `clientRequestPath` never carries a query, so comparing the two
-    // directly reported four pages as untouched while the table above them
-    // showed their opens. It cost one run and it was visible only because the
-    // two lists disagreed on the same screen.
+    // `targetOf` returns a link with a query; `clientRequestPath` never has one, so strip it.
+    // why: lessons/workers-view.md#target-path
     const clean = (t) => String(t).split(/[?#]/)[0];
     return m.DEMOS.map((d) => ({ name: d.name, path: clean(m.targetOf(d) || '') })).filter((d) => d.path);
   } catch {
@@ -378,11 +240,8 @@ function tally(map, key, cls, count, ip) {
 
 // ── run ─────────────────────────────────────────────────────────────────────
 
-// A failure here is nearly always Cloudflare saying no in words worth reading,
-// and a Node stack trace buries those words under five lines of this file's own
-// internals. Print what the API said and stop.
-// ⚠️ IT IS SAFE TO PRINT: every message this file raises is built from the
-// API's own text or from a constant. The token is never interpolated into one.
+// Print the API's own words and stop; no message here carries the token.
+// why: lessons/workers-view.md#fail
 const fail = (err) => { console.error('\n' + (err?.message || err)); process.exit(1); };
 process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
@@ -416,14 +275,9 @@ let from = SINCE
   ? new Date(`${SINCE}T00:00:00Z`)
   : new Date(to.getTime() - (DAYS > 0 ? DAYS * 864e5 : 864e5));
 
-// 🔴 CLAMP BEFORE ASKING, NOT AFTER. MEASURED: this zone refuses
-// `httpRequestsAdaptiveGroups` older than 4w3d and refuses any single query
-// wider than a day, so a `--since 2026-01-01` typed by somebody who has not
-// read the header is 260 round trips that all fail the same way. Cut it here,
-// say so, and ask once.
-// ⚠️ AN `Invalid Date` COMPARES FALSE AGAINST EVERYTHING, so it slips past both
-// of the checks below and fails four calls later inside `pageRows`, with a
-// message about a filter rather than about the flag that was typed wrong.
+// Clamp before asking: older than 4w3d or wider than a day is refused, so cut and say so.
+// An `Invalid Date` compares false to everything, so it is checked first.
+// why: lessons/workers-view.md#clamp
 if (Number.isNaN(from.getTime())) {
   console.error(`--since ${SINCE} is not a date. Write it as YYYY-MM-DD.`);
   process.exit(1);
@@ -483,11 +337,8 @@ const refused = new Map();
 
 for (const r of site) {
   if (r.edgeResponseStatus >= 300) {
-    // 🔴 BY PATH, NOT BY CODE ALONE. This section said "mostly vulnerability
-    // scanners walking a wordlist" over a bare count of 403s, which was a
-    // guess dressed as a caption: nothing in a status code names what was
-    // asked for, and a 403 on `/` is a completely different event from a 403
-    // on `/wp-config.php`. Print what was refused and let the reader decide.
+    // By path, not by status alone: a 403 on `/` and one on `/wp-config.php` are different events.
+    // why: lessons/workers-view.md#by-path
     const key = `${r.edgeResponseStatus} ${r.clientRequestPath}`;
     refused.set(key, (refused.get(key) || 0) + r.count);
   }

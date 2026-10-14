@@ -1,21 +1,6 @@
-// Serves the OBS source page and the test pattern to OBS's CEF.
-//
-// RUNS ON THE PRO, out of the M1's own checkout of this repo, bound to
-// 127.0.0.1. Two reasons it is local rather than fetched from the dev Mac:
-//
-//   · macOS Local Network Privacy is granted PER APP. A terminal process
-//     inherits the grant; OBS.app and Chrome.app do not, so a browser source
-//     pointed at a LAN address renders ERR_ADDRESS_UNREACHABLE — a pure black
-//     frame with nothing in any OBS log. 127.0.0.1 needs no grant.
-//   · a standing test box must not stop working when a laptop sleeps.
-//
-// It serves demo/shell/pattern.mjs straight out of the working tree. That is a
-// CHECKOUT, not a copy: `git` is the mechanism that makes drift visible, which
-// is precisely what workers/pub's hand-maintained container copy lacks (it drew
-// the pre-session-12 picture for a whole session and nothing said so). To keep
-// that true this server refuses to start silently on an unknown revision — it
-// prints the sha, and /rev serves it so a measurement can be attributed to a
-// build the way BUILD attributes a device log.
+// Serves the OBS source page and test pattern on 127.0.0.1 from the M1's own checkout:
+// OBS.app has no Local Network grant, so a LAN address renders black. /rev serves the git sha.
+// why: lessons/rig-obs.md#obs-serve
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';

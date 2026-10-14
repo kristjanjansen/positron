@@ -23,10 +23,10 @@ export const preflight = (methods = 'GET, POST, OPTIONS', headers = 'content-typ
     },
   });
 
-// The pages this project serves: the site, this account's workers.dev mirrors,
-// and a dev server on this machine or the local network. An Origin header is a
-// fact about a browser only; curl sends any value, so this stops accidents and
-// is not security. Same list as workers/wish/src/wish.mjs.
+// The site, this account's workers.dev mirrors and a dev server here or on the LAN.
+// An Origin header binds a browser only (curl sends anything): it stops accidents, it is not
+// security. Same list as workers/wish/src/wish.mjs.
+// why: lessons/workers-lib.md#origins
 const SITE = ['https://positron.studio', 'https://www.positron.studio'];
 const OURS = /^https:\/\/[a-z0-9-]+\.kristjan-jansen\.workers\.dev$/;
 const NEAR = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;

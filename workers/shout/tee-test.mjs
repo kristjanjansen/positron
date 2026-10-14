@@ -1,7 +1,7 @@
-// node workers/shout/tee-test.mjs
-// The tee against demo/fake-station.mjs: listeners arriving together must open
-// one upstream connection. Any fetch to a host other than 127.0.0.1 throws, so
-// this test cannot reach a broadcaster even if a station URL leaks into it.
+// node workers/shout/tee-test.mjs: listeners arriving together on demo/fake-station.mjs must open
+// one
+// upstream. Any fetch to a host other than 127.0.0.1 throws, so it cannot reach a broadcaster.
+// why: lessons/workers-shout.md#tee-test
 import { startStation } from '../../demo/fake-station.mjs';
 import { Mount } from './worker.mjs';
 

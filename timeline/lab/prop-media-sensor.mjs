@@ -1,40 +1,8 @@
 #!/usr/bin/env node
-// timeline/lab/prop-media-sensor.mjs — L4b's SENSOR, and the two ways it can
-// lie about a picture that is not moving.
-//
-//   node timeline/lab/prop-media-sensor.mjs [--verbose]
-//
-// `timeline/lab/prop-nested.mjs` suite 9 already asserts that a frame sample is
-// carried, goes stale, and is rejected across a discontinuity — all of it with
-// an element that is PLAYING. This file is the paused half, and it exists
-// because that half shipped broken:
-//
-//   MEASURED on `demo/memento/` (2026-09-13). After a seek with the element
-//   PAUSED, the playhead crept forward ~180 ms over the next 250 ms while
-//   `currentTime` sat still at the position it had been sent to, then snapped
-//   back when the frame sample went stale. It failed the shared `keyboard seek
-//   lands` check at `2437 ~ 2225`, and the page worked around it with
-//   `useRvfc: false`. The cause: L4b carries a frame sample onto the wall clock
-//   as `mediaTime + (wall − expectedDisplayTime) × rate`, and `rate` was read
-//   off `playbackRate` alone — WHICH IS 1 ON A PAUSED ELEMENT.
-//
-// Four checks, and S2/S4 are as important as S1/S3: they are what stops the
-// creep being "fixed" by turning the sensor off, which is the repair that makes
-// every test here pass and L4b pointless.
-//
-//   S1  a PAUSED element is not extrapolated          (the reported defect)
-//   S2  a PLAYING element still is                    (positive control)
-//   S3  while the picture is frozen, a sample older than the last move of
-//       `currentTime` is old news and is dropped      (the second guard, which
-//                                                      was written down in the
-//                                                      file and never wired)
-//   S4  …and that test is NOT applied while the picture is moving (positive
-//       control: `currentTime` moves every tick during playback and is noticed
-//       a tick late, so an unconditional version of S3 switches the sensor off
-//       for good — and a fake whose currentTime never changes cannot see it)
-//
-// Plain node ESM, no deps, no network. Real wall time is the subject here, so
-// the sleeps are real and short; the deck runs on the virtual clock as usual.
+// node timeline/lab/prop-media-sensor.mjs [--verbose]: L4b paused. S1 a paused element is not
+// extrapolated, S2 a playing one is, S3 frozen, a sample older than currentTime's last move is
+// dropped, S4 not during playback. Real short sleeps; the deck on the virtual clock.
+// why: lessons/timeline-lab.md#pms-header
 
 import { createDeck, createVirtualRuntime } from '../transport.mjs';
 import { mediaMaster } from '../media-master.mjs';
@@ -84,11 +52,9 @@ function rig(startPosMs) {
   return { vr, deck };
 }
 
-// ===========================================================================
-// S1 — THE DEFECT. A paused element after a seek: the picture is frozen on one
-//      frame, `currentTime` sits on it, and the playhead must sit on it too for
-//      as long as nobody presses anything. Before the fix this read ~+150 ms.
-// ===========================================================================
+// S1: a paused element after a seek: the playhead stays on the frozen frame (it crept about +150
+// ms).
+// why: lessons/timeline-lab.md#pms-s1
 {
   const { deck } = rig(2225);
   const el = fakeVideo(2.225);
@@ -110,11 +76,8 @@ function rig(startPosMs) {
   mm.dispose(); deck.dispose();
 }
 
-// ===========================================================================
-// S2 — POSITIVE CONTROL. The carry is the whole point of L4b (measured: it took
-//      365 corrections down to 18 at a 5 ms band). A PLAYING element's frame
-//      sample must still be carried onto now at `playbackRate`.
-// ===========================================================================
+// S2: positive control: a playing element's sample is carried at playbackRate.
+// why: lessons/timeline-lab.md#pms-s2
 {
   const { deck } = rig(1020);
   const el = fakeVideo(1.0);                   // playing: paused = false
@@ -132,12 +95,8 @@ function rig(startPosMs) {
   mm.dispose(); deck.dispose();
 }
 
-// ===========================================================================
-// S3 — THE SECOND GUARD. Paused, and `currentTime` was moved AFTER the last
-//      presented frame (a small scrub — SMALLER than jumpMs, so the existing
-//      rejection cannot see it). The frame on the glass is the old one; the
-//      only thing that knows where the element was sent is `currentTime`.
-// ===========================================================================
+// S3: paused, currentTime moved after the last frame by less than jumpMs: currentTime wins.
+// why: lessons/timeline-lab.md#pms-s3
 {
   const { deck } = rig(1000);
   const el = fakeVideo(1.0);
@@ -164,16 +123,10 @@ function rig(startPosMs) {
   mm.dispose(); deck.dispose();
 }
 
-// ===========================================================================
-// S4 — POSITIVE CONTROL FOR S3, AND THE TRAP. `currentTime` moves on nearly
-//      every tick during playback, and this file notices it a tick LATE (at
-//      `wall`, inside tick()). So an UNCONDITIONAL "the frame must be newer
-//      than the last currentTime change" test rejects every sample during
-//      ordinary playback and switches L4b off for good.
-//
-//      ⚠️ A fake element whose currentTime never changes passes that broken
-//      version. This check moves it, which is the only reason it can fail.
-// ===========================================================================
+// S4: positive control for S3: during playback currentTime moves every tick and is noticed late, so
+// an
+// unconditional S3 switches the sensor off. This check moves currentTime, so it can fail.
+// why: lessons/timeline-lab.md#pms-s4
 {
   const { deck } = rig(1000);
   const el = fakeVideo(1.0);

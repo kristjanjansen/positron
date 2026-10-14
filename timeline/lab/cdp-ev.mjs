@@ -1,5 +1,5 @@
-// proto/paths/harness/cdp.mjs — minimal CDP client (timeline/lab lineage) with
-// EVENT dispatch added, so console errors and exceptions can be counted.
+// A minimal CDP client with event dispatch, so console errors and exceptions can be counted.
+// why: lessons/timeline-lab.md#cdp-ev
 export class CDP {
   constructor() { this.id = 0; this.pending = new Map(); this.handlers = new Map(); }
   async connect(port, urlMatch) {

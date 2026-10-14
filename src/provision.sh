@@ -1,11 +1,7 @@
 #!/bin/zsh
-# Create (or reuse) a Cloudflare Stream live input with LL-HLS enabled,
-# and print everything needed to publish and play.
-#
-#   ./provision.sh [name]
-#
-# Requires CF_API_TOKEN + CF_ACCOUNT_ID in ../.env
-# Token needs Account -> Stream -> Edit.
+# ./provision.sh [name]: create or reuse a Stream live input with LL-HLS and print how to publish
+# and play. Needs CF_API_TOKEN and CF_ACCOUNT_ID in ../.env, token with Stream Edit.
+# why: lessons/src.md#provision
 set -e
 cd "$(dirname "$0")"
 set -a; . ../.env; set +a

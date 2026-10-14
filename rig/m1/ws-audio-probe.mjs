@@ -1,22 +1,6 @@
-// Can our own WebSocket relay carry AUDIO, at the shape a microcontroller would
-// send it? Run before buying an ESP32, not after.
-//
-//   node ws-audio-probe.mjs [seconds]
-//
-// THE POINT: Opus exists to save bandwidth, and on this relay bandwidth is the
-// abundant thing — 512 KiB/s per socket against raw 48 kHz 16-bit mono PCM at
-// 96 KB/s. Opus at 48 kHz is ~85% of one ESP32-S3 core (third-party benchmark),
-// so encoding trades the SCARCE resource for the plentiful one. Sending raw PCM
-// costs no CPU and no encoder frame delay.
-//
-// What could still kill it is the relay's own cap: 60 msg/s, enforced by a token
-// bucket that drops SILENTLY — no error, no close, no backpressure. Measured off
-// the wire: MSG_BURST 120 plus 60/s, 298 delivered in three seconds. So this
-// probe counts what comes back, per configuration, and the counter is the only
-// thing that can see a drop.
-//
-// The relay echoes to the sender, so round trip and loss are both measured on
-// ONE clock and carry no clock offset.
+// node ws-audio-probe.mjs [seconds]: can our relay carry raw PCM at a microcontroller's shape?
+// The relay's rate cap drops silently, so the count of what comes back is the measurement.
+// why: lessons/rig-m1.md#ws-audio-probe
 const ROOM = process.env.WS_ROOM || 'audio-probe';
 const URL_ = `wss://ws.positron.studio/room/${ROOM}/ws`;
 const SECS = Number(process.argv[2] || 8);

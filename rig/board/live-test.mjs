@@ -1,14 +1,7 @@
-// rig/board/live-test.mjs — drive a running board over the REAL relay and check
-// that what comes back is sound.
-//
-// The distinction this file exists for: "frames are arriving" and "the
-// instrument is working" are different claims, and three readings in 2026-09
-// confused them — a live, unmuted, enabled audio track carrying digital silence
-// looks exactly like a working one from every angle except the samples. So the
-// check is RMS before a note against RMS after it.
-//
-//   node board.mjs --room board-test &
-//   node live-test.mjs --room board-test
+// Drive a running board over the real relay and check RMS before a note against RMS after it:
+// frames arriving is not sound. node board.mjs --room board-test & node live-test.mjs --room
+// board-test
+// why: lessons/rig-board-tests.md#live-test-header
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i >= 0 ? process.argv[i + 1] : d; };
@@ -54,14 +47,8 @@ ws.onopen = async () => {
   try {
     console.log(`room ${ROOM}\n`);
     console.log('the board answers');
-    // ⚠️ THIS CHECK COULD NOT PASS BETWEEN 2026-09-16 AND 2026-09-18, AND IT
-    // WAS NOT THIS FILE'S FAULT. The board's pong carried an `at` field, `at`
-    // was then an envelope field, `format()` threw on the collision, and the handler
-    // answered `board.error` instead. So the reply never arrived and this read
-    // as a board that was not there. The board sends `pongAt` now.
-    // ⚠️ THE FIELD IS NOT READ HERE AND MUST NOT BE. The board's clock and this
-    // process's clock share no origin, so a round trip is only measurable in
-    // ONE clock: see `relay-compare.mjs`, which times it in its own.
+    // `pongAt` is not read: the board's clock shares no origin with ours (see relay-compare.mjs).
+    // why: lessons/rig-board-tests.md#live-test-ping
     send({ type: 'board.ping' });
     const pong = await reply('board.pong');
     ok('board.ping -> board.pong', !!pong);

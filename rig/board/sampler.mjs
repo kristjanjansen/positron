@@ -1,42 +1,7 @@
-// rig/board/sampler.mjs: the piano the board's sampler plays, as files on the
-// SD card and one .sfz that maps them. No engine is raised here; this is the
-// half that is the same whichever SFZ player ends up running it.
-//
-// SINCE 2026-10-11 PROGRAM 0 IS THE SALAMANDER GRAND (`ensureSalamander`,
-// below), and the FluidR3 piano this header describes is program 2. Both stay
-// on the card and in R2.
-//
-// The recordings are the thirty /nola/ uses (demo/nola/PROVENANCE.json:
-// FluidR3_GM's acoustic grand through midi-js-soundfonts, MIT), one every minor
-// third from A0 (21) to C8 (108), served from R2 by the station worker. The
-// browser pages (`demo/code/sampler.mjs`) play them by one rule and
-// this file writes the same rule down as SFZ so the Pi and a browser agree:
-//
-//   - a key plays the NEAREST recording, a tie going to the lower one. Three
-//     apart means every recording owns exactly itself and one key either side
-//     (n-1, n, n+1) and no key is ever a tie, so the ranges tile 20..109 with
-//     no gap and no overlap;
-//   - level follows velocity as (v/127)^1.5, /nola/'s curve, written as
-//     `amp_velcurve_N` points because SFZ's own default curve is a square;
-//   - a released key fades rather than stops.
-//
-// ⚠️ THE GAIN AND THE RELEASE ARE NOT MEASURED ON THE PI YET. The files peak
-// at 0.097 (measured on /nola/ 2026-09-22, all thirty decoded), the browser
-// aims one hard note at 0.30, which is +9.8 dB, and the board's capture SUMS
-// left and right (jacksynth.mjs), which for these files (stereo, 44.1 kHz,
-// measured with ffprobe 2026-10-11) adds up to 6 dB back where the channels
-// agree and less where they do not. So `volume` is +6 dB from arithmetic, and the first note through
-// the relay is what settles it.
-//
-// ⚠️ FLAC, NOT THE MP3 AS FETCHED. An MP3 starts with the encoder's priming
-// silence (about 25 ms at 44.1 kHz for LAME), and a player that does not read
-// the LAME gapless header plays it, which is 25 ms added to every key press on
-// an instrument whose whole subject is the time from key to sound. ffmpeg's
-// decoder honours the header when there is one, so the conversion is where the
-// priming can leave. MEASURED 2026-10-11 on 60: the mp3 and the FLAC decode to
-// the same 3.128889 s and neither has a gap at -60 dB from the start, so
-// whatever priming these files carry, ffmpeg already removed it, and FLAC keeps
-// that result out of the player's hands.
+// The sampler's piano as files on the card and one .sfz, by the browser's rules: nearest recording
+// (ties down), level (v/127)^1.5, release fades. Program 0 is the Salamander, 2 FluidR3. Volume +6
+// dB is arithmetic, unmeasured on the Pi. FLAC: ffmpeg drops MP3 priming once, not every key press.
+// why: lessons/rig-board-io.md#sampler-header
 import { existsSync, mkdirSync, readdirSync, writeFileSync, readFileSync, renameSync, statSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -67,10 +32,8 @@ export function keyRanges(notes = PIANO_NOTES) {
   });
 }
 
-/**
- * The .sfz text. `ext` is the file extension the samples carry on the card,
- * `dir` is written as `default_path` so the file can sit anywhere.
- */
+// The .sfz text; `ext` is the samples' extension, `dir` becomes `default_path`.
+// why: lessons/rig-board-io.md#piano-sfz
 export function pianoSfz({ notes = PIANO_NOTES, ext = 'flac', dir = '', volume = PIANO_VOLUME_DB,
                            release = PIANO_RELEASE_S } = {}) {
   const curve = VEL_POINTS.map((v) => `amp_velcurve_${v}=${Math.pow(v / 127, 1.5).toFixed(4)}`).join(' ');
@@ -99,14 +62,10 @@ export function presentSamples(dir = SAMPLE_DIR, ext = 'flac', notes = PIANO_NOT
   return { have: notes.filter((n) => have.has(n)), missing: notes.filter((n) => !have.has(n)) };
 }
 
-/**
- * Put the piano on the card. IDEMPOTENT: a file already there is not fetched
- * again, and the .sfz is rewritten only when its text would change. Each file
- * is written to a temporary name and renamed into place, so a run cut off half
- * way leaves no half file that `presentSamples` would count.
- *
- * Fetches only what is missing, one at a time: 30 files, 732 KB in total.
- */
+// Put the piano on the card, idempotent: fetch only what is missing, one at a time (30 files, 732
+// KB),
+// write under a temp name and rename.
+// why: lessons/rig-board-io.md#ensure-piano
 export async function ensurePiano({ dir = SAMPLE_DIR, base = SAMPLE_BASE, onLog = () => {}, fetchImpl = fetch,
                                     convert = flacFromMp3 } = {}) {
   mkdirSync(dir, { recursive: true });
@@ -131,17 +90,10 @@ export async function ensurePiano({ dir = SAMPLE_DIR, base = SAMPLE_BASE, onLog 
   return { dir, sfz: sfzPath, fetched, wroteSfz: old !== text, ...presentSamples(dir) };
 }
 
-// ── the Rhodes, the second set (program 1) ──────────────────────────────────
-//
-// jRhodes3d by Jeff Learman (CC BY-NC-SA 4.0), as `/concepts/sampler/010/`
-// plays it: our R2 copies, capped at 4 s, faded over 8 ms, AAC 96 kbps
-// (demo/nola/PROVENANCE-rhodes.json). Fifteen notes at the author's uneven
-// steps and five velocity layers, layer 1 the hardest, ten holes at the top of
-// layers 1 and 3. 🔴 THESE TABLES ARE COPIES of
-// `demo/code/sampler.mjs`, because that module imports
-// `/shell/pedal.mjs` by an absolute URL node cannot resolve; `test.mjs` imports
-// the browser module with that one import rewritten and grades every table
-// here against it, so the two cannot drift silently.
+// The Rhodes (program 1, jRhodes3d, CC BY-NC-SA 4.0): 15 notes by 5 layers. The tables are copies
+// of
+// demo/code/sampler.mjs (node cannot import it as is); test.mjs grades them against it.
+// why: lessons/rig-board-io.md#rhodes
 
 export const RHODES_BASE = SAMPLE_BASE.replace(/piano\/$/, 'rhodes/');
 export const RHODES_DIR = process.env.BOARD_RHODES || SAMPLE_DIR.replace(/piano\/?$/, 'rhodes');
@@ -154,11 +106,8 @@ export const rhodesName = (note, layer) => `rhodes-${String(note).padStart(3, '0
 export const RHODES_FILES = Object.freeze(RHODES_NOTES.flatMap((n) =>
   [1, 2, 3, 4, 5].filter((l) => !RHODES_ABSENT.has(`${n}-${l}`)).map((l) => rhodesName(n, l))));
 
-/**
- * Put the Rhodes on the card, the way `ensurePiano` does the piano: only what
- * is missing is fetched, one at a time, each converted to FLAC under a
- * temporary name and renamed into place. 65 files, 3.2 MB as AAC.
- */
+// Put the Rhodes on the card like the piano: 65 files, 3.2 MB as AAC, converted to FLAC.
+// why: lessons/rig-board-io.md#ensure-rhodes
 export async function ensureRhodes({ dir = RHODES_DIR, base = RHODES_BASE, onLog = () => {}, fetchImpl = fetch,
                                      convert = flacFromMp3 } = {}) {
   mkdirSync(dir, { recursive: true });
@@ -186,16 +135,10 @@ export async function ensureRhodes({ dir = RHODES_DIR, base = RHODES_BASE, onLog
   return { dir, fetched, missing: RHODES_FILES.filter((n) => !existsSync(join(dir, `${n}.flac`))) };
 }
 
-// ── the Salamander grand, the piano since 2026-10-11 (program 0) ────────────
-//
-// plans/plan-piano-samples.md: Salamander Grand Piano V3 by Alexander Holm
-// (CC BY 3.0), four of its sixteen velocity layers at the same thirty notes,
-// capped at 8 s, and the 88 key-off release samples. The board's copy is made
-// for it by demo/resources/fetch-salamander.mjs: MONO (the capture sums out_1
-// and out_2 anyway), 48 kHz (the scsynth rate, so BufRateScale is 1), 16 bit
-// FLAC, so nothing is converted here. 208 files, fetched once, one at a time.
-// THE BANDS AND THE NAMES ARE COPIES of demo/code/sampler.mjs and
-// test.mjs grades them against it.
+// The Salamander grand (program 0, CC BY 3.0): four of sixteen layers at thirty notes plus 88
+// key-offs,
+// mono 48 kHz FLAC made by fetch-salamander.mjs. Bands and names are graded against the browser's.
+// why: lessons/rig-board-io.md#salamander
 
 export const SALAMANDER_BASE = SAMPLE_BASE.replace(/piano\/$/, 'salamander/pi/');
 export const SALAMANDER_DIR = process.env.BOARD_SALAMANDER || SAMPLE_DIR.replace(/piano\/?$/, 'salamander');
@@ -213,11 +156,8 @@ export const SALAMANDER_FILES = Object.freeze([
   ...RELEASE_KEYS.map(releaseName),
 ]);
 
-/**
- * Put the Salamander on the card: only what is missing is fetched, one at a
- * time, written under a temporary name and renamed into place, so a run cut
- * off half way leaves nothing `ensureSalamander` would count. Already FLAC.
- */
+// Put the Salamander on the card: missing files only, one at a time, temp name then rename.
+// why: lessons/rig-board-io.md#ensure-salamander
 export async function ensureSalamander({ dir = SALAMANDER_DIR, base = SALAMANDER_BASE, onLog = () => {},
                                          fetchImpl = fetch } = {}) {
   mkdirSync(dir, { recursive: true });

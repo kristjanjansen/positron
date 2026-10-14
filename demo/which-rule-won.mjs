@@ -1,55 +1,7 @@
-// demo/which-rule-won.mjs — FOR ONE ELEMENT AND ONE PROPERTY, EVERY DECLARATION
-// THAT WAS MADE FOR IT, WHERE EACH CAME FROM, AND WHICH ONE WON.
-//
-//   node demo/which-rule-won.mjs kit '.pos-rows-r' padding-left
-//   node demo/which-rule-won.mjs nola '.panel-plate' padding-top --width 375
-//   node demo/which-rule-won.mjs fau '.fau-src textarea' padding-top --base https://positron.studio
-//
-// 🔴 IT EXISTS BECAUSE THIRTY CASCADE INCIDENTS IN THIS REPOSITORY WERE FOUND BY
-// `getComputedStyle` AND ALMOST NEVER BY READING THE FILE, AND `getComputedStyle`
-// ONLY SAYS WHAT WON, NEVER WHO. A component's `padding: 7px 9px` SHORTHAND at
-// (0,2,1) beat a page's `padding-top` longhand at (0,1,1) on `/fau/` while the
-// source read as correct, and the page sheet loading later did not help, because
-// weight decides before order does. Nothing on the page said so. This prints
-// `<- via shorthand padding: 7px 9px` beside the winner, which is that incident
-// made visible in one line.
-//
-// ✅ **`CSS.getMatchedStylesForNode` IS THE ONLY COMPLETE SOURCE, AND IT IS
-// CDP-ONLY.** `getComputedStyle` returns resolved values with no provenance and
-// reads `0.3125rem` back as `5px`. `getMatchedCSSRules` was removed from Chrome in
-// 64 and never existed in Firefox. No npm package wraps this. So this file drives
-// Chrome the same way `verify.mjs` and `shot.mjs` do, raw CDP over node's global
-// WebSocket, no dependencies.
-//
-// 🔴 **THE ARRAY CDP HANDS BACK IS ALREADY IN CASCADE ORDER, EXCEPT THAT IT
-// IGNORES `!important`.** MEASURED on a crafted page with layers, an id rule, an
-// important rule and an inline style: `.imp !important` sat at index 5 below
-// `#only` at index 9 while the computed value was the important one. So taking
-// the last match is wrong whenever importance is in play, and it looks right on
-// every page that has none. This file re-ranks: origin band, then layer order,
-// then specificity, then source order, with importance inverting both the
-// origin bands and the layer order, which is what the spec says it does.
-//
-// ⚠️ **BLINK ALSO EMITS EXPANDED LONGHAND ECHOES WITH NO `range`, WHICH MUST BE
-// SKIPPED**, or every shorthand is counted twice. DevTools' own frontend does
-// `if (style.range && !property.range) continue`, and so does this.
-//
-// ⚠️ **INHERITANCE STOPS AT THE NEAREST DECLARING ANCESTOR.** An earlier draft
-// ranked across depths and reported a grandparent's `color` over the parent's,
-// because `inheritedFrom = 0` is falsy. The symptom was a plausible wrong answer
-// rather than an error, which is the worst kind.
-//
-// 🔴 **THE PORT IS READ BACK FROM THE PROFILE, NEVER GUESSED.** The draft this
-// was adopted from launched on a fixed port and asked `/json/list`, which attaches
-// to whatever Chrome is already on that port. `verify.mjs` pays for that lesson
-// at length: a guessed port can be somebody else's browser. `--remote-debugging-
-// port=0` and `DevToolsActivePort` is the house pattern and this follows it.
-//
-// ⚠️ **WHAT IT STILL CANNOT SEE**, stated rather than papered over: `@scope`
-// proximity (CDP does not rank it), whether a `@container` block is active (CDP's
-// `CSSContainerQuery` carries no `active` boolean while `CSSSupports` does),
-// shadow tree-scope distance, and a value winning because a transition is
-// running (that is `CSS.getAnimatedStylesForNode`, experimental).
+// node demo/which-rule-won.mjs <slug> '<selector>' <property> [--width N] [--base URL]: every
+// declaration for one property and which won, via CDP CSS.getMatchedStylesForNode, re-ranked for
+// `!important` (CDP's order ignores it), skipping longhand echoes; cannot see @scope or @container.
+// why: lessons/harness.md#which-rule-won
 
 import { launchChrome, connectCdp } from './chrome.mjs';
 
@@ -96,8 +48,8 @@ cdp.on((m) => { if (m.method === 'CSS.styleSheetAdded') sheets.set(m.params.head
 const { S } = await cdp.page();
 await S('Page.enable');
 await S('DOM.enable');
-// ⚠️ `CSS.enable` BEFORE NAVIGATING, or `styleSheetAdded` is missed for every
-// sheet the page loads and the source column reads `(no stylesheet header)`.
+// `CSS.enable` before navigating, or every sheet's styleSheetAdded is missed.
+// why: lessons/harness.md#css-enable
 await S('CSS.enable');
 if (WIDTH) {
   // The same emulation `shot.mjs` uses, so a question about a phone layout is
@@ -216,8 +168,8 @@ for (const h of hits) {
 
 const cs = await S('CSS.getComputedStyleForNode', { nodeId });
 const got = cs.computedStyle.find((p) => p.name === PROPERTY);
-// ⚠️ THE COMPUTED VALUE IS RESOLVED, SO `0.3125rem` READS BACK AS `5px` AND
-// `navy` AS `rgb(0, 0, 128)`. A mismatch here is a prompt to look, not a verdict.
+// The computed value is resolved (`0.3125rem` reads `5px`): a mismatch is a prompt, not a verdict.
+// why: lessons/harness.md#resolved
 console.log(`\ncomputed ${PROPERTY} = ${got && got.value}${winner ? `   (the winner said ${winner.prop.value})` : ''}`);
 
 ws.close();

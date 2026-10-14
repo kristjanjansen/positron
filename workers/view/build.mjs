@@ -1,24 +1,7 @@
-// build.mjs — assemble workers/view/public/ from the repo's protos.
-//
-//   node build.mjs                 -> public/, the deploy artefact (committed)
-//   node build.mjs --out /tmp/x    -> anywhere else; public/ untouched. Use this
-//                                     to ask "does the build still pass?".
-//
-// Why a build step instead of pointing wrangler's `assets.directory` at the
-// repo root: the repo root holds `.env` (13 live secrets). An assets directory
-// is uploaded VERBATIM AND PUBLICLY. So we copy an explicit allowlist of files
-// — never a directory glob — into public/, and nothing else can leak.
-//
-// The layout MIRRORS THE REPO on purpose. Every page's imports then resolve
-// untouched, exactly as they do under its own dev server:
-//   proto/deck      `../../timeline/transport.mjs` → /timeline/transport.mjs
-//   proto/remixer     `/timeline/transport.mjs`      → /timeline/transport.mjs
-//   proto/deck      `./ingest.mjs`                  → /proto/deck/…
-// That is the "solve it in the asset layout, not in the proto" rule.
-//
-// ⚠️ THERE WAS A CACHE-EXPLODING STEP HERE and the page it served is archived;
-// `explode()` still exists further down, unused, for the next proto that ships
-// a committed cache. See the note beside it.
+// node build.mjs -> public/ (the committed deploy artefact); --out <dir> builds elsewhere.
+// An explicit allowlist, never a glob: the repo root holds `.env` and assets upload publicly.
+// The layout mirrors the repo so every page's imports resolve as under its dev server.
+// why: lessons/workers-view.md#build-header
 
 import zlib from 'node:zlib';
 import { mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
@@ -34,27 +17,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
 const DEPLOY_OUT = join(HERE, 'public');
 
-// ── where the build lands ───────────────────────────────────────────────────
-//
-// 🔴 A FIXED OUTPUT DIRECTORY IS A SHARED MUTABLE GLOBAL. That is this repo's
-// own rule about ports — *"let the OS choose and read back what you got"* — and
-// `public/` is the same shape wearing a directory: it is `rm -rf`'d and
-// rewritten on every run. Two builds at once and one of them empties the
-// directory the other is copying into, with nothing in either output saying so.
-// MEASURED 2026-09-14: one ordinary build left **60 files dirty, none of them
-// written by a person**, which is what every other agent's `git status` then
-// has to be read through.
-//
-// `--out <dir>` (or `BUILD_OUT=<dir>`) builds somewhere else. Use it whenever
-// the question is *"does the build still pass?"* — which is what the four
-// refusals at the bottom of this file exist to answer — because then the answer
-// costs nothing in the shared tree.
-//
-// ⚠️ IT IS DELIBERATELY NOT THE DEFAULT. `public/` is the deploy artefact and
-// it is committed on purpose: `git log --oneline -- workers/view/public` is how
-// anyone answers *"what was actually on the edge when that log was written?"*.
-// A scratch build must never be mistaken for one, so it says so on the way in
-// and on the way out.
+// public/ is emptied and rewritten each run, so two builds at once corrupt each other: use
+// `--out <dir>` (or BUILD_OUT) to ask whether the build passes. Not the default: public/ is
+// committed.
+// why: lessons/workers-view.md#out
 const OUT = (() => {
   const i = process.argv.indexOf('--out');
   if (i >= 0 && !process.argv[i + 1]) {
@@ -66,13 +32,12 @@ const OUT = (() => {
 })();
 const SCRATCH = OUT !== DEPLOY_OUT;
 
-// the demo story order, single-sourced from demo/manifest.mjs
-// rowHTML/noteHTML come from the manifest too. They used to be duplicated here
-// AND in demo/index.html, so fixing one left the other printing `undefined`.
+// The demo order, rowHTML and noteHTML come from demo/manifest.mjs, single-sourced.
+// why: lessons/workers-view.md#manifest
 const { DEMOS: DEMO_MANIFEST, extraPages } =
   await import(new URL('../../demo/manifest.mjs', import.meta.url));
-// The concept pages: their rows and the folders they live in. Since 2026-10-13
-// they are the front page and answer at /<group>/<slug>/ (demo/shell/concept-list.mjs).
+// The concept pages, at /<group>/<slug>/ (demo/shell/concept-list.mjs).
+// why: lessons/workers-view.md#concept-rows
 const { CONCEPTS, CONCEPT_DIRS, DEMO_CARDS } =
   await import(new URL('../../demo/shell/concept-list.mjs', import.meta.url));
 // The share card and its tags (demo/shell/share-card.mjs), and the rasteriser
@@ -84,24 +49,20 @@ const { renderPng, inkBox } = await import(new URL('./og/render.mjs', import.met
 // ── the allowlist ───────────────────────────────────────────────────────────
 // [ repo-relative source, public/-relative destination ]
 const FILES = [
-  // shared timeline library — loaded by remixer and deck, never copied
-  // into either proto. One canonical copy, same as the dev servers alias.
+  // The shared timeline library, one canonical copy, never copied into a proto.
+  // why: lessons/workers-view.md#timeline
   ['timeline/transport.mjs', 'timeline/transport.mjs'],
   ['timeline/media-master.mjs', 'timeline/media-master.mjs'],
 
-  // ⚠️ `megatimeline` WAS HERE AND IS IN `archive/`. Four entries came out with
-  // it — the page, its viewport and gesture modules, and the census it fetched
-  // from the ROOT (`/census.json`), which nothing else ever read. Its two
-  // committed JSONL caches were exploded into static assets a little further
-  // down; those calls are gone too, so the build no longer writes nine search
-  // results and one item that had no reader. The source is under `archive/`.
+  // megatimeline and its census are in archive/.
+  // why: lessons/workers-view.md#megatimeline
 
-  // 2. remixer, ARCHIVED 2026-10-05 (archive/remixer/). Only its hls.js stays:
-  //    eight pages load /proto/remixer/hls.min.js, so the path keeps answering.
+  // remixer is archived; its hls.js stays because eight pages load /proto/remixer/hls.min.js.
+  // why: lessons/workers-view.md#remixer
   ['proto/remixer/hls.min.js', 'proto/remixer/hls.min.js'],
 
-  // 3. deck — renamed from `aikajana` 2026-09-15; the corpus plus archive.org
-  //    media, nothing proxied
+  // 3. deck: the corpus plus archive.org media, nothing proxied.
+  // why: lessons/workers-view.md#deck
   ['proto/deck/index.html', 'proto/deck/index.html'],
   ['proto/deck/corpus.json', 'proto/deck/corpus.json'],
 
@@ -109,12 +70,9 @@ const FILES = [
   ['proto/flipper/index.html', 'proto/flipper/index.html'],
   ['proto/flipper/hls.min.js', 'proto/flipper/hls.min.js'],
 
-  // 5. looper — an INSTRUMENT, not a viewer, and the first page here with no
-  // upstream of any kind: no ERR, no proxy, no Durable Object, no network at
-  // all once loaded. It needs three more library modules than the viewers do,
-  // and the AudioWorklet processor, which is fetched at runtime by URL
-  // (`addModule('./onset-worklet.js')`) rather than imported — easy to forget,
-  // and the failure mode is a silent ear that detects nothing.
+  // 5. looper, with no network at all once loaded. The AudioWorklet is fetched by URL
+  // (`addModule('./onset-worklet.js')`), not imported: forget it and the ear detects nothing.
+  // why: lessons/workers-view.md#looper
   ['timeline/nested.mjs', 'timeline/nested.mjs'],
   ['timeline/score.mjs', 'timeline/score.mjs'],
   ['timeline/csound.mjs', 'timeline/csound.mjs'],         // sound compiles a score in the page
@@ -125,119 +83,42 @@ const FILES = [
   ['proto/looper/peer.mjs', 'proto/looper/peer.mjs'],
   ['proto/looper/onset-worklet.js', 'proto/looper/onset-worklet.js'],
 
-  // MoQ audio return (shell/moq-audio.mjs). The wrapper and the PCM worklets
-  // live under proto/jam because that is where they were measured (session 6i,
-  // 35.8 ms key->ear); the shell module is the only consumer and the build
-  // refuses it if these are missing, which is how they got listed at all.
+  // MoQ audio return (shell/moq-audio.mjs): wrapper and PCM worklets live under proto/jam,
+  // where they were measured (35.8 ms key to ear).
+  // why: lessons/workers-view.md#moq-return
   ['proto/jam/moq/www/moq-synth.js', 'proto/jam/moq/www/moq-synth.js'],
   ['proto/jam/playout-worklet.js', 'proto/jam/playout-worklet.js'],
 
-  // ── the demo sequence (plans/plan-demos.md) ─────────────────────────────────────
-  // strip.mjs is REQUIRED here: every Act 0 demo imports it, and
-  // proto/megatimeline/index.html has imported /timeline/strip.mjs since
-  // commit 3647696 without it ever being allowlisted — which is why
-  // megatimeline has been dead on the public URL. Adding it fixes both.
+  // The demo sequence (plans/plan-demos.md). strip.mjs is required: every Act 0 demo imports it.
+  // why: lessons/workers-view.md#strip
   ['timeline/strip.mjs', 'timeline/strip.mjs'],
   ['demo/manifest.mjs', 'manifest.mjs'],
-  // demo/shell is ENUMERATED, not listed: see shellFiles() below. A hand-kept
-  // list meant a new shell module deployed as a 404 while local verify passed,
-  // because the dev server serves the repo directly and only the deploy strips
-  // to public/. That is a silent break, so the list is gone.
+  // demo/shell is enumerated, not listed: a hand list deployed new modules as 404s.
+  // why: lessons/workers-view.md#shell-enumerated
   ...shellFiles(),
-  // ⚠️ THE ROUTE VECTORS ARE DATA, ENUMERATED ONE LEVEL DOWN AND JSON ONLY, so
-  // `/rout/` runs the same files `route-core-test.mjs` runs. Hand-written
-  // contract files with no secret in them; `index.json` is their list.
+  // Route vectors: JSON only, one level down, so /rout/ runs what route-core-test.mjs runs.
+  // why: lessons/workers-view.md#route-vectors
   ...routeVectorFiles(),
   // 06 imports the v6 player UNCHANGED rather than reimplementing it
   ['src/low-latency-player.js', 'src/low-latency-player.js'],
 
-  // ── six Circuit patches, so `/pack/` has something to open ────────────────
-  //
-  // 🔴 THESE ARE THE OWNER'S OWN PATCHES AND PUBLISHING THEM WAS ASKED FOR IN
-  // WORDS. `/pack/` shows nothing until a file lands and `New Pack.circuitpack`
-  // is NOT published, so a visitor met an upload box and an empty page. The
-  // request was *"can we get some sample patches in to choose from?"*, then
-  // *"at least one"*, and the publishing question was put to the owner rather
-  // than assumed: *"that is your sound design going onto a public URL, so I am
-  // not doing it unless you say"*, answered *"do it"*.
-  //
-  // 🔴 A PATCH IS NOT A PACK, AND THAT DISTINCTION IS THE WHOLE SAFETY OF THIS
-  // BLOCK. `New Pack.circuitpack` holds 32 of somebody's SESSIONS and stays off
-  // this list for good. These are six 350 byte synth patches with no session
-  // data in them at all.
-  //
-  // ✅ AND EVERY ONE WAS CHECKED BEFORE IT WAS WRITTEN, not after. Each is
-  // exactly 350 bytes and each carries `00` at offset 6, which is
-  // `Replace Current Patch` and lands in RAM. The extractor THROWS on a length
-  // that is not 350, on a byte 6 that is not `00`, and on anything `readPatch`
-  // calls `writesFlash`, because `01` at that offset is `Replace Patch` and
-  // writes flash on an instrument with no factory reset.
-  //
-  // ⚠️ SIX AND NOT ONE, AND NOT SIXTY FOUR. The ask was `at least one`; six is
-  // what it takes to make the page's picture move. Between them they cover six
-  // waveforms, three filter types, all three voice modes and 0 to 4 mod slots
-  // in use, so pressing through them changes every box in the diagram. Sixty
-  // four would be publishing the bank.
+  // Six of the owner's Circuit patches for /pack/, published on request. Patches, never the session
+  // pack. Each is 350 bytes with `00` at offset 6 (RAM only); the extractor throws on anything
+  // else.
+  // why: lessons/workers-view.md#patches
   ['demo/resources/patches/aciiid.syx', 'resources/patches/aciiid.syx'],
   ['demo/resources/patches/flamed.syx', 'resources/patches/flamed.syx'],
   ['demo/resources/patches/aggie.syx', 'resources/patches/aggie.syx'],
   ['demo/resources/patches/frosted-glass.syx', 'resources/patches/frosted-glass.syx'],
   ['demo/resources/patches/smooth-pad.syx', 'resources/patches/smooth-pad.syx'],
   ['demo/resources/patches/twins.syx', 'resources/patches/twins.syx'],
-  // 🔴 `/notes/` IS NOT SHIPPED. It rendered two essays on the front page, and
-  // those have moved to `research/`, which is where writing that argues or
-  // reports lives and which is not deployed. A viewer page with nothing left to
-  // view is furniture, so the three lines go together rather than leaving a URL
-  // that 404s whatever you ask it for. `demo/notes/index.html` stays in the
-  // repo: putting a note back is these lines and a row in `NOTES`.
+  // /notes/ is not shipped: its essays moved to research/; demo/notes/index.html stays.
+  // why: lessons/workers-view.md#notes-off
 
-  // The box listener: play a Raspberry Pi in another building from a phone.
-  // It needs nothing else deployed — proto/jam/playout-worklet.js is already
-  // listed above for the MoQ return path, and the page talks only to
-  // ws.positron.studio. Served at /keys/.
-  // ⚠️ FROM THE MANIFEST, NOT LISTED HERE. `demoFiles()` enumerates BUILT demos;
-  // a page that is not one — the box's listener in rig/, the component sandbox —
-  // used to need a hand-written line here AND a matching rewrite in
-  // demo/server.mjs. Two pages, four edits, in two files, with nothing to notice
-  // if only one of the pair was made. Each declares its own `src` now.
-  // ── SuperCollider's own sound server, vendored ────────────────────────────
-  //
-  // ⚠️ LISTED BY NAME, because `shellFiles()` enumerates ONE directory level and
-  // filters to web extensions — it would take neither the `.wasm` nor anything
-  // under `vendor/chunks/`. That is the containment argument working as
-  // intended rather than a gap to widen: this is 1.86 MB of third-party binary
-  // and it should cost somebody a deliberate line.
-  //
-  // 🔴 IT MOVED HERE FROM `demo/patch/vendor/` ON 2026-09-13, AND THE REASON IS
-  // THAT `patch` IS OFF THE SITE. Its row is gone from `demo/manifest.mjs`, so
-  // nothing under `demo/patch/` is copied any more — and `/grains/` now boots
-  // this engine to run Pappus in the tab. A page fetching `/patch/vendor/…`
-  // would be asking for a URL with nothing behind it, which is `moq.mjs`
-  // exactly: a module holding a path a rename had moved, 404ing with nothing
-  // saying so, killing the page for a reason no log line mentions.
-  //
-  // 🔴 AND NOT A SECOND COPY UNDER `demo/grains/vendor/`, which `LAYOUT.md`
-  // rule 6 would suggest. Two copies of a 1.7 MB AGPL binary can drift apart
-  // and the drift is SILENT, because each page goes on working. One copy; the
-  // protection the rule was giving is replaced by `checkPresent()` and
-  // `checkVendorUrls()` below, both proved by breaking them. Same argument, and
-  // the same departure, as the controller meshes in the next block.
-  //
-  // 🔴 THE CHUNKS ARE NOT OPTIONAL EVEN THOUGH THEY ARE NEVER FETCHED.
-  // `supersonic.js` holds `import("./chunks/midi_manager-….js")` and one for
-  // gamepads — dynamic imports that a page using neither will never run, but
-  // `checkImports()` reads the source and would refuse the build over them, and
-  // rightly: an import with no deployed file is a 404 waiting for the first
-  // person to plug in a controller. `chunk-V5WXEJ46.js` IS loaded, statically.
-  //
-  // LICENCE: the engine is scsynth (GPL-3.0-or-later) on clockwork
-  // (AGPL-3.0-or-later) and the combined work is AGPL-3.0-or-later — the one
-  // licence where serving over a network is the trigger, and this serves it
-  // over a network. The texts ship beside the binaries rather than living in
-  // somebody's memory. ⚠️ `sonic-pi-beep.scsyndef` and its MIT synthdefs
-  // licence did NOT come across: that was `patch`'s demo asset and nothing
-  // fetches it any more, and a vendored file with no consumer in the shared kit
-  // is a thing for somebody to wonder about later.
+  // Pages outside the manifest declare their own `src`. Vendored scsynth (1.86 MB,
+  // AGPL-3.0-or-later)
+  // listed by name, one copy under shell/vendor/; its chunks ship because checkImports reads them.
+  // why: lessons/workers-view.md#supersonic
   ['demo/shell/vendor/supersonic.js', 'shell/vendor/supersonic.js'],
   ['demo/shell/vendor/chunks/chunk-V5WXEJ46.js', 'shell/vendor/chunks/chunk-V5WXEJ46.js'],
   ['demo/shell/vendor/chunks/gamepad_manager-G6XPZUN2.js', 'shell/vendor/chunks/gamepad_manager-G6XPZUN2.js'],
@@ -247,67 +128,29 @@ const FILES = [
   ['demo/shell/vendor/LICENSE-supersonic-scsynth', 'shell/vendor/LICENSE-supersonic-scsynth'],
   ['demo/shell/vendor/LICENSE-supersonic-scsynth-core', 'shell/vendor/LICENSE-supersonic-scsynth-core'],
 
-  // ── the two definitions `/grains/` loads into that engine ─────────────────
-  //
-  // 🔴 NOT VENDORED AND NOT BUILT HERE: these are compiled by sclang ON THE
-  // BOARD, by `rig/board/norns/writedefs.scd`, out of the same
-  // `Engine_Pappus.sc` and `PosSource.sc` the Raspberry Pi's own service
-  // compiles. `/grains/` claims the browser runs the graph the board runs, and
-  // that claim is only true while these bytes came from there.
-  //
-  // ⚠️ `demoFiles()` cannot take them — a subdirectory, and `.scsyndef` is not
-  // a web extension — so they are named here, and `checkCompiledDefs()` below
-  // refuses the build when either one has drifted from the source it was
-  // compiled from. A stale artefact is silent in the worst direction: the tab
-  // runs last week's graph beside the board's today, and the page goes on
-  // saying they are the same instrument.
+  // Compiled by sclang on the board from Engine_Pappus.sc and PosSource.sc, named here because
+  // demoFiles() takes neither; checkCompiledDefs() refuses the build if they drift from source.
+  // why: lessons/workers-view.md#grains-defs
   ['demo/grains/defs/pappus-tiny.scsyndef', 'grains/defs/pappus-tiny.scsyndef'],
   ['demo/grains/defs/possource.scsyndef', 'grains/defs/possource.scsyndef'],
   ['demo/grains/defs/PROVENANCE.json', 'grains/defs/PROVENANCE.json'],
 
-  // ── the controller models, vendored ───────────────────────────────────────
-  //
-  // ⚠️ LISTED BY NAME for the same reason `patch/vendor/` is: `shellFiles()`
-  // enumerates ONE directory level and filters to web extensions, so it takes
-  // neither a `.glb` nor anything under `shell/vendor/`. The wall is working;
-  // this is a deliberate line through it.
-  //
-  // 🔴 AND THEY ARE UNDER `shell/`, NOT UNDER A DEMO'S `vendor/`, WHICH IS A
-  // DEPARTURE FROM `LAYOUT.md` RULE 6 AND IS ARGUED THERE. The consumer is
-  // `demo/shell/xr-room.mjs`, which BOTH `scene` and `mirror` import — so a
-  // per-slug path would mean one page's controllers came out of a directory
-  // named after the other page. The hazard that rule exists to prevent is
-  // `moq.mjs`'s: a shared module holding a path a rename had moved, 404ing
-  // silently. What replaces it is the existence check below, which refuses the
-  // build rather than shipping the 404.
-  //
-  // LICENCE: MIT, Copyright (c) 2019 Amazon —
-  // `@webxr-input-profiles/assets@1.0.20`, `immersive-web/webxr-input-profiles`.
-  // 217,984 + 213,868 bytes. The text and the provenance ship beside them.
+  // Controller models (.glb, MIT, Amazon webxr-input-profiles 1.0.20) under shell/ because
+  // xr-room.mjs
+  // serves two pages; listed by name, and the existence check refuses a missing one.
+  // why: lessons/workers-view.md#controllers
 
-  // ── the slide face, JetBrains Mono, for `demo/shell/slide.mjs` ──────────
-  //
-  // The site's one mono since 2026-10-12 (`--mono`, `--brand` and the slide
-  // face all read these files), and the archived `/slides/` deck reads them
-  // too since its own vendor folder and its byte-identical copy went
-  // (plans/plan-fonts-minimal.md). Under `shell/` because the consumers are kit
-  // components, and a kit module loading a font out of one demo's folder is
-  // the cross-page import this file refuses. 400 and 600, Latin subset, plus
-  // the Greek 600 subset for the logo's β, @fontsource 5.3.0, SIL OFL 1.1,
-  // licence beside them.
+  // JetBrains Mono 400 and 600 (Latin, plus Greek 600 for the logo), @fontsource 5.3.0, OFL 1.1:
+  // the site's one mono, read by kit components, so it lives under shell/.
+  // why: lessons/workers-view.md#mono
   ['demo/shell/vendor/jetbrains-mono-latin-400-normal.woff2', 'shell/vendor/jetbrains-mono-latin-400-normal.woff2'],
   ['demo/shell/vendor/jetbrains-mono-latin-600-normal.woff2', 'shell/vendor/jetbrains-mono-latin-600-normal.woff2'],
   ['demo/shell/vendor/jetbrains-mono-greek-600-normal.woff2', 'shell/vendor/jetbrains-mono-greek-600-normal.woff2'],
   ['demo/shell/vendor/LICENSE-jetbrains-mono', 'shell/vendor/LICENSE-jetbrains-mono'],
 
-  // ── Geist, the site's `--sans` from 2026-10-12 ──────────────────────────
-  //
-  // Picked from six sans faces sampled beside the brand mono on
-  // `/kit/frontpage/` (*"we need sans serif to match our brand mono"*), and the
-  // other five deleted with plans/plan-fonts-minimal.md. Under `shell/` because
-  // `shell.css` declares it as `Brand Geist` and every page reads it through
-  // `--sans`. 400 and 600, Latin subset, @fontsource/geist 5.3.0 off
-  // cdn.jsdelivr.net, SIL OFL 1.1, licence beside it.
+  // Geist, the site's `--sans` (`Brand Geist` in shell.css). 400 and 600 Latin, @fontsource/geist
+  // 5.3.0, OFL 1.1.
+  // why: lessons/workers-view.md#geist
   ...['geist'].flatMap((f) => [
     [`demo/shell/vendor/${f}-latin-400-normal.woff2`, `shell/vendor/${f}-latin-400-normal.woff2`],
     [`demo/shell/vendor/${f}-latin-600-normal.woff2`, `shell/vendor/${f}-latin-600-normal.woff2`],
@@ -318,18 +161,10 @@ const FILES = [
   ['demo/shell/vendor/meta-quest-touch-plus-right.glb', 'shell/vendor/meta-quest-touch-plus-right.glb'],
   ['demo/shell/vendor/LICENSE-webxr-input-profiles', 'shell/vendor/LICENSE-webxr-input-profiles'],
 
-  // ── the Pico router firmware and the emulator it runs in, for `/kit/` ─────
-  //
-  // ⚠️ LISTED BY NAME FOR THE REASON EVERY LINE IN THIS BLOCK IS: `shellFiles()`
-  // enumerates ONE directory level, so nothing under `shell/vendor/` ships
-  // unless it is here, and `.uf2` is on no extension list at all.
-  // `demo/shell/pico.mjs` and `pico-worker.mjs` are flat in `demo/shell/` and
-  // are enumerated. The emulator is rp2040js 1.4.0 bundled into one module
-  // (MIT); the boot ROM is the RP2040 B1's, which the firmware calls into, and
-  // its terms are in the licence file beside it. The UF2 is
-  // `rig/pico/firmware/build-pico/router.uf2`, byte for byte, 57,856 bytes:
-  // the owner's own firmware, published because the HARDWARE tab was asked for
-  // as *"Can you make demo of hw kit in psoitron kit new tab?"*.
+  // The Pico router firmware (router.uf2, 57,856 bytes, the owner's) and rp2040js 1.4.0 with the
+  // B1 boot ROM, for /kit/'s hardware tab. Listed by name: nothing under shell/vendor/ is
+  // enumerated.
+  // why: lessons/workers-view.md#pico
   ['demo/shell/vendor/rp2040js.mjs', 'shell/vendor/rp2040js.mjs'],
   ['demo/shell/vendor/LICENSE-rp2040js', 'shell/vendor/LICENSE-rp2040js'],
   ['demo/shell/vendor/pico-bootrom.mjs', 'shell/vendor/pico-bootrom.mjs'],
@@ -341,188 +176,65 @@ const FILES = [
   // rig/pico/patch/build-pico/patch.uf2, byte for byte: concept 070's own firmware,
   // keys to Pico to synth on a patchbay screen (rig/pico/patch/build.sh copies it here).
   ['demo/resources/pico/patch-pico.uf2', 'resources/pico/patch-pico.uf2'],
-  // ui.c alone as WebAssembly, for the OLED part blocks (rig/pico/firmware/wasm/).
-  // ⚠️ IT SHIPPED MISSING ONCE, 2026-10-04: green locally, because the dev
-  // server serves the whole repository, and a 404 on the edge. A file the page
-  // FETCHES is invisible to the import check above.
+  // ui.c as WebAssembly for the OLED blocks. A fetched file is invisible to the import check.
+  // why: lessons/workers-view.md#oled
   ['demo/resources/pico/oled-ui.wasm', 'resources/pico/oled-ui.wasm'],
 
-  // ── the typeface `/weight/` is made of, vendored ────────────────────────────
-  //
-  // ⚠️ LISTED BY NAME, and this one would have been missed by looking: a font
-  // is not an `import`, so `checkImports()` cannot see it, AND `.woff2` is not
-  // in `demoFiles()`'s extension set, so even at the top of `demo/weight/` it
-  // would not have been copied. That is the `manifest.webmanifest` failure
-  // exactly — `/items/` renamed one file and shipped a 404 to production
-  // because an allowlist declined silently. `checkVendorUrls()` below is what
-  // now refuses the build instead, which is why the page's `@font-face` writes
-  // its `src` as a QUOTED `/weight/vendor/…` string.
-  //
-  // 🔴 TWO FILES, BECAUSE ESTONIAN IS SPLIT ACROSS TWO OF THEM. Ä Ö Ü Õ are in
-  // `latin` (U+00xx) and Š Ž are in `latin-ext` (U+0160, U+017E). Dropping
-  // either one does not fail: the browser substitutes a system face for the
-  // letters it cannot find, per glyph, with no 404 and no exception — one
-  // letter of one word in the wrong typeface. The page measures that rather
-  // than trusting it (`text.mjs`, `ensureFont`).
-  //
-  // ⚠️ THE PAGE DOES NOT NAME THE TYPEFACE — it asks for `weight-display` and
-  // `weight-text`, two aliases its stylesheet points at whatever is listed here.
-  // So a font change is these three lines, two files, and the `src` pair in the
-  // page; nothing in `text.mjs` or in any assert moves. Keep it that way.
-  //
-  // LICENCE: SIL Open Font License 1.1 — Gabarito, via `google/fonts`
-  // (`ofl/gabarito`). The two subsets are Google's own builds; the licence
-  // ships beside them.
+  // Gabarito for /weight/, OFL 1.1, two subsets because Estonian spans latin and latin-ext (S and Z
+  // caron); a missing one fails per glyph, silently. The page uses aliases, so a swap is local.
+  // why: lessons/workers-view.md#gabarito
   ['demo/weight/vendor/gabarito-latin.woff2', 'weight/vendor/gabarito-latin.woff2'],
   ['demo/weight/vendor/gabarito-latin-ext.woff2', 'weight/vendor/gabarito-latin-ext.woff2'],
   ['demo/weight/vendor/LICENSE-gabarito', 'weight/vendor/LICENSE-gabarito'],
 
-  // ── Plaits and Warps, compiled to WebAssembly, for `/muta/` ─────────────────
-  //
-  // ⚠️ LISTED BY NAME FOR THE THIRD REASON IN A ROW AND IT IS THE SAME ONE:
-  // `.wasm` is not in `demoFiles()`'s extension set and `vendor/` is a
-  // subdirectory, so these artefacts would be declined silently and the page
-  // would ship pointing at a 404. `checkVendorUrls()` below is what refuses
-  // the build instead, which is why `demo/muta/index.html` writes both URLs as
-  // quoted `/muta/vendor/*.wasm` strings.
-  //
-  // 🔴 UNDER THE PAGE, NOT IN `demo/shell/`, WHICH IS LAYOUT.md RULE 6.
-  // One page reads it. Promoting 188 KB of somebody else's DSP into the shared
-  // kit invites a second page to import it without noticing what it costs, and
-  // the two exceptions already recorded there (the controller meshes, wasm
-  // scsynth) both moved because TWO pages needed them.
-  //
-  // LICENCE: MIT, Emilie Gillet, for BOTH, and it is worth checking per module
-  // rather than per repository. `plaits/` and `stmlib/` are STM32F projects,
-  // which is the half of the eurorack grant that is MIT rather than GPL:
-  // `plaits/makefile` says `FAMILY = f37x` and `warps/makefile` says
-  // `FAMILY = f4xx`. The panel graphics are NOT taken and are the one thing in
-  // that ecosystem that could not be. The licences, the upstream commits and
-  // the source digests baked into each wasm live in `demo/muta/vendor/`; the
-  // build recipe for both is `demo/muta/build/build.sh`.
-  //
-  // ⚠️ `PROVENANCE-*.json` IS DELIBERATELY NOT DEPLOYED. The page reads each
-  // build stamp out of the WASM ITSELF (`plai_build()`, `warp_build()`), which
-  // is the copy that cannot drift from the thing making the sound. A second
-  // copy served beside it would be a number that agrees by construction, which
-  // LESSONS #82 records as two witnesses who are one witness.
+  // Plaits and Warps as wasm for /muta/ (MIT, Emilie Gillet), under the page since one page reads
+  // it.
+  // PROVENANCE-*.json is not deployed: the page reads each build stamp out of the wasm itself.
+  // why: lessons/workers-view.md#muta
   ['demo/muta/vendor/plai.wasm', 'muta/vendor/plai.wasm'],
   ['demo/muta/vendor/LICENSE-plaits', 'muta/vendor/LICENSE-plaits'],
   ['demo/muta/vendor/warp.wasm', 'muta/vendor/warp.wasm'],
   ['demo/muta/vendor/LICENSE-warps', 'muta/vendor/LICENSE-warps'],
 
-  // ── the Faust compiler itself, for `/fau/` ─────────────────────────────────
-  //
-  // ⚠️ THE FOURTH CASE OF THE SAME RULE: `demoFiles()` takes neither a `.wasm`
-  // nor a subdirectory, and `.data` is not a web extension at all, so all four
-  // of these would be declined in silence and the page would ship pointing at
-  // four 404s. `checkVendorUrls()` is what refuses the build instead, which is
-  // why `demo/shell/faust.mjs` (until 2026-10-06 `demo/fau/index.html`) writes
-  // each of them out as a whole quoted path in one object. ⚠️ AND WHY NEITHER FILE SPELLS A VENDOR
-  // PATH IN PROSE: this check reads comments as well as code, and refused this
-  // very build over an ellipsis standing in for a file name.
-  //
-  // 🔴 6,162,473 BYTES OF COMPILER, WHICH IS 2.49 TIMES THE VENDORED SCSYNTH
-  // ALREADY IN THIS REPOSITORY OVER BROTLI. `plans/plan-fau.md` §1 prices it
-  // file by file: 3,598,106 for the compiler, 2,407,445 that is not data at all
-  // but the 53 standard library `.lib` files as plain Faust source, and 156,922
-  // of Emscripten glue. The page fetches none of it on a visit — the first
-  // press does — and says in its own log what pressing will cost.
-  //
-  // 🔴 THE EDGE DOES NOT COMPRESS AN EXTENSION IT HAS NEVER HEARD OF, MEASURED
-  // 2026-09-23 AGAINST THE DEPLOY, which is what `plans/plan-fau.md` §11 item 3
-  // asked somebody to check. Shipped as `libfaust-wasm.data` it came back with
-  // NO content-type and NO content-encoding, 2,407,445 bytes whole, while the
-  // `.wasm`, the `.js` and the `.mjs` beside it were all brotli. That is 2 MB of
-  // a visitor's bandwidth on the one file in the set that compresses best.
-  // ✅ SO IT IS SERVED AS `.txt` AND IT IS HONESTLY ONE: 99.95 per cent of its
-  // bytes are printable, because it is 53 Faust library sources concatenated by
-  // Emscripten's `file_packager`. The page names this path explicitly, and the
-  // package name baked INSIDE the compiler is untouched by the rename.
-  //
-  // LICENCE: LGPL 2.1 or later. The text shipped in the package is the FAUST
-  // wasm copyright header (GRAME, 2021-2024) over the full LGPL 2.1, and it is
-  // vendored verbatim beside the binaries. ⚠️ npm's own metadata for
-  // `@grame/faustwasm@0.18.5` says `LGPL-3.0`, which disagrees with the file in
-  // the tarball; the file is what ships here and what a reader can check.
-  // ⚠️ THE STANDARD LIBRARY IS A PATCHWORK and the licence above does not cover
-  // it: of the 53 `.lib` files inside the `.data` blob, five declare
-  // `LicenseRef-LGPL-2.1-or-later-with-Faust-exception`, THREE declare
-  // `STK-4.3`, two declare `LGPL with exception`, one `LGPL-2.1-or-later`, and
-  // 42 declare nothing at all. `plans/plan-fau.md` §7.2 lists them.
+  // The Faust compiler for /fau/: 6,162,473 bytes, fetched on the first press. The .data is served
+  // as
+  // .txt because the edge does not compress an unknown extension. LGPL 2.1+; stdlib licences vary.
+  // why: lessons/workers-view.md#faust
   ['demo/fau/vendor/libfaust-wasm.wasm', 'fau/vendor/libfaust-wasm.wasm'],
   ['demo/fau/vendor/libfaust-wasm.data.txt', 'fau/vendor/libfaust-wasm.data.txt'],
   ['demo/fau/vendor/libfaust-wasm.js', 'fau/vendor/libfaust-wasm.js'],
   ['demo/fau/vendor/faustwasm.mjs', 'fau/vendor/faustwasm.mjs'],
   ['demo/fau/vendor/LICENSE-faustwasm', 'fau/vendor/LICENSE-faustwasm'],
 
-  // ── the Organ, compiled ahead of time, for a page with no compiler ─────────
-  //
-  // ⚠️ LISTED BY NAME FOR THE SAME REASON AS EVERY `.wasm` ABOVE: `demoFiles()`
-  // takes no `.wasm` and `demo/resources/` is not a demo. These are what
-  // `demo/shell/faust.mjs`'s `faustFactory('/resources/faust/organ.json')`
-  // fetches on a press: 13,332 B raw, against 6,162,473 B for the compiler
-  // (`plans/plan-live-slides.md` section 5). Made by
-  // `node demo/resources/build-faust-aot.mjs` from `demo/fau/presets.mjs`.
-  // 🔴 AND `checkFaustAot()` BELOW REFUSES THE BUILD WHEN THEY ARE STALE, which
-  // is `checkCompiledDefs()` for `/grains/` again: edit the Organ on `/fau/`
-  // and the ahead of time copy would go on playing the old one, with nothing
-  // 404ing and every number agreeing with itself.
+  // The Organ compiled ahead of time (13,332 B against 6 MB of compiler); checkFaustAot() refuses
+  // the build when it is stale against demo/fau/presets.mjs.
+  // why: lessons/workers-view.md#organ
   ['demo/resources/faust/organ.json', 'resources/faust/organ.json'],
   ['demo/resources/faust/organ.voice.wasm', 'resources/faust/organ.voice.wasm'],
   ['demo/resources/faust/organ.effect.wasm', 'resources/faust/organ.effect.wasm'],
   ['demo/resources/faust/mixer32.wasm', 'resources/faust/mixer32.wasm'],
   ['demo/resources/faust/PROVENANCE.json', 'resources/faust/PROVENANCE.json'],
-  // ⚠️ AND THE MONO SINE OF THE FRONT PAGE'S `synths` DECK, 2026-10-06, from
-  // `demo/shell/synth-steps.mjs` by the same script, fetched by
-  // `demo/shell/slide-synth.mjs` on the first `Test tone` press of the
-  // unedited program. A mono program is one `.wasm` and no mixer. The four
-  // polyphonic steps that were listed here (osc2, env, filter, echo) and the
-  // first one (osc) left the deck the same day.
-  // 🔴 READ OFF `SYNTH_STEPS`, NOT TYPED, SINCE 2026-10-06: the filter and LFO
-  // slides shipped with their `.json` and `.wasm` missing from a hand list
-  // here, so both 404'd on the edge while every local check was green (the
-  // dev server serves `demo/` itself). Reported as *"does no compile"*. A
-  // step is one `.wasm` and its `.json`, hidden ones too, so a step brought
-  // back plays at once.
+  // The synths deck's programs, read off SYNTH_STEPS, never typed: a hand list shipped 404s.
+  // why: lessons/workers-view.md#synth-steps
   ...SYNTH_STEPS.flatMap((st) => [`${st.id}.json`, `${st.id}.wasm`]
     .map((f) => [`demo/resources/faust/${f}`, `resources/faust/${f}`])),
 
-  // ── the Rhodes attribution for `/nola/` ───────────────────────────────────
-  //
-  // ⚠️ LISTED BY NAME FOR THE FIFTH TIME AND FOR THE SAME REASON: `demoFiles()`
-  // filters to web extensions and a licence file has none. The 65 `rhodes-*.m4a`
-  // it names ARE enumerated, because `.m4a` is on that list and they are flat in
-  // `demo/nola/` rather than in a subdirectory, which is the whole reason they
-  // are flat. `PROVENANCE-rhodes.json` rides along the same way.
-  //
-  // 🔴 AND IT IS NOT OPTIONAL PAPERWORK. The samples are Jeff Learman's 1977
-  // Rhodes under CC BY-NC-SA 4.0, and attribution is a condition of serving them
-  // at all. A deploy that shipped the audio and declined the credit would be
-  // shipping the one file that makes the other 65 allowed.
+  // The Rhodes samples are CC BY-NC-SA 4.0, so the attribution file is a condition of serving them.
+  // why: lessons/workers-view.md#rhodes
   ['demo/nola/LICENSE-jrhodes3d', 'nola/LICENSE-jrhodes3d'],
 
   ...extraPages(),
-  // 🔴 THE FRONT PAGE IS demo/index.html, COPIED AS IT IS, SINCE 2026-10-13
-  // (*"move concepts to frontpage"*): the concepts index with THE HERO, LARGE on
-  // top. Until then this file baked the manifest's groups into menu.html, and
-  // demo/index.html was a second renderer of the same rows for the dev server.
-  // Both are in archive/frontpage/. One page now, the same file on both ends.
+  // The front page is demo/index.html, copied as it is.
+  // why: lessons/workers-view.md#front
   ['demo/index.html', 'index.html'],
   ...demoFiles(),
   ...conceptFiles(),
   ...archiveFiles(),
 ];
 
-/**
- * Allowlist entries for every BUILT demo, generated from demo/manifest.mjs so
- * the list stops being hand-maintained (plans/plan-demos.md, order of work step 8).
- *
- * This reads a directory, which the rule above forbids — but the rule exists
- * because the REPO ROOT holds .env. Enumeration here is confined to
- * demo/<nn>-<name>/ and filtered to web extensions, so there is no path by
- * which a secret enters public/.
- */
+// Allowlist entries for every built demo, from demo/manifest.mjs. Enumeration is confined to demo
+// folders and filtered to web extensions, so no secret can enter public/.
+// why: lessons/workers-view.md#demo-files
 function routeVectorFiles() {
   let names = [];
   try { names = readdirSync(join(REPO, 'demo/shell/route-vectors')); } catch { return []; }
@@ -534,11 +246,9 @@ function routeVectorFiles() {
 // enumerated folder, and checkImports() refuses a deployed module importing one.
 function isTest(name) { return name.endsWith('-test.mjs') || name === 'run-tests.mjs'; }
 
-/**
- * Every web file in demo/shell that git tracks, deployed flat at /shell/. An
- * untracked scratch file cannot ship; a page that needs one fails checkImports().
- * Without git it falls back to the directory listing and says so on stderr.
- */
+// Every git-tracked web file in demo/shell, flat at /shell/; untracked files cannot ship.
+// Without git it falls back to the directory listing and says so on stderr.
+// why: lessons/workers-view.md#shell-files
 function shellFiles() {
   const OK = new Set(['.mjs', '.js', '.css']);
   let names;
@@ -558,21 +268,9 @@ function shellFiles() {
     .map((n) => [`demo/shell/${n}`, `shell/${n}`]);
 }
 
-/**
- * Refuse to ship a demo whose /shell/… or ./… import has no file in public/.
- *
- * This is the check that would have caught the 404 above before it went out:
- * the page imported /shell/moq.mjs, the copy list did not carry it, and
- * nothing complained until a browser asked for it on the live site.
- *
- * IT SCANS MODULES, NOT JUST PAGES, and it did not always. While it read HTML
- * only, `demo/shell/moq.mjs` went on importing `/08-moq/moq-vendor.js` for the
- * whole life of the slug rename — a 404 that killed the module, so `moq` and
- * `ladder` never reached `__demo.ready` and asserted NOTHING. Both read as red
- * for a plausible wrong reason (no relay on this network) and stayed that way.
- * A page is not the only thing that can import; the check has to follow the
- * imports wherever they live.
- */
+// Refuse a demo or module whose /shell/ or ./ import has no file in public/. It scans modules too,
+// since a module importing a moved path kills every page that loads it.
+// why: lessons/workers-view.md#check-imports
 function checkImports(copied) {
   const have = new Set(copied.map(([, dst]) => dst));
   const missing = [];
@@ -582,17 +280,10 @@ function checkImports(copied) {
     let text = '';
     try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
     const dir = dirname(dst);
-    // ⚠️ `[^'"\n]`, AND THE NEWLINE IS THE PART THAT WAS MISSING. Without it
-    // the `import…` alternative runs across line breaks, so any IDENTIFIER
-    // containing the word — `importMs` — swallowed everything up to the next
-    // quoted string and reported `grains/engine.mjs imports /status.reply`
-    // about an OSC address in a comparison twelve lines below it. It refused a
-    // build over two things that are not imports, and `demo/patch/engine.mjs`
-    // had the same variable and passed only because the string that followed it
-    // happened to be a real deployed path. A guard that can refuse for a reason
-    // that is not true teaches people to edit the guard.
-    // A multi-line `import { … } from '…'` is still caught: its specifier
-    // follows `from`, which is the second alternative.
+    // `[^'"\n]` keeps the `import` alternative on one line, or `importMs` matches into a later
+    // string.
+    // A multi-line import is still caught through `from`.
+    // why: lessons/workers-view.md#import-regex
     for (const m of text.matchAll(/(?:import[^'"\n]*?|from\s*)['"](\.\/[^'"]+|\/[^'"]+)['"]/g)) {
       const spec = m[1];
       if (isTest(spec.split('?')[0])) { missing.push(`${dst} imports ${spec}, a unit test, which is never deployed`); continue; }
@@ -619,25 +310,9 @@ function checkImports(copied) {
 
 function demoFiles() {
   const out = [];
-  // ⚠️ MEDIA TOO. This was code and stylesheets only, so a demo that carries a
-  // sound file shipped the page and not the sound — a 404 the page cannot
-  // recover from and the build had no reason to mention. `dust` carries two
-  // 1965 excerpts; the allowlist is still an allowlist, because this directory
-  // is the wall that keeps `enumerate, don't list` away from the repo root.
-  // 🔴 `.webmanifest` IS ON THIS LIST BECAUSE LEAVING IT OFF SHIPPED A 404 TO
-  // PRODUCTION. `/items/` renamed `manifest.json` to `manifest.webmanifest` to
-  // get the spec content type, the build silently declined to copy it, and the
-  // deploy went out with `<link rel="manifest">` pointing at nothing — the one
-  // file an iPhone reads to decide whether a page may be installed at all.
-  // ⚠️ AN ALLOWLIST FAILS SILENTLY BY DESIGN, which is the point of it; what
-  // was missing is that nothing ASKED whether every local URL in a page has a
-  // file behind it. `checkImports()` does that for modules only.
-  // 🔴 `.mp4` ADDED 2026-09-18 FOR THE SAME REASON `.m4a` IS HERE, AND IT
-  // FAILED IN THE SAME SILENT WAY FIRST. `/stage/` gained a public domain film
-  // as its default background; the build copied the film's provenance JSON
-  // beside it and declined the film, so the page would have shipped with a
-  // `<video>` pointing at a 404 and the build would have said `copied 182
-  // files` about it. That is the `.webmanifest` story again, third time.
+  // Media too, or a page ships without its sound. `.webmanifest` and `.mp4` are here because an
+  // allowlist that declines silently shipped 404s for both.
+  // why: lessons/workers-view.md#web-ext
   const OK = new Set(['.html', '.mjs', '.js', '.css', '.json', '.webmanifest',
                       '.m4a', '.mp3', '.opus', '.ogg', '.wav', '.webm',
                       '.mp4', '.m4v',
@@ -657,30 +332,9 @@ function demoFiles() {
   return out;
 }
 
-/**
- * The concept pages, deployed WHOLE, one folder per group: demo/<group>/ at
- * /<group>/, each page at /<group>/<slug>/, with no manifest row. Asked
- * 2026-10-09 as `demo/concepts/` at /concepts/<n>/; moved to the front page and
- * to /<group>/<slug>/ on 2026-10-13 (*"move concepts to frontpage ... rename
- * all with group/slug, rm numbers"*). The folders are CONCEPT_DIRS in
- * demo/shell/concept-list.mjs.
- *
- * ⚠️ A RULE AND NOT ROWS, ON PURPOSE. A manifest row is also a subject for
- * `demo/verify.mjs`, which grades every `built` row, `unlisted` or not, and
- * these pages publish nothing for it to grade beyond the shell's own. And a
- * row per page means a new page deploys only after somebody remembers to add
- * one. This walks the folders, so a new page ships on the next build.
- * ⚠️ SAME CONTAINMENT AS demoFiles(): named subtrees, filtered to the same web
- * extensions, so nothing from the repo root can reach public/.
- * 🔴 AND IT REFUSES A FOLDER THAT WOULD TAKE OVER A STILL-SERVED ADDRESS. A
- * concept group is a top-level path now, beside every demo slug. For one
- * afternoon the radio concepts were /stations/ because the archived radio demo
- * still answered at /radio/; asked *"Resolve clashes"*, the demo moved to
- * /archive/radio/ (manifest row `archive/radio`) and the group took /radio/. A demo slug, a manifest page path, or a top-level destination
- * of the hand list above, under the same name as a concept folder, stops the
- * build here, as does a row whose folder is not in CONCEPT_DIRS (it would not
- * be copied and its card would 404).
- */
+// Concept folders deployed whole at /<group>/, by rule rather than rows, so a new page ships on the
+// next build. Refuses a folder that would take over a served address, or a row not in CONCEPT_DIRS.
+// why: lessons/workers-view.md#concept-files
 function conceptFiles() {
   const taken = new Set(DEMO_MANIFEST.flatMap((d) => [d.name.split('/')[0],
     ...(d.page ? [d.page.split('/').filter(Boolean)[0]] : [])]));
@@ -710,24 +364,13 @@ function conceptFiles() {
   return CONCEPT_DIRS.flatMap((g) => walk(`demo/${g}`));
 }
 
-/**
- * `/archive/`, 2026-10-12 (*"make "/arhive" page and move csound and tutotial
- * slide there"*): `demo/archive/` deployed whole at /archive/, as conceptFiles()
- * does for the concept folders, with no manifest row. Beside it the markdown notes that
- * describe removed pages, `archive/typist.md` and `archive/concepts/*.md`,
- * deployed at their repository paths so the dev server (which serves the repo
- * root) and the deploy answer the same URL. `_headers` below serves them as
- * plain text. Only `.md`, from those two places, so nothing else in archive/
- * (old pages, captures) reaches public/.
- */
+// demo/archive/ at /archive/, plus archive/typist.md and archive/concepts/*.md at their repo
+// paths, served as plain text. Only `.md` from those two places.
+// why: lessons/workers-view.md#archive-files
 function archiveFiles() {
   const out = [];
-  // One level of subdirectories as well, for a retired page kept whole
-  // (`demo/archive/clock-follow/`, the old concepts clock/040, moved there
-  // 2026-10-12 when the clock pages were renumbered).
-  // A folder a manifest row owns (`archive/radio`, the archived radio demo, since
-  // 2026-10-13) is copied by demoFiles() with its media, so it is skipped here:
-  // copying it twice is a duplicate destination and the build refuses it.
+  // One level of subdirectories too; a folder a manifest row owns is skipped (demoFiles copies it).
+  // why: lessons/workers-view.md#archive-subdirs
   const owned = new Set(DEMO_MANIFEST.filter((d) => d.name.startsWith('archive/')).map((d) => d.name.slice(8)));
   const walk = (rel) => {
     for (const e of readdirSync(join(REPO, 'demo/archive', rel), { withFileTypes: true })) {
@@ -744,21 +387,9 @@ function archiveFiles() {
   return out;
 }
 
-// ── deployed-copy rewrites ──────────────────────────────────────────────────
-// The ONLY edits made to any proto's bytes, applied to the COPY in public/.
-// The files in proto/ are not touched. Each one exists because the source
-// hardcodes a dev-server localhost URL that cannot resolve from a phone.
-// ── appended to the deployed copy ───────────────────────────────────────────
-// A BACK LINK for the archive pages, which predate the index and have no way
-// to reach it — on a phone the only exit is the browser gesture.
-//
-// APPENDED rather than substituted, deliberately: the first attempt used
-// REWRITES with "</html>" as the anchor and build.mjs correctly refused,
-// because proto/megatimeline/index.html has no closing tag. A position:fixed
-// anchor works wherever it lands in the body, so it needs no anchor at all.
-//
-// Deployed copy only: under each proto's own dev server "/" is the repo root,
-// not the index, so the link would point at nothing there.
+// Edits to deployed copies only, never to proto/. A back link is appended (no anchor needed), for
+// archive pages with no other way back; under a proto's own server it would point nowhere.
+// why: lessons/workers-view.md#rewrites
 const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:99999;'
   + 'font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;'
   + 'color:#ffd400;background:#0b0e14cc;border:1px solid #2b3546;border-radius:4px;'
@@ -767,16 +398,8 @@ const BACK = '<a href="/" style="position:fixed;left:8px;bottom:8px;z-index:9999
 const APPEND = {
   'proto/deck/index.html': BACK,
 };
-/**
- * A digest of the bytes about to be copied — four hex, enough to tell two
- * trees apart and short enough to read off a phone.
- *
- * ⚠️ TOLERATE AN UNREADABLE FILE RATHER THAN THROWING HERE. `checkPresent()` is
- * what reports a missing file — by name, with the build refused and nothing
- * deleted — and it runs a few hundred lines below this. An ENOENT thrown out of
- * the stamp would pre-empt it with a stack trace, which is exactly the raw
- * failure that check exists to replace.
- */
+// Four hex of the bytes to copy. Tolerates an unreadable file so checkPresent reports it by name.
+// why: lessons/workers-view.md#tree-digest
 const treeDigest = () => {
   const h = createHash('sha256');
   for (const [src] of FILES) {
@@ -786,17 +409,9 @@ const treeDigest = () => {
   return h.digest('hex').slice(0, 4);
 };
 
-// A build id the browser can report back. git sha + build time + the tree.
-//
-// ⚠️ THE SHA AND THE CLOCK ARE EACH INSUFFICIENT, FOR DIFFERENT REASONS. The
-// sha alone is not enough because an uncommitted edit deploys under the
-// previous one — which is why the time was added. But a time says WHEN, never
-// WHOSE: two working trees at one sha, built seconds apart by two agents, then
-// differ by a number that looks like a clock and carries nothing about which
-// tree shipped. `Attribute a run to a build before iterating on it` quietly
-// stops working there, because the stamp DID change and it is the wrong
-// build's. The digest is over the bytes themselves, so two identical trees
-// stamp identically and two different ones cannot.
+// Build id: git sha, build time and a digest of the tree, since the sha misses uncommitted edits
+// and a time says when but not whose.
+// why: lessons/workers-view.md#stamp
 const BUILD_STAMP = `${execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim()}`
   + `-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}`
   + `-${treeDigest()}`;
@@ -806,15 +421,8 @@ const REWRITES = {
     [`export const BUILD = 'dev';`, `export const BUILD = '${BUILD_STAMP}';`],
   ],
   'proto/flipper/index.html': [
-    // flipper has NO viewport meta. research/mobile-2026-08.md §3 lists exactly
-    // this bug — "the single biggest bug on three of the four public surfaces"
-    // — and fixed it in megatimeline, remixer, aikajana and replay. flipper
-    // was not in that pass, so it still lays out at 980 px and a phone renders
-    // it shrunk to ~40%. Measured at a true 390 px layout it is already fluid:
-    // 0 px horizontal overflow, tiles and HUD intact, three live streams
-    // playing. So the deployed copy gets the same one line the other three
-    // carry, verbatim. proto/flipper/index.html itself is NOT modified — the
-    // missing meta is a real gap in that proto and belongs in its own commit.
+    // flipper has no viewport meta, so its deployed copy gets the same one line the others carry.
+    // why: lessons/workers-view.md#flipper-viewport
     ['<meta charset="utf-8">',
       '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'],
   ],
@@ -833,28 +441,10 @@ async function queryHash(queryParams) {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
 }
 
-// ── the icons: p.s, drawn here with no browser ─────────────────────────────
-//
-// 🔴 p.s SINCE 2026-10-14, REPLACING β+. The owner said yes to the trials on
-// /kit/logo/#p-s (`PS_ICONS` in demo/kit/logo/index.html), and these are those
-// trials made here, the way the avatars below are: SVG text through resvg
-// (`renderPng`), centred on resvg's own ink box (`inkBox`). The mark is the
-// mono face at 600, tracked -0.12 em, the dot in the accent #ffd400, on
-// #0b0e14, clipped to the shape the trial names: `square` is a 0.18 radius,
-// `ios` 0.225, `circle` a circle. `ps` has no dot (two pixels at 16) and keeps
-// the face's own spacing, as `drawPs` does.
-//
-//   /favicon.ico                    16 ps, 32 p.s, 48 p.s, one ICO, never renamed
-//   /icons/apple-touch-<hash>.png   180, ios
-//   /icons/android-<hash>.png       192, circle, in the manifest
-//   /icons/store-<hash>.png         512, ios, in the manifest
-//   /icons/manifest-<hash>.webmanifest
-//
-// ⚠️ demo/favicon.ico IS THE DEV SERVER'S COPY, AND ONLY THAT. demo/server.mjs
-// serves files off disk and has no build step, so a page on :8890 asking for
-// /favicon.ico needs a file there (a 404 has turned harnesses red before, see
-// demo/partitur/index.html). The build never reads it: it compares, and says
-// so when the two differ.
+// The p.s icons, drawn here with resvg and no browser: mono 600, -0.12 em, accent dot, on #0b0e14.
+// /favicon.ico (16/32/48), hashed apple-touch, android, store and manifest under /icons/.
+// demo/favicon.ico is only the dev server's copy; the build compares and says when they differ.
+// why: lessons/workers-view.md#icons
 const PS_ICON_SPECS = {
   favicon16: [16, 'square', 0.86, 'ps'],
   favicon32: [32, 'square', 0.86, 'p.s'],
@@ -920,20 +510,8 @@ async function psIcons() {
   };
 }
 
-// ── run ─────────────────────────────────────────────────────────────────────
-//
-// 🔴 EVERY REFUSAL FIRST, BEFORE ONE BYTE IS WRITTEN OR DELETED — AND THAT WAS
-// NOT TRUE UNTIL 2026-09-14, WHILE `checkPresent`'S OWN COMMENT SAID IT WAS.
-// All four calls sat BELOW the copy loop, so a listed file that was not on disk
-// did not produce the named refusal this file goes to such trouble to write: it
-// produced a raw `ENOENT` from `copyFile` in the middle of the run, on top of
-// an `OUT` that had already been emptied — a half-built output directory and a
-// stack trace, which is the exact failure the comment claimed was prevented.
-// MEASURED by moving `scsynth-nrt.wasm` aside and watching it happen.
-//
-// The checks read FILES and the repo, never OUT, so there was never a reason
-// for them to be down there. Function declarations hoist; the calls moved and
-// nothing else did.
+// Every refusal runs before one byte is written or deleted; the checks read FILES, never OUT.
+// why: lessons/workers-view.md#refusals
 checkImports(FILES);
 checkPresent(FILES);
 checkVendorUrls(FILES);
@@ -941,9 +519,8 @@ checkCompiledDefs();
 await checkFaustAot();
 checkOut(OUT);
 
-// ⚠️ SAY WHICH BUILD THIS IS, BEFORE IT RUNS AND AGAIN AFTER. A scratch build
-// that is mistaken for a real one is a deploy nobody made; a real one mistaken
-// for a scratch build is sixty files somebody has to explain.
+// Say which build this is, before and after.
+// why: lessons/workers-view.md#which
 console.log(SCRATCH ? `SCRATCH BUILD -> ${OUT} (public/ untouched)` : `build -> ${OUT}`);
 console.log(`stamp ${BUILD_STAMP}`);
 
@@ -952,17 +529,12 @@ if (!SCRATCH) takeBuildLock('BUILD');
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
-// 🔴 NO GENERATED FRONT PAGE SINCE 2026-10-13. This block baked the manifest's
-// groups (`byGroup`, `groupHTML`, `noteHTML`) into workers/view/menu.html at
-// public/index.html. The front page is demo/index.html now, copied by the list
-// above like any other page, and menu.html is archive/frontpage/menu.html.
+// The front page is demo/index.html, copied by the list above.
+// why: lessons/workers-view.md#front-page
 
-// favicon.ico, generated here. Browsers request /favicon.ico for every page
-// whether or not the HTML asks for one; without this the four protos (which
-// declare no icon, and three of which we must not edit) each log a 404 to the
-// console, and "zero console errors" stops being true. The apple touch icon and
-// the manifest are written beside it under /icons/, hashed, and named in every
-// page by `withIconLinks` below.
+// Browsers ask /favicon.ico for every page, so it is generated here; icons and the manifest are
+// hashed under /icons/ and named in every page by `withIconLinks`.
+// why: lessons/workers-view.md#favicon
 const ICONS = await psIcons();
 await writeFile(join(OUT, 'favicon.ico'), ICONS.ico);
 console.log(`  favicon /favicon.ico: p.s at 16 (ps), 32, 48, ${ICONS.ico.length} bytes`);
@@ -979,24 +551,10 @@ for (const [path, bytes, what] of ICONS.files) {
   console.log(`  icon ${path}: ${what}, ${bytes.length} bytes`);
 }
 
-// ── the share card, og/site-<hash>.png ───────────────────────────────────────
-//
-// 🔴 ONE CARD FOR EVERY PAGE FOR NOW, DRAWN WITH NO BROWSER, 2026-10-13. Asked:
-// *"Build frontpage og card and apply to all pages"*, then *"What headless
-// chrome?!!? See ../eccm etc"*, and since the same evening the hero's type
-// alone (*"No patchbay. Do like frontpage"*). The SVG is written by
-// share-card.mjs from HERO and the font metrics, and resvg (wasm, og/render.mjs)
-// rasterises it with the site's faces as TTFs (og/og-fonts.py). eccm and trip
-// render the same way at the EDGE, on the first fetch, because their cards come
-// from a database; here every input is in the repository at build, so the PNG
-// is a static asset like the favicon and costs no Worker, no R2 and no wasm in
-// the deployed bundle.
-// ⚠️ THE NAME CARRIES A HASH OF THE SVG AND TEMPLATE_V, because scrapers cache
-// a preview by URL: a changed card is a new URL, and an old one is a 404 after
-// the next deploy, which is fine for a scraper that already holds its bytes.
-// ⚠️ AND THE INSTAGRAM PORTRAIT BESIDE IT, 1080 BY 1350 (*"Do also ig image"*),
-// which no page names: Instagram reads no Open Graph, it is posted by hand and
-// downloaded from /kit/share/.
+// One share card for every page, no browser: share-card.mjs SVG through resvg with the site's TTFs.
+// The name hashes the SVG and TEMPLATE_V, since scrapers cache by URL. Instagram portrait
+// 1080x1350.
+// why: lessons/workers-view.md#share-card
 const CARD = siteCard();
 await mkdir(join(OUT, 'og'), { recursive: true });
 for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['instagram hello', helloCard()]]) {
@@ -1006,15 +564,9 @@ for (const [what, c] of [['share card', CARD], ['instagram card', igCard()], ['i
   console.log(`  ${what} ${c.path}: ${c.width}x${c.height}, ${png.length} bytes, ${(performance.now() - t0).toFixed(0)} ms`);
 }
 
-// 🔴 THE INSTAGRAM AVATAR AS A FILE, 2026-10-13: *"deploy. links to ig first
-// post and avatar in positron.studio"*. /kit/logo/'s P.S AVATARS draws it on a
-// canvas for a download; this is the same mark made here, with no browser, so
-// it has a URL: p.s in the mono face at 600, tracked -0.12 em, the dot in the
-// accent, its ink 0.56 of the width and centred on resvg's own ink box, on a
-// full 320 square that Instagram crops to a circle.
-// GitHub (460, square, ink 0.62) and YouTube (800, cropped to a circle, ink
-// 0.56) joined it 2026-10-14 (*"do profile images for gh and yt"*), at
-// /kit/logo/'s upload sizes and fills.
+// Profile images (Instagram 320, GitHub 460, YouTube 800): p.s in the mono at 600, centred on
+// resvg's ink box, at /kit/logo/'s upload sizes and fills.
+// why: lessons/workers-view.md#avatars
 for (const [NET, S, FILL] of [['instagram', 320, 0.56], ['github', 460, 0.62], ['youtube', 800, 0.56]]) {
   const mark = (size, dx = 0, dy = 0) => `<text x="${dx.toFixed(2)}" y="${dy.toFixed(2)}" font-family="'Brand JetBrains Mono', 'JetBrains Mono', monospace" font-weight="600" font-size="${size.toFixed(2)}" letter-spacing="${(-0.12 * size).toFixed(2)}" fill="#e6e6e6">p<tspan fill="#ffd400">.</tspan>s</text>`;
   const wrap = (body, bg) => `<svg xmlns="http://www.w3.org/2000/svg" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">${bg ? `<rect width="${S}" height="${S}" fill="#0b0e14"/>` : ''}${body}</svg>`;
@@ -1029,45 +581,17 @@ for (const [NET, S, FILL] of [['instagram', 320, 0.56], ['github', 460, 0.62], [
   console.log(`  ${NET} avatar ${path}: ${S}x${S}, ${png.length} bytes`);
 }
 
-// ── _headers — the half of the noindex that the Worker cannot reach ──────────
-//
-// 🔴 STATIC ASSETS ARE SERVED BY THE EDGE BEFORE THE WORKER RUNS. `src/index.js`
-// wraps every response IT returns in `X-Robots-Tag`, and that covers `/api/*`,
-// `/err-img`, `/icy/*`, `/report`, `/notes/<slug>` and the 404. It covers none
-// of the fifty pages, none of the modules and none of the committed cache,
-// because for those the Worker is never invoked at all. This file is what
-// covers them, and the two must keep saying the same thing.
-//
-// ⚠️ `_headers` IS A CONFIG FILE, NOT AN ASSET. Cloudflare reads it at upload
-// and does not serve it, so this does not put a file at /_headers. `/*` matches
-// every path on every hostname this Worker answers, which includes the
-// `workers.dev` name that `workers_dev: true` keeps alive.
-//
-// To turn indexing back on when the site IS ready: delete this block, delete
-// `NOINDEX`/`marked()`/`ROBOTS` from src/index.js, and drop the meta pass in
-// the copy loop below. Nothing else knows about any of it.
-// The second block serves archiveFiles()'s markdown notes as plain text, so a
-// browser shows them rather than offering a download.
-// The third serves the share card for a year: its name changes when it does.
+// _headers: assets skip the Worker, so this carries X-Robots-Tag for them. It is config, not an
+// asset. Also: archive notes as text/plain, the share card cached a year.
+// why: lessons/workers-view.md#headers
 await writeFile(join(OUT, '_headers'), '/*\n  X-Robots-Tag: noindex, nofollow\n'
   + '/archive/*.md\n  Content-Type: text/plain; charset=utf-8\n'
   + '/og/*\n  Cache-Control: public, max-age=31536000, immutable\n'
   + '/icons/*\n  Cache-Control: public, max-age=31536000, immutable\n');
 
-// ── the noindex meta, on every page, whoever wrote the page ─────────────────
-//
-// The header above is the control that actually works. This is the second
-// channel, and it exists because a header is invisible in the file: somebody
-// reading a page's source should be able to see that it is not meant to be
-// found. 45 of the 50 pages already carried it when this landed.
-//
-// ⚠️ IT PATCHES THE DEPLOYED COPY ONLY, which is the same treatment
-// `proto/flipper/index.html` already gets for its missing viewport, and for the
-// same reason: three of the four protos must not be edited. A page in demo/
-// should carry the tag in its own source, and this is the net under it.
-// ⚠️ AND IT SAYS HOW MANY IT CAUGHT. A build step that silently repairs pages
-// cannot be told apart from one that has nothing to repair, so the count is
-// printed: if it ever rises, a new page shipped without the tag.
+// The noindex meta on every deployed page, so a page's source shows it; counted, so a rise means
+// a page shipped without the tag.
+// why: lessons/workers-view.md#robots-meta
 const ROBOTS_META = '<meta name="robots" content="noindex, nofollow">';
 const CHARSET = '<meta charset="utf-8">';
 const patched = [];
@@ -1083,17 +607,9 @@ function withRobotsMeta(src, text) {
     : `${ROBOTS_META}\n${text}`;
 }
 
-// ── the share tags, on every page ───────────────────────────────────────────
-//
-// Open Graph and the X card, written into the deployed copy of every page next
-// to the robots meta, because a link preview bot reads the HTML the edge serves
-// and runs no script (so `mount()` cannot be where they come from). The tag set
-// is eccm's and trip's. Title and description per page, from what already
-// names it: a concept page's CONCEPTS row (`title`, `say`), a demo's manifest
-// row (`title` or its name, the card's `say` or the row's `one`), the front page
-// from HERO, and anything else from its own <title>. The image is the one site
-// card for every page. A page that carries its own og:image keeps it, and the
-// count is printed, as for the robots meta.
+// Open Graph and X card tags in every deployed page (bots run no script), titled from the
+// CONCEPTS row, the manifest row, HERO or <title>. A page's own og:image is kept; counted.
+// why: lessons/workers-view.md#share-tags
 const SHARE = new Map();
 for (const c of CONCEPTS) SHARE.set(`${c.id}/index.html`, { title: c.title, description: c.say });
 for (const d of DEMO_MANIFEST) {
@@ -1178,22 +694,9 @@ console.log(`  share tags written into ${shared.length} page(s), every one namin
 // Same spirit as the duplicate-destination guard above, for the other silent
 // break: an import with nothing deployed behind it.
 
-/**
- * 🔴 REFUSE THE BUILD IF A LISTED FILE IS NOT THERE.
- *
- * `checkImports` catches a MODULE that imports something undeployed. It cannot
- * catch a BINARY, because a binary is not imported — it is fetched by URL, and
- * a URL is just a string to every check in this file. So a vendored asset that
- * was renamed, or never committed, would copy-fail somewhere in the middle of
- * the run with a raw ENOENT, or — worse, if the list were edited but the file
- * left behind — ship a 404 that only a headset would ever meet.
- *
- * That is `moq.mjs` again: a module holding a path that moved. The controller
- * models live under `shell/vendor/` precisely because the module that wants
- * them is shared, so this check is what makes that safe. It runs BEFORE
- * anything is copied, so a missing file is a refusal rather than a half-built
- * output directory.
- */
+// Refuse the build if a listed file is missing: binaries are fetched by URL, not imported.
+// Runs before anything is copied.
+// why: lessons/workers-view.md#check-present
 function checkPresent(copied) {
   const gone = copied.filter(([src]) => !existsSync(join(REPO, src))).map(([src]) => src);
   if (gone.length) {
@@ -1203,23 +706,9 @@ function checkPresent(copied) {
   }
 }
 
-/**
- * 🔴 REFUSE AN `--out` THAT WOULD DELETE SOMETHING THIS BUILD DID NOT WRITE.
- *
- * The run section empties OUT with `rm -rf`. For `public/` that is correct and
- * has been for a year. For a directory somebody typed on the command line it is
- * a loaded gun pointed at whatever they mistyped — and the whole point of
- * `--out` is that it gets typed, often, by people and agents in a hurry.
- *
- * So three refusals, in rising order of how bad the mistake would be: never the
- * repo or anything containing it; never a directory that has files in it which
- * this build did not put there. A build output is recognisable — it always has
- * `index.html` and `favicon.ico`, both of which this file authors itself — so
- * "did we write this?" is answerable without keeping a marker file around.
- *
- * ⚠️ An EMPTY or ABSENT directory is fine and is the common case: `--out` into
- * a fresh temp dir is the whole intended use.
- */
+// Refuse an `--out` that is the repo, contains it, or holds files this build did not write
+// (an output always has index.html and favicon.ico). Empty or absent is fine.
+// why: lessons/workers-view.md#check-out
 function checkOut(out) {
   const refuse = (why) => {
     console.error(`\nBUILD REFUSED — --out ${out}:`);
@@ -1238,21 +727,9 @@ function checkOut(out) {
   }
 }
 
-/**
- * 🔴 AND REFUSE A `vendor/` URL IN THE SOURCE WITH NOTHING DEPLOYED BEHIND IT.
- *
- * The other half of the same hazard, from the other end: `xr-room.mjs` holds
- * the string `/shell/vendor/` and builds a filename from a profile id. If the
- * directory were renamed, `checkPresent` above would still pass — the files
- * exist, they are just somewhere else — and the module would 404 at runtime on
- * a headset, which is the most expensive place this repo has to find anything.
- *
- * So the literal paths in the source are checked too. Only fixed ones can be:
- * a name built from a runtime value cannot be known here, which is why the
- * runtime ALSO falls back to a drawn stand-in and says on the tablet's own face
- * which one you are looking at. Three guards, because this exact class of bug
- * has already cost two demos a day of reading red for the wrong reason.
- */
+// Refuse a literal vendor/ or defs/ URL in a source with nothing deployed behind it.
+// A name built at runtime cannot be checked, so the runtime also falls back and says so.
+// why: lessons/workers-view.md#check-vendor
 function checkVendorUrls(copied) {
   const have = new Set(copied.map(([, dst]) => dst));
   const bad = [];
@@ -1260,15 +737,12 @@ function checkVendorUrls(copied) {
     if (!['.html', '.mjs', '.js'].includes(extname(dst))) continue;
     let text = '';
     try { text = readFileSync(join(REPO, src), 'utf8'); } catch { continue; }
-    // ⚠️ `defs` AS WELL AS `vendor`, ADDED 2026-09-13. `/grains/` fetches two
-    // compiled SynthDefs from `/grains/defs/`. They are not vendored — they are
-    // build artefacts of the Raspberry Pi — but the hazard is identical: a
-    // string in the source, no import to follow, and a 404 at runtime that
-    // leaves the page booting for ever with nothing in the log.
+    // `defs` as well as `vendor`: compiled SynthDefs are fetched by URL the same way.
+    // why: lessons/workers-view.md#defs
     for (const m of text.matchAll(/['"`](\/[A-Za-z0-9_-]+\/(?:vendor|defs)\/[^'"`${}]*)['"`]/g)) {
       const rel = m[1].replace(/^\//, '');
-      // a bare directory prefix is a base that gets a filename appended at
-      // runtime — check the DIRECTORY has something in it
+      // A bare directory prefix gets a filename at runtime, so check the directory is non-empty.
+      // why: lessons/workers-view.md#dir
       const isDir = rel.endsWith('/');
       const ok = isDir ? [...have].some((h) => h.startsWith(rel)) : have.has(rel);
       if (!ok) bad.push(`${dst} points at ${m[1]}`);
@@ -1281,48 +755,9 @@ function checkVendorUrls(copied) {
   }
 }
 
-/**
- * 🔴 AND REFUSE A COMPILED SynthDef THAT NO LONGER MATCHES ITS SOURCE.
- *
- * `demo/grains/defs/*.scsyndef` are built by sclang ON THE BOARD out of
- * `rig/board/norns/Engine_Pappus.sc` and `PosSource.sc`. `/grains/` loads them
- * into wasm scsynth in the tab and claims, in its own first paragraph, that the
- * browser is running the graph the Raspberry Pi is running.
- *
- * That claim has one silent failure and this is it: somebody edits the engine,
- * the board recompiles on its next restart, and the checked-in artefact does
- * not — so the tab runs the OLD graph beside the board's new one and every
- * number on the page goes on agreeing, because both ends are still measured
- * the same way. Nothing 404s, nothing throws, and the page's whole subject is
- * quietly false.
- *
- * `PROVENANCE.json` records the md5 of every source and every artefact. This
- * re-takes both and refuses the build on any disagreement, with the recipe in
- * the message — the artefact cannot be rebuilt here, so the refusal has to say
- * where it is rebuilt.
- *
- * ⚠️ IT IS A HASH OF THE SOURCE, NOT OF THE COMPILER. A different sclang could
- * still produce different bytes from the same `.sc`; that is why the artefact's
- * own hash is checked too, so at least "the file in the repo is the file that
- * was weighed" is never in doubt.
- */
-/**
- * 🔴 EVERY AHEAD OF TIME PROGRAM MUST HAVE BEEN COMPILED FROM THE TEXT ITS PAGE
- * SHOWS, BY THE COMPILER THIS REPOSITORY VENDORS, WITH THE FLAGS IT USES: the
- * Organ `/fau/` shows, and since 2026-10-06 the program of the `synths` deck.
- * `checkCompiledDefs()`'s twin, and for the same reason: a stale artefact
- * plays the old instrument and nothing anywhere says so.
- *
- * `demo/resources/faust/PROVENANCE.json` records the md5 of each program's TEXT
- * (read out of `demo/fau/presets.mjs` or `demo/shell/synth-steps.mjs` by
- * importing it, the same module the page or the deck imports), the md5 of each compiler file, the flags, and the md5 of each
- * artefact. This re-takes all of them and refuses on any disagreement, with
- * the command that remakes them in the message.
- * ⚠️ IT DOES NOT COMPILE. A build must not boot a 6 MB compiler; the md5 of
- * the source and of the compiler files is what a recompile would depend on,
- * and `node demo/resources/build-faust-aot.mjs --check` is the full recompile,
- * byte for byte and by RMS.
- */
+// Refuse grains defs, or an AOT Faust program, whose source, compiler, flags or artefact md5
+// disagrees with its PROVENANCE.json. Neither compiles; a stale artefact plays the old instrument.
+// why: lessons/workers-view.md#faust-aot
 async function checkFaustAot() {
   const dir = 'demo/resources/faust';
   const remake = 'node demo/resources/build-faust-aot.mjs';
@@ -1340,8 +775,8 @@ async function checkFaustAot() {
   /* Where a recorded source is read from: the same two lists
      `build-faust-aot.mjs` compiles, by the same `<file>#<id>` key. */
   const LISTS = { 'demo/fau/presets.mjs': PRESETS, 'demo/shell/synth-steps.mjs': SYNTH_STEPS };
-  /* ⚠️ AND A PROGRAM THAT EXISTS AND WAS NEVER COMPILED IS STALE TOO: a step
-     added to the deck with no artefact would 404 on its first press. */
+  // A program that exists with no artefact is stale too: it would 404 on its first press.
+  // why: lessons/workers-view.md#never-compiled
   for (const s of SYNTH_STEPS) {
     if (!(`demo/shell/synth-steps.mjs#${s.id}` in (doc.sources || {}))) bad.push(`the deck step ${s.id} in demo/shell/synth-steps.mjs was never compiled`);
   }
@@ -1423,12 +858,8 @@ async function explode(jsonl, key2path) {
   return n;
 }
 
-// ⚠️ THE EXPLODED CACHES WENT WITH MEGATIMELINE. They turned its two committed
-// JSONL files into one static asset per entry, so a cache hit was a plain file
-// read and ERR was never called for a query already on disk. Nothing else ever
-// read them: the page that asked for `cache/search/…` and `cache/item/…` is the
-// page now in `archive/`. `explode()` and `queryHash()` are left in this file —
-// they are the mechanism, and the next proto with a committed cache wants them.
+// The exploded caches went with megatimeline; `explode()` and `queryHash()` stay as the mechanism.
+// why: lessons/workers-view.md#explode
 console.log('cache: nothing to explode — megatimeline is archived');
 // deploy.mjs uploads public/ only if it still matches this record, byte for byte.
 if (!SCRATCH) await writeBuildRecord(BUILD_STAMP);

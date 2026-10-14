@@ -1,10 +1,6 @@
-// demo/chrome.mjs: one headless Chrome for a harness, and the CDP socket to it.
-//
-// Every path out kills Chrome and removes its profile: close() on the normal
-// path, and an `exit` listener for the rest (an early process.exit, an uncaught
-// throw or rejection, and SIGINT, SIGTERM or SIGHUP, which are turned into an
-// exit here). why: lessons in CLAUDE.md "How a session is run", and
-// .claude/skills/positron-verify "Close every Chrome you start".
+// One headless Chrome for a harness and its CDP socket. Every path out kills Chrome and removes its
+// profile: close(), and an `exit` listener for the rest (signals become an exit here).
+// why: lessons/harness.md#chrome
 
 import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -26,19 +22,10 @@ function hookExit() {
   for (const [sig, code] of Object.entries(codes)) process.on(sig, () => process.exit(code));
 }
 
-/**
- * Start headless Chrome on a per-run profile and wait for its CDP endpoint.
- * The port is 0 and read back from the profile's DevToolsActivePort, never guessed.
- *
- * @param {object} o
- * @param {string} o.prefix  profile name prefix, `<prefix>-<pid>` under harness-profile's ROOT
- * @param {string[]} [o.args]  flags after the common five
- * @param {boolean} [o.clearCache]  remove the profile's HTTP cache before the spawn
- * @param {number} [o.tries]  polls of DevToolsActivePort
- * @param {number} [o.every]  ms between polls
- * @returns {Promise<{proc, port: number, wsUrl: string, profile: string, swept: number, close: () => Promise<void>}>}
- *   throws `chrome did not come up` after killing it and removing the profile.
- */
+// Headless Chrome on a per-run profile; the port is 0 and read back from DevToolsActivePort.
+// launchChrome({ prefix, args, clearCache, tries, every }) -> { proc, port, wsUrl, profile, swept,
+// close }. Throws `chrome did not come up` after killing it and removing the profile.
+// why: lessons/harness.md#launch
 export async function launchChrome({ prefix, args = [], clearCache = false, tries = 60, every = 250 } = {}) {
   hookExit();
   const claimed = claimProfile(prefix);
@@ -84,13 +71,9 @@ export async function launchChrome({ prefix, args = [], clearCache = false, trie
   return b;
 }
 
-/**
- * A CDP socket on the browser endpoint. Events go to every `on()` listener.
- * `page()` makes a blank target and returns a sender bound to its session,
- * because the browser endpoint has no Page domain.
- * @param {string} wsUrl
- * @param {{timeout?: number}} [o]  reject a call after this many ms; 0 waits for ever
- */
+// A CDP socket on the browser endpoint; `page()` makes a blank target and returns a session sender,
+// since the browser endpoint has no Page domain. connectCdp(wsUrl, { timeout }) (0 waits for ever).
+// why: lessons/harness.md#cdp
 export async function connectCdp(wsUrl, { timeout = 0 } = {}) {
   const ws = new WebSocket(wsUrl);
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });

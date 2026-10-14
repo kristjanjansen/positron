@@ -1,43 +1,14 @@
-// rig/board/video.mjs — the board draws a picture and sends it, as H.264.
-//
-// `rig/vis/v3dpipe` renders a generative shader headless on the VideoCore VI
-// (EGL surfaceless over GBM — see rig/vis/README.md for why that is the only
-// way in on a machine with no screen) and writes raw RGBA to stdout. ffmpeg's
-// `h264_v4l2m2m` encoder — the board's HARDWARE encoder on /dev/video11 — turns
-// that into an Annex-B byte stream, and this cuts the stream into one message
-// per frame.
-//
-// MEASURED, 30 s, alongside the running instruments: 29.6 fps at 1280x720 for
-// 18.6% user + 14.0% sys of 400%, 79 MB, zero audio dropouts, throttled=0x0.
-//
-// ⚠️ VIDEO GETS ITS OWN SOCKET, AND THAT IS FORCED BY A MEASUREMENT.
-// The relay's per-socket budget is `MSG_PER_SEC` 60 (workers/relay/src/index.js)
-// and the audio stream is already 50 a second — 48000/960. Thirty video frames
-// on the same socket would be 80 against a cap of 60, and the token bucket drops
-// the excess SILENTLY: no error, no close, no backpressure, counted only in the
-// relay's own /stats. So a picture sharing the audio socket would quietly cost a
-// quarter of both. A second socket has its own bucket and its own 512 KiB/s.
-//
-// ⚠️ AND IT KEEPS THE AUDIO FRAMING UNAMBIGUOUS. Every page in this project
-// treats an incoming binary frame as PCM. Putting H.264 on the same socket would
-// need a type byte in a header that is already deployed on both ends, or a magic
-// number that a 32-bit sequence counter can eventually collide with. A separate
-// room needs neither.
+// A shader rendered headless on the VideoCore (rig/vis/v3dpipe), encoded by h264_v4l2m2m,
+// one message per frame: 29.6 fps at 1280x720 for about a third of one core. Its own socket
+// and room: the audio socket is near the relay's cap, and binary frames there are PCM.
+// why: lessons/rig-board-io.md#video-header
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
-/**
- * The PIDs of every ffmpeg encoding video right now.
- *
- * ⚠️ MATCHED ON `rawvideo`, AND THAT IS DELIBERATE RATHER THAN LAZY. The board's
- * AUDIO capture is also an ffmpeg — `-f jack -i posboard` — so `pkill -x ffmpeg`
- * would take the instrument's sound with it. Only the video encoder reads raw
- * frames on stdin, so that is what tells them apart.
- *
- * ⚠️ And read with `ps` rather than `pgrep -f`: a `-f` pattern matches the
- * command line running the check and answers about ITSELF. LESSONS #39, twice
- * in one session.
- */
+// PIDs of ffmpeg encoding video, matched on `rawvideo` (the audio capture is also ffmpeg), read
+// with
+// `ps`, since `pgrep -f` matches itself.
+// why: lessons/rig-board-io.md#encoder-pids
 export function encoderPids() {
   try {
     const out = execFileSync('ps', ['-eo', 'pid,args', '--no-headers'], { encoding: 'utf8' });
@@ -48,17 +19,10 @@ export function encoderPids() {
   } catch { return []; }
 }
 
-/**
- * Kill encoders nobody owns.
- *
- * ⚠️ AN ORPHANED ENCODER BRICKS THE FEATURE UNTIL A REBOOT, and it survives a
- * restart of this service: systemd replaces the node process and nothing reaps
- * what it spawned, so the device stays held and every later `video.start`
- * refuses forever. board.mjs already sweeps orphans at startup for exactly this
- * reason — but only at startup, and an encoder can be orphaned at any time.
- * The caller decides it is safe: it calls this only when IT is not streaming,
- * in which case an encoder on this board is by definition garbage.
- */
+// Kill encoders nobody owns: an orphan holds /dev/video11 across a service restart. Called only
+// when
+// this process is not streaming.
+// why: lessons/rig-board-io.md#sweep-encoders
 export function sweepStrayEncoders(onLog) {
   const pids = encoderPids();
   for (const pid of pids) {
@@ -75,24 +39,10 @@ export function videoAvailable() {
   return existsSync(V3DPIPE) && existsSync('/dev/video11') && existsSync('/dev/dri/renderD128');
 }
 
-/**
- * Cut an Annex-B byte stream into one access unit per frame.
- *
- * ⚠️ THIS ENCODER PUTS SPS AND PPS BEFORE EVERY SINGLE FRAME, which is more
- * than "inline headers" and exactly what a lossy fan-out wants — a viewer who
- * joins mid-stream has the parameter sets the moment the next IDR arrives.
- * MEASURED on this board's stack (ffmpeg 7.1.5, kernel 6.18.34) over 150 frames
- * at -g 30: 150 SPS, 150 PPS, 5 IDR, pattern `7,8,5, 7,8,1, 7,8,1, …`. libx264
- * on the same input emits 5 and 5. There is an open upstream report that
- * `h264_v4l2m2m` omits inline parameter sets and is therefore unusable for live
- * streaming; it does not reproduce here, and that was checked because it would
- * have killed this file outright.
- *
- * So a new frame begins at each SPS. That is a property of this encoder rather
- * than of H.264, so the splitter falls back to cutting at any slice NAL when no
- * SPS has been seen — otherwise a stack that does NOT emit them would buffer the
- * entire stream into one enormous message and look like a hang.
- */
+// One access unit per frame. This encoder emits SPS and PPS before every frame (measured 150/150),
+// so
+// a frame starts at each SPS; with no SPS seen it cuts at any slice NAL rather than buffer forever.
+// why: lessons/rig-board-io.md#annexb
 export function createAnnexBSplitter(onUnit) {
   let buf = Buffer.alloc(0);
   let sawSps = false;
@@ -114,8 +64,8 @@ export function createAnnexBSplitter(onUnit) {
       const begins = type === 7 || (!sawSps && (type === 1 || type === 5));
       if (begins) cuts.push(s.at);
     }
-    // Emit every COMPLETE unit — everything between one cut and the next. The
-    // tail after the last cut is incomplete by definition and stays buffered.
+    // Emit complete units; the tail after the last cut stays buffered.
+    // why: lessons/rig-board-io.md#complete
     for (let i = 0; i + 1 < cuts.length; i++) {
       const unit = buf.subarray(cuts[i], cuts[i + 1]);
       let key = false;
@@ -132,35 +82,18 @@ export function createAnnexBSplitter(onUnit) {
   };
 }
 
-/**
- * Start rendering and encoding. `onFrame(bytes, key)` gets one access unit per
- * frame; `stop()` kills both processes.
- *
- * The bitrate default is 2 Mbit/s, which is not a taste: MEASURED Pi →
- * Cloudflare → laptop, 2 and 4 Mbit/s arrive byte-identical with zero gaps,
- * 5 passes despite nominally exceeding the cap, and 8 loses 28% of frames
- * silently. Design to 4 and measure; ship 2, which is 48% of one socket's byte
- * budget and leaves room for the keyframes to be six times the mean.
- */
+// onFrame(bytes, key) per access unit; stop() kills both. 2 Mbit/s: 2 and 4 arrive intact through
+// the
+// relay, 8 loses 28% silently.
+// why: lessons/rig-board-io.md#start-video
 export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
                              gop = 30, passes = 1, onFrame, onLog } = {}) {
   if (!videoAvailable()) {
     return { ok: false, reason: `no renderer at ${V3DPIPE} or no hardware encoder at /dev/video11` };
   }
-  // ⚠️ THE HARDWARE ENCODER IS A SINGLE EXCLUSIVE DEVICE. A second ffmpeg on
-  // /dev/video11 does not fail — it BLOCKS, forever, looking exactly like an
-  // encoder that produces no bytes. Stacking them is what wedged the device
-  // badly enough to need a reboot on 2026-09-11. Refuse instead, and say what
-  // is holding it.
-  //
-  // ⚠️ `pgrep -x`, NEVER `-f`: a `-f` pattern matches the very command line
-  // running the check, so it always answers "held" — including about itself.
-  // That is LESSONS #39, and it cost twenty minutes twice in one session.
-  // The caller only reaches here when it is NOT already streaming, so anything
-  // holding the device is an orphan — from a killed run, or from a restart of
-  // this service that left its child behind. Clear it rather than refusing
-  // forever: refusing was correct about the danger and wrong about the remedy,
-  // and it left the feature permanently unavailable with an accurate message.
+  // The encoder is exclusive and a second ffmpeg on it blocks forever; since this process is not
+  // streaming here, anything holding it is an orphan and is cleared. `pgrep -x`, never `-f`.
+  // why: lessons/rig-board-io.md#exclusive
   const swept = sweepStrayEncoders(onLog);
   if (swept) {
     onLog?.(`waiting for the device to come back after sweeping ${swept}`);
@@ -169,15 +102,9 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
   if (still > 0) {
     return { ok: false, reason: `${still} encoder process(es) still hold /dev/video11 and would not die — the device needs a reboot`, held: still };
   }
-  // 0 frames means FOREVER — see the comment in rig/vis/v3dpipe.c. It meant
-  // "render none and exit" until 2026-09-11, which left ffmpeg waiting on a
-  // pipe nothing would ever come down while every status said the picture was
-  // up.
-  // ⚠️ stdin IS A PIPE, not 'ignore': it is the renderer's control channel.
-  // stdout carries the pixels and stderr the timings, so a parameter has
-  // nowhere else to arrive — and the alternative, restarting with new argv,
-  // costs seconds and cycles the exclusive hardware encoder that wedged this
-  // board once already.
+  // 0 frames means forever. stdin is a pipe: the renderer's control channel (stdout pixels, stderr
+  // timings).
+  // why: lessons/rig-board-io.md#forever
   const render = spawn(V3DPIPE, [String(w), String(h), '0', String(passes)],
     { stdio: ['pipe', 'pipe', 'pipe'] });
   const enc = spawn('ffmpeg', [
@@ -185,21 +112,16 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-r', String(fps), '-i', '-',
     '-pix_fmt', 'yuv420p', '-c:v', 'h264_v4l2m2m',
     '-b:v', String(bitrate),
-    // ⚠️ A JOINER WAITS FOR AN IDR, and that is a GOP choice rather than a bug.
-    // At -g 30 and 30 fps that is up to one second of black for someone who has
-    // just opened the page. Shorter GOPs cost bitrate; this is the knob.
+    // A joiner waits for an IDR: up to one second at -g 30; shorter GOPs cost bitrate.
+    // why: lessons/rig-board-io.md#gop
     '-g', String(gop),
     '-f', 'h264', '-',
   ], { stdio: ['pipe', 'pipe', 'pipe'] });
   render.stdout.pipe(enc.stdin);
 
   let frames = 0, bytes = 0, keys = 0, biggest = 0;
-  // ⚠️ WHICH GPU DREW IT, CAPTURED FROM THE RENDERER'S OWN FIRST LINE. The page
-  // names the chip under its own picture; the streamed picture deserves the
-  // same, or one pane is attributed and the other is anonymous. And it must be
-  // READ rather than declared here: `v3dpipe` prints what EGL actually gave it,
-  // which is the difference between the real v3d driver and a software
-  // rasteriser that would quietly be twenty times slower.
+  // Which GPU drew it, read from the renderer's first line (a software rasteriser is 20x slower).
+  // why: lessons/rig-board-io.md#renderer
   let renderer = null;
   const split = createAnnexBSplitter((unit, key) => {
     if (unit === null) { onLog?.('the encoder produced no frame boundary in 4 MB — stopping rather than buffering'); return; }
@@ -208,19 +130,15 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     onFrame?.(unit, key);
   });
   enc.stdout.on('data', split);
-  // ⚠️ v3dpipe reports its own timing on STDERR, which is the only place the
-  // render rate is visible — its stdout is the pixels.
+  // v3dpipe reports timing on stderr; stdout is pixels.
+  // why: lessons/rig-board-io.md#stderr
   render.stderr?.on('data', (d) => {
     const t = String(d).trim();
     if (!t) return;
     const m = t.match(/^renderer\s+(.+?)\s\s/);
     if (m && !renderer) renderer = m[1].trim();
-    // 🔴 THE RENDERER'S VERDICT IS THE ONLY ONE WORTH REPORTING. Writing to a
-    // pipe succeeds whether or not the shader on the other end compiles, so
-    // `shader()` used to answer `ok: true` for a body the renderer then
-    // refused — a count of what was QUEUED reading identically to what
-    // LANDED, which is `createMidiLane.scheduled()` in a new costume. The
-    // caller waits for one of these lines instead.
+    // The renderer's SHADER-OK/LIVE/REFUSED line is the verdict; a pipe write succeeds regardless.
+    // why: lessons/rig-board-io.md#verdict
     for (const line of t.split('\n')) {
       if (/^SHADER-OK/.test(line)) pendingShader?.({ ok: true, detail: 'compiled, fading in' });
       else if (/^SHADER-REFUSED/.test(line)) pendingShader?.({ ok: false, reason: line.replace(/^SHADER-REFUSED\s*/, '').slice(0, 160) });
@@ -238,38 +156,24 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     });
   }
 
-  // What the picture is set to right now. Kept here rather than asked of the
-  // renderer, because it has no way to answer — a one-way channel means this
-  // end owns the truth, and a client reading it back is reading what was SENT.
+  // The picture's settings, owned here: the channel is one-way, so a reader reads what was sent.
+  // why: lessons/rig-board-io.md#params
   const params = { seg: 8, fb: 0.78, scale: 4, warp: 0.08, hue: 1 };
 
   return {
     ok: true, w, h, fps, bitrate, gop, passes,
     params: () => ({ ...params }),
-    /**
-     * A whole new picture, down the same channel.
-     *
-     * ⚠️ BASE64, BECAUSE THE CHANNEL IS ONE COMMAND PER LINE. GLSL has
-     * newlines; escaping them would be a small format nobody else implements,
-     * and base64 is already in both standard libraries.
-     *
-     * ⚠️ AND THE BODY CARRIES NO `#version` LINE. The board compiles as
-     * `310 es` and the browser as `300 es`, so the header belongs to each end
-     * and only the body travels. A body arriving with its own header would
-     * compile on exactly one of them.
-     *
-     * The renderer compiles it on its own thread and keeps the running picture
-     * if it will not build — it prints SHADER-OK, SHADER-LIVE or
-     * SHADER-REFUSED, which is what the caller hears back.
-     */
+    // A new shader body in base64 (one command per line), with no #version: the board compiles 310
+    // es,
+    // the browser 300 es. The renderer keeps the running picture if it does not build.
+    // why: lessons/rig-board-io.md#shader
     shader: async (body) => {
       if (typeof body !== 'string' || !body.length) return { ok: false, reason: 'no shader body' };
       if (body.length > 12000) return { ok: false, reason: `${body.length} bytes — larger than the channel takes` };
       if (/#version/.test(body)) return { ok: false, reason: 'send the body without a #version line — each end adds its own' };
       try {
-        // ⚠️ WAIT FOR THE COMPILER, NOT FOR THE PIPE. A write to stdin succeeds
-        // whatever the GLSL says; the answer that matters comes back on stderr
-        // one frame later. A second is generous — the board took 35 ms.
+        // Wait for the compiler's verdict on stderr (the board took 35 ms), up to a second.
+        // why: lessons/rig-board-io.md#wait-compiler
         const verdict = new Promise((res) => {
           pendingShader = (v) => { pendingShader = null; res(v); };
           setTimeout(() => { if (pendingShader) { pendingShader = null; res({ ok: false, reason: 'the renderer did not answer' }); } }, 1500);
@@ -291,14 +195,9 @@ export function startVideo({ w = 1280, h = 720, fps = 30, bitrate = 2_000_000,
     stop: () => {
       stopping = true;
       for (const p of [render, enc]) { try { p.kill('SIGTERM'); } catch { /* gone */ } }
-      // ⚠️ AND MAKE SURE, BECAUSE SIGTERM DID NOT. An ffmpeg holding
-      // /dev/video11 survived SIGTERM and kept the device for minutes, so every
-      // later `video.start` queued behind it and read from the outside as "the
-      // encoder produces no bytes". Six of them stacked up that way and the
-      // device ended up needing a REBOOT. The board had already recorded this
-      // exact lesson about an instrument: a graceful quit plus SIGTERM left the
-      // process alive for two minutes once, and SIGKILL after a grace period is
-      // the only guarantee. It was not applied here.
+      // SIGKILL after a grace period: an ffmpeg survived SIGTERM, held /dev/video11, and six
+      // stacked up.
+      // why: lessons/rig-board-io.md#sigkill
       setTimeout(() => {
         for (const p of [render, enc]) { try { p.kill('SIGKILL'); } catch { /* gone */ } }
       }, 800).unref?.();

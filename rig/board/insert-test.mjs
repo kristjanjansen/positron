@@ -1,67 +1,7 @@
-// rig/board/insert-test.mjs: the granulator a closed tab leaves behind, and the
-// board taking it out by itself.
-//
-// 🔴 WHY THIS FILE EXISTS AT ALL. An insert left in by a `/grains/` tab that
-// was simply CLOSED goes on wrapping whatever the next page plays and feeds its
-// own delay: MEASURED 2026-09-12, a steady -6.1 dBFS subsonic drone while
-// `board.alive` reported `voices: 0`, true about notes and false about sound.
-// Until 2026-09-16 the thing that cleared it was `/keys/` sending `fx.pappus
-// {on:false, onlyIfIdle:true}` on load. That message is gone, with the last of
-// the granulator on that page, so THE BOARD CLEANS UP AFTER ITSELF now. A
-// guarantee that used to depend on somebody opening a second page was never a
-// guarantee, because nobody had to open one.
-//
-// The guard lives on the board and the board is the only end that can be
-// graded: `/keys/` was `rig/board/listen.html`, retired 2026-09-17 to
-// `archive/keys/`. It was `built: false`, it published
-// no `__demo` and `demo/verify.mjs` cannot see it. A guard nothing can grade is
-// a guard that will rot, so this is the harness.
-//
-//   node rig/board/insert-test.mjs --room studio-1 --instrument <a JACK instrument>
-//
-// ⚠️ IT TOUCHES A SHARED INSTRUMENT and it says so: it switches the insert on
-// and off a few times and puts it back the way it found it. It needs an
-// instrument on the JACK graph, which `fx.pappus` refuses without — so it
-// starts one if nothing is playing and reports what it did.
-//
-// ⚠️ TWO IDENTITIES, NOT TWO SOCKETS OF CONVENIENCE. The whole mechanism turns
-// on `from` being per-connection: the board dates every client by when it last
-// sent ANY message, and "the tab was closed" is visible to it only as "that
-// `from` stopped talking". So the test opens TWO connections. One pretends to
-// be `/grains/` (asks for the insert and keeps polling, exactly as that page
-// does) and one pretends to be `/keys/` (which now sends nothing at all and only
-// watches). One socket doing both would pass vacuously, because a client is
-// never held off by its own claim.
-//
-// ── WHAT THIS PROVES, AND WHAT WOULD MAKE IT FAIL ───────────────────────────
-//
-//   1  the insert goes in when a page asks, and the board names the holder
-//   2  the five-second heartbeat carries it, so a page learns without asking
-//   3  NEGATIVE CONTROL: a live page KEEPS its insert past the board's window.
-//      A board that swept on a plain timer fails here, and it is the only case
-//      that can tell "cleans up after itself" from "drops it after 15 s".
-//   4  and a second page merely ARRIVING changes nothing. `/keys/` used to send
-//      a message here; it sends none, and the insert must survive that.
-//   5  THE DROP: the `/grains/` connection CLOSES and the board takes the
-//      insert out on its own, announced on `board.alive`, with nobody asking.
-//   6  a new instrument does not come up granulated afterwards.
-//   7  a plain `fx.pappus {on:false}` is still obeyed, which is what keeps it a
-//      thing a person can type at a wedged board.
-//
-// 🔴 IT REFUSES BY DEFAULT SINCE 2026-10-13 (exit 2), BECAUSE THE BOARD HAS NO
-// INSTRUMENT FOR THE INSERT TO WRAP. It raised Yoshimi, and Yoshimi left the
-// board that day (archive/yoshimi/README.md). `fx.pappus` raises the granulator
-// only around a JACK INSTRUMENT (board.mjs `inst.jack`, set by `JACK_SYNTHS`,
-// which is empty now). The sampler and the Circuit are both on JACK, and
-// neither is one: the sampler is `samp`, beside the instrument slot, and the
-// Circuit is a hardware input in its own room. So `fx.pappus {on: true}` answers
-// `nothing is playing for an insert to wrap` whatever else is playing, and
-// every case below would stop at case 1 for a reason that is not the sweep.
-// Retargeting to the sampler would not be a swap: it needs the board to let the
-// insert wrap the sampler's standing rows, which is board code and a push.
-//   node rig/board/insert-test.mjs --room studio-1 --instrument yoshimi
-// runs it as it was, for a board that has a JACK instrument again (the README
-// says how to bring Yoshimi back).
+// node rig/board/insert-test.mjs --room studio-1 --instrument <JACK instrument>
+// The board drops an insert a closed tab left and keeps a live page's; two connections, one polling
+// like /grains/, one watching. Refuses by default (exit 2): no JACK instrument to wrap.
+// why: lessons/rig-board-tests.md#it-header
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);
@@ -76,10 +16,9 @@ if (!INSTRUMENT) {
   console.log('Name one with --instrument <source> on a board that has it. Nothing was sent to the board.\n');
   process.exit(2);
 }
-// 📄 `INSERT_HELD_MS` in board.mjs. Read from there in words rather than shared as
-// a constant, because this process cannot import the board's copy — so the test
-// waits a margin past it and SAYS the number, which is how a disagreement shows
-// up as a failure rather than as flake.
+// board.mjs's INSERT_HELD_MS, restated: this process cannot import it, so it waits past it and says
+// so.
+// why: lessons/rig-board-tests.md#held-ms
 const HELD_MS = 15000;
 // The board's heartbeat, which is where every page learns about a change it did
 // not make. Two of them past the window is the deadline used below.
@@ -110,14 +49,8 @@ async function client(label) {
     setTimeout(() => rej(new Error('the relay did not open in 8 s')), 8000);
   });
   const send = (m) => { const line = format(m, { from, seq: seq++, by: 'tool' }); ws.send(line); sent++; return JSON.parse(line).id; };
-  /**
-   * Ask, and wait for the answer to THIS question.
-   *
-   * ⚠️ MATCHED ON `re`, NEVER ON TYPE ALONE. The relay broadcasts, so a reply
-   * to somebody else's `fx.pappus` — or their QUESTION, which carries the same
-   * type — arrives here too. `grains` learned this the expensive way and
-   * reported "10 nudges in 1 s" about a board that had moved 2,800 times.
-   */
+  // Wait for the answer to this question, matched on `re`: the relay broadcasts other replies too.
+  // why: lessons/rig-board-tests.md#ask
   const ask = async (m, type, ms = 90000) => {
     const id = send(m);
     const until = Date.now() + ms;
@@ -145,15 +78,12 @@ async function client(label) {
 console.log(`\n== the insert, and the board taking it out by itself · room "${ROOM}" ==`);
 
 let grainsTab = await client('as-grains');
-// 🔴 CONNECTED AND SILENT FOR THE WHOLE RUN. This is what `/keys/` is now: a page
-// that joins the room and asks the board for nothing about the granulator. If a
-// check below needed it to speak, the thing being graded would not be the board
-// cleaning up after itself.
+// Connected and silent all run: what a page that never mentions the granulator looks like.
+// why: lessons/rig-board-tests.md#board-tab
 const boardTab = await client('as-board');
 
-// ── something for the insert to wrap ──────────────────────────────────────
-// ⚠️ `fx.pappus` REFUSES WITH NOTHING ON THE JACK GRAPH, so a test that skipped
-// this would measure a refusal for the wrong reason and call it arbitration.
+// Something for the insert to wrap: fx.pappus refuses with nothing on the JACK graph.
+// why: lessons/rig-board-tests.md#something
 let status = await grainsTab.ask({ type: 'audio.status' }, 'audio.started', 10000);
 if (!status) { console.log('  no board answered in this room — nothing to test'); process.exit(1); }
 const wasPlaying = status.ok ? status.source : null;
@@ -172,12 +102,8 @@ ok('and the board says WHO asked for it, which nothing could see before',
   on?.fxBy === grainsTab.from && on?.fx === 'pappus',
   `${on?.fxBy} ${on?.fxAgoSec} s ago, held=${on?.fxHeld}`);
 
-// ── 2. the heartbeat carries it, so a page learns without asking ──────────
-// 🔴 THE WHOLE REPORTING HALF TURNS ON THIS, AND SO DOES CASE 5. A page that
-// has to ASK finds out when it next polls; a page that is told finds out in
-// five seconds, and the page that needs telling is the one that did NOT make
-// the change. `/keys/` reads nothing about the insert any more, so this channel
-// is now what `insert-test` itself watches.
+// 2. The heartbeat carries the insert, so a page that did not make a change learns of it in 5 s.
+// why: lessons/rig-board-tests.md#case-2
 {
   const b = await boardTab.beat((m) => m.fx !== undefined, 12000);
   ok('the five-second heartbeat carries the insert and its holder',
@@ -185,17 +111,9 @@ ok('and the board says WHO asked for it, which nothing could see before',
     b ? `board.alive fx=${b.fx} fxBy=${b.fxBy} fxHeld=${b.fxHeld}` : 'no heartbeat in 12 s');
 }
 
-// ── 3. THE NEGATIVE CONTROL: a live page keeps its insert ─────────────────
-//
-// 🔴 WITHOUT THIS, CASE 5 PASSES ON A BOARD THAT SIMPLY DROPS THE INSERT AFTER
-// FIFTEEN SECONDS WHATEVER IS HAPPENING. That board would be worse than the bug
-// it replaced: `/grains/` would lose the granulator under itself every quarter
-// minute while somebody was listening to it. So the claim being graded is not
-// "it goes away", it is "it goes away WHEN AND ONLY WHEN nobody is holding it".
-//
-// ⚠️ IT POLLS THE WAY `/grains/` DOES AND NO FASTER: `params.state` on a 4 s
-// interval, which is that page's own `setInterval`. A test that talked
-// continuously would prove something no real page does.
+// 3. Negative control: a live page keeps its insert, polling params.state every 4 s like /grains/;
+// a board that dropped it on a plain 15 s timer fails here.
+// why: lessons/rig-board-tests.md#case-3
 {
   const until = Date.now() + HELD_MS + 2 * BEAT_MS;
   console.log(`  … holding the insert for ${Math.round((HELD_MS + 2 * BEAT_MS) / 1000)} s while the grains half polls every 4 s, which is what an open tab looks like`);
@@ -210,26 +128,17 @@ ok('and the board says WHO asked for it, which nothing could see before',
   ok('a page that is open and quiet KEEPS its insert past the board\'s window',
     beats.length >= 3 && dropped.length === 0,
     `${beats.length} heartbeats over ${Math.round((HELD_MS + 2 * BEAT_MS) / 1000)} s, ${dropped.length} of them without the insert · the board's window is ${HELD_MS / 1000} s`);
-  // ── 4. and a second page ARRIVING changes nothing ───────────────────────
-  // `/keys/` used to send `fx.pappus {on:false, onlyIfIdle:true}` right here, on
-  // connect. It sends nothing now, and this is the assert that says so: if this
-  // half ever speaks again, the case above stops being about the board.
+  // 4. A second page arriving changes nothing; this half must send nothing.
+  // why: lessons/rig-board-tests.md#case-4
   ok('the board half sent nothing at all, so what held the insert was the grains half being alive',
     boardTab.sentCount() === beforeSent,
     `${boardTab.sentCount() - beforeSent} messages from the board half`);
 }
 
-// ── 5. THE DROP: a closed tab, and the board clearing up after it ─────────
-//
-// 🔴 THIS IS THE FAULT THE WHOLE FILE IS ABOUT. The socket CLOSES, which is
-// what a tab being shut looks like from the relay. The relay says nothing about
-// it, because `workers/relay/src/index.js` forwards frames verbatim, never
-// parses one, and its `webSocketClose()` is an empty method. The board
-// sees only that a `from` stopped talking.
-//
-// ⚠️ NOBODY ASKS FOR THIS. The watching half sends no message; it waits for an
-// unprompted `board.alive`. A check that asked would be grading the reply to its
-// own question rather than the board acting on its own.
+// 5. The drop: the grains socket closes (the relay says nothing), and the board takes the insert
+// out
+// unprompted, announced on board.alive.
+// why: lessons/rig-board-tests.md#case-5
 {
   const closedAt = Date.now();
   grainsTab.close();
@@ -246,17 +155,9 @@ ok('and the board says WHO asked for it, which nothing could see before',
     gone ? `fxBy=${gone.fxBy} fxHeld=${gone.fxHeld}` : 'nothing to read');
 }
 
-// ── 6. a new instrument does not come up granulated ──────────────────────
-//
-// `startAudio` re-patches a switched-on insert onto whatever comes up, which is
-// right for the page holding it and is how a closed tab's granulator used to
-// end up wrapping the next person's instrument. The board sweeps at the top of
-// that call too, so the five seconds between the drop and the next heartbeat
-// are not audible either.
-//
-// ⚠️ THIS ASSERTS THE PROPERTY, NOT THE RACE. Beating the heartbeat from
-// outside the board is not something this can time reliably, so what is checked
-// is the thing that matters: the instrument comes up with no insert on it.
+// 6. A new instrument comes up with no insert on it (the property, not the race with the
+// heartbeat).
+// why: lessons/rig-board-tests.md#case-6
 {
   const started = await boardTab.ask({ type: 'audio.start', source: INSTRUMENT }, 'audio.started', 120000);
   ok('an instrument started afterwards comes up with no insert on it',
@@ -264,12 +165,8 @@ ok('and the board says WHO asked for it, which nothing could see before',
     `source=${started?.source} fx=${started?.fx} fxBy=${started?.fxBy}`);
 }
 
-// ── 7. the negative control for the other direction ──────────────────────
-//
-// 🔴 WITHOUT THIS, EVERY CASE ABOVE PASSES ON A BOARD THAT STOPPED PUTTING THE
-// INSERT IN AT ALL. A fresh connection claims it, and a plain switch-off is
-// still obeyed, which is what keeps `fx.pappus {on:false}` a thing a person can
-// type at a wedged board.
+// 7. Negative control the other way: a fresh claim still works and a plain switch-off is obeyed.
+// why: lessons/rig-board-tests.md#case-7
 {
   grainsTab = await client('as-grains');
   const back = await grainsTab.ask({ type: 'fx.pappus', on: true }, 'fx.pappus');
@@ -285,9 +182,8 @@ ok('and the board says WHO asked for it, which nothing could see before',
 if (wasInsert) {
   const back = await grainsTab.ask({ type: 'fx.pappus', on: true }, 'fx.pappus');
   console.log(`  put the insert back: ${back?.on === true ? 'in' : `FAILED — ${back?.reason}`}`);
-  // ⚠️ AND THE BOARD WILL TAKE IT STRAIGHT BACK OUT when this process exits,
-  // because a closed socket is exactly what case 5 is about. Said here so the
-  // next reader does not report it as a bug.
+  // The board drops it again after this process exits: that is case 5, not a bug.
+  // why: lessons/rig-board-tests.md#exit-note
   console.log(`  ⚠ the board will drop it again about ${HELD_MS / 1000} s after this process exits, which is the rule working`);
 }
 grainsTab.close(); boardTab.close();

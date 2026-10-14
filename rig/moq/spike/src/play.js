@@ -1,8 +1,6 @@
-// Media-layer spike PLAYER: CF draft-14 relay -> @moq/net subscribe ->
-// hang catalog + legacy container -> WebCodecs decode -> canvas -> burned-row read.
-// Modes: default = hang player (catalog.json -> video rendition).
-//        ?track=NAME&raw=1 = subscribe an arbitrary track and hexdump first frames
-//        (for probing what an IETF moq-pub broadcast actually carries).
+// Media spike player: CF draft-14 relay, hang catalog, WebCodecs, burned-row read.
+// ?track=NAME&raw=1 hexdumps the first frames of any track.
+// why: lessons/rig-moq.md#moq-play
 import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 

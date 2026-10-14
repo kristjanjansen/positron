@@ -1,26 +1,7 @@
-// rig/board/relay-compare.mjs — the same board, the same protocol, two relays.
-//
-//   node relay-compare.mjs --room r --relay ws://localhost:8895
-//   node relay-compare.mjs --room r                       (ws.positron.studio)
-//
-// Two numbers, both measured in THIS process's clock so no cross-process clock
-// comparison is involved — the board's `performance.now()` and ours share no
-// origin and subtracting them would be meaningless.
-//
-//   ping    board.ping -> board.pong. The control plane: what steering costs.
-//           ⚠️ THIS NUMBER WAS UNMEASURABLE FROM 2026-09-16 TO 2026-09-18 and
-//           the failure looked like a dead room. The board's pong carried an
-//           `at` field, `at` was then an envelope field, `format()` threw on the
-//           collision, and the board answered `board.error`. So `await
-//           reply('board.pong')` timed out and this file exited saying `no
-//           board.pong`. The board sends `pongAt` now. The timestamp in it is
-//           still ignored here, deliberately: the two clocks share no origin,
-//           so `performance.now()` around the round trip is the only honest
-//           measurement of it.
-//   sound   note.on -> the first audio frame that is actually loud. This is
-//           the one you FEEL, and it includes the synth, the framing and both
-//           directions. Identical on both relays, so the difference between
-//           the two runs is the relay and nothing else.
+// node relay-compare.mjs --room r [--relay ws://localhost:8895]: one board, two relays.
+// ping (board.ping to pong) and sound (note.on to first loud frame), both timed in this process's
+// clock, since the board's clock shares no origin with it.
+// why: lessons/rig-board-tests.md#relay-compare-header
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i >= 0 ? process.argv[i + 1] : d; };
@@ -79,12 +60,9 @@ ws.onopen = async () => {
     const sounds = [];
     let discarded = 0;
     for (let i = 0; i < N; i++) {
-      // ⚠️ Wait for CONFIRMED quiet, and discard the round if it never came.
-      // The first version let the timeout fall through, so a note was sent
-      // while the previous one still rang and the very next frame counted as
-      // its onset — reporting 0.9 ms, which is less than one frame and less
-      // than the trip the note has to make. An impossible minimum is the
-      // signature of a measurement catching the tail of the thing before.
+      // Wait for confirmed quiet or discard the round: a ringing tail reads as an impossible 0.9 ms
+      // onset.
+      // why: lessons/rig-board-tests.md#relay-compare-quiet
       let quiet = 0, sawQuiet = false;
       await new Promise((res) => {
         const t = setTimeout(() => { onFrame = null; res(); }, 3000);

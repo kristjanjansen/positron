@@ -7,12 +7,14 @@ import * as Container from "@moq/hang/container";
 const params = new URLSearchParams(location.search);
 const NS = params.get("ns") ?? "positron-safari-test";
 const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.com";
-// Baseline profile level 3.1 (720p30-capable) — the safe cross-browser H.264 flavor.
+// Baseline profile level 3.1: the safe cross-browser H.264.
+// why: lessons/rig-moq.md#pub-safari-codec
 const CODEC = params.get("codec") ?? "avc1.42001f";
 const FPS = 30;
 const GOP = 30; // 1 s
 
-// Binary row geometry — matches rig/whep/publish.html exactly (1280x720 reference grid).
+// Binary row geometry: matches rig/whep/publish.html (1280x720 reference grid).
+// why: lessons/rig-moq.md#pub-safari-row
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
 
 function log(...a) {
@@ -68,8 +70,8 @@ function draw() {
 		const t0 = performance.now();
 		const conn = await Connection.connect(new URL(RELAY), { websocket: { enabled: false } });
 		log("CONNECTED", `ms=${(performance.now() - t0).toFixed(0)}`, `version=${conn.version}`);
-		// Self-healing: if the relay drops the session, reload the page — headless
-		// Chrome restarts the whole publisher (fresh connect + catalog republish).
+		// If the relay drops the session, reload: a fresh connect and catalog republish.
+		// why: lessons/rig-moq.md#pub-safari-heal
 		conn.closed?.then?.((e) => {
 			log("CONN_CLOSED", JSON.stringify(String(e?.message ?? e)), "reloading in 2s");
 			setTimeout(() => location.reload(), 2000);
@@ -79,9 +81,9 @@ function draw() {
 		conn.publish(Path.from(NS), bc);
 		log("PUBLISHED path=" + NS);
 
-		// hang catalog on track "catalog.json" (hang Catalog.RootSchema shape).
-		// annexb H.264 = self-contained bitstream (SPS/PPS ride with every keyframe),
-		// so the decoder needs NO description — catalog carries just the codec string.
+		// hang catalog on "catalog.json". annexb carries SPS/PPS in band, so only the codec string
+		// is needed.
+		// why: lessons/rig-moq.md#pub-safari-catalog
 		const catalog = {
 			video: {
 				renditions: {
@@ -142,7 +144,8 @@ function draw() {
 			vf.close();
 			i++;
 		}, 1000 / FPS);
-		// STATS every 60 s — this publisher runs for hours; keep the log small.
+		// STATS every 60 s, since this runs for hours.
+		// why: lessons/rig-moq.md#pub-safari-stats
 		setInterval(() => log("STATS", `submitted=${i}`, `encoded=${encoded}`, `dropped=${dropped}`, `encErrs=${encErrors}`, `queue=${encoder.encodeQueueSize}`), 60000);
 	} catch (e) {
 		log("FAIL", e?.constructor?.name, JSON.stringify(e?.message ?? String(e)), "reloading in 5s");

@@ -1,9 +1,7 @@
 #!/bin/zsh
-# Drive ONE publisher-death round (RUNBOOK §13 phase 3).
-# Usage: mgrid-deathdrive.sh <round>    e.g. 1
-# Precondition: victim publisher p10 runs ALONE in Chrome udd moq-mgrid-victim<round>-udd.
-# SIGKILLs the victim's whole Chrome tree (no clean QUIC close), timestamps the kill,
-# waits for probe close/silent events, then relaunches the victim fresh (rejoin timing).
+# mgrid-deathdrive.sh <round> (RUNBOOK §13 phase 3): SIGKILL the lone victim publisher's Chrome,
+# wait for the probes to notice, relaunch it fresh to time the rejoin.
+# why: lessons/rig-moq.md#mgrid-deathdrive
 set -e
 R=$1
 CH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -25,7 +23,8 @@ until [ "$(grep -aE '"k":"(close|silent)","pub":"p10"' "$ROOT/results/moq-mgrid-
 done
 sleep 3
 
-# relaunch victim fresh (rejoin) — new udd for the NEXT round number
+# Relaunch the victim with a new udd for the next round number.
+# why: lessons/rig-moq.md#mgrid-deathdrive-relaunch
 NR=$((R+1))
 TR=$(python3 -c 'import time;print(int(time.time()*1000))')
 rm -rf "logs/moq-mgrid-victim${NR}-udd"

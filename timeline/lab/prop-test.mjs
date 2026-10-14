@@ -1,19 +1,7 @@
-// timeline/lab/prop-test.mjs — the C2 property test (plan-timeline §5 C2):
-//     reduce(events <= t)  ===  state after play(0 -> t)
-// on randomized synthetic traces (the simulate_typing rule: synthetic and real
-// traces share one shape; no humans in CI). Runs in plain node on the virtual
-// runtime (deterministic — zero wall-clock flake). Exits nonzero on violation.
-//
-//   node timeline/lab/prop-test.mjs [--seeds 30] [--verbose]
-//
-// Two suites:
-//   basic      — play straight through 0 -> t, t random (may bisect the trace).
-//   gymnastics — random seek/pause/resume/rate ops mid-run; on seek the state
-//                is reconstructed via reduce(<= target) (the documented seek
-//                semantics); final state must STILL equal reduce(<= tEnd).
-// State machine is non-commutative (add/mul/set) so ordering bugs, double
-// fires and drops all surface as value mismatches. Fire counts are audited
-// separately (exactly-once per pass).
+// node timeline/lab/prop-test.mjs [--seeds 30] [--verbose]: reduce(events <= t) equals the state
+// after play(0 -> t), on random synthetic traces on the virtual runtime; basic and gymnastics
+// suites with a non-commutative state machine, fire counts audited. Exits nonzero on a violation.
+// why: lessons/timeline-lab.md#pt-header
 
 import {
   createTransport, createScheduler, createVirtualRuntime, createDeck,
@@ -162,14 +150,12 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
   if (VERBOSE) console.log(`gym seed=${seed} n=${events.length} ops=${nOps} state=${rig.state} ok`);
 }
 
-// ---------------------------------------------------------------------------
-// suite 3: the SIX API SEAMS (v0.2), each asserted deterministically on the
-// virtual runtime. Every one of these was a real client's bug report.
-// ---------------------------------------------------------------------------
+// Suite 3: the six API seams, each a client's bug report, asserted on the virtual runtime.
+// why: lessons/timeline-lab.md#pt-3
 
-// --- seam 3: shipped default host must be the lab VERDICT (worker), with main
-//     an explicit opt-in. In node there is no global Worker, so the default
-//     falls back to main — assert BOTH branches of the rule.
+// Seam 3: the default host is worker; in node there is none, so it falls back to main. Both
+// branches.
+// why: lessons/timeline-lab.md#pt-seam3
 {
   const vr = createVirtualRuntime(1_000_000);
   const t = createTransport({ clock: vr.clock });
@@ -237,10 +223,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
   check('seam1', 0, gotB.length === 5, 'unregister() did not detach the adapter');
 }
 
-// --- seam 4: wall -> audio bridge. A fake AudioContext (deterministic) proves
-//     the conversion: the instant handed to actuate() in AudioContext seconds
-//     must equal ctx.currentTime + (-deltaMs + leadMs)/1000, i.e. an EARLY fire
-//     leaves exactly its earliness as scheduling headroom.
+// Seam 4: the wall-to-audio bridge: when = ctx.currentTime + (-deltaMs + leadMs)/1000.
+// why: lessons/timeline-lab.md#pt-seam4
 {
   const vr = createVirtualRuntime(1_000_000);
   const ctx = { get currentTime() { return (vr.now() - 1_000_000) / 1000; } }; // audio secs since epoch
@@ -275,10 +259,9 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
   check('seam4', 0, nb.length === 1 && nb[0] === null, 'the bridge must be opt-in: no caps.audio -> when === null');
 }
 
-// --- seam 5: the reduce POLICY must see the whole prefix, not one scan's
-//     missed events. Reproduced deterministically: a freeze host swallows ticks
-//     for a window (the SIGSTOP shape) so a batch of events is missed mid-run;
-//     the reducer is NON-COMMUTATIVE, so a batch-only reducer cannot be right.
+// Seam 5: the reducer sees the whole prefix: a freeze host swallows ticks so a batch is missed, and
+// the non-commutative reducer would expose a batch-only fold.
+// why: lessons/timeline-lab.md#pt-seam5
 function freezeHost(inner, fromT, toT, nowFn) {
   return {
     name: 'freeze',
@@ -294,8 +277,8 @@ function freezeHost(inner, fromT, toT, nowFn) {
 for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
   const rand = mulberry32(seed * 15485863 + 7);
   const events = [];
-  // add/mul only — NO `set`. A `set` inside the missed window would let a
-  // batch-only fold resynchronize by luck and hide the very bug under test.
+  // add and mul only: a `set` in the missed window could resynchronise by luck.
+  // why: lessons/timeline-lab.md#pt-no-set
   const op2 = () => (rand() < 0.5 ? { f: 'add', v: 1 + Math.floor(rand() * 9) } : { f: 'mul', v: 2 + Math.floor(rand() * 2) });
   for (let i = 0; i < 240; i++) events.push({ at: +(i * 100 + 50).toFixed(3), op: op2(), idx: i });
   const vr = createVirtualRuntime(1_000_000);
@@ -335,7 +318,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
       `reduce policy asserted ${asserted}, whole-prefix fold is ${want.state} (batch-only reducer bug)`);
     check('seam5', seed, c.prefixN === want.count,
       `reducer got a prefix of ${c.prefixN}, whole prefix at pos ${c.pos} is ${want.count}`);
-    // the one-scan batch is a strict, much smaller subset — the OLD input
+    // the one-scan batch is a strict, much smaller subset
+    // why: lessons/timeline-lab.md#pt-subset
     check('seam5', seed, c.missedN > 0 && c.missedN < c.prefixN,
       `missed batch ${c.missedN} vs prefix ${c.prefixN} — the freeze did not actually starve a scan`);
     // and the explicit fromSnapshot alternative is consistent with the prefix
@@ -359,16 +343,10 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
     'reduceAt() (the C2 left-hand side, queryable) disagrees with the fold');
 }
 
-// ---------------------------------------------------------------------------
-// suite 4: NESTING — a span that is itself a deck (timeline/nested.mjs).
-// Nested seek (reduce-on-seek must run INSIDE the child), rate composition
-// (incl. honest degradation against the child's caps.rates lattice), nested
-// pause, absence outside the span, and cycle/depth rejection.
-//
-// Two decks need two tick metronomes on ONE clock: the virtual host holds a
-// single tickCb, so it is fanned out here (setTimer passes straight through, so
-// commit ordering is still exact).
-// ---------------------------------------------------------------------------
+// Suite 4: nesting (seek, rate composition and degradation, pause, absence, cycles). Two decks
+// share
+// one clock, so the single tick callback is fanned out here.
+// why: lessons/timeline-lab.md#pt-4
 function sharedVR(startMs = 1_000_000) {
   const vr = createVirtualRuntime(startMs);
   const cbs = new Set();
@@ -613,8 +591,8 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   for (const dk of [a, b, c, d, e2, ...chain]) dk.dispose();
 }
 
-// --- 4d: the MASTER direction — the parent slaves to the CHILD'S POSITION,
-//     never to whatever masters the child (rule 4, the important half).
+// 4d: the master direction: the parent slaves to the child's position, never the child's master.
+// why: lessons/timeline-lab.md#pt-4d
 {
   const vr = sharedVR();
   const sink = { live: new Set(), asserts: [], fires: 0 };
@@ -642,10 +620,10 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   parent.pause();
   check('nest-master', 1, nest.servo() === 0, 'a paused parent must not be synced by its child');
 
-  // A DEGRADED CHILD CANNOT MASTER: at parent 1.5x the composed rate 0.75x is
-  // off the child's lattice, so the child runs at a rate the parent did not ask
-  // for. Mastering must SUSPEND (else that rate is silently imposed on the whole
-  // arrangement) and the direction flip back to follow.
+  // A degraded child cannot master: at parent 1.5x the child's 0.75x is off its lattice, so
+  // mastering
+  // suspends and follow resumes.
+  // why: lessons/timeline-lab.md#pt-degraded
   parent.setRate(1.5);
   const rep = nest.rateReport('sess');
   check('nest-master', 2, rep.wanted === 0.75 && rep.chose === 1 && rep.degraded,
@@ -664,19 +642,10 @@ const heldNow = (sink) => [...sink.live].sort((a, b) => a - b);
   nest.dispose(); parent.dispose(); child.dispose();
 }
 
-// ---------------------------------------------------------------------------
-// suite 5: CONTINUOUS KINDS (v0.4). A kind whose state is defined BETWEEN
-// samples. Every arm here is one of the six seams proto/paths filed:
-//   5a sampleAt() against an ANALYTIC curve (and the proof that a two-sample
-//      ctx really does force a C1 interpolator down to linear)
-//   5b the CURSOR is not O(n) — comparisons counted under forward play,
-//      backward seek and random access
-//   5c info.next / info.nexts: an interpolated reduce is expressible, and it
-//      agrees with sampleAt to the last bit
-//   5d caps are READ, and refusals are reported {wanted, chose, degraded, reason}
-//   5e caps.followsTransport: play/pause/rate delivered, seek and sync NOT
-//   5f logdeck: a row's epoch-µs `at` must not clobber the injected position `at`
-// ---------------------------------------------------------------------------
+// Suite 5: continuous kinds. 5a sampleAt against an analytic curve; 5b cursor not O(n); 5c
+// info.next;
+// 5d caps read and refusals reported; 5e followsTransport; 5f logdeck `at` not clobbered.
+// why: lessons/timeline-lab.md#pt-5
 import { createCursor } from '../transport.mjs';
 import { makeLogDeck } from '../logdeck.mjs';
 
@@ -690,8 +659,8 @@ const curveAt = (ms) => {
 const lerp1 = (a, b, u) => a + (b - a) * u;
 const clamp01 = (u) => Math.min(1, Math.max(0, u));
 
-/** time-knotted (non-uniform) Catmull-Rom as a cubic Hermite — the same form
- *  proto/paths uses; p0/p3 null -> reflected phantom endpoints. */
+// Time-knotted Catmull-Rom as a cubic Hermite; missing ends reflected.
+// why: lessons/timeline-lab.md#pt-catmull
 function catmull(p0, p1, p2, p3, u) {
   const t1 = p1.at, t2 = p2.at, h = t2 - t1;
   if (!(h > 0)) return { x: p1.x, y: p1.y, at: t1 };
@@ -714,8 +683,8 @@ function makePointerish() {
       continuous: true, interpolate: true, interpolators: ['hold', 'linear', 'catmull-rom'],
       neighbourhood: 1,                    // 0 = two-sample, 1 = one each side
       tier: 1,                             // §5b: what I return BETWEEN samples is
-                                           // tier-1 restoration, and I say so —
-                                           // which is what arms the firewall (E3)
+                                           // tier-1 restoration, declared, which arms the firewall
+                                           // why: lessons/timeline-lab.md#pt-tier
       method: 'catmull-rom', catchUp: 'reduce', assertOnSeek: true,
       seek: true, rate: true, rates: [0.25, 0.5, 1, 2, 4], followsTransport: true,
     },
@@ -727,8 +696,8 @@ function makePointerish() {
       if (m === 'hold') return { x: a.x, y: a.y, at: a.at, method: 'hold' };
       const lin = { x: lerp1(a.x, b.x, u), y: lerp1(a.y, b.y, u), at: lerp1(a.at, b.at, u), method: 'linear' };
       if (m === 'linear') return lin;
-      // A SPLINE IS NOT A FUNCTION OF TWO SAMPLES: with no neighbourhood at all
-      // this is the honest best, and it says so.
+      // With no neighbourhood a spline degrades to linear, and says so.
+      // why: lessons/timeline-lab.md#pt-two-sample
       if (!ctx || (ctx.prev === undefined && ctx.next === undefined))
         return { ...lin, method: 'linear-degraded' };
       return { ...catmull(ctx.prev || null, a, b, ctx.next || null, u), method: 'catmull-rom' };
@@ -766,9 +735,8 @@ function makeContinuousDeck(vr, opts = {}) {
       ...items, { at: 500, kind: 'd', payload: { v: 1 } }, { at: 2500, kind: 'd', payload: { v: 2 } },
     ],
     adapters: { p: ad, d: disc },
-    // E3: the deck-level policy every omitting query below resolves to. It is
-    // here BECAUSE `p` declares caps.tier 1 — without it every sampleAt in
-    // suite 5 would throw EVIDENCE_POLICY_REQUIRED, which is the point.
+    // The deck policy every omitting query resolves to; without it `p` (tier 1) would throw.
+    // why: lessons/timeline-lab.md#pt-policy
     evidence: opts.evidence === undefined ? { restored: { maxTier: 1 } } : opts.evidence,
   });
   return { deck, ad, items };
@@ -835,9 +803,8 @@ function makeContinuousDeck(vr, opts = {}) {
   const deck = mkDeck(N);
   const cmps = () => deck.cursorStats('p').cursor.comparisons;
 
-  // forward play: 60 Hz over the whole trace — the render loop's access pattern.
-  // THE WITNESS that it is not O(n): the same sweep over a 4x longer trace must
-  // cost the same PER FRAME. A rescan would cost 4x more.
+  // Forward play at 60 Hz: a 4x longer trace must cost the same per frame.
+  // why: lessons/timeline-lab.md#pt-sweep
   const sweep = (dk, n, frames) => {
     dk.sampleAt('p', 0);
     const c0 = dk.cursorStats('p').cursor.comparisons;
@@ -955,7 +922,8 @@ function makeContinuousDeck(vr, opts = {}) {
   deck.dispose();
 }
 
-// --- 5e: caps.followsTransport — play/pause/rate, never seek, never sync ----
+// 5e: followsTransport gets play, pause and rate; never seek or sync.
+// why: lessons/timeline-lab.md#pt-5e
 {
   const vr = sharedVR();
   const { deck, ad } = makeContinuousDeck(vr);
@@ -977,7 +945,8 @@ function makeContinuousDeck(vr, opts = {}) {
   deck.dispose();
 }
 
-// --- 5f: logdeck — the row's epoch-µs `at` must not clobber the injected one -
+// 5f: logdeck: the row's epoch-us `at` must not clobber the injected one.
+// why: lessons/timeline-lab.md#pt-5f
 {
   const vr = sharedVR();
   const T0 = 1_756_000_000_000_000;           // epoch µs, the shape every client stores
@@ -997,18 +966,10 @@ function makeContinuousDeck(vr, opts = {}) {
   deck.dispose();
 }
 
-// ---------------------------------------------------------------------------
-// suite 6: THE EVIDENCE FIREWALL (v0.5, plan-timeline §5b). Interpolation is
-// not a rendering detail — it is tier 1 of a restoration spectrum, and a system
-// that serves restored material without saying so is lying by omission.
-//   6a  attested NEVER returns an interpolated value; restored(tier<=1) does
-//   6b  the FORCED-CHOICE rule fires when the policy is omitted, and only where
-//       the answer could actually differ
-//   6c  a reconstructor APPENDS a derived lane; provenance round-trips
-//   6d  a tier-2 lane is EXCLUDED at maxTier 1, not down-mixed
-//   6e  REVERSIBILITY: dropping a derived lane leaves the master bit-identical
-//   6f  tiers 2/3 are unimplemented BY DESIGN — the same seam, not the same code
-// ---------------------------------------------------------------------------
+// Suite 6: the evidence firewall. 6a attested never interpolates; 6b forced choice only where it
+// matters; 6c reconstructors append; 6d tier 2 excluded at maxTier 1; 6e drop restores; 6f tiers
+// 2/3.
+// why: lessons/timeline-lab.md#pt-6
 
 // --- 6a: attested never interpolates; restored(<=1) does -------------------
 {
@@ -1123,11 +1084,13 @@ function makeContinuousDeck(vr, opts = {}) {
   check('ev-recon', 4, deck.sampleAt('p~catmull', 1234.5, { evidence: 'attested' }) === null,
     'sampleAt on an excluded lane must answer null, never a quietly held value');
 
-  // 6d — a TIER-2 lane, and the cap that excludes it
+  // 6d: a tier-2 lane and the cap that excludes it.
+  // why: lessons/timeline-lab.md#pt-6d
   const rc2 = deck.registerReconstructor('dream', {
     from: 'p', tier: 2, method: 'inpaint-stub', confidence: 0.4,
     hz: 10,
-    // tier >= 2 MUST bring its own derive() — the library implements tier 1 only
+    // tier >= 2 brings its own derive()
+    // why: lessons/timeline-lab.md#pt-derive
     derive: (pos, ctx) => ({ x: ctx.a.x, y: ctx.a.y, at: pos, method: 'inpaint-stub' }),
   });
   const ran2 = rc2.run();
@@ -1140,13 +1103,15 @@ function makeContinuousDeck(vr, opts = {}) {
   const dgD = deck.degradations('p~dream').reports.find((r) => r.chose === 'excluded');
   check('ev-tier', 1, dgD && /tier-2/.test(dgD.reason) && /allows tier <= 1/.test(dgD.reason),
     `the exclusion must say which tier and which cap: ${JSON.stringify(dgD)}`);
-  // a mixed window under maxTier 1 keeps tier-1 and drops tier-2 — one query
+  // a mixed window under maxTier 1 keeps tier 1 and drops tier 2
+  // why: lessons/timeline-lab.md#pt-mixed
   const mixed = deck.window(['p', 'p~catmull', 'p~dream'], -Infinity, Infinity, { evidence: { restored: { maxTier: 1 } } });
   check('ev-tier', 2, mixed.length === items.length + ran.emitted &&
     mixed.every((r, i, a) => i === 0 || a[i - 1].at <= r.at),
     `a multi-lane window must merge in position order and drop only the over-tier lane (${mixed.length})`);
 
-  // 6f — tiers 2/3 are the same SEAM, not the same code, and the library says so
+  // 6f: tiers 2 and 3 are the same seam, not the same code.
+  // why: lessons/timeline-lab.md#pt-6f
   let refused = null;
   try { deck.registerReconstructor('halluc', { from: 'p', tier: 3 }); } catch (e) { refused = e.message; }
   check('ev-tier', 3, refused && /tier 3 must bring its own derive/.test(refused),
@@ -1164,7 +1129,8 @@ function makeContinuousDeck(vr, opts = {}) {
   check('ev-tier', 3, purity && /lane purity/.test(purity),
     `a derived row appended to the MASTER trace must be refused: ${purity}`);
 
-  // 6e — REVERSIBILITY. Deleting a restoration is dropping its lane.
+  // 6e: reversibility, deleting a restoration is dropping its lane.
+  // why: lessons/timeline-lab.md#pt-6e
   const dropped = rc.drop().dropped + rc2.drop().dropped;
   check('ev-drop', 0, dropped === ran.emitted + ran2.emitted, `both lanes must drop in full (${dropped})`);
   check('ev-drop', 0, JSON.stringify(deck.eventsOf('p')) === masterBefore,
@@ -1185,27 +1151,21 @@ function makeContinuousDeck(vr, opts = {}) {
   deck.dispose();
 }
 
-// ---------------------------------------------------------------------------
-// suite 7: UNCERTAINTY AS POSITION (v0.6, plan-timeline §7.4 / §−1's "a smear,
-// not a fake instant"). `at` stays a scalar; a frozen sibling `when` carries the
-// bracket, and the scalar is resolved ONCE at ingest by a named versioned rule.
-//   7a  a `when` row fires at `earliest`, exactly once, and NEVER moves the sort
-//   7b  possible/necessary give different, correct answers — and `necessary` is
-//       UNANSWERABLE-AND-SAYS-SO when the inner bracket is absent
-//   7c  the two axes stay independent: all four cells of evidence × certainty
-//   7d  positionAccounting() sums correctly, BY RULE
-//   7e  caps.series fixes a multi-controller lane that degraded SILENTLY
-//   7f  two-phase seek FAILS OPEN under a deliberately slow adapter
-// ---------------------------------------------------------------------------
+// Suite 7: uncertainty as position. 7a fires at `earliest`; 7b possible vs necessary; 7c the axes
+// are
+// independent; 7d positionAccounting by rule; 7e caps.series; 7f two-phase seek fails open.
+// why: lessons/timeline-lab.md#pt-7
 import { normalizeWhen, normalizeCertainty, WHEN_KINDS } from '../transport.mjs';
 
 const Y = (y, m = 0, d = 1) => Date.UTC(y, m, d);
-/** the nine fields, with the optional five defaulted — tests name only what matters */
+// the nine fields, the optional five defaulted
+// why: lessons/timeline-lab.md#pt-w
 const W = (o) => ({ verbatim: null, edtf: null, innerFrom: null, innerTo: null, note: null, ...o });
 const ids = (rows) => rows.map((r) => r.id);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-// --- 7a: THE FIRING RULE — at = when.earliest, and nothing else moves --------
+// 7a: the firing rule, at = when.earliest, and nothing else moves.
+// why: lessons/timeline-lab.md#pt-7a
 {
   // The supplied `at` on `smear-200` is deliberately WRONG (9999) and
   // `smear-050` supplies none at all: both must land on `when.earliest`.
@@ -1226,14 +1186,15 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     `the lane must be sorted by the ANCHOR: ${ids(rows)}`);
   check('when-fire', 0, rows.find((r) => r.id === 'smear-200').at === 200,
     'a supplied at that disagrees with when.earliest must be OVERRIDDEN, not honoured');
-  // the anchoring is REPORTED — degradations() gains its fourth literal
+  // the anchoring is reported
+  // why: lessons/timeline-lab.md#pt-anchored
   const anc = deck.degradations('arc').reports.filter((r) => r.chose === 'anchored');
   check('when-fire', 1, anc.length === 2 && anc.some((r) => /test-band@1/.test(r.reason)) &&
     anc.some((r) => /OVERRIDDEN/.test(r.reason)),
     `every anchoring must be on the record, naming its rule: ${JSON.stringify(anc.map((r) => r.reason.slice(0, 60)))}`);
 
-  // THE SORT DOES NOT MOVE: a twin deck given the same anchors as plain scalars
-  // fires the same ids in the same order at the same positions.
+  // A twin deck with the same anchors as scalars fires the same ids in the same order.
+  // why: lessons/timeline-lab.md#pt-sort
   const vr2 = sharedVR();
   const twin = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 6000], items: [
     { at: 100, kind: 'arc', id: 'crisp-100', payload: {} }, { at: 200, kind: 'arc', id: 'smear-200', payload: {} },
@@ -1355,7 +1316,8 @@ const FUZZY = [
   check('cert', 3, bad && /use 'possible'/.test(bad), `an unknown certainty must be refused: ${bad}`);
   check('cert', 3, normalizeCertainty(undefined).implicit === true && normalizeCertainty('possible').implicit === false,
     'the default is marked as implicit, so a caller can tell it apart from an explicit choice');
-  // the CRISP FAST PATH: a lane with no bracket answers identically under both
+  // a lane with no bracket answers the same under both
+  // why: lessons/timeline-lab.md#pt-crisp
   const crispOnly = deck.window('arch', A, B, { certainty: 'possible' }).filter((r) => !r.when);
   check('cert', 4, same(ids(crispOnly), ['exact-1965']) &&
     same(ids(deck.window('arch', A, B, { certainty: 'necessary' }).filter((r) => !r.when)), ['exact-1965']),
@@ -1366,7 +1328,8 @@ const FUZZY = [
   deck.dispose();
 }
 
-// --- 7c: THE TWO AXES ARE INDEPENDENT — all four combinations ---------------
+// 7c: the two axes are independent, all four combinations.
+// why: lessons/timeline-lab.md#pt-7c
 {
   const vr = sharedVR();
   const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 10000], items: [
@@ -1395,7 +1358,8 @@ const FUZZY = [
     `all four cells must be populated and distinct: ${JSON.stringify(cell)}`);
   check('axes', 1, new Set(Object.values(cell).map((v) => v.join(','))).size === 4,
     'no cell may be a synonym for another — the 2x2 is fully populated');
-  // NEITHER RESTRICTION IMPLIES THE OTHER, stated as an equality on the sets
+  // neither restriction implies the other
+  // why: lessons/timeline-lab.md#pt-neither
   check('axes', 2, cell['attested|possible'].filter((x) => x.startsWith('res')).length === 0 &&
     cell['all|necessary'].filter((x) => x === 'att-smear' || x === 'res-smear').length === 0 &&
     cell['all|possible'].length === 4,
@@ -1427,7 +1391,8 @@ const FUZZY = [
   check('pos-acct', 0, same(Object.keys(pa.byRule).sort(),
     ['decade-guess@1', 'edtf-l1@1', 'err-audio-month-null@1', 'hand', 'unknown']),
     `the rules must be the ones the rows carry: ${Object.keys(pa.byRule)}`);
-  // THE HEADLINE NUMBER: "N % of this lane is positioned by a padding artefact"
+  // the share of a lane positioned by a padding artefact
+  // why: lessons/timeline-lab.md#pt-headline
   check('pos-acct', 1, pa.byRule['err-audio-month-null@1'].n === 1 && pa.byRule['err-audio-month-null@1'].fraction === 1 / 8 &&
     pa.byRule.hand.n === 2 && pa.byRule.hand.fraction === 2 / 8,
     `fraction must be n / TOTAL rows (not n / smeared) — the visible number is "x % of this lane": ${JSON.stringify(Object.entries(pa.byRule).map(([k, r]) => [k, r.n, +r.fraction.toFixed(3)]))}`);
@@ -1452,11 +1417,12 @@ const FUZZY = [
   deck.dispose();
 }
 
-// --- 7e: caps.series — a multi-controller lane that used to lie silently -----
+// 7e: caps.series on a multi-controller lane.
+// why: lessons/timeline-lab.md#pt-7e
 {
   const vr = sharedVR();
-  // ONE kind, TWO controllers, interleaved. The straddling pair over the merged
-  // lane at t=750 is (cc74@500, cc1@1000) — two DIFFERENT controllers.
+  // One kind, two controllers interleaved: the merged pair at t=750 straddles two controllers.
+  // why: lessons/timeline-lab.md#pt-cc
   const cc = [
     { at: 0, cc: 1, v: 0 }, { at: 500, cc: 74, v: 200 }, { at: 1000, cc: 1, v: 100 },
     { at: 1500, cc: 74, v: 200 }, { at: 2000, cc: 1, v: 0 }, { at: 2500, cc: 74, v: 200 },
@@ -1469,7 +1435,8 @@ const FUZZY = [
   const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 3000],
     evidence: { restored: { maxTier: 1 } }, adapters: { cc: ad },
     items: cc.map((r, i) => ({ at: r.at, kind: 'cc', id: `cc-${i}`, payload: r })) });
-  // (1) THE OLD BEHAVIOUR, now on the record instead of silent
+  // (1) the old behaviour, now reported
+  // why: lessons/timeline-lab.md#pt-old
   const merged = deck.sampleAt('cc', 750);
   check('series', 0, merged === 150,
     `without a series the merged lane still interpolates ACROSS controllers (cc74=200 -> cc1=100): got ${merged}`);
@@ -1497,7 +1464,8 @@ const FUZZY = [
   deck.dispose();
 }
 
-// --- 7f: two-phase seek — non-blocking, fail-open, re-armed -----------------
+// 7f: two-phase seek, non-blocking, fail-open, re-armed.
+// why: lessons/timeline-lab.md#pt-7f
 {
   const vr = sharedVR();
   const log = [];
@@ -1561,7 +1529,8 @@ const FUZZY = [
   try { deck.seek(10, { disposition: 'Whenever' }); } catch (e) { badDisp = e.message; }
   check('2phase', 4, badDisp && /LocateTransportDisposition/.test(badDisp), `an unknown disposition must be refused: ${badDisp}`);
   deck.dispose();
-  // THE FAST PATH: a deck with NO slow-sync adapter takes the v0.5 path exactly
+  // with no slow-sync adapter, the plain seek path
+  // why: lessons/timeline-lab.md#pt-fast
   const vr2 = sharedVR();
   const plain = createDeck({ clock: vr2.clock, tickHost: vr2.newHost(), range: [0, 10000],
     items: [{ at: 100, kind: 'x', payload: {} }] });
@@ -1579,7 +1548,8 @@ const FUZZY = [
   const quiet = [];
   const deck = createDeck({ clock: vr.clock, tickHost: vr.newHost(), autoStart: false, range: [0, 1000],
     adapters: { note: { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {}, silence: (i) => quiet.push(['note', i.reason, i.kind]) } } });
-  // registered LATE — invisible in deck.adapters, which is the reported bug
+  // registered late, invisible in deck.adapters
+  // why: lessons/timeline-lab.md#pt-late
   deck.sched.registerAdapter('late', { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {}, silence: (i) => quiet.push(['late', i.reason, i.kind]) });
   deck.sched.registerAdapter('video', { caps: { catchUp: 'drop' }, actuate() {} });          // default: HOLD a frame
   deck.sched.registerAdapter('liar2', { caps: { absentState: 'silence', catchUp: 'drop' }, actuate() {} });
@@ -1597,28 +1567,13 @@ const FUZZY = [
   deck.dispose();
 }
 
-// ---------------------------------------------------------------------------
-// suite 8: THE FIRE-SIDE FIREWALL and deck.assertState (v0.7, plan-timeline
-// §8.8's two named seams). Suite 6 proves the READ side: under 'attested' a
-// query cannot be TOLD something invented. This proves the other half: under
-// 'attested' something invented cannot HAPPEN.
-//   8a  THE PROPERTY, over random traces: the set of actuations of an
-//       'attested' deck holding derived lanes is IDENTICAL to that of a deck
-//       that never had them — and so is the drift channel, which is what makes
-//       the identity possible (a refusal writes no drift row).
-//   8b  the refusal is VISIBLE: status 'gated', degradations(), gateAccounting(),
-//       the onGate() channel, and request({actuate}) as a pre-flight.
-//   8c  actuation's SECOND door: the seek fold's assertState() is refused too,
-//       so reduceAt() and the seek path can no longer disagree about one lane.
-//   8d  a policy change mid-play is a STATE change: tighten -> silence(),
-//       loosen -> re-assert; a lane that cannot go quiet says so.
-//   8e  deck.assertState(kind, state, info): assert-then-fold-forward equals
-//       reduce(<= t) (the MIDI-chase property), the snapshot moves, no drift row
-//       is written, and a VERIFIED disagreement is reported as 'asserted-over'.
-// ---------------------------------------------------------------------------
+// Suite 8: the fire-side firewall and assertState. 8a an attested deck with derived lanes actuates
+// as one without them; 8b refusals visible; 8c the seek's assertState refused; 8d policy changes
+// mid-play; 8e assertState then fold forward equals reduce(<= t), no drift row, 'asserted-over'.
+// why: lessons/timeline-lab.md#pt-8
 
-// --- 8a: THE PROPERTY — an attested performance is the performance of a deck
-// with no restoration in it, over random traces ----------------------------
+// 8a: an attested performance equals one with no restoration, over random traces.
+// why: lessons/timeline-lab.md#pt-8a
 for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
   const rand = mulberry32(seed * 31337 + 7);
   const n = 40 + Math.floor(rand() * 60);
@@ -1716,8 +1671,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
     `and on the live onGate() channel, once per refused row: ${seen.length}`);
   check('gate-see', 2, deck.isGated('n~d') && !deck.isGated('n'),
     'isGated must name exactly the refused lanes');
-  // 8c — THE SECOND DOOR. A seek must not push a state folded from the refused
-  // lane into its actuator while reduceAt() answers null for the same lane.
+  // 8c: the second door: a seek must not assert a refused lane's fold.
+  // why: lessons/timeline-lab.md#pt-8c
   t.length = 0;
   deck.seek(700.5);
   check('gate-door', 0, t.some((r) => r[0] === 'assert-n') && !t.some((r) => r[0] === 'assert-derived'),
@@ -1786,7 +1741,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 2); seed++) {
   d2.dispose();
 }
 
-// --- 8e: deck.assertState — the MIDI-chase property ------------------------
+// 8e: deck.assertState, the MIDI-chase property.
+// why: lessons/timeline-lab.md#pt-8e
 for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
   const rand = mulberry32(seed * 15485863 + 3);
   const events = genTrace(rand);
@@ -1798,7 +1754,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
     clock: vr.clock, tickHost: vr.host, range: [0, 40000],
     items: events.map((e, i) => ({ at: e.at, kind: 'ctr', id: `e${i}`, payload: { op: e.op, idx: e.idx } })),
     adapters: { ctr: { caps: { catchUp: 'reduce' },
-      // FORWARD fold from info.from — the mode assertState exists to serve
+      // a forward fold from info.from
+      // why: lessons/timeline-lab.md#pt-forward
       reduce: (payloads, pos, info) => {
         let s = info.from.state === undefined ? 0 : info.from.state;
         for (const e of info.since) s = apply(s, e.payload.op);
@@ -1810,7 +1767,8 @@ for (let seed = 1; seed <= Math.ceil(NSEEDS / 3); seed++) {
   const truth1 = reduce(events, t1).state;
   const truth2 = reduce(events, t2).state;
 
-  // THE ENTRY POINT: push authoritative state in at t1 without replaying it
+  // push authoritative state in at t1 without replaying
+  // why: lessons/timeline-lab.md#pt-entry
   const rep = deck.assertState('ctr', truth1, { pos: t1, reason: 'external-sync', source: 'test' });
   check('assert', seed, rep.applied && held === truth1 && asserts === 1,
     `assertState must reach the adapter exactly once and carry the state: ${JSON.stringify({ applied: rep.applied, held })}`);

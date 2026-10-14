@@ -1,13 +1,7 @@
 #!/usr/bin/env node
-// ============================================================================
-// The BROWSER half of the offline-render determinism proof: renderDeckAudio()
-// through a REAL OfflineAudioContext, twice, comparing the event-trace bytes
-// AND the rendered PCM hash.
-//
-//   node timeline/lab/run-render.mjs
-//
-// House rules: port 8894, one Chrome, tl-render-udd pattern, plain node ESM.
-// ============================================================================
+// node timeline/lab/run-render.mjs: renderDeckAudio() through a real OfflineAudioContext twice,
+// comparing trace bytes and the PCM hash. Port 8894, one Chrome.
+// why: lessons/timeline-lab.md#rr-header
 import { createRequire } from 'module';
 import os from "node:os";
 const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));
@@ -94,11 +88,10 @@ const check = (n, ok, d) => { if (!ok) bad++; console.log(`${ok ? 'PASS' : 'FAIL
   check('nest-child-positions-identical', n.identicalChildPos, `childPos digest ${n1.childPosDigestHash}`);
   check('nest-loop-repeats-its-audio', n.impulsesExact,
     `${n.passes} passes must put the same pass at the same samples, ${n.loopMs} ms apart: ${n.impulsesGot.length}/${n.impulsesWant.length} exact`);
-  // THE NEGATIVE CONTROL, and the reason renderDeckAudio EXPANDS a loop instead
-  // of replaying it: bind the child lane to the CHILD's transport and every
-  // wrap's `child.seek()` fires createAudioLane's cancelCommitted(), which
-  // stop()s and disconnect()s nodes that have not sounded yet — because
-  // offline, NOTHING has sounded until startRendering().
+  // Negative control: a child lane on the child's transport loses its nodes at every wrap's seek,
+  // since
+  // offline nothing has sounded until startRendering().
+  // why: lessons/timeline-lab.md#rr-lane
   console.log(`  mode:'lane' NEGATIVE CONTROL — impulses ${JSON.stringify(n.laneMode.impulses)} (want ${JSON.stringify(n.impulsesWant)}), nonzero ${n.laneMode.audio.nonzero}, lane ${JSON.stringify(n.laneMode.childLane)}`);
   check('nest-lane-mode-is-the-control', n.laneMode.impulses.length < n.impulsesWant.length && n.laneMode.audio.nonzero < n1.audio.nonzero,
     `a child lane bound to the CHILD's transport renders ${n.laneMode.audio.nonzero}/${n1.audio.nonzero} nonzero samples — reproducibly, and nearly silent`);

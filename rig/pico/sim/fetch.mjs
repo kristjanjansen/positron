@@ -1,12 +1,5 @@
-// rig/pico/sim/fetch.mjs: download, once, the two binaries the emulator needs.
-// Both land in firmware/, which is gitignored, so a clone fetches them first.
-//
-//   MicroPython for the plain Raspberry Pi Pico (RP2040), from micropython.org.
-//   The RP2040 B1 bootrom, as rp2040js ships it in its demo/ directory (built
-//   from github.com/raspberrypi/pico-bootrom, BSD-3-Clause). The npm package
-//   does not include it, and the MicroPython image calls into it.
-//
-// Skips any file already present. `node fetch.mjs`, or let run.mjs do it.
+// node fetch.mjs: download MicroPython for the RP2040 and the B1 bootrom into firmware/, once.
+// why: lessons/rig-pico.md#sim-fetch
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

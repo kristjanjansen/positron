@@ -1,15 +1,7 @@
 #!/bin/bash
-# rig/pico/firmware/build.sh: build the router for both boards, inside Docker.
-#
-#   rig/pico/firmware/build.sh          pico (RP2040, the emulator) and pico2_w (RP2350, the desk)
-#   rig/pico/firmware/build.sh pico     just one
-#
-# Writes build-<board>/router.uf2 beside this file. The CMake tree lives in the
-# container's /tmp and is thrown away; only the .uf2 comes back, which is ARM
-# code and never runs on this Mac.
-#
-# 🔴 NOTHING NATIVE RUNS ON THE MAC. The compiler, CMake and picotool are all in
-# the image `positron-pico-sdk:2.2.0`, built from the Dockerfile here on first use.
+# rig/pico/firmware/build.sh [pico|pico2_w]: build the router in Docker (positron-pico-sdk:2.2.0).
+# Only build-<board>/router.uf2 comes back; nothing native runs on the Mac.
+# why: lessons/rig-pico.md#firmware-build
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RIG="$(cd "$HERE/../.." && pwd)"

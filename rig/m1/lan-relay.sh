@@ -1,24 +1,8 @@
 #!/bin/bash
-# A MoQ relay on the LAN, so the sound stops going to Cloudflare and back.
-#
-# WHY: measured, the trip to a Cloudflare edge and back is 34.19 ms. On a LAN
-# that is the whole cost of the MoQ return path -- transit landed at 37-40 ms
-# against a WebRTC cushion of 38-60. A relay in the same room drops transit to
-# ~1 ms while KEEPING the thing that makes MoQ worth using: the playout floor is
-# ours, so latency is a number we choose rather than one NetEQ imposes.
-#
-# THE CERTIFICATE IS THE FIDDLY PART, and it is already paid for once
-# (rig/moq/RUNBOOK.md §12): a browser will accept a self-signed cert for
-# WebTransport via serverCertificateHashes, but Chrome requires
-#   * ECDSA P-256, and
-#   * validity <= 14 DAYS.
-# The repo's old auto.crt is ECDSA and TEN YEARS, which is why it failed. This
-# mints a 10-day one and prints the SHA-256 of the DER, which is what the page
-# pins.
-#
-#   ./lan-relay.sh cert     mint a 10-day cert + print the fingerprint
-#   ./lan-relay.sh run      run the relay on :4443
-#   ./lan-relay.sh print    print the fingerprint of the current cert
+# A MoQ relay on the LAN: transit about 1 ms against 34 ms to a Cloudflare edge and back.
+# Chrome pins a self-signed WebTransport cert only if ECDSA P-256 and valid <= 14 days.
+# ./lan-relay.sh cert | run | print
+# why: lessons/rig-m1.md#lan-relay-header
 set -euo pipefail
 
 DIR="${MOQ_DIR:-$HOME/moq-lan}"

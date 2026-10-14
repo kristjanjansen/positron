@@ -1,6 +1,6 @@
-// timeline/lab/server.mjs — static files + the truth clock, port 8896.
-// /time-local: hrtime-anchored epoch-µs (the jam-harness method: pages
-// min-RTT-calibrate against THIS over loopback; error well under 1 ms).
+// Static files and the truth clock on port 8896: /time-local is hrtime-anchored epoch us that pages
+// calibrate against over loopback (well under 1 ms).
+// why: lessons/timeline-lab.md#sr-header
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, dirname, extname, normalize } from 'node:path';

@@ -1,15 +1,7 @@
 #!/bin/zsh
-# Interrupt the RTMPS ingest at increasing gap lengths and record when it happens,
-# so player recovery can be measured against a known timeline.
-#
-#   ./chaos.sh [gap durations...]      default: 2 5 12 25 60
-#
-# Why the gap lengths matter: the live input was created with
-# recording.timeoutSeconds = 10.
-#   gap <  10s  -> Cloudflare resumes the SAME broadcast (same video UID)
-#   gap >= 10s  -> Cloudflare ends it and mints a NEW video UID behind the same
-#                  live-input URL. That is a different recovery problem, and the
-#                  one most likely to break a player.
+# ./chaos.sh [gaps...] (default 2 5 12 25 60): interrupt RTMPS ingest and log when.
+# timeoutSeconds is 10: shorter gaps resume the video UID, longer ones mint a new one.
+# why: lessons/rig-misc.md#chaos-header
 set -e
 cd "$(dirname "$0")"
 if (( $# )); then GAPS=($@); else GAPS=(2 5 12 25 60); fi

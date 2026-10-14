@@ -1,16 +1,7 @@
 #!/bin/bash
-# rig/route-core/test.sh: build the C routing core and run it against every
-# vector `demo/shell/route-vectors/index.json` lists, inside Docker.
-#
-#   rig/route-core/test.sh             gcc, -Wall -Wextra -Werror, then the vectors
-#   rig/route-core/test.sh --arm       also a Cortex-M4 build, and its .text/.bss
-#   SRC=/some/copy rig/route-core/test.sh   grade a scratch copy (how it was sabotaged)
-#
-# 🔴 NOTHING NATIVE RUNS ON THE MAC. This laptop kills any binary compiled or
-# downloaded under the home directory (exit 137), so the compiler, the binary
-# and the run all live in the container, and the binary is written to the
-# container's /tmp, never into this checkout. Only `node` runs here, to turn the
-# JSON into lines, and it pipes them straight into the container's stdin.
+# rig/route-core/test.sh [--arm]: build the C core and run every route vector, inside Docker.
+# Nothing native runs on the Mac (it kills local binaries); SRC=<copy> grades a scratch copy.
+# why: lessons/rig-misc.md#route-core-test
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SRC="${SRC:-$HERE}"
@@ -35,8 +26,8 @@ node "$HERE/vectors-to-lines.mjs" | docker run --rm -i -v "$SRC":/src:ro gcc:14 
 "
 
 if [ "$ARM" = 1 ]; then
-  # ⚠️ The stock Debian toolchain, installed into a throwaway container each
-  # run. Nothing is kept, so this costs a package download every time.
+  # Stock Debian toolchain in a throwaway container: a package download every run.
+  # why: lessons/rig-misc.md#route-core-toolchain
   docker run --rm -v "$SRC":/src:ro debian:bookworm-slim sh -c "
     set -e
     apt-get update -qq >/dev/null && apt-get install -y -qq gcc-arm-none-eabi binutils-arm-none-eabi >/dev/null

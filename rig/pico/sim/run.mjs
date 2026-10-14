@@ -1,9 +1,5 @@
-// rig/pico/sim/run.mjs: boot MicroPython on an emulated Pico, put the OLED
-// driver on it, run rig/pico/oled/main.py unchanged, press keys, save the screen.
-//
-//   npm install && node run.mjs    # shot-0.png, shot-1.png, shot-2.png beside this file
-//
-// The first run downloads the firmware and the bootrom into firmware/.
+// npm install && node run.mjs: MicroPython on an emulated Pico running oled/main.py, shot-*.png.
+// why: lessons/rig-pico.md#sim-run
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -1,12 +1,7 @@
 #!/bin/zsh
-# Does HOW the encoder dies decide whether Cloudflare keeps the broadcast?
-#
-#   SIGSTOP/CONT -> nothing closes; data stops, then resumes  (network glitch)
-#   SIGKILL      -> no RTMP goodbye, kernel still sends TCP FIN
-#   SIGTERM      -> ffmpeg sends RTMP deleteStream             (clean goodbye)
-#
-# recording.timeoutSeconds=10 on this input; gap is 5 s in every case, so any
-# difference in outcome is attributable to the disconnect style alone.
+# Does how the encoder dies (SIGSTOP/CONT, SIGKILL, SIGTERM) decide whether Cloudflare keeps
+# the broadcast? Each gap is 5 s against timeoutSeconds=10.
+# why: lessons/rig-misc.md#kill-test-header
 set -e
 cd "$(dirname "$0")"
 uid=$(python3 -c "import json;print(json.load(open('../src/.last-input'))['uid'])")
@@ -31,7 +26,8 @@ pkill -f "live.cloudflare.com" 2>/dev/null || true; sleep 2
 start; wait_live; sleep 15
 echo "settled, videoUID=$(vid | cut -c1-8)"
 
-# ── case 1: SIGSTOP/CONT — the pure network glitch ──────────────────────────
+# Case 1: SIGSTOP/CONT, the pure network glitch.
+# why: lessons/rig-misc.md#kill-test-1
 b=$(vid)
 echo "── SIGSTOP ${GAP}s then SIGCONT ──"
 kill -STOP $(ffpid)
@@ -40,7 +36,8 @@ kill -CONT $(ffpid)
 verdict "SIGSTOP" "$b"
 sleep 15
 
-# ── case 2: SIGKILL — dead process, no RTMP goodbye ─────────────────────────
+# Case 2: SIGKILL, dead process with no RTMP goodbye.
+# why: lessons/rig-misc.md#kill-test-2
 b=$(vid)
 echo "── SIGKILL, restart after ${GAP}s ──"
 kill -9 $(ffpid)
@@ -49,7 +46,8 @@ start
 verdict "SIGKILL" "$b"
 sleep 15
 
-# ── case 3: SIGTERM — clean goodbye (chaos.sh baseline) ─────────────────────
+# Case 3: SIGTERM, the clean goodbye.
+# why: lessons/rig-misc.md#kill-test-3
 b=$(vid)
 echo "── SIGTERM, restart after ${GAP}s ──"
 kill -TERM $(ffpid)

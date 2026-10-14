@@ -1,17 +1,7 @@
-// rig/pico/sim/ssd1306.mjs: an SSD1306 128x64 OLED on an rp2040js I2C bus, and
-// a pure JavaScript PNG of what it shows.
-//
-// The model is the part of the datasheet the MicroPython micropython-lib driver
-// exercises, plus the addressing modes a C driver might use:
-//   control byte: bit 7 Co (one byte follows, then another control byte),
-//                 bit 6 D/C (1 data, 0 command)
-//   0x20 memory addressing mode (0 horizontal, 1 vertical, 2 page)
-//   0x21 column range, 0x22 page range, 0xB0..0xB7 page start (page mode),
-//   0x00..0x0F and 0x10..0x1F column start (page mode)
-//   0xAE/0xAF display off/on, 0xA6/0xA7 normal/inverse, 0xA4/0xA5 entire on,
-//   0xA0/0xA1 segment remap, 0xC0/0xC8 COM scan direction, 0x40..0x7F start line
-// Everything else is consumed with its argument count and otherwise ignored
-// (contrast, clock, precharge, charge pump, scrolling).
+// An SSD1306 128x64 on an rp2040js I2C bus, and a pure JS PNG of it. Models the commands the
+// drivers use (addressing modes, ranges, on/off, inverse, remap, scan direction, start line); the
+// rest are consumed with their argument counts. Command list: lessons/rig-pico.md#ssd1306-model.
+// why: lessons/rig-pico.md#ssd1306-model
 import { deflateSync } from 'node:zlib';
 import { I2CMode } from 'rp2040js';
 

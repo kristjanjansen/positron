@@ -1,40 +1,7 @@
-// rig/board/rtc.mjs: a direct path from a browser to one input, or to the
-// board's main socket (`createMainDirect`, at the end), beside the relay.
-//
-// Asked 2026-09-30: *"can we bring roundtrip more down"*, then *"webrtc for
-// away"*. `plans/plan-away-webrtc.md` has the whole case. The short of it: the
-// relay was ~72 of the 93 ms from a key press to its note arriving back, and
-// the laptop and this board are 4.1 ms apart by ping.
-//
-// MEASURED 2026-09-30, P0, headless Chrome on the laptop to `node-datachannel`
-// 0.33.4 on this Pi, signalled through a relay room: the channel opened in
-// 158 ms, the selected pair was HOST to HOST over UDP (libdatachannel resolved
-// Chrome's `*.local` candidate by itself), and 200 of 200 frames of 1,932 bytes
-// came back at p50 3.7 ms, p90 5.2, p99 8.8 round trip.
-//
-// 🔴 THE RELAY STAYS, AND IT IS STILL WHERE THIS STARTS. Offer, answer and
-// candidates travel in the input's own room (`<room>-<name>`), each carrying
-// the page's `peer` id, so no new worker exists and two browsers cannot answer
-// each other. A page that cannot get a channel open keeps the relay.
-//
-// 🔴 A DATA CHANNEL IS NOT A WAY ROUND THE MIDI GATE. Every `ctl` message goes
-// through the SAME `handle()` as a relay message (`inputs.mjs`), so
-// `midiVerdict` decides both paths from one place.
-//
-// Two channels a browser, opened by the page:
-//   pcm  unordered, no retransmits   the frames. A late frame is useless, and
-//                                    ordered reliable delivery stalled behind a
-//                                    lost packet at a p95 of 417 ms under 2 %
-//                                    loss (proto/jam/NOTES.md, measured August).
-//   ctl  unordered, reliable         input.want, midi.send, midi.panic,
-//                                    audio.status. A note off must arrive, and
-//                                    must not queue behind a lost note on.
-//
-// ⚠️ UNORDERED MEANS A NOTE OFF CAN OVERTAKE ITS NOTE ON on a fast tap, which
-// leaves a note stuck on an instrument in another building. So a page numbers
-// every `midi.send` (`n`, rising) and `fresher()` refuses anything older than
-// the last message applied to the same key. Pure, and tested with the reorder
-// as its negative control.
+// A direct WebRTC path beside the relay, signalled in the input's room: 3.7 ms p50 round
+// trip against the relay's ~72 ms. `pcm` unordered, no retransmits; `ctl` unordered reliable,
+// through the same handle() as the relay. Notes are numbered so a late note-off is refused.
+// why: lessons/rig-board-io.md#rtc-header
 
 export const MAX_PEERS = 4;
 export const PEER_IDLE_MS = 60_000;
@@ -52,12 +19,8 @@ export function midiKey(bytes) {
   return null;
 }
 
-/**
- * Should a numbered message be applied, given the last number applied to its
- * key. Updates `last` when it says yes. A message with no number, or with no
- * key, is applied: an older page and a refusal-bound message both reach the
- * gate as they did before.
- */
+// Apply a numbered message only if newer than the last on its key; unnumbered or keyless pass.
+// why: lessons/rig-board-io.md#fresher
 export function fresher(last, bytes, n) {
   const key = midiKey(bytes);
   if (key == null || !Number.isFinite(n)) return true;
@@ -67,21 +30,15 @@ export function fresher(last, bytes, n) {
   return true;
 }
 
-/**
- * The key a `note.on` or `note.off` is ordered and held within: its node, its
- * channel and its note. The main socket's verbs, where an input's are raw MIDI
- * bytes (`midiKey`). Null for anything that is not a note with a number.
- */
+// The key a note is ordered within: node, channel, note; null otherwise.
+// why: lessons/rig-board-io.md#note-key
 export function noteKey(m) {
   if (!m || (m.type !== 'note.on' && m.type !== 'note.off') || !Number.isInteger(m.note)) return null;
   return `${typeof m.node === 'string' ? m.node : ''}:${Number.isInteger(m.channel) ? m.channel : 0}:${m.note}`;
 }
 
-/**
- * `fresher` for the main socket's notes. A numbered note older than the last
- * one applied to its key is refused; an unnumbered one is applied, so a page
- * that does not number its notes is no worse off than on the relay.
- */
+// `fresher` for main-socket notes; unnumbered notes pass, as on the relay.
+// why: lessons/rig-board-io.md#fresher-note
 export function fresherNote(last, m) {
   const key = noteKey(m);
   if (key == null || !Number.isFinite(m.n)) return true;
@@ -91,25 +48,18 @@ export function fresherNote(last, m) {
   return true;
 }
 
-/**
- * The live half. `PeerConnection` is node-datachannel's class, or a fake.
- * `signal(msg)` sends into the relay room; `handle(msg, reply)` is the input's
- * own handler; `frameMs` is what the capture delivers per unit.
- */
+// The live half: PeerConnection (or a fake), signal(msg), handle(msg, reply), frameMs.
+// why: lessons/rig-board-io.md#create-rtc
 export function createRtc({
   PeerConnection, signal, handle, log = () => {}, now = () => Date.now(),
   iceServers = ['stun:stun.cloudflare.com:3478'], maxPeers = MAX_PEERS, idleMs = PEER_IDLE_MS,
   unitMs, rate, onGone = () => {},
-  // Labels a page may open beside `pcm` and `ctl`. Since 2026-10-13: `cam`,
-  // the Pi camera's frames on /remote/circuit-on-pi/ (camera.mjs
-  // `attachDirect`). A channel listed here is only HELD: nothing is sent on it
-  // until its owner is asked over `ctl` and says yes. Anything not listed is
-  // closed, as before.
+  // Labels a page may open beside pcm and ctl (e.g. `cam`); held, and nothing is sent until asked
+  // over ctl.
+  // why: lessons/rig-board-io.md#channels
   channels = [], onChannelClosed = () => {},
-  // The board's wall clock, for `rtc.pong`'s `at`: with the round trip it
-  // gives the page the offset between the two clocks, which a camera lag
-  // measured against the board's clock needs (it is otherwise worth what NTP
-  // on both machines is worth).
+  // The board's wall clock for rtc.pong's `at`, so a page can estimate the clock offset.
+  // why: lessons/rig-board-io.md#wall
   wall = () => Date.now(),
 }) {
   const peers = new Map();
@@ -254,22 +204,9 @@ export function createRtc({
   };
 }
 
-/**
- * The board's MAIN socket on the direct path, beside the inputs (`inputs.mjs`).
- *
- * 🔴 FOUND 2026-10-11: `/concepts/sampler/035/` offered the direct path in
- * `studio-1`, the room of the main socket, and waited three seconds for an
- * answer that could never come. Only the per input sockets (`<room>-<input>`,
- * what `/away/` joins) had `createRtc`, so the main socket dropped the offer on
- * the floor: no answer, no refusal, nothing in the journal. This is the same
- * path for the synth capture (Yoshimi and the sampler summed on JACK).
- *
- * `handle(msg, reply)` is the main socket's own handler, so a note over `ctl`
- * goes through exactly what a note over the relay does. It is async on the
- * board, so a throw here arrives as a rejection and is caught, never left
- * unhandled (an unhandled rejection takes the service down).
- * `frame` is the relay's frame in samples; the direct path sends half of it.
- */
+// The main socket on the direct path (it used to drop offers silently). handle is the main socket's
+// own, async, rejections caught. `frame` is the relay's frame; the direct path sends half.
+// why: lessons/rig-board-io.md#main-direct
 export function createMainDirect({ PeerConnection = null, signal, handle, frame, rate, log = () => {}, ...rest }) {
   const unit = frame % 2 === 0 ? frame / 2 : frame;
   const run = (m, reply, peer) => {
@@ -292,10 +229,8 @@ export function createMainDirect({ PeerConnection = null, signal, handle, frame,
   return {
     /** What `board.hello` and `board.alive` say, so a page knows whether to offer. */
     direct: !!rtc,
-    /**
-     * Signalling from the relay room. True when the message was the direct
-     * path's, answered or refused out loud; false for everything else.
-     */
+    // True when the message was the direct path's (answered or refused), false otherwise.
+    // why: lessons/rig-board-io.md#signalling
     signalling(msg) {
       if (msg?.type === 'rtc.offer') {
         if (!rtc) { signal({ type: 'rtc.refused', peer: msg.peer, why: 'this board has no direct path, use the relay' }); return true; }
@@ -313,12 +248,8 @@ export function createMainDirect({ PeerConnection = null, signal, handle, frame,
       for (let o = 0; o < int16.length; o += unit) rtc.pcm(int16.subarray(o, o + unit));
     },
     sweep() { rtc?.sweep(); },
-    /**
-     * A listed extra channel a peer has opened (`channels` above), or null.
-     * Since 2026-10-13, for the shader picture's `vid` channel on
-     * /remote/shader-on-pi/ (board.mjs `video.direct`). `has` says whether the
-     * peer exists at all, so a caller can wait for a channel still opening.
-     */
+    // A listed extra channel a peer opened, or null; `has` says whether the peer exists.
+    // why: lessons/rig-board-io.md#channel
     channel: (peer, label) => rtc?.peers.get(peer)?.ch?.[label] ?? null,
     has: (peer) => !!rtc?.peers.has(peer),
     status: () => (rtc ? rtc.status() : null),

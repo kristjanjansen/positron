@@ -1,18 +1,6 @@
-// CroneEngine.sc — a stand-in for norns' engine base class.
-//
-// A norns "engine" is an ordinary SuperCollider class that inherits from
-// CroneEngine and registers commands; the rest of norns — the Lua layer, the
-// grid, softcut — is not involved in making the sound. So an engine runs on
-// plain scsynth given four things, which is all this file provides:
-//
-//   *new(context, doneCallback)   the constructor shape engines expect
-//   alloc                          called once, inside a Routine so that
-//                                  server.sync inside it works
-//   addCommand / addPoll           registration, kept in a dictionary
-//   free                           teardown
-//
-// Engine_Pappus touches exactly four members of the audio context —
-// server, in_b, out_b, xg — so the context can be a plain Event.
+// Stand-in for norns' engine base class: *new, alloc (in a Routine), addCommand/addPoll, free.
+// The context can be a plain Event: Engine_Pappus uses only server, in_b, out_b, xg.
+// why: lessons/rig-board-norns.md#crone-header
 CroneEngine {
 	var <>context, <>doneCallback;
 	var <commands, <polls;
@@ -26,9 +14,9 @@ CroneEngine {
 		doneCallback = argDoneCallback;
 		commands = IdentityDictionary.new;
 		polls = IdentityDictionary.new;
-		// norns runs alloc inside a Routine and only fires doneCallback once
-		// it returns. Engines rely on that — Pappus calls server.sync in
-		// prAlloc, which needs a thread.
+		// alloc runs in a Routine as on norns: Pappus calls server.sync in prAlloc, which needs a
+		// thread.
+		// why: lessons/rig-board-norns.md#crone-routine
 		Routine({
 			this.alloc;
 			if(doneCallback.notNil, { doneCallback.value(this) });
@@ -48,15 +36,10 @@ CroneEngine {
 		^func;
 	}
 
-	// Not part of norns' interface — this is how a caller without Lua invokes
-	// a registered command.
-	//
-	// ⚠️ The handler is given an ARRAY, and its first argument is msg[1], not
-	// msg[0] — norns passes the OSC message with the command name still in
-	// slot 0. Engines are written against that: Pappus does
-	//     addCommand("amp", "f", { arg msg; synth.set(\amp, msg[1]) })
-	// so passing the arguments directly gets `Message 'at' not understood` on
-	// an Integer. Rebuild the shape norns would have sent.
+	// Not norns API: how a caller without Lua runs a command. Handlers expect msg[0] to be the
+	// name,
+	// so the args are rebuilt into the array norns would send.
+	// why: lessons/rig-board-norns.md#crone-cmd
 	cmd { arg name ... args;
 		var f = commands[name.asSymbol];
 		if(f.isNil, {

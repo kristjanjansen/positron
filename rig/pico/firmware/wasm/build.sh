@@ -1,11 +1,7 @@
 #!/bin/bash
-# rig/pico/firmware/wasm/build.sh: ../ui.c and its fonts as a WebAssembly
-# module for /kit/, built inside the emscripten/emsdk image.
-#
-#   rig/pico/firmware/wasm/build.sh     writes demo/resources/pico/oled-ui.wasm
-#
-# STANDALONE_WASM with no entry point, so the module has NO imports and the
-# page instantiates it with an empty object: no emscripten JavaScript glue.
+# Writes demo/resources/pico/oled-ui.wasm from ../ui.c, in the emsdk image.
+# STANDALONE_WASM with no entry point: no imports, no emscripten glue.
+# why: lessons/rig-pico.md#wasm-build
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FW="$(cd "$HERE/.." && pwd)"

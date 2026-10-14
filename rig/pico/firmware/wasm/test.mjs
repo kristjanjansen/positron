@@ -1,13 +1,6 @@
-// rig/pico/firmware/wasm/test.mjs: is demo/resources/pico/oled-ui.wasm the
-// same drawing code as the firmware? Two compilers, one ui.c: the key labels
-// the emulated router puts on its screen are compared pixel for pixel with
-// what the module draws from the same four words.
-//
-//   node rig/pico/firmware/wasm/test.mjs
-//
-// Needs ../build-pico/router.uf2 (../build.sh pico) and the module (./build.sh).
-// ⚠️ A NEGATIVE CONTROL: the same comparison against a module drawing with OK
-// lit must FAIL, or a comparison that passes proves nothing.
+// node rig/pico/firmware/wasm/test.mjs: oled-ui.wasm against the emulated router's key labels,
+// pixel for pixel. Negative control: a module drawing OK lit must fail.
+// why: lessons/rig-pico.md#wasm-test
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

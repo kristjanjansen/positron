@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-// Cold start to the first answer on a path that spawns nothing (/ready, a 404
-// from server.mjs), so neither runtime pays the first ffmpeg exec that /health
-// does. Legacy waits 8 s after destroy (its instance slot is not released for
-// about 6 s, measured in probe.mjs); new waits the same 8 s so the two are
-// treated alike. Interleaved, 5 cycles each.
+// Cold start to first answer on /ready, which spawns nothing; both runtimes wait 8 s after destroy.
+// why: lessons/rig-containers.md#probe-cheap
 import fs from "fs";
 const RT = { legacy: "https://positron-cnt-test.kristjan-jansen.workers.dev", next: "https://positron-cnt-next.kristjan-jansen.workers.dev" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

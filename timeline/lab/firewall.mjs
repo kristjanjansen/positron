@@ -1,28 +1,8 @@
 #!/usr/bin/env node
-// timeline/lab/firewall.mjs — THE FIRE-SIDE FIREWALL: the proof, and the price.
-//
-//   node timeline/lab/firewall.mjs [--json] [--baseline <path/to/pre-v0.7/transport.mjs>]
-//
-// plan-timeline §8.8 left the evidence firewall READ-SIDE ONLY: "nothing stops
-// a derived lane from FIRING under 'attested', so an evidence-only performance
-// is the adapter's job". This file is the gate's evidence, in the shape the
-// read side already set:
-//
-//   the read side proved  — under 'attested' the error is bit-identical to a
-//                           plain hold, and dropping 1,674 derived rows leaves
-//                           the master trace and the audit bit-identical.
-//   the fire side proves  — the ACTUATION TRACE of an 'attested' deck holding
-//                           twelve derived lanes is BIT-IDENTICAL to the trace
-//                           of a deck that never had them, and to the trace of
-//                           the same deck after the lanes were physically
-//                           dropped. Three decks, one string.
-//
-// Everything runs on the virtual runtime (deterministic, zero wall-clock flake)
-// except §D's cost measurement, which is wall-clock by necessity and uses a
-// FRACTIONAL cadence — a past session in this repo presented a single locked
-// phase sample as a distribution (cues at exactly 15.000 s = exactly 150 poll
-// periods) and "improved" cue sync 59 -> 16 ms by measuring the same instant
-// over and over. Nothing here samples on a tick multiple.
+// node timeline/lab/firewall.mjs [--json] [--baseline <pre-v0.7 transport.mjs>]
+// An 'attested' deck with twelve derived lanes actuates bit-identically to one without them and one
+// after dropping them. Virtual runtime, except D's cost, sampled on a fractional cadence.
+// why: lessons/timeline-lab.md#fw-header
 
 import { createDeck, createVirtualRuntime } from '../transport.mjs';
 import { createNest } from '../nested.mjs';
@@ -63,13 +43,9 @@ function rig(startMs = 1_700_000_000_000) {
 // locked phase.
 const STEP_MS = 5.137;
 
-// ===========================================================================
-// THE FIXTURE — proto/loops' disintegration, with the adapter's hand-written
-// gate REMOVED. loops.mjs closes the hole by hand inside actuate()
-// (`if (ev.maxTier < tier) return`), which is exactly the thing that was the
-// adapter's job; this fixture reuses its constants (PARTIALS, tierOf, METHOD)
-// and does NOT close it, so what is measured below is the LIBRARY's gate.
-// ===========================================================================
+// The fixture: proto/loops' disintegration with its hand-written gate removed, so the library's
+// gate is measured.
+// why: lessons/timeline-lab.md#fw-fixture
 
 function buildPiece({ clock, newHost, evidence, iters = DIS_ITERS, loopMs = 2000, trace, withDerived = true }) {
   const T = (row) => { if (trace) trace.push(row); };
@@ -144,9 +120,8 @@ function playPiece(opts) {
   return { trace, drift, acct, gate, per, audit };
 }
 
-// ===========================================================================
-// A. THE HOLE — the negative control, on the pre-v0.7 code.
-// ===========================================================================
+// A. The hole: the negative control on the pre-v0.7 code.
+// why: lessons/timeline-lab.md#fw-a
 log('\nA. THE HOLE (negative control: the shipped read-side-only firewall)');
 out.hole = { measured: false };
 if (BASELINE) {
@@ -186,9 +161,8 @@ if (BASELINE) {
   log('  NOT MEASURED — pass --baseline <path to a pre-v0.7 transport.mjs> to reproduce the hole');
 }
 
-// ===========================================================================
-// B. BIT-IDENTICAL ACTUATION — the fire side's answer to the read side's proof.
-// ===========================================================================
+// B. Bit-identical actuation: three decks, one string.
+// why: lessons/timeline-lab.md#fw-b
 log("\nB. BIT-IDENTICAL ACTUATION — three decks, one string");
 {
   const A = playPiece({ evidence: 'attested', withDerived: true });   // gated
@@ -229,9 +203,8 @@ log("\nB. BIT-IDENTICAL ACTUATION — three decks, one string");
   };
 }
 
-// ===========================================================================
-// C. DISINTEGRATION INVARIANCE — twelve repetitions, one performance.
-// ===========================================================================
+// C. Disintegration invariance: twelve repetitions, one performance.
+// why: lessons/timeline-lab.md#fw-c
 log('\nC. DISINTEGRATION INVARIANCE — inventedFraction 0 -> 90.6 %, the performance does not move');
 {
   const att = playPiece({ evidence: 'attested' });
@@ -278,10 +251,8 @@ log('\nC. DISINTEGRATION INVARIANCE — inventedFraction 0 -> 90.6 %, the perfor
   };
 }
 
-// ===========================================================================
-// D. THE PRICE — the wall lane's scan is latency-critical (25 ms tick /
-// 100 ms horizon). Three arms, all on a FRACTIONAL cadence.
-// ===========================================================================
+// D. The price on the hot path (25 ms tick, 100 ms horizon); three arms on a fractional cadence.
+// why: lessons/timeline-lab.md#fw-d
 log('\nD. THE PRICE — what the gate costs the hot path');
 {
   const N = 20000, REPS = 40;
@@ -365,20 +336,9 @@ log('\nD. THE PRICE — what the gate costs the hot path');
     refusedCheaperPct: +((1 - pr / pf) * 100).toFixed(1),
   };
 
-  // The gate against the PRE-v0.7 code, if a baseline was supplied.
-  //
-  // METHOD, and it is the point of this arm: a DIFFERENCE OF TWO p50s over this
-  // workload gave +11.4 %, +0.8 %, +9.8 %, +10.7 % and +5.5 % on the SAME two
-  // builds — five "measurements" of one number, spanning an order of magnitude.
-  // That is the repo's own locked-phase trap wearing a different hat, so this
-  // arm does two things instead:
-  //   1. PAIRED DIFFERENCES — A and B run back to back inside one rep (order
-  //      alternating) and the DIFFERENCE is the sample, so a thermal ramp or a
-  //      GC pause lands on both halves of the pair;
-  //   2. A SAME-MODULE NEGATIVE CONTROL — the baseline benchmarked against a
-  //      byte-identical copy of itself, loaded as a second module instance.
-  //      Whatever that control reports is this benchmark's floor, and no effect
-  //      smaller than it may be claimed.
+  // Against a baseline: paired differences run back to back (two p50s ranged +0.8% to +11.4% on the
+  // same builds), with the baseline against a copy of itself as the floor no claim may go under.
+  // why: lessons/timeline-lab.md#fw-baseline
   if (BASELINE) {
     const url = BASELINE.startsWith('/') ? BASELINE : `${process.cwd()}/${BASELINE}`;
     const base = await import(url);
@@ -426,9 +386,8 @@ log('\nD. THE PRICE — what the gate costs the hot path');
   } else log('  (pre-v0.7 A/B: NOT MEASURED — pass --baseline)');
 }
 
-// ===========================================================================
-// E. THE POLICY MOVES WHILE IT PLAYS — G4.
-// ===========================================================================
+// E. The policy moves while it plays (G4).
+// why: lessons/timeline-lab.md#fw-e
 log('\nE. THE POLICY MOVES WHILE IT PLAYS');
 {
   const vr = createVirtualRuntime(1_700_000_000_000);
@@ -495,10 +454,8 @@ log('\nE. THE POLICY MOVES WHILE IT PLAYS');
   deck.dispose(); d2.dispose();
 }
 
-// ===========================================================================
-// F. deck.assertState — G5. The cost of verifying, and the drift channel it
-// deliberately does not touch.
-// ===========================================================================
+// F. deck.assertState (G5): the cost of verifying, and the drift channel it does not touch.
+// why: lessons/timeline-lab.md#fw-f
 log('\nF. deck.assertState(kind, state, info)');
 {
   const N = 4000;
@@ -562,14 +519,10 @@ log('\nF. deck.assertState(kind, state, info)');
   deck.dispose();
 }
 
-// ===========================================================================
-// G. THE LOOP WRAP — how the gate meets caps.loopState 'carry'/'rearm' and
-// adapter.loopWrap(). nested.mjs's wrap does three things in order: tell the
-// adapters that asked (loopWrap), re-seek the child, re-assert the CARRY lanes
-// at `out`. Only the last two are actuation, so only those are gated — and a
-// gated CARRY lane is the interesting cell, because it is the one place a lane
-// asks to have state pushed into it at every boundary.
-// ===========================================================================
+// G. The loop wrap and the gate: only the re-seek and the carry re-assert are actuation, so only
+// those
+// are gated; a gated carry lane is the interesting cell.
+// why: lessons/timeline-lab.md#fw-g
 log('\nG. THE LOOP WRAP × THE GATE');
 {
   const { vr, newHost } = rig();
@@ -584,8 +537,8 @@ log('\nG. THE LOOP WRAP × THE GATE');
     plan: ({ aAt, bAt }) => [(aAt + bAt) / 2], derive: (pos) => ({ pos }), confidence: () => 0.4,
   });
   rc.run();
-  // the derived lane declares CARRY too — it has the reduce+assertState pair,
-  // so nested will try to assert it at `out` on every wrap
+  // the derived lane declares carry too, so nested asserts it at `out` every wrap
+  // why: lessons/timeline-lab.md#fw-carry
   child.sched.registerAdapter('lv~d', {
     caps: { tier: 2, catchUp: 'reduce', loopState: 'carry', assertOnSeek: true, loopWrap: true },
     actuate: () => t.push(['derived']),
@@ -617,14 +570,8 @@ log('\nG. THE LOOP WRAP × THE GATE');
   nest.dispose(); child.dispose(); parent.dispose();
 }
 
-// ===========================================================================
-// H. THE OFFLINE RENDER — does the gate come along for free?
-// `offlineDeck()` is `createDeck()` on a render runtime, so it uses the same
-// createScheduler and SHOULD inherit the gate. "Should" is a hypothesis; this
-// makes it a result. The claim under test is §B's, one domain over: a rendered
-// 'attested' deck must be byte-identical to a render of the same deck with no
-// restoration in it.
-// ===========================================================================
+// H. The offline render: a rendered 'attested' deck must equal a render with no restoration.
+// why: lessons/timeline-lab.md#fw-h
 log('\nH. THE OFFLINE RENDER');
 {
   const items = [0, 200.5, 400.25, 600.75, 800.125, 1000.5].map((at, i) => ({ at, kind: 'z', id: `z${i}`, payload: { i } }));

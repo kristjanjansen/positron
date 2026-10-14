@@ -1,8 +1,6 @@
 #!/bin/zsh
-# Keeps path `rig` ALWAYS publishing: whenever the real encoder is absent,
-# publish a slate into the same path. The real encoder overrides us at will
-# (overridePublisher). Readers attached to `rig` — i.e. the Cloudflare
-# forwarder — should never see the path die.
+# Keep path `rig` publishing a slate whenever the real encoder (which overrides it) is absent.
+# why: lessons/rig-misc.md#babysitter
 FF7=/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg
 SLATE_PID=""
 slate_start() {

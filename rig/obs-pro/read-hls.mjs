@@ -1,11 +1,6 @@
-// Pull frames from the live LL-HLS edge and read the burned clock back out.
-//
-// "947 frames encoded, 0 skipped" says the encoder ran. It does NOT say the
-// picture is readable at the other end — that is the green-suite trap this
-// project has paid for twice. A decoded checksum is the only thing that proves
-// the row survived encode -> CDN -> decode.
-//
-//   node read-hls.mjs <m3u8> [frames]
+// node read-hls.mjs <m3u8> [frames]: read the burned clock from the live edge, since an encoder
+// count does not prove the row survived encode, CDN and decode.
+// why: lessons/rig-obs.md#obs-read-hls
 import { execFileSync } from 'node:child_process';
 import { ROW, CLOCK_BITS } from '../../demo/shell/pattern.mjs';
 

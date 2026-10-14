@@ -1,16 +1,8 @@
 #!/usr/bin/env node
-// ============================================================================
-// L4b MEASUREMENT — requestVideoFrameCallback.mediaTime vs HTMLMediaElement
-// .currentTime, as the media servo's sensor.
-//
-//   node timeline/lab/run-sensor.mjs [--fps 30,60] [--secs 18]
-//
-// One real headless-Chrome playback per fps; FOUR mediaMaster instances over
-// the same <video> ({rvfc, currentTime} x {tol 20 ms, 40 ms}). Reports the
-// disagreement distribution (p50/p95/max of |mediaTime - currentTime|) and the
-// servo correction counts per arm. House rules: port 8894, one Chrome,
-// tl-sensor-udd pattern, plain node ESM.
-// ============================================================================
+// node timeline/lab/run-sensor.mjs [--fps 30,60] [--secs 18]: rVFC mediaTime against currentTime as
+// the
+// servo's sensor, four mediaMaster arms per fps; reports disagreement and corrections. Port 8894.
+// why: lessons/timeline-lab.md#rs-header
 import { createRequire } from 'module';
 import os from "node:os";
 const require = createRequire(path.join(os.homedir(), ".npm/_npx/705bc6b22212b352/node_modules/"));

@@ -110,8 +110,8 @@ print(f'PART-TARGET={PT} targetdur={s["targetdur"]} parts/seg={per_seg} '
       f'msn0={s["msn0"]} last_msn={s["last_msn"]} tail_parts={s["parts"].get(s["last_msn"], 0)}')
 print(f'hint: {s["hint"]}')
 
-# PRELOAD-HINT is the authoritative "next unpublished part" — use it when present
-# (segment part-count varies: TARGETDURATION=3 but real segments are 4x0.5s parts).
+# PRELOAD-HINT names the next unpublished part; segment part counts vary (4 x 0.5 s here).
+# why: lessons/rig-misc.md#edge-lag-hint
 if s['hint_next']:
     msn, part = s['hint_next']
 else:

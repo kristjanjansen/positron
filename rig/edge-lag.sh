@@ -8,7 +8,8 @@ N=${1:-10}
 
 for i in $(seq 1 $N); do
   MASTER=$(curl -s "$B/$UID_/manifest/video.m3u8?protocol=llhls")
-  # track ids change every broadcast — never hardcode the prefix
+  # Track ids change every broadcast, so the prefix is never hardcoded.
+  # why: lessons/rig-misc.md#edge-lag-track
   CHILD=$(echo "$MASTER" | grep -m1 '^stream_.*\.m3u8')
   T0=$(python3 -c 'import time;print(repr(time.time()))')
   BODY=$(curl -s "$B/$UID_/manifest/$CHILD")

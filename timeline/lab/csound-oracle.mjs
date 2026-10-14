@@ -1,50 +1,7 @@
-// timeline/lab/csound-oracle.mjs — our compiler against the REFERENCE one.
-//
-//   node timeline/lab/csound-oracle.mjs          # skips cleanly if csound is absent
-//   CSOUND=/opt/homebrew/bin/csound node timeline/lab/csound-oracle.mjs
-//   CSOUND=timeline/lab/csound-ssh.mjs node timeline/lab/csound-oracle.mjs
-//
-// WHY THIS EXISTS. `csound-test.mjs` checks the compiler against numbers a human
-// derived from the same formula the compiler implements. That catches a typo and
-// cannot catch a MISREADING — and on 2026-09-09 it was hiding two real defects
-// for the whole life of the file:
-//
-//   · the tempo ramp. We interpolated TEMPO linearly in beat, making time the
-//     logarithmic integral. Csound interpolates SECONDS PER BEAT linearly in
-//     beat, making time a trapezoid. On `t 0 120 30 90` that is 17.500 s against
-//     our 17.261 — 239 ms — and on `t 0 60 20 180` it is 2.35 s by beat 20.
-//   · `^+x`. We resolved it against the previous note of the SAME INSTRUMENT.
-//     Csound resolves it against the IMMEDIATELY PRECEDING STATEMENT, whatever
-//     instrument that was. `+` and `.` really are per-instrument, so the three
-//     shorthands do NOT share a reference note — exactly the sort of thing that
-//     has to be measured rather than reasoned about (LESSONS #26).
-//
-// and on 2026-09-10 three more, all of them about SECTIONS (`s`), which reset
-// the clock AND the tempo AND most of the carry. Those are the cases below
-// from `sections reset the tempo` down.
-//
-// HOW, AND WHAT EACH HALF CAN SEE. Csound converts p2/p3 from beats to seconds
-// during score sorting, so an instrument that `prints` its own p2 reports the
-// reference answer — but that answer is SECTION-LOCAL, and it stays 0.000 for
-// the first note of every section however far into the piece that section is.
-// A multi-section score therefore needs both:
-//
-//   · p2 and p3, which are EXACT and grade the tempo map, the carry, `b` and
-//     everything else that happens inside one section; and
-//   · `times`, the absolute performance clock, which is the only thing that can
-//     see the section OFFSET — and which is quantised to one k-period, because
-//     csound starts a section on a k-boundary. `ksmps = 1` makes that 1/48000 s
-//     (20.8 µs), and the run prints the worst error it actually saw, so
-//     "exact" and "within tolerance" do not read the same.
-//
-// `-n` means no audio, so this is a compiler comparison and never a render.
-//
-// TRAP, and it cost a round: csound writes ANSI escapes, so a `^EVT` match drops
-// most lines — a partial result that looks like a finding rather than like a
-// broken filter (LESSONS #45). The escape is written `\\u001b` below and not as
-// the raw byte it used to be: a raw control character in source does not
-// survive being read out of the file and pasted into a probe, which is how the
-// same trap caught the same filter a second time.
+// node timeline/lab/csound-oracle.mjs (CSOUND=<bin or csound-ssh.mjs>): our compiler against
+// csound, since self-derived numbers cannot catch a misreading. p2/p3 grade a section; `times`
+// (ksmps 1, 20.8 us) grades section offsets. `-n`, no audio. ANSI escapes are matched as \u001b.
+// why: lessons/timeline-lab.md#co-header
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -110,10 +67,9 @@ const CASES = [
     'b 5\ni 1 0 1\nf 0 10\ns\ni 1 0 1'],
   ['. crosses a section for p2 and p3, and comes back 0 for p4',
     'i 1 5 1 777\ns\ni 1 . . .'],
-  // ...while a p-field merely LEFT OFF does not cross at all. Two carries, two
-  // rules, and the only way to know that is to ask. It has to be p3 that is
-  // left off: p4 is zeroed by the OTHER rule, so a p4 probe here reads green
-  // whichever way this one is wired and would prove nothing.
+  // A p-field left off does not cross a section; it must be p3, since p4 is zeroed by the other
+  // rule.
+  // why: lessons/timeline-lab.md#co-left-off
   ['a p-field left off the end does not cross a section',
     'i 1 0 3\ns\ni 1 4'],
   ['but + and ^ do not cross one',
@@ -124,15 +80,12 @@ const CASES = [
       's', 't 0 90', 'b 2', 'i 1 0 1', 'i 1 2 2', 'f 0 12'].join('\n')],
 ];
 
-// Known, OPEN divergences — reported rather than omitted, because a suite that
-// quietly drops a failing case is how a defect becomes permanent.
+// Known open divergences, reported rather than omitted.
+// why: lessons/timeline-lab.md#co-open
 const KNOWN_OPEN = [
-  // Ours: `n name` replays the span from the mark to HERE, in place. Csound's:
-  // `n` REWINDS THE SOURCE and re-reads from the mark, and it only fires when
-  // the `n` sits at a section boundary — so this score replays nothing there
-  // (and trips an internal error inside csound's own backtrace printer).
-  // Matching it would mean giving up the quotation, which is the reason this
-  // compiler exists, so the difference is stated instead of split.
+  // `n`: ours replays the span in place; csound rewinds the source only at a section boundary.
+  // Stated.
+  // why: lessons/timeline-lab.md#co-n
   ['n is a span here and a source rewind there (KNOWN OPEN)',
     'm theme\ni 1 0 1\ni 1 1 1\nn theme'],
   // p3 < 0 means "hold until something turns it off". A timeline row has no
@@ -140,10 +93,9 @@ const KNOWN_OPEN = [
   // The ONSET matches, and so does the section length it implies.
   ['a held note has no duration a row can hold (KNOWN OPEN)',
     'i 1 0 -1\ni 1 2 1\ns\ni 1 0 1'],
-  // Two `t` in one section: csound sorts by the last one and then emits the
-  // first as a runtime `t`, which re-warps at play time — the two answers it
-  // gives are not consistent with each other. Ours takes the last, which is
-  // what the sorted score says.
+  // Two `t` in one section: csound's two answers disagree; ours takes the last, as its sorted score
+  // does.
+  // why: lessons/timeline-lab.md#co-two-t
   ['two t statements in one section (KNOWN OPEN)',
     't 0 60\ni 1 0 1\nt 0 240\ni 1 4 1'],
 ];
@@ -151,11 +103,8 @@ const KNOWN_OPEN = [
 const ANSI = /\u001b\[[0-9;]*m/g;
 const strip = (s) => s.replace(ANSI, '').replace(/\u001b/g, '');
 
-// Every candidate has to ANSWER, `CSOUND` included. A csound that is named but
-// cannot run — a stale path, or `csound-ssh.mjs` pointed at a machine that is
-// asleep — would otherwise return zero events for every case, and a whole suite
-// of "EVENT COUNT DIFFERS" reads like a compiler that has fallen over rather
-// than like a reference nobody could reach.
+// Every candidate must answer, CSOUND included, or a dead reference reads as a broken compiler.
+// why: lessons/timeline-lab.md#co-path
 function csoundPath() {
   const tried = process.env.CSOUND
     ? [process.env.CSOUND]
@@ -181,21 +130,16 @@ if (!bin) {
 const dir = mkdtempSync(join(tmpdir(), 'csound-oracle-'));
 writeFileSync(join(dir, 't.orc'), ORC);
 
-// csound writes `prints` output to STDERR, not stdout — which cost a run,
-// because execFileSync returns only stdout unless the process throws, so every
-// case read back as "csound produced 0 events" and looked like a finding.
-// spawnSync hands over both streams whatever the exit code.
+// csound writes `prints` to stderr; spawnSync returns both streams whatever the exit code.
+// why: lessons/timeline-lab.md#co-stderr
 function run(bin2, args) {
   const r = spawnSync(bin2, args, { encoding: 'utf8' });
   return `${r.stdout || ''}${r.stderr || ''}`;
 }
 
-/**
- * Csound's own answer for a score, in performance order:
- *   at, dur  — SECTION-LOCAL seconds, exact
- *   p4       — the fourth p-field, which is where the carry rules show
- *   abs      — the absolute clock, quantised to one k-period
- */
+// Csound's answer in performance order: at, dur (section-local, exact), p4, abs (k-period
+// quantised).
+// why: lessons/timeline-lab.md#co-reference
 function reference(score) {
   const f = join(dir, 'case.sco');
   writeFileSync(f, `${score}\ne\n`);

@@ -1,26 +1,15 @@
 #!/bin/zsh
-# Gapless Cloudflare relay: ONE long-lived uplink ffmpeg whose socket never
-# closes, fed by a FIFO of concatenated MPEG-TS from whichever source exists.
-#
-#   encoder --rtmp--> mediamtx --\
-#                                 feeder loop --TS--> FIFO --> uplink ffmpeg --RTMPS--> Cloudflare
-#   slate (lavfi) ---------------/
-#
-# The uplink re-encodes with setpts=N/FR/TB so timestamp jumps at splice
-# points vanish; source switches become instant cuts. Cost: one extra encode.
-#
-# NO set -e: this is a supervisor. A failing kill/curl must never take the
-# feeder down (it did: an orphaned slate then feeds the FIFO forever).
+# Gapless Cloudflare relay: one long-lived uplink fed by a FIFO of TS from whichever source exists.
+# setpts=N/FR/TB hides splice jumps. No set -e: a supervisor must survive a failing kill or curl.
+# why: lessons/rig-misc.md#gapless-header
 cd "$(dirname "$0")"
 FF7=/opt/homebrew/opt/ffmpeg@7/bin/ffmpeg
 KEY=$(python3 -c "import json;print(json.load(open('../../src/.last-input'))['key'])")
 FIFO=/tmp/rig-ts.fifo
 rm -f $FIFO; mkfifo $FIFO
 
-# --- uplink: never exits, never closes the CF socket -----------------------
-# discardcorrupt: a splice can truncate the old leg's audio PES mid-frame —
-# drop that one packet instead of letting it cascade into an encoder death.
-# -r 30 pins output fps so timestamp debris can never re-infer a bogus rate.
+# Uplink: discardcorrupt drops a truncated audio packet at a splice; -r 30 pins the output rate.
+# why: lessons/rig-misc.md#gapless-uplink
 $FF7 -hide_banner -loglevel warning \
   -err_detect ignore_err \
   -f mpegts -fflags +genpts+igndts+discardcorrupt -i $FIFO \

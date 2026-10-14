@@ -1,9 +1,7 @@
-// timeline/lab/midi-recv.mjs — virtual MIDI destination (the ~/personal/midi
-// pattern) timestamping arrivals on the truth clock. Writes JSONL rows
-// {note, vel, tUs} to the file given as argv[2]. Calibrates its own epoch-µs
-// clock against the lab server's /time-local (min-RTT), so page-send stamps
-// and arrival stamps share one base.
-//   node midi-recv.mjs /path/out.jsonl
+// node midi-recv.mjs /path/out.jsonl: a virtual MIDI destination writing {note, vel, tUs}, its
+// clock
+// calibrated against the lab server's /time-local so send and arrival stamps share one base.
+// why: lessons/timeline-lab.md#mr-header
 import midi from 'midi';
 import { appendFileSync } from 'node:fs';
 

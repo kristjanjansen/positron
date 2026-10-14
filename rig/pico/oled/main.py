@@ -1,12 +1,6 @@
-# rig/pico/oled/main.py - the 4 button SSD1306 OLED on a Pico, proved.
-#
-# Wiring is wiring.svg beside this file: SDA GP4, SCL GP5, buttons GP10 to
-# GP13 to ground, power from 3V3(OUT). Runs unchanged on a real Pico 2 W and in
-# Wokwi (paste diagram.json and this file). It only proves the wiring: the
-# screen says hello and shows which buttons are held.
-#
-# The driver: in Wokwi add ssd1306.py from micropython-lib to the project; on a
-# real Pico W on wifi, `import mip; mip.install('ssd1306')` once from the REPL.
+# Proves the OLED wiring (wiring.svg: SDA GP4, SCL GP5, keys GP10 to GP13): hello, and held keys.
+# Needs micropython-lib ssd1306.py (`mip.install('ssd1306')` on a real Pico W).
+# why: lessons/rig-pico.md#oled-main
 from machine import Pin, I2C
 import ssd1306
 import time

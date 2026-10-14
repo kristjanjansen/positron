@@ -1,10 +1,6 @@
-// In-container page server + probes on :8890 (cloud twin of obs-docker/serve.mjs).
-//   /clock.html  burned-clock page for the OBS browser source (localhost fetch)
-//   /now         container Date.now() — clock-skew probe (Worker-proxied from the Mac)
-//   /collect     POST beacons -> /tmp/beacons.jsonl ; /beacons returns the tail
-//   /cpu         /proc-sampled CPU: total + per-obs-process, 1.5 s window
-//   /top         ps snapshot
-//   /health      boot info
+// In-container page server and probes on :8890: /clock.html, /now, /collect, /beacons, /cpu,
+// /top, /health.
+// why: lessons/rig-obs.md#serve-cloud
 import http from "node:http";
 import { readFileSync, appendFileSync, readdirSync, existsSync } from "node:fs";
 

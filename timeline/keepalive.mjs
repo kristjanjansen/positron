@@ -1,45 +1,7 @@
-// timeline/keepalive.mjs — the two cheap, PUBLISHED exemptions that keep a
-// hidden tab's clock alive. v0.6. Browser only, plain ESM, no deps.
-//
-// ===========================================================================
-// WHY THIS FILE EXISTS. Our hidden-tab result (worker tick 8.5 ms p95 hidden
-// vs main-thread 981 ms, rAF 9175 ms) defends against THROTTLING. Chrome 133
-// added a second, different mechanism — FREEZING on Energy Saver — and a
-// worker tick is not on its exemption list:
-//
-//   >5 min hidden + silent + CPU-intensive  ->  the page is FROZEN
-//   exempt: mic/camera/screen-capture, a live RTCPeerConnection,
-//           WebUSB / WebBluetooth / WebHID, or a HELD WEB LOCK
-//   — https://developer.chrome.com/blog/freezing-on-energy-saver
-//
-// MEASURED HERE (timeline/lab/run-freeze.mjs, SIGSTOP on the renderer, which
-// is what a freeze is): a dedicated worker is frozen WITH its page — its own
-// `setInterval` log shows the same multi-minute gap the main thread does. The
-// worker tick host buys nothing against freezing. So the mitigation has to be
-// one of Chrome's own exemptions, and two of them are nearly free:
-//
-//   (1) A HELD WEB LOCK — explicitly on the exemption list, one line, no
-//       audio device, no permission prompt, works with the tab muted.
-//   (2) AN AUDIBLE PAGE — an audible page is exempt from freezing AND from
-//       the 1 Hz background timer clamp, and Firefox additionally does not
-//       throttle a tab containing an AudioContext at all.
-//       ⚠️ HONEST CAVEAT: "audible" is Chrome's own determination and a
-//       gain of literally 0 is NOT audible. This helper therefore emits a
-//       real, tiny (default 8e-4) low-frequency tone rather than silence,
-//       and reports the gain it used. If you cannot accept any output, use
-//       the lock alone.
-//
-// AND THE THIRD OPTION, which is the one we actually rely on: ACCEPT THE
-// FREEZE. `catchUp: 'reduce'` folds the whole missed prefix and re-asserts on
-// the first task after resume — measured at 0.1 ms to correct state after a
-// 20 s freeze and (see NOTES) at 5-minute scale. A frozen tab that wakes up
-// CORRECT is a much cheaper guarantee than a tab that never freezes.
-//
-//   import { keepAwake } from './keepalive.mjs';
-//   const ka = await keepAwake({ lock: true, audio: true });
-//   ka.status();   // {lock, audio, reasons}
-//   ka.release();
-// ===========================================================================
+// Chrome freezes a hidden silent page after 5 min on Energy Saver, workers too. Exemptions:
+// a held Web Lock, or an audible page (a real tone, default gain 8e-4; gain 0 is not audible).
+// keepAwake({ lock, audio }) -> { status(), release() }. catchUp 'reduce' recovers after one.
+// why: lessons/timeline-misc.md#keepalive
 
 export async function keepAwake({
   lock = true,

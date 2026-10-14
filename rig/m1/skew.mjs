@@ -1,25 +1,7 @@
-// HANDOFF item 0: min-RTT clock skew over a REAL LINK, between two machines.
-//
-//   node skew.mjs <id> [seconds] [room]
-//
-// Run it on BOTH machines at once with different ids. Everything the project's
-// multi-device timing rests on is this number, and it has only ever been
-// measured on loopback (peer-to-peer ±0.15 ms, drift 7 µs / 25 min) or against a
-// Worker `/time` endpoint (±50 ms, and that was BIAS -- edge path asymmetry, not
-// jitter).
-//
-// It stopped being theoretical today: MoQ transit between these two machines
-// read −14.2 ms. A negative latency is the skew showing up, because the send
-// stamp is one machine's clock and the read is the other's.
-//
-// WHY MIN-RTT AND NOT AN AVERAGE: an average is dragged by every queued packet;
-// the minimum is the one sample that got through cleanly. The claim under test
-// is that min-RTT estimation is SCALE-FREE -- a 311 ms link estimated as well as
-// a 1.3 ms one -- but that evidence was still loopback-shaped. If a real link's
-// offset spread is materially worse than ±0.15 ms, peer-to-peer estimation alone
-// does not carry a multi-device click track, and that is the useful outcome.
-//
-// This runs in node: peer.mjs uses only WebSocket and performance, both global.
+// node skew.mjs <id> [seconds] [room], on both machines at once: min-RTT clock skew over a real
+// link.
+// Min-RTT, since the minimum is the one sample that got through without queueing.
+// why: lessons/rig-m1.md#skew-header
 import { createPeer, wsTransport } from '../../proto/looper/peer.mjs';
 
 const id = process.argv[2] || `peer-${Math.floor(Math.random() * 1e6)}`;
@@ -55,12 +37,8 @@ console.log(`\n${id} — ${sk.length} samples over ${secs}s`);
 if (!sk.length) { console.log('  no peer answered — is the other side running in the same room?'); process.exit(1); }
 console.log(`  round trip     min ${Math.min(...rtts).toFixed(3)}  p50 ${q(rtts,50).toFixed(3)}  p95 ${q(rtts,95).toFixed(3)}  max ${Math.max(...rtts).toFixed(3)} ms`);
 console.log(`  offset, ALL    p50 ${q(offs,50).toFixed(3)}  spread ${(Math.max(...offs) - Math.min(...offs)).toFixed(3)} ms`);
-// The KEPT set is the running minimum's TRAJECTORY, not a stability measure:
-// every early sample counts as kept while the minimum is still falling, so its
-// spread conflates converging with wandering. What stability actually looks
-// like is the offset over the LAST THIRD of the run, once the minimum has
-// settled -- and the real check is the other machine, which estimates the same
-// quantity independently and should come back equal and opposite.
+// Stability is the offset over the last third, once the minimum settled; the kept set is its path.
+// why: lessons/rig-m1.md#skew-tail
 const tail = sk.slice(Math.floor(sk.length * 2 / 3)).map((l) => l.offset);
 console.log(`  offset, LAST 3rd  p50 ${q(tail,50).toFixed(3)}  p05–p95 ${(q(tail,95) - q(tail,5)).toFixed(3)} ms wide`);
 console.log(`  (kept set = the running minimum's trajectory, ${keptOffs.length} samples — not a stability measure)`);

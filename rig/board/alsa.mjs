@@ -1,27 +1,15 @@
-// rig/board/alsa.mjs — the patchbay, as a value.
-//
-// plan-hardware §8.4: a wrong MIDI patch is SILENT. Nothing errors, no light
-// changes, notes just do not arrive — and you are in another city. So every
-// step here is arranged so that a patch is CHECKED before it is applied, and
-// anything that cannot be checked is refused by name rather than attempted.
-//
-// Two backends, chosen by whether `aconnect` exists:
-//   alsa  — the board
-//   fake  — a fixture, so the whole naming/validation layer is testable on a
-//           laptop with no hardware. It is NOT a simulation of MIDI; it stands
-//           in for the port list only, and `apply` on it changes nothing.
+// The MIDI patchbay as a value: a wrong patch is silent, so every patch is checked before it is
+// applied and what cannot be checked is refused. Backends: `alsa` (aconnect) or `fake` (a fixture
+// port list).
+// why: lessons/rig-board-io.md#alsa-header
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-// ⚠️ IMPORTED DIRECTLY, NOT THROUGH ANOTHER SHELL MODULE: `push.sh` ships only
-// the `../../demo/shell` files a board module names itself.
+// Imported directly: push.sh ships only the shell files a board module names.
+// why: lessons/rig-board-io.md#midi-kinds
 import { KINDS, ALIASES, canonKind } from '../../demo/shell/midi-kinds.mjs';
 
-/**
- * 🔴 THE ONE KIND LIST SINCE 2026-10-03, shared with `bay.mjs` and the input
- * gate. This said `pitchbend` and `aftertouch` where the bay said `bend` and
- * `touch`; both old spellings are still ACCEPTED through `ALIASES`, so a patch
- * saved before the change still plans, and a step reports the new name.
- */
+// The one kind list, shared with bay.mjs; old spellings are accepted through ALIASES.
+// why: lessons/rig-board-io.md#carry
 export const CARRY = KINDS;
 export const CARRY_ALIASES = ALIASES;
 
@@ -32,15 +20,8 @@ export function backend() {
   } catch { return 'fake'; }
 }
 
-/**
- * Parse `aconnect -l`. Pure, so it is testable against a fixture — which is the
- * only reason the naming layer can be finished before the board arrives.
- *
- * The format is two indent levels and two prose lines:
- *   client 20: 'Circuit' [type=kernel,card=1]
- *       0 'Circuit MIDI 1  '
- *   \tConnecting To: 24:0
- */
+// Parse `aconnect -l` (client lines, port lines, Connecting To lines); pure, tested on a fixture.
+// why: lessons/rig-board-io.md#parse-aconnect
 export function parseAconnect(text) {
   const clients = [];
   let client = null, port = null;
@@ -73,18 +54,9 @@ export function parseAconnect(text) {
 // "24:0, 28:0[real:1]" -> ['24:0','28:0']. The bracket suffix is queue detail.
 const refs = (s) => s.split(',').map((x) => x.trim().replace(/\[.*$/, '')).filter(Boolean);
 
-/**
- * ⚠️ THE TWO ZEROES MUST NOT LOOK ALIKE. `aconnect -l` exits 1 with an empty
- * stdout when the sequencer is unreachable — no `/dev/snd/seq`, modules not
- * loaded, user not in `audio`. Measured in an arm64 Linux container,
- * 2026-09-10. Letting that surface as an empty client list would make "ALSA is
- * broken" indistinguishable from "nothing is plugged in", which is this
- * project's own rule about a partial result that is too tidy.
- *
- * So a failure is a REPORTED FACT rather than a throw: the board stays up and can
- * say what is wrong over the relay, which is the point of a service nobody can
- * walk over to.
- */
+// An unreachable sequencer (aconnect exits 1, empty stdout) is reported as an error, never as an
+// empty list, so the board can say what is wrong over the relay.
+// why: lessons/rig-board-io.md#list-ports
 export function listPorts({ from, fixture = false } = {}) {
   if (from) return { backend: 'fake', clients: parseAconnect(readFileSync(from, 'utf8')), error: null };
   const be = fixture ? 'fake' : backend();
@@ -111,12 +83,8 @@ function hintFor(err) {
   return null;
 }
 
-/**
- * Flatten to the addressable things, with the plumbing hidden. `System` and
- * `Midi Through` are always present and are never what anybody means by "the
- * circuit"; leaving them in the candidate set is how a fuzzy match picks the
- * wrong port and the patch goes silent.
- */
+// Addressable ports without the plumbing (System, Midi Through), which a fuzzy match would pick.
+// why: lessons/rig-board-io.md#addressable
 export function addressable(clients) {
   const out = [];
   for (const c of clients) {
@@ -135,14 +103,8 @@ export function addressable(clients) {
   return out;
 }
 
-/**
- * THE NAMING LAYER IS THE PRODUCT (plan-hardware §8.4). ALSA says `20:0`;
- * nobody says that out loud. This maps what a person says onto a port.
- *
- * Ambiguity is REPORTED, never broken by picking the first — a patch that
- * silently chose the wrong one of two matching devices is the exact failure
- * this whole file is arranged to prevent.
- */
+// Map what a person says onto a port; ambiguity is reported, never resolved by picking the first.
+// why: lessons/rig-board-io.md#resolve
 export function resolve(name, ports) {
   const q = String(name).trim().toLowerCase();
   if (!q) return { ok: false, reason: 'empty name' };
@@ -169,19 +131,9 @@ export function resolve(name, ports) {
   return { ok: false, reason: `nothing here is called "${name}"`, candidates: ports.map((p) => p.client) };
 }
 
-/**
- * Turn a patch document into steps, WITHOUT touching the rig. This is the whole
- * point: the answer to "will this work" arrives before anything changes.
- *
- * ⚠️ `carry` is the part `aconnect` cannot do. An ALSA subscription is
- * unfiltered — it carries every message class the source emits, and there is no
- * per-class option on the connection. So a document asking for a SUBSET is
- * refused rather than approximated: applying a full connection where "note
- * only" was asked would leak clock and transport into a rig, which is most of
- * what makes dawless setups painful and exactly what the document was written
- * to control. Refusing is loud; over-connecting is silent.
- * (To verify on the board — see README.)
- */
+// A patch document to steps without touching the rig. A `carry` subset is refused: an ALSA
+// subscription carries every class, and over-connecting is silent.
+// why: lessons/rig-board-io.md#alsa-plan
 export function plan(doc, ports) {
   const problems = [], steps = [];
   if (!doc || typeof doc !== 'object') return { ok: false, steps, problems: ['patch is not an object'] };
@@ -220,11 +172,8 @@ export function plan(doc, ports) {
   return { ok: problems.length === 0, steps, problems };
 }
 
-/**
- * Apply a plan. Refuses outright unless the plan is clean — there is no
- * "apply the parts that worked", because a half-applied patch is a rig whose
- * state nobody wrote down.
- */
+// Apply only a clean plan; there is no applying the parts that worked.
+// why: lessons/rig-board-io.md#alsa-apply
 export function apply(planned, { dry = false } = {}) {
   if (!planned.ok) return { ok: false, ran: [], reason: 'plan has problems; nothing applied' };
   const ran = [];
@@ -248,19 +197,10 @@ export function clearAll({ dry = false } = {}) {
   catch (e) { return { ok: false, result: 'failed', error: String(e.stderr ?? e.message).trim() }; }
 }
 
-// `sourcesOf` moved here from yoshimi.mjs on 2026-10-13, when Yoshimi left the
-// board (archive/yoshimi/README.md): it reads any client's sources off
-// `aconnect -l`, and `jacksynth.mjs` `strayMidiSources` uses it for every JACK synth.
-/**
- * Who feeds a sequencer client, out of `aconnect -l`, as `{ id, name }` per
- * source port. `match` is a RegExp on the client's name or `(id, name) => bool`. The board's check that Yoshimi hears the virmidi port and
- * nothing else: an instance edited by hand, or a Yoshimi that ignores the
- * setting, would show the Circuit here.
- *
- *   client 128: 'yoshimi' [type=user,pid=4321]
- *       0 'input           '
- *           Connected From: 16:0, 44:0[real:0]
- */
+// Who feeds a sequencer client, as {id, name} per source port, from `aconnect -l`; `match` is a
+// RegExp
+// or (id, name) => bool. Used by jacksynth.mjs strayMidiSources.
+// why: lessons/rig-board-io.md#sources-of
 export function sourcesOf(listing, match) {
   const names = new Map();
   let cur = null, inside = false;

@@ -1,23 +1,6 @@
-# AbletonOSC handler for Live's BROWSER — the one thing AbletonOSC does not
-# expose and the one thing a remote instrument needs: a track with no device on
-# it makes no sound however well the MIDI arrives.
-#
-# Live's LOM does have it (Live 10+): application.browser.instruments is a tree
-# of BrowserItem, and browser.load_item(item) loads onto the SELECTED track. So
-# "load an instrument onto track N" is: select N, find a loadable item, load it.
-#
-#   /live/browser/roots                       -> every browser root and its size
-#   /live/browser/instruments                 -> top-level instrument names
-#   /live/browser/find <substring> [limit]    -> loadable items matching
-#   /live/browser/load <track_index> <name>   -> select track, load first match
-#
-# Installed to Live's Remote Scripts and picked up by /live/api/reload.
-# REGISTERED FROM view.py, NOT FROM manager.py. /live/api/reload does rebuild the
-# handler list -- it calls clear_api() then init_api() -- but it reloads only the
-# abletonosc/* modules, and NOT manager.py. So a handler added to manager's list
-# needs a Live restart, while one registered from inside an already-reloaded
-# module does not. Live refuses AppleScript quit, so "no restart" is the whole
-# point.
+# AbletonOSC handler for Live's browser: /live/browser/roots, instruments, find, load.
+# Registered from view.py, since /live/api/reload does not reload manager.py.
+# why: lessons/rig-m1.md#abletonosc-browser
 from typing import Optional, Tuple
 
 
@@ -43,13 +26,8 @@ def register(self):
                 for r in walk(c, depth + 1, limit):
                     yield r
 
-        # ⚠️ A VST IS NOT UNDER `instruments`, AND SEARCHING ONLY THERE FINDS
-        # NOTHING WITH NO ERROR. Live's browser has separate roots and third
-        # party plugins live under `plugins`; `instruments` holds Live's own
-        # devices. Asking this for "Arturia", "Analog Lab" and "Rhodes" all
-        # returned empty, which reads as "not installed" and meant "not looked
-        # for". Every root is searched now and each hit says which one it came
-        # from, because loading needs to look in the same place.
+        # Search every root: third-party plugins are under `plugins`, not `instruments`.
+        # why: lessons/rig-m1.md#abletonosc-roots
         ROOTS = ("instruments", "plugins", "sounds", "drums", "user_library",
                  "packs", "audio_effects", "midi_effects")
 
@@ -93,9 +71,8 @@ def register(self):
         def find(params: Optional[Tuple] = ()):
             needle = str(params[0]).lower()
             limit = int(params[1]) if len(params) > 1 else 20
-            # "root/name", so the caller can see WHERE it was found — an Arturia
-            # patch under `plugins` and a Live preset under `sounds` are
-            # different things and a bare name hides that.
+            # "root/name", so the caller sees where an item was found.
+            # why: lessons/rig-m1.md#abletonosc-hit
             return tuple("%s/%s" % (r, it.name) for r, it in _hits(needle, limit))
 
         def load(params: Optional[Tuple] = ()):

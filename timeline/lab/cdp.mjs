@@ -1,5 +1,5 @@
-// timeline/lab/cdp.mjs — minimal CDP client over node's built-in WebSocket
-// (jam-harness lineage), plus a browser-endpoint variant for Target control.
+// A minimal CDP client over node's WebSocket, plus a browser-endpoint variant for Target control.
+// why: lessons/timeline-lab.md#cdp
 export class CDP {
   constructor() { this.id = 0; this.pending = new Map(); }
   async connect(port, urlMatch) {

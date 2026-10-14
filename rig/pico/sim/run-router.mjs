@@ -1,28 +1,7 @@
-// rig/pico/sim/run-router.mjs: the C router of rig/pico/firmware/ on an
-// emulated Pico, driven over its MIDI UART and its four keys, graded step by
-// step, with a screenshot after each.
-//
-//   ../firmware/build.sh pico      # builds ../firmware/build-pico/router.uf2 in Docker
-//   node run-router.mjs            # router-0.png .. router-6.png, router-font-*.png
-//
-// MIDI goes in through UART0's RX FIFO (rp2040js `feedByte`) and comes out of
-// UART0's data register (`onByte`), which is the pin pair GP1 and GP0 on the
-// board. The emulated UART has no baud timing: a byte is in the FIFO the moment
-// it is fed, so 31250 baud is set by the firmware and not exercised here.
-//
-// The screen is READ BACK through the display model, not trusted from the
-// firmware. The fonts are parsed out of the same ui.c and font headers the
-// firmware compiles, and a phrase counts as on the panel only when every pixel
-// of its character cells matches exactly, lit on dark or dark on lit (which is
-// how the inverted header, banner and footer cell are told apart). The bars,
-// dots, arrow and meter are checked as pixels too.
-//
-// Then once per compiled font: the same UF2 with ONE flash byte patched (the
-// byte after "UIFONT" in main.c's FONT_PICK) boots in that font, and the real
-// screen is shot in scene 2 and in the hold state, router-font-<name>.png and
-// router-font-<name>-hold.png.
-//
-// Exits 1 on any FAIL.
+// node run-router.mjs (after ../firmware/build.sh pico): the C router on an emulated Pico, MIDI
+// over UART0 and the four keys, graded per step with the screen read back pixel-exact through the
+// model. Then once per font via a patched FONT_PICK byte. Exits 1 on any FAIL.
+// why: lessons/rig-pico.md#run-router-header
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,10 +68,9 @@ function panel(px, F) {
     }
     return hits;
   }
-  // Everything legible, as runs of characters, for the log. Only what this
-  // screen draws: capitals, digits and a little punctuation, so a lower case
-  // glyph whose top half equals some edge is not read. Where two glyphs share
-  // the cap band (O and a Q whose tail is below it) the first listed wins.
+  // Legible runs for the log: capitals, digits, a little punctuation; on a shared cap band the
+  // first wins.
+  // why: lessons/rig-pico.md#run-router-readable
   const READABLE = 'ABCDEFGHIJKLMNOPRSTUVWXYZQ0123456789+/:,';
   function read() {
     const hits = [];
@@ -318,7 +296,8 @@ try {
       s.headerLit() > 0.6 && s.arrow() >= 8 && !m.length && ins && s.dot(ins) === 'on', `${missing(m)} arrow ${s.arrow()} px`);
     await send(REPLACE_PATCH);
     s = await shot(`router-font-${G.name}-hold.png`, G);
-    // ONE LINE, NEVER TWO: whichever wording fitted, and no second banner line.
+    // One banner line only, whichever wording fitted.
+    // why: lessons/rig-pico.md#run-router-one-line
     const said = HOLD_WORDS.find((t) => s.has(t, true));
     const k4 = s.has('OK/NO', true) ? 'OK/NO' : 'OK';
     const hint = s.has('TAP OK, HOLD NO', false) || s.has('HOLD = NO', false);
@@ -327,15 +306,10 @@ try {
     stop();
   }
 
-  // ── the key labels down the right, every font ──
-  // The module's four buttons sit in a column beside the screen, so byte 7
-  // moves the labels there. Graded as pixels: one full height rule, the four
-  // labels in top to bottom order inside the column, nothing of the link or
-  // the header reaching past the rule, and K4's cell filled while held.
-  // ⚠️ A NEGATIVE CONTROL FIRST: the default boot must have NO such rule, or a
-  // check that finds one proves nothing about byte 7.
-  // The column's rule runs from under the header to the foot: every row from
-  // 16 down lit, which no box side, arrow or footer divider is.
+  // Key labels down the right (byte 7): one full-height rule from row 16, labels in order inside
+  // it,
+  // K4 filled while held. Negative control first: the default boot has no such rule.
+  // why: lessons/rig-pico.md#run-router-labels
   const ruleAt = (px) => { for (let x = 127; x > 64; x--) { let n = 0; for (let y = 16; y < 64; y++) n += px[y * 128 + x]; if (n === 48) return x; } return -1; };
   start();
   pico.boot();

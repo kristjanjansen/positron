@@ -1,7 +1,6 @@
-// SAFARI MoQ TEST player module. Loaded by index.html AFTER the boot script has
-// verified WebTransport exists and the user tapped start. Everything is reported
-// on-screen (no devtools on iPhone), into window.__report (for CDP probes), and
-// via POST /beacon to the Worker (visible in `wrangler tail`).
+// Safari MoQ test player, loaded after WebTransport is verified and the user tapped start.
+// Reports on screen, in window.__report and via POST /beacon.
+// why: lessons/rig-moq.md#safari-play-header
 import { Connection, Path } from "@moq/net";
 import * as Container from "@moq/hang/container";
 
@@ -11,7 +10,8 @@ const RELAY = params.get("relay") ?? "https://draft-14.cloudflare.mediaoverquic.
 const CODEC_OVERRIDE = params.get("codec"); // force decoder codec string
 const LOG_URL = params.get("log"); // optional extra log collector (local rig runs)
 
-// Burned binary row geometry — must match pub-safari.js exactly.
+// Burned binary row geometry: must match pub-safari.js exactly.
+// why: lessons/rig-moq.md#safari-play-row
 const NBLOCKS = 56, BLOCK_W = 20, ROW_X = 40, ROW_Y = 100, ROW_H = 80;
 
 const report = (window.__report = window.__report ?? {});
@@ -164,7 +164,8 @@ setInterval(() => {
 				+ `${report.aDecoded} chunks decoded · lat ~${al !== undefined ? Math.round(al) : "?"} ms `
 				+ `· A/V skew ${sk !== undefined ? (sk > 0 ? "+" : "") + Math.round(sk) : "?"} ms `
 				+ `· ${report.aUnderruns} underruns · ${report.aDecErrors} errors`, "ok");
-			// The big audibility verdict — "decoded fine" is NOT "audible".
+			// The audibility verdict: decoded fine is not audible.
+			// why: lessons/rig-moq.md#safari-play-verdict
 			if (report.audioState === "suspended")
 				setStatus("st-averdict", "TAP TO ENABLE SOUND — AudioContext suspended (autoplay policy)", "wait");
 			else if (report.audioState === "sounding")
@@ -183,12 +184,10 @@ setInterval(() => {
 }, 1000);
 setInterval(() => beacon("stats"), 5000);
 
-// @moq/net v0.3.3 hard-blocks WebTransport on ALL Safari via a UA sniff
-// (connection/browser.js: `safari: "<0"`, citing WebKit bug 319818 — "flow-control
-// window never refills, which permanently stalls sessions"). Safari's actual
-// WebTransport is never even tried. connect() accepts a pre-built transport
-// though, so on that specific failure we construct the WebTransport ourselves
-// and hand it over — this page's whole point is to measure what Safari really does.
+// The @moq/net package blocks WebTransport on Safari by UA (WebKit 319818); on that failure we
+// build the
+// WebTransport ourselves and hand it to connect(), since measuring Safari is the point.
+// why: lessons/rig-moq.md#safari-play-connect
 async function connectAny() {
 	try {
 		return await Connection.connect(new URL(RELAY), { websocket: { enabled: false } });
@@ -227,7 +226,8 @@ async function session(startedAt) {
 
 	const bc = conn.consume(Path.from(NS));
 
-	// --- catalog (CF rejects subscribe-before-announce with "Track not found" — retry) ---
+	// Catalog: CF rejects subscribe-before-announce with "Track not found", so retry.
+	// why: lessons/rig-moq.md#safari-play-catalog
 	report.stage = "catalog";
 	let catGroup;
 	for (let attempt = 0; attempt < 30 && !dead; attempt++) {
@@ -285,13 +285,10 @@ async function session(startedAt) {
 	});
 	decoder.configure(dcfg);
 
-	// --- AUDIO (RUNBOOK §10): if the catalog carries an audio track, decode and
-	// play it through WebAudio. Measurement: publisher audio timestamps are
-	// wall-anchored µs and a loud 6 ms tick fires at every 500 ms wall boundary,
-	// so rounding a detected tick's media time to the nearest 500 ms recovers
-	// the publisher wall time exactly (same one-clock trick as the burned video
-	// row). aLat carries the device-clock offset on phones, but the A/V skew
-	// (aLat − video g2g) cancels it — skew is exact on any device.
+	// Audio (RUNBOOK §10): a 6 ms tick at every 500 ms wall boundary, so rounding a tick's media
+	// time
+	// recovers publisher wall time. A/V skew cancels the device clock offset.
+	// why: lessons/rig-moq.md#safari-play-audio
 	let audioStop = () => {};
 	const aName = Object.keys(catalog?.audio?.renditions ?? {})[0];
 	if (!aName) {
@@ -327,12 +324,10 @@ async function session(startedAt) {
 				log("AUDIO", `codec=${aCfg.codec}`, `ctx=${audioCtx.state}`);
 				beacon("audio-start", { audioCodec: aCfg.codec, audioState: audioCtx.state });
 
-				// --- SILENCE DETECTION (RUNBOOK §10.7): measure the ACTUAL output
-				// level, not just decode success. All buffer sources feed a master
-				// gain -> destination, with an AnalyserNode tapping the master bus;
-				// a 250 ms sampler collects output power into a rolling 3 s window.
-				// Decoded-PCM power is windowed separately (pcmDb) so a SILENT
-				// verdict can say WHERE the sound died (decoder vs output path).
+				// Silence detection (RUNBOOK §10.7): output power via an analyser on the master
+				// bus, decoded power
+				// separately, so a SILENT verdict says where the sound died.
+				// why: lessons/rig-moq.md#safari-play-silence
 				const masterGain = audioCtx.createGain();
 				masterGain.connect(audioCtx.destination);
 				const analyser = audioCtx.createAnalyser();
@@ -365,7 +360,8 @@ async function session(startedAt) {
 					const decoding = report.aDecoded > lastADecoded;
 					lastADecoded = report.aDecoded;
 					if (audioCtx.state !== "running") {
-						// suspended ctx renders nothing — do NOT call that silence
+						// A suspended context renders nothing; that is not silence.
+						// why: lessons/rig-moq.md#safari-play-suspended
 						report.audioState = "suspended";
 						silentStreak = 0;
 					} else if (report.audioLevelDb > NOISE_FLOOR_DB) {
@@ -385,9 +381,8 @@ async function session(startedAt) {
 					}
 					report.silentSeconds = report.audioState === "silent" ? silentStreak : 0;
 				};
-				// iOS autoplay policy: a suspended ctx resumes only from a user
-				// gesture — any tap on the page counts (the pre-start gate tap
-				// already created+resumed it; this covers later suspensions).
+				// iOS resumes a suspended context only from a gesture, so any tap resumes it.
+				// why: lessons/rig-moq.md#safari-play-resume
 				const resumeTap = () => { audioCtx.resume().catch(() => {}); };
 				document.addEventListener("click", resumeTap);
 				document.addEventListener("touchend", resumeTap, { passive: true });
@@ -397,11 +392,9 @@ async function session(startedAt) {
 				let lastTickMediaMs = -1e12;
 				const aStart = performance.now();
 				const wallNow = () => performance.timeOrigin + performance.now();
-				// AudioDecoder output timestamps are regenerated by the browser
-				// (sample-count accumulation + Opus pre-skip shift) — carry the
-				// ENCODED chunk timestamps through a FIFO instead (Opus 20 ms is
-				// 1-in-1-out, verified: without this, a content skip at join
-				// showed up as a permanent +500 ms phantom on aLat).
+				// Carry encoded chunk timestamps through a FIFO: AudioDecoder regenerates output
+				// timestamps.
+				// why: lessons/rig-moq.md#safari-play-ts
 				const inTsQ = [];
 				const aDec = new AudioDecoder({
 					output: (ad) => {

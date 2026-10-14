@@ -1,37 +1,7 @@
-// rig/route-core/vectors-to-lines.mjs: the route vectors as numbered lines a C
-// runner can read with `fgets` and `strtol`, so the core never meets JSON.
-//
-//   node rig/route-core/vectors-to-lines.mjs > lines.txt
-//
-// This is L2's job from `plans/plan-route-core.md` §7, done the dumb way: a
-// port name becomes its index, a link id becomes a number, an op name becomes
-// its opcode, a kind becomes its bit. 🔴 IT RESOLVES NAMES AND NOTHING ELSE. It
-// never checks a range, a direction or a cycle, because then the C would be
-// graded on what this file already refused. An op it does not know is written
-// as opcode 255, a value that is not an integer as `?`, a port nobody declared
-// as 255, and the C is left to refuse each of them.
-//
-// ⚠️ THE NUMBERS MUST MEAN WHAT `route_core.h` SAYS. The op and kind lists below
-// are checked against `route-core.mjs` and `midi-kinds.mjs` on every run, and a
-// drift exits 1 before a line is written.
-//
-// ⚠️ A POLICY KEY IS READ THROUGH `canonKind`, so `{ pitchbend: 'deny' }`
-// means bend. This file did it first; the JS read the key verbatim until
-// 2026-10-03 and does the same now. Vector 21 uses one.
-//
-// The format, one record a line, fields split by spaces:
-//   V file name...                       a vector starts
-//   P index name dir accepts v0..v7      a port; verbs 0 allow 1 confirm 2 deny 3 unset
-//   R port verb len b0 b1 ...            a rule on that port; `xx` is any byte
-//   L id from to nops (code a0..a4)*     a link to make; `-` absent, `?` not an integer,
-//                                        `v` notecc's on 'vel', and a curve's points as
-//                                        one token `in,out,in,out,...` in its a0
-//   I port t hex...                      an input
-//   U id t | C port t | D port           unlink, confirm, deny
-//   X id code                            an expected refusal, code as in route_status
-//   O port t hex...                      an expected output
-//   H port n                             expected held at the end
-//   E                                    the vector ends
+// node rig/route-core/vectors-to-lines.mjs > lines.txt: route vectors as lines for the C runner.
+// Resolves names only (unknown op 255, non-integer `?`); every refusal is left to the C.
+// Op and kind numbers are checked against route-core.mjs each run. Format: lessons/rig-misc.md.
+// why: lessons/rig-misc.md#vectors-to-lines
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,15 +35,11 @@ const int32 = (v) => (Number.isInteger(v) && Math.abs(v) < 2 ** 31 - 2 ? String(
 function arg(op, field, v) {
   if (v === undefined) return ABSENT;
   if (field === 'cls') { const k = canonKind(v); return k === null ? INVALID : String(KINDS.indexOf(k)); }
-  // ⚠️ velocity's scale is a fraction. The C takes it in THOUSANDTHS, so 0.5 is
-  // 500, a scale under 1/2000 rounds to 0 and is refused (the JS refuses it too
-  // since 2026-10-03, vector 20), and a fourth decimal is lost. Why thousandths:
-  // `route_core.c`, the op.
+  // velocity's scale goes in thousandths (0.5 is 500); under 1/2000 rounds to 0 and is refused.
+  // why: lessons/rig-misc.md#vectors-velocity
   if (op === 'velocity' && field === 'scale') return typeof v === 'number' ? int32(Math.round(v * 1000)) : INVALID;
-  // ⚠️ A CURVE'S TABLE IS ONE TOKEN, its pairs flattened with commas, so the
-  // fixed five slots of an L line still hold it. Anything that is not a list of
-  // integer pairs is `?`. How many points, their range and their order are the
-  // C's to refuse, not this file's: 17 points go across as 34 numbers.
+  // A curve's table is one comma-joined token in a0; any non-integer-pair list is `?`.
+  // why: lessons/rig-misc.md#vectors-curve
   if (field === 'points') {
     const ok = Array.isArray(v) && v.length > 0 && v.every((q) => Array.isArray(q) && q.length === 2 && q.every((x) => int32(x) !== INVALID));
     return ok ? v.flat().join(',') : INVALID;

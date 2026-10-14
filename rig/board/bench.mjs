@@ -1,11 +1,5 @@
-// rig/board/bench.mjs — how much of this board one instrument costs.
-//
-// synth.mjs claims a Pi 4 runs 8 voices at 3-4x realtime, derived from 41x on
-// an M1 and a guess at the ratio between the chips. A guess in a comment is a
-// claim nobody can check, so: run this on the board and the measured number
-// replaces it.
-//
-//   node bench.mjs
+// node bench.mjs: what one instrument costs on this board, measuring synth.mjs's estimate.
+// why: lessons/rig-board-synth.md#bench-header
 import { createSynth, RATE } from './synth.mjs';
 import { cpus, loadavg } from 'node:os';
 

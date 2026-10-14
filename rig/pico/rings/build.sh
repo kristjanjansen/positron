@@ -1,14 +1,7 @@
 #!/bin/bash
-# rig/pico/rings/build.sh: build the rings firmware for the plain RP2040 Pico,
-# inside Docker, and copy the UF2 to where the page fetches it.
-#
-#   rig/pico/rings/build.sh
-#
-# Writes build-pico/rings.uf2 beside this file and demo/resources/pico/rings-pico.uf2.
-# The image is the router's, `positron-pico-sdk:2.2.0`, built from
-# rig/pico/firmware/Dockerfile on first use.
-#
-# 🔴 NOTHING NATIVE RUNS ON THE MAC. The compiler, CMake and picotool are all in the image.
+# rig/pico/rings/build.sh: the rings firmware for the RP2040 Pico, built in Docker,
+# copied to demo/resources/pico/rings-pico.uf2. Nothing native runs on the Mac.
+# why: lessons/rig-pico.md#rings-build
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RIG="$(cd "$HERE/../.." && pwd)"

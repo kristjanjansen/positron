@@ -1,13 +1,6 @@
-// rig/pico/sim/pico.mjs: an emulated Raspberry Pi Pico (RP2040) with the
-// 4 button SSD1306 board of rig/pico/oled/ wired to it, scriptable.
-//
-//   SSD1306 on I2C0 at 0x3C (GP4 SDA, GP5 SCL on the real board; the emulator
-//   routes I2C0 by peripheral, not by pin, so the pins are not checked here).
-//   K1..K4 on GP10..GP13, to ground, read through the pull-up: released is high.
-//
-// Time is the emulator's own clock (clock.nanos), not the wall clock, so
-// `hold(1, 200)` is 200 ms as the firmware sees it however long it takes to
-// emulate.
+// An emulated RP2040 with the 4 button SSD1306 board: OLED on I2C0 at 0x3C, K1..K4 on GP10..GP13
+// to ground. Time is the emulator's clock, so `hold(1, 200)` is 200 ms to the firmware.
+// why: lessons/rig-pico.md#pico-sim-header
 import { readFileSync } from 'node:fs';
 import { Simulator, USBCDC, ConsoleLogger, LogLevel } from 'rp2040js';
 import { SSD1306 } from './ssd1306.mjs';
@@ -29,14 +22,8 @@ function loadUF2(path, mcu) {
   }
 }
 
-// The I2C bus as wires, for the one transfer MicroPython does NOT send through
-// the I2C peripheral. ports/rp2/machine_i2c.c answers a zero length write by
-// bit-banging the pins as SIO GPIO ("Workaround issue with hardware I2C not
-// accepting zero-length writes"), and i2c.scan() is nothing but zero length
-// writes. rp2040js has no wires between pins, and a pin reads back only what
-// setInputValue last put there, so without this the scan reads [] while the
-// hardware path to the same display works. This models the pull-ups (a line is
-// high unless somebody drives it low) and a target that ACKs its address.
+// I2C as wires for zero-length writes (i2c.scan), which MicroPython bit-bangs over SIO GPIO.
+// why: lessons/rig-pico.md#pico-sim-wired-i2c
 class WiredI2CTarget {
   constructor(mcu, sdaPin, sclPin, address, onByte = () => {}) {
     this.sda = mcu.gpio[sdaPin];
@@ -205,11 +192,8 @@ export class Pico {
     return { out: this.serial.slice(ok, end1 - 1), err: this.serial.slice(end1, end2 - 1) };
   }
 
-  // A filesystem the firmware can import from. MicroPython's own one lives in
-  // flash, and rp2040js does not emulate flash ERASE and PROGRAM (reads work,
-  // writes are lost): on the emulated board `os.listdir('/')` is [] and
-  // `os.VfsLfs2.mkfs(rp2.Flash())` fails with ENOSPC. So this mounts a littlefs
-  // on a RAM block device at '/' instead, which a real board never needs.
+  // littlefs on a RAM block device at '/': rp2040js does not emulate flash erase and program.
+  // why: lessons/rig-pico.md#pico-sim-ramdisk
   async ramdisk(blocks = 64, size = 512) {
     const r = await this.exec(`import os
 class RAMBlockDev:

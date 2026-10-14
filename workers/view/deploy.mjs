@@ -1,25 +1,7 @@
-// deploy.mjs — build public/ and ship exactly that build, or refuse.
-//
-//   node workers/view/deploy.mjs            build, interlock, deploy, confirm
-//   node workers/view/deploy.mjs --dry-run  everything except the upload
-//
-// 🔴 WHY THIS EXISTS. `build.mjs` and `npx wrangler deploy` are two commands
-// about two different moments, and nothing has ever joined them. With one
-// person that is fine. With two agents in one checkout it is this:
-//
-//   A: node build.mjs        public/ is A's tree
-//   B: node build.mjs        public/ is B's tree
-//   A: npx wrangler deploy   A ships B's tree, under B's stamp
-//
-// and every downstream rule quietly stops working. `Attribute a run to a build
-// before iterating on it` reads a stamp that is somebody else's.
-// `Confirm the stamp changed before asking anyone to retest` confirms it —
-// it did change, to the wrong thing. There is no output anywhere that looks
-// wrong, which is the worst shape there is.
-//
-// So: hold a lock across build and upload, have build.mjs record a fingerprint
-// of what it wrote and its stamp, and refuse to upload a public/ that differs
-// from that record by one byte. The fingerprint is over CONTENT, not mtimes.
+// node workers/view/deploy.mjs [--dry-run]: build public/ and ship exactly that build, or refuse.
+// A lock spans build and upload, and an upload is refused if public/ differs by one byte from the
+// content fingerprint build.mjs recorded, so one agent cannot ship another's tree under its stamp.
+// why: lessons/workers-view.md#deploy-header
 import { spawnSync } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
@@ -29,17 +11,16 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, 'public');
-// The wrangler `npx wrangler --version` resolved to on 2026-10-14. Raise it on purpose.
+// The wrangler version to run. Raise it on purpose.
+// why: lessons/workers-view.md#wrangler
 export const WRANGLER = '4.75.0';
 // Beside public/, never in it: public/ is uploaded verbatim. `.wrangler/` is gitignored.
 export const LOCK = join(HERE, '.wrangler', 'positron-build.lock');
 export const RECORD = join(HERE, '.wrangler', 'positron-build.json');
 
-/**
- * Hold the lock on building into public/ until this process exits. A build
- * spawned by a deploy that already holds it is told so through
- * POSITRON_BUILD_LOCK=<holder pid>. Refuses (exit 1) while a live process holds it.
- */
+// Hold the build lock until exit; a child build is told via POSITRON_BUILD_LOCK=<pid>. Exit 1 if
+// held.
+// why: lessons/workers-view.md#lock
 export function takeBuildLock(what) {
   let holder = null;
   try { holder = Number(readFileSync(LOCK, 'utf8')); } catch { /* free */ }
@@ -84,13 +65,8 @@ export async function fingerprint(dir) {
   return out;
 }
 
-/**
- * What changed between two fingerprints, in words. Empty array means identical.
- *
- * ⚠️ IT REPORTS ALL THREE KINDS. An output directory that lost a file between
- * the build and the upload is as wrong as one that gained a changed one, and a
- * check that only looked for modifications would call that clean.
- */
+// What changed between two fingerprints, in words; reports added, removed and changed files.
+// why: lessons/workers-view.md#drift
 export function drift(before, after) {
   const notes = [];
   for (const [f, h] of before) {
@@ -101,38 +77,15 @@ export function drift(before, after) {
   return notes;
 }
 
-// ── run ─────────────────────────────────────────────────────────────────────
-// (guarded, so the functions above can be imported and tested without
-// building or deploying anything — which is how their refusal was proved)
+// Guarded, so the functions above can be imported and tested without building or deploying.
+// why: lessons/workers-view.md#run
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const DRY = process.argv.includes('--dry-run');
   const STRICT = process.argv.includes('--strict');
 
-  // ── what this deploy is about to ship that nobody has committed ───────────
-  //
-  // 🔴 IT ALWAYS LISTS AND IT NEVER REFUSES, and that asymmetry is the whole
-  // design. This started as a hard gate — refuse when the tree is dirty — and
-  // the agent who had been on the receiving end of it all day priced it: they
-  // had deployed five times in ninety minutes, every one at the user's explicit
-  // instruction, every one with legitimate half-finished work in the tree. A
-  // gate would have fired on all five, so the override would have been typed
-  // five times and been muscle memory by the third.
-  //
-  // That is this repo's own rule arriving somewhere new: *"a colour scale whose
-  // normal reading is a warning has no warning left."* A refusal that fires on
-  // the normal case is not a guard, it is a keystroke — and it is worse than no
-  // guard, because it trains you straight past the once it would have mattered.
-  //
-  // ⚠️ AND THE HARM WAS NEVER THE DEPLOYING. Every one of those deploys was the
-  // right call. The harm was that the OTHER agent did not know — and what fixed
-  // that was the announcements, not anything that could have refused. So the
-  // part worth automating is the part a person cannot forget to do: enumerate,
-  // out of git rather than out of somebody's memory, exactly what is going out
-  // uncommitted. It was done by hand five times and nearly missed a file.
-  //
-  // `--strict` is for when the tree SHOULD be clean — a release, a bisect — and
-  // there the refusal means something precisely because it is not the normal
-  // answer.
+  // Lists what is going out uncommitted, out of git, and never refuses: a gate on the normal case
+  // becomes a reflex. `--strict` refuses, for when the tree should be clean.
+  // why: lessons/workers-view.md#uncommitted
   const REPO = join(HERE, '..', '..');
   const gitLines = (args) => {
     const r = spawnSync('git', args, { cwd: REPO, encoding: 'utf8' });
@@ -216,9 +169,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process.exit(0);
   }
 
-  // ⚠️ `.env` IN THE CWD SHADOWS MACHINE OAUTH (CLAUDE.md). Unset the two
-  // variables rather than requiring a particular working directory, which is
-  // the documented fix and the one nobody has to remember.
+  // Unset the two token variables: a `.env` in the cwd shadows machine OAuth.
+  // why: lessons/workers-view.md#deploy-env
   const env = { ...process.env };
   delete env.CF_API_TOKEN;
   delete env.CLOUDFLARE_API_TOKEN;
@@ -235,9 +187,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   }
   if (up.status !== 0) process.exit(up.status ?? 1);
 
-  // `Confirm the stamp changed before asking anyone to retest — the edge serves
-  // the previous build for a few seconds after deploy.` That rule has been
-  // carried in prose and performed by hand. Perform it here.
+  // Confirm the edge serves the new stamp; it serves the previous build for a few seconds.
+  // why: lessons/workers-view.md#confirm
   const WANT = `export const BUILD = '${stamp}'`;
   let live = false;
   for (let i = 0; i < 20 && !live; i++) {

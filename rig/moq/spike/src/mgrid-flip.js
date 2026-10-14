@@ -1,10 +1,6 @@
-// MULTI-PUBLISHER grid: viewer -> publisher FLIP page (RUNBOOK §13, "spotlight
-// from the crowd" on MoQ). Starts as a pure viewer: subscribes to ALL roster
-// publishers (decodes everything, posts nothing per-frame). Polls /cmd?id= every
-// 100 ms; on {action:"publish"} it starts publishing its own canvas on its own
-// namespace over the SAME MoQ connection, then registers in the roster.
-// Timestamps (same host clock as driver+probes) as {k:"flip",id,ev,t} rows.
-// Params: ?id=f1 &name=flips &relay=
+// Grid viewer-to-publisher flip (RUNBOOK §13): views all, polls /cmd every 100 ms, on publish
+// starts its own namespace on the same connection. Params: ?id=f1 &name=flips &relay=
+// why: lessons/rig-moq.md#mgrid-flip-header
 import { Connection, Path, Broadcast } from "@moq/net";
 import * as Container from "@moq/hang/container";
 

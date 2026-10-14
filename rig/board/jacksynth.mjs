@@ -1,48 +1,30 @@
-// rig/board/jacksynth.mjs — instruments that are JACK clients.
-//
-// Yoshimi is a JACK client and cannot write to a pipe, so this module builds
-// the chain the container proved out:
-//
-//   jackd -d dummy          a clock, no hardware
-//     -> yoshimi            the instrument
-//     -> ffmpeg -f jack     capture, raw s16 on stdout, straight into the board
-//
-// MIDI IN is the other half, and it uses something setup.sh already loads.
-// snd-virmidi gives four virtual ports that are BOTH an ALSA sequencer client
-// and a raw character device: writing three bytes to /dev/snd/midiC<n>D0 emits
-// them on sequencer port <client>:0, which `aconnect` then routes to the synth.
-// So the board plays a JACK synth by writing raw MIDI bytes to a file.
+// Instruments that are JACK clients: jackd (dummy clock or the card) -> the synth -> ffmpeg -f jack
+// capture (raw s16 on stdout into the board). MIDI in by writing raw bytes to a snd-virmidi device
+// that aconnect routes to the synth's sequencer port.
+// why: lessons/rig-board-synth.md#js-header
 import { spawn, execFileSync, execSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { openSync, writeSync, closeSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-// 🔴 EVERY JACK CONNECTION THIS FILE MAKES OR BREAKS GOES THROUGH `jack.mjs`
-// SINCE 2026-10-11. There were 21 `jack_connect`/`jack_disconnect` shell
-// strings here, each run blind with its output thrown away. Each re-patch is
-// now a small document (`links` that must be there, `own` inputs whose whole
-// feed it decides), planned against the graph, applied, and READ BACK.
+// Every JACK connection goes through jack.mjs: a small document planned against the graph, applied,
+// and read back.
+// why: lessons/rig-board-synth.md#js-jack-mjs
 import { sourcesOf as alsaSourcesOf } from './alsa.mjs';
 import { parseJackLsp, listJack, plan as jackPlan, apply as jackApply, diff as jackDiff, setPortNames } from './jack.mjs';
 export { parseJackLsp };
 
 export const RATE = 48000, FRAME = 960;
 
-/**
- * A minimal OSC encoder. sclang listens on 57120 and run-pappus.scd installs an
- * OSCdef at /pappus/cmd, so this is the whole control channel for an engine
- * with 106 parameters — no library needed.
- *
- * OSC is: address, then a typetag string beginning with a comma, then the
- * arguments — every part null-terminated and padded to a multiple of four.
- */
+// A minimal OSC encoder for sclang's /pappus/cmd OSCdef on 57120: address, typetag, args, each
+// null-terminated and padded to four.
+// why: lessons/rig-board-synth.md#osc
 function oscPad(buf) {
   const pad = 4 - (buf.length % 4 || 4);
   return pad === 4 ? buf : Buffer.concat([buf, Buffer.alloc(pad)]);
 }
 function oscStr(str) { return oscPad(Buffer.concat([Buffer.from(str, 'ascii'), Buffer.alloc(1)])); }
 export function oscMessage(address, args = []) {
-  // A Uint8Array (a Buffer is one) is a BLOB, `b`: an int32 length, the bytes,
-  // padded to four. Added 2026-10-12 for `/d_recv` (`scollide.mjs`); no caller
-  // before then passed bytes, so every message they build is unchanged.
+  // A Uint8Array is a blob `b`: int32 length, bytes, padded to four (for /d_recv).
+  // why: lessons/rig-board-synth.md#blob
   const isBlob = (a) => a instanceof Uint8Array;
   const tags = ',' + args.map((a) => (typeof a === 'string' ? 's' : isBlob(a) ? 'b' : Number.isInteger(a) ? 'i' : 'f')).join('');
   const parts = [oscStr(address), oscStr(tags)];
@@ -62,24 +44,20 @@ export function oscMessage(address, args = []) {
 
 /** Seconds from 1900 to 1970, which is where an OSC timetag counts from. */
 export const NTP_EPOCH_OFFSET = 2208988800;
-/**
- * An OSC timetag for a moment in epoch milliseconds: `[seconds, fraction]`,
- * both uint32. The same arithmetic as `demo/shell/scsynth.mjs` `ntpOf` in the
- * tab, done in milliseconds so the fraction is not built from a float that has
- * already lost its last digits. `null` is OSC's "immediately", `[0, 1]`.
- */
+// An OSC timetag for epoch ms, [seconds, fraction] as uint32, computed in ms so the fraction keeps
+// its
+// digits (same arithmetic as demo/shell/scsynth.mjs ntpOf). null is "immediately", [0, 1].
+// why: lessons/rig-board-synth.md#ntp
 export function ntpTimetag(atMs) {
   if (atMs == null) return [0, 1];
   const whole = Math.floor(atMs / 1000);
   const frac = Math.min(0xFFFFFFFF, Math.round(((atMs - whole * 1000) / 1000) * 4294967296));
   return [whole + NTP_EPOCH_OFFSET, frac];
 }
-/**
- * An OSC bundle: `#bundle`, the timetag, then each element as an int32 size and
- * its bytes. `messages` is `[[address, ...args], ...]`. scsynth runs a bundle
- * at its timetag on its own clock, so everything in one bundle starts in the
- * same sample (the choke and the hit, `scollide.mjs`).
- */
+// An OSC bundle: `#bundle`, the timetag, then int32-sized elements. scsynth runs it at the timetag,
+// so
+// everything in it starts in one sample.
+// why: lessons/rig-board-synth.md#bundle
 export function oscBundle(timetag, messages) {
   const [sec, frac] = Array.isArray(timetag) ? timetag : ntpTimetag(timetag);
   const head = Buffer.alloc(16);
@@ -99,44 +77,23 @@ export function oscBundle(timetag, messages) {
 const sh = (cmd) => { try { return execSync(cmd, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'] }); } catch { return ''; } };
 const have = (bin) => { try { execFileSync('which', [bin], { stdio: 'pipe' }); return true; } catch { return false; } };
 
-/**
- * The ports of this board's audio path, named ONCE.
- *
- * They were typed in three places: `startJackSynth` wired `posboard:input_1` as a
- * literal, `pappusFx` declared its own copies, and `sourceFeed` a third pair. A
- * port name typed twice is a report and a re-patch that can describe different
- * graphs, which is exactly the failure `jackGraph()` below exists to catch, so
- * the report and the wiring now read the same five strings.
- *
- * `posboard` is the ffmpeg capture's JACK client name: the frames a page HEARS
- * are whatever is summed into `posboard:input_1`, so that port is the end of the
- * chain and the one thing every question here is really about.
- */
+// The audio path's port names, once. `posboard` is the ffmpeg capture's JACK client: what is summed
+// into `posboard:input_1` is what a page hears.
+// why: lessons/rig-board-synth.md#ports
 const CAP_CLIENT = 'posboard';
 const CAP = `${CAP_CLIENT}:input_1`;
 const SCIN = 'SuperCollider:in_1', SCIN2 = 'SuperCollider:in_2';
 const SCOUT = 'SuperCollider:out_1', SCOUT2 = 'SuperCollider:out_2';
 
-/**
- * Patch the graph to a document and say how it went. Never throws, because
- * none of the 21 commands it replaced could either: a refused plan or a link
- * that did not land is LOGGED and returned, and the caller decides.
- *
- * ⚠️ ONE DIFFERENCE FROM THE SHELL STRINGS, AND IT IS ON PURPOSE. A command
- * list touched only the links it named. A document that OWNS an input also
- * cuts any other source feeding it, which is what `jack.rebuild` already did
- * and what every comment in this file says the capture needs: a stray source
- * summed into `posboard:input_1` is indistinguishable from the instrument. On
- * the graph this board actually runs (read 2026-10-11) nothing else feeds
- * those inputs, so the difference is zero commands.
- * ⚠️ AND A PLAN NAMING A PORT THAT IS NOT THERE APPLIES NOTHING, where the old
- * strings ran the half that could run. That half was a graph nobody wrote down.
- */
+// Patch the graph to a document and report; never throws. An owned input also loses any other
+// source feeding it (a stray summed into the capture is indistinguishable from the instrument), and
+// a plan naming a missing port applies nothing.
+// why: lessons/rig-board-synth.md#wire
 export function wire(doc, { onLog, what = 'jack' } = {}) {
   const g = listJack();
   if (g.error) { onLog?.(`${what}: ${g.error}, nothing patched`); return { ok: false, planned: null, ran: [], reason: g.error }; }
-  // 🔴 THE BAY'S LINKS RIDE ON EVERY RE-PATCH (see `setBayRows`), so a document
-  // that owns an input keeps a bay link into it instead of cutting it.
+  // The bay's links ride on every re-patch, so an owned input keeps a bay link into it.
+  // why: lessons/rig-board-synth.md#bay-rides
   const planned = jackPlan(withBay(doc, g.rows), g.rows);
   if (!planned.ok) {
     onLog?.(`${what}: refused, ${planned.problems.join('; ')}`);
@@ -149,37 +106,16 @@ export function wire(doc, { onLog, what = 'jack' } = {}) {
 }
 const l = (from, to) => ({ from, to });
 
-/**
- * 🔴 THE BAY'S JACK LINKS, AND WHO WINS AGAINST THE BOARD'S OWN CHAIN.
- * Decided 2026-10-11 (plans/plan-nodes-revisited.md §5 item 6, not answered by
- * the owner): A BAY LINK IS PART OF WHAT THE BOARD BELIEVES. Until then
- * `fx.pappus` and `jack.rebuild` owned the capture and the granulator's inputs
- * and would cut anything they did not name, so the Circuit patched into the
- * granulator from a page would have lasted until the next press of the
- * granulator's switch. Now `board.mjs` keeps the rows of every bay link it
- * applied here, `wire()` adds them to every document it patches, and
- * `jackChain` counts them as wanted, so a rebuild puts them back rather than
- * taking them out.
- * ⚠️ A ROW WHOSE PORT IS NOT ON THE GRAPH IS SKIPPED, NOT REFUSED. The
- * granulator going away does not unmake the link; it comes back with the
- * granulator, because the re-patch that raises it carries the row.
- * ⚠️ IN MEMORY ONLY. A service restart forgets every bay link, which is the same
- * as every other piece of state this board holds (the insert, the source), and
- * a page that wants one back makes it again.
- */
+// A bay link is part of what the board believes: wire() adds its rows to every document and
+// jackChain
+// wants them, so fx.pappus and jack.rebuild keep them. Missing ports are skipped; in memory only.
+// why: lessons/rig-board-synth.md#bay-rows
 let bayRows = [];
 export function setBayRows(rows) { bayRows = Array.isArray(rows) ? rows.map((r) => l(r.from, r.to)) : []; }
 export function getBayRows() { return bayRows.map((r) => l(r.from, r.to)); }
-/**
- * 🔴 AN ENGINE THAT SOUNDS BESIDE THE INSTRUMENT, SINCE 2026-10-11 (option b of
- * plans/plan-sampler-pi-pico.md §2.2). The SuperCollider sampler sums into the
- * capture next to Yoshimi, and every document here that OWNS the capture
- * (`pappusFx`, `jack.rebuild`) would otherwise cut it as a stray. So an engine
- * names its standing links once, by name, and they ride on every re-patch
- * exactly as a bay link does: wanted by `jackChain`, kept by `wire()`.
- * ⚠️ NOT A BAY LINK. A page's `jack.unlink` and `setBayRows` cannot remove one;
- * only the engine that set it, by setting its name to `[]` when it stops.
- */
+// An engine that sounds beside the instrument (the sampler) names its standing links, kept on every
+// re-patch; only that engine removes them, by setting its name to [].
+// why: lessons/rig-board-synth.md#standing
 const standing = new Map();
 export function setStandingRows(name, rows) {
   if (Array.isArray(rows) && rows.length) standing.set(name, rows.map((r) => l(r.from, r.to)));
@@ -193,35 +129,19 @@ function withBay(doc, rows) {
   return extra.length ? { ...doc, links: [...(doc.links ?? []), ...extra] } : doc;
 }
 
-/**
- * 🔴 jackd ON THE CARD, SINCE 2026-10-11. With the dummy driver jackd keeps
- * time off the Pi's timer and `alsa_in` resamples the Fast Track Pro's own
- * clock into it, adaptively, forever. MEASURED that day through the relay,
- * the same note burst each time: `arecord` read a floor of -80.5 dBFS and an
- * HF share of 0.04; `alsa_in` read -80.1 and 0.15 just after a restart, and
- * -18.8 and 0.14 some minutes later, which the owner called *"supernoisy"*.
- * Two clocks and a resampler between them. With jackd on the card there is
- * one clock and nothing to resample.
- *
- * `card` is the input configured `"jackd": ...` in BOARD_INPUTS
- * (`inputs.mjs`), set once at startup by board.mjs. CAPTURE ONLY (`-C`):
- * no `system:playback_*` exists, so neither Yoshimi nor scsynth can send
- * anything to the card's outputs, which carried nothing before either.
- * ⚠️ `-r` TWICE IS NOT A TYPO: before `-d` it is jackd's `--no-realtime`
- * (this service has `ulimit -r` 0), after it the driver's rate.
- */
+// jackd on the card: one clock, no resampler (alsa_in resampling read up to -18.8 dBFS of noise).
+// `card` comes from BOARD_INPUTS; capture only (-C). `-r` before -d is no-realtime, after it the
+// rate.
+// why: lessons/rig-board-synth.md#card
 let CARD = null;
 export function setJackCard(card) { CARD = card ?? null; }
 export function jackdArgs(card) {
   if (!card) return ['-r', '-d', 'dummy', '-r', String(RATE), '-p', '1024'];
   return ['-r', '-d', 'alsa', '-C', card.device, '-r', String(RATE), '-p', String(card.period), '-n', String(card.periods)];
 }
-/**
- * ⚠️ JACK_NO_AUDIO_RESERVATION, MEASURED 2026-10-11 ON THE FIRST TRY: jackd
- * asks the D-Bus session bus to reserve the card, a service has no session
- * bus, and it gave up with `Audio device hw:CARD=Pro,DEV=0 cannot be
- * acquired`, exit 255, and the board fell back to the dummy clock.
- */
+// JACK_NO_AUDIO_RESERVATION: a service has no D-Bus session bus, so jackd could not reserve the
+// card.
+// why: lessons/rig-board-synth.md#no-reservation
 export const JACKD_ENV = { JACK_NO_AUDIO_RESERVATION: '1' };
 /** The card's capture ports shown by the input's name (`jack.mjs` `setPortNames`). */
 export function cardPortNames(card) {
@@ -240,17 +160,12 @@ export function countXruns(text) {
 const jackdState = { xruns: 0, card: null, since: null, lines: 0 };
 export const jackdStats = () => ({ ...jackdState });
 
-/**
- * jackd, raised if JACK does not answer. Shared by the instrument chain and by
- * the hardware inputs on JACK (`inputs.mjs` `via: "jack"`), which need a server
- * before any instrument has been asked for.
- * Answers `card`: the input whose card is the clock, or null on the dummy one.
- */
+// jackd, raised if JACK does not answer; shared with the inputs on JACK. Returns the clock card or
+// null.
+// why: lessons/rig-board-synth.md#ensure-jackd
 export async function ensureJackd({ onLog } = {}) {
-  // Ask JACK, not the process table. `pgrep -x jackd` reports a server this
-  // process may not be able to REACH, in a different mount namespace or as a
-  // different user, and skipping the start on that basis leaves every client
-  // unable to connect. jack_lsp answers the question actually being asked.
+  // Ask JACK (jack_lsp), not the process table: pgrep finds servers this process may not reach.
+  // why: lessons/rig-board-synth.md#ask-jack
   if (sh('jack_lsp 2>/dev/null').trim()) {
     const owns = jackdOwns(sh('pgrep -ax jackd 2>/dev/null').split('\n')[0], CARD);
     setPortNames(cardPortNames(owns ? CARD : null));
@@ -258,9 +173,9 @@ export async function ensureJackd({ onLog } = {}) {
   }
   sh('pkill -9 -x jackd 2>/dev/null');            // a server we cannot reach is worse than none
   await wait(400);
-  // ⚠️ THE CARD FIRST AND THE DUMMY CLOCK SECOND. A card that is unplugged or
-  // held by something else must not cost Yoshimi its server; the input then
-  // falls back to `alsa_in`, which says so in the log.
+  // The card first, the dummy clock second, so an unplugged card does not cost the instrument its
+  // server.
+  // why: lessons/rig-board-synth.md#card-first
   for (const card of CARD ? [CARD, null] : [null]) {
     const p = spawn('jackd', jackdArgs(card), { stdio: ['ignore', 'pipe', 'pipe'], detached: true, env: { ...process.env, ...JACKD_ENV } });
     p.unref();
@@ -299,105 +214,29 @@ export async function ensureJackd({ onLog } = {}) {
   return { ok: false, reason: 'jackd would not start' };
 }
 
-/**
- * The instruments this module knows how to raise.
- *
- * 🔴 ONE INSTRUMENT, SINCE 2026-09-16. FluidSynth and hexter stood here and are
- * at `archive/box-fluidsynth-hexter/`. The reason is the graph rather than the
- * code: there is ONE jackd, ONE capture and ONE room on this board, so whatever
- * is up is what every listener on every page hears, and a second instrument is
- * a way to take the sound away from somebody in another building. `/knobs/`
- * cannot work at all without yoshimi's filter, and it was found refusing to
- * start because somebody had pressed a button on another page.
- *
- * ⚠️ The INSERT — pappus — is deliberately not a key here.
- * Everything in this table is offered to clients as an instrument. They live
- * further down, by the code that raises it: `pappusFx()`.
- *
- * ⚠️ Pappus is NOT an instrument and is not in this table any more. It
- * granulates its INPUT, so as an instrument it faithfully processed silence,
- * and shipping it beside yoshimi made it look like a second sound source that
- * happened to be identical to the first. It is an EFFECT — see `pappusFx()`
- * below, which inserts it between whatever is playing and the capture, and can
- * be switched on and off under a running instrument.
- */
+// The instruments this module can raise. One jackd, one capture, one room, so one instrument.
+// Pappus
+// is an insert, not an instrument (see pappusFx()).
+// why: lessons/rig-board-synth.md#jack-synths
 export const JACK_SYNTHS = {
-  // 🔴 EMPTY OF YOSHIMI SINCE 2026-10-13, AND LEFT IN PLACE ON PURPOSE. Asked:
-  // *"discard yoshimi. with possiblity to do dual setup in future"*. Its entry
-  // and `YOSHIMI_ARGS` are verbatim in archive/yoshimi/jacksynth-entry.mjs, and
-  // archive/yoshimi/README.md says how to put them back. `startJackSynth` and
-  // this table stay, so a JACK synth is one entry again.
+  // Empty of Yoshimi on purpose: its entry is in archive/yoshimi/jacksynth-entry.mjs, and this
+  // table
+  // stays so a JACK synth is one entry again.
+  // why: lessons/rig-board-synth.md#empty
 
-  // 🔴 AN `archive` SOURCE STOOD HERE AND LEFT ON 2026-09-16. It played ERR's
-  // 1965 radio archive into the JACK graph: ffmpeg into `snd-aloop`, `alsa_in`
-  // out the other side as `err1965`, on `-stream_loop -1`, so it never ended.
-  // No page offered it, and every connection this repo opens to ERR appears in
-  // a public broadcaster's audience measurement. `archive/box-pappus/` has it.
+  // An archive source played ERR's 1965 radio here; it is in archive/box-pappus/.
+  // why: lessons/rig-board-synth.md#archive-source
 };
 
-/**
- * Pappus as an INSERT, not an instrument.
- *
- * Off:  instrument L+R -> posboard (the capture)
- * On:   instrument L+R -> SuperCollider:in_1/in_2 ... out_1/out_2 -> posboard
- *
- * The engine keeps running while it is bypassed, because it takes half a
- * minute to compile a 2,030-line class library and nobody wants that between
- * two presses of a button. Bypassing is a re-patch, which is instant.
- *
- * 🔴 BOTH CHANNELS, AND THE RIGHT ONE WAS BYPASSING THE INSERT ENTIRELY UNTIL
- * 2026-09-13. `startJackSynth` connects an instrument's LEFT AND RIGHT ports to
- * `posboard:input_1`, deliberately — many ports into one input sum in JACK, and
- * that mono-SUM is what makes a capture of a stereo instrument honest (see the
- * comment there: mono-left read a note as 1661 Hz where mono-sum read 2029 Hz).
- * This function then disconnected only the LEFT one and inserted only the LEFT
- * one, so with the granulator switched on a page heard
- *
- *     the granulator's left output  +  the instrument's right channel, DRY
- *
- * MEASURED on the board, `jack_lsp -c`: `posboard:input_1` had two sources,
- * `yoshimi:right` and `SuperCollider:out_1`. Two things follow. The insert
- * could never be heard on its own — every measurement of "what does this
- * granulator do" taken through this capture had the dry instrument summed into
- * it — and the granulator was being FED in mono-left, which is the exact defect
- * the capture comment was written about, one stage upstream.
- *
- * ⚠️ It also fits the open puzzle of 2026-09-12, recorded in `grains`: no
- * granulator parameter could be shown to change the returned audio, and "the
- * envelope NEVER dropped below a quarter of its own median at any setting". A
- * dry instrument summed under a grain cloud is exactly that shape. That is a
- * consistent explanation and not a proof, and it is written here as the first
- * thing to re-run rather than as a finding.
- *
- * The reverb insert that used to live below had this right all along: it
- * patched `port` AND `portR`, which is why the two inserts disagreed about what
- * a page could hear.
- */
+// Pappus as an insert: off, instrument L+R -> posboard; on, L+R -> SuperCollider:in_1/in_2,
+// out_1/out_2 -> posboard. The engine keeps running while bypassed (it compiles for half a minute);
+// bypass is a re-patch. Both channels both ways, or a dry right channel sits under the granulator.
+// why: lessons/rig-board-synth.md#pappus-fx
 let pappusProc = null;
-/**
- * ⚠️ A JACK PORT IS NOT A READY ENGINE, AND THE GAP IS SEVEN SECONDS.
- *
- * `SuperCollider:out_1` appears as soon as scsynth boots; the 2,030-line engine
- * class is compiled and its 106 commands registered several seconds LATER, and
- * sclang answers an unknown command with nothing at all. So waiting on the port
- * returned ok while every command sent afterwards fell into a void — measured
- * from the board's own log: `pappus inserted` at 05:38:59.8, a minute of 1965
- * loaded at 05:39:03.5, and `PAPPUS READY` only at 05:39:06.0. The load, the
- * buffer lock and the gates were all sent 2.6 s before anything could receive
- * them, with no error anywhere, and the page said the material was loaded.
- *
- * The engine prints `PAPPUS READY` when it means it. That is the signal.
- *
- * ⚠️ AND IT PRINTS IT LAST, since 2026-09-13 — because "it means it" turned out
- * to need one more thing. The line used to go out at the TOP of the engine
- * callback, and `run-pappus.scd`'s own startup Routine then waited a second and
- * set `mrate 0.5`, `msrc 2`, `amp`, `ingain` and `run` on top of whatever the
- * client had sent in that second, since the client had been told it could start.
- * MEASURED: `grains` asked for 2.2 grains a second on a cold board and the
- * engine reported 0.5, which is that file's own default arriving late. It failed
- * only on the FIRST visit after a restart, which is the visit nobody is
- * watching. Anything moved into that Routine has to stay above the line.
- */
+// A JACK port is not a ready engine: commands sent before `PAPPUS READY` (about seven seconds
+// later)
+// vanish. The engine prints it last, after run-pappus.scd's startup settings.
+// why: lessons/rig-board-synth.md#pappus-ready
 let pappusReady = false;
 
 export function pappusAvailable() {
@@ -424,12 +263,9 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
     const rt = '/tmp/rt';
     try { mkdirSync(rt, { recursive: true, mode: 0o700 }); } catch { /* there already */ }
     pappusProc = spawn('sclang', ['/opt/positron-board/rig/board/norns/run-pappus.scd'], {
-      // ⚠️ NO AUTOCONNECT, SINCE jackd CAN OWN A CARD (2026-10-11). scsynth
-      // patches itself to the PHYSICAL ports unless told otherwise, and with
-      // jackd on the Fast Track Pro the physical capture IS the Circuit, so the
-      // granulator would hear it with nobody having asked. Every link into
-      // `SuperCollider:in_*` is this file's or a bay link's to make. A pattern
-      // that names no port connects nothing.
+      // No autoconnect: with jackd on the card, scsynth would patch the Circuit into the granulator
+      // unasked.
+      // why: lessons/rig-board-synth.md#no-autoconnect
       env: { ...process.env, XDG_RUNTIME_DIR: rt, QT_QPA_PLATFORM: 'offscreen', QTWEBENGINE_DISABLE_SANDBOX: '1',
              SC_JACK_DEFAULT_INPUTS: 'posnothing:none', SC_JACK_DEFAULT_OUTPUTS: 'posnothing:none' },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -454,28 +290,15 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
     for (let i = 0; i < 120 && !pappusReady; i++) await wait(500);
     if (!pappusReady) { stopPappus(); return { ok: false, reason: 'the engine came up but never reported READY' }; }
   } else {
-    // Somebody else's sclang, or one this process started before a restart:
-    // its stdout is not ours to read, and it has been up long enough to have
-    // finished compiling. Treat that as ready rather than waiting forever for
-    // a line that will never arrive on this pipe.
+    // An sclang already running (another process, or before a restart) is treated as ready.
+    // why: lessons/rig-board-synth.md#adopted
     pappusReady = true;
   }
 
-  // Insert it: the instrument stops feeding the capture directly and feeds
-  // Pappus instead, and Pappus feeds the capture. ⚠️ BOTH CHANNELS EACH WAY —
-  // see the header. A right channel left on the capture is a dry instrument
-  // under everything the insert does; a right channel not patched to `in_2` is
-  // a granulator fed in mono-left.
-  //
-  // ⚠️ AND THE GRANULATOR'S OWN RIGHT CHANNEL, for the same reason one stage
-  // down: Pappus pans (SPRAY, TILT and the delay taps all place things in the
-  // stereo field), so capturing only `out_1` drops whatever it put on the right.
-  // Many ports into one input sum in JACK, so this is the mono-SUM the capture
-  // comment in `startJackSynth` argues for, applied to the thing that is
-  // actually playing.
-  //
-  // With no instrument the inputs are not owned: the old commands then only
-  // connected the return, and cutting anything here would be new behaviour.
+  // Insert both channels each way and capture both granulator outputs (it pans), summed mono in
+  // JACK.
+  // With no instrument the inputs are not owned.
+  // why: lessons/rig-board-synth.md#insert
   const w = wire({ v: 1,
     links: [
       ...(instrumentPort ? [l(instrumentPort, SCIN)] : []),
@@ -489,34 +312,15 @@ export async function pappusFx(on, { instrumentPort, instrumentPortR, onLog } = 
   return { ok: true, on: true, fed: !!instrumentPort, stereo: !!instrumentPortR, ready: pappusReady, wired: w.ok };
 }
 
-/**
- * Take the instrument OUT of the granulator's input, or put it back.
- *
- * 🔴 THE SOURCE AND THE INSTRUMENT CANNOT BOTH BE IN THERE. `PosSource.sc`
- * writes to scsynth's own input bus, and scsynth fills that bus from JACK at the
- * top of every block — so with `<instrument> -> SuperCollider:in_1` still
- * patched, the granulator chews the SUM of the two. That is not "the same input
- * at both ends" (plan-twins §4a), it is a third material neither end can
- * describe, and it would read as the comparison being noisy rather than as the
- * wiring being wrong.
- *
- * ⚠️ AND THE INSTRUMENT IS NOT STOPPED, IT IS UNPLUGGED. `posboard` — the ffmpeg
- * capture whose frames are the audio a page hears — is raised as part of the
- * instrument's own chain, so `audio.stop` would take the sound of the result
- * away along with the material. Disconnecting one JACK link leaves the capture
- * where it is, and `pappusFx` still owns the other end of the insert.
- */
+// Unplug the instrument from the granulator's input while generated material plays: scsynth sums
+// JACK into its input bus. Unplugged, not stopped, since posboard belongs to the instrument's
+// chain.
+// why: lessons/rig-board-synth.md#source-feed
 export function sourceFeed(on, { instrumentPort, instrumentPortR, onLog } = {}) {
   if (!instrumentPort) return { ok: true, instrument: null, fed: false };
-  // `on` here means "the generated source is the material", so the INSTRUMENT
-  // is disconnected. Named for what is being asked for rather than for what is
-  // done to the wire, because every caller is asking the first question.
-  // ⚠️ BOTH CHANNELS. Unplugging only the left one leaves the right one in the
-  // granulator's buffer, which is not "the same input at both ends" — it is the
-  // page's material plus half an instrument, and it would read as the
-  // comparison being noisy rather than as the wiring being wrong.
-  // ⚠️ IT OWNS ONLY THE GRANULATOR'S INPUTS and never the capture, so the
-  // insert's return stays exactly where `pappusFx` put it.
+  // `on` means the generated source is the material; both channels; it owns only the granulator's
+  // inputs.
+  // why: lessons/rig-board-synth.md#pairs
   const pairs = [[instrumentPort, SCIN], ...(instrumentPortR ? [[instrumentPortR, SCIN2]] : [])];
   const w = wire({ v: 1, links: on ? [] : pairs.map(([p, bus]) => l(p, bus)), own: pairs.map(([, bus]) => bus) },
                  { onLog, what: 'source feed' });
@@ -536,31 +340,16 @@ export function pappusOsc(cmdName, ...args) {
 }
 
 
-/**
- * The granular roll and the drift moved to `pappus.mjs` — one implementation,
- * seeded, in named characters, and with four mode ranges corrected against the
- * engine. The version that lived here rolled `scanmode`, `spraymode` and
- * `swarmmode` 0..2 where the engine indexes `mode - 1` over four-element
- * arrays, so mode 4 was unreachable on all three; `contour` 1..8 of 17; and its
- * chord selector was always-true, so the major chord was dead code.
- *
- * `pappusOsc` below stays: it is the panic path, which has nothing to do with
- * rolling anything.
- */
+// The roll and drift live in pappus.mjs; pappusOsc below is the panic path.
+// why: lessons/rig-board-synth.md#roll-moved
 
-/**
- * Silence the insert as well as the instrument.
- *
- * A MIDI all-notes-off reaches the synth and nothing else — but Pappus holds a
- * ring buffer of captured audio, eight delay taps and a reverb tail, all of
- * which keep sounding after every note has stopped. `bufclear` and `delayclear`
- * are its own commands for exactly this.
- */
+// Silence the insert too: bufclear and delayclear, since its buffer, taps and tail keep sounding.
+// why: lessons/rig-board-synth.md#panic
 export function pappusPanic() {
   pappusOsc('bufclear', 1);
   pappusOsc('delayclear', 1);
-  // The reverb has no clear, so collapse its time and let it fall silent, then
-  // restore it — dropping `amp` instead would mute the instrument as well.
+  // The reverb has no clear: collapse its time, then restore it.
+  // why: lessons/rig-board-synth.md#rtime
   pappusOsc('rtime', 0.2);
   setTimeout(() => pappusOsc('rtime', 2.5), 900);
   return true;
@@ -569,11 +358,9 @@ export function pappusPanic() {
 export function stopPappus() {
   pappusReady = false;
   if (pappusProc) { try { pappusProc.kill('SIGTERM'); } catch { /* gone */ } pappusProc = null; }
-  // ⚠️ NOT `pkill -x scsynth` ANY MORE, SINCE 2026-10-11. The board runs a
-  // second scsynth for the sampler (`scsampler.mjs`), and a name match would
-  // take somebody's piano away with the granulator. Every scsynth but the ones
-  // listening on `KEEP_SC_PORTS` (the sampler's, and since 2026-10-12 the page
-  // programs' `poscollide`), by pid.
+  // Kill scsynth by pid, keeping KEEP_SC_PORTS (the sampler, poscollide): a name match would kill
+  // them.
+  // why: lessons/rig-board-synth.md#kill-pids
   for (const pid of pappusScsynthPids(sh('pgrep -ax scsynth 2>/dev/null'))) sh(`kill -9 ${pid} 2>/dev/null`);
   sh('pkill -9 -x sclang 2>/dev/null');
 }
@@ -582,21 +369,11 @@ export function stopPappus() {
 export const SAMPLER_SC_PORT = 57130;
 /** The page programs' own scsynth, `poscollide`, when it has one (`scollide.mjs`). */
 export const COLLIDE_SC_PORT = 57131;
-/**
- * 🔴 EVERY scsynth THE GRANULATOR DOES NOT OWN, AS A LIST. It was one port, the
- * sampler's, until 2026-10-12, when `scollide.mjs` added a third server on
- * 57131 that a granulator switch would otherwise have killed
- * (plans/plan-pi-supercollider-defs.md §1.4). The collide port is kept whether
- * or not that server is running, and whichever engine `scollide.mjs` chose: a
- * port nobody listens on matches no pid, so keeping it costs nothing.
- */
+// Every scsynth the granulator does not own, by port; an unused port matches nothing.
+// why: lessons/rig-board-synth.md#keep-ports
 export const KEEP_SC_PORTS = Object.freeze([SAMPLER_SC_PORT, COLLIDE_SC_PORT]);
-/**
- * The scsynth pids `stopPappus` may kill, read off `pgrep -ax scsynth`: every
- * one except a server started with `-u <port>` for a port in `keepPorts`. Pure,
- * so the one line that decides whose sound stops is graded without a board.
- * A single number is still taken, as one port.
- */
+// The pids stopPappus may kill, from `pgrep -ax scsynth`; pure, so it is graded without a board.
+// why: lessons/rig-board-synth.md#scsynth-pids
 export function pappusScsynthPids(pgrepAx, keepPorts = KEEP_SC_PORTS) {
   const keep = [keepPorts].flat().map(Number).filter((n) => Number.isInteger(n) && n > 0);
   return String(pgrepAx).split('\n').map((x) => x.trim()).filter(Boolean)
@@ -609,26 +386,10 @@ export function jackSynthAvailable(name) {
   return !!d && d.needs.every(have);
 }
 
-// ── looking at the graph, and putting it back ────────────────────────────────
-//
-// 🔴 NOTHING ON THIS BOARD EVER REPORTED THE JACK AUDIO GRAPH, AND THAT IS
-// WHERE ITS LEVEL FAULTS LIVE. `ports.get` answers with the ALSA SEQUENCER,
-// which is MIDI, so the audio path was visible only over ssh. The board dials
-// OUT to the relay and answers verbs from any network; `ssh <user>@<pi>` needs
-// the studio LAN. So on 2026-09-17 the output peak fell from 0.0445 to 0.0010,
-// about 40x, with the page, the MIDI level and the instrument each ruled out by
-// measurement, and the one remaining suspect was the one thing nobody outside
-// the building could look at.
-//
-// ⚠️ THE REPORT COMES FIRST AND IT CHANGES NOTHING. `jackGraph` and `jackChain`
-// only read. `jackRebuild` is the only thing here that writes, and it writes
-// the DIFF rather than re-running a sequence of commands: see its own comment
-// for why that is what makes it safe to send at a board somebody else is
-// listening to.
-// ⚠️ IT HAS RUN ON THE BOARD SINCE 2026-10-11. Written 2026-09-18 from a
-// laptop that could not reach it; the parser moved to `jack.mjs` that day and
-// is graded against `jack_lsp` text captured off the Pi
-// (`fixtures/jack-lsp-c-pi.txt`, `fixtures/jack-lsp-cpt-pi.txt`).
+// The JACK audio graph, readable over the relay (ports.get is only MIDI). jackGraph and jackChain
+// only
+// read; jackRebuild writes the diff. Parser graded on jack_lsp text captured off the Pi.
+// why: lessons/rig-board-synth.md#graph
 
 /** `jack_lsp -c` and what can be read beside it, as an object. */
 export function jackGraph() {
@@ -636,39 +397,23 @@ export function jackGraph() {
     return { ok: false, server: 'unknown', reason: 'jack_lsp is not installed on this board',
              ports: [], graph: [], procs: null, jackd: null };
   }
-  // `-p -t` as well since 2026-10-11, so every row says its direction and
-  // type; a bare `-c` row is the same row without them.
+  // `-p -t` too, so every row has direction and type.
+  // why: lessons/rig-board-synth.md#lsp-pt
   const graph = listJack().rows;
-  // An empty listing means NO SERVER rather than no ports, and that is this
-  // file's own established reading: `startJackSynth` decides whether to raise
-  // jackd on exactly this test, and its comment says why it asks JACK rather
-  // than the process table.
+  // An empty listing means no server.
+  // why: lessons/rig-board-synth.md#server
   const server = graph.length ? 'up' : 'down';
 
-  /**
-   * How many of each, so a graph that looks right can still be shown to be the
-   * wrong one. Two yoshimis and the capture is patched to whichever registered
-   * its port first; a scsynth that outlived a service restart keeps its ports
-   * and answers nobody. `sweepOrphans()` in board.mjs exists for that and runs
-   * only at startup, so a board that has been up for a week has never swept.
-   *
-   * ⚠️ `pgrep -cx`, NEVER `-f`. CLAUDE.md, and it cost twenty minutes twice:
-   * `pgrep -f <pattern>` matches the asking command's own line and answers
-   * about itself.
-   */
+  // Process counts, so a right-looking graph can still be wrong (a duplicate or an orphan).
+  // `pgrep -cx`, never `-f`, which matches itself.
+  // why: lessons/rig-board-synth.md#procs
   const procs = {};
   for (const n of ['jackd', 'yoshimi', 'sclang', 'scsynth', 'ffmpeg']) {
     const c = sh(`pgrep -cx ${n} 2>/dev/null`).trim();
     procs[n] = c === '' ? 0 : Number(c) || 0;
   }
-  // ⚠️ `-a` ADDS THE COMMAND LINE; THE MATCH IS STILL `-x`, on the name. Worth
-  // having because the rate and the period the server was started with are in
-  // it, and everything downstream assumes them: the capture asks ffmpeg for
-  // `-ar 48000` whatever jackd is actually running at.
-  // ⚠️ DECLARED, NOT MEASURED. This is what jackd was ASKED for on its command
-  // line, which is not necessarily what it settled on, and a server somebody
-  // else started is in this string too. Anything wanting the truth has to ask
-  // the server.
+  // `-a` adds the command line (declared rate and period, not measured); the match stays `-x`.
+  // why: lessons/rig-board-synth.md#jackd-line
   const jackd = sh('pgrep -ax jackd 2>/dev/null').split('\n')[0]?.trim() || null;
   const rateArgs = jackd ? [...jackd.matchAll(/-r\s+(\d+)/g)].map((m) => Number(m[1])) : [];
   return {
@@ -686,21 +431,9 @@ export function jackGraph() {
   };
 }
 
-/**
- * What the graph SHOULD be for the thing that is playing, and what it is.
- *
- * 🔴 THE WIRING WRITTEN AS A FACT, ONCE, RATHER THAN AS TWO SEQUENCES OF
- * COMMANDS. `startJackSynth` step 4 and `pappusFx` each build this chain by
- * running connects in an order; neither can answer "is it still like that?"
- * afterwards, and until now nothing could. The edge list below is the same
- * wiring stated as what must be true, so the report and the repair share one
- * description and a third copy cannot drift.
- *
- * The scope is deliberately narrow: the edges into the two SINKS this board's
- * audio path has, the capture and the granulator's inputs. `system:playback_*`,
- * a monitor, anything a person patched by hand elsewhere on the graph, are none
- * of this function's business and are neither reported as wrong nor touched.
- */
+// What the graph should be for what plays, and what it is: one edge list for report and repair.
+// Only the edges into the capture and the granulator's inputs are its business.
+// why: lessons/rig-board-synth.md#chain
 export function jackChain({ instrumentPort, instrumentPortR, insert = false, source = false, graph = null } = {}) {
   const g = graph ?? jackGraph();
   const rows = g.graph ?? [];
@@ -716,12 +449,8 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
       want.push([instrumentPort, CAP]);
       if (instrumentPortR) want.push([instrumentPortR, CAP]);
     } else {
-      // ⚠️ WITH GENERATED MATERIAL THE INSTRUMENT IS DELIBERATELY UNPLUGGED,
-      // so a rebuild must not put it back. scsynth fills its input bus from
-      // JACK at the top of every block, so an instrument still patched to
-      // `SuperCollider:in_1` is SUMMED with `PosSource`'s output and the
-      // granulator chews a third material neither end can describe. That is
-      // what `sourceFeed` exists to prevent.
+      // With generated material the instrument stays unplugged; a rebuild must not put it back.
+      // why: lessons/rig-board-synth.md#unplugged
       if (!source) {
         want.push([instrumentPort, SCIN]);
         if (instrumentPortR) want.push([instrumentPortR, SCIN2]);
@@ -730,18 +459,16 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
     }
   }
 
-  // The bay's links are wanted too, since 2026-10-11 (`setBayRows`), so a
-  // rebuild puts a page's link back rather than cutting it as a stray.
+  // The bay's links are wanted too.
+  // why: lessons/rig-board-synth.md#bay-wanted
   for (const r of bayOnGraph(rows)) if (!want.some(([f, t]) => f === r.from && t === r.to)) want.push([r.from, r.to]);
 
-  // Anything ELSE feeding those sinks. This is the half that re-running the
-  // connect commands can never find: a link that should not be there sums into
-  // the capture, and nothing downstream can tell it from the instrument. The
-  // granulator's inputs are swept whenever its ports exist at all, insert on or
-  // off, because `pappusFx(false)` disconnects them for the same reason.
+  // Anything else feeding those sinks is a stray; the granulator's inputs are swept whenever they
+  // exist.
+  // why: lessons/rig-board-synth.md#sinks
   const sinks = [CAP, ...(present(SCIN) ? [SCIN, SCIN2] : [])];
-  // ⚠️ THE CHAIN IS A `jack.mjs` DOCUMENT, so the report here and the repair
-  // in `jackRebuild` read one description through one diff.
+  // The chain is a jack.mjs document: report and repair read one description.
+  // why: lessons/rig-board-synth.md#chain-doc
   const doc = { v: 1, links: want.map(([from, to]) => ({ from, to })), own: sinks };
   const { missing, extra } = jackDiff(doc, rows);
   return {
@@ -759,41 +486,14 @@ export function jackChain({ instrumentPort, instrumentPortR, insert = false, sou
   };
 }
 
-/**
- * Put the graph back, and nothing else.
- *
- * 🔴 IT IS A DIFF, NOT A TEARDOWN, AND THAT IS THE WHOLE SAFETY ARGUMENT. This
- * board has ONE jackd, ONE capture and ONE room, and the relay forwards
- * verbatim, so a recovery verb is heard by whoever is listening in another
- * building. A graph that is already right therefore runs ZERO commands and
- * nobody hears anything; the only thing this can ever cut is a link that should
- * not be there, and the only thing it can ever add is a link that should.
- *
- * ⚠️ IT KILLS NOTHING. No `pkill`, no restart of jackd, yoshimi or sclang, and
- * no service restart. Every step is one `jack_connect` or `jack_disconnect`,
- * which this file already relies on being instant: bypassing the insert under a
- * playing instrument is the same operation and is a re-patch rather than a
- * rebuild of anything. An instrument picker was removed from this board for
- * being a control that took the sound away from somebody else, and a verb that
- * killed a process to recover a patchbay would be that control wearing a
- * recovery label.
- *
- * ⚠️ DISCONNECT FIRST, THEN CONNECT, WHICH IS THE ORDER `pappusFx` ALREADY
- * USES. It costs a gap of a few milliseconds in the capture where a wrong
- * source is removed before the right one lands, and the alternative is a moment
- * with both live, which is the louder wrong and is the shape of the mono-sum
- * bug this file has already paid for once.
- *
- * ⚠️ `plan: true` RUNS NOTHING and returns the same steps. Every verb that
- * changes this rig has a twin that changes nothing (`patch.plan` against
- * `patch.apply`), because a wrong patch is SILENT and a plan is not.
- */
+// Put the graph back as a diff: a right graph runs nothing, it kills nothing, disconnects before
+// connecting (a few ms gap beats two sources live), and `plan: true` runs nothing.
+// why: lessons/rig-board-synth.md#rebuild
 export function jackRebuild({ instrumentPort, instrumentPortR, insert = false, source = false,
                               plan = false, graph = null, onLog } = {}) {
   const at = { instrumentPort, instrumentPortR, insert, source };
-  // ⚠️ `graph` IS FOR THE PLAN PATH AND FOR THE TESTS. The APPLIED path reads
-  // the graph back itself below, because the whole value of `after` is that it
-  // was measured after the commands ran rather than predicted before them.
+  // `graph` is for the plan path and tests; the applied path reads the graph back itself.
+  // why: lessons/rig-board-synth.md#graph-arg
   const before = jackChain({ ...at, graph });
   if (!instrumentPort) {
     return { ok: false, plan, changed: 0, steps: [], before, after: before,
@@ -816,37 +516,25 @@ export function jackRebuild({ instrumentPort, instrumentPortR, insert = false, s
     onLog?.(steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'} would run, nothing did` : 'the graph is already what it should be');
     return { ok: true, plan: true, changed: 0, steps, before, after: before };
   }
-  // ⚠️ THE TEXT TRAVELS, NOT A BOOLEAN. `jack_connect` answers non-empty on
-  // failure AND on "already connected", and exits 1 for both (MEASURED on the
-  // board 2026-10-11), so no exit status here tells them apart.
+  // The text travels: jack_connect exits 1 for "already connected" and for failure alike.
+  // why: lessons/rig-board-synth.md#text
   const ran = jackApply(planned, { read: () => [] }).ran;
   ran.forEach((r, i) => { steps[i].said = r.said; });
   for (const s of steps) onLog?.(`${s.act} ${s.from} -> ${s.to}${s.said ? ` (${s.said})` : ''}`);
-  // 🔴 `ok` IS THE GRAPH READ BACK, NOT THE COMMANDS HAVING RUN. Printing "ok"
-  // is not evidence (CLAUDE.md); a `jack_connect` to a port that vanished
-  // between the read and the write answers on stderr and changes nothing.
+  // `ok` is the graph read back, not the commands having run.
+  // why: lessons/rig-board-synth.md#ok
   const after = jackChain(at);
   return { ok: after.intact, plan: false, changed: steps.length, steps, before, after };
 }
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 🔴 THE REVERB INSERT IS GONE, 2026-09-17, ON INSTRUCTION: *"Rm chorus reverb
-// from keys ui and board"*. What stood here was `positron-space`, a Csound
-// insert on the JACK graph that passed the dry signal and added a tail, driven
-// from `/keys/` by `fx.space`. It and its orchestra are at
-// `archive/keys-space/`.
-//
-// ⚠️ PAPPUS IS NOT AFFECTED and is deliberately still here. The two were
-// opposite kinds of insert on one graph and only ever one at a time; what is
-// left is the grain cloud that `/grains/` drives, along with `sweepInsert()`,
-// which is what stops an insert outliving the page that asked for it.
+// The Csound reverb insert is in archive/keys-space/; Pappus is the insert left.
+// why: lessons/rig-board-synth.md#reverb-gone
 
-/**
- * Every source feeding sequencer client `client` that is not the board's
- * virmidi port. Empty is the healthy answer; with no virmidi at all, every
- * source is a stray, because then nothing the board sends can be among them.
- */
+// Sources feeding sequencer client `client` that are not the board's virmidi port; empty is
+// healthy.
+// why: lessons/rig-board-synth.md#stray-midi
 export function strayMidiSources(listing, client, virmidiClient) {
   const own = virmidiClient != null ? `${virmidiClient}:0` : null;
   // By NUMBER, not name: two yoshimis can share a name and one of them is ours.
@@ -870,57 +558,28 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
 
   const procs = [];
   let stopping = false;               // so an orderly teardown is not reported as a death
-  // 1. a clock with no hardware
-  // Ask JACK, not the process table. `pgrep -x jackd` reports a server this
-  // process may not be able to REACH — a different mount namespace, a different
-  // user — and skipping the start on that basis leaves every client unable to
-  // connect. jack_lsp answers the question actually being asked.
-  // ⚠️ jackd is NOT in `procs`. It is a shared server that outlives any one
-  // instrument, and having it in the teardown list meant every instrument
-  // switch killed the server the next instrument was about to need — which
-  // presented as "registered no JACK port", three processes downstream.
-  //
-  // And ask JACK, not the process table: `pgrep -x jackd` reports a server this
-  // process may not be able to REACH, and skipping the start on that basis
-  // leaves every client unable to connect.
+  // 1. A clock with no hardware. Ask JACK, not the process table. jackd is not in `procs`: it
+  // outlives
+  // instruments, and killing it broke the next one.
+  // why: lessons/rig-board-synth.md#step-1
   {
     const j = await ensureJackd({ onLog });
     if (!j.ok) return { ok: false, reason: j.reason };
   }
 
-  // ⚠️ STEP 2 WAS A FEEDER AND IT LEFT WITH hexter, 2026-09-16. A def could
-  // declare `feeder: '<another key>'`, which raised that instrument first and
-  // patched it into this one's inputs, for a source that PROCESSES rather than
-  // generates. Exactly one def ever declared one and its feeder was hexter, so
-  // the mechanism had no second user and no way to be exercised.
-  // `archive/box-fluidsynth-hexter/board-half.js` has it.
+  // 3. The instrument (a feeder step 2 left with hexter; archive/box-fluidsynth-hexter/).
+  // why: lessons/rig-board-synth.md#step-3
 
-  // 3. the instrument
-  //
-  // `spawnAll` rather than `spawn` for a source that is more than one process.
-  // ⚠️ NOTHING IN THE TABLE USES IT TODAY. The source that did was the ERR
-  // archive, which needed ffmpeg decoding into a loopback card and `alsa_in`
-  // bridging that card into JACK, because ffmpeg has NO JACK MUXER (`ffmpeg
-  // -devices` lists jack as `D`, a demuxer, only). It is kept because the shape
-  // is right for anything played from a file or a network: whichever process
-  // registers the JACK port `portMatch` finds is the thing that gets patched,
-  // exactly like a synth's output.
+  // 3. The instrument. `spawnAll` for a source that is several processes (unused today); whichever
+  // registers the port `portMatch` finds is patched.
+  // why: lessons/rig-board-synth.md#spawn-all
   const spawned = def.spawnAll ? def.spawnAll(opts) : [def.spawn(opts)];
   procs.push(...spawned);
   const synth = spawned[spawned.length - 1];
   let log = '';
-  // ⚠️ FORWARD STDOUT TOO. sclang reports through `postln`, which is stdout —
-  // so "PAPPUS READY" and every engine error were being collected into a
-  // variable nobody read, and the board looked like it had started something
-  // that silently did nothing.
-  // ⚠️ STRIP THE PROMPT, DO NOT MATCH ON IT. Yoshimi's CLI writes `yoshimi> `
-  // continuously and PREFIXES its real output with it, so a filter that only
-  // dropped `@ Top` left thousands of bare prompts in the journal — and the
-  // lines worth having were hiding behind one:
-  //     yoshimi> Main Part 1 loaded 0001-DX Rhodes 1
-  //     yoshimi> Main Part 1 load FAILED No instrument at 6 in this bank
-  // which is Yoshimi saying exactly whether a patch change landed. Peel the
-  // prompts off, then drop what is left only if it is empty or a context line.
+  // Forward stdout too (sclang posts there). Strip Yoshimi's `yoshimi> ` prompt, then drop empty
+  // lines.
+  // why: lessons/rig-board-synth.md#say
   const say = (raw) => {
     const t = String(raw).replace(/^(?:yoshimi>\s*)+/, '').trim();
     if (!t || /^@ \w+/.test(t) || /^(sc3>|->)/.test(t)) return;
@@ -929,32 +588,17 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   for (const pr of spawned) {
     pr.stdout?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
     pr.stderr?.on('data', (d) => { log += d; for (const line of String(d).split('\n')) say(line); });
-    // ⚠️ SAY WHEN ONE OF THEM DIES. A source is more than one process now, and
-    // the one that makes the sound is not the one that holds the JACK port. A
-    // bridge such as `alsa_in` keeps its port registered whether or not
-    // anything is being written to the card behind it, so a dead writer
-    // presents as a perfectly healthy graph carrying digital silence. That is
-    // this project's oldest failure shape and the only defence is to report it.
+    // Say when a process dies: a bridge keeps its port, so a dead writer looks like a healthy
+    // graph.
+    // why: lessons/rig-board-synth.md#exit
     pr.on('exit', (code, sig) => {
       if (stopping) return;               // an orderly teardown is not news
       onLog?.(`⚠ ${pr.spawnfile} exited (${sig ?? code}) — this source is no longer making sound`);
     });
   }
-  // ⚠️ POLL FOR THE PORT; DO NOT SLEEP A GUESSED AMOUNT. This line used to be
-  // `await wait(def.warmup ?? 6000)` — and twenty lines above, about jackd,
-  // this same file already says why that is wrong: "2.5 s was enough on a warm
-  // board and not on a cold one, which is the worst kind of timing constant."
-  // The lesson was written down and not applied to the line below it.
-  //
-  // It cost nine and a half seconds on every switch to an instrument that was
-  // ready in one. MEASURED while there were three instruments: a warm switch
-  // took 9540 ms against a pipe path's 725 ms, and almost all of it was
-  // 6000 + 2500 + 600 of sleeping.
-  // The warmup is now a CEILING rather than a duration.
-  //
-  // `settle` is for an instrument that registers its port before it can play —
-  // yoshimi loads 911 instruments across 24 banks after it appears on the graph
-  // — and it is waited only after the port is actually there.
+  // Poll for the port up to the warmup ceiling, never sleep a guess (a warm switch took 9540 ms);
+  // `settle` is waited only after the port exists.
+  // why: lessons/rig-board-synth.md#warmup
   const ceiling = def.warmup ?? 6000;   // Yoshimi's 13 s is `warmup` on its archived entry
   const t0port = Date.now();
   let ready = false;
@@ -965,35 +609,27 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   onLog?.(ready ? `port up in ${Date.now() - t0port} ms` : `no port after ${ceiling} ms — carrying on so the failure is reported below`);
   if (ready && def.settle) await wait(def.settle);
 
-  // 3. capture: raw s16 on stdout, read straight into the frame pump.
-  // ⚠️ SHARED SINCE 2026-10-11 (`ensureCapture` below): the sampler sums into
-  // the same capture, so this instrument holds it rather than owning it.
+  // 3. Capture, shared since the sampler sums into it: this instrument holds it.
+  // why: lessons/rig-board-synth.md#capture
   await ensureCapture(name, { onFrame, onLog });
 
   // 4. wire the instrument's output into the capture client
   const port = sh('jack_lsp').split('\n').find((p) => def.portMatch.test(p));
   if (!port) { procs.forEach((p) => p.kill()); releaseCapture(name); return { ok: false, reason: `${name} registered no JACK port`, log: log.slice(-300) }; }
-  // ⚠️ AND THE RIGHT CHANNEL, WHICH WAS GOING NOWHERE. `portMatch` finds ONE
-  // port, and for a stereo instrument that is the left one — so the capture was
-  // mono-LEFT rather than mono-SUM and everything panned right was silently
-  // absent. Measured on the same note through the same soundfont: the pipe path
-  // (which averages the two channels) read 2029 Hz, the JACK path 1661 Hz, an
-  // apparent 0.29-octave difference that was not the transport at all. Many
-  // ports into one input SUM in JACK, which is what mono-sum means.
+  // And the right channel: many ports into one input sum in JACK (mono-left read 1661 Hz, mono-sum
+  // 2029).
+  // why: lessons/rig-board-synth.md#port-r
   let portR = null;
   if (def.portMatch2) {
     portR = sh('jack_lsp').split('\n').find((p) => def.portMatch2.test(p)) ?? null;
     if (!portR) onLog?.(`${name}: no right channel found, so the capture is one channel of a stereo source`);
   }
-  // ⚠️ ADDITIVE, NOT OWNED: these two lines only ever added, and whatever else
-  // the capture had was left alone. `jack.rebuild` is what cuts a stray.
+  // Additive, not owned; jack.rebuild cuts strays.
+  // why: lessons/rig-board-synth.md#additive
   const wired = wire({ v: 1, links: [l(port, CAP), ...(portR ? [l(portR, CAP)] : [])] }, { onLog, what: `${name} into the capture` });
 
-  // ⚠️ THE FEEDER'S OWN PATCH WAS HERE and left with step 2 above. It joined
-  // the feeding instrument to `SuperCollider:in_1`, which is a HARDWARE input:
-  // Pappus reads `In.ar` there, and a private bus would have had it granulating
-  // silence. `pappusFx()` further down does that join for the running
-  // instrument and is untouched.
+  // 5. MIDI in, through virmidi; pappusFx() joins the instrument to the granulator.
+  // why: lessons/rig-board-synth.md#step-5
 
   // 5. MIDI in, through virmidi
   const vm = findVirmidi();
@@ -1008,22 +644,15 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     sh(`aconnect ${vm.client}:0 ${alsaClient}:0`);
     try { midiFd = openSync(vm.dev, 'w'); } catch (e) { onLog?.(`virmidi open failed: ${e.message}`); }
   }
-  // ⚠️ AND THE VIRMIDI PORT IS ITS ONLY SOURCE. Yoshimi on `Search` subscribed
-  // itself to the Circuit, which made the board's own raw read of it EBUSY
-  // (yoshimi.mjs `externalMidi`). The instance edit stops that; this cuts any
-  // stray that survives it, by name in the log, so it cannot come back silently.
+  // The virmidi port must be the only source; strays are cut by name in the log.
+  // why: lessons/rig-board-synth.md#strays
   const strays = alsaClient ? strayMidiSources(sh('aconnect -l'), alsaClient, vm?.client) : [];
   for (const s of strays) { sh(`aconnect -d ${s.id} ${alsaClient}:0`); onLog?.(`cut ${s.name ?? s.id} (${s.id}) -> ${name}: the board is its only MIDI source`); }
 
   // 6. the capture's bytes, cut into 20 ms frames: `ensureCapture` does it.
 
-  // ⚠️ STEP 7 WAS `def.osc` AND IT LEFT WITH hexter TOO. It sent DSSI OSC to a
-  // plugin host once the instrument was up, which is how hexter loaded its four
-  // factory DX7 cartridges and chose a program. Yoshimi is not a plugin and
-  // reads its own banks off the disk, so nothing is left to say afterwards.
-  // ⚠️ `def.oscCmd` BELOW IS A DIFFERENT CHANNEL and stays: that is the running
-  // parameter socket a SuperCollider engine is driven on, not a one-off setup
-  // message to a plugin host.
+  // `def.oscCmd` is the running parameter socket of a SuperCollider engine.
+  // why: lessons/rig-board-synth.md#osc-cmd
 
   const midi = (bytes) => { if (midiFd !== null) { try { writeSync(midiFd, Buffer.from(bytes)); } catch { /* gone */ } } };
 
@@ -1036,9 +665,8 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
     return true;
   };
   return {
-    // ⚠️ `jack: true` IS LOAD-BEARING. The caller gates the granular insert on
-    // it, and so does the page. Leaving it to be inferred from which variable
-    // happened to be set is exactly the coupling this refactor removed.
+    // `jack: true` is load-bearing: the insert is gated on it.
+    // why: lessons/rig-board-synth.md#jack-true
     ok: true, source: name, jack: true, port, portR, channels: portR ? 2 : 1, alsaClient, midi: !!midiFd, wired: wired.ok,
     rate: RATE, msgPerSec: RATE / FRAME,
     noteOn: (ch, n, v) => midi([0x90 | (ch & 15), n & 127, v & 127]),
@@ -1057,26 +685,13 @@ export async function startJackSynth(name, { onFrame, onLog, ...opts } = {}) {
   };
 }
 
-// ── the capture, held by whoever is sounding ────────────────────────────────
-//
-// 🔴 ONE ffmpeg ON `posboard`, HELD BY NAME, SINCE 2026-10-11. It was spawned
-// inside `startJackSynth` and killed with the instrument, which was right while
-// the board had one sound. With the sampler beside Yoshimi (option b,
-// plans/plan-sampler-pi-pico.md §2.2) either may be the only thing playing, so
-// the capture lives while ANY holder does and a second holder reuses it rather
-// than starting a second `posboard` (JACK would name it `posboard-01`, and
-// nothing is wired to that).
-// ⚠️ THE FRAME PUMP IS THE NEWEST HOLDER'S `onFrame`. Every holder on this board
-// passes the same `sendPcm`, so this is a formality, written down so it is not
-// a surprise.
+// One ffmpeg on `posboard`, held by name while any holder sounds; a second holder reuses it (JACK
+// would name another `posboard-01`, wired to nothing). The pump is the newest holder's onFrame.
+// why: lessons/rig-board-synth.md#capture-holders
 const capture = { proc: null, users: new Set(), onFrame: null, onUnit: null };
 export const captureHolders = () => [...capture.users];
-/**
- * Half a frame, as soon as it exists, for the main socket's direct path
- * (`rtc.mjs` `createMainDirect`), the same split `inputs.mjs` reads in. The
- * relay's `onFrame` still gets whole frames, at the moment it always did, built
- * from two halves. Set once by `board.mjs`; null sends nothing extra.
- */
+// Half a frame as soon as it exists, for the main socket's direct path; relay frames are unchanged.
+// why: lessons/rig-board-synth.md#capture-unit
 export function setCaptureUnit(fn) { capture.onUnit = typeof fn === 'function' ? fn : null; }
 export async function ensureCapture(user, { onFrame, onLog } = {}) {
   capture.users.add(user);

@@ -1,9 +1,8 @@
 #!/bin/sh
-# One WebRTC live input for /stage/'s own container, and its WHIP URL stored as
-# the STAGE_WHIP_URL secret on positron-pub. Run by the owner, because the WHIP
-# URL carries the input's key and an agent may not write secrets.
-# Prints the input UID, which is public (it is in every WHEP play URL) and goes
-# into the code. Requires CF_API_TOKEN and CF_ACCOUNT_ID in ../.env.
+# One WebRTC live input for /stage/, its WHIP URL stored as STAGE_WHIP_URL on positron-pub. The
+# owner runs it: the WHIP URL carries the key. Prints the public input UID. Needs CF_API_TOKEN,
+# CF_ACCOUNT_ID.
+# why: lessons/src.md#stage
 set -e
 cd "$(dirname "$0")"
 . ../.env

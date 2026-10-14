@@ -1,15 +1,7 @@
-// Dual-output driver: one OBS instance, MoQ (stream slot, obs-moq -> d14 relay)
-// + RTMP (recording slot pre-baked as Custom Output (FFmpeg) -> local mediamtx)
-// simultaneously. Works against the obscloud image locally (ws://127.0.0.1:4455)
-// or through the CF Worker proxy (OBS_WS_URL=wss://.../obsws).
-//
-//   node run-dual.mjs verify              profile/plugin sanity (Advanced? RecType? moq_service?)
-//   node run-dual.mjs setup [pageUrl]     scenes+video from zero (default page http://127.0.0.1:8890/clock.html)
-//   node run-dual.mjs start [relay]       fresh-ns MoQ StartStream + StartRecord; prints ns
-//   node run-dual.mjs startrec            StartRecord only
-//   node run-dual.mjs measure [n] [nowUrl] grabber on rtmp obsdockrec: burned-row lat n frames
-//                                          + docker stats + clock-offset probe via nowUrl
-//   node run-dual.mjs stop                StopRecord + StopStream
+// One OBS with MoQ (stream slot) and RTMP (recording slot) at once, local or via OBS_WS_URL.
+// node run-dual.mjs verify | setup [pageUrl] | start [relay] | startrec | measure [n] [nowUrl] |
+// stop
+// why: lessons/rig-obs.md#run-dual
 import { spawn, execFile } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

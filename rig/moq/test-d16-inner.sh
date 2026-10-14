@@ -1,8 +1,7 @@
 #!/bin/bash
-# Runs INSIDE the moq-dev container. Tests the AUTHENTICATED draft-16 CF MoQ endpoint.
-# Usage: test-d16-inner.sh <clock|media> [duration_s]
-# Env: MOQ_TOKEN_PUBSUB (publisher), MOQ_TOKEN_SUB (subscriber). NEVER printed.
-# Binaries expected at /target/release (volume moq-target16).
+# Inside moq-dev: test-d16-inner.sh <clock|media> [duration_s] against the authenticated draft-16
+# endpoint. MOQ_TOKEN_PUBSUB and MOQ_TOKEN_SUB are never printed. Binaries in /target/release.
+# why: lessons/rig-moq.md#test-d16-inner
 set -u
 MODE="${1:-clock}"
 DUR="${2:-40}"

@@ -1,45 +1,7 @@
-// rig/board/jack-bay-live.mjs: the bay half of the JACK arm, run against the
-// real board, graded on the far side of the wire.
-//
-//   node rig/board/jack-bay-live.mjs                 the Circuit into the capture, and back out
-//   node rig/board/jack-bay-live.mjs --pappus        REFUSED since 2026-10-13 (exit 2), see below
-//   node rig/board/jack-bay-live.mjs --sabotage      never make the link; the level asserts must go red
-//
-// Written 2026-10-11 (plans/plan-nodes-revisited.md §3 item 3). What it asserts
-// is never a drawn wire and never a command having run:
-//   - the JACK graph READ BACK by the board after `jack.link` and `jack.unlink`;
-//   - the SOUND arriving in the board's main room (`studio-1`, the capture's
-//     stream) while the Circuit plays a note, against the same note with the
-//     link absent, which is the negative control that proves the level check
-//     can fail.
-//
-// 🔴 IT PLAYS THE CIRCUIT. Note on and note off on channel 1 through the input's
-// own gate (`midi.send`, inputs.mjs `midiVerdict`), 400 ms each, and CC 123 at
-// the end. No SysEx, no program change, nothing that writes the instrument.
-// ⚠️ IT CHANGES THE ONE JACK GRAPH ON THE BOARD for about a minute. Whoever is
-// listening to `studio-1` hears the Circuit in it while the link is up. It
-// restores what it found: the link is unlinked, and a sampler it had to start
-// is stopped again.
-//
-// 🔴 THE SAMPLER HOLDS THE CAPTURE, SINCE 2026-10-13. Until then this raised
-// Yoshimi so that `posboard` existed, and Yoshimi left the board that day
-// (archive/yoshimi/README.md). The sampler is the swap because it is the one
-// engine left that raises the shared capture and stands in it (its standing
-// rows, `possampler:out_1/2 -> posboard:input_1`, jacksynth.mjs
-// `setStandingRows`), so every READ BACK below asks the same question it asked
-// of Yoshimi's two ports: does a bay link sit beside the board's own rows and
-// leave them alone. It plays no note on the sampler, so the main room's floor
-// is the sampler idle and the Circuit is the only thing that can lift it.
-// It stops the sampler at the end if it started it.
-// ⚠️ WHAT THE SWAP COSTS. The board's own CHAIN is an instrument's (`inst`),
-// and the sampler is not one, so with only the sampler up `jack.graph` reads
-// `chain.intact: false` by construction and `jack.rebuild` refuses (`nothing is
-// playing on the JACK graph`). The chain checks therefore read the diff
-// (`missing` and `extra` empty, the capture present) rather than `intact`, and
-// §5 item 6 (a re-patch keeps the link) is asserted as the refusal it is now:
-// nothing moved, the link still on the graph. `--pappus` REFUSES (exit 2):
-// `fx.pappus` raises the granulator only around a JACK instrument
-// (`inst.jack`), and the board has none since Yoshimi left.
+// node rig/board/jack-bay-live.mjs [--sabotage]: the JACK arm on the real board, graded by the JACK
+// graph read back and by sound in `studio-1`, with the unlinked note as negative control. Plays the
+// Circuit (notes, CC 123, no SysEx) and changes the board's JACK graph for about a minute.
+// why: lessons/rig-board-tests.md#jack-bay-live-header
 import { format, parse, randomId, RELAY_BASE } from '../../demo/shell/wire.mjs';
 
 const argv = process.argv.slice(2);

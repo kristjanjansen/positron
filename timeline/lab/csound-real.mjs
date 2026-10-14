@@ -1,71 +1,37 @@
 #!/usr/bin/env node
-// timeline/lab/csound-real.mjs — our compiler against the reference, on
-// SOMEBODY ELSE'S REAL SCORES.
-//
-//   node timeline/lab/csound-real.mjs <score.sco> [<score.sco> …]
-//   SCSORT_HOST=mbp SCSORT_BIN=/opt/homebrew/bin/scsort node … 
-//
-// WHY THIS AND NOT `csound-oracle.mjs`. The oracle grades SEMANTICS against
-// cases we wrote: each one is a question about the format, and the score exists
-// to ask it. This grades a file a composer wrote for a performance, where
-// nobody chose what it would exercise. Those catch different things — 42/42
-// green here meant nothing while both of the only two real scores in existence
-// THREW at line 12.
-//
-// 🔴 THE REFERENCE IS `scsort`, NOT `csound`, AND IT IS A BETTER ONE. It is the
-// score preprocessor on its own: it reads a score and prints it sorted and
-// tempo-warped, with NO orchestra, no audio and no `prints` to filter ANSI
-// escapes out of. With a `w` (warp) statement in force it writes p2 and p3 each
-// as a PAIR — beats first, then seconds — so one run grades the beat arithmetic
-// and the tempo map separately, which the orchestra trick cannot do.
-//
-// ⚠️ AND IT READS STDIN ONLY. MEASURED 2026-09-14: `scsort file.sco` with stdin
-// closed prints `f0 800000000000.0 / e` — an EMPTY SCORE, not an error. So
-// calling it the obvious way reports that the composer's score has no notes in
-// it. That is why this file does not reuse `csound-ssh.mjs`, which ships its
-// arguments as files.
+// node timeline/lab/csound-real.mjs <score.sco> ...: our compiler against the reference on real
+// composers' scores, which exercise what nobody chose (both real vClick scores once threw at line
+// 12).
+// why: lessons/timeline-lab.md#cr-header
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { compileCsound } from '../csound.mjs';
 
-// 🔴 THE REFERENCE IS PLAIN `csound`, NOT `scsort`, AND THE DIFFERENCE MATTERS.
-// `scsort` is the obvious tool and it is a Homebrew-only artefact: Debian's
-// csound package ships `cs`, `csbeats`, `csdebugger` and `csound` and NOTHING
-// else, so a check built on it cannot run on the Raspberry Pi — the machine that
-// is actually always on. MEASURED 2026-09-14: `csound -n -t 0 <orc> <sco>`
-// writes the same sorted score to `score.srt` in the working directory, and the
-// two outputs are identical on both machines.
-//
-// ⚠️ `-n` is no audio, so this is a compiler comparison and never a render.
-// The Pi is named by the environment and never written here: CSOUND_HOST or
-// PI_HOST=<user>@<pi>. With neither set and no local csound, the check skips.
+// The reference is `csound -n -t 0 <orc> <sco>`, which writes score.srt (Debian ships no scsort).
+// Remote via CSOUND_HOST or PI_HOST=<user>@<pi>; with neither and no local csound, it skips.
+// why: lessons/timeline-lab.md#cr-reference
 const HOST = process.env.CSOUND_HOST || process.env.PI_HOST || '';
 const BIN = process.env.CSOUND_BIN || 'csound';
 
-// An orchestra is required even though nothing is rendered. Sorting happens
-// before performance, so an `i` naming an instrument this file does not declare
-// still sorts — which is what lets a real score full of `i "countdown"` be
-// graded without reimplementing the composer's orchestra.
+// An orchestra is required though nothing renders; unknown instruments still sort.
+// why: lessons/timeline-lab.md#cr-orc
 const ORC_B64 = Buffer.from(
   ['sr=44100', 'ksmps=128', 'nchnls=1', '0dbfs=1', 'instr 1', 'endin', ''].join('\n'),
   'utf8').toString('base64');
 
 function sortedScore(text) {
-  // ⚠️ THE SCORE TRAVELS INSIDE THE SCRIPT, base64, NOT ON STDIN. A remote shell
-  // reads its own script from stdin, so a `cat > a.sco` inside it consumes the
-  // script rather than the score — and csound then sorts an empty file and
-  // prints a score with no notes in it. This exact collision produced the first
-  // run of this harness: two real scores, '0 events' each, no error anywhere.
+  // The score travels base64 inside the script: `sh -s` reads its script from stdin.
+  // why: lessons/timeline-lab.md#cr-b64
   const b64 = Buffer.from(text, 'utf8').toString('base64');
   const script = [
-    'D=/var/folders/b2/thzz8sln00l74dgk6vtnfhjm0000gn/T/tmp.OZ0H2UGQ9c',
-    'cd "\"',
+    'D=$(mktemp -d)',
+    'cd "$D"',
     `printf %s '${ORC_B64}' | base64 -d > a.orc`,
     `printf %s '${b64}' | base64 -d > a.sco`,
     `${BIN} -n -t 0 a.orc a.sco >/dev/null 2>&1`,
     'cat score.srt 2>/dev/null',
-    'cd /; rm -rf "\"',
+    'cd /; rm -rf "$D"',
   ].join('\n');
   const local = spawnSync('sh', ['-c', 'command -v csound'], { encoding: 'utf8' });
   const r = local.status === 0
@@ -77,22 +43,15 @@ function sortedScore(text) {
   return r.stdout || '';
 }
 
-// 🔴 A PROBE THAT ACCEPTS EMPTY OUTPUT IS NOT A PROBE. The first version of this
-// file treated any non-null answer as "the reference is available", so a wrong
-// binary path — `/usr/bin/scsort`, which does not exist on the Pi — reported
-// "0 events" for both of the composer's scores and read as a compiler that
-// emits nothing. Require a row that could only come from a working reference.
+// The probe needs a row only a working reference could print; empty output is not "available".
+// why: lessons/timeline-lab.md#cr-probe
 function referenceWorks() {
   const out = sortedScore('t 0 120\ni 1 2 1 100\ne\n');
   return out !== null && /^i\s/m.test(out);
 }
 
-/**
- * Read scsort's sorted score.
- *
- * ⚠️ Numbers come back as C99 HEX FLOATS (`0x1.8p+1`), which `Number()` does
- * not parse and `parseFloat` reads as 0 — silently, and 0 is a plausible beat.
- */
+// Numbers are C99 hex floats (`0x1.8p+1`): Number() rejects them and parseFloat reads 0.
+// why: lessons/timeline-lab.md#cr-hex
 function hex(s) {
   if (!/^[+-]?0x/i.test(s)) return Number(s);
   const m = /^([+-]?)0x([0-9a-f]*)(?:\.([0-9a-f]*))?p([+-]?\d+)$/i.exec(s);
@@ -128,10 +87,8 @@ function readSorted(out) {
   return sections;
 }
 
-// ⚠️ TWO STATEMENTS AT THE SAME BEAT ARE NOT IN A DEFINED ORDER, and neither
-// side is claiming one — csound sorts by time and so do we, and a tie keeps
-// whatever order the file had. Comparing them needs a tiebreak BOTH sides can
-// apply, or every tie pairs the wrong rows and reports itself as a defect.
+// Same-beat statements have no defined order, so both sides get one tiebreak.
+// why: lessons/timeline-lab.md#cr-ties
 const name = (r) => String(r.p1).replace(/"/g, '');
 const byPlace = (a, b) => a.section - b.section || a.beat - b.beat
   || name(a).localeCompare(name(b));
@@ -176,21 +133,15 @@ for (const file of files) {
     continue;
   }
 
-  // 🔴 THE P-FIELDS HAVE TO BE COMPARED TOO, AND THIS IS NOT A NICETY.
-  // `test.sco` puts its score expressions in p4 and p5 — `[8/3]` as a beat
-  // count, `[16/3]` as a note value — and NOWHERE in p2 or p3. A check that
-  // grades only onset and duration is therefore blind in exactly the place the
-  // composer actually used the feature: measured, with bracket evaluation
-  // switched off this file still read 2/2 green.
-  // ⚠️ Compare the OVERLAPPING prefix only. csound writes a trailing 0 after
-  // some string p-fields and not others, and padding it back is inventing a
-  // rule; a length difference is reported and does not fail.
+  // Compare p-fields too (the real scores use brackets only in p4 and p5), over the overlapping
+  // prefix;
+  // a length difference is reported, not failed.
+  // why: lessons/timeline-lab.md#cr-pfields
   let worstBeat = 0, worstMs = 0, wrongInstr = 0, wrongP = 0, lenDiff = 0;
   for (let k = 0; k < refSorted.length; k++) {
     const r = refSorted[k], m = mineRows[k];
-    // 🔴 A named instrument is `"countdown"` on one side and countdown on the
-    // other; compare unquoted, or every string row reads as a mismatch and the
-    // real ones get lost in them.
+    // Compare instrument names unquoted.
+    // why: lessons/timeline-lab.md#cr-unquoted
     if (String(r.p1).replace(/"/g, '') !== String(m.p1).replace(/"/g, '')) wrongInstr++;
     worstBeat = Math.max(worstBeat, Math.abs(r.beat - m.beat));
     worstMs = Math.max(worstMs, Math.abs(r.sec * 1000 - m.ms));

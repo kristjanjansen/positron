@@ -1,14 +1,7 @@
 #!/bin/bash
-# rig/pico/patch/build.sh: build the /archive/pico-router/ (once /concepts/070/) firmware for the plain RP2040 Pico,
-# inside Docker, and copy the UF2 to where the page fetches it.
-#
-#   rig/pico/patch/build.sh
-#
-# Writes build-pico/patch.uf2 beside this file and demo/resources/pico/patch-pico.uf2.
-# The image is the router's, `positron-pico-sdk:2.2.0`, built from
-# rig/pico/firmware/Dockerfile on first use.
-#
-# 🔴 NOTHING NATIVE RUNS ON THE MAC. The compiler, CMake and picotool are all in the image.
+# rig/pico/patch/build.sh: the /archive/pico-router/ firmware for the RP2040 Pico, built in Docker,
+# copied to demo/resources/pico/patch-pico.uf2. Nothing native runs on the Mac.
+# why: lessons/rig-pico.md#patch-build
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RIG="$(cd "$HERE/../.." && pwd)"

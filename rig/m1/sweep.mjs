@@ -1,16 +1,6 @@
-// Sweep the MoQ publisher's knobs across both relays and report loss and latency.
-//
-//   node sweep.mjs [repeats]        default 2
-//
-// WHY IT EXISTS: a single run once showed 31% loss over Cloudflare and two later
-// runs at the IDENTICAL config showed 2.4% and 3.9%. One run is an anecdote, and
-// an anecdote with a percentage sign on it reads like a finding. So every config
-// is run more than once and the SPREAD is printed beside the median -- if the
-// spread is wider than the difference between configs, the sweep has not
-// separated anything and says so.
-//
-// The LAN relay is the control on every row: a change that helps on both is
-// about the ENCODING, one that helps only over distance is about the PATH.
+// node sweep.mjs [repeats]: MoQ publisher knobs on both relays, median and spread per config.
+// The LAN relay is the control: helping on both is the encoding, only over distance is the path.
+// why: lessons/rig-m1.md#sweep-header
 import { spawn, execFileSync } from 'node:child_process';
 
 const HOST = process.env.M1_HOST || 'mbp';

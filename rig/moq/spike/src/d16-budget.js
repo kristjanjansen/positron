@@ -1,7 +1,7 @@
-// Draft-16 subscribe-budget re-check (§14.5): churn N subscribes to NONEXISTENT
-// namespaces on ONE session, then acquire a LIVE broadcast on the same session.
-// Draft-14 behavior (§13.4): ~40-60 churned subscribes exhaust the session permanently.
-// Params: ?relay= &churn=60 &live=d16budget/live
+// Draft-16 subscribe budget (§14.5): churn N subscribes to missing namespaces, then acquire a live
+// one.
+// On draft-14, 40 to 60 churned subscribes exhausted the session. Params: ?relay= &churn=60 &live=
+// why: lessons/rig-moq.md#d16-budget
 import { Connection, Path } from "@moq/net";
 
 const params = new URLSearchParams(location.search);
