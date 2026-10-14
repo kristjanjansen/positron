@@ -732,7 +732,7 @@ void main(){
   // the Pi's is the one the board announces, `pi-1:shader` (boardGraph, below).
   addNodes(bay, S, ['knob-segments', 'code', 'shader', 'screen'], {
     portLabel: 'node:port',
-    label: { 'knob-segments': 'knob', shader: 'mirror shader here', screen: 'picture here' },
+    label: { shader: 'mirror shader here', screen: 'picture here' },
     ports: { 'knob-segments:value-out': { shape: { of: 'param', names: ['segments'] } } },
     deliver: {
       'shader:value-in': (e) => {

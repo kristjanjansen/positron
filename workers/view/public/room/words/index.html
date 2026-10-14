@@ -141,13 +141,13 @@
   const L = (label) => ({ label });
   addNodes(bay, S, ['keys', 'synth', 'fx', 'rec', 'scope', 'speaker'], {
     deliver: { 'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)), 'rec:midi-in': record },
-    label: { synth: 'saw synth', scope: 'scope' },
+    label: { synth: 'saw' },
     ports: {
       'keys:midi-out': L('keyboard, the notes I play'),
       'synth:midi-in': L('synth, notes in'), 'synth:audio-out': L('synth, sound out'),
       'fx:audio-in': L('low-pass filter, sound in'), 'fx:audio-out': L('low-pass filter, sound out'),
       'rec:midi-in': L('recorder, notes to record'), 'rec:midi-out': L('recorder, the notes it recorded'),
-      'scope:audio-in': L('scope, shows the sound'), 'speaker:audio-in': L('speakers'),
+      'scope:audio-in': L('waveform, shows the sound'), 'speaker:audio-in': L('speakers'),
     },
   });
 

@@ -226,13 +226,14 @@ const CSS = `
  *                   the audio graph: `bus` is the chosen source, the same node
  *                   the granulator and the source scope hear
  * @param o.top      elements after Play on its row (070's follow switch)
+ * @param o.context  `() => AudioContext` to play in (48 kHz); left out, Play makes one
  *
  * Added 2026-10-13 for /granulator/beat/; a page that passes none of
  * wire, audio, top or `engine.value` gets what it got before.
  */
 export function createGrainRig({ d, engine, patches, controls, roles = { size: 'size', density: 'rate' },
   hue = () => null, under = [], check: pageCheck = null, outputScope = true, source: firstSource = null,
-  wire = null, audio = null, top: topExtra = [] }) {
+  wire = null, audio = null, top: topExtra = [], context = null }) {
   if (!document.getElementById('cc-grain-css')) {
     const st = el('style'); st.id = 'cc-grain-css'; st.textContent = CSS; document.head.append(st);
   }
@@ -266,8 +267,8 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
   // Every knob's value comes in on grains:value-in, one port for all of them,
   // as on /code/collide/; the event names its control. Every grain the engine
   // reports leaves on grains:value-out, so a scope follows the grains by a link.
-  addNodes(bay, S, ['radio', 'grains', 'wave', ...(outputScope ? ['scope'] : []), 'speaker', 'patch-values'], {
-    label: { grains: engine.label, wave: 'source scope', ...(outputScope ? { scope: 'output scope' } : {}) },
+  addNodes(bay, S, [{ name: 'player', as: 'radio', label: 'radio' }, 'grains', 'wave', ...(outputScope ? ['scope'] : []), 'speaker', 'patch-values'], {
+    label: { grains: engine.label, ...(outputScope ? { scope: 'output scope' } : {}) },
     deliver: { 'grains:value-in': (ev) => valueIn(ev), 'wave:value-in': (ev) => waveGrain(ev),
       ...(outputScope ? { 'scope:value-in': (ev) => scopeGrain(ev) } : {}) },
     ports: { ...lab({ 'radio:file-in': 'radio', 'radio:audio-out': 'radio', 'grains:audio-in': 'grains',
@@ -565,7 +566,7 @@ export function createGrainRig({ d, engine, patches, controls, roles = { size: '
 
   // ── play and stop ────────────────────────────────────────────────────────
   async function play() {
-    ctx ??= new AudioContext({ sampleRate: 48000 });
+    ctx ??= context ? context() : new AudioContext({ sampleRate: 48000 });
     ctx.resume();
     if (!srcBus) {
       srcBus = ctx.createGain();

@@ -34,10 +34,11 @@ import { createTempoDetector, LO, HI, STEADY, steady } from '/radio/tempo.mjs';
  * @param {Function} o.start          `(station) => void`: its sound into `rig.out`
  * @param {Function} o.stop           stop the station's sound
  * @param {object} [o.demo]           more read only hooks for `window.__demo.tempo`
+ * @param {Function} [o.context]      `() => AudioContext` to play in; left out, Play makes one
  * @returns the rig: `ctx`, `pull`, `out`, `playing`, `at` (getters), `pb`, `play`, `stop`
  */
 export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, playerOut: PLAYER_OUT, seen = false,
-  holdSources, flowing, onChoose = null, refuse = null, build = null, load = null, start, stop: stopSource, demo = {} }) {
+  holdSources, flowing, onChoose = null, refuse = null, build = null, load = null, start, stop: stopSource, demo = {}, context = null }) {
   let at = 0;
   const WAVE_IN = `${S}:wave:audio-in`, WAVE_BEATS = `${S}:wave:value-in`, SPEAKER_IN = `${S}:speaker:audio-in`;
   const BPM_IN = `${S}:bpm:audio-in`, BPM_EV = `${S}:bpm:value-out`;
@@ -48,7 +49,7 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
   // The wave's beats and the scope's tempo are only what arrives on their value
   // ins. The fx box is a low cut plus a click on the beat grid, mixed against the
   // untouched radio by its own knob: tempo on value-in, the mix on value-in-2.
-  addNodes(bay, S, ['wave', 'bpm', 'display', 'fx-click', 'mix-knob', 'speaker'], {
+  addNodes(bay, S, ['wave', { name: 'tempo', as: 'bpm' }, 'display', 'fx-click', 'mix-knob', 'speaker'], {
     deliver: { 'wave:value-in': (ev) => beatsIn(ev), 'display:value-in': (ev) => shown(ev),
       'fx:value-in': (ev) => fxTempo(ev), 'fx:value-in-2': (ev) => fxMix(ev) },
     ports: Object.fromEntries(Object.entries({ 'wave:audio-in': 'wave', 'wave:value-in': 'beats',
@@ -290,7 +291,7 @@ export function createTempoRig({ bay, d, site: S, stations: STATIONS, srcOf, pla
 
   function play() {
     if (refuse?.()) return;
-    ctx ??= new AudioContext();
+    ctx ??= context ? context() : new AudioContext();
     ctx.resume();
     if (!out) {
       pull = ctx.createGain(); pull.gain.value = 0; pull.connect(ctx.destination);

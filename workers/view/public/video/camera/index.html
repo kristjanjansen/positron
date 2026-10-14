@@ -35,14 +35,13 @@
 </style>
 <script type="module">
   import { conceptNav } from '/shell/concept-nav.mjs';
-  import { mount, el, armVideo } from '/shell/shell.mjs';
+  import { mount, el } from '/shell/shell.mjs';
   import { createBay } from '/shell/bay.mjs';
   import { addNodes, relabel } from '/shell/nodes.mjs';
   import { createPatchbay } from '/shell/patchbay.mjs';
   import { createVideoPanel } from '/shell/video-panel.mjs';
-  import { createButtonGroup } from '/shell/button-group.mjs';
-  import { createPicker } from '/shell/picker.mjs';
   import { drawCamera, FRAME_W, FRAME_H } from '/shell/pattern.mjs';
+  import { createCamera } from '/shell/camera.mjs';
 
   // The local camera half of /cam/, as a patchbay: the camera is a node with a
   // video-out, the picture on this page is a node with a video-in, and the
@@ -60,7 +59,6 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   addNodes(bay, S, [{ name: 'camera', variant: 'page' }, 'screen'], {
-    label: { screen: 'picture' },
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'picture' } },
   });
   // Once on, the camera box takes the device's own name.
@@ -82,23 +80,22 @@
   hold(CAM, SCREEN);
 
   // ── the camera ──────────────────────────────────────────────────────────
-  const video = el('video');
-  video.muted = true; video.playsInline = true; video.autoplay = true;
-  let cam = null, gen = 0, lastFrame = 0, raf = 0;
-  let devices = [], deviceId = null;
+  // The camera itself is the kit's (camera.mjs, which /connect/ runs too).
+  const camera = createCamera({ log: (line, kind) => d.log(line, kind),
+    onOn: ({ label, set }) => {
+      name.textContent = label;
+      size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
+      camNode(label || 'camera');
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(frame);
+      pb.refresh();
+    },
+    onOff: () => { cancelAnimationFrame(raf); size.textContent = ''; route(); pb.refresh(); },
+  });
+  const video = camera.video;
+  let raf = 0;
+  const flowing = camera.flowing;
 
-  // A frame arrived: what lights the video wire.
-  function watchFrames() {
-    if (typeof video.requestVideoFrameCallback !== 'function') return;
-    const tick = () => { if (!cam) return; lastFrame = performance.now(); video.requestVideoFrameCallback(tick); };
-    video.requestVideoFrameCallback(tick);
-  }
-  const flowing = () => !!cam && performance.now() - lastFrame < 500;
-
-  // ── the picture ─────────────────────────────────────────────────────────
-  // The camera drawn by the test picture's own `drawCamera`, contained rather
-  // than covered (a phone camera can come back portrait), with no scrim,
-  // because nothing is drawn on top of it here.
   const canvas = el('canvas');
   canvas.width = FRAME_W; canvas.height = FRAME_H;
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -118,105 +115,18 @@
   // (asked 2026-10-10, *"keep same bg color initially"*).
   const GROUND = '#0b0e14';
   function route() {
-    const on = !!cam && holds(CAM, SCREEN);
+    const on = camera.on() && holds(CAM, SCREEN);
     if (on) drawCamera(ctx, video, FRAME_W, FRAME_H, { scrim: 0 });
     else { ctx.fillStyle = GROUND; ctx.fillRect(0, 0, FRAME_W, FRAME_H); }
   }
-  function frame() { route(); if (cam) raf = requestAnimationFrame(frame); }
+  function frame() { route(); if (camera.on()) raf = requestAnimationFrame(frame); }
   route();
 
   const pb = createPatchbay(bay, { flowing: (l) => l.from === CAM && holds(CAM, SCREEN) && flowing() });
 
   // ── start and stop ──────────────────────────────────────────────────────
-  async function start() {
-    const mine = ++gen;
-    armVideo(video);   // before any await, or iOS refuses later
-    let s;
-    try {
-      s = await navigator.mediaDevices.getUserMedia({
-        video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-          width: { ideal: FRAME_W }, height: { ideal: FRAME_H }, frameRate: { ideal: 30 } },
-        audio: false,
-      });
-    } catch (e) {
-      const why = e?.name === 'NotAllowedError' ? 'the camera was refused'
-        : e?.name === 'NotFoundError' ? 'this machine has no camera'
-        : `the camera did not start (${e?.name || e})`;
-      d.log(why, 'bad');
-      face(false);
-      return;
-    }
-    if (gen !== mine) { s.getTracks().forEach((t) => t.stop()); return; }
-    cam = s;
-    const track = cam.getVideoTracks()[0];
-    const set = track.getSettings();
-    deviceId = set.deviceId || deviceId;
-    video.srcObject = cam;
-    video.play().catch(() => {});
-    // A camera's label ends in its USB ids, `(2C0E:82E3)`, which name nothing a reader needs.
-    const label = (track.label || '').replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '');
-    name.textContent = label;
-    size.textContent = set.width && set.height ? `${set.width}x${set.height}` : '';
-    camNode(label || 'camera');
-    d.log(`camera on: ${track.label || 'default'} at ${set.width}x${set.height}`, 'hi');
-    watchFrames();
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(frame);
-    pb.refresh();
-    face(true);
-    await listCameras();
-  }
-
-  function stop() {
-    gen++;
-    cam?.getTracks().forEach((t) => t.stop());
-    cam = null;
-    cancelAnimationFrame(raf);
-    try { video.pause(); } catch { /* fine */ }
-    video.srcObject = null;
-    size.textContent = '';
-    route();
-    pb.refresh();
-    face(false);
-    d.log('camera off, every track stopped');
-  }
-
-  // ── which camera, once there is more than one ───────────────────────────
-  // Device labels are empty until the camera has been allowed, so the list is
-  // read after the first start and never on a visit.
-  const picker = createPicker({ what: 'camera',
-    prev: () => pick((at() - 1 + devices.length) % devices.length),
-    next: () => pick((at() + 1) % devices.length),
-    onPick: (i) => pick(i) });
-  picker.el.hidden = true;
-  const at = () => Math.max(0, devices.findIndex((x) => x.deviceId === deviceId));
-  async function listCameras() {
-    try {
-      devices = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'videoinput');
-    } catch { devices = []; }
-    picker.options(devices.map((x, i) => x.label || `camera ${i + 1}`));
-    picker.show(at());
-    picker.el.hidden = devices.length < 2;
-  }
-  async function pick(i) {
-    const dev = devices[i];
-    if (!dev || dev.deviceId === deviceId) return;
-    deviceId = dev.deviceId;
-    picker.show(i);
-    if (cam) { stop(); await start(); }
-  }
-
-  const transport = createButtonGroup({ buttons: [
-    { id: 'cam', icon: 'video', label: 'start the camera', onPress: () => (cam ? stop() : start()) },
-  ] });
-  // The group itself disables the button while a press's promise runs, so a
-  // second press cannot start a second camera while the prompt is up.
-  function face(on) {
-    transport.setIcon('cam', on ? 'stop' : 'video', on ? 'stop the camera' : 'start the camera');
-  }
-
   const top = el('div', 'cc-top');
-  top.append(transport.el, picker.el);
+  top.append(camera.transport.el, camera.picker.el);
   d.stack.add(top, panel.el, pb.el);
   d.ready();
 </script>

@@ -38,6 +38,9 @@
 // graph's sound exactly: the Impulse at its old rate and the ramp times 0.
 //
 // The comments in it are for a visitor reading the box: short and plain.
+import { bootScsynth } from '../shell/scsynth.mjs';
+import { compile } from '../shell/sclang-lite.mjs';
+
 export const PROGRAM = `// grains read out of an eight second ring of what comes in
 {
   var buf = \\buf.kr(0);
@@ -143,3 +146,83 @@ export const PATCHES = [
 
 /** Every control value of a patch, defaults filled in. */
 export const valuesOf = (p) => ({ ...DEFAULTS, ...p.set });
+
+// ── the engine, behind grain-rig.mjs's contract ───────────────────────────
+// Lifted 2026-10-14 from /granulator/grains/ for /connect/ (plans/
+// plan-connect-ui.md, the convergence rule); /granulator/beat/ still carries
+// its own copy with the tempo. Its program is compiled when it is made (pure
+// JavaScript, no fetch); `boot` brings scsynth up in the context it is handed.
+export function createRingEngine({ log = () => {} } = {}) {
+  const NODE = 4000, BUF = 0, DEF = 'gring';
+  // ── the program: compiled as the page opens, pure JavaScript, no fetch ───
+  const t0 = performance.now();
+  const good = compile(PROGRAM, { name: DEF });
+  const compileMs = performance.now() - t0;
+  if (!good.ok) log(`the granulator's program did not compile: ${good.message}`, 'bad');
+
+  // ── the engine, behind the rig's contract ────────────────────────────────
+  let eng = null, ctx = null, values = valuesOf(PATCHES[0]), mixNow = 1;
+  const T = { bufferBytes: RING_SECONDS * 48000 * 4, compileMs: +compileMs.toFixed(1) };
+  const engine = {
+    label: 'grain ring',
+    // The wet/dry is `\mix` in the program's last line, so the blend happens
+    // in the engine and the dry source never leaves it.
+    mixes: true,
+    async boot({ ctx: ac, input, grain, log }) {
+      ctx = ac;
+      const t1 = performance.now();
+      if (!good.ok) throw new Error('the program did not compile');
+      eng = await bootScsynth({
+        audioContext: ctx, input, log,
+        // `SendReply.ar(trig, '/grain', [pos, size, write / frames, rate])`
+        // arrives as ['/grain', nodeID, replyID, pos, size, write head, rate]:
+        // SendReply puts two of its own in front. Both positions are fractions
+        // of the same eight seconds, so how long ago the grain's audio came in
+        // is their difference round the ring.
+        onReply: (m) => {
+          if (m[0] !== '/grain') return false;
+          const pos = m[3], head = m[5];
+          grain({ pos, ago: ((((head - pos) % 1) + 1) % 1) * RING_SECONDS, dur: m[4], voice: 0, rate: m[6] });
+          return true;
+        },
+      });
+      eng.out.gain.value = 0;
+      T.moduleMs = Math.round(eng.moduleMs); T.bootMs = Math.round(eng.bootMs);
+      const ta = performance.now();
+      const alloc = await eng.sendAndWait((m) => (m[0] === '/done' || m[0] === '/fail') && (m[1] === '/b_alloc' || m[1] === '/b_allocPtr'),
+        5000, '/b_alloc', BUF, RING_SECONDS * ctx.sampleRate, 1);
+      if (!alloc || alloc[0] !== '/done') throw new Error('the ring buffer was not allocated');
+      T.allocMs = Math.round(performance.now() - ta);
+      const td = performance.now();
+      const done = await eng.sendAndWait((m) => m[0] === '/done' && m[1] === '/d_recv', 5000, '/d_recv', good.bytes);
+      if (!done) throw new Error('the engine never said it had the definition');
+      T.defMs = Math.round(performance.now() - td); T.defBytes = good.bytes.length;
+      const go = await eng.sendAndWait((m) => m[0] === '/n_go' || (m[0] === '/fail' && m[1] === '/s_new'), 5000,
+        '/s_new', DEF, NODE, 1, 0, 'buf', BUF, 'inbus', 2, 'mix', mixNow, ...Object.entries(values).flat());
+      if (!go || go[0] !== '/n_go') throw new Error('the granulator did not start');
+      T.startMs = Math.round(performance.now() - t1);
+      log(`the granulator up ${T.startMs} ms after Play: one ${RING_SECONDS} s buffer of ${(T.bufferBytes / 1e6).toFixed(1)} MB, `
+        + `the ${good.bytes.length} B definition compiled in ${T.compileMs} ms and taken in ${T.defMs} ms`);
+      return { meter: eng.meter, out: eng.out, timing: T, scsynth: eng };
+    },
+    // What a patch does beyond its values: the read head starts again at the
+    // write head, so `back` means what it says after a stretch has left it
+    // anywhere.
+    land() {
+      eng.send('/n_set', NODE, 'sync', 1);
+      setTimeout(() => eng.send('/n_set', NODE, 'sync', 0), 40);
+    },
+    knob(name, v) { if (name === 'mix') mixNow = v; else values[name] = v; eng.send('/n_set', NODE, name, v); },
+    fixed(set) { Object.assign(values, set); eng.send('/n_set', NODE, ...Object.entries(set).flat()); },
+    run(on) { eng.send('/n_run', NODE, on ? 1 : 0); },
+    async read(name) {
+      const r = await eng.sendAndWait((m) => m[0] === '/n_set' && m[2] === name, 3000, '/s_get', NODE, name);
+      return r ? Number(r[3]) : null;
+    },
+    glitches: () => { try { return eng?.sonic.getMetrics?.()?.glitchCount ?? null; } catch { return null; } },
+  };
+
+  engine.good = good;
+  engine.T = T;
+  return engine;
+}

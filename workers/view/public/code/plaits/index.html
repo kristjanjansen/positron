@@ -32,7 +32,7 @@
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createKeyboard, keyRange } from '/shell/keyboard.mjs';
   import { createPicker } from '/shell/picker.mjs';
-  import { createPlaitsVoice, PATCHES, P } from '../plaits-voice.mjs';
+  import { createPlaitsVoice, createPlaitsKeys, PATCHES, P, KNOBS } from '../plaits-voice.mjs';
 
   // A second Plaits concept. Asked 2026-10-12: *"make second plaits demo with
   // keyboard and all parameters. 2 row patamters perhaps to mimic muta
@@ -72,34 +72,15 @@
 
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
-  const SHORT = ['analog', 'shaper', 'FM', 'formant', 'additive', 'table', 'chord', 'speech',
-    'swarm', 'noise', 'dust', 'string', 'modal', 'kick', 'snare', 'hat'];
   const P0 = PATCHES[0];
-  // The knobs, in /muta/'s order. `to` is what the value does at Plaits.
-  // `short` is the word under a dial whose name would be cut with an ellipsis
-  // (the knob cell holds about six letters); the full name is its hover, its
-  // node's label and the value's name on the wire.
-  const ROWS = [
-    [
-      { name: 'model', min: 0, max: 15, step: 1, value: P0.engine, to: (v) => param(P.engine, Math.round(v)),
-        format: (v) => SHORT[Math.round(v)] ?? '' },
-      { name: 'pitch', min: -24, max: 24, step: 1, value: 0, to: (v) => { transpose = Math.round(v); },
-        format: (v) => `${v > 0 ? '+' : ''}${Math.round(v)}` },
-      { name: 'harmonics', short: 'harm', value: P0.harmonics, to: (v) => param(P.harmonics, v) },
-      { name: 'timbre', value: P0.timbre, to: (v) => param(P.timbre, v) },
-      { name: 'morph', value: P0.morph, to: (v) => param(P.morph, v) },
-    ],
-    [
-      { name: 'timbre CV', short: 'T CV', id: 'timbre-cv', min: -1, max: 1, value: 0, to: (v) => param(P.timbreModAmount, v) },
-      { name: 'FM CV', id: 'fm-cv', min: -1, max: 1, value: 0, to: (v) => param(P.fmAmount, v) },
-      { name: 'morph CV', short: 'M CV', id: 'morph-cv', min: -1, max: 1, value: 0, to: (v) => param(P.morphModAmount, v) },
-      { name: 'decay', value: P0.decay, to: (v) => param(P.decay, v) },
-      { name: 'colour', value: P0.colour, to: (v) => param(P.lpgColour, v) },
-    ],
-  ];
-  const ALL = ROWS.flat().map((k) => ({ min: 0, max: 1, id: k.name, ...k }));
+  // The knobs, in /muta/'s order, are plaits-voice.mjs's KNOBS (/connect/
+  // shows the same panel). `to` is what the value does at Plaits. `short` is
+  // the word under a dial whose name would be cut with an ellipsis (the knob
+  // cell holds about six letters); the full name is its hover, its node's
+  // label and the value's name on the wire.
+  const ALL = KNOBS.map((k) => ({ ...k,
+    to: k.param === 'transpose' ? (v) => keys.setTranspose(v) : (v) => param(P[k.param], k.round ? Math.round(v) : v) }));
   const byName = new Map(ALL.map((k) => [k.name, k]));
-  let transpose = 0;
   const param = (id, value) => voice.send({ t: 'param', id, value });
 
   // ── the bay ──────────────────────────────────────────────────────────────
@@ -107,24 +88,10 @@
 
   const voice = createPlaitsVoice({ log: d.log, voices: 6, onUp: () => route() });
   voice.setGain(P0.gain);   // the first patch's level trim
-  const held = new Set();        // keys down that have reached Plaits, by key note
-  const playing = new Map();     // key note -> the note Plaits was handed
+  // The first key boots the voice and plays once it is up, if still held.
+  const keys = createPlaitsKeys(voice);
+  const { noteOn, noteOff, playing } = keys;
   let notesIn = 0, paramsIn = 0;
-  function noteOn(n, vel) {
-    held.add(n);
-    if (!voice.ready()) {
-      // The first key boots the voice and plays once it is up, if still held.
-      voice.boot().then((ok) => { if (ok && held.has(n) && !playing.has(n)) noteOn(n, vel); });
-      return;
-    }
-    const at = Math.max(0, Math.min(127, n + transpose));
-    playing.set(n, at);
-    voice.noteOn(at, vel);
-  }
-  function noteOff(n) {
-    held.delete(n);
-    if (playing.has(n)) { voice.noteOff(playing.get(n)); playing.delete(n); }
-  }
   let kb = null;
   // The shapes are /shell/nodes.mjs's. A knob is labelled with its full name,
   // and a port with its `node:port`, which is what a refusal names.
@@ -225,7 +192,7 @@
   window.__demo.knobs = grid;
   window.__demo.plaits = {
     bay, knobs, pick, patches: PATCHES, features: voice.features, ready: voice.ready, ctx: voice.ctx,
-    wasmAsked: voice.asked, level: voice.level, at: () => at, transpose: () => transpose,
+    wasmAsked: voice.asked, level: voice.level, at: () => at, transpose: keys.transpose,
     playing: () => [...playing.values()].sort(),
     key: (n, on) => bay.send(ID('keys', 'midi-out'), { cls: 'note', ch: 1, d1: n, d2: on ? 100 : 0 }),
     counts: () => ({ notesIn, paramsIn }),

@@ -79,6 +79,7 @@
   // ── the bay ─────────────────────────────────────────────────────────────
   const bay = createBay();
   addNodes(bay, S, ['camera', 'screen'], {
+    label: { screen: 'original' },
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
   });
   addNodes(bay, S, ['moq-relay'], { ports: { [RELAY_IN]: { label: 'video' }, [RELAY_OUT]: { label: 'video' } } });

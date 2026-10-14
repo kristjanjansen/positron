@@ -381,7 +381,6 @@
   // crossfader takes them. Each port keeps its `node:port` label.
   addNodes(bay, 'web', ['scope', 'fader', 'xfade', 'speaker'], {
     portLabel: 'node:port',
-    label: { scope: 'waveforms' },
     ports: { 'scope:audio-in-2': {} },
     deliver: { 'xfade:value-in': (e) => {
       if (e?.of !== 'param' || e.name !== 'x') return;

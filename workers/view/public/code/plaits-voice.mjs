@@ -62,13 +62,69 @@ export const PATCHES = [
   { name: 'Wind', engine: 9, harmonics: 0.35, timbre: 0.55, morph: 0.4, decay: 0.9, colour: 0.6, gain: 1 },
 ];
 
+// ── the panel /code/plaits/ and /connect/ both show ──────────────────────
+// Lifted 2026-10-14 from /code/plaits/ (plans/plan-connect-ui.md, the
+// convergence rule), with that page's reasons beside it there.
+/** The models in a knob cell's six letters, MODELS' order. */
+export const MODEL_SHORT = ['analog', 'shaper', 'FM', 'formant', 'additive', 'table', 'chord', 'speech',
+  'swarm', 'noise', 'dust', 'string', 'modal', 'kick', 'snare', 'hat'];
+/**
+ * Every parameter /muta/ exposes, as one row of knobs in its order. `param` is
+ * the key in P it sets (rounded when `round`), or 'transpose' for pitch, which
+ * offsets the keys rather than reaching Plaits. `id` is a knob node's name.
+ */
+export const KNOBS = [
+  { name: 'model', min: 0, max: 15, step: 1, value: PATCHES[0].engine, param: 'engine', round: true,
+    format: (v) => MODEL_SHORT[Math.round(v)] ?? '' },
+  { name: 'pitch', min: -24, max: 24, step: 1, value: 0, param: 'transpose',
+    format: (v) => `${v > 0 ? '+' : ''}${Math.round(v)}` },
+  { name: 'harmonics', short: 'harm', value: PATCHES[0].harmonics, param: 'harmonics' },
+  { name: 'timbre', value: PATCHES[0].timbre, param: 'timbre' },
+  { name: 'morph', value: PATCHES[0].morph, param: 'morph' },
+  { name: 'timbre CV', short: 'T CV', id: 'timbre-cv', min: -1, max: 1, value: 0, param: 'timbreModAmount' },
+  { name: 'FM CV', id: 'fm-cv', min: -1, max: 1, value: 0, param: 'fmAmount' },
+  { name: 'morph CV', short: 'M CV', id: 'morph-cv', min: -1, max: 1, value: 0, param: 'morphModAmount' },
+  { name: 'decay', value: PATCHES[0].decay, param: 'decay' },
+  { name: 'colour', value: PATCHES[0].colour, param: 'lpgColour' },
+].map((k) => ({ min: 0, max: 1, id: k.name, ...k }));
+
+/**
+ * Keys into a voice: the notes held, a transpose (the pitch knob), and a first
+ * note that boots the voice and plays once it is up if its key is still down.
+ * @param {object} voice   createPlaitsVoice's
+ * @param {object} [o]
+ * @param {() => Promise<boolean>} [o.boot]  how a note before the voice is up starts it
+ */
+export function createPlaitsKeys(voice, { boot = () => voice.boot() } = {}) {
+  const held = new Set();        // keys down that have reached Plaits, by key note
+  const playing = new Map();     // key note -> the note Plaits was handed
+  let transpose = 0;
+  function noteOn(n, vel) {
+    held.add(n);
+    if (!voice.ready()) {
+      boot().then((ok) => { if (ok && held.has(n) && !playing.has(n)) noteOn(n, vel); });
+      return;
+    }
+    const at = Math.max(0, Math.min(127, n + transpose));
+    playing.set(n, at);
+    voice.noteOn(at, vel);
+  }
+  function noteOff(n) {
+    held.delete(n);
+    if (playing.has(n)) { voice.noteOff(playing.get(n)); playing.delete(n); }
+  }
+  return { noteOn, noteOff, playing, setTranspose: (v) => { transpose = Math.round(v); }, transpose: () => transpose };
+}
+
 /**
  * @param {object} o
  * @param {Function} o.log       `(line, kind)`
  * @param {number} [o.voices]    how many voices the shim plays (1 to 8)
  * @param {Function} [o.onUp]    called once the voice is up, to connect it
+ * @param {() => AudioContext} [o.context]  a context to play in (a page's shared
+ *   one, at 48 kHz); left out, `boot()` makes its own, as it always has
  */
-export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} } = {}) {
+export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {}, context = null } = {}) {
   let ctx = null, node = null, out = null, master = null, analyser = null, buf = null, freq = null;
   let ready = null, bytesP = null, level = 0, gain = 1;
   const queue = [];
@@ -88,7 +144,7 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {} 
     if (ready) return Promise.resolve(ready);
     // Made here, synchronously inside the press. 48000 by name, because Plaits
     // is compiled for it (/muta/ says why).
-    ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+    ctx = context ? context() : new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
     ctx.resume();
     ready = (async () => {
       const t0 = performance.now();

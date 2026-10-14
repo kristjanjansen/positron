@@ -50,8 +50,8 @@
   import { createKnob } from '/shell/knob.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { createInstrumentPanel } from '/shell/instrument-panel.mjs';
-  import { createPicoRunner, parseUF2, W as OLED_W, H as OLED_H } from '/shell/pico.mjs';
-  import { drawOled } from '/shell/oled-view.mjs';
+  import { createPicoDevice } from '/shell/pico.mjs';
+  import { drawOled, oledCanvas } from '/shell/oled-view.mjs';
   useMediumColours();
 
   // /synth/recorder/ with the kit's own transport bar and timeline glued together in
@@ -202,58 +202,28 @@
   // ⚠️ NOTHING IS FETCHED ON A VISIT. The worker and the UF2 wait for the first
   // key, knob or press of the panel; bytes that arrive meanwhile are kept and
   // sent once it has booted.
-  const PICO_UF2 = '/resources/pico/rings-pico.uf2';
-  const pico = { state: 'off', runner: null, queue: [], frames: 0, px: null, bytes: 0 };
-  const oledCv = document.createElement('canvas');
-  oledCv.width = OLED_W; oledCv.height = OLED_H;
-  drawOled(oledCv, new Uint8Array(OLED_W * OLED_H));
+  // The device is the kit's (pico.mjs `createPicoDevice`, which /connect/ runs too).
   const oledBox = el('div', 'cc-oled');
   oledBox.title = 'press to start the Pico';
-  oledBox.append(oledCv);
-  // A whole number scale, so every panel pixel is the same size on screen.
-  new ResizeObserver(() => {
-    const k = Math.max(1, Math.floor(Math.min(oledBox.clientWidth / OLED_W, oledBox.clientHeight / OLED_H)));
-    oledCv.style.width = `${k * OLED_W}px`; oledCv.style.height = `${k * OLED_H}px`;
-  }).observe(oledBox);
+  const oledCv = oledCanvas(oledBox);
   // The footer's middle says the screen's resolution, and only says otherwise while it loads or if it failed.
   const picoSays = el('span', 'cc-pico-say', '128\u00d764');
   const showing = () => bay.links().some((l) => l.from === `${S}:pico:video-out` && l.to === `${S}:oled:video-in`);
-  async function picoStart() {
-    if (pico.state !== 'off') return;
-    pico.state = 'loading'; picoSays.textContent = 'loading';
-    try {
-      const res = await fetch(PICO_UF2);
-      if (!res.ok) throw new Error(`${PICO_UF2} answered ${res.status}`);
-      const image = parseUF2(await res.arrayBuffer());
-      pico.runner = createPicoRunner({ onFrame: (px) => {
-        pico.frames++; pico.px = px;
-        if (showing()) drawOled(oledCv, px);
-      } });
-      pico.runner.boot(image);
-      pico.state = 'running'; picoSays.textContent = '128\u00d764'; oledBox.title = '';
-      d.log(`the Pico booted rings-pico.uf2, ${image.length.toLocaleString('en')} bytes of flash`);
-      if (pico.queue.length) { pico.runner.send(pico.queue); pico.queue = []; }
-    } catch (e) {
-      pico.state = 'failed'; picoSays.textContent = 'failed';
-      d.log(`the Pico did not start: ${e.message}`, 'bad');
-    }
-  }
+  const pico = createPicoDevice({
+    onFrame: (px) => { if (showing()) drawOled(oledCv, px); },
+    onState: (st) => { picoSays.textContent = st === 'running' ? '128\u00d764' : st; if (st === 'running') oledBox.title = ''; },
+    log: (line, kind) => d.log(line, kind),
+  });
+  const picoStart = () => pico.start();
   oledBox.addEventListener('pointerdown', () => picoStart());
-  // One bay event to MIDI bytes on channel 1: note on 0x90, note off 0x80, CC 0xB0.
-  function picoIn(e) {
-    const b = e.cls === 'note' ? (e.d2 ? [0x90, e.d1, e.d2] : [0x80, e.d1, 0]) : e.cls === 'cc' ? [0xB0, e.d1, e.d2] : null;
-    if (!b) return;
-    pico.bytes += b.length;
-    if (pico.state === 'running') pico.runner.send(b);
-    else if (pico.state !== 'failed') { pico.queue.push(...b); picoStart(); }
-  }
+  const picoIn = (e) => pico.midi(e);
 
   let kb = null;
   // The shapes are /shell/nodes.mjs's; the page says only what each in-port
   // does. The volume knob is a node of its own, as on /synth/sound/: a turn is
   // one CC 7 out of its own port, so its cable is the one that pulses.
   addNodes(bay, S, ['keys', 'synth', 'rec', 'speaker', 'midi-state', 'shader-dots', 'screen', 'pico', 'oled', 'volume-knob'], {
-    label: { synth: 'saw', screen: 'picture' },
+    label: { synth: 'saw' },
     deliver: {
       'keys:midi-in': (e) => (e.d2 ? kb?.press(e.d1, 'midi') : kb?.release(e.d1, 'midi')),
       'synth:midi-in': (e) => (e.d2 ? noteOn(e.d1, e.d2) : noteOff(e.d1)),

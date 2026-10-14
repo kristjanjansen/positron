@@ -179,11 +179,10 @@
   const bay = createBay();
   // The shapes are /shell/nodes.mjs's; the labels and the delivery are this page's.
   for (const c of K) LABEL.set(c.name, c.label);
-  addNodes(bay, S, [{ name: 'recording', as: SRC.id, site: SRC.store, label: SRC.label }, 'radio',
+  addNodes(bay, S, [{ name: 'recording', as: SRC.id, site: SRC.store, label: SRC.label }, { name: 'player', as: 'radio', label: 'radio' },
     // `granulator` on screen and in its ids (asked 2026-10-13: *"no grains mentions"*).
-    'granulator', 'speaker', 'shader-landscape', 'screen',
+    { name: 'grains', as: 'granulator', label: 'granulator' }, 'speaker', 'shader-landscape', 'screen',
     ...K.map((c) => ({ name: 'knob', as: `knob-${c.label}`, label: c.label, variant: 'unshaped' }))], {
-    label: { screen: 'screen' },
     ports: {
       [`${SRC.id}:file-out`]: { label: 'recording', address: SRC.url },
       'radio:file-in': { label: 'radio' }, 'radio:audio-out': { label: 'radio' },
@@ -191,7 +190,7 @@
       'granulator:value-out': { label: 'events' },
       'speaker:audio-in': { label: 'speakers' },
       'shader:audio-in': { label: 'level' }, 'shader:value-in': { label: 'values' }, 'shader:video-out': { label: 'picture' },
-      'screen:video-in': { label: 'screen' },
+      'screen:video-in': { label: 'picture' },
       // where a granulator's value can land later: unlinked today
       ...Object.fromEntries(K.flatMap((c) => [[`knob-${c.label}:value-out`, { label: c.label }],
         [`knob-${c.label}:value-in`, { label: c.label }]])),

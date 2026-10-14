@@ -100,7 +100,7 @@ export const CONCEPTS = [
   // sampler/015 Sustain debugger archived 2026-10-12 (*"arcive/move to md the sampler015"*): archive/concepts/sampler-015.md.
   // sampler/030 moved to remote/030 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { id: 'drums/machine', title: 'Drum machine', say: 'Four SuperCollider drums on 16 steps, each on a patchbay wire that silences it when taken away.' },
-  { id: 'drums/knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a scope for each drum, heard from the next hit.' },
+  { id: 'drums/knobs', title: 'Drum knobs', say: 'The same drum machine with a knob and a waveform for each drum, heard from the next hit.' },
   { id: 'drums/samples', title: 'Sample drums', say: 'Drop a Circuit pack or WAVs and each sample becomes a named row. Drag across the grid to draw hits.' },
   // rhythm/030 moved to remote/040 2026-10-13 (*"yea, move them all to remote instruments or stm"*); the old URL 404s (no forwarding).
   { id: 'drums/camera', title: 'Camera drums', say: 'Point your camera and its picture plays as a 16 by 9 drum pattern, where brighter areas play busier.' },

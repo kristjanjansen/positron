@@ -167,9 +167,10 @@ const LATE_S = 0.3;
  * @param {(ins:object)=>void} [o.onProgram]  the instrument changed (sampler.mjs's object)
  * @param {(eng:object)=>void} [o.onReady]  the engine is up
  * @param {number[]} [o.warm]  [lo, hi] notes to fetch when the Rhodes is switched to
+ * @param {() => AudioContext} [o.context]  a context to play in; left out, the first intent makes one
  */
 export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch = () => {},
-  onProgram = () => {}, onReady = () => {}, warm: warmRange = null } = {}) {
+  onProgram = () => {}, onReady = () => {}, warm: warmRange = null, context: given = null } = {}) {
   prefetchScsynth();
   const programs = instruments.map((x) => x.program).filter((p) => SETS[p]);
   let ctx = null, eng = null, ready = null, settle = null, attempt = null;
@@ -196,7 +197,7 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
 
   /** The context, made once and asked to run on every call (a press is a gesture; a hover is not). */
   function context() {
-    if (!ctx) ctx = new AudioContext({ latencyHint: 'interactive' });
+    if (!ctx) ctx = given ? given() : new AudioContext({ latencyHint: 'interactive' });
     // Fire and move on: resume() waits on a gesture and never rejects.
     if (ctx.state !== 'running') ctx.resume().catch(() => {});
     return ctx;
@@ -402,6 +403,8 @@ export function createScSampler({ instruments = [PIANO], log = () => {}, onFetch
     loading: () => loading > 0 || draining,
     ctx: () => ctx,
     engine: () => eng,
+    /** The engine's way out once it is up (bootScsynth's `out`), for a caller with its own router. */
+    out: () => eng?.out ?? null,
     ready: () => !!eng,
     stat: () => ({ ...stat, urls: [...stat.urls], loadMs: [...stat.loadMs], programs: [...stat.programs],
       timing: { ...stat.timing }, buffers: buffers.size, voices: core.sounding(), inst: core.current().id,

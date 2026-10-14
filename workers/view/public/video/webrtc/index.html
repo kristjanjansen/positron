@@ -93,6 +93,7 @@
   // The camera's video goes to Stream's WebRTC input by WHIP and comes back by WHEP.
   const bay = createBay();
   addNodes(bay, S, ['camera', 'screen'], {
+    label: { screen: 'original' },
     ports: { 'camera:video-out': { label: 'camera' }, 'screen:video-in': { label: 'original' } },
   });
   addNodes(bay, S, ['stream-live'], { ports: { [LIVE_IN]: { label: 'video' }, [LIVE_OUT]: { label: 'video' } } });

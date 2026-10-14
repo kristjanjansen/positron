@@ -592,3 +592,50 @@ export async function createOledUi(bytes) {
   }
   return { fonts, screen };
 }
+
+/**
+ * The emulated Pico as a device, as /synth/dots/ plays it: the rings firmware
+ * (rig/pico/rings/main.c) fetched and booted on the first note or press, MIDI
+ * events in on UART0 RX, every new 128x64 screen out through `onFrame`. Lifted
+ * 2026-10-14 from that page for /connect/ (plans/plan-connect-ui.md, the
+ * convergence rule).
+ * ⚠️ NOTHING IS FETCHED UNTIL `start()` OR THE FIRST EVENT. Bytes that arrive
+ * while it boots are kept and sent once it is up.
+ * @param {object} [o]
+ * @param {string} [o.uf2]                 the firmware image, our origin
+ * @param {(px: Uint8Array) => void} [o.onFrame]
+ * @param {(state: string) => void} [o.onState]   'loading', 'running' or 'failed'
+ * @param {(line: string, kind?: string) => void} [o.log]
+ */
+export function createPicoDevice({ uf2 = '/resources/pico/rings-pico.uf2', onFrame = () => {}, onState = () => {}, log = () => {} } = {}) {
+  const pico = { state: 'off', runner: null, queue: [], frames: 0, px: null, bytes: 0 };
+  async function start() {
+    if (pico.state !== 'off') return;
+    pico.state = 'loading'; onState('loading');
+    try {
+      const res = await fetch(uf2);
+      if (!res.ok) throw new Error(`${uf2} answered ${res.status}`);
+      const image = parseUF2(await res.arrayBuffer());
+      pico.runner = createPicoRunner({ onFrame: (px) => {
+        pico.frames++; pico.px = px;
+        onFrame(px);
+      } });
+      pico.runner.boot(image);
+      pico.state = 'running'; onState('running');
+      log(`the Pico booted ${uf2.split('/').pop()}, ${image.length.toLocaleString('en')} bytes of flash`);
+      if (pico.queue.length) { pico.runner.send(pico.queue); pico.queue = []; }
+    } catch (e) {
+      pico.state = 'failed'; onState('failed');
+      log(`the Pico did not start: ${e.message}`, 'bad');
+    }
+  }
+  // One bay event to MIDI bytes on channel 1: note on 0x90, note off 0x80, CC 0xB0.
+  function midi(e) {
+    const b = e.cls === 'note' ? (e.d2 ? [0x90, e.d1, e.d2] : [0x80, e.d1, 0]) : e.cls === 'cc' ? [0xB0, e.d1, e.d2] : null;
+    if (!b) return;
+    pico.bytes += b.length;
+    if (pico.state === 'running') pico.runner.send(b);
+    else if (pico.state !== 'failed') { pico.queue.push(...b); start(); }
+  }
+  return { start, midi, stat: pico, state: () => pico.state, frames: () => pico.frames, px: () => pico.px };
+}
