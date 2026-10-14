@@ -1,5 +1,9 @@
 ## Open
 
+- **Node catalogue step 2: every concept page builds its nodes with addNodes() from nodes.mjs** (2026-10-14, four agents by group). Asked: *"do these"*.
+
+- **Live announce: every page announces its nodes (bay-node graph.announce) so /connect/ can show what is present now** (2026-10-14). Asked: *"do these"*. After step 2.
+
 - **/connect/ from the catalogue (only real nodes, each with its pages), examples as lowercase Geist pills in a new "human input" colour** (2026-10-14, agent). Asked: *"lowercase. fully round. geist. find nonused color to sigify human inout / pronpot / voice"*, *"still have those imaginary ones?"*.
 
 - ~~**GitHub button in the front page header**~~ (2026-10-14, DONE). Asked: *"add gh button to frontpage header"*. Points at github.com/positron-studio/positron.
