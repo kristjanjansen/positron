@@ -1,6 +1,6 @@
 ---
 name: positron-ui
-description: Page furniture on a patchbay page: the kit in demo/shell/ and /kit/<part>/, the bay picture (createPatchbay, bay-view, medium colours), controls as node ports (a knob is a value-out, keys are midi-out plus midi-in), readouts, tables, sliders, transport bars, CSS, spacing, phone layout and the prose a visitor reads. Load before building or changing any interface, any control, any port a control stands for, any readout cell, the patchbay block on a page, or any stylesheet rule.
+description: "Page furniture on a patchbay page: the kit in demo/shell/ and /kit/<part>/, the bay picture (createPatchbay, bay-view, medium colours), controls as node ports (a knob is a value-out, keys are midi-out plus midi-in), readouts, tables, sliders, transport bars, CSS, spacing, phone layout and the prose a visitor reads. Load before building or changing any interface, any control, any port a control stands for, any readout cell, the patchbay block on a page, or any stylesheet rule."
 ---
 
 # The kit, the page and everything a visitor looks at

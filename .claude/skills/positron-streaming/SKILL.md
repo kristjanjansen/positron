@@ -1,6 +1,6 @@
 ---
 name: positron-streaming
-description: A stream as a heavy patchbay link, and the transport it negotiates (TRANSPORTS and chooseTransport in demo/shell/bay.mjs): HLS, LL-HLS, MoQ, WHIP and WHEP, Cloudflare Stream and Workers, the relay room and its limits, ERR and somebody else's Icecast, Durable Objects, R2. Load before changing anything under workers/ or src/, before any page that plays a stream or adds an audio, video, file or state link that leaves the machine, and before quoting a latency or a bill.
+description: "A stream as a heavy patchbay link, and the transport it negotiates (TRANSPORTS and chooseTransport in demo/shell/bay.mjs): HLS, LL-HLS, MoQ, WHIP and WHEP, Cloudflare Stream and Workers, the relay room and its limits, ERR and somebody else's Icecast, Durable Objects, R2. Load before changing anything under workers/ or src/, before any page that plays a stream or adds an audio, video, file or state link that leaves the machine, and before quoting a latency or a bill."
 ---
 
 # Streaming, the relay, and what each provider actually does

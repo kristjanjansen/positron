@@ -1,6 +1,6 @@
 ---
 name: positron-xr
-description: WebXR on a Quest, immersive sessions, passthrough, the way out of a headset page, and filling a screen on a phone (fullscreen.mjs, used by concept pages). Load before any gl: true or headset page, before a full screen button on any page, before verify-gl.mjs or verify-quest.mjs, and before any claim about what a headset can do.
+description: "WebXR on a Quest, immersive sessions, passthrough, the way out of a headset page, and filling a screen on a phone (fullscreen.mjs, used by concept pages). Load before any gl: true or headset page, before a full screen button on any page, before verify-gl.mjs or verify-quest.mjs, and before any claim about what a headset can do."
 ---
 
 # Headsets, immersive sessions and full screen

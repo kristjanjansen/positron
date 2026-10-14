@@ -6,7 +6,7 @@
 
 - ~~**Front page contacts: icons, below the hero**~~ (2026-10-14, DONE, BUILD 925a6189, then moved by the line above). Asked: *"Contavts: use icons? Below hero?"*, following the header move above. Drawn SVG icons (mail, Instagram), not glyphs.
 
-- **Research: how to distribute our skills** (2026-10-14, a background agent). Asked: *"In bg investigate how we should distribute our skills"*. Output `research/skills-distribution-2026-10-14.md`.
+- ~~**Research: how to distribute our skills**~~ (2026-10-14, DONE; steps wait for the owner, starting with the public repo question). Asked: *"In bg investigate how we should distribute our skills"*. Output `research/skills-distribution-2026-10-14.md`.
 
 - ~~**Research: local MCP tools or DIY for UI video capture, for Instagram stories**~~ (2026-10-14, DONE; building `demo/reel.mjs` waits for a yes). Asked: *"In bg research what local mcp tools or diy we can do for ui video capture for ig stories etc"*. Output `research/ui-video-capture-2026-10-14.md`.
 
