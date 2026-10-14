@@ -115,10 +115,6 @@ const DEFAULTS = {
   settle: 0.15, turnMs: 130, endJit: 0.03, timeJit: 0.12, over: 0.022, wobble: 0.05,
 };
 
-/** Look a movement up by name. Returns the pair, or undefined. */
-export const moveAt = (i) => MOVES[i];
-export const moveNamed = (name) => MOVES.find(([n]) => n === name)?.[1];
-
 /**
  * 🔴 THE COARSEST LANE THAT CAN SHOW A HAND, AND IT IS ARITHMETIC RATHER THAN
  * TASTE. The ends wander by `endJit` of the travel, so on a lane of N steps that

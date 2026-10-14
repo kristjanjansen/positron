@@ -325,10 +325,6 @@ const CLASS_OF = { maj: 'maj', maj6: 'maj', maj7: 'maj', maj9: 'maj', maj11: 'ma
   dim: 'dim', dim7: 'dim', min7b5: 'hdim',
   sus2: 'sus', sus4: 'sus', 2: 'sus', aug: 'aug' };
 
-/** The class a quality is counted under, or `null` for one this file has no
- *  row for. Exported so a check can walk it against the build's own classifier. */
-export const classOfQuality = (q) => (Object.hasOwn(CLASS_OF, q) ? CLASS_OF[q] : null);
-
 /**
  * 🔴 A SURFACE SPELLING THE PAGE CANNOT VOICE IS A LABEL THAT LIES ABOUT ITS OWN
  * DOTS. The table carries the commonest spelling of every symbol per style,

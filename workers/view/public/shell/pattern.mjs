@@ -65,7 +65,6 @@ export const ROW = {
 
 /** 48 bits of epoch milliseconds, MSB first, then the 8-bit XOR of those bytes. */
 export const CLOCK_BITS = 48;
-export const CHECK_BITS = 8;
 
 /** The six clock bytes, MSB first. */
 function clockBytes(ms) {

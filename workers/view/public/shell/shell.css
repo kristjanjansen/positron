@@ -122,6 +122,8 @@
        --pad-seg   one cell of a segmented row, sharing edges with its
                    neighbours, so its own padding is all the air a word has
        --pad-bar   a control on the transport bar, which is dense on purpose
+                   (declared until 2026-10-14 and never read by any rule:
+                   the bar's word buttons take --pad-btn, so it was removed)
      ⚠️ THE PHONE VALUE OF `--pad-seg` IS SMALLER AND THAT IS NOT DRIFT. At
      390 px a segmented row carries `flex: 1 0 auto` so it fits rather than
      wrapping, and padding is what decides whether four station names fit at
@@ -129,7 +131,6 @@
      phone rules. */
   --pad-btn: 18px;
   --pad-seg: 14px;
-  --pad-bar: 11px;
   /* 🔴 THE ONE VERTICAL GAP IN THE PROJECT, AND IT IS DECLARED HERE ONLY.
      Every distance between two blocks of a page comes from this token, through
      `.pos-stack` below. Changing the spacing of the whole site is this line.
@@ -197,8 +198,8 @@
      than the phone* is still one statement in one place and growing both keys
      again is one edit here. Four typed heights would be four.
      ⚠️ THEY ARE AT `:root` RATHER THAN ON `.keys` BECAUSE A `var()` THAT DOES
-     NOT RESOLVE TAKES THE WHOLE DECLARATION WITH IT. `.k` is also a label class
-     on `.pos-xr-offer`, so a token declared on `.keys` would leave that one with
+     NOT RESOLVE TAKES THE WHOLE DECLARATION WITH IT. `.k` was also a label class
+     on `.pos-xr-offer` (removed 2026-10-14, nothing drew it), so a token declared on `.keys` would leave that one with
      no height at all rather than with the fallback it has today. This is the
      `--fdr-foot` lesson: a custom property inherits DOWNWARD, never sideways. */
   --k-white: calc(74px * 4 / 3);
@@ -447,8 +448,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    paid for. It is one 11 px line of furniture at the top of every demo page,
    and 10 px under it put it close enough to the page name to read as part of
    the title rather than as a way out of the page.
-   ⚠️ THE DESKTOP VALUE DOES NOT MOVE. 30 px below, and the index's own 38 px,
-   are both unchanged and are in the block underneath.
+   ⚠️ THE DESKTOP VALUE DOES NOT MOVE. 30 px below is unchanged and is in the
+   block underneath.
    ⚠️ AND THE INDEX IS DELIBERATELY NOT FOLLOWING THIS ONE. The front page has
    no back link, so on a phone its name sits at the top of the body with no
    furniture above it, which is what the phone ask above says is fine, and
@@ -462,17 +463,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 @media (min-width: 600px) {
   .pos-back { margin-bottom: 30px; }
   .pos-what { margin-top: 12px; }
-  /* 🔴 THE FRONT PAGE HAS NO BACK LINK, SO IT HAD NO AIR EITHER. Asked for:
-     *"add more space on top of frontpage title in desktop"*. On a demo page the
-     30 px above belongs to `.pos-back`, and the index has nothing to go back
-     to, so its name sat hard against the top of the window while every page it
-     links to breathes. 38 is the back link's own line plus that margin, which
-     is what the eye is comparing it against.
-     ⚠️ A CLASS, NOT `:has(.pos-back)`. A browser that does not know a
-     pseudo-class discards the whole selector list it appears in, and this file
-     already records what that cost on `:fullscreen`. A class cannot be
-     discarded by a browser that has never heard of it. */
-  .pos-head.pos-index { margin-top: 38px; }
 }
 .pos-back:hover { color: var(--hi); }
 /* 🔴 `center`, NOT `baseline`, AND THE BASELINE WAS FOR SOMETHING THAT NO
@@ -531,27 +521,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
    above it stays mono. */
 .pos-what, .pos-tabs-about-t { color: var(--dim); font-family: var(--sans); font-size: 13.5px; max-width: 62ch; }
 .pos-what { margin: 6px 0 0; }
-/* the front page's sentence at the heading's own size, asked 2026-10-07 as
-   *"same size as title"*; every other page keeps 13.5 */
-/* 🔴 THE FRONT PAGE'S TYPE AND AIR AS ONE SYSTEM, 2026-10-07, asked as *"help me
-   imrove sdesign of frontpage. typo sizes and whitespace only. i am lost"*,
-   after an afternoon of single asks (*"same size as title"*, *"3 x more space
-   on top and 2x more on bottom"*) that each moved one number. MEASURED before:
-   the heading and the sentence both 17 px, so neither led; 26.8 px from the
-   heading to the sentence and 85 from the sentence to SLIDES, against 44
-   between every other pair of sections, so the intro was further from its own
-   page than the sections were from each other.
-   THE SCALE: four sizes, each a clear step from the next (positron-compose,
-   no two adjacent steps within about 25 per cent):
-     24  the page's name
-     15  the sentence, the same size as a card's title
-     12.5 a card's description (card.mjs, unchanged)
-     10.5 a section label (unchanged)
-   THE AIR: 12 inside a group, 48 between groups, so the heading and its
-   sentence read as one block and every section below it sits at one rhythm,
-   the intro's included. */
-.pos-index .pos-name { font-size: 24px; }
-.pos-index .pos-what { font-size: 15px; line-height: 1.55; max-width: 58ch; margin: 12px 0 0; }
 
 /* how it works — one plain paragraph */
 
@@ -1032,7 +1001,6 @@ button.pos-pri[data-busy="1"] {
 }
 
 /* ── hardware (sound + midi) ──────────────────────────────────────────── */
-.pos-hw { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 /* the direction label and its picker are one control: same box, same baseline */
 .pos-hw-tag {
   font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
@@ -1597,16 +1565,6 @@ button.pos-pri[data-busy="1"] {
   .tbar-rates { flex: 1 1 100%; }
   .tbar-rates .pos-choice, .tbar-rates .pos-choice .step { width: 100%; }
 }
-/* A live source has no clock worth printing — see the note in transport-bar.mjs.
-   The word never changes now (it briefly alternated with SLOWED, which said what
-   the rate buttons beside it already say), so `min-width` is only a stable slot
-   where the time readout used to sit rather than a guard against reflow. */
-.tbar-live {
-  flex: none; min-width: 52px; text-align: center;
-  font: 500 10px/1 var(--mono); letter-spacing: .12em;
-  color: var(--hi); margin-right: auto;
-}
-.tbar[data-scrub="1"] .tbar-live { margin-right: 0; }
 /* ⚠️ NEVER NARROWER THAN TALL. `0.5x` is four characters and `1x` is two, so
    padding alone gave a row of buttons that stepped from wide to narrow and
    read as three different kinds of control. A square is the floor; anything
@@ -1713,7 +1671,6 @@ button.pos-pri[data-busy="1"] {
 .pos-strip-foot:not([data-on="1"]) > div:first-child { color: var(--dim2); }
 
 /* ── index ────────────────────────────────────────────────────────────── */
-.pos-acts { list-style: none; margin: 0; padding: 0; }
 /* ⚠️ THE GAP ABOVE IS THREE TIMES THE GAP BELOW, and that ratio is the whole
    job of a subheader. A heading belongs to what FOLLOWS it; with similar space
    on both sides it floats between two groups and a reader has to work out
@@ -1755,20 +1712,6 @@ button.pos-pri[data-busy="1"] {
 .pos-why.soft { color: var(--dim2); border-style: dotted; border-color: var(--line); }
 .pos-sub { font: 500 11.5px/1.5 var(--mono); color: var(--dim); margin: 4px 0 0; }
 
-/* The headset offer. Only ever drawn inside a headset (caps.mjs), so it is
-   sized for a hand-ray and a curved panel at arm's length rather than for a
-   mouse: a big target, a lot of contrast, and no query string to type. */
-.pos-xr-offer {
-  display: grid; gap: 4px; margin: 14px 0 6px; padding: 18px 20px;
-  border: 1px solid var(--hi); border-radius: 8px; text-decoration: none;
-  background: color-mix(in oklab, var(--hi) 9%, var(--card));
-  -webkit-tap-highlight-color: transparent;
-}
-.pos-xr-offer .k { font: 600 11px/1.4 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--hi); }
-.pos-xr-offer .n { font: 600 26px/1.2 var(--mono); color: var(--fg); }
-.pos-xr-offer .o { font: 400 15px/1.5 var(--mono); color: var(--dim); }
-.pos-xr-offer .g { font: 500 13px/1.5 var(--mono); color: var(--hi); opacity: .85; margin-top: 4px; }
-.pos-xr-offer:hover { background: color-mix(in oklab, var(--hi) 16%, var(--card)); }
 .pos-row .nm { font: 600 15px/1.3 var(--mono); min-width: 0; grid-column: 2; }
 /* The two headset pages, emphasised with NO EXTRA UI — no badge, no heading, no
    second list, no rule down the edge. Just the name they already have, brighter.
@@ -3241,7 +3184,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
   width: 22px; height: 16px; padding: 0; display: grid; place-items: center;
 }
 .pos-fb-x:hover { color: var(--fg); }
-.pos-fb-note { margin: 0; color: var(--dim); font-size: 12.5px; }
 .pos-fb-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .pos-fb-row .pos-field { flex: 1 1 160px; }
 .pos-fb-send { margin-left: auto; }
@@ -4517,7 +4459,7 @@ button.pos-pg-lab:hover { color: var(--fg); }
    2026-09-23. The button beside it says `Notes off` as typed, and two controls
    in one row shouting at different volumes is the row telling a reader there
    are two kinds of thing in it when there are not. A LABEL is uppercased here
-   (`.kpad-l`, a readout key); a button's own word is not. */
+   (a readout key); a button's own word is not. */
 .pos-toggle {
   height: 34px; padding: 0 11px;
   font: 500 11px/1 var(--mono);
@@ -4660,13 +4602,6 @@ button.pos-pg-lab:hover { color: var(--fg); }
 }
 .kpad-tempo[data-said] { color: var(--dim); }
 .kpad-ratio { color: var(--dim); }
-/* the same gutter label as a slider's, for the same reason: one word saying
-   what the control next to it moves, in a face that cannot be mistaken for the
-   control itself */
-.kpad-l {
-  font: 500 9.5px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
-  color: var(--dim2); white-space: nowrap;
-}
 .kpad button {
   height: var(--kpad-h); padding: 0 var(--kpad-pad);
   font: 500 11px/1 var(--mono); color: var(--dim);
@@ -4933,27 +4868,6 @@ body.has-dg-end > .pos-how, body.has-dg-end > .pos-dg {
   stroke: color-mix(in oklab, var(--fg) 34%, var(--dg-stroke, var(--line2)));
   fill: color-mix(in oklab, var(--fg) 3%, transparent);
 }
-
-/* ── in a headset, the rows that cannot use it recede ─────────────────────────
- *
- * `caps.mjs` puts `.xr` on <html> when `immersive-vr` is supported — a
- * CAPABILITY test, never a user-agent one, and its own note says the flag is
- * about LAYOUT, which is why the Immersive Web Emulator answering true is
- * correct here.
- *
- * 🔴 DIMMED, NEVER DISABLED. Opacity only: every row still links, still takes
- * focus, still reads to a screen reader, still works if you press it. A
- * `pointer-events: none` here would turn "this one is less interesting right
- * now" into "this one is broken", which is a different and false statement —
- * the same reason `caps.mjs` un-links a row WITH THE REASON IN WORDS rather
- * than hiding it.
- *
- * ⚠️ And it comes back on hover and focus, so a row you have actually reached
- * for is never the faint one. A dimmed thing you cannot un-dim by looking at it
- * is a trap rather than a hint. */
-html.xr .pos-acts .pos-row:not([data-xr]) { opacity: .45; transition: opacity 120ms ease; }
-html.xr .pos-acts .pos-row:not([data-xr]):hover,
-html.xr .pos-acts .pos-row:not([data-xr]):focus-within { opacity: 1; }
 
 /* ── a card: a link with room in it — shell/card.mjs ─────────────────────────
  *
@@ -5340,8 +5254,6 @@ button.pos-linkbtn:active { background: none; }
    already the right size and the transform is about where the INK sits inside
    it, not about how much room the label takes. */
 .pos-sym { display: inline-block; will-change: transform; }
-.pos-sym-svg { display: block; }
-.pos-sym-svg svg { display: block; }
 
 /* The line joining the parts of one machine. No head: every arrow in a diagram
    means "the signal goes this way", and a head between two programs on one
@@ -5550,8 +5462,7 @@ button.pos-linkbtn:active { background: none; }
    removed, so the accessible name is still the whole sentence and the live
    region still announces a change. `display: none` would take both away, which
    is how a dot ends up meaning something only to people who can see it. */
-.pos-pres[data-mode="dot"] .pos-pres-w,
-.pos-pres[data-mode="dot"] .pos-pres-of {
+.pos-pres[data-mode="dot"] .pos-pres-w {
   position: absolute; width: 1px; height: 1px;
   min-width: 0; margin: 0; padding: 0; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap;
@@ -6351,12 +6262,6 @@ button.pos-linkbtn:active { background: none; }
   justify-content: start;
 }
 
-/* ── a half height button group — shell/button-group.mjs ────────────────────
-   A shorter button beside a full one says "this matters less", which is what a
-   row of secondary actions under a grid is. The label above it is the group's
-   own `label`, unchanged. */
-.pos-bgroup-half .pos-bgroup-row button { height: 22px; padding: 0 9px; font-size: 11px; }
-
 /* ── a pad's own label, above its own pad — shell/pad.mjs ───────────────────
    🔴 EVERY PAD GETS THE SLOT EVEN WITH NOTHING IN IT. A grid where only the
    downbeats are named would otherwise have four pads sitting lower than the
@@ -6397,18 +6302,6 @@ button.pos-linkbtn:active { background: none; }
   color: var(--dim2); min-height: 12px; margin-bottom: calc(var(--ctl-head) - 12px);
   text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
-/* ── a button's own label, above its own button — shell/button-group.mjs ────
-   The join is dropped when these are in use: a segmented row claims "one thing
-   with several parts", which individual labels deny. See the component. */
-.pos-bgroup-cols { display: inline-flex; gap: 6px; align-items: flex-end; }
-.pos-bgroup-col { display: inline-flex; flex-direction: column; min-width: 0; }
-.pos-bgroup-top {
-  font: 500 9px/12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-  color: var(--dim2); min-height: 12px; margin-bottom: 3px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.pos-bgroup-cols button { border-radius: 4px; }
 
 /* ── half height pads, and disabled states — shell/pad.mjs, knob.mjs ────────
    🔴 HALF HEIGHT IS A PROP ON A PAD, NOT A SECOND COMPONENT. Asked for
@@ -6648,8 +6541,6 @@ button.pos-linkbtn:active { background: none; }
    how /twelve/ broke: it lifted its button column by a foot's height, which was
    right until the pads gained one of their own. */
 .pos-crow { display: flex; align-items: flex-end; gap: var(--ctl-gap); }
-/* A control that has to SPAN a column of n others: n surfaces plus n-1 steps. */
-.pos-crow [data-span] { --span-n: 3; }
 
 /* ── the invisible hand on a fader — shell/fader.mjs ────────────────────────
    🔴 JOINED TO THE LANE, THE WAY `.sld-hand-row` JOINS THE HORIZONTAL ONE.

@@ -129,32 +129,3 @@ export function setSymbol(host, glyph) {
   return off;
 }
 
-/**
- * A button whose label is a symbol.
- *
- * 🔴 IT TAKES A GLYPH OR AN SVG, AND THAT IS THE POINT OF HAVING IT. The two
- * were different kinds of control: `⛶` was a text label centred by the grid and
- * the picker's die was an inline `<svg>` centred by `display: block` — one of
- * them wrong, in a way that only shows when you look closely, and no single
- * place to fix it. Here a symbol is a symbol: given a glyph it is measured and
- * nudged, given markup it is dropped in as a block, and a caller says which it
- * has rather than which layout it needs.
- *
- * @param {object} o
- * @param {string} [o.glyph]  a character. Measured and centred.
- * @param {string} [o.svg]    markup instead. Already centred; nothing to measure.
- * @param {string} o.aria     what it IS, in words. A picture is not a name, and
- *                            this is what a screen reader and a check both read.
- * @param {string} [o.title]  the tooltip; defaults to `aria`.
- */
-export function createSymbolButton({ glyph = '', svg = '', aria, title, onPress, cls = '' } = {}) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = `pos-symbtn${cls ? ` ${cls}` : ''}`;
-  b.setAttribute('aria-label', aria || glyph || 'symbol');
-  b.title = title ?? aria ?? '';
-  if (svg) { b.innerHTML = `<span class="pos-sym pos-sym-svg">${svg}</span>`; }
-  else { b.textContent = glyph; centreSymbol(b); }
-  if (onPress) b.addEventListener('click', onPress);
-  return b;
-}

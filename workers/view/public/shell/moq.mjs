@@ -197,7 +197,15 @@ async function pickCodec({ want, width, height, framerate, bitrate, log }) {
  *               namespace, so two publishers on two devices come out different
  *               colours without anyone allocating them.
  */
-export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null, codec = null, paint = null }) {
+// The newest latency samples kept for `pct()`; a long run would otherwise grow
+// and re-sort without limit.
+const MOQ_KEEP = 2000;
+
+/**
+ * `signal` (an AbortSignal) stops it at any point, including the wait for the
+ * catalog, which can take up to 25 tries of about 5 s before this resolves.
+ */
+export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, fps = 30, log = () => {}, forceTransport = false, hue = null, codec = null, paint = null, signal = null }) {
   const patternHue = hue ?? hueFor(ns);
   const gop = fps;                                 // 1 s
   const src = document.createElement('canvas');
@@ -214,18 +222,32 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     codec: null,
   };
   const samples = [];
+  let sampled = 0;
   const timers = [];
-  let closed = false;
+  let closed = false, conn = null, encoder = null, decoder = null;
+  const stop = () => {
+    closed = true;
+    timers.forEach(clearInterval);
+    for (const c of [encoder, decoder]) { try { if (c && c.state !== 'closed') c.close(); } catch { /* already */ } }
+    try { conn?.close?.(); } catch { /* already gone */ }
+  };
+  const aborted = new Promise((res) => {
+    if (signal?.aborted) res('aborted');
+    signal?.addEventListener('abort', () => res('aborted'), { once: true });
+  });
+  signal?.addEventListener('abort', stop, { once: true });
+  if (signal?.aborted) { stop(); return api(); }
 
   const startedAt = performance.timeOrigin + performance.now();
   const t0 = performance.now();
   const relayUrl = new URL(MOQ_RELAY);
   const transport = await webTransportFor(relayUrl, forceTransport);
   if (transport) log('FORCED a self-built WebTransport. Expect a flow-control deadlock, WebKit 319818', 'bad');
-  const conn = await Connection.connect(relayUrl, {
+  conn = await Connection.connect(relayUrl, {
     websocket: { enabled: false },
     ...(transport ? { transport } : {}),
   });
+  if (closed) { stop(); return api(); }
   st.version = conn.version;
   st.sessionMs = Math.round(performance.now() - t0);
   log(`session in ${st.sessionMs}ms, negotiated ${st.version}`, 'hi');
@@ -239,6 +261,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     // far end what to configure. Publishing `vp8` and then encoding something
     // else is a decoder rejecting a stream that is perfectly fine.
     const pick = await pickCodec({ want: codec, width: w, height: h, framerate: fps, bitrate: 2_000_000, log });
+    if (closed) return api();
     if (!pick) { log('no codec in the preference list can be encoded here', 'bad'); return api(); }
     st.codec = pick.codec;
     log(`encoding ${pick.codec}${codec ? ' (asked for)' : ''}`, 'hi');
@@ -265,7 +288,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     const vTrack = bc.createTrack('video', Container.trackInfo({ latencyMax: 2000 }));
     const prod = new Container.Legacy.Producer(vTrack);
 
-    const encoder = new VideoEncoder({
+    encoder = new VideoEncoder({
       output: (chunk, metadata) => {
         // ⚠️ CARRY THE DECODER DESCRIPTION WHEN THERE IS ONE. VP8 needs none, so
         // this was never missed; AV1 and H.264 hand their parameter sets out
@@ -319,12 +342,14 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
         sub.nextGroup(),
         sub.closed.then((e) => ({ err: e })),
         new Promise((res) => setTimeout(() => res('timeout'), 4000)),
+        aborted,
       ]);
-      if (r && r !== 'timeout' && !r.err) { group = r; break; }
+      if (r && r !== 'timeout' && r !== 'aborted' && !r.err) { group = r; break; }
       if (attempt === 0) log('waiting for the catalog to be announced');
       sub.close?.();
-      await new Promise((res) => setTimeout(res, 1000));
+      await Promise.race([new Promise((res) => setTimeout(res, 1000)), aborted]);
     }
+    if (closed) return api();
     if (!group) { log('catalog never arrived', 'bad'); return api(); }
 
     st.catalog = await group.readJson();
@@ -337,7 +362,7 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
     const vSub = bc.subscribe(name);
     const consumer = new Container.Consumer(vSub, { format: new Container.Legacy.Format(), latency: 0 });
 
-    const decoder = new VideoDecoder({
+    decoder = new VideoDecoder({
       output: (vf) => {
         const recv = performance.timeOrigin + performance.now();
         // MATCH THE SOURCE, do not force it into ours. `drawImage(vf,0,0,w,h)`
@@ -364,13 +389,17 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
         // share one clock, so the delta is exact rather than an estimate; in
         // watch mode the clocks are unrelated and the delta is meaningless.
         if (burned == null) st.badRows++;
-        else if (role === 'loopback') samples.push(recv - burned);
+        else if (role === 'loopback') {
+          sampled++;
+          if (samples.push(recv - burned) > MOQ_KEEP) samples.shift();
+        }
       },
       error: (e) => { st.decErrs++; log(`decode error ${String(e?.message ?? e).slice(0, 70)}`, 'bad'); },
     });
     const dcfg = { codec: rc.codec, optimizeForLatency: true };
     if (rc.description) dcfg.description = Uint8Array.from(atob(rc.description), (c) => c.charCodeAt(0));
     const ds = await VideoDecoder.isConfigSupported(dcfg);
+    if (closed) return api();
     if (!ds.supported) { log(`decoder rejects ${rc.codec}`, 'bad'); return api(); }
     decoder.configure(dcfg);
 
@@ -394,18 +423,14 @@ export async function startMoq({ out, ns, role = 'loopback', w = 1280, h = 720, 
   function api() {
     return {
       get version() { return st.version; },
-      get stats() { return { ...st, samples: samples.length }; },
+      get stats() { return { ...st, samples: sampled }; },
       /** Rounded: sub-ms precision on a wall-clock delta is false precision. */
       pct(p) {
         if (!samples.length) return null;
         const s = samples.slice().sort((a, b) => a - b);
         return Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))] * 10) / 10;
       },
-      stop() {
-        closed = true;
-        timers.forEach(clearInterval);
-        try { conn.close?.(); } catch { /* already gone */ }
-      },
+      stop,
     };
   }
   return api();

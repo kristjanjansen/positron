@@ -1052,8 +1052,9 @@ export function createKeyboard(host, {
     ratioEl.style.minWidth = `${RATIO_CH}ch`;
     padStart.append(tempoEl, ratioEl);
   }
-  const panicBtn = make('button', '', 'Panic', {
-    type: 'button', title: 'stop every note that is still sounding',
+  // `Stop` since 2026-10-14 (was `Panic`): it stops every note and every loop.
+  const panicBtn = make('button', '', 'Stop', {
+    type: 'button', title: 'stop every note and every loop',
   });
   panicBtn.onclick = () => api.panic();
   /**
@@ -1256,7 +1257,7 @@ export function createKeyboard(host, {
     tape: null,        // the movements, or null when this slot is empty
     at: 0,             // when the first movement landed. See the lead-in note below
     lap: 0,            // how long one turn is
-    timers: [],
+    timers: new Set(), // pending timeouts; each one leaves the set when it fires
     going: false,      // is this slot playing right now
     rec: false,        // is this slot taking movements right now
     keys: new Set(),   // what this slot has down, which is NOT the same as `held`
@@ -1422,7 +1423,7 @@ export function createKeyboard(host, {
   const stopTake = (i) => {
     const t = takes[i];
     for (const timer of t.timers) clearTimeout(timer);
-    t.timers = [];
+    t.timers.clear();
     t.going = false;
     t.rec = false;
     /* ⚠️ AND STOPPING LETS GO OF WHAT THE LOOP HAD DOWN AND NOTHING ELSE. A note
@@ -1454,6 +1455,13 @@ export function createKeyboard(host, {
    * that is a few milliseconds late is a note; a note that is dropped is a hole
    * in the phrase, and the hole is far easier to hear.
    */
+  /* A timer that leaves `t.timers` when it fires, so the set holds only what is
+     still pending rather than growing by a lap's worth of events every lap. */
+  const later = (t, fn, ms) => {
+    const id = setTimeout(() => { t.timers.delete(id); fn(); }, ms);
+    t.timers.add(id);
+  };
+
   const runTake = (i) => {
     const t = takes[i];
     t.anchor = performance.now();
@@ -1462,7 +1470,7 @@ export function createKeyboard(host, {
       if (!t.going) return;
       const base = t.anchor + lapNo * t.lap;
       for (const e of t.tape) {
-        t.timers.push(setTimeout(() => {
+        later(t, () => {
           if (!t.going) return;
           replaying++;
           try {
@@ -1485,11 +1493,10 @@ export function createKeyboard(host, {
               onUp(e.note, 'loop'); t.notes.delete(e.note);
             }
           } finally { replaying--; }
-        }, Math.max(0, base + e.t - performance.now())));
+        }, Math.max(0, base + e.t - performance.now()));
       }
       lapNo++;
-      t.timers.push(setTimeout(round,
-        Math.max(0, t.anchor + lapNo * t.lap - performance.now())));
+      later(t, round, Math.max(0, t.anchor + lapNo * t.lap - performance.now()));
     };
     round();
   };
@@ -1998,6 +2005,17 @@ export function createKeyboard(host, {
       for (const t of touches.values()) if (t.raf) cancelAnimationFrame(t.raf);
       touches.clear();
       for (const k of [...held]) release(k, 'panic');
+      /* Every loop stops too (asked 2026-10-14, *"stop loops"*), through the same
+         walk `offerLoop(false)` uses, so the Loop button and `onLoop` follow. */
+      for (let i = 0; i < SLOTS; i++) {
+        if (machine.state(i) === 'recording') { machine.press(i); machine.settle(i); }
+        if (machine.state(i) === 'looping') { machine.press(i); machine.settle(i); }
+      }
+      for (const t of takes) {
+        for (const n of t.notes) onUp(n, 'panic');
+        t.notes.clear();
+        t.keys.clear();
+      }
       for (const b of els.values()) b.classList.remove('down');
       /* ⚠️ AND THE NOTES LIT FROM OUTSIDE GO WITH THE PAINT, or the footer
          goes on naming a chord under a button labelled `Panic`. The lamps
@@ -2111,6 +2129,7 @@ export function createKeyboard(host, {
      * the page it was grading.
      */
     destroy() {
+      for (let i = 0; i < SLOTS; i++) stopTake(i);
       api.panic();
       if (letters) {
         removeEventListener('keydown', onKeyDown);

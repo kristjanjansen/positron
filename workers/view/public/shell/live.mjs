@@ -284,12 +284,22 @@ export async function whepPlay(url, video, { log = () => {}, onTrack, iceServers
   };
   pc.onconnectionstatechange = () => log(`pc ${pc.connectionState}`);
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  await gathered(pc, iceServers);
-  const res = await offerSdp(url, pc.localDescription.sdp, { log });
-  await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
-  return { pc, inbound, location: res.headers.get('location') };
+  // A failed offer closes the peer connection, and a session the server made
+  // before the throw is deleted, or every failed Start leaks one of each.
+  let location = null;
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await gathered(pc, iceServers);
+    const res = await offerSdp(url, pc.localDescription.sdp, { log });
+    location = res.headers.get('location');
+    await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
+  } catch (e) {
+    try { pc.close(); } catch { /* already */ }
+    if (location) fetch(new URL(location, url), { method: 'DELETE', keepalive: true }).catch(() => {});
+    throw e;
+  }
+  return { pc, inbound, location };
 }
 
 /**
@@ -395,18 +405,26 @@ export async function camWhipPublish(stream, { url = CAM_WHIP_PROXY, log = () =>
   const pc = new RTCPeerConnection(rtcConfig(iceServers));
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
   pc.onconnectionstatechange = () => log(`publish ${pc.connectionState}`);
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
-  await gathered(pc, iceServers);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/sdp' },
-    body: pc.localDescription.sdp,
-  });
-  const body = await res.text();
-  if (!res.ok) { pc.close(); throw new Error(`publish ${res.status}: ${body.slice(0, 120)}`); }
-  const id = res.headers.get('x-whip-id');
-  await pc.setRemoteDescription({ type: 'answer', sdp: body });
+  let id = null;
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await gathered(pc, iceServers);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/sdp' },
+      body: pc.localDescription.sdp,
+    });
+    const body = await res.text();
+    if (!res.ok) throw new Error(`publish ${res.status}: ${body.slice(0, 120)}`);
+    id = res.headers.get('x-whip-id');
+    await pc.setRemoteDescription({ type: 'answer', sdp: body });
+  } catch (e) {
+    // The worker holds the one camera input for a session until it hears DELETE.
+    try { pc.close(); } catch { /* already */ }
+    if (id) fetch(`${url}/${id}`, { method: 'DELETE', keepalive: true }).catch(() => {});
+    throw e;
+  }
   log(`publishing, id ${id}`, 'hi');
   return {
     pc, id,

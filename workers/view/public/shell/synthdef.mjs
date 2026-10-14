@@ -104,7 +104,6 @@ export const fitsCeiling = (bytes) => {
 
 /** The four rates a building block can run at, named the way a page can print them. */
 export const RATE = { once: 0, slow: 1, sample: 2, demand: 3 };
-export const RATE_NAME = ['once', 'slow', 'per sample', 'on demand'];
 
 /**
  * The arithmetic `BinaryOpUGen` does, by its special index.
@@ -116,7 +115,6 @@ export const RATE_NAME = ['once', 'slow', 'per sample', 'on demand'];
  * output, which only holds if 2 really is multiply.
  */
 export const OP = { add: 0, sub: 1, mul: 2, div: 4 };
-export const OP_NAME = { 0: '+', 1: '-', 2: '*', 4: '/' };
 
 // ── writing ─────────────────────────────────────────────────────────────────
 

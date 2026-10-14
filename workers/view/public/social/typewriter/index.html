@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta property="og:site_name" content="positron.studio">
+<meta property="og:type" content="website">
+<meta property="og:title" content="typewriter">
+<meta property="og:description" content="A line types itself onto a story frame with a real typewriter, recorded to a file">
+<meta property="og:url" content="https://positron.studio/social/typewriter/">
+<meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e14">
+<title>POSITRON social/typewriter</title>
+<link rel="stylesheet" href="/shell/shell.css">
+<style>
+  /* The reel is drawn at 1080 x 1920 and shown at a phone's size. */
+  .tw-stage { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 640px) { .tw-stage { grid-template-columns: minmax(0, 1fr); } }
+  .tw-cv { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 9 / 16; border-radius: var(--r, 4px); background: #0b0e14; border: 1px solid var(--line2); box-sizing: border-box; }
+  .tw-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .tw-side textarea {
+    display: block; inline-size: 100%; min-block-size: 9em; box-sizing: border-box; resize: vertical;
+    font: 400 14px/1.5 var(--mono); color: var(--fg); background: var(--card);
+    border: 1px solid var(--line2); border-radius: var(--r, 4px); padding: 10px 12px;
+  }
+  .tw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .tw-dl { font: 400 13px/1.4 var(--mono); color: var(--fg); }
+  .tw-note { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--dim); }
+</style>
+<script type="module">
+  import { mount, el } from '/shell/shell.mjs';
+  import { SELFCHECK } from '/shell/selfcheck.mjs';
+  import { createSamples, createVoice } from '/typist/sampler.mjs';
+
+  // A typewriter reel for a story: the text types itself onto a 1080 x 1920
+  // frame with the Hermes Precisa's own key sounds, and Record makes the file.
+  // A visit draws the finished frame and opens nothing; the samples are fetched
+  // on the first press.
+  const W = 1080, H = 1920;
+  // Instagram covers about 14% at the top and up to 35% at the bottom of a reel
+  // (research/ui-video-capture-2026-10-14.md), so the words live between these.
+  const SAFE_TOP = 270, SAFE_BOTTOM = 1250, X = 96, TEXT_W = W - 2 * X;
+  const C = { bg: '#0b0e14', fg: '#e6e6e6', dim: '#8b93a1', hi: '#ffd400' };
+  const SIZE = 88, LINE = 1.22;   // "Connect anything" fits one line at 88
+
+  const d = mount({
+    name: 'social/typewriter',
+    what: 'Type a line and it types itself onto a story frame, with a real typewriter. Record makes the file.',
+    readout: null, index: '/social/', indexLabel: 'social',
+  });
+  const h1 = d.head.querySelector('.pos-name');
+  if (h1) h1.textContent = 'typewriter';
+
+  const cv = el('canvas', 'tw-cv');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const ta = el('textarea', '', '', { spellcheck: 'false', 'aria-label': 'the text to type' });
+  ta.value = 'Connect anything\nto everything.';
+  const play = el('button', '', 'Play', { type: 'button' });
+  const rec = el('button', 'pos-pri', 'Record', { type: 'button' });
+  const dl = el('a', 'tw-dl');
+  dl.hidden = true;
+  const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. Words stay clear of the top 14% and the bottom 35%.');
+  const row = el('div', 'tw-row');
+  row.append(play, rec, dl);
+  const side = el('div', 'tw-side');
+  side.append(ta, row, note);
+  const stage = el('div', 'tw-stage');
+  stage.append(cv, side);
+  d.el.append(stage);
+
+  const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
+  const font = (w, px) => `${w} ${px}px ${mono}`;
+
+  // A seeded random, so a retake of the same text types with the same rhythm.
+  function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+  const hash = (t) => [...t].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+
+  // Lines as typed: the text's own line breaks, then wrapped to TEXT_W.
+  function layout(text) {
+    ctx.font = font(600, SIZE);
+    const lines = [];
+    for (const para of text.split('\n')) {
+      let line = '';
+      for (const word of para.split(/(?<= )/)) {
+        if (line && ctx.measureText(line + word).width > TEXT_W) { lines.push(line); line = word; } else line += word;
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  // When each character lands, in ms from the start, and what it sounds like.
+  function schedule(text) {
+    const r = rng(hash(text));
+    const ev = [];
+    let t = 700;
+    let col = 0;
+    for (const ch of text) {
+      if (ch === '\n') { t += 380; ev.push({ t, ch, kind: 'insertLineBreak' }); t += 260; col = 0; continue; }
+      t += (ch === ' ' ? 120 : 70) + r() * 90 + (/[.,!?]/.test(ch) ? 140 : 0);
+      ev.push({ t, ch, kind: 'insertText', col: ++col });
+    }
+    return { ev, end: t + 2200 };
+  }
+
+  function draw(text, typed, ms, typing) {
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, H);
+    // the wordmark, as the front page sets it
+    ctx.font = font(400, 34);
+    ctx.letterSpacing = '4.8px';
+    ctx.textBaseline = 'alphabetic';
+    let x = X;
+    for (const [s, c] of [['POSITRON', C.dim], ['.', C.hi], ['STUDIO', C.dim]]) {
+      ctx.fillStyle = c; ctx.fillText(s, x, SAFE_TOP + 40); x += ctx.measureText(s).width;
+    }
+    ctx.letterSpacing = '0px';
+    // the typed text
+    const shown = text.slice(0, typed);
+    const lines = layout(shown);
+    ctx.font = font(600, SIZE);
+    const top = SAFE_TOP + 220;
+    let cx = X, cy = top;
+    lines.forEach((ln, i) => {
+      const y = top + i * SIZE * LINE;
+      // a full stop that ends the text is the accent, as on the front page
+      const last = i === lines.length - 1 && typed === text.length && ln.endsWith('.');
+      ctx.fillStyle = C.fg;
+      ctx.fillText(last ? ln.slice(0, -1) : ln, X, y);
+      if (last) { ctx.fillStyle = C.hi; ctx.fillText('.', X + ctx.measureText(ln.slice(0, -1)).width, y); }
+      cx = X + ctx.measureText(ln).width; cy = y;
+    });
+    // the caret: solid while typing, blinking once it has stopped
+    if (typing || Math.floor(ms / 530) % 2 === 0) {
+      ctx.fillStyle = C.hi;
+      ctx.fillRect(cx + 6, cy - SIZE * 0.78, SIZE * 0.08, SIZE * 0.92);
+    }
+    // the address, small, inside the safe band
+    ctx.font = font(400, 30);
+    ctx.fillStyle = C.dim;
+    ctx.fillText('positron.studio', X, SAFE_BOTTOM - 40);
+  }
+
+  let audio = null;
+  async function sound() {
+    if (audio) return audio;
+    const ac = new AudioContext();
+    const samples = createSamples();
+    const out = ac.createGain();
+    const tap = ac.createMediaStreamDestination();
+    out.connect(ac.destination);
+    out.connect(tap);
+    const voice = createVoice(ac, samples, { out, tuning: () => ({ rate: {} }) });
+    await samples.load(ac);
+    audio = { ac, voice, tap };
+    d.log(`typewriter sounds ready, ${samples.stat.decoded} files in ${samples.stat.ms} ms`);
+    return audio;
+  }
+
+  let running = null;
+  // Types the text once, in real time; resolves at the end of the hold.
+  async function run() {
+    const text = ta.value;
+    const { ev, end } = schedule(text);
+    const a = await sound();
+    if (a.ac.state === 'suspended') await a.ac.resume();
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      let next = 0;
+      const frame = () => {
+        const ms = performance.now() - t0;
+        while (next < ev.length && ev[next].t <= ms) {
+          const e = ev[next++];
+          a.voice.sound(e.kind, e.ch, e.col || 0);
+        }
+        draw(text, next, ms, next < ev.length);
+        if (ms < end && running) requestAnimationFrame(frame);
+        else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  play.onclick = async () => {
+    if (running) return;
+    running = 'play';
+    play.dataset.busy = '';
+    try { await run(); } finally { running = null; delete play.dataset.busy; }
+  };
+
+  const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
+  rec.onclick = async () => {
+    if (running) return;
+    running = 'rec';
+    rec.dataset.busy = '';
+    dl.hidden = true;
+    try {
+      const a = await sound();
+      const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+      const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...a.tap.stream.getAudioTracks()]);
+      const mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });
+      const parts = [];
+      mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+      const stopped = new Promise((r) => { mr.onstop = r; });
+      mr.start(250);
+      await run();
+      mr.stop();
+      await stopped;
+      stream.getTracks().forEach((t) => t.kind === 'video' && t.stop());
+      const blob = new Blob(parts, { type: type.split(';')[0] || 'video/webm' });
+      const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+      if (dl.href) URL.revokeObjectURL(dl.href);
+      dl.href = URL.createObjectURL(blob);
+      dl.download = `positron-typewriter.${ext}`;
+      dl.textContent = `Download ${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB`;
+      dl.hidden = false;
+      d.log(`recorded ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB`);
+      if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
+    } catch (e) {
+      d.log(`recording failed: ${e.message}`, 'bad');
+    } finally { running = null; delete rec.dataset.busy; }
+  };
+
+  // The finished frame, drawn once the face is in.
+  ta.oninput = () => { if (!running) draw(ta.value, ta.value.length, 0, false); };
+  await document.fonts.load(font(600, SIZE)).catch(() => {});
+  draw(ta.value, ta.value.length, 0, false);
+
+  if (SELFCHECK) {
+    const lines = layout(ta.value);
+    ctx.font = font(600, SIZE);
+    const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+    d.assert('the default text fits the frame between its side margins', widest <= TEXT_W,
+      `widest line ${Math.round(widest)} px of ${TEXT_W}`);
+    const bottom = SAFE_TOP + 220 + (lines.length - 1) * SIZE * LINE;
+    d.assert('the words sit inside the band a story leaves clear', bottom < SAFE_BOTTOM - 80,
+      `last baseline ${Math.round(bottom)}, band ends ${SAFE_BOTTOM}`);
+    const { ev, end } = schedule(ta.value);
+    d.assert('every character is scheduled, in order, and the take is under 15 s',
+      ev.length === [...ta.value].length && ev.every((e, i) => !i || e.t > ev[i - 1].t) && end < 15000,
+      `${ev.length} events, ${(end / 1000).toFixed(1)} s`);
+    const px = ctx.getImageData(X, SAFE_TOP + 220 - SIZE, TEXT_W, SIZE).data;
+    let ink = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i] > 100) ink++;
+    d.assert('the first line of the finished frame has ink', ink > 500, `${ink} bright pixels`);
+    d.assert('a visit opened no audio', audio === null);
+  }
+  d.ready();
+</script>

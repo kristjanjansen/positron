@@ -100,14 +100,6 @@ export const PAD_MIN = 10;
  *  gap, which is what lets the label column and the steps share one pitch. */
 export const PAD_GAP = 2;
 
-/** How tall the ruler is.
- *  ⚠️ THIS SAID *"it carries no text"* UNTIL 2026-09-22 AND THAT IS NO LONGER
- *  TRUE. `ticks` numbers the beats on it. The height is unchanged and does not
- *  depend on whether there is text in it, which is what makes the option free:
- *  `.pos-pg-tick` already carried the font and the colours for a string it
- *  never had. */
-export const RULER_H = 8;
-
 /**
  * How long the head's light takes to arrive and how long it takes to die, in
  * milliseconds.
@@ -288,9 +280,6 @@ function ensureSteps(steps) {
   sheet.textContent += (sheet.textContent ? '\n' : '') + out.join('\n');
   widest = n;
 }
-
-/** For a check that wants to know the sheet grew rather than trust that it did. */
-export function stepRulesBuilt() { return widest; }
 
 /**
  * @param {object} o

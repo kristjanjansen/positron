@@ -96,12 +96,13 @@ export function createPatchbay(raw, { title = 'patchbay', detail, flowing = () =
         const k = `${from} -> ${to}`;
         const h = hops.get(k);
         if (h) { h.origs.push(l); h.sent += l.sent || 0; continue; }
+        // Same object, fields refreshed from the link on every read, or a link
+        // whose transforms or `enabled` changed went on drawing the old ones.
         let hop = hopCache.get(k);
-        if (!hop) {
-          hop = { ...l, from, to, via: 'relay' };
-          delete hop.id; delete hop.session;
-          hopCache.set(k, hop);
-        }
+        if (!hop) { hop = {}; hopCache.set(k, hop); }
+        for (const f of Object.keys(hop)) delete hop[f];
+        Object.assign(hop, l, { from, to, via: 'relay' });
+        delete hop.id; delete hop.session;
         /* A timed link's option is drawn once, on the hop INTO the receiver,
            which is the end that waits (bay.mjs `schedule`). */
         const keep = l.options && Object.fromEntries(Object.entries(l.options).filter(([k]) => to === l.to || !TIMING_NAMES.includes(k)));

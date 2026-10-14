@@ -2,7 +2,7 @@
 // copy only, so a page always says what it is. Asked for after a run whose
 // result could not be attributed: without a stamp there is no way to tell a
 // fix that did not work from a fix that was never loaded.
-export const BUILD = '1f036842-071108-d21d';
+export const BUILD = '03871704-073113-7bd8';
 // demo/shell/shell.mjs — page frame + the __demo contract.
 //
 // mount() builds the whole chrome and returns the only API a demo needs.
@@ -78,7 +78,7 @@ export function mount({
   joined = true,
   controls = [],         // [{id, label, primary?}]
   index = '/',
-  indexLabel = 'demos',  // the word after the arrow; a concept page at /<group>/<slug>/ says `concepts`
+  indexLabel = 'demos',  // the word after the arrow; a concept page passes `positron`, the front page
 } = {}) {
   document.title = `POSITRON ${name}`;
   favicon();
@@ -693,6 +693,8 @@ export function addLine(logEl, msg, kind, t) {
   row.append(el('span', 'pos-t', at.toFixed(2)));
   row.append(el('span', 'pos-m', String(msg)));
   logEl.append(row);
+  // The same cap as `__demo.logs`, so the screen and the record agree.
+  while (logEl.childElementCount > LOG_CAP) logEl.firstElementChild.remove();
   logEl.scrollTop = logEl.scrollHeight;
   tapLine(at, msg, kind);
   return row;
@@ -1017,27 +1019,39 @@ export function guard(d) {
  * failure, the 2 s batch, and the repeat collapsing — one phone sent the same
  * fragLoadError ~30x in a run and pushed everything useful out of the ring.
  */
-export function createShipper(url = 'https://pub.positron.studio/log') {
+export function createShipper(url = 'https://pub.positron.studio/log', { delayMs = 2000, post = null, beacon = null } = {}) {
   const pending = [];
-  let timer = null, lastKey = '', repeat = 0;
+  let timer = null, last = null, repeat = 0;
+  const viaFetch = (body) => fetch(url, {
+    method: 'POST', body, keepalive: true, headers: { 'content-type': 'text/plain' },
+  }).catch(() => { /* diagnostics are never load-bearing */ });
+  // A fetch started in pagehide can be cancelled with the page; a beacon is not.
+  const viaBeacon = (body) => {
+    try { if (navigator.sendBeacon?.(url, body)) return; } catch { /* fall back */ }
+    viaFetch(body);
+  };
+  const send = post || viaFetch, sendLast = beacon || viaBeacon;
+  function take() {
+    clearTimeout(timer); timer = null;
+    if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; last = null; }
+    return pending.splice(0, pending.length).join('\n');
+  }
+  const flush = () => { const b = take(); if (b) send(b); };
+  const flushLast = () => { const b = take(); if (b) sendLast(b); };
+  if (typeof addEventListener === 'function') {
+    addEventListener('pagehide', flushLast);
+    addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLast(); });
+  }
   return function ship(line) {
-    const key = String(line).slice(0, 60);
-    if (key === lastKey) { repeat++; return; }
-    if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; }
-    lastKey = key;
-    pending.push(`${(performance.now() / 1000).toFixed(2)} ${line}`);
-    if (timer) return;
-    timer = setTimeout(async () => {
-      timer = null;
-      const batch = pending.splice(0, pending.length).join('\n');
-      if (!batch) return;
-      try {
-        await fetch(url, {
-          method: 'POST', body: batch, keepalive: true,
-          headers: { 'content-type': 'text/plain' },
-        });
-      } catch { /* diagnostics are never load-bearing */ }
-    }, 2000);
+    // Only an identical line is a repeat: two lines sharing a prefix are two lines.
+    line = String(line);
+    if (line === last) repeat++;
+    else {
+      if (repeat) { pending.push(`  (previous line x${repeat + 1})`); repeat = 0; }
+      last = line;
+      pending.push(`${(performance.now() / 1000).toFixed(2)} ${line}`);
+    }
+    timer ??= setTimeout(flush, delayMs);
   };
 }
 

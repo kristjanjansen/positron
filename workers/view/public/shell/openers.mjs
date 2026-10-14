@@ -60,8 +60,6 @@ export const BY_TRANSPORT = {
   // A link inside one board's JACK graph, 2026-10-11: the board applies it.
   jack: ['jack'],
 };
-/** Every opener this file has, `remote` first because it is decided first. */
-export const OPENER_KINDS = ['remote', ...new Set(Object.values(BY_TRANSPORT).flat())];
 
 /**
  * 🔴 ONE LEASE HELPER, plan §4 step 2. A board capture is a lease: asked for,
@@ -232,7 +230,11 @@ export function createOpeners({ log = () => {}, host, self = {}, isRemote = () =
       via: () => board.stats().via || 'relay',
       state: () => `${board.stats().frames} fr`,
       count: () => board.stats().frames,
-      close: () => { try { out?.disconnect(); } catch { /* */ } board.send({ type: 'audio.stop' }); board.close(); },
+      close: () => {
+        try { out?.disconnect(); } catch { /* */ }
+        board.send({ type: 'audio.stop' }); board.close();
+        ctx?.close().catch(() => { /* already closed */ });
+      },
     };
   }
 

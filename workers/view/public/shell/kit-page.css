@@ -419,9 +419,6 @@
   display: inline-flex; align-items: flex-end; gap: 12px; padding: 7px 10px;
   background: var(--disp-back); border: 1px solid var(--line); border-radius: 3px;
 }
-.kit-swatch { display: inline-flex; align-items: baseline; gap: 7px; margin-right: 20px; }
-.kit-swatch-n { font: 600 12px/1.6 var(--mono); color: var(--fg); }
-.kit-swatch-w { font: 400 12px/1.6 var(--mono); color: var(--dim); }
 .kit-cap + .pos-report { margin-top: 0; }
 
 /* The three distances a stacked control keeps, drawn at the heights the

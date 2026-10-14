@@ -8,6 +8,10 @@
 // puts two panes side by side is claiming they are comparable, and until the
 // material is the same that claim is false.
 //
+// (The page's builder, `buildSource`, was deleted 2026-10-14: nothing called it
+// after `grains` was archived. It is in git history. The board's builder and
+// `partialsOf` remain.)
+//
 // So: one spec, two builders, and a check at the INPUT rather than at the
 // output — measuring at the output measures the granulator too, and an A/B
 // where both arms share a defect returns "identical", which reads as fine.
@@ -106,53 +110,6 @@ export function partialsOf(spec = {}, rate = 48000) {
   return { spec: s, partials: out, dropped, rate };
 }
 
-/**
- * The page's builder: one `OscillatorNode` per partial into one gain.
- *
- * ⚠️ SINE ONLY. The whole argument above collapses if this reaches for
- * `type: 'sawtooth'` as a shortcut for twelve sines — that is the
- * implementation-defined wavetable this module exists to avoid, and it would
- * look identical on screen while being a different sound from the board's.
- */
-export function buildSource(ctx, spec = {}, { destination } = {}) {
-  const plan = partialsOf(spec, ctx.sampleRate);
-  const out = ctx.createGain();
-  out.gain.value = 1;
-  const oscs = [];
-  for (const p of plan.partials) {
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = p.hz;
-    const g = ctx.createGain();
-    g.gain.value = p.amp;
-    o.connect(g).connect(out);
-    o.start();
-    oscs.push({ o, g, p });
-  }
-  if (destination) out.connect(destination);
-  return {
-    node: out,
-    plan,
-    /** Rebuild in place: frequencies and gains move, nothing is restarted. */
-    set(next) {
-      const re = partialsOf({ ...plan.spec, ...next }, ctx.sampleRate);
-      // A changed partial COUNT changes how many oscillators there should be,
-      // and this deliberately does not grow or shrink the bank — it silences
-      // what is no longer in the table and leaves it in place, so a sweep of
-      // `count` costs no allocation and no click.
-      for (let i = 0; i < oscs.length; i++) {
-        const p = re.partials[i];
-        if (!p) { oscs[i].g.gain.setTargetAtTime(0, ctx.currentTime, 0.02); continue; }
-        oscs[i].o.frequency.setTargetAtTime(p.hz, ctx.currentTime, 0.02);
-        oscs[i].g.gain.setTargetAtTime(p.amp, ctx.currentTime, 0.02);
-      }
-      plan.spec = re.spec;
-      plan.partials = re.partials;
-      return re;
-    },
-    stop() { for (const { o } of oscs) { try { o.stop(); } catch { /* already */ } } },
-  };
-}
 
 /**
  * The same spec as something the board can build, over the wire.
