@@ -1,6 +1,6 @@
 # Consolidating plans/ and research/, a proposal
 
-Status (2026-10-14): open. Nothing in it has been done; every merge and move waits for the owner's yes.
+Status (2026-10-14): partly done. Steps 2 and 3 (five merges, ten moves) are in 91a2d824; the other moves wait.
 
 Asked 2026-10-14: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. The marking is done: every plan and research document now carries one `Status (2026-10-14): ...` line under its title, and `plans/README.md` and `research/README.md` index them. This document is the "perhaps consolidate" half. **Nothing below has been done.** A moved or merged path breaks every comment that cites it, and the 2026-09-20 move into `plans/` cost a rewrite of 129 files.
 
