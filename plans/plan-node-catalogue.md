@@ -64,3 +64,126 @@ export function addNodes(bay, site, names, { deliver = {}, label = {} } = {}) { 
   (`midi`, `typewriter`) and the page names the instance.
 - Whether the relay and Stream (`cf-relay`, `cf-stream`) belong in the catalogue
   or stay drawn by `patchbay.mjs` from a link's transport, as now.
+
+## Step 1, done 2026-10-14
+
+`demo/shell/nodes.mjs` holds **80 entries**, read off every `addNode` and
+`addPort` in the 43 pages under `CONCEPT_DIRS` (the 42 `CONCEPTS` rows plus
+`room/words`, which is off the index and still built) and the modules they call:
+`synth/patch-synth.mjs`, `granulator/grain-rig.mjs`, `radio/rig.mjs`,
+`drums/drum-machine.mjs`, `shell/midi-devices.mjs`, and the room pages' graph
+literals that `createBayNode` fills into a bay. No page was edited.
+`demo/shell/nodes-test.mjs` is 26 ok, 0 failed, 8 of them negative controls,
+and runs under `node demo/shell/run-tests.mjs` (57 passed, 5 skipped, of 62).
+
+### The shape, and where it grew past the plan
+
+- An entry is `{ kind, label, ports, pages, labels?, node?, site?, place?, net?, match?, instance? }`.
+  `labels` lists only the pages whose label differs from `label`.
+- **The key is a catalogue name, not always the id.** Three unrelated nodes are
+  `web:shader`, two are `web:fx`, three are `web:rec`, two are `web:player`,
+  two are `web:patch`, two are `web:fader`, two are `web:keys`, and
+  `web:midi` is a plugged-in keyboard on four pages and a MIDI state engine on
+  `synth/dots`. So `node` carries the id segment when it is not the name
+  (`'shader-dither': { node: 'shader' }`).
+- **A port's key is its name**, and `dir` and `medium` come from it unless it
+  says otherwise: `filter:cutoff-in` (audio) and `grains:tempo-in` (value) are
+  the two ports not named `<medium>-<dir>`.
+- **`optional` ports** are added only when a page passes a deliver or an
+  override for them, because one type carries extra ports on some pages
+  (`keys:midi-in` for its lights on 7 of 14 pages, `keys:value-in` and
+  `value-in-2` on `radio/key` only, `speaker:value-in` and `clock-in` on
+  `history/newsreels` only).
+- **`addNodes(bay, site, names, { deliver, label, ports })` takes a third
+  option the brief did not name, `ports`**: per port overrides merged onto the
+  catalogue's (a shape with `names`, an `address`, a port label, `emits:
+  ['note', 'cc']`), and the way to ask for an optional port or a repeat
+  (`machines:value-out-3`). Step 2 needs it for the pictures to stay identical.
+  A name may also be an object, `{ name: 'drum', as: 'kick', label, site }`,
+  for an instance no pattern describes. Every map is keyed `<node>:<port>` or
+  by full id, and a deliver, label or override naming nothing on the page
+  throws, as an unknown name does, naming `demo/shell/nodes.mjs NODES`.
+- **Port labels are not in the catalogue.** Pages use three conventions (none,
+  `node:port`, and words such as `keyboard, the notes I play` on `room/words`),
+  so a page passes its own through `ports`. Found on the way: an unlabelled
+  port makes the bay's refusal read `undefined is an output`, which
+  `synth/keyboard` does today.
+
+### Label disagreements
+
+| type | default | the others |
+| --- | --- | --- |
+| `synth` | `saw` (recorder, timeline, dots) | `sine` (synth/keyboard), `saw synth` (room/words) |
+| `collide` | `SuperCollider` (code/collide) | `SuperCollider here` (remote/collide), a tie |
+| `shader` (mirror) | `mirror shader` (shader/mirror) | `mirror shader here` (shader/remote), a tie |
+| `scope` | `waveform` (6 pages) | `scope` (drums/knobs, room/words), `waveform here` (remote/collide), `waveforms` (drums/remote) |
+| `wave` | `wave` (tuner, key, live, tempo) | `source scope` (granulator/grains, beat), `ERR wave` and `Ida wave` (radio/blend) |
+| `screen` | `original` (video/shader, webrtc, llhls, moq, drums/camera) | `picture` (synth/dots, video/camera, remote/circuit, history/newsreels), `screen` (shader/mirror, landscape), `picture here` (shader/remote), `camera` (video/recorder) |
+| `knob` | the parameter's name (8 pages) | `knob` (synth/sound, video/shader, shader/mirror, shader/remote), `macro <n>` (remote/circuit), `<drum> <param>` (drums/knobs) |
+| `knob-mix` | `mix knob`, kind **engine** (radio/live, tempo, key) | `wet/dry`, kind **person** (granulator/grains, beat). The one KIND disagreement on a shared id; catalogued as `knob-mix` (engine) plus the grain pages' instance of `knob` |
+| `station` | the station (`Vikerraadio`, radio/blend and tuner) | with the broadcaster, `ERR Raadio 2` (radio/live, key) |
+| `typing`, `paper`, `typewriter`, `fx-typewriter` | `keyboard`, `paper`, `typewriter`, `fx` | `typist <k>`, `paper <k>`, `typewriter <k>`, `fx <k>` (typist/score) |
+
+Also, and not labels but the same question: **one thing under two names.**
+`bpm` (radio/live, tempo) and `tempo` (granulator/beat) are both `tempo
+detector` with `audio-in` and `value-out`; `grains` (`grain ring`) and
+`granulator` (shader/landscape) are the same granulator; `radio` (grain pages,
+landscape) and `player` (radio/tempo) are both `file-in` to `audio-out`.
+`rec-video` is an **engine** where every other recorder is a **store**.
+The kit's patchbay specimens draw a grey description per node (`INFO` in
+`demo/kit/patchbay/index.html`) that disagrees with the pages too: `on-screen
+keyboard`, `saw synth` and `sine synth`, `canvas`, `WebGL shader`, `notice
+bar`, `chat box`. Those are descriptions rather than labels, built from link
+lists with no kind, so the kit has no entries of its own.
+
+Port field variations a page passes through `ports`: `keys:midi-out` emits
+`note, cc` on code/piano and remote/piano; the `midi` device emits `note, cc`
+on code/piano and remote/circuit; `camera:video-out` carries `transports:
+['page']` on four pages and none on the three loopbacks; `chat`'s ports carry
+`shape: { of: 'text' }` on room/chat and `transports: ['relay']` on
+room/broadcast and room/history; `knob-segments` names `segments` in its shape.
+
+### Per-instance types
+
+`midi` (`midi`, `midi-2`, ... in plug order, labelled by the input), `knob`
+(`knob-<name>`), `drum` (one per voice key, `kick` to `s63`), `scope`
+(`scope-pi`, `scope-<drum>`), `wave` (`wave-<station>`), `screen` (`screen-pi`,
+and a second picture is a screen instance under its own id: `dither`,
+`playback`, `loopback`, `hls`, `moq`, `pixels`), `typing`, `paper`,
+`typewriter` and `fx-typewriter` (`<type>-<k>` per typist on typist/score),
+`machines` (one `value-out-<k>` per typist, a `repeat` port), `recording`
+(`cf-r2:<id>`), `station` (`<broadcaster>:<station>`), `chat`, `admin` and
+`notice` (on each tab's random `web-<4 letters>` site), and `camera` (its
+label becomes the device's own name once on).
+
+### What I could not read, or left out
+
+- **The Pi side, as asked**, including six Pi nodes the pages declare by hand:
+  `pi-1:circuit` (with a page-side `value-in` the board does not announce),
+  `pi-1:collide` (with a page-side `value-in`), `pi-1:sampler`, `pi-1:drums`,
+  and two that `boardGraph()` has no node for at all: `pi-1:camera`
+  (remote/circuit) and `pi-1:shader` (`v3dpipe on the Pi, simulated`,
+  shader/remote; the board's own node is `gpu`). Step 3 cannot get those two
+  from `boardGraph()`.
+- **The relay and Stream, as asked, but the brief's reason holds for
+  `cf-relay` only.** `patchbay.mjs` draws `cf-relay:<room>` from a link's
+  transport; `cf-shout:<mount>` (radio/blend, tuner, live, key),
+  `cf-stream:live` (video/webrtc), `cf-stream:hls` (video/llhls) and
+  `cf-moq:relay` (video/moq) are declared by the pages like any node. Left out
+  of `NODES`; whether they belong is still the open question below.
+- **Runtime-only names**: Faust's and Collide's knobs come from the compiled
+  program, the drum voices from `voices.mjs` and the sample bank, the MIDI
+  devices and the camera's label from the browser, and a recording's or a
+  relay's `address` from the page. The catalogue holds the types; the instance
+  lists in `instance` are what the source says today.
+- **The room pages** do not call `addNode`: their nodes are graph literals that
+  `createBayNode`'s registry fills into a bay, and other tabs' nodes arrive at
+  run time. Read from the literals.
+- **The kit's specimens** include archived and demo ids (`web:webgl`,
+  `web:left`, `web:editor`, `fau:fau`, `nola:nola`, `here:*`, `away:keys:out`)
+  that no concept page builds; not catalogued.
+- `grain-rig.mjs` can build an output `scope`, and both pages pass
+  `outputScope: false`, so no page builds it; not listed.
+- `pages` was filled by reading, not by a test importing every page's node
+  list as the plan proposed; that test needs the pages on `addNodes` first,
+  which is step 2.
