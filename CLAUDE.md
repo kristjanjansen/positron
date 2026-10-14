@@ -521,6 +521,27 @@ bug was a fact true of every part and of no part's author.
 
 ## Conventions
 
+- 🔴 **A COMMENT SAYS WHAT THE CODE CANNOT, IN ONE TO THREE LINES. THE STORY
+  OF HOW IT GOT THAT WAY LIVES IN `lessons/`.** Instructed 2026-10-14: *"cut
+  comments, perhaps to separare lessons md or smth. updaet claude.md for
+  cutting down comments to essnece"*. MEASURED that day by the code review:
+  `shell.css` was 70.6 per cent comment (5,702 of 8,080 lines), and the kit's
+  modules carried 39,543 comment lines against 32,934 lines of code. A reader
+  looking for the rule had to read the whole history to find it.
+  - **What stays in the code:** the constraint or the reason a reader would
+    otherwise undo it (*"`display: block`, or the textarea's baseline leaves a
+    1.5 px seam inside a glue"*), a measured number with its unit, a pointer
+    to the lesson. No dates, no quoted conversations, no account of what it
+    used to be, no capital letter alarms, no rule repeated from another file.
+  - **What moves:** everything else, VERBATIM, to `lessons/<area>.md` (for
+    example `lessons/shell-css.md`, `lessons/kit-transport.md`), under a
+    heading naming the file and the selector or function. Never summarised:
+    the measurements and the quoted reports are why a rule survives, which is
+    the same rule as moving a skill.
+  - **The pointer** is one line: `// why: lessons/shell-css.md#pos-glue`.
+  - **New code is written this way from the start.** A new lesson goes to
+    `lessons/`, and the comment gets the one line.
+
 - 🔴 **A FINISHED PLAN IS REPORTED IN FULL, NOT HANDED OVER AS A FILENAME.**
   Instructed 2026-09-20: *"when plans done show them here in full details.
   write it into claude.md when plans getting ready"*. It is the same rule as

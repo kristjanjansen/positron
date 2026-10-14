@@ -1,5 +1,10 @@
 ## Open
 
+- **Cut comments to their essence; the history moves verbatim to `lessons/`** (2026-10-14). Asked: *"cut comments, perhaps to separare lessons md or smth. updaet claude.md for cutting down comments to essnece"*. Rule in CLAUDE.md (Conventions, "A comment says what the code cannot"). Runs AFTER the review fixes land, partitioned by directory.
+
+- **Fix the code review issues in parallel** (2026-10-14). Asked: *"fix the review issues in parallel"*. From `plans/plan-code-review-2026-10-14.md` phases 0 to 4: kit bugs, harness, workers, untracking and deletions. Phase 5 (consolidation) and the `@layer` half of phase 6 are not in this pass. Nothing pushed while the public repo question is open.
+
+
 - ~~**Front page: contact info into the header, footer removed**~~ (2026-10-14, DONE: footer gone, BUILD 925a6189). Asked: *"Try to get contact info to frontpage header. Rm footer"*. `demo/index.html`: Email and Instagram links between the wordmark and Feedback; on a phone they take their own line under the wordmark.
 
 - **Front page contacts: left of Feedback, buttons like it, try with and without labels** (2026-10-14). Asked: *"Put contacts left from feedback, similar buttons. Try with labels and without"*. Supersedes the icons under the hero (deployed as BUILD 925a6189).
