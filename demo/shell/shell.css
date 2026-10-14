@@ -4133,6 +4133,7 @@ button.pos-linkbtn:active { background: none; }
 .pos-hero-eye { font: 400 13px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
 .pos-hero-eye b, .pos-hero-h b { color: var(--hi); font-weight: inherit; }
 .pos-hero-h { font: 600 clamp(32px, 7vw, 56px)/1.08 var(--mono); letter-spacing: -.04em; color: var(--fg); margin-top: 18px; }
+a.pos-hero-secret, a.pos-hero-secret:hover, a.pos-hero-secret:visited { color: inherit; text-decoration: none; cursor: inherit; }
 .pos-hero-l { font: 400 clamp(18px, 2.3vw, 22px)/1.45 var(--sans); letter-spacing: -.01em; color: var(--fg); margin-top: 24px; max-width: 32em; }
 .pos-hero-s { font: 400 clamp(14px, 1.5vw, 16px)/1.5 var(--sans); color: var(--dim2); margin-top: 18px; }
 /* The hero's patchbay: drawn at a fixed width by hero.mjs and scaled to the
