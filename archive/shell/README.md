@@ -24,3 +24,7 @@ Kept rather than deleted because the grain scheduler in it is readable and the
 `follow`-the-write-head idea is worth re-reading before anyone writes another
 one. It is NOT a fallback and must not be wired back in: if a page needs a
 granulator, the answer is the real one.
+
+## local-remote.mjs, worklet.mjs (archived 2026-10-14)
+
+No deployed page used either: local-remote lost its last user when /kit/ dropped it on 2026-10-12, worklet was only read by its own test. Plans named both as ideas. Archived on the owner's *"keep or archive? - tell me, not needed?"*. Their CSS (`.pos-lr*` in shell.css) goes with the comment cut. Imports are relative to demo/shell and will need fixing if they come back.
