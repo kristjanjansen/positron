@@ -8,7 +8,7 @@
 
 - **Research: how to distribute our skills** (2026-10-14, a background agent). Asked: *"In bg investigate how we should distribute our skills"*. Output `research/skills-distribution-2026-10-14.md`.
 
-- **Research: local MCP tools or DIY for UI video capture, for Instagram stories** (2026-10-14, a background agent). Asked: *"In bg research what local mcp tools or diy we can do for ui video capture for ig stories etc"*. Output `research/ui-video-capture-2026-10-14.md`.
+- ~~**Research: local MCP tools or DIY for UI video capture, for Instagram stories**~~ (2026-10-14, DONE; building `demo/reel.mjs` waits for a yes). Asked: *"In bg research what local mcp tools or diy we can do for ui video capture for ig stories etc"*. Output `research/ui-video-capture-2026-10-14.md`.
 
 - **Plans and research: review, mark done, perhaps consolidate** (2026-10-14, a background agent). Asked: *"In bg review research abd plans and clean up, mark them done, perhaos consolidate?"*. A status line on each, an index, and a consolidation proposal; moves and merges wait for a yes.
 
