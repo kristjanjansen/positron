@@ -88,25 +88,22 @@
   /* The wordmark sits on the Feedback row (see the script), so the hero starts
      at its headline; the space above the row is a little less than a demo
      page's, asked 2026-10-13 (*"Keep top whitespace, perhaps bit less"*). */
-  /* Contact as two drawn icons under THE HERO, LARGE (asked 2026-10-14:
-     *"Try to get contact info to frontpage header. Rm footer"*, then
-     *"Contavts: use icons? Below hero?"*). SVG strokes in currentColor, not
-     font glyphs, so they are the same shape on every machine; dim like the
-     hero's small line, lit on hover like Feedback. The address and handle are
-     in each link's title and aria-label. */
-  .cc-contact { display: flex; gap: 8px; }
-  .cc-contact a {
-    display: grid; place-items: center; width: 40px; height: 40px;
-    color: var(--dim); border: 1px solid var(--line2); border-radius: var(--r, 4px);
-    transition: color .15s, border-color .15s;
+  /* Contact: two icon buttons left of Feedback, drawn like it (26 px, its edge,
+     dim2 lit to fg). SVG strokes, not font glyphs, so the shape is the same
+     everywhere; the address and handle are in title and aria-label. */
+  .cc-contact {
+    display: inline-grid; place-items: center; width: 26px; height: 26px;
+    color: var(--dim2); border: 1px solid var(--line2); border-radius: 4px;
+    -webkit-touch-callout: none; touch-action: manipulation;
   }
-  .cc-contact a:hover { color: var(--fg); border-color: var(--dim2); }
-  .cc-contact svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+  .cc-contact:hover { color: var(--fg); }
+  .cc-contact svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+  .pos-title:has(> .cc-contact) { gap: 8px; }
+  .pos-title > .cc-contact:first-of-type { margin-left: auto; }
+  .pos-title:has(> .cc-contact) .pos-fb-btn { margin-left: 0; }
   .pos-title .pos-hero-eye { margin: 0; flex: 1 1 auto; }
   .pos-hero.pos-hero-index { padding-top: 8px; }
   .pos-hero-index .pos-hero-h { margin-top: 0; }
-  .pos-head.pos-index { margin-top: 20px; }
-  @media (min-width: 600px) { .pos-head.pos-index { margin-top: 28px; } }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
@@ -202,24 +199,19 @@
   // No link to /archive/ from here since 2026-10-12 (*"rm arhive link"*); the
   // page stays at its URL.
 
-  // Contact under the hero as two icons (asked 2026-10-14, *"Contavts: use
-  // icons? Below hero?"*). The address is the one that already reaches the mail
-  // worker; the Instagram handle is not registered yet, so that link 404s until
-  // it is.
+  // Contact, left of Feedback. The Instagram handle is not registered yet.
   const ICONS = {
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5 12 13l8.5-6.5"/>',
     instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r=".6" fill="currentColor"/>',
   };
-  const icon = (href, name, label, extra = {}) => {
-    const a = el('a', '', '', { href, title: label, 'aria-label': label, ...extra });
+  const contact = (href, name, label, extra = {}) => {
+    const a = el('a', 'cc-contact', '', { href, title: label, 'aria-label': label, ...extra });
     a.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
     return a;
   };
-  const contact = el('nav', 'cc-contact', '', { 'aria-label': 'contact' });
-  contact.append(
-    icon('mailto:positron@positron.studio', 'mail', 'positron@positron.studio'),
-    icon('https://www.instagram.com/positron.studio/', 'instagram', 'Instagram @positron.studio', { rel: 'noopener' }),
+  document.querySelector('.pos-head .pos-fb-btn')?.before(
+    contact('mailto:positron@positron.studio', 'mail', 'positron@positron.studio'),
+    contact('https://www.instagram.com/positron.studio/', 'instagram', 'Instagram @positron.studio', { rel: 'noopener' }),
   );
-  hero.el.after(contact);
   d.ready();
 </script>
