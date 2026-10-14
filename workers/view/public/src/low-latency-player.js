@@ -1,124 +1,13 @@
-/**
- * Low-latency HLS player for Cloudflare Stream.
- *
- * Wraps hls.js with the configuration and recovery behaviour a live player
- * needs against Cloudflare LL-HLS. Everything here exists because a specific
- * failure was observed in testing:
- *
- *  1. hls.js picks a live-edge position ONCE and, by default, has no recovery:
- *     `maxLiveSyncPlaybackRate` is 1 and `maxLatency` is Infinity. Any startup
- *     hiccup parks the player at an arbitrary latency forever. Measured on the
- *     same stream, same config: 7.6 s one run, 15.4 s the next.
- *
- *  2. Cloudflare mints a NEW video UID behind the live-input URL on every
- *     encoder reconnect — even a 2-second one. The playing level becomes a
- *     dead timeline: `liveSyncPosition` goes stale (it can even move
- *     backwards), and seeking can never help. Only a full reload recovers.
- *
- *  3. A page opened before the broadcast exists gets a fatal
- *     `manifestParsingError`. Patching up a live Hls instance afterwards
- *     (stopLoad/loadSource/startLoad) leaves it wedged: no errors, no loads,
- *     no recovery. The only reliable reset is destroying the instance and
- *     building a new one — the programmatic page-refresh.
- *
- * Recovery model:
- *   latency drift      -> nudge playbackRate (invisible), else seek (one skip);
- *                         repeated silent seek failures escalate to a rebuild
- *   player stall       -> seek; after N failed seeks, full rebuild
- *   element starved    -> readyState < 2 with the clock still counting:
- *                         hole-skip to the next buffered range, else rebuild
- *   source stall       -> live edge stopped advancing: full rebuild
- *                         (seekable-end check from elektronstudio/v4)
- *   fatal hls error    -> media-error quick fixes, else full rebuild
- *   no stream yet      -> rebuild on a steady cadence until it exists
- *   tab became visible -> seek to live edge (hidden tabs always come back stale)
- *
- * v14: three fixes to the native path, all found by driving DESKTOP SAFARI
- * over WebDriver (demo/verify-safari.mjs) — a browser the CDP harness cannot
- * reach at all. Native HLS plays at exactly 1.000x sustained; what looked
- * like 0.29x was the aftermath of v13's own source watchdog reloading a
- * healthy stream, because under native HLS currentTime does not share a
- * timeline with seekable. The watchdog now needs BOTH frozen, telemetry no
- * longer hides behind getStartDate(), and bufferReport says null rather
- * than 0 when it cannot tell.
- *
- * v12: PREFER NATIVE HLS ON IPHONE. The old check only fell back to native
- * when hls.js was UNSUPPORTED, which was a correct proxy for "iPhone" until
- * iOS 17.1 added ManagedMediaSource — after which Hls.isSupported() returns
- * true there and the fallback silently stopped firing. So the one platform with
- * a first-class native HLS stack (AVFoundation, hardware decode, Apple's own
- * LL-HLS) was being put on the MMS path, where Safari closes the MediaSource
- * under us and dumps every buffer. Now decided on the real question, and
- * overridable with preferNative for a same-numbers A/B.
- *
- * v11: startFragPrefetch + initialLiveManifestSize 3 + startOnSegmentBoundary,
- * the three hls.js knobs that all default against us and all push the same way:
- * begin with more material, on a boundary. These target the one failure here
- * that is really hls.js — its audio controller starting behind the main one.
- * UNCONFIRMED on a device as of writing; the startup gate in v10 is the
- * belt-and-braces version of the same idea and stays either way.
- *
- * v10: do not play until the AUDIO/VIDEO intersection is playable, and do not
- * let the starved watchdog seek over an audio-only shortfall. Cloudflare lands
- * audio seconds behind video at startup; video.buffered is the intersection,
- * so the element had 0.05 s to play while video held 5 s. Playing there stalls,
- * the seek that follows opens a hole, and the hole outlives the lag. The lag
- * itself is transient — advance recovers to 1.0 and stays.
- *
- * v9: cap the rendition on ADVANCE. capLevelOnFPSDrop keys on dropped frames
- * and the stuttering iPhone drops 3 of 507 — it advances the media clock at
- * 0.16-0.41x with 5-10 s buffered and the edge moving at 1.0x. Frames are not
- * discarded; time crawls. Also recorded: on that device AUDIO carries holes
- * that video does not, and video.buffered being their intersection inherits
- * them.
- *
- * v8: a drift-seek must earn itself — minimum interval, minimum buffered
- * runway, and it yields by RAISING the target when the device proves it
- * cannot hold one. Setting currentTime aborts in-flight fragment loads, and
- * on an iPhone that abort-per-seek loop ran every 2-3 s for two minutes and
- * was itself the jerkiness. Smooth at 8 s beats jerky at 6 s.
- *
- * v7: liveSyncSeconds overrides PART-HOLD-BACK, because a target inside one
- * keyframe interval is structurally unreachable (measured: 1 INDEPENDENT part
- * per 2.0 s segment) and chasing it is the iOS jank. Level switches are now
- * reported. Also observed and deliberately NOT acted on: Cloudflare emits
- * non-monotonic EXT-X-PROGRAM-DATE-TIME during startup (56.935 -> 56.604,
- * i.e. 331 ms backwards), which only matters here if pdtDriftTrigger is on —
- * it is off by default.
- *
- * v6: split the paused/readyState tick gate (re-play() when visible; starved
- * hole-skip with the stall clock left counting — fixes the measured 18.5–20 s
- * readyState-1 park after same-broadcast resumes), escalate repeated silent
- * drift-seek failures to a rebuild, play() on visibility resync, PDT wall
- * latency in telemetry (+ optional flag-gated PDT drift trigger, default off).
- *
- * Usage:
- *   const player = createLowLatencyPlayer(videoEl, manifestUrl, opts?);
- *   player.on('latency', ({latency, target}) => …)   // ~2/s while playing
- *   player.on('dimensions', ({width, height}) => …)  // before first frame
- *   player.on('rebuild', ({why, attempt}) => …)
- *   player.destroy();
- */
+// Low-latency HLS for Cloudflare Stream: hls.js config plus recovery (drift, stall, starved, source
+// stall, fatal error, no stream yet, tab visible), and native HLS on WebKit. v14.
+// createLowLatencyPlayer(video, url, opts).on('latency'|'dimensions'|'rebuild', fn); .destroy().
+// why: lessons/src.md#player-header
 
 const DEFAULTS = {
-  /**
-   * A DRIFT-SEEK IS NOT FREE. Setting currentTime aborts every in-flight
-   * fragment load, and the abort is what stops the buffer from ever growing.
-   *
-   * Measured on an iPhone (iOS 18.7, Safari 26.6.1, ManagedMediaSource,
-   * Safari gating loads): RESYNC drift fired every 2-3 s for two solid
-   * minutes, each one immediately followed by "ERR aborted" on BOTH tracks.
-   * Latency oscillated across the trigger — 8.25 -> seek -> 6.90 -> 8.34 ->
-   * seek — and some seeks went out with buf=0.02, i.e. with no runway to land
-   * on, which guarantees the stall it was trying to cure. The jerkiness was
-   * this control loop, not the stream: the publisher A/B was clean and the
-   * page had segments 0.8 s after asking.
-   *
-   * So a drift-seek now has to earn itself three ways: enough time since the
-   * last one, enough buffered runway to survive it, and a target that the
-   * device has not already proved it cannot hold.
-   */
-  /** Never drift-seek more often than this (ms). */
+  // A drift-seek aborts in-flight fragment loads, so it must earn itself: time since the last one,
+  // buffered runway, and a target the device has shown it can hold. Never more often than this
+  // (ms).
+  // why: lessons/src.md#drift-seek
   minDriftSeekMs: 10000,
   /** Refuse to drift-seek with less than this much buffer ahead (s). */
   driftSeekMinBuffer: 1.5,
@@ -126,40 +15,19 @@ const DEFAULTS = {
   driftHeldBeforeYield: 3,
   /** How far the target may drift upward when the device cannot hold it (s). */
   maxTargetBias: 6,
-  /**
-   * Step the level down when the playhead cannot keep up with wall time.
-   *
-   * hls.js's own capLevelOnFPSDrop is enabled below, but it is INERT for this
-   * failure: it keys on droppedVideoFrames, and the iPhone that stutters drops
-   * almost nothing — 3 frames out of 507. What it does instead is advance the
-   * media clock at 0.16-0.41x while the live edge advances at 1.0x and 5-10 s
-   * sit buffered. Frames are not being discarded; time itself crawls.
-   *
-   * So cap on the symptom that is actually present. Below this ratio, for this
-   * many consecutive ticks, drop one rendition.
-   */
+  // Step the level down when the playhead advances slower than this ratio for N ticks:
+  // capLevelOnFPSDrop is inert, a stuttering iPhone dropped 3 of 507 frames while crawling at 0.2x.
+  // why: lessons/src.md#advance-floor
   advanceFloor: 0.8,
   advanceTicksBeforeCap: 6,
-  /**
-   * Do not start playing until there is a real INTERSECTION to play.
-   *
-   * Measured on desktop Chrome and on iOS alike: at startup Cloudflare lands
-   * the AUDIO track seconds behind the video track —
-   *   video [[2.83,4.83],[8.83,21.83]]   audio [[2.85,3.36],[8.84,16.84]]
-   * — and video.buffered is their INTERSECTION, so the element had 0.05 s to
-   * play while video held 5 s. Playing there stalls at once, the starved
-   * watchdog seeks to the edge, and THAT seek leaves a 5.5 s hole (3.36->8.84)
-   * which was still visible as an orphan range 40 s later. The lag is
-   * transient — advance climbed 0.26 -> 1.0 by t=36 s and stayed — so the whole
-   * stutter is a startup cascade that begins with playing too early.
-   */
+  // Do not play until the audio/video intersection holds this much: Stream lands audio seconds
+  // behind
+  // video at startup, and playing into 0.05 s stalls and leaves a 5.5 s hole.
+  // why: lessons/src.md#start-buffer
   startBuffer: 1.0,
   startBufferTimeoutMs: 8000,
-  /**
-   * Ticks the starved watchdog waits before seeking, when the shortfall is
-   * AUDIO ONLY (video has data past the playhead, the intersection does not).
-   * Seeking forward cannot make an audio segment arrive; it only opens a hole.
-   */
+  // Ticks the starved watchdog waits when the shortfall is audio only: a seek cannot conjure audio.
+  // why: lessons/src.md#audio-lag
   audioLagTicks: 12,
   /** Seek instead of nudging once we are this far past target (seconds). */
   seekThreshold: 2.0,
@@ -167,32 +35,10 @@ const DEFAULTS = {
   nudgeThreshold: 0.3,
   /** Max playback rate while catching up. 1.05 is imperceptible. */
   catchUpRate: 1.05,
-  /**
-   * Latency target in seconds, OVERRIDING the manifest's PART-HOLD-BACK.
-   *
-   * Cloudflare advertises PART-HOLD-BACK=1.5 with PART-TARGET=0.5, but
-   * measured on our own stream (2026-09-04) only ONE part per segment carries
-   * INDEPENDENT=YES — 10 of 38 — because our GOP is 2.0 s. So the player can
-   * APPEND at 0.5 s granularity but can only START DECODING every 2.0 s. A
-   * target inside one keyframe interval is unreachable: it overshoots, nudges
-   * at catchUpRate, crosses seekThreshold, resyncs, and repeats. That loop is
-   * the iOS jank.
-   *
-   * The publisher was ruled out FIRST, not assumed: the container and this Mac
-   * publishing the identical command both gave segment inter-arrival jitter
-   * 0.40 and EXTINF sd 0.003 s (2.000-2.021). Encoder starvation wobbles
-   * declared durations; these do not.
-   *
-   * 3.0 s == 1.5 GOPs. hls.js honours this only when passed at construction
-   * (its targetLatency getter tests hls.userConfig.liveSyncDuration).
-   * Set null to obey whatever the manifest advertises.
-   */
-  /**
-   * Which player: 'auto' (default), true to force native HLS, false to force
-   * hls.js. 'auto' picks native only where it is clearly better — an iPhone,
-   * detected as "native HLS available and no plain MediaSource". See the
-   * decision block in the body for why the old check stopped working.
-   */
+  // liveSyncSeconds overrides PART-HOLD-BACK: one INDEPENDENT part per 2.0 s segment makes a target
+  // inside a GOP unreachable. 3.0 s = 1.5 GOPs, passed at construction. preferNative:
+  // 'auto'|true|false.
+  // why: lessons/src.md#live-sync
   preferNative: 'auto',
   liveSyncSeconds: 3.0,
   /** Fallback latency target if the manifest advertises no hold-back. */
@@ -216,11 +62,9 @@ const DEFAULTS = {
   /** Append a rebuild nonce to the manifest URL. OFF: Cloudflare propagates
    *  manifest query params into child playlist URLs, with unknown effects. */
   cacheBust: false,
-  /** Also fire the drift-seek off PDT wall-clock latency. OFF by default:
-   *  hls.latency freezes stale during socket-open ingest pauses (measured
-   *  1.7 s reported vs 8.4 s true) and PDT is the only honest signal there —
-   *  but a wall-lag with nothing buffered ahead is player-irreducible, so the
-   *  trigger also requires liveSyncPosition to be usefully ahead. */
+  // Also drift-seek on PDT wall latency (hls.latency freezes in ingest pauses). Off by default, and
+  // only when liveSyncPosition is usefully ahead.
+  // why: lessons/src.md#pdt-trigger
   pdtDriftTrigger: false,
 };
 
@@ -232,55 +76,15 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
   let destroyed = false;
 
-  // ---- which player? ------------------------------------------------------
-  //
-  // This used to read `if (!Hls.isSupported() && canPlayType(hls))`, which was
-  // a correct proxy for "this is an iPhone" only while iPhone had NO MSE at all.
-  // iOS 17.1 added ManagedMediaSource, so Hls.isSupported() now returns TRUE
-  // there and the check silently stopped firing — putting the one platform with
-  // an excellent native HLS stack (AVFoundation, hardware decode, and Apple's
-  // own LL-HLS implementation) onto the MMS path instead, where Safari closes
-  // the MediaSource under us and every buffer is dumped.
-  //
-  // So decide on the real question. Native HLS available AND no plain
-  // MediaSource is exactly iPhone: macOS/iPad Safari have both and keep the
-  // hls.js path (which gives us level capping and latency control), Chrome has
-  // MediaSource and no native HLS.
+  // Which player. `Hls.isSupported()` is true on iPhone since iOS 17.1 (ManagedMediaSource), so it
+  // no longer identifies one; decide on native HLS capability instead.
+  // why: lessons/src.md#which-player
   const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
   const onlyManagedMse = typeof self !== 'undefined' && !self.MediaSource && !!self.ManagedMediaSource;
-  // ANY browser with native HLS, not just iPhone. The first version of this
-  // required onlyManagedMse, which excluded macOS Safari because it has a plain
-  // MediaSource too — on the theory that hls.js is worth having wherever it
-  // works, for the level capping and latency control.
-  //
-  // Measured on desktop Safari 26.6.2 over WebDriver, same page, same 40 s:
-  //
-  //             native      hls.js
-  //   advance    0.961x      0.344x
-  //   latency    5.25 s      7.71 s
-  //   errors     0           2 (aborted at 4.7 s, levelLoadTimeOut at 40 s)
-  //   buffered   contiguous  hole [[16,18.01],[20.01,26.5]]
-  //
-  // The hls.js log also showed "resynced to the live edge" at 4741 ms and
-  // "aborted" at 4751 ms — the drift-seek killing its own fragment loads, 10 ms
-  // apart. Control we cannot use well is worth less than a player that works,
-  // so WebKit gets AVFoundation. Chrome and Firefox have no native HLS, so this
-  // leaves them on hls.js without needing a browser check.
-  // THE GATE IS ManagedMediaSource, not canPlayType.
-  //
-  // canPlayType('application/vnd.apple.mpegurl') returns "maybe" in BOTH Safari
-  // and Chrome (measured on both, 2026-09-05) — so it cannot tell them apart at
-  // all, and using its truthiness put Chrome on the native path, where it cannot
-  // play HLS and the whole suite broke. ManagedMediaSource is WebKit-only:
-  //
-  //                      ManagedMediaSource   MediaSource
-  //   Safari macOS              true             true
-  //   Safari iOS                true             false
-  //   Chrome                    false            true
-  //
-  // So it is a capability test for "Apple's media stack is here", which is
-  // exactly the thing worth preferring, with no brand sniffing. Safari older
-  // than 17.1 has no MMS and keeps hls.js — the previous behaviour.
+  // Native HLS on all WebKit, gated on ManagedMediaSource, since canPlayType answers "maybe" in
+  // Chrome
+  // too. Desktop Safari: native 0.961x and 5.25 s, hls.js 0.344x and 7.71 s with 2 errors.
+  // why: lessons/src.md#native-gate
   const webkitMedia = typeof self !== 'undefined' && !!self.ManagedMediaSource;
   const useNative = cfg.preferNative === true
     || (cfg.preferNative === 'auto' && webkitMedia);
@@ -291,13 +95,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   // ---- state shared across rebuilds ----------------------------------------
   let hls = null;
   let timer = null;
-  // Rate-measurement state, hoisted HERE on purpose. It used to sit beside
-  // measureRates() further down, which is AFTER the native-HLS branch returns —
-  // so on an iPhone the declarations never executed and the native path's own
-  // interval threw "Cannot access 'lastAdvT' before initialization" every tick.
-  // The page showed nothing. Local verify could not catch it: desktop Chrome
-  // never takes that branch. State both branches share must be declared before
-  // either branch can return.
+  // Shared rate state is declared before the native branch returns, or that branch throws a TDZ
+  // error.
+  // why: lessons/src.md#hoisted
   let advEma = null, edgeEma = null, lastAdvT = 0, lastAdvCt = -1, lastEdgeV = -1;
   let advRefT = 0, advRefCt = -1, edgeRefT = 0, edgeRefV = -1;
   let rebuildTimer = null;
@@ -335,12 +135,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     return null;
   }
 
-  /**
-   * Freeze the last decoded frame into the element's poster before teardown,
-   * so a rebuild shows a still image instead of flashing black. MSE-fed video
-   * does not taint the canvas (hls.js fetches media via CORS), so this is safe
-   * on the hls.js path; a tainted canvas (native src fallback) just skips.
-   */
+  // Freeze the last frame into the poster before teardown, so a rebuild shows a still, not black.
+  // A tainted canvas (native src) just skips.
+  // why: lessons/src.md#freeze
   function freezeFrame() {
     if (video.readyState < 2 || !video.videoWidth) return;
     try {
@@ -352,12 +149,10 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     } catch {}
   }
 
-  /**
-   * Tear the Hls instance down and build a fresh one. Deliberately blunt:
-   * every observed wedge (dead level after UID swap, instance stuck after
-   * manifestParsingError) recovers under a full rebuild and under nothing
-   * weaker. State that must survive lives outside boot().
-   */
+  // Tear down and build fresh: every observed wedge recovers under a full rebuild and nothing
+  // weaker.
+  // State that must survive lives outside boot().
+  // why: lessons/src.md#rebuild
   let lastRebuildAt = 0;
   function rebuild(why) {
     if (destroyed) return;
@@ -407,52 +202,36 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       manifestLoadingMaxRetry: Infinity,
       manifestLoadingRetryDelay: cfg.manifestRetryDelay,
       manifestLoadingMaxRetryTimeout: 8000,
-      // Fragment retries: moderate. At the LL-HLS live edge a brief part 404
-      // is NORMAL (players request parts as they are born) — v4's fail-fast
-      // (1 retry) turned that churn into fatal->rebuild storms that crashed
-      // the tab. But v3's slow default backoff took 3-5 min to surface a real
-      // swap. Middle path: a few quick retries, tight timeout cap.
+      // A few quick fragment retries with a tight cap: a part 404 at the live edge is normal, and
+      // fail-fast
+      // caused rebuild storms while slow backoff hid a UID swap for minutes.
+      // why: lessons/src.md#frag-retry
       levelLoadingMaxRetry: 4,
       levelLoadingRetryDelay: 1000,
       fragLoadingMaxRetry: 4,
       fragLoadingRetryDelay: 500,
       fragLoadingMaxRetryTimeout: 4000,
       maxLiveSyncPlaybackRate: cfg.catchUpRate,
-      // MEASURED on an iPhone: with 5-7 s buffered and loading keeping up at
-      // ~0.9x, the playhead advanced 0.94 s in 4.04 s of wall time — 0.23x
-      // realtime on the 1280x720 rendition. Loading was never the problem;
-      // presentation was. hls.js has exactly this control: FPS_DROP watches
-      // droppedVideoFrames against decoded and steps the level down when the
-      // ratio exceeds fpsDroppedMonitoringThreshold. Off by default.
+      // capLevelOnFPSDrop on, though it keys on dropped frames; the advance cap covers what it
+      // misses.
+      // why: lessons/src.md#fps-drop
       capLevelOnFPSDrop: true,
 
-      // ── starting with enough material, aligned ───────────────────────
-      // The one failure in this file that is genuinely hls.js behaviour is
-      // that its AUDIO stream controller starts after the main one and
-      // trails at the live edge. video.buffered is the INTERSECTION of the
-      // source buffers, so the element gets 0.05 s to play while video holds
-      // 5 s. All three knobs below default AGAINST us and all three push in
-      // the same direction: begin with more material, on a boundary.
-      //
-      // Defaults read off the bundled 1.7.1, not recalled:
-      //   startFragPrefetch       false
-      //   initialLiveManifestSize 1
-      //   startOnSegmentBoundary  false
+      // Start with more material, on a boundary: these three knobs default against us in 1.7.1
+      // (startFragPrefetch false, initialLiveManifestSize 1, startOnSegmentBoundary false).
+      // why: lessons/src.md#start-aligned
 
       // Fetch the first fragment before media attach, so both loaders are
       // already moving when playback is allowed to begin.
       startFragPrefetch: true,
 
-      // Refuse to start until the playlist carries 3 segments. The AUDIO
-      // playlist is then populated too — measured at the origin, the two
-      // tracks advance in exact lockstep (v-a = 0.00 s over 12 samples), so
-      // waiting for depth in one waits for depth in both.
+      // Wait for 3 segments; the audio and video playlists advance in lockstep, so both have depth.
+      // why: lessons/src.md#manifest-size
       initialLiveManifestSize: 3,
 
-      // Start at a segment boundary rather than mid-segment. With exactly one
-      // INDEPENDENT part per 2 s segment (measured: 10 of 38), a boundary is
-      // the only place both tracks are simultaneously decodable from scratch.
-      // Costs up to one segment of latency; buys alignment.
+      // A segment boundary is the only point both tracks decode from scratch; costs up to one
+      // segment.
+      // why: lessons/src.md#boundary
       startOnSegmentBoundary: true,
       // A target shorter than one keyframe interval cannot be held; see
       // liveSyncSeconds. Must be in userConfig, hence here and not a setter.
@@ -462,24 +241,18 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
     let mediaRecoveries = 0;
 
-    // ── why did Safari close the MediaSource? ──────────────────────────
-    // "mediaSourceRequiresReset — MediaSource closed while media attached"
-    // has now appeared in three separate iPhone runs, and each time every
-    // buffer is dumped (tracks {} immediately after) — which is the visible
-    // flash. ManagedMediaSource also GATES loading via startstreaming /
-    // endstreaming, and hls.js 1.7.1 wires both. None of that is observable
-    // from the outside, so observe it directly.
+    // Watch the MediaSource directly: Safari closes it and dumps every buffer, and MMS gates
+    // loading.
+    // why: lessons/src.md#media-source
     watchMediaSource();
-    // NOT emitted synchronously: boot() runs inside createLowLatencyPlayer,
-    // before the caller has had a chance to chain .on(), so a synchronous
-    // emit reaches nobody. The iOS report came back with no ENGINE line at
-    // all and that was this bug, not a device signal.
+    // Deferred: boot() runs inside the constructor, before the caller can chain .on().
+    // why: lessons/src.md#engine-emit
     if (rebuilds === 0) setTimeout(() => emit('engine', engineReport()), 0);
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
-      // Dimensions live in the master manifest (#EXT-X-STREAM-INF RESOLUTION):
-      // available ~200 ms after loadSource, seconds before the first decoded
-      // frame sets videoWidth. Reserve layout now — no jump.
+      // Resolution from the master manifest, about 200 ms after loadSource, reserves layout before
+      // the frame.
+      // why: lessons/src.md#dimensions
       const best = (data.levels || [])
         .filter((l) => l.width && l.height)
         .sort((a, b) => b.width - a.width)[0];
@@ -492,11 +265,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
     hls.on(Hls.Events.LEVEL_LOADED, () => { mediaRecoveries = 0; });
 
-    // ABR churn is the other jank candidate and it is UNMEASURED on the
-    // device that showed the problem. The stream carries four renditions
-    // (720/480/360/240) with tightly clustered BANDWIDTH, and a switch at
-    // the live edge cannot present a frame until the next INDEPENDENT part
-    // — once per 2.0 s. Report switches so the phone can answer it.
+    // Report level switches: four close renditions and one keyframe per 2 s make ABR churn a
+    // suspect.
+    // why: lessons/src.md#level-switch
     hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
       const l = hls.levels?.[data.level];
       levelSwitches++;
@@ -515,11 +286,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         hls.recoverMediaError();
         return;
       }
-      // Parsing errors (204 empty manifest — stream not started) are NOT
-      // covered by the native loading retry, and a wedged instance emits
-      // nothing further. Rebuild on a rising backoff: quick first retries for
-      // the common transient, easing off while the edge converges after a
-      // broadcast swap instead of hammering stale manifests.
+      // A 204 empty manifest (no stream yet) is fatal and wedges the instance; rebuild on a rising
+      // backoff.
+      // why: lessons/src.md#parse-error
       consecutiveFailures++;
       const delay = Math.min(10000, cfg.bootstrapRetryDelay * Math.max(1, Math.ceil(consecutiveFailures / 3)));
       scheduleRebuild(data.details || data.type, delay);
@@ -530,28 +299,18 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     hls.attachMedia(video);
   }
 
-  // ---- native HLS (AVFoundation) -------------------------------------------
-  // Deliberately AFTER bufferReport()/measureRates() are defined, so the native
-  // path reports the SAME quantities as the hls.js path. Comparing two players
-  // on two different measurements would be worthless.
+  // Native HLS, after bufferReport() and measureRates(), so both paths report the same quantities.
+  // why: lessons/src.md#native
   if (useNative) {
-    // Deferred, exactly as on the hls.js path: boot happens inside
-    // createLowLatencyPlayer, before the caller can chain .on(), so a
-    // synchronous emit reaches nobody. The iPhone log came back with no ENGINE
-    // line and that was this bug reintroduced, not a device signal.
+    // Deferred for the same reason as on the hls.js path.
+    // why: lessons/src.md#native-engine
     setTimeout(() => emit('engine', {
       player: 'native', managedMediaSource: !!self.ManagedMediaSource,
       plainMediaSource: !!self.MediaSource, nativeHls, hls: null,
     }), 0);
-    // RECOVERY, which this path had none of. Measured on an iPhone at t=153 s:
-    // MEDIA-ERROR code 3 "Media failed to decode", then currentTime back to 0
-    // and nothing further. The hls.js path carries every watchdog; here we set
-    // src and walked away. And Cloudflare mints a NEW video UID on every
-    // encoder reconnect (5265d9d9, 8cce2ccd, d0390546, 11e6883c observed today),
-    // which a bare <video src> cannot survive at all.
-    //
-    // A reload is the only lever native HLS gives us, so use it — rate limited,
-    // because a reload storm is worse than a stall.
+    // Native recovery is a reload, the only lever (decode errors are terminal, UIDs change); rate
+    // limited.
+    // why: lessons/src.md#native-recovery
     let nativeLastEdge = -1;
     let nativeLastCt = -1;
     let nativeCtMoved = Date.now();
@@ -589,17 +348,10 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       if (destroyed) return;
       const rates = measureRates();
 
-      // Source watchdog — and it needs BOTH signals frozen, not one.
-      //
-      // Measured in desktop Safari over WebDriver: under native HLS,
-      // currentTime does NOT share a timeline with seekable the way it does
-      // under MSE. A healthy stream showed currentTime 38.42 against
-      // seekableEnd 23.5, so an edge-only check declared the source dead and
-      // reloaded a stream that was playing at exactly 1.000x — and the reload
-      // is what then produced the misaligned, apparently-stalled state. The
-      // watchdog was manufacturing the fault it was watching for.
-      //
-      // If the playhead is advancing, the source is alive by definition.
+      // The native source watchdog needs both the edge and the playhead frozen: currentTime does
+      // not
+      // share a timeline with seekable here, and an edge-only check reloaded a healthy stream.
+      // why: lessons/src.md#native-source
       const edge = seekableEnd();
       if (edge != null && edge > nativeLastEdge + 0.01) { nativeLastEdge = edge; nativeEdgeMoved = Date.now(); }
       const ctMoving = video.currentTime > nativeLastCt + 0.01;
@@ -613,10 +365,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         return;
       }
 
-      // NOT gated behind latency. getStartDate() can be unavailable for a while,
-      // and the first Safari run reported an entirely empty readout for 45 s
-      // because every field sat behind it — exactly when the numbers were most
-      // wanted. Latency is allowed to be null; everything else still reports.
+      // Not gated behind latency: getStartDate() can be unavailable for a while; latency may be
+      // null.
+      // why: lessons/src.md#native-telemetry
       const latency = nativeLatency();
       // No target to chase: AVFoundation runs its own catch-up against the
       // manifest's PART-HOLD-BACK, which is Apple's own spec. Report what it
@@ -689,17 +440,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     return true;
   }
 
-  /**
-   * What is actually buffered, and per source buffer.
-   *
-   * video.buffered on a MediaSource is the INTERSECTION of every source
-   * buffer, so a demuxed stream (this one carries a separate AUDIO group)
-   * reports len 0 the moment audio and video ranges stop overlapping — even
-   * with both tracks holding seconds of data. Measured on an iPhone:
-   * bufferStalledError with bufferInfo.len 0 while sitting 7.15 s behind the
-   * live edge, i.e. content was available and not landing contiguously.
-   * Reporting the tracks SEPARATELY is what tells those two cases apart.
-   */
+  // What is buffered, per source buffer: video.buffered is the intersection, so a demuxed stream
+  // reads 0 when audio and video stop overlapping.
+  // why: lessons/src.md#buffer-report
   function bufferReport() {
     const fmt = (tr) => {
       const out = [];
@@ -712,11 +455,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     for (let i = 0; i < b.length; i++) {
       if (b.start(i) <= t + 0.1 && b.end(i) > t) { ahead = b.end(i) - t; break; }
     }
-    // NULL, not 0, when the playhead sits outside every buffered range. Under
-    // native HLS that is normal rather than starvation — Safari reported
-    // currentTime 38.42 against buffered [[18,25]] on a stream playing at
-    // 1.000x — and reporting 0 there reads as "starved" and drives the wrong
-    // decisions. 0 means measured-and-empty; null means cannot tell.
+    // null, not 0, outside every buffered range: 0 means measured and empty, null means cannot
+    // tell.
+    // why: lessons/src.md#null-ahead
     const inRange = ahead > 0;
     const rep = { ahead: inRange ? +ahead.toFixed(2) : null, ranges: fmt(b) };
     // hls.js keeps the per-type buffers here. Undocumented, so guarded.
@@ -733,21 +474,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     return rep;
   }
 
-  /**
-   * How fast is the playhead ACTUALLY advancing per wall second?
-   *
-   * On an iPhone, latency and buffer grew together — latency 6.39 -> 10.81 s
-   * while runway grew 5.0 -> 7.6 s — which means 4.42 s of latency accrued
-   * over 6.05 s of wall time with data sitting ready. Either the device
-   * presents frames far slower than realtime, or the live edge is running away
-   * and hls.latency is reporting THAT as our lag. Those have opposite fixes,
-   * and this is the number that tells them apart:
-   *
-   *   advance ~= 1.0 and latency still climbing  -> the EDGE is running away
-   *   advance << 1.0                             -> the DEVICE cannot keep up
-   *
-   * edgeRate is the same question asked of the live edge itself.
-   */
+  // How fast the playhead and the live edge advance per wall second: advance near 1.0 with latency
+  // climbing means the edge runs away; advance well under 1.0 means the device cannot keep up.
+  // why: lessons/src.md#rates
   function measureRates() {
     const now = Date.now();
     const ct = video.currentTime;
@@ -757,17 +486,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       if (dt > 0.2) {
         if (lastAdvCt >= 0 && !video.paused) {
           const r = (ct - lastAdvCt) / dt;
-          // A LONG BASELINE, not an EMA.
-          //
-          // The EMA was seeded while currentTime was still 0 (before play) and
-          // then crawled toward the truth: it read 0.624 on desktop Safari at
-          // t=35 s while a direct two-point measurement of the same player gave
-          // 1.000 sustained. An exponential average of a quantity with a long
-          // startup transient is mostly a report on the transient.
-          //
-          // So measure against a reference point instead, and move the reference
-          // only when the playhead jumps (a seek is not a playback rate) or when
-          // the baseline gets stale.
+          // A long baseline, not an EMA (an EMA reported the startup transient), moved only on a
+          // jump or when stale.
+          // why: lessons/src.md#baseline
           if (r < -0.1 || r >= 3) {
             advRefT = now; advRefCt = ct;          // a jump: restart the baseline
           } else if (advRefT === 0) {
@@ -860,9 +581,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
   function tick() {
     if (destroyed || Date.now() < cooldownUntil) return;
 
-    // -- source watchdog: is new content still being produced? --------------
-    // Runs even while paused/stalled — currentTime advancing through the
-    // remaining buffer must not mask a dead origin.
+    // Source watchdog: runs while paused too, so draining the buffer cannot mask a dead origin.
+    // why: lessons/src.md#source-watchdog
     const edge = seekableEnd();
     if (edge != null && edge > lastEdge + 0.01) { lastEdge = edge; lastEdgeMove = Date.now(); }
     if (everPlayed && Date.now() - lastEdgeMove > cfg.sourceStallTimeout) {
@@ -880,19 +600,10 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
       return;
     }
     if (video.readyState < 2) {
-      // Starved element. Do NOT reset the stall clock: a drift-seek that lands
-      // in a buffer hole (same-broadcast resume) leaves readyState at 1
-      // indefinitely — measured 20.0 s and 18.5 s parks — and the old
-      // early-return disarmed every watchdog while resetting the clock.
-      //
-      // Fast path first: playhead beached at a hole with a real buffered range
-      // just ahead (post-burst appends land beyond the seek point and the
-      // element never recovers on its own — hls.js's gap controller takes
-      // ~20 s). Three consecutive ticks of confirmation (~1.5 s) filter out
-      // ordinary in-flight seeks whose data is still arriving.
-      // One attempt per target: a wedged mid-swap level bounces the playhead
-      // back (measured: ct 0 <-> skip-target loop every ~3 s) — re-skipping to
-      // the same spot is noise; defer to the starved escalation below instead.
+      // Starved: keep the stall clock running (holes parked readyState 1 for 18 to 20 s). Skip to a
+      // real
+      // range just ahead after 3 confirming ticks, once per target, before escalating.
+      // why: lessons/src.md#starved
       const ahead = nextBufferedAhead(0.25);
       if (ahead != null && Math.abs(ahead - lastHoleSkipTo) > 0.5) {
         beachedTicks++;
@@ -906,10 +617,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
         }
       } else beachedTicks = 0;
       if (Date.now() - lastAdvance > cfg.stallTimeout) {
-        // Is the shortfall AUDIO ONLY? Video holding seconds past the playhead
-        // while the intersection holds nothing means the missing piece is an
-        // audio segment. A seek forward cannot conjure one — it just opens a
-        // hole, which is exactly how the 5.5 s orphan range got made. Wait.
+        // Audio-only shortfall: wait, since a seek forward only opens a hole.
+        // why: lessons/src.md#audio-only
         const rep = bufferReport();
         const vr = rep.tracks?.video;
         const vEnd = vr?.length ? vr[vr.length - 1][1] : null;
@@ -949,11 +658,9 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
 
     // -- latency control ----------------------------------------------------
     const rates = measureRates();
-    // A resync jumps currentTime, so the EMA needs a moment to be meaningful
-    // again; only judge when the buffer is healthy and we are actually playing.
-    // ?? 0 is explicit rather than relying on `null > 2` being false: ahead is
-    // null when the playhead sits outside every range, and "cannot tell" must
-    // not be read as "plenty buffered".
+    // Judge advance only while playing with a healthy buffer; `?? 0` because null means cannot
+    // tell.
+    // why: lessons/src.md#advance-judge
     if (rates.advance != null && !video.paused && (bufferReport().ahead ?? 0) > 2) {
       if (rates.advance < cfg.advanceFloor) slowTicks++;
       else slowTicks = Math.max(0, slowTicks - 1);
@@ -975,10 +682,8 @@ export function createLowLatencyPlayer(video, url, opts = {}) {
     if (latency == null) return;
     const target = targetLatency();
     const drift = latency - target;
-    // PDT wall-clock latency: the only honest signal while hls.latency sits
-    // frozen during a socket-open ingest pause. Always reported; only acted
-    // on when cfg.pdtDriftTrigger is set AND there is somewhere ahead to seek
-    // to (otherwise the wall lag is player-irreducible).
+    // PDT wall latency, always reported; acted on only with pdtDriftTrigger and room ahead to seek.
+    // why: lessons/src.md#pdt-latency
     const pd = hls?.playingDate;
     const pdtLatency = pd ? (Date.now() - pd.getTime()) / 1000 : null;
     const pdtDrift = cfg.pdtDriftTrigger && pdtLatency != null

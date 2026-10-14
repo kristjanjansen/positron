@@ -1,125 +1,21 @@
-// timeline/csound.mjs — a Csound/vClick SCORE, compiled into timeline rows.
-//
-// The claim this file exists to make good on (demo/notes/uuu-positron.md §3):
-// a vClick score is a fine authoring format and a poor runtime one, and the
-// three places it runs out are all places this library already has an answer.
-//
-//   · No quotation. A score is flat events, so "that passage again, three
-//     times" has to be written out again — which is why vClick's README says
-//     every piece needs its own written-out score. Csound HAS the syntax for it
-//     (`m name` marks, `n name` repeats), and this compiler turns those into
-//     quotation geometry instead of duplicated lines.
-//   · Seek is not a property of the format. To start at bar 47 you need the
-//     STATE at bar 47 — which tempo is in force, what is still ringing. The
-//     score carries no fold; `deck.reduceAt(kind, pos)` computes one.
-//   · Tempo lives in the score, not the transport, so a client cannot derive
-//     "where are we now" for itself and the server must tell it — the network
-//     in the critical path of every beat. Compiled here ONCE into a beat↔ms map
-//     the client owns.
-//
-// WHAT A CSOUND SCORE IS, in the three statements that matter:
-//
-//     t 0 120  30 90        tempo: 120 bpm at beat 0, ramping to 90 at beat 30
-//     i 1  0.0  2.0  8000 440
-//       │   │    │    └────┴── p4, p5: whatever that instrument reads
-//       │   │    └── p3: duration, IN BEATS
-//       │   └── p2: start, IN BEATS, absolute within its section
-//       └── p1: which instrument
-//     s                     end of a section — and the start of a new clock
-//
-// P2 AND P3 ARE BEATS, NOT SECONDS. That is the whole reason this is a compiler
-// and not a parser: with a `t` statement the beat→second map is the integral of
-// 60/tempo(beat). Csound interpolates SECONDS PER BEAT linearly in beat, so
-// that integral is a TRAPEZOID of 60/tempo — not the logarithmic integral a
-// linear-in-tempo reading gives. Getting it wrong is silent: every note lands,
-// slightly late, and only an accelerando shows it. The default when a score
-// carries no `t` is 60 bpm, which is why so many scores read as if p2 were
-// seconds — at 60 bpm it is.
-//
-// AND A SECTION IS A NEW CLOCK. `s` does not merely restart p2 at zero: it
-// throws the tempo away. Everything below about sections is MEASURED against
-// csound 6.18 (`timeline/lab/csound-oracle.mjs`), because this file was 22/22
-// green for months with two real defects that only the reference could see —
-// a test that derives its expected value from the same formula the compiler
-// implements can catch a typo and can never catch a misreading (LESSONS #43).
-// What the reference says, at every onset of a three-section score:
-//
-//   1. The next section starts at the previous section's END TIME, in seconds.
-//   2. A section ENDS at the furthest of: every `i` statement's p2 + p3 (a
-//      negative p3 means "until turned off" and contributes only its p2),
-//      every `f` statement's p2, and the `s` statement's own argument if it
-//      has one — all of them in that section's beats, warped by that
-//      section's tempo. An empty section takes no time at all.
-//   3. Each section has its OWN tempo map, and it RESETS TO 60 BPM unless the
-//      section declares its own `t`. A `t` governs the whole section wherever
-//      in it it sits, and where a section has more than one, the last wins.
-//   4. A `t` whose first pair is not at beat 0 is ignored ENTIRELY — the
-//      section stays at 60 bpm. It is not held back to beat 0.
-//   5. `b`, the clock base, resets to 0 at `s`. It offsets in BEATS, and it
-//      offsets `f` statements as well as notes — but NOT the `s` argument.
-//   6. The `+` time carry resets at `s`, and so does `^`. The P-FIELD carry
-//      does not: `.` still carries p2 and p3 across the boundary, while p4
-//      and everything after it come back as 0. Nobody would guess that; it is
-//      what csound does.
-//
-// BEATS REPORTED HERE ARE GLOBAL. Sections are laid end to end on one beat
-// axis (`payload.beat`, `sections[i].fromBeat`), because a score document
-// carries one beat axis and a deck needs one position. The beat as the
-// musician WROTE it — section-local, starting again at zero — is
-// `payload.sectionBeat`. `compiled.tempo` is a single map over the global axis
-// that reproduces every row's millisecond, spelling each section boundary as
-// two points at the same beat: a piecewise-linear map's way of writing a jump.
+// A Csound/vClick score compiled to timeline rows: `m`/`n` become quotations, seek gets a fold, and
+// tempo becomes a beat-to-ms map the client owns. p2/p3 are beats; seconds per beat ramp linearly.
+// Sections (`s`) start new clocks; rules measured against csound 6.18 (lab/csound-oracle.mjs).
+// why: lessons/timeline-csound.md#header
 
 /** Tempo when a score declares none. At 60 bpm one beat is one second. */
 export const DEFAULT_BPM = 60;
 
-// ---------------------------------------------------------------------------
-// 1a. MACROS — `#define` / `$NAME`, because real scores do not start without it
-// ---------------------------------------------------------------------------
-//
-// 🔴 EVERY REAL vCLICK SCORE THREW HERE UNTIL 2026-09-14, AT LINE 12 OF LINE 12.
-// Both scores published in `tarmoj/vclick` open with `t 0 $REPTEMPO`, so the
-// tempo came back NaN and `tempoMap` threw before a single note was read. The
-// compiler had been 42/42 green for a week against fixtures written to please
-// it, and could not compile the only two real files in existence.
-//
-// ⚠️ EVERY RULE BELOW WAS MEASURED AGAINST `scsort` (csound 6.18.1), NOT READ
-// OFF THE MANUAL — that is this repo's rule about implementing somebody else's
-// format, and it is why several things the plan said to REFUSE are supported
-// here instead. `scsort` reads a score on stdin and prints it sorted and
-// tempo-warped, with p2 and p3 each as a (beats, seconds) pair, which makes it
-// a far better oracle than an orchestra that has to `prints` its own p-fields.
-//
-//   $NAME            ✅ 3          plain substitution
-//   $NAME.           ✅ 3          the dot TERMINATES the name and is consumed
-//   $M(5'99)         ✅ 5 … 99     arguments, separated by an apostrophe
-//   #define A #3# twice            ✅ the LAST definition wins
-//   a body over two lines          ✅ works, so the body is not line-bounded
-//   [$N/2] with N 4  ✅ 2          macros expand BEFORE brackets are evaluated
-//
-// 🔴 AND THE ONE THAT DECIDES THE ERROR HANDLING. An undefined `$NOPE` does not
-// leave itself in place and does not stop the score: MEASURED, `i 1 $NOPE 1 100`
-// sorts to a bare `i 1` — the macro AND THE REST OF THE LINE are gone — and
-// then csound's p-field carry refills p2/p3/p4 from the previous note. So a
-// mistyped macro name presents as a DUPLICATE NOTE, which is the worst
-// available shape: no gap, no throw, a plausible row in the right place. We
-// refuse it by name instead, because a compiler that reproduces that bug
-// faithfully is not being faithful to anything anyone wants.
-//
-// `#include` is recognised and NOT supported: it needs a filesystem, this runs
-// in a browser, and inventing a search path would be inventing semantics.
+// 1a. Macros, measured against `scsort`: $NAME, $NAME. (dot consumed), $M(a'b) arguments, the last
+// #define wins, bodies may span lines, macros expand before brackets. An undefined $NAME is refused
+// by name (csound drops the line and duplicates a note). #include is not supported.
+// why: lessons/timeline-csound.md#macros
 
 const MACRO_PASS_LIMIT = 50;
 
-/**
- * Expand `#define` macros. Returns the expanded text and any warnings.
- *
- * Expansion REPEATS TO A FIXED POINT because a macro body may name another
- * macro — `#define REPTEMPO #$TEMPO1#` is in both real scores, and a
- * single-pass substituter leaves `$TEMPO1` standing, which is exactly the
- * NaN that started this. The pass limit turns a cyclic definition into a named
- * failure rather than a hang.
- */
+// Expand #define macros to a fixed point (a body may name another macro), with a pass limit
+// so a cycle fails by name. Returns text and warnings.
+// why: lessons/timeline-csound.md#expand-macros
 export function expandMacros(text) {
   const warnings = [];
   const macros = new Map();                 // NAME -> { params, body }
@@ -166,9 +62,9 @@ export function expandMacros(text) {
         break;
       }
       j++;                                       // the closing '#'
-      // ⚠️ A REDEFINITION IS NOT AN ERROR AND THE LAST ONE WINS — measured, and
-      // it matters because vClick's server REWRITES `#define REPTEMPO` by hand
-      // to start from a bar, which would otherwise collide with the original.
+      // A redefinition is not an error; the last wins (vClick rewrites REPTEMPO to start from a
+      // bar).
+      // why: lessons/timeline-csound.md#redefine
       macros.set(name, { params, body });
       // keep the newlines the definition spanned, so every later line number
       // still names the line the musician typed
@@ -213,9 +109,8 @@ export function expandMacros(text) {
     const name = m[1];
     const def = macros.get(name);
     if (!def) {
-      // 🔴 Refused BY NAME rather than reproduced. See the block above: csound
-      // drops the rest of the line and the carry refills it, so the score plays
-      // a convincing wrong note instead of failing.
+      // Refused by name rather than reproduced: csound would play a convincing wrong note.
+      // why: lessons/timeline-csound.md#undefined
       warnings.push(`line ${at}: '${name}' is not defined — csound would drop `
         + 'the rest of this line and carry the previous note into it');
       src = src.slice(0, m.index) + src.slice(m.index + m[0].length - (m[3] ? 1 : 0));
@@ -251,33 +146,12 @@ export function expandMacros(text) {
   return { text: src, warnings };
 }
 
-// ---------------------------------------------------------------------------
-// 1b. SCORE EXPRESSIONS — `[8/3]`, and the silent zero they used to become
-// ---------------------------------------------------------------------------
-//
-// 🔴 A BRACKET IN p2 OR p3 WAS SILENTLY WRONG, WITH ZERO WARNINGS. `Number('[4/2]')`
-// is NaN, the p-field fell through to a string, and `Number(p[1]) || 0` made it
-// beat 0 — so a note landed at the top of the section and the run stayed green.
-// In the two real scores the brackets sit in p4 and p5, where they were carried
-// through verbatim and nothing was mistimed. That is LUCK, not a property:
-// `test.sco` writes `[16/3]` as a NUMBER OF BEATS (p4) in two bars, and one
-// edit moving that idea into p3 would have been a silent retime.
-//
-// ✅ MEASURED against scsort, all of them: `[1+2]` 3 · `[6-4]` 2 · `[2*3]` 6 ·
-// `[8/4]` 2 · `[2^3]` 8 · `[7%4]` 3 · `[[1+1]*[3-1]]` 4 · `[0-1]` -1 ·
-// `[-2+3]` 1. So nesting, both unary and binary minus, power and modulo are all
-// real, and `^` is POWER here even though it means something else entirely in
-// p2 outside brackets.
-//
-// ⚠️ `~` (a random number) is recognised and REFUSED: it is deliberately not
-// reproducible, and a compiler whose output changes between two runs of the
-// same score cannot be graded against anything, including itself.
+// 1b. Score expressions `[..]`, measured against scsort: + - * / ^ (power) % with nesting and unary
+// minus. `~` (random) is refused: unreproducible.
+// why: lessons/timeline-csound.md#expressions
 
-/**
- * Evaluate a Csound score expression. Returns a number, or `null` when the
- * expression is not one we will stand behind — the caller warns and keeps the
- * raw text, so nothing becomes a confident zero.
- */
+// Evaluate a score expression, or null when we will not stand behind it; the caller warns.
+// why: lessons/timeline-csound.md#eval-expr
 export function evalScoreExpr(raw) {
   const s = String(raw);
   if (!s.startsWith('[') || !s.endsWith(']')) return null;
@@ -330,15 +204,11 @@ export function evalScoreExpr(raw) {
   return (i === src.length && Number.isFinite(v)) ? v : null;
 }
 
-// ---------------------------------------------------------------------------
-// 1. PARSE — statements, in order, with their line numbers kept for messages.
-// ---------------------------------------------------------------------------
+// 1. Parse: statements in order, with line numbers.
+// why: lessons/timeline-csound.md#parse-banner
 
-/**
- * Split a score into statements. Comments (`;` to end of line, and `/* … *\/`)
- * are stripped; blank lines vanish; everything else keeps its line number so a
- * failure can name the line a musician typed.
- */
+// Split into statements; `;` and block comments stripped; each keeps its line number.
+// why: lessons/timeline-csound.md#parse
 export function parseCsoundScore(text) {
   const out = [];
   const src = String(text).replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -356,24 +226,13 @@ export function parseCsoundScore(text) {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// 2. TEMPO — the beat↔time map, and its exact integral.
-// ---------------------------------------------------------------------------
+// 2. Tempo: the beat-to-time map and its exact integral.
+// why: lessons/timeline-csound.md#tempo-banner
 
-/**
- * Build a tempo map from (beat, bpm) pairs.
- *
- * Before the first point and after the last, the tempo HOLDS — Csound does not
- * extrapolate a ramp past its end, and a score that ends mid-accelerando would
- * otherwise run away. TWO POINTS AT THE SAME BEAT are legal and mean a JUMP:
- * the second one wins from that beat on. That is how `csoundPart` writes a
- * section boundary onto one axis, and the sort below is stable (ES2019
- * guarantees it), so their written order is the order they take effect in.
- *
- * A map handed here is already valid. The rule that a `t` STATEMENT whose
- * first pair is not at beat 0 is ignored outright belongs to the statement,
- * not to the map, and lives in `compileCsound`.
- */
+// A tempo map from (beat, bpm) pairs; tempo holds past either end. Two points at one beat are a
+// jump,
+// the later wins (stable sort). The rule ignoring a `t` not at beat 0 lives in compileCsound.
+// why: lessons/timeline-csound.md#tempo-map
 export function tempoMap(pairs) {
   const pts = (pairs && pairs.length ? pairs : [[0, DEFAULT_BPM]])
     .map(([b, m]) => [Number(b), Number(m)])
@@ -394,14 +253,10 @@ export function tempoMap(pairs) {
       const b1 = next ? Math.min(next[0], beat) : beat;
       const span = b1 - b0;
       if (span <= 0) continue;
-      // SECONDS PER BEAT is what Csound interpolates linearly in beat — not the
-      // TEMPO. So elapsed time is the trapezoid of 60/tempo, not the logarithmic
-      // integral a linear-in-beat tempo would give. This is measured against the
-      // reference implementation (csound 6.18), not derived: on `t 0 120 30 90`
-      // Csound puts beat 30 at 17.500 s where the log form gives 17.261, and on
-      // `t 0 60 20 180` it puts beat 20 at 13.333 s against the log form's
-      // 10.986. Trapezoid matches all 15 onsets and durations of the oracle,
-      // including a four-point map, to nine decimal places.
+      // Csound ramps seconds per beat linearly, so elapsed time is a trapezoid of 60/tempo: on
+      // `t 0 120 30 90` beat 30 is at 17.500 s (the log form says 17.261). Matches the oracle to 9
+      // places.
+      // why: lessons/timeline-csound.md#trapezoid
       const s0 = 60 / m0;
       const s1 = next ? s0 + ((60 / next[1]) - s0) * (span / (next[0] - b0)) : s0;
       t += (span * (s0 + s1)) / 2;
@@ -410,12 +265,8 @@ export function tempoMap(pairs) {
     return t;
   };
 
-  /**
-   * Seconds per beat AT a beat — the same interpolation `secondsAt` integrates,
-   * evaluated instead of summed. Needed to cut a map at a section boundary that
-   * falls in the middle of a ramp: the tempo carried across the join is the
-   * interpolated one, not the last written point.
-   */
+  // Seconds per beat at a beat, for cutting a map mid-ramp.
+  // why: lessons/timeline-csound.md#spb-at
   const spbAt = (beat) => {
     let s = 60 / pts[0][1];
     for (let i = 0; i < pts.length; i++) {
@@ -453,26 +304,16 @@ export function tempoMap(pairs) {
   };
 }
 
-/**
- * A tempo map's points restricted to `[0, endBeat]`, with the tempo PINNED at
- * the end — the value `spbAt` interpolates there, so cutting mid-ramp carries
- * the tempo that was actually in force and not the last point written.
- */
+// A map's points in [0, endBeat], pinned at the end to the interpolated tempo.
+// why: lessons/timeline-csound.md#points-through
 function pointsThrough(tempo, endBeat) {
   const out = tempo.points.filter(([b]) => b < endBeat).map(([b, m]) => [b, m]);
   out.push([endBeat, tempo.bpmAt(endBeat)]);
   return out;
 }
 
-/**
- * Every section's map, shifted onto ONE beat axis and joined.
- *
- * Each join is TWO POINTS AT THE SAME BEAT — the outgoing tempo and the
- * incoming one — because that is how a piecewise-linear map writes a
- * discontinuity, and a section boundary is exactly that. A single-section
- * score gets its own points back unchanged, which is why every existing
- * document is byte-identical after this.
- */
+// Every section's map on one beat axis, each join two points at one beat; one section is unchanged.
+// why: lessons/timeline-csound.md#global-tempo
 function globalTempoPoints(sections) {
   const points = [];
   for (let i = 0; i < sections.length; i++) {
@@ -486,15 +327,9 @@ function globalTempoPoints(sections) {
   return points.length ? points : [[0, DEFAULT_BPM]];
 }
 
-/**
- * The tempo map ONE section declares, from the `t` statements inside it.
- *
- * Measured rules, all four of them counter-intuitive enough to have cost a
- * probe each: a section with no `t` is 60 bpm even when the section before it
- * had one; a `t` governs its whole section wherever it sits; the last `t` in
- * a section wins; and a `t` whose first pair is not at beat 0 is discarded
- * whole rather than held back to zero.
- */
+// One section's map: 60 bpm without its own `t`; a `t` governs its whole section; the last wins;
+// a `t` whose first pair is not at beat 0 is discarded whole.
+// why: lessons/timeline-csound.md#section-tempo
 function sectionTempo(sts, warnings) {
   const ts = sts.filter((s) => s.op === 't');
   if (!ts.length) return tempoMap([]);
@@ -520,45 +355,30 @@ function sectionTempo(sts, warnings) {
   return tempoMap(pairs);
 }
 
-// ---------------------------------------------------------------------------
-// 3. COMPILE — statements + tempo into rows a deck can hold.
-// ---------------------------------------------------------------------------
+// 3. Compile: statements and tempo into rows.
+// why: lessons/timeline-csound.md#compile-banner
 
-/**
- * @param text  a Csound score
- * @param opts.kind    deck kind for the emitted rows (default 'note')
- * @param opts.expand  expand `n` repeats into rows as well as reporting them
- *                     (default true — a deck needs rows; the quotations are
- *                     reported either way so a SCORE can carry structure)
- *
- * @returns {{tempo, items, sections, repeats, warnings, durationMs}}
- *   `items[].at` and `durationMs` are milliseconds from the start of the score.
- *   `items[].payload.beat` is on the GLOBAL beat axis, `payload.sectionBeat` is
- *   the beat as written, `payload.section` the section's index.
- *   `sections[i]` is `{ index, fromBeat, toBeat, startMs, endMs, points, tempo }`
- *   — `fromBeat`/`toBeat` global, `points`/`tempo` that section's own map, and
- *   `startMs`/`endMs` the thing a global beat cannot give you, since the clock
- *   restarts at every `s`.
- */
+// compileCsound(text, { kind = 'note', expand = true }) -> {tempo, items, sections, repeats,
+// warnings, durationMs}. `at` and durationMs in ms; payload.beat global, sectionBeat as written;
+// sections[i] = { index, fromBeat, toBeat, startMs, endMs, points, tempo }.
+// why: lessons/timeline-csound.md#compile
 export function compileCsound(text, { kind = 'note', expand = true } = {}) {
-  // ⚠️ MACROS FIRST, AND THE ORDER IS MEASURED, NOT CHOSEN: `[$N/2]` with N 4
-  // evaluates to 2, so a macro can be an OPERAND of a bracket and expansion has
-  // to have finished before any expression is looked at.
+  // Macros first: `[$N/2]` with N 4 is 2, so expansion finishes before brackets.
+  // why: lessons/timeline-csound.md#macros-first
   const expanded = expandMacros(text);
   const sts = parseCsoundScore(expanded.text);
   const warnings = [...expanded.warnings];
 
-  // ── Pass 1: cut into SECTIONS. This has to happen before any p2 becomes a
-  // time, because a `t` governs its whole section from wherever it appears in
-  // it — including from after the notes it governs.
+  // Pass 1: cut into sections before any p2 becomes a time; a `t` governs from anywhere in its
+  // section.
+  // why: lessons/timeline-csound.md#pass-1
   const groups = [];
   let group = { sts: [], lenBeats: null };
   for (const s of sts) {
     if (s.op === 'e') break;                       // `e` ends the score; the rest is dropped
     if (s.op === 's') {
-      // `s 10` sets this section's length to beat 10. It is a floor, not an
-      // override — a note that runs past it still holds the section open — and
-      // unlike an `f` it is NOT shifted by `b`.
+      // `s 10` sets a floor on the section's length, not shifted by `b`.
+      // why: lessons/timeline-csound.md#s-arg
       if (s.args.length) {
         const n = Number(s.args[0]);
         if (Number.isFinite(n)) group.lenBeats = n;
@@ -576,16 +396,10 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
   const sections = [];
   const repeats = [];
 
-  // The P-FIELD carry SURVIVES a section boundary for p2 and p3 and is zeroed
-  // for p4 and everything after it — measured, twice, because it reads like a
-  // bug in the reference and is not. So it lives out here, while `+`, `^` and
-  // `b` are declared per section and therefore reset.
-  //
-  // `carryLen` is separate and DOES reset at `s`, because the two carries are
-  // not the same mechanism. A p-field simply LEFT OFF the end of a statement
-  // is carried too — `i 1 0 1 777 888` then `i 1 2 1` gives the second note
-  // p4 777 and p5 888 — but that implicit carry stops dead at a section, where
-  // an explicit `.` in p2 or p3 still crosses. Measured both ways.
+  // The p-field carry crosses a section for p2 and p3 and zeroes p4 onward (measured). `carryLen`,
+  // the
+  // implicit carry of fields left off the end, resets at `s`.
+  // why: lessons/timeline-csound.md#carry
   const carry = new Map();          // p1 -> that instrument's last p-field array
   const carryLen = new Map();       // p1 -> how many p-fields it wrote
   let startMs = 0;                  // where this section begins, in ms
@@ -598,7 +412,7 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
     const prevEnd = new Map();      // p1 -> where its last note ended, for `+`
     const secItems = [];
     let prevAny = null;             // the previous i statement IN THIS SECTION, for `^`
-    let base = 0;                   // `b` — an offset added to every p2, in beats
+    let base = 0;                   // `b`, an offset added to every p2, in beats; why: lessons/timeline-csound.md#base
     let endBeat = 0;                // furthest the written material reaches, LOCAL beats
 
     const push = (p, atBeat, durBeats, line) => {
@@ -609,8 +423,8 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
         at, kind,
         payload: {
           instr: p[0],
-          beat: fromBeat + atBeat,          // global — what a document and a deck read
-          sectionBeat: atBeat,              // local — what the musician wrote
+          beat: fromBeat + atBeat,          // global, what a document and a deck read; why: lessons/timeline-csound.md#beat
+          sectionBeat: atBeat,              // local, what the musician wrote; why: lessons/timeline-csound.md#section-beat
           section: si,
           durBeats,
           durMs: end - at,
@@ -630,9 +444,8 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
           const p1 = String(s.args[0]);
           const carried = carry.get(p1) || [];
           const p = s.args.map((raw, idx) => {
-            // `.` carries the same p-field from the previous note OF THIS
-            // INSTRUMENT — not the previous line, which is what makes a carried
-            // score readable when two instruments interleave.
+            // `.` carries from the previous note of this instrument, not the previous line.
+            // why: lessons/timeline-csound.md#dot
             if (raw === '.') {
               if (carried[idx] === undefined) {
                 warnings.push(`line ${s.line}: '.' in p${idx + 1} with nothing to carry`);
@@ -641,14 +454,10 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
               return carried[idx];
             }
             if (idx === 1) {
-              // p2 shorthands, and the three do NOT share a reference note —
-              // measured against csound 6.18 rather than assumed. `+` is
-              // "where the previous note OF THIS INSTRUMENT ended"; `^+x` /
-              // `^-x` are relative to where the IMMEDIATELY PRECEDING
-              // STATEMENT started, whatever instrument that was. On
-              //     i 1 0 2 / i 2 5 2 / i 1 ^+0.5 .
-              // Csound answers 5.5, not 0.5. Both reset at `s`, where `.`
-              // does not.
+              // `+` is where this instrument's previous note ended; `^+x` is relative to the
+              // previous statement's start, any instrument (i 1 0 2 / i 2 5 2 / i 1 ^+0.5 . gives
+              // 5.5). Both reset at `s`.
+              // why: lessons/timeline-csound.md#plus-caret
               if (raw === '+') return prevEnd.get(p1) ?? 0;
               const rel = /^\^([+-])?([\d.]+)$/.exec(raw);
               if (rel) {
@@ -656,11 +465,9 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
                 return (prevAny?.[1] ?? 0) + delta;
               }
             }
-            // A SCORE EXPRESSION, `[8/3]`. Until 2026-09-14 this fell straight
-            // through to the string below and `Number(p[1]) || 0` turned it into
-            // beat 0 with no warning — see §1b. Evaluated here so p2 and p3 are
-            // right; a form we will not stand behind returns null and is warned
-            // about rather than guessed at.
+            // A score expression in p2/p3, evaluated; an unsupported form returns null and is
+            // warned about.
+            // why: lessons/timeline-csound.md#bracket
             if (raw.startsWith('[')) {
               const v = evalScoreExpr(raw);
               if (v !== null) return v;
@@ -672,9 +479,9 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
             const n = Number(raw);
             return Number.isFinite(n) ? n : raw;      // named instruments stay strings
           });
-          // p-fields left off the end are carried from this instrument's
-          // previous note IN THIS SECTION — `carryLen` is 0 after an `s`, so
-          // nothing crosses.
+          // Fields left off the end carry from this instrument's previous note in this section
+          // only.
+          // why: lessons/timeline-csound.md#trailing-carry
           for (let idx = p.length; idx < (carryLen.get(p1) || 0); idx++) p[idx] = carried[idx];
           carry.set(p1, p);
           carryLen.set(p1, p.length);
@@ -687,24 +494,14 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
         }
         case 't': break;                                    // handled by sectionTempo
         case 'b': base = Number(s.args[0]) || 0; break;     // clock base offset, in beats
-        // A mark names WHERE THE WRITTEN MATERIAL HAS REACHED, which is the end
-        // of the last note so far — not the parse position, and not the section
-        // start. `endBeat` already tracks exactly that.
+        // A mark names where the written material has reached: the end of the last note so far.
+        // why: lessons/timeline-csound.md#mark
         case 'm': marks.set(s.args[0], endBeat); break;
         case 'n': {
-          // THE QUOTATION. `n name` replays the span from the mark to HERE. That
-          // is a reference, not a copy, and reporting it as one is the whole
-          // argument: a repeat that is a value can be seeked into, counted, and
-          // rewritten without touching the notes it quotes.
-          //
-          // KNOWN DIVERGENCE, reported by the oracle rather than hidden: csound
-          // 6.18's `n` is not this. It is a REWIND OF THE SOURCE — it re-reads
-          // the statements from the mark, and it only fires when the `n` sits
-          // at a section boundary, so `m … i … n` inside one section replays
-          // NOTHING there (and trips an internal error in its backtrace). The
-          // span this reports is the span a musician means; matching csound
-          // would mean giving up the quotation, so the difference is stated
-          // instead of split.
+          // `n name` is a quotation from the mark to here, reported as a reference. csound 6.18's
+          // `n` rewinds
+          // the source and only fires at a section boundary; the difference is stated, not split.
+          // why: lessons/timeline-csound.md#quotation
           const from = marks.get(s.args[0]);
           if (from === undefined) {
             warnings.push(`line ${s.line}: n '${s.args[0]}' has no matching m`);
@@ -724,10 +521,9 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
             line: s.line,
           });
           if (expand) {
-            // A quotation played, rather than quoted: same rows, shifted. Note the
-            // shift is in BEATS and re-mapped through the tempo — shifting the
-            // MILLISECONDS would silently transpose the passage into whatever
-            // tempo happens to be in force where it lands.
+            // A played quotation shifts in beats and re-maps through the tempo, never in
+            // milliseconds.
+            // why: lessons/timeline-csound.md#shift
             const src = secItems.filter((it) => it.payload.sectionBeat >= from && it.payload.sectionBeat < to);
             for (const it of src) {
               push(it.payload.p, it.payload.sectionBeat - from + atBeat, it.payload.durBeats, it.payload.line);
@@ -736,10 +532,9 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
           break;
         }
         case 'f': {
-          // An f-table is ORCHESTRA-side and carries no timeline row — but its
-          // p2 HOLDS THE SECTION OPEN to that beat, which is the whole point of
-          // the `f 0 <n>` idiom, and `b` shifts it exactly like a note's p2.
-          // Measured: any p1, not only `f 0`.
+          // An f statement makes no row but holds the section open to its p2, shifted by `b`; any
+          // p1.
+          // why: lessons/timeline-csound.md#f-table
           const at = Number(s.args[1]);
           if (Number.isFinite(at) && base + at > endBeat) {
             endBeat = base + at;
@@ -751,10 +546,8 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
           break;
         }
         case 'a': case 'v': case 'r': case '}': case '{':
-          // Time warps and macro loops are authoring sugar; they carry no
-          // timeline row. Recorded as warnings rather than dropped in silence,
-          // because a score that leans on them compiles to something quietly
-          // shorter than it reads.
+          // Time warps and loops are warned about, not dropped silently.
+          // why: lessons/timeline-csound.md#ignored
           warnings.push(`line ${s.line}: '${s.op}' statement ignored (no timeline row)`);
           break;
         default:
@@ -775,18 +568,16 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
 
     startMs = endMs;
     fromBeat += endBeat;
-    // The carry across the boundary: p2 and p3 survive an explicit `.`, p4 and
-    // after come back as 0, and a field left off the end carries nothing at all
-    // (`carryLen` to 0). `prevEnd`, `prevAny` and `base` are per-section and
-    // reset with the loop.
+    // Across the boundary p2 and p3 carry, p4 onward reset to 0, implicit carry stops; per-section
+    // state resets.
+    // why: lessons/timeline-csound.md#boundary-carry
     for (const [k, p] of carry) carry.set(k, p.map((v, i) => (i <= 2 ? v : 0)));
     carryLen.clear();
   }
 
   items.sort((a, b) => a.at - b.at || a.payload.line - b.payload.line);
-  // The last section's end is at or past every note's end, so this is the same
-  // number as before for a score that ends on a note — and the right one for a
-  // score held open by `f 0` or by `s <n>`.
+  // The last section's end, so `f 0` and `s <n>` holds count.
+  // why: lessons/timeline-csound.md#duration
   const durationMs = Math.max(
     sections[sections.length - 1]?.endMs || 0,
     ...items.map((it) => it.at + (it.payload.durMs || 0)),
@@ -796,20 +587,9 @@ export function compileCsound(text, { kind = 'note', expand = true } = {}) {
   return { tempo: tempoMap(globalTempoPoints(sections)), items, sections, repeats, warnings, durationMs };
 }
 
-/**
- * The repeats as SCORE VALUES — one quotation per `n`, naming the deck the
- * quoted span lives in. This is the half of the mapping that a stored score
- * carries: `score({ quotations })` round-trips to JSON, `nest.add()` plays it,
- * and neither has to see the notes.
- *
- * In MILLISECONDS, because `score()` is an arrangement and an arrangement runs
- * in ms — `scoreDoc()` is the one that is in beats, and sound builds its
- * `uses` from `repeats[].inBeat/outBeat/atBeat` for that reason.
- *
- * Takes the quotation constructor rather than importing score.mjs, so this
- * module stays a pure compiler with no dependency on the score format's
- * version — pass `quotation` from timeline/score.mjs.
- */
+// The repeats as score quotations, in ms (an arrangement runs in ms). Takes `quotation` from
+// timeline/score.mjs as an argument, so this module stays a pure compiler.
+// why: lessons/timeline-csound.md#repeats
 export function repeatsAsQuotations(compiled, { ref, quotation }) {
   if (!ref) throw new Error('repeatsAsQuotations: `ref` names the deck the span lives in');
   if (typeof quotation !== 'function') throw new Error('repeatsAsQuotations: pass quotation from timeline/score.mjs');
@@ -823,31 +603,10 @@ export function repeatsAsQuotations(compiled, { ref, quotation }) {
   }));
 }
 
-/**
- * A Csound score as a score-document PART (plans/plan-score.md P1).
- *
- * `compileCsound` already computes everything this needs; the only work here is
- * re-shaping it into the container's envelope, which is deliberately narrow:
- * when, how long, what kind, which line. The p-fields go under `payload`
- * VERBATIM. There is no attempt to name p5 "frequency" or p4 "amplitude" —
- * only the instrument knows, and a container that guessed would be lying in a
- * field a reader would trust.
- *
- * IN BEATS, because that is what the document stores and what a Csound score
- * is written in. A document has ONE beat axis and csound's sections each start
- * again at zero, so `at` is the GLOBAL beat and the tempo it comes back with
- * carries a doubled point at every section boundary to spell the reset. The
- * self-test asserts that `partItems` on this document reproduces
- * `compileCsound`'s milliseconds exactly, rather than assuming it.
- *
- * `expand: false` on purpose: a repeat belongs in `uses` as one entry with a
- * count, and expanding it into rows here would throw away the only thing this
- * format has over a flat event list.
- *
- * @returns {{part, tempo, sections, repeats, durationMs}} — `tempo` is the
- *          [beat, bpm] pair list the document carries, `repeats` the `n`
- *          statements ready for `repeatsAsQuotations`.
- */
+// A score as a document part in global beats -> {part, tempo, sections, repeats, durationMs}.
+// p-fields verbatim under `payload`, a doubled tempo point per section start, and `expand: false`
+// so a repeat stays one `uses` entry. The self-test checks its ms against compileCsound.
+// why: lessons/timeline-csound.md#csound-part
 export function csoundPart(text, { kind = 'note' } = {}) {
   const compiled = compileCsound(text, { kind, expand: false });
   const rows = compiled.items.map((it, i) => ({

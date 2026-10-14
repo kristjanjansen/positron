@@ -1,64 +1,15 @@
-// timeline/score.mjs — A QUOTATION IS A VALUE.
-//
-// plan-timeline §5 C10 draws the boundary: *the timeline is a TRACE format,
-// never an authoring format; a score is a PROGRAM that QUOTES traces.* §7.7
-// names the seam that made C10 unbuildable: **a quotation was not yet a value.**
-// `nest.add({deck, in, out, rate})` mutated a nest, took a live object for its
-// `deck`, and left nothing behind that a stored score could carry. You could
-// build an arrangement. You could not SAVE one, mail one, diff one, or load one
-// in a process that had never seen the decks.
-//
-// This module is that value, and the two functions that close the loop:
-//
-//     const q = quotation({ ref: 'kurenniemi-1972', at: 5000, rate: 1,
-//                           in: { mark: 'chorus-3' }, out: { mark: 'chorus-4' },
-//                           provenance: { source, asserter, certainty: [...] } });
-//     const s = nest.toScore({ id: 'ekstra-1' });      // arrangement -> value
-//     const json = JSON.stringify(s);                  // value -> bytes
-//     loadScore(JSON.parse(json), (ref) => decks[ref], { parent });  // bytes -> arrangement
-//
-// THREE PROPERTIES, and they are the whole point:
-//
-// 1. **A quotation is a VALUE.** Frozen, structurally comparable
-//    (`quotationEquals`), JSON round-trippable with no loss. It names its source
-//    by IDENTITY (`ref`, a string) and never by object, so the value outlives
-//    the process that made it. `resolve` is the only place a ref becomes a deck.
-//
-// 2. **`in`/`out` may be MARKS, not numbers.** `{mark: 'chorus-3'}` is resolved
-//    against the child's own `mark` lane AT LOAD TIME. A number says "1200 ms
-//    into the tape"; a mark says "the third chorus". When the source is re-cut —
-//    a leader trimmed, a restoration inserted, the tape re-transferred — the
-//    numbers are silently wrong and the marks are silently right. That is the
-//    seam that lets a score survive its source. Numeric in/out keeps working
-//    unchanged, and is what you get when you never asked for more.
-//
-// 3. **Provenance survives the door.** `exportProvenance()` emits the three
-//    carriers the survey found (research/browser-av-editors-wide-2026-08.md §4):
-//    C2PA `Action.changes[].regionOfInterest` + `reviewRatings`, HLS
-//    `EXT-X-DATERANGE` with `X-` attributes, and OTIO namespaced per-clip
-//    metadata. We emit STRUCTURES, validated against published field names. We
-//    do not sign, and `exportProvenance().caveats` says so in every document.
-//
-// The certainty model is TEI's, because TEI is the only standard that has both
-// certainty and media time: `@cert` + `@resp` + — the sleeper — **`@locus`**,
-// which separates uncertainty about the BOUNDARY (`start`/`end`) from
-// uncertainty about the IDENTITY (`name`). "I am 0.95 this is the Kurenniemi
-// segment and 0.6 on where it starts" is one sentence in TEI and is
-// inexpressible in C2PA, PROV-O, Web Annotation, or OTIO. We keep it in the
-// value and report what each carrier loses.
-//
-// Plain ESM, browser+node, no deps beyond the library itself.
+// A quotation is a value: frozen, JSON-safe, naming its source by `ref`. `in`/`out`
+// may be marks ({mark}) resolved at load, so a score survives a re-cut. nest.toScore() saves an
+// arrangement, loadScore() rebuilds it; exportProvenance() emits unsigned C2PA, HLS, OTIO.
+// why: lessons/timeline-score.md#header
 
 import { createNest } from './nested.mjs';
 
 export const SCORE_VERSION = 1;
 export const NS = 'org.positron.timeline';
 
-// ---------------------------------------------------------------------------
-// 1. DECK IDENTITY — a ref is a string, and a deck is an object. The WeakMap is
-//    the only bridge, and it is deliberately one-directional: a score never
-//    holds a deck, and a deck never learns which scores quote it.
-// ---------------------------------------------------------------------------
+// 1. Deck identity: a WeakMap from deck to ref, one way; a score never holds a deck.
+// why: lessons/timeline-score.md#refs
 const REFS = new WeakMap();     // deck -> ref
 const MARKS = new WeakMap();    // deck -> [{id, at, label}]  (registry fallback)
 
@@ -75,19 +26,9 @@ export function refDeck(deck, ref) {
 }
 export function deckRef(deck) { return (deck && REFS.get(deck)) || null; }
 
-// ---------------------------------------------------------------------------
-// 2. MARKS — content addressing, minimally.
-//
-//    A deck exposes marks in whichever of three ways it already can:
-//      a. a real LANE of kind `mark` (`deck.schedule({at, kind:'mark', id,
-//         payload:{label}})`) — the native form, because then a mark is an event
-//         like everything else, moves with a re-cut, and is visible in window();
-//      b. `deck.marks` / `deck.marks()` — for decks built by an adapter that
-//         already has its own mark list;
-//      c. `registerMarks(deck, [...])` — the escape hatch for a deck you do not
-//         own (a media element wrapper).
-//    All three normalise to `{id, at, label}`.
-// ---------------------------------------------------------------------------
+// 2. Marks, from a `mark` lane, `deck.marks`, or registerMarks(deck, [...]), normalised to {id, at,
+// label}.
+// why: lessons/timeline-score.md#marks
 
 export function registerMarks(deck, marks) {
   MARKS.set(deck, normMarks(marks));
@@ -121,13 +62,9 @@ export function marksOf(deck, { kind = 'mark' } = {}) {
 /** Is this in/out a mark address rather than a number? */
 export function isMarkAddress(a) { return !!a && typeof a === 'object' && typeof a.mark === 'string'; }
 
-/**
- * Resolve one in/out address against a deck. Numbers pass through untouched —
- * that is the "numeric in/out working unchanged" guarantee.
- *
- * @returns {{at:number, address, mark:?object, matchedBy:?string, offset:number,
- *            wasAt:?number, moved:?{from:number,to:number,deltaMs:number}}}
- */
+// Resolve one in/out address; numbers pass through. Returns {at, address, mark, matchedBy, offset,
+// wasAt, moved}.
+// why: lessons/timeline-score.md#resolve-address
 export function resolveAddress(deck, address, { kind = 'mark', where = 'in' } = {}) {
   if (typeof address === 'number' || typeof address === 'string') {
     const n = Number(address);
@@ -147,18 +84,16 @@ export function resolveAddress(deck, address, { kind = 'mark', where = 'in' } = 
   const offset = Number(address.offset || 0);
   if (!Number.isFinite(offset)) throw new Error(`quotation.${where}: mark offset must be finite`);
   const at = hit.at + offset;
-  // `wasAt` is what the mark resolved to when the score was WRITTEN. It is
-  // forensic only — never used to position anything — and it is how a load can
-  // say out loud "this mark moved 300 ms since you saved this".
+  // `wasAt` is forensic only: it lets a load report how far a mark moved.
+  // why: lessons/timeline-score.md#was-at
   const wasAt = Number.isFinite(address.wasAt) ? Number(address.wasAt) : null;
   const moved = wasAt !== null && Math.abs(wasAt - at) > 1e-9
     ? { from: wasAt, to: at, deltaMs: +(at - wasAt).toFixed(6) } : null;
   return { at, address: { ...address, offset: offset || undefined }, mark: hit, matchedBy, offset, wasAt, moved };
 }
 
-// ---------------------------------------------------------------------------
-// 3. THE QUOTATION VALUE
-// ---------------------------------------------------------------------------
+// 3. The quotation value.
+// why: lessons/timeline-score.md#quotation-banner
 
 const LOCI = new Set(['name', 'start', 'end', 'location', 'value']);   // TEI @locus, verbatim
 
@@ -206,26 +141,9 @@ function normProvenance(p, where) {
   return Object.keys(out).length ? out : null;
 }
 
-// --- §8: REPEAT — the smallest program that quotes a trace -----------------
-//
-// plan-timeline §8.1: a loop is AUTHORING ("do this again" is an instruction,
-// not an observation), so it is a SCORE concept and never a log concept. The
-// log of a looped performance holds N repetitions at N timestamps, because that
-// is what happened. The loop lives HERE, beside {ref, in, out, rate}, as one
-// more field of the quotation value — which makes a loop *a quotation with
-// repetition*, the smallest possible program that quotes a trace.
-//
-// §8.7 asked "count, duration, or infinite?" and guessed "probably all three".
-// All three, with one canonical spelling each:
-//     repeat: 7               a COUNT — 7 passes of [in, out)
-//     repeat: {untilMs: n}    a DURATION in PARENT ms; the last pass may be CUT
-//     repeat: 'infinite'      until something stops it — and §8.7's other two
-//                             questions (the store, the renderer) are entirely
-//                             about this value.
-// `repeat: 1` is "played once", which is the absence of a loop, so it
-// normalises AWAY: quotation({…, repeat: 1}) and quotation({…}) are the same
-// value and compare equal. That keeps `repeat` a field that appears only when
-// it changes something.
+// A loop is authoring, so it lives on the quotation: repeat 7 (count), {untilMs} (parent ms, the
+// last pass may be cut) or 'infinite'. repeat 1 normalises away.
+// why: lessons/timeline-score.md#repeat
 
 /** 'infinite' | positive integer | {untilMs} -> the canonical stored form. */
 export function normalizeRepeat(r, where = 'quotation.repeat') { return normRepeat(r, where); }
@@ -247,23 +165,9 @@ function normRepeat(r, where) {
   throw new Error(`${where}: must be a positive integer count, {untilMs:n}, or 'infinite' — got ${JSON.stringify(r)}`);
 }
 
-/**
- * §8.2, THE MAP: `childPos = in + ((parentPos − at)·rate) mod (out − in)` —
- * the fragment map with **modulo instead of clamp**. One function, exported, so
- * the nest, the tests and a client all phrase the loop the same way.
- *
- * @param x           (parentPos − at) · rate — elapsed in the CHILD's domain
- * @param L           out − in, the loop length in the child's domain
- * @param childTotal  the child-domain total this loop is allowed to consume
- *                    (iterations·L, or Infinity)
- * @returns {{iter, off, x, past}} `off` ∈ [0, L]; `iter` is 0-based.
- *
- * The one non-obvious clause: at the very END (x = childTotal, an exact
- * multiple of L) the modulo says 0, which would park the child at `in` after
- * its last pass. Rule 7c says `out` IS the child's end, so the final instant
- * resolves to (iter = n−1, off = L) instead — the loop leaves through the same
- * door a single pass leaves through.
- */
+// childPos = in + ((parentPos - at) * rate) mod (out - in). loopPhase(x, L, childTotal) ->
+// {iter, off, x, past}; at the exact end it resolves to (n-1, L) so the loop leaves through `out`.
+// why: lessons/timeline-score.md#loop-phase
 export function loopPhase(x, L, childTotal = Infinity) {
   if (!(L > 0)) throw new Error(`loopPhase: the loop length (out - in) must be positive, got ${L}`);
   if (!(x > 0)) return { iter: 0, off: 0, x: 0, past: x < 0 };
@@ -277,12 +181,9 @@ export function loopPhase(x, L, childTotal = Infinity) {
   return { iter, off, x: xx, past };
 }
 
-/**
- * The PARENT-time geometry a `repeat` implies. Everything the nest, the
- * renderer and the store need to answer §8.7 is one call.
- * @returns {{loop, L, onePassMs, iterations, parentDurMs, childTotal,
- *            unbounded, partialLast}}
- */
+// The parent-time geometry of a repeat: {loop, L, onePassMs, iterations, parentDurMs, childTotal,
+// unbounded, partialLast}.
+// why: lessons/timeline-score.md#geometry
 export function repeatGeometry({ in: cin = 0, out: cout, rate = 1, repeat } = {}) {
   const L = Number(cout) - Number(cin);
   if (!(L > 0)) throw new Error(`repeatGeometry: out (${cout}) must be strictly after in (${cin})`);
@@ -317,18 +218,9 @@ function normAddress(a, where) {
   throw new Error(`${where}: must be a number or {mark:'id', offset?, wasAt?}, got ${JSON.stringify(a)}`);
 }
 
-/**
- * Build a quotation VALUE. Frozen; no live references; JSON-safe.
- *
- * @param spec {id?, ref, at?, rate?, in?, out?, repeat?, master?, provenance?, meta?}
- *        `ref`  names the quoted deck by IDENTITY (a string), never by object.
- *        `in`/`out` are numbers in the child's domain, or `{mark:'id'}`.
- *        `at`   is the placement in the PARENT's domain.
- *        `repeat` is §8: a count, `{untilMs}`, or `'infinite'`. Omitted (or 1)
- *               is one pass, i.e. no loop, and the field does not appear.
- *        Omitting `in`/`out` quotes the child's whole range — rule 1 is still
- *        the special case of rule 7.
- */
+// quotation({ id?, ref, at?, rate?, in?, out?, repeat?, master?, provenance?, meta? }): frozen and
+// JSON-safe; `at` in the parent's domain, in/out numbers or {mark}; omitted in/out quote the whole.
+// why: lessons/timeline-score.md#quotation
 export function quotation(spec = {}) {
   if (!spec || typeof spec !== 'object') throw new Error('quotation(spec) needs an object');
   const ref = spec.ref !== undefined ? String(spec.ref) : (spec.deck ? deckRef(spec.deck) : null);
@@ -341,10 +233,8 @@ export function quotation(spec = {}) {
   if (!(rate > 0)) throw new Error('quotation: `rate` must be positive');
   const q = clean({
     v: SCORE_VERSION,
-    // `== null` on purpose: an ABSENT id and a null id are the same absence,
-    // and `String(null)` is the string "null" — which round-tripped an
-    // anonymous quotation into one named "null" and broke byte-identity on the
-    // second pass. Found by the §8 repeat round-trip; the bug predates it.
+    // `== null`: String(null) is "null" and broke byte-identity on a second round trip.
+    // why: lessons/timeline-score.md#null-id
     id: spec.id == null ? null : String(spec.id),
     ref, at, rate,
     in: normAddress(spec.in, 'quotation.in'),
@@ -362,13 +252,13 @@ export function isQuotation(x) {
     && typeof x.at === 'number' && typeof x.rate === 'number';
 }
 
-/** Canonical (key-sorted) JSON — the identity of a quotation as a value. */
+// Canonical, key-sorted JSON: a quotation's identity as a value.
+// why: lessons/timeline-score.md#key
 export function quotationKey(q) { return canonical(q); }
 export function quotationEquals(a, b) { return canonical(a) === canonical(b); }
 
-// ---------------------------------------------------------------------------
-// 4. THE SCORE VALUE
-// ---------------------------------------------------------------------------
+// 4. The score value.
+// why: lessons/timeline-score.md#score-banner
 
 /** A score is a program: an id, a list of quotations, and metadata. Nothing in
  *  it is a live object, so the whole thing is `JSON.stringify`-able and the
@@ -392,9 +282,8 @@ export function score(spec = {}) {
 export function isScore(x) { return !!x && typeof x === 'object' && x.v === SCORE_VERSION && Array.isArray(x.quotations); }
 export function scoreToJSON(s, space) { return JSON.stringify(s, null, space); }
 
-/** Total parse: every failure names the field. A score that parses is a score
- *  that will load, modulo refs the resolver cannot supply and marks the source
- *  no longer carries — the two failures that are about the WORLD, not the file. */
+// A total parse; every failure names its field.
+// why: lessons/timeline-score.md#parse-score
 export function parseScore(input) {
   const raw = typeof input === 'string' ? JSON.parse(input) : input;
   if (!raw || typeof raw !== 'object') throw new Error('parseScore: not an object');
@@ -405,24 +294,16 @@ export function parseScore(input) {
   }) });
 }
 
-/** Every ref a score needs — the manifest a loader must be able to supply. */
+// Every ref a score needs, for the loader to supply.
+// why: lessons/timeline-score.md#score-refs
 export function scoreRefs(s) { return [...new Set(s.quotations.map((q) => q.ref))]; }
 
-// ---------------------------------------------------------------------------
-// 5. LOAD — the other half of the round trip.
-// ---------------------------------------------------------------------------
+// 5. Load.
+// why: lessons/timeline-score.md#load-banner
 
-/**
- * Instantiate a score as a live arrangement.
- *
- * @param s        a score value (or its JSON text)
- * @param resolve  (ref, quotation) -> deck. THE ONLY place a ref becomes an
- *                 object. A process that has never seen these decks needs
- *                 nothing else.
- * @param opts     {parent, nest, autoRange, markKind, ...nestOpts}
- * @returns {{nest, spans, report}} — `report.marks` carries every mark that
- *          resolved, and every mark that MOVED since the score was written.
- */
+// loadScore(score or JSON, resolve(ref, q) -> deck, { parent, nest, autoRange, markKind, ... })
+// -> {nest, spans, report}; report.marks lists resolved and moved marks.
+// why: lessons/timeline-score.md#load-score
 export function loadScore(s, resolve, opts = {}) {
   const sc = typeof s === 'string' || !isScore(s) ? parseScore(s) : s;
   if (typeof resolve !== 'function')
@@ -455,18 +336,10 @@ export function loadScore(s, resolve, opts = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 6. PROVENANCE EXPORT — three carriers.
-//
-// The survey's finding (research/browser-av-editors-wide-2026-08.md §4b) is the
-// design constraint: **nobody writes time-ranged provenance.** C2PA has had the
-// fields since 2.x, the reference SDK ships one fixture with an EMPTY time map,
-// the official Verify UI has zero `temporal` code paths, and the conformance
-// program never tests it. Premiere marks generated frames in its own UI and its
-// exported credential collapses to per-clip. So: we emit the structures, we
-// validate them against published field names, and every document carries its
-// own `caveats` list saying what it is NOT.
-// ---------------------------------------------------------------------------
+// 6. Provenance export on three carriers. Nobody reads time-ranged provenance, so we emit
+// structures,
+// check them against published field names and attach `caveats` saying what they are not.
+// why: lessons/timeline-score.md#provenance
 
 const C2PA_ACTION_FIELDS = new Set(['action', 'when', 'softwareAgent', 'changed', 'instanceId',
   'parameters', 'digitalSourceType', 'changes', 'actors', 'description', 'reason', 'related']);
@@ -508,13 +381,8 @@ const OTIO_CLIP_FIELDS = new Set(['OTIO_SCHEMA', 'name', 'source_range', 'media_
 
 // --- the uniform row a carrier serialises ----------------------------------
 
-/**
- * Normalise any subject (score | nest | deck) to provenance ROWS in ms:
- *   {id, ref, parentIn, parentOut, childIn, childOut, rate, tier, method,
- *    source, asserter, certainty[], confidence, kind}
- * A row is "a claim about a time range", which is precisely what all three
- * carriers can hold and no ecosystem tool currently reads.
- */
+// Any subject (score, nest, deck) to provenance rows in ms: claims about a time range.
+// why: lessons/timeline-score.md#provenance-rows
 export function provenanceRows(subject, { markKind = 'mark', resolve } = {}) {
   // a nest
   if (subject && typeof subject.spans === 'function') {
@@ -528,9 +396,9 @@ export function provenanceRows(subject, { markKind = 'mark', resolve } = {}) {
         asserter: p.asserter || null, certainty: p.certainty || [],
         confidence: identityCert(p.certainty), kind: 'quotation',
         marks: sp.marks || null, trim: sp.trim || null,
-        // §8: a repeated quotation claims N × the fragment's worth of parent
-        // time, and an UNBOUNDED one claims a time range with no end — which is
-        // exactly what none of the three carriers can say (see the caveats).
+        // A repeated quotation claims N passes; an unbounded one, a range with no end (no carrier
+        // can say it).
+        // why: lessons/timeline-score.md#repeat-claim
         repeat: sp.repeat === undefined ? undefined : sp.repeat,
         iterations: sp.loop ? sp.iterations : undefined,
         unbounded: sp.unbounded || undefined,
@@ -566,7 +434,8 @@ export function provenanceRows(subject, { markKind = 'mark', resolve } = {}) {
       });
     });
   }
-  // a deck: one row per DERIVED lane — "these seconds were reconstructed"
+  // a deck: one row per derived lane
+  // why: lessons/timeline-score.md#deck-rows
   if (subject && typeof subject.provenanceOf === 'function') {
     const ref = deckRef(subject) || 'deck';
     const rows = [];
@@ -614,14 +483,9 @@ export function npt(ms) {
 
 // --- the door ---------------------------------------------------------------
 
-/**
- * Emit provenance for a score / nest / deck on one of three carriers.
- *
- * @param subject  score | nest | deck
- * @param opts {carrier: 'c2pa'|'hls'|'otio', anchor, title, softwareAgent,
- *              ns, resolve, markKind}
- * @returns {{carrier, doc, text?, rows, caveats:[], validation}}
- */
+// exportProvenance(subject, { carrier: 'c2pa'|'hls'|'otio', anchor, title, softwareAgent, ns,
+// resolve, markKind }) -> {carrier, doc, text?, rows, caveats, validation}.
+// why: lessons/timeline-score.md#export
 export function exportProvenance(subject, opts = {}) {
   const carrier = String(opts.carrier || 'c2pa').toLowerCase();
   const rows = provenanceRows(subject, opts);
@@ -642,9 +506,8 @@ function c2paDoc(rows, opts) {
   const actions = [], ingredients = [];
   for (const r of rows) {
     const changes = [];
-    // 1. the region that IS the quotation — a temporal range in the delivered
-    //    asset's own play time (§18.15.4.6: `Action.changes` is an array of
-    //    region-maps naming the regions of interest that were changed).
+    // 1. The quotation as a temporal region in Action.changes.
+    // why: lessons/timeline-score.md#c2pa-region
     changes.push(clean({
       region: [{ type: 'temporal', time: clean({ type: 'npt', start: npt(r.parentIn), end: npt(r.parentOut) }) }],
       name: r.id,
@@ -654,10 +517,8 @@ function c2paDoc(rows, opts) {
         : `quotes ${r.ref} [${npt(r.childIn)}, ${npt(r.childOut)}) at rate ${r.rate}`,
       metadata: clean({
         reviewRatings: ratings(r),
-        // $source-type is a CLOSED vocabulary. The Kurenniemi lesson lands
-        // exactly here: an assertion with no asserter is `humanEntry.anonymous`
-        // and the carrier says so, rather than letting an unsigned claim read
-        // like an identified one.
+        // $source-type is a closed vocabulary: no asserter is `humanEntry.anonymous`, said so.
+        // why: lessons/timeline-score.md#source-type
         dataSource: r.source ? clean({
           type: r.tier ? 'algorithmicMedia' : (r.asserter ? 'humanEntry.identified' : 'humanEntry.anonymous'),
           details: r.source,
@@ -665,11 +526,9 @@ function c2paDoc(rows, opts) {
         }) : undefined,
       }),
     }));
-    // 2. BOUNDARY uncertainty gets its OWN region, because C2PA has exactly one
-    //    place to put a confidence number (reviewRatings, on assertion
-    //    metadata) and no way to say *which part* of the claim it qualifies.
-    //    TEI's @locus does; the mapping is lossy and this is the loss, made
-    //    visible instead of dropped.
+    // 2. Boundary uncertainty gets its own region: C2PA cannot say which part a confidence
+    // qualifies.
+    // why: lessons/timeline-score.md#boundary
     for (const c of boundaryCerts(r.certainty)) {
       const edge = c.locus === 'start' ? r.parentIn : r.parentOut;
       const w = Number(c.widthMs || 0);
@@ -698,9 +557,8 @@ function c2paDoc(rows, opts) {
       changes,
     }));
     if (r.kind === 'quotation') {
-      // §18.16.13, normative: *"when only a portion of an ingredient is used…
-      // the metadata field should contain a regionOfInterest field"*. That
-      // sentence is the archival-quotation case, written by a standards body.
+      // A partial ingredient carries a regionOfInterest, as C2PA 18.16.13 says.
+      // why: lessons/timeline-score.md#ingredient
       ingredients.push(clean({
         label: 'c2pa.ingredient.v3',
         data: clean({
@@ -768,10 +626,8 @@ const C2PA_CAVEATS = [
 
 // --- (b) EXT-X-DATERANGE ---------------------------------------------------
 
-/** RFC 8216 §4.3.2.7. `X-` is *"a namespace reserved for client-defined
- *  attributes"*, and clients *"SHOULD use a reverse-DNS syntax"*. Our namespace
- *  is X-ORG-POSITRON-*. hls.js surfaces these already
- *  (`enableDateRangeMetadataCues`, default true) as metadata TextTrack cues. */
+// RFC 8216 X- attributes under X-ORG-POSITRON-*; hls.js surfaces them as metadata cues.
+// why: lessons/timeline-score.md#hls-doc
 function hlsDoc(rows, opts) {
   const anchor = opts.anchor === undefined ? 0
     : (opts.anchor instanceof Date ? opts.anchor.getTime() : (typeof opts.anchor === 'string' ? Date.parse(opts.anchor) : Number(opts.anchor)));
@@ -792,17 +648,15 @@ function hlsDoc(rows, opts) {
       [`${pfx}-RATE`, num(r.rate)],
       [`${pfx}-TIER`, num(r.tier || 0)],
     ];
-    // §8: a loop is authoring, and no carrier has a word for it. HLS is the one
-    // that CAN say "this never ends" natively — END-ON-NEXT — and we still do
-    // not use it, because our repeat is a parent-domain program, not a playlist
-    // boundary. The X- attribute is the honest spelling.
+    // A loop as an X- attribute, not END-ON-NEXT: our repeat is a parent-domain program.
+    // why: lessons/timeline-score.md#hls-repeat
     if (r.repeat !== undefined) a.push([`${pfx}-REPEAT`, typeof r.repeat === 'object' ? qs(`untilMs:${r.repeat.untilMs}`) : qs(String(r.repeat))]);
     if (r.method) a.push([`${pfx}-METHOD`, qs(r.method)]);
     if (r.source) a.push([`${pfx}-SOURCE`, qs(r.source)]);
     if (r.asserter) a.push([`${pfx}-ASSERTER`, qs(r.asserter)]);
     if (typeof r.confidence === 'number') a.push([`${pfx}-CONFIDENCE`, num(r.confidence)]);
-    // TEI @locus, one attribute per uncertain THING — the carrier that can
-    // actually hold the distinction, because X- attributes are free-form.
+    // One attribute per uncertain thing (TEI @locus).
+    // why: lessons/timeline-score.md#locus
     for (const c of r.certainty || []) {
       a.push([`${pfx}-CERT-${String(c.locus).toUpperCase()}`, typeof c.cert === 'number' ? num(c.cert) : qs(String(c.cert))]);
       if (c.resp) a.push([`${pfx}-RESP-${String(c.locus).toUpperCase()}`, qs(String(c.resp))]);
@@ -827,12 +681,9 @@ const HLS_CAVEATS = [
 
 // --- (c) OTIO-shaped -------------------------------------------------------
 
-/** OTIO has NO provenance in its schema; the sanctioned hook is the namespaced
- *  per-object `metadata` dict (Clip, Track, Timeline, MediaReference all have
- *  one). We put the whole quotation value there under `org.positron.timeline`,
- *  which means an OTIO round trip through any conforming tool preserves it
- *  verbatim — the one carrier that loses NOTHING, and the one nothing acts on.
- *  RationalTime rate is 1000 (ms), so no 23.976 rounding exists here at all. */
+// OTIO has no provenance schema; the value goes in per-clip metadata under org.positron.timeline,
+// preserved verbatim. Rate 1000 (ms), so no frame rounding.
+// why: lessons/timeline-score.md#otio-doc
 function otioDoc(rows, opts) {
   const rate = 1000;
   const RT = (ms) => ({ OTIO_SCHEMA: 'RationalTime.1', value: +ms.toFixed(6), rate });
@@ -849,7 +700,8 @@ function otioDoc(rows, opts) {
       OTIO_SCHEMA: 'Clip.2',
       name: r.id,
       enabled: true,
-      // source_range is in the SOURCE's domain — which is exactly our in/out.
+      // source_range is in the source's domain, our in/out.
+      // why: lessons/timeline-score.md#source-range
       source_range: TR(r.childIn, r.childOut - r.childIn),
       media_reference: { OTIO_SCHEMA: 'ExternalReference.1', target_url: `positron:deck/${r.ref}`,
         metadata: { [NS]: { ref: r.ref, unit: 'ms' } } },
@@ -894,9 +746,8 @@ const OTIO_CAVEATS = [
 
 // --- validation -------------------------------------------------------------
 
-/** Check a document against PUBLISHED field names. This is not a schema
- *  validator — it is the check that we did not invent a spelling, which is the
- *  failure mode that matters when nothing downstream will tell us. */
+// Checks field names against published ones: not a schema validator.
+// why: lessons/timeline-score.md#validate
 export function validateProvenance(doc, carrier) {
   const errors = [], warnings = [], seen = { regions: 0, temporal: 0, ratings: 0, clips: 0, tags: 0 };
   const bad = (m) => errors.push(m);
@@ -1041,41 +892,15 @@ function canonical(x) {
 }
 export { canonical as canonicalJSON };
 
-// ---------------------------------------------------------------------------
-// 8. THE SCORE DOCUMENT — one container, several languages (plans/plan-score.md).
-//
-// NORMALIZE THE ENVELOPE, NEVER THE PAYLOAD.
-//
-// A Csound note is `i 1 0.0 2.0 8000 440` — instrument, start, duration, then
-// whatever p-fields that instrument reads. A MIDI note is channel, number,
-// velocity. One of ours is a `kind` and an arbitrary payload. A container that
-// made these one vocabulary would need a lowest common denominator, and that
-// denominator is a lie about all three: p5 is not velocity, velocity is not p5,
-// and "note number" means nothing to an instrument that reads a frequency.
-//
-// So a ROW standardises only what is genuinely common — when, how long, what
-// kind of thing it is, which line it came from — and carries the rest verbatim
-// under `payload`, tagged by the part's `lang`. The test for any proposed
-// envelope field: could a Csound p-field, a MIDI velocity and one of our
-// payloads all answer it without one of them lying?
-//
-// TWO DOMAINS, ON PURPOSE. A document is authored in BEATS (`unit: 'beat'`)
-// with a tempo MAP, because that is what a score is; an arrangement runs in ms.
-// `loadScoreDoc` is the converter, and it takes the beat->ms map as an ARGUMENT
-// rather than importing one — the same inversion `repeatsAsQuotations` uses to
-// avoid depending on this file. A container that imported a language's compiler
-// would be a container with a favourite language.
-//
-// A `unit: 'beat'` document with no tempo means 60 bpm, at which one beat is
-// one second. A MIDI part gets `tempo: [[0, 60]]` and SAYS SO, rather than
-// quietly meaning milliseconds.
-// ---------------------------------------------------------------------------
+// 8. The score document: normalise the envelope (when, how long, kind, line), never the payload,
+// which goes verbatim under `payload` per part `lang`. Authored in beats with a tempo map (none is
+// 60 bpm); loadScoreDoc converts to ms with a beat-to-ms map passed in.
+// why: lessons/timeline-score.md#score-doc
 
 export const SCORE_DOC_VERSION = 1;
 
-/** The languages a part may declare. Open by design — an unknown lang is a
- *  warning on load, never a refusal, because the envelope is readable whether
- *  or not this build knows how to sound the payload. */
+// Part languages; an unknown lang is a warning, never a refusal.
+// why: lessons/timeline-score.md#langs
 export const SCORE_LANGS = ['csound', 'midi', 'positron'];
 
 function scoreRow(r, where) {
@@ -1101,25 +926,16 @@ function scorePart(p, name) {
   return clean({
     lang,
     rows: p.rows.map((r, i) => scoreRow(r, `${where}.rows[${i}]`)),
-    // Csound statements that carry no row (`f`, `a`, `v`, `r`, `{`, `}`) are
-    // warnings in the compiler, not silent drops. A score leaning on them
-    // compiles to something quietly shorter than it reads, so the document
-    // carries the warnings and a reader can be told.
+    // Compiler warnings (f, a, v, r, {, }) travel with the document.
+    // why: lessons/timeline-score.md#warnings
     warnings: Array.isArray(p.warnings) && p.warnings.length ? p.warnings.map(String) : undefined,
     meta: p.meta ?? undefined,
   });
 }
 
-/**
- * A score document: named parts, and uses of them.
- *
- * `uses` are QUOTATIONS — the same value `nest.add()` takes — and a use's `ref`
- * names a PART rather than a deck. That is deliberate reuse rather than a
- * second vocabulary: one thing that names its source by identity, one
- * canonicaliser, one equality.
- *
- * @param spec {id?, unit?, tempo?, parts, uses, meta?}
- */
+// scoreDoc({ id?, unit?, tempo?, parts, uses, meta? }): uses are quotations whose `ref` names a
+// part.
+// why: lessons/timeline-score.md#score-doc-fn
 export function scoreDoc(spec = {}) {
   if (!spec || typeof spec !== 'object') throw new Error('scoreDoc(spec) needs an object');
   const unit = spec.unit === undefined ? 'beat' : String(spec.unit);
@@ -1168,19 +984,10 @@ export function parseScoreDoc(input) {
   return scoreDoc(raw);
 }
 
-/**
- * THE JSONL VIEW — a deterministic projection, never a second source of truth.
- *
- * Canonical JSON is authoritative; this is a rendering of it, one record per
- * line, so a player can light "the line playing now" by index instead of
- * searching a path. `parseScoreDocJSONL` reads it back, and the demo asserts
- * the two agree byte for byte — two representations that can disagree is
- * exactly the defect worth designing out.
- *
- * Line order is header, then each part's declaration followed by its rows in
- * document order, then the uses. Parts are visited in sorted name order because
- * `scoreDoc` stores them that way.
- */
+// A JSONL projection of canonical JSON, never a second source: header, each part and its rows
+// (sorted
+// names), then uses; parseScoreDocJSONL reads it back and the demo asserts they agree.
+// why: lessons/timeline-score.md#jsonl
 export function scoreDocToJSONL(doc) {
   const out = [canonical({ t: 'doc', v: doc.v, id: doc.id, unit: doc.unit, tempo: doc.tempo, meta: doc.meta })];
   for (const [name, p] of Object.entries(doc.parts)) {
@@ -1214,17 +1021,9 @@ export function parseScoreDocJSONL(text) {
   return scoreDoc({ id: head.id, unit: head.unit, tempo: head.tempo, meta: head.meta, parts, uses });
 }
 
-/**
- * A part's rows as DECK ITEMS, in milliseconds.
- *
- * `tempoMap` is passed in rather than imported: the beat->ms integral lives in
- * `timeline/csound.mjs` because that is where it was needed first, and a
- * container that imported a language's compiler would be a container with a
- * favourite language. Pass `tempoMap` from there.
- *
- * Every item carries `payload.row` — the row's id — which is what lets a player
- * light the score line a firing note came from without a lookup by position.
- */
+// A part's rows as deck items in ms, `tempoMap` passed in (from timeline/csound.mjs); every item
+// carries payload.row so a player can light its line.
+// why: lessons/timeline-score.md#part-items
 export function partItems(doc, name, { tempoMap, kind } = {}) {
   const p = doc.parts[name];
   if (!p) throw new Error(`partItems: no part named '${name}' (parts: ${Object.keys(doc.parts).join(', ')})`);
@@ -1243,7 +1042,8 @@ export function partItems(doc, name, { tempoMap, kind } = {}) {
   });
 }
 
-/** The span a part occupies, in ms — what a use with no `in`/`out` quotes. */
+// The span a part occupies in ms, what a use with no in/out quotes.
+// why: lessons/timeline-score.md#part-range
 export function partRangeMs(doc, name, { tempoMap } = {}) {
   const items = partItems(doc, name, { tempoMap });
   if (!items.length) return [0, 0];
@@ -1252,17 +1052,9 @@ export function partRangeMs(doc, name, { tempoMap } = {}) {
   return [lo, hi];
 }
 
-/**
- * Instantiate a document as a live arrangement.
- *
- * The document is in beats; the arrangement runs in ms, so every use's `at`,
- * `in` and `out` is converted here. A MARK address passes through untouched —
- * a mark is resolved against the source's own lane at load, which is the whole
- * reason it survives a re-cut.
- *
- * @param resolve (partName, use) -> deck. The only place a name becomes an
- *        object, exactly as in `loadScore`.
- */
+// Instantiate a document: at/in/out converted from beats to ms; marks pass through.
+// resolve(partName, use) -> deck.
+// why: lessons/timeline-score.md#load-doc
 export function loadScoreDoc(doc, resolve, opts = {}) {
   const dc = isScoreDoc(doc) ? doc : parseScoreDoc(doc);
   const { tempoMap } = opts;
