@@ -591,3 +591,11 @@ imports of all 43 concept pages.
 Asked *"Do working ui"*; taken as recommended: D1 yes, a composer on /connect/ only;
 D2 one knob instance per parameter; D3 concept pages keep their hand wiring for now;
 D4 the AudioContext starts on the first press on a face; D5 lift one synth copy now.
+
+## How the demos converge (asked *"Do we need rewrite all demos to match this approach?"*, then *"Go"*, 2026-10-14)
+
+No rewrite. Each time /connect/ needs an engine that lives only inside a page,
+that engine moves into a shared kit module and that page moves onto it in the
+same change; a page changes only when one of its engines is needed elsewhere.
+Archived demos are never touched. Whether a concept page becomes a saved patch
+opened in the composer is decided after slices 1 to 3 hold up.
