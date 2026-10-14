@@ -1,9 +1,14 @@
 # positron.studio — DEPLOYED
 
-> Worker **script name** is still `elektron-view`. That is deliberate: renaming a
-> script creates a NEW Worker and abandons the `Gate` Durable Object holding the
-> durable ERR cache. The public identity is the custom domain; the script name is
-> an internal handle nobody types.
+> Worker **script name** is still `elektron-view`. The public identity is the
+> custom domain; the script name is an internal handle nobody types. It was
+> first kept because renaming a script creates a NEW Worker and would have
+> abandoned the `Gate` Durable Object holding the durable ERR cache. That reason
+> is gone: the ERR proxy (`/api/search`, `/api/item`, `/api/stats`) and `Gate`
+> were removed on 2026-10-14, and `wrangler.jsonc` carries migration `v2`
+> (`deleted_classes: ["Gate"]`), which permanently deletes the Gate's stored
+> cache on the next deploy. A rename would still change the `workers.dev` name
+> and the deploy record, so it stays as it is.
 
 **URL:** `https://positron.studio`
 **Deployed:** 2026-09-04 (version `2c810777-48a0-4516-ab68-9e4921c05a1f` — the
@@ -82,7 +87,9 @@ can fail.
 `assets.directory = ./public`; every page, every ES module, `census.json`,
 `corpus.json`, both copies of `hls.min.js` and every committed cache entry are
 served straight from Cloudflare's edge without the Worker running at all.
-`src/index.js` executes only for `/api/*`, `/icy/*` and `/report`.
+`src/index.js` executes only for paths with no asset behind them: `/robots.txt`,
+`/err-img`, `/icy/*`, `/report`, `/notes/<slug>`, a few redirects and the 404.
+(It also ran `/api/*` until 2026-10-14; see the note at the top.)
 
 **`public/` is built, not committed, and never a directory glob.** `build.mjs`
 copies an **explicit 12-file allowlist** out of the repo. This is a safety
@@ -105,11 +112,14 @@ a proto** — one canonical copy, the same aliasing the dev servers do.
 
 ## Routes (everything else is a static asset)
 
+`/api/search`, `/api/item/{type}/{slug}` and `/api/stats` were removed on
+2026-10-14 with the `Gate` Durable Object; nothing outside `archive/` called
+them. Everything below about the proxy, the gate and its durable cache is the
+record of what ran until then.
+
 | method | path | purpose |
 |---|---|---|
-| POST | `/api/search` | the **one** proxied upstream: `arhiiv.err.ee/api/v1/search`. Cached, gated, validated. |
-| GET | `/api/item/{audio\|video\|photo}/{slug}` | content record via `…/api/v1/content/{type}/{slug}`. Same cache and gate. |
-| GET | `/api/stats` | what the gate has actually done. Linked from the menu footer. |
+| GET | `/err-img` | an ERR thumbnail, same-origin so https://positron.studio/floor/ can read it as a texture. |
 | GET | `/icy/{mount}.mp3` | **stub, not a proxy.** Always `{title:null}`. |
 | POST | `/report` | autotest sink. `204`, nothing stored. |
 | — | anything else | `404` from the Worker (`not_found_handling: "none"`, no SPA fallback). |
@@ -134,6 +144,10 @@ pass; nobody else's page can use or read this proxy.
 **Nothing media-shaped is ever proxied or stored by this Worker.**
 
 ## The rate limiter — what it actually guarantees
+
+**Removed 2026-10-14.** This section describes the `Gate` Durable Object as it
+ran until then. Migration `v2` in `wrangler.jsonc` deletes the class and its
+stored cache.
 
 A **single Durable Object instance**, `GATE.idFromName('err')`, sits in front of
 every upstream call this deployment makes.

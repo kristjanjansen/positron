@@ -7,8 +7,9 @@
   // uploaded publicly and verbatim. Run `node build.mjs` before every deploy.
   //
   // Static assets serve every page, every module and every committed cache
-  // entry straight from the edge. src/index.js runs only for /api/*, /icy/*
-  // and /report — see DEPLOYED.md.
+  // entry straight from the edge. src/index.js runs only for paths with no
+  // asset behind them (/err-img, /icy/*, /report, /notes/<slug>, redirects),
+  // see DEPLOYED.md.
   "name": "elektron-view",
   // Public hostname(s) on positron.studio (Cloudflare Registrar zone, added
   // 2026-09-04). workers_dev stays TRUE on purpose: the .workers.dev name keeps
@@ -25,11 +26,13 @@
     // being answered with an SPA index.html
     "not_found_handling": "none"
   },
-  // ONE instance (idFromName('err')) gates every upstream arhiiv.err.ee call
-  // this deployment makes, and holds the durable 2-day response cache.
-  "durable_objects": {
-    "bindings": [{ "name": "GATE", "class_name": "Gate" }]
-  },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Gate"] }],
+  // The `Gate` Durable Object (the ERR search proxy's global rate gate and
+  // durable 2-day cache) was removed 2026-10-14 with /api/search, /api/item and
+  // /api/stats. v2 DELETES the class and, with it, every row it stored. Both
+  // tags stay: migrations are applied in order and v1 is already applied.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Gate"] },
+    { "tag": "v2", "deleted_classes": ["Gate"] }
+  ],
   "observability": { "enabled": true }
 }

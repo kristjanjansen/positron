@@ -1,146 +1,29 @@
-// elektron-view — the public viewing surfaces of this repo on one URL.
+// elektron-view: positron.studio's Worker.
 //
-// Static assets (public/, built by build.mjs) serve every page and every
-// committed cache entry directly from the edge; this Worker only runs for the
-// handful of paths below. Four pages ship: /proto/megatimeline/,
-// /proto/remixer/, /proto/aikajana/, /proto/flipper/, plus a menu at /.
+// Static assets (public/, built by build.mjs) serve every page directly from
+// the edge, and this Worker runs only for paths with no asset behind them:
+// /robots.txt, /err-img, /icy/*, /report, /notes/<slug>, a few redirects and
+// the 404. Every response it returns carries X-Robots-Tag (see `marked`).
 //
-// ── the only reason this Worker exists: ONE proxied upstream, politely ──────
-// arhiiv.err.ee's search is POST + JSON, so the browser forces an OPTIONS
-// preflight, and the archive's OPTIONS answers 204 WITHOUT
-// access-control-allow-origin (measured, research/err-archives-2026-08.md).
-// So POST /api/v1/search cannot be called from a page and must be proxied.
-// Everything else the pages need is already CORS-clear and goes DIRECT from
-// the browser, untouched by us: content GETs (ACAO:*), vod.err.ee HLS,
-// archive.org media, arhiiv-images thumbnails. Nothing media-shaped is ever
-// proxied or stored here.
+// The ERR search proxy (/api/search, /api/item, /api/stats) and the `Gate`
+// Durable Object behind it were removed on 2026-10-14: nothing outside
+// archive/ called them. wrangler.jsonc carries the migration that deletes Gate.
 //
-// ⚠️ CORRECTED 2026-09-14: "arhiiv-images thumbnails are CORS-clear" is true for
-// an `<img>` and FALSE for a texture. MEASURED with an Origin header, both
+// /err-img stays because https://positron.studio/floor/ reads ERR thumbnails
+// as WebGL textures. MEASURED 2026-09-14 with an Origin header: both
 // `arhiiv-images.err.ee` and the `arhiiv-img.err.ee` resizer answer 200 with NO
-// `access-control-allow-origin` at all. A page can DISPLAY such an image; it
-// cannot read its pixels, and `texImage2D` on one throws a SecurityError. So
-// `/floor/` — a WebGL grid of archive thumbnails — needs them same-origin, which
-// is the second proxied route below. The distinction is display versus READ,
-// and it is invisible until something tries to read.
-//
-// This now runs on Cloudflare's network rather than one laptop, so the
-// politeness that was a local `await sleep(1000)` has to become a real global
-// gate. See the Gate Durable Object at the bottom, and DEPLOYED.md for the
-// honest statement of what it does and does not guarantee.
+// `access-control-allow-origin`. A page can DISPLAY such an image; it cannot
+// read its pixels, and `texImage2D` on one throws a SecurityError. So the floor
+// needs them same-origin. The distinction is display versus READ, and it is
+// invisible until something tries to read.
 
-const UPSTREAM = 'https://arhiiv.err.ee';
 const UA = 'elektron-view/1.0 (+https://positron.studio; archive viewer prototype; contact kristjan.jansen@gmail.com)';
-
-// The archive sends 2-day cache headers on its own responses. We honour them
-// rather than inventing our own TTL.
-const TTL_MS = 2 * 24 * 60 * 60 * 1000;
-
-const MAX_BODY = 4000;          // search bodies are ~350 bytes; hard cap vs abuse
-const SLUG_RE = /^[a-z0-9-]{1,120}$/;
-const TYPE_RE = /^(audio|video|photo)$/;
-
-// Isolate-local memo. Real, but per-isolate and lost on eviction — it is a
-// nicety in front of the DO cache, never the guarantee.
-const memo = new Map();
-const MEMO_MAX = 60;
 
 const json = (obj, status = 200, extra = {}) =>
   new Response(typeof obj === 'string' ? obj : JSON.stringify(obj), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', ...extra },
   });
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-// canonical query hash — MUST match build.mjs byte for byte, or committed
-// cache entries silently stop being found and every query goes upstream.
-const canon = (v) =>
-  Array.isArray(v) ? v.map(canon)
-    : v && typeof v === 'object'
-      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])]))
-      : v;
-
-async function queryHash(queryParams) {
-  const bytes = new TextEncoder().encode(JSON.stringify(canon(queryParams)));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
-}
-
-function memoGet(k) {
-  const hit = memo.get(k);
-  if (!hit) return null;
-  if (Date.now() - hit.at > TTL_MS) { memo.delete(k); return null; }
-  return hit.body;
-}
-function memoPut(k, body) {
-  memo.set(k, { at: Date.now(), body });
-  if (memo.size > MEMO_MAX) memo.delete(memo.keys().next().value);
-}
-
-// ── the shared read path: memo → committed asset → DO cache → gated upstream ─
-async function serveCached({ cacheKey, assetPath, upstreamReq, env, ctx, origin }) {
-  const hit = memoGet(cacheKey);
-  if (hit) return json(hit, 200, { 'x-positron-cache': 'memo', 'x-positron-upstream': '0' });
-
-  // committed cache: shipped in the repo, exploded into public/cache/ at build
-  // time. Permanent, global, free, and the reason a normal visit costs ERR
-  // exactly nothing.
-  const asset = await env.ASSETS.fetch(new URL(assetPath, origin));
-  if (asset.ok) {
-    const body = await asset.text();
-    memoPut(cacheKey, body);
-    return json(body, 200, { 'x-positron-cache': 'committed', 'x-positron-upstream': '0' });
-  }
-
-  const gate = env.GATE.get(env.GATE.idFromName('err'));
-
-  // durable cache: anything this deployment has already fetched once, for
-  // everyone, for 2 days. This is what stops N visitors becoming N calls.
-  const cached = await gate.fetch(`https://gate/cache?k=${encodeURIComponent(cacheKey)}`);
-  if (cached.status === 200) {
-    const body = await cached.text();
-    memoPut(cacheKey, body);
-    return json(body, 200, { 'x-positron-cache': 'durable', 'x-positron-upstream': '0' });
-  }
-
-  // miss → ask the global gate for a slot
-  const slotRes = await gate.fetch('https://gate/acquire', { method: 'POST' });
-  const slot = await slotRes.json();
-  if (!slot.ok) {
-    return json(
-      { error: 'upstream gated', reason: slot.reason, detail: slot.detail },
-      503,
-      { 'retry-after': String(Math.ceil((slot.waitMs ?? 2000) / 1000)), 'x-positron-cache': 'gated' },
-    );
-  }
-  if (slot.waitMs > 0) await sleep(slot.waitMs);
-
-  const t0 = Date.now();
-  let up;
-  try {
-    up = await fetch(upstreamReq());
-  } catch (e) {
-    return json({ error: 'upstream unreachable', detail: String(e) }, 502);
-  }
-  const body = await up.text();
-  if (up.status === 200) {
-    memoPut(cacheKey, body);
-    ctx.waitUntil(
-      gate.fetch('https://gate/cache', {
-        method: 'PUT',
-        headers: { 'x-key': cacheKey },
-        body,
-      }).catch(() => {}),
-    );
-  }
-  return json(body, up.status, {
-    'x-positron-cache': 'miss',
-    'x-positron-upstream': '1',
-    'x-positron-gate-wait-ms': String(slot.waitMs),
-    'x-upstream-ms': String(Date.now() - t0),
-  });
-}
 
 // ── not ready to be found ───────────────────────────────────────────────────
 //
@@ -260,68 +143,13 @@ const routes = {
       });
     }
 
-    // Not an open proxy, part 1: same-origin only. Our own pages are
+    // Same-origin only. Our own pages are
     // same-origin so they always pass; a POST from anyone else's site carries
     // a foreign Origin and is refused. No CORS headers are ever sent, so no
     // third-party page can read a response even if it got one.
     const origin = request.headers.get('origin');
     if (origin && origin !== url.origin) {
-      return json({ error: 'cross-origin use of this proxy is not allowed' }, 403);
-    }
-
-    // ── POST /api/search — the one genuinely proxied endpoint ──────────────
-    if (p === '/api/search' && request.method === 'POST') {
-      const raw = await request.text();
-      if (raw.length > MAX_BODY) return json({ error: 'body too large' }, 413);
-
-      let parsed;
-      try { parsed = JSON.parse(raw); } catch { return json({ error: 'body must be JSON' }, 400); }
-
-      // Not an open proxy, part 2: the path upstream is a constant, and the
-      // body must look like the documented search query. Nothing a caller
-      // sends can redirect this at another host, another path, or another verb.
-      const qp = parsed && parsed.queryParams;
-      if (!qp || typeof qp !== 'object' || Array.isArray(qp)) {
-        return json({ error: 'expected {queryParams:{…}}' }, 400);
-      }
-      if (qp.type !== undefined && !(TYPE_RE.test(qp.type) || qp.type === 'all')) {
-        return json({ error: 'bad type' }, 400);
-      }
-      const limit = Number(qp.limit ?? 20);
-      if (!Number.isFinite(limit) || limit < 1 || limit > 500) return json({ error: 'bad limit' }, 400);
-
-      const hash = await queryHash(qp);
-      return serveCached({
-        cacheKey: `search:${hash}`,
-        assetPath: `/cache/search/${hash}.json`,
-        origin: url.origin,
-        env, ctx,
-        upstreamReq: () => new Request(`${UPSTREAM}/api/v1/search`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'user-agent': UA, accept: 'application/json' },
-          // re-serialise the VALIDATED object: whatever else was in the raw
-          // body does not travel upstream
-          body: JSON.stringify({ queryParams: qp }),
-        }),
-      });
-    }
-
-    // ── GET /api/item/{type}/{slug} — content record ───────────────────────
-    // These are CORS-clear upstream and remixer fetches them direct; they route
-    // through here for megatimeline only so the committed item cache applies.
-    const m = p.match(/^\/api\/item\/([a-z]+)\/([^/]+)$/);
-    if (m && request.method === 'GET') {
-      const [, type, slug] = m;
-      if (!TYPE_RE.test(type) || !SLUG_RE.test(slug)) return json({ error: 'bad item ref' }, 400);
-      return serveCached({
-        cacheKey: `item:${type}:${slug}`,
-        assetPath: `/cache/item/${type}/${slug}.json`,
-        origin: url.origin,
-        env, ctx,
-        upstreamReq: () => new Request(`${UPSTREAM}/api/v1/content/${type}/${slug}`, {
-          headers: { 'user-agent': UA, accept: 'application/json' },
-        }),
-      });
+      return json({ error: 'cross-origin use of this worker is not allowed' }, 403);
     }
 
     // ── GET /err-img — a thumbnail, same-origin, so WebGL can READ it ──────
@@ -331,10 +159,9 @@ const routes = {
     // `remixer`; nothing here is being unlocked. What changes is that the bytes
     // arrive same-origin, so a texture upload is allowed to read them.
     //
-    // Not an open proxy, same two parts as the search route: the upstream HOST
-    // is a constant, and the only thing a caller controls is a path that must
-    // match the archive's own thumbnail shape — a four-digit year folder and a
-    // plain filename. No `..`, no slashes beyond the one, no other extension.
+    // Not an open proxy: the upstream HOST is a constant, and the only thing a
+    // caller controls is a path that must match the archive's own thumbnail
+    // shape: a four-digit year folder and a plain filename. No `..`, no slashes beyond the one, no other extension.
     // Size is clamped to a tile-sized range, because the point is a floor of
     // small pictures and an unbounded `width` is somebody else's bandwidth.
     if (p === '/err-img' && request.method === 'GET') {
@@ -385,8 +212,8 @@ const routes = {
       // re-asks for the same tiles every time you walk back over them, and a
       // week in the local cache means walking back costs nothing at all.
       // ⚠️ NOT stored in the repo, deliberately — 298 thumbnails is ~2 MB of
-      // somebody else's images, and this file's own header says nothing
-      // media-shaped is kept here. Proxied and cached is not the same as held.
+      // somebody else's images, and nothing media-shaped is kept
+      // here. Proxied and cached is not the same as held.
       const out = new Response(r.body, {
         status: 200,
         headers: {
@@ -419,13 +246,6 @@ const routes = {
     // this deployment keeps nothing.
     if (p === '/report' && request.method === 'POST') {
       return new Response(null, { status: 204 });
-    }
-
-    // ── GET /api/stats — what the gate has actually done ───────────────────
-    if (p === '/api/stats' && request.method === 'GET') {
-      const gate = env.GATE.get(env.GATE.idFromName('err'));
-      const s = await gate.fetch('https://gate/stats');
-      return json(await s.text(), 200, { 'cache-control': 'no-store' });
     }
 
     // ── GET /notes/<slug> — a real path for a note ─────────────────────────
@@ -488,118 +308,3 @@ export default {
     return marked(await routes.fetch(request, env, ctx));
   },
 };
-
-// ────────────────────────────────────────────────────────────────────────────
-// Gate — ONE Durable Object instance (idFromName('err')) in front of every
-// upstream call this deployment makes.
-//
-// It is a real global gate, not a per-isolate approximation: every Worker
-// isolate in every colo routes through this single object, and a Durable
-// Object runs single-threaded, so the read-reserve-write below happens with no
-// interleaving. The slot is reserved SYNCHRONOUSLY and the caller is told how
-// long to wait before using it — the waiting happens in the Worker, not in
-// here, so a queue costs DO time nothing and stays correctly spaced.
-//
-// Guarantees: upstream calls are spaced >= MIN_SPACING_MS apart globally, and
-// there are at most DAY_CAP of them per UTC day, across all visitors.
-// ────────────────────────────────────────────────────────────────────────────
-const MIN_SPACING_MS = 1000;  // <= 1 request/second, globally
-const MAX_WAIT_MS = 6000;     // deeper queue than this → 503 + Retry-After
-const DAY_CAP = 400;          // hard ceiling per UTC day, all visitors together
-const CACHE_ROWS = 150;       // durable response cache, oldest evicted
-const CACHE_MAX_BYTES = 1_000_000;
-
-export class Gate {
-  constructor(state) {
-    this.sql = state.storage.sql;
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)`);
-    this.sql.exec(`CREATE TABLE IF NOT EXISTS cache (k TEXT PRIMARY KEY, at INTEGER, body TEXT)`);
-  }
-
-  get(k, dflt) {
-    const row = this.sql.exec('SELECT v FROM meta WHERE k = ?', k).toArray()[0];
-    return row ? JSON.parse(row.v) : dflt;
-  }
-  set(k, v) {
-    this.sql.exec(
-      'INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v',
-      k, JSON.stringify(v),
-    );
-  }
-
-  async fetch(request) {
-    const url = new URL(request.url);
-
-    if (url.pathname === '/acquire') return this.acquire();
-
-    if (url.pathname === '/cache') {
-      if (request.method === 'PUT') {
-        const key = request.headers.get('x-key') || '';
-        const body = await request.text();
-        if (key && body.length <= CACHE_MAX_BYTES) {
-          this.sql.exec(
-            'INSERT INTO cache (k, at, body) VALUES (?, ?, ?) ON CONFLICT(k) DO UPDATE SET at = excluded.at, body = excluded.body',
-            key, Date.now(), body,
-          );
-          this.sql.exec(
-            'DELETE FROM cache WHERE k IN (SELECT k FROM cache ORDER BY at DESC LIMIT -1 OFFSET ?)',
-            CACHE_ROWS,
-          );
-        }
-        return new Response(null, { status: 204 });
-      }
-      const key = url.searchParams.get('k') || '';
-      const row = this.sql.exec('SELECT at, body FROM cache WHERE k = ?', key).toArray()[0];
-      // honour the archive's 2-day freshness rather than serving forever
-      if (!row || Date.now() - row.at > TTL_MS) return new Response(null, { status: 404 });
-      return new Response(row.body, { status: 200 });
-    }
-
-    if (url.pathname === '/stats') {
-      const rows = this.sql.exec('SELECT COUNT(*) AS n FROM cache').toArray()[0];
-      return Response.json({
-        spacingMs: MIN_SPACING_MS,
-        dayCapUtc: DAY_CAP,
-        day: this.get('day', null),
-        upstreamToday: this.get('dayCount', 0),
-        upstreamTotal: this.get('total', 0),
-        refusedBusy: this.get('refusedBusy', 0),
-        refusedCap: this.get('refusedCap', 0),
-        durableCacheRows: rows ? rows.n : 0,
-        nextSlotInMs: Math.max(0, this.get('lastAt', 0) + MIN_SPACING_MS - Date.now()),
-      });
-    }
-
-    return new Response('not found', { status: 404 });
-  }
-
-  // Synchronous read-reserve-write. No `await` before the state is written, so
-  // concurrent callers cannot both take the same slot.
-  acquire() {
-    const now = Date.now();
-    const today = new Date(now).toISOString().slice(0, 10);
-
-    if (this.get('day', null) !== today) {
-      this.set('day', today);
-      this.set('dayCount', 0);
-    }
-    const dayCount = this.get('dayCount', 0);
-    if (dayCount >= DAY_CAP) {
-      this.set('refusedCap', this.get('refusedCap', 0) + 1);
-      return Response.json({ ok: false, reason: 'daily-cap', detail: `${DAY_CAP}/UTC day reached`, waitMs: 3600_000 });
-    }
-
-    const lastAt = this.get('lastAt', 0);
-    const slotAt = Math.max(now, lastAt + MIN_SPACING_MS);
-    const waitMs = slotAt - now;
-    if (waitMs > MAX_WAIT_MS) {
-      this.set('refusedBusy', this.get('refusedBusy', 0) + 1);
-      return Response.json({ ok: false, reason: 'busy', detail: 'gate queue deeper than 6 s', waitMs });
-    }
-
-    this.set('lastAt', slotAt);
-    this.set('dayCount', dayCount + 1);
-    this.set('total', this.get('total', 0) + 1);
-    return Response.json({ ok: true, waitMs, dayCount: dayCount + 1 });
-  }
-}
