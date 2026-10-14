@@ -42,7 +42,14 @@
   .cn-ex > button.cn-pill:hover { border-color: var(--voice); background: transparent; }
 
   .cn-props { display: flex; flex-direction: column; gap: 12px; }
-  .cn-props[hidden], .cn-pic[hidden] { display: none; }
+  .cn-props[hidden] { display: none; }
+  /* The picture's room is held from the first frame, so linking moves nothing below it. */
+  .cn-pic { min-block-size: 140px; }
+  .cn-pic.cn-pic-empty { display: grid; place-items: center; border: 1px dashed var(--line2); border-radius: var(--r, 4px); }
+  .cn-pic.cn-pic-empty > :not(.cn-empty) { display: none; }
+  .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
+  .cn-empty { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
+  .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
   .cn-prop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
   .cn-prop-t { font: 400 12.5px/1.4 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
   .cn-prop-n { flex-basis: 100%; font: 400 12px/1.4 var(--sans); color: var(--dim); }
@@ -183,7 +190,7 @@
   ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to]) => ({ from, to, transforms: [] })) }));
 
   const d = mount({ name: 'connect',
-    what: 'Say what should play what, or press an out port and then an in port. Pressing a wire takes it away.',
+    what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
     readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
 
@@ -241,7 +248,7 @@
   const exRow = el('div', 'cn-ex');
   for (const ex of EXAMPLES) {
     const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: `as on /${ex.page}/` });
-    b.addEventListener('click', () => ask(ex.say));
+    b.addEventListener('click', (e) => build(ex, e.isTrusted));
     exRow.append(b);
   }
 
@@ -308,6 +315,16 @@
     redraw();
     return r.ok;
   }
+  // An example press builds its patch straight away: the links are known, so no
+  // model is asked. It replaces whatever was linked, because an example is a whole patch.
+  function build(ex, person) {
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    let made = 0;
+    for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person) ? 1 : 0;
+    for (const b of exRow.children) b.setAttribute('aria-pressed', String(b.textContent === ex.say));
+    d.log(`built "${ex.say}", ${made} of ${ex.links.length} links`);
+    redraw();
+  }
   function removeLink(id) {
     const l = bay.links().find((x) => x.id === id);
     if (!l || !bay.unlink(id)) return;
@@ -347,7 +364,8 @@
   const pb = createPatchbay(shown, { room: 'studio-1' });
   const pic = el('div', 'cn-pic');
   pic.append(pb.el);
-  pic.hidden = true;
+  const empty = el('p', 'cn-empty', 'press an example, or an out port and then an in port');
+  pic.append(empty);
 
   // The picture is the kit's and redraws itself on resize, so its ports and
   // wires are made pressable after every draw rather than once.
@@ -445,7 +463,7 @@
 
   function redraw() {
     if (armed && !bay.port(armed)) armed = null;
-    pic.hidden = bay.links().length === 0;
+    pic.classList.toggle('cn-pic-empty', bay.links().length === 0);
     drawGrid();
     pb.refresh();
     decorate();
@@ -463,7 +481,8 @@
   async function check() {
     const A = d.assert;
     const inGrid = (id) => !!groups.querySelector(`.cn-box[data-node="${id}"]`);
-    const inPicture = (id) => [...(svgOf()?.querySelectorAll('.lv-title') || [])].some((t) => t.textContent === id);
+    // what a reader sees: an empty picture hides the last drawing rather than redrawing nothing
+    const inPicture = (id) => !pic.classList.contains('cn-pic-empty') && [...(svgOf()?.querySelectorAll('.lv-title') || [])].some((t) => t.textContent === id);
     const has = (from, to) => bay.links().some((l) => l.from === from && l.to === to);
     const press = (id) => document.querySelector(`button[data-port="${id}"], text[data-port="${id}"]`)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const frame = () => new Promise((r) => requestAnimationFrame(() => r()));
@@ -480,7 +499,7 @@
       `no page: ${orphan.join(', ') || 'none'}; not a page: ${unknown.join(', ') || 'none'}`);
     A('a type made per instance is one box, not one per knob', !bay.nodes().some((n) => /:knob-(?!volume$|mix$)|:midi-\d|:scope-|:screen-/.test(n.id)),
       bay.nodes().filter((n) => /:knob-|:midi-\d|:scope-|:screen-/.test(n.id)).map((n) => n.id).join(', '));
-    A('nothing is linked on a visit, and no picture is drawn', bay.links().length === 0 && pic.hidden);
+    A('nothing is linked on a visit, and the picture\'s room is held empty', bay.links().length === 0 && pic.classList.contains('cn-pic-empty') && pic.getBoundingClientRect().height >= 140);
 
     // Every example's links can be made, each on a fresh bay so one cannot
     // block another, and with the consent a person's press of Connect gives.
@@ -527,17 +546,15 @@
     A('a link out of somebody else\'s server waits for a person\'s own press', bay.links().length === before && /somebody else's server/.test(logs()),
       logs().split('\n').filter((x) => x.startsWith('refused')).pop());
 
-    // A proposal, from the stand-in, applied by pressing Connect.
+    // An example press builds its patch at once, replacing what was linked.
     const ex = EXAMPLES[1];
+    const reached0 = reached;
     [...exRow.children].find((b) => b.textContent === ex.say).click();
-    await frame(); await asking;
-    const rows = [...props.querySelectorAll('.cn-prop')];
-    A('an example press shows its links as rows', rows.length === ex.links.length,
-      `${rows.length} rows`);
-    for (const r of rows) r.querySelector('.pos-pri').click();
     await frame();
-    A('confirming each row links it, and Plaits moves into the picture',
-      ex.links.every((l) => has(l.from, l.to)) && inPicture('web:plaits') && !inGrid('web:plaits') && props.hidden);
+    A('an example press builds exactly its links, asks no model, and Plaits moves into the picture',
+      bay.links().length === ex.links.length && ex.links.every((l) => has(l.from, l.to))
+        && inPicture('web:plaits') && !inGrid('web:plaits') && reached === reached0,
+      `${bay.links().length} links`);
 
     // A sentence nobody listed gets the stand-in with a broken transform.
     ask('something else');
