@@ -1,5 +1,27 @@
 ## Open
 
+- **Clean private lines from code and standing files before the push** (2026-10-14, agent). Asked: *"yes"* to: rig/audit.mjs, rig/board/README.md, rig/m1/live-setup.mjs, demo/pack, demo/tom, three Circuit tests, HANDOFF, BACKLOG, PROGRESS, LESSONS, LAYOUT.
+
+- **Delete view's ERR proxy and the Gate Durable Object (migration)** (2026-10-14, agent). Asked: *"view's ERR proxy: delete it? - yes"*.
+
+- **Review phase 5: consolidate repeated code into the kit, and bay-traffic remove()** (2026-10-14, agent). Asked: *"do review"*.
+
+- **reel.mjs: the typist page's frame, recording and download as a kit library** (2026-10-14, agent). Asked: *"do reel.mjs"*.
+
+- **Comment cut, second wave after the above lands** (2026-10-14). Asked: *"do comment cut"*.
+
+- **p.s as the real favicon and app icons; no round dot on the hello post** (2026-10-14). Asked: *"p.s as the real favicon - yes. no round dot"*.
+
+- **Radio naming: decide /radio/blend vs /radio/live, /typist/score** (2026-10-14). Asked: *"decide raio"*.
+
+- **Archived demo pages read `← demos`: fix** (2026-10-14). Asked: *"← demos - fix"*.
+
+- **Drums on the Pi plays about 5 dB quiet: fix** (2026-10-14, agent). Asked: *"fix"*.
+
+- **Collide on Pi scopes: propose what to do** (2026-10-14). Asked: *"the Collide on Pi scopes - what to do?"*.
+
+- **Plan statuses: an archived but served page counts as done** (2026-10-14, decided as asked: *"decide"*).
+
 - ~~**/social/typist/ uses the standard transport bar**~~ (2026-10-14, DONE). Asked: *"use standard transport bar"*.
 
 - ~~**/social/typist/: a stop button while recording, and proof it records**~~ (2026-10-14, DONE: a headless take was 7.3 s of 1080x1920 H.264 30 fps with AAC, peak 0.0 dB, so output gain 0.7). Asked: *"no stop button when recording. does it recording at all?"*.
