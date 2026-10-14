@@ -10,7 +10,7 @@
 # only thing that leaves the container is a `.wasm`, which is data that node and a
 # browser read, not an executable anything on this machine will try to run.
 #
-#   demo/muta/build/build.sh plai           build Plaits into demo/muta/vendor/
+#   demo/muta/build/build.sh plaits           build Plaits into demo/muta/vendor/
 #   demo/muta/build/build.sh warp           build Warps  into demo/muta/vendor/
 #   demo/muta/build/build.sh warp --check   print what WOULD be built, compile nothing
 #
@@ -29,13 +29,13 @@
 # the identity, which is the whole reason the digest exists.
 #
 # 🔴 AND THE C SYMBOL PREFIXES ARE PER MODULE AND DO NOT MOVE. Plaits' exports
-# are `plai_*` and Warps' are `warp_*`. Renaming Plaits' exports to match the
+# are `plaits_*` and Warps' are `warp_*`. Renaming Plaits' exports to match the
 # page's new slug would mean rebuilding a byte-reproducible artefact for a
 # cosmetic reason and changing a digest that exists to prove something. The
 # page, the directory and the slug were renamed; the symbols were not.
 #
 # The upstream source is NOT vendored into this repository. It is cloned at two
-# pinned commits into `tmp/plai-src/`, which is gitignored, and the commits are
+# pinned commits into `tmp/plaits-src/`, which is gitignored, and the commits are
 # written into `demo/muta/vendor/PROVENANCE-<module>.json` beside the artefact.
 # Both repositories are MIT (Emilie Gillet): `plaits/` and `warps/` are STM32F
 # projects, which is the half of the grant that is MIT, and each makefile says
@@ -45,7 +45,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
-WORK="$REPO/tmp/plai-src"
+WORK="$REPO/tmp/plaits-src"
 OUT="$REPO/demo/muta/vendor"
 
 # Pinned upstream. Change either of these and the source digest changes, which
@@ -61,20 +61,20 @@ IMAGE="emscripten/emsdk:latest"
 MODULE="${1:-}"
 CHECK=0
 [ "${2:-}" = "--check" ] && CHECK=1
-[ "${1:-}" = "--check" ] && { echo "usage: build.sh <plai|warp> [--check]"; exit 1; }
+[ "${1:-}" = "--check" ] && { echo "usage: build.sh <plaits|warp> [--check]"; exit 1; }
 
 # ── the exact source set, per module ────────────────────────────────────────
 # Listed rather than globbed, so adding an engine is a visible edit and the
 # digest below cannot drift without somebody typing something.
 case "$MODULE" in
-plai)
+plaits)
   UPSTREAM_DIR="plaits"
   UPSTREAM_NAME="plaits"
   FAMILY_NOTE="plaits/makefile declares FAMILY = f37x, an STM32F project, so the MIT"
   LICENCE_HEADER="plaits/dsp/voice.h"
   LICENCE_FILE="LICENSE-plaits"
   LICENCE_TITLE="Plaits DSP"
-  SLUG_NOTE="This page is called muta and the instrument on it is plated PLAI, the"
+  SLUG_NOTE="The instrument is named Plaits on this site by the owner's choice (2026-10-14); the"
   SOURCES=(
     plaits/dsp/voice.cc
     plaits/resources.cc
@@ -108,7 +108,7 @@ plai)
     stmlib/dsp/units.cc
     stmlib/utils/random.cc
   )
-  EXPORTS='["_plai_init","_plai_set_param","_plai_get_param","_plai_render","_plai_out_ptr","_plai_aux_ptr","_plai_scratch_frames","_plai_active_engine","_plai_engine_count","_plai_block_size","_plai_sample_rate","_plai_blocks_rendered","_plai_build","_plai_source_sha","_plai_set_polyphony","_plai_polyphony","_plai_max_voices","_plai_trim","_plai_note_on","_plai_note_off","_plai_all_off","_plai_set_drone","_plai_droning","_plai_held","_plai_voice_note","_plai_voice_level","_plai_voice_state","_plai_steals","_plai_last_voice","_plai_last_stolen","_plai_last_stolen_note","_plai_last_stolen_level","_plai_voice_renders","_plai_voice_bytes","_plai_alloc_bytes"]'
+  EXPORTS='["_plaits_init","_plaits_set_param","_plaits_get_param","_plaits_render","_plaits_out_ptr","_plaits_aux_ptr","_plaits_scratch_frames","_plaits_active_engine","_plaits_engine_count","_plaits_block_size","_plaits_sample_rate","_plaits_blocks_rendered","_plaits_build","_plaits_source_sha","_plaits_set_polyphony","_plaits_polyphony","_plaits_max_voices","_plaits_trim","_plaits_note_on","_plaits_note_off","_plaits_all_off","_plaits_set_drone","_plaits_droning","_plaits_held","_plaits_voice_note","_plaits_voice_level","_plaits_voice_state","_plaits_steals","_plaits_last_voice","_plaits_last_stolen","_plaits_last_stolen_note","_plaits_last_stolen_level","_plaits_voice_renders","_plaits_voice_bytes","_plaits_alloc_bytes"]'
   ;;
 warp)
   UPSTREAM_DIR="warps"
@@ -136,7 +136,7 @@ warp)
   EXPORTS='["_warp_init","_warp_set_param","_warp_get_param","_warp_render","_warp_in_l_ptr","_warp_in_r_ptr","_warp_out_ptr","_warp_aux_ptr","_warp_scratch_frames","_warp_block_size","_warp_max_block","_warp_sample_rate","_warp_table_rate","_warp_band_shift","_warp_band_lo","_warp_band_hi","_warp_band_count","_warp_algorithm","_warp_algorithm_blend","_warp_vocoder_amount","_warp_vocoding","_warp_carrier_shape","_warp_blocks_rendered","_warp_frames_rendered","_warp_carry","_warp_build","_warp_source_sha"]'
   ;;
 *)
-  echo "usage: build.sh <plai|warp> [--check]"
+  echo "usage: build.sh <plaits|warp> [--check]"
   exit 1
   ;;
 esac

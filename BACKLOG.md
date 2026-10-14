@@ -1,5 +1,7 @@
 ## Open
 
+- ~~**Rename plai to plaits**~~ (2026-10-14, DONE: plaits.wasm rebuilt in Docker, emcc 6.0.10 as before, 200780 bytes; plaits_* exports, plaits_shim.cc, PROVENANCE-plaits.json; muta and connect green). Asked: *"Rename plai to plaits"*. The wasm, the shim, its `plai_*` exports, `build.sh`'s module name and the pages that load it.
+
 - ~~**The hero's "Connect" is a secret link to /connect/**~~ (2026-10-14, DONE). Asked: *"make connect header title into a link to connect page. "secret link" no visual hover/cursor erc"*. demo/shell/hero.mjs `head`.
 
 - ~~**/connect/: the twelve examples replace all twenty**~~ (2026-10-14, DONE: verify 98/98 with DEMO_FAKE_CAMERA=1; the drums-reach-the-speakers assert went red in 2 of 4 runs, intermittent, its detail now says whether the machine itself was silent). Asked: *"replace all. 12."* plans/plan-connect-use-cases.md §3, #12 kept; the copy assert becomes its inverse.

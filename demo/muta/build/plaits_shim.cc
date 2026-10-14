@@ -1,4 +1,4 @@
-// demo/muta/build/plai_shim.cc: the whole contact surface between a browser
+// demo/muta/build/plaits_shim.cc: the whole contact surface between a browser
 // and Emilie Gillet's Plaits DSP.
 //
 // WHAT THIS IS NOT: a port, a rewrite, or a reimplementation. Every sample
@@ -53,7 +53,7 @@
 // compile-time constant and the resources tables are built against it. Rack
 // answers this by running a sample rate converter on the output; this shim
 // refuses instead, because a page that reports the rate it got is worth more
-// than one that silently detunes. `plai_init` returns 0 on a mismatch.
+// than one that silently detunes. `plaits_init` returns 0 on a mismatch.
 
 #include <cstddef>
 #include <cstring>
@@ -62,11 +62,11 @@
 #include "plaits/dsp/voice.h"
 #include "stmlib/utils/buffer_allocator.h"
 
-#ifndef PLAI_BUILD
-#define PLAI_BUILD "unstamped"
+#ifndef PLAITS_BUILD
+#define PLAITS_BUILD "unstamped"
 #endif
-#ifndef PLAI_SOURCE_SHA
-#define PLAI_SOURCE_SHA "unstamped"
+#ifndef PLAITS_SOURCE_SHA
+#define PLAITS_SOURCE_SHA "unstamped"
 #endif
 
 namespace {
@@ -154,14 +154,14 @@ const float kSilence = 0.002f;
 const float kLevelRelease = 0.99f;
 
 // Scratch the caller can render into without owning an allocator inside wasm
-// memory. `plai_render` still takes pointers, so a native host on another
+// memory. `plaits_render` still takes pointers, so a native host on another
 // machine can hand it its own buffers.
 const int kScratch = 1024;
 float out_scratch[kScratch];
 float aux_scratch[kScratch];
 
-const char kBuild[] = PLAI_BUILD;
-const char kSourceSha[] = PLAI_SOURCE_SHA;
+const char kBuild[] = PLAITS_BUILD;
+const char kSourceSha[] = PLAITS_SOURCE_SHA;
 
 void SilenceVoice(int v) {
   VoiceState& s = vs[v];
@@ -188,7 +188,7 @@ void RenderBlock() {
   for (int v = 0; v < polyphony; v++) {
     VoiceState& s = vs[v];
     // A FREE VOICE IS NOT RENDERED. Eight voices holding one note cost one
-    // voice, which is what `plai_held` reports and what the page's load cell
+    // voice, which is what `plaits_held` reports and what the page's load cell
     // is careful to say it is NOT measuring.
     if (!s.active) { s.level = 0.0f; continue; }
 
@@ -252,9 +252,9 @@ extern "C" {
 //   4  morph           0..1
 //   5  decay           0..1, the lowpass gate's decay
 //   6  lpg_colour      0..1, the lowpass gate's response
-//   7  trigger         (removed: a gate belongs to a voice, see plai_note_on)
+//   7  trigger         (removed: a gate belongs to a voice, see plaits_note_on)
 //   8  level           accent, only read when 10 is 1
-//   9  trigger_patched (removed: see plai_set_drone)
+//   9  trigger_patched (removed: see plaits_set_drone)
 //  10  level_patched   0 or 1
 //  11  fm_amount       -1..1, also the internal envelope's pitch sweep
 //  12  timbre_mod_amount
@@ -262,7 +262,7 @@ extern "C" {
 
 /** Prepare every voice. Returns 1 when the host runs at the rate Plaits was
  *  compiled for, 0 when it does not and the pitch would be wrong. */
-int plai_init(float host_sample_rate) {
+int plaits_init(float host_sample_rate) {
   for (int v = 0; v < kMaxVoices; v++) {
     stmlib::BufferAllocator allocator(alloc_buffer[v], sizeof(alloc_buffer[v]));
     voice[v].Init(&allocator);
@@ -299,7 +299,7 @@ int plai_init(float host_sample_rate) {
   return (host_sample_rate > want - 0.5f && host_sample_rate < want + 0.5f) ? 1 : 0;
 }
 
-void plai_set_param(int id, float v) {
+void plaits_set_param(int id, float v) {
   switch (id) {
     case 0:  patch.engine = static_cast<int>(v); break;
     case 1:
@@ -325,7 +325,7 @@ void plai_set_param(int id, float v) {
   }
 }
 
-float plai_get_param(int id) {
+float plaits_get_param(int id) {
   switch (id) {
     case 0:  return static_cast<float>(patch.engine);
     case 1:  return base_note;
@@ -347,7 +347,7 @@ float plai_get_param(int id) {
  * HOW MANY VOICES RUN. Clamped to 1..kMaxVoices and returned, so a caller that
  * asks for twelve is told it got eight rather than finding out by listening.
  */
-int plai_set_polyphony(int n) {
+int plaits_set_polyphony(int n) {
   if (n < 1) n = 1;
   if (n > kMaxVoices) n = kMaxVoices;
   // A voice that is leaving stops here rather than vanishing mid-note: it is
@@ -359,8 +359,8 @@ int plai_set_polyphony(int n) {
   return polyphony;
 }
 
-int plai_polyphony(void) { return polyphony; }
-int plai_max_voices(void) { return kMaxVoices; }
+int plaits_polyphony(void) { return polyphony; }
+int plaits_max_voices(void) { return kMaxVoices; }
 
 /**
  * THE OUTPUT TRIM, READ RATHER THAN RE-DERIVED. The page prints this, and it
@@ -369,7 +369,7 @@ int plai_max_voices(void) { return kMaxVoices; }
  * 0.354, which is 9 dB below where this page sat when it was monophonic, and
  * that is the price of eight voices never summing past the destination.
  */
-float plai_trim(void) { return trim; }
+float plaits_trim(void) { return trim; }
 
 /**
  * PLAY A NOTE, AND RETURN THE VOICE THAT TOOK IT.
@@ -407,7 +407,7 @@ float plai_trim(void) { return trim; }
  *               Only read when `hold` is 0; a pluck wants the ping envelope and
  *               gets its loudness from the engine.
  */
-int plai_note_on(float note, int hold, float level) {
+int plaits_note_on(float note, int hold, float level) {
   if (!ready) return -1;
 
   int pick = -1;
@@ -467,7 +467,7 @@ int plai_note_on(float note, int hold, float level) {
   /**
    * 🔴 A LEVEL ABOVE ZERO IS WHAT PATCHES THE LEVEL INPUT, NOT A HOLD OF ZERO.
    * This read `hold == 0` for one build and that was too broad by one caller:
-   * the page's own BENCH plays `plai_note_on(note, 0)` for each voice and then
+   * the page's own BENCH plays `plaits_note_on(note, 0)` for each voice and then
    * drones them, so all eight became keyboard notes and the drone silenced
    * every one. It priced eight voices at the cost of the one the drone
    * allocates for itself, **4 µs against 4 µs**, and the assert that says a
@@ -492,7 +492,7 @@ int plai_note_on(float note, int hold, float level) {
  * RELEASE ONE NOTE, WHICH IS WHAT A KEY COMING BACK UP MEANS.
  *
  * 🔴 UNTIL 2026-09-22 THIS FILE HAD NO NOTE-OFF AT ALL, AND THAT IS WHY A REAL
- * KEYBOARD PLAYED PLUCKS. `plai_note_on` is the only way in and its `hold`
+ * KEYBOARD PLAYED PLUCKS. `plaits_note_on` is the only way in and its `hold`
  * argument is a number of BLOCKS decided at the moment the key goes DOWN, so
  * the length of a note had to be guessed before the player had finished
  * playing it. 6 ms of hold through a lowpass gate is a pluck whatever the key
@@ -519,7 +519,7 @@ int plai_note_on(float note, int hold, float level) {
  * @return how many voices were released, which is 0 for a note nobody is
  *         holding and is a fact the page prints rather than an error.
  */
-int plai_note_off(float note) {
+int plaits_note_off(float note) {
   int n = 0;
   for (int v = 0; v < polyphony; v++) {
     VoiceState& s = vs[v];
@@ -539,7 +539,7 @@ int plai_note_off(float note) {
 
 /** Stop everything, now. Used when the voice count changes and by the page's
  *  own checks, so a run never inherits the last one's ringing. */
-void plai_all_off(void) {
+void plaits_all_off(void) {
   for (int v = 0; v < kMaxVoices; v++) SilenceVoice(v);
   droning = false;
 }
@@ -553,7 +553,7 @@ void plai_all_off(void) {
  * instead is whatever is already held, which means a chord pressed first and
  * droned second sustains as a chord.
  */
-void plai_set_drone(int on) {
+void plaits_set_drone(int on) {
   if (on) {
     /**
      * 🔴 A KEYBOARD NOTE IS NOT DRONE MATERIAL, AND TURNING IT INTO ONE IS A
@@ -579,7 +579,7 @@ void plai_set_drone(int on) {
        IT. A drone that patched the level input would be a note held by an
        envelope rather than an engine running free, and would silence itself on
        the next drone. */
-    if (!any) plai_note_on(base_note, 0, 0.0f);
+    if (!any) plaits_note_on(base_note, 0, 0.0f);
     for (int v = 0; v < polyphony; v++) {
       if (!vs[v].active) continue;
       vs[v].hold = 0;
@@ -607,25 +607,25 @@ void plai_set_drone(int on) {
   droning = on != 0;
 }
 
-int plai_droning(void) { return droning ? 1 : 0; }
+int plaits_droning(void) { return droning ? 1 : 0; }
 
 /** How many voices are being rendered right now. */
-int plai_held(void) {
+int plaits_held(void) {
   int n = 0;
   for (int v = 0; v < polyphony; v++) if (vs[v].active) n++;
   return n;
 }
 
-float plai_voice_note(int v) {
+float plaits_voice_note(int v) {
   return (v < 0 || v >= kMaxVoices) ? 0.0f : vs[v].note;
 }
 
-float plai_voice_level(int v) {
+float plaits_voice_level(int v) {
   return (v < 0 || v >= kMaxVoices) ? 0.0f : vs[v].level;
 }
 
 /** 0 beyond the voice count, 1 free, 2 the gate is up, 3 ringing, 4 droning. */
-int plai_voice_state(int v) {
+int plaits_voice_state(int v) {
   if (v < 0 || v >= kMaxVoices) return 0;
   if (v >= polyphony) return 0;
   const VoiceState& s = vs[v];
@@ -635,15 +635,15 @@ int plai_voice_state(int v) {
   return 3;
 }
 
-int plai_steals(void) { return steals; }
-int plai_last_voice(void) { return last_voice; }
-int plai_last_stolen(void) { return last_stolen; }
-float plai_last_stolen_note(void) { return last_stolen_note; }
-float plai_last_stolen_level(void) { return last_stolen_level; }
+int plaits_steals(void) { return steals; }
+int plaits_last_voice(void) { return last_voice; }
+int plaits_last_stolen(void) { return last_stolen; }
+float plaits_last_stolen_note(void) { return last_stolen_note; }
+float plaits_last_stolen_level(void) { return last_stolen_level; }
 
 /** Fill `frames` samples of each output. Returns how many 12-frame blocks of
  *  Plaits were run to do it, which is the number the page prints. */
-int plai_render(float* out, float* aux, int frames) {
+int plaits_render(float* out, float* aux, int frames) {
   if (!ready) return 0;
   int ran = 0;
   int i = 0;
@@ -665,46 +665,46 @@ int plai_render(float* out, float* aux, int frames) {
   return ran;
 }
 
-float* plai_out_ptr(void) { return out_scratch; }
-float* plai_aux_ptr(void) { return aux_scratch; }
-int plai_scratch_frames(void) { return kScratch; }
+float* plaits_out_ptr(void) { return out_scratch; }
+float* plaits_aux_ptr(void) { return aux_scratch; }
+int plaits_scratch_frames(void) { return kScratch; }
 
 /** Which model is sounding, asked of the voice that took the last note. Not the
  *  same as parameter 0: `voice.cc` runs the request through a hysteresis
  *  quantizer and only swaps on a trigger when one is patched, so the asked-for
  *  engine and the sounding engine can differ for a block or two. The page shows
  *  both. */
-int plai_active_engine(void) {
+int plaits_active_engine(void) {
   const int v = (last_voice >= 0 && last_voice < polyphony) ? last_voice : 0;
   return voice[v].active_engine();
 }
 
-int plai_engine_count(void) { return 16; }
-int plai_block_size(void) { return static_cast<int>(plaits::kBlockSize); }
-float plai_sample_rate(void) { return plaits::kSampleRate; }
-int plai_blocks_rendered(void) { return blocks_rendered; }
+int plaits_engine_count(void) { return 16; }
+int plaits_block_size(void) { return static_cast<int>(plaits::kBlockSize); }
+float plaits_sample_rate(void) { return plaits::kSampleRate; }
+int plaits_blocks_rendered(void) { return blocks_rendered; }
 
 /**
  * `Voice::Render` CALLS, SUMMED OVER EVERY VOICE, AND IT IS THE HALF THAT MAKES
  * THE BLOCK INVARIANT CHECKABLE. With N voices sounding for a whole stretch,
- * this has to advance by exactly N times `plai_blocks_rendered`. Anything that
+ * this has to advance by exactly N times `plaits_blocks_rendered`. Anything that
  * rendered a voice on its own schedule, at its own length, or not at all, shows
  * up as a number that does not divide.
  */
-int plai_voice_renders(void) { return voice_renders; }
+int plaits_voice_renders(void) { return voice_renders; }
 
 /** What eight voices cost in bytes, read off the types rather than estimated. */
-int plai_voice_bytes(void) { return static_cast<int>(sizeof(plaits::Voice)); }
-int plai_alloc_bytes(void) { return static_cast<int>(sizeof(alloc_buffer[0])); }
+int plaits_voice_bytes(void) { return static_cast<int>(sizeof(plaits::Voice)); }
+int plaits_alloc_bytes(void) { return static_cast<int>(sizeof(alloc_buffer[0])); }
 
 /** The full stamp: both upstream commits, the source digest, the compiler. */
-const char* plai_build(void) { return kBuild; }
+const char* plaits_build(void) { return kBuild; }
 
 /** The source digest alone, over the exact list of .cc files compiled into
  *  this module and the shim itself. A native build of the same sources on
  *  another machine prints the same sixteen characters, and that is the only
  *  thing that can turn "the same instrument at both ends" into a checkable
  *  statement rather than a claim about two things that sound alike. */
-const char* plai_source_sha(void) { return kSourceSha; }
+const char* plaits_source_sha(void) { return kSourceSha; }
 
 }  // extern "C"

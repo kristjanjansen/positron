@@ -31,7 +31,7 @@ satisfies that, rather than what creates it.
 | what | where | licence text |
 | --- | --- | --- |
 | Faust compiler, WebAssembly | `demo/fau/vendor/libfaust-wasm.wasm` | `demo/fau/vendor/LICENSE-faustwasm` (GNU Lesser) |
-| Mutable Instruments Plaits DSP | `demo/muta/vendor/plai.wasm` | `demo/muta/vendor/LICENSE-plaits` |
+| Mutable Instruments Plaits DSP | `demo/muta/vendor/plaits.wasm` | `demo/muta/vendor/LICENSE-plaits` |
 | Mutable Instruments Warps DSP | `demo/muta/vendor/warp.wasm` | `demo/muta/vendor/LICENSE-warps` |
 | Jeff Learman's jRhodes3d, his own 1977 Rhodes Mark I Stage 73 | 99 files under `demo/nola/` | `demo/nola/LICENSE-jrhodes3d` |
 | Bravura music font | `demo/shell/vendor/` | `LICENSE-bravura` (SIL Open Font License) |

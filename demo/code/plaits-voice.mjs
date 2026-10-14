@@ -1,14 +1,14 @@
-// The Plaits voice /code/plaits/ plays: /muta/'s `muta-worklet.js` and `plai.wasm`, bytes fetched
+// The Plaits voice /code/plaits/ plays: /muta/'s `muta-worklet.js` and `plaits.wasm`, bytes fetched
 // on the main thread because a worklet cannot fetch. `warm()` fetches, `boot()` must run in a
 // press; a note before the voice is up is dropped. Sound leaves via `out()`, `speakers()`, `scopeIn()`.
 // See lessons/page-code.md#code-34
 
 import { createWaveShape } from '/shell/synth-view.mjs';
 
-const PLAI_URL = '/muta/vendor/plai.wasm';
+const PLAITS_URL = '/muta/vendor/plaits.wasm';
 const WORKLET_URL = '/muta/muta-worklet.js';
 
-/** The parameter ids, as muta-worklet.js and plai_shim.cc spell them. */
+/** The parameter ids, as muta-worklet.js and plaits_shim.cc spell them. */
 export const P = {
   engine: 0, note: 1, harmonics: 2, timbre: 3, morph: 4, decay: 5, lpgColour: 6,
   fmAmount: 11, timbreModAmount: 12, morphModAmount: 13,
@@ -115,8 +115,8 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {},
     else if (m.t === 'param' || m.t === 'voices') queue.push(m);
   }
   /** Fetch the bytes, nothing else. Safe to call on intent. */
-  const warm = () => (bytesP ||= fetch(PLAI_URL).then((r) => {
-    if (!r.ok) throw new Error(`${PLAI_URL} answered ${r.status}`);
+  const warm = () => (bytesP ||= fetch(PLAITS_URL).then((r) => {
+    if (!r.ok) throw new Error(`${PLAITS_URL} answered ${r.status}`);
     return r.arrayBuffer();
   }).catch((e) => { bytesP = null; throw e; }));
 
@@ -130,7 +130,7 @@ export function createPlaitsVoice({ log = () => {}, voices = 6, onUp = () => {},
     ready = (async () => {
       const t0 = performance.now();
       const [bytes] = await Promise.all([warm(), ctx.audioWorklet.addModule(WORKLET_URL)]);
-      node = new AudioWorkletNode(ctx, 'plai-voice', { outputChannelCount: [2] });
+      node = new AudioWorkletNode(ctx, 'plaits-voice', { outputChannelCount: [2] });
       node.onprocessorerror = () => log('the audio thread dropped the Plaits voice', 'bad');
       const up = new Promise((res, rej) => {
         const timer = setTimeout(() => rej(new Error('the worklet never answered')), 5000);

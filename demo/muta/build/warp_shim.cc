@@ -13,7 +13,7 @@
 //
 // `Modulator` is `Init(float sample_rate)`, `Process(ShortFrame*, ShortFrame*,
 // size_t)` and one `Parameters` struct. There is no voice, no allocator, no
-// note, no gate and no stealing rule, so the half of `plai_shim.cc` that is
+// note, no gate and no stealing rule, so the half of `plaits_shim.cc` that is
 // polyphony machinery simply does not exist here.
 //
 // ── 🔴 THE BLOCK LENGTH IS 60 AND IT IS NOT A FREE CHOICE ───────────────────
@@ -47,7 +47,7 @@
 // have crossed that line and taken a path the firmware never exercises.
 //
 // ⚠️ 128 IS NOT A MULTIPLE OF 60, SO THERE IS A CARRY, exactly as there is in
-// `plai_shim.cc` for a different reason. Two blocks fire in one quantum and
+// `plaits_shim.cc` for a different reason. Two blocks fire in one quantum and
 // eight frames are held over, so the third block lands 52 frames into the next
 // call. `warp_carry()` reports how many frames are sitting in the block that is
 // not full yet.
@@ -77,7 +77,7 @@
 // half of it is an octave low.
 //
 // ⚠️ WHAT WAS REFUSED IS RUNNING THE CONTEXT AT 96 kHz, which is the tidy
-// looking answer and is the trap. `plai_init` returns 0 at any rate but 48000
+// looking answer and is the trap. `plaits_init` returns 0 at any rate but 48000
 // by design, so a 96 kHz context would silently make the two firmwares on this
 // page incompatible. Oversampling 2x inside this shim is the real fix and is a
 // later job; it is 40 to 60 lines here plus a converter on the incoming
@@ -182,7 +182,7 @@ extern "C" {
 
 /** Prepare the modulator at the host's rate. Returns 1 when that rate is the
  *  one the filter bank's coefficients were computed at, 0 when it is not and
- *  the vocoder's bands are shifted. Unlike `plai_init` this is NOT a refusal:
+ *  the vocoder's bands are shifted. Unlike `plaits_init` this is NOT a refusal:
  *  Warps at the wrong rate is half right, and the page reports which half. */
 int warp_init(float host_sample_rate) {
   host_rate = host_sample_rate;
@@ -357,7 +357,7 @@ int warp_carrier_shape(void) { return modulator.parameters().carrier_shape; }
 const char* warp_build(void) { return kBuild; }
 
 /** The source digest alone, over the exact list of .cc files compiled into this
- *  module and the shim itself. It is a DIFFERENT digest from the one plai.wasm
+ *  module and the shim itself. It is a DIFFERENT digest from the one plaits.wasm
  *  carries, because the shim bytes and the source list are both different, and
  *  that is what keeps one build script from giving two modules one identity. */
 const char* warp_source_sha(void) { return kSourceSha; }

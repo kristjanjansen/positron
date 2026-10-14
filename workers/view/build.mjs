@@ -191,7 +191,7 @@ const FILES = [
   // it.
   // PROVENANCE-*.json is not deployed: the page reads each build stamp out of the wasm itself.
   // why: lessons/workers-view.md#muta
-  ['demo/muta/vendor/plai.wasm', 'muta/vendor/plai.wasm'],
+  ['demo/muta/vendor/plaits.wasm', 'muta/vendor/plaits.wasm'],
   ['demo/muta/vendor/LICENSE-plaits', 'muta/vendor/LICENSE-plaits'],
   ['demo/muta/vendor/warp.wasm', 'muta/vendor/warp.wasm'],
   ['demo/muta/vendor/LICENSE-warps', 'muta/vendor/LICENSE-warps'],
