@@ -24,10 +24,10 @@
   /* The maker's own colour, on the arc only: --hi keeps its site-wide meaning, and
      the hardware-moved and off states win because their rules come later.
      See lessons/page-muta.md#muta-1 */
-  .plai-panel .pos-knob-arc { stroke: var(--mi-teal-lit); }
+  .plaits-panel .pos-knob-arc { stroke: var(--mi-teal-lit); }
   /* A running hand's glyph takes the instrument's colour where shell.css uses --hi.
      See lessons/page-muta.md#muta-2 */
-  .plai-panel .pos-knob-hand[data-on="1"] { color: var(--mi-teal-lit); }
+  .plaits-panel .pos-knob-hand[data-on="1"] { color: var(--mi-teal-lit); }
 
   /* Two grids as one child of the row; min-width 0 keeps the drag in the row, not the
      page. 21 px of block padding insets the ink equally: 17 px of empty cell beside
@@ -36,16 +36,16 @@
   /* It scrolls rather than squeezes: flex 0 0 auto on the grids, or at 375 px the
      first grid shrinks and cuts HARMONICS and MORPH mid-word.
      See lessons/page-muta.md#muta-4 */
-  .plai-knobs {
+  .plaits-knobs {
     display: flex; align-items: start; min-width: 0; overflow-x: auto;
     padding-block: 21px;
   }
-  .plai-knobs > * { flex: 0 0 auto; }
+  .plaits-knobs > * { flex: 0 0 auto; }
   /* A rule between the two grids, because a plain gap reads as one more column gap.
      --rows-gap is at :root (16 px); --panel-gap needs a .panel ancestor this lacks.
      align-items: start, or the shorter grid stretches off the taller one's lattice.
      See lessons/page-muta.md#muta-5 */
-  .plai-knobs > :first-child {
+  .plaits-knobs > :first-child {
     border-right: 1px solid var(--line);
     padding-right: var(--rows-gap);
     margin-right: var(--rows-gap);
@@ -70,7 +70,7 @@
      arrows. After the rule it overrides: order wins, not weight. Graded by shot 375.
      See lessons/page-muta.md#muta-9 */
   @media (max-width: 560px) {
-    .plai-panel .muta-end { flex: 1 1 100%; }
+    .plaits-panel .muta-end { flex: 1 1 100%; }
     .muta-end .pos-pick { width: auto; flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; }
   }
 
@@ -79,7 +79,7 @@
      @container (containment collapses the fit-content surface).
      See lessons/page-muta.md#muta-10 */
   @media (min-width: 561px) {
-    .plai-knobs { justify-content: center; }
+    .plaits-knobs { justify-content: center; }
   }
 </style>
 
@@ -105,10 +105,10 @@
   // One artefact, one shim, one pinned commit. vendor/ and build/ also hold Warps,
   // which build/build.sh still compiles and nothing here fetches.
   // See lessons/page-muta.md#muta-14
-  const PLAI_URL = '/muta/vendor/plai.wasm';
+  const PLAITS_URL = '/muta/vendor/plaits.wasm';
 
   // The sixteen models in the order plaits/dsp/voice.cc:38 registers them, because
-  // plai_active_engine() returns an index into this order.
+  // plaits_active_engine() returns an index into this order.
   // See lessons/page-muta.md#muta-15
   const MODELS = [
     'virtual analog', 'waveshaping', 'two operator FM', 'granular formant',
@@ -117,9 +117,9 @@
     'modal', 'bass drum', 'snare drum', 'hi-hat',
   ];
 
-  // Parameter ids, also spelled out in demo/muta/build/plai_shim.cc and
+  // Parameter ids, also spelled out in demo/muta/build/plaits_shim.cc and
   // demo/muta/muta-worklet.js; a mismatch moves the wrong control instead of throwing.
-  // 7 and 9 (the triggers) are gone: a gate is per voice, plai_note_on and drone.
+  // 7 and 9 (the triggers) are gone: a gate is per voice, plaits_note_on and drone.
   // See lessons/page-muta.md#muta-16
   const P = {
     engine: 0, note: 1, harmonics: 2, timbre: 3, morph: 4,
@@ -127,7 +127,7 @@
     fmAmount: 11, timbreModAmount: 12, morphModAmount: 13,
   };
 
-  // The wasm reports plai_max_voices(), but the control is built before the fetch, so
+  // The wasm reports plaits_max_voices(), but the control is built before the fetch, so
   // this is typed once and a check grades it against the wasm.
   // See lessons/page-muta.md#muta-17
   const SLIDER_MAX_VOICES = 8;
@@ -286,7 +286,7 @@
           onInput: (v) => setVoices(v) }),
     ],
   });
-  const knobGrid = el('div', 'plai-knobs');
+  const knobGrid = el('div', 'plaits-knobs');
   knobGrid.append(ownGrid.el, extraGrid.el);
 
   // See lessons/page-muta.md#muta-37
@@ -338,7 +338,7 @@
     viz: scope.el,
     rows: [[knobGrid]],
     plate: { name: 'MUTA', patch: endGroup },
-    cls: 'plai-panel',
+    cls: 'plaits-panel',
     full: true,
   });
 
@@ -373,7 +373,7 @@
   /**
    * A keyboard plays the oscillator whenever the page is armed. requestMIDIAccess is
    * a prompt, so it is asked once (ensureMidi is idempotent) from the arming gesture,
-   * never on load. A key holds the gate until plai_note_off.
+   * never on load. A key holds the gate until plaits_note_off.
    * See lessons/page-muta.md#muta-46
    */
   let midi = null;
@@ -389,7 +389,7 @@
   let droneWanted = false;
   /* pedal.mjs owns the held sets, the 63/64 threshold, the change filter and panic;
      release here is one message to the worklet. The damper time is ignored: the
-     shim's plai_note_off has its own shape.
+     shim's plaits_note_off has its own shape.
      See lessons/page-muta.md#muta-49 */
   /* A drone has nothing to let go of, so the release is swallowed here and not at
      keyUp: the pedal must still learn the key came up.
@@ -539,7 +539,7 @@
     if (warmed) return warmed;
     wasmFetches++;
     const t0 = performance.now();
-    warmed = grab(PLAI_URL).then((bytes) => {
+    warmed = grab(PLAITS_URL).then((bytes) => {
       wasmBytes = bytes.byteLength;             // read BEFORE anything transfers it
       fetchMs = performance.now() - t0;
       /* The bench is a second instance on the main thread, connected to nothing, because
@@ -584,7 +584,7 @@
     // See lessons/page-muta.md#muta-67
     const bytes = await warmUp();
 
-    node = new AudioWorkletNode(ctx, 'plai-voice', { outputChannelCount: [2] });
+    node = new AudioWorkletNode(ctx, 'plaits-voice', { outputChannelCount: [2] });
     node.port.onmessage = (e) => onWorklet(e.data);
     // A processor that throws is dropped silently for the rest of the page's life.
     // See lessons/page-muta.md#muta-68
@@ -756,26 +756,26 @@
   function makeBench(bytes) {
     const ex = new WebAssembly.Instance(new WebAssembly.Module(bytes), {}).exports;
     if (typeof ex._initialize === 'function') ex._initialize();
-    ex.plai_init(48000);
-    return { ex, op: ex.plai_out_ptr(), ap: ex.plai_aux_ptr() };
+    ex.plaits_init(48000);
+    return { ex, op: ex.plaits_out_ptr(), ap: ex.plaits_aux_ptr() };
   }
 
   function costOf(engine, n) {
     const { ex, op, ap } = bench;
-    ex.plai_all_off();
-    ex.plai_set_polyphony(n);
-    ex.plai_set_param(P.engine, engine);
+    ex.plaits_all_off();
+    ex.plaits_set_polyphony(n);
+    ex.plaits_set_param(P.engine, engine);
     // Spread, so no two voices are rendering the same note and the engines
     // cannot share a cached anything.
-    for (let i = 0; i < n; i++) ex.plai_note_on(40 + i * 5, 0);
-    ex.plai_set_drone(1);                          // gate out of the way
+    for (let i = 0; i < n; i++) ex.plaits_note_on(40 + i * 5, 0);
+    ex.plaits_set_drone(1);                          // gate out of the way
     // Warm up first: early calls measure the JIT tiering, and the DSP's hysteresis
     // quantizer has to settle on the new model.
     // See lessons/page-muta.md#muta-83
-    for (let i = 0; i < 200; i++) ex.plai_render(op, ap, 128);
+    for (let i = 0; i < 200; i++) ex.plaits_render(op, ap, 128);
     const N = 1000;                                // 2.7 s of audio
     const t0 = performance.now();
-    for (let i = 0; i < N; i++) ex.plai_render(op, ap, 128);
+    for (let i = 0; i < N; i++) ex.plaits_render(op, ap, 128);
     return (performance.now() - t0) / N;
   }
 
@@ -788,20 +788,20 @@
   function stealRule() {
     if (!bench) return null;
     const { ex, op, ap } = bench;
-    ex.plai_all_off();
-    ex.plai_set_polyphony(2);
-    ex.plai_set_param(P.engine, 0);
-    const loud = ex.plai_note_on(60, 24);
+    ex.plaits_all_off();
+    ex.plaits_set_polyphony(2);
+    ex.plaits_set_param(P.engine, 0);
+    const loud = ex.plaits_note_on(60, 24);
     // Drones only this voice; the next note-on patches its own trigger back in.
     // See lessons/page-muta.md#muta-85
-    ex.plai_set_drone(1);
-    for (let i = 0; i < 8; i++) ex.plai_render(op, ap, 128);
-    const faded = ex.plai_note_on(67, 24);            // 6 ms of gate, then decay
-    for (let i = 0; i < 150; i++) ex.plai_render(op, ap, 128);   // 0.4 s
-    const levels = [ex.plai_voice_level(0), ex.plai_voice_level(1)];
-    const took = ex.plai_note_on(72, 24);
-    const stolen = ex.plai_last_stolen();
-    ex.plai_all_off();
+    ex.plaits_set_drone(1);
+    for (let i = 0; i < 8; i++) ex.plaits_render(op, ap, 128);
+    const faded = ex.plaits_note_on(67, 24);            // 6 ms of gate, then decay
+    for (let i = 0; i < 150; i++) ex.plaits_render(op, ap, 128);   // 0.4 s
+    const levels = [ex.plaits_voice_level(0), ex.plaits_voice_level(1)];
+    const took = ex.plaits_note_on(72, 24);
+    const stolen = ex.plaits_last_stolen();
+    ex.plaits_all_off();
     return { held: loud, faded, levels, took, stolen };
   }
 
@@ -928,7 +928,7 @@
        See lessons/page-muta.md#muta-95 */
     pedal.forgetKeys();
     droning = true;
-    /* No note: plai_set_drone(1) allocates one itself when nothing sounds, and a note
+    /* No note: plaits_set_drone(1) allocates one itself when nothing sounds, and a note
        sent from here would arrive after it as a second, triggered attack.
        See lessons/page-muta.md#muta-96 */
     send({ t: 'drone', on: true });
@@ -1096,7 +1096,7 @@
        the second group starting beyond it, so a rule that never matched goes red.
        See lessons/page-muta.md#muta-114 */
     const bTmod = box('timbreMod'), bDecay = box('decay');
-    const firstGroup = document.querySelector('.plai-knobs > *');
+    const firstGroup = document.querySelector('.plaits-knobs > *');
     const rule = firstGroup ? getComputedStyle(firstGroup) : null;
     const lineW = rule ? parseFloat(rule.borderRightWidth) : NaN;
     d.assert('the panel’s own four are divided from the added ones by a drawn line',
@@ -1346,7 +1346,7 @@
       /* See lessons/page-muta.md#muta-136 */
       // voice.cc sets three envelope rates from kBlockSize, not from the size it is handed
       // (lines 135, 207, 213), so every voice must sit on the same block boundary. With N
-      // voices sounding, plai_voice_renders() advances by exactly N times blocks rendered.
+      // voices sounding, plaits_voice_renders() advances by exactly N times blocks rendered.
       // See lessons/page-muta.md#muta-137
       const br = blockRule;
       d.assert('every voice rendered the same blocks of twelve as every other',
@@ -1479,7 +1479,7 @@
 
       /**
        * The model changes under a note already sounding. It compares the signal, not
-       * plai_active_engine(), which only echoes what this page sent.
+       * plaits_active_engine(), which only echoes what this page sent.
        * See lessons/page-muta.md#muta-149
        */
       send({ t: 'allOff' });
@@ -1584,7 +1584,7 @@
 
       /**
        * A key still ringing when the drone starts must not become a second endless drone
-       * (plai_set_drone clears every trigger). Compared against a drone started with
+       * (plaits_set_drone clears every trigger). Compared against a drone started with
        * nothing sounding, so a quiet drone cannot pass it.
        * See lessons/page-muta.md#muta-158
        */
@@ -1685,8 +1685,8 @@
         `three sustained notes reach ${oscPeak.toFixed(4)} out of the oscillator`);
 
       /**
-       * One voice means one note with three keys down, read from the DSP's plai_held and
-       * plai_voice_note, not from what the page sent.
+       * One voice means one note with three keys down, read from the DSP's plaits_held and
+       * plaits_voice_note, not from what the page sent.
        * See lessons/page-muta.md#muta-163
        */
       send({ t: 'allOff' });

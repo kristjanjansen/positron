@@ -2,7 +2,7 @@
 // worklet processor.
 //
 // 🔴 AND THERE WERE TWO UNTIL 2026-09-28. `warp-mod` ran Warps in this same
-// file, downstream of `plai-voice`, out of a second `.wasm` built from a second
+// file, downstream of `plaits-voice`, out of a second `.wasm` built from a second
 // shim at the same pinned commit; neither knew the other existed and what
 // joined them was a WebAudio connection made in the page. It went out on
 // *"arhive/rmwarps and rm all routing code around it"*, and the class and its
@@ -59,11 +59,11 @@
 //
 // ── A NOTE IS NOT A PARAMETER, AND THAT IS WHAT CHANGED FOR POLYPHONY ───────
 //
-// 🔴 UNTIL THE VOICES ARRIVED, A PLUCK WAS `plai_set_param(7, 1)` FOLLOWED BY
-// `plai_set_param(7, 0)` TWO QUANTA LATER, AND BOTH OF THOSE IDS ARE GONE.
+// 🔴 UNTIL THE VOICES ARRIVED, A PLUCK WAS `plaits_set_param(7, 1)` FOLLOWED BY
+// `plaits_set_param(7, 0)` TWO QUANTA LATER, AND BOTH OF THOSE IDS ARE GONE.
 // A gate belongs to ONE voice, so it cannot be a panel parameter: parameter 7
 // (trigger) and parameter 9 (trigger_patched) were removed from the shim and
-// replaced by `plai_note_on`, `plai_all_off` and `plai_set_drone`. The old ids
+// replaced by `plaits_note_on`, `plaits_all_off` and `plaits_set_drone`. The old ids
 // now fall through the shim's `default: break`, which means a page still
 // sending them makes no sound and reports no error. They are listed below as
 // removed for exactly that reason.
@@ -74,7 +74,7 @@
 // wasm reports rather than a 12 typed here a second time.
 
 // The parameter ids, spelled out. The same list is in
-// demo/muta/build/plai_shim.cc and a disagreement between them moves the wrong
+// demo/muta/build/plaits_shim.cc and a disagreement between them moves the wrong
 // control rather than throwing, which is why both sides carry the names.
 const P = {
   engine: 0, note: 1, harmonics: 2, timbre: 3, morph: 4,
@@ -84,7 +84,7 @@ const P = {
 };
 
 // 🔴 THERE IS NO CLOCK IN HERE, MEASURED RATHER THAN ASSUMED. This file timed
-// its own `plai_render` with `performance.now()` until 2026-09-22, and in
+// its own `plaits_render` with `performance.now()` until 2026-09-22, and in
 // headless Chrome 141 the page reported `the audio thread here has no clock`
 // on every run: `performance` is not exposed to an AudioWorkletGlobalScope by
 // the specification and Chrome does not add it. `currentTime` and
@@ -254,7 +254,7 @@ class PlaiVoice extends AudioWorkletProcessor {
     if (m.t === 'wasm') { this.boot(m.bytes, m.rate); return; }
     if (!this.ex) return;
     if (m.t === 'param') {
-      this.ex.plai_set_param(m.id, m.value);
+      this.ex.plaits_set_param(m.id, m.value);
       /**
        * 🔴 THE SCOPE'S TIME BASE COMES FROM THE NOTE, NOT FROM THE SIGNAL.
        * Reported as *"supernervous"* after two rounds of trying to make a
@@ -274,29 +274,29 @@ class PlaiVoice extends AudioWorkletProcessor {
     }
     if (m.t === 'channel') { this.channel = m.value ? 1 : 0; return; }
     if (m.t === 'voices') {
-      const got = this.ex.plai_set_polyphony(m.n | 0);
-      this.port.postMessage({ t: 'voices', asked: m.n | 0, got, trim: this.ex.plai_trim() });
+      const got = this.ex.plaits_set_polyphony(m.n | 0);
+      this.port.postMessage({ t: 'voices', asked: m.n | 0, got, trim: this.ex.plaits_trim() });
       return;
     }
     if (m.t === 'allOff') {
-      this.ex.plai_all_off();
-      this.port.postMessage({ t: 'allOff', held: this.ex.plai_held() });
+      this.ex.plaits_all_off();
+      this.port.postMessage({ t: 'allOff', held: this.ex.plaits_held() });
       return;
     }
     if (m.t === 'drone') {
-      this.ex.plai_set_drone(m.on ? 1 : 0);
-      this.port.postMessage({ t: 'drone', on: this.ex.plai_droning() === 1, held: this.ex.plai_held() });
+      this.ex.plaits_set_drone(m.on ? 1 : 0);
+      this.port.postMessage({ t: 'drone', on: this.ex.plaits_droning() === 1, held: this.ex.plaits_held() });
       return;
     }
     if (m.t === 'noteOn') { this.noteOn(m); return; }
     /* A KEY COMING BACK UP, WHICH THE SHIM COULD NOT BE TOLD ABOUT UNTIL
-       2026-09-22. `plai_note_off` drops that note's gate and leaves the voice
+       2026-09-22. `plaits_note_off` drops that note's gate and leaves the voice
        rendering, so the lowpass gate closes over `decay` rather than the sound
        being cut. `released` is 0 for a note nobody is holding, which is an
        ordinary thing for a keyboard to send and not an error. */
     if (m.t === 'noteOff') {
-      const released = this.ex.plai_note_off(m.note);
-      this.port.postMessage({ t: 'noteOff', note: m.note, released, held: this.ex.plai_held() });
+      const released = this.ex.plaits_note_off(m.note);
+      this.port.postMessage({ t: 'noteOff', note: m.note, released, held: this.ex.plaits_held() });
       return;
     }
   }
@@ -312,9 +312,9 @@ class PlaiVoice extends AudioWorkletProcessor {
    */
   noteOn(m) {
     const ex = this.ex;
-    const poly = ex.plai_polyphony();
+    const poly = ex.plaits_polyphony();
     const before = [];
-    for (let v = 0; v < poly; v++) before.push(ex.plai_voice_level(v));
+    for (let v = 0; v < poly; v++) before.push(ex.plaits_voice_level(v));
 
     // Milliseconds in, blocks out, converted with the block size the wasm
     // reports. 0 holds the gate up until something else takes it down, which is
@@ -328,18 +328,18 @@ class PlaiVoice extends AudioWorkletProcessor {
        engine's accent as well as the lowpass gate's level, so this is velocity
        arriving at the DSP rather than being counted and thrown away. */
     const level = Number.isFinite(m.level) ? Math.min(1, Math.max(0, m.level)) : 1;
-    const voice = ex.plai_note_on(m.note, hold, level);
+    const voice = ex.plaits_note_on(m.note, hold, level);
     this.port.postMessage({
       t: 'note',
       note: m.note,
       voice,
       holdBlocks: hold,
       level,
-      stolen: ex.plai_last_stolen(),
-      stolenNote: ex.plai_last_stolen_note(),
-      stolenLevel: ex.plai_last_stolen_level(),
-      steals: ex.plai_steals(),
-      held: ex.plai_held(),
+      stolen: ex.plaits_last_stolen(),
+      stolenNote: ex.plaits_last_stolen_note(),
+      stolenLevel: ex.plaits_last_stolen_level(),
+      steals: ex.plaits_steals(),
+      held: ex.plaits_held(),
       before,
     });
   }
@@ -358,14 +358,14 @@ class PlaiVoice extends AudioWorkletProcessor {
       // failure is silence rather than an error.
       if (typeof ex._initialize === 'function') ex._initialize();
 
-      const rateOk = ex.plai_init(rate) === 1;
-      this.outPtr = ex.plai_out_ptr();
-      this.auxPtr = ex.plai_aux_ptr();
-      const cap = ex.plai_scratch_frames();
+      const rateOk = ex.plaits_init(rate) === 1;
+      this.outPtr = ex.plaits_out_ptr();
+      this.auxPtr = ex.plaits_aux_ptr();
+      const cap = ex.plaits_scratch_frames();
       this.out = new Float32Array(ex.memory.buffer, this.outPtr, cap);
       this.aux = new Float32Array(ex.memory.buffer, this.auxPtr, cap);
-      this.blockSize = ex.plai_block_size();
-      this.maxVoices = ex.plai_max_voices();
+      this.blockSize = ex.plaits_block_size();
+      this.maxVoices = ex.plaits_max_voices();
       this.ex = ex;
 
       this.port.postMessage({
@@ -374,17 +374,17 @@ class PlaiVoice extends AudioWorkletProcessor {
         bytes: bytes.byteLength,
         rateOk,
         hostRate: rate,
-        dspRate: ex.plai_sample_rate(),
+        dspRate: ex.plaits_sample_rate(),
         blockSize: this.blockSize,
-        engines: ex.plai_engine_count(),
+        engines: ex.plaits_engine_count(),
         scratch: cap,
         maxVoices: this.maxVoices,
-        polyphony: ex.plai_polyphony(),
-        trim: ex.plai_trim(),
-        voiceBytes: ex.plai_voice_bytes(),
-        allocBytes: ex.plai_alloc_bytes(),
-        build: readString(ex, ex.plai_build()),
-        sourceSha: readString(ex, ex.plai_source_sha()),
+        polyphony: ex.plaits_polyphony(),
+        trim: ex.plaits_trim(),
+        voiceBytes: ex.plaits_voice_bytes(),
+        allocBytes: ex.plaits_alloc_bytes(),
+        build: readString(ex, ex.plaits_build()),
+        sourceSha: readString(ex, ex.plaits_source_sha()),
       });
     } catch (err) {
       this.port.postMessage({ t: 'fail', why: String(err && err.message || err) });
@@ -408,7 +408,7 @@ class PlaiVoice extends AudioWorkletProcessor {
     const frames = ch[0].length;
     if (frames > this.out.length) return true;     // never render past the scratch
 
-    const blocks = this.ex.plai_render(this.outPtr, this.auxPtr, frames);
+    const blocks = this.ex.plaits_render(this.outPtr, this.auxPtr, frames);
     // THE FIRST SAMPLE, ANNOUNCED FROM WHERE IT HAPPENS. "Ready" is the wasm
     // instantiating; this is the audio thread having actually produced
     // something, and the two are what the page's `boot` cell measures between.
@@ -463,16 +463,16 @@ class PlaiVoice extends AudioWorkletProcessor {
       this.port.postMessage({
         t: 'meter',
         peak: this.peak,
-        blocks: this.ex.plai_blocks_rendered(),
+        blocks: this.ex.plaits_blocks_rendered(),
         // 🔴 THE HALF THAT MAKES THE BLOCK INVARIANT CHECKABLE. `Voice::Render`
         // calls summed over every voice. With N voices sounding for a whole
         // window this advances by exactly N times `blocks`, and a voice that
         // rendered on its own schedule or at its own length would not divide.
-        renders: this.ex.plai_voice_renders(),
-        held: this.ex.plai_held(),
-        poly: this.ex.plai_polyphony(),
+        renders: this.ex.plaits_voice_renders(),
+        held: this.ex.plaits_held(),
+        poly: this.ex.plaits_polyphony(),
         blocksPerQuantum: this.blocksLast,
-        engine: this.ex.plai_active_engine(),
+        engine: this.ex.plaits_active_engine(),
         frames,
       });
       this.peak = 0;
@@ -492,4 +492,4 @@ function readString(ex, ptr) {
   return s;
 }
 
-registerProcessor('plai-voice', PlaiVoice);
+registerProcessor('plaits-voice', PlaiVoice);

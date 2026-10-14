@@ -1,4 +1,4 @@
-Plaits DSP, compiled into demo/muta/vendor/plai.wasm
+Plaits DSP, compiled into demo/muta/vendor/plaits.wasm
 
 Source: https://github.com/VCVRack/pichenettes-eurorack.git
         9739c0227708fab7a28b4efef7b27a9a1bc098d1
@@ -58,6 +58,6 @@ The MIT text, verbatim from the header of plaits/dsp/voice.h:
   // See http://creativecommons.org/licenses/MIT/ for more information.
 
 The same README asks that derivative works not carry the Mutable
-Instruments name or the module's name. This page is called muta and the instrument on it is plated PLAI, the
+Instruments name or the module's name. The instrument is named Plaits on this site by the owner's choice (2026-10-14); the
 panel graphics are not taken, and the attribution above is to the
 author rather than branding.
