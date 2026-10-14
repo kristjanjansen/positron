@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "positron.studio",
+  "short_name": "positron",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "icons": [
+    {
+      "src": "/icons/android-b9d366a2.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/store-17fcc557.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -6,8 +6,8 @@
 // its six slides and everything that draws them moved here VERBATIM, and
 // `demo/kit/logo/index.html` shows each one as a block of its own. The CSS
 // that was brand-only moved with them, to `brand-slides.css`.
-// ⚠️ `drawMark` LIVES HERE NOW, and the favicon note in `shell.mjs` says so:
-// it is what `demo/favicon.ico` was rendered with.
+// ⚠️ `drawMark` LIVES HERE NOW. It drew the β+ `demo/favicon.ico` that p.s
+// replaced on 2026-10-14 (the favicon note in `shell.mjs`).
 // ⚠️ NOTHING HERE OPENS ANYTHING. A slide is drawn from its data; the only
 // file one costs is the slide face's Greek subset, from this origin, fetched by
 // the browser when a β is laid out.

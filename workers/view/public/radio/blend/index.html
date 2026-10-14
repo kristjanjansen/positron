@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex, nofollow">
 <meta property="og:site_name" content="positron.studio">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Radio">
+<meta property="og:title" content="Blend">
 <meta property="og:description" content="Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.">
 <meta property="og:url" content="https://positron.studio/radio/blend/">
 <meta property="og:image" content="https://positron.studio/og/site-98871a52.png">
@@ -14,6 +14,8 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <title>Radio</title>
@@ -91,7 +93,7 @@
   bay.addPort({ id: FADER_OUT, label: 'crossfader', dir: 'out', medium: 'audio' });
   bay.addPort({ id: SPEAKER_IN, label: 'speakers', dir: 'in', medium: 'audio' });
 
-  const d = mount({ name: 'Radio', what: '', readout: null, index: '/', indexLabel: 'positron' });
+  const d = mount({ name: 'Blend', what: '', readout: null, index: '/', indexLabel: 'positron' });
   conceptNav('radio/blend');
 
   // ── the sound: two streams, two gains, one AudioContext ──────────────────

@@ -14,6 +14,8 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON · pack</title>
@@ -200,7 +202,7 @@
    * message and its own test asserts that absence. The reason is one byte.
    * `Replace Current Patch` and `Replace Patch` differ at offset 6 of a 350 byte
    * message, the second overwrites a patch in FLASH on an instrument with no
-   * factory reset, and `New Pack.circuitpack` is the backup of that flash.
+   * factory reset, and the owner's pack is the backup of that flash.
    * ⚠️ A grep for `requestMIDIAccess` finds it absent on every day it is absent
    * and says nothing about the day somebody adds it behind a helper. This wraps
    * the method and counts.
@@ -215,7 +217,7 @@
   window.fetch = (...a) => { fetched++; return realFetch(...a); };
 
   // 🔴 THE PACK IS NOT IN THIS REPOSITORY ANY MORE, ON ANY ORIGIN. It moved to
-  // the private `<private-pack-repo>` on 2026-09-24 (*"rm new pack, is in
+  // the owner's private pack repository on 2026-09-24 (*"rm new pack, is in
   // separate repo"*), before this repository was prepared to go public, and the
   // blob it had been sitting on in history went with it.
   // 🔴 SO THE DEFAULT IS TO FETCH NOTHING, AND THE SECOND WAY IN IS AN EXPLICIT
@@ -254,7 +256,7 @@
     /**
      * 🔴 NO CONTROLS EITHER, AND `open the pack here` WENT ON 2026-09-21 BECAUSE
      * IT WAS ASKED FOR: *"rm 'open pack here'"*. It read the repository's own
-     * `New Pack.circuitpack`, which is published nowhere, so the control did
+     * copy of the owner's pack, which is published nowhere, so the control did
      * something on this machine and answered a sentence everywhere else. The
      * page has ONE way in now and it is the same one for everybody.
      * ⚠️ A BACKGROUND AGENT DELETED THIS CONTROL ON ITS OWN AUTHORITY EARLIER
@@ -2590,7 +2592,7 @@
         && drop.el.classList.contains('pos-drop-area'),
         `at ${location.hostname} after ${fetched} request(s) and ${drop.opens} file(s) opened`);
     } else {
-      await openPack('New Pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
+      await openPack('pack.circuitpack', new Uint8Array(await r.arrayBuffer()));
 
       /**
        * 🔴 THE FOOTER ARRIVES WITH THE FILE AND SPANS THE BLOCK. `glued` is
@@ -2626,7 +2628,7 @@
        * this is the second reading of the same fact, off the deployed bytes.
        */
 
-      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
+      await openPack('pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       d.assert('the pack reads as 64 patches, 32 sessions and 64 samples',
         patches.length === 64 && sessions.length === 32 && samples.length === 64,
@@ -2994,7 +2996,7 @@
         && patches[0].name === 'Frog Steps' && patches[1].name === 'Woo-z',
         `${sessions.length} session holding ${patches.map((x) => x.name).join(' and ')}`);
 
-      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
+      await openPack('pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       const heads = new Set(sessions.map((s) => s.head));
       d.assert('and the first four bytes are not what decided it, because INIT is on both sides',
@@ -3277,7 +3279,7 @@
       // this page's third assert measuring something next to the quantity in
       // question, and the other two are in `HANDOFF.md`.
 
-      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
+      await openPack('pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       /**
        * 🔴 THE FLASH WARNING, DRIVEN RATHER THAN READ. A file that would
@@ -3382,7 +3384,7 @@
         }
       }
 
-      await openPack('New Pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
+      await openPack('pack.circuitpack', new Uint8Array(await (await realFetch(PACK)).arrayBuffer()));
 
       const before = fetched;
       showPatch(3);

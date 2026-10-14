@@ -14,50 +14,21 @@
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:alt" content="positron.studio: Connect anything to everything. Create playful, interactive worlds, from the web up to the cloud and down to microcontrollers.">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-c7b28d7f.png">
+<link rel="manifest" href="/icons/manifest-8e6dda01.webmanifest">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0e14">
 <title>POSITRON social/typist</title>
 <link rel="stylesheet" href="/shell/shell.css">
-<style>
-  /* The reel is drawn at 1080 x 1920 and shown at a phone's size. */
-  .tw-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 48px; align-items: start; }
-  @media (max-width: 640px) { .tw-stage { grid-template-columns: minmax(0, 1fr); } }
-  .tw-cv { display: block; inline-size: 100%; block-size: auto; aspect-ratio: 9 / 16; border-radius: var(--r, 4px); background: #0b0e14; border: 1px solid var(--line2); box-sizing: border-box; }
-  .tw-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .tw-field { display: flex; flex-direction: column; gap: 6px; }
-  .tw-l { font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
-  .tw-side textarea {
-    display: block; inline-size: 100%; box-sizing: border-box; resize: vertical;
-    font: 400 14px/1.5 var(--mono); color: var(--fg); background: var(--card);
-    border: 1px solid var(--line2); border-radius: var(--r, 4px); padding: 10px 12px;
-  }
-  .tw-note { margin: 0; font: 400 12px/1.5 var(--mono); color: var(--dim); }
-</style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createSamples, createVoice } from '/typist/sampler.mjs';
-  import { createTransportBar, barButton } from '/shell/transport-bar.mjs';
-  import { setIcon } from '/shell/icon-button.mjs';
-  import { makeLogDeck } from '/timeline/logdeck.mjs';
+  import { createReel, field, font, drawWordmark, drawLowerLine, W, H, X, TEXT_W, SAFE_TOP, SAFE_BOTTOM, C } from '/shell/reel.mjs';
 
-  // A typewriter reel for a story: the text types itself onto a 1080 x 1920
-  // frame with the Hermes Precisa's own key sounds, and Record makes the file.
-  // A visit draws the finished frame and opens nothing; the samples are fetched
-  // on the first press.
-  const W = 1080, H = 1920;
-  // Instagram covers about 14% at the top and up to 35% at the bottom of a reel
-  // (research/ui-video-capture-2026-10-14.md), so the words live between these.
-  const SAFE_TOP = 270, SAFE_BOTTOM = 1250, X = 72, TEXT_W = W - 2 * X;
-  const C = { bg: '#0b0e14', fg: '#e6e6e6', dim: '#8b93a1', hi: '#ffd400' };
-  const LINE = 1.22, MAX = 160, MIN = 64;
-  // The main type is as big as its widest written line allows, between MIN and MAX.
-  let SIZE = 88;
-  function fit(text) {
-    ctx.font = font(600, 100);
-    const widest = Math.max(1, ...text.split('\n').map((l) => ctx.measureText(l).width));
-    SIZE = Math.max(MIN, Math.min(MAX, Math.floor(100 * TEXT_W / widest)));
-  }
+  // A typewriter reel for a story: the text types itself onto the frame with
+  // the Hermes Precisa's own key sounds, and Record makes the file.
+  const LINE = 1.22, MAX = 160, MIN = 64, TOP = SAFE_TOP + 220;
 
   const d = mount({
     name: 'social/typist',
@@ -67,45 +38,20 @@
   const h1 = d.head.querySelector('.pos-name');
   if (h1) h1.textContent = 'typist';
 
-  const cv = el('canvas', 'tw-cv');
-  cv.width = W; cv.height = H;
-  const ctx = cv.getContext('2d');
-  const field = (label, value, rows) => {
-    const wrap = el('label', 'tw-field');
-    const t = el('textarea', '', '', { spellcheck: 'false', rows: String(rows) });
-    t.value = value;
-    wrap.append(el('span', 'tw-l', label), t);
-    return { wrap, t };
-  };
   const main = field('typed', 'Connect anything\nto everything.', 4);
   const lower = field('lower line', '', 2);
   const ta = main.t;
-  // record and the take's download sit at the right of the standard bar
-  const rec = barButton({ aria: 'record' });
-  setIcon(rec, 'record', 'record');
-  const dlBtn = barButton({ aria: 'download the take' });
-  setIcon(dlBtn, 'download', 'download the take');
-  dlBtn.disabled = true;
-  const dl = el('a');
-  dlBtn.onclick = () => { if (dl.href) dl.click(); };
-  const note = el('p', 'tw-note', '1080 x 1920, 30 fps, with sound. The typed words stay clear of the top 14% and the bottom 35%; the lower line sits as low as the site name sits high.');
-  const side = el('div', 'tw-side');
-  side.append(main.wrap, lower.wrap, note);
-  const stage = el('div', 'tw-stage');
-  stage.append(side, cv);
-  const barHost = el('div', 'tw-bar');
-  d.el.append(barHost, stage);
+  const note = el('p', 'reel-note', '1080 x 1920, 30 fps, with sound. The typed words stay clear of the top 14% and the bottom 35%; the lower line sits as low as the site name sits high.');
 
-  const mono = getComputedStyle(document.documentElement).getPropertyValue('--mono').trim() || 'monospace';
-  const font = (w, px) => `${w} ${px}px ${mono}`;
-
-  // A seeded random, so a retake of the same text types with the same rhythm.
-  function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
-  const hash = (t) => [...t].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
-
+  // The main type is as big as its widest written line allows, between MIN and MAX.
+  function fit(ctx, text) {
+    ctx.font = font(600, 100);
+    const widest = Math.max(1, ...text.split('\n').map((l) => ctx.measureText(l).width));
+    return Math.max(MIN, Math.min(MAX, Math.floor(100 * TEXT_W / widest)));
+  }
   // Lines as typed: the text's own line breaks, then wrapped to TEXT_W.
-  function layout(text) {
-    ctx.font = font(600, SIZE);
+  function layout(ctx, text, size) {
+    ctx.font = font(600, size);
     const lines = [];
     for (const para of text.split('\n')) {
       let line = '';
@@ -117,12 +63,15 @@
     return lines;
   }
 
+  // A seeded random, so a retake of the same text types with the same rhythm.
+  function rng(seed) { let s = seed >>> 0 || 1; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+  const hash = (t) => [...t].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
+
   // When each character lands, in ms from the start, and what it sounds like.
   function schedule(text) {
     const r = rng(hash(text));
     const ev = [];
-    let t = 700;
-    let col = 0;
+    let t = 700, col = 0;
     for (const ch of text) {
       if (ch === '\n') { t += 380; ev.push({ t, ch, kind: 'insertLineBreak' }); t += 260; col = 0; continue; }
       t += (ch === ' ' ? 120 : 70) + r() * 90 + (/[.,!?]/.test(ch) ? 140 : 0);
@@ -131,29 +80,18 @@
     return { ev, end: t + 2200 };
   }
 
-  function draw(text, typed, ms, typing) {
+  function draw(ctx, { pos, playing, idle, take }) {
+    const { text, ev } = take;
+    const typed = idle ? ev.length : ev.filter((e) => e.t <= pos).length;
     ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, W, H);
-    // the wordmark, as the front page sets it
-    ctx.font = font(400, 34);
-    ctx.letterSpacing = '4.8px';
-    ctx.textBaseline = 'alphabetic';
-    // the site name's ink starts `pad` below the frame's top; the lower line ends as far above its bottom
-    const pad = SAFE_TOP + 40 - ctx.measureText('POSITRON').actualBoundingBoxAscent;
-    let x = X;
-    for (const [s, c] of [['POSITRON', C.dim], ['.', C.hi], ['STUDIO', C.dim]]) {
-      ctx.fillStyle = c; ctx.fillText(s, x, SAFE_TOP + 40); x += ctx.measureText(s).width;
-    }
-    ctx.letterSpacing = '0px';
-    // the typed text
-    fit(text);
-    const shown = text.slice(0, typed);
-    const lines = layout(shown);
-    ctx.font = font(600, SIZE);
-    const top = SAFE_TOP + 220;
-    let cx = X, cy = top;
+    const pad = drawWordmark(ctx);
+    const size = fit(ctx, text);
+    const lines = layout(ctx, text.slice(0, typed), size);
+    ctx.font = font(600, size);
+    let cx = X, cy = TOP;
     lines.forEach((ln, i) => {
-      const y = top + i * SIZE * LINE;
+      const y = TOP + i * size * LINE;
       // a full stop that ends the text is the accent, as on the front page
       const last = i === lines.length - 1 && typed === text.length && ln.endsWith('.');
       ctx.fillStyle = C.fg;
@@ -162,147 +100,53 @@
       cx = X + ctx.measureText(ln).width; cy = y;
     });
     // the caret: solid while typing, blinking once it has stopped
-    if (typing || Math.floor(ms / 530) % 2 === 0) {
+    if ((playing && typed < ev.length) || Math.floor((playing ? pos : performance.now()) / 530) % 2 === 0) {
       ctx.fillStyle = C.hi;
-      ctx.fillRect(cx + 6, cy - SIZE * 0.78, SIZE * 0.08, SIZE * 0.92);
+      ctx.fillRect(cx + 6, cy - size * 0.78, size * 0.08, size * 0.92);
     }
-    // the lower line, if any, small and inside the safe band
-    if (lower.t.value.trim()) {
-      ctx.font = font(400, 34);
-      ctx.fillStyle = C.dim;
-      const ls = lower.t.value.trim().split('\n');
-      const base = H - pad - Math.max(...ls.map((l) => ctx.measureText(l).actualBoundingBoxDescent));
-      ls.forEach((ln, i) => ctx.fillText(ln, X, base - (ls.length - 1 - i) * 46));
-    }
+    drawLowerLine(ctx, lower.t.value, pad);
   }
 
-  let audio = null;
-  async function sound() {
-    if (audio) return audio;
-    const ac = new AudioContext();
-    const samples = createSamples();
-    const out = ac.createGain();
-    out.gain.value = 0.7;   // a recorded take peaked at 0.0 dB at full gain
-    const tap = ac.createMediaStreamDestination();
-    out.connect(ac.destination);
-    out.connect(tap);
-    const voice = createVoice(ac, samples, { out, tuning: () => ({ rate: {} }) });
-    await samples.load(ac);
-    audio = { ac, voice, tap };
-    d.log(`typewriter sounds ready, ${samples.stat.decoded} files in ${samples.stat.ms} ms`);
-    return audio;
-  }
-
-  // The take is a log of key presses on a deck, so the standard bar plays,
-  // pauses and seeks it; the frame is drawn from the deck's position.
-  const KIND = 'key';
-  let recording = null;   // { mr, stopped, parts, type } while a take is being recorded
-  let deck = null, bar = null, take = null;
-
-  function build() {
-    const { ev, end } = schedule(ta.value);
-    const items = ev.map((e, i) => ({ at: Math.round(e.t), kind: KIND, id: `k${i}`, payload: e }));
-    take = { text: ta.value, ev, end };
-    const adapter = {
-      caps: { discrete: true, continuous: false, interpolate: false, stateful: true,
-              seek: true, rate: true, catchUp: 'reduce', assertOnSeek: true, rates: [1] },
-      actuate(p) { audio?.voice.sound(p.kind, p.ch, p.col || 0); },
-      reduce(payloads, pos) { return { pos }; },
-      assertState() {},
-    };
-    bar?.destroy?.();
-    barHost.replaceChildren();
-    deck = makeLogDeck({ lanes: [{ kind: KIND, rows: [], adapter }], items, leadInMs: 0, tailMs: 0, range: [0, end] });
-    bar = createTransportBar(barHost, deck, { loop: false, right: [rec, dlBtn], command: {
-      // the first play fetches and decodes the samples; the bar sweeps until they are in
-      play: async () => {
-        if (!audio) { barHost.dataset.busy = '1'; try { await sound(); } finally { delete barHost.dataset.busy; } }
-        if (audio.ac.state === 'suspended') await audio.ac.resume();
-        return deck.play();
+  const reel = await createReel({
+    d, name: 'typist', kind: 'key', side: [main.wrap, lower.wrap, note], draw,
+    timeline: () => {
+      const { ev, end } = schedule(ta.value);
+      return { text: ta.value, ev, end, items: ev.map((e) => ({ at: e.t, payload: e })) };
+    },
+    sound: {
+      gain: 0.7,   // a recorded take peaked at 0.0 dB at full gain
+      async load(ac, out) {
+        const samples = createSamples();
+        const voice = createVoice(ac, samples, { out, tuning: () => ({ rate: {} }) });
+        await samples.load(ac);
+        d.log(`typewriter sounds ready, ${samples.stat.decoded} files in ${samples.stat.ms} ms`);
+        return voice;
       },
-    } });
-  }
-
-  // The frame follows the deck every animation frame; a finished take stops the recorder.
-  function tick() {
-    const pos = deck.position();
-    // idle at either end, the frame shows the finished text
-    const idle = !deck.playing() && (pos <= 0 || pos >= take.end);
-    const typed = idle ? take.ev.length : take.ev.filter((e) => e.t <= pos).length;
-    draw(take.text, typed, deck.playing() ? pos : performance.now(), deck.playing() && typed < take.ev.length);
-    if (recording && performance.now() - recording.t0 > 300 && (!deck.playing() || pos >= take.end)) stopRecording();
-    requestAnimationFrame(tick);
-  }
-
-  const TYPES = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'];
-  async function startRecording() {
-    rec.dataset.busy = '';
-    try { await sound(); if (audio.ac.state === 'suspended') await audio.ac.resume(); } finally { delete rec.dataset.busy; }
-    const type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
-    const stream = new MediaStream([...cv.captureStream(30).getVideoTracks(), ...audio.tap.stream.getAudioTracks()]);
-    const mr = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8e6, audioBitsPerSecond: 192e3 });
-    const parts = [];
-    mr.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
-    const stopped = new Promise((r) => { mr.onstop = r; });
-    deck.seek(0);
-    mr.start(250);
-    deck.play();
-    recording = { mr, stopped, parts, type, stream, t0: performance.now() };
-    setIcon(rec, 'stop', 'stop recording');
-    dlBtn.disabled = true;
-    d.log(`recording ${type || 'the browser default'}`);
-  }
-  async function stopRecording() {
-    const r = recording;
-    if (!r) return;
-    recording = null;
-    if (deck.playing()) deck.pause();
-    r.mr.stop();
-    await r.stopped;
-    r.stream.getTracks().forEach((t) => t.kind === 'video' && t.stop());
-    const ms = performance.now() - r.t0;
-    const blob = new Blob(r.parts, { type: r.type.split(';')[0] || 'video/webm' });
-    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
-    if (dl.href) URL.revokeObjectURL(dl.href);
-    dl.href = URL.createObjectURL(blob);
-    dl.download = `positron-typist.${ext}`;
-    dlBtn.disabled = false;
-    dlBtn.title = `download ${ext.toUpperCase()}, ${(ms / 1000).toFixed(1)} s, ${(blob.size / 1e6).toFixed(1)} MB`;
-    setIcon(rec, 'record', 'record');
-    d.log(`recorded ${(ms / 1000).toFixed(1)} s of ${blob.type}, ${(blob.size / 1e6).toFixed(2)} MB; the download button has it`);
-    if (ext !== 'mp4') d.log('this browser records WebM; Instagram wants MP4, so convert it or record in Chrome', 'warn');
-    window.__demo.take = { type: blob.type, bytes: blob.size, ms, url: dl.href };
-  }
-  rec.onclick = () => (recording ? stopRecording() : startRecording().catch((e) => d.log(`recording failed: ${e.message}`, 'bad')));
-
-  // The finished frame, drawn once the face is in.
-  // A new text is a new take: rebuilt when nothing is playing or recording.
-  let rebuild = 0;
-  ta.oninput = () => { clearTimeout(rebuild); rebuild = setTimeout(() => { if (!recording && !deck.playing()) build(); }, 300); };
-  await document.fonts.load(font(600, SIZE)).catch(() => {});
-  build();
-  draw(take.text, take.ev.length, 0, false);
-  requestAnimationFrame(tick);
+    },
+    play: (p, voice) => voice.sound(p.kind, p.ch, p.col || 0),
+  });
+  ta.oninput = () => reel.rebuildSoon();
 
   if (SELFCHECK) {
-    fit(ta.value);
-    const lines = layout(ta.value);
-    ctx.font = font(600, SIZE);
+    const { ctx } = reel;
+    const size = fit(ctx, ta.value);
+    const lines = layout(ctx, ta.value, size);
+    ctx.font = font(600, size);
     const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
     d.assert('the default text fits the frame between its side margins', widest <= TEXT_W,
       `widest line ${Math.round(widest)} px of ${TEXT_W}`);
-    const bottom = SAFE_TOP + 220 + (lines.length - 1) * SIZE * LINE;
+    const bottom = TOP + (lines.length - 1) * size * LINE;
     d.assert('the words sit inside the band a story leaves clear', bottom < SAFE_BOTTOM - 80,
       `last baseline ${Math.round(bottom)}, band ends ${SAFE_BOTTOM}`);
     const { ev, end } = schedule(ta.value);
     d.assert('every character is scheduled, in order, and the take is under 15 s',
       ev.length === [...ta.value].length && ev.every((e, i) => !i || e.t > ev[i - 1].t) && end < 15000,
       `${ev.length} events, ${(end / 1000).toFixed(1)} s`);
-    const px = ctx.getImageData(X, SAFE_TOP + 220 - SIZE, TEXT_W, SIZE).data;
+    const px = ctx.getImageData(X, TOP - size, TEXT_W, size).data;
     let ink = 0;
     for (let i = 0; i < px.length; i += 4) if (px[i] > 100) ink++;
     d.assert('the first line of the finished frame has ink', ink > 500, `${ink} bright pixels`);
-    d.assert('a visit opened no audio', audio === null);
+    d.assert('a visit opened no audio', reel.audio === null);
   }
   d.ready();
 </script>

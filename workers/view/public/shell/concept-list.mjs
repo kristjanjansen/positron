@@ -60,7 +60,7 @@ export const CONCEPTS = [
   // (asked 2026-10-12, *"make draw concept group and move xy concept and draw demo
   // there"*). draw/000 was synth/050 until then; /synth/sound/ is Sound design since 2026-10-13.
   // draw/000 XY filter moved to /archive/ 2026-10-12 (*"Revert xy changes, archive cy and draw"*), and the draw group with it.
-  { id: 'radio/blend', title: 'Radio', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
+  { id: 'radio/blend', title: 'Blend', say: 'Listen to Vikerraadio and Ida Radio Tallinn live and blend between them on a crossfader.' },
   { id: 'radio/tuner', title: 'Tuner', say: 'Turn one dial across four live stations, as on an old AM set, with noise and a whistle in between.' },
   { id: 'radio/tempo', title: 'Tempo', say: 'Find the tempo of recordings of Raadio 2, Raadio 4 and Ida, with the beats it hears on the wave.' },
   { id: 'radio/live', title: 'Live tempo', say: 'The same tempo detector on Raadio 2, Raadio 4 or Ida live, one station at a time through our relay.' },
