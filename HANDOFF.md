@@ -1,3 +1,39 @@
+# Handoff, 2026-10-14, session 77: one word addresses, share cards, p.s, the footer
+
+## Where it is right now
+
+- **Site: BUILD `9e9465ab-183712-a4fa`**, confirmed on the edge. Every deploy this session went from a clean worktree of HEAD (`git worktree add --detach`, build, deploy, commit `public/` there, fast forward main). ⚠️ An interrupted deploy once left a stale worktree entry; `git worktree prune` before `add` clears it.
+- **Working tree clean. No agent running. No headless Chrome left.** Dev server up on :8890.
+- **GitHub: 229 commits since `7564a0b6` are NOT pushed.** Push needs the account switch in CLAUDE.md, and switching back.
+- Counted 2026-10-14: **56 demo rows, 55 built**; **42 concept pages** in synth, code, granulator, remote, drums, radio, video, shader, typist, history, room (front page order) plus the kit card; **117 plans**.
+
+## What landed (all deployed)
+
+| where | what |
+| --- | --- |
+| every concept page | one plain lowercase word per slug, never the group's name: https://positron.studio/remote/circuit/, https://positron.studio/granulator/grains/, https://positron.studio/radio/blend/. Old dashed addresses, `/stations/...` and `/concepts/<group>/<nnn>/` 404. Back link reads `← positron`; next always at the right |
+| groups | rhythm became **drums** (https://positron.studio/drums/machine/, knobs, samples, camera) and sits before radio; Drums on the Pi is https://positron.studio/drums/remote/, Shader on Pi is https://positron.studio/shader/remote/ (old `/remote/drums/`, `/remote/shader/`, `/rhythm/...` 404). The archived radio demo is https://positron.studio/archive/radio/ so the radio group owns `/radio/` |
+| https://positron.studio/room/chat/ | is the chat window page; `/room/window/` (Chat UI wired) 404s. Join no longer clips on a phone (shell.css: a button group in a panel footer slot keeps its width) |
+| https://positron.studio/granulator/beat/ | always follows the tempo, on its own wire `web:tempo:value-out` to `web:grains:tempo-in`; the follow switch and the hold under STEADY are gone. Self-check 27/27 (was 29/29) |
+| https://positron.studio/shader/landscape/ | 6 knobs (rows, height, loud, swell, counts, heave), measured on the real GPU, each with a value-in for the granulator to drive later; 13/13 |
+| iPhone Safari | `wakeAudioOnGesture()` in audio.mjs (createKeyboard installs it): the keys, Plaits and Collide sound from the second touch; a second touchend within 350 ms is prevented so a repeated note never zooms; the Raadio 2 and 4 MP3s start mid frame and `fromFirstFrame()` (mp3-frames.mjs) skips the junk. Tested in desktop Safari and headless Chrome, **NOT on an iPhone** |
+| front page | the kit card at the foot (https://positron.studio/kit/); a footer: WRITE positron@positron.studio, INSTAGRAM @positron.studio, `positron.studio 2026` in mono, labels as the group headings, values as card lines, no rule, 140 px above. held moved to https://positron.studio/archive/ |
+| share cards | **no browser in the pipeline** (the owner: *"What headless chrome?!!? See ../eccm etc"*): `demo/shell/share-card.mjs` writes SVG from `font-metrics.mjs`, `workers/view/og/render.mjs` rasterises with vendored resvg-wasm at build. The site card https://positron.studio/og/site-98871a52.png is the og:image of all 119 pages (build.mjs `withShareMeta`); Instagram https://positron.studio/og/ig-69ba96c6.png, first post https://positron.studio/og/hello-82052bf7.png (Hello, / is this / thing / on?, i dots gray, the ? dot green and lit), avatar https://positron.studio/og/avatar-instagram-de7595e3.png. All on https://positron.studio/kit/share/. `TEMPLATE_V` 6; names are hashed, so a change is a new URL |
+| https://positron.studio/kit/logo/#p-s | **p.s trials**, tracking -0.12 em, centred on the ink: favicons 16 (ps), 32 and 48 (p.s), apple touch, android, store; avatars per network with downloads at the upload size. **The shipped favicon and app icon are still β+** |
+| kit | part pages read `← kit`; /kit/frontpage/ archived (still served, on /archive/); /kit/share/ new |
+| research and plans | `research/web-presence-names-2026-10-13.md`: positron-studio where a dash is allowed (GitHub, npm, YouTube, LinkedIn), positronstudio on X and Mastodon, `@positron.studio` on Bluesky (domain handle) and **Instagram (`positronstudio` is taken there, `positron.studio` reads free)**; skills.sh is crowded with Posit's 42 `positron-*` skills. `plans/plan-og-insta-images.md` (its Chrome route marked OVERRULED at the top) |
+
+## Open, waiting on the owner
+
+- **The ? dot in the hello post is a pill**, because JetBrains Mono 600 draws it wider than tall. Offered: a drawn round dot (recommended), the ? at 400, or keep it. No answer.
+- **p.s as the real icon**: say ship and the favicon (16 ps, 32 and 48 p.s), apple touch and manifest icons change from β+.
+- **Other avatars as files**: only Instagram's is built; the rest download from /kit/logo/.
+- **Naming questions** from the slug pass: `/radio/blend` vs `/radio/live`, `/typist/score`, the Plaits card opening "The same Plaits voice", prev at the left on desktop too.
+- **Archived demo pages** still read `← demos` (the shell default); `← positron`?
+- **Instagram account** `positron.studio` not created yet, so the footer link 404s until it is. Nothing was registered anywhere.
+- **bay-svg.mjs** has no stacked phone layout and sat 3 px off the live bay view; unused by the cards now, kept for later.
+- Carried from session 76 (below): knobs/away, Collide on Pi scopes, capture concepts, "agent skills" wording, Drums on the Pi level, board MIDI forward, the cushion drift fix, key detection at 1 kHz.
+
 # Handoff, 2026-10-13, session 76: fonts, loopbacks, remote instruments, a big archive
 
 ## Where it is right now
