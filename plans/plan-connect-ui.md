@@ -585,3 +585,9 @@ No browser was started and nothing was measured. The plan rests on reading
 `demo/connect/index.html`, `demo/shell/nodes.mjs`, `bay.mjs`, `openers.mjs`,
 `audio.mjs`, `board.mjs`, `patch-synth.mjs`, seven concept pages, and the
 imports of all 43 concept pages.
+
+## Decisions, 2026-10-14
+
+Asked *"Do working ui"*; taken as recommended: D1 yes, a composer on /connect/ only;
+D2 one knob instance per parameter; D3 concept pages keep their hand wiring for now;
+D4 the AudioContext starts on the first press on a face; D5 lift one synth copy now.

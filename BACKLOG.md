@@ -1,5 +1,7 @@
 ## Open
 
+- **/connect/ working UI, slices 0 to 3 of plans/plan-connect-ui.md (runtime, keys to synth to speaker, knobs, scope)** (2026-10-14, agent). Asked: *"Do working ui"*. Decisions taken as recommended: D1 composer on /connect/ only, D2 one knob per parameter, D3 concept pages not moved, D4 audio starts on the first press on a face, D5 lift one synth copy. The pages move onto the lifted modules after the catalogue pass lands.
+
 - **Node catalogue: one pass applying what step 2 collected** (2026-10-14, agent): portLabel option, relabel, addPorts, three port reorders, refuse ambiguous knob names, the stream and shout hops as entries, addNodes failures visible, ports grouped by node as the rule; then the pages drop their helpers and inline leftovers.
 
 - ~~**/connect/: an example press builds its patch straight away (no model asked), and the picture's room is held from the first frame**~~ (2026-10-14, DONE). Asked: *"clickig on voice pill actally builds patchbay"*, *"reserve space for it iitally"*.
