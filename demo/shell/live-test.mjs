@@ -8,9 +8,12 @@
 // that fires on everything would turn a permanent 404 into a seven-second hang
 // and a page that reads as slow rather than as wrong.
 //
+// The second section fakes RTCPeerConnection and grades the failure path of
+// `whepPlay` and `camWhipPublish`: four NEGATIVE CONTROLS, so seven of 12.
+//
 // `sleep` is injected, so this runs in milliseconds rather than in the ~7 s the
 // real backoff takes. The delays are asserted as VALUES instead.
-import { offerSdp, WHEP_RETRY } from './live.mjs';
+import { offerSdp, WHEP_RETRY, whepPlay, camWhipPublish } from './live.mjs';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -96,6 +99,47 @@ console.log('\n== the WHEP 409 retry ==');
   try { await offerSdp('https://x/whep', 'v=0 offer', { sleep: nap }); } catch (e) { err = e; }
   ok('a 500 fails at once too: only 409 means “not yet”',
      calls.length === 1 && napped.length === 0, `${calls.length} request(s), ${err?.message}`);
+}
+
+console.log('\n== a failed offer leaks nothing ==');
+{
+  // A peer connection whose answer is refused, so the throw lands after a 2xx.
+  const pcs = [];
+  globalThis.RTCPeerConnection = class {
+    constructor() { this.closed = false; this.iceGatheringState = 'complete'; this.localDescription = { sdp: 'v=0 offer' }; pcs.push(this); }
+    addTransceiver() {} addTrack() {} addEventListener() {}
+    async createOffer() { return {}; }
+    async setLocalDescription() {}
+    async setRemoteDescription() { throw new Error('bad answer'); }
+    close() { this.closed = true; }
+  };
+  globalThis.MediaStream = class { addTrack() {} };
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), method: init?.method });
+    const ok200 = init?.method === 'POST';
+    return { status: ok200 ? 201 : 200, ok: true, text: async () => 'v=0 answer',
+      headers: { get: (h) => ({ location: '/whep/s1', 'x-whip-id': 'w1' })[h] ?? null } };
+  };
+
+  let err = null;
+  try { await whepPlay('https://x/play/whep', {}, {}); } catch (e) { err = e; }
+  ok('NEGATIVE CONTROL: a WHEP answer that throws closes its peer connection', err && pcs.at(-1).closed, err?.message);
+  ok('NEGATIVE CONTROL: and DELETEs the session the 201 made',
+     sent.some((r) => r.method === 'DELETE' && r.url === 'https://x/whep/s1'), JSON.stringify(sent));
+
+  sent.length = 0; err = null;
+  try { await camWhipPublish({ getTracks: () => [] }, { url: 'https://x/cam/whip' }); } catch (e) { err = e; }
+  ok('NEGATIVE CONTROL: a WHIP answer that throws closes its peer connection', err && pcs.at(-1).closed, err?.message);
+  ok('NEGATIVE CONTROL: and DELETEs the session, so the camera input is free',
+     sent.some((r) => r.method === 'DELETE' && r.url === 'https://x/cam/whip/w1'), JSON.stringify(sent));
+
+  sent.length = 0; err = null;
+  globalThis.fetch = async (url, init) => { sent.push({ url: String(url), method: init?.method });
+    return { status: 409, ok: false, text: async () => 'busy', headers: { get: () => null } }; };
+  try { await camWhipPublish({ getTracks: () => [] }, { url: 'https://x/cam/whip' }); } catch (e) { err = e; }
+  ok('a refused WHIP closes its peer connection and DELETEs nothing, because nothing was made',
+     err && pcs.at(-1).closed && !sent.some((r) => r.method === 'DELETE'), err?.message);
 }
 
 globalThis.fetch = realFetch;

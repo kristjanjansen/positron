@@ -257,7 +257,7 @@ export function createBoard({
       saidDriver = kind;
     }
   }
-  setInterval(driverTick, 250);
+  const driverTimer = setInterval(driverTick, 250);
 
   /**
    * 🔴 ONLY THE BOARD COUNTS AS THE BOARD, AND ONE OF THESE PAGES GOT THIS
@@ -286,8 +286,21 @@ export function createBoard({
   let told = null;                    // what `board.hello` announced, if we heard it
   let chIn = channels, shapeChecked = false, shapeWrong = 0, shapeSaid = '';
 
-  async function startAudio() {
-    if (ctx) return ctx;
+  // One build shared by every caller. A failed build is forgotten, so the
+  // next call tries again rather than handing back a context with no playout.
+  let starting = null;
+  function startAudio() {
+    starting ||= buildAudio().catch((e) => {
+      log(`the board's sound could not be built: ${e?.message || e}`, 'bad');
+      if (ctx && ctx !== audioContext) ctx.close().catch(() => {});
+      ctx = null; playout = null; meterNode = null; meterBuf = null;
+      starting = null;
+      return null;
+    });
+    return starting;
+  }
+
+  async function buildAudio() {
     if (audioContext && audioContext.sampleRate !== rate) {
       log(`this page's audio runs at ${audioContext.sampleRate} Hz and the board sends ${rate}. Nothing in the chain resamples, so the board's sound is not played into it`, 'bad');
       return null;
@@ -827,6 +840,6 @@ export function createBoard({
 
     /** `peak` is a running maximum; a page timing one note resets it. */
     resetPeak: () => { peak = 0; },
-    close: () => { clearInterval(rttTimer); useRelay('closing'); pres.stop(); wire.close(); },
+    close: () => { clearInterval(rttTimer); clearInterval(driverTimer); useRelay('closing'); pres.stop(); wire.close(); },
   };
 }

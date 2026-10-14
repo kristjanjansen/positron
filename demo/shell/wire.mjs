@@ -251,7 +251,7 @@ export function openWire(room, {
     // two are distinguished by `reconnects`.
     refusal: null, roomSockets: null,
   };
-  let ws = null, closed = false, backoff = 300;
+  let ws = null, closed = false, backoff = 300, retry = null;
 
   /**
    * Why the upgrade was refused, asked of the only thing that can answer.
@@ -276,6 +276,8 @@ export function openWire(room, {
   }
 
   function connect() {
+    retry = null;
+    if (closed) return;
     stats.from = randomId(6);           // per CONNECTION, never per person
     stats.seq = 0;
     let opened = false;
@@ -301,7 +303,7 @@ export function openWire(room, {
       // `access-control-allow-origin: *`), and it reports `sockets` against
       // `limits.maxSockets`. So ASK, rather than infer from a silence.
       if (!opened) diagnose();
-      setTimeout(connect, backoff);
+      retry = setTimeout(connect, backoff);
       backoff = Math.min(backoff * 2, 5000);
     };
     ws.onerror = () => { /* close follows; one report is enough */ };
@@ -382,6 +384,7 @@ export function openWire(room, {
     ping,
     stats: () => ({ ...stats }),
     state: () => ws?.readyState ?? 3,
-    close: () => { closed = true; try { ws.close(); } catch { /* already gone */ } },
+    // A reconnect queued by a blip must not rejoin the room after Leave.
+    close: () => { closed = true; clearTimeout(retry); retry = null; try { ws.close(); } catch { /* already gone */ } },
   };
 }

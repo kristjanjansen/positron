@@ -24,6 +24,10 @@ export function pinned(sha256hex) {
   return { webtransport: { serverCertificateHashes: [{ algorithm: 'sha-256', value }] } };
 }
 const WORKLET = '/proto/jam/playout-worklet.js';
+/** The newest transit samples kept for the percentiles. */
+export const MOQ_AUDIO_KEEP = 2000;
+// The relay wrapper is a classic script that sets window.MoqSynth.
+const loadWrapper = () => (window.MoqSynth ? null : import('/proto/jam/moq/www/moq-synth.js'));
 const nowUs = () => (performance.timeOrigin + performance.now()) * 1000;
 
 /** Opus, lowest delay the browser will actually accept. */
@@ -53,7 +57,7 @@ async function pickOpus(preferUs = 5000) {
 // Cloudflare, 200 ms lost 0.0% on BOTH -- and was also the FASTEST Cloudflare
 // config (73 ms against 76), so it costs nothing to take.
 export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, groupMs = 200, latencyMax = 100, frameUs = 5000, connect = null, log = () => {} }) {
-  await import('/proto/jam/moq/www/moq-synth.js');
+  await loadWrapper();
   await ac.audioWorklet.addModule(WORKLET);
 
   // REALTIME PACING PIN. A headless AudioContext with nothing pulling it renders
@@ -126,7 +130,12 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
   return {
     ns,
     stats: () => ({ ...st, used: pub.used?.(), queue: enc.encodeQueueSize }),
-    close() { try { enc.close(); } catch {} try { pub.close(); } catch {} try { pacer.pause(); } catch {} },
+    close() {
+      // The tap goes too, or each publish leaves a node feeding a closed encoder.
+      cap.port.onmessage = null;
+      try { bus.disconnect(cap); } catch {} try { cap.disconnect(); } catch {} try { sink.disconnect(); } catch {}
+      try { enc.close(); } catch {} try { pub.close(); } catch {} try { pacer.pause(); } catch {}
+    },
   };
 }
 
@@ -137,7 +146,7 @@ export async function publishSynth({ ac, bus, msDest, ns, relay = MOQ_RELAY, gro
  * caller can tap it for onset detection.
  */
 export async function subscribeSynth({ ac, ns, relay = MOQ_RELAY, floorMs = 10, connect = null, log = () => {} }) {
-  await import('/proto/jam/moq/www/moq-synth.js');
+  await loadWrapper();
   await ac.audioWorklet.addModule(WORKLET);
 
   const out = new AudioWorkletNode(ac, 'pcm-playout', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
@@ -158,7 +167,7 @@ export async function subscribeSynth({ ac, ns, relay = MOQ_RELAY, floorMs = 10, 
       data.close();
       out.port.postMessage({ pcm }, [pcm.buffer]);
       st.decoded++;
-      if (meta) st.transitMs.push((nowUs() - meta.sendUs) / 1000);
+      if (meta && st.transitMs.push((nowUs() - meta.sendUs) / 1000) > MOQ_AUDIO_KEEP) st.transitMs.shift();
     },
     error: (e) => log('decoder: ' + e.message),
   });

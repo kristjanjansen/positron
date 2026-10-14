@@ -14,7 +14,7 @@
 // send stamp on nobody's clock, MEASURED up to 159 ms off between machines, as
 // if somebody had agreed it. `parse()` renames it to `sent` first.
 //
-// EIGHT OF THE 16 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and counted
+// NINE OF THE 18 ARE NEGATIVE CONTROLS, marked `NEGATIVE CONTROL` and counted
 // at the end. They are written so the bug they name fails them.
 //
 // SIX SABOTAGES, MEASURED 2026-10-04, each on a copy of `wire.mjs` in a scratch
@@ -27,10 +27,10 @@
 //   W5  normalising on truthiness, so `at: 0` is missed       2 red
 //   W6  normalising whenever `at` is there, `sent` or not     2 red
 //
-// WHAT IS NOT GRADED HERE: `openWire()`, which needs a WebSocket, a relay and a
-// room. `/wire/` grades that against the real relay and reads `sent` back.
+// `openWire()`'s reconnect and close are graded against a fake WebSocket in
+// this file. Its traffic against a real room is graded by the pages.
 
-import { format, parse, normalise } from './wire.mjs';
+import { format, parse, normalise, openWire } from './wire.mjs';
 
 let pass = 0, fail = 0, neg = 0;
 const ok = (name, cond, detail = '') => {
@@ -96,6 +96,38 @@ console.log('\n== parse(): the other kinds are untouched ==');
   ok('binary is binary, with its byte count', b.kind === 'binary' && b.msg === null && b.bytes === 12);
   const u = parse('not json {');
   ok('an unreadable frame is reported, not thrown', u.kind === 'unreadable' && u.msg === null);
+}
+
+console.log('\n== openWire(): close() cancels a queued reconnect ==');
+{
+  const made = [];
+  class FakeSocket {
+    constructor(url) { this.url = url; this.readyState = 0; made.push(this); }
+    open() { this.readyState = 1; this.onopen?.(); }
+    drop() { this.readyState = 3; this.onclose?.(); }
+    close() { this.drop(); }
+    send() {}
+  }
+  const real = globalThis.WebSocket;
+  globalThis.WebSocket = FakeSocket;
+  try {
+    const w = openWire('test-room', { base: 'ws://127.0.0.1:1', by: 'tool' });
+    made[0].open();
+    made[0].drop();                       // a relay blip: a reconnect is queued at 300 ms
+    w.close();                            // Leave, inside that window
+    await new Promise((r) => setTimeout(r, 450));
+    ok('NEGATIVE CONTROL: Leave during a blip opens no new socket', made.length === 1, `${made.length} sockets`);
+
+    const made0 = made.length;
+    const w2 = openWire('test-room', { base: 'ws://127.0.0.1:1', by: 'tool' });
+    made[made0].open();
+    made[made0].drop();
+    await new Promise((r) => setTimeout(r, 450));
+    ok('a blip with nobody leaving still reconnects', made.length === made0 + 2, `${made.length - made0} sockets`);
+    w2.close();
+  } finally {
+    globalThis.WebSocket = real;
+  }
 }
 
 console.log(`\n${pass} ok, ${fail} failed, ${neg} of them negative controls`);
