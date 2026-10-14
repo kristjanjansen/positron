@@ -2,8 +2,8 @@
 //
 //   CIRCUIT_PACK=<path> node demo/shell/unzip-test.mjs
 //
-// 🔴 IT READS THE OWNER'S CIRCUIT PACK, WHICH LIVES IN <private-pack-repo>
-// (CLAUDE.md), NOT IN THIS REPOSITORY. Reading is free and nothing here writes. It is the right fixture precisely because it is real: a
+// 🔴 IT READS THE OWNER'S CIRCUIT PACK, WHICH LIVES IN THE OWNER'S PRIVATE PACK
+// REPOSITORY, NOT IN THIS ONE. Reading is free and nothing here writes. It is the right fixture precisely because it is real: a
 // zip somebody made for a test has whatever shape the test wanted.
 //
 // THREE OF THESE ARE NEGATIVE CONTROLS, because a reader that returned an empty
@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readZip, entry } from './unzip.mjs';
 
-const PACK = process.env.CIRCUIT_PACK || path.join(path.dirname(new URL(import.meta.url).pathname), '../../tmp/personal/New Pack.circuitpack');
+const PACK = process.env.CIRCUIT_PACK || '';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, detail = '') => {
@@ -24,8 +24,8 @@ console.log('\n== the zip reader ==');
 
 if (!fs.existsSync(PACK)) {
   // exit 77 is SKIP to demo/shell/run-tests.mjs: nothing was measured, so it must not read as a pass
-  console.log('  SKIP: no pack. It is circuit/2026-09-20-circuit.circuitpack in the private repository');
-  console.log('  <private-pack-repo>; run with CIRCUIT_PACK=<that file> to measure it.');
+  console.log('  SKIP: no pack. The owner\'s pack is in the owner\'s private pack repository;');
+  console.log('  run with CIRCUIT_PACK=<a .circuitpack file> to measure it.');
   process.exit(77);
 }
 

@@ -1,6 +1,6 @@
 // demo/shell/circuit-patch-test.mjs — the patch decoder, against the real pack.
 //
-//   node demo/shell/circuit-patch-test.mjs
+//   CIRCUIT_PACK=<path> node demo/shell/circuit-patch-test.mjs
 //
 // 🔴 IT IS GRADED AGAINST AN IMPLEMENTATION THAT NO LONGER EXISTS, WHICH IS THE
 // ONLY GRADING WORTH HAVING HERE. `research/circuit-soundbank-2026-09-21.md` and
@@ -13,7 +13,7 @@
 // catch a misreading.
 //
 // 🔴 AND IT READS THE OWNER'S CIRCUIT PACK (CIRCUIT_PACK=<path>, from
-// <private-pack-repo>), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
+// the owner's private pack repository), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
 // and nothing here writes.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,7 +21,7 @@ import { readZip, entry } from './unzip.mjs';
 import * as C from './circuit-patch.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = process.env.CIRCUIT_PACK || path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
+const PACK = process.env.CIRCUIT_PACK || '';
 const BOUGHT = path.join(HERE, '../../tmp/purchages/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
 
 let pass = 0, fail = 0, skip = 0;
@@ -41,8 +41,8 @@ console.log('\n== the Circuit patch decoder ==');
 
 if (!fs.existsSync(PACK)) {
   // exit 77 is SKIP to demo/shell/run-tests.mjs: nothing was measured, so it must not read as a pass
-  console.log('  SKIP: no pack. It is circuit/2026-09-20-circuit.circuitpack in the private repository');
-  console.log('  <private-pack-repo>; run with CIRCUIT_PACK=<that file> to measure it.');
+  console.log('  SKIP: no pack. The owner\'s pack is in the owner\'s private pack repository;');
+  console.log('  run with CIRCUIT_PACK=<a .circuitpack file> to measure it.');
   process.exit(77);
 }
 
@@ -205,9 +205,9 @@ ok('the owner\'s own sessions are USER 22, DEMO 7 and INIT 3',
 // WORST COMBINATION THERE IS: it read `the three that say INIT are ordinary work
 // rather than blanks` and passed every time. They are not blanks, and they are
 // not work either. MEASURED 2026-09-21 against a stranger's pack off the public
-// archive: `session_16` is BYTE IDENTICAL to a stock template that appears ten
-// times in that pack, and `session_10` and `session_22` differ from it at
-// exactly one byte, 0xBBAC. The owner's other 29 differ from it by 262 to 5,412
+// archive: one of the three is BYTE IDENTICAL to a stock template that appears
+// ten times in that pack, and the other two differ from it at exactly one
+// byte, 0xBBAC. The owner's other 29 differ from it by 262 to 5,412
 // bytes, a median of 1,524. `index.json` names all three `Initial Session`.
 // ⚠️ SO THE CLAIM HERE IS NARROWED TO WHAT THIS FILE MEASURES: they are not
 // empty. Which one they are is graded in `circuit-session-test.mjs`.
@@ -244,7 +244,9 @@ if (!fs.existsSync(BOUGHT)) {
     }
     ok(`${pk.name.split('/').pop()} has 32 sessions and 1 distinct fingerprint`, per.size === 1, `${per.size}`);
   }
-  ok('both purchased packs call themselves *New Pack, the same as the owner\'s',
+  // `*New Pack` is the default name Components gives a pack, so a safe pack and
+  // one that would erase sessions can carry the same name. Read the contents.
+  ok('both purchased packs carry the default pack name, the one any pack can carry',
     names.size === 1 && [...names][0] === '*New Pack', [...names].join());
   ok('their entropy is 0.009 flat and 0.07 per cent of their bytes are non-zero',
     blanks.every((s) => s.entropy < 0.02) && blanks.every((s) => s.nonZero < 0.001),

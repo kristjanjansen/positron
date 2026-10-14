@@ -10,7 +10,7 @@
 // real-link figure. Keep both, and know which is which: THAT one is a
 // measurement run, two machines for 180 s, and its numbers are cited. THIS one
 // is the demo-facing peer — it joins and stays, names itself after the machine
-// so a roster reads `raspberrypi 3.1 ms away`, and carries a `--self-test` with
+// so a roster reads `<the board's hostname> 3.1 ms away`, and carries a `--self-test` with
 // an injected skew so the estimator can be graded with no network at all.
 // ⚠️ If they start to disagree about anything, the measurement tool wins.
 //
@@ -53,7 +53,7 @@ const EVERY = Number(flag('every', '2')) || 2;
 
 // ⚠️ A DEFAULT ID THAT IS THE MACHINE'S NAME, not a random string. `jam` gives
 // browsers random ids because a browser is anonymous; a board is not, and a
-// roster reading `raspberrypi 3.1 ms away` is the thing somebody wants to see.
+// roster reading `<the board's hostname> 3.1 ms away` is the thing somebody wants to see.
 // It still falls back to a random suffix, because two Pis would otherwise elect
 // each other reference by a coin toss nobody can see.
 const { hostname } = await import('node:os');

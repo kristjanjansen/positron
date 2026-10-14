@@ -95,7 +95,7 @@ SENTENCE IS WHAT HELD IT UP**: it said no such endpoint existed and that
 rotating meant delete and recreate, which made a one-command fix read as a
 scoped refactor. Corrected in place on 2026-09-25. ⚠️ **A history rewrite is not the fix
 either** and was not attempted: the file's own §3 already makes that argument
-about the `kristjanjansen/studio` exposure, in its own words, that rotating is
+about the exposure in the old studio repository, in its own words, that rotating is
 what actually fixes an exposure and that rewriting history is optional cleanup
 rather than the fix.
 
@@ -325,6 +325,7 @@ Anything bought or licensed goes in `purchased/` and nothing in it is committed.
 ⚠️ **It is one rule about WHERE a thing lives.** A rule per filename rots the
 moment the next thing arrives under a different name, and teaches the next
 person that a download may sit in the root as long as somebody adds a line.
-⚠️ **`New Pack.circuitpack` in the root is the opposite case and stays
-tracked**: the owner's own Circuit backup, somebody's only copy, and `CLAUDE.md`
-says why it must never be deleted. **Ours to keep, theirs to sell.**
+⚠️ **The owner's own Circuit backup is the opposite case**: not bought, and
+somebody's only copy. It left this repository on 2026-09-24 for the owner's
+private pack repository, because a public clone cannot be recalled, and it must
+never be deleted. **Ours to keep, theirs to sell.**

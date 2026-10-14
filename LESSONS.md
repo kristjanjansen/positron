@@ -858,7 +858,7 @@ connection. **Use `pkill -x`**, which matches the process name exactly.
 Raspberry Pi OS reads `custom.toml` from a firstrun script that **Raspberry Pi
 Imager injects**, together with a `systemd.run=` entry in `cmdline.txt`. Write
 the image with `dd` and there is no hook, so the file is never read: the card
-boots as `raspberrypi` with no user and no sshd, the file is still sitting there
+boots with the stock hostname, no user and no sshd, the file is still sitting there
 afterwards, and nothing in any log mentions it. `userconf.txt` and an empty
 `ssh` file are handled by services **inside the image** and work on a plain
 write. An hour went into placing a file nothing was ever going to look at.
@@ -2379,7 +2379,7 @@ through `playout` and put its head on the far left of the Browser.
 The session opened with a request for something session 36 had already built.
 `/making/`'s readout had become table columns in the tree and the edge still
 served the old page, so from the owner's browser there was nothing to
-distinguish finished-but-undeployed from never-started. He re-asked, and the
+distinguish finished-but-undeployed from never-started. The owner re-asked, and the
 correct answer was a deploy.
 
 `HANDOFF.md` made it worse rather than catching it: its **What is live** table

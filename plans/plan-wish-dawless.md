@@ -74,7 +74,7 @@ What it would gain:
 - **Precautions live at the hub, not at the page.** Every route ends in the
   Pi's gate. CORRECTED 2026-10-03: the Circuit DOES have a factory reset
   (Components restores the factory content), and the owner's sessions are
-  backed up in `<private-pack-repo>`, so SysEx is an ordinary message type with
+  backed up in the owner's private pack repository, so SysEx is an ordinary message type with
   a precaution (a flash-writing `Replace Patch` asks first), not a wall.
 
 ## 5. What listens

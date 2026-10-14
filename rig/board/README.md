@@ -443,7 +443,7 @@ graded them are in `git show 141d7f3^:rig/board/pappus-test.mjs`.
 
 ## 🔴 Looking at the board, and putting its graph back (2026-09-18)
 
-The board answers verbs from any network and `ssh positron@<pi>` only
+The board answers verbs from any network and `ssh <user>@<pi>` only
 answers on the studio LAN, so until now a fault in the audio path was visible
 only to somebody in the building. `ports.get` reports the ALSA **sequencer**,
 which is MIDI, and nothing ever reported the JACK **audio** graph, which is where this
@@ -559,7 +559,7 @@ The graph afterwards listed the same connections as before.
 
 ```sh
 ./push.sh                      # finds the board on ssh, ships, restarts, prints md5s
-./push.sh <pi>        # if the address is known
+./push.sh <pi>                 # if the address is known
 ```
 
 Confirm it landed by the md5s `push.sh` prints, which now cover
@@ -568,7 +568,7 @@ deploy that landed one of them would answer the new verbs with a
 `ReferenceError` on a board nobody can ssh to. Then, from anywhere:
 
 ```sh
-ssh positron@<ip> md5sum /opt/positron-board/rig/board/{board,jacksynth}.mjs
+ssh <user>@<pi> md5sum /opt/positron-board/rig/board/{board,jacksynth}.mjs
 node ask.mjs --room studio-1 jack.graph
 ```
 

@@ -1,7 +1,7 @@
 // demo/shell/circuit-session-test.mjs
 // The session container, against the real pack, with no browser.
 //
-//   node demo/shell/circuit-session-test.mjs
+//   CIRCUIT_PACK=<path> node demo/shell/circuit-session-test.mjs
 //
 // 🔴 IT IS GRADED AGAINST AN IMPLEMENTATION THAT NO LONGER EXISTS, WHICH IS THE
 // ONLY GRADING WORTH HAVING HERE. Every figure in the first section was measured
@@ -19,7 +19,7 @@
 // to what it can and cannot prove, and it is reported rather than hidden.
 //
 // 🔴 AND IT READS THE OWNER'S CIRCUIT PACK (CIRCUIT_PACK=<path>, from
-// <private-pack-repo>), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
+// the owner's private pack repository), THE ONLY BACKUP OF THEIR SESSIONS. Reading is free
 // and nothing here writes, sends or touches a port.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,7 +28,7 @@ import * as S from './circuit-session.mjs';
 import * as C from './circuit-patch.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const PACK = process.env.CIRCUIT_PACK || path.join(HERE, '../../tmp/personal/New Pack.circuitpack');
+const PACK = process.env.CIRCUIT_PACK || '';
 const BOUGHT = path.join(HERE, '../../tmp/purchages/Synth-Patches.com - Soundbank for Novation Circuit and Tracks.zip');
 
 let pass = 0, fail = 0, skip = 0;
@@ -45,8 +45,8 @@ console.log('\n== the Circuit session container ==');
 
 if (!fs.existsSync(PACK)) {
   // exit 77 is SKIP to demo/shell/run-tests.mjs: nothing was measured, so it must not read as a pass
-  console.log('  SKIP: no pack. It is circuit/2026-09-20-circuit.circuitpack in the private repository');
-  console.log('  <private-pack-repo>; run with CIRCUIT_PACK=<that file> to measure it.');
+  console.log('  SKIP: no pack. The owner\'s pack is in the owner\'s private pack repository;');
+  console.log('  run with CIRCUIT_PACK=<a .circuitpack file> to measure it.');
   process.exit(77);
 }
 

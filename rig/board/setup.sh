@@ -125,7 +125,7 @@ echo "== config"
 # Which relay room the board joins. Anything that knows this name can drive it.
 ROOM=$ROOM
 # The name it calls itself in board.hello.
-# ⚠️ NOT UNIQUE. \`hostname\` is \`raspberrypi\` on a fresh Pi OS, so two boards
+# ⚠️ NOT UNIQUE. \`hostname\` is the same stock word on every fresh Pi OS, so two boards
 # introduce themselves with the same word. BOARD_ID below is the one that is not.
 BOARD_NAME=$(hostname)
 # 🔴 THE ONE NAME THAT IS THIS BOARD AND NO OTHER, minted once at install and

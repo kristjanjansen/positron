@@ -54,7 +54,9 @@ function readPackages() {
 const MACHINES = {
   board: {
     what: 'the Raspberry Pi that IS the instrument',
-    ssh: process.env.BOARD_SSH || 'positron@<pi>',
+    // The login is read from the environment and never written here:
+    // PI_HOST=<user>@<pi> (BOARD_SSH is the older name and still read).
+    ssh: process.env.PI_HOST || process.env.BOARD_SSH || null,
     // ⚠️ Ask port 22, not mDNS — `positron-board.local` does not resolve from
     // this sandbox. CLAUDE.md has the sweep.
     // 🔴 READ FROM `rig/board/packages.txt`, NOT LISTED HERE. This was a
@@ -172,6 +174,7 @@ const fixes = [];
 for (const name of names) {
   const m = MACHINES[name];
   if (!m) { console.log(`no machine called "${name}" — try: ${Object.keys(MACHINES).join(', ')}`); continue; }
+  if (!m.ssh) { console.log(`\n== ${name}: no ssh target. Set PI_HOST=<user>@<pi> (or an ssh config alias) and run again.`); missing++; continue; }
   console.log(`\n== ${name} — ${m.what}\n   ${m.ssh}\n`);
   const rows = m.mac ? await auditPro(m) : await auditBox(m, fix);
   for (const [state, what, why, cmd] of rows) {

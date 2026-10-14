@@ -10,7 +10,7 @@
 
 - **Comment cut, second wave after the above lands** (2026-10-14). Asked: *"do comment cut"*.
 
-- **p.s as the real favicon and app icons; no round dot on the hello post** (2026-10-14). Asked: *"p.s as the real favicon - yes. no round dot"*.
+- ~~**p.s as the real favicon and app icons; no round dot on the hello post**~~ (2026-10-14, DONE in build.mjs; live with the next deploy). Asked: *"p.s as the real favicon - yes. no round dot"*.
 
 - **Radio naming: decide /radio/blend vs /radio/live, /typist/score** (2026-10-14). Asked: *"decide raio"*.
 
@@ -402,7 +402,7 @@
 
 - ~~**Sync as concepts: the `ahead` and `follow` link options, then clock/030 Ahead link, 040 Follow, 050 Aligned after**~~ (2026-10-12). Asked: *"whay about sync demo?"*, then *"start it"*. plans/plan-routing-time.md §4.3; the bay change first by one agent, then the three pages; /sync/ marked not needed after. Now: the bay's ahead and follow options are in the working tree (bay.mjs, link-options.mjs), uncommitted; clock/030 to 050 not started.
 - ~~**Backlog triage**~~ (2026-10-12). Asked: *"what on backlog"*, then *"do triage"*. 244 open rows, many done or overtaken and never struck: strike each with its commit or reason, merge duplicates, report what is genuinely open by topic. DONE: every un-struck row and Open heading under `## Open` triaged 2026-10-12, summary in the section below, not committed.
-- ~~**Reboot the Pi**~~ (2026-10-12). Asked: *"restart"*, *"pi i mean"*. Given to the agent working on the Pi: reboot, then check the service, md5s, JACK, what came up and the capture floor. DONE: the owner ran it (`ssh positron@<pi> sudo systemctl reboot`, after the auto mode classifier refused it to an agent); back on ssh in about 25 s, board service active, 28 of 28 md5s match, jackd up; Yoshimi, the capture and the engines start on demand.
+- ~~**Reboot the Pi**~~ (2026-10-12). Asked: *"restart"*, *"pi i mean"*. Given to the agent working on the Pi: reboot, then check the service, md5s, JACK, what came up and the capture floor. DONE: the owner ran it (`ssh <user>@<pi> sudo systemctl reboot`, after the auto mode classifier refused it to an agent); back on ssh in about 25 s, board service active, 28 of 28 md5s match, jackd up; Yoshimi, the capture and the engines start on demand.
 - **"what i need to do? just move on"** (2026-10-12). The session decides the open choices: tempo fixes 1 and 2 of plan-tempo-key-improve built, the edma key profile left as an option (it flips more and costs Raadio 2); Pappus restarted on the Pi as it was before the push; the engine stop xruns tried; /mirror/'s H.264 receiver into a kit module and shader/010 on the real Pi; rhythm/020 sample loader with the 000 drums recorded as the default kit, pitch and length per row (8 knobs), /tom/ on the shared loader; drums on the Pi as rhythm/030 after 020. Now: tempo fixes 1 and 2 built (ecb2d57f); rhythm/020 loader and board-video.mjs in the tree uncommitted; Pappus, engine xruns, rhythm/030 not seen. Tempo fixes 1 and 2 DONE in ecb2d57f: one detector in demo/concepts/radio/tempo.mjs; on the beat 62.9 to 77.2%, grid jumps 21.4 to 4.5 a minute; "no steady beat" 26.6% of readings (10 to 38% per recording), more than the plan's 20%.
 - ~~**On the Pi's LAN: step 4 to 6 of plan-pi-supercollider-defs, synth/100 and shader/010 on the real Pi**~~ (2026-10-12). Asked: *"im in pi lan, go with backlog stuff"*, VPN off. Push and md5 first; then the engine measurement (own vs shared), timed kicks, the piano unaffected; synth/100 relay and direct; shader/010 on the board's video (v3dpipe needs the `uSegments` line compiled). The OLED waits: not bought. DONE by a background agent: Pi 4 Model B, 13 md5s match; engine OWN (same DSP, shared needs the 202 MB sampler up first); five programs load same: true (collide compiles in 53.5 ms); timed kicks 5.1 ms median spread 8.2, late 0 over 290; the piano unaffected; synth/100 real Pi lag median about 266 ms relay, 108 ms direct, offset under 0.4 ms; v3dpipe rebuilt with uSegments, shader/010's program SHADER-LIVE at 26.2 fps. The push restart ended Yoshimi and Pappus (Yoshimi restarted, Pappus not). Open: stopping an engine costs 1 to 2 xruns; shader/010 needs /mirror/'s H.264 receiver as a kit module; drums on the Pi (plan steps 6, 7).
 - ~~**rhythm/050: eight drums instead of four**~~ (2026-10-12). Asked: *"add 4 more drum isntrumets to 050"*. Four more voices (for example clap, low tom, high tom, rim or cowbell) and four more read rows of the 16 x 9 picture; 000 and 010 keep four. Then *"add invert button on right image. make shaders bw only, (can you find icon for invert?)"*: an invert icon button on the pixelated panel, the shader black and white only; no invert in the kit's Feather set, so a `contrast` icon (a circle half filled, Lucide's shape) is added to icons.mjs. Then *"grid shold change immediately"*: the grid follows the picture every frame, not once a bar. DONE by a background agent: clap, low tom, high tom, cowbell; picture rows 2 to 9 are the eight drums (the top row dropped, black with a dotted line); a 16 x 9 readback each frame, 0 of 120 frames disagreeing with the picture; pure black and white; `web:invert` node and a `contrast` icon added to icons.mjs (kit/icons 26/26). Open: at 1280 the speaker column scrolls out of the patchbay box.
@@ -1308,7 +1308,7 @@ Same message: *"webrtc for away"*. Read as the go the plan waited on, and as yes
 
 Now: CLAUDE.md, skill and plan-wish-dawless fixed (d0f3e723); 42 lines in 29 files still match 'no factory reset', some of them corrections. (triaged 2026-10-12)
 
-ASKED, VERBATIM: *"Don't be so protective about the circuit. It does have a factory reset. Look it up. And we also protected our or stored our custom resets. So be careful, but don't be so afraid of sysacks. It's just any other device with some precautions and etc."* LOOKED UP the same day: Novation's support article *"Using Components to reset a product to Factory Settings"* restores a Circuit's factory content through Components (Send to Circuit on the Circuit Factory Pack, plus a firmware reinstall). It does not bring back the owner's sessions, and those are backed up in `<private-pack-repo>`. So the repeated line "no factory reset and therefore no undo" is FALSE as written: **49 places** say it (`grep -rn -i 'no factory reset'` over CLAUDE.md, .claude, demo, rig, plans, research, BACKLOG, LESSONS, HANDOFF). CLAUDE.md, the `positron-hardware` skill and `plans/plan-wish-dawless.md` corrected in the same pass; the rest per page as each is touched. The SysEx gate in `rig/board/inputs.mjs` stays as a precaution, not as a wall.
+ASKED, VERBATIM: *"Don't be so protective about the circuit. It does have a factory reset. Look it up. And we also protected our or stored our custom resets. So be careful, but don't be so afraid of sysacks. It's just any other device with some precautions and etc."* LOOKED UP the same day: Novation's support article *"Using Components to reset a product to Factory Settings"* restores a Circuit's factory content through Components (Send to Circuit on the Circuit Factory Pack, plus a firmware reinstall). It does not bring back the owner's sessions, and those are backed up in the owner's private pack repository. So the repeated line "no factory reset and therefore no undo" is FALSE as written: **49 places** say it (`grep -rn -i 'no factory reset'` over CLAUDE.md, .claude, demo, rig, plans, research, BACKLOG, LESSONS, HANDOFF). CLAUDE.md, the `positron-hardware` skill and `plans/plan-wish-dawless.md` corrected in the same pass; the rest per page as each is touched. The SysEx gate in `rig/board/inputs.mjs` stays as a precaution, not as a wall.
 
 ### ~~Open 2026-10-03: routing as abstract as possible, small enough for a microcontroller, inputs as one of many~~ DONE: plans/plan-route-core.md, then built: bbb70735 midi-kinds.mjs, route-core.mjs, 94613c52 rig/route-core C, 51574fdf Pico router.
 
@@ -4797,7 +4797,7 @@ asserted.
 **MEASURED: the module test 52/52 before and 84/84 after, sabotages 5 to 10,
 negative controls 6 to 9.** ⚠️ The brief's "57 asserts, seven sabotages" does not
 reproduce, and the reason is worth knowing: it is 52 on this machine because
-`tmp/personal/New Pack.circuitpack` left this repository on 2026-09-24 and the
+the owner's pack left this repository on 2026-09-24 and the
 test early exits on it.
 ⚠️ **AND THAT EXIT STRANDS 58 OF THE TEST'S 142 ASSERTS ON ANY CHECKOUT THAT
 FOLLOWS CLAUDE.md**, including the whole `tmp/packs` sysex stream corpus block,
@@ -5386,7 +5386,7 @@ publish current eccm demo as it is to eccm.positron.studio. when done, scrap
 all eccm stuff from positron. can you  do it?"* Worked after the two lines
 above land, from the session 0 plan.
 ✅ Done the same day by a background agent: https://eccm.positron.studio/ answers
-200 on every page, font and picture, https://github.com/kristjanjansen/eccm holds
+200 on every page, font and picture, the eccm repository holds
 the history (private, `main`, at `~/personal/eccm`), and the positron side is
 committed as `5da6325` and deployed as BUILD `5da6325-081318-4c5e`, with
 `/eccm/*` answering 301 to the new host. `HANDOFF.md` has the whole list. The
@@ -6018,11 +6018,11 @@ and `user-select` on controls and canvases.
 ✅ **THE REFERENCE TO READ FIRST**, the design system's Chart component itself,
 not its examples (the first draft of this line pointed at four `app/examples/*.tsx`
 files, which is where a component is used and not where it is written):
-    ~/projects/enefit-design-system/components/Chart/ChartTooltip.css
-    ~/projects/enefit-design-system/components/Chart/Chart.css
-    ~/projects/enefit-design-system/components/Chart/ChartCursor.css
-    ~/projects/enefit-design-system/components/Chart/ChartGrid.css
-    ~/projects/enefit-design-system/components/Chart/ChartDot.css
+    <design-system>/components/Chart/ChartTooltip.css
+    <design-system>/components/Chart/Chart.css
+    <design-system>/components/Chart/ChartCursor.css
+    <design-system>/components/Chart/ChartGrid.css
+    <design-system>/components/Chart/ChartDot.css
 
 ⚠️ What to look at in it: `-webkit-text-size-adjust`, `user-select`,
 `-webkit-touch-callout`, `touch-action`, and whatever it does about `font-size`
@@ -9365,15 +9365,14 @@ use it"*, *"explain why havin domain is prefeered"*, *"do it now"*
 6. **Why a custom domain is preferred**, explained rather than asserted.
 
 🔴 **AND THE AUDIT FOUND ONE THING THAT MUST NOT BE PUBLISHED, SO THE REPO IS
-NOT FLIPPED IN THE SAME BREATH AS THE REST.** `New Pack.circuitpack` is
+NOT FLIPPED IN THE SAME BREATH AS THE REST.** The owner's Circuit pack was
 **reachable in history at `419ec5c`, 3,506,555 bytes**, verified with
 `git cat-file -s`. CLAUDE.md says what it is in red: a complete backup of the
 Novation Circuit on this desk, **29 sessions of somebody's real work**, their
-ONLY copy since `tmp/` stopped being tracked, and the owner's words about it are
-*"(kept private)"*. A public repository hands that file
+ONLY copy since `tmp/` stopped being tracked. A public repository hands that file
 to anyone who clones it, and a clone cannot be recalled.
 ⚠️ **AND THE SAME BLOB IS CURRENTLY A BACKUP**, which is the bind. CLAUDE.md
-names `git show 419ec5c:'New Pack.circuitpack'` as the recovery path, so a
+named a `git show` of that blob as the recovery path, so a
 history rewrite that drops it destroys the second copy at the same moment it
 protects it. **The order is: copy the blob out to disk, verify 3,506,555 bytes,
 THEN rewrite.**

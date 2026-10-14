@@ -193,7 +193,7 @@
   window.fetch = (...a) => { fetched++; return realFetch(...a); };
 
   // 🔴 THE PACK IS NOT IN THIS REPOSITORY ANY MORE, ON ANY ORIGIN. It moved to
-  // the private `<private-pack-repo>` on 2026-09-24 (*"rm new pack, is in
+  // the owner's private pack repository on 2026-09-24 (*"rm new pack, is in
   // separate repo"*), before this repository was prepared to go public, and the
   // blob it had been sitting on in history went with it.
   // 🔴 SO THE DEFAULT IS TO FETCH NOTHING, AND THE SECOND WAY IN IS AN EXPLICIT
@@ -1679,7 +1679,7 @@
         `at ${location.hostname} after ${fetched} request(s) and ${drop.opens} file(s) opened`);
     } else {
       const bytes = new Uint8Array(await r.arrayBuffer());
-      await openPack('New Pack.circuitpack', bytes);
+      await openPack('pack.circuitpack', bytes);
 
       d.assert('the pack gives the grid one row for every sample in it, and the steps do not move',
         rows.length === 64 && grid.pads.length === 64

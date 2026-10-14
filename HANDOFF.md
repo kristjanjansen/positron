@@ -169,7 +169,7 @@ to run something, check this list first.
 - **In flight, uncommitted:** `demo/concepts/radio/020/index.html` (a background agent was mid-way: better tempo detector, all confidences shown, BPM scope same height as the wave and 4x time zoom with labels, an fx box `web:fx` with a synthesised bass drum and a `web:knob-mix` wet/dry knob, equal loudness across the mix). Read its last report or the diff before committing; it was told to stop browser runs when the owner closed Chrome.
 - **Untracked build leftovers** in `workers/view/public/` (concepts/room/001 to 004, synth/080, typist, kit/chat, shell/chat-ui.mjs) from an agent's test build; delete them by name before any build or commit of `public/`.
 
-## The Pi (<pi>, site `pi-1`)
+## The Pi (`<pi>`, site `pi-1`)
 
 - Site and ports renamed: `pi-1`, ports `<medium>-<dir>`; board announces `kind`/`label`.
 - **JACK runs on the Fast Track Pro itself** (`jackd -d alsa -C hw:CARD=Pro -p 512 -n 3`, capture only); the Circuit is on JACK and clean (floor about -80 dBFS, same as arecord). The arecord config is saved on the Pi. A power cycle of the Fast Track Pro cured 8 bit samples once; do it again if they return.
@@ -1113,7 +1113,7 @@ Worker and no rig file changed, so nothing was built or deployed.** Commits
   the ground: `ls plans/ | grep -i` on the subject costs one command.
 - **The Circuit has a factory reset** (Novation, *"Using Components to reset a
   product to Factory Settings"*). It restores Novation's content, never the
-  owner's sessions, which live in `<private-pack-repo>`. **49 lines** in the repo
+  owner's sessions, which live in the owner's private pack repository. **49 lines** in the repo
   still say "no factory reset"; fixed per page as touched.
 - **A kernel ALSA route into the Circuit would bypass `rig/board/inputs.mjs`
   entirely**, because the gate writes to the rawmidi device and a sequencer
@@ -1320,7 +1320,7 @@ below. Nineteen commits, `6e1498a` to `2250e10`, every one deployed.
   account switch in CLAUDE.md.
 - Counted at the end: **60 demos, 58 built, 2 unlisted**, **80 plans**,
   **81 `### Open`** and **43 `### Done 2026-09-30`** in `BACKLOG.md`.
-- 🔴 **THE OWNER'S VPN BLOCKS THE LAN.** It routes 192.168.1.0/24 into its
+- 🔴 **THE OWNER'S VPN BLOCKS THE LAN.** It routes `<lan-prefix>.0/24` into its
   tunnel (`utun4`), so ping and ssh to the Pi fail even bound to `en0`. Pages
   still reach the Pi through the relay. **The Pi has NOT been updated** (below).
 
@@ -1371,9 +1371,9 @@ below. Nineteen commits, `6e1498a` to `2250e10`, every one deployed.
 - **Update the Pi once the VPN is off**, or `/shape/`'s CCs stay refused:
 
 ```sh
-scp rig/board/inputs.mjs positron@<pi>:/tmp/inputs.mjs
-scp demo/shell/circuit-cc.mjs positron@<pi>:/tmp/circuit-cc.mjs
-ssh positron@<pi> 'sudo install -m 644 /tmp/inputs.mjs /opt/positron-board/rig/board/inputs.mjs && sudo install -d /opt/positron-board/demo/shell && sudo install -m 644 /tmp/circuit-cc.mjs /opt/positron-board/demo/shell/circuit-cc.mjs && sudo systemctl restart positron-board && md5sum /opt/positron-board/rig/board/inputs.mjs /opt/positron-board/demo/shell/circuit-cc.mjs'
+scp rig/board/inputs.mjs <user>@<pi>:/tmp/inputs.mjs
+scp demo/shell/circuit-cc.mjs <user>@<pi>:/tmp/circuit-cc.mjs
+ssh <user>@<pi> 'sudo install -m 644 /tmp/inputs.mjs /opt/positron-board/rig/board/inputs.mjs && sudo install -d /opt/positron-board/demo/shell && sudo install -m 644 /tmp/circuit-cc.mjs /opt/positron-board/demo/shell/circuit-cc.mjs && sudo systemctl restart positron-board && md5sum /opt/positron-board/rig/board/inputs.mjs /opt/positron-board/demo/shell/circuit-cc.mjs'
 ```
   Expect `5263c9d0826c1482271d98693d3b9a82` and
   `0f5dc26ca88f9e20c769456df2089a39` (re-measured at HEAD), then the board
@@ -1782,7 +1782,7 @@ FOR 184 COMMITS.** Instructed: *"just go to main"*. `main`, `origin/main` and th
 old branch all point at **`bdb9335`**, the working tree is CLEAN, nothing is in
 flight, and `main` tracks `origin/main`. ⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT
 BACK AND CHECKED** after every push: `gh auth status` reads
-`<work-account>` active.
+the work account active.
 
 🔴 **AND THE LIVE SITE IS ONE COMMIT BEHIND THE REPOSITORY ON PURPOSE, WHICH IS
 THE FIRST THING TO DECIDE NEXT.** The edge reads **BUILD
@@ -2054,7 +2054,7 @@ Confirmed by reading the deployed `shell/shell.mjs` rather than by trusting
 `deploy.mjs`'s own line. **7 commits this session**, the working tree is CLEAN,
 nothing is in flight, and `4155175` is on
 `origin/session-28-station-videoradio`. ⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT
-BACK AND CHECKED**: `gh auth status` reads `<work-account>` active.
+BACK AND CHECKED**: `gh auth status` reads the work account active.
 
 MEASURED after, counted and not remembered: **57 demos, 55 built, 55 cards**,
 and **75 plans in `plans/`**. None of those three moved today; no manifest row
@@ -2473,7 +2473,7 @@ https://eccm.positron.studio, which answers 200.
   every page carrying `X-Robots-Tag: noindex`, and no `/eccm/` path left in
   any deployed page. Shot at 375 and 1280 from the new host, nothing dragging
   the page sideways.
-- **The repository is https://github.com/kristjanjansen/eccm, private, branch
+- **The repository is the eccm repository, private, branch
   `main`**, at `~/personal/eccm`, carried out of this one with
   `git filter-repo` on a fresh clone so the 20 commits that touched
   `demo/eccm/`, the four eccm plans, the `eccm-ui` skill and
@@ -2649,7 +2649,7 @@ the personal account dance in `CLAUDE.md`, and was not asked for).
 | --- | --- |
 | `plans/plan-eccm-cms.md` | one Worker, D1 of eleven tables plus `draft`, R2 originals with `/cdn-cgi/image` renditions, Access OTP, `publish_at` as a WHERE clause, newsletter needs Workers Paid; today's additions: §5 the rada7 shape (eight hints, the sentence is the product), §8 drafts (a `draft` table behind a debounced PUT with `rev`, `localStorage` as crash buffer), paste (a `text/html` walker into the markdown subset), dates (native `datetime-local` enhanced by flatpickr), stream items (`workers/items` alarms as a second publish path), trip's image model; §13 caching, SEO, JSON-LD `Event`, RSS and iCal, one unchunked sitemap |
 | `plans/plan-eccm-design.md` | eccm.ee today is stock Cassiopeia, Roboto declared and never served, 14.4 px on 142 characters a line, `width: 3320px` typed, a 381 by 199 JPEG logo from a 2023 PSD and no vector; the system is one family (Plex Sans) in two weights, 18 px on 66 ch, about 30 `--eccm-*` tokens; eight of `positron-compose`'s ten sections carry over and a typography layer is what it lacks; a 25 rule `eccm-ui` skill outline; **first step is one email to ECCM for the vector and the tagline face** |
-| `plans/plan-eccm-setup.md` | its own private repository `kristjanjansen/eccm` from the first commit (positron is public since 2026-09-24), `eccm.positron.studio` and `eccm-media.positron.studio` as one-line custom domains on this zone, staging on this account and production on ECCM's as two wrangler environments, a seven step handover, half a day before the CMS plan's session 1 |
+| `plans/plan-eccm-setup.md` | its own private repository, the eccm repository, from the first commit (positron is public since 2026-09-24), `eccm.positron.studio` and `eccm-media.positron.studio` as one-line custom domains on this zone, staging on this account and production on ECCM's as two wrangler environments, a seven step handover, half a day before the CMS plan's session 1 |
 
 ## What the eccm demo does not have yet, in the order to build it
 
@@ -2896,7 +2896,7 @@ ACCIDENT.** That is `22294ed`, checked before staging and committed without a
 browser run, which its own message says plainly.
 
 ⚠️ **THE ACTIVE GITHUB ACCOUNT WAS PUT BACK**, verified rather than assumed:
-`gh auth status` reads `<work-account>` active after the push.
+`gh auth status` reads the work account active after the push.
 ⚠️ **AND `deploy.mjs` REBUILDS BEFORE IT SHIPS**, so the stamp on the edge names
 the commit BEFORE the one carrying it. `acc8355` exists only to bring that string
 back into the repository so a page’s stamp can be attributed.

@@ -159,7 +159,7 @@ on its channels. Hotplug is a diff too, never a teardown.
 
 Corrected 2026-10-03: the Circuit has a factory reset (Components restores the
 factory content), and the owner's sessions are backed up in
-`<private-pack-repo>`. So SysEx is an ordinary kind, and a port's policy says
+the owner's private pack repository. So SysEx is an ordinary kind, and a port's policy says
 what to do with each kind:
 
 | policy | meaning | example |

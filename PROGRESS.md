@@ -306,12 +306,12 @@ outranks the plan documents wherever they disagree:
 - **The M-Audio Fast Track Pro sends nothing.** *"maudio does nada"*, confirmed
   on the wire. It is an interface.
 
-**THE CIRCUIT IS BACKED UP AND VERIFIED TWICE.** `New Pack.circuitpack` in the
-repository root and at `<private-pack-repo>`, private, **round tripped and md5
-compared**. The device has no factory reset, so three ordinary operations in
+**THE CIRCUIT IS BACKED UP AND VERIFIED TWICE.** The pack was in the
+repository root then and is in the owner's private pack repository now, **round
+tripped and md5 compared**. The device has no factory reset, so three ordinary operations in
 Components are unrecoverable.
-🔴 **THE 32 USER SESSIONS ARE NOT IN IT AND THEY ARE THE PART THAT MATTERS**:
-*"(kept private)"*. ⚠️ And session NAMES were read as
+🔴 **THE 32 USER SESSIONS ARE NOT IN IT AND THEY ARE THE PART THAT MATTERS.**
+⚠️ And session NAMES were read as
 evidence of session CONTENT, which is the same class of mistake as reading a URL
 as evidence of who owned a domain. Re-measured: **32 distinct fingerprints, not
 one empty.**
@@ -3193,8 +3193,8 @@ symptom to read; a rising one is too.
 
 ### The second machine, and two facts about this shell
 
-`the owner's MacBook Pro (2)` — MacBookPro18,3, M1 Pro, 10 cores, 16 GB, macOS
-26.6.2, at **<mbp>**, reachable as `ssh mbp` with key auth. It stays
+The second laptop: MacBookPro18,3, M1 Pro, 10 cores, 16 GB, macOS
+26.6.2, at **`<mbp>`**, reachable as `ssh mbp` with key auth. It stays
 reachable **with the lid closed** on AC (`SleepDisabled 1`), and its GUI session
 is reachable from SSH (`WindowServer`, Finder and `launchctl gui/501` all
 answer) — so GUI apps can be launched and driven remotely.
@@ -4967,7 +4967,7 @@ measured or quoted from a doc, not assumed.
   snippet pasted into markdown.
 - Written up in `demo/notes/uuu-positron.md` (live at positron.studio/notes/),
   including what positron can offer a LAN setup: `wsTransport` does not care that
-  the relay is a Durable Object, so pointing it at `ws://192.168.x.x` runs the
+  the relay is a Durable Object, so pointing it at `ws://<lan-address>` runs the
   clock and score machinery with no internet.
 
 ### The iOS jank, run to ground (2026-09-04, end of session 8)
