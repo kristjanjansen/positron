@@ -8,33 +8,35 @@
 <title>POSITRON connect</title>
 <link rel="stylesheet" href="/shell/shell.css">
 <style>
-  .cn-sites { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 24px 32px; }
-  .cn-site h3 { margin: 0 0 8px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
-  .cn-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 6px 0; border-top: 1px solid var(--line); }
-  .cn-id { font: 400 13px/1.4 var(--mono); color: var(--fg); }
-  .cn-label { font: 400 13px/1.4 var(--sans); color: var(--dim); }
-  .cn-ports { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font: 400 12px/1.4 var(--mono); }
+  /* Unlinked nodes as the patchbay draws a box, four to a row, grouped by where they run. */
+  .cn-site + .cn-site { margin-top: 32px; }
+  .cn-site h3 { margin: 0 0 12px; font: 600 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim2); }
+  .cn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  @media (max-width: 900px) { .cn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .cn-box { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: var(--card2); border: 1px solid var(--line2); border-radius: var(--r, 4px); min-width: 0; }
+  .cn-head { display: flex; flex-direction: column; gap: 2px; }
+  .cn-id { font: 600 13px/1.3 var(--mono); color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cn-label { font: 400 11.5px/1.3 var(--sans); color: var(--dim); }
+  .cn-ports { display: flex; justify-content: space-between; gap: 8px; font: 400 12px/1.5 var(--mono); }
+  .cn-ports > div { display: flex; flex-direction: column; }
+  .cn-ports > div:last-child { text-align: right; }
 </style>
 <script type="module">
   import { mount, el } from '/shell/shell.mjs';
   import { SELFCHECK } from '/shell/selfcheck.mjs';
   import { createBay } from '/shell/bay.mjs';
-  import { createPatchbay, useMediumColours } from '/shell/patchbay.mjs';
+  import { useMediumColours } from '/shell/patchbay.mjs';
 
   // The things the site already has, as nodes with their ports and nothing
-  // linked yet: the starting point for a patchbay you wire by saying what
-  // should play what, as /wish/ does on the desk.
+  // linked yet. A hand list until plans/plan-node-catalogue.md lands, when it
+  // reads demo/shell/nodes.mjs and the Pi's boardGraph() instead.
   const NODES = [
     // in your hands
     ['web:keys', 'person', 'on-screen keys', ['midi-out', 'midi-in']],
     ['web:midi', 'device', 'a plugged-in MIDI keyboard', ['midi-out']],
     ['web:knob', 'device', 'a knob', ['value-out']],
     ['web:camera', 'device', 'camera', ['video-out']],
-    ['web:mic', 'device', 'microphone', ['audio-out']],
     ['web:typewriter', 'person', 'typing', ['value-out']],
-    ['phone:touch', 'person', 'touch', ['midi-out']],
-    ['phone:tilt', 'device', 'tilt', ['value-out']],
-    ['pico-1:knob', 'device', 'a knob on a Pico', ['value-out']],
     // sound made in this tab
     ['web:sine', 'engine', 'sine synth', ['midi-in', 'audio-out']],
     ['web:plaits', 'engine', 'Plaits', ['midi-in', 'value-in', 'audio-out']],
@@ -47,12 +49,12 @@
     ['web:tempo', 'engine', 'tempo detector', ['audio-in', 'clock-out', 'value-out']],
     ['web:key', 'engine', 'key detector', ['audio-in', 'value-out']],
     ['web:shader', 'engine', 'shader', ['video-in', 'value-in', 'video-out']],
+    ['web:pico', 'engine', 'emulated Pico', ['midi-in', 'video-out']],
     ['web:recorder', 'store', 'recorder', ['midi-in', 'file-out']],
     // where it can be heard and seen
     ['web:speaker', 'screen', 'speakers', ['audio-in']],
     ['web:scope', 'screen', 'waveform', ['audio-in']],
     ['web:screen', 'screen', 'this screen', ['video-in']],
-    ['phone:screen', 'screen', 'every phone watching', ['video-in']],
     // the Pi in the studio
     ['pi-1:circuit', 'device', 'Novation Circuit', ['midi-in', 'value-in', 'audio-out']],
     ['pi-1:collide', 'engine', 'SuperCollider on the Pi', ['midi-in', 'value-in', 'audio-out']],
@@ -81,32 +83,37 @@
   const d = mount({ name: 'connect', what: 'Everything the site can connect, laid out with nothing connected yet.', readout: null, index: '/', indexLabel: 'positron' });
   useMediumColours();
 
-  // the picture, with no links
-  const pb = createPatchbay({ nodes: () => bay.nodes(), ports: () => bay.ports(), links: () => bay.links() });
-
-  // and the same as a list, by where it runs
+  // one box per node, ins on the left and outs on the right, as the patchbay draws them
   const bySite = new Map();
   for (const n of bay.nodes()) {
     const site = n.id.split(':')[0];
-    if (!bySite.has(site)) bySite.set(site, []);
-    bySite.get(site).push(n);
+    const where = SITES[site] || site;
+    if (!bySite.has(where)) bySite.set(where, []);
+    bySite.get(where).push(n);
   }
-  const list = el('div', 'cn-sites');
+  const groups = [];
   for (const [site, nodes] of bySite) {
     const box = el('section', 'cn-site');
-    box.append(el('h3', '', `${site}, ${SITES[site] || site}`));
+    box.append(el('h3', '', site));
+    const grid = el('div', 'cn-grid');
     for (const n of nodes) {
-      const row = el('div', 'cn-row');
-      const ports = el('div', 'cn-ports');
+      const card = el('div', 'cn-box');
+      const head = el('div', 'cn-head');
+      head.append(el('span', 'cn-id', n.id), el('span', 'cn-label', n.label || ''));
+      const ports = el('div', 'cn-ports'), ins = el('div'), outs = el('div');
       for (const p of bay.ports().filter((p) => p.id.startsWith(`${n.id}:`))) {
-        ports.append(el('span', `md-${p.medium}`, p.id.split(':')[2]));
+        (p.dir === 'out' ? outs : ins).append(el('span', `md-${p.medium}`, p.id.split(':')[2]));
       }
-      row.append(el('span', 'cn-id', n.id.split(':')[1]), el('span', 'cn-label', n.label || ''), ports);
-      box.append(row);
+      ports.append(ins, outs);
+      card.append(head, ports);
+      grid.append(card);
     }
-    list.append(box);
+    box.append(grid);
+    groups.push(box);
   }
-  d.stack.add(pb.el, list);
+  const all = el('div');
+  all.append(...groups);
+  d.stack.add(all);
   for (const f of failed) d.log(f, 'bad');
 
   if (SELFCHECK) {

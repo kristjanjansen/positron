@@ -2,7 +2,7 @@
 
 - **One node catalogue, `demo/shell/nodes.mjs`: pages take their nodes from it, /connect/ reads it** (2026-10-14). Asked: *"can we not centralize is somehow?"*, then *"do it"*. Plan: `plans/plan-node-catalogue.md`. The page moves wait for review phase 5.
 
-- **/connect/: a 4-column grid grouped by site, only real nodes** (2026-10-14). Asked: *"use 4col grid and group. are those real?"* about phone touch and tilt (they are not: the hero's made-up phone patch).
+- ~~**/connect/: a 4-column grid grouped by site, only real nodes**~~ (2026-10-14, DONE; still a hand list until the catalogue). Asked: *"use 4col grid and group. are those real?"* about phone touch and tilt (they are not: the hero's made-up phone patch).
 
 - **Patchbay demo based on /wish/: first a page with a bunch of nodes we might connect, unconnected; a list if the patchbay cannot draw unlinked nodes** (2026-10-14). Asked: *"start to work on patchbay demo, based on wish. at first mae a demo page with bunch of nodes we might want to connect. can patchbay suppor nonconnected viz? if not, just provide a list. local dev link"*.
 
