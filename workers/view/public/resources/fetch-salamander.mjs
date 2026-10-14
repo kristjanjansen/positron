@@ -277,7 +277,7 @@ either way.
 
 Four of the sixteen velocity layers (v1, v6, v11, v16) of the 30 notes, and
 the 88 key-off release samples. Made by demo/resources/fetch-salamander.mjs in
-https://github.com/kristjanjansen/positron.
+https://github.com/positron-studio/positron.
 `;
 
 const sum = (rows, k) => rows.reduce((s, r) => s + r[k], 0);

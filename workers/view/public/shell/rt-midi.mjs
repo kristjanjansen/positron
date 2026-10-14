@@ -33,7 +33,7 @@ export function make({ send, wake, log }) {
     const names = [...devices.plugged].map((id) => own.node(id)?.label || id);
     status.textContent = names.length ? `playing from ${names.join(', ')}` : 'MIDI is on, nothing is plugged in';
   }
-  const buttons = createButtonGroup({ buttons: [{ id: 'ask', label: 'Use a MIDI keyboard', onPress: () => ask() }] });
+  const buttons = createButtonGroup({ buttons: [{ id: 'ask', icon: 'play', label: 'Use a MIDI keyboard', onPress: () => ask() }] });
   async function ask() {
     wake();
     asked++;
