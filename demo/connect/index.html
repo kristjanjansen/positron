@@ -50,6 +50,10 @@
   .cn-pic:not(.cn-pic-empty) > .cn-empty { display: none; }
   .cn-empty { margin: 0; font: 400 13px/1.4 var(--sans); color: var(--dim2); }
   .cn-ex > button.cn-pill[aria-pressed="true"] { border-color: var(--voice); }
+  /* An example whose patch does not run yet is dimmed, never disabled: it still
+     builds its picture, and its title says what is missing. */
+  .cn-ex > button.cn-pill[data-runs="marked"] { opacity: .5; }
+  .cn-ex > button.cn-pill[data-runs="marked"]:hover, .cn-ex > button.cn-pill[data-runs="marked"]:focus-visible { opacity: 1; }
   .cn-prop { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
   .cn-prop-t { font: 400 12.5px/1.4 var(--mono); color: var(--fg); overflow-wrap: anywhere; }
   .cn-prop-n { flex-basis: 100%; font: 400 12px/1.4 var(--sans); color: var(--dim); }
@@ -59,11 +63,23 @@
   .cn-prop-b > button.pos-sm { text-transform: none; }
   .cn-prop-n:empty { display: none; }
 
-  /* The faces of the linked nodes, in a concept page's order: pictures, the
+  /* The faces of the linked nodes, in a concept page's order: pictures, panels, the
      knob row, the keys. Empty paints nothing. */
   .cn-faces { display: flex; flex-direction: column; gap: 24px; }
   .cn-faces[hidden] { display: none; }
   .cn-face { min-width: 0; }
+  /* A node's own panel (Plaits' knobs, the drum grid, the Pi's Join): one column. */
+  .cn-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .cn-face-say { margin: 0; font: 400 12px/1.4 var(--sans); color: var(--dim); }
+  .cn-pi-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ctl-gap); }
+  .cn-pi-row button { text-transform: none; }
+  /* Record in red, the one control that starts writing (concept.css's .cc-rec, which this page does not load). */
+  .cn-panel .cc-rec { color: var(--rec, #e5484d); }
+  /* The OLED as /synth/dots/ draws it: dark ink, the 128x64 canvas whole-number scaled in the middle. */
+  .cn-oled { display: grid; place-items: center; width: 100%; aspect-ratio: 16 / 9; background: #05070c; border-radius: var(--r, 4px); }
+  .cn-oled canvas { display: block; image-rendering: pixelated; }
+  /* The typist's sheet takes the height of its box. */
+  .cn-paper { height: 240px; border-radius: var(--r, 4px); overflow: hidden; }
 
   /* The listen control sits in the raspberry pi group, under its heading. */
   .cn-live { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -94,7 +110,7 @@
   import { NODES as CATALOGUE, addNodes } from '/shell/nodes.mjs';
   import { boardGraph, BOARD_SITE } from '/shell/graph-registry.mjs';
   import { CONCEPTS } from '/shell/concept-list.mjs';
-  import { createRuntimes, EXTRA_PORTS, knobChoices, knobFor } from '/shell/node-runtime.mjs';
+  import { createRuntimes, EXTRA_PORTS, knobChoices, knobFor, loaderOf, FACED } from '/shell/node-runtime.mjs';
   import { sharedAudio, claim, release, contexts } from '/shell/audio.mjs';
   import { createKnobGrid } from '/shell/knob-grid.mjs';
   import { knobRaw } from '/shell/synth-params.mjs';
@@ -107,10 +123,15 @@
 
   // Every socket this page opens, counted from its first line, so "a visit opens
   // nothing" is an assert over a counter rather than a reading of the file.
-  const OPENED = [];
+  const OPENED = [], MIDI_ASKED = [], CAMERA_ASKED = [];
   if (SELFCHECK) {
     const Native = window.WebSocket;
     window.WebSocket = class extends Native { constructor(u, p) { super(u, p); OPENED.push(String(u)); } };
+    // The MIDI prompt, counted the same way: only a person's press on the midi box asks.
+    const ask = navigator.requestMIDIAccess?.bind(navigator);
+    if (ask) navigator.requestMIDIAccess = (o) => { MIDI_ASKED.push(o); return ask(o); };
+    const gum = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices);
+    if (gum) navigator.mediaDevices.getUserMedia = (o) => { CAMERA_ASKED.push(o); return gum(o); };
   }
 
   // ── what the site has, read rather than typed ───────────────────────────
@@ -141,6 +162,10 @@
   // A type whose catalogue label is a pattern (`<drum>, SuperCollider`) is
   // named for what it is; the instances are in the box's hover.
   const LABELS = { knob: 'knob', drum: 'drum voice', recording: 'radio recording', station: 'live station', shout: 'radio relay' };
+  // A value-in whose names the catalogue leaves to the page, as the pages give
+  // them, so the knob box asks which one. The collide runtime's own list is
+  // held to this by the self-check.
+  const PARAM_NAMES = { collide: ['bright', 'decay'] };
   // A station's site is its broadcaster's, so the one box is on ERR's.
   const siteOf = (name, e) => (name === 'station' ? 'err' : e.site ?? 'web');
   // room/words is built and served and kept off the index (concept-list.mjs).
@@ -161,7 +186,8 @@
       const e = CATALOGUE[name], site = siteOf(name, e), label = LABELS[name] ?? e.label, as = AS[name] ?? name;
       // Every port, the optional ones too: some page builds each of them.
       // A port has no label in the catalogue, and a refusal reads it.
-      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${p}` }]));
+      const ports = Object.fromEntries(Object.keys(e.ports).map((p) => [`${as}:${p}`, { label: `${label} ${p}`,
+        ...(p === 'value-in' && PARAM_NAMES[name] ? { shape: { of: 'param', names: PARAM_NAMES[name] } } : {}) }]));
       try {
         addNodes(b, site, [{ name, as, site, label }], { ports });
         for (const [p, f] of Object.entries(EXTRA_PORTS[name] || {})) b.addPort({ id: `${site}:${as}:${p}`, ...f, label: `${label} ${p}` });
@@ -186,9 +212,9 @@
   const { bay, failed } = makeBay();
 
   // ── a second of a kind (decision D6) ─────────────────────────────────────
-  // A synth or a scope may be used twice: once every one of them is linked, the
-  // grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
-  const MULTI = ['synth', 'scope'];
+  // A synth, a scope or a screen may be used twice: once every one of them is linked,
+  // the grid offers the next as `synth-2`, `scope-3`, with a runtime and a face of its own.
+  const MULTI = ['synth', 'scope', 'screen'];
   const instancesOf = (type) => bay.nodes().filter((n) => TYPE.get(n.id) === type).map((n) => n.id);
   // The bay cannot drop a node, so an instance unlinked again stays in it and the grid shows the first free one.
   const firstFree = (type) => { const s = linkedNodes(); return instancesOf(type).find((id) => !s.has(id)) ?? null; };
@@ -228,7 +254,7 @@
     ['play the circuit in the studio', 'remote/circuit', [[KEYS, `${CIRCUIT}:midi-in`], [`${CIRCUIT}:audio-out`, SPK]]],
     ['change the circuit\'s patch', 'remote/circuit', [[W('patch', 'midi-out'), `${CIRCUIT}:midi-in`]]],
     ['play the piano on the pi', 'remote/piano', [[KEYS, `${PIANO}:midi-in`], [`${PIANO}:audio-out`, SPK]]],
-    ['a knob opens supercollider\'s filter', 'code/collide', [[KNOB, W('collide', 'value-in')]]],
+    ['a knob opens supercollider\'s filter', 'code/collide', [[KNOB, W('collide', 'value-in'), 'bright']]],
     ['a knob bends the mirror shader', 'shader/mirror', [[KNOB, W('shader', 'value-in')], [W('shader', 'video-out'), SCREEN]]],
     ['show me plaits\' waveform', 'code/plaits', [[W('plaits', 'audio-out'), W('scope', 'audio-in')]]],
     ['grain a radio recording', 'granulator/grains', [[REC, W('player', 'file-in')], [W('player', 'audio-out'), W('grains', 'audio-in')], [W('grains', 'audio-out'), SPK]]],
@@ -248,7 +274,9 @@
     ['typing plays the typewriter', 'typist/typewriter', [[W('typing', 'value-out'), W('typewriter', 'value-in')],
       ['cf-r2:typewriter-samples:file-out', W('typewriter', 'file-in')], [W('typewriter', 'audio-out'), SPK]]],
     ['the keys light up the pico', 'synth/dots', [[KEYS, W('pico', 'midi-in')], [W('pico', 'video-out'), W('oled', 'video-in')]]],
-  ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to]) => ({ from, to, transforms: [] })) }));
+  // A third field on a link is the parameter a knob into a value-in turns, so
+  // an example makes that one knob instance rather than asking.
+  ].map(([say, page, links]) => ({ say, page, links: links.map(([from, to, param]) => ({ from, to, transforms: [], ...(param ? { param } : {}) })) }));
 
   const d = mount({ name: 'connect',
     what: 'Press an example to build its patch, or an out port and then an in port. Pressing a wire takes it away.',
@@ -306,9 +334,26 @@
 
   // No typed request for now (asked 2026-10-14, *"rm ask button and input atm"*):
   // an example press is the request.
+  // What runs of an example, read off the runtimes rather than typed: a node
+  // with no runtime marks its pill until one is written, and a node that opens
+  // a paid service or somebody else's server makes it a person's press only.
+  const PRESS_ONLY = {
+    'cf-stream:live': 'Stream is billed by the minute',
+    'err:station': 'a live station is somebody else\'s server',
+  };
+  function runsOf(ex) {
+    const nodes = [...new Set(ex.links.flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))];
+    return { nodes, missing: nodes.filter((n) => !PRESS_ONLY[n] && !loaderOf(n, typeOf)), press: nodes.filter((n) => PRESS_ONLY[n]) };
+  }
   const exRow = el('div', 'cn-ex');
   for (const ex of EXAMPLES) {
-    const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: `as on /${ex.page}/` });
+    const r = runsOf(ex);
+    const lines = [`as on /${ex.page}/`];
+    if (r.press.length) lines.push(`runs on a person's press only: ${r.press.map((n) => PRESS_ONLY[n]).join(', ')}`);
+    if (r.missing.length) lines.push(`drawn, not running yet: ${r.missing.join(', ')}`);
+    const b = el('button', 'pos-sm cn-pill', ex.say, { type: 'button', title: lines.join('\n') });
+    b.dataset.runs = r.press.length ? 'press' : r.missing.length ? 'marked' : 'runs';
+    if (r.missing.length) b.dataset.missing = r.missing.join(' ');
     b.addEventListener('click', (e) => build(ex, e.isTrusted));
     exRow.append(b);
   }
@@ -365,11 +410,12 @@
 
   // ── linking, by press or by confirming a proposal ────────────────────────
   let last = { ok: true, why: '' };
-  function connect(from, to, transforms = [], consent = false) {
+  function connect(from, to, transforms = [], consent = false, param = null) {
     // The knob type into a value-in that names its parameters is ONE knob, for
-    // the parameter a person picks; with one name there is nothing to ask.
+    // the parameter a person picks; with one name, or an example's own, there is nothing to ask.
     const names = knobChoices(bay, from, to);
     if (names?.length === 1) return connect(...knobFor(bay, to, names[0]), transforms, consent);
+    if (names && names.includes(param)) return connect(...knobFor(bay, to, param), transforms, consent);
     if (names) { askParam(to, names, transforms, consent); return false; }
     bay.seen(from); bay.seen(to);
     // A link out of somebody else's server needs a person's own press (bay.mjs, consent).
@@ -386,7 +432,7 @@
   function build(ex, person) {
     for (const l of [...bay.links()]) bay.unlink(l.id);
     let made = 0;
-    for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person) ? 1 : 0;
+    for (const l of ex.links) made += connect(l.from, l.to, l.transforms || [], person, l.param) ? 1 : 0;
     for (const b of exRow.children) b.setAttribute('aria-pressed', String(b.textContent === ex.say));
     d.log(`built "${ex.say}", ${made} of ${ex.links.length} links`);
     redraw();
@@ -711,6 +757,7 @@
     const all = runtime.list().filter((x) => x.rt.face);
     const knobs = all.filter((x) => x.rt.slot === 'knob');
     const parts = all.filter((x) => x.rt.slot === 'picture').map((x) => part(x.id, x.rt.face));
+    parts.push(...all.filter((x) => x.rt.slot === 'panel').map((x) => part(x.id, x.rt.face)));
     const turns = (id) => nodeOf(bay.links().find((l) => nodeOf(l.from) === id)?.to ?? '');
     const byTarget = new Map();
     for (const x of knobs) { const t = turns(x.id); if (!byTarget.has(t)) byTarget.set(t, []); byTarget.get(t).push(x); }
@@ -989,9 +1036,354 @@
     await runtimes();
     A('with nothing linked every runtime is closed and the faces take no room', runtime.list().length === 0 && faces.hidden);
 
+    await checkRunners();
+    await checkExamples();
+
     A('the self-check asked the wish worker nothing', reached === 0, `${reached} calls`);
 
     await checkLive();
+  }
+
+  // ── the runtimes past slice 3, one example each ───────────────────────────
+  // Each is pressed the way a person would, through its own face or its own
+  // handler, and graded on the far side of its link: what the next runtime
+  // heard, what reached the speakers, what the OLED drew.
+  async function checkRunners() {
+    const A = d.assert;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(50); return fn(); };
+    const RT = (id) => runtime.get(id);
+    const pressEx = async (say) => { [...exRow.children].find((b) => b.textContent === say).click(); await runtimes(); };
+    const shows = (id) => !!RT(id)?.face && faces.contains(RT(id).face);
+    const linkOf = (from, to) => bay.links().find((l) => l.from === from && l.to === to);
+    const logs = () => window.__demo.logs.map((x) => x.msg).join('\n');
+
+    // ── Plaits, from a MIDI keyboard ──
+    const asked0 = MIDI_ASKED.length;
+    await pressEx('play plaits from my midi keyboard');
+    const midi = RT('web:midi'), plaits = RT('web:plaits');
+    A('the MIDI keyboard and Plaits run, each with its face, and linking them asked the browser for no MIDI',
+      !!midi && !!plaits && !!RT('web:speaker') && shows('web:midi') && shows('web:plaits') && MIDI_ASKED.length === asked0
+        && plaits.knobs.size === 10, `runtimes ${runtime.list().map((x) => x.id).join(' ')}, asked ${MIDI_ASKED.length - asked0}`);
+    // A keyboard the check plugs in itself: an input that is not a device, handed to the runtime as a person's grant would be.
+    class FakeIn extends EventTarget { id = 'check-in-1'; name = 'check keyboard'; state = 'connected'; }
+    const fin = new FakeIn();
+    midi.attach({ inputs: new Map([[fin.id, fin]]), onstatechange: null });
+    const play = (b0, n, v) => { const e = new Event('midimessage'); e.data = new Uint8Array([b0, n, v]); fin.dispatchEvent(e); };
+    const p0 = plaits.heard();
+    runtime.wake();
+    await until(() => plaits.ready(), 8000);
+    play(0x90, 57, 100);
+    await sleep(500);
+    const plaitsLoud = runtime.level();
+    play(0x80, 57, 0);
+    A('a note from the plugged keyboard crosses web:midi -> web:plaits, and Plaits reaches the speakers',
+      plaits.ready() && plaits.heard() === p0 + 2 && plaitsLoud > 0.01 && midi.heard() === 2,
+      `ready ${plaits.ready()}, plaits heard ${plaits.heard() - p0}, speakers ${plaitsLoud.toFixed(4)}`);
+    removeLink(linkOf(W('midi', 'midi-out'), W('plaits', 'midi-in'))?.id);
+    await runtimes();
+    const p1 = plaits.heard();
+    play(0x90, 60, 100); play(0x80, 60, 0);
+    A('NEGATIVE CONTROL: with that link gone the keyboard still plays and Plaits hears nothing, and the MIDI box is closed',
+      plaits.heard() === p1 && !RT('web:midi'), `plaits heard ${plaits.heard() - p1}`);
+    await sleep(300);
+
+    // ── the drum machine ──
+    await pressEx('the drum machine plays its drums');
+    const seq = RT('web:sequencer'), drum = RT('web:drum');
+    A('the drum machine runs as two boxes, its grid the sequencer\'s face, and the drums have no face of their own',
+      !!seq && !!drum && shows('web:sequencer') && !!seq.face.querySelector('.tbar-toggle') && !drum.face,
+      `runtimes ${runtime.list().map((x) => x.id).join(' ')}`);
+    const d0 = drum.heard(), s0 = seq.heard();
+    seq.face.querySelector('.tbar-toggle')?.click();
+    await until(() => drum.heard() > d0 + 4, 8000);
+    await sleep(600);
+    const drumsLoud = runtime.level();
+    A('Play on its bar sends steps over web:sequencer -> web:drum, and the drums reach the speakers',
+      seq.heard() > s0 && drum.heard() > d0 + 4 && drumsLoud > 0.005,
+      `sent ${seq.heard() - s0}, drums heard ${drum.heard() - d0}, speakers ${drumsLoud.toFixed(4)}`);
+    // A second link out of the sequencer keeps it running, so taking the drums' link away is the only change.
+    const KEYS_IN = W('keys', 'midi-in');
+    connect(W('sequencer', 'midi-out'), KEYS_IN);
+    removeLink(linkOf(W('sequencer', 'midi-out'), W('drum', 'midi-in'))?.id);
+    await runtimes();
+    const d1 = drum.heard(), s1 = seq.heard();
+    await sleep(500);
+    let drumsAfter = 0;
+    for (let i = 0; i < 25; i++) { drumsAfter = Math.max(drumsAfter, runtime.level()); await sleep(20); }
+    A('NEGATIVE CONTROL: with the sequencer\'s link to the drums gone it still plays its steps (into the keys), the drums hear none and the speakers are silent',
+      seq.heard() > s1 && drum.heard() === d1 && !!RT('web:sequencer') && drumsAfter < 0.001,
+      `sent ${seq.heard() - s1}, drums heard ${drum.heard() - d1}, speakers ${drumsAfter.toFixed(5)}`);
+    seq.stop();
+
+    // ── typing plays the typewriter ──
+    await pressEx('typing plays the typewriter');
+    const typing = RT('web:typing'), tw = RT('web:typewriter'), store = RT('cf-r2:typewriter-samples');
+    A('the paper, the typewriter and its samples run, and linking them read nothing from the bucket',
+      !!typing && !!tw && !!store && shows('web:typing') && store.heard() === 0 && !tw.loaded(),
+      `store reads ${store?.heard()}`);
+    const key = (ch) => {
+      const k = typing.paper.keys;
+      k.value += ch; k.setSelectionRange(k.value.length, k.value.length);
+      k.dispatchEvent(new InputEvent('input', { inputType: 'insertText', data: ch, bubbles: true }));
+    };
+    const t0 = tw.heard();
+    key('a');
+    await until(() => tw.loaded(), 8000);
+    // A strike is a few tens of ms, so the loudest the speakers got over a short window.
+    let typeLoud = 0;
+    key('b'); key('c');
+    for (let i = 0; i < 30; i++) { typeLoud = Math.max(typeLoud, runtime.level()); await sleep(10); }
+    A('typing on the paper reaches the typewriter over its link, the first key reads the samples once, and it strikes at the speakers',
+      tw.heard() === t0 + 3 && store.heard() === 1 && tw.loaded() && tw.strikes() >= 2 && typeLoud > 0.005,
+      `heard ${tw.heard() - t0}, store reads ${store.heard()}, strikes ${tw.strikes()}, speakers ${typeLoud.toFixed(4)}`);
+    removeLink(linkOf(W('typing', 'value-out'), W('typewriter', 'value-in'))?.id);
+    await runtimes();
+    const t1 = tw.heard();
+    key('d');
+    A('NEGATIVE CONTROL: unlinked, a key on the paper reaches the typewriter no more', tw.heard() === t1, `heard ${tw.heard() - t1}`);
+
+    // ── the keys light up the Pico ──
+    await pressEx('the keys light up the pico');
+    const pico = RT('web:pico'), oled = RT('web:oled'), kb = RT('web:keys')?.kb;
+    A('the keys, the emulated Pico and its OLED run, each with a face, and nothing was fetched for the Pico yet',
+      !!pico && !!oled && !!kb && shows('web:pico') && shows('web:oled') && pico.pico.state() === 'off');
+    const C4 = kb.keyOf(60);
+    kb.press(C4);
+    await until(() => oled.heard() > 0 && oled.lit() > 0, 10000);
+    kb.release(C4);
+    A('a key boots the Pico, and the screens it draws arrive at the OLED over web:pico -> web:oled',
+      pico.heard() >= 1 && pico.pico.state() === 'running' && oled.heard() > 0 && oled.lit() > 0,
+      `pico heard ${pico.heard()}, state ${pico.pico.state()}, oled frames ${oled.heard()}, lit ${oled.lit()}`);
+    removeLink(linkOf(W('pico', 'video-out'), W('oled', 'video-in'))?.id);
+    await runtimes();
+    const f0 = pico.frames();
+    kb.press(kb.keyOf(64)); await sleep(150); kb.release(kb.keyOf(64));
+    await until(() => pico.frames() > f0, 3000);
+    A('NEGATIVE CONTROL: with the OLED unlinked the Pico still draws and no OLED is there to get it',
+      pico.frames() > f0 && !RT('web:oled'), `pico frames ${pico.frames() - f0}`);
+
+    // ── a knob opens SuperCollider's filter ──
+    await pressEx('a knob opens supercollider\'s filter');
+    const sc = RT('web:collide'), bright = RT('web:knob-bright');
+    A('the knob example makes one knob for bright, linked into SuperCollider, which shows its program, and its names are the program\'s',
+      !!sc && !!bright && shows('web:collide') && shows('web:knob-bright') && !!linkOf('web:knob-bright:value-out', W('collide', 'value-in'))
+        && sc.names.join() === PARAM_NAMES.collide.join() && bright.knob.value() === sc.param('bright'),
+      `names ${sc?.names.join(' ')}, knob ${bright?.knob.value()}, engine ${sc?.param('bright')}`);
+    bright.knob.set(0.9);
+    await sleep(50);
+    A('turning it sets bright on the engine, over the link', Math.abs(sc.param('bright') - 0.9) < 1e-6 && sc.params() >= 1, `bright ${sc.param('bright')}`);
+    connect(KEYS, W('collide', 'midi-in')); connect(W('collide', 'audio-out'), SPK);
+    await runtimes();
+    runtime.wake();
+    await until(() => !!sc.voice.engine(), 8000);
+    const kbc = RT('web:keys').kb;
+    kbc.press(kbc.keyOf(57));
+    // Its envelope falls to a quiet sustain, so the loudest over the attack.
+    let scLoud = 0;
+    for (let i = 0; i < 40; i++) { scLoud = Math.max(scLoud, runtime.level()); await sleep(10); }
+    kbc.release(kbc.keyOf(57));
+    A('with the keys and the speakers linked as well, a key sounds SuperCollider at the speakers',
+      !!sc.voice.engine() && sc.heard() >= 1 && scLoud > 0.005, `engine ${!!sc.voice.engine()}, heard ${sc.heard()}, speakers ${scLoud.toFixed(4)}`);
+    removeLink(linkOf('web:knob-bright:value-out', W('collide', 'value-in'))?.id);
+    await runtimes();
+    bright.knob.set(0.1);
+    A('NEGATIVE CONTROL: the knob unlinked moves nothing, and its face is gone', Math.abs(sc.param('bright') - 0.9) < 1e-6 && !shows('web:knob-bright'),
+      `bright ${sc.param('bright')}`);
+
+    // ── pictures: the mirror shader, and the camera through the dither ──
+    // Graded structurally (it drew, it is not a flat field), never by pixels
+    // across machines. With no WebGL2 the shaders say so, in the same asserts.
+    const noGl = !document.createElement('canvas').getContext('webgl2');
+    const spread = (cv) => {
+      const t = document.createElement('canvas'); t.width = 160; t.height = 90;
+      const g = t.getContext('2d'); g.drawImage(cv, 0, 0, 160, 90);
+      const px = g.getImageData(0, 0, 160, 90).data;
+      // The spread of the red channel: a flat field is about 0, a picture is not.
+      // Not r+g+b: the mirror's colour is three cosines 120 degrees apart, whose
+      // sum is constant by construction (positron-verify), so it varies in hue.
+      let s1 = 0, s2 = 0;
+      const n = px.length / 4;
+      for (let i = 0; i < px.length; i += 4) { const v = px[i]; s1 += v; s2 += v * v; }
+      return { sd: Math.sqrt(Math.max(0, s2 / n - (s1 / n) ** 2)) };
+    };
+    await pressEx('a knob bends the mirror shader');
+    const mirror = RT('web:shader'), screen = RT('web:screen'), seg = RT('web:knob-segments');
+    await until(() => (screen?.heard() ?? 0) > 5, 3000);
+    const ms = screen && spread(screen.canvas);
+    A('the mirror shader runs with its program in a code box; the knob sends its 8 over the link and the screen shows a picture',
+      !!mirror && !!seg && shows('web:shader') && shows('web:screen') && shows('web:knob-segments') && mirror.segments() === 8
+        && mirror.delivered() === 1 && (noGl ? /no WebGL2/.test(logs()) : mirror.heard() > 5 && ms.sd > 10),
+      noGl ? 'no WebGL2 here, said in the log' : `segments ${mirror?.segments()}, frames ${mirror?.heard()}, red spread ${ms?.sd.toFixed(1)}`);
+    seg.knob.set(3);
+    await sleep(50);
+    A('turning the knob sets segments over the link', mirror.segments() === 3 && mirror.delivered() === 2, `segments ${mirror.segments()}`);
+    removeLink(linkOf('web:knob-segments:value-out', W('shader', 'value-in'))?.id);
+    await runtimes();
+    seg.knob.set(12);
+    A('NEGATIVE CONTROL: unlinked, the knob sets nothing', mirror.segments() === 3 && mirror.delivered() === 2, `segments ${mirror.segments()}`);
+
+    const cam0 = CAMERA_ASKED.length;
+    await pressEx('camera through the dither shader');
+    const camRt = RT('web:camera'), dith = RT('web:shader-dither'), scr = RT('web:screen');
+    A('the camera, the dither and the screen run, and linking them opened no camera',
+      !!camRt && !!dith && !!scr && shows('web:camera') && shows('web:screen') && CAMERA_ASKED.length === cam0 && !camRt.camera.on());
+    camRt.face.querySelector('button[data-id="cam"]')?.click();
+    await until(() => camRt.camera.frames() > 5 && dith.heard() > 5, 6000);
+    const ds = spread(scr.canvas);
+    A('Start on the camera\'s face opens it, and its frames cross camera -> dither -> screen as a dithered picture',
+      CAMERA_ASKED.length === cam0 + 1 && camRt.camera.on() && camRt.camera.frames() > 5
+        && (noGl ? /no WebGL2/.test(logs()) : dith.heard() > 5 && scr.heard() > 5 && ds.sd > 10),
+      `camera frames ${camRt.camera.frames()}, dithered ${dith.heard()}, screen ${scr.heard()}, red spread ${ds.sd.toFixed(1)}`);
+    const tracks = camRt.camera.stream()?.getTracks() ?? [];
+    // A second screen on the camera keeps it linked, so taking the dither's link away is the only change.
+    connect(W('camera', 'video-out'), 'web:screen-2:video-in');
+    removeLink(linkOf(W('camera', 'video-out'), W('shader-dither', 'video-in'))?.id);
+    await runtimes();
+    const df = dith.heard(), cf = camRt.camera.frames(), scr2 = RT('web:screen-2');
+    await sleep(600);
+    A('NEGATIVE CONTROL: with camera -> dither unlinked the camera still runs into a second screen and the dither gets no picture',
+      dith.heard() === df && camRt.camera.frames() > cf && (scr2?.heard() ?? 0) > 0 && camRt.camera.on(),
+      `dithered ${dith.heard() - df}, camera frames ${camRt.camera.frames() - cf}, screen-2 ${scr2?.heard()}`);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('unlinked, the camera\'s box closes and every track is stopped', !RT('web:camera') && !camRt.camera.on()
+      && tracks.length > 0 && tracks.every((t) => t.readyState === 'ended'), `${tracks.length} tracks, ${tracks.map((t) => t.readyState).join(' ')}`);
+
+    // ── grain a radio recording ──
+    await pressEx('grain a radio recording');
+    const player = RT('web:player'), grains = RT('web:grains'), rec = RT('cf-r2:recording');
+    A('the recording, the player and the grain ring run, the player shows Play, and linking them fetched nothing',
+      !!player && !!grains && !!rec && shows('web:player') && rec.heard() === 0 && player.heard() === 0 && !grains.up(),
+      `store reads ${rec?.heard()}, opened ${player?.heard()}`);
+    player.face.querySelector('button[data-id="play"]')?.click();
+    await until(() => player.playing() && grains.up(), 15000);
+    // The ring has to hold some of the recording before a grain sounds like it.
+    let grainLoud = 0;
+    const tg = performance.now();
+    while (performance.now() - tg < 12000 && grainLoud < 0.003) { grainLoud = Math.max(grainLoud, runtime.level()); await sleep(100); }
+    A('Play reads the recording once from the linked store, the ring reports grains, and they reach the speakers',
+      rec.heard() === 1 && player.playing() && grains.up() && grains.heard() > 0 && grainLoud > 0.003,
+      `store reads ${rec.heard()}, playing ${player.playing()}, grains ${grains.heard()}, speakers ${grainLoud.toFixed(4)}`);
+    removeLink(linkOf(W('grains', 'audio-out'), SPK)?.id);
+    await runtimes();
+    await sleep(300);
+    const g0 = grains.heard();
+    let grainQuiet = 0;
+    for (let i = 0; i < 20; i++) { grainQuiet = Math.max(grainQuiet, runtime.level()); await sleep(25); }
+    A('NEGATIVE CONTROL: with the grains\' audio-out unlinked the ring still makes grains and nothing reaches the speakers',
+      grains.heard() > g0 && grainQuiet < 0.001, `grains ${grains.heard() - g0}, speakers ${grainQuiet.toFixed(5)}`);
+    player.stop();
+
+    // ── record what I play and play it back ──
+    await pressEx('record what i play and play it back');
+    const recRt = RT('web:rec'), syn = RT('web:synth'), kbr = RT('web:keys')?.kb;
+    A('the recorder runs with Record, Play and its table, and the keys reach it and not the synth',
+      !!recRt && !!syn && shows('web:rec') && !!recRt.face.querySelector('button[data-id="rec"]') && !linkOf(KEYS, W('synth', 'midi-in')));
+    recRt.face.querySelector('button[data-id="rec"]')?.click();
+    const sy0 = syn.heard();
+    for (const n of [60, 64]) { kbr.press(kbr.keyOf(n)); await sleep(120); kbr.release(kbr.keyOf(n)); await sleep(60); }
+    recRt.recorder.stop();
+    A('Record takes the two keys that cross keys -> rec, and the synth hears none of them while recording',
+      recRt.heard() === 2 && recRt.recorder.notes.every((r) => r.len != null) && syn.heard() === sy0,
+      `taken ${recRt.heard()}, synth heard ${syn.heard() - sy0}`);
+    runtime.wake();
+    recRt.face.querySelector('button[data-id="play"]')?.click();
+    let recLoud = 0;
+    const tr = performance.now();
+    while (performance.now() - tr < 600) { recLoud = Math.max(recLoud, runtime.level()); await sleep(15); }
+    A('Play sends the same notes out of rec:midi-out at their times, the synth plays them, and they reach the speakers',
+      recRt.sent() === 4 && syn.heard() === sy0 + 4 && recLoud > 0.01, `sent ${recRt.sent()}, synth heard ${syn.heard() - sy0}, speakers ${recLoud.toFixed(4)}`);
+    removeLink(linkOf(W('rec', 'midi-out'), W('synth', 'midi-in'))?.id);
+    await runtimes();
+    const sy1 = syn.heard(), rs = recRt.sent();
+    recRt.face.querySelector('button[data-id="play"]')?.click();
+    await sleep(600);
+    A('NEGATIVE CONTROL: with rec -> synth unlinked Play still sends the notes and the synth hears none',
+      recRt.sent() === rs + 4 && syn.heard() === sy1, `sent ${recRt.sent() - rs}, synth heard ${syn.heard() - sy1}`);
+
+    // ── the sampler, linked by hand: its example waits for the looper ──
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    connect(KEYS, W('sampler', 'midi-in')); connect(W('sampler', 'audio-out'), SPK);
+    await runtimes();
+    const smp = RT('web:sampler'), kbs = RT('web:keys').kb;
+    const loudFor = async (ms) => { let m = 0; const t = performance.now(); while (performance.now() - t < ms) { m = Math.max(m, runtime.level()); await sleep(20); } return m; };
+    runtime.wake();
+    kbs.press(kbs.keyOf(60));
+    const bare = await loudFor(800);
+    kbs.release(kbs.keyOf(60));
+    A('NEGATIVE CONTROL: with no samples linked into its file-in the sampler sounds nothing for a key, and says so',
+      !!smp && smp.heard() === 0 && bare < 0.001 && /no samples linked into its file-in/.test(logs()), `speakers ${bare.toFixed(5)}`);
+    connect('cf-r2:piano-samples:file-out', W('sampler', 'file-in'));
+    await runtimes();
+    const piano = RT('cf-r2:piano-samples');
+    await until(() => !!smp.sampler.ready(), 10000);
+    kbs.press(kbs.keyOf(60));
+    const pianoLoud = await loudFor(3000);
+    kbs.release(kbs.keyOf(60));
+    A('with the piano samples linked, a key (its on and its off) fetches its recording from our bucket and the sampler reaches the speakers',
+      smp.sampler.ready() && smp.heard() === 2 && piano?.heard() === 1 && pianoLoud > 0.005,
+      `engine ${smp.sampler.ready()}, heard ${smp.heard()}, store reads ${piano?.heard()}, speakers ${pianoLoud.toFixed(4)}`);
+
+    // ── a patch change for the Circuit, held off before Join ──
+    await pressEx('change the circuit\'s patch');
+    const patch = RT('web:patch'), circ = RT(`${BOARD_SITE}:circuit`);
+    const o0 = OPENED.length;
+    patch.pick(5);
+    A('a patch picked reaches the Circuit\'s box on the Pi, which sends nothing and joins nothing before Join',
+      !!patch && !!circ && shows('web:patch') && shows(`${BOARD_SITE}:circuit`) && patch.heard() === 1 && circ.heldOff() === 1
+        && !circ.joined() && !circ.board() && OPENED.length === o0, `held off ${circ?.heldOff()}, sockets ${OPENED.length - o0}`);
+  }
+
+  // ── every example: it runs, or its pill says why it does not ──────────────
+  async function checkExamples() {
+    const A = d.assert;
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    // What each example is, written down here rather than read off the code it
+    // grades, so a mark that goes missing or appears is a red assert, not a new one.
+    const EXPECT = {
+      'grains in time with the recording': ['web:tempo'],
+      'what key is the live radio in?': 'press',
+      'the dial tunes the radio': ['web:dial', 'web:tuner'],
+      'send the camera through stream and back': 'press',
+      'the camera plays the drums': ['web:pixelate'],
+      'loop what i play into the piano': ['web:looper'],
+    };
+    let ran = 0;
+    const skipped = [];
+    for (const [i, ex] of EXAMPLES.entries()) {
+      const pill = exRow.children[i];
+      const r = runsOf(ex), want = EXPECT[ex.say] ?? 'runs';
+      if (want === 'press' || r.press.length) {
+        A(`"${ex.say}" is marked as a person's press only`, want === 'press' && pill.dataset.runs === 'press' && /person's press only/.test(pill.title), pill.title);
+        skipped.push(`${ex.say} (${r.press.map((n) => PRESS_ONLY[n]).join(', ')})`);
+        continue;
+      }
+      if (Array.isArray(want) || r.missing.length) {
+        A(`"${ex.say}" is dimmed and its title names what does not run: ${Array.isArray(want) ? want.join(', ') : 'nothing'}`,
+          Array.isArray(want) && want.join() === r.missing.join() && pill.dataset.runs === 'marked' && getComputedStyle(pill).opacity < 1
+            && want.every((n) => pill.title.includes(n)), pill.title);
+        continue;
+      }
+      pill.click();
+      await runtimes();
+      // The nodes the press really linked: a knob into a named value-in is its own instance (web:knob-bright).
+      const nodes = [...new Set(bay.links().flatMap((l) => [nodeOf(l.from), nodeOf(l.to)]))];
+      const dead = nodes.filter((n) => !runtime.get(n));
+      const faceless = nodes.filter((n) => runtime.get(n) && (FACED.includes(typeOf(n)) || n.startsWith(`${BOARD_SITE}:`))
+        && !(runtime.get(n).face && faces.contains(runtime.get(n).face)));
+      A(`"${ex.say}" runs: all ${ex.links.length} links made, every node of its patch has a runtime, and a face where its type has one`,
+        pill.dataset.runs === 'runs' && bay.links().length === ex.links.length && !dead.length && !faceless.length,
+        `${bay.links().length} links; no runtime: ${dead.join(' ') || 'none'}; no face: ${faceless.join(' ') || 'none'}`);
+      ran++;
+    }
+    d.log(`${ran} of ${EXAMPLES.length} examples run here; left for a person's press: ${skipped.join('; ') || 'none'}`);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
   }
 
   // ── the live layer, against the stand-ins ─────────────────────────────────
@@ -1078,5 +1470,70 @@
     A('Stop leaves the room, the heard groups and boxes go, and nothing is marked', !listener && live.sites.size === 0
       && !groups.querySelector('.cn-box[data-live]') && !groups.querySelector('.cn-site[data-site]') && !svgOf()?.querySelector('.cn-livemark')
       && !card(`${BOARD_SITE}:synth`));
+
+    await checkPi(room);
+  }
+
+  // ── the Pi, joined from its own face, against the stand-in board ───────────
+  // demo/fake-board.mjs answers in the private room and its `-circuit` input
+  // room with the board's own code, and counts on its side what reached the
+  // Circuit's port. Never studio-1: the room is the check's own.
+  async function checkPi(room) {
+    const A = d.assert;
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const runtimes = async () => { await runtime.idle(); await new Promise((r) => requestAnimationFrame(() => r())); };
+    const until = async (fn, ms) => { const t0 = performance.now(); while (!fn() && performance.now() - t0 < ms) await sleep(100); return fn(); };
+    const loudest = async (ms) => { let m = 0; const t0 = performance.now(); while (performance.now() - t0 < ms) { m = Math.max(m, runtime.level()); await sleep(20); } return m; };
+    const pressEx = async (say) => { [...exRow.children].find((b) => b.textContent === say).click(); await runtimes(); };
+    const CIRC = `${BOARD_SITE}:circuit`, PIANO_ID = `${BOARD_SITE}:sampler`;
+
+    await pressEx('play the circuit in the studio');
+    const circ = runtime.get(CIRC), kb = runtime.get('web:keys')?.kb;
+    const o0 = OPENED.length;
+    kb.press(kb.keyOf(60)); kb.release(kb.keyOf(60));
+    A('a link to the Circuit opens nothing: no board and no socket before Join, and a key is held off',
+      !!circ && !circ.board() && !circ.joined() && OPENED.length === o0 && circ.heldOff() === 2 && circ.heard() === 0,
+      `sockets ${OPENED.length - o0}, held off ${circ?.heldOff()}`);
+    runtime.wake();
+    circ.face.querySelector('button[data-id="join"]')?.click();
+    await until(() => circ.joined(), 12000);
+    A('Join on the Circuit\'s face joins the check\'s own room, never the studio\'s, and holds the lease',
+      circ.joined() && circ.room === `${room}-circuit` && !circ.room.startsWith(STUDIO_ROOM)
+        && OPENED.every((u) => !u.includes(`/room/${STUDIO_ROOM}`)) && (circ.lease()?.renewals() ?? 0) >= 1,
+      `room ${circ.room}, joined ${circ.joined()}, renewals ${circ.lease()?.renewals()}`);
+    const outs = async () => (await circ.board().ask({ type: 'audio.status' }, 'audio.started', 4000))?.midi?.out ?? null;
+    const before = await outs();
+    kb.press(kb.keyOf(60)); await sleep(120); kb.release(kb.keyOf(60));
+    await sleep(500);
+    const after = await outs();
+    A('a key after Join reaches the stand-in board, counted on its side as written to the Circuit\'s port',
+      before !== null && after - before === 2 && circ.heard() === 2, `the board counts ${before} then ${after}, the box sent ${circ.heard()}`);
+    const piLoud = await loudest(1500);
+    A('the board\'s sound comes back into this page\'s one context and reaches the speakers', piLoud > 0.01, `speakers ${piLoud.toFixed(4)}`);
+    removeLink(bay.links().find((l) => l.from === `${CIRC}:audio-out`)?.id);
+    await runtimes();
+    await sleep(300);
+    const piQuiet = await loudest(600);
+    A('NEGATIVE CONTROL: with the Circuit\'s audio-out unlinked nothing reaches the speakers, and the Circuit stays joined',
+      piQuiet < 0.001 && circ.joined(), `speakers ${piQuiet.toFixed(5)}`);
+    const lease = circ.lease();
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
+    A('unlinked, the Circuit\'s box closes and leaves the room', !runtime.get(CIRC) && !circ.board() && !circ.joined(),
+      `renewals so far ${lease?.renewals() ?? 0}`);
+
+    // The sampler on the Pi: the stand-in has none, so Join says so and sends nothing.
+    await pressEx('play the piano on the pi');
+    const piano = runtime.get(PIANO_ID), kb2 = runtime.get('web:keys')?.kb;
+    piano.face.querySelector('button[data-id="join"]')?.click();
+    await until(() => /could not start/.test(piano.face.textContent), 12000);
+    kb2.press(kb2.keyOf(60)); kb2.release(kb2.keyOf(60));
+    A('NEGATIVE CONTROL: a board with no sampler is said on the piano\'s face, and a key sends it nothing',
+      /could not start the sampler/.test(piano.face.textContent) && !piano.joined() && piano.heard() === 0 && piano.room === room,
+      piano.face.querySelector('.cn-face-say')?.textContent);
+    for (const l of [...bay.links()]) bay.unlink(l.id);
+    redraw();
+    await runtimes();
   }
 </script>

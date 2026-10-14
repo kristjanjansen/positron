@@ -1,6 +1,6 @@
 ## Open
 
-- **/connect/: every example actually runs (slices 4 on): a context option for Plaits, drum machine, granulator, samplers, radio rig; runtimes for plaits, midi (permission on a press), drums and sequencer, typewriter (samples on a press), pico and oled, the Pi (Join press); a check that every example ends with all its nodes running; until then examples that cannot run are marked** (2026-10-14). Reported: *"i can not see almost no of the ui rendered"*. Starts when the catalogue agent hands back /connect/ and node-runtime.mjs.
+- **/connect/: every example actually runs (slices 4 on)** (14 of 20 RUN since 2026-10-14; open: 10 tempo ring, 16 pixelate, 17 looper, 12 tuner needs a decision, 11 and 14 press only): a context option for Plaits, drum machine, granulator, samplers, radio rig; runtimes for plaits, midi (permission on a press), drums and sequencer, typewriter (samples on a press), pico and oled, the Pi (Join press); a check that every example ends with all its nodes running; until then examples that cannot run are marked** (2026-10-14). Reported: *"i can not see almost no of the ui rendered"*. Starts when the catalogue agent hands back /connect/ and node-runtime.mjs.
 
 - ~~**/connect/ live: on the Pi's own group, not a separate list; announced Pi nodes with no page become boxes ("no page yet"), never "not in the catalogue"**~~ (2026-10-14, DONE). Asked: *"do not get it. should it be next to pi?"* after Listen in studio-1 showed synth, pappus, capture, gpu, midi-fasttrack-pro as not in the catalogue.
 

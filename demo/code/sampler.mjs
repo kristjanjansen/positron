@@ -211,9 +211,10 @@ export function planFor(ins, near, layer) {
  * @param {(on:boolean)=>void} [o.onFetch]  a fetch began (true) or settled (false)
  * @param {(ins:object)=>void} [o.onProgram]  the instrument changed
  * @param {number[]} [o.warm]  [lo, hi] notes to fetch when an instrument is switched to
+ * @param {() => AudioContext} [o.context]  a context to play in; left out, the first note makes one
  */
 export function createSampler({ instruments = [PIANO], log = () => {}, onFetch = () => {},
-  onProgram = () => {}, warm = null } = {}) {
+  onProgram = () => {}, warm = null, context = null } = {}) {
   let ctx = null, out = null, inst = instruments[0], loading = 0;
   const buffers = new Map();      // url -> AudioBuffer
   const inflight = new Map();     // url -> promise, so a press and the queue behind it never fetch one file twice
@@ -226,7 +227,7 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
 
   function ensure() {
     if (ctx) return ctx;
-    ctx = new AudioContext({ latencyHint: 'interactive' });
+    ctx = context ? context() : new AudioContext({ latencyHint: 'interactive' });
     // Fire and move on: resume() waits on a gesture and never rejects.
     ctx.resume().catch(() => {});
     out = ctx.createGain();
@@ -417,6 +418,8 @@ export function createSampler({ instruments = [PIANO], log = () => {}, onFetch =
 
   return {
     midi, noteOn, noteOff, program, panic,
+    /** Its one way out, once a note has made the context; a caller with its own router connects it. */
+    out: () => out,
     inst: () => inst,
     sounding: () => voices.length,
     loading: () => loading > 0,

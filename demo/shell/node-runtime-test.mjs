@@ -13,7 +13,7 @@
 import { NODES } from './nodes.mjs';
 import { createBay } from './bay.mjs';
 import { addNodes } from './nodes.mjs';
-import { RUNTIMES, NOT_YET, EXTRA_PORTS, plan, routes, knobChoices, knobFor, whyNot } from './node-runtime.mjs';
+import { RUNTIMES, NOT_YET, SITES, EXTRA_PORTS, plan, routes, knobChoices, knobFor, whyNot, loaderOf } from './node-runtime.mjs';
 import { routeAudio } from './audio-router.mjs';
 import { PARAM_NAMES, PARAMS, knobRaw } from './synth-params.mjs';
 
@@ -34,8 +34,14 @@ const stray = [...Object.keys(RUNTIMES), ...Object.keys(NOT_YET)].filter((k) => 
 A('neither list names a type the catalogue does not have', !stray.length, stray.join(', '));
 A('every reason is a sentence, not an empty string', Object.values(NOT_YET).every((s) => typeof s === 'string' && s.length > 20));
 A('a Pi node has a reason too', /Raspberry Pi/.test(whyNot(null, 'pi-1:circuit')));
-A('the five that run are keys, synth, speaker, knob and scope',
-  ['keys', 'synth', 'speaker', 'knob', 'scope'].every((k) => typeof RUNTIMES[k] === 'function') && Object.keys(RUNTIMES).length === 5);
+A('every runtime is a lazy loader, so a visit loads none of them', Object.values(RUNTIMES).every((f) => typeof f === 'function' && f.length === 0));
+{
+  const typeOf = (id) => ({ 'web:synth': 'synth', 'web:paper': 'paper' })[id] ?? null;
+  A('a catalogue type with a runtime is found by its type', loaderOf('web:synth', typeOf) === RUNTIMES.synth);
+  A('a Pi node is found by its site, since it is not a catalogue type', loaderOf('pi-1:circuit', typeOf) === SITES['pi-1']);
+  A('NEGATIVE CONTROL: a type that does not run has no loader, and neither does a site with none',
+    loaderOf('web:paper', typeOf) === null && loaderOf('cf-stream:live', typeOf) === null && loaderOf('pi-12:circuit', typeOf) === null);
+}
 // The synth's value-in is the catalogue's since 2026-10-14; nodes.mjs is import
 // free, so its names are typed there and held to the voice's here.
 const catNames = NODES.synth.ports['value-in']?.shape?.names ?? [];

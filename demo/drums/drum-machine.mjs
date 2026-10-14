@@ -107,6 +107,9 @@ import { LIFE } from './voices.mjs';
  * @param {(rows: number) => number} [o.gain]  the mix's level for this many
  *   rows, read at the first play and at every new shape; left out, it follows
  *   how many drums there are in all, as it always has
+ * @param {(ev: object) => void} [o.sequence]  where the grid's notes go instead of
+ *   along this machine's own sequencer wires (/connect/, whose own link carries
+ *   them to `api.play`); left out, they go along the wires as always
  * @param {{ over: number, node: string, label: (rows: number) => string }} [o.group]
  *   above `over` rows the patchbay draws the rows as ONE box, `web:<node>`,
  *   with one MIDI wire in and one audio wire out (rhythm/020 with a 64 sample
@@ -122,7 +125,7 @@ import { LIFE } from './voices.mjs';
  */
 export function createDrumMachine(d, { voices, patternIn = false, onBar = null, flowing = null, scopes: wantScopes = false, onWake = null,
   onStart = null, onStop = null, ahead = 150, context = null, mix = null, shape: shapeOpt = null, onShape = null,
-  start: startPattern = true, gain = null, group = null }) {
+  start: startPattern = true, gain = null, group = null, sequence = null }) {
   const S = 'web';
   const ID = (node, port) => `${S}:${node}:${port}`;
   const SEQ = ID('sequencer', 'midi-out');
@@ -452,7 +455,9 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
       if (s === 0 && onBar) onBar(Math.floor((next - 1) / STEPS));
       if (at < performance.now()) continue;      // already gone by: never sent late
       VOICES.forEach((v, r) => {
-        if (grid.get(r, s)) bay.send(SEQ, { cls: 'note', ch: 10, d1: v.note, d2: 100, at, step: s });
+        if (!grid.get(r, s)) return;
+        const ev = { cls: 'note', ch: 10, d1: v.note, d2: 100, at, step: s };
+        if (sequence) sequence(ev); else bay.send(SEQ, ev);
       });
     }
   }
@@ -699,6 +704,10 @@ export function createDrumMachine(d, { voices, patternIn = false, onBar = null, 
     /** The mix's loudness right now, read off the analyser, 0 before the first play. */
     level: () => { if (!an) return 0; an.getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; return Math.sqrt(s / buf.length); },
     start, stop,
+    /** One note into the voices as if the sequencer had sent it, along its own wires (a hit only once the engine is up). */
+    play: (ev) => bay.send(SEQ, { at: performance.now(), ...ev }),
+    /** Bring the engine up without starting the sequencer: the context, scsynth and the definitions. */
+    boot() { ctx ??= context ? context() : new AudioContext({ latencyHint: 'interactive' }); ctx.resume(); return wake(); },
     /** The shape now, and a new one: at once when stopped, at the top of the next loop when playing. */
     shape: () => ({ rows: VOICES.length, steps: STEPS }),
     /** `fresh`: build the grid again, empty, even when the shape is the same (a new kit). */

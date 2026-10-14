@@ -658,3 +658,46 @@ is one page at a time, with its own check before and after.
 | `demo/shell/synth-voice.mjs` | MOVED, all of them, the saw copies with `cutoff: null` so they stay filterless: `demo/synth/keyboard/`, `demo/synth/recorder/`, `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` |
 | `demo/shell/synth-params.mjs` | MOVED: `demo/synth/patch-synth.mjs` (`WAVES`, `hz`, `expo`, `hzText`, `sText`, and the `wave`, `cutoff`, `q`, `attack`, `release` rows of `KNOBS`; its own defaults stay its own) |
 | `demo/shell/rt-scope.mjs` (`scopeWindow`, from the first rising zero crossing) | MOVED: `demo/synth/module-page.mjs` `frame()` |
+| `demo/code/plaits-voice.mjs` (`KNOBS`, `MODEL_SHORT`, `createPlaitsKeys`) | MOVED: `demo/code/plaits/` |
+| `demo/shell/pico.mjs` (`createPicoDevice`), `demo/shell/oled-view.mjs` (`oledCanvas`) | MOVED: `demo/synth/dots/` |
+| `demo/shell/camera.mjs` | MOVED: `demo/video/camera/`, `demo/video/shader/`. OPEN: `demo/video/recorder/`, `demo/video/webrtc/`, `demo/video/llhls/`, `demo/video/moq/`, `demo/drums/camera/` |
+| `demo/shell/dither-shader.mjs` | MOVED: `demo/video/shader/` |
+| `demo/shell/mirror-shader.mjs` | MOVED: `demo/shader/mirror/`. OPEN: `demo/shader/remote/` |
+| `demo/granulator/grain-ring.mjs` (`createRingEngine`) | MOVED: `demo/granulator/grains/`. OPEN: `demo/granulator/beat/` (its copy carries the tempo) |
+| `demo/shell/note-recorder.mjs` | MOVED: `demo/synth/recorder/`. OPEN: `demo/synth/timeline/`, `demo/synth/dots/`, `demo/room/words/` |
+
+## Built, 2026-10-14: a runtime for every node of 14 examples
+
+Local at http://127.0.0.1:8890/connect/. Not committed, not deployed. Every
+example pill whose patch does not fully run is dimmed with a title naming what
+is missing (`data-runs="marked"`), or titled as a person's press only
+(`data-runs="press"`); the marks are read off `loaderOf`, so a new runtime
+removes its own mark.
+
+| # | example | state |
+| --- | --- | --- |
+| 1 | let the keys play the synth | runs |
+| 2 | play plaits from my midi keyboard | runs (MIDI asked only on the midi box's press) |
+| 3 | play the circuit in the studio | runs; the Pi joins on its face's Join |
+| 4 | change the circuit's patch | runs; held off until Join |
+| 5 | play the piano on the pi | runs; Join asks the board for its sampler |
+| 6 | a knob opens supercollider's filter | runs |
+| 7 | a knob bends the mirror shader | runs |
+| 8 | show me plaits' waveform | runs |
+| 9 | grain a radio recording | runs |
+| 10 | grains in time with the recording | marked: `web:tempo` (the ring engine with a tempo-in is /granulator/beat/'s copy, not lifted) |
+| 11 | what key is the live radio in? | press only (ERR); also marked: `cf-shout:relay`, `web:level`, `web:key` |
+| 12 | the dial tunes the radio | marked: `web:dial`, `web:tuner` (its graph is /radio/tuner/'s, fed only by ERR stations) |
+| 13 | camera through the dither shader | runs |
+| 14 | send the camera through stream and back | press only (Stream, billed) |
+| 15 | the drum machine plays its drums | runs |
+| 16 | the camera plays the drums | marked: `web:pixelate` (/drums/camera/'s shader and readback, not lifted) |
+| 17 | loop what i play into the piano | marked: `web:looper` (/code/piano/'s, woven through its pedal, strip and deck) |
+| 18 | record what i play and play it back | runs |
+| 19 | typing plays the typewriter | runs; samples read from R2 on the first key |
+| 20 | the keys light up the pico | runs |
+
+New in `node-runtime.mjs`: `SITES` (a Pi node runs by its site), `loaderOf`,
+`FACED`, and a factory gets `reroute`, `upstream(port)`, `downstream(port)` and
+`peerSpec(name)`; a factory may be async. Pictures are pulled: a screen asks the
+runtime linked into its video-in for a frame each animation frame.

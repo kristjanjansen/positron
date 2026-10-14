@@ -43,6 +43,23 @@ export function drawOled(cv, px) {
  * ⚠️ AND A BOX WITH NO WIDTH YET IS NOT A NARROW BOX: inside a closed tab the
  * stack measures 0, and that is skipped rather than read as a phone.
  */
+/**
+ * A 128x64 canvas in `box`, blank, scaled by a whole number to fit it, so
+ * every panel pixel is the same size on screen. Lifted 2026-10-14 from
+ * /synth/dots/ for /connect/. The box's own rule gives it a size.
+ */
+export function oledCanvas(box) {
+  const cv = document.createElement('canvas');
+  cv.width = OLED_W; cv.height = OLED_H;
+  drawOled(cv, new Uint8Array(OLED_W * OLED_H));
+  box.append(cv);
+  new ResizeObserver(() => {
+    const k = Math.max(1, Math.floor(Math.min(box.clientWidth / OLED_W, box.clientHeight / OLED_H)));
+    cv.style.width = `${k * OLED_W}px`; cv.style.height = `${k * OLED_H}px`;
+  }).observe(box);
+  return cv;
+}
+
 export function oledScreen(fitTo, { across = 1, gap = 18 } = {}) {
   const screen = el('div', 'kit-oled');
   const cv = document.createElement('canvas');
